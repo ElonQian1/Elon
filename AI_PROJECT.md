@@ -30,7 +30,7 @@ elon 是一个云端 APK 开发平台。用户在手机 APK 里用自然语言�
 
 这些是后续最有价值的完善方向：
 
-1. 真正的远程 embedding provider：接入用户自带 API key 和模型配置，把云端 embedding 写入现有 `embeddings(chunk_id, model)`。
+1. 真正的远程 embedding provider：接入用户自带 API key 和模型配置，把云端 embedding 写入现有 `embeddings(chunk_id, model)`；设计边界见 `AI_ARCHITECTURE.md`。
 2. 多模型检索策略：按项目/用户选择 embedding 模型，并在 task pack 中记录模型来源、维度、召回质量。
 3. 索引增量更新：文件变更后只重算受影响 chunks、symbols、embeddings，而不是全量重建。
 4. 用户项目默认 AI 文档：新项目应默认具备 `AI_PROJECT.md`、`AI_INDEX.md`、`AI_RULES.md`、`AI_TASK_TEMPLATE.md` 和 `.aiignore`。

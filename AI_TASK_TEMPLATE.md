@@ -12,8 +12,9 @@
 1. `AGENTS.md`
 2. `.github/copilot-instructions.md`
 3. `AI_PROJECT.md`
-4. `AI_INDEX.md`
-5. 与任务相关的 `.github/instructions/*.instructions.md`
+4. `AI_ARCHITECTURE.md`
+5. `AI_INDEX.md`
+6. 与任务相关的 `.github/instructions/*.instructions.md`
 
 ## 工作要求
 

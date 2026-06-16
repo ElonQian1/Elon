@@ -7,8 +7,9 @@
 1. `AGENTS.md`
 2. `.github/copilot-instructions.md`
 3. `AI_PROJECT.md`
-4. `AI_RULES.md`
-5. `docs/project-readme.md`
+4. `AI_ARCHITECTURE.md`
+5. `AI_RULES.md`
+6. `docs/project-readme.md`
 
 ## 目录索引
 

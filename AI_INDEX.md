@@ -1,6 +1,6 @@
 # Elon AI Index
 
-本文件是给 AI 的高信噪比入口索引。需要规则时先读 `AGENTS.md`；需要项目事实时读 `AI_PROJECT.md`；需要具体实现时再按本文件定位源码。
+本文件是给 AI 的高信噪比入口索引。需要规则时先读 `AGENTS.md`；需要项目事实时读 `AI_PROJECT.md`；需要架构分层时读 `AI_ARCHITECTURE.md`；需要具体实现时再按本文件定位源码。
 
 ## 后端核心入口
 

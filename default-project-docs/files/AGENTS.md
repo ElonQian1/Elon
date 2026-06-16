@@ -10,13 +10,13 @@
 
 1. 读 `.github/copilot-instructions.md`。
 2. 按任务类型读取 `.github/instructions/*.instructions.md`。
-3. 如需了解项目目标、技术栈或常用命令，读取 `AI_PROJECT.md`、`AI_INDEX.md` 和 `docs/project-readme.md`。
+3. 如需了解项目目标、架构、技术栈或常用命令，读取 `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md` 和 `docs/project-readme.md`。
 
 ## 按需文档
 
 | 任务类型 | 继续读取 |
 |---|---|
-| 项目定位、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
+| 项目定位、架构、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | Git、提交、分支、发布、回滚 | `.github/instructions/git-workflow.instructions.md` |
 | Android、APK、Gradle、移动端构建 | `.github/instructions/android.instructions.md` |
 | UI、交互、样式、移动端页面 | `.github/instructions/ui.instructions.md` |

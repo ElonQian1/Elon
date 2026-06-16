@@ -17,7 +17,7 @@
 
 | 任务类型 | 继续读取 |
 |---|---|
-| 项目定位、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
+| 项目定位、架构、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
 | 模块化、拆文件、治理巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和任务相关源码 |

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "template_version": "2026-06-16.1",
+  "template_version": "2026-06-16.2",
   "authority": ".github/copilot-instructions.md",
   "strategy": "copilot-primary-bridged-agents",
   "update_policy": {
@@ -25,6 +25,10 @@
     {
       "path": "AI_PROJECT.md",
       "role": "ai-project-guide"
+    },
+    {
+      "path": "AI_ARCHITECTURE.md",
+      "role": "ai-architecture-guide"
     },
     {
       "path": "AI_INDEX.md",

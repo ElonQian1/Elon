@@ -19,7 +19,8 @@
 1. `AGENTS.md`
 2. `.github/copilot-instructions.md`
 3. `AI_PROJECT.md`
-4. `AI_INDEX.md`
+4. `AI_ARCHITECTURE.md`
+5. `AI_INDEX.md`
 
 ## 希望 AI 先输出
 
