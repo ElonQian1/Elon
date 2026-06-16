@@ -456,11 +456,14 @@ pub async fn register_external_project(
             "join_mode 必须为 open / approval / invite / readonly",
         );
     }
-    if req.is_public.unwrap_or(false) {
+    let is_elon_self = create_result.project.id == "elon-self";
+    let effective_is_public = req.is_public.unwrap_or(false) || is_elon_self;
+    let effective_join_mode = if is_elon_self { "approval" } else { join_mode };
+    if effective_is_public {
         if let Err(e) =
             state
                 .store
-                .set_project_visibility(&create_result.project.id, true, join_mode)
+                .set_project_visibility(&create_result.project.id, true, effective_join_mode)
         {
             return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string());
         }
@@ -470,8 +473,8 @@ pub async fn register_external_project(
         "project": create_result.project,
         "reused_existing": create_result.reused_existing,
         "node_id": node_id,
-        "is_public": req.is_public.unwrap_or(false),
-        "join_mode": if req.is_public.unwrap_or(false) { join_mode } else { "invite" },
+        "is_public": effective_is_public,
+        "join_mode": if effective_is_public { effective_join_mode } else { "invite" },
     }))
     .into_response()
 }

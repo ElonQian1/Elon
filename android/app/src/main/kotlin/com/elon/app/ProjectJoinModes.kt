@@ -37,7 +37,7 @@ internal fun projectJoinActionLabel(mode: String, alreadyJoined: Boolean = false
     return when (normalizeProjectJoinMode(mode)) {
         PROJECT_JOIN_MODE_OPEN -> "加入"
         PROJECT_JOIN_MODE_READONLY -> "进入体验"
-        else -> "申请加入"
+        else -> "审批加入"
     }
 }
 

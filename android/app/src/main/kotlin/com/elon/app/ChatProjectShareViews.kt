@@ -304,7 +304,7 @@ private fun projectShareActionLabel(share: ChatProjectShare, role: String): Stri
         normalizeProjectJoinMode(share.joinMode) == PROJECT_JOIN_MODE_INVITE -> "接受邀请"
         normalizeProjectJoinMode(share.joinMode) == PROJECT_JOIN_MODE_READONLY -> "进入体验"
         normalizeProjectJoinMode(share.joinMode) == PROJECT_JOIN_MODE_OPEN -> "加入项目"
-        else -> "申请加入"
+        else -> "审批加入"
     }
 }
 

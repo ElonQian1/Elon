@@ -401,7 +401,7 @@ class ProjectPlazaActivity : Activity() {
     private fun buildJoinButton(projectId: String, projectName: String, joinMode: String): View {
         val (btnText, btnColor) = when (joinMode) {
             "open" -> Pair("直接加入", ACTION_BG)
-            "approval" -> Pair("申请加入", ACTION_BG)
+            "approval" -> Pair("审批加入", ACTION_BG)
             "readonly" -> Pair("只读访问", SECONDARY_BG)
             else -> Pair("加入", ACTION_BG)
         }
@@ -437,7 +437,7 @@ class ProjectPlazaActivity : Activity() {
             maxLines = 3
         }
         AlertDialog.Builder(this)
-            .setTitle("申请加入「$projectName」")
+            .setTitle("审批加入「$projectName」")
             .setMessage("owner 审批通过后你将成为项目成员")
             .setView(msgInput)
             .setPositiveButton("提交申请") { _, _ ->
@@ -839,7 +839,7 @@ class ProjectPlazaActivity : Activity() {
             setTextColor(Color.parseColor(TEXT_PRIMARY))
         }
         val joinModeSpinner = Spinner(this).apply {
-            val labels = arrayOf("只读体验", "直接加入", "申请加入")
+            val labels = arrayOf("只读体验", "直接加入", "审批加入")
             adapter = ArrayAdapter(
                 this@ProjectPlazaActivity,
                 android.R.layout.simple_spinner_dropdown_item,

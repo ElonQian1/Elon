@@ -303,6 +303,11 @@ impl Store {
     ) -> Result<()> {
         let conn = self.conn()?;
         ensure_project_not_system(&conn, project_id, "系统归档项目不能公开到项目广场")?;
+        let (is_public, join_mode) = if project_id == "elon-self" {
+            (true, "approval")
+        } else {
+            (is_public, join_mode)
+        };
         let n = conn.execute(
             "UPDATE projects SET is_public = ?1, join_mode = ?2, updated_at = ?3
              WHERE id = ?4 AND status != 'deleted'",
@@ -870,6 +875,48 @@ mod tests {
             .get_project_access(&invited.id, &project.id)
             .expect("joined user should have project access");
         assert_eq!(access.role, "member");
+    }
+
+    #[test]
+    fn elon_self_is_public_store_project_with_approval_join() {
+        let store = temp_store();
+        let owner = store
+            .create_user("elon-self-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let applicant = store
+            .create_user("elon-self-applicant@example.com", "secret1", None, None)
+            .expect("applicant should be created");
+
+        store
+            .ensure_project_for_user(
+                &owner.id,
+                "elon-self",
+                "一龙项目",
+                Some("一龙项目主仓库"),
+                "template",
+                "android",
+                None,
+            )
+            .expect("elon self project should be ensured");
+        store
+            .set_project_visibility("elon-self", false, "open")
+            .expect("visibility changes should keep elon self in approval mode");
+
+        let public_project = store
+            .get_public_project("elon-self")
+            .expect("elon self should appear in the store");
+        assert!(public_project.is_public);
+        assert_eq!(public_project.join_mode, "approval");
+
+        let join_error = store
+            .join_project(&applicant.id, "elon-self")
+            .expect_err("approval project should not join directly");
+        assert!(join_error.to_string().contains("需要审批"));
+
+        let request = store
+            .create_join_request(&applicant.id, "elon-self", Some("想加入"))
+            .expect("applicant should be able to request approval");
+        assert_eq!(request.status, "pending");
     }
 
     #[test]

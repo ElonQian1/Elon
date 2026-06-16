@@ -84,7 +84,7 @@
     if (joined) return '进入项目';
     if (normalizeJoinMode(mode) === 'open') return '加入';
     if (normalizeJoinMode(mode) === 'readonly') return '进入体验';
-    return '申请加入';
+    return '审批加入';
   }
 
   function projectIdentity(project) {

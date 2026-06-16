@@ -247,14 +247,25 @@ pub async fn update_visibility(
         );
     }
 
+    let effective_is_public = if project_id == "elon-self" {
+        true
+    } else {
+        req.is_public
+    };
+    let effective_join_mode = if project_id == "elon-self" {
+        "approval"
+    } else {
+        join_mode
+    };
+
     match state
         .store
-        .set_project_visibility(&project_id, req.is_public, join_mode)
+        .set_project_visibility(&project_id, effective_is_public, effective_join_mode)
     {
         Ok(()) => Json(serde_json::json!({
             "ok": true,
-            "is_public": req.is_public,
-            "join_mode": join_mode,
+            "is_public": effective_is_public,
+            "join_mode": effective_join_mode,
         }))
         .into_response(),
         Err(e) => {

@@ -289,6 +289,8 @@ impl Store {
                      node_id = ?5,
                      repo_url = COALESCE(?6, repo_url),
                      branch = COALESCE(?7, branch),
+                     is_public = CASE WHEN ?1 = 'elon-self' THEN 1 ELSE is_public END,
+                     join_mode = CASE WHEN ?1 = 'elon-self' THEN 'approval' ELSE join_mode END,
                      updated_at = ?8
                  WHERE id = ?1 AND status != 'deleted'",
                 params![
@@ -578,6 +580,16 @@ impl Store {
              WHERE id = ?1",
             params![id, source_type, template, clean_optional(workspace_path)],
         )?;
+        if id == "elon-self" {
+            tx.execute(
+                "UPDATE projects
+                 SET is_public = 1,
+                     join_mode = 'approval',
+                     updated_at = ?2
+                 WHERE id = ?1 AND status != 'deleted'",
+                params![id, now],
+            )?;
+        }
         tx.execute(
             "INSERT OR IGNORE INTO project_members (project_id, user_id, role, created_at)
              VALUES (?1, ?2, 'owner', ?3)",

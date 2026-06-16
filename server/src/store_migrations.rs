@@ -70,6 +70,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (48, "PC 硬盘节点项目仓库绑定", migration_v48),
     (49, "PC 硬盘节点 owner checkout 路径", migration_v49),
     (50, "项目展示别名", migration_v50),
+    (51, "一龙自项目公开展示并审批加入", migration_v51),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1785,6 +1786,20 @@ fn migration_v50(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_v51(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        UPDATE projects
+           SET is_public = 1,
+               join_mode = 'approval',
+               updated_at = datetime('now')
+         WHERE id = 'elon-self'
+           AND status != 'deleted';
+        "#,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1858,6 +1873,52 @@ mod tests {
         assert_eq!(nickname, "钱一龙");
         assert_eq!(joint_created_by, "usr_old_owner");
         assert!(qian_joint_role.is_none());
+    }
+
+    #[test]
+    fn migration_v51_publishes_elon_self_with_approval() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v2(&conn).expect("visibility columns should apply");
+
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_owner", "18800000000", "owner"],
+        )
+        .expect("owner should insert");
+        insert_project(&conn, "elon-self", "一龙项目", "usr_owner");
+        insert_project(&conn, "prj_joint", "普通联合项目", "usr_owner");
+        conn.execute(
+            "UPDATE projects SET is_public = 0, join_mode = 'readonly' WHERE id = 'elon-self'",
+            [],
+        )
+        .expect("elon self should update");
+        conn.execute(
+            "UPDATE projects SET is_public = 1, join_mode = 'open' WHERE id = 'prj_joint'",
+            [],
+        )
+        .expect("joint project should update");
+
+        migration_v51(&conn).expect("migration should apply");
+
+        let elon_visibility: (i64, String) = conn
+            .query_row(
+                "SELECT is_public, join_mode FROM projects WHERE id = 'elon-self'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("elon self project should load");
+        let joint_visibility: (i64, String) = conn
+            .query_row(
+                "SELECT is_public, join_mode FROM projects WHERE id = 'prj_joint'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .expect("joint project should load");
+
+        assert_eq!(elon_visibility, (1, "approval".to_string()));
+        assert_eq!(joint_visibility, (1, "open".to_string()));
     }
 
     fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {
