@@ -628,7 +628,7 @@ fn cli_done_error(cli_name: &str, stdout_text: &str, stderr_text: &str) -> Strin
 ///   c. 其他非 globalStorage 路径
 ///   d. 兜底：任何找到的路径
 fn detect_available_clis() -> Vec<(String, String)> {
-    let candidates = ["copilot", "codex", "gh"];
+    let candidates = ["copilot", "codex", "claude", "gemini", "gh"];
     candidates
         .iter()
         .filter_map(|name| {
@@ -838,6 +838,7 @@ async fn run_cli_prompt(
 
     // 构建命令
     // Copilot: copilot --allow-all [extra_args] -p "<prompt>"
+    // Claude/Gemini: claude|gemini [extra_args] -p "<prompt>"
     // Codex 首次: codex exec --dangerously-bypass-approvals-and-sandbox "<prompt>"
     // Codex 续接: codex exec resume <session-uuid> "<prompt>"
     let mut cmd = tokio::process::Command::new(actual_bin);
@@ -894,6 +895,10 @@ async fn run_cli_prompt(
         for a in &extra_args {
             cmd.arg(a);
         }
+    } else if cli_name == "claude" || cli_name == "gemini" {
+        for a in &extra_args {
+            cmd.arg(a);
+        }
     } else {
         for a in &extra_args {
             cmd.arg(a);
@@ -903,7 +908,7 @@ async fn run_cli_prompt(
     if cli_name == "codex" {
         // Codex: prompt 是位置参数（-p 是 --profile，不是 prompt）
         cmd.arg(&prompt);
-    } else if cli_name == "copilot" {
+    } else if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
         cmd.args(["-p", &prompt]);
     } else {
         cmd.arg(&prompt);
@@ -2626,6 +2631,8 @@ async fn admin_env_check(
             "npm":          tool_available("npm"),
             "codex":        tool_available("codex"),
             "copilot":      tool_available("copilot"),
+            "claude":       tool_available("claude"),
+            "gemini":       tool_available("gemini"),
             "android_sdk":  android_sdk_ready(),
             "gradle_mirror": gradle_mirror_ok(),
             "ollama":       tool_available("ollama"),

@@ -24,11 +24,27 @@ fn ensure_file(path: PathBuf, content: impl FnOnce() -> io::Result<String>) -> i
 
 fn local_cli_script() -> io::Result<String> {
     Ok(r#"param(
-    [ValidateSet('env', 'status', 'task', 'check', 'build', 'test')][string]$Action = 'status',
+    [ValidateSet('env', 'status', 'task', 'agent', 'check', 'build', 'test')][string]$Action = 'status',
 
     [string]$TaskName = '',
 
-    [string]$Base = ''
+    [string]$Base = '',
+
+    [ValidateSet('status', 'cli-wrapper', 'api-runtime')][string]$AgentMode = 'status',
+
+    [ValidateSet('codex', 'claude', 'gemini', 'copilot')][string]$Cli = 'codex',
+
+    [string]$Prompt = '',
+
+    [string]$ApiBase = '',
+
+    [string]$ApiKey = '',
+
+    [string]$Model = '',
+
+    [switch]$DryRun,
+
+    [switch]$Yes
 )
 
 $ErrorActionPreference = 'Stop'
@@ -96,6 +112,21 @@ function Invoke-Task {
     & $script -Name $TaskName -Base $Base
 }
 
+function Invoke-Agent {
+    $script = Join-Path $PSScriptRoot 'elon-agent.ps1'
+    if (-not (Test-Path -LiteralPath $script)) {
+        throw "Missing agent runtime script: $script"
+    }
+    $agentArgs = @('-Mode', $AgentMode, '-Cli', $Cli)
+    if ($Prompt.Trim()) { $agentArgs += @('-Prompt', $Prompt) }
+    if ($ApiBase.Trim()) { $agentArgs += @('-ApiBase', $ApiBase) }
+    if ($ApiKey.Trim()) { $agentArgs += @('-ApiKey', $ApiKey) }
+    if ($Model.Trim()) { $agentArgs += @('-Model', $Model) }
+    if ($DryRun) { $agentArgs += '-DryRun' }
+    if ($Yes) { $agentArgs += '-Yes' }
+    & $script @agentArgs
+}
+
 function Invoke-Check {
     if (Test-Path -LiteralPath 'gradlew.bat') {
         Invoke-External '.\gradlew.bat' @(':app:assembleDebug')
@@ -142,6 +173,7 @@ switch ($Action) {
     'env' { Invoke-EnvCheck }
     'status' { Invoke-Status }
     'task' { Invoke-Task }
+    'agent' { Invoke-Agent }
     'check' { Invoke-Check }
     'build' { Invoke-Build }
     'test' { Invoke-Test }
@@ -177,9 +209,12 @@ mod tests {
     #[test]
     fn local_cli_script_dispatches_core_commands() {
         let script = local_cli_script().unwrap();
-        assert!(script.contains("ValidateSet('env', 'status', 'task', 'check', 'build', 'test')"));
+        assert!(script
+            .contains("ValidateSet('env', 'status', 'task', 'agent', 'check', 'build', 'test')"));
         assert!(script.contains("elon-dev-check.ps1"));
         assert!(script.contains("elon-new-task.ps1"));
+        assert!(script.contains("elon-agent.ps1"));
+        assert!(script.contains("AgentMode"));
         assert!(script.contains("assembleDebug"));
         assert!(script.contains("cargo"));
         assert!(script.contains("npm"));

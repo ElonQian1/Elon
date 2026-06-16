@@ -1,3 +1,4 @@
+use crate::project_agent_runtime::ensure_project_agent_runtime_files;
 use crate::project_commands::ensure_project_command_files;
 use crate::project_environment::ensure_project_environment_files;
 use crate::project_workflow::ensure_project_workflow_files;
@@ -29,6 +30,7 @@ pub fn ensure_project_scaffold(repo: &Path, req: &ProjectScaffoldRequest<'_>) ->
     })?;
     ensure_project_command_files(repo, req)?;
     ensure_project_environment_files(repo, req)?;
+    ensure_project_agent_runtime_files(repo, req)?;
     ensure_project_workflow_files(repo, req)?;
     if req.template.eq_ignore_ascii_case("android") {
         ensure_file(
@@ -153,7 +155,9 @@ mod tests {
         assert!(root.join(".gitattributes").exists());
         assert!(root.join(".env.example").exists());
         assert!(root.join("docs").join("dev-environment.md").exists());
+        assert!(root.join("docs").join("agent-runtime.md").exists());
         assert!(root.join("scripts").join("elon.ps1").exists());
+        assert!(root.join("scripts").join("elon-agent.ps1").exists());
         assert!(root.join("scripts").join("elon-dev-check.ps1").exists());
         assert!(root.join("scripts").join("elon-new-task.ps1").exists());
         assert!(root.join(".elon").join("project.json").exists());

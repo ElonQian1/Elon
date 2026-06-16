@@ -11,6 +11,10 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
     let (workspace_root_writable, root_issue) = check_workspace_root(&root);
 
     let git = command_status("git", &["--version"]);
+    let codex = command_status("codex", &["--version"]);
+    let claude = command_status("claude", &["--version"]);
+    let gemini = command_status("gemini", &["--version"]);
+    let copilot = command_status("copilot", &["--version"]);
     let java = command_status("java", &["-version"]);
     let gradle = command_status("gradle", &["--version"]);
     let rustc = command_status("rustc", &["--version"]);
@@ -24,11 +28,9 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
     let rust_ready = rustc.available && cargo.available;
     let node_ready = node.available;
     let dev_env_ready = android_ready || rust_ready || node_ready;
-    let ai_cli_ready = allowed_clis.iter().any(|cli| {
-        cli.eq_ignore_ascii_case("codex")
-            || cli.eq_ignore_ascii_case("copilot")
-            || cli.eq_ignore_ascii_case("claude")
-    });
+    let route_a_ready = route_a_cli_ready(allowed_clis);
+    let api_runtime_ready = api_runtime_key_available();
+    let ai_cli_ready = route_a_ready || api_runtime_ready;
 
     let mut issues = Vec::new();
     if let Some(issue) = root_issue {
@@ -43,6 +45,12 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
         );
     }
 
+    if !ai_cli_ready && !api_runtime_ready {
+        issues.push(
+            "未检测到 Route A AI CLI，也未检测到 Route B API key；项目仍可创建，但本机 AI agent 入口暂不可用".to_string(),
+        );
+    }
+
     NodeDevRuntimeProfile {
         workspace_root_path,
         workspace_root_writable,
@@ -50,9 +58,41 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
         workspace_provision_ready: workspace_root_writable && git_ready,
         dev_env_ready,
         ai_cli_ready,
-        toolchains: vec![git, java, gradle, android_sdk, rustc, cargo, node, npm],
+        toolchains: vec![
+            git,
+            java,
+            gradle,
+            android_sdk,
+            rustc,
+            cargo,
+            node,
+            npm,
+            codex,
+            claude,
+            gemini,
+            copilot,
+        ],
         issues,
     }
+}
+
+fn route_a_cli_ready(allowed_clis: &[String]) -> bool {
+    allowed_clis.iter().any(|cli| {
+        matches!(
+            cli.to_ascii_lowercase().as_str(),
+            "codex" | "copilot" | "claude" | "gemini"
+        )
+    })
+}
+
+fn api_runtime_key_available() -> bool {
+    ["ELON_AGENT_API_KEY", "OPENAI_API_KEY", "HUNYUAN_API_KEY"]
+        .iter()
+        .any(|key| {
+            std::env::var(key)
+                .map(|value| !value.trim().is_empty())
+                .unwrap_or(false)
+        })
 }
 
 fn check_workspace_root(root: &PathBuf) -> (bool, Option<String>) {
