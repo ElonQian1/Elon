@@ -48,6 +48,16 @@ function Compress-ArchiveWithRetry {
     }
 }
 
+function Write-Utf8NoBom {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Content
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
+}
+
 # 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
 $ServerDir = Join-Path $PSScriptRoot "..\server"
 Push-Location $ServerDir
@@ -127,8 +137,9 @@ try {
         linuxDownloadUrl = $LinuxDownloadUrl
         windowsClientDownloadUrl = $WindowsClientDownloadUrl
     }
-    $PackageVersionInfo | ConvertTo-Json -Depth 4 |
-        Set-Content -LiteralPath (Join-Path $PackageInternal "node-agent-version.json") -Encoding UTF8
+    Write-Utf8NoBom `
+        -Path (Join-Path $PackageInternal "node-agent-version.json") `
+        -Content ($PackageVersionInfo | ConvertTo-Json -Depth 4)
     Compress-ArchiveWithRetry -Path (Join-Path $PackageRoot "*") -DestinationPath $WindowsClientPackage
 } finally {
     Remove-Item -LiteralPath $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue
@@ -163,7 +174,7 @@ $VersionInfo = [ordered]@{
 }
 $VersionFile = New-TemporaryFile
 try {
-    $VersionInfo | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $VersionFile -Encoding UTF8
+    Write-Utf8NoBom -Path $VersionFile -Content ($VersionInfo | ConvertTo-Json -Depth 4)
     scp -o ProxyCommand=none $VersionFile "${Server}:${RemoteDir}/node-agent-version.json"
     if ($LASTEXITCODE -ne 0) { throw "版本信息上传失败" }
 } finally {

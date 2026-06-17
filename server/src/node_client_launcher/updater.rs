@@ -41,6 +41,7 @@ fn try_update_agent_if_needed(install_dir: &Path) -> Result<()> {
         .with_context(|| format!("版本接口返回错误 {version_url}"))?
         .text()
         .context("无法读取远程版本内容")?;
+    let remote_text = remote_text.trim_start_matches('\u{feff}').to_string();
     let remote: VersionInfo =
         serde_json::from_str(&remote_text).context("远程版本内容不是合法 JSON")?;
     if remote.git_sha.trim().is_empty() {
