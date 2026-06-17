@@ -52,8 +52,12 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
     preserve_user_env(&install_dir, &internal_dir)?;
     cleanup_legacy_top_level(&install_dir)?;
 
-    windows_integration::create_desktop_shortcut(&install_dir)?;
-    windows_integration::enable_autostart(&install_dir)?;
+    if let Err(error) = windows_integration::create_desktop_shortcut(&install_dir) {
+        eprintln!("警告：创建桌面快捷方式失败：{error:#}");
+    }
+    if let Err(error) = windows_integration::enable_autostart(&install_dir) {
+        eprintln!("警告：注册开机自启失败：{error:#}");
+    }
     Ok(install_dir)
 }
 

@@ -55,28 +55,34 @@ pub(crate) fn create_desktop_shortcut(install_dir: &Path) -> Result<()> {
         let shortcut = desktop_path().join(format!("{APP_NAME}.lnk"));
         let target = paths::client_exe(install_dir);
         let workdir = install_dir.to_path_buf();
-        let script = r#"
-$shortcut = $args[0]
-$target = $args[1]
-$workdir = $args[2]
+        if let Some(parent) = shortcut.parent() {
+            std::fs::create_dir_all(parent)
+                .with_context(|| format!("无法创建桌面目录 {}", parent.display()))?;
+        }
+        let script = format!(
+            r#"
+$shortcut = '{}'
+$target = '{}'
+$workdir = '{}'
 $shell = New-Object -ComObject WScript.Shell
 $link = $shell.CreateShortcut($shortcut)
 $link.TargetPath = $target
 $link.WorkingDirectory = $workdir
 $link.IconLocation = $target
 $link.Save()
-"#;
+"#,
+            ps_single_quote(&shortcut.to_string_lossy()),
+            ps_single_quote(&target.to_string_lossy()),
+            ps_single_quote(&workdir.to_string_lossy())
+        );
         let status = Command::new("powershell")
             .args([
                 "-NoProfile",
                 "-ExecutionPolicy",
                 "Bypass",
                 "-Command",
-                script,
+                &script,
             ])
-            .arg(shortcut)
-            .arg(target)
-            .arg(workdir)
             .status()
             .context("无法创建桌面快捷方式")?;
         if !status.success() {
@@ -96,6 +102,22 @@ pub(crate) fn remove_desktop_shortcut() {
 
 #[cfg(windows)]
 fn desktop_path() -> std::path::PathBuf {
+    if let Ok(output) = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            "[Environment]::GetFolderPath('Desktop')",
+        ])
+        .output()
+    {
+        if output.status.success() {
+            let path = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            if !path.is_empty() {
+                return std::path::PathBuf::from(path);
+            }
+        }
+    }
+
     std::env::var("USERPROFILE")
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|_| std::path::PathBuf::from("."))
@@ -107,4 +129,9 @@ fn remove_legacy_scheduled_task() {
     let _ = Command::new("schtasks")
         .args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"])
         .status();
+}
+
+#[cfg(windows)]
+fn ps_single_quote(value: &str) -> String {
+    value.replace('\'', "''")
 }
