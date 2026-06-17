@@ -61,19 +61,25 @@ internal object GroupSummaryPostsApi {
         val payload = JSONObject()
             .put("limit", 120)
             .put("pin", true)
-            .put("instructions", "请按群聊 AI 文档生成可置顶查看的总结帖；优先区分议题、结论、行动项和相关发言。")
+            .put("max_topics", 4)
+            .put("instructions", "请按群聊 AI 文档自动拆分议题并生成可置顶查看的总结帖；优先区分上午/下午不同事项、结论、行动项和相关发言。")
             .toString()
             .toRequestBody("application/json".toMediaType())
         val request = AuthManager.applyAuth(
             activity,
             Request.Builder()
-                .url("$serverUrl/api/me/groups/${urlPart(group.id)}/summary-posts")
+                .url("$serverUrl/api/me/groups/${urlPart(group.id)}/summary-posts/auto-split")
                 .post(payload)
         ).build()
         http.newCall(request).execute().use { response ->
             val body = response.body?.string().orEmpty()
             if (!response.isSuccessful) error(readErrorMessage(body, "生成总结帖失败"))
-            return groupSummaryPostFromJson(JSONObject(body).optJSONObject("post") ?: JSONObject())
+            val json = JSONObject(body)
+            val posts = json.optJSONArray("posts")
+            if (posts != null && posts.length() > 0) {
+                return groupSummaryPostFromJson(posts.optJSONObject(0) ?: JSONObject())
+            }
+            return groupSummaryPostFromJson(json.optJSONObject("post") ?: JSONObject())
         }
     }
 

@@ -3684,19 +3684,24 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     renderGroupSummaryLoading();
     groupSummaryMeta.textContent = '系统正在打包最近聊天 Context Pack';
     groupSummaryAction.textContent = '生成中';
-    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/summary-posts', {
+    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/summary-posts/auto-split', {
       method: 'POST',
       body: JSON.stringify({
         limit: 120,
+        max_topics: 4,
         pin: true,
-        instructions: '请按群聊 AI 文档生成可置顶查看的总结帖；优先区分议题、结论、行动项和相关发言。'
+        instructions: '请按群聊 AI 文档自动拆分议题并生成可置顶查看的总结帖；优先区分上午/下午不同事项、结论、行动项和相关发言。'
       })
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '生成总结帖失败');
     if (!currentGroup || currentGroup.id !== group.id) return;
-    const post = data.post || null;
-    groupSummaryPosts = post ? [post].concat(groupSummaryPosts.filter((item) => item.id !== post.id)) : groupSummaryPosts;
+    const createdPosts = Array.isArray(data.posts) ? data.posts : (data.post ? [data.post] : []);
+    const createdIds = new Set(createdPosts.map((item) => item && item.id).filter(Boolean));
+    const post = createdPosts[0] || null;
+    groupSummaryPosts = createdPosts.length
+      ? createdPosts.concat(groupSummaryPosts.filter((item) => !createdIds.has(item.id)))
+      : groupSummaryPosts;
     renderGroupSummaryStrip(groupSummaryPosts[0] || post, false);
     scheduleGroupSummaryRefresh(group.id);
   }

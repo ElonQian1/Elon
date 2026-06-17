@@ -202,6 +202,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
                 .post(group_summary_api::create_group_summary_post),
         )
         .route(
+            "/api/me/groups/:group_id/summary-posts/auto-split",
+            post(group_summary_api::auto_split_group_summary_posts),
+        )
+        .route(
             "/api/me/groups/:group_id/summary-posts/:post_id",
             get(group_summary_api::get_group_summary_post)
                 .patch(group_summary_api::update_group_summary_post),

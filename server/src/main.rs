@@ -44,6 +44,8 @@ mod friend_events;
 mod global_ws;
 mod group_chat_project_docs;
 mod group_summary_api;
+mod group_summary_context_pack;
+mod group_summary_topic_split;
 mod homecli_agent;
 mod image_generation;
 mod intent_router;
