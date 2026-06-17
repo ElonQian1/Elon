@@ -13,6 +13,17 @@
 - `group_ai_docs`
 - `output_contract`
 
+## 检索策略记录
+
+`retrieval_strategy` 必须说明本次 Context Pack 如何取得消息：
+
+- `selected_messages`：最终进入总结的源消息。
+- `exact_message_ids`：是否来自用户指定消息。
+- `time_window`：是否使用开始/结束时间过滤。
+- `keyword_search_endpoint`：可用的群聊消息检索入口。
+- `hybrid_layers`：本次系统支持的检索层。
+- `vector_status`：群聊向量索引状态。
+
 ## 输出约束
 
 - 总结帖必须引用 `selected_messages` 中的消息 ID。

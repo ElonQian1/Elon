@@ -76,14 +76,18 @@ pub(crate) fn build_context_pack(
         "retrieval_strategy": {
             "exact_message_ids": !input.message_ids.is_empty(),
             "time_window": input.start_at.is_some() || input.end_at.is_some(),
+            "keyword_search_endpoint": "/api/me/groups/:group_id/messages/search",
             "hybrid_layers": [
                 "selected_messages",
                 "time_window",
+                "recent_messages",
+                "keyword_full_text",
+                "sender_filter",
                 "group_ai_documents",
-                "future_keyword_full_text",
+                "external_app_context",
                 "future_vector_embedding"
             ],
-            "vector_status": "pending_group_chat_index"
+            "vector_status": "pending_group_chat_embedding_index"
         },
         "source_message_count": messages.len(),
         "selected_messages": messages.iter().map(|message| json!({

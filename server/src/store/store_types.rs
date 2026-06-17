@@ -150,6 +150,30 @@ pub struct GroupSummarySourceMessage {
 }
 
 #[derive(Debug, Clone)]
+pub struct GroupChatRetrievalInput {
+    pub query: Option<String>,
+    pub sender: Option<String>,
+    pub message_ids: Vec<String>,
+    pub start_at: Option<String>,
+    pub end_at: Option<String>,
+    pub limit: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupChatRetrievalHit {
+    pub message: GroupSummarySourceMessage,
+    pub score: i64,
+    pub match_reasons: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupChatRetrievalResult {
+    pub strategy: Vec<String>,
+    pub vector_status: String,
+    pub hits: Vec<GroupChatRetrievalHit>,
+}
+
+#[derive(Debug, Clone)]
 pub struct GroupSummaryCreateInput {
     pub title: Option<String>,
     pub topic: Option<String>,

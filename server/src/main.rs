@@ -42,6 +42,7 @@ mod external_app_registry;
 mod friend_api;
 mod friend_events;
 mod global_ws;
+mod group_chat_retrieval_api;
 mod group_chat_project_docs;
 mod group_summary_api;
 mod group_summary_context_pack;

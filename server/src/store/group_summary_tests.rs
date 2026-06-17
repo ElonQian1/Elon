@@ -1,4 +1,4 @@
-use super::{GroupSummaryCreateInput, Store};
+use super::{GroupChatRetrievalInput, GroupSummaryCreateInput, Store};
 
 fn temp_store() -> Store {
     let path = std::env::temp_dir().join(format!(
@@ -90,4 +90,107 @@ fn group_summary_post_keeps_context_sources_and_pin_state() {
         )
         .expect("post should unpin");
     assert!(unpinned.post.pinned_at.is_none());
+}
+
+#[test]
+fn group_chat_retrieval_scores_keyword_and_sender_matches() {
+    let store = temp_store();
+    let owner = store
+        .create_user("retrieval-owner@example.com", "secret1", Some("群主"), None)
+        .expect("owner should create");
+    let member = store
+        .create_user(
+            "retrieval-member@example.com",
+            "secret1",
+            Some("发布同学"),
+            None,
+        )
+        .expect("member should create");
+    store
+        .add_friend(&owner.id, Some("email"), "retrieval-member@example.com")
+        .expect("friend pair should create");
+    let group = store
+        .create_friend_group(&owner.id, Some("检索测试群"), &[member.id.clone()])
+        .expect("group should create");
+    store
+        .send_friend_group_message(&owner.id, &group.id, "上午先讨论菜单样式", None)
+        .expect("first message should insert");
+    let target = store
+        .send_friend_group_message(&member.id, &group.id, "下午发布灰度版本，观察错误码", None)
+        .expect("target message should insert");
+
+    let result = store
+        .search_group_chat_messages(
+            &owner.id,
+            &group.id,
+            &GroupChatRetrievalInput {
+                query: Some("灰度 错误码".into()),
+                sender: Some("发布同学".into()),
+                message_ids: Vec::new(),
+                start_at: None,
+                end_at: None,
+                limit: 10,
+            },
+        )
+        .expect("search should run");
+    assert_eq!(result.hits.len(), 1);
+    assert_eq!(result.hits[0].message.id, target.id);
+    assert!(result.hits[0]
+        .match_reasons
+        .iter()
+        .any(|reason| reason == "sender_filter"));
+    assert!(result.strategy.contains(&"keyword_full_text".to_string()));
+    assert_eq!(result.vector_status, "pending_group_chat_embedding_index");
+}
+
+#[test]
+fn group_chat_retrieval_keeps_exact_message_order() {
+    let store = temp_store();
+    let owner = store
+        .create_user(
+            "retrieval-id-owner@example.com",
+            "secret1",
+            Some("群主"),
+            None,
+        )
+        .expect("owner should create");
+    let member = store
+        .create_user(
+            "retrieval-id-member@example.com",
+            "secret1",
+            Some("成员"),
+            None,
+        )
+        .expect("member should create");
+    store
+        .add_friend(&owner.id, Some("email"), "retrieval-id-member@example.com")
+        .expect("friend pair should create");
+    let group = store
+        .create_friend_group(&owner.id, Some("ID检索测试群"), &[member.id.clone()])
+        .expect("group should create");
+    let first = store
+        .send_friend_group_message(&owner.id, &group.id, "第一条", None)
+        .expect("first message should insert");
+    let second = store
+        .send_friend_group_message(&member.id, &group.id, "第二条", None)
+        .expect("second message should insert");
+
+    let result = store
+        .search_group_chat_messages(
+            &owner.id,
+            &group.id,
+            &GroupChatRetrievalInput {
+                query: None,
+                sender: None,
+                message_ids: vec![second.id.clone(), first.id.clone()],
+                start_at: None,
+                end_at: None,
+                limit: 10,
+            },
+        )
+        .expect("search should run");
+    assert_eq!(result.hits.len(), 2);
+    assert_eq!(result.hits[0].message.id, first.id);
+    assert_eq!(result.hits[1].message.id, second.id);
+    assert!(result.strategy.contains(&"exact_message_ids".to_string()));
 }

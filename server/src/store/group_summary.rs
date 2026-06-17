@@ -5,8 +5,9 @@ use std::collections::BTreeSet;
 use crate::group_chat_project_docs::default_group_chat_docs;
 
 use super::{
-    new_id, now, GroupAiDocument, GroupSummaryContextPack, GroupSummaryCreateInput,
-    GroupSummaryPost, GroupSummaryPostDetail, GroupSummarySourceMessage, Store,
+    new_id, now, GroupAiDocument, GroupChatRetrievalHit, GroupChatRetrievalInput,
+    GroupChatRetrievalResult, GroupSummaryContextPack, GroupSummaryCreateInput, GroupSummaryPost,
+    GroupSummaryPostDetail, GroupSummarySourceMessage, Store,
 };
 
 impl Store {
@@ -105,6 +106,112 @@ impl Store {
             return Err(anyhow!("没有找到可总结的群聊消息"));
         }
         Ok(messages)
+    }
+
+    pub fn search_group_chat_messages(
+        &self,
+        user_id: &str,
+        group_id: &str,
+        input: &GroupChatRetrievalInput,
+    ) -> Result<GroupChatRetrievalResult> {
+        self.ensure_summary_group_member(user_id, group_id)?;
+        let mut strategy = Vec::new();
+        let query = clean_search_text(input.query.as_deref());
+        let sender = clean_search_text(input.sender.as_deref());
+        let limit = input.limit.clamp(1, 100);
+        if !input.message_ids.is_empty() {
+            strategy.push("exact_message_ids".to_string());
+            let messages = self.group_summary_messages_by_id(group_id, &input.message_ids)?;
+            return Ok(GroupChatRetrievalResult {
+                strategy: with_vector_status(strategy),
+                vector_status: group_chat_vector_status(),
+                hits: messages
+                    .into_iter()
+                    .map(|message| GroupChatRetrievalHit {
+                        message,
+                        score: 100,
+                        match_reasons: vec!["exact_message_id".to_string()],
+                    })
+                    .take(limit as usize)
+                    .collect(),
+            });
+        }
+        if query.is_some() {
+            strategy.push("keyword_full_text".to_string());
+        }
+        if sender.is_some() {
+            strategy.push("sender_filter".to_string());
+        }
+        if input.start_at.is_some() || input.end_at.is_some() {
+            strategy.push("time_window".to_string());
+        }
+        if strategy.is_empty() {
+            strategy.push("recent_messages".to_string());
+        }
+        let candidate_limit = if query.is_some() {
+            (limit * 12).clamp(limit, 1000)
+        } else {
+            limit
+        };
+        let sender_like = sender.as_ref().map(|value| format!("%{}%", value));
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT m.id, m.group_id, m.sender_user_id,
+                    COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) AS sender_name,
+                    m.content, m.created_at
+             FROM friend_group_messages m
+             JOIN users u ON u.id = m.sender_user_id
+             WHERE m.group_id = ?1
+               AND (?2 IS NULL OR m.created_at >= ?2)
+               AND (?3 IS NULL OR m.created_at <= ?3)
+               AND (?4 IS NULL
+                    OR m.sender_user_id = ?4
+                    OR COALESCE(u.nickname, u.email, u.phone, m.sender_user_id) LIKE ?5)
+             ORDER BY m.created_at DESC
+             LIMIT ?6",
+        )?;
+        let mut messages = stmt
+            .query_map(
+                params![
+                    group_id,
+                    input.start_at.as_deref(),
+                    input.end_at.as_deref(),
+                    sender.as_deref(),
+                    sender_like.as_deref(),
+                    candidate_limit
+                ],
+                group_summary_source_from_row,
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        messages.reverse();
+        let terms = search_terms(query.as_deref());
+        let mut hits = messages
+            .into_iter()
+            .filter_map(|message| {
+                let (score, reasons, keyword_matched) =
+                    score_group_chat_message(&message, &terms, sender.as_deref());
+                if query.is_some() && !keyword_matched {
+                    return None;
+                }
+                Some(GroupChatRetrievalHit {
+                    message,
+                    score,
+                    match_reasons: reasons,
+                })
+            })
+            .collect::<Vec<_>>();
+        hits.sort_by(|left, right| {
+            right
+                .score
+                .cmp(&left.score)
+                .then_with(|| right.message.created_at.cmp(&left.message.created_at))
+        });
+        hits.truncate(limit as usize);
+        Ok(GroupChatRetrievalResult {
+            strategy: with_vector_status(strategy),
+            vector_status: group_chat_vector_status(),
+            hits,
+        })
     }
 
     pub fn create_group_summary_post_draft(
@@ -357,6 +464,19 @@ impl Store {
                     now
                 ],
             )?;
+            conn.execute(
+                "UPDATE friend_group_ai_documents
+                    SET title = ?1, content = ?2, position = ?3, updated_at = ?4
+                  WHERE group_id = ?5 AND path = ?6 AND updated_by IS NULL",
+                params![
+                    doc.title,
+                    doc.content.trim(),
+                    position as i64,
+                    now,
+                    group_id,
+                    doc.path
+                ],
+            )?;
         }
         Ok(())
     }
@@ -432,6 +552,74 @@ fn clean_doc_path(path: &str) -> Result<&str> {
         return Err(anyhow!("文档路径无效"));
     }
     Ok(path)
+}
+
+fn clean_search_text(value: Option<&str>) -> Option<String> {
+    value
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| value.chars().take(120).collect())
+}
+
+fn search_terms(query: Option<&str>) -> Vec<String> {
+    query
+        .into_iter()
+        .flat_map(|value| value.split_whitespace())
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .take(8)
+        .map(|value| value.to_lowercase())
+        .collect()
+}
+
+fn score_group_chat_message(
+    message: &GroupSummarySourceMessage,
+    terms: &[String],
+    sender: Option<&str>,
+) -> (i64, Vec<String>, bool) {
+    let content = message.content.to_lowercase();
+    let sender_name = message.sender_name.to_lowercase();
+    let sender_user_id = message.sender_user_id.to_lowercase();
+    let mut score = 1;
+    let mut reasons = Vec::new();
+    let mut keyword_matched = terms.is_empty();
+    for term in terms {
+        if content.contains(term) {
+            score += 20;
+            keyword_matched = true;
+            reasons.push(format!("content_keyword:{}", truncate_reason(term)));
+        }
+        if sender_name.contains(term) || sender_user_id.contains(term) {
+            score += 8;
+            keyword_matched = true;
+            reasons.push(format!("sender_keyword:{}", truncate_reason(term)));
+        }
+    }
+    if let Some(sender) = sender {
+        let sender = sender.to_lowercase();
+        if message.sender_user_id.eq_ignore_ascii_case(&sender) || sender_name.contains(&sender) {
+            score += 15;
+            reasons.push("sender_filter".to_string());
+        }
+    }
+    if reasons.is_empty() {
+        reasons.push("recent_message".to_string());
+    }
+    (score, reasons, keyword_matched)
+}
+
+fn truncate_reason(value: &str) -> String {
+    value.chars().take(24).collect()
+}
+
+fn with_vector_status(mut strategy: Vec<String>) -> Vec<String> {
+    strategy.push("group_ai_documents".to_string());
+    strategy.push("vector_embedding_pending".to_string());
+    strategy
+}
+
+fn group_chat_vector_status() -> String {
+    "pending_group_chat_embedding_index".to_string()
 }
 
 fn clean_title(input: Option<&str>, messages: &[GroupSummarySourceMessage]) -> String {
