@@ -102,6 +102,7 @@ internal class MainNavigationController(
     private fun showProjectTopTabs(plazaSelected: Boolean) {
         binding.topTitleText.visibility = View.GONE
         binding.projectTopTabs.visibility = View.VISIBLE
+        applyProjectTopContentOffset(enabled = true)
         updateProjectTopTabVisual(
             tab = binding.projectHomeTopTab,
             indicator = binding.projectHomeTabIndicator,
@@ -116,7 +117,14 @@ internal class MainNavigationController(
 
     private fun hideProjectTopTabs() {
         binding.projectTopTabs.visibility = View.GONE
+        applyProjectTopContentOffset(enabled = false)
         binding.topTitleText.visibility = View.VISIBLE
+    }
+
+    private fun applyProjectTopContentOffset(enabled: Boolean) {
+        val offset = if (enabled) designPx(PROJECT_TOP_CONTENT_OFFSET_PX).toFloat() else 0f
+        binding.projectTopTabs.translationY = offset
+        binding.addButton.translationY = offset
     }
 
     private fun updateProjectTopTabVisual(tab: TextView, indicator: View, selected: Boolean) {
@@ -1045,6 +1053,7 @@ internal class MainNavigationController(
         const val PROJECT_TOP_INDICATOR_WIDTH_PX = 98
         const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
         const val PROJECT_TOP_INDICATOR_TOP_PX = 14
+        const val PROJECT_TOP_CONTENT_OFFSET_PX = 48
         const val PROJECT_ADD_BUTTON_SIZE_PX = 156
         const val PROJECT_ADD_BUTTON_END_PX = 70
         const val PROJECT_ADD_BUTTON_PADDING_PX = 46
