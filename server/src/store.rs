@@ -38,6 +38,7 @@ mod node_payouts;
 mod pc_project_binding;
 mod project_branding;
 mod project_execution_sessions;
+mod project_identities;
 mod project_member_conversations;
 mod project_runtime_permissions;
 mod project_space;
@@ -222,7 +223,7 @@ impl Store {
 
     /// 注册一个指向外部本地路径的项目（如 D:\rust\active-projects\bb64a）。
     /// source_type='local_path'，workspace_path 写入项目记录。
-    /// 同名项目复用现有记录（reused_existing=true）。
+    /// 同一代码身份优先复用现有记录（reused_existing=true）。
     pub fn register_external_project(
         &self,
         user_id: &str,
@@ -253,6 +254,8 @@ impl Store {
 
         let now = now();
         let conn = self.conn()?;
+        let identity_candidates =
+            project_identities::identity_candidates(node_id, workspace_path, repo_url, branch);
 
         let requested_project_id = project_id.map(str::trim).filter(|v| !v.is_empty());
         if let Some(project_id) = requested_project_id {
@@ -284,115 +287,120 @@ impl Store {
                     anyhow::bail!("该本地路径已绑定到项目「{}」，请直接打开该项目", display);
                 }
             }
-
-            let tx = conn.unchecked_transaction()?;
-            tx.execute(
-                "UPDATE projects
-                 SET name = ?2,
-                     description = COALESCE(?3, description),
-                     template = 'local',
-                     source_type = 'local_path',
-                     workspace_path = ?4,
-                     node_id = ?5,
-                     repo_url = COALESCE(?6, repo_url),
-                     branch = COALESCE(?7, branch),
-                     is_public = CASE WHEN ?1 = 'elon-self' THEN 1 ELSE is_public END,
-                     join_mode = CASE WHEN ?1 = 'elon-self' THEN 'approval' ELSE join_mode END,
-                     updated_at = ?8
-                 WHERE id = ?1 AND status != 'deleted'",
-                params![
-                    project_id,
-                    name,
-                    clean_optional(description),
-                    workspace_path,
-                    node_id,
-                    repo_url,
-                    branch,
-                    now
-                ],
-            )?;
-            tx.execute(
-                "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
-                 VALUES (?1, ?2, ?3, 'project_bound_external', ?4, ?5)",
-                params![
-                    new_id("evt"),
-                    project_id,
+            if let Some(existing) =
+                project_identities::find_owner_project_by_identity(
+                    &conn,
                     user_id,
-                    serde_json::json!({
-                        "workspace_path": workspace_path,
-                        "node_id": node_id,
-                        "repo_url": repo_url,
-                        "branch": branch,
-                    })
-                    .to_string(),
-                    now
-                ],
-            )?;
-            tx.commit()?;
+                    &identity_candidates,
+                )?
+            {
+                if existing.id != project_id {
+                    return Err(project_identities::identity_conflict_error(&existing));
+                }
+            }
+            if let Some(existing) =
+                project_identities::find_owner_project_by_git_remote(&conn, user_id, repo_url)?
+            {
+                if existing.id != project_id {
+                    return Err(project_identities::identity_conflict_error(&existing));
+                }
+            }
 
-            let project = find_project_by_id_for_user(&conn, user_id, project_id)?
-                .ok_or_else(|| anyhow!("项目绑定后无法读取"))?;
+            let project = update_external_project_binding(
+                &conn,
+                user_id,
+                project_id,
+                Some(name),
+                clean_optional(description),
+                workspace_path,
+                node_id,
+                repo_url,
+                branch,
+                &now,
+                "project_bound_external",
+            )?;
             return Ok(CreateProjectResult {
                 project,
                 reused_existing: true,
             });
         }
 
-        if let Some(mut project) = find_owner_project_by_name(&conn, user_id, name)? {
-            conn.execute(
-                "UPDATE projects
-                 SET template = 'local',
-                     source_type = 'local_path',
-                     workspace_path = ?2,
-                     node_id = ?3,
-                     repo_url = COALESCE(?4, repo_url),
-                     branch = COALESCE(?5, branch),
-                     updated_at = ?6
-                 WHERE id = ?1",
-                params![&project.id, workspace_path, node_id, repo_url, branch, now],
-            )?;
-            project.template = "local".into();
-            project.source_type = "local_path".into();
-            project.workspace_path = Some(workspace_path.to_string());
-            project.node_id = node_id.map(ToOwned::to_owned);
-            if repo_url.is_some() {
-                project.repo_url = repo_url.map(ToOwned::to_owned);
-            }
-            if branch.is_some() {
-                project.branch = branch.map(ToOwned::to_owned);
-            }
-            project.updated_at = now;
-            return Ok(CreateProjectResult {
-                project,
-                reused_existing: true,
-            });
-        }
-        if let Some(mut project) =
-            find_owner_project_by_workspace_path(&conn, user_id, workspace_path)?
+        if let Some(project) =
+            project_identities::find_owner_project_by_identity(&conn, user_id, &identity_candidates)?
         {
-            conn.execute(
-                "UPDATE projects
-                 SET template = 'local',
-                     source_type = 'local_path',
-                     workspace_path = ?2,
-                     node_id = ?3,
-                     repo_url = COALESCE(?4, repo_url),
-                     branch = COALESCE(?5, branch),
-                     updated_at = ?6
-                 WHERE id = ?1",
-                params![&project.id, workspace_path, node_id, repo_url, branch, now],
+            let project = update_external_project_binding(
+                &conn,
+                user_id,
+                &project.id,
+                None,
+                None,
+                workspace_path,
+                node_id,
+                repo_url,
+                branch,
+                &now,
+                "project_reused_external_identity",
             )?;
-            project.template = "local".into();
-            project.source_type = "local_path".into();
-            project.workspace_path = Some(workspace_path.to_string());
-            project.node_id = node_id.map(ToOwned::to_owned);
-            if repo_url.is_some() {
-                project.repo_url = repo_url.map(ToOwned::to_owned);
-            }
-            if branch.is_some() {
-                project.branch = branch.map(ToOwned::to_owned);
-            }
-            project.updated_at = now;
+            return Ok(CreateProjectResult {
+                project,
+                reused_existing: true,
+            });
+        }
+        if let Some(project) =
+            project_identities::find_owner_project_by_git_remote(&conn, user_id, repo_url)?
+        {
+            let project = update_external_project_binding(
+                &conn,
+                user_id,
+                &project.id,
+                None,
+                None,
+                workspace_path,
+                node_id,
+                repo_url,
+                branch,
+                &now,
+                "project_reused_external_git_remote",
+            )?;
+            return Ok(CreateProjectResult {
+                project,
+                reused_existing: true,
+            });
+        }
+        if let Some(project) = find_owner_project_by_workspace_path(&conn, user_id, workspace_path)?
+        {
+            let project = update_external_project_binding(
+                &conn,
+                user_id,
+                &project.id,
+                None,
+                None,
+                workspace_path,
+                node_id,
+                repo_url,
+                branch,
+                &now,
+                "project_reused_external_path",
+            )?;
+            return Ok(CreateProjectResult {
+                project,
+                reused_existing: true,
+            });
+        }
+        if let Some(project) = find_owner_project_by_name(&conn, user_id, name)? {
+            let project = update_external_project_binding(
+                &conn,
+                user_id,
+                &project.id,
+                None,
+                None,
+                workspace_path,
+                node_id,
+                repo_url,
+                branch,
+                &now,
+                "project_reused_external_name",
+            )?;
             return Ok(CreateProjectResult {
                 project,
                 reused_existing: true,
@@ -402,52 +410,113 @@ impl Store {
         let id = new_id("prj");
         let workspace_key = id.clone();
         let description = clean_optional(description);
-        let tx = conn.unchecked_transaction()?;
-        tx.execute(
-            "INSERT INTO projects (
-                id, name, description, workspace_key, template, source_type, repo_url, branch,
-                workspace_path, node_id,
-                status, created_by, created_at, updated_at
-             )
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11, ?12, ?12)",
-            params![
-                id,
-                name,
-                description,
-                workspace_key,
-                template,
-                source_type,
+        let create_result = {
+            let tx = conn.unchecked_transaction()?;
+            tx.execute(
+                "INSERT INTO projects (
+                    id, name, description, workspace_key, template, source_type, repo_url, branch,
+                    workspace_path, node_id,
+                    status, created_by, created_at, updated_at
+                 )
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, 'active', ?11, ?12, ?12)",
+                params![
+                    id,
+                    name,
+                    description,
+                    workspace_key,
+                    template,
+                    source_type,
+                    repo_url,
+                    branch,
+                    workspace_path,
+                    node_id,
+                    user_id,
+                    now
+                ],
+            )?;
+            tx.execute(
+                "INSERT INTO project_members (project_id, user_id, role, created_at)
+                 VALUES (?1, ?2, 'owner', ?3)",
+                params![id, user_id, now],
+            )?;
+            tx.execute(
+                "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
+                 VALUES (?1, ?2, ?3, 'project_registered_external', ?4, ?5)",
+                params![
+                    new_id("evt"),
+                    id,
+                    user_id,
+                    serde_json::json!({
+                        "name": name,
+                        "workspace_path": workspace_path,
+                        "node_id": node_id,
+                        "repo_url": repo_url,
+                        "branch": branch,
+                    })
+                    .to_string(),
+                    now
+                ],
+            )?;
+            project_identities::replace_project_identities(
+                &tx,
+                &id,
+                user_id,
+                node_id,
+                workspace_path,
                 repo_url,
                 branch,
-                workspace_path,
-                node_id,
-                user_id,
-                now
-            ],
-        )?;
-        tx.execute(
-            "INSERT INTO project_members (project_id, user_id, role, created_at)
-             VALUES (?1, ?2, 'owner', ?3)",
-            params![id, user_id, now],
-        )?;
-        tx.execute(
-            "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
-             VALUES (?1, ?2, ?3, 'project_registered_external', ?4, ?5)",
-            params![
-                new_id("evt"),
-                id,
-                user_id,
-                serde_json::json!({
-                    "name": name,
-                    "workspace_path": workspace_path,
-                    "node_id": node_id,
-                    "repo_url": repo_url,
-                    "branch": branch,
-                }).to_string(),
-                now
-            ],
-        )?;
-        tx.commit()?;
+                &now,
+            )?;
+            tx.commit()?;
+            Ok::<(), anyhow::Error>(())
+        };
+        if let Err(err) = create_result {
+            if let Some(project) =
+                project_identities::find_owner_project_by_identity(
+                    &conn,
+                    user_id,
+                    &identity_candidates,
+                )?
+            {
+                let project = update_external_project_binding(
+                    &conn,
+                    user_id,
+                    &project.id,
+                    None,
+                    None,
+                    workspace_path,
+                    node_id,
+                    repo_url,
+                    branch,
+                    &now,
+                    "project_reused_external_identity",
+                )?;
+                return Ok(CreateProjectResult {
+                    project,
+                    reused_existing: true,
+                });
+            }
+            if let Some(project) = find_owner_project_by_name(&conn, user_id, name)? {
+                let project = update_external_project_binding(
+                    &conn,
+                    user_id,
+                    &project.id,
+                    None,
+                    None,
+                    workspace_path,
+                    node_id,
+                    repo_url,
+                    branch,
+                    &now,
+                    "project_reused_external_name",
+                )?;
+                return Ok(CreateProjectResult {
+                    project,
+                    reused_existing: true,
+                });
+            }
+            return Err(err);
+        }
 
         let mut project = ProjectSummary {
             id,
@@ -912,6 +981,86 @@ fn project_summary_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Project
     Ok(project)
 }
 
+#[allow(clippy::too_many_arguments)]
+fn update_external_project_binding(
+    conn: &Connection,
+    user_id: &str,
+    project_id: &str,
+    name_override: Option<&str>,
+    description_override: Option<&str>,
+    workspace_path: &str,
+    node_id: Option<&str>,
+    repo_url: Option<&str>,
+    branch: Option<&str>,
+    now: &str,
+    event_type: &str,
+) -> Result<ProjectSummary> {
+    let tx = conn.unchecked_transaction()?;
+    let changed = tx.execute(
+        "UPDATE projects
+         SET name = COALESCE(?2, name),
+             description = COALESCE(?3, description),
+             template = 'local',
+             source_type = 'local_path',
+             workspace_path = ?4,
+             node_id = ?5,
+             repo_url = COALESCE(?6, repo_url),
+             branch = COALESCE(?7, branch),
+             is_public = CASE WHEN ?1 = 'elon-self' THEN 1 ELSE is_public END,
+             join_mode = CASE WHEN ?1 = 'elon-self' THEN 'approval' ELSE join_mode END,
+             updated_at = ?8
+         WHERE id = ?1 AND status != 'deleted'",
+        params![
+            project_id,
+            name_override,
+            description_override,
+            workspace_path,
+            node_id,
+            repo_url,
+            branch,
+            now
+        ],
+    )?;
+    if changed == 0 {
+        anyhow::bail!("项目不存在，或当前用户无权访问");
+    }
+
+    tx.execute(
+        "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![
+            new_id("evt"),
+            project_id,
+            user_id,
+            event_type,
+            serde_json::json!({
+                "workspace_path": workspace_path,
+                "node_id": node_id,
+                "repo_url": repo_url,
+                "branch": branch,
+            })
+            .to_string(),
+            now
+        ],
+    )?;
+
+    let project = find_project_by_id_for_user(&tx, user_id, project_id)?
+        .ok_or_else(|| anyhow!("项目绑定后无法读取"))?;
+    project_identities::replace_project_identities(
+        &tx,
+        project_id,
+        user_id,
+        project.node_id.as_deref(),
+        project.workspace_path.as_deref().unwrap_or(workspace_path),
+        project.repo_url.as_deref(),
+        project.branch.as_deref(),
+        now,
+    )?;
+    tx.commit()?;
+
+    Ok(project)
+}
+
 fn find_owner_project_by_name(
     conn: &Connection,
     user_id: &str,
@@ -1012,10 +1161,7 @@ fn find_owner_project_by_workspace_path(
 }
 
 fn normalize_workspace_path_for_match(path: &str) -> String {
-    path.trim()
-        .trim_end_matches(|ch| ch == '/' || ch == '\\')
-        .replace('\\', "/")
-        .to_ascii_lowercase()
+    project_identities::normalize_workspace_path(path)
 }
 
 fn find_project_by_id_for_user(
@@ -1215,6 +1361,124 @@ mod tests {
     }
 
     #[test]
+    fn register_external_project_reuses_existing_git_remote_with_different_path_and_name() {
+        let store = temp_store();
+        let user = store
+            .create_user("pc-project-git-owner@example.com", "secret1", None, None)
+            .expect("user should be created");
+
+        let first = store
+            .register_external_project(
+                &user.id,
+                None,
+                "江西吉安商会",
+                None,
+                r"D:\rust\active-projects\江西吉安商会",
+                Some("node-a"),
+                Some("git@github.com:Owner/Jiangxi-Jian.git"),
+                Some("main"),
+            )
+            .expect("first project should register");
+        let second = store
+            .register_external_project(
+                &user.id,
+                None,
+                "本地git项目",
+                None,
+                r"D:\rust\active-projects\jx-ja-copy",
+                Some("node-b"),
+                Some("https://github.com/owner/jiangxi-jian"),
+                Some("refs/heads/main"),
+            )
+            .expect("same git remote should reuse existing project");
+
+        assert!(second.reused_existing);
+        assert_eq!(second.project.id, first.project.id);
+        assert_eq!(second.project.name, "江西吉安商会");
+        assert_eq!(
+            second.project.workspace_path.as_deref(),
+            Some(r"D:\rust\active-projects\jx-ja-copy")
+        );
+        let conn = store.conn().expect("db connection");
+        let project_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM projects WHERE created_by = ?1 AND status != 'deleted'",
+                params![user.id],
+                |row| row.get(0),
+            )
+            .expect("project count");
+        let identity_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_identities WHERE project_id = ?1",
+                params![second.project.id],
+                |row| row.get(0),
+            )
+            .expect("identity count");
+        assert_eq!(project_count, 1);
+        assert_eq!(identity_count, 3);
+    }
+
+    #[test]
+    fn register_external_project_prefers_existing_path_over_same_name() {
+        let store = temp_store();
+        let user = store
+            .create_user("pc-project-path-priority@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project_a = store
+            .register_external_project(
+                &user.id,
+                None,
+                "项目A",
+                None,
+                r"D:\rust\active-projects\a",
+                Some("node-a"),
+                None,
+                None,
+            )
+            .expect("project A should register");
+        let project_b = store
+            .register_external_project(
+                &user.id,
+                None,
+                "项目B",
+                None,
+                r"D:\rust\active-projects\b",
+                Some("node-b"),
+                None,
+                None,
+            )
+            .expect("project B should register");
+
+        let reused = store
+            .register_external_project(
+                &user.id,
+                None,
+                "项目A",
+                None,
+                r"D:/rust/active-projects/b/",
+                Some("node-c"),
+                None,
+                None,
+            )
+            .expect("path match should win over name match");
+
+        assert!(reused.reused_existing);
+        assert_eq!(reused.project.id, project_b.project.id);
+        assert_eq!(reused.project.name, "项目B");
+        assert_ne!(reused.project.id, project_a.project.id);
+        let project_count: i64 = store
+            .conn()
+            .expect("db connection")
+            .query_row(
+                "SELECT COUNT(*) FROM projects WHERE created_by = ?1 AND status != 'deleted'",
+                params![user.id],
+                |row| row.get(0),
+            )
+            .expect("project count");
+        assert_eq!(project_count, 2);
+    }
+
+    #[test]
     fn register_external_project_rejects_binding_to_path_owned_by_another_project() {
         let store = temp_store();
         let user = store
@@ -1264,6 +1528,53 @@ mod tests {
             .expect_err("binding duplicate workspace path should fail");
 
         assert!(err.to_string().contains("该本地路径已绑定到项目"));
+        assert!(err.to_string().contains(&existing.project.name));
+    }
+
+    #[test]
+    fn register_external_project_rejects_binding_to_git_identity_owned_by_another_project() {
+        let store = temp_store();
+        let user = store
+            .create_user("pc-project-git-conflict@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let existing = store
+            .register_external_project(
+                &user.id,
+                None,
+                "江西吉安商会",
+                None,
+                r"D:\rust\active-projects\江西吉安商会",
+                Some("node-a"),
+                Some("git@github.com:Owner/Jiangxi-Jian.git"),
+                Some("main"),
+            )
+            .expect("first project should register");
+        let other = store
+            .ensure_project_for_user(
+                &user.id,
+                "prj-other-git",
+                "其他项目",
+                None,
+                "template",
+                "android",
+                None,
+            )
+            .expect("other project should exist");
+
+        let err = store
+            .register_external_project(
+                &user.id,
+                Some(&other.id),
+                "其他项目",
+                None,
+                r"D:\rust\active-projects\other",
+                Some("node-b"),
+                Some("https://github.com/owner/jiangxi-jian.git"),
+                Some("main"),
+            )
+            .expect_err("binding duplicate git remote should fail");
+
+        assert!(err.to_string().contains("该代码项目已绑定到项目"));
         assert!(err.to_string().contains(&existing.project.name));
     }
 

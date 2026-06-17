@@ -74,6 +74,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (52, "项目级 AI 运行权限授权", migration_v52),
     (53, "群聊 AI 文档、Context Pack 与总结帖", migration_v53),
     (54, "外部应用账号、默认群映射与授权码", migration_v54),
+    (55, "项目代码身份去重索引", migration_v55),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1986,6 +1987,64 @@ fn migration_v54(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_v55(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_identities (
+          id             TEXT PRIMARY KEY,
+          project_id     TEXT NOT NULL,
+          owner_user_id  TEXT NOT NULL,
+          scope_key      TEXT NOT NULL,
+          node_id        TEXT,
+          identity_type  TEXT NOT NULL,
+          identity_value TEXT NOT NULL,
+          confidence     INTEGER NOT NULL DEFAULT 100,
+          source         TEXT NOT NULL DEFAULT 'register_external_project',
+          created_at     TEXT NOT NULL,
+          updated_at     TEXT NOT NULL,
+          UNIQUE(owner_user_id, scope_key, identity_type, identity_value),
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          FOREIGN KEY (owner_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_identities_project
+          ON project_identities(project_id);
+
+        CREATE INDEX IF NOT EXISTS idx_project_identities_owner_updated
+          ON project_identities(owner_user_id, updated_at DESC);
+
+        INSERT OR IGNORE INTO project_identities (
+          id, project_id, owner_user_id, scope_key, node_id, identity_type,
+          identity_value, confidence, source, created_at, updated_at
+        )
+        SELECT
+          'pident_m55_ws_' || p.id,
+          p.id,
+          p.created_by,
+          CASE
+            WHEN p.node_id IS NULL OR TRIM(p.node_id) = ''
+              THEN 'node:unknown'
+            ELSE 'node:' || LOWER(TRIM(p.node_id))
+          END,
+          NULLIF(TRIM(p.node_id), ''),
+          'workspace_path',
+          LOWER(RTRIM(REPLACE(TRIM(p.workspace_path), '\', '/'), '/')),
+          100,
+          'migration_v55',
+          COALESCE(p.created_at, datetime('now')),
+          datetime('now')
+        FROM projects p
+        WHERE p.status != 'deleted'
+          AND p.created_by IS NOT NULL
+          AND p.source_type IN ('local_path', 'pc_managed')
+          AND p.workspace_path IS NOT NULL
+          AND TRIM(p.workspace_path) != ''
+        ORDER BY p.updated_at DESC;
+        "#,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2105,6 +2164,44 @@ mod tests {
 
         assert_eq!(elon_visibility, (1, "approval".to_string()));
         assert_eq!(joint_visibility, (1, "open".to_string()));
+    }
+
+    #[test]
+    fn migration_v55_backfills_workspace_project_identities() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v20(&conn).expect("node_id column should apply");
+
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_owner", "18800000000", "owner"],
+        )
+        .expect("owner should insert");
+        insert_project(&conn, "prj_jian", "江西吉安商会", "usr_owner");
+        conn.execute(
+            "UPDATE projects
+             SET workspace_path = ?1,
+                 node_id = ?2
+             WHERE id = 'prj_jian'",
+            params![r"D:\rust\active-projects\江西吉安商会\", "node-a"],
+        )
+        .expect("project workspace should update");
+
+        migration_v55(&conn).expect("identity migration should apply");
+
+        let identity: (String, String, String) = conn
+            .query_row(
+                "SELECT scope_key, identity_type, identity_value
+                 FROM project_identities
+                 WHERE project_id = 'prj_jian'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .expect("identity should be backfilled");
+        assert_eq!(identity.0, "node:node-a");
+        assert_eq!(identity.1, "workspace_path");
+        assert_eq!(identity.2, "d:/rust/active-projects/江西吉安商会");
     }
 
     fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {
