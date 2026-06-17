@@ -113,7 +113,7 @@ internal class ProjectManagementHomeView(
         val project = item.project
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.TOP
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openProject(item.index) }
@@ -353,8 +353,8 @@ internal class ProjectManagementHomeView(
         const val SEGMENT_HEIGHT_PX = 138
         const val SEGMENT_GAP_PX = 120
         const val FIRST_ROW_TOP_MARGIN_PX = 102
-        const val ROW_HEIGHT_PX = 176
-        const val ROW_GAP_PX = 142
+        const val ROW_HEIGHT_PX = 220
+        const val ROW_GAP_PX = 98
         const val THUMB_SIZE_PX = 172
         const val THUMB_RADIUS_PX = 10
         const val TEXT_START_GAP_PX = 58
