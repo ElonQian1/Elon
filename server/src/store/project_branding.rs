@@ -8,11 +8,92 @@ use super::{
     Store,
 };
 
-const BB64A_DIR_NAME: &str = "bb64a";
 const BB64A_DISPLAY_NAME: &str = "一龙网游加速器";
 const BB64A_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/bb64a-logo.png");
+const FB2_DISPLAY_NAME: &str = "多冠体育";
+const FB2_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/fb2-logo.png");
+const JIANGXI_JIAN_CHAMBER_DISPLAY_NAME: &str = "江西吉安商会";
+const JIANGXI_JIAN_CHAMBER_LOGO_BYTES: &[u8] =
+    include_bytes!("../assets/project-icons/jiangxi-jian-chamber-logo.png");
 
 static BB64A_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
+static FB2_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
+static JIANGXI_JIAN_CHAMBER_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
+
+const BB64A_IDENTIFIERS: &[&str] = &["bb64a"];
+const FB2_IDENTIFIERS: &[&str] = &["fb2"];
+const JIANGXI_JIAN_CHAMBER_IDENTIFIERS: &[&str] =
+    &["江西吉安商会", "NanchangJiAnChamber", "JiangxiJianChamber"];
+
+#[derive(Clone, Copy)]
+enum KnownProjectBrand {
+    Bb64a,
+    Fb2,
+    JiangxiJianChamber,
+}
+
+const KNOWN_PROJECT_BRANDS: &[KnownProjectBrand] = &[
+    KnownProjectBrand::Bb64a,
+    KnownProjectBrand::Fb2,
+    KnownProjectBrand::JiangxiJianChamber,
+];
+
+impl KnownProjectBrand {
+    fn identifiers(self) -> &'static [&'static str] {
+        match self {
+            KnownProjectBrand::Bb64a => BB64A_IDENTIFIERS,
+            KnownProjectBrand::Fb2 => FB2_IDENTIFIERS,
+            KnownProjectBrand::JiangxiJianChamber => JIANGXI_JIAN_CHAMBER_IDENTIFIERS,
+        }
+    }
+
+    fn display_name(self) -> &'static str {
+        match self {
+            KnownProjectBrand::Bb64a => BB64A_DISPLAY_NAME,
+            KnownProjectBrand::Fb2 => FB2_DISPLAY_NAME,
+            KnownProjectBrand::JiangxiJianChamber => JIANGXI_JIAN_CHAMBER_DISPLAY_NAME,
+        }
+    }
+
+    fn logo_data_url(self) -> &'static str {
+        match self {
+            KnownProjectBrand::Bb64a => logo_data_url(&BB64A_LOGO_DATA_URL, BB64A_LOGO_BYTES),
+            KnownProjectBrand::Fb2 => logo_data_url(&FB2_LOGO_DATA_URL, FB2_LOGO_BYTES),
+            KnownProjectBrand::JiangxiJianChamber => logo_data_url(
+                &JIANGXI_JIAN_CHAMBER_LOGO_DATA_URL,
+                JIANGXI_JIAN_CHAMBER_LOGO_BYTES,
+            ),
+        }
+    }
+
+    fn matches(
+        self,
+        name: &str,
+        source_type: &str,
+        workspace_path: Option<&str>,
+        storage_repo_path: Option<&str>,
+        storage_worktree_path: Option<&str>,
+    ) -> bool {
+        let identifiers = self.identifiers();
+        if identifiers
+            .iter()
+            .any(|expected| name.trim().eq_ignore_ascii_case(expected))
+        {
+            return true;
+        }
+        if !matches!(source_type, "local_path" | "pc_managed") {
+            return false;
+        }
+        [workspace_path, storage_repo_path, storage_worktree_path]
+            .into_iter()
+            .flatten()
+            .any(|path| {
+                identifiers
+                    .iter()
+                    .any(|expected| path_ends_with_dir(path, expected))
+            })
+    }
+}
 
 pub(crate) fn apply_project_summary_branding(project: &mut ProjectSummary) {
     let fallback_display_name = default_display_name_for_project(
@@ -134,17 +215,14 @@ fn default_display_name_for_project(
     storage_repo_path: Option<&str>,
     storage_worktree_path: Option<&str>,
 ) -> Option<String> {
-    if is_bb64a_project(
+    known_brand_for_project(
         name,
         source_type,
         workspace_path,
         storage_repo_path,
         storage_worktree_path,
-    ) {
-        Some(BB64A_DISPLAY_NAME.to_string())
-    } else {
-        None
-    }
+    )
+    .map(|brand| brand.display_name().to_string())
 }
 
 fn branded_icon_data_url(
@@ -158,16 +236,14 @@ fn branded_icon_data_url(
     if let Some(icon_data_url) = clean_icon_data_url(icon_data_url) {
         return Some(icon_data_url);
     }
-    if is_bb64a_project(
+    known_brand_for_project(
         name,
         source_type,
         workspace_path,
         storage_repo_path,
         storage_worktree_path,
-    ) {
-        return Some(bb64a_logo_data_url().to_string());
-    }
-    None
+    )
+    .map(|brand| brand.logo_data_url().to_string())
 }
 
 fn clean_icon_data_url(icon_data_url: Option<String>) -> Option<String> {
@@ -182,29 +258,28 @@ fn clean_display_name(display_name: Option<String>) -> Option<String> {
         .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("null"))
 }
 
-fn bb64a_logo_data_url() -> &'static str {
-    BB64A_LOGO_DATA_URL
-        .get_or_init(|| format!("data:image/png;base64,{}", B64.encode(BB64A_LOGO_BYTES)))
+fn logo_data_url(cache: &'static OnceLock<String>, logo_bytes: &'static [u8]) -> &'static str {
+    cache
+        .get_or_init(|| format!("data:image/png;base64,{}", B64.encode(logo_bytes)))
         .as_str()
 }
 
-fn is_bb64a_project(
+fn known_brand_for_project(
     name: &str,
     source_type: &str,
     workspace_path: Option<&str>,
     storage_repo_path: Option<&str>,
     storage_worktree_path: Option<&str>,
-) -> bool {
-    if name.trim().eq_ignore_ascii_case(BB64A_DIR_NAME) {
-        return true;
-    }
-    if !matches!(source_type, "local_path" | "pc_managed") {
-        return false;
-    }
-    [workspace_path, storage_repo_path, storage_worktree_path]
-        .into_iter()
-        .flatten()
-        .any(|path| path_ends_with_dir(path, BB64A_DIR_NAME))
+) -> Option<KnownProjectBrand> {
+    KNOWN_PROJECT_BRANDS.iter().copied().find(|brand| {
+        brand.matches(
+            name,
+            source_type,
+            workspace_path,
+            storage_repo_path,
+            storage_worktree_path,
+        )
+    })
 }
 
 fn path_ends_with_dir(path: &str, expected: &str) -> bool {
@@ -220,7 +295,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn bb64a_branding_matches_windows_workspace_path() {
+    fn known_project_branding_matches_windows_workspace_paths() {
         assert_eq!(
             default_display_name_for_project(
                 "bb64a",
@@ -232,19 +307,55 @@ mod tests {
             .as_deref(),
             Some(BB64A_DISPLAY_NAME)
         );
+        assert_eq!(
+            default_display_name_for_project(
+                "fb2",
+                "pc_managed",
+                Some(r"D:\rust\active-projects\fb2"),
+                None,
+                None
+            )
+            .as_deref(),
+            Some(FB2_DISPLAY_NAME)
+        );
+        assert_eq!(
+            default_display_name_for_project(
+                "NanchangJiAnChamber",
+                "local_path",
+                Some(r"D:\rust\active-projects\江西吉安商会\NanchangJiAnChamber"),
+                None,
+                None
+            )
+            .as_deref(),
+            Some(JIANGXI_JIAN_CHAMBER_DISPLAY_NAME)
+        );
     }
 
     #[test]
-    fn bb64a_branding_preserves_manual_icon() {
+    fn known_project_branding_preserves_manual_icon() {
         let icon = branded_icon_data_url(
             Some("data:image/png;base64,manual".to_string()),
-            "bb64a",
+            "fb2",
             "pc_managed",
-            Some(r"D:\rust\active-projects\bb64a"),
+            Some(r"D:\rust\active-projects\fb2"),
             None,
             None,
         );
         assert_eq!(icon.as_deref(), Some("data:image/png;base64,manual"));
+    }
+
+    #[test]
+    fn known_project_branding_supplies_default_icons() {
+        let icon = branded_icon_data_url(
+            None,
+            "江西吉安商会",
+            "pc_managed",
+            Some(r"D:\rust\active-projects\江西吉安商会"),
+            None,
+            None,
+        )
+        .expect("default icon");
+        assert!(icon.starts_with("data:image/png;base64,"));
     }
 
     #[test]

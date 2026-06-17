@@ -30,7 +30,7 @@ internal class ProjectPlazaPatternView(
 
     private val bannerRotation = -14f
     private val sortedProjects = projects
-        .sortedWith(compareByDescending<StoreProject> { it.memberCount }.thenBy { it.name })
+        .sortedWith(compareByDescending<StoreProject> { it.memberCount }.thenBy { it.displayTitle() })
         .take(14)
     private val density = resources.displayMetrics.density
     private val bgPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -200,7 +200,7 @@ internal class ProjectPlazaPatternView(
 
     private fun drawInitialIcon(canvas: Canvas, project: StoreProject, rect: RectF, size: Float) {
         iconTextPaint.textSize = size * 0.36f
-        val text = avatarText(project.name.ifBlank { "项目" })
+        val text = avatarText(project.displayTitle())
         val metrics = iconTextPaint.fontMetrics
         val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
         canvas.drawText(text, rect.centerX(), baseline, iconTextPaint)

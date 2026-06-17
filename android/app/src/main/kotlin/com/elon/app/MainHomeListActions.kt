@@ -372,7 +372,7 @@ internal class MainHomeListActions(
                     plazaBannerProjects = projects
                         .sortedWith(
                             compareByDescending<StoreProject> { it.memberCount }
-                                .thenBy { it.name }
+                                .thenBy { it.displayTitle() }
                         )
                     if (binding.projectPage.visibility == View.VISIBLE) renderProjectList()
                 }

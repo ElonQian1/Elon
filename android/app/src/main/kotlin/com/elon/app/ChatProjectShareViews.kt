@@ -44,7 +44,7 @@ internal fun AppProject.toChatProjectShare(): ChatProjectShare {
 internal fun StoreProject.toChatProjectShare(): ChatProjectShare {
     return ChatProjectShare(
         id = id,
-        name = name,
+        name = displayTitle(),
         description = description,
         ownerAccount = ownerAccount.takeIf { it.isNotBlank() && it != "?" },
         memberCount = memberCount,

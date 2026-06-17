@@ -25,6 +25,11 @@
       .replace(/'/g, '&#39;');
   }
 
+  function cleanText(value) {
+    const text = String(value == null ? '' : value).trim();
+    return text && text.toLowerCase() !== 'null' ? text : '';
+  }
+
   function projects() {
     const app = bridge();
     return typeof app.getProjects === 'function' ? app.getProjects() : [];
@@ -47,7 +52,13 @@
   }
 
   function titleOf(project) {
-    return project.name || project.title || '未命名项目';
+    return cleanText(project.displayName) ||
+      cleanText(project.display_name) ||
+      cleanText(project.alias) ||
+      cleanText(project.project_alias) ||
+      cleanText(project.title) ||
+      cleanText(project.name) ||
+      '未命名项目';
   }
 
   function projectInitial(project) {

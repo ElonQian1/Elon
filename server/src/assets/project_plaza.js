@@ -40,6 +40,11 @@
       .replace(/'/g, '&#39;');
   }
 
+  function cleanText(value) {
+    const text = String(value == null ? '' : value).trim();
+    return text && text.toLowerCase() !== 'null' ? text : '';
+  }
+
   function token() {
     const app = bridge();
     return typeof app.getToken === 'function' ? app.getToken() : '';
@@ -88,8 +93,15 @@
   }
 
   function projectIdentity(project) {
-    const name = String(project.name || '').trim() || '未命名项目';
-    const description = String(project.description || '').trim();
+    const displayName = cleanText(project.displayName) ||
+      cleanText(project.display_name) ||
+      cleanText(project.alias) ||
+      cleanText(project.project_alias);
+    const name = cleanText(project.name) || cleanText(project.title) || '未命名项目';
+    const description = cleanText(project.description);
+    if (displayName) {
+      return { title: displayName, subtitle: description };
+    }
     if (description && /^[A-Za-z0-9._-]{3,24}$/.test(name) && /[A-Za-z]/.test(name) && Array.from(description).length <= 24) {
       return { title: description, subtitle: '项目代号：' + name };
     }

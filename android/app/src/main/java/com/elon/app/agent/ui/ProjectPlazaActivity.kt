@@ -296,6 +296,7 @@ class ProjectPlazaActivity : Activity() {
     private fun buildProjectCard(project: JSONObject): LinearLayout {
         val projectId = project.optString("id")
         val name = project.optString("name", "未知项目")
+        val displayName = projectDisplayName(project)
         val description = project.optString("description", "")
         val ownerAccount = project.optString("owner_account", "")
         val memberCount = project.optInt("member_count", 0)
@@ -322,7 +323,7 @@ class ProjectPlazaActivity : Activity() {
                 gravity = Gravity.CENTER_VERTICAL
 
                 addView(TextView(context).apply {
-                    text = name
+                    text = displayName
                     textSize = 16f
                     setTypeface(null, Typeface.BOLD)
                     setTextColor(Color.parseColor(TEXT_PRIMARY))
@@ -898,7 +899,7 @@ class ProjectPlazaActivity : Activity() {
                 val reused = result.optBoolean("reused_existing", false)
                 Toast.makeText(
                     this@ProjectPlazaActivity,
-                    if (reused) "已存在同名项目，复用：${project.optString("name")}" else "注册成功：${project.optString("name")}",
+                    if (reused) "已存在同名项目，复用：${projectDisplayName(project)}" else "注册成功：${projectDisplayName(project)}",
                     Toast.LENGTH_LONG,
                 ).show()
                 showOwnerReview()
@@ -968,5 +969,14 @@ class ProjectPlazaActivity : Activity() {
         val error = result?.optString("error")?.trim().orEmpty()
         if (error.isNotEmpty()) return error
         return fallback
+    }
+
+    private fun projectDisplayName(project: JSONObject): String {
+        val keys = arrayOf("displayName", "display_name", "alias", "project_alias", "name")
+        for (key in keys) {
+            val value = project.optString(key, "").trim()
+            if (value.isNotEmpty() && !value.equals("null", ignoreCase = true)) return value
+        }
+        return "未知项目"
     }
 }

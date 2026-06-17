@@ -425,7 +425,7 @@ internal class MainMarketplaceActions(
                 addView(TextView(activity).apply {
                     includeFontPadding = false
                     gravity = Gravity.CENTER
-                    text = avatarText(project.name.ifBlank { "项目" })
+                    text = avatarText(project.displayTitle())
                     setTextColor(Color.parseColor("#253140"))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     setTypeface(typeface, Typeface.BOLD)
@@ -611,12 +611,15 @@ internal class MainMarketplaceActions(
     }
 
     private fun identityFor(project: StoreProject): ProjectCardIdentity {
-        val name = project.name.trim().ifBlank { "未命名项目" }
+        val name = project.name.trim()
+        val title = project.displayTitle()
         val description = project.description?.trim()?.takeIf { it.isNotBlank() }
-        return if (description != null && looksLikeCodeName(name) && description.length <= 24) {
+        return if (project.hasDisplayAlias()) {
+            ProjectCardIdentity(title, description)
+        } else if (description != null && looksLikeCodeName(name) && description.length <= 24) {
             ProjectCardIdentity(description, "项目代号：$name")
         } else {
-            ProjectCardIdentity(name, description)
+            ProjectCardIdentity(title, description)
         }
     }
 

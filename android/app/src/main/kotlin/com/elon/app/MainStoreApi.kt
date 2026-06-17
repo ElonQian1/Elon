@@ -14,6 +14,7 @@ import java.net.URLEncoder
 internal data class StoreProject(
     val id: String,
     val name: String,
+    val displayName: String? = null,
     val description: String?,
     val template: String,
     val ownerAccount: String,
@@ -39,6 +40,23 @@ internal data class StoreProject(
     val workspacePending: Boolean = false
 )
 
+internal fun StoreProject.displayTitle(): String {
+    return cleanStoreProjectDisplayText(displayName)
+        ?: cleanStoreProjectDisplayText(name)
+        ?: "未命名项目"
+}
+
+internal fun StoreProject.hasDisplayAlias(): Boolean {
+    val title = cleanStoreProjectDisplayText(displayName) ?: return false
+    val rawName = cleanStoreProjectDisplayText(name) ?: return true
+    return !title.equals(rawName, ignoreCase = true)
+}
+
+internal fun cleanStoreProjectDisplayText(value: String?): String? {
+    val text = value?.trim().orEmpty()
+    return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
+}
+
 internal data class ProjectCreateNodeOption(
     val nodeId: String,
     val displayName: String,
@@ -59,7 +77,7 @@ internal data class ProjectCreateNodeOption(
 )
 
 internal fun StoreProject.toJointAppProject(): AppProject {
-    return newAppProject(name, description ?: "联合项目").copy(
+    return newAppProject(displayTitle(), description ?: "联合项目").copy(
         id = id,
         isJointProject = true,
         collaborationProjectId = id,
@@ -88,7 +106,7 @@ internal fun StoreProject.toJointAppProject(): AppProject {
  * 项目出现在"个人项目"分组。
  */
 internal fun StoreProject.toOwnerAppProject(): AppProject {
-    return newAppProject(name, description ?: "我的项目").copy(
+    return newAppProject(displayTitle(), description ?: "我的项目").copy(
         id = id,
         isJointProject = false,
         collaborationProjectId = null,
@@ -480,7 +498,8 @@ private fun storeUrlPart(value: String): String =
 
 internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     id = obj.getString("id"),
-    name = obj.optStoreProjectDisplayName() ?: obj.getString("name"),
+    name = obj.getString("name"),
+    displayName = obj.optStoreProjectDisplayName(),
     description = obj.optString("description").takeIf { it.isNotBlank() },
     template = obj.optString("template", "custom"),
     ownerAccount = obj.optString("owner_account", "?"),
@@ -511,7 +530,8 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
 
 private fun parseCreatedStoreProject(obj: JSONObject, ownerAccount: String?) = StoreProject(
     id = obj.getString("id"),
-    name = obj.optStoreProjectDisplayName() ?: obj.optString("name", "联合项目"),
+    name = obj.optString("name", "联合项目"),
+    displayName = obj.optStoreProjectDisplayName(),
     description = obj.optString("description").takeIf { it.isNotBlank() },
     template = obj.optString("template", "android"),
     ownerAccount = obj.optString("owner_account").takeIf { it.isNotBlank() }

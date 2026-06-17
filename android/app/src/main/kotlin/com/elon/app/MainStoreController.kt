@@ -180,7 +180,7 @@ internal class MainStoreController(
             gravity = Gravity.CENTER_VERTICAL
 
             addView(TextView(activity).apply {
-                text = project.name
+                text = project.displayTitle()
                 setTextColor(Color.parseColor("#D6D6D6"))
                 textSize = 15f
                 setTypeface(typeface, android.graphics.Typeface.BOLD)
@@ -237,7 +237,7 @@ internal class MainStoreController(
         val alreadyJoined = !project.viewerRole.isNullOrBlank()
         val joinLabel = if (alreadyJoined) "进入空间" else projectJoinActionLabel(project.joinMode)
         val builder = AlertDialog.Builder(activity)
-            .setTitle(project.name)
+            .setTitle(project.displayTitle())
             .setMessage(msg)
             .setNegativeButton("返回", null)
 

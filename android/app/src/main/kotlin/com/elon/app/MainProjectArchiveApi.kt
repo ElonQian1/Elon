@@ -9,6 +9,7 @@ import org.json.JSONObject
 internal data class ArchiveProjectRecord(
     val id: String,
     val name: String,
+    val displayName: String? = null,
     val description: String?,
     val role: String,
     val isPublic: Boolean,
@@ -27,6 +28,12 @@ internal data class ArchiveProjectRecord(
     val conversationRoute: ArchiveConversationRoute? = null,
     val workspaceStatus: ArchiveWorkspaceStatus? = null
 ) {
+    fun displayTitle(): String {
+        return cleanStoreProjectDisplayText(displayName)
+            ?: cleanStoreProjectDisplayText(name)
+            ?: "未命名项目"
+    }
+
     fun toAppProject(): AppProject {
         val systemKey = systemKey?.trim()
             ?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
@@ -40,7 +47,7 @@ internal data class ArchiveProjectRecord(
         }
         return AppProject(
             id = id,
-            title = summarize(name, 24),
+            title = summarize(displayTitle(), 24),
             subtitle = subtitle,
             updatedAt = updatedAtMs,
             stage = lastTaskStatus?.takeIf { it.isNotBlank() }
@@ -172,9 +179,8 @@ internal fun parseArchiveProject(obj: JSONObject): ArchiveProjectRecord {
     val project = obj.optJSONObject("project") ?: obj
     return ArchiveProjectRecord(
         id = project.getString("id"),
-        name = project.optArchiveProjectDisplayName()
-            ?: project.optCleanString("name")
-            ?: "未命名项目",
+        name = project.optCleanString("name") ?: "未命名项目",
+        displayName = project.optArchiveProjectDisplayName(),
         description = project.optCleanString("description"),
         role = project.optCleanString("role") ?: "member",
         isPublic = project.optBoolean("is_public", false),

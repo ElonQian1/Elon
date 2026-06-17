@@ -5,6 +5,7 @@ internal fun ArchiveProjectRecord.toStoreProject(ownerAccountFallback: String?):
     return StoreProject(
         id = id,
         name = name,
+        displayName = displayName,
         description = description,
         template = "android",
         ownerAccount = if (!systemKey.isNullOrBlank()) {
