@@ -207,7 +207,7 @@ internal class MainMarketplaceActions(
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding(dp(16), 0, dp(16), 0)
+                setPadding(dp(FILTER_SIDE_PADDING_DP), 0, dp(FILTER_SIDE_PADDING_DP), 0)
                 filters.forEach { addView(filterChip(it)) }
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -356,11 +356,16 @@ internal class MainMarketplaceActions(
                         addProjectDetailText("创建者：${project.ownerAccount.ifBlank { "未知" }}")
                         addProjectDetailText("成员：${project.memberCount.coerceAtLeast(0)}")
                     }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    rightMargin = dp(INFO_ROW_RIGHT_MARGIN_DP)
                 })
                 addView(View(activity).apply {
                     setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
                 }, LinearLayout.LayoutParams(dp(DIVIDER_WIDTH_DP), dp(1)).apply {
-                    topMargin = dp(12)
+                    topMargin = dp(10)
                 })
                 addView(TextView(activity).apply {
                     includeFontPadding = false
@@ -371,7 +376,7 @@ internal class MainMarketplaceActions(
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     setLineSpacing(dp(2).toFloat(), 1.0f)
                 }, LinearLayout.LayoutParams(dp(DESC_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = dp(10)
+                    topMargin = dp(8)
                 })
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -433,7 +438,7 @@ internal class MainMarketplaceActions(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            bottomMargin = dp(10)
+            bottomMargin = dp(8)
         })
     }
 
@@ -496,7 +501,7 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor(COLOR_BUTTON_TEXT))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_LIST_SECONDARY_SP)
             setTypeface(typeface, Typeface.BOLD)
             background = rect(COLOR_BUTTON_BG, 999)
             isClickable = true
@@ -753,27 +758,30 @@ internal class MainMarketplaceActions(
         const val FONT_AVATAR_SP = 24f
         const val FONT_PAGE_TITLE_SP = 16f
         const val FONT_STATUS_SP = 15f
+        const val FONT_LIST_SECONDARY_SP = 13f
         const val FONT_META_SP = 12f
-        const val SEARCH_HEIGHT_DP = 56
-        const val SEARCH_RADIUS_DP = 28
+        const val SEARCH_HEIGHT_DP = 48
+        const val SEARCH_RADIUS_DP = 24
         const val SEARCH_SIDE_MARGIN_DP = 20
         const val DESIGN_WIDTH_PX = 1272
         const val SEGMENT_WIDTH_PX = 210
         const val SEGMENT_HEIGHT_PX = 138
-        const val FILTER_ITEM_GAP_DP = 8
+        const val FILTER_SIDE_PADDING_DP = 20
+        const val FILTER_ITEM_GAP_DP = 14
         const val CARD_RADIUS_DP = 18
         const val CARD_HEADER_HEIGHT_DP = 44
-        const val CARD_BODY_HEIGHT_DP = 140
+        const val CARD_BODY_HEIGHT_DP = 160
         const val FIRST_CARD_TOP_MARGIN_DP = 18
         const val CARD_GAP_DP = 10
         const val THUMB_SIZE_DP = 40
-        const val DIVIDER_WIDTH_DP = 172
-        const val DESC_WIDTH_DP = 158
-        const val CARD_BODY_CONTENT_TOP_DP = 28
-        const val CARD_MAIN_RIGHT_MARGIN_DP = 132
-        const val ACTION_BUTTON_WIDTH_DP = 76
-        const val ACTION_BUTTON_HEIGHT_DP = 36
-        const val ACTION_BUTTON_GAP_DP = 12
-        const val ACTION_BUTTON_BOTTOM_DP = 14
+        const val DIVIDER_WIDTH_DP = 220
+        const val DESC_WIDTH_DP = 240
+        const val CARD_BODY_CONTENT_TOP_DP = 22
+        const val CARD_MAIN_RIGHT_MARGIN_DP = 24
+        const val INFO_ROW_RIGHT_MARGIN_DP = 96
+        const val ACTION_BUTTON_WIDTH_DP = 68
+        const val ACTION_BUTTON_HEIGHT_DP = 32
+        const val ACTION_BUTTON_GAP_DP = 10
+        const val ACTION_BUTTON_BOTTOM_DP = 10
     }
 }
