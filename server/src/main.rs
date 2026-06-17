@@ -37,6 +37,7 @@ mod context_compiler;
 mod conversation_router;
 mod errors;
 mod external_app_api;
+mod external_app_context;
 mod external_app_registry;
 mod friend_api;
 mod friend_events;

@@ -7,7 +7,7 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::sync::Arc;
 use tracing::{info, warn};
 
@@ -133,8 +133,18 @@ pub async fn create_group_summary_post(
         Ok(messages) => messages,
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
+    let external_context = crate::external_app_context::group_context_for_chat(
+        &state,
+        &group_id,
+        input.topic.as_deref(),
+    )
+    .await;
     let context_pack = match serde_json::to_string_pretty(&build_context_pack(
-        &group_id, &input, &messages, &documents,
+        &group_id,
+        &input,
+        &messages,
+        &documents,
+        external_context,
     )) {
         Ok(pack) => pack,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -273,7 +283,7 @@ async fn generate_group_summary(
         &[
             json!({
                 "role": "system",
-                "content": "你是群聊总结帖 AI。你只能根据 Context Pack 和群聊 AI 文档总结，不得编造。输出中文 Markdown，包含：摘要、已达成结论、待确认问题、行动项、相关发言。相关发言必须引用消息 ID。"
+                "content": "你是群聊总结帖 AI。你只能根据 Context Pack 和群聊 AI 文档总结，不得编造。输出中文 Markdown，包含：摘要、已达成结论、待确认问题、行动项、相关发言。相关发言必须引用消息 ID。若 Context Pack 包含外部赛事/赔率上下文，只能作为讨论背景，必须说明不保证结果，不诱导投注。"
             }),
             json!({
                 "role": "user",
@@ -304,6 +314,7 @@ fn build_context_pack(
     input: &GroupSummaryCreateInput,
     messages: &[GroupSummarySourceMessage],
     documents: &[GroupAiDocument],
+    external_context: Option<Value>,
 ) -> serde_json::Value {
     let source_start_at = messages.first().map(|message| message.created_at.as_str());
     let source_end_at = messages.last().map(|message| message.created_at.as_str());
@@ -342,6 +353,7 @@ fn build_context_pack(
             "title": doc.title.as_str(),
             "content": doc.content.as_str()
         })).collect::<Vec<_>>(),
+        "external_app_context": external_context,
         "output_contract": {
             "format": "markdown",
             "required_sections": ["摘要", "已达成结论", "待确认问题", "行动项", "相关发言"],

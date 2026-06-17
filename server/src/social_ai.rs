@@ -4,7 +4,7 @@
 
 use anyhow::{anyhow, Result};
 use chrono::{SecondsFormat, Utc};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex, OnceLock},
@@ -253,7 +253,7 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
         }
         return Ok(());
     }
-    let reply = social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history).await;
+    let reply = social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history, None).await;
     let messages = state
         .store
         .insert_friend_social_ai_reply(&user_id, &friend_id, &reply)?;
@@ -276,7 +276,7 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
         return Ok(DEVELOPMENT_REDIRECT_REPLY.to_string());
     }
     let reply =
-        social_ai_reply_or_fallback(&state, &user_id, DIRECT_SOCIAL_AI_SCENE, &history).await;
+        social_ai_reply_or_fallback(&state, &user_id, DIRECT_SOCIAL_AI_SCENE, &history, None).await;
     let message = state
         .store
         .insert_direct_social_ai_reply(&user_id, &reply)?;
@@ -293,7 +293,16 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
     let reply = if is_development_intent(&history).is_some() {
         DEVELOPMENT_REDIRECT_REPLY.to_string()
     } else {
-        social_ai_reply_or_fallback(&state, &user_id, "群聊", &history).await
+        let external_context =
+            crate::external_app_context::group_context_for_chat(&state, &group_id, None).await;
+        social_ai_reply_or_fallback(
+            &state,
+            &user_id,
+            "群聊",
+            &history,
+            external_context.as_ref(),
+        )
+        .await
     };
     let message = state
         .store
@@ -307,8 +316,9 @@ async fn social_ai_reply_or_fallback(
     user_id: &str,
     scene: &str,
     history: &[SocialAiHistoryMessage],
+    external_context: Option<&Value>,
 ) -> String {
-    match build_reply(state, user_id, scene, history).await {
+    match build_reply(state, user_id, scene, history, external_context).await {
         Ok(reply) => reply,
         Err(error) => {
             warn!("{scene} AI 生成失败: {}", error);
@@ -326,6 +336,7 @@ async fn build_reply(
     user_id: &str,
     scene: &str,
     history: &[SocialAiHistoryMessage],
+    external_context: Option<&Value>,
 ) -> Result<String> {
     if history.is_empty() {
         return Ok(if scene == DIRECT_SOCIAL_AI_SCENE {
@@ -341,9 +352,16 @@ async fn build_reply(
     } else {
         "请回答最后一次 @EL 触发的问题。"
     };
+    let external_context_block = format_external_context(external_context);
     let prompt_text = format!(
-        "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n{answer_instruction}",
+        "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n{}{}\n\n{answer_instruction}",
         format_history(history),
+        external_context_block,
+        if external_context_block.is_empty() {
+            ""
+        } else {
+            "\n"
+        },
     );
 
     match resolve_social_agent(state).await {
@@ -382,6 +400,19 @@ async fn build_reply(
             build_reply_with_cli(state, user_id, &prompt_text).await
         }
         Err(api_err) => Err(api_err),
+    }
+}
+
+fn format_external_context(external_context: Option<&Value>) -> String {
+    let Some(context) = external_context else {
+        return String::new();
+    };
+    match serde_json::to_string_pretty(context) {
+        Ok(context_json) => format!(
+            "外部项目业务上下文（只作为群聊讨论参考，不得承诺命中、不得诱导投注；涉及比赛预测时必须说明不确定性）：\n<external_app_context>\n{}\n</external_app_context>",
+            context_json
+        ),
+        Err(_) => String::new(),
     }
 }
 

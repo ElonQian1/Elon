@@ -34,6 +34,21 @@ pub fn external_app_by_id(app_id: &str) -> Option<&'static ExternalAppDefinition
     EXTERNAL_APPS.iter().find(|app| app.id == app_id.trim())
 }
 
+pub fn external_group_by_group_id(
+    group_id: &str,
+) -> Option<(
+    &'static ExternalAppDefinition,
+    &'static ExternalAppGroupDefinition,
+)> {
+    let group_id = group_id.trim();
+    EXTERNAL_APPS.iter().find_map(|app| {
+        app.default_groups
+            .iter()
+            .find(|group| group.group_id == group_id)
+            .map(|group| (app, group))
+    })
+}
+
 pub fn public_external_app_config(app: &ExternalAppDefinition) -> serde_json::Value {
     serde_json::json!({
         "id": app.id,
