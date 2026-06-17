@@ -11,17 +11,19 @@
 <body>
   <main class="pc-shell" id="pcShell">
     <aside class="server-rail" aria-label="空间">
-      <button class="rail-avatar active" id="friendsRail" type="button" title="好友">
-        <span>友</span>
+      <button class="rail-avatar active" id="friendsRail" type="button" data-label="好友" aria-label="好友">
+        <span class="rail-icon friends-icon" aria-hidden="true"></span>
         <small id="friendBadge"></small>
       </button>
-      <button class="rail-avatar node" id="nodeRail" type="button" title="PC 节点">
-        <span>PC</span>
+      <button class="rail-avatar node" id="nodeRail" type="button" data-label="PC 节点" aria-label="PC 节点">
+        <span class="rail-icon node-icon" aria-hidden="true"></span>
         <small id="nodeBadge"></small>
       </button>
       <div class="rail-divider"></div>
       <div class="project-rail-list" id="projectRailList"></div>
-      <button class="rail-avatar add" id="openWebBtn" type="button" title="打开移动网页版">+</button>
+      <button class="rail-avatar add" id="openWebBtn" type="button" data-label="打开移动网页版" aria-label="打开移动网页版">
+        <span class="rail-icon plus-icon" aria-hidden="true"></span>
+      </button>
     </aside>
 
     <aside class="channel-panel">
@@ -75,6 +77,7 @@
       <div class="member-list" id="memberList"></div>
     </aside>
   </main>
+  <div class="rail-tooltip" id="railTooltip" role="tooltip"></div>
 
   <script src="/assets/pc_app_utils.js"></script>
   <script src="/assets/pc_app.js"></script>

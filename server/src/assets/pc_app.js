@@ -17,7 +17,8 @@
     channelTitle: $('channelTitle'), channelSubtitle: $('channelSubtitle'), userName: $('userName'),
     userMeta: $('userMeta'), userDot: $('userDot'), friendBadge: $('friendBadge'), nodeBadge: $('nodeBadge'),
     sidebarSearch: $('sidebarSearch'), composer: $('composer'), input: $('messageInput'),
-    sendBtn: $('sendBtn'), aiTaskBtn: $('aiTaskBtn'), memberPanelTitle: $('memberPanelTitle')
+    sendBtn: $('sendBtn'), aiTaskBtn: $('aiTaskBtn'), memberPanelTitle: $('memberPanelTitle'),
+    railTooltip: $('railTooltip')
   };
 
   function saveToken(token) {
@@ -57,6 +58,15 @@
     return clean(project.icon_data_url || project.iconDataUrl || project.icon_url || project.iconUrl || project.logo || project.avatar);
   }
 
+  function projectHue(project) {
+    const seed = `${project.id || ''}:${titleOf(project)}`;
+    let hash = 0;
+    for (let i = 0; i < seed.length; i += 1) {
+      hash = ((hash << 5) - hash + seed.charCodeAt(i)) | 0;
+    }
+    return 18 + (Math.abs(hash) % 318);
+  }
+
   function userName(user) {
     return clean(user && (user.nickname || user.phone || user.email || user.account || user.id)) || '未登录';
   }
@@ -87,12 +97,15 @@
     els.projectRailList.innerHTML = state.projects.map((project) => {
       const title = titleOf(project);
       const icon = iconUrlOf(project);
-      return `<button class="rail-avatar" type="button" data-project-id="${escapeHtml(project.id)}" title="${escapeHtml(title)}">
-        <span>${escapeHtml(firstChar(title, '项'))}${icon ? `<img src="${escapeHtml(icon)}" alt="" onerror="this.remove()" />` : ''}</span>
+      const hue = projectHue(project);
+      const iconMarkup = icon ? `<img src="${escapeHtml(icon)}" alt="" onerror="this.parentElement.classList.add('fallback'); this.remove()" />` : '';
+      return `<button class="rail-avatar project" type="button" data-project-id="${escapeHtml(project.id)}" data-label="${escapeHtml(title)}" aria-label="${escapeHtml(title)}" style="--project-hue:${hue}">
+        <span class="rail-icon ${icon ? '' : 'fallback'}" aria-hidden="true">${iconMarkup}</span>
       </button>`;
     }).join('');
     els.projectRailList.querySelectorAll('[data-project-id]').forEach((btn) => {
       btn.addEventListener('click', () => selectProject(btn.dataset.projectId));
+      attachRailTooltip(btn);
     });
   }
 
@@ -218,6 +231,7 @@
   function bindEvents() {
     els.friendsRail.addEventListener('click', selectFriends);
     els.nodeRail.addEventListener('click', selectNode);
+    [els.friendsRail, els.nodeRail, $('openWebBtn')].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
@@ -233,6 +247,32 @@
       els.input.style.height = '46px';
       els.input.style.height = Math.min(120, els.input.scrollHeight) + 'px';
     });
+  }
+
+  function attachRailTooltip(button) {
+    if (!button || button.dataset.tooltipBound) return;
+    button.dataset.tooltipBound = '1';
+    button.addEventListener('mouseenter', showRailTooltip);
+    button.addEventListener('focus', showRailTooltip);
+    button.addEventListener('mouseleave', hideRailTooltip);
+    button.addEventListener('blur', hideRailTooltip);
+  }
+
+  function showRailTooltip(event) {
+    if (!els.railTooltip) return;
+    const button = event.currentTarget;
+    const label = clean(button.dataset.label || button.getAttribute('aria-label'));
+    if (!label) return;
+    const rect = button.getBoundingClientRect();
+    els.railTooltip.textContent = label;
+    els.railTooltip.style.left = `${Math.round(rect.right + 12)}px`;
+    els.railTooltip.style.top = `${Math.round(rect.top + rect.height / 2)}px`;
+    els.railTooltip.classList.add('show');
+  }
+
+  function hideRailTooltip() {
+    if (!els.railTooltip) return;
+    els.railTooltip.classList.remove('show');
   }
 
   async function loadBaseData() {
