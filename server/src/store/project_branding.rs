@@ -10,6 +10,8 @@ use super::{
 
 const BB64A_DISPLAY_NAME: &str = "一龙网游加速器";
 const BB64A_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/bb64a-logo.png");
+const ELON_SELF_DISPLAY_NAME: &str = "一龙项目";
+const ELON_SELF_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/elon-self-logo.png");
 const FB2_DISPLAY_NAME: &str = "多冠体育";
 const FB2_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/fb2-logo.png");
 const JIANGXI_JIAN_CHAMBER_DISPLAY_NAME: &str = "江西吉安商会";
@@ -17,10 +19,12 @@ const JIANGXI_JIAN_CHAMBER_LOGO_BYTES: &[u8] =
     include_bytes!("../assets/project-icons/jiangxi-jian-chamber-logo.png");
 
 static BB64A_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
+static ELON_SELF_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
 static FB2_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
 static JIANGXI_JIAN_CHAMBER_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
 
 const BB64A_IDENTIFIERS: &[&str] = &["bb64a"];
+const ELON_SELF_IDENTIFIERS: &[&str] = &["elon-self", "一龙项目", "Elon"];
 const FB2_IDENTIFIERS: &[&str] = &["fb2"];
 const JIANGXI_JIAN_CHAMBER_IDENTIFIERS: &[&str] =
     &["江西吉安商会", "NanchangJiAnChamber", "JiangxiJianChamber"];
@@ -28,11 +32,13 @@ const JIANGXI_JIAN_CHAMBER_IDENTIFIERS: &[&str] =
 #[derive(Clone, Copy)]
 enum KnownProjectBrand {
     Bb64a,
+    ElonSelf,
     Fb2,
     JiangxiJianChamber,
 }
 
 const KNOWN_PROJECT_BRANDS: &[KnownProjectBrand] = &[
+    KnownProjectBrand::ElonSelf,
     KnownProjectBrand::Bb64a,
     KnownProjectBrand::Fb2,
     KnownProjectBrand::JiangxiJianChamber,
@@ -42,6 +48,7 @@ impl KnownProjectBrand {
     fn identifiers(self) -> &'static [&'static str] {
         match self {
             KnownProjectBrand::Bb64a => BB64A_IDENTIFIERS,
+            KnownProjectBrand::ElonSelf => ELON_SELF_IDENTIFIERS,
             KnownProjectBrand::Fb2 => FB2_IDENTIFIERS,
             KnownProjectBrand::JiangxiJianChamber => JIANGXI_JIAN_CHAMBER_IDENTIFIERS,
         }
@@ -50,6 +57,7 @@ impl KnownProjectBrand {
     fn display_name(self) -> &'static str {
         match self {
             KnownProjectBrand::Bb64a => BB64A_DISPLAY_NAME,
+            KnownProjectBrand::ElonSelf => ELON_SELF_DISPLAY_NAME,
             KnownProjectBrand::Fb2 => FB2_DISPLAY_NAME,
             KnownProjectBrand::JiangxiJianChamber => JIANGXI_JIAN_CHAMBER_DISPLAY_NAME,
         }
@@ -58,6 +66,9 @@ impl KnownProjectBrand {
     fn logo_data_url(self) -> &'static str {
         match self {
             KnownProjectBrand::Bb64a => logo_data_url(&BB64A_LOGO_DATA_URL, BB64A_LOGO_BYTES),
+            KnownProjectBrand::ElonSelf => {
+                logo_data_url(&ELON_SELF_LOGO_DATA_URL, ELON_SELF_LOGO_BYTES)
+            }
             KnownProjectBrand::Fb2 => logo_data_url(&FB2_LOGO_DATA_URL, FB2_LOGO_BYTES),
             KnownProjectBrand::JiangxiJianChamber => logo_data_url(
                 &JIANGXI_JIAN_CHAMBER_LOGO_DATA_URL,
@@ -309,6 +320,17 @@ mod tests {
         );
         assert_eq!(
             default_display_name_for_project(
+                "一龙项目",
+                "pc_managed",
+                Some(r"D:\rust\active-projects\elon cli"),
+                None,
+                None
+            )
+            .as_deref(),
+            Some(ELON_SELF_DISPLAY_NAME)
+        );
+        assert_eq!(
+            default_display_name_for_project(
                 "fb2",
                 "pc_managed",
                 Some(r"D:\rust\active-projects\fb2"),
@@ -348,9 +370,9 @@ mod tests {
     fn known_project_branding_supplies_default_icons() {
         let icon = branded_icon_data_url(
             None,
-            "江西吉安商会",
+            "elon-self",
             "pc_managed",
-            Some(r"D:\rust\active-projects\江西吉安商会"),
+            Some(r"D:\rust\active-projects\elon cli"),
             None,
             None,
         )

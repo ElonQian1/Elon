@@ -907,6 +907,11 @@ mod tests {
             .expect("elon self should appear in the store");
         assert!(public_project.is_public);
         assert_eq!(public_project.join_mode, "approval");
+        assert_eq!(public_project.display_name.as_deref(), Some("一龙项目"));
+        assert!(public_project
+            .icon_data_url
+            .as_deref()
+            .is_some_and(|icon| icon.starts_with("data:image/png;base64,")));
 
         let join_error = store
             .join_project(&applicant.id, "elon-self")
