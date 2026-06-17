@@ -62,12 +62,29 @@ pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
     if !client.exists() {
         bail!("缺少客户端启动器：{}", client.display());
     }
-    let mut cmd = Command::new(&client);
-    cmd.current_dir(install_dir)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
+    #[cfg(windows)]
+    {
+        let command = format!(
+            "timeout /t 2 /nobreak >nul & start \"\" \"{}\"",
+            client.display()
+        );
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", &command])
+            .current_dir(install_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
+    }
+    #[cfg(not(windows))]
+    {
+        let mut cmd = Command::new(&client);
+        cmd.current_dir(install_dir)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null());
+        spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
+    }
     Ok(())
 }
 
