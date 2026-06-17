@@ -325,7 +325,7 @@ internal class ProjectSpaceFeedView(
                 })
                 addView(TextView(activity).apply {
                     text = "回复于$timeText"
-                    textSize = 11f
+                    textSize = 12f
                     setTextColor(Color.parseColor("#777777"))
                     setPadding(0, dp(3), 0, 0)
                 })
@@ -540,7 +540,7 @@ internal class ProjectSpaceFeedView(
             if (showButton) {
                 addView(TextView(activity).apply {
                     text = "+"
-                    textSize = 34f
+                    textSize = 24f
                     includeFontPadding = false
                     gravity = Gravity.CENTER
                     setTextColor(Color.parseColor("#D6D6D6"))

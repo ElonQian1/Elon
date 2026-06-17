@@ -101,7 +101,7 @@ internal class ProjectManagementHomeView(
             foreground = selectableForeground()
             setOnClickListener { onClick() }
             setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-            setDesignTextSize(SEGMENT_TEXT_PX)
+            setFontSizeSp(FONT_SEGMENT_SP)
             setTypeface(typeface, Typeface.NORMAL)
             setPadding(designPx(if (selected) 62 else 0), 0, designPx(if (selected) 62 else 0), 0)
             if (selected) background = roundedPx(COLOR_SEGMENT_SELECTED, SEGMENT_HEIGHT_PX / 2)
@@ -141,7 +141,7 @@ internal class ProjectManagementHomeView(
                 gravity = Gravity.CENTER
                 text = "›"
                 setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
-                setDesignTextSize(CHEVRON_TEXT_PX)
+                setFontSizeSp(FONT_CHEVRON_SP)
             }, LinearLayout.LayoutParams(
                 designPx(CHEVRON_WIDTH_PX),
                 LinearLayout.LayoutParams.MATCH_PARENT
@@ -159,7 +159,7 @@ internal class ProjectManagementHomeView(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor(COLOR_TEXT_LIST_TITLE))
-                setDesignTextSize(LIST_TITLE_TEXT_PX)
+                setFontSizeSp(FONT_LIST_TITLE_SP)
                 setTypeface(typeface, Typeface.NORMAL)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -172,7 +172,7 @@ internal class ProjectManagementHomeView(
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
-                setDesignTextSize(LIST_DESC_TEXT_PX)
+                setFontSizeSp(FONT_LIST_DESC_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -201,7 +201,7 @@ internal class ProjectManagementHomeView(
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.END
             setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
-            setDesignTextSize(META_TEXT_PX)
+            setFontSizeSp(FONT_META_SP)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.WRAP_CONTENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
@@ -240,7 +240,7 @@ internal class ProjectManagementHomeView(
                 includeFontPadding = false
                 text = if (showJoint) "暂无联合项目" else "还没有项目，点击 + 创建"
                 setTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
-                setDesignTextSize(EMPTY_TEXT_PX)
+                setFontSizeSp(FONT_EMPTY_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -317,8 +317,8 @@ internal class ProjectManagementHomeView(
         return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
     }
 
-    private fun TextView.setDesignTextSize(value: Int) {
-        setTextSize(TypedValue.COMPLEX_UNIT_PX, designPx(value).toFloat())
+    private fun TextView.setFontSizeSp(value: Int) {
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, value.toFloat())
     }
 
     private fun roundedPx(color: String, radiusPx: Int): GradientDrawable {
@@ -366,11 +366,11 @@ internal class ProjectManagementHomeView(
         const val EMPTY_HEIGHT_PX = 520
         const val BOTTOM_SPACER_PX = 120
 
-        const val SEGMENT_TEXT_PX = 54
-        const val LIST_TITLE_TEXT_PX = 43
-        const val LIST_DESC_TEXT_PX = 43
-        const val META_TEXT_PX = 35
-        const val EMPTY_TEXT_PX = 40
-        const val CHEVRON_TEXT_PX = 58
+        const val FONT_SEGMENT_SP = 17
+        const val FONT_LIST_TITLE_SP = 17
+        const val FONT_LIST_DESC_SP = 13
+        const val FONT_META_SP = 12
+        const val FONT_EMPTY_SP = 16
+        const val FONT_CHEVRON_SP = 24
     }
 }

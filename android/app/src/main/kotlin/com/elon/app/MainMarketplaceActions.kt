@@ -149,7 +149,7 @@ internal class MainMarketplaceActions(
                 includeFontPadding = false
                 text = "搜索"
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             })
             addView(buildFilterScroller(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -206,7 +206,7 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             gravity = Gravity.CENTER
             setPadding(0, dp(2), 0, dp(5))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_ROW_TITLE_SP)
             isClickable = true
             foreground = selectableForeground()
             layoutParams = LinearLayout.LayoutParams(
@@ -357,7 +357,7 @@ internal class MainMarketplaceActions(
                 includeFontPadding = false
                 text = "时间"
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_META_SP)
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -427,7 +427,7 @@ internal class MainMarketplaceActions(
                     gravity = Gravity.CENTER
                     text = avatarText(project.displayTitle())
                     setTextColor(Color.parseColor("#253140"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_AVATAR_SP)
                     setTypeface(typeface, Typeface.BOLD)
                 }, FrameLayout.LayoutParams(
                     FrameLayout.LayoutParams.MATCH_PARENT,
@@ -451,7 +451,7 @@ internal class MainMarketplaceActions(
                 includeFontPadding = false
                 this.text = text
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             })
             addView(View(activity).apply {
                 background = rect(dotColor, 999)
@@ -467,7 +467,7 @@ internal class MainMarketplaceActions(
             includeFontPadding = false
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#101010"))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             setTypeface(typeface, Typeface.BOLD)
             background = rect("#C8C8C8", 999)
             isClickable = true
@@ -590,7 +590,7 @@ internal class MainMarketplaceActions(
             this.text = text
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor(color))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             setPadding(dp(20), dp(58), dp(20), dp(58))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -685,6 +685,10 @@ internal class MainMarketplaceActions(
         const val COLOR_TEXT_TERTIARY = "#777777"
         const val COLOR_DIVIDER = "#A8A8A8"
         const val COLOR_THUMB_BG = "#D2D2D2"
+        const val FONT_AVATAR_SP = 24f
+        const val FONT_ROW_TITLE_SP = 17f
+        const val FONT_PAGE_TITLE_SP = 16f
+        const val FONT_META_SP = 12f
         const val RESULTS_TRAY_RADIUS_DP = 18
         const val RESULTS_TRAY_OVERLAP_DP = 16
     }

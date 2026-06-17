@@ -954,7 +954,7 @@ internal class MainNavigationController(
             binding.projectHomeTopTabWrap.layoutParams = it
         }
         listOf(binding.projectHomeTopTab, binding.projectPlazaTopTab).forEach {
-            it.setTextSize(TypedValue.COMPLEX_UNIT_PX, designPx(PROJECT_TOP_TAB_TEXT_PX).toFloat())
+            it.setTextSize(TypedValue.COMPLEX_UNIT_SP, PROJECT_TOP_TAB_TEXT_SP)
         }
         listOf(binding.projectHomeTabIndicator, binding.projectPlazaTabIndicator).forEach {
             it.layoutParams = it.layoutParams.apply {
@@ -1041,7 +1041,7 @@ internal class MainNavigationController(
         const val PROJECT_TOP_PADDING_START_PX = 78
         const val PROJECT_TOP_PADDING_END_PX = 250
         const val PROJECT_TOP_TAB_GAP_PX = 188
-        const val PROJECT_TOP_TAB_TEXT_PX = 70
+        const val PROJECT_TOP_TAB_TEXT_SP = 16f
         const val PROJECT_TOP_INDICATOR_WIDTH_PX = 98
         const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
         const val PROJECT_TOP_INDICATOR_TOP_PX = 14

@@ -856,7 +856,7 @@ internal class ProjectSpaceController(
                     gravity = Gravity.CENTER_VERTICAL
                     addView(TextView(activity).apply {
                         text = space.project.name
-                        textSize = 20f
+                        textSize = 17f
                         setTypeface(typeface, Typeface.BOLD)
                         setTextColor(Color.parseColor("#D6D6D6"))
                         maxLines = 2

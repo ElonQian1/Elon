@@ -9,6 +9,7 @@ import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
+import android.util.TypedValue
 import android.view.View
 import kotlin.math.cos
 import kotlin.math.sin
@@ -107,7 +108,7 @@ internal class ProjectPlazaPatternView(
         if (icon != null) {
             drawBitmapIcon(canvas, icon, tileRect, radius)
         } else if (project != null) {
-            drawInitialIcon(canvas, project, tileRect, slot.size)
+            drawInitialIcon(canvas, project, tileRect)
         }
     }
 
@@ -198,8 +199,8 @@ internal class ProjectPlazaPatternView(
         canvas.restore()
     }
 
-    private fun drawInitialIcon(canvas: Canvas, project: StoreProject, rect: RectF, size: Float) {
-        iconTextPaint.textSize = size * 0.36f
+    private fun drawInitialIcon(canvas: Canvas, project: StoreProject, rect: RectF) {
+        iconTextPaint.textSize = sp(24)
         val text = avatarText(project.displayTitle())
         val metrics = iconTextPaint.fontMetrics
         val baseline = rect.centerY() - (metrics.ascent + metrics.descent) / 2f
@@ -221,6 +222,9 @@ internal class ProjectPlazaPatternView(
     }
 
     private fun dp(value: Int): Int = (value * density + 0.5f).toInt()
+
+    private fun sp(value: Int): Float =
+        TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, value.toFloat(), resources.displayMetrics)
 
     private companion object {
         private const val FOCUS_SLOT_INDEX = 0

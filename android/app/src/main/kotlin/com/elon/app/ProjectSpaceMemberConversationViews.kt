@@ -95,7 +95,7 @@ internal class ProjectSpaceMemberConversationViews(
                     append(member.account)
                     if (isSelf) append(" (我)")
                 }
-                textSize = 20f
+                textSize = 17f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.parseColor("#D6D6D6"))
             })

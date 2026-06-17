@@ -438,7 +438,7 @@ internal class MainProjectActions(
                     text = project.title.ifBlank { "未命名项目" }
                     setTextColor(Color.parseColor("#D6D6D6"))
                     setTypeface(typeface, Typeface.BOLD)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 20f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
@@ -559,7 +559,7 @@ internal class MainProjectActions(
                     includeFontPadding = false
                     text = action.title
                     setTextColor(Color.parseColor("#D6D6D6"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 15.5f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
@@ -567,7 +567,7 @@ internal class MainProjectActions(
                     includeFontPadding = false
                     text = action.subtitle
                     setTextColor(Color.parseColor("#A8A8A8"))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 }, LinearLayout.LayoutParams(

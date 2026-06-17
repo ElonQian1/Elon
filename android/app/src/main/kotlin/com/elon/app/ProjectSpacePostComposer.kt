@@ -172,7 +172,7 @@ internal class ProjectSpacePostComposer(
     private fun imageTile(): TextView {
         return TextView(activity).apply {
             text = "+"
-            textSize = 34f
+            textSize = 24f
             gravity = Gravity.CENTER
             setTextColor(Color.parseColor("#8C8C8C"))
             background = roundedBackground("#1E1E1E", 6)
@@ -188,7 +188,7 @@ internal class ProjectSpacePostComposer(
         val cleanUrl = imageUrl?.trim()?.takeIf { it.isNotBlank() }
         if (cleanUrl == null) {
             imageTile.text = "+"
-            imageTile.textSize = 34f
+            imageTile.textSize = 24f
             imageTile.setTextColor(Color.parseColor("#8C8C8C"))
         } else {
             imageTile.text = "$label\n${cleanUrl.take(42)}"
@@ -229,7 +229,7 @@ internal class ProjectSpacePostComposer(
             }
             addView(TextView(activity).apply {
                 text = "›"
-                textSize = 20f
+                textSize = 24f
                 gravity = Gravity.CENTER
                 setTextColor(Color.parseColor("#777777"))
             }, LinearLayout.LayoutParams(dp(24), LinearLayout.LayoutParams.WRAP_CONTENT))

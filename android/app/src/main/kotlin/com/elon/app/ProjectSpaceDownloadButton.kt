@@ -42,7 +42,7 @@ internal fun projectSpaceQuickActions(
             }
             addView(TextView(activity).apply {
                 text = "安装应用"
-                textSize = 18f
+                textSize = 16f
                 gravity = Gravity.CENTER
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.parseColor("#D6D6D6"))

@@ -72,7 +72,7 @@
                         android:singleLine="true"
                         android:text="我的项目"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="20dp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <View
@@ -101,7 +101,7 @@
                         android:singleLine="true"
                         android:text="项目广场"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="20dp"
+                        android:textSize="16sp"
                         android:textStyle="bold" />
 
                     <View
@@ -425,7 +425,7 @@
                         android:paddingEnd="22dp"
                         android:text="待提交需求"
                         android:textColor="@color/elon_text_primary"
-                        android:textSize="18sp" />
+                        android:textSize="16sp" />
 
                     <TextView
                         android:id="@+id/projectOverviewText"
@@ -611,7 +611,7 @@
                 android:maxLines="1"
                 android:text="Ai 会话"
                 android:textColor="@color/elon_text_primary"
-                android:textSize="18sp" />
+                android:textSize="16sp" />
         </LinearLayout>
 
         <ScrollView

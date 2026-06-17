@@ -20,7 +20,7 @@
 .project-plaza-search-title {
   margin: 0;
   color: #d6d6d6;
-  font-size: 18px;
+  font-size: 16px;
   line-height: 1;
   font-weight: 400;
 }
@@ -43,7 +43,7 @@
   background: transparent;
   color: #a8a8a8;
   padding: 2px 0 5px;
-  font-size: 15px;
+  font-size: 17px;
   line-height: 1;
   cursor: pointer;
   text-decoration: none;
@@ -104,7 +104,7 @@
 
 .project-plaza-status {
   color: #d6d6d6;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -151,7 +151,7 @@
   display: grid;
   place-items: center;
   overflow: hidden;
-  font-size: 16px;
+  font-size: 24px;
   font-weight: 800;
   line-height: 1;
 }
@@ -210,7 +210,7 @@
   right: 24px;
   top: 42px;
   color: #d6d6d6;
-  font-size: 14px;
+  font-size: 12px;
   line-height: 1;
   white-space: nowrap;
 }
@@ -233,7 +233,7 @@
   border-radius: 999px;
   background: #c8c8c8;
   color: #101010;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 34px;
   font-weight: 800;
   text-align: center;
@@ -252,7 +252,7 @@
   padding: 58px 20px;
   color: #777777;
   text-align: center;
-  font-size: 14px;
+  font-size: 16px;
   line-height: 1.5;
 }
 
