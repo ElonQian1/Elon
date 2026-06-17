@@ -72,6 +72,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (50, "项目展示别名", migration_v50),
     (51, "一龙自项目公开展示并审批加入", migration_v51),
     (52, "项目级 AI 运行权限授权", migration_v52),
+    (53, "群聊 AI 文档、Context Pack 与总结帖", migration_v53),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1828,6 +1829,90 @@ fn migration_v52(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_runtime_permission_audit_project_time
           ON project_runtime_permission_audit(project_id, created_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v53(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS friend_group_ai_documents (
+          group_id    TEXT NOT NULL,
+          path        TEXT NOT NULL,
+          title       TEXT NOT NULL,
+          content     TEXT NOT NULL,
+          position    INTEGER NOT NULL DEFAULT 0,
+          updated_by  TEXT,
+          updated_at  TEXT NOT NULL,
+          PRIMARY KEY (group_id, path),
+          FOREIGN KEY (group_id) REFERENCES friend_groups(id),
+          FOREIGN KEY (updated_by) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS friend_group_summary_context_packs (
+          id              TEXT PRIMARY KEY,
+          group_id        TEXT NOT NULL,
+          purpose         TEXT NOT NULL,
+          query           TEXT,
+          payload_json    TEXT NOT NULL,
+          source_start_at TEXT,
+          source_end_at   TEXT,
+          message_count   INTEGER NOT NULL DEFAULT 0,
+          created_by      TEXT NOT NULL,
+          created_at      TEXT NOT NULL,
+          FOREIGN KEY (group_id) REFERENCES friend_groups(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS friend_group_summary_posts (
+          id                   TEXT PRIMARY KEY,
+          group_id             TEXT NOT NULL,
+          title                TEXT NOT NULL,
+          topic                TEXT,
+          summary              TEXT NOT NULL,
+          status               TEXT NOT NULL DEFAULT 'generating',
+          context_pack_id      TEXT NOT NULL,
+          source_start_at      TEXT,
+          source_end_at        TEXT,
+          source_message_count INTEGER NOT NULL DEFAULT 0,
+          model_used           TEXT,
+          error                TEXT,
+          pinned_at            TEXT,
+          pinned_by            TEXT,
+          created_by           TEXT NOT NULL,
+          created_at           TEXT NOT NULL,
+          updated_at           TEXT NOT NULL,
+          FOREIGN KEY (group_id) REFERENCES friend_groups(id),
+          FOREIGN KEY (context_pack_id) REFERENCES friend_group_summary_context_packs(id),
+          FOREIGN KEY (pinned_by) REFERENCES users(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS friend_group_summary_post_sources (
+          post_id    TEXT NOT NULL,
+          message_id TEXT NOT NULL,
+          position   INTEGER NOT NULL DEFAULT 0,
+          excerpt    TEXT NOT NULL,
+          PRIMARY KEY (post_id, message_id),
+          FOREIGN KEY (post_id) REFERENCES friend_group_summary_posts(id),
+          FOREIGN KEY (message_id) REFERENCES friend_group_messages(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_group_ai_documents_group_position
+          ON friend_group_ai_documents(group_id, position);
+
+        CREATE INDEX IF NOT EXISTS idx_group_summary_context_group_time
+          ON friend_group_summary_context_packs(group_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_group_summary_posts_group_pinned
+          ON friend_group_summary_posts(group_id, pinned_at DESC, updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_group_summary_posts_group_updated
+          ON friend_group_summary_posts(group_id, updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_group_summary_sources_message
+          ON friend_group_summary_post_sources(message_id);
         "#,
     )?;
     Ok(())

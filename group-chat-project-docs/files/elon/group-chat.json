@@ -1,0 +1,12 @@
+{
+  "kind": "elon_group_chat_project",
+  "version": 1,
+  "features": {
+    "summary_posts": true,
+    "context_pack_required": true,
+    "topic_split": true,
+    "hybrid_retrieval": true
+  },
+  "default_summary_status": "generating"
+}
+

@@ -128,6 +128,84 @@ pub struct FriendGroupMessage {
     pub outgoing: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupAiDocument {
+    pub group_id: String,
+    pub path: String,
+    pub title: String,
+    pub content: String,
+    pub updated_by: Option<String>,
+    pub updated_by_name: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupSummarySourceMessage {
+    pub id: String,
+    pub group_id: String,
+    pub sender_user_id: String,
+    pub sender_name: String,
+    pub content: String,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupSummaryCreateInput {
+    pub title: Option<String>,
+    pub topic: Option<String>,
+    pub instructions: Option<String>,
+    pub message_ids: Vec<String>,
+    pub start_at: Option<String>,
+    pub end_at: Option<String>,
+    pub limit: i64,
+    pub pin: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupSummaryContextPack {
+    pub id: String,
+    pub group_id: String,
+    pub purpose: String,
+    pub query: Option<String>,
+    pub payload_json: String,
+    pub source_start_at: Option<String>,
+    pub source_end_at: Option<String>,
+    pub message_count: i64,
+    pub created_by: String,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupSummaryPost {
+    pub id: String,
+    pub group_id: String,
+    pub title: String,
+    pub topic: Option<String>,
+    pub summary: String,
+    pub status: String,
+    pub context_pack_id: String,
+    pub source_start_at: Option<String>,
+    pub source_end_at: Option<String>,
+    pub source_message_count: i64,
+    pub model_used: Option<String>,
+    pub error: Option<String>,
+    pub pinned_at: Option<String>,
+    pub pinned_by: Option<String>,
+    pub pinned_by_name: Option<String>,
+    pub created_by: String,
+    pub created_by_name: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GroupSummaryPostDetail {
+    pub post: GroupSummaryPost,
+    pub context_pack: GroupSummaryContextPack,
+    pub sources: Vec<GroupSummarySourceMessage>,
+}
+
 // ── 管理后台 ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

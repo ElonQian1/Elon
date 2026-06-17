@@ -20,6 +20,9 @@ mod compute_metering;
 mod conversations;
 mod friend_messages;
 mod friends;
+mod group_summary;
+#[cfg(test)]
+mod group_summary_tests;
 mod groups;
 mod join_requests;
 mod native_sessions;
