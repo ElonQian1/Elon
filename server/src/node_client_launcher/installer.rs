@@ -2,9 +2,13 @@ use anyhow::{Context, Result};
 use std::{
     path::{Path, PathBuf},
     process::{Command, Stdio},
+    time::Duration,
 };
 
-use super::{paths, process, windows_integration, AGENT_EXE_NAME, INTERNAL_DIR_NAME};
+use super::{
+    env_file, paths, process, windows_integration, AGENT_EXE_NAME, DEFAULT_ADMIN_PORT,
+    INTERNAL_DIR_NAME,
+};
 
 const INTERNAL_FILES: &[&str] = &[
     AGENT_EXE_NAME,
@@ -41,7 +45,9 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
     std::fs::create_dir_all(&internal_dir)
         .with_context(|| format!("无法创建安装目录 {}", internal_dir.display()))?;
 
+    let previous_port = configured_admin_port(&install_dir);
     process::stop_agent();
+    process::wait_for_port_closed(previous_port, Duration::from_secs(5));
 
     let current_exe = std::env::current_exe().context("无法定位当前客户端 exe")?;
     copy_if_needed(&current_exe, &paths::client_exe(&install_dir))?;
@@ -137,6 +143,17 @@ fn cleanup_legacy_top_level(install_dir: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn configured_admin_port(install_dir: &Path) -> u16 {
+    env_file::read_env_file(&paths::env_file(install_dir))
+        .ok()
+        .and_then(|values| {
+            values
+                .get("NODE_ADMIN_PORT")
+                .and_then(|value| value.parse::<u16>().ok())
+        })
+        .unwrap_or(DEFAULT_ADMIN_PORT)
 }
 
 fn copy_if_needed(source: &Path, dest: &Path) -> Result<()> {

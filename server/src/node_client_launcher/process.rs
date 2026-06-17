@@ -136,6 +136,17 @@ pub(crate) fn wait_for_port(port: u16, timeout: Duration) -> bool {
     false
 }
 
+pub(crate) fn wait_for_port_closed(port: u16, timeout: Duration) -> bool {
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        if !is_port_open(port) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(200));
+    }
+    !is_port_open(port)
+}
+
 pub(crate) fn is_port_open(port: u16) -> bool {
     TcpStream::connect(("127.0.0.1", port)).is_ok()
 }
