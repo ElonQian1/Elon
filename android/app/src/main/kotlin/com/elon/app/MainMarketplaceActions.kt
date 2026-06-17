@@ -222,7 +222,7 @@ internal class MainMarketplaceActions(
             gravity = Gravity.CENTER
             minWidth = dp(48)
             minHeight = dp(FILTER_ROW_HEIGHT_DP)
-            setPadding(dp(8), 0, dp(8), 0)
+            setPadding(dp(FILTER_UNSELECTED_SIDE_PADDING_DP), 0, dp(FILTER_UNSELECTED_SIDE_PADDING_DP), 0)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             isClickable = true
             foreground = selectableForeground()
@@ -230,7 +230,7 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             ).apply {
-                marginEnd = dp(14)
+                marginEnd = dp(FILTER_ITEM_GAP_DP)
             }
             setOnClickListener {
                 if (activeFilterKey == option.key) return@setOnClickListener
@@ -249,7 +249,11 @@ internal class MainMarketplaceActions(
             chip.paint.isUnderlineText = false
             chip.setTypeface(chip.typeface, Typeface.NORMAL)
             chip.background = if (selected) rect(COLOR_SEGMENT_SELECTED, FILTER_RADIUS_DP) else null
-            val sidePadding = if (selected) 20 else 8
+            val sidePadding = if (selected) {
+                FILTER_SELECTED_SIDE_PADDING_DP
+            } else {
+                FILTER_UNSELECTED_SIDE_PADDING_DP
+            }
             chip.setPadding(dp(sidePadding), 0, dp(sidePadding), 0)
         }
     }
@@ -287,7 +291,7 @@ internal class MainMarketplaceActions(
         }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            background = rect(COLOR_CARD_BODY, 12)
+            background = rect(COLOR_CARD_BODY, CARD_RADIUS_DP)
             clipToOutline = true
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -368,8 +372,8 @@ internal class MainMarketplaceActions(
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 leftMargin = dp(24)
-                rightMargin = dp(150)
-                topMargin = dp(28)
+                rightMargin = dp(CARD_MAIN_RIGHT_MARGIN_DP)
+                topMargin = dp(CARD_BODY_CONTENT_TOP_DP)
             })
 
             addView(TextView(activity).apply {
@@ -390,7 +394,7 @@ internal class MainMarketplaceActions(
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.END or Gravity.CENTER_VERTICAL
                 addView(joinBtn, LinearLayout.LayoutParams(dp(ACTION_BUTTON_WIDTH_DP), dp(ACTION_BUTTON_HEIGHT_DP)).apply {
-                    marginEnd = dp(12)
+                    marginEnd = dp(ACTION_BUTTON_GAP_DP)
                 })
                 addView(actionButton(projectPlazaApkActionLabel(project)).apply {
                     val hasApk = !project.latestApkUrl.isNullOrBlank()
@@ -398,7 +402,7 @@ internal class MainMarketplaceActions(
                     isEnabled = hasApk || hasInstalledApp
                     alpha = if (isEnabled) 1f else 0.55f
                     setOnClickListener { tryInstallProject(project, this, joinBtn) }
-                }, LinearLayout.LayoutParams(dp(92), dp(34)))
+                }, LinearLayout.LayoutParams(dp(ACTION_BUTTON_WIDTH_DP), dp(ACTION_BUTTON_HEIGHT_DP)))
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -406,7 +410,7 @@ internal class MainMarketplaceActions(
             ).apply {
                 leftMargin = dp(24)
                 rightMargin = dp(24)
-                bottomMargin = dp(20)
+                bottomMargin = dp(ACTION_BUTTON_BOTTOM_DP)
             })
         }
     }
@@ -464,13 +468,13 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginStart = dp(24)
+                marginStart = dp(18)
             }
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 this.text = text
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_STATUS_SP)
             })
             addView(View(activity).apply {
                 background = rect(dotColor, 999)
@@ -725,20 +729,28 @@ internal class MainMarketplaceActions(
         const val COLOR_STATUS_DANGER = "#E62129"
         const val FONT_AVATAR_SP = 24f
         const val FONT_PAGE_TITLE_SP = 16f
+        const val FONT_STATUS_SP = 15f
         const val FONT_META_SP = 12f
         const val SEARCH_HEIGHT_DP = 56
         const val SEARCH_RADIUS_DP = 28
         const val FILTER_ROW_HEIGHT_DP = 48
         const val FILTER_RADIUS_DP = 24
+        const val FILTER_SELECTED_SIDE_PADDING_DP = 16
+        const val FILTER_UNSELECTED_SIDE_PADDING_DP = 2
+        const val FILTER_ITEM_GAP_DP = 8
         const val CARD_RADIUS_DP = 18
-        const val CARD_HEADER_HEIGHT_DP = 56
-        const val CARD_BODY_HEIGHT_DP = 192
-        const val FIRST_CARD_TOP_MARGIN_DP = 28
-        const val CARD_GAP_DP = 16
-        const val THUMB_SIZE_DP = 56
-        const val DIVIDER_WIDTH_DP = 196
-        const val DESC_WIDTH_DP = 220
-        const val ACTION_BUTTON_WIDTH_DP = 96
-        const val ACTION_BUTTON_HEIGHT_DP = 44
+        const val CARD_HEADER_HEIGHT_DP = 44
+        const val CARD_BODY_HEIGHT_DP = 140
+        const val FIRST_CARD_TOP_MARGIN_DP = 18
+        const val CARD_GAP_DP = 10
+        const val THUMB_SIZE_DP = 40
+        const val DIVIDER_WIDTH_DP = 172
+        const val DESC_WIDTH_DP = 158
+        const val CARD_BODY_CONTENT_TOP_DP = 28
+        const val CARD_MAIN_RIGHT_MARGIN_DP = 132
+        const val ACTION_BUTTON_WIDTH_DP = 76
+        const val ACTION_BUTTON_HEIGHT_DP = 36
+        const val ACTION_BUTTON_GAP_DP = 12
+        const val ACTION_BUTTON_BOTTOM_DP = 14
     }
 }
