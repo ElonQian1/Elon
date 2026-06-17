@@ -16,3 +16,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "ElonApp"
 include ':app'
+include ':chat-voice-kit'

@@ -1,5 +1,7 @@
 package com.elon.app
 
+import com.elon.chatvoice.ChatVoiceIds
+
 internal const val VOICE_TTS_COMPARISON_PREVIEW_TEXT = "你好呀，我是你的 AI 助手。以后就让我陪你聊天吧。"
 
 internal data class VoiceTtsVoiceOption(
@@ -12,7 +14,7 @@ internal data class VoiceTtsVoiceOption(
 
 internal object VoiceTtsVoiceCatalog {
     const val COMPARISON_PREVIEW_TEXT = VOICE_TTS_COMPARISON_PREVIEW_TEXT
-    const val SYSTEM_TTS_VOICE_ID = "android_system"
+    const val SYSTEM_TTS_VOICE_ID = ChatVoiceIds.ANDROID_SYSTEM_TTS
 
     val systemVoice: VoiceTtsVoiceOption = VoiceTtsVoiceOption(
         id = SYSTEM_TTS_VOICE_ID,

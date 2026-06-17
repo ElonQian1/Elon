@@ -6,6 +6,7 @@ server/Cargo.lock
 # Android build outputs & local config
 android/.gradle/
 android/app/build/
+android/chat-voice-kit/build/
 android/local.properties
 android/*.apk
 android/app/*.jks
