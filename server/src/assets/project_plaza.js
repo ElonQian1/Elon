@@ -17,9 +17,12 @@
     joinedIds: new Set(),
     busyId: '',
     filterKey: 'all',
+    query: '',
     status: '',
     error: false
   };
+
+  let searchTimer = 0;
 
   function bridge() {
     return window.ElonWebApp || {};
@@ -86,10 +89,8 @@
   }
 
   function joinActionLabel(mode, joined) {
-    if (joined) return '进入项目';
-    if (normalizeJoinMode(mode) === 'open') return '加入';
-    if (normalizeJoinMode(mode) === 'readonly') return '进入体验';
-    return '审批加入';
+    if (joined || normalizeJoinMode(mode) !== 'approval') return '进入空间';
+    return '申请加入';
   }
 
   function projectIdentity(project) {
@@ -195,6 +196,7 @@
       limit: String(PAGE_LIMIT),
       offset: String(offset)
     });
+    if (state.query.trim()) params.set('q', state.query.trim());
     if (filter.hasApk != null) params.set('has_apk', String(filter.hasApk));
     if (filter.sort) params.set('sort', filter.sort);
     const res = await callApi('/api/store/projects?' + params.toString(), { cache: 'no-store' });
@@ -221,11 +223,16 @@
     const el = root();
     if (!el) return;
     el.innerHTML = `
-      <div class="project-plaza-search-panel">
-        <h2 class="project-plaza-search-title">搜索</h2>
-        <div class="project-plaza-filter-row">
-          ${filters.map(renderFilter).join('')}
-        </div>
+      <div class="project-plaza-search-bar">
+        <span class="project-plaza-search-icon" aria-hidden="true">
+          <svg viewBox="0 0 26 26" fill="none">
+            <path d="M11.6 5.8a5.8 5.8 0 1 0 .1 0M16.1 16.1 21.8 21.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+          </svg>
+        </span>
+        <input class="project-plaza-search-input" type="search" placeholder="搜索应用" value="${escapeHtml(state.query)}" data-plaza-action="search" />
+      </div>
+      <div class="project-plaza-filter-row">
+        ${filters.map(renderFilter).join('')}
       </div>
       <div class="project-plaza-results">
         ${renderResults()}
@@ -260,7 +267,7 @@
       <div class="project-plaza-card" data-id="${escapeHtml(project.id)}">
         <div class="project-plaza-card-head">
           <div class="project-plaza-name">${escapeHtml(identity.title)}</div>
-          <div class="project-plaza-status" style="--dot:${mode === 'approval' ? '#F04B4F' : '#58BE6A'}">${approvalLabel(mode)}</div>
+          <div class="project-plaza-status" style="--dot:${mode === 'approval' ? '#E62129' : '#58BE6A'}">${approvalLabel(mode)}</div>
           <div class="project-plaza-status" style="--dot:${apkUrl ? '#58BE6A' : '#777777'}">${apkUrl ? '可安装' : '暂无APK'}</div>
         </div>
         <div class="project-plaza-card-body">
@@ -365,6 +372,15 @@
     if (!el || el.dataset.projectPlazaReady === 'true') return;
     el.dataset.projectPlazaReady = 'true';
     el.addEventListener('click', handleAction);
+    el.addEventListener('input', handleInput);
+  }
+
+  function handleInput(event) {
+    const input = event.target.closest('[data-plaza-action="search"]');
+    if (!input) return;
+    state.query = input.value || '';
+    window.clearTimeout(searchTimer);
+    searchTimer = window.setTimeout(() => loadProjects(), 320);
   }
 
   function handleAction(event) {

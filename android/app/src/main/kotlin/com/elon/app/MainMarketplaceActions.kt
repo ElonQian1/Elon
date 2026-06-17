@@ -5,6 +5,7 @@ import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.text.Editable
+import android.text.InputType
 import android.text.TextUtils
 import android.text.TextWatcher
 import android.util.TypedValue
@@ -109,23 +110,26 @@ internal class MainMarketplaceActions(
         filterChipViews.clear()
         val shell = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, 0, 0, dp(28))
+            setPadding(0, 0, 0, dp(32))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         }
-        shell.addView(buildSearchPanel())
+        shell.addView(buildSearchBar())
+        shell.addView(buildFilterScroller(), LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(FILTER_ROW_HEIGHT_DP)
+        ).apply {
+            topMargin = dp(20)
+        })
         val results = LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(RESULTS_TRAY_OVERLAP_DP), 0, 0)
-            background = topRoundedRect(COLOR_APP_BG, RESULTS_TRAY_RADIUS_DP)
+            setPadding(0, 0, 0, 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = -dp(RESULTS_TRAY_OVERLAP_DP)
-            }
+            )
         }
         shell.addView(results)
         container.addView(shell)
@@ -134,45 +138,50 @@ internal class MainMarketplaceActions(
         return results
     }
 
-    private fun buildSearchPanel(): LinearLayout {
+    private fun buildSearchBar(): LinearLayout {
         return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            background = rect(COLOR_CARD_HEADER, 14)
-            setPadding(dp(22), dp(20), dp(22), dp(16))
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = rect(COLOR_SEARCH_BG, SEARCH_RADIUS_DP)
+            setPadding(dp(20), 0, dp(18), 0)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                dp(SEARCH_HEIGHT_DP)
             ).apply {
-                topMargin = dp(12)
-            }
-            addView(TextView(activity).apply {
-                includeFontPadding = false
-                text = "搜索"
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
-            })
-            addView(buildFilterScroller(), LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
+                marginStart = dp(16)
+                marginEnd = dp(16)
                 topMargin = dp(16)
+            }
+            addView(ImageView(activity).apply {
+                setImageResource(R.drawable.ic_search_simple)
+                setColorFilter(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+                contentDescription = null
+            }, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+                marginEnd = dp(12)
             })
             addView(buildSearchField(), LinearLayout.LayoutParams(
+                0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(1)
-            ).apply {
-                topMargin = dp(1)
-            })
+                1f
+            ))
         }
     }
 
     private fun buildSearchField(): EditText {
         return EditText(activity).apply {
             searchField = this
-            visibility = View.GONE
+            background = null
+            hint = "搜索应用"
             setText(searchQuery)
             setSingleLine(true)
+            inputType = InputType.TYPE_CLASS_TEXT
             imeOptions = EditorInfo.IME_ACTION_SEARCH
+            includeFontPadding = false
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, 0, 0, 0)
+            setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            setHintTextColor(Color.parseColor(COLOR_TEXT_PLACEHOLDER))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = Unit
@@ -193,10 +202,16 @@ internal class MainMarketplaceActions(
         return HorizontalScrollView(activity).apply {
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
+            clipToPadding = false
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                setPadding(dp(16), 0, dp(16), 0)
                 filters.forEach { addView(filterChip(it)) }
-            })
+            }, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.MATCH_PARENT
+            ))
         }
     }
 
@@ -205,15 +220,17 @@ internal class MainMarketplaceActions(
             text = option.label
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setPadding(0, dp(2), 0, dp(5))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_ROW_TITLE_SP)
+            minWidth = dp(48)
+            minHeight = dp(FILTER_ROW_HEIGHT_DP)
+            setPadding(dp(8), 0, dp(8), 0)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             isClickable = true
             foreground = selectableForeground()
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                LinearLayout.LayoutParams.MATCH_PARENT
             ).apply {
-                marginEnd = dp(34)
+                marginEnd = dp(14)
             }
             setOnClickListener {
                 if (activeFilterKey == option.key) return@setOnClickListener
@@ -228,9 +245,12 @@ internal class MainMarketplaceActions(
     private fun updateFilterChipVisuals() {
         filterChipViews.forEach { (key, chip) ->
             val selected = key == activeFilterKey
-            chip.setTextColor(Color.parseColor(if (selected) COLOR_TEXT_PRIMARY else COLOR_TEXT_SECONDARY))
-            chip.paint.isUnderlineText = selected
-            chip.setTypeface(chip.typeface, if (selected) Typeface.BOLD else Typeface.NORMAL)
+            chip.setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
+            chip.paint.isUnderlineText = false
+            chip.setTypeface(chip.typeface, Typeface.NORMAL)
+            chip.background = if (selected) rect(COLOR_SEGMENT_SELECTED, FILTER_RADIUS_DP) else null
+            val sidePadding = if (selected) 20 else 8
+            chip.setPadding(dp(sidePadding), 0, dp(sidePadding), 0)
         }
     }
 
@@ -253,14 +273,14 @@ internal class MainMarketplaceActions(
             container.addView(centerMessage("暂无匹配项目", COLOR_TEXT_SECONDARY))
             return
         }
-        projects.forEach { project ->
-            container.addView(buildProjectCard(project))
+        projects.forEachIndexed { index, project ->
+            container.addView(buildProjectCard(project, index))
         }
     }
 
-    private fun buildProjectCard(project: StoreProject): LinearLayout {
+    private fun buildProjectCard(project: StoreProject, index: Int): LinearLayout {
         val alreadyJoined = isProjectJoined(project)
-        val joinBtn = actionButton(projectJoinActionLabel(project.joinMode, alreadyJoined)).apply {
+        val joinBtn = actionButton(projectEntryActionLabel(project, alreadyJoined)).apply {
             setOnClickListener {
                 if (alreadyJoined) openJoinedProject(project) else tryJoinProject(project, this)
             }
@@ -275,15 +295,15 @@ internal class MainMarketplaceActions(
             ).apply {
                 marginStart = dp(16)
                 marginEnd = dp(16)
-                topMargin = dp(8)
+                topMargin = dp(if (index == 0) FIRST_CARD_TOP_MARGIN_DP else CARD_GAP_DP)
             }
             addView(createCardHeader(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(54)
+                dp(CARD_HEADER_HEIGHT_DP)
             ))
             addView(createCardBody(project, joinBtn), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(184)
+                dp(CARD_BODY_HEIGHT_DP)
             ))
         }
     }
@@ -294,14 +314,14 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(24), 0, dp(24), 0)
-            background = topRoundedRect(COLOR_CARD_HEADER, 12)
+            background = topRoundedRect(COLOR_CARD_HEADER, CARD_RADIUS_DP)
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = identity.title
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
                 setTypeface(typeface, Typeface.BOLD)
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(statusLabel(joinApprovalLabel(project.joinMode), approvalDotColor(project.joinMode)))
@@ -318,7 +338,7 @@ internal class MainMarketplaceActions(
                 addView(LinearLayout(activity).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
-                    addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(40), dp(40)).apply {
+                    addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(THUMB_SIZE_DP), dp(THUMB_SIZE_DP)).apply {
                         marginEnd = dp(14)
                     })
                     addView(LinearLayout(activity).apply {
@@ -329,8 +349,7 @@ internal class MainMarketplaceActions(
                 })
                 addView(View(activity).apply {
                     setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
-                    alpha = 0.74f
-                }, LinearLayout.LayoutParams(dp(196), dp(1)).apply {
+                }, LinearLayout.LayoutParams(dp(DIVIDER_WIDTH_DP), dp(1)).apply {
                     topMargin = dp(12)
                 })
                 addView(TextView(activity).apply {
@@ -341,16 +360,16 @@ internal class MainMarketplaceActions(
                     setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     setLineSpacing(dp(2).toFloat(), 1.0f)
-                }, LinearLayout.LayoutParams(dp(206), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = dp(11)
+                }, LinearLayout.LayoutParams(dp(DESC_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
+                    topMargin = dp(10)
                 })
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 leftMargin = dp(24)
-                rightMargin = dp(132)
-                topMargin = dp(34)
+                rightMargin = dp(150)
+                topMargin = dp(28)
             })
 
             addView(TextView(activity).apply {
@@ -370,10 +389,10 @@ internal class MainMarketplaceActions(
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.END or Gravity.CENTER_VERTICAL
-                addView(joinBtn, LinearLayout.LayoutParams(dp(92), dp(34)).apply {
-                    marginEnd = dp(10)
+                addView(joinBtn, LinearLayout.LayoutParams(dp(ACTION_BUTTON_WIDTH_DP), dp(ACTION_BUTTON_HEIGHT_DP)).apply {
+                    marginEnd = dp(12)
                 })
-                addView(actionButton(projectApkActionLabel(activity, project.id, project.name, project.latestApkUrl)).apply {
+                addView(actionButton(projectPlazaApkActionLabel(project)).apply {
                     val hasApk = !project.latestApkUrl.isNullOrBlank()
                     val hasInstalledApp = isProjectAppInstalled(activity, project.id, project.name)
                     isEnabled = hasApk || hasInstalledApp
@@ -404,7 +423,7 @@ internal class MainMarketplaceActions(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply {
-            bottomMargin = dp(9)
+            bottomMargin = dp(10)
         })
     }
 
@@ -466,10 +485,10 @@ internal class MainMarketplaceActions(
             this.text = text
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTextColor(Color.parseColor("#101010"))
+            setTextColor(Color.parseColor(COLOR_BUTTON_TEXT))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             setTypeface(typeface, Typeface.BOLD)
-            background = rect("#C8C8C8", 999)
+            background = rect(COLOR_BUTTON_BG, 999)
             isClickable = true
             foreground = selectableForeground()
             maxLines = 1
@@ -503,7 +522,7 @@ internal class MainMarketplaceActions(
                     }
                     .onFailure {
                         joinBtn.isEnabled = true
-                        joinBtn.text = projectJoinActionLabel(project.joinMode)
+                        joinBtn.text = projectEntryActionLabel(project, false)
                         Toast.makeText(activity, it.message ?: "加入失败", Toast.LENGTH_SHORT).show()
                     }
             }
@@ -523,7 +542,7 @@ internal class MainMarketplaceActions(
                     }
                     .onFailure {
                         joinBtn.isEnabled = true
-                        joinBtn.text = projectJoinActionLabel(project.joinMode)
+                        joinBtn.text = projectEntryActionLabel(project, false)
                         Toast.makeText(activity, it.message ?: "申请失败", Toast.LENGTH_SHORT).show()
                     }
             }
@@ -559,7 +578,7 @@ internal class MainMarketplaceActions(
             }
             activity.runOnUiThread {
                 installBtn.isEnabled = true
-                installBtn.text = projectApkActionLabel(activity, project.id, project.name, project.latestApkUrl)
+                installBtn.text = projectPlazaApkActionLabel(project)
                 result
                     .onSuccess { url ->
                         if (shouldJoin) {
@@ -580,7 +599,7 @@ internal class MainMarketplaceActions(
     }
 
     private fun markProjectJoined(project: StoreProject, joinBtn: TextView) {
-        joinBtn.text = "进入空间"
+        joinBtn.text = projectEntryActionLabel(project, true)
         joinBtn.isEnabled = true
         joinBtn.setOnClickListener { openJoinedProject(project) }
     }
@@ -641,13 +660,13 @@ internal class MainMarketplaceActions(
     }
 
     private fun approvalDotColor(joinMode: String): String {
-        return if (normalizeProjectJoinMode(joinMode) == PROJECT_JOIN_MODE_APPROVAL) "#F04B4F" else "#58BE6A"
+        return if (normalizeProjectJoinMode(joinMode) == PROJECT_JOIN_MODE_APPROVAL) COLOR_STATUS_DANGER else COLOR_STATUS_SUCCESS
     }
 
     private fun apkDotColor(project: StoreProject): String {
         return if (project.latestApkUrl.isNullOrBlank() &&
             !isProjectAppInstalled(activity, project.id, project.name)
-        ) "#777777" else "#58BE6A"
+        ) COLOR_TEXT_TERTIARY else COLOR_STATUS_SUCCESS
     }
 
     private fun apkStatusLabel(project: StoreProject): String {
@@ -656,6 +675,18 @@ internal class MainMarketplaceActions(
             project.latestApkUrl.isNullOrBlank() -> "暂无APK"
             else -> "可安装"
         }
+    }
+
+    private fun projectEntryActionLabel(project: StoreProject, alreadyJoined: Boolean): String {
+        return if (alreadyJoined || normalizeProjectJoinMode(project.joinMode) != PROJECT_JOIN_MODE_APPROVAL) {
+            "进入空间"
+        } else {
+            "申请加入"
+        }
+    }
+
+    private fun projectPlazaApkActionLabel(project: StoreProject): String {
+        return if (isProjectAppInstalled(activity, project.id, project.name)) "打开应用" else "下载APK"
     }
 
     private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {
@@ -677,19 +708,37 @@ internal class MainMarketplaceActions(
 
     private companion object {
         const val FILTER_ALL = "all"
-        const val COLOR_APP_BG = "#101010"
-        const val COLOR_CARD_HEADER = "#202024"
-        const val COLOR_CARD_BODY = "#2A2A2A"
-        const val COLOR_TEXT_PRIMARY = "#D6D6D6"
-        const val COLOR_TEXT_SECONDARY = "#A8A8A8"
+        const val COLOR_APP_BG = "#000000"
+        const val COLOR_CARD_HEADER = "#1F2023"
+        const val COLOR_CARD_BODY = "#1A1A1A"
+        const val COLOR_SEARCH_BG = "#272727"
+        const val COLOR_SEGMENT_SELECTED = "#1A1A1A"
+        const val COLOR_TEXT_PRIMARY = "#D9D9D9"
+        const val COLOR_TEXT_SECONDARY = "#B8B8B8"
+        const val COLOR_TEXT_PLACEHOLDER = "#AFAFAF"
         const val COLOR_TEXT_TERTIARY = "#777777"
-        const val COLOR_DIVIDER = "#A8A8A8"
-        const val COLOR_THUMB_BG = "#D2D2D2"
+        const val COLOR_DIVIDER = "#6D6E6F"
+        const val COLOR_THUMB_BG = "#FFFFFF"
+        const val COLOR_BUTTON_BG = "#FFFFFF"
+        const val COLOR_BUTTON_TEXT = "#000000"
+        const val COLOR_STATUS_SUCCESS = "#58BE6A"
+        const val COLOR_STATUS_DANGER = "#E62129"
         const val FONT_AVATAR_SP = 24f
-        const val FONT_ROW_TITLE_SP = 17f
         const val FONT_PAGE_TITLE_SP = 16f
         const val FONT_META_SP = 12f
-        const val RESULTS_TRAY_RADIUS_DP = 18
-        const val RESULTS_TRAY_OVERLAP_DP = 16
+        const val SEARCH_HEIGHT_DP = 56
+        const val SEARCH_RADIUS_DP = 28
+        const val FILTER_ROW_HEIGHT_DP = 48
+        const val FILTER_RADIUS_DP = 24
+        const val CARD_RADIUS_DP = 18
+        const val CARD_HEADER_HEIGHT_DP = 56
+        const val CARD_BODY_HEIGHT_DP = 192
+        const val FIRST_CARD_TOP_MARGIN_DP = 28
+        const val CARD_GAP_DP = 16
+        const val THUMB_SIZE_DP = 56
+        const val DIVIDER_WIDTH_DP = 196
+        const val DESC_WIDTH_DP = 220
+        const val ACTION_BUTTON_WIDTH_DP = 96
+        const val ACTION_BUTTON_HEIGHT_DP = 44
     }
 }
