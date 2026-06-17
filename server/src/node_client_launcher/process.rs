@@ -57,6 +57,20 @@ pub(crate) fn stop_agent() {
     }
 }
 
+pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
+    let client = paths::client_exe(install_dir);
+    if !client.exists() {
+        bail!("缺少客户端启动器：{}", client.display());
+    }
+    let mut cmd = Command::new(&client);
+    cmd.current_dir(install_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
+    Ok(())
+}
+
 pub(crate) fn open_pc_web_page(
     port: u16,
     env_values: &std::collections::HashMap<String, String>,

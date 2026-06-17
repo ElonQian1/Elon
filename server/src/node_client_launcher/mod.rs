@@ -34,7 +34,7 @@ pub(crate) fn run() -> Result<()> {
         ClientCommand::Install => {
             let install_dir = installer::install_or_repair()?;
             updater::update_agent_if_needed(&install_dir)?;
-            process::start_or_open(&install_dir)?;
+            process::launch_installed_client(&install_dir)?;
         }
         ClientCommand::Uninstall => installer::uninstall()?,
         ClientCommand::Update => {
