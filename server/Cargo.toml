@@ -22,7 +22,7 @@ elon-pc-dev-runtime = { path = "pc-dev-runtime" }
 # Web 框架
 axum = { version = "0.7", features = ["ws", "macros", "multipart"] }
 tower = "0.4"
-tower-http = { version = "0.5", features = ["cors", "fs"] }
+tower-http = { version = "0.5", features = ["cors", "fs", "compression-gzip"] }
 
 # 序列化
 serde = { version = "1", features = ["derive"] }

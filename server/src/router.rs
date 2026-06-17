@@ -4,6 +4,7 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
+use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::ServeFile;
 
@@ -740,6 +741,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/admin/node-payouts/:payout_id/reject",
             post(node_payout_admin::reject),
         )
+        .layer(CompressionLayer::new())
         .layer(cors)
         .with_state(state)
 }

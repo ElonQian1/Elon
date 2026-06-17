@@ -17,6 +17,7 @@ const FB2_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/fb2-logo.p
 const JIANGXI_JIAN_CHAMBER_DISPLAY_NAME: &str = "江西吉安商会";
 const JIANGXI_JIAN_CHAMBER_LOGO_BYTES: &[u8] =
     include_bytes!("../assets/project-icons/jiangxi-jian-chamber-logo.png");
+const PUBLIC_PROJECT_ICON_DATA_URL_SOFT_LIMIT: usize = 48_000;
 
 static BB64A_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
 static ELON_SELF_LOGO_DATA_URL: OnceLock<String> = OnceLock::new();
@@ -131,18 +132,11 @@ pub(crate) fn apply_public_project_branding(
     source_type: &str,
     workspace_path: Option<&str>,
 ) {
-    let fallback_display_name =
-        default_display_name_for_project(&project.name, source_type, workspace_path, None, None);
-    project.display_name =
-        clean_display_name(project.display_name.take()).or(fallback_display_name);
-    project.icon_data_url = branded_icon_data_url(
-        project.icon_data_url.take(),
-        &project.name,
-        source_type,
-        workspace_path,
-        None,
-        None,
-    );
+    let known_brand =
+        known_brand_for_project(&project.name, source_type, workspace_path, None, None);
+    project.display_name = clean_display_name(project.display_name.take())
+        .or_else(|| known_brand.map(|brand| brand.display_name().to_string()));
+    project.icon_data_url = public_project_icon_data_url(project.icon_data_url.take(), known_brand);
 }
 
 pub(crate) fn apply_project_space_branding(
@@ -257,6 +251,23 @@ fn branded_icon_data_url(
     .map(|brand| brand.logo_data_url().to_string())
 }
 
+fn public_project_icon_data_url(
+    icon_data_url: Option<String>,
+    known_brand: Option<KnownProjectBrand>,
+) -> Option<String> {
+    match (clean_icon_data_url(icon_data_url), known_brand) {
+        (Some(icon_data_url), _)
+            if icon_data_url.len() <= PUBLIC_PROJECT_ICON_DATA_URL_SOFT_LIMIT =>
+        {
+            Some(icon_data_url)
+        }
+        // 项目广场列表只展示小缩略图；历史同步的完整 APK 图标会让列表 JSON 变大。
+        (Some(_), Some(brand)) | (None, Some(brand)) => Some(brand.logo_data_url().to_string()),
+        (Some(icon_data_url), None) => Some(icon_data_url),
+        (None, None) => None,
+    }
+}
+
 fn clean_icon_data_url(icon_data_url: Option<String>) -> Option<String> {
     icon_data_url
         .map(|value| value.trim().to_string())
@@ -367,6 +378,35 @@ mod tests {
     }
 
     #[test]
+    fn public_project_branding_compacts_large_known_project_icons() {
+        let small_icon = "data:image/png;base64,manual".to_string();
+        let mut small_project = public_project("fb2", Some(small_icon.clone()));
+        apply_public_project_branding(
+            &mut small_project,
+            "pc_managed",
+            Some(r"D:\rust\active-projects\fb2"),
+        );
+        assert_eq!(
+            small_project.icon_data_url.as_deref(),
+            Some(small_icon.as_str())
+        );
+
+        let large_icon = format!(
+            "data:image/png;base64,{}",
+            "a".repeat(PUBLIC_PROJECT_ICON_DATA_URL_SOFT_LIMIT + 1)
+        );
+        let mut large_project = public_project("fb2", Some(large_icon));
+        apply_public_project_branding(
+            &mut large_project,
+            "pc_managed",
+            Some(r"D:\rust\active-projects\fb2"),
+        );
+        let icon = large_project.icon_data_url.expect("compact default icon");
+        assert!(icon.starts_with("data:image/png;base64,"));
+        assert!(icon.len() <= PUBLIC_PROJECT_ICON_DATA_URL_SOFT_LIMIT);
+    }
+
+    #[test]
     fn known_project_branding_supplies_default_icons() {
         let icon = branded_icon_data_url(
             None,
@@ -411,5 +451,26 @@ mod tests {
         };
         apply_project_summary_branding(&mut project);
         assert_eq!(project.display_name.as_deref(), Some("自定义加速器"));
+    }
+
+    fn public_project(name: &str, icon_data_url: Option<String>) -> PublicProjectItem {
+        PublicProjectItem {
+            id: format!("prj-{name}"),
+            name: name.to_string(),
+            display_name: None,
+            description: None,
+            template: "android".to_string(),
+            owner_account: "owner".to_string(),
+            owner_id: "owner-id".to_string(),
+            member_count: 1,
+            is_public: true,
+            join_mode: "approval".to_string(),
+            viewer_role: None,
+            last_task_status: None,
+            latest_apk_url: None,
+            icon_data_url,
+            created_at: "now".to_string(),
+            updated_at: "now".to_string(),
+        }
     }
 }
