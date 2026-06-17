@@ -80,6 +80,7 @@ async fn handle(
         target: voice_target,
         project_id,
         conversation_id,
+        group_id,
         sample_rate,
         channels,
     }) = hello
@@ -130,6 +131,7 @@ async fn handle(
             voice_target: voice_target.clone(),
             project_id: project_id.clone(),
             conversation_id: conversation_id.clone(),
+            group_id: group_id.clone(),
         };
         let _ = sender
             .send(Message::Text(
@@ -189,6 +191,7 @@ async fn handle(
                 voice_target: voice_target.clone(),
                 project_id: project_id.clone(),
                 conversation_id: conversation_id.clone(),
+                group_id: group_id.clone(),
             };
             let _ = sender
                 .send(Message::Text(
@@ -237,6 +240,7 @@ async fn handle(
         voice_target,
         project_id,
         conversation_id,
+        group_id,
     };
 
     // 3. AI 回复通道：AI 任务产生的 WsMessage JSON 通过这个 channel 流回

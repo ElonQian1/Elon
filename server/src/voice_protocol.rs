@@ -9,6 +9,10 @@
 use serde::{Deserialize, Serialize};
 
 pub const VOICE_TARGET_SOCIAL_AI_DIRECT: &str = "social_ai_direct";
+/// 只做实时转写，不自动投递给项目、好友或群聊。
+pub const VOICE_TARGET_TRANSCRIBE_ONLY: &str = "transcribe_only";
+/// 把转写文本作为群消息发送，适合 fb2 等外部应用复用主项目群聊体验。
+pub const VOICE_TARGET_EXTERNAL_GROUP: &str = "external_group";
 /// 悬浮球手机控制 target：语音识别后由 OpenAI Realtime 处理，
 /// AI 回复手机自动化 JSON 脚本或闲聊文本。
 pub const VOICE_TARGET_PHONE_CONTROL: &str = "phone_control";
@@ -28,6 +32,8 @@ pub enum ClientControl {
         /// 可选：把转写文本投递到指定项目对话（方案 B 使用）。
         project_id: Option<String>,
         conversation_id: Option<String>,
+        /// 可选：把转写文本投递到指定群聊；`external_group` target 必填。
+        group_id: Option<String>,
         /// 客户端声明的采样率，必须等于 24000；不等于则服务器拒绝。
         sample_rate: u32,
         channels: u16,
@@ -90,7 +96,10 @@ pub fn resolve_authenticated_voice_user(
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_authenticated_voice_user, ClientControl, VOICE_TARGET_SOCIAL_AI_DIRECT};
+    use super::{
+        resolve_authenticated_voice_user, ClientControl, VOICE_TARGET_EXTERNAL_GROUP,
+        VOICE_TARGET_SOCIAL_AI_DIRECT, VOICE_TARGET_TRANSCRIBE_ONLY,
+    };
 
     #[test]
     fn hello_target_is_backward_compatible() {
@@ -125,6 +134,53 @@ mod tests {
             panic!("expected hello");
         };
         assert_eq!(target.as_deref(), Some(VOICE_TARGET_SOCIAL_AI_DIRECT));
+    }
+
+    #[test]
+    fn hello_accepts_transcribe_only_target() {
+        let client = format!(
+            r#"{{
+                "type":"hello",
+                "user_id":"usr_1",
+                "target":"{}",
+                "sample_rate":24000,
+                "channels":1
+            }}"#,
+            VOICE_TARGET_TRANSCRIBE_ONLY
+        );
+        let parsed: ClientControl = serde_json::from_str(&client).expect("hello parses");
+        let ClientControl::Hello {
+            target, group_id, ..
+        } = parsed
+        else {
+            panic!("expected hello");
+        };
+        assert_eq!(target.as_deref(), Some(VOICE_TARGET_TRANSCRIBE_ONLY));
+        assert_eq!(group_id, None);
+    }
+
+    #[test]
+    fn hello_accepts_external_group_target() {
+        let client = format!(
+            r#"{{
+                "type":"hello",
+                "user_id":"usr_1",
+                "target":"{}",
+                "group_id":"ext_fb2_official",
+                "sample_rate":24000,
+                "channels":1
+            }}"#,
+            VOICE_TARGET_EXTERNAL_GROUP
+        );
+        let parsed: ClientControl = serde_json::from_str(&client).expect("hello parses");
+        let ClientControl::Hello {
+            target, group_id, ..
+        } = parsed
+        else {
+            panic!("expected hello");
+        };
+        assert_eq!(target.as_deref(), Some(VOICE_TARGET_EXTERNAL_GROUP));
+        assert_eq!(group_id.as_deref(), Some("ext_fb2_official"));
     }
 
     #[test]

@@ -109,6 +109,11 @@ static EXTERNAL_APPS: &[ExternalAppDefinition] = &[ExternalAppDefinition {
         "ai_documents",
         "context_pack",
         "main_account_authorization",
+        "voice_asr",
+        "voice_tts",
+        "realtime_transcribe",
+        "external_group_voice_input",
+        "chat_experience_bootstrap",
     ],
     default_groups: &[
         ExternalAppGroupDefinition {

@@ -8,9 +8,14 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
-    project_auth::project_access, project_chat::run_project_agent_with_scheduler,
-    project_execution_mode::ProjectExecutionMode, types::AppState,
-    voice_protocol::VOICE_TARGET_SOCIAL_AI_DIRECT,
+    external_app_registry::external_group_by_group_id,
+    project_auth::project_access,
+    project_chat::run_project_agent_with_scheduler,
+    project_execution_mode::ProjectExecutionMode,
+    types::AppState,
+    voice_protocol::{
+        VOICE_TARGET_EXTERNAL_GROUP, VOICE_TARGET_SOCIAL_AI_DIRECT, VOICE_TARGET_TRANSCRIBE_ONLY,
+    },
 };
 
 pub struct DispatchTarget {
@@ -18,6 +23,7 @@ pub struct DispatchTarget {
     pub voice_target: Option<String>,
     pub project_id: Option<String>,
     pub conversation_id: Option<String>,
+    pub group_id: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -38,10 +44,39 @@ pub async fn dispatch_transcript(
     transcript: &str,
     ai_reply_tx: UnboundedSender<String>,
 ) -> Result<DispatchOutcome> {
-    if target.voice_target.as_deref() == Some(VOICE_TARGET_SOCIAL_AI_DIRECT) {
-        return dispatch_to_direct_social_ai(state, target, transcript, ai_reply_tx).await;
+    let message = transcript.trim();
+    if message.is_empty() {
+        return Ok(DispatchOutcome {
+            ok: false,
+            message: "转写文本为空，已忽略".into(),
+        });
     }
 
+    match target.voice_target.as_deref() {
+        Some(VOICE_TARGET_TRANSCRIBE_ONLY) => {
+            return Ok(DispatchOutcome {
+                ok: true,
+                message: format!("转写完成，未自动发送（{} 字）", message.chars().count()),
+            });
+        }
+        Some(VOICE_TARGET_EXTERNAL_GROUP) => {
+            return dispatch_to_external_group(state, target, message).await;
+        }
+        Some(VOICE_TARGET_SOCIAL_AI_DIRECT) => {
+            return dispatch_to_direct_social_ai(state, target, message, ai_reply_tx).await;
+        }
+        _ => {}
+    }
+
+    dispatch_to_project_chat(state, target, message, ai_reply_tx).await
+}
+
+async fn dispatch_to_project_chat(
+    state: &Arc<AppState>,
+    target: &DispatchTarget,
+    message: &str,
+    ai_reply_tx: UnboundedSender<String>,
+) -> Result<DispatchOutcome> {
     let project_id = target
         .project_id
         .as_deref()
@@ -57,14 +92,7 @@ pub async fn dispatch_transcript(
         None,
     )?;
 
-    let message = transcript.trim().to_string();
-    if message.is_empty() {
-        return Ok(DispatchOutcome {
-            ok: false,
-            message: "转写文本为空，已忽略".into(),
-        });
-    }
-
+    let message = message.to_string();
     let char_count = message.chars().count();
     let download_base = format!("{}/api/projects/{}/download", state.public_url, project.id);
 
@@ -99,20 +127,50 @@ pub async fn dispatch_transcript(
     })
 }
 
-async fn dispatch_to_direct_social_ai(
+async fn dispatch_to_external_group(
     state: &Arc<AppState>,
     target: &DispatchTarget,
     transcript: &str,
+) -> Result<DispatchOutcome> {
+    let group_id = target
+        .group_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow::anyhow!("voice dispatch: external_group 缺少 group_id"))?;
+    let Some((_app, _group)) = external_group_by_group_id(group_id) else {
+        anyhow::bail!("voice dispatch: {group_id} 不是已注册外部应用群聊");
+    };
+
+    let message =
+        state
+            .store
+            .send_friend_group_message(&target.user_id, group_id, transcript, None)?;
+    if let Ok(recipient_user_ids) = state
+        .store
+        .friend_group_member_ids(&target.user_id, group_id)
+    {
+        crate::friend_events::publish_group_message(&message, recipient_user_ids);
+    }
+    crate::social_ai::spawn_group_reply(
+        state.clone(),
+        target.user_id.clone(),
+        group_id.to_string(),
+        message.content.clone(),
+    );
+
+    Ok(DispatchOutcome {
+        ok: true,
+        message: format!("语音消息已发送到群聊（{} 字）", transcript.chars().count()),
+    })
+}
+
+async fn dispatch_to_direct_social_ai(
+    state: &Arc<AppState>,
+    target: &DispatchTarget,
+    message: &str,
     ai_reply_tx: UnboundedSender<String>,
 ) -> Result<DispatchOutcome> {
-    let message = transcript.trim();
-    if message.is_empty() {
-        return Ok(DispatchOutcome {
-            ok: false,
-            message: "转写文本为空，已忽略".into(),
-        });
-    }
-
     tracing::info!(
         target: "voice",
         user_id = %target.user_id,
