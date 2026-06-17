@@ -22,6 +22,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
 import kotlin.concurrent.thread
+import kotlin.math.roundToInt
 
 internal class MainMarketplaceActions(
     private val activity: AppCompatActivity,
@@ -119,7 +120,7 @@ internal class MainMarketplaceActions(
         shell.addView(buildSearchBar())
         shell.addView(buildFilterScroller(), LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
-            dp(FILTER_ROW_HEIGHT_DP)
+            filterChipHeightPx()
         ).apply {
             topMargin = dp(20)
         })
@@ -148,8 +149,8 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(SEARCH_HEIGHT_DP)
             ).apply {
-                marginStart = dp(16)
-                marginEnd = dp(16)
+                marginStart = dp(SEARCH_SIDE_MARGIN_DP)
+                marginEnd = dp(SEARCH_SIDE_MARGIN_DP)
                 topMargin = dp(16)
             }
             addView(ImageView(activity).apply {
@@ -220,15 +221,15 @@ internal class MainMarketplaceActions(
             text = option.label
             includeFontPadding = false
             gravity = Gravity.CENTER
-            minWidth = dp(48)
-            minHeight = dp(FILTER_ROW_HEIGHT_DP)
-            setPadding(dp(FILTER_UNSELECTED_SIDE_PADDING_DP), 0, dp(FILTER_UNSELECTED_SIDE_PADDING_DP), 0)
+            minWidth = 0
+            minHeight = 0
+            setPadding(0, 0, 0, 0)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
             isClickable = true
             foreground = selectableForeground()
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.MATCH_PARENT
+                filterChipHeightPx()
             ).apply {
                 marginEnd = dp(FILTER_ITEM_GAP_DP)
             }
@@ -248,13 +249,18 @@ internal class MainMarketplaceActions(
             chip.setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
             chip.paint.isUnderlineText = false
             chip.setTypeface(chip.typeface, Typeface.NORMAL)
-            chip.background = if (selected) rect(COLOR_SEGMENT_SELECTED, FILTER_RADIUS_DP) else null
-            val sidePadding = if (selected) {
-                FILTER_SELECTED_SIDE_PADDING_DP
+            chip.background = if (selected) {
+                roundedPx(COLOR_SEGMENT_SELECTED, SEGMENT_HEIGHT_PX / 2)
             } else {
-                FILTER_UNSELECTED_SIDE_PADDING_DP
+                null
             }
-            chip.setPadding(dp(sidePadding), 0, dp(sidePadding), 0)
+            (chip.layoutParams as? LinearLayout.LayoutParams)?.let { params ->
+                params.width = if (selected) filterChipWidthPx() else LinearLayout.LayoutParams.WRAP_CONTENT
+                params.height = filterChipHeightPx()
+                chip.layoutParams = params
+            }
+            chip.minWidth = if (selected) filterChipWidthPx() else 0
+            chip.setPadding(0, 0, 0, 0)
         }
     }
 
@@ -701,6 +707,14 @@ internal class MainMarketplaceActions(
         }
     }
 
+    private fun roundedPx(color: String, radiusPx: Int): GradientDrawable {
+        return GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            setColor(Color.parseColor(color))
+            cornerRadius = designPx(radiusPx).toFloat()
+        }
+    }
+
     private fun topRoundedRect(color: String, radiusDp: Int): GradientDrawable {
         val radius = dp(radiusDp).toFloat()
         return GradientDrawable().apply {
@@ -708,6 +722,15 @@ internal class MainMarketplaceActions(
             setColor(Color.parseColor(color))
             cornerRadii = floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
         }
+    }
+
+    private fun filterChipWidthPx(): Int = designPx(SEGMENT_WIDTH_PX)
+
+    private fun filterChipHeightPx(): Int = designPx(SEGMENT_HEIGHT_PX)
+
+    private fun designPx(value: Int): Int {
+        val width = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: DESIGN_WIDTH_PX
+        return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
     }
 
     private companion object {
@@ -733,10 +756,10 @@ internal class MainMarketplaceActions(
         const val FONT_META_SP = 12f
         const val SEARCH_HEIGHT_DP = 56
         const val SEARCH_RADIUS_DP = 28
-        const val FILTER_ROW_HEIGHT_DP = 48
-        const val FILTER_RADIUS_DP = 24
-        const val FILTER_SELECTED_SIDE_PADDING_DP = 16
-        const val FILTER_UNSELECTED_SIDE_PADDING_DP = 2
+        const val SEARCH_SIDE_MARGIN_DP = 20
+        const val DESIGN_WIDTH_PX = 1272
+        const val SEGMENT_WIDTH_PX = 210
+        const val SEGMENT_HEIGHT_PX = 138
         const val FILTER_ITEM_GAP_DP = 8
         const val CARD_RADIUS_DP = 18
         const val CARD_HEADER_HEIGHT_DP = 44
