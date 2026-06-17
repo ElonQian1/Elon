@@ -117,7 +117,7 @@ internal class ProjectManagementHomeView(
         val project = item.project
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.TOP
+            gravity = Gravity.CENTER_VERTICAL
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openProject(item.index) }
@@ -133,7 +133,7 @@ internal class ProjectManagementHomeView(
 
             addView(projectTextColumn(project), LinearLayout.LayoutParams(
                 0,
-                designPx(THUMB_SIZE_PX),
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 1f
             ).apply {
                 marginStart = designPx(TEXT_START_GAP_PX)
@@ -157,6 +157,7 @@ internal class ProjectManagementHomeView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
+            minimumHeight = designPx(THUMB_SIZE_PX)
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = project.title.ifBlank { "项目名称" }
