@@ -11,6 +11,8 @@ use super::{
 const BB64A_DISPLAY_NAME: &str = "一龙网游加速器";
 const BB64A_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/bb64a-logo.png");
 const ELON_SELF_DISPLAY_NAME: &str = "一龙项目";
+const ELON_SELF_PUBLIC_DESCRIPTION: &str =
+    "一龙云端 APK 开发平台自身项目，加入后可参与平台空间协作";
 const ELON_SELF_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/elon-self-logo.png");
 const FB2_DISPLAY_NAME: &str = "多冠体育";
 const FB2_LOGO_BYTES: &[u8] = include_bytes!("../assets/project-icons/fb2-logo.png");
@@ -136,6 +138,7 @@ pub(crate) fn apply_public_project_branding(
         known_brand_for_project(&project.name, source_type, workspace_path, None, None);
     project.display_name = clean_display_name(project.display_name.take())
         .or_else(|| known_brand.map(|brand| brand.display_name().to_string()));
+    project.description = public_project_description(project.description.take(), known_brand);
     project.icon_data_url = public_project_icon_data_url(project.icon_data_url.take(), known_brand);
 }
 
@@ -266,6 +269,36 @@ fn public_project_icon_data_url(
         (Some(icon_data_url), None) => Some(icon_data_url),
         (None, None) => None,
     }
+}
+
+fn public_project_description(
+    description: Option<String>,
+    known_brand: Option<KnownProjectBrand>,
+) -> Option<String> {
+    let description = clean_description(description);
+    if matches!(known_brand, Some(KnownProjectBrand::ElonSelf))
+        && description
+            .as_deref()
+            .map(is_generic_local_git_description)
+            .unwrap_or(true)
+    {
+        return Some(ELON_SELF_PUBLIC_DESCRIPTION.to_string());
+    }
+    description
+}
+
+fn clean_description(description: Option<String>) -> Option<String> {
+    description
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty() && !value.eq_ignore_ascii_case("null"))
+}
+
+fn is_generic_local_git_description(description: &str) -> bool {
+    description
+        .chars()
+        .filter(|ch| !ch.is_whitespace())
+        .collect::<String>()
+        .eq_ignore_ascii_case("本地Git项目")
 }
 
 fn clean_icon_data_url(icon_data_url: Option<String>) -> Option<String> {
@@ -404,6 +437,36 @@ mod tests {
         let icon = large_project.icon_data_url.expect("compact default icon");
         assert!(icon.starts_with("data:image/png;base64,"));
         assert!(icon.len() <= PUBLIC_PROJECT_ICON_DATA_URL_SOFT_LIMIT);
+    }
+
+    #[test]
+    fn public_project_branding_replaces_elon_self_generic_description() {
+        let mut project = public_project("一龙项目", None);
+        project.description = Some("本地 Git 项目".to_string());
+
+        apply_public_project_branding(
+            &mut project,
+            "pc_managed",
+            Some(r"D:\rust\active-projects\elon cli"),
+        );
+
+        let description = project.description.expect("branded description");
+        assert_eq!(description, ELON_SELF_PUBLIC_DESCRIPTION);
+        assert!(description.chars().count() > 24);
+    }
+
+    #[test]
+    fn public_project_branding_preserves_specific_description() {
+        let mut project = public_project("fb2", None);
+        project.description = Some("多冠体育赛事应用".to_string());
+
+        apply_public_project_branding(
+            &mut project,
+            "pc_managed",
+            Some(r"D:\rust\active-projects\fb2"),
+        );
+
+        assert_eq!(project.description.as_deref(), Some("多冠体育赛事应用"));
     }
 
     #[test]

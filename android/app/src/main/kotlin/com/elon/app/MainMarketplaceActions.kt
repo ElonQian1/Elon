@@ -625,7 +625,15 @@ internal class MainMarketplaceActions(
 
     private fun looksLikeCodeName(value: String): Boolean {
         if (value.length !in 3..24) return false
-        return value.any { it.isLetter() } && value.all { it.isLetterOrDigit() || it == '_' || it == '-' || it == '.' }
+        return value.any { isAsciiLetter(it) } && value.all { isAsciiCodeNameChar(it) }
+    }
+
+    private fun isAsciiCodeNameChar(value: Char): Boolean {
+        return isAsciiLetter(value) || value in '0'..'9' || value == '_' || value == '-' || value == '.'
+    }
+
+    private fun isAsciiLetter(value: Char): Boolean {
+        return value in 'A'..'Z' || value in 'a'..'z'
     }
 
     private fun joinApprovalLabel(joinMode: String): String {
