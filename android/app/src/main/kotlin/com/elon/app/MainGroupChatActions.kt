@@ -36,6 +36,15 @@ internal class MainGroupChatActions(
     private var activeGroup: AppGroup? = null
     private var activeAdapter: ChatAdapter? = null
     private var polling = false
+    private val summaryPosts by lazy {
+        MainGroupSummaryPosts(
+            activity = activity,
+            binding = binding,
+            http = http,
+            serverUrl = serverUrl,
+            onPostsChanged = onGroupSummariesChanged
+        )
+    }
 
     private val pollRunnable = object : Runnable {
         override fun run() {
@@ -61,6 +70,7 @@ internal class MainGroupChatActions(
             binding.chatList.jumpToLatestMessageBeforeNextDraw()
         }
         showFriendChat(group.name, animate)
+        summaryPosts.openGroup(group)
         loadMessages(group, silent = false, scrollToBottom = true)
         startPolling()
     }
@@ -68,12 +78,17 @@ internal class MainGroupChatActions(
     fun closeGroupChat() {
         activeGroup = null
         activeAdapter = null
+        summaryPosts.clear()
         stopPolling()
     }
 
     fun isActive(): Boolean = activeGroup != null
 
     fun currentGroup(): AppGroup? = activeGroup
+
+    fun showSummaryPosts(group: AppGroup? = activeGroup) {
+        summaryPosts.showPosts(group)
+    }
 
     fun clearCurrentMessages() {
         val group = activeGroup ?: return

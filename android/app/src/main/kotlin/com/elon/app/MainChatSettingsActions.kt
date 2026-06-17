@@ -30,7 +30,8 @@ internal class MainChatSettingsActions(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val clearFriendMessages: () -> Unit,
     private val clearGroupMessages: () -> Unit,
-    private val onAddGroupMember: ((AppGroup, () -> Unit) -> Unit)? = null
+    private val onAddGroupMember: ((AppGroup, () -> Unit) -> Unit)? = null,
+    private val showGroupSummaryPosts: ((AppGroup) -> Unit)? = null
 ) {
     private val prefs by lazy { AuthManager.userDataPrefs(activity) }
     private var pageAnimator: AnimatorSet? = null
@@ -78,6 +79,12 @@ internal class MainChatSettingsActions(
             addView(divider())
             addView(actionRow("群公告", "暂无公告") {
                 toast("群公告功能准备中")
+            })
+            addView(divider())
+            addView(actionRow("AI 总结帖", "查看置顶总结，或生成最近讨论总结") {
+                dismissWithAnimation(dialog) {
+                    showGroupSummaryPosts?.invoke(group) ?: toast("AI 总结帖准备中")
+                }
             })
             addView(divider())
             addView(actionRow("查找聊天内容", "搜索这个群里的聊天记录") {
@@ -159,15 +166,17 @@ internal class MainChatSettingsActions(
         dialog.show()
     }
 
-    private fun dismissWithAnimation(dialog: Dialog) {
+    private fun dismissWithAnimation(dialog: Dialog, onDismissed: () -> Unit = {}) {
         val root = dialog.window?.decorView?.findViewById<ViewGroup>(android.R.id.content)
             ?.getChildAt(0)
         if (root == null) {
             dialog.dismiss()
+            onDismissed()
             return
         }
         playPageSlide(root, root.translationX, pageWidth(root)) {
             dialog.dismiss()
+            onDismissed()
         }
     }
 

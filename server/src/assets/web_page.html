@@ -352,6 +352,52 @@
       padding: 0 16px;
       display: flex; align-items: center;
     }
+    .group-summary-strip {
+      flex: 0 0 auto;
+      min-height: 64px;
+      border: 0;
+      background: var(--project-space-info-bg);
+      color: var(--ink);
+      padding: 10px 12px 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .group-summary-strip .summary-text {
+      min-width: 0;
+      flex: 1;
+      display: grid;
+      gap: 6px;
+    }
+    .group-summary-strip .summary-title {
+      color: var(--ink);
+      font-size: 15px;
+      font-weight: 700;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .group-summary-strip .summary-meta {
+      color: var(--ink-muted);
+      font-size: 13px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .group-summary-strip .summary-action {
+      flex: 0 0 auto;
+      min-width: 64px;
+      height: 38px;
+      padding: 0 12px;
+      border: 0;
+      border-radius: 19px;
+      background: var(--secondary-btn);
+      color: var(--secondary-btn-ink);
+      font-size: 13px;
+      cursor: pointer;
+    }
     .chat-list {
       flex: 1; overflow-y: auto;
       padding: 10px 10px;
@@ -1882,6 +1928,13 @@
       <!-- 项目内聊天视图 -->
       <div id="chatView" class="chat-view hidden">
         <div class="stage-hint" id="stageHint">点击输入需求，开发进度会自动记录到项目页。</div>
+        <button id="groupSummaryStrip" class="group-summary-strip hidden" type="button">
+          <span class="summary-text">
+            <span id="groupSummaryTitle" class="summary-title">AI 总结帖</span>
+            <span id="groupSummaryMeta" class="summary-meta">正在读取群聊总结帖...</span>
+          </span>
+          <span id="groupSummaryAction" class="summary-action">查看</span>
+        </button>
         <div class="chat-list" id="chatList"></div>
       </div>
     </div>
@@ -2504,6 +2557,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const chatView = $('chatView');
   const chatList = $('chatList');
   const stageHint = $('stageHint');
+  const groupSummaryStrip = $('groupSummaryStrip');
+  const groupSummaryTitle = $('groupSummaryTitle');
+  const groupSummaryMeta = $('groupSummaryMeta');
+  const groupSummaryAction = $('groupSummaryAction');
   const searchBar = $('searchBar');
   const searchInput = $('searchInput');
 
@@ -2762,6 +2819,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let projectSpaceAnnouncementExpanded = false;
   let currentFriend = null;
   let currentGroup = null;
+  let groupSummaryPosts = [];
+  let groupSummaryRefreshTimer = null;
   let currentTab = 'chatPage';
   let socket = null;
   let appSocket = null;
@@ -3119,6 +3178,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     messageInput.placeholder = isContactChatActive() ? '发消息' : '描述你想开发的 App 功能';
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
+    renderGroupSummaryStrip(groupSummaryPosts[0] || null, !inGroupChat);
     if (tabsBar) tabsBar.classList.toggle('hidden', inChat);
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     // 返回按钮：聊天详情页显示
@@ -3144,9 +3204,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (t.dataset.tab === 'chatPage') {
       if (socket) { try { socket.close(); } catch {} socket = null; }
       stopContactPolling();
+      stopGroupSummaryRefreshTimer();
       currentProject = null;
       currentFriend = null;
       currentGroup = null;
+      groupSummaryPosts = [];
+      renderGroupSummaryStrip(null, true);
       progressLog = [];
     }
     switchTab(t.dataset.tab);
@@ -3195,6 +3258,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const name = currentFriend ? friendDisplayName(currentFriend) : currentGroup ? groupDisplayName(currentGroup) : '聊天';
     showNativeOnly('「' + name + '」的聊天设置、成员管理和长按消息操作请在 Android APK 中使用。网页版已同步私聊/群聊收发。');
   });
+  if (groupSummaryStrip) {
+    groupSummaryStrip.addEventListener('click', () => {
+      showGroupSummaryPanel().catch((e) => renderGroupSummaryError(e.message || '总结帖操作失败'));
+    });
+  }
   ttsVoiceRow.addEventListener('click', () => {
     ttsVoiceMask.classList.add('active');
   });
@@ -3423,10 +3491,20 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
   }
 
+  function stopGroupSummaryRefreshTimer() {
+    if (groupSummaryRefreshTimer) {
+      clearTimeout(groupSummaryRefreshTimer);
+      groupSummaryRefreshTimer = null;
+    }
+  }
+
   function closeContactChat() {
     stopContactPolling();
+    stopGroupSummaryRefreshTimer();
     currentFriend = null;
     currentGroup = null;
+    groupSummaryPosts = [];
+    renderGroupSummaryStrip(null, true);
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
@@ -3459,6 +3537,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (tabsBar) tabsBar.classList.add('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     modelBtn.style.display = currentGroup ? 'none' : '';
+    renderGroupSummaryStrip(groupSummaryPosts[0] || null, !currentGroup);
     messageInput.placeholder = '发消息';
     topTitle.textContent = currentFriend ? friendDisplayName(currentFriend) : groupDisplayName(currentGroup);
     updateSendButtonState();
@@ -3480,6 +3559,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatList.innerHTML = '';
     lastChatTimelineMs = 0;
     applyContactChatChrome();
+    renderGroupSummaryStrip(null, true);
     loadFriendMessages(true).catch((e) => appendBubble('error', e.message || '加载好友消息失败'));
     stopContactPolling();
     friendPollTimer = setInterval(() => {
@@ -3502,7 +3582,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     searchInput.value = '';
     chatList.innerHTML = '';
     lastChatTimelineMs = 0;
+    groupSummaryPosts = [];
     applyContactChatChrome();
+    renderGroupSummaryLoading();
+    loadGroupSummaryPosts(false).catch((e) => renderGroupSummaryError(e.message || '加载总结帖失败'));
     loadGroupMessages(true).catch((e) => appendBubble('error', e.message || '加载群聊消息失败'));
     stopContactPolling();
     friendPollTimer = setInterval(() => {
@@ -3530,6 +3613,165 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (!currentGroup || currentGroup.id !== group.id) return;
     renderContactMessages(data.messages || [], 'group', group, scrollToBottom);
     await loadSocialChats();
+  }
+
+  function renderGroupSummaryLoading() {
+    if (!groupSummaryStrip) return;
+    groupSummaryStrip.classList.remove('hidden');
+    groupSummaryTitle.textContent = 'AI 总结帖';
+    groupSummaryMeta.textContent = '正在读取群聊总结帖...';
+    groupSummaryAction.textContent = '查看';
+  }
+
+  function renderGroupSummaryError(message) {
+    if (!groupSummaryStrip) return;
+    groupSummaryStrip.classList.remove('hidden');
+    groupSummaryTitle.textContent = 'AI 总结帖';
+    groupSummaryMeta.textContent = message || '加载总结帖失败';
+    groupSummaryAction.textContent = '重试';
+  }
+
+  function renderGroupSummaryStrip(post, hidden) {
+    if (!groupSummaryStrip) return;
+    groupSummaryStrip.classList.toggle('hidden', !!hidden);
+    if (hidden) return;
+    if (!post) {
+      groupSummaryTitle.textContent = 'AI 总结帖';
+      groupSummaryMeta.textContent = '暂无总结帖，点击生成最近群聊总结';
+      groupSummaryAction.textContent = '生成';
+      return;
+    }
+    groupSummaryTitle.textContent = (post.pinned_at ? '置顶总结 · ' : '最新总结 · ') + (post.title || '群聊总结');
+    groupSummaryMeta.textContent = groupSummaryMetaText(post);
+    groupSummaryAction.textContent = isGroupSummaryGenerating(post) ? '刷新' : '查看';
+  }
+
+  function groupSummaryMetaText(post) {
+    const state = isGroupSummaryGenerating(post)
+      ? '生成中'
+      : post.status === 'ready_with_fallback'
+        ? '提取式总结'
+        : post.status === 'ready'
+          ? '已生成'
+          : (post.status || '总结帖');
+    const pin = post.pinned_at ? '置顶 · ' : '';
+    const count = Number(post.source_message_count || 0);
+    const countText = count > 0 ? ' · ' + count + ' 条发言' : '';
+    const author = post.created_by_name ? ' · ' + post.created_by_name : '';
+    return pin + state + countText + author;
+  }
+
+  function isGroupSummaryGenerating(post) {
+    return post && ['generating', 'pending', 'draft'].includes(String(post.status || ''));
+  }
+
+  async function loadGroupSummaryPosts(silent) {
+    if (!currentGroup) return [];
+    const group = currentGroup;
+    if (!silent) renderGroupSummaryLoading();
+    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/summary-posts?limit=20');
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '加载总结帖失败');
+    if (!currentGroup || currentGroup.id !== group.id) return [];
+    groupSummaryPosts = data.posts || [];
+    renderGroupSummaryStrip(groupSummaryPosts[0] || null, false);
+    return groupSummaryPosts;
+  }
+
+  async function createGroupSummaryPost() {
+    if (!currentGroup) return;
+    const group = currentGroup;
+    renderGroupSummaryLoading();
+    groupSummaryMeta.textContent = '系统正在打包最近聊天 Context Pack';
+    groupSummaryAction.textContent = '生成中';
+    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/summary-posts', {
+      method: 'POST',
+      body: JSON.stringify({
+        limit: 120,
+        pin: true,
+        instructions: '请按群聊 AI 文档生成可置顶查看的总结帖；优先区分议题、结论、行动项和相关发言。'
+      })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || '生成总结帖失败');
+    if (!currentGroup || currentGroup.id !== group.id) return;
+    const post = data.post || null;
+    groupSummaryPosts = post ? [post].concat(groupSummaryPosts.filter((item) => item.id !== post.id)) : groupSummaryPosts;
+    renderGroupSummaryStrip(groupSummaryPosts[0] || post, false);
+    scheduleGroupSummaryRefresh(group.id);
+  }
+
+  function scheduleGroupSummaryRefresh(groupId) {
+    stopGroupSummaryRefreshTimer();
+    let attempt = 0;
+    const tick = () => {
+      if (!currentGroup || currentGroup.id !== groupId || attempt >= 5) return;
+      attempt += 1;
+      loadGroupSummaryPosts(true).catch(() => {});
+      groupSummaryRefreshTimer = setTimeout(tick, attempt < 3 ? 2500 : 5000);
+    };
+    groupSummaryRefreshTimer = setTimeout(tick, 1800);
+  }
+
+  async function showGroupSummaryPanel() {
+    if (!currentGroup) return;
+    const top = groupSummaryPosts[0] || null;
+    if (!top) {
+      try {
+        await createGroupSummaryPost();
+      } catch (e) {
+        renderGroupSummaryError(e.message || '生成总结帖失败');
+      }
+      return;
+    }
+    if (isGroupSummaryGenerating(top)) {
+      await loadGroupSummaryPosts(false).catch((e) => renderGroupSummaryError(e.message || '刷新总结帖失败'));
+      return;
+    }
+    showGroupSummaryPostDetail(top.id);
+  }
+
+  async function showGroupSummaryPostDetail(postId) {
+    if (!currentGroup || !postId) return;
+    const group = currentGroup;
+    const res = await api('/api/me/groups/' + encodeURIComponent(group.id) + '/summary-posts/' + encodeURIComponent(postId));
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      showNativeOnly(data.error || '读取总结帖失败');
+      return;
+    }
+    if (!currentGroup || currentGroup.id !== group.id) return;
+    openGroupSummaryDialog(data.post || {}, data.sources || []);
+  }
+
+  function openGroupSummaryDialog(post, sources) {
+    const dlg = document.createElement('div');
+    dlg.className = 'modal-mask active';
+    dlg.innerHTML = `<div class="modal" style="max-width:680px">
+      <h2></h2>
+      <div class="modal-pre" style="white-space:pre-wrap;max-height:58vh;overflow:auto"></div>
+      <div class="hint-text"></div>
+      <div class="actions">
+        <button class="btn-cancel" type="button" data-close>关闭</button>
+        <button class="btn-confirm" type="button" data-refresh>刷新</button>
+      </div>
+    </div>`;
+    dlg.querySelector('h2').textContent = post.title || '群聊总结';
+    const body = dlg.querySelector('.modal-pre');
+    const sourceText = (sources || []).slice(0, 12).map((item) => {
+      return '- ' + (item.sender_name || '群成员') + ' · ' + (item.created_at || '') + '\n  ' + (item.content || '');
+    }).join('\n');
+    body.textContent = (post.summary || 'AI 正在生成总结帖，请稍后刷新。')
+      + (sourceText ? '\n\n来源消息\n' + sourceText : '');
+    dlg.querySelector('.hint-text').textContent = groupSummaryMetaText(post);
+    dlg.querySelector('[data-close]').addEventListener('click', () => dlg.remove());
+    dlg.querySelector('[data-refresh]').addEventListener('click', () => {
+      dlg.remove();
+      showGroupSummaryPostDetail(post.id);
+      loadGroupSummaryPosts(true).catch(() => {});
+    });
+    dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.remove(); });
+    document.body.appendChild(dlg);
   }
 
   function renderContactMessages(messages, chatKind, contact, scrollToBottom) {

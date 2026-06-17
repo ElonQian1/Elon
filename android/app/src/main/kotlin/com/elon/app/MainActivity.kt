@@ -570,7 +570,8 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground,
             clearFriendMessages = { friendChatActions.clearCurrentMessages() },
             clearGroupMessages = { groupChatActions.clearCurrentMessages() },
-            onAddGroupMember = { group, onDone -> groupActions.showAddMemberDialog(group, onDone) }
+            onAddGroupMember = { group, onDone -> groupActions.showAddMemberDialog(group, onDone) },
+            showGroupSummaryPosts = { group -> groupChatActions.showSummaryPosts(group) }
         )
     }
 

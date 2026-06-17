@@ -325,6 +325,63 @@
                 android:textColor="@color/elon_text_secondary"
                 android:textSize="13sp" />
 
+            <LinearLayout
+                android:id="@+id/groupSummaryStrip"
+                android:layout_width="match_parent"
+                android:layout_height="64dp"
+                android:background="@color/elon_surface_header"
+                android:clickable="true"
+                android:foreground="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingStart="16dp"
+                android:paddingEnd="12dp"
+                android:visibility="gone">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/groupSummaryTitleText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:text="AI 总结帖"
+                        android:textColor="@color/elon_text_primary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/groupSummaryMetaText"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="6dp"
+                        android:ellipsize="end"
+                        android:includeFontPadding="false"
+                        android:maxLines="1"
+                        android:text="正在读取群聊总结帖..."
+                        android:textColor="@color/elon_text_placeholder"
+                        android:textSize="13sp" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/groupSummaryActionButton"
+                    android:layout_width="64dp"
+                    android:layout_height="38dp"
+                    android:layout_marginStart="10dp"
+                    android:background="@drawable/bg_quick_button"
+                    android:gravity="center"
+                    android:maxLines="1"
+                    android:text="查看"
+                    android:textColor="@color/elon_text_primary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/chatList"
                 android:layout_width="match_parent"
