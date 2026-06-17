@@ -133,7 +133,7 @@ internal class ProjectManagementHomeView(
 
             addView(projectTextColumn(project), LinearLayout.LayoutParams(
                 0,
-                LinearLayout.LayoutParams.WRAP_CONTENT,
+                designPx(THUMB_SIZE_PX),
                 1f
             ).apply {
                 marginStart = designPx(TEXT_START_GAP_PX)
@@ -148,7 +148,7 @@ internal class ProjectManagementHomeView(
                 setFontSizeSp(FONT_CHEVRON_SP)
             }, LinearLayout.LayoutParams(
                 designPx(CHEVRON_WIDTH_PX),
-                LinearLayout.LayoutParams.MATCH_PARENT
+                designPx(THUMB_SIZE_PX)
             ))
         }
     }
@@ -350,13 +350,13 @@ internal class ProjectManagementHomeView(
         const val COLOR_THUMB_BG = "#FFFFFF"
 
         const val DESIGN_WIDTH_PX = 1272
-        const val SEGMENT_SIDE_PX = 84
+        const val SEGMENT_SIDE_PX = 30
         const val ROW_SIDE_PX = 112
         const val ROW_END_PX = 92
         const val SEGMENT_TOP_MARGIN_PX = 154
         const val SEGMENT_HEIGHT_PX = 138
         const val SEGMENT_WIDTH_PX = 210
-        const val SEGMENT_GAP_PX = 6
+        const val SEGMENT_GAP_PX = 60
         const val FIRST_ROW_TOP_MARGIN_PX = 102
         const val ROW_HEIGHT_PX = 220
         const val ROW_GAP_PX = 98
@@ -364,8 +364,8 @@ internal class ProjectManagementHomeView(
         const val THUMB_RADIUS_PX = 10
         const val TEXT_START_GAP_PX = 58
         const val TEXT_END_GAP_PX = 44
-        const val DESC_TOP_MARGIN_PX = 17
-        const val META_TOP_MARGIN_PX = 18
+        const val DESC_TOP_MARGIN_PX = 10
+        const val META_TOP_MARGIN_PX = 8
         const val META_GAP_PX = 112
         const val CHEVRON_WIDTH_PX = 52
         const val EMPTY_HEIGHT_PX = 520

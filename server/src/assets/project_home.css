@@ -10,7 +10,8 @@
   height: 42px;
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 54px;
+  margin-left: -26px;
   margin-bottom: 32px;
 }
 
@@ -109,7 +110,7 @@
 
 .project-home-desc {
   display: block;
-  margin-top: 7px;
+  margin-top: 4px;
   color: #AFAFAF;
   font-size: 13px;
   line-height: 18px;
@@ -121,7 +122,7 @@
 .project-home-meta-row {
   display: flex;
   gap: 30px;
-  margin-top: 7px;
+  margin-top: 4px;
   color: #AFAFAF;
   font-size: 12px;
   line-height: 18px;
