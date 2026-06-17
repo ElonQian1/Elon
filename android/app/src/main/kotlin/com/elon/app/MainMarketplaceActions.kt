@@ -757,7 +757,7 @@ internal class MainMarketplaceActions(
         const val COLOR_STATUS_DANGER = "#E62129"
         const val FONT_AVATAR_SP = 24f
         const val FONT_PAGE_TITLE_SP = 16f
-        const val FONT_STATUS_SP = 15f
+        const val FONT_STATUS_SP = 14f
         const val FONT_LIST_SECONDARY_SP = 13f
         const val FONT_META_SP = 12f
         const val SEARCH_HEIGHT_DP = 48
