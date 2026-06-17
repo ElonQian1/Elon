@@ -398,7 +398,7 @@ internal class MainMarketplaceActions(
                 Gravity.END or Gravity.TOP
             ).apply {
                 rightMargin = dp(24)
-                topMargin = dp(42)
+                topMargin = dp(CARD_TIME_TOP_DP)
             })
 
             addView(LinearLayout(activity).apply {
@@ -776,7 +776,8 @@ internal class MainMarketplaceActions(
         const val THUMB_SIZE_DP = 40
         const val DIVIDER_WIDTH_DP = 220
         const val DESC_WIDTH_DP = 240
-        const val CARD_BODY_CONTENT_TOP_DP = 22
+        const val CARD_BODY_CONTENT_TOP_DP = 14
+        const val CARD_TIME_TOP_DP = 34
         const val CARD_MAIN_RIGHT_MARGIN_DP = 24
         const val INFO_ROW_RIGHT_MARGIN_DP = 96
         const val ACTION_BUTTON_WIDTH_DP = 68
