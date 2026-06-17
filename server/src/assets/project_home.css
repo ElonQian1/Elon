@@ -10,26 +10,28 @@
   height: 42px;
   display: flex;
   align-items: center;
-  gap: 38px;
+  gap: 28px;
   margin-bottom: 32px;
 }
 
 .project-home-segment {
-  min-width: 60px;
+  width: 70px;
+  min-width: 70px;
   height: 42px;
   border: 0;
   border-radius: 21px;
+  box-sizing: border-box;
   background: transparent;
   color: #D9D9D9;
+  display: grid;
+  place-items: center;
   padding: 0;
   font-size: 17px;
-  line-height: 24px;
+  line-height: 1;
   cursor: pointer;
 }
 
 .project-home-segment.active {
-  min-width: 66px;
-  padding: 0 18px;
   background: #1A1A1A;
 }
 

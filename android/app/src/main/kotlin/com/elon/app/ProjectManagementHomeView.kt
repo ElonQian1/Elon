@@ -74,17 +74,12 @@ internal class ProjectManagementHomeView(
                 setPersonalProjectsExpanded(true)
                 setJointProjectsExpanded(false)
                 render()
-            })
+            }, segmentButtonLayoutParams())
             addView(segmentButton("联合", selected = showJoint) {
                 setPersonalProjectsExpanded(false)
                 setJointProjectsExpanded(true)
                 render()
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                designPx(SEGMENT_HEIGHT_PX)
-            ).apply {
-                marginStart = designPx(SEGMENT_GAP_PX)
-            })
+            }, segmentButtonLayoutParams(marginStartPx = SEGMENT_GAP_PX))
         }
     }
 
@@ -103,9 +98,18 @@ internal class ProjectManagementHomeView(
             setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
             setFontSizeSp(FONT_SEGMENT_SP)
             setTypeface(typeface, Typeface.NORMAL)
-            setPadding(designPx(if (selected) 62 else 0), 0, designPx(if (selected) 62 else 0), 0)
-            if (selected) background = roundedPx(COLOR_SEGMENT_SELECTED, SEGMENT_HEIGHT_PX / 2)
-            minWidth = designPx(if (selected) 210 else 96)
+            setPadding(0, 0, 0, 0)
+            background = if (selected) roundedPx(COLOR_SEGMENT_SELECTED, SEGMENT_HEIGHT_PX / 2) else null
+            minWidth = 0
+        }
+    }
+
+    private fun segmentButtonLayoutParams(marginStartPx: Int = 0): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            designPx(SEGMENT_WIDTH_PX),
+            designPx(SEGMENT_HEIGHT_PX)
+        ).apply {
+            marginStart = designPx(marginStartPx)
         }
     }
 
@@ -351,7 +355,8 @@ internal class ProjectManagementHomeView(
         const val ROW_END_PX = 92
         const val SEGMENT_TOP_MARGIN_PX = 154
         const val SEGMENT_HEIGHT_PX = 138
-        const val SEGMENT_GAP_PX = 120
+        const val SEGMENT_WIDTH_PX = 210
+        const val SEGMENT_GAP_PX = 6
         const val FIRST_ROW_TOP_MARGIN_PX = 102
         const val ROW_HEIGHT_PX = 220
         const val ROW_GAP_PX = 98
