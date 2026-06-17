@@ -73,6 +73,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (51, "一龙自项目公开展示并审批加入", migration_v51),
     (52, "项目级 AI 运行权限授权", migration_v52),
     (53, "群聊 AI 文档、Context Pack 与总结帖", migration_v53),
+    (54, "外部应用账号、默认群映射与授权码", migration_v54),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -1913,6 +1914,73 @@ fn migration_v53(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_group_summary_sources_message
           ON friend_group_summary_post_sources(message_id);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v54(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS external_app_accounts (
+          app_id           TEXT NOT NULL,
+          external_user_id TEXT NOT NULL,
+          account          TEXT NOT NULL,
+          display_name     TEXT,
+          avatar_url       TEXT,
+          main_user_id     TEXT,
+          status           TEXT NOT NULL DEFAULT 'active'
+                           CHECK (status IN ('active', 'disabled')),
+          created_at       TEXT NOT NULL,
+          updated_at       TEXT NOT NULL,
+          last_seen_at     TEXT,
+          PRIMARY KEY (app_id, external_user_id),
+          UNIQUE(app_id, account),
+          FOREIGN KEY (main_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_accounts_account
+          ON external_app_accounts(account, status);
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_accounts_main_user
+          ON external_app_accounts(main_user_id, app_id);
+
+        CREATE TABLE IF NOT EXISTS external_app_groups (
+          app_id            TEXT NOT NULL,
+          external_group_id TEXT NOT NULL,
+          group_id          TEXT NOT NULL,
+          name              TEXT NOT NULL,
+          position          INTEGER NOT NULL DEFAULT 0,
+          auto_join         INTEGER NOT NULL DEFAULT 0,
+          metadata_json     TEXT,
+          created_at        TEXT NOT NULL,
+          updated_at        TEXT NOT NULL,
+          PRIMARY KEY (app_id, external_group_id),
+          UNIQUE(app_id, group_id),
+          FOREIGN KEY (group_id) REFERENCES friend_groups(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_groups_group
+          ON external_app_groups(group_id);
+
+        CREATE TABLE IF NOT EXISTS external_app_auth_codes (
+          id           TEXT PRIMARY KEY,
+          app_id       TEXT NOT NULL,
+          code_hash    TEXT NOT NULL UNIQUE,
+          user_id      TEXT NOT NULL,
+          scopes_json  TEXT NOT NULL,
+          redirect_uri TEXT,
+          expires_at   TEXT NOT NULL,
+          consumed_at  TEXT,
+          created_at   TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_auth_codes_app_user
+          ON external_app_auth_codes(app_id, user_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_auth_codes_expiry
+          ON external_app_auth_codes(expires_at, consumed_at);
         "#,
     )?;
     Ok(())

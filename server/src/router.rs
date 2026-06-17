@@ -10,15 +10,15 @@ use tower_http::services::ServeFile;
 use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
-    billing_api, billing_pay, chat_attachments, context_compiler, friend_api, global_ws,
-    group_summary_api, lan_peer, lm_chat, node_api, node_compute_admin, node_payout_admin,
-    peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
-    project_deletion, project_docs, project_downloads, project_git, project_join_requests,
-    project_membership, project_runtime_permission_api, project_space, project_storage_git,
-    project_store, project_workspace_health, project_workspace_recovery, release_claim,
-    server_agent_runtime, speech_translate, token_usage_api, user_api, user_archive_api,
-    user_memory_api, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
-    voice_ws_virtual_mic, web,
+    billing_api, billing_pay, chat_attachments, context_compiler, external_app_api, friend_api,
+    global_ws, group_summary_api, lan_peer, lm_chat, node_api, node_compute_admin,
+    node_payout_admin, peer_relay, project_api, project_attachments, project_chat,
+    project_conversation_identity, project_deletion, project_docs, project_downloads, project_git,
+    project_join_requests, project_membership, project_runtime_permission_api, project_space,
+    project_storage_git, project_store, project_workspace_health, project_workspace_recovery,
+    release_claim, server_agent_runtime, speech_translate, token_usage_api, user_api,
+    user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat,
+    voice_ws_transcribe, voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -84,6 +84,30 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/auth/login", post(auth_api::login))
         .route("/api/auth/register", post(auth_api::register))
         .route("/api/me", get(auth_api::me))
+        .route(
+            "/api/external/apps/:app_id",
+            get(external_app_api::get_external_app),
+        )
+        .route(
+            "/api/external/apps/:app_id/accounts/lookup",
+            post(external_app_api::lookup_external_account),
+        )
+        .route(
+            "/api/external/apps/:app_id/accounts/sync",
+            post(external_app_api::sync_external_account),
+        )
+        .route(
+            "/api/external/apps/:app_id/accounts/session",
+            post(external_app_api::create_external_account_session),
+        )
+        .route(
+            "/api/external/apps/:app_id/authorize",
+            post(external_app_api::authorize_external_app),
+        )
+        .route(
+            "/api/external/apps/:app_id/authorize/exchange",
+            post(external_app_api::exchange_external_app_authorization),
+        )
         .route(
             "/api/me/profile",
             axum::routing::patch(project_api::update_profile),

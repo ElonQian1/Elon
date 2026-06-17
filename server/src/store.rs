@@ -18,6 +18,9 @@ mod build_quota;
 mod common;
 mod compute_metering;
 mod conversations;
+mod external_apps;
+#[cfg(test)]
+mod external_apps_tests;
 mod friend_messages;
 mod friends;
 mod group_summary;

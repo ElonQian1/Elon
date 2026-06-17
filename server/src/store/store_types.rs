@@ -206,6 +206,87 @@ pub struct GroupSummaryPostDetail {
     pub sources: Vec<GroupSummarySourceMessage>,
 }
 
+// ── 外部应用 / 子项目接入 ─────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExternalAppGroupSeed {
+    pub app_id: String,
+    pub external_group_id: String,
+    pub group_id: String,
+    pub name: String,
+    pub position: i64,
+    pub auto_join: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExternalAppGroupLink {
+    pub app_id: String,
+    pub external_group_id: String,
+    pub group_id: String,
+    pub name: String,
+    pub position: i64,
+    pub auto_join: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExternalAccountOrigin {
+    pub app_id: String,
+    pub external_user_id: String,
+    pub account: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub main_user_id: Option<String>,
+    pub status: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalAccountUpsert {
+    pub external_user_id: String,
+    pub account: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub status: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExternalAccountSessionInput {
+    pub external_user_id: String,
+    pub account: String,
+    pub display_name: Option<String>,
+    pub avatar_url: Option<String>,
+    pub device_name: Option<String>,
+    pub apk_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExternalAccountSession {
+    pub token: String,
+    pub expires_at: String,
+    pub user: PublicUser,
+    pub account: ExternalAccountOrigin,
+    pub default_groups: Vec<ExternalAppGroupLink>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExternalAppAuthorizationCode {
+    pub code: String,
+    pub app_id: String,
+    pub user_id: String,
+    pub scopes: Vec<String>,
+    pub redirect_uri: Option<String>,
+    pub expires_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExternalAppAuthorizationExchange {
+    pub app_id: String,
+    pub user: PublicUser,
+    pub scopes: Vec<String>,
+    pub redirect_uri: Option<String>,
+    pub created_at: String,
+}
+
 // ── 管理后台 ──────────────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]
