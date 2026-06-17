@@ -22,6 +22,7 @@ $Server = "root@43.139.149.158"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
 $RemoteDir = "/opt/elon/data/downloads"
 $Bin = "elon-node-agent"
+$ClientBinName = "elon-node-client"
 $WindowsClientPackageName = "elon-node-agent-windows.zip"
 
 Write-Host "=== elon-node-agent 构建 + 发布 ===" -ForegroundColor Cyan
@@ -90,7 +91,7 @@ if (-not (Test-Path $LinuxBin)) { throw "Linux 二进制不存在：$LinuxBin" }
 Write-Host "[2/4] 编译 Windows 版本..." -ForegroundColor Yellow
 Push-Location (Join-Path $PSScriptRoot "..\server")
 try {
-    cargo build --release --bin $Bin
+    cargo build --release --bin $Bin --bin $ClientBinName
     if ($LASTEXITCODE -ne 0) { throw "Windows 编译失败" }
 } finally {
     Pop-Location
@@ -98,6 +99,8 @@ try {
 
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
+$ClientBin = Join-Path $TargetDir "release\$ClientBinName.exe"
+if (-not (Test-Path $ClientBin)) { throw "Windows 客户端入口不存在：$ClientBin" }
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
 Write-Host "[2.5/4] 打包 Windows 客户端..." -ForegroundColor Yellow
@@ -107,26 +110,15 @@ $WindowsDownloadUrl = "$BaseUrl/api/node-agent/download/windows"
 $WindowsClientDownloadUrl = "$BaseUrl/api/node-agent/download/windows-client"
 $LauncherDir = Join-Path $PSScriptRoot "node-agent-launcher"
 $PackageRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("elon-node-agent-windows-" + [Guid]::NewGuid().ToString("N"))
+$PackageInternal = Join-Path $PackageRoot "_internal"
 $WindowsClientPackage = Join-Path $TargetDir "release\$WindowsClientPackageName"
-New-Item -ItemType Directory -Force -Path $PackageRoot | Out-Null
+New-Item -ItemType Directory -Force -Path $PackageRoot, $PackageInternal | Out-Null
 try {
-    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "$Bin.exe") -Force
-    $launcherFiles = @(
-        "启动一龙节点.cmd",
-        "安装一龙PC节点.cmd",
-        "start-node-agent.ps1",
-        "tray-launcher.ps1",
-        "install-elon-node.ps1",
-        "uninstall-elon-node.ps1",
-        "node-agent.env.example",
-        "卸载一龙PC节点.cmd",
-        "README.txt"
-    )
-    foreach ($file in $launcherFiles) {
-        $src = Join-Path $LauncherDir $file
-        if (-not (Test-Path -LiteralPath $src)) { throw "Windows 客户端打包缺少文件：$src" }
-        Copy-Item -LiteralPath $src -Destination (Join-Path $PackageRoot $file) -Force
-    }
+    Copy-Item -LiteralPath $ClientBin -Destination (Join-Path $PackageRoot "一龙PC节点.exe") -Force
+    Copy-Item -LiteralPath $ClientBin -Destination (Join-Path $PackageRoot "卸载一龙PC节点.exe") -Force
+    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageInternal "$Bin.exe") -Force
+    Copy-Item -LiteralPath (Join-Path $LauncherDir "node-agent.env.example") -Destination (Join-Path $PackageInternal "node-agent.env.example") -Force
+    Copy-Item -LiteralPath (Join-Path $LauncherDir "README.txt") -Destination (Join-Path $PackageInternal "README.txt") -Force
     $PackageVersionInfo = [ordered]@{
         version = $PackageVersion
         gitSha = $GitSha
@@ -136,7 +128,7 @@ try {
         windowsClientDownloadUrl = $WindowsClientDownloadUrl
     }
     $PackageVersionInfo | ConvertTo-Json -Depth 4 |
-        Set-Content -LiteralPath (Join-Path $PackageRoot "node-agent-version.json") -Encoding UTF8
+        Set-Content -LiteralPath (Join-Path $PackageInternal "node-agent-version.json") -Encoding UTF8
     Compress-ArchiveWithRetry -Path (Join-Path $PackageRoot "*") -DestinationPath $WindowsClientPackage
 } finally {
     Remove-Item -LiteralPath $PackageRoot -Recurse -Force -ErrorAction SilentlyContinue

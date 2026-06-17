@@ -11,6 +11,10 @@ path = "src/main.rs"
 name = "elon-node-agent"
 path = "src/node_agent_main.rs"
 
+[[bin]]
+name = "elon-node-client"
+path = "src/node_client_launcher_main.rs"
+
 [dependencies]
 # 异步运行时
 tokio = { version = "1", features = ["full"] }
