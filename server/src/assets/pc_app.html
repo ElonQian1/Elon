@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111214" />
+  <title>一龙 PC 工作台</title>
+  <link rel="icon" href="data:image/png;base64,__BRAND_PNG_B64__" />
+  <link rel="stylesheet" href="/assets/pc_app.css" />
+</head>
+<body>
+  <main class="pc-shell" id="pcShell">
+    <aside class="server-rail" aria-label="空间">
+      <button class="rail-avatar active" id="friendsRail" type="button" title="好友">
+        <span>友</span>
+        <small id="friendBadge"></small>
+      </button>
+      <button class="rail-avatar node" id="nodeRail" type="button" title="PC 节点">
+        <span>PC</span>
+        <small id="nodeBadge"></small>
+      </button>
+      <div class="rail-divider"></div>
+      <div class="project-rail-list" id="projectRailList"></div>
+      <button class="rail-avatar add" id="openWebBtn" type="button" title="打开移动网页版">+</button>
+    </aside>
+
+    <aside class="channel-panel">
+      <div class="workspace-title">
+        <div>
+          <strong id="workspaceName">好友</strong>
+          <span id="workspaceMeta">加载中</span>
+        </div>
+        <button class="icon-button" id="refreshBtn" type="button" title="刷新">↻</button>
+      </div>
+      <div class="channel-search">
+        <input id="sidebarSearch" placeholder="搜索好友、频道或项目" />
+      </div>
+      <div class="channel-list" id="channelList"></div>
+      <div class="user-strip">
+        <div class="user-dot" id="userDot">龙</div>
+        <div class="user-info">
+          <strong id="userName">未登录</strong>
+          <span id="userMeta">请先登录网页版</span>
+        </div>
+        <button class="icon-button" id="logoutBtn" type="button" title="退出登录">⎋</button>
+      </div>
+    </aside>
+
+    <section class="chat-column">
+      <header class="chat-topbar">
+        <div class="chat-title">
+          <span id="channelGlyph">#</span>
+          <div>
+            <strong id="channelTitle">好友</strong>
+            <span id="channelSubtitle">从左侧选择好友、节点或项目频道</span>
+          </div>
+        </div>
+        <div class="topbar-actions">
+          <button class="text-button" id="openLegacyWebBtn" type="button">网页版</button>
+          <button class="text-button" id="openLocalNodeBtn" type="button">本机节点</button>
+        </div>
+      </header>
+
+      <div class="message-list" id="messageList"></div>
+
+      <form class="composer" id="composer">
+        <button class="composer-tool" type="button" id="aiTaskBtn" title="在 AI 开发频道发起任务">AI</button>
+        <textarea id="messageInput" rows="1" placeholder="选择一个频道后开始输入"></textarea>
+        <button class="send-button" id="sendBtn" type="submit">发送</button>
+      </form>
+    </section>
+
+    <aside class="member-panel">
+      <div class="member-title" id="memberPanelTitle">成员</div>
+      <div class="member-list" id="memberList"></div>
+    </aside>
+  </main>
+
+  <script src="/assets/pc_app_utils.js"></script>
+  <script src="/assets/pc_app.js"></script>
+</body>
+</html>

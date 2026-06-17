@@ -6,7 +6,7 @@ use std::{
     time::Duration,
 };
 
-use super::{env_file, paths, DEFAULT_ADMIN_PORT};
+use super::{env_file, paths, DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL};
 
 pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     let internal_dir = paths::internal_dir(install_dir);
@@ -33,7 +33,7 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         wait_for_port(port, Duration::from_secs(15));
     }
 
-    open_admin_page(port)
+    open_pc_web_page(port, &env_values)
 }
 
 pub(crate) fn stop_agent() {
@@ -57,12 +57,33 @@ pub(crate) fn stop_agent() {
     }
 }
 
-pub(crate) fn open_admin_page(port: u16) -> Result<()> {
-    let url = format!("http://127.0.0.1:{port}/");
+pub(crate) fn open_pc_web_page(
+    port: u16,
+    env_values: &std::collections::HashMap<String, String>,
+) -> Result<()> {
+    let local_admin_url = format!("http://127.0.0.1:{port}/");
+    let open_target = env_values
+        .get("NODE_AGENT_OPEN_TARGET")
+        .map(|value| value.trim().to_ascii_lowercase())
+        .unwrap_or_else(|| "pc_web".to_string());
+    let url = if open_target == "local_admin" {
+        local_admin_url
+    } else {
+        let base_url = web_base_url(env_values);
+        format!(
+            "{}/pc?node_admin={}",
+            base_url.trim_end_matches('/'),
+            encode_query_component(&local_admin_url)
+        )
+    };
+    open_url(&url)
+}
+
+fn open_url(url: &str) -> Result<()> {
     #[cfg(windows)]
     {
         Command::new("explorer")
-            .arg(&url)
+            .arg(url)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -72,7 +93,7 @@ pub(crate) fn open_admin_page(port: u16) -> Result<()> {
     #[cfg(not(windows))]
     {
         Command::new("xdg-open")
-            .arg(&url)
+            .arg(url)
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -80,6 +101,29 @@ pub(crate) fn open_admin_page(port: u16) -> Result<()> {
             .with_context(|| format!("无法打开管理页 {url}"))?;
     }
     Ok(())
+}
+
+fn web_base_url(env_values: &std::collections::HashMap<String, String>) -> String {
+    env_values
+        .get("NODE_AGENT_WEB_BASE_URL")
+        .or_else(|| env_values.get("NODE_AGENT_UPDATE_BASE_URL"))
+        .map(|value| value.trim())
+        .filter(|value| !value.is_empty())
+        .unwrap_or(DEFAULT_BASE_URL)
+        .to_string()
+}
+
+fn encode_query_component(value: &str) -> String {
+    let mut encoded = String::new();
+    for byte in value.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                encoded.push(byte as char);
+            }
+            _ => encoded.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    encoded
 }
 
 pub(crate) fn wait_for_port(port: u16, timeout: Duration) -> bool {

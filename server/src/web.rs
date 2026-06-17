@@ -8,7 +8,7 @@ use std::sync::{Arc, OnceLock};
 
 use axum::{
     extract::State,
-    http::{HeaderMap, HeaderValue, header},
+    http::{header, HeaderMap, HeaderValue},
     response::{Html, IntoResponse},
 };
 
@@ -23,6 +23,9 @@ const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
 const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
 const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
+const PC_APP_CSS: &str = include_str!("assets/pc_app.css");
+const PC_APP_UTILS_JS: &str = include_str!("assets/pc_app_utils.js");
+const PC_APP_JS: &str = include_str!("assets/pc_app.js");
 
 pub async fn web_page() -> impl IntoResponse {
     static HTML: OnceLock<String> = OnceLock::new();
@@ -49,6 +52,21 @@ pub async fn download_page(State(state): State<Arc<AppState>>) -> Html<String> {
     )
 }
 
+pub async fn pc_app_page() -> impl IntoResponse {
+    static HTML: OnceLock<String> = OnceLock::new();
+    let body = HTML
+        .get_or_init(|| PC_APP_HTML_TEMPLATE.replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim()))
+        .as_str();
+    let mut headers = HeaderMap::new();
+    headers.insert(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-store, no-cache, must-revalidate, max-age=0"),
+    );
+    headers.insert(header::PRAGMA, HeaderValue::from_static("no-cache"));
+    headers.insert(header::EXPIRES, HeaderValue::from_static("0"));
+    (headers, Html(body))
+}
+
 fn build_html() -> String {
     WEB_HTML_TEMPLATE
         .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim())
@@ -65,6 +83,7 @@ fn build_html() -> String {
 }
 
 const WEB_HTML_TEMPLATE: &str = include_str!("assets/web_page.html");
+const PC_APP_HTML_TEMPLATE: &str = include_str!("assets/pc_app.html");
 const DOWNLOAD_HTML_TEMPLATE: &str = include_str!("assets/download_page.html");
 
 /// PWA manifest.json —— 让 iOS/Android 浏览器把网页识别为可安装应用。
@@ -161,5 +180,41 @@ pub async fn project_home_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PROJECT_HOME_JS,
+    )
+}
+
+pub async fn pc_app_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_CSS,
+    )
+}
+
+pub async fn pc_app_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_JS,
+    )
+}
+
+pub async fn pc_app_utils_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_UTILS_JS,
     )
 }
