@@ -65,15 +65,23 @@ pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
     #[cfg(windows)]
     {
         let command = format!(
-            "timeout /t 2 /nobreak >nul & start \"\" \"{}\"",
-            client.display()
+            "Start-Sleep -Seconds 2; Start-Process -FilePath '{}'",
+            ps_single_quote(&client.to_string_lossy())
         );
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", &command])
-            .current_dir(install_dir)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
+        let mut cmd = Command::new("powershell");
+        cmd.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            &command,
+        ])
+        .current_dir(install_dir)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
         spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
     }
     #[cfg(not(windows))]
@@ -86,6 +94,11 @@ pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
         spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
     }
     Ok(())
+}
+
+#[cfg(windows)]
+fn ps_single_quote(value: &str) -> String {
+    value.replace('\'', "''")
 }
 
 pub(crate) fn open_pc_web_page(
