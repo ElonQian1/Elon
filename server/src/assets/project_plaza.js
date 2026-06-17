@@ -197,7 +197,7 @@
     });
     if (filter.hasApk != null) params.set('has_apk', String(filter.hasApk));
     if (filter.sort) params.set('sort', filter.sort);
-    const res = await fetch('/api/store/projects?' + params.toString(), { cache: 'no-store' });
+    const res = await callApi('/api/store/projects?' + params.toString(), { cache: 'no-store' });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '加载失败');
     return Array.isArray(data.projects) ? data.projects : [];

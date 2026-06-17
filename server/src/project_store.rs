@@ -3,7 +3,7 @@
 /// 路由（无需登录即可浏览，加入需要登录）：
 ///   GET  /api/store/projects          浏览公开项目（分页 + 搜索）
 ///   GET  /api/store/projects/:id      单个项目详情预览
-///   GET  /api/store/joined            我已加入（非 owner）的项目列表
+///   GET  /api/store/joined            我已加入或拥有的项目列表
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -94,7 +94,7 @@ pub async fn get_store_project(
     }
 }
 
-/// GET /api/store/joined — 我已加入（非 owner）的项目列表（需登录）
+/// GET /api/store/joined — 我已加入或拥有的项目列表（需登录）
 pub async fn list_joined_projects(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,

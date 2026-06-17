@@ -341,7 +341,7 @@ impl Store {
         Ok(())
     }
 
-    pub fn join_project(&self, user_id: &str, project_id: &str) -> Result<()> {
+    pub fn join_project(&self, user_id: &str, project_id: &str) -> Result<bool> {
         let conn = self.conn()?;
         // 检查项目存在且公开
         let (is_public, join_mode, source_type): (i64, String, String) = conn
@@ -358,6 +358,16 @@ impl Store {
 
         if is_public == 0 {
             anyhow::bail!("该项目不对外公开");
+        }
+        let existing_role: Option<String> = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                params![project_id, user_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if existing_role.is_some() {
+            return Ok(true);
         }
         if join_mode == "approval" {
             anyhow::bail!("该项目需要审批才能加入，请联系项目管理员");
@@ -376,7 +386,7 @@ impl Store {
              VALUES (?1, ?2, ?3, ?4)",
             params![project_id, user_id, role, now()],
         )?;
-        Ok(())
+        Ok(false)
     }
 
     /// 退出项目（owner 不可退出，由 handler 层校验）
@@ -537,7 +547,7 @@ impl Store {
         Ok(rows)
     }
 
-    /// 列出用户已加入（但非 owner）的公开项目
+    /// 列出用户已加入或拥有的公开项目；项目广场用它判断“加入”还是“进入空间”。
     pub fn list_joined_projects(&self, user_id: &str) -> Result<Vec<PublicProjectItem>> {
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
@@ -556,12 +566,12 @@ impl Store {
                p.created_by AS owner_id,
                p.source_type,
                p.workspace_path,
-               p.display_name
+               p.display_name,
+               pm.role
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
              LEFT JOIN users u ON u.id = p.created_by
              WHERE pm.user_id = ?1
-               AND pm.role != 'owner'
                AND p.status != 'deleted'
              ORDER BY p.updated_at DESC",
         )?;
@@ -577,7 +587,7 @@ impl Store {
                     member_count: row.get(5)?,
                     is_public: row.get::<_, i64>(6)? != 0,
                     join_mode: row.get(7)?,
-                    viewer_role: None,
+                    viewer_role: row.get(17)?,
                     last_task_status: row.get(8)?,
                     latest_apk_url: row.get(9)?,
                     icon_data_url: row.get(10)?,
@@ -1035,13 +1045,35 @@ mod tests {
             .expect("owner account search should still list");
         assert_eq!(account_matches.len(), 1);
 
-        store
+        let first_join = store
             .join_project(&member.id, &project.id)
             .expect("member should join");
+        assert!(!first_join);
+        let second_join = store
+            .join_project(&member.id, &project.id)
+            .expect("repeated join should be idempotent");
+        assert!(second_join);
         let joined = store
             .list_joined_projects(&member.id)
             .expect("joined projects should list");
         assert_eq!(joined[0].owner_account, "项目主人");
+
+        let owner_joined = store
+            .list_joined_projects(&owner.id)
+            .expect("owner projects should count as joined in store");
+        assert_eq!(owner_joined[0].id, project.id);
+        assert_eq!(owner_joined[0].viewer_role.as_deref(), Some("owner"));
+
+        let member_count: i64 = store
+            .conn()
+            .expect("db connection")
+            .query_row(
+                "SELECT COUNT(*) FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+                params![project.id, member.id],
+                |row| row.get(0),
+            )
+            .expect("member count should load");
+        assert_eq!(member_count, 1);
     }
 
     #[test]

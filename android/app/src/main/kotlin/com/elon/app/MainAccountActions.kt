@@ -73,6 +73,7 @@ internal class MainAccountActions(
 
     private fun mergeRemoteProjects(remoteProjects: List<AppProject>): Boolean {
         var changed = false
+        changed = removeStaleRemoteProjects(remoteProjects) || changed
         remoteProjects.forEach { remoteProject ->
             val index = projects.indexOfFirst { local ->
                 local.id == remoteProject.id ||
@@ -86,7 +87,77 @@ internal class MainAccountActions(
                 changed = true
             }
         }
+        changed = collapseDuplicateRemoteProjects() || changed
         return changed
+    }
+
+    private fun removeStaleRemoteProjects(remoteProjects: List<AppProject>): Boolean {
+        val remoteKeys = remoteProjects.flatMap { remoteProjectKeys(it) }.toSet()
+        return projects.removeAll { local ->
+            local.id != ELON_SELF_PROJECT_ID &&
+                local.normalizedSystemProjectKey() == null &&
+                local.isRemoteBackedCacheEntry() &&
+                remoteProjectKeys(local).none { it in remoteKeys }
+        }
+    }
+
+    private fun collapseDuplicateRemoteProjects(): Boolean {
+        val seen = mutableSetOf<String>()
+        var changed = false
+        var index = 0
+        while (index < projects.size) {
+            val key = canonicalRemoteProjectKey(projects[index])
+            if (key != null && !seen.add(key)) {
+                projects.removeAt(index)
+                changed = true
+            } else {
+                index += 1
+            }
+        }
+        return changed
+    }
+
+    private fun remoteProjectKeys(project: AppProject): List<String> {
+        return listOf(project.id, project.collaborationProjectId)
+            .mapNotNull { cleanRemoteProjectKey(it) }
+            .distinct()
+    }
+
+    private fun canonicalRemoteProjectKey(project: AppProject): String? {
+        if (!project.isRemoteBackedCacheEntry()) return null
+        return cleanRemoteProjectKey(project.collaborationProjectId) ?: cleanRemoteProjectKey(project.id)
+    }
+
+    private fun AppProject.isRemoteBackedCacheEntry(): Boolean {
+        return hasServerProjectIdPrefix(id) ||
+            cleanRemoteProjectKey(collaborationProjectId) != null ||
+            hasCleanRemoteField(projectOriginType) ||
+            hasCleanRemoteField(projectOriginLabel) ||
+            hasCleanRemoteField(ownerAccount) ||
+            hasCleanRemoteField(workspaceKind) ||
+            hasCleanRemoteField(archiveEntryKey) ||
+            hasCleanRemoteField(memoryScopeType) ||
+            memberCount != null ||
+            remoteConversationCount != null
+    }
+
+    private fun cleanRemoteProjectKey(value: String?): String? {
+        val text = value?.trim().orEmpty()
+        if (text.isBlank() || text.equals("null", ignoreCase = true)) return null
+        if (text == ELON_SELF_PROJECT_ID) return text
+        if (text.startsWith("prj_")) return text
+        if (text.length == 36 && text.count { it == '-' } == 4) return text
+        return null
+    }
+
+    private fun hasServerProjectIdPrefix(value: String?): Boolean {
+        val text = value?.trim().orEmpty()
+        return text == ELON_SELF_PROJECT_ID || text.startsWith("prj_")
+    }
+
+    private fun hasCleanRemoteField(value: String?): Boolean {
+        val text = value?.trim().orEmpty()
+        return text.isNotBlank() && !text.equals("null", ignoreCase = true)
     }
 
     private fun mergeElonSelfProjectIcon(remoteIconDataUrl: String?): Boolean {

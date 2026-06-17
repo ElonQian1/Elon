@@ -71,9 +71,10 @@ pub async fn join_project(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     match state.store.join_project(&user.id, &project_id) {
-        Ok(()) => Json(serde_json::json!({
+        Ok(already_member) => Json(serde_json::json!({
             "ok": true,
-            "message": "已成功加入项目",
+            "already_member": already_member,
+            "message": if already_member { "你已经是该项目成员" } else { "已成功加入项目" },
             "project_id": project_id,
         }))
         .into_response(),
