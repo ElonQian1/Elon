@@ -82,13 +82,12 @@ pub(crate) fn open_pc_web_page(
 fn open_url(url: &str) -> Result<()> {
     #[cfg(windows)]
     {
-        Command::new("explorer")
-            .arg(url)
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", "start", "", url])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
-            .with_context(|| format!("无法打开管理页 {url}"))?;
+            .stderr(Stdio::null());
+        spawn_hidden(&mut cmd).with_context(|| format!("无法打开管理页 {url}"))?;
     }
     #[cfg(not(windows))]
     {
