@@ -7,12 +7,16 @@
 }
 
 .project-home-segments {
+  position: sticky;
+  top: 44px;
+  z-index: 3;
   height: 42px;
   display: flex;
   align-items: center;
   gap: 54px;
   margin-left: -26px;
   margin-bottom: 32px;
+  background: #000000;
 }
 
 .project-home-segment {

@@ -334,6 +334,7 @@ internal class MainHomeListActions(
         ProjectManagementHomeView(
             activity = activity,
             container = binding.projectContentLayout,
+            segmentContainer = binding.projectSegmentBar,
             projects = projects,
             plazaProjects = { plazaBannerProjects },
             personalProjectsExpanded = { personalProjectsExpanded },

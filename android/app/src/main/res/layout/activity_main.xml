@@ -541,6 +541,16 @@
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
         <LinearLayout
+            android:id="@+id/projectSegmentBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top"
+            android:background="@color/elon_bg_app"
+            android:elevation="3dp"
+            android:orientation="vertical"
+            android:visibility="gone" />
+
+        <LinearLayout
             android:id="@+id/projectSpaceFeedActionsOverlay"
             android:layout_width="64dp"
             android:layout_height="wrap_content"

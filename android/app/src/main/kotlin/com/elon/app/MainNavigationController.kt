@@ -100,9 +100,9 @@ internal class MainNavigationController(
     }
 
     private fun showProjectTopTabs(plazaSelected: Boolean) {
+        setProjectToolbarExpanded(true)
         binding.topTitleText.visibility = View.GONE
         binding.projectTopTabs.visibility = View.VISIBLE
-        applyProjectTopContentOffset(enabled = true)
         updateProjectTopTabVisual(
             tab = binding.projectHomeTopTab,
             indicator = binding.projectHomeTabIndicator,
@@ -116,15 +116,21 @@ internal class MainNavigationController(
     }
 
     private fun hideProjectTopTabs() {
+        setProjectToolbarExpanded(false)
         binding.projectTopTabs.visibility = View.GONE
-        applyProjectTopContentOffset(enabled = false)
+        setProjectHomeSegmentVisible(false)
         binding.topTitleText.visibility = View.VISIBLE
     }
 
-    private fun applyProjectTopContentOffset(enabled: Boolean) {
-        val offset = if (enabled) designPx(PROJECT_TOP_CONTENT_OFFSET_PX).toFloat() else 0f
-        binding.projectTopTabs.translationY = offset
-        binding.addButton.translationY = offset
+    private fun setProjectToolbarExpanded(expanded: Boolean) {
+        binding.toolbar.layoutParams = binding.toolbar.layoutParams.apply {
+            height = designPx(if (expanded) PROJECT_TOP_TOOLBAR_HEIGHT_PX else PROJECT_TOOLBAR_HEIGHT_PX)
+        }
+    }
+
+    private fun setProjectHomeSegmentVisible(visible: Boolean) {
+        binding.projectSegmentBar.visibility = if (visible) View.VISIBLE else View.GONE
+        if (visible) binding.projectSegmentBar.bringToFront()
     }
 
     private fun updateProjectTopTabVisual(tab: TextView, indicator: View, selected: Boolean) {
@@ -212,6 +218,7 @@ internal class MainNavigationController(
         binding.topTitleText.setOnLongClickListener(null)
         if (tab == binding.tabProject) {
             showProjectTopTabs(plazaSelected = false)
+            setProjectHomeSegmentVisible(true)
         } else {
             hideProjectTopTabs()
         }
@@ -829,6 +836,7 @@ internal class MainNavigationController(
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
         showProjectTopTabs(plazaSelected = false)
+        setProjectHomeSegmentVisible(true)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
@@ -858,6 +866,7 @@ internal class MainNavigationController(
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
         showProjectTopTabs(plazaSelected = true)
+        setProjectHomeSegmentVisible(false)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
@@ -948,9 +957,7 @@ internal class MainNavigationController(
     }
 
     private fun applyProjectManagementDesignMetrics() {
-        binding.toolbar.layoutParams = binding.toolbar.layoutParams.apply {
-            height = designPx(PROJECT_TOOLBAR_HEIGHT_PX)
-        }
+        setProjectToolbarExpanded(false)
         binding.projectTopTabs.setPadding(
             designPx(PROJECT_TOP_PADDING_START_PX),
             0,
@@ -1046,6 +1053,7 @@ internal class MainNavigationController(
     private companion object {
         const val DESIGN_WIDTH_PX = 1272
         const val PROJECT_TOOLBAR_HEIGHT_PX = 176
+        const val PROJECT_TOP_TOOLBAR_HEIGHT_PX = 224
         const val PROJECT_TOP_PADDING_START_PX = 78
         const val PROJECT_TOP_PADDING_END_PX = 250
         const val PROJECT_TOP_TAB_GAP_PX = 188
@@ -1053,7 +1061,6 @@ internal class MainNavigationController(
         const val PROJECT_TOP_INDICATOR_WIDTH_PX = 98
         const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
         const val PROJECT_TOP_INDICATOR_TOP_PX = 14
-        const val PROJECT_TOP_CONTENT_OFFSET_PX = 48
         const val PROJECT_ADD_BUTTON_SIZE_PX = 156
         const val PROJECT_ADD_BUTTON_END_PX = 70
         const val PROJECT_ADD_BUTTON_PADDING_PX = 46

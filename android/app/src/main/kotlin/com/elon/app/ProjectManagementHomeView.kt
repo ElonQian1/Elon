@@ -18,6 +18,7 @@ import kotlin.math.roundToInt
 internal class ProjectManagementHomeView(
     private val activity: AppCompatActivity,
     private val container: LinearLayout,
+    private val segmentContainer: LinearLayout?,
     private val projects: () -> List<AppProject>,
     private val plazaProjects: () -> List<StoreProject>,
     private val personalProjectsExpanded: () -> Boolean,
@@ -55,7 +56,11 @@ internal class ProjectManagementHomeView(
         val showJoint = jointProjectsExpanded() && !personalProjectsExpanded()
         val visibleProjects = if (showJoint) joint else personal
 
-        container.addView(createSegmentRow(showJoint), segmentLayoutParams())
+        if (renderFixedSegment(showJoint)) {
+            container.addView(fixedSegmentSpacer())
+        } else {
+            container.addView(createSegmentRow(showJoint), segmentLayoutParams())
+        }
         if (visibleProjects.isEmpty()) {
             container.addView(createEmptyState(showJoint), firstRowLayoutParams())
         } else {
@@ -64,6 +69,17 @@ internal class ProjectManagementHomeView(
             }
         }
         container.addView(bottomSpacer())
+    }
+
+    private fun renderFixedSegment(showJoint: Boolean): Boolean {
+        val target = segmentContainer ?: return false
+        target.removeAllViews()
+        target.setBackgroundColor(Color.parseColor(COLOR_BG))
+        target.layoutParams = target.layoutParams.apply {
+            height = designPx(FIXED_SEGMENT_BAR_HEIGHT_PX)
+        }
+        target.addView(createSegmentRow(showJoint), fixedSegmentLayoutParams())
+        return true
     }
 
     private fun createSegmentRow(showJoint: Boolean): View {
@@ -308,6 +324,26 @@ internal class ProjectManagementHomeView(
         return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
+    private fun fixedSegmentSpacer(): View {
+        return View(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                designPx(FIXED_SEGMENT_BAR_HEIGHT_PX)
+            )
+        }
+    }
+
+    private fun fixedSegmentLayoutParams(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            designPx(SEGMENT_HEIGHT_PX)
+        ).apply {
+            marginStart = designPx(SEGMENT_SIDE_PX)
+            marginEnd = designPx(SEGMENT_SIDE_PX)
+            topMargin = designPx(FIXED_SEGMENT_TOP_MARGIN_PX)
+        }
+    }
+
     private fun bottomSpacer(): View {
         return View(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
@@ -358,6 +394,8 @@ internal class ProjectManagementHomeView(
         const val SEGMENT_HEIGHT_PX = 138
         const val SEGMENT_WIDTH_PX = 210
         const val SEGMENT_GAP_PX = 60
+        const val FIXED_SEGMENT_TOP_MARGIN_PX = 106
+        const val FIXED_SEGMENT_BAR_HEIGHT_PX = FIXED_SEGMENT_TOP_MARGIN_PX + SEGMENT_HEIGHT_PX
         const val FIRST_ROW_TOP_MARGIN_PX = 102
         const val ROW_HEIGHT_PX = 220
         const val ROW_GAP_PX = 98
