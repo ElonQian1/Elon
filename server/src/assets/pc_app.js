@@ -694,7 +694,11 @@
     if (!content) return;
     els.sendBtn.disabled = true;
     try {
-      if (state.activeKind === 'friends' && state.activePeer) {
+      if (state.activeKind === 'doctor') {
+        await doctor.sendComposerMessage(content);
+        els.input.value = '';
+        els.input.style.height = '46px';
+      } else if (state.activeKind === 'friends' && state.activePeer) {
         const path = state.activePeer.kind === 'group'
           ? `/api/me/groups/${encodeURIComponent(state.activePeer.id)}/messages`
           : `/api/me/friends/${encodeURIComponent(state.activePeer.id)}/messages`;

@@ -14,6 +14,7 @@
     state.doctorAnalysis = state.doctorAnalysis || '';
     state.doctorMemories = state.doctorMemories || null;
     state.doctorResult = state.doctorResult || null;
+    state.doctorMessages = Array.isArray(state.doctorMessages) ? state.doctorMessages : [];
 
     function localNodeApiUrl(path) {
       const base = state.nodeAdminUrl.endsWith('/') ? state.nodeAdminUrl : `${state.nodeAdminUrl}/`;
@@ -60,7 +61,7 @@
       els.workspaceName.textContent = '电脑医生';
       els.workspaceMeta.textContent = '独立本机维护项目';
       setHeader('医', '电脑医生', '诊断 Windows 网络、代理、DNS 和常见系统设置');
-      setComposer(false, '在电脑医生页面中描述问题', false);
+      setComposer(true, '描述电脑问题，按 Enter 发送给电脑医生', false);
       deps.renderChannels();
       renderDoctorMain();
       renderMembers('电脑医生权限', [
@@ -80,14 +81,12 @@
     }
 
     function syncDoctorProblem() {
-      const input = $('doctorProblem');
-      if (input) state.doctorProblem = input.value;
       return clean(state.doctorProblem);
     }
 
     function doctorStatusHtml() {
       if (!state.doctorResult) {
-        return '<div class="doctor-output">描述问题后，可以先做只读体检，再让远程 AI 根据本机快照分析。</div>';
+        return '<div class="doctor-output">直接使用底部消息发送框描述问题；电脑医生会先采集只读快照，再让远程 AI 分析。</div>';
       }
       return `<div class="doctor-output ${escapeHtml(state.doctorResult.kind || '')}">${escapeHtml(state.doctorResult.text || '')}</div>`;
     }
@@ -111,6 +110,47 @@
       }).join('')}</div>`;
     }
 
+    function doctorActorName(message) {
+      if (message.role === 'user') {
+        return clean(state.user && (state.user.nickname || state.user.account || state.user.phone || state.user.email)) || '你';
+      }
+      return '电脑医生';
+    }
+
+    function doctorMessageGlyph(message) {
+      return message.role === 'user' ? '你' : '医';
+    }
+
+    function doctorConversationHtml() {
+      if (!state.doctorMessages.length) {
+        return `<div class="doctor-conversation-empty">
+          用底部的消息发送框描述电脑问题，例如“网页打不开但微信能用”或“代理关不掉”。
+        </div>`;
+      }
+      return `<div class="doctor-conversation">${state.doctorMessages.map((message) => {
+        const name = doctorActorName(message);
+        const tone = message.role === 'assistant' ? ` ai ${message.kind || ''}` : '';
+        return `<article class="message-row doctor-message-row">
+          <div class="message-avatar fallback"><span>${escapeHtml(doctorMessageGlyph(message))}</span></div>
+          <div class="message-body">
+            <div class="message-meta"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(message.time || '')}</span></div>
+            <div class="message-content${tone}">${escapeHtml(message.content || '')}</div>
+          </div>
+        </article>`;
+      }).join('')}</div>`;
+    }
+
+    function appendDoctorMessage(role, content, kind) {
+      const message = {
+        role,
+        content,
+        kind: kind || '',
+        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+      };
+      state.doctorMessages.push(message);
+      return message;
+    }
+
     function renderDoctorMain() {
       setDoctorMode(true);
       els.messageList.innerHTML = `<div class="doctor-page">
@@ -125,15 +165,12 @@
 
         <section class="doctor-panel" data-doctor-panel="diagnosis">
           <h3>诊断对话</h3>
-          <div class="doctor-field">
-            <label for="doctorProblem">电脑问题</label>
-            <textarea id="doctorProblem" placeholder="如：网页打不开但微信能用；GitHub 访问很慢；代理开关关不掉；Wi-Fi 连上但没有网络">${escapeHtml(state.doctorProblem)}</textarea>
-          </div>
           <div class="doctor-actions">
             <button class="text-button" id="doctorSnapshotBtn" type="button">只读体检</button>
-            <button class="text-button" id="doctorAnalyzeBtn" type="button">远程 AI 分析</button>
+            <button class="text-button" id="doctorAnalyzeBtn" type="button">分析最近问题</button>
             <button class="text-button" id="doctorMemorySaveBtn" type="button">保存为问题记忆</button>
           </div>
+          ${doctorConversationHtml()}
           ${doctorStatusHtml()}
         </section>
 
@@ -169,11 +206,9 @@
         </section>
       </div>`;
 
-      const problem = $('doctorProblem');
-      if (problem) problem.addEventListener('input', () => { state.doctorProblem = problem.value; });
       $('openDoctorLocalBtn')?.addEventListener('click', () => window.open(`${state.nodeAdminUrl}#doctor`, '_blank'));
       $('doctorSnapshotBtn')?.addEventListener('click', loadDoctorSnapshot);
-      $('doctorAnalyzeBtn')?.addEventListener('click', doctorAnalyze);
+      $('doctorAnalyzeBtn')?.addEventListener('click', () => doctorAnalyze());
       $('doctorMemorySaveBtn')?.addEventListener('click', saveDoctorMemory);
       $('doctorMemoryRefreshBtn')?.addEventListener('click', () => loadDoctorMemory(false));
       els.messageList.querySelectorAll('[data-doctor-repair]').forEach((btn) => {
@@ -195,13 +230,17 @@
       renderDoctorMain();
     }
 
-    async function doctorAnalyze() {
-      const problem = syncDoctorProblem();
+    async function doctorAnalyze(problemFromComposer) {
+      const problem = clean(typeof problemFromComposer === 'string' ? problemFromComposer : '') || syncDoctorProblem();
       if (!problem) {
         state.doctorResult = { kind: 'err', text: '请先描述电脑问题。' };
         renderDoctorMain();
         return;
       }
+      state.doctorSection = 'diagnosis';
+      state.doctorProblem = problem;
+      appendDoctorMessage('user', problem);
+      const assistantMessage = appendDoctorMessage('assistant', '正在采集只读快照，并请求远程 AI 分析…');
       state.doctorResult = { kind: '', text: '正在采集只读快照，并请求远程 AI 分析…' };
       renderDoctorMain();
       try {
@@ -211,11 +250,19 @@
         });
         state.doctorAnalysis = data.analysis || '';
         state.doctorSnapshot = data.snapshot || state.doctorSnapshot;
-        state.doctorResult = { kind: 'ok', text: state.doctorAnalysis || '远程 AI 已完成分析。' };
+        assistantMessage.content = state.doctorAnalysis || '远程 AI 已完成分析。';
+        assistantMessage.kind = 'ok';
+        state.doctorResult = { kind: 'ok', text: '远程 AI 已完成分析。' };
       } catch (error) {
-        state.doctorResult = { kind: 'err', text: `远程 AI 分析失败：${error.message || error}` };
+        assistantMessage.content = `远程 AI 分析失败：${error.message || error}`;
+        assistantMessage.kind = 'err';
+        state.doctorResult = { kind: 'err', text: assistantMessage.content };
       }
       renderDoctorMain();
+    }
+
+    async function sendComposerMessage(content) {
+      await doctorAnalyze(content);
     }
 
     async function doctorRepair(action) {
@@ -298,7 +345,8 @@
     return {
       renderChannels,
       selectDoctor,
-      selectSection
+      selectSection,
+      sendComposerMessage
     };
   }
 

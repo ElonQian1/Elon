@@ -105,6 +105,31 @@
   flex-wrap: wrap;
   align-items: center;
 }
+.doctor-conversation,
+.doctor-conversation-empty {
+  margin-top: 12px;
+}
+.doctor-conversation {
+  display: grid;
+  gap: 12px;
+}
+.doctor-conversation-empty {
+  padding: 14px;
+  border: 1px dashed #454954;
+  border-radius: 8px;
+  color: var(--text-muted);
+  line-height: 1.55;
+}
+.doctor-message-row {
+  padding: 0;
+}
+.doctor-message-row .message-content {
+  max-width: min(760px, 100%);
+}
+.doctor-message-row .message-content.err {
+  border: 1px solid rgba(223, 92, 92, .38);
+  color: #ffd7d7;
+}
 .doctor-output,
 .doctor-snapshot,
 .doctor-memory {
