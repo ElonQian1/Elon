@@ -32,6 +32,10 @@
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
     setRails, renderChannels, setDoctorMode
   });
+  const node = window.ElonPcNode.create({
+    state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
+    setRails, renderChannels, setNodeMode
+  });
 
   function saveToken(token) {
     state.token = token || '';
@@ -188,7 +192,7 @@
     const query = filterText();
     if (state.activeKind === 'friends') return renderFriendChannels(query);
     if (state.activeKind === 'doctor') return doctor.renderChannels(channelButton);
-    if (state.activeKind === 'node') return renderNodeChannels(query);
+    if (state.activeKind === 'node') return node.renderChannels(channelButton);
     return renderProjectChannels(query);
   }
 
@@ -212,24 +216,6 @@
     els.channelList.querySelectorAll('[data-peer-kind]').forEach((btn) => {
       btn.addEventListener('click', () => selectPeer(btn.dataset.peerKind, btn.dataset.itemId));
     });
-  }
-
-  function renderNodeChannels() {
-    const onlineCount = state.nodes.filter((node) => node.online).length;
-    els.channelList.innerHTML = `
-      <div class="channel-section">本机</div>
-      ${channelButton({ id: 'local-node', kind: 'node', glyph: 'PC', title: '节点注册', sub: '本机 agent 管理页', active: true })}
-      <div class="channel-section">我的节点</div>
-      ${state.nodes.map((node) => channelButton({
-        id: node.node_id || node.agent_id || '',
-        kind: 'node-list',
-        glyph: node.online ? '●' : '○',
-        title: clean(node.display_name || node.device_name || node.short_id || node.node_id || 'PC 节点'),
-        sub: node.online ? '在线' : '离线',
-        online: !!node.online
-      })).join('') || '<div class="empty-state">暂无节点</div>'}
-      <div class="channel-section">状态</div>
-      <div class="empty-state">${onlineCount}/${state.nodes.length} 台在线</div>`;
   }
 
   function renderProjectChannels(query) {
@@ -320,12 +306,12 @@
   function bindEvents() {
     els.friendsRail.addEventListener('click', selectFriends);
     els.doctorRail.addEventListener('click', doctor.selectDoctor);
-    els.nodeRail.addEventListener('click', selectNode);
+    els.nodeRail.addEventListener('click', node.selectNode);
     [els.friendsRail, els.doctorRail, els.nodeRail, $('openWebBtn')].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
-    $('openLocalNodeBtn').addEventListener('click', () => window.open(state.nodeAdminUrl, '_blank'));
+    $('openLocalNodeBtn').addEventListener('click', node.openNodeWindow);
     els.userSettingsBtn.addEventListener('click', openSettings);
     els.settingsCloseBtn.addEventListener('click', closeSettings);
     els.settingsBackdrop.addEventListener('click', (event) => {
@@ -458,37 +444,6 @@
     } catch (error) {
       showError(error);
     }
-  }
-
-  async function selectNode() {
-    state.activeKind = 'node';
-    state.activeProjectId = '';
-    state.activeChannelId = '';
-    state.activePeer = null;
-    setRails('node');
-    els.workspaceName.textContent = 'PC 节点';
-    els.workspaceMeta.textContent = '注册、节点状态';
-    setHeader('PC', '本机节点注册页面', '节点管理页面已融合在 PC 工作台内');
-    setComposer(false, '节点管理页中操作', false);
-    renderChannels();
-    renderNodeMain();
-    renderMembers('我的节点', state.nodes.map((node) => ({
-      name: clean(node.display_name || node.device_name || node.short_id || node.node_id || 'PC 节点'),
-      sub: node.online ? '在线' : '离线'
-    })));
-  }
-
-  function renderNodeMain() {
-    setNodeMode(true);
-    els.messageList.innerHTML = `<div class="node-toolbar">
-      <div>
-        <strong>本机节点管理</strong>
-        <div class="node-status-line">来源：${escapeHtml(state.nodeAdminUrl)}。这里直接嵌入本机 agent 页面，不再让用户面对两个独立入口。</div>
-      </div>
-      <button class="text-button" type="button" id="openNodeFrame">新窗口打开</button>
-    </div>
-    <iframe class="node-frame" src="${escapeHtml(state.nodeAdminUrl)}" title="一龙 PC 节点本地管理"></iframe>`;
-    $('openNodeFrame').addEventListener('click', () => window.open(state.nodeAdminUrl, '_blank'));
   }
 
   async function selectProject(projectId) {
@@ -899,7 +854,7 @@
     if (!state.token) return showLoginState();
     await loadBaseData();
     if (state.activeKind === 'doctor') return doctor.selectDoctor();
-    if (state.activeKind === 'node') return selectNode();
+    if (state.activeKind === 'node') return node.selectNode();
     if (state.activeKind === 'project' && state.activeProjectId) return selectProject(state.activeProjectId);
     return selectFriends();
   }
