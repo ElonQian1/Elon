@@ -86,12 +86,13 @@
       if (['available', 'external', 'unavailable', 'coming_soon', 'needs_configuration', 'third_party', 'planned', 'pending'].includes(explicit)) {
         return explicit;
       }
-      if (valueOf(item.url, item.download_url, item.downloadUrl, item.href)) return 'available';
+      if (valueOf(item.url, item.download_url, item.downloadUrl, item.fallback_url, item.fallbackUrl, item.href)) return 'available';
       if (valueOf(item.manifest_url, item.manifestUrl)) return 'pending';
       return 'planned';
     }
 
-    function statusLabel(status) {
+    function statusLabel(status, platform) {
+      if (platform === 'web' && (status === 'available' || status === 'external')) return '网页入口';
       if (status === 'available') return '可下载';
       if (status === 'external') return '外部入口';
       if (status === 'unavailable') return '暂不可用';
@@ -268,9 +269,9 @@
         <span class="project-landing-platform">${escapeHtml(item.short)}</span>
         <span class="project-landing-download-main">
           <strong>${escapeHtml(item.label)}</strong>
-          <span>${escapeHtml(detail || statusLabel(item.status))}</span>
+          <span>${escapeHtml(detail || statusLabel(item.status, item.platform))}</span>
         </span>
-        <em>${escapeHtml(statusLabel(item.status))}</em>
+        <em>${escapeHtml(statusLabel(item.status, item.platform))}</em>
       </button>`;
     }
 
