@@ -36,7 +36,8 @@
   });
   const node = window.ElonPcNode.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
-    setRails, renderChannels, setNodeMode
+    setRails, renderChannels, setNodeMode, localNodeApi, ensureLocalNodeLogin,
+    openSettings, loadBaseData
   });
   const projectLanding = window.ElonPcProjectLanding.create({
     state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
@@ -334,7 +335,7 @@
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
-    $('openLocalNodeBtn').addEventListener('click', node.openNodeWindow);
+    $('openLocalNodeBtn').addEventListener('click', node.selectNode);
     els.userSettingsBtn.addEventListener('click', openSettings);
     els.settingsCloseBtn.addEventListener('click', closeSettings);
     els.settingsBackdrop.addEventListener('click', (event) => {

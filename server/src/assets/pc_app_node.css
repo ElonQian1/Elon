@@ -94,6 +94,197 @@
   min-height: 0;
   display: grid;
 }
+.node-native-admin {
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  gap: 12px;
+  padding-right: 2px;
+}
+.node-admin-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.node-admin-grid.top {
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, .65fr);
+}
+.node-admin-grid.bottom {
+  align-items: start;
+}
+.node-admin-panel {
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius);
+  background: #202126;
+  padding: 15px;
+}
+.node-admin-panel.identity {
+  background: #202b31;
+}
+.node-admin-panel h3 {
+  margin: 2px 0 0;
+  font-size: 16px;
+}
+.node-panel-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.node-admin-eyebrow {
+  color: #8ad7ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+.node-admin-copy {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.node-admin-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 12px;
+}
+.node-action:disabled,
+.node-mini-button:disabled {
+  cursor: not-allowed;
+  opacity: .55;
+}
+.node-mini-button {
+  min-height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #2b2d33;
+  color: var(--text-soft);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.node-mini-button:hover {
+  color: var(--text);
+  background: #343741;
+}
+.node-kv-list.dense {
+  gap: 8px;
+}
+.node-kv-list.dense div {
+  grid-template-columns: 72px minmax(0, 1fr);
+}
+.node-form-field {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+.node-form-field span,
+.node-check-field {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.node-check-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 28px;
+}
+.node-check-field input {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--green);
+}
+.node-form-field input {
+  width: 100%;
+  min-height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #181a1f;
+  color: var(--text);
+  padding: 0 10px;
+  font: inherit;
+  font-size: 13px;
+  box-sizing: border-box;
+}
+.node-form-field input:focus {
+  outline: none;
+  border-color: #5d97cf;
+}
+.node-inline-result {
+  min-height: 0;
+  margin-top: 10px;
+}
+.node-inline-result > div {
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-word;
+}
+.node-inline-result .ok {
+  border: 1px solid rgba(77, 174, 105, .35);
+  background: rgba(77, 174, 105, .1);
+}
+.node-inline-result .error {
+  border: 1px solid rgba(223, 92, 92, .35);
+  background: rgba(223, 92, 92, .1);
+  color: #f0a5a5;
+}
+.node-env-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.node-env-grid > div,
+.node-model-list > div,
+.node-empty-panel {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #181a1f;
+}
+.node-env-grid > div {
+  min-height: 52px;
+  padding: 9px;
+  display: grid;
+  gap: 3px;
+}
+.node-env-grid strong,
+.node-model-list strong {
+  color: var(--text);
+  font-size: 13px;
+}
+.node-env-grid span,
+.node-model-list span {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+.node-env-grid .ok {
+  border-color: rgba(77, 174, 105, .36);
+}
+.node-env-grid .miss {
+  border-color: rgba(216, 165, 53, .32);
+}
+.node-model-list {
+  display: grid;
+  gap: 8px;
+}
+.node-model-list > div {
+  min-height: 50px;
+  padding: 10px;
+  display: grid;
+  gap: 4px;
+}
+.node-empty-panel {
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
 .node-loading,
 .node-setup-card {
   border: 1px solid var(--line-soft);
@@ -253,7 +444,10 @@
 @media (max-width: 980px) {
   .node-detail-metrics,
   .node-detail-grid,
-  .node-detail-grid.compact {
+  .node-detail-grid.compact,
+  .node-admin-grid,
+  .node-admin-grid.top,
+  .node-env-grid {
     grid-template-columns: 1fr;
   }
 }

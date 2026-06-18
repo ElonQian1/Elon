@@ -9,6 +9,16 @@
     state.nodePollTimer = state.nodePollTimer || null;
     state.nodeLocalOnline = false;
     state.activeNodeId = state.activeNodeId || '';
+    const nativeAdmin = window.ElonPcNodeAdmin && window.ElonPcNodeAdmin.create({
+      state, $, clean, escapeHtml,
+      localNodeApi: adminNodeApi,
+      ensureLocalNodeLogin: deps.ensureLocalNodeLogin,
+      openSettings: deps.openSettings,
+      loadBaseData: deps.loadBaseData,
+      renderChannels: deps.renderChannels,
+      probeLocalNode,
+      formatBytes
+    });
 
     function renderChannels(channelButton) {
       const onlineCount = state.nodes.filter((node) => node.online).length;
@@ -93,7 +103,7 @@
             <div>
               <div class="node-kicker">一龙 Win 端</div>
               <h2>连接本机 PC 节点</h2>
-              <p>首次使用需要下载并确认安装；安装后点击“启动 Win 端”，浏览器会拉起本机程序，本页检测到 7799 服务后自动嵌入管理页。</p>
+              <p>首次使用需要下载并确认安装；安装后点击“启动 Win 端”，浏览器会拉起本机程序，本页检测到 7799 服务后直接显示原生节点管理面板。</p>
             </div>
             <span class="node-status-chip checking" id="nodeLocalStatus">检测中</span>
           </section>
@@ -189,11 +199,18 @@
       }
     }
 
-    async function localNodeApi(path, timeoutMs) {
+    async function localNodeApi(path, optionsOrTimeout, timeoutMs) {
+      const request = typeof optionsOrTimeout === 'object' && optionsOrTimeout !== null
+        ? Object.assign({}, optionsOrTimeout)
+        : {};
+      const timeout = typeof optionsOrTimeout === 'number' ? optionsOrTimeout : (timeoutMs || 8000);
+      if (request.body && !request.headers) request.headers = { 'Content-Type': 'application/json' };
       const controller = new AbortController();
-      const timer = window.setTimeout(() => controller.abort(), timeoutMs);
+      const timer = window.setTimeout(() => controller.abort(), timeout);
       try {
-        const resp = await fetch(localNodeApiUrl(path), { cache: 'no-store', signal: controller.signal });
+        const resp = await fetch(localNodeApiUrl(path), Object.assign({ cache: 'no-store' }, request, {
+          signal: controller.signal
+        }));
         const text = await resp.text();
         const data = text ? JSON.parse(text) : {};
         if (!resp.ok) throw new Error(data.error || data.message || `HTTP ${resp.status}`);
@@ -208,10 +225,15 @@
       return new URL(String(path || '').replace(/^\//, ''), base).toString();
     }
 
+    async function adminNodeApi(path, options) {
+      if (typeof deps.localNodeApi === 'function') return deps.localNodeApi(path, options || {});
+      return localNodeApi(path, options || {}, 8000);
+    }
+
     function renderNodeConnected(status) {
       state.nodeLocalOnline = true;
       setStatus('已连接', 'online');
-      setLaunchButton('打开本机页面');
+      setLaunchButton('高级本机页');
       const surface = $('nodeLocalSurface');
       const line = $('nodeVersionLine');
       if (line) {
@@ -220,8 +242,21 @@
         line.textContent = `${name} · ${logged} · ${status.connected ? '云端在线' : '等待连接云端'}`;
       }
       if (surface) {
-        surface.innerHTML = `<iframe class="node-frame" src="${escapeHtml(state.nodeAdminUrl)}" title="一龙 PC 节点本地管理"></iframe>`;
+        if (nativeAdmin) nativeAdmin.render(surface, status);
+        else renderNodeConnectedFallback(surface, status);
       }
+    }
+
+    function renderNodeConnectedFallback(surface, status) {
+      surface.innerHTML = `
+        <div class="node-setup-card">
+          <h3>${escapeHtml(clean(status.device_name) || '本机节点已连接')}</h3>
+          <p>本机节点服务已启动，但当前页面缺少原生管理模块。请刷新页面，或打开高级本机页继续操作。</p>
+          <div class="node-admin-actions">
+            <button class="node-action primary" type="button" id="nodeFallbackAdvanced">打开高级本机页</button>
+          </div>
+        </div>`;
+      $('nodeFallbackAdvanced')?.addEventListener('click', () => window.open(state.nodeAdminUrl, '_blank', 'noopener'));
     }
 
     function renderNodeSetup(reason) {
@@ -239,7 +274,7 @@
             <div><strong>2</strong><span>双击「一龙PC节点.exe」，它会自动安装、开机自启，并注册网页一键唤起。</span></div>
             <div><strong>3</strong><span>安装后点击“启动 Win 端”，再在本机页面登录一龙账号并注册 PC 节点。</span></div>
           </div>
-          <p class="node-safe-note">浏览器不能静默安装或强行启动本地程序；已安装后可以通过 elon-node://open 唤起，启动后本页会自动检测并嵌入管理页。</p>
+          <p class="node-safe-note">浏览器不能静默安装或强行启动本地程序；已安装后可以通过 elon-node://open 唤起，启动后本页会自动检测并显示节点管理面板。</p>
         </div>`;
     }
 

@@ -30,6 +30,7 @@ const PC_PROJECT_LANDING_CSS: &str = include_str!("assets/pc_project_landing.css
 const PC_VOICE_PROJECT_CSS: &str = include_str!("assets/pc_voice_project.css");
 const PC_APP_UTILS_JS: &str = include_str!("assets/pc_app_utils.js");
 const PC_APP_MARKDOWN_JS: &str = include_str!("assets/pc_app_markdown.js");
+const PC_APP_NODE_ADMIN_JS: &str = include_str!("assets/pc_app_node_admin.js");
 const PC_APP_NODE_JS: &str = include_str!("assets/pc_app_node.js");
 const PC_APP_DOCTOR_JS: &str = include_str!("assets/pc_app_doctor.js");
 const PC_PROJECT_LANDING_JS: &str = include_str!("assets/pc_project_landing.js");
@@ -267,6 +268,19 @@ pub async fn pc_app_node_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PC_APP_NODE_JS,
+    )
+}
+
+pub async fn pc_app_node_admin_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_NODE_ADMIN_JS,
     )
 }
 
