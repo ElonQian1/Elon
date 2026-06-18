@@ -49,6 +49,7 @@ mod pc_workspace_git_remote;
 mod pc_workspace_provisioner;
 mod project_default_docs;
 mod project_docs_scan;
+mod project_landing;
 mod project_workspace_inspect;
 mod windows_doctor;
 

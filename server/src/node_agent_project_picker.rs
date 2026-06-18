@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 
-use crate::project_workspace_inspect;
+use crate::{project_landing, project_workspace_inspect};
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct InspectLocalProjectReq {
@@ -56,6 +56,7 @@ fn project_info_response(workspace_path: &str) -> (StatusCode, Json<serde_json::
                 "ok": true,
                 "project": project,
                 "inspect": inspect,
+                "landing": project_landing::load_workspace_landing(Path::new(workspace_path)),
             })),
         ),
         Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),

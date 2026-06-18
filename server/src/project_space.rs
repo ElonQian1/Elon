@@ -18,6 +18,7 @@ use crate::{
     project_docs_channel,
     project_execution_mode::ProjectExecutionMode,
     project_keys::clean_trace_id,
+    project_landing,
     project_mobile::ensure_mobile_project,
     store::{ProjectAccess, PublicUser},
     tools,
@@ -181,6 +182,7 @@ fn project_space_response(
         "project": project,
         "channels": channels,
         "members": members,
+        "landing": project_landing_manifest(&state, &access),
         "latest_apk_url": latest_project_apk_url(&state, &access),
     }))
     .into_response()
@@ -904,6 +906,15 @@ fn latest_project_apk_url(
             state.public_url, project.id
         ))
     })
+}
+
+fn project_landing_manifest(
+    state: &AppState,
+    project: &crate::store::ProjectAccess,
+) -> Option<serde_json::Value> {
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    project_landing::load_workspace_landing(&workspace)
 }
 
 fn result_message(message: &str, apk_url: Option<&str>, status: Option<&str>) -> String {

@@ -43,6 +43,17 @@
       return [];
     }
 
+    function downloadArrayOf(value) {
+      if (Array.isArray(value)) return value;
+      if (!value || typeof value !== 'object') return [];
+      return Object.entries(value).map(([platform, item]) => {
+        if (item && typeof item === 'object' && !Array.isArray(item)) {
+          return Object.assign({ platform }, item);
+        }
+        return { platform, url: item };
+      });
+    }
+
     function valueOf() {
       for (const value of arguments) {
         const next = clean(value);
@@ -136,9 +147,9 @@
     function downloadsOf(project, landing) {
       const byPlatform = new Map();
       const rawDownloads = [
-        ...arrayOf(state.projectSpace && state.projectSpace.downloads),
-        ...arrayOf(landing.downloads),
-        ...arrayOf(project && project.downloads)
+        ...downloadArrayOf(state.projectSpace && state.projectSpace.downloads),
+        ...downloadArrayOf(landing.downloads),
+        ...downloadArrayOf(project && project.downloads)
       ];
       rawDownloads.map(normalizeDownload).filter(Boolean).forEach((item) => byPlatform.set(item.platform, item));
 
@@ -256,6 +267,14 @@
       if (customLandingUrl) resources.push({ label: '完整介绍', url: customLandingUrl });
       const manifestUrl = valueOf(landing.landing_manifest_url, landing.landingManifestUrl, project && (project.landing_manifest_url || project.landingManifestUrl));
       if (manifestUrl) resources.push({ label: 'Landing Manifest', url: manifestUrl });
+      [
+        ...arrayOf(landing.resources),
+        ...arrayOf(project && project.resources)
+      ].forEach((item) => {
+        const url = valueOf(item && (item.url || item.href || item.link));
+        const label = valueOf(item && (item.label || item.name || item.title), '相关链接');
+        if (url) resources.push({ label, url });
+      });
       return resources.map((resource) =>
         `<button class="project-landing-resource" type="button" data-resource-url="${escapeHtml(resource.url)}">${escapeHtml(resource.label)}</button>`
       ).join('');
