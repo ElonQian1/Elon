@@ -2114,6 +2114,16 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::post(windows_doctor::analyze_handler),
             )
             .route(
+                "/api/doctor/sessions",
+                axum::routing::get(windows_doctor::sessions_list_handler)
+                    .post(windows_doctor::session_create_handler),
+            )
+            .route(
+                "/api/doctor/sessions/:session_id",
+                axum::routing::get(windows_doctor::session_get_handler)
+                    .delete(windows_doctor::session_delete_handler),
+            )
+            .route(
                 "/api/doctor/memory",
                 axum::routing::get(windows_doctor::memory_list_handler)
                     .post(windows_doctor::memory_save_handler),

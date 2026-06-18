@@ -23,6 +23,37 @@
     radial-gradient(circle at 31% 72%, rgba(84, 202, 150, .34) 0 5px, transparent 6px);
 }
 
+.doctor-new-session {
+  margin-bottom: 8px;
+  border: 1px solid rgba(138, 215, 255, .2);
+  background: rgba(49, 93, 114, .28);
+}
+.doctor-new-session .glyph {
+  background: #315d72;
+  color: #dff7ff;
+}
+.doctor-session-item .main strong {
+  max-width: 172px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doctor-session-item .main span {
+  max-width: 172px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.doctor-session-empty {
+  margin: 4px 8px 12px;
+  padding: 10px;
+  border: 1px dashed #3b4049;
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .message-list.doctor-mode { padding: 18px; }
 .doctor-page {
   max-width: 1040px;

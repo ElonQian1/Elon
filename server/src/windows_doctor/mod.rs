@@ -1,4 +1,8 @@
-use axum::{extract::State, http::StatusCode, Json};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    Json,
+};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
@@ -9,6 +13,7 @@ use std::{
 mod command;
 mod memory;
 mod repair;
+mod sessions;
 mod snapshot;
 
 const MAX_ANALYSIS_PROBLEM_CHARS: usize = 2_000;
@@ -28,6 +33,7 @@ const DOCTOR_SYSTEM_PROMPT: &str = r#"你是一龙 Windows 电脑医生。你会
 #[serde(rename_all = "camelCase")]
 pub(crate) struct DoctorAnalyzeRequest {
     problem: String,
+    session_id: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -36,6 +42,13 @@ pub(crate) struct DoctorRepairRequest {
     action: String,
     confirm: Option<bool>,
     adapter_name: Option<String>,
+    session_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct DoctorSessionCreateRequest {
+    title: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,17 +84,37 @@ pub(crate) async fn analyze_handler(
         );
     }
 
-    let Some(token) = runtime.user_token().await else {
+    let mut session = match sessions::load_or_create(req.session_id.as_deref(), &problem) {
+        Ok(session) => session,
+        Err(error) => {
+            return json_status(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                json!({"ok": false, "error": format!("读取诊断会话失败: {error}")}),
+            )
+        }
+    };
+    sessions::push_message(&mut session, "user", &problem, None);
+    if let Err(error) = sessions::save_session(&session) {
         return json_status(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"ok": false, "error": format!("保存诊断会话失败: {error}")}),
+        );
+    }
+
+    let Some(token) = runtime.user_token().await else {
+        return analysis_error_response(
             StatusCode::UNAUTHORIZED,
-            json!({"ok": false, "error": "尚未登录，无法使用远程 AI 分析"}),
+            &mut session,
+            "尚未登录，无法使用远程 AI 分析".to_string(),
+            None,
         );
     };
 
     let snapshot = snapshot::collect_snapshot();
     let memories =
         memory::relevant_memories(&problem, &memory::read_memory_items().unwrap_or_default());
-    let user_prompt = build_doctor_prompt(&problem, &snapshot, &memories);
+    let context_messages = sessions::context_messages(&session);
+    let user_prompt = build_doctor_prompt(&problem, &snapshot, &memories, &context_messages);
     let body = json!({
         "messages": [
             { "role": "system", "content": DOCTOR_SYSTEM_PROMPT },
@@ -102,9 +135,11 @@ pub(crate) async fn analyze_handler(
     {
         Ok(response) => response,
         Err(error) => {
-            return json_status(
+            return analysis_error_response(
                 StatusCode::BAD_GATEWAY,
-                json!({"ok": false, "error": format!("连接远程 AI 失败: {error}")}),
+                &mut session,
+                format!("连接远程 AI 失败: {error}"),
+                None,
             )
         }
     };
@@ -113,21 +148,36 @@ pub(crate) async fn analyze_handler(
     let value = match response.json::<Value>().await {
         Ok(value) => value,
         Err(error) => {
-            return json_status(
+            return analysis_error_response(
                 StatusCode::BAD_GATEWAY,
-                json!({"ok": false, "error": format!("远程 AI 响应解析失败: {error}")}),
+                &mut session,
+                format!("远程 AI 响应解析失败: {error}"),
+                None,
             )
         }
     };
 
     if !status.is_success() {
-        return json_status(
+        return analysis_error_response(
             status,
-            json!({"ok": false, "error": value.get("error").and_then(Value::as_str).unwrap_or("远程 AI 调用失败"), "raw": value}),
+            &mut session,
+            value
+                .get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("远程 AI 调用失败")
+                .to_string(),
+            Some(json!({"raw": value})),
         );
     }
 
     let analysis = extract_llm_text(&value).unwrap_or_else(|| value.to_string());
+    sessions::push_message(&mut session, "assistant", &analysis, Some("ok"));
+    if let Err(error) = sessions::save_session(&session) {
+        return json_status(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"ok": false, "error": format!("保存诊断会话失败: {error}")}),
+        );
+    }
     json_status(
         StatusCode::OK,
         json!({
@@ -136,8 +186,82 @@ pub(crate) async fn analyze_handler(
             "snapshot": snapshot,
             "memories": memories,
             "allowedRepairs": repair::allowed_repairs(),
+            "session": session,
+            "sessions": sessions::list_session_summaries().unwrap_or_default(),
         }),
     )
+}
+
+pub(crate) async fn sessions_list_handler(
+    State(_runtime): State<Arc<crate::NodeRuntime>>,
+) -> (StatusCode, Json<Value>) {
+    match sessions::list_session_summaries() {
+        Ok(items) => json_status(
+            StatusCode::OK,
+            json!({"ok": true, "items": items, "path": sessions::sessions_path().display().to_string()}),
+        ),
+        Err(error) => json_status(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"ok": false, "error": format!("读取诊断会话失败: {error}")}),
+        ),
+    }
+}
+
+pub(crate) async fn session_create_handler(
+    State(_runtime): State<Arc<crate::NodeRuntime>>,
+    Json(req): Json<DoctorSessionCreateRequest>,
+) -> (StatusCode, Json<Value>) {
+    match sessions::create_session(req.title.as_deref()) {
+        Ok(session) => json_status(
+            StatusCode::OK,
+            json!({
+                "ok": true,
+                "session": session,
+                "sessions": sessions::list_session_summaries().unwrap_or_default(),
+            }),
+        ),
+        Err(error) => json_status(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"ok": false, "error": format!("创建诊断会话失败: {error}")}),
+        ),
+    }
+}
+
+pub(crate) async fn session_get_handler(
+    State(_runtime): State<Arc<crate::NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> (StatusCode, Json<Value>) {
+    match sessions::read_session(&session_id) {
+        Ok(Some(session)) => json_status(StatusCode::OK, json!({"ok": true, "session": session})),
+        Ok(None) => json_status(
+            StatusCode::NOT_FOUND,
+            json!({"ok": false, "error": "诊断会话不存在"}),
+        ),
+        Err(error) => json_status(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"ok": false, "error": format!("读取诊断会话失败: {error}")}),
+        ),
+    }
+}
+
+pub(crate) async fn session_delete_handler(
+    State(_runtime): State<Arc<crate::NodeRuntime>>,
+    Path(session_id): Path<String>,
+) -> (StatusCode, Json<Value>) {
+    match sessions::delete_session(&session_id) {
+        Ok(deleted) => json_status(
+            StatusCode::OK,
+            json!({
+                "ok": true,
+                "deleted": deleted,
+                "sessions": sessions::list_session_summaries().unwrap_or_default(),
+            }),
+        ),
+        Err(error) => json_status(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            json!({"ok": false, "error": format!("删除诊断会话失败: {error}")}),
+        ),
+    }
 }
 
 pub(crate) async fn memory_list_handler(
@@ -214,6 +338,28 @@ pub(crate) async fn repair_handler(
         .get("success")
         .and_then(Value::as_bool)
         .unwrap_or(false);
+    if let Some(session_id) = req.session_id.as_deref() {
+        if let Ok(Some(mut session)) = sessions::read_session(session_id) {
+            let detail = outcome
+                .get("error")
+                .or_else(|| outcome.get("stderr"))
+                .or_else(|| outcome.get("stdout"))
+                .and_then(Value::as_str)
+                .unwrap_or("");
+            let content = if detail.is_empty() {
+                format!("已执行白名单修复：{}。", plan.title)
+            } else {
+                format!("已执行白名单修复：{}。\n\n{}", plan.title, detail)
+            };
+            sessions::push_message(
+                &mut session,
+                "assistant",
+                &content,
+                Some(if ok { "ok" } else { "err" }),
+            );
+            let _ = sessions::save_session(&session);
+        }
+    }
     json_status(
         if ok {
             StatusCode::OK
@@ -234,12 +380,51 @@ fn build_doctor_prompt(
     problem: &str,
     snapshot: &Value,
     memories: &[memory::DoctorMemoryItem],
+    context_messages: &[sessions::DoctorSessionMessage],
 ) -> String {
     let memories_text = serde_json::to_string_pretty(memories).unwrap_or_else(|_| "[]".to_string());
+    let context_text =
+        serde_json::to_string_pretty(context_messages).unwrap_or_else(|_| "[]".to_string());
     let snapshot_text = serde_json::to_string_pretty(snapshot).unwrap_or_else(|_| "{}".to_string());
     format!(
-        "用户问题：\n{problem}\n\n历史电脑问题记忆（可能为空）：\n{memories_text}\n\n本机只读快照：\n{snapshot_text}\n\n请给出诊断结论、证据、建议动作。若建议执行修复，只能使用 allowedRepairs 中的 action，并说明为什么需要用户确认。输出格式使用轻量 Markdown：少量短清单即可，避免大表格和多层标题。"
+        "本轮用户问题：\n{problem}\n\n当前诊断会话最近消息（用于理解追问上下文，可能包含本轮问题）：\n{context_text}\n\n历史电脑问题记忆（跨会话复用，可能为空）：\n{memories_text}\n\n本机只读快照：\n{snapshot_text}\n\n请基于同一会话上下文给出诊断结论、证据、建议动作。若建议执行修复，只能使用 allowedRepairs 中的 action，并说明为什么需要用户确认。输出格式使用轻量 Markdown：少量短清单即可，避免大表格和多层标题。"
     )
+}
+
+fn analysis_error_response(
+    status: StatusCode,
+    session: &mut sessions::DoctorSession,
+    error: String,
+    extra: Option<Value>,
+) -> (StatusCode, Json<Value>) {
+    sessions::push_message(session, "assistant", &error, Some("err"));
+    let save_error = sessions::save_session(session)
+        .err()
+        .map(|err| err.to_string());
+    let mut value = json!({
+        "ok": false,
+        "error": error,
+        "session": session,
+        "sessions": sessions::list_session_summaries().unwrap_or_default(),
+    });
+    if let Some(extra) = extra {
+        merge_json_object(&mut value, extra);
+    }
+    if let Some(save_error) = save_error {
+        value["sessionSaveError"] = json!(save_error);
+    }
+    json_status(status, value)
+}
+
+fn merge_json_object(target: &mut Value, extra: Value) {
+    let Some(target) = target.as_object_mut() else {
+        return;
+    };
+    if let Some(extra) = extra.as_object() {
+        for (key, value) in extra {
+            target.insert(key.clone(), value.clone());
+        }
+    }
 }
 
 fn extract_llm_text(value: &Value) -> Option<String> {

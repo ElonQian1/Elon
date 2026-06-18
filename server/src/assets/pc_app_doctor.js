@@ -1,7 +1,6 @@
 (function () {
   const markdown = window.ElonPcMarkdown || {};
-  const SECTIONS = [
-    { id: 'diagnosis', glyph: '医', title: '诊断对话', sub: '描述问题并让远程 AI 分析' },
+  const TOOL_SECTIONS = [
     { id: 'snapshot', glyph: '查', title: '只读体检', sub: '网络、代理、DNS、服务状态' },
     { id: 'repair', glyph: '修', title: '白名单修复', sub: '清 DNS、代理、重启网卡' },
     { id: 'memory', glyph: '记', title: '问题记忆', sub: '常见电脑问题复用' }
@@ -15,6 +14,9 @@
     state.doctorAnalysis = state.doctorAnalysis || '';
     state.doctorMemories = state.doctorMemories || null;
     state.doctorResult = state.doctorResult || null;
+    state.doctorSessions = Array.isArray(state.doctorSessions) ? state.doctorSessions : [];
+    state.doctorActiveSessionId = state.doctorActiveSessionId || '';
+    state.doctorSessionsLoaded = !!state.doctorSessionsLoaded;
     state.doctorMessages = Array.isArray(state.doctorMessages) ? state.doctorMessages : [];
 
     function localNodeApiUrl(path) {
@@ -37,9 +39,20 @@
     }
 
     function renderChannels(channelButton) {
+      const sessions = Array.isArray(state.doctorSessions) ? state.doctorSessions : [];
+      const sessionList = sessions.length
+        ? sessions.map(renderDoctorSessionButton).join('')
+        : `<div class="empty-state doctor-session-empty">${state.doctorSessionsLoaded ? '暂无诊断会话' : '正在读取会话…'}</div>`;
       els.channelList.innerHTML = [
         '<div class="channel-section">电脑医生项目</div>',
-        SECTIONS.map((section) => channelButton({
+        `<button class="channel-item doctor-new-session" type="button" data-doctor-new-session="1">
+          <span class="glyph">+</span>
+          <span class="main"><strong>新诊断</strong><span>开启一次独立排查</span></span>
+        </button>`,
+        '<div class="channel-section">诊断会话</div>',
+        sessionList,
+        '<div class="channel-section">工具</div>',
+        TOOL_SECTIONS.map((section) => channelButton({
           id: section.id,
           kind: 'doctor-section',
           glyph: section.glyph,
@@ -48,9 +61,32 @@
           active: state.doctorSection === section.id
         })).join('')
       ].join('');
+      els.channelList.querySelector('[data-doctor-new-session]')?.addEventListener('click', createDoctorSession);
+      els.channelList.querySelectorAll('[data-doctor-session-id]').forEach((btn) => {
+        btn.addEventListener('click', () => selectDoctorSession(btn.dataset.doctorSessionId));
+      });
       els.channelList.querySelectorAll('[data-doctor-section]').forEach((btn) => {
         btn.addEventListener('click', () => selectSection(btn.dataset.doctorSection));
       });
+    }
+
+    function renderDoctorSessionButton(session) {
+      const id = clean(session && session.id);
+      const title = clean(session && session.title) || '未命名诊断';
+      const messageCount = Number(session && session.messageCount) || 0;
+      const updated = Number(session && session.updatedAtMs) || 0;
+      const sub = messageCount ? `${messageCount} 条消息 · ${formatDoctorTime(updated)}` : '空会话';
+      return `<button class="channel-item doctor-session-item ${id === state.doctorActiveSessionId ? 'active' : ''}" type="button" data-doctor-session-id="${escapeHtml(id)}">
+        <span class="glyph">#</span>
+        <span class="main"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(sub)}</span></span>
+      </button>`;
+    }
+
+    function formatDoctorTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
     function selectDoctor() {
@@ -71,6 +107,7 @@
         { name: '白名单修复', sub: '执行前二次确认' },
         { name: '问题记忆', sub: '保存在本机节点' }
       ]);
+      loadDoctorSessions(true);
       if (state.doctorMemories === null) loadDoctorMemory(true);
     }
 
@@ -79,6 +116,105 @@
       deps.renderChannels();
       const target = els.messageList.querySelector(`[data-doctor-panel="${state.doctorSection}"]`);
       if (target) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+
+    async function createDoctorSession() {
+      state.doctorSection = 'diagnosis';
+      state.doctorResult = { kind: '', text: '正在创建新的诊断会话…' };
+      state.doctorMessages = [];
+      state.doctorProblem = '';
+      state.doctorAnalysis = '';
+      renderDoctorMain();
+      try {
+        const data = await doctorApi('/api/doctor/sessions', {
+          method: 'POST',
+          body: JSON.stringify({ title: '新的电脑诊断' })
+        });
+        if (Array.isArray(data.sessions)) state.doctorSessions = data.sessions;
+        applyDoctorSession(data.session || null);
+        state.doctorResult = { kind: 'ok', text: '新的诊断会话已创建。' };
+      } catch (error) {
+        state.doctorResult = { kind: 'err', text: `创建诊断会话失败：${error.message || error}` };
+      }
+      deps.renderChannels();
+      renderDoctorMain();
+    }
+
+    async function selectDoctorSession(sessionId) {
+      const id = clean(sessionId);
+      if (!id) return;
+      state.doctorActiveSessionId = id;
+      state.doctorSection = 'diagnosis';
+      state.doctorResult = { kind: '', text: '正在读取诊断会话…' };
+      deps.renderChannels();
+      renderDoctorMain();
+      await loadDoctorSession(id);
+    }
+
+    async function loadDoctorSessions(quiet) {
+      try {
+        const data = await doctorApi('/api/doctor/sessions');
+        state.doctorSessions = Array.isArray(data.items) ? data.items : [];
+        state.doctorSessionsLoaded = true;
+        if (!state.doctorActiveSessionId && state.doctorSessions.length) {
+          await loadDoctorSession(state.doctorSessions[0].id);
+          return;
+        }
+      } catch (error) {
+        state.doctorSessions = [];
+        state.doctorSessionsLoaded = true;
+        if (!quiet) state.doctorResult = { kind: 'err', text: `读取诊断会话失败：${error.message || error}` };
+      }
+      if (state.activeKind === 'doctor') {
+        deps.renderChannels();
+        renderDoctorMain();
+      }
+    }
+
+    async function loadDoctorSession(sessionId) {
+      const id = clean(sessionId);
+      if (!id) return;
+      try {
+        const data = await doctorApi(`/api/doctor/sessions/${encodeURIComponent(id)}`);
+        applyDoctorSession(data.session || null);
+        state.doctorResult = null;
+      } catch (error) {
+        state.doctorResult = { kind: 'err', text: `读取诊断会话失败：${error.message || error}` };
+      }
+      if (state.activeKind === 'doctor') {
+        deps.renderChannels();
+        renderDoctorMain();
+      }
+    }
+
+    function applyDoctorSession(session) {
+      if (!session || !session.id) return;
+      state.doctorActiveSessionId = clean(session.id);
+      state.doctorMessages = normalizeDoctorMessages(session.messages || []);
+      state.doctorProblem = latestDoctorMessage('user');
+      state.doctorAnalysis = latestDoctorMessage('assistant', 'ok');
+    }
+
+    function normalizeDoctorMessages(messages) {
+      return (Array.isArray(messages) ? messages : []).map((message) => {
+        const createdAtMs = Number(message.createdAtMs) || Date.now();
+        return {
+          id: clean(message.id),
+          role: message.role === 'user' ? 'user' : 'assistant',
+          content: clean(message.content),
+          kind: clean(message.kind),
+          createdAtMs,
+          time: formatDoctorTime(createdAtMs)
+        };
+      });
+    }
+
+    function latestDoctorMessage(role, kind) {
+      for (let i = state.doctorMessages.length - 1; i >= 0; i -= 1) {
+        const message = state.doctorMessages[i];
+        if (message.role === role && (!kind || message.kind === kind)) return clean(message.content);
+      }
+      return '';
     }
 
     function syncDoctorProblem() {
@@ -145,11 +281,14 @@
     }
 
     function appendDoctorMessage(role, content, kind) {
+      const createdAtMs = Date.now();
       const message = {
+        id: `local-${createdAtMs}-${state.doctorMessages.length + 1}`,
         role,
         content,
         kind: kind || '',
-        time: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+        createdAtMs,
+        time: formatDoctorTime(createdAtMs)
       };
       state.doctorMessages.push(message);
       return message;
@@ -251,18 +390,31 @@
       try {
         const data = await doctorApi('/api/doctor/analyze', {
           method: 'POST',
-          body: JSON.stringify({ problem })
+          body: JSON.stringify({ problem, sessionId: state.doctorActiveSessionId || null })
         });
         state.doctorAnalysis = data.analysis || '';
         state.doctorSnapshot = data.snapshot || state.doctorSnapshot;
-        assistantMessage.content = state.doctorAnalysis || '远程 AI 已完成分析。';
-        assistantMessage.kind = 'ok';
+        if (Array.isArray(data.sessions)) state.doctorSessions = data.sessions;
+        if (data.session) {
+          applyDoctorSession(data.session);
+        } else {
+          assistantMessage.content = state.doctorAnalysis || '远程 AI 已完成分析。';
+          assistantMessage.kind = 'ok';
+        }
         state.doctorResult = { kind: 'ok', text: '远程 AI 已完成分析。' };
       } catch (error) {
-        assistantMessage.content = `远程 AI 分析失败：${error.message || error}`;
-        assistantMessage.kind = 'err';
-        state.doctorResult = { kind: 'err', text: assistantMessage.content };
+        const data = error.data || {};
+        const errorText = data.error || error.message || String(error);
+        if (Array.isArray(data.sessions)) state.doctorSessions = data.sessions;
+        if (data.session) {
+          applyDoctorSession(data.session);
+        } else {
+          assistantMessage.content = `远程 AI 分析失败：${errorText}`;
+          assistantMessage.kind = 'err';
+        }
+        state.doctorResult = { kind: 'err', text: `远程 AI 分析失败：${errorText}` };
       }
+      deps.renderChannels();
       renderDoctorMain();
     }
 
@@ -293,7 +445,12 @@
       try {
         const data = await doctorApi('/api/doctor/repair', {
           method: 'POST',
-          body: JSON.stringify({ action, confirm: true, adapterName: adapterName || null })
+          body: JSON.stringify({
+            action,
+            confirm: true,
+            adapterName: adapterName || null,
+            sessionId: state.doctorActiveSessionId || null
+          })
         });
         const outcome = data.outcome || {};
         const text = [
@@ -302,6 +459,7 @@
           outcome.error ? `error:\n${outcome.error}` : ''
         ].filter(Boolean).join('\n\n') || '完成';
         state.doctorResult = { kind: 'ok', text: `${data.title || label} 已执行。\n\n${text}` };
+        if (state.doctorActiveSessionId) loadDoctorSession(state.doctorActiveSessionId);
         setTimeout(loadDoctorSnapshot, 800);
       } catch (error) {
         const outcome = error.data && error.data.outcome ? error.data.outcome : {};
