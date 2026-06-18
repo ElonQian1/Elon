@@ -21,16 +21,15 @@ pub fn maybe_open_admin_page(port: u16) {
     std::thread::spawn(move || {
         wait_for_admin_port(port);
         let url = admin_url(port);
-        if let Err(err) = std::process::Command::new("cmd")
-            .arg("/C")
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.arg("/C")
             .arg("start")
             .arg("")
             .arg(&url)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-        {
+            .stderr(std::process::Stdio::null());
+        if let Err(err) = spawn_hidden(&mut cmd) {
             tracing::warn!(%url, error = %err, "无法自动打开 node-agent 管理页");
         }
     });
@@ -59,4 +58,11 @@ fn auto_open_enabled() -> bool {
             )
         })
         .unwrap_or(true)
+}
+
+#[cfg(windows)]
+fn spawn_hidden(command: &mut std::process::Command) -> std::io::Result<std::process::Child> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW).spawn()
 }

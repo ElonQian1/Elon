@@ -39,21 +39,21 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
 pub(crate) fn stop_agent() {
     #[cfg(windows)]
     {
-        let _ = Command::new("taskkill")
-            .args(["/IM", "elon-node-agent.exe", "/F"])
+        let mut cmd = Command::new("taskkill");
+        cmd.args(["/IM", "elon-node-agent.exe", "/F"])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+            .stderr(Stdio::null());
+        let _ = status_hidden(&mut cmd);
     }
     #[cfg(not(windows))]
     {
-        let _ = Command::new("pkill")
-            .arg("elon-node-agent")
+        let mut cmd = Command::new("pkill");
+        cmd.arg("elon-node-agent")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+            .stderr(Stdio::null());
+        let _ = status_hidden(&mut cmd);
     }
 }
 
@@ -203,4 +203,14 @@ fn spawn_hidden(command: &mut Command) -> std::io::Result<std::process::Child> {
         command.creation_flags(CREATE_NO_WINDOW);
     }
     command.spawn()
+}
+
+fn status_hidden(command: &mut Command) -> std::io::Result<std::process::ExitStatus> {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    command.status()
 }

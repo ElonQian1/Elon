@@ -184,15 +184,19 @@ fn same_path(left: &Path, right: &Path) -> bool {
 fn schedule_self_delete(install_dir: &Path) -> Result<()> {
     #[cfg(windows)]
     {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+
         let command = format!(
             "timeout /t 1 /nobreak >nul & rmdir /s /q \"{}\"",
             install_dir.display()
         );
-        Command::new("cmd")
-            .args(["/C", &command])
+        let mut cmd = Command::new("cmd");
+        cmd.args(["/C", &command])
             .stdin(Stdio::null())
             .stdout(Stdio::null())
-            .stderr(Stdio::null())
+            .stderr(Stdio::null());
+        cmd.creation_flags(CREATE_NO_WINDOW)
             .spawn()
             .context("无法安排卸载清理")?;
     }

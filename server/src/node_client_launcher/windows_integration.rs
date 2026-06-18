@@ -9,6 +9,8 @@ use std::process::Command;
 use super::{paths, APP_NAME};
 
 #[cfg(windows)]
+use std::process::{ExitStatus, Stdio};
+#[cfg(windows)]
 const RUN_VALUE_NAME: &str = "ElonNodeAgent";
 #[cfg(windows)]
 const LEGACY_TASK_NAME: &str = "ElonNodeAgentTray";
@@ -23,20 +25,19 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
         let client = paths::client_exe(install_dir);
         let value = format!("\"{}\"", client.display());
         remove_legacy_scheduled_task();
-        let status = Command::new("reg")
-            .args([
-                "add",
-                r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-                "/v",
-                RUN_VALUE_NAME,
-                "/t",
-                "REG_SZ",
-                "/d",
-                &value,
-                "/f",
-            ])
-            .status()
-            .context("无法注册开机自启")?;
+        let mut cmd = silent_command("reg");
+        cmd.args([
+            "add",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v",
+            RUN_VALUE_NAME,
+            "/t",
+            "REG_SZ",
+            "/d",
+            &value,
+            "/f",
+        ]);
+        let status = hidden_status(&mut cmd).context("无法注册开机自启")?;
         if !status.success() {
             anyhow::bail!("注册开机自启失败");
         }
@@ -91,22 +92,24 @@ pub(crate) fn remove_url_protocol() {
     #[cfg(windows)]
     {
         let key = format!(r"HKCU\Software\Classes\{}", PROTOCOL_SCHEME);
-        let _ = Command::new("reg").args(["delete", &key, "/f"]).status();
+        let mut cmd = silent_command("reg");
+        cmd.args(["delete", &key, "/f"]);
+        let _ = hidden_status(&mut cmd);
     }
 }
 
 pub(crate) fn disable_autostart() {
     #[cfg(windows)]
     {
-        let _ = Command::new("reg")
-            .args([
-                "delete",
-                r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-                "/v",
-                RUN_VALUE_NAME,
-                "/f",
-            ])
-            .status();
+        let mut cmd = silent_command("reg");
+        cmd.args([
+            "delete",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v",
+            RUN_VALUE_NAME,
+            "/f",
+        ]);
+        let _ = hidden_status(&mut cmd);
         remove_legacy_scheduled_task();
     }
 }
@@ -138,16 +141,15 @@ $link.Save()
             ps_single_quote(&target.to_string_lossy()),
             ps_single_quote(&workdir.to_string_lossy())
         );
-        let status = Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                &script,
-            ])
-            .status()
-            .context("无法创建桌面快捷方式")?;
+        let mut cmd = silent_command("powershell");
+        cmd.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ]);
+        let status = hidden_status(&mut cmd).context("无法创建桌面快捷方式")?;
         if !status.success() {
             anyhow::bail!("创建桌面快捷方式失败");
         }
@@ -166,35 +168,50 @@ Remove-Item -LiteralPath $shortcut -Force -ErrorAction SilentlyContinue
 "#,
             ps_single_quote(APP_NAME)
         );
-        let _ = Command::new("powershell")
-            .args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                &script,
-            ])
-            .status();
+        let mut cmd = silent_command("powershell");
+        cmd.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            &script,
+        ]);
+        let _ = hidden_status(&mut cmd);
     }
 }
 
 #[cfg(windows)]
 fn remove_legacy_scheduled_task() {
-    let _ = Command::new("schtasks")
-        .args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"])
-        .status();
+    let mut cmd = silent_command("schtasks");
+    cmd.args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"]);
+    let _ = hidden_status(&mut cmd);
 }
 
 #[cfg(windows)]
 fn reg_add(args: &[&str], message: &str) -> Result<()> {
-    let status = Command::new("reg")
-        .args(args)
-        .status()
-        .with_context(|| message.to_string())?;
+    let mut cmd = silent_command("reg");
+    cmd.args(args);
+    let status = hidden_status(&mut cmd).with_context(|| message.to_string())?;
     if !status.success() {
         anyhow::bail!("{message}");
     }
     Ok(())
+}
+
+#[cfg(windows)]
+fn silent_command(program: &str) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    cmd
+}
+
+#[cfg(windows)]
+fn hidden_status(command: &mut Command) -> std::io::Result<ExitStatus> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    command.creation_flags(CREATE_NO_WINDOW).status()
 }
 
 #[cfg(windows)]

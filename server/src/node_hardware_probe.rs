@@ -179,7 +179,15 @@ fn detect_gpu_memory_total_bytes() -> Option<u64> {
 }
 
 fn run_command(program: &str, args: &[&str]) -> Option<String> {
-    let output = Command::new(program).args(args).output().ok()?;
+    let mut command = Command::new(program);
+    command.args(args);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
+    let output = command.output().ok()?;
     if !output.status.success() {
         return None;
     }
