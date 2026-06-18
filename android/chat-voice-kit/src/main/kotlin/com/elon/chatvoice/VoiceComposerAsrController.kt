@@ -179,7 +179,12 @@ class VoiceComposerAsrController(
                     completeWithTranscript(transcript)
                 },
                 onFailure = { error ->
-                    completeWithError(ChatVoiceError("server_asr_failed", error.message ?: "云端语音识别失败", error))
+                    val voiceError = if (error is ServerAsrException) {
+                        ChatVoiceError(error.code, error.message, error)
+                    } else {
+                        ChatVoiceError("server_asr_failed", error.message ?: "云端语音识别失败", error)
+                    }
+                    completeWithError(voiceError)
                 },
             )
         }

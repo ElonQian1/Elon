@@ -15,6 +15,13 @@ import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
+class ServerAsrException(
+    val code: String,
+    override val message: String,
+    val httpStatus: Int,
+    val responseBody: String,
+) : IOException(message)
+
 class ServerAsrClient(
     private val config: ChatVoiceConfig,
     private val client: OkHttpClient = defaultClient(),
@@ -48,7 +55,7 @@ class ServerAsrClient(
                     response.use {
                         val raw = it.body?.string().orEmpty()
                         if (!it.isSuccessful) {
-                            deliver(callback, Result.failure(IOException("ASR ${it.code}: $raw")))
+                            deliver(callback, Result.failure(serverError(it.code, raw)))
                             return
                         }
                         val text = runCatching { JSONObject(raw).optString("text") }.getOrDefault("")
@@ -81,6 +88,21 @@ class ServerAsrClient(
                 }
             }
             .build()
+
+    private fun serverError(status: Int, raw: String): ServerAsrException {
+        val parsed = runCatching {
+            JSONObject(raw).optString("error")
+                .ifBlank { JSONObject(raw).optString("message") }
+        }.getOrDefault("")
+        val fallback = parsed.ifBlank { "云端语音识别失败" }
+        val (code, message) = when (status) {
+            401, 403 -> "server_asr_unauthorized" to "语音服务登录已失效，请重新进入聊天后再试"
+            402 -> "server_asr_payment_required" to "语音服务额度不足，请联系管理员处理"
+            413 -> "server_asr_audio_too_large" to "语音太长，请缩短后再试"
+            else -> "server_asr_http_$status" to fallback
+        }
+        return ServerAsrException(code, message, status, raw)
+    }
 
     private fun MultipartBody.Builder.addTextPart(name: String, value: String): MultipartBody.Builder =
         addFormDataPart(name, value)
