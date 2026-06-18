@@ -442,7 +442,9 @@ class TaskWorkService : Service() {
                 prefs = prefs,
                 wasDevelopment = task.isDevelopment,
                 apkUrl = apkUrl,
-                success = success
+                success = success,
+                projectId = task.projectId,
+                conversationId = task.conversationId
             )
         }
         broadcastState()

@@ -32,6 +32,15 @@ class ElonApplication : Application() {
                         groupName = event.groupName,
                         createdAt = event.createdAt
                     )
+                is GlobalWsEvent.ProjectTaskDone ->
+                    notifyProjectTaskDoneFromGlobalWs(
+                        context = this@ElonApplication,
+                        prefs = AuthManager.userDataPrefs(this@ElonApplication),
+                        projectId = event.projectId,
+                        conversationId = event.conversationId,
+                        message = event.message,
+                        apkUrl = event.apkUrl,
+                    )
                 else -> Unit
             }
         }

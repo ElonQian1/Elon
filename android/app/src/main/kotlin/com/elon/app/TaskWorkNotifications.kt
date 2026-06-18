@@ -10,14 +10,20 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Build
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import org.json.JSONArray
 import org.json.JSONObject
 
 private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked_v3_chat_sound_badge"
+private const val PREF_RECENT_TASK_COMPLETION_KEY = "recent_task_completion_key"
+private const val PREF_RECENT_TASK_COMPLETION_AT = "recent_task_completion_at"
+private const val RECENT_TASK_COMPLETION_WINDOW_MS = 2 * 60 * 1000L
 
 internal fun setupTaskCompletionAlerts(activity: Activity, prefs: SharedPreferences, requestCode: Int) {
     ChatMessageNotifications.createChannel(activity)
@@ -34,6 +40,11 @@ internal fun clearCompletedTaskBadge(context: Context, prefs: SharedPreferences)
 internal fun createTaskWorkNotificationChannels(context: Context) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val notificationManager = context.getSystemService(NotificationManager::class.java)
+    val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
+    val soundAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+        .build()
     notificationManager.createNotificationChannel(
         NotificationChannel(
             TaskWorkService.ACTIVE_WORK_CHANNEL_ID,
@@ -50,8 +61,10 @@ internal fun createTaskWorkNotificationChannels(context: Context) {
             "任务完成提醒",
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "后台任务完成后显示桌面角标"
+            description = "后台任务或项目会话完成后发出声音并显示桌面角标"
             setShowBadge(true)
+            setSound(soundUri, soundAttributes)
+            enableVibration(true)
         }
     )
     notificationManager.createNotificationChannel(
@@ -129,12 +142,41 @@ internal fun notifyBackgroundTaskCompleted(
     prefs: SharedPreferences,
     wasDevelopment: Boolean,
     apkUrl: String?,
-    success: Boolean
+    success: Boolean,
+    projectId: String? = null,
+    conversationId: String? = null
 ) {
+    markTaskCompletionNotified(prefs, projectId, conversationId)
     val count = prefs.getInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0) + 1
     prefs.edit().putInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
     setTaskLauncherBadgeCount(context, count)
     showTaskCompletedNotification(context, count, wasDevelopment, apkUrl, success)
+}
+
+internal fun notifyProjectTaskDoneFromGlobalWs(
+    context: Context,
+    prefs: SharedPreferences,
+    projectId: String?,
+    conversationId: String?,
+    message: String,
+    apkUrl: String?
+) {
+    if (hasPendingLocalTask(prefs, projectId, conversationId)) return
+    if (wasTaskCompletionRecentlyNotified(prefs, projectId, conversationId)) return
+
+    markTaskCompletionNotified(prefs, projectId, conversationId)
+    val count = prefs.getInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0) + 1
+    prefs.edit().putInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
+    setTaskLauncherBadgeCount(context, count)
+    showTaskCompletedNotification(
+        context = context,
+        count = count,
+        wasDevelopment = true,
+        apkUrl = apkUrl,
+        success = true,
+        titleOverride = "会话已完成",
+        textOverride = taskCompletionNotificationText(message, apkUrl)
+    )
 }
 
 internal fun showAppUpdateNotification(context: Context, json: JSONObject) {
@@ -174,30 +216,35 @@ private fun showTaskCompletedNotification(
     count: Int,
     wasDevelopment: Boolean,
     apkUrl: String?,
-    success: Boolean
+    success: Boolean,
+    titleOverride: String? = null,
+    textOverride: String? = null
 ) {
     if (!canPostNotifications(context)) return
 
-    val title = when {
+    val title = titleOverride ?: when {
         !success -> "任务需要处理"
         wasDevelopment -> "开发任务已完成"
         else -> "任务已完成"
     }
-    val text = if (apkUrl != null) {
+    val text = textOverride ?: if (apkUrl != null) {
         "已有 $count 个任务完成，APK 可以下载测试。"
     } else {
         "已有 $count 个任务完成，点击查看结果。"
     }
+    val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
     val notification = NotificationCompat.Builder(context, TaskWorkService.TASK_COMPLETE_CHANNEL_ID)
         .setSmallIcon(R.drawable.ic_notification_task_done)
         .setContentTitle(title)
         .setContentText(text)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(text))
         .setNumber(count)
         .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
         .setContentIntent(mainActivityPendingIntent(context))
         .setAutoCancel(true)
         .setOnlyAlertOnce(true)
-        .setSilent(true)
+        .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
+        .setSound(soundUri)
         .setCategory(NotificationCompat.CATEGORY_STATUS)
         .setPriority(NotificationCompat.PRIORITY_DEFAULT)
         .build()
@@ -222,4 +269,66 @@ private fun canPostNotifications(context: Context): Boolean {
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
         PackageManager.PERMISSION_GRANTED
+}
+
+private fun hasPendingLocalTask(
+    prefs: SharedPreferences,
+    projectId: String?,
+    conversationId: String?
+): Boolean {
+    val tasksJson = prefs.getString(TaskWorkService.PREF_PENDING_WORK_TASKS, null)?.takeIf { it.isNotBlank() }
+    if (tasksJson != null) {
+        val array = runCatching { JSONArray(tasksJson) }.getOrNull() ?: return false
+        for (index in 0 until array.length()) {
+            val payload = array.optJSONObject(index)?.optString("payload") ?: continue
+            if (isSameTaskPayload(payload, projectId, conversationId)) return true
+        }
+    }
+
+    val payload = prefs.getString(TaskWorkService.PREF_PENDING_WORK_PAYLOAD, null)
+    return isSameTaskPayload(payload, projectId, conversationId)
+}
+
+private fun isSameTaskPayload(payload: String?, projectId: String?, conversationId: String?): Boolean {
+    if (payload.isNullOrBlank()) return false
+    val payloadProjectId = taskPayloadString(payload, "project_id")
+    val payloadConversationId = taskPayloadString(payload, "conversation_id")
+    return !projectId.isNullOrBlank() &&
+        !conversationId.isNullOrBlank() &&
+        payloadProjectId == projectId &&
+        payloadConversationId == conversationId
+}
+
+private fun completionKey(projectId: String?, conversationId: String?): String? {
+    if (projectId.isNullOrBlank() || conversationId.isNullOrBlank()) return null
+    return "$projectId:$conversationId"
+}
+
+private fun markTaskCompletionNotified(
+    prefs: SharedPreferences,
+    projectId: String?,
+    conversationId: String?
+) {
+    val key = completionKey(projectId, conversationId) ?: return
+    prefs.edit()
+        .putString(PREF_RECENT_TASK_COMPLETION_KEY, key)
+        .putLong(PREF_RECENT_TASK_COMPLETION_AT, System.currentTimeMillis())
+        .apply()
+}
+
+private fun wasTaskCompletionRecentlyNotified(
+    prefs: SharedPreferences,
+    projectId: String?,
+    conversationId: String?
+): Boolean {
+    val key = completionKey(projectId, conversationId) ?: return false
+    if (prefs.getString(PREF_RECENT_TASK_COMPLETION_KEY, null) != key) return false
+    val notifiedAt = prefs.getLong(PREF_RECENT_TASK_COMPLETION_AT, 0L)
+    return notifiedAt > 0 && System.currentTimeMillis() - notifiedAt <= RECENT_TASK_COMPLETION_WINDOW_MS
+}
+
+private fun taskCompletionNotificationText(message: String, apkUrl: String?): String {
+    if (!apkUrl.isNullOrBlank()) return "会话已完成，APK 可以下载测试。"
+    val text = message.replace('\n', ' ').trim()
+    return if (text.length <= 80) text.ifBlank { "点击查看会话结果。" } else text.take(80) + "..."
 }

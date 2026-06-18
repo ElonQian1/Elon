@@ -13,6 +13,7 @@ import org.json.JSONObject
  *
  * 预留扩展（服务端功能上线后 Android 端自动生效）：
  *   - [FriendMessage]       好友消息
+ *   - [ProjectTaskDone]     项目会话完成
  */
 sealed class GlobalWsEvent {
 
@@ -63,6 +64,15 @@ sealed class GlobalWsEvent {
         val lastReadAt: String,
     ) : GlobalWsEvent()
 
+    /** 项目 AI 会话已完成，可用于跨 PC/手机提醒用户查看结果 */
+    data class ProjectTaskDone(
+        val projectId: String,
+        val triggeredByUserId: String,
+        val conversationId: String,
+        val message: String,
+        val apkUrl: String?,
+    ) : GlobalWsEvent()
+
     /** 无法识别的事件类型，原始 JSON 保留供调试 */
     data class Unknown(val raw: String) : GlobalWsEvent()
 
@@ -104,6 +114,13 @@ sealed class GlobalWsEvent {
                 "read_receipt" -> ReadReceipt(
                     fromUserId = json.optString("fromUserId", ""),
                     lastReadAt = json.optString("lastReadAt", ""),
+                )
+                "project_task_done" -> ProjectTaskDone(
+                    projectId = json.optString("projectId", ""),
+                    triggeredByUserId = json.optString("triggeredByUserId", ""),
+                    conversationId = json.optString("conversationId", ""),
+                    message = json.optString("message", "项目任务已完成"),
+                    apkUrl = json.optString("apkUrl", "").takeIf { it.isNotBlank() },
                 )
                 else -> Unknown(text)
             }
