@@ -1,10 +1,7 @@
 use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::path::{Path, PathBuf};
 
 use crate::project_workspace_inspect;
 
@@ -125,6 +122,7 @@ fn json_error(
 #[cfg(windows)]
 fn pick_folder() -> anyhow::Result<Option<String>> {
     use std::os::windows::process::CommandExt;
+    use std::process::Command;
 
     const CREATE_NO_WINDOW: u32 = 0x08000000;
     let script = r#"
