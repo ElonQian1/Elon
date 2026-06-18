@@ -58,6 +58,34 @@
     return clean(project.icon_data_url || project.iconDataUrl || project.icon_url || project.iconUrl || project.logo || project.avatar);
   }
 
+  function avatarUrlOf(entity) {
+    if (!entity) return '';
+    return clean(entity.avatar_data_url || entity.avatarDataUrl ||
+      entity.sender_avatar_data_url || entity.senderAvatarDataUrl ||
+      entity.avatar_url || entity.avatarUrl ||
+      entity.icon_data_url || entity.iconDataUrl ||
+      entity.image_url || entity.imageUrl ||
+      entity.avatar);
+  }
+
+  function avatarContents(url, label, fallback) {
+    const source = clean(url);
+    const initial = firstChar(label, fallback || '员');
+    const image = source
+      ? `<img src="${escapeHtml(source)}" alt="" onerror="this.remove(); this.parentElement.classList.add('fallback')" />`
+      : '';
+    return `${image}<span>${escapeHtml(initial)}</span>`;
+  }
+
+  function avatarElement(tag, className, url, label, fallback) {
+    const source = clean(url);
+    return `<${tag} class="${className}${source ? '' : ' fallback'}">${avatarContents(source, label, fallback)}</${tag}>`;
+  }
+
+  function sameId(left, right) {
+    return String(left || '') === String(right || '');
+  }
+
   function projectHue(project) {
     const seed = `${project.id || ''}:${titleOf(project)}`;
     let hash = 0;
@@ -88,9 +116,11 @@
 
   function renderUser() {
     const name = userName(state.user);
+    const avatar = avatarUrlOf(state.user);
     els.userName.textContent = name;
     els.userMeta.textContent = state.token ? '在线' : '需要登录';
-    els.userDot.textContent = firstChar(name, '龙');
+    els.userDot.classList.toggle('fallback', !avatar);
+    els.userDot.innerHTML = avatarContents(avatar, name, '龙');
   }
 
   function renderProjectRail() {
@@ -126,13 +156,13 @@
     els.channelList.innerHTML = [
       '<div class="channel-section">好友</div>',
       friends.map((friend) => channelButton({
-        id: friend.id, kind: 'friend', glyph: '●', title: userName(friend),
+        id: friend.id, kind: 'friend', avatar: avatarUrlOf(friend), avatarFallback: userName(friend), title: userName(friend),
         sub: friend.is_online ? '在线' : '离线', online: !!friend.is_online,
         active: state.activePeer && state.activePeer.kind === 'friend' && state.activePeer.id === friend.id
       })).join('') || '<div class="empty-state">暂无好友</div>',
       '<div class="channel-section">群聊</div>',
       groups.map((group) => channelButton({
-        id: group.id, kind: 'group', glyph: '群', title: clean(group.name || group.title || '未命名群聊'),
+        id: group.id, kind: 'group', avatar: avatarUrlOf(group), avatarFallback: clean(group.name || group.title || '群聊'), glyph: '群', title: clean(group.name || group.title || '未命名群聊'),
         sub: `${Number(group.member_count || group.members_count || 0)} 位成员`,
         active: state.activePeer && state.activePeer.kind === 'group' && state.activePeer.id === group.id
       })).join('') || '<div class="empty-state">暂无群聊</div>'
@@ -183,8 +213,11 @@
     const attrs = item.kind === 'project-channel'
       ? `data-channel-id="${escapeHtml(item.id)}"`
       : `data-peer-kind="${escapeHtml(item.kind)}" data-item-id="${escapeHtml(item.id)}"`;
+    const glyph = item.avatar || item.avatarFallback
+      ? avatarElement('span', 'glyph channel-avatar', item.avatar, item.avatarFallback || item.title || item.glyph || '#', item.glyph || '#')
+      : `<span class="glyph">${escapeHtml(item.glyph || '#')}</span>`;
     return `<button class="channel-item ${item.active ? 'active' : ''}" type="button" ${attrs}>
-      <span class="glyph">${escapeHtml(item.glyph || '#')}</span>
+      ${glyph}
       <span class="main"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.sub || '')}</span></span>
       ${typeof item.online === 'boolean' ? `<i class="presence-dot ${item.online ? 'online' : ''}"></i>` : ''}
     </button>`;
@@ -326,7 +359,7 @@
     els.workspaceName.textContent = '好友';
     els.workspaceMeta.textContent = `${state.friends.length} 位好友 · ${state.groups.length} 个群聊`;
     renderChannels();
-    renderMembers('好友在线', state.friends.map((f) => ({ name: userName(f), sub: f.is_online ? '在线' : '离线' })));
+    renderMembers('好友在线', state.friends.map((f) => Object.assign({}, f, { name: userName(f), sub: f.is_online ? '在线' : '离线' })));
     if (state.activePeer) selectPeer(state.activePeer.kind, state.activePeer.id);
     else {
       setHeader('友', '好友列表', '选择左侧好友或群聊开始对话');
@@ -406,7 +439,7 @@
     try {
       state.projectSpace = await api(`/api/projects/${encodeURIComponent(projectId)}/space`);
       const members = state.projectSpace.members || [];
-      renderMembers('项目成员', members.map((m) => ({
+      renderMembers('项目成员', members.map((m) => Object.assign({}, m, {
         name: userName(m),
         sub: m.role || m.member_role || 'member'
       })));
@@ -448,8 +481,32 @@
     els.memberList.innerHTML = (members || []).map((member) => {
       const name = clean(member.name || member.nickname || member.account || member.user_account || member.phone || member.email) || '成员';
       const sub = clean(member.sub || member.role || member.status || member.id) || '';
-      return `<div class="member-row"><div class="member-avatar">${escapeHtml(firstChar(name, '员'))}</div><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(sub)}</span></div></div>`;
+      return `<div class="member-row">${avatarElement('div', 'member-avatar', avatarUrlOf(member), name, '员')}<div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(sub)}</span></div></div>`;
     }).join('') || '<div class="empty-state">暂无成员</div>';
+  }
+
+  function avatarForMessage(message, scope) {
+    const direct = avatarUrlOf(message);
+    if (direct) return direct;
+    const senderId = clean(message.sender_user_id || message.senderUserId || message.sender_id || message.senderId || message.user_id || message.userId);
+    if (message.outgoing || (state.user && senderId && sameId(senderId, state.user.id))) return avatarUrlOf(state.user);
+    if (scope === 'friend') {
+      const friend = state.friends.find((item) => senderId ? sameId(item.id, senderId) : (state.activePeer && sameId(item.id, state.activePeer.id)));
+      return avatarUrlOf(friend);
+    }
+    if (scope === 'group') {
+      const group = state.groups.find((item) => state.activePeer && sameId(item.id, state.activePeer.id));
+      const member = group && Array.isArray(group.members)
+        ? group.members.find((item) => sameId(item.id || item.user_id || item.userId, senderId))
+        : null;
+      return avatarUrlOf(member);
+    }
+    if (scope === 'project') {
+      const member = ((state.projectSpace && state.projectSpace.members) || [])
+        .find((item) => sameId(item.user_id || item.userId || item.id, senderId));
+      return avatarUrlOf(member);
+    }
+    return '';
   }
 
   function renderMessages(messages, scope) {
@@ -464,7 +521,7 @@
       const role = clean(message.role || message.kind || message.message_kind);
       const tone = role.includes('assistant') || role.includes('ai') ? 'ai' : (role.includes('task') ? 'task' : '');
       return `<article class="message-row">
-        <div class="message-avatar">${escapeHtml(firstChar(name, '员'))}</div>
+        ${avatarElement('div', 'message-avatar', avatarForMessage(message, scope), name, '员')}
         <div class="message-body">
           <div class="message-meta"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(formatTime(message.created_at || message.createdAt))}</span></div>
           <div class="message-content ${tone}">${escapeHtml(message.content || message.text || message.message || '')}</div>
