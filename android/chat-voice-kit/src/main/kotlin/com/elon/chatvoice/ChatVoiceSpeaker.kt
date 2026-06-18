@@ -25,6 +25,7 @@ class ChatVoiceSpeaker(
     context: Context,
     private val config: ChatVoiceConfig,
     private val client: OkHttpClient = defaultClient(),
+    private val eventSink: ChatVoiceEventSink? = null,
 ) : TextToSpeech.OnInitListener {
     private val appContext = context.applicationContext
     private val main = Handler(Looper.getMainLooper())
@@ -88,6 +89,7 @@ class ChatVoiceSpeaker(
             if (config.fallbackToSystemTts) {
                 speakWithSystem(text, onDone, onError)
             } else {
+                eventSink?.onVoiceEvent(ChatVoiceEvent.Error(error))
                 onError(error)
             }
         }
@@ -134,7 +136,8 @@ class ChatVoiceSpeaker(
             call.enqueue(object : Callback {
                 override fun onFailure(call: Call, e: IOException) {
                     if (!call.isCanceled()) main.post {
-                        onError(ChatVoiceError("server_tts_network", "服务器 TTS 网络失败", e))
+                        val error = ChatVoiceError("server_tts_network", "服务器 TTS 网络失败", e)
+                        onError(error)
                     }
                 }
 
@@ -144,7 +147,8 @@ class ChatVoiceSpeaker(
                         if (!it.isSuccessful || body == null) {
                             val message = body?.string().orEmpty()
                             main.post {
-                                onError(ChatVoiceError("server_tts_${it.code}", message.ifBlank { "服务器 TTS 失败" }))
+                                val error = ChatVoiceError("server_tts_${it.code}", message.ifBlank { "服务器 TTS 失败" })
+                                onError(error)
                             }
                             return
                         }
@@ -168,20 +172,26 @@ class ChatVoiceSpeaker(
             mediaPlayer = MediaPlayer().apply {
                 setDataSource(file.absolutePath)
                 setOnCompletionListener {
+                    eventSink?.onVoiceEvent(ChatVoiceEvent.TtsEnd)
                     stop()
                     onDone()
                 }
                 setOnErrorListener { _, _, _ ->
                     stop()
-                    onError(ChatVoiceError("server_tts_playback", "服务器 TTS 音频播放失败"))
+                    val error = ChatVoiceError("server_tts_playback", "服务器 TTS 音频播放失败")
+                    onError(error)
                     true
                 }
-                setOnPreparedListener { it.start() }
+                setOnPreparedListener {
+                    eventSink?.onVoiceEvent(ChatVoiceEvent.TtsStart)
+                    it.start()
+                }
                 prepareAsync()
             }
         }.onFailure {
             stop()
-            onError(ChatVoiceError("server_tts_playback", "服务器 TTS 音频初始化失败", it))
+            val error = ChatVoiceError("server_tts_playback", "服务器 TTS 音频初始化失败", it)
+            onError(error)
         }
     }
 
@@ -201,13 +211,18 @@ class ChatVoiceSpeaker(
         val result = engine.speak(text, TextToSpeech.QUEUE_FLUSH, params, UUID.randomUUID().toString())
         if (result == TextToSpeech.ERROR) {
             activeSystemDone = null
-            onError(ChatVoiceError("system_tts_error", "手机系统 TTS 播放失败"))
+            val error = ChatVoiceError("system_tts_error", "手机系统 TTS 播放失败")
+            eventSink?.onVoiceEvent(ChatVoiceEvent.Error(error))
+            onError(error)
+        } else {
+            eventSink?.onVoiceEvent(ChatVoiceEvent.TtsStart)
         }
     }
 
     private fun finishSystemSpeak() {
         val done = activeSystemDone
         activeSystemDone = null
+        eventSink?.onVoiceEvent(ChatVoiceEvent.TtsEnd)
         done?.invoke()
     }
 

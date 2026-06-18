@@ -15,11 +15,14 @@ import java.util.Locale
 class SystemSpeechTranscriber(
     context: Context,
     private val languageTag: String = "zh-CN",
+    private val eventSink: ChatVoiceEventSink? = null,
 ) {
     interface Listener {
         fun onReady() {}
+        fun onVolume(value: Float) {}
         fun onPartial(transcript: SpeechTranscript) {}
         fun onFinal(transcript: SpeechTranscript) {}
+        fun onCanceled() {}
         fun onError(error: ChatVoiceError) {}
     }
 
@@ -42,6 +45,12 @@ class SystemSpeechTranscriber(
             }
             stopRecognizer(cancelOnly = true)
             activeListener = listener
+            eventSink?.onVoiceEvent(
+                ChatVoiceEvent.StateChanged(
+                    ChatVoiceListeningState.PREPARING,
+                    ChatVoiceInteractionContract.stateText(ChatVoiceListeningState.PREPARING),
+                )
+            )
             recognizer = SpeechRecognizer.createSpeechRecognizer(appContext).apply {
                 setRecognitionListener(createRecognitionListener())
                 startListening(recognizerIntent(preferOffline))
@@ -55,8 +64,11 @@ class SystemSpeechTranscriber(
 
     fun cancel() {
         main.post {
+            val listener = activeListener
             stopRecognizer(cancelOnly = true)
             activeListener = null
+            eventSink?.onVoiceEvent(ChatVoiceEvent.Cancel)
+            listener?.onCanceled()
         }
     }
 
@@ -87,12 +99,26 @@ class SystemSpeechTranscriber(
     private fun createRecognitionListener(): RecognitionListener =
         object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
+                eventSink?.onVoiceEvent(
+                    ChatVoiceEvent.StateChanged(
+                        ChatVoiceListeningState.LISTENING,
+                        ChatVoiceInteractionContract.stateText(ChatVoiceListeningState.LISTENING),
+                    )
+                )
                 activeListener?.onReady()
+            }
+
+            override fun onRmsChanged(rmsdB: Float) {
+                val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
+                activeListener?.onVolume(normalized)
+                eventSink?.onVoiceEvent(ChatVoiceEvent.Volume(normalized))
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
                 val text = firstResult(partialResults) ?: return
-                activeListener?.onPartial(SpeechTranscript(text, isFinal = false, SpeechSource.SYSTEM_ASR))
+                val transcript = SpeechTranscript(text, isFinal = false, SpeechSource.SYSTEM_ASR)
+                activeListener?.onPartial(transcript)
+                eventSink?.onVoiceEvent(ChatVoiceEvent.PartialResult(transcript))
             }
 
             override fun onResults(results: Bundle?) {
@@ -101,9 +127,13 @@ class SystemSpeechTranscriber(
                 stopRecognizer(cancelOnly = false)
                 activeListener = null
                 if (text.isBlank()) {
-                    listener?.onError(ChatVoiceError("system_asr_no_match", "没有听清"))
+                    val error = ChatVoiceError("system_asr_no_match", "没有听清")
+                    eventSink?.onVoiceEvent(ChatVoiceEvent.Error(error))
+                    listener?.onError(error)
                 } else {
-                    listener?.onFinal(SpeechTranscript(text.trim(), isFinal = true, SpeechSource.SYSTEM_ASR))
+                    val transcript = SpeechTranscript(text.trim(), isFinal = true, SpeechSource.SYSTEM_ASR)
+                    eventSink?.onVoiceEvent(ChatVoiceEvent.FinalResult(transcript))
+                    listener?.onFinal(transcript)
                 }
             }
 
@@ -111,13 +141,14 @@ class SystemSpeechTranscriber(
                 val listener = activeListener
                 stopRecognizer(cancelOnly = true)
                 activeListener = null
-                listener?.onError(ChatVoiceError("system_asr_$error", speechErrorMessage(error)))
+                val voiceError = ChatVoiceError("system_asr_$error", speechErrorMessage(error))
+                eventSink?.onVoiceEvent(ChatVoiceEvent.Error(voiceError))
+                listener?.onError(voiceError)
             }
 
             override fun onBeginningOfSpeech() = Unit
-            override fun onRmsChanged(rmsdB: Float) = Unit
-            override fun onBufferReceived(buffer: ByteArray?) = Unit
             override fun onEndOfSpeech() = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
         }
 

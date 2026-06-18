@@ -32,6 +32,132 @@ val config = ChatVoiceConfig(
 - `ServerAsrClient`：上传音频到主项目 `/api/voice/asr`。
 - `ChatVoiceSpeaker`：优先调用主项目 `/api/voice/tts`，失败或选择 `android_system` 时回退手机系统 TTS。
 - `HoldToTalkController`：按住说话、上滑取消、松开发送的手势状态。
+- `ChatVoiceInteractionContract`：主项目语音浮层的状态文案、手势阈值、颜色 token 和区域判断。
+- `ChatVoiceEventSink` / `ChatVoiceEvent`：统一事件流，供 fb2 原生 UI 或 H5 浮层订阅。
+
+不要引用或复制主项目 `com.elon.app.MainSpeechInputActions`、`VoiceRecordingOverlay`、`VoiceSpeaker`、`VoiceServerTtsPlayer`。这些类属于主 App 内部实现，依赖主项目页面、附件、好友/群聊上下文。fb2 只引用 `com.elon.chatvoice.*`。
+
+## 操作 UI 规范
+
+主项目语音操作分两种模式：
+
+| 模式 | 默认松手行为 | 可选区域 |
+|---|---|---|
+| `ChatVoiceMode.AGENT` | `AI_REPLY` | `AI_REPLY`、`TRANSCRIBE`、`CANCEL` |
+| `ChatVoiceMode.FRIEND_CHAT` | `SEND` | `SEND`、`AI_REPLY`、`TRANSCRIBE`、`CANCEL` |
+
+状态文案由 `ChatVoiceInteractionContract.copy` 固定：
+
+| 状态 | 文案 |
+|---|---|
+| 未录音 | `按住 说话` |
+| 准备中 | `准备中...` |
+| 录音中 | `正在听...` |
+| 已听到声音 | `听到了，松手发送` |
+| 松手识别中 | `识别中...` |
+| 无声 | `没有检测到声音` |
+| 噪声 | `环境较嘈杂，请靠近手机说话` |
+| 太短 | `语音太短，请轻触再试` |
+| 识别失败 | `识别失败，请重试` |
+| TTS 播放 | `语音播放中...` |
+
+区域文案：
+
+| 区域 | 文案 |
+|---|---|
+| `AI_REPLY` | `松开 AI回复`，好友/群聊上滑后显示 `滑到这 AI回复` |
+| `TRANSCRIBE` | `松开 转文字` |
+| `CANCEL` | `松开 取消` |
+| `SEND` | `松开 发送` |
+
+切换规则：
+
+1. `ACTION_DOWN` 进入 pending；`longPressStartDelayMs` 到达后发出 `Start`。
+2. 录音开始后显示浮层，状态先是 `PREPARING`，系统 ASR ready 后进入 `LISTENING`。
+3. `onRmsChanged` 归一化为 0-1 音量，驱动波形。
+4. partial 结果实时显示；final 结果作为最终文本。
+5. 松手时，当前区域决定后续动作：`SEND` 发语音，`AI_REPLY` 用转写文本触发 AI，`TRANSCRIBE` 只转文字，`CANCEL` 丢弃。
+6. 如果录音低于阈值，进入 `TOO_SHORT`，回到 `按住 说话`。
+7. TTS 开始发 `TtsStart`，播放 UI 进入 `TTS_PLAYING`；结束发 `TtsEnd`。
+
+## 手势和反馈阈值
+
+阈值由 `ChatVoiceInteractionContract.holdOptions` 固定：
+
+| 字段 | 默认值 | 说明 |
+|---|---:|---|
+| `longPressStartDelayMs` | `0` | 主项目按下即启动；fb2 不要额外加长按延迟 |
+| `minRecordDurationMs` | `600` | SDK 判定录音太短的最小时长 |
+| `minVoiceBytes` | `256` | SDK 判定录音太短的最小音频字节数 |
+| `cancelDragUpDp` | `56dp` | 好友/群聊模式上滑进入选择区的距离 |
+| `horizontalChoiceDp` | `80dp` | 兼容旧水平拖动：左取消，右转文字 |
+| `touchChoiceHeightDp` | `118dp` | 底部选择托盘高度 |
+| `heardVibrationMs` | `30ms` | VAD/ASR 确认听到声音时短震动 |
+| `heardPulseMs` | `220ms` | 听到声音时气泡脉冲动画时长 |
+| `countdownWarningRatio` | `0.75` | 倒计时超过 75% 时变黄提醒 |
+
+视觉 token 由 `ChatVoiceInteractionContract.tokens` 固定，H5 可直接使用这些十六进制颜色：
+
+| token | 值 |
+|---|---|
+| `overlayScrim` | `#CC000000` |
+| `bubbleNormal` | `#58BE6A` |
+| `bubbleCancel` | `#E65A5A` |
+| `waveBar` | `#2C6C52` |
+| `trayOuter` | `#70575757` |
+| `trayInner` | `#8A707070` |
+| `trayHighlight` | `#48FFFFFF` |
+| `textDefault` | `#DDEDEDED` |
+| `textTranscribe` | `#EAF7F0` |
+| `textCancel` | `#FFE3E3` |
+| `countdownNormal` | `#60FFFFFF` |
+| `countdownWarning` | `#FFCC44` |
+
+## SDK 事件
+
+`ChatVoiceEventSink` 暴露这些事件：
+
+| 事件 | 触发来源 |
+|---|---|
+| `Start` | `HoldToTalkController` 真正开始录音 |
+| `Volume(value)` | `SystemSpeechTranscriber.onRmsChanged`，0-1 |
+| `PartialResult(transcript)` | 手机系统 ASR partial |
+| `FinalResult(transcript)` | 手机系统 ASR final |
+| `Cancel` | 手势取消或主动取消 |
+| `Error(error)` | ASR/TTS/播放错误 |
+| `TooShort(minimumDurationMs, minimumBytes)` | `ChatVoiceRecorder.stop()` 判定录音太短 |
+| `TtsStart` | 服务器或系统 TTS 开始播放 |
+| `TtsEnd` | 服务器或系统 TTS 播放结束 |
+| `StateChanged(state, text)` | ASR 状态变化 |
+| `ZoneChanged(zone, text)` | 手势区域变化 |
+
+示例：
+
+```kotlin
+val sink = ChatVoiceEventSink { event ->
+    when (event) {
+        is ChatVoiceEvent.Volume -> renderWave(event.value)
+        is ChatVoiceEvent.PartialResult -> renderPartial(event.transcript.text)
+        is ChatVoiceEvent.FinalResult -> submitText(event.transcript.text)
+        is ChatVoiceEvent.ZoneChanged -> renderZone(event.zone, event.text)
+        is ChatVoiceEvent.TtsStart -> showTtsPlaying()
+        is ChatVoiceEvent.TtsEnd -> hideTtsPlaying()
+        is ChatVoiceEvent.Error -> showToast(event.error.message)
+        else -> Unit
+    }
+}
+```
+
+## 原生浮层复用结论
+
+主项目已有 `VoiceRecordingOverlay`，但它是 App 内部 View：
+
+- 依赖 `Activity.window.decorView`
+- 依赖主项目 `MainSpeechInputActions` 驱动
+- `internal class`，不是 SDK API
+- 绑定主项目 AI回复/好友/附件行为
+
+因此 fb2 **不能直接调用这个类，也不要复制源码**。fb2 应该按 `ChatVoiceInteractionContract` 的状态机、token、文案和阈值还原 UI。Native Android 可以自己画 View；H5/WebView 可以按同一 token 画浮层。
 
 ## 推荐体验策略
 

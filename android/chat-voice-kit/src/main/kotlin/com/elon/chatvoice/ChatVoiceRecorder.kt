@@ -7,7 +7,11 @@ import android.media.MediaRecorder
 import android.os.SystemClock
 import java.io.File
 
-class ChatVoiceRecorder(private val context: Context) {
+class ChatVoiceRecorder(
+    private val context: Context,
+    private val options: ChatVoiceHoldOptions = ChatVoiceInteractionContract.holdOptions,
+    private val eventSink: ChatVoiceEventSink? = null,
+) {
     private val appContext = context.applicationContext
     private var recorder: MediaRecorder? = null
     private var outputFile: File? = null
@@ -48,6 +52,7 @@ class ChatVoiceRecorder(private val context: Context) {
     }
 
     fun stop(): Result<RecordedVoice> {
+        val durationMillis = recordedDurationMillis()
         val duration = recordedDurationSeconds()
         val activeRecorder = recorder
         val file = outputFile
@@ -59,11 +64,16 @@ class ChatVoiceRecorder(private val context: Context) {
         }
         val stopped = runCatching { activeRecorder.stop() }
         runCatching { activeRecorder.release() }
-        if (stopped.isFailure || !file.isFile || file.length() <= MIN_VOICE_BYTES) {
+        if (stopped.isFailure ||
+            durationMillis < options.minRecordDurationMs ||
+            !file.isFile ||
+            file.length() <= options.minVoiceBytes
+        ) {
             file.delete()
+            eventSink?.onVoiceEvent(ChatVoiceEvent.TooShort(options.minRecordDurationMs, options.minVoiceBytes))
             return Result.failure(IllegalStateException("voice recording is too short"))
         }
-        return Result.success(RecordedVoice(file = file, durationSeconds = duration))
+        return Result.success(RecordedVoice(file = file, durationSeconds = duration, durationMillis = durationMillis))
     }
 
     fun cancel() {
@@ -82,7 +92,6 @@ class ChatVoiceRecorder(private val context: Context) {
     private fun voiceCacheDir(): File =
         File(appContext.cacheDir, "elon_chat_voice").apply { mkdirs() }
 
-    companion object {
-        private const val MIN_VOICE_BYTES = 256L
-    }
+    private fun recordedDurationMillis(): Long =
+        if (startedAt <= 0L) 0L else SystemClock.elapsedRealtime() - startedAt
 }

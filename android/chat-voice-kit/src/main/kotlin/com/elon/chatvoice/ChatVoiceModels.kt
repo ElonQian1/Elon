@@ -42,5 +42,6 @@ data class TtsRequest(
 data class RecordedVoice(
     val file: File,
     val durationSeconds: Int,
+    val durationMillis: Long = durationSeconds * 1000L,
     val mimeType: String = "audio/mp4",
 )
