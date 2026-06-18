@@ -120,32 +120,6 @@
     </div>
   </div>
 
-  <h3>网页版入口（不提供算力也能使用）</h3>
-  <div class="card">
-    <div class="split-grid">
-      <div class="mini-panel">
-        <strong>使用一龙网页版</strong>
-        <div class="muted">
-          没有配置 Codex CLI / Copilot CLI 的电脑，也可以从这里进入网页版，登录账号后新建项目、聊天和使用其它在线 PC 节点。
-        </div>
-      </div>
-      <div class="mini-panel">
-        <strong>成为本机算力节点</strong>
-        <div class="muted">
-          登录后本机会先注册成你的 PC 节点；安装 AI 编码工具后，才会被项目创建流程选为可承接任务的节点。
-        </div>
-      </div>
-    </div>
-    <div class="action-row">
-      <a id="cloudWebLink" class="button-link" href="#" target="_blank" rel="noopener">打开一龙网页版</a>
-      <button class="secondary" type="button" onclick="copyCloudWebUrl()">复制网页版地址</button>
-    </div>
-    <div id="cloudWebResult"></div>
-    <p class="muted" style="margin:12px 0 0">
-      网页版会在云端页面内完成登录。登录后进入底部「项目」，点击右上角「新建项目」即可选择可用 PC 节点创建项目；如果本机已启用硬盘服务，网页版会优先把本机选为代码硬盘节点。
-    </p>
-  </div>
-
   <h3>当前配置</h3>
   <div class="grid" id="cfg"></div>
 
@@ -199,7 +173,7 @@
   <h3>AI 编码工具（让本机能承接项目任务）</h3>
   <div class="card">
     <p class="muted" style="margin-top:0">
-      这一步只影响“让本机提供项目开发算力”。如果暂时不安装，仍可通过上方网页版入口使用平台和其它在线节点。
+      这一步只影响“让本机提供项目开发算力”。如果暂时不安装，仍可通过新版 Windows 端使用平台和其它在线节点。
     </p>
     <div class="grid" id="envCheckGrid"></div>
     <div class="action-row">
@@ -220,30 +194,6 @@
     <thead><tr><th>模型 ID</th><th>提供方</th><th>价格 (credits/1k)</th></tr></thead>
     <tbody></tbody>
   </table>
-
-  <h3>情绪女声 TTS <button style="padding:4px 10px;font-size:12px" onclick="loadTts()">刷新</button></h3>
-  <div id="ttsStatus" class="card">
-    <span style="color:#8b949e">检查中…</span>
-  </div>
-
-  <h3>TTS 中继配置（把本机 GPU 贡献给用户）</h3>
-  <div class="card">
-    <p style="font-size:13px;color:#8b949e;margin-top:0">
-      配置后，当用户请求 AI 回复语音时，云端服务器会通过 WebSocket 隧道把请求转发到本机 TTS Worker 处理，
-      GPU 算力贡献给平台用户。<br>
-      本机需先运行模型 TTS Worker（默认端口 5011）。
-    </p>
-    <div class="form-row">
-      <label>本机 TTS Worker 地址（留空则禁用 TTS 中继）</label>
-      <input id="ttsWorkerUrlInput" placeholder="http://127.0.0.1:5011" />
-    </div>
-    <button id="saveTtsRelayBtn" onclick="saveTtsRelay()">保存并生效</button>
-    <div id="ttsRelayResult"></div>
-    <p style="font-size:12px;color:#8b949e;margin-top:10px">
-      模型 TTS Worker 启动命令：<code>scripts\start-local-model-tts-worker.ps1</code><br>
-      安装 IndexTTS2 运行时：<code>scripts\setup-indextts2-runtime.ps1</code>
-    </p>
-  </div>
 
   <h3>环境变量参考（高级，普通用户无需配置）</h3>
   <pre>
@@ -282,50 +232,19 @@ function hardwareLine(h) {
   if (h.gpu_memory_total_bytes) parts.push('显存 ' + fmtBytes(h.gpu_memory_total_bytes));
   return parts.filter(Boolean).join(' · ') || '未探测';
 }
-function cloudWebUrl(r) {
-  const base = ((r && r.cloud_http_url) || 'http://43.139.149.158:8080').replace(/\/+$/, '');
-  const agentId = r && r.agent_id ? String(r.agent_id).trim() : '';
-  if (!agentId) return base + '/web';
-  return base + '/web?preferred_storage_node_id=' + encodeURIComponent(agentId);
-}
 function pcWorkspaceUrl(r) {
   const base = ((r && r.cloud_http_url) || 'http://43.139.149.158:8080').replace(/\/+$/, '');
   const adminUrl = location.origin + '/';
   return base + '/pc?node_admin=' + encodeURIComponent(adminUrl);
 }
-function updateCloudWebLink(url) {
-  const link = document.getElementById('cloudWebLink');
-  if (link) link.href = url;
-  window.__elonCloudWebUrl = url;
-}
 function updatePcDoctorLink(url) {
   const link = document.getElementById('pcDoctorLink');
   if (link) link.href = url;
-}
-async function copyCloudWebUrl() {
-  const url = window.__elonCloudWebUrl || cloudWebUrl(null);
-  const out = document.getElementById('cloudWebResult');
-  try {
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      await navigator.clipboard.writeText(url);
-    } else {
-      const el = document.createElement('textarea');
-      el.value = url;
-      document.body.appendChild(el);
-      el.select();
-      document.execCommand('copy');
-      document.body.removeChild(el);
-    }
-    out.innerHTML = `<div class="ok-toast">✅ 已复制：<code>${url}</code></div>`;
-  } catch (e) {
-    out.innerHTML = `<div class="err-toast">❌ 复制失败，请手动复制：<code>${url}</code></div>`;
-  }
 }
 async function load() {
   if (window.__elonDup) return;
   const r = await fetch('/api/status').then(r => r.json()).catch(() => null);
   if (!r) { document.getElementById('connStatus').textContent = '加载失败'; return; }
-  updateCloudWebLink(cloudWebUrl(r));
   const pcUrl = pcWorkspaceUrl(r);
   updatePcDoctorLink(pcUrl);
   const pcLink = document.getElementById('cloudPcSettingsLink');
@@ -479,110 +398,6 @@ async function saveStorageConfig() {
   }
 }
 
-// ── TTS 中继配置 ─────────────────────────────────────────────────────────────
-async function loadTtsRelayConfig() {
-  const r = await fetch('/api/tts-relay-config').then(r => r.json()).catch(() => null);
-  if (!r) return;
-  const input = document.getElementById('ttsWorkerUrlInput');
-  if (input) input.value = r.ttsWorkerUrl || '';
-}
-
-async function saveTtsRelay() {
-  const url = (document.getElementById('ttsWorkerUrlInput')?.value || '').trim();
-  const out = document.getElementById('ttsRelayResult');
-  out.innerHTML = '';
-  const btn = document.getElementById('saveTtsRelayBtn');
-  btn.disabled = true; btn.textContent = '保存中…';
-  try {
-    const resp = await fetch('/api/tts-relay-config', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ tts_worker_url: url || null }),
-    });
-    const j = await resp.json();
-    if (j.ok) {
-      out.innerHTML = `<div class="ok-toast" style="margin-top:8px">${url ? '✅ TTS 中继已启用: ' + j.ttsWorkerUrl : '✅ TTS 中继已禁用'}。云端重连后生效。</div>`;
-      setTimeout(loadTts, 1000);
-    } else {
-      out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ ${j.error || 'HTTP ' + resp.status}</div>`;
-    }
-  } catch(e) {
-    out.innerHTML = `<div class="err-toast" style="margin-top:8px">❌ 请求失败: ${e}</div>`;
-  } finally {
-    btn.disabled = false; btn.textContent = '保存并生效';
-  }
-}
-
-// ── TTS Worker 状态 ──────────────────────────────────────────────────────────
-async function loadTts() {
-  const box = document.getElementById('ttsStatus');
-  const r = await fetch('/api/tts-status').then(r => r.json()).catch(() => null);
-  if (!r) { box.innerHTML = '<span style="color:#f85149">请求失败</span>'; return; }
-
-  const h = r.health || {};
-  const running = r.running;
-  const provider = (h.defaultProvider || '').replace('index_tts2','IndexTTS2').replace('cosyvoice3','CosyVoice3') || '—';
-  const rt = h.runtime || {};
-  const idxOk  = rt.indexTts2  && rt.indexTts2.importable;
-  const cosyOk = rt.cosyVoice  && rt.cosyVoice.importable;
-  const assets  = h.assets || {};
-  const missingVoices   = (assets.missingVoices   || []).length;
-  const missingEmotions = (assets.missingEmotions || []).length;
-  const totalVoices   = (assets.voices   || []).length;
-  const totalEmotions = (assets.emotions || []).length;
-
-  let html = '';
-
-  // 运行状态
-  if (running) {
-    html += `<div class="ok-toast" style="margin:0 0 12px">🟢 TTS Worker 正在运行（端口 ${r.port}，引擎 ${provider}）</div>`;
-  } else {
-    html += `<div class="err-toast" style="margin:0 0 12px">🔴 TTS Worker 未运行（端口 ${r.port}）</div>`;
-    if (!r.enabled_in_env) {
-      html += `<div class="warn">未启用。要在每次启动节点时自动拉起 TTS Worker，请在 <code>node-agent.env</code> 里加：<br><code>TTS_WORKER_ENABLED=true</code></div>`;
-    }
-  }
-
-  if (running) {
-    // 声音素材状态
-    html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:12px">`;
-    const voiceOk = missingVoices === 0 && totalVoices > 0;
-    const emoOk   = missingEmotions === 0 && totalEmotions > 0;
-    html += `<div><span style="color:#8b949e">女声素材（${totalVoices} 个）</span><br>`;
-    html += voiceOk
-      ? `<span style="color:#2ea043">✅ 全部就绪</span>`
-      : `<span style="color:#f85149">❌ 缺少 ${missingVoices}/${totalVoices} 个 WAV</span>`;
-    html += `</div>`;
-    html += `<div><span style="color:#8b949e">情绪素材（${totalEmotions} 个）</span><br>`;
-    html += emoOk
-      ? `<span style="color:#2ea043">✅ 全部就绪</span>`
-      : `<span style="color:#f85149">❌ 缺少 ${missingEmotions}/${totalEmotions} 个 WAV</span>`;
-    html += `</div>`;
-
-    // 模型状态
-    html += `<div><span style="color:#8b949e">IndexTTS2 模型</span><br>`;
-    html += idxOk
-      ? `<span style="color:#2ea043">✅ 已加载</span>`
-      : `<span style="color:#d29922">⬜ 未安装</span>`;
-    html += `</div>`;
-    html += `<div><span style="color:#8b949e">CosyVoice3 模型</span><br>`;
-    html += cosyOk
-      ? `<span style="color:#2ea043">✅ 已加载</span>`
-      : `<span style="color:#d29922">⬜ 未安装</span>`;
-    html += `</div>`;
-    html += `</div>`;
-
-    // 素材缺失时给出操作提示
-    if (missingVoices > 0 || missingEmotions > 0) {
-      html += `<div class="warn">缺少声音素材 WAV 文件，不同女声选择将无法生效（会回退到系统 TTS）。<br>运行：<code>scripts\\import-tts-asset-pack.ps1 -AssetRoot &lt;你的素材目录&gt;</code></div>`;
-    }
-    if (!idxOk && !cosyOk) {
-      html += `<div class="warn">两个 TTS 引擎均未安装，语音合成无法工作。<br>安装 IndexTTS2：<code>scripts\\setup-indextts2-runtime.ps1</code></div>`;
-    }
-  }
-
-  box.innerHTML = html || '<span style="color:#8b949e">无数据</span>';
-}
 
 // ── AI 编码工具环境检查 ─────────────────────────────────────────────────────
 async function loadEnvCheck() {
@@ -663,10 +478,7 @@ async function saveApiKey() {
 load();
 loadStorageConfig();
 loadEnvCheck();
-loadTts();
-loadTtsRelayConfig();
 setInterval(load, 5000);
-setInterval(loadTts, 15000);
 </script>
 </body>
 </html>

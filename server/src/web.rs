@@ -26,9 +26,12 @@ const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 const PC_APP_CSS: &str = include_str!("assets/pc_app.css");
 const PC_APP_NODE_CSS: &str = include_str!("assets/pc_app_node.css");
 const PC_APP_DOCTOR_CSS: &str = include_str!("assets/pc_app_doctor.css");
+const PC_VOICE_PROJECT_CSS: &str = include_str!("assets/pc_voice_project.css");
 const PC_APP_UTILS_JS: &str = include_str!("assets/pc_app_utils.js");
 const PC_APP_NODE_JS: &str = include_str!("assets/pc_app_node.js");
 const PC_APP_DOCTOR_JS: &str = include_str!("assets/pc_app_doctor.js");
+const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
+const PC_VOICE_PROJECT_JS: &str = include_str!("assets/pc_voice_project.js");
 const PC_APP_JS: &str = include_str!("assets/pc_app.js");
 
 pub async fn web_page() -> impl IntoResponse {
@@ -217,6 +220,16 @@ pub async fn pc_app_doctor_css() -> impl IntoResponse {
     )
 }
 
+pub async fn pc_voice_project_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_VOICE_PROJECT_CSS,
+    )
+}
+
 pub async fn pc_app_js() -> impl IntoResponse {
     (
         [
@@ -240,6 +253,32 @@ pub async fn pc_app_node_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PC_APP_NODE_JS,
+    )
+}
+
+pub async fn voice_tts_sdk_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        VOICE_TTS_SDK_JS,
+    )
+}
+
+pub async fn pc_voice_project_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_VOICE_PROJECT_JS,
     )
 }
 

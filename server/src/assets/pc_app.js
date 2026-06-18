@@ -6,13 +6,14 @@
   const state = {
     token: readToken(), user: null, projects: [], friends: [], groups: [], nodes: [],
     activeKind: 'friends', activeProjectId: '', activeChannelId: '', activeChannelKind: '',
+    activeVoiceChannel: 'studio',
     activePeer: null, projectSpace: null,
     nodeAdminUrl: safeNodeAdminUrl()
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
 
   const els = {
-    friendsRail: $('friendsRail'), doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), projectRailList: $('projectRailList'),
+    friendsRail: $('friendsRail'), doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), projectRailList: $('projectRailList'),
     channelList: $('channelList'), memberList: $('memberList'), messageList: $('messageList'),
     workspaceName: $('workspaceName'), workspaceMeta: $('workspaceMeta'), channelGlyph: $('channelGlyph'),
     channelTitle: $('channelTitle'), channelSubtitle: $('channelSubtitle'), userName: $('userName'),
@@ -154,6 +155,7 @@
     els.friendsRail.classList.toggle('active', kind === 'friends');
     els.doctorRail.classList.toggle('active', kind === 'doctor');
     els.nodeRail.classList.toggle('active', kind === 'node');
+    els.voiceRail.classList.toggle('active', kind === 'voice');
     Array.from(els.projectRailList.children).forEach((btn) => {
       btn.classList.toggle('active', kind === 'project' && btn.dataset.projectId === state.activeProjectId);
     });
@@ -193,6 +195,7 @@
     if (state.activeKind === 'friends') return renderFriendChannels(query);
     if (state.activeKind === 'doctor') return doctor.renderChannels(channelButton);
     if (state.activeKind === 'node') return node.renderChannels(channelButton);
+    if (state.activeKind === 'voice') return window.ElonVoiceProject.renderChannels(voiceContext());
     return renderProjectChannels(query);
   }
 
@@ -307,7 +310,8 @@
     els.friendsRail.addEventListener('click', selectFriends);
     els.doctorRail.addEventListener('click', doctor.selectDoctor);
     els.nodeRail.addEventListener('click', node.selectNode);
-    [els.friendsRail, els.doctorRail, els.nodeRail, $('openWebBtn')].forEach(attachRailTooltip);
+    els.voiceRail.addEventListener('click', () => selectVoiceProject());
+    [els.friendsRail, els.doctorRail, els.nodeRail, els.voiceRail, $('openWebBtn')].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
@@ -444,6 +448,32 @@
     } catch (error) {
       showError(error);
     }
+  }
+
+  function voiceContext() {
+    return {
+      state, els, api, setHeader, setComposer, setNodeMode, renderMembers,
+      escapeHtml, clean, selectVoiceChannel
+    };
+  }
+
+  function selectVoiceProject(channelId) {
+    state.activeKind = 'voice';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activePeer = null;
+    state.activeVoiceChannel = channelId || state.activeVoiceChannel || 'studio';
+    setRails('voice');
+    els.workspaceName.textContent = 'ai声音';
+    els.workspaceMeta.textContent = '情绪女声 TTS';
+    renderChannels();
+    return selectVoiceChannel(state.activeVoiceChannel);
+  }
+
+  function selectVoiceChannel(channelId) {
+    state.activeVoiceChannel = channelId || 'studio';
+    renderChannels();
+    return window.ElonVoiceProject.renderMain(voiceContext());
   }
 
   async function selectProject(projectId) {
@@ -859,6 +889,7 @@
     await loadBaseData();
     if (state.activeKind === 'doctor') return doctor.selectDoctor();
     if (state.activeKind === 'node') return node.selectNode();
+    if (state.activeKind === 'voice') return selectVoiceProject(state.activeVoiceChannel);
     if (state.activeKind === 'project' && state.activeProjectId) return selectProject(state.activeProjectId);
     return selectFriends();
   }
