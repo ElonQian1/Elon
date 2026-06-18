@@ -34,6 +34,9 @@ const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
 pub(crate) fn ensure_installed() -> Result<PathBuf> {
     let install_dir = paths::install_dir()?;
     if install_layout_ready(&install_dir) && paths::is_running_from_install_dir(&install_dir) {
+        if let Err(error) = windows_integration::register_url_protocol(&install_dir) {
+            eprintln!("警告：注册网页一键唤起入口失败：{error:#}");
+        }
         return Ok(install_dir);
     }
     install_or_repair()
@@ -64,6 +67,9 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
     if let Err(error) = windows_integration::enable_autostart(&install_dir) {
         eprintln!("警告：注册开机自启失败：{error:#}");
     }
+    if let Err(error) = windows_integration::register_url_protocol(&install_dir) {
+        eprintln!("警告：注册网页一键唤起入口失败：{error:#}");
+    }
     Ok(install_dir)
 }
 
@@ -71,6 +77,7 @@ pub(crate) fn uninstall() -> Result<()> {
     let install_dir = paths::install_dir()?;
     process::stop_agent();
     windows_integration::disable_autostart();
+    windows_integration::remove_url_protocol();
     windows_integration::remove_desktop_shortcut();
 
     if install_dir.exists() {

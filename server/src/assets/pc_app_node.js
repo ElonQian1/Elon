@@ -1,11 +1,13 @@
 (function () {
   const DOWNLOAD_URL = '/api/node-agent/download/windows-client';
   const VERSION_URL = '/api/node-agent/version';
+  const LAUNCH_URL = 'elon-node://open';
 
   function createNodeController(deps) {
     const { state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer, setRails, setNodeMode } = deps;
     state.nodeProbeSeq = state.nodeProbeSeq || 0;
     state.nodePollTimer = state.nodePollTimer || null;
+    state.nodeLocalOnline = false;
 
     function renderChannels(channelButton) {
       const onlineCount = state.nodes.filter((node) => node.online).length;
@@ -51,13 +53,13 @@
             <div>
               <div class="node-kicker">一龙 Win 端</div>
               <h2>连接本机 PC 节点</h2>
-              <p>如果你还没有安装 Win 端，先下载客户端包；如果已经安装，启动「一龙PC节点.exe」后这里会自动切换到本机管理页。</p>
+              <p>首次使用需要下载并确认安装；安装后点击“启动 Win 端”，浏览器会拉起本机程序，本页检测到 7799 服务后自动嵌入管理页。</p>
             </div>
             <span class="node-status-chip checking" id="nodeLocalStatus">检测中</span>
           </section>
           <section class="node-actions-panel">
             <a class="node-action primary" id="downloadNodeClient" href="${DOWNLOAD_URL}" download>下载 Win 端</a>
-            <button class="node-action" type="button" id="openNodeFrame">打开本机页面</button>
+            <button class="node-action" type="button" id="openNodeFrame">启动 Win 端</button>
             <button class="node-action" type="button" id="retryNodeProbe">重新检测</button>
           </section>
           <div class="node-version-line" id="nodeVersionLine">正在读取最新 Win 端版本...</div>
@@ -74,16 +76,40 @@
       $('openNodeFrame')?.addEventListener('click', openNodeWindow);
       $('retryNodeProbe')?.addEventListener('click', () => probeLocalNode());
       $('downloadNodeClient')?.addEventListener('click', () => {
-        renderNodeSetup('下载后解压压缩包，双击「一龙PC节点.exe」。它会自动安装、启动并打开本机管理页。');
+        renderNodeSetup('下载后解压压缩包，双击「一龙PC节点.exe」。它会自动安装、注册一键唤起入口，并打开 PC 网页。');
         setStatus('下载已开始', 'checking');
         startInstallPolling();
       });
     }
 
     function openNodeWindow() {
-      window.open(state.nodeAdminUrl, '_blank', 'noopener');
+      if (state.nodeLocalOnline) {
+        window.open(state.nodeAdminUrl, '_blank', 'noopener');
+        return;
+      }
+      renderNodeSetup('如果浏览器询问是否打开“一龙PC节点”，请选择允许；如果没有反应，说明这台电脑还没安装 Win 端，请先下载。');
       setStatus('等待启动', 'checking');
+      setLaunchButton('等待启动...');
+      launchInstalledClient();
       startInstallPolling();
+      window.setTimeout(() => probeLocalNode(true), 900);
+    }
+
+    function launchInstalledClient() {
+      try {
+        if (document.body && document.createElement) {
+          const frame = document.createElement('iframe');
+          frame.style.display = 'none';
+          frame.setAttribute('aria-hidden', 'true');
+          frame.src = LAUNCH_URL;
+          document.body.appendChild(frame);
+          window.setTimeout(() => frame.remove(), 2000);
+          return;
+        }
+      } catch (_) {
+        // Fall through to window.open below.
+      }
+      window.open(LAUNCH_URL, '_blank', 'noopener');
     }
 
     function startInstallPolling() {
@@ -143,7 +169,9 @@
     }
 
     function renderNodeConnected(status) {
+      state.nodeLocalOnline = true;
       setStatus('已连接', 'online');
+      setLaunchButton('打开本机页面');
       const surface = $('nodeLocalSurface');
       const line = $('nodeVersionLine');
       if (line) {
@@ -157,7 +185,9 @@
     }
 
     function renderNodeSetup(reason) {
+      state.nodeLocalOnline = false;
       setStatus('未连接', 'offline');
+      setLaunchButton('启动 Win 端');
       const surface = $('nodeLocalSurface');
       if (!surface) return;
       surface.innerHTML = `
@@ -166,10 +196,10 @@
           <p>${escapeHtml(reason || '请先安装并启动一龙 Win 端。')}</p>
           <div class="node-step-list">
             <div><strong>1</strong><span>下载 Win 端压缩包并解压。</span></div>
-            <div><strong>2</strong><span>双击「一龙PC节点.exe」，它会自动安装、开机自启并打开本机页面。</span></div>
-            <div><strong>3</strong><span>在本机页面登录一龙账号，注册成为 PC 节点。</span></div>
+            <div><strong>2</strong><span>双击「一龙PC节点.exe」，它会自动安装、开机自启，并注册网页一键唤起。</span></div>
+            <div><strong>3</strong><span>安装后点击“启动 Win 端”，再在本机页面登录一龙账号并注册 PC 节点。</span></div>
           </div>
-          <p class="node-safe-note">浏览器不能静默安装或强行启动本地程序；启动后本页会自动检测并嵌入管理页。</p>
+          <p class="node-safe-note">浏览器不能静默安装或强行启动本地程序；已安装后可以通过 elon-node://open 唤起，启动后本页会自动检测并嵌入管理页。</p>
         </div>`;
     }
 
@@ -192,6 +222,11 @@
       if (!el) return;
       el.textContent = text;
       el.className = `node-status-chip ${mode || ''}`;
+    }
+
+    function setLaunchButton(text) {
+      const button = $('openNodeFrame');
+      if (button) button.textContent = text;
     }
 
     function formatBytes(value) {

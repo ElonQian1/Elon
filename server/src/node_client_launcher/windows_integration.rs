@@ -1,16 +1,27 @@
-use anyhow::{Context, Result};
-use std::{path::Path, process::Command};
+#[cfg(windows)]
+use anyhow::Context;
+use anyhow::Result;
+use std::path::Path;
+#[cfg(windows)]
+use std::process::Command;
 
+#[cfg(windows)]
 use super::{paths, APP_NAME};
 
+#[cfg(windows)]
 const RUN_VALUE_NAME: &str = "ElonNodeAgent";
+#[cfg(windows)]
 const LEGACY_TASK_NAME: &str = "ElonNodeAgentTray";
+#[cfg(windows)]
+const PROTOCOL_SCHEME: &str = "elon-node";
 
 pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
-    let client = paths::client_exe(install_dir);
-    let value = format!("\"{}\"", client.display());
+    #[cfg(not(windows))]
+    let _ = install_dir;
     #[cfg(windows)]
     {
+        let client = paths::client_exe(install_dir);
+        let value = format!("\"{}\"", client.display());
         remove_legacy_scheduled_task();
         let status = Command::new("reg")
             .args([
@@ -33,6 +44,57 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
     Ok(())
 }
 
+pub(crate) fn register_url_protocol(install_dir: &Path) -> Result<()> {
+    #[cfg(not(windows))]
+    let _ = install_dir;
+    #[cfg(windows)]
+    {
+        let client = paths::client_exe(install_dir);
+        let key = format!(r"HKCU\Software\Classes\{}", PROTOCOL_SCHEME);
+        let icon_key = format!(r"{}\DefaultIcon", key);
+        let command_key = format!(r"{}\shell\open\command", key);
+        let display_name = format!("URL:{}", APP_NAME);
+        let icon_value = format!("\"{}\",0", client.display());
+        let command_value = format!("\"{}\" \"%1\"", client.display());
+
+        reg_add(
+            &["add", &key, "/ve", "/d", &display_name, "/f"],
+            "无法注册网页唤起入口",
+        )?;
+        reg_add(
+            &[
+                "add",
+                &key,
+                "/v",
+                "URL Protocol",
+                "/t",
+                "REG_SZ",
+                "/d",
+                "",
+                "/f",
+            ],
+            "无法注册网页唤起协议标记",
+        )?;
+        reg_add(
+            &["add", &icon_key, "/ve", "/d", &icon_value, "/f"],
+            "无法注册网页唤起图标",
+        )?;
+        reg_add(
+            &["add", &command_key, "/ve", "/d", &command_value, "/f"],
+            "无法注册网页唤起命令",
+        )?;
+    }
+    Ok(())
+}
+
+pub(crate) fn remove_url_protocol() {
+    #[cfg(windows)]
+    {
+        let key = format!(r"HKCU\Software\Classes\{}", PROTOCOL_SCHEME);
+        let _ = Command::new("reg").args(["delete", &key, "/f"]).status();
+    }
+}
+
 pub(crate) fn disable_autostart() {
     #[cfg(windows)]
     {
@@ -50,6 +112,8 @@ pub(crate) fn disable_autostart() {
 }
 
 pub(crate) fn create_desktop_shortcut(install_dir: &Path) -> Result<()> {
+    #[cfg(not(windows))]
+    let _ = install_dir;
     #[cfg(windows)]
     {
         let target = paths::client_exe(install_dir);
@@ -119,6 +183,18 @@ fn remove_legacy_scheduled_task() {
     let _ = Command::new("schtasks")
         .args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"])
         .status();
+}
+
+#[cfg(windows)]
+fn reg_add(args: &[&str], message: &str) -> Result<()> {
+    let status = Command::new("reg")
+        .args(args)
+        .status()
+        .with_context(|| message.to_string())?;
+    if !status.success() {
+        anyhow::bail!("{message}");
+    }
+    Ok(())
 }
 
 #[cfg(windows)]
