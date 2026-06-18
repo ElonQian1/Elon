@@ -24,7 +24,9 @@ const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
 const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
 const PROJECT_HOME_JS: &str = include_str!("assets/project_home.js");
 const PC_APP_CSS: &str = include_str!("assets/pc_app.css");
+const PC_APP_DOCTOR_CSS: &str = include_str!("assets/pc_app_doctor.css");
 const PC_APP_UTILS_JS: &str = include_str!("assets/pc_app_utils.js");
+const PC_APP_DOCTOR_JS: &str = include_str!("assets/pc_app_doctor.js");
 const PC_APP_JS: &str = include_str!("assets/pc_app.js");
 
 pub async fn web_page() -> impl IntoResponse {
@@ -193,6 +195,16 @@ pub async fn pc_app_css() -> impl IntoResponse {
     )
 }
 
+pub async fn pc_app_doctor_css() -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "text/css; charset=utf-8"),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_DOCTOR_CSS,
+    )
+}
+
 pub async fn pc_app_js() -> impl IntoResponse {
     (
         [
@@ -216,5 +228,18 @@ pub async fn pc_app_utils_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PC_APP_UTILS_JS,
+    )
+}
+
+pub async fn pc_app_doctor_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_DOCTOR_JS,
     )
 }

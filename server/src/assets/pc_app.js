@@ -12,7 +12,7 @@
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
 
   const els = {
-    friendsRail: $('friendsRail'), nodeRail: $('nodeRail'), projectRailList: $('projectRailList'),
+    friendsRail: $('friendsRail'), doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), projectRailList: $('projectRailList'),
     channelList: $('channelList'), memberList: $('memberList'), messageList: $('messageList'),
     workspaceName: $('workspaceName'), workspaceMeta: $('workspaceMeta'), channelGlyph: $('channelGlyph'),
     channelTitle: $('channelTitle'), channelSubtitle: $('channelSubtitle'), userName: $('userName'),
@@ -21,6 +21,11 @@
     sendBtn: $('sendBtn'), aiTaskBtn: $('aiTaskBtn'), memberPanelTitle: $('memberPanelTitle'),
     railTooltip: $('railTooltip')
   };
+
+  const doctor = window.ElonPcDoctor.create({
+    state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
+    setRails, renderChannels, setDoctorMode
+  });
 
   function saveToken(token) {
     state.token = token || '';
@@ -113,6 +118,7 @@
 
   function setRails(kind) {
     els.friendsRail.classList.toggle('active', kind === 'friends');
+    els.doctorRail.classList.toggle('active', kind === 'doctor');
     els.nodeRail.classList.toggle('active', kind === 'node');
     Array.from(els.projectRailList.children).forEach((btn) => {
       btn.classList.toggle('active', kind === 'project' && btn.dataset.projectId === state.activeProjectId);
@@ -151,6 +157,7 @@
   function renderChannels() {
     const query = filterText();
     if (state.activeKind === 'friends') return renderFriendChannels(query);
+    if (state.activeKind === 'doctor') return doctor.renderChannels(channelButton);
     if (state.activeKind === 'node') return renderNodeChannels(query);
     return renderProjectChannels(query);
   }
@@ -181,7 +188,7 @@
     const onlineCount = state.nodes.filter((node) => node.online).length;
     els.channelList.innerHTML = `
       <div class="channel-section">本机</div>
-      ${channelButton({ id: 'local-node', kind: 'node', glyph: 'PC', title: '节点注册与电脑维护', sub: '融合本机管理页', active: true })}
+      ${channelButton({ id: 'local-node', kind: 'node', glyph: 'PC', title: '节点注册', sub: '本机 agent 管理页', active: true })}
       <div class="channel-section">我的节点</div>
       ${state.nodes.map((node) => channelButton({
         id: node.node_id || node.agent_id || '',
@@ -217,7 +224,9 @@
   function channelButton(item) {
     const attrs = item.kind === 'project-channel'
       ? `data-channel-id="${escapeHtml(item.id)}"`
-      : `data-peer-kind="${escapeHtml(item.kind)}" data-item-id="${escapeHtml(item.id)}"`;
+      : (item.kind === 'doctor-section'
+        ? `data-doctor-section="${escapeHtml(item.id)}"`
+        : `data-peer-kind="${escapeHtml(item.kind)}" data-item-id="${escapeHtml(item.id)}"`);
     const glyph = item.avatar || item.avatarFallback
       ? avatarElement('span', 'glyph channel-avatar', item.avatar, item.avatarFallback || item.title || item.glyph || '#', item.glyph || '#')
       : `<span class="glyph">${escapeHtml(item.glyph || '#')}</span>`;
@@ -254,7 +263,19 @@
     els.input.placeholder = placeholder || '输入消息';
   }
 
-  function setNodeMode(enabled) { els.messageList.classList.toggle('node-mode', !!enabled); }
+  function clearSurfaceModes() {
+    els.messageList.classList.remove('node-mode', 'doctor-mode');
+  }
+
+  function setNodeMode(enabled) {
+    clearSurfaceModes();
+    if (enabled) els.messageList.classList.add('node-mode');
+  }
+
+  function setDoctorMode(enabled) {
+    clearSurfaceModes();
+    if (enabled) els.messageList.classList.add('doctor-mode');
+  }
 
   async function init() {
     bindEvents();
@@ -268,8 +289,9 @@
 
   function bindEvents() {
     els.friendsRail.addEventListener('click', selectFriends);
+    els.doctorRail.addEventListener('click', doctor.selectDoctor);
     els.nodeRail.addEventListener('click', selectNode);
-    [els.friendsRail, els.nodeRail, $('openWebBtn')].forEach(attachRailTooltip);
+    [els.friendsRail, els.doctorRail, els.nodeRail, $('openWebBtn')].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
@@ -348,7 +370,7 @@
     els.memberList.innerHTML = '';
     setNodeMode(false);
     els.messageList.innerHTML = `<div class="empty-state">
-      <strong>登录后一处使用好友、项目和 PC 节点</strong>
+      <strong>登录后一处使用好友、电脑医生、项目和 PC 节点</strong>
       <p>PC 工作台读取网页版登录态。点击下方按钮登录后，刷新本页即可进入 Discord 风格工作区。</p>
       <button class="text-button" type="button" id="loginWeb">打开网页版登录</button>
     </div>`;
@@ -370,7 +392,7 @@
       setHeader('友', '好友列表', '选择左侧好友或群聊开始对话');
       setComposer(false, '选择好友或群聊后开始输入', false);
       setNodeMode(false);
-      els.messageList.innerHTML = '<div class="empty-state"><strong>好友和群聊</strong><p>左侧第一枚图标固定打开好友列表。项目图标会排在 PC 节点下方。</p></div>';
+      els.messageList.innerHTML = '<div class="empty-state"><strong>好友和群聊</strong><p>左侧第一枚图标固定打开好友列表；电脑医生和 PC 节点是独立入口，项目图标排在固定入口下方。</p></div>';
     }
   }
 
@@ -404,7 +426,7 @@
     state.activePeer = null;
     setRails('node');
     els.workspaceName.textContent = 'PC 节点';
-    els.workspaceMeta.textContent = '注册、电脑维护、节点状态';
+    els.workspaceMeta.textContent = '注册、节点状态';
     setHeader('PC', '本机节点注册页面', '节点管理页面已融合在 PC 工作台内');
     setComposer(false, '节点管理页中操作', false);
     renderChannels();
@@ -701,6 +723,7 @@
   async function refreshActive() {
     if (!state.token) return showLoginState();
     await loadBaseData();
+    if (state.activeKind === 'doctor') return doctor.selectDoctor();
     if (state.activeKind === 'node') return selectNode();
     if (state.activeKind === 'project' && state.activeProjectId) return selectProject(state.activeProjectId);
     return selectFriends();

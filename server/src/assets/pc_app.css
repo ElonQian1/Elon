@@ -622,7 +622,6 @@ button { cursor: pointer; }
   color: var(--text-muted);
   font-size: 13px;
 }
-
 .composer {
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr) 68px;

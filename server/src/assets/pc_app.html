@@ -7,6 +7,7 @@
   <title>一龙 PC 工作台</title>
   <link rel="icon" href="data:image/png;base64,__BRAND_PNG_B64__" />
   <link rel="stylesheet" href="/assets/pc_app.css" />
+  <link rel="stylesheet" href="/assets/pc_app_doctor.css" />
 </head>
 <body>
   <main class="pc-shell" id="pcShell">
@@ -14,6 +15,9 @@
       <button class="rail-avatar active" id="friendsRail" type="button" data-label="好友" aria-label="好友">
         <span class="rail-icon friends-icon" aria-hidden="true"></span>
         <small id="friendBadge"></small>
+      </button>
+      <button class="rail-avatar doctor" id="doctorRail" type="button" data-label="电脑医生" aria-label="电脑医生">
+        <span class="rail-icon doctor-icon" aria-hidden="true"></span>
       </button>
       <button class="rail-avatar node" id="nodeRail" type="button" data-label="PC 节点" aria-label="PC 节点">
         <span class="rail-icon node-icon" aria-hidden="true"></span>
@@ -80,6 +84,7 @@
   <div class="rail-tooltip" id="railTooltip" role="tooltip"></div>
 
   <script src="/assets/pc_app_utils.js"></script>
+  <script src="/assets/pc_app_doctor.js"></script>
   <script src="/assets/pc_app.js"></script>
 </body>
 </html>

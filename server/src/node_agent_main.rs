@@ -35,6 +35,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tower_http::cors::{Any, CorsLayer};
 use tracing::{info, warn};
 
 mod cli_usage;
@@ -2140,6 +2141,12 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route(
                 "/api/tts-relay-config",
                 axum::routing::get(admin_tts_relay_get).post(admin_tts_relay_set),
+            )
+            .layer(
+                CorsLayer::new()
+                    .allow_origin(Any)
+                    .allow_methods(Any)
+                    .allow_headers(Any),
             )
             .with_state(runtime);
         match tokio::net::TcpListener::bind(addr).await {
