@@ -38,6 +38,7 @@ class VoiceComposerView @JvmOverloads constructor(
     private var permissionBlocked = false
     private var asrController = newAsrController(config)
     private var holdController = newHoldController(config)
+    private var recordingOverlay = ChatVoiceRecordingOverlay(context, config)
 
     init {
         orientation = HORIZONTAL
@@ -52,6 +53,8 @@ class VoiceComposerView @JvmOverloads constructor(
         config = next
         currentZone = next.releaseZone
         pendingReleaseZone = next.releaseZone
+        recordingOverlay.hide()
+        recordingOverlay.applyConfig(next)
         asrController = newAsrController(next)
         holdController = newHoldController(next).also { it.attachTo(holdButton) }
         applyStyle()
@@ -97,6 +100,7 @@ class VoiceComposerView @JvmOverloads constructor(
     fun resetVoiceState() {
         permissionBlocked = false
         currentZone = config.releaseZone
+        recordingOverlay.hide()
         showState(VoiceComposerState.IDLE, config.copy.holdToTalk)
     }
 
@@ -104,6 +108,7 @@ class VoiceComposerView @JvmOverloads constructor(
         main.removeCallbacksAndMessages(null)
         holdController.cancelActiveHold()
         asrController.releaseResources()
+        recordingOverlay.hide()
     }
 
     private fun buildChildren() {
@@ -199,6 +204,7 @@ class VoiceComposerView @JvmOverloads constructor(
                 override fun onHoldPending() {
                     permissionBlocked = false
                     currentZone = next.releaseZone
+                    showRecordingOverlayIfNeeded()
                     showState(VoiceComposerState.PREPARING, next.copy.preparing)
                 }
 
@@ -213,12 +219,28 @@ class VoiceComposerView @JvmOverloads constructor(
                         return
                     }
                     currentZone = next.releaseZone
+                    recordingOverlay.setListeningState(ChatVoiceListeningState.PREPARING)
                     next.eventSink?.onVoiceEvent(ChatVoiceEvent.Start)
                     callbacks.onVoicePressStart()
                     asrController.start()
                 }
 
+                override fun onTouchMove(rawX: Float, rawY: Float) {
+                    if (!next.recordingOverlayEnabled) return
+                    val nextZone = recordingOverlay.updateTouch(rawX, rawY)
+                    if (nextZone == currentZone) return
+                    currentZone = nextZone
+                    showState(if (nextZone == ChatVoiceZone.CANCEL) VoiceComposerState.CANCELING else VoiceComposerState.RECORDING)
+                    next.eventSink?.onVoiceEvent(
+                        ChatVoiceEvent.ZoneChanged(
+                            nextZone,
+                            ChatVoiceInteractionContract.releaseText(next.chatMode, nextZone),
+                        )
+                    )
+                }
+
                 override fun onCancelZoneChanged(inCancelZone: Boolean) {
+                    if (next.recordingOverlayEnabled) return
                     currentZone = if (inCancelZone) ChatVoiceZone.CANCEL else next.releaseZone
                     if (inCancelZone) {
                         showState(VoiceComposerState.CANCELING, next.copy.canceling)
@@ -233,9 +255,15 @@ class VoiceComposerView @JvmOverloads constructor(
                     )
                 }
 
+                override fun shouldCancelOnReleaseFromDrag(): Boolean = !next.recordingOverlayEnabled
+
                 override fun onHoldRelease() {
                     if (permissionBlocked) {
                         resetVoiceState()
+                        return
+                    }
+                    if (currentZone == ChatVoiceZone.CANCEL) {
+                        cancelHold()
                         return
                     }
                     releaseHold()
@@ -252,6 +280,7 @@ class VoiceComposerView @JvmOverloads constructor(
     private fun releaseHold() {
         pendingReleaseZone = currentZone
         callbacks.onVoiceReleased(pendingReleaseZone)
+        recordingOverlay.setListeningState(ChatVoiceListeningState.PROCESSING)
         showState(VoiceComposerState.PROCESSING, config.copy.processing)
         asrController.release()
     }
@@ -267,14 +296,17 @@ class VoiceComposerView @JvmOverloads constructor(
             config = next,
             callbacks = object : VoiceComposerAsrController.Callbacks {
                 override fun onReady() {
+                    recordingOverlay.setListeningState(ChatVoiceListeningState.LISTENING)
                     showState(VoiceComposerState.RECORDING, config.copy.recording)
                 }
 
                 override fun onVolume(value: Float) {
+                    recordingOverlay.setVolume(value)
                     callbacks.onVoiceVolume(value)
                 }
 
                 override fun onPartial(transcript: SpeechTranscript) {
+                    recordingOverlay.updatePartial(transcript.text)
                     callbacks.onVoicePartial(transcript)
                 }
 
@@ -284,11 +316,13 @@ class VoiceComposerView @JvmOverloads constructor(
                 }
 
                 override fun onServerFallbackStarted(reason: ChatVoiceError?) {
+                    recordingOverlay.setListeningState(ChatVoiceListeningState.PROCESSING)
                     showState(VoiceComposerState.SERVER_PROCESSING, config.copy.serverProcessing)
                     callbacks.onVoiceServerFallbackStarted(reason)
                 }
 
                 override fun onTooShort() {
+                    recordingOverlay.setListeningState(ChatVoiceListeningState.TOO_SHORT)
                     showState(VoiceComposerState.TOO_SHORT, config.copy.tooShort)
                     callbacks.onVoiceCanceled()
                     main.postDelayed({ resetVoiceState() }, 700L)
@@ -301,6 +335,7 @@ class VoiceComposerView @JvmOverloads constructor(
                 override fun onError(error: ChatVoiceError) {
                     val permissionError = error.code == "record_audio_denied" || error.code == "system_asr_9"
                     val text = if (permissionError) config.copy.permissionDenied else error.message.ifBlank { config.copy.recognitionFailed }
+                    recordingOverlay.setListeningState(ChatVoiceListeningState.ERROR)
                     showState(if (permissionError) VoiceComposerState.PERMISSION_DENIED else VoiceComposerState.ERROR, text)
                     if (permissionError) callbacks.onPermissionRequired()
                     callbacks.onVoiceError(error)
@@ -308,6 +343,12 @@ class VoiceComposerView @JvmOverloads constructor(
                 }
             },
         )
+
+    private fun showRecordingOverlayIfNeeded() {
+        if (!config.recordingOverlayEnabled) return
+        val host = rootView as? ViewGroup ?: parent as? ViewGroup ?: return
+        recordingOverlay.show(host)
+    }
 
     private fun showState(nextState: VoiceComposerState, text: String = stateText(nextState)) {
         state = nextState

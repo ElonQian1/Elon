@@ -28,6 +28,7 @@ val config = ChatVoiceConfig(
 ## 能力边界
 
 - `VoiceComposerView`：SDK 正式输出的微信式聊天输入栏，内置文本/语音模式切换、整条“按住 说话”按钮、上滑取消、松手识别和状态文案。
+- `ChatVoiceRecordingOverlay`：SDK 正式输出的主项目同款按住说话浮层，内置深色遮罩、绿色波形气泡、实时转写、底部弧形 `取消 / AI回复 / 发送 / 转文字` 选择区。
 - `VoiceComposerConfig` / `VoiceComposerCallbacks`：输入栏样式、图标、文案、默认松手区域和宿主回调。
 - `SystemSpeechTranscriber`：主项目同款手机系统 ASR 链路，内置引擎枚举、系统默认解析、预热、busy/client/cold-start 重试、厂商引擎回退和 stop 后超时保护。
 - `ChatVoiceRecorder`：按住说话期间录制 m4a，给服务端 ASR 或语音消息复用。
@@ -91,6 +92,10 @@ val composer = VoiceComposerView(requireContext()).apply {
 
 `VoiceComposerView` 默认用主项目同款手机系统 ASR 链路完成“按住说话、松手识别”：SDK 会先预热当前最优系统识别引擎，按下后优先使用手机本地 ASR；遇到 `ERROR_RECOGNIZER_BUSY`、瞬时 `ERROR_CLIENT`、冷启动 `SERVER_DISCONNECTED` 等厂商引擎问题时，会在本次会话内重试或切换到下一个可用引擎。fb2 不需要复制主项目 `MainSpeechInputActions` / `AgentVoiceBridge` 的内部逻辑。
 
+`VoiceComposerView` 默认开启 `recordingOverlayEnabled = true`，按住说话时自动把主项目同款浮层挂到当前页面根 View 上：准备中显示绿色波形气泡，移动手指会高亮 `取消 / AI回复 / 发送 / 转文字` 区域，partial 结果实时显示，松手后按当前区域回调 `onVoiceRecognized(transcript, zone)`。fb2 不需要再写临时 Web 浮层。
+
+如果某个宿主页面已经有完全自定义的浮层，可以设置 `VoiceComposerConfig(recordingOverlayEnabled = false)`，再通过 `ChatVoiceEventSink` 和 `onStateChanged` 自己渲染。但 fb2 常规聊天页应保持默认开启，以获得主项目同款操控感。
+
 如果 fb2 需要完整稳定链路，必须传 `VoiceComposerAsrConfig(serverFallbackEnabled = true, serverConfig = config)`：SDK 会在按下时同时保存一份录音，松手后先等系统 ASR；如果系统 ASR 报错、无结果、所有本地引擎失败，或超过 `localResultTimeoutMs` 仍未返回，就自动上传录音到主项目 `/api/voice/asr`。这样 UI 不会长期停在 `识别中...`。
 
 如果 fb2 只传 `VoiceComposerView` 而不配置 `VoiceComposerAsrConfig.serverConfig`，SDK 会退化为“仅手机系统 ASR”，不会自动走云端兜底。
@@ -109,6 +114,7 @@ val composer = VoiceComposerView(requireContext()).apply {
 | `asr.localEngineFallbackEnabled` | 是否启用主项目同款本地识别引擎轮换，默认 `true` |
 | `asr.prewarmLocalEngine` | 是否在输入栏初始化和每次识别结束后预热系统 ASR，默认 `true` |
 | `copy` | 文本框 hint、`按住 说话`、权限失败、识别中、语音/键盘/加号按钮文案 |
+| `recordingOverlayEnabled` | 是否使用 SDK 内置主项目同款按住说话浮层，默认 `true` |
 | `style` | 输入栏背景、按钮颜色、文字颜色、圆角、间距、左侧/右侧图标 Drawable |
 | `eventSink` | 继续订阅 `Start`、`Volume`、`PartialResult`、`FinalResult`、`Cancel`、`Error` 等底层语音事件 |
 
@@ -238,14 +244,16 @@ val sink = ChatVoiceEventSink { event ->
 
 ## 原生 UI 复用结论
 
-`VoiceComposerView` 是 SDK 公共 API，fb2 可以直接调用；`VoiceRecordingOverlay` 仍然是主 App 内部 View：
+`VoiceComposerView` 和 `ChatVoiceRecordingOverlay` 都是 SDK 公共 API，fb2 可以直接调用。常规场景优先使用 `VoiceComposerView`，它会自动托管 `ChatVoiceRecordingOverlay`。
+
+主 App 内部的 `com.elon.app.VoiceRecordingOverlay` 仍然不是 SDK API：
 
 - 依赖 `Activity.window.decorView`
 - 依赖主项目 `MainSpeechInputActions` 驱动
 - `internal class`，不是 SDK API
 - 绑定主项目 AI回复/好友/附件行为
 
-因此 fb2 **不能直接调用 `VoiceRecordingOverlay`，也不要复制源码**。Native Android 输入栏用 `VoiceComposerView`；如果 fb2 某些页面仍是 H5/WebView，只按 `ChatVoiceInteractionContract` 的状态机、token、文案和阈值还原浮层。
+因此 fb2 **不能直接调用主 App 的 `com.elon.app.VoiceRecordingOverlay`，也不要复制源码**。Native Android 输入栏用 SDK `VoiceComposerView`；如果 fb2 某些页面仍是 H5/WebView，只按 `ChatVoiceInteractionContract` 的状态机、token、文案和阈值还原浮层。
 
 ## 推荐体验策略
 

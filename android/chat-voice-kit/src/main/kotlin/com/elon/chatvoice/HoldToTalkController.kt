@@ -17,7 +17,9 @@ class HoldToTalkController(
     interface Callbacks {
         fun onHoldPending() {}
         fun onHoldStart() {}
+        fun onTouchMove(rawX: Float, rawY: Float) {}
         fun onCancelZoneChanged(inCancelZone: Boolean) {}
+        fun shouldCancelOnReleaseFromDrag(): Boolean = true
         fun onHoldRelease() {}
         fun onHoldCancel() {}
     }
@@ -53,6 +55,7 @@ class HoldToTalkController(
             }
             MotionEvent.ACTION_MOVE -> {
                 if (!tracking || !started) return true
+                callbacks.onTouchMove(event.rawX, event.rawY)
                 val nextCanceling = downY - event.rawY > threshold && abs(event.rawY - downY) > threshold
                 if (nextCanceling != canceling) {
                     canceling = nextCanceling
@@ -73,7 +76,7 @@ class HoldToTalkController(
                 val wasStarted = started
                 reset()
                 if (!wasStarted) return true
-                if (shouldCancel) {
+                if (shouldCancel && callbacks.shouldCancelOnReleaseFromDrag()) {
                     eventSink?.onVoiceEvent(ChatVoiceEvent.Cancel)
                     callbacks.onHoldCancel()
                 } else {

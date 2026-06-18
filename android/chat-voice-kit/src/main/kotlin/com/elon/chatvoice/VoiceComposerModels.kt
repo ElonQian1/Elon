@@ -76,6 +76,7 @@ data class VoiceComposerAsrConfig(
 data class VoiceComposerConfig(
     val chatMode: ChatVoiceMode = ChatVoiceMode.FRIEND_CHAT,
     val releaseZone: ChatVoiceZone = ChatVoiceInteractionContract.defaultZone(chatMode),
+    val recordingOverlayEnabled: Boolean = true,
     val languageTag: String = "zh-CN",
     val preferOfflineAsr: Boolean = false,
     val asr: VoiceComposerAsrConfig = VoiceComposerAsrConfig(),
