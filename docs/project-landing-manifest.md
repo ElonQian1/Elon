@@ -26,6 +26,8 @@ PC 网页端打开项目时，默认先展示主项目渲染的“项目介绍�
 
 Manifest 最大 256 KB。字段只接受 JSON，不执行 HTML 或脚本。URL 目前只接受 `http://`、`https://` 和站内 `/path`。
 
+下载项的真实下载地址优先使用 `url` / `download_url` / `downloadUrl`，也兼容子项目发布页常用的 `fallback_url` / `fallbackUrl`。只有有真实 URL 且状态为 `available` / `external` 时，PC 页面才显示可点击入口。
+
 ## 示例
 
 ```json

@@ -293,7 +293,17 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
             insert_string(
                 &mut object,
                 "url",
-                first_url(source, &["url", "download_url", "downloadUrl", "href"]),
+                first_url(
+                    source,
+                    &[
+                        "url",
+                        "download_url",
+                        "downloadUrl",
+                        "fallback_url",
+                        "fallbackUrl",
+                        "href",
+                    ],
+                ),
             );
             insert_string(
                 &mut object,
@@ -652,7 +662,7 @@ mod tests {
             "title": "Demo",
             "downloads": {
                 "windows": {
-                    "downloadUrl": "https://example.com/app.exe",
+                    "fallback_url": "https://example.com/app.exe",
                     "fileSize": 7141343,
                     "changelog": "fix tun"
                 },

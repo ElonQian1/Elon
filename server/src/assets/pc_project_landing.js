@@ -112,7 +112,7 @@
         platform,
         label: valueOf(item.label, item.name, meta.label),
         short: valueOf(item.short, item.badge, meta.short),
-        url: valueOf(item.url, item.download_url, item.downloadUrl, item.href),
+        url: valueOf(item.url, item.download_url, item.downloadUrl, item.fallback_url, item.fallbackUrl, item.href),
         manifestUrl: valueOf(item.manifest_url, item.manifestUrl),
         version: valueOf(item.version_name, item.versionName, item.version, item.build),
         size: valueOf(item.size_label, item.sizeLabel, item.size, formatBytes(item.size_bytes || item.sizeBytes || item.file_size || item.fileSize)),
