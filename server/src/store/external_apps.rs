@@ -6,10 +6,11 @@ use super::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     ExternalAccountOrigin, ExternalAccountSession, ExternalAccountSessionInput,
     ExternalAccountUpsert, ExternalAppAuthorizationCode, ExternalAppAuthorizationExchange,
-    ExternalAppGroupLink, ExternalAppGroupSeed, PublicUser, Store,
+    ExternalAppGroupLink, ExternalAppGroupSeed, ExternalAppTrialCredit, PublicUser, Store,
 };
 
 const EXTERNAL_OWNER_DOMAIN: &str = "external.elon.local";
+const EXTERNAL_APP_TRIAL_METHOD: &str = "external_app_trial";
 
 impl Store {
     pub fn external_account_origin_hint(
@@ -86,7 +87,7 @@ impl Store {
         let avatar_url = clean_optional(input.avatar_url.as_deref()).map(ToOwned::to_owned);
         let ts = now();
 
-        let main_user_id = {
+        let (main_user_id, trial_credit) = {
             let conn = self.conn()?;
             let tx = conn.unchecked_transaction()?;
             let default_groups = ensure_external_app_default_groups_tx(&tx, &app_id, group_seeds)?;
@@ -152,8 +153,11 @@ impl Store {
                 )?;
             }
 
+            let trial_credit =
+                maybe_grant_external_app_trial_credit_tx(&tx, &app_id, &main_user_id, &ts)?;
+
             tx.commit()?;
-            main_user_id
+            (main_user_id, trial_credit)
         };
 
         self.ensure_default_joint_project_memberships_for_user(&main_user_id)?;
@@ -175,6 +179,7 @@ impl Store {
             user,
             account,
             default_groups,
+            trial_credit,
         })
     }
 
@@ -430,6 +435,80 @@ fn create_external_shadow_user_tx(
         ],
     )?;
     Ok(user_id)
+}
+
+fn maybe_grant_external_app_trial_credit_tx(
+    tx: &Transaction<'_>,
+    app_id: &str,
+    user_id: &str,
+    ts: &str,
+) -> Result<Option<ExternalAppTrialCredit>> {
+    let config_key = format!("external_app_{}_trial_credit_fen", app_id);
+    let amount_fen = tx
+        .query_row(
+            "SELECT value FROM billing_config WHERE key = ?1",
+            params![config_key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()?
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .unwrap_or(0);
+    if amount_fen <= 0 {
+        return Ok(None);
+    }
+
+    let operator_id = format!("external_app:{app_id}");
+    let already_granted = tx
+        .query_row(
+            "SELECT 1
+             FROM recharge_records
+             WHERE user_id = ?1 AND method = ?2 AND operator_id = ?3
+             LIMIT 1",
+            params![user_id, EXTERNAL_APP_TRIAL_METHOD, operator_id.as_str()],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    if already_granted {
+        return Ok(None);
+    }
+
+    tx.execute(
+        "INSERT OR IGNORE INTO user_balance (user_id, balance_fen, updated_at)
+         VALUES (?1, 0, ?2)",
+        params![user_id, ts],
+    )?;
+    tx.execute(
+        "UPDATE user_balance
+         SET balance_fen = balance_fen + ?1, updated_at = ?2
+         WHERE user_id = ?3",
+        params![amount_fen, ts, user_id],
+    )?;
+    let balance_after_fen: i64 = tx.query_row(
+        "SELECT balance_fen FROM user_balance WHERE user_id = ?1",
+        params![user_id],
+        |row| row.get(0),
+    )?;
+    tx.execute(
+        "INSERT INTO recharge_records
+         (id, user_id, amount_fen, method, operator_id, note, created_at)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![
+            new_id("rch"),
+            user_id,
+            amount_fen,
+            EXTERNAL_APP_TRIAL_METHOD,
+            operator_id.as_str(),
+            format!("{app_id} external app trial credit"),
+            ts
+        ],
+    )?;
+
+    Ok(Some(ExternalAppTrialCredit {
+        app_id: app_id.to_string(),
+        amount_fen,
+        balance_after_fen,
+    }))
 }
 
 fn active_user_id_by_account_tx(tx: &Transaction<'_>, account: &str) -> Result<Option<String>> {

@@ -38,6 +38,17 @@ fn external_app_session_links_user_and_auto_joins_default_group() {
         Some(session.user.id.as_str())
     );
     assert_eq!(session.default_groups.len(), 5);
+    let trial_credit = session
+        .trial_credit
+        .as_ref()
+        .expect("fb2 first session should grant trial credit");
+    assert_eq!(trial_credit.app_id, "fb2");
+    assert_eq!(trial_credit.amount_fen, 100);
+    assert_eq!(trial_credit.balance_after_fen, 100);
+    assert_eq!(
+        store.billing_get_balance(&session.user.id).unwrap(),
+        Some(100)
+    );
 
     let groups = store
         .list_friend_groups(&session.user.id)
@@ -67,6 +78,11 @@ fn external_app_session_links_user_and_auto_joins_default_group() {
         )
         .expect("second session should reuse link");
     assert_eq!(second.user.id, session.user.id);
+    assert!(second.trial_credit.is_none());
+    assert_eq!(
+        store.billing_get_balance(&session.user.id).unwrap(),
+        Some(100)
+    );
 }
 
 #[test]

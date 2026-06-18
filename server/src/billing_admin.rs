@@ -286,6 +286,7 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
         "billing_node_llm_min_reservation_fen": config_int("billing_node_llm_min_reservation_fen", 1),
         "billing_image_min_reservation_fen": config_int("billing_image_min_reservation_fen", 1),
         "billing_realtime_voice_min_reservation_fen": config_int("billing_realtime_voice_min_reservation_fen", 1),
+        "external_app_fb2_trial_credit_fen": config_int("external_app_fb2_trial_credit_fen", 100),
         "billing_open_reservation_alert_threshold": config_int("billing_open_reservation_alert_threshold", 100),
         "node_provider_revenue_share_x1000": config_int("node_provider_revenue_share_x1000", 800),
         "node_payout_min_fen": config_int("node_payout_min_fen", 100),
@@ -299,6 +300,7 @@ pub async fn get_config(State(state): State<Arc<AppState>>, headers: HeaderMap) 
             "billing_node_llm_min_reservation_fen": "节点 LLM 调用最低预授权冻结金额（分）",
             "billing_image_min_reservation_fen": "图片生成最低预授权冻结金额（分）",
             "billing_realtime_voice_min_reservation_fen": "AI 实时语音对话每轮最低预授权冻结金额（分）",
+            "external_app_fb2_trial_credit_fen": "fb2 用户首次创建外部应用会话时赠送的 AI 回复试用余额（分），ASR/TTS 不消耗此额度",
             "billing_open_reservation_alert_threshold": "冻结中预授权数量超过该值时产生对账告警",
             "node_provider_revenue_share_x1000": "节点提供者分账比例×1000，800 = 消费者真实扣费的 80%",
             "node_payout_min_fen": "节点收益最低提现金额（分），100 = 1 元"
@@ -325,6 +327,7 @@ const ALLOWED_CONFIG_KEYS: &[&str] = &[
     "billing_node_llm_min_reservation_fen",
     "billing_image_min_reservation_fen",
     "billing_realtime_voice_min_reservation_fen",
+    "external_app_fb2_trial_credit_fen",
     "billing_open_reservation_alert_threshold",
     "node_provider_revenue_share_x1000",
     "node_payout_min_fen",

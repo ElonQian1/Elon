@@ -290,6 +290,15 @@ pub struct ExternalAccountSession {
     pub user: PublicUser,
     pub account: ExternalAccountOrigin,
     pub default_groups: Vec<ExternalAppGroupLink>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub trial_credit: Option<ExternalAppTrialCredit>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ExternalAppTrialCredit {
+    pub app_id: String,
+    pub amount_fen: i64,
+    pub balance_after_fen: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

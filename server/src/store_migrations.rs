@@ -76,6 +76,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (54, "外部应用账号、默认群映射与授权码", migration_v54),
     (55, "项目代码身份去重索引", migration_v55),
     (56, "所有用户默认加入指定联合开发项目", migration_v56),
+    (57, "fb2 外部应用 AI 回复试用额度配置", migration_v57),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2043,6 +2044,15 @@ fn migration_v55(conn: &Connection) -> Result<()> {
 fn migration_v56(conn: &Connection) -> Result<()> {
     crate::store::default_joint_projects::ensure_default_joint_project_memberships_for_all_users_conn(
         conn,
+    )?;
+    Ok(())
+}
+
+fn migration_v57(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+         VALUES ('external_app_fb2_trial_credit_fen', '100', datetime('now'))",
+        [],
     )?;
     Ok(())
 }

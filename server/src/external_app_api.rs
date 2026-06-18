@@ -154,6 +154,7 @@ pub async fn create_external_account_session(
             "user": session.user,
             "account": session.account,
             "default_groups": session.default_groups,
+            "trial_credit": session.trial_credit,
         }))
         .into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
