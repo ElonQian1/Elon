@@ -38,6 +38,10 @@
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
     setRails, renderChannels, setNodeMode
   });
+  const projectLanding = window.ElonPcProjectLanding.create({
+    state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
+    channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode
+  });
 
   function saveToken(token) {
     state.token = token || '';
@@ -225,8 +229,17 @@
   function renderProjectChannels(query) {
     const channels = ((state.projectSpace && state.projectSpace.channels) || [])
       .filter((channel) => channelName(channel).toLowerCase().includes(query));
+    const homeVisible = !query || '首页开始介绍下载overviewhome'.includes(query);
     els.channelList.innerHTML = [
       '<div class="channel-section">频道</div>',
+      homeVisible ? channelButton({
+        id: 'project-home',
+        kind: 'project-home',
+        glyph: '首',
+        title: '首页',
+        sub: '项目介绍与下载',
+        active: !state.activeChannelId
+      }) : '',
       channels.map((channel) => channelButton({
         id: channel.id,
         kind: 'project-channel',
@@ -239,14 +252,19 @@
     els.channelList.querySelectorAll('[data-channel-id]').forEach((btn) => {
       btn.addEventListener('click', () => selectProjectChannel(btn.dataset.channelId));
     });
+    els.channelList.querySelectorAll('[data-project-home]').forEach((btn) => {
+      btn.addEventListener('click', selectProjectLanding);
+    });
   }
 
   function channelButton(item) {
     const attrs = item.kind === 'project-channel'
       ? `data-channel-id="${escapeHtml(item.id)}"`
+      : (item.kind === 'project-home'
+        ? 'data-project-home="1"'
       : (item.kind === 'doctor-section'
         ? `data-doctor-section="${escapeHtml(item.id)}"`
-        : `data-peer-kind="${escapeHtml(item.kind)}" data-item-id="${escapeHtml(item.id)}"`);
+        : `data-peer-kind="${escapeHtml(item.kind)}" data-item-id="${escapeHtml(item.id)}"`));
     const glyph = item.avatar || item.avatarFallback
       ? avatarElement('span', 'glyph channel-avatar', item.avatar, item.avatarFallback || item.title || item.glyph || '#', item.glyph || '#')
       : `<span class="glyph">${escapeHtml(item.glyph || '#')}</span>`;
@@ -284,7 +302,7 @@
   }
 
   function clearSurfaceModes() {
-    els.messageList.classList.remove('node-mode', 'doctor-mode');
+    els.messageList.classList.remove('node-mode', 'doctor-mode', 'project-landing-mode');
   }
 
   function setNodeMode(enabled) {
@@ -504,16 +522,17 @@
         sub: m.role || m.member_role || 'member'
       })));
       renderChannels();
-      const first = (state.projectSpace.channels || [])[0];
-      if (first) selectProjectChannel(first.id);
-      else {
-        setHeader('#', titleOf(project), '暂无频道');
-        setNodeMode(false);
-        els.messageList.innerHTML = '<div class="empty-state"><strong>暂无频道</strong><p>项目空间还没有可显示的频道。</p></div>';
-      }
+      selectProjectLanding();
     } catch (error) {
       showError(error);
     }
+  }
+
+  function selectProjectLanding() {
+    state.activeChannelId = '';
+    state.activeChannelKind = 'home';
+    renderChannels();
+    projectLanding.render();
   }
 
   async function selectProjectChannel(channelId) {
