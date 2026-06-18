@@ -29,7 +29,7 @@ val config = ChatVoiceConfig(
 
 - `VoiceComposerView`：SDK 正式输出的微信式聊天输入栏，内置文本/语音模式切换、整条“按住 说话”按钮、上滑取消、松手识别和状态文案。
 - `VoiceComposerConfig` / `VoiceComposerCallbacks`：输入栏样式、图标、文案、默认松手区域和宿主回调。
-- `SystemSpeechTranscriber`：手机系统 ASR，本地识别，适合作为显式选项或网络失败回退。
+- `SystemSpeechTranscriber`：主项目同款手机系统 ASR 链路，内置引擎枚举、系统默认解析、预热、busy/client/cold-start 重试、厂商引擎回退和 stop 后超时保护。
 - `ChatVoiceRecorder`：按住说话期间录制 m4a，给服务端 ASR 或语音消息复用。
 - `ServerAsrClient`：上传音频到主项目 `/api/voice/asr`。
 - `ChatVoiceSpeaker`：优先调用主项目 `/api/voice/tts`，失败或选择 `android_system` 时回退手机系统 TTS。
@@ -89,7 +89,9 @@ val composer = VoiceComposerView(requireContext()).apply {
 }
 ```
 
-`VoiceComposerView` 默认用手机系统 ASR 完成“按住说话、松手识别”。如果 fb2 需要主项目同款稳定链路，必须传 `VoiceComposerAsrConfig(serverFallbackEnabled = true, serverConfig = config)`：SDK 会在按下时同时保存一份录音，松手后先等系统 ASR；如果系统 ASR 报错、无结果或超过 `localResultTimeoutMs` 仍未返回，就自动上传录音到主项目 `/api/voice/asr`。这样 UI 不会长期停在 `识别中...`。
+`VoiceComposerView` 默认用主项目同款手机系统 ASR 链路完成“按住说话、松手识别”：SDK 会先预热当前最优系统识别引擎，按下后优先使用手机本地 ASR；遇到 `ERROR_RECOGNIZER_BUSY`、瞬时 `ERROR_CLIENT`、冷启动 `SERVER_DISCONNECTED` 等厂商引擎问题时，会在本次会话内重试或切换到下一个可用引擎。fb2 不需要复制主项目 `MainSpeechInputActions` / `AgentVoiceBridge` 的内部逻辑。
+
+如果 fb2 需要完整稳定链路，必须传 `VoiceComposerAsrConfig(serverFallbackEnabled = true, serverConfig = config)`：SDK 会在按下时同时保存一份录音，松手后先等系统 ASR；如果系统 ASR 报错、无结果、所有本地引擎失败，或超过 `localResultTimeoutMs` 仍未返回，就自动上传录音到主项目 `/api/voice/asr`。这样 UI 不会长期停在 `识别中...`。
 
 如果 fb2 只传 `VoiceComposerView` 而不配置 `VoiceComposerAsrConfig.serverConfig`，SDK 会退化为“仅手机系统 ASR”，不会自动走云端兜底。
 
@@ -104,6 +106,8 @@ val composer = VoiceComposerView(requireContext()).apply {
 | `asr.serverFallbackEnabled` | 是否启用云端 ASR 兜底 |
 | `asr.serverConfig` | 主项目 `ChatVoiceConfig`；包含 baseUrl 和 bearer token |
 | `asr.localResultTimeoutMs` | 松手后等待系统 ASR final 的最长时间，默认 `4500ms` |
+| `asr.localEngineFallbackEnabled` | 是否启用主项目同款本地识别引擎轮换，默认 `true` |
+| `asr.prewarmLocalEngine` | 是否在输入栏初始化和每次识别结束后预热系统 ASR，默认 `true` |
 | `copy` | 文本框 hint、`按住 说话`、权限失败、识别中、语音/键盘/加号按钮文案 |
 | `style` | 输入栏背景、按钮颜色、文字颜色、圆角、间距、左侧/右侧图标 Drawable |
 | `eventSink` | 继续订阅 `Start`、`Volume`、`PartialResult`、`FinalResult`、`Cancel`、`Error` 等底层语音事件 |

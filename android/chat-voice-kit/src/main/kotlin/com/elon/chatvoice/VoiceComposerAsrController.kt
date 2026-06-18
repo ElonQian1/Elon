@@ -37,12 +37,17 @@ class VoiceComposerAsrController(
     private var localFinal: SpeechTranscript? = null
     private var localError: ChatVoiceError? = null
 
+    init {
+        prewarmLocalEngine()
+    }
+
     fun applyConfig(next: VoiceComposerConfig) {
         cancel(notify = false)
         config = next
         transcriber = newTranscriber(next)
         recorder = newRecorder(next)
         serverClient = newServerClient(next)
+        prewarmLocalEngine()
     }
 
     fun start(): Boolean {
@@ -91,6 +96,7 @@ class VoiceComposerAsrController(
         runCatching { transcriber.cancel() }
         runCatching { recorder.cancel() }
         cleanupRecordedVoice()
+        prewarmLocalEngine()
         if (notify) callbacks.onCanceled()
     }
 
@@ -198,6 +204,7 @@ class VoiceComposerAsrController(
         serverCall?.cancel()
         serverCall = null
         cleanupRecordedVoice()
+        prewarmLocalEngine()
         callbacks.onFinal(transcript)
     }
 
@@ -209,6 +216,7 @@ class VoiceComposerAsrController(
         serverCall = null
         cleanupRecordedVoice()
         config.eventSink?.onVoiceEvent(ChatVoiceEvent.Error(error))
+        prewarmLocalEngine()
         callbacks.onError(error)
     }
 
@@ -219,6 +227,7 @@ class VoiceComposerAsrController(
         completed = true
         runCatching { transcriber.cancel() }
         cleanupRecordedVoice()
+        prewarmLocalEngine()
         config.eventSink?.onVoiceEvent(ChatVoiceEvent.TooShort(config.holdOptions.minRecordDurationMs, config.holdOptions.minVoiceBytes))
         callbacks.onTooShort()
     }
@@ -233,11 +242,21 @@ class VoiceComposerAsrController(
         sessionId == session
 
     private fun newTranscriber(next: VoiceComposerConfig): SystemSpeechTranscriber =
-        SystemSpeechTranscriber(appContext, next.languageTag, next.eventSink)
+        SystemSpeechTranscriber(
+            appContext,
+            next.languageTag,
+            next.eventSink,
+            engineFallbackEnabled = next.asr.localEngineFallbackEnabled,
+            prewarmEnabled = next.asr.prewarmLocalEngine,
+        )
 
     private fun newRecorder(next: VoiceComposerConfig): ChatVoiceRecorder =
         ChatVoiceRecorder(appContext, next.holdOptions, next.eventSink)
 
     private fun newServerClient(next: VoiceComposerConfig): ServerAsrClient? =
         next.asr.serverConfig?.let { ServerAsrClient(it) }
+
+    private fun prewarmLocalEngine() {
+        if (config.asr.prewarmLocalEngine) runCatching { transcriber.prewarm() }
+    }
 }

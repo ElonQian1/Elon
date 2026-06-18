@@ -1,6 +1,7 @@
 package com.elon.chatvoice
 
 import android.Manifest
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -16,6 +17,8 @@ class SystemSpeechTranscriber(
     context: Context,
     private val languageTag: String = "zh-CN",
     private val eventSink: ChatVoiceEventSink? = null,
+    private val engineFallbackEnabled: Boolean = true,
+    private val prewarmEnabled: Boolean = true,
 ) {
     interface Listener {
         fun onReady() {}
@@ -31,8 +34,42 @@ class SystemSpeechTranscriber(
     private var recognizer: SpeechRecognizer? = null
     private var activeListener: Listener? = null
     private var sessionId = 0
+    private var candidates: List<ChatVoiceRecognitionEngine> = emptyList()
+    private var candidateIndex = 0
+    private var sawAnyPartial = false
+    private var busyRetryOnSame = 0
+    private var coldStartRetryOnSame = 0
+    private var sessionConflictRetry = 0
+    private var listeningStartedAt = 0L
+    private var currentEngine: ChatVoiceRecognitionEngine? = null
+    private var prewarmedEngine: ComponentName? = null
+    private var currentPreferOffline = false
 
     fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(appContext)
+
+    fun prewarm() {
+        if (!prewarmEnabled || !isAvailable()) return
+        main.post {
+            if (activeListener != null || recognizer != null) return@post
+            val engine = ChatVoiceRecognitionEngineSelector.listForUse(appContext).firstOrNull() ?: return@post
+            recognizer = createRecognizer(engine.component).also {
+                prewarmedEngine = engine.component
+                it.setRecognitionListener(emptyRecognitionListener())
+            }
+            eventSink?.onVoiceEvent(
+                ChatVoiceEvent.StateChanged(
+                    ChatVoiceListeningState.PREPARING,
+                    ChatVoiceInteractionContract.stateText(ChatVoiceListeningState.PREPARING),
+                )
+            )
+            main.postDelayed({
+                if (activeListener == null && recognizer != null && prewarmedEngine == engine.component) {
+                    stopRecognizer(cancelOnly = true)
+                    prewarmedEngine = null
+                }
+            }, PREWARM_WATCHDOG_MS)
+        }
+    }
 
     fun start(listener: Listener, preferOffline: Boolean = false) {
         main.post {
@@ -45,18 +82,28 @@ class SystemSpeechTranscriber(
                 listener.onError(ChatVoiceError("record_audio_denied", "缺少麦克风权限"))
                 return@post
             }
-            stopRecognizer(cancelOnly = true)
+            if (recognizer != null && prewarmedEngine == null) {
+                stopRecognizer(cancelOnly = true)
+            }
             activeListener = listener
+            currentPreferOffline = preferOffline
+            candidates = if (engineFallbackEnabled) {
+                ChatVoiceRecognitionEngineSelector.listForUse(appContext)
+            } else {
+                listOf(ChatVoiceRecognitionEngine(null, ChatVoiceRecognitionEngine.SYSTEM_DEFAULT_KEY, "系统默认"))
+            }
+            candidateIndex = 0
+            sawAnyPartial = false
+            busyRetryOnSame = 0
+            coldStartRetryOnSame = 0
+            sessionConflictRetry = 0
             eventSink?.onVoiceEvent(
                 ChatVoiceEvent.StateChanged(
                     ChatVoiceListeningState.PREPARING,
                     ChatVoiceInteractionContract.stateText(ChatVoiceListeningState.PREPARING),
                 )
             )
-            recognizer = SpeechRecognizer.createSpeechRecognizer(appContext).apply {
-                setRecognitionListener(createRecognitionListener(session))
-                startListening(recognizerIntent(preferOffline))
-            }
+            startWithCurrentCandidate(session, preferOffline)
         }
     }
 
@@ -109,7 +156,42 @@ class SystemSpeechTranscriber(
         if (cancelOnly) runCatching { current.cancel() } else runCatching { current.stopListening() }
         runCatching { current.destroy() }
         recognizer = null
+        prewarmedEngine = null
+        currentEngine = null
     }
+
+    private fun startWithCurrentCandidate(session: Int, preferOffline: Boolean, reuseCurrent: Boolean = false) {
+        val engine = candidates.getOrNull(candidateIndex)
+        if (engine == null) {
+            failActiveListener(ChatVoiceError("system_asr_no_engine", "没有可用的手机语音识别引擎"))
+            return
+        }
+        currentEngine = engine
+        val current = if (reuseCurrent && recognizer != null) {
+            recognizer!!
+        } else if (recognizer != null && prewarmedEngine == engine.component) {
+            recognizer!!
+        } else {
+            stopRecognizer(cancelOnly = true)
+            createRecognizer(engine.component)
+        }
+        prewarmedEngine = null
+        recognizer = current.apply {
+            setRecognitionListener(createRecognitionListener(session))
+        }
+        listeningStartedAt = System.currentTimeMillis()
+        runCatching { current.startListening(recognizerIntent(preferOffline)) }
+            .onFailure { error ->
+                handleRecognitionError(session, SpeechRecognizer.ERROR_CLIENT, error.message ?: "启动识别失败", preferOffline)
+            }
+    }
+
+    private fun createRecognizer(component: ComponentName?): SpeechRecognizer =
+        if (component != null) {
+            SpeechRecognizer.createSpeechRecognizer(appContext, component)
+        } else {
+            SpeechRecognizer.createSpeechRecognizer(appContext)
+        }
 
     private fun recognizerIntent(preferOffline: Boolean): Intent =
         Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
@@ -144,6 +226,7 @@ class SystemSpeechTranscriber(
             override fun onPartialResults(partialResults: Bundle?) {
                 if (session != sessionId) return
                 val text = firstResult(partialResults) ?: return
+                sawAnyPartial = true
                 val transcript = SpeechTranscript(text, isFinal = false, SpeechSource.SYSTEM_ASR)
                 activeListener?.onPartial(transcript)
                 eventSink?.onVoiceEvent(ChatVoiceEvent.PartialResult(transcript))
@@ -160,6 +243,7 @@ class SystemSpeechTranscriber(
                     eventSink?.onVoiceEvent(ChatVoiceEvent.Error(error))
                     listener?.onError(error)
                 } else {
+                    currentEngine?.let { ChatVoiceEngineHealthStore.markOk(appContext, it.key()) }
                     val transcript = SpeechTranscript(text.trim(), isFinal = true, SpeechSource.SYSTEM_ASR)
                     eventSink?.onVoiceEvent(ChatVoiceEvent.FinalResult(transcript))
                     listener?.onFinal(transcript)
@@ -168,17 +252,84 @@ class SystemSpeechTranscriber(
 
             override fun onError(error: Int) {
                 if (session != sessionId) return
-                val listener = activeListener
-                stopRecognizer(cancelOnly = true)
-                activeListener = null
-                val voiceError = ChatVoiceError("system_asr_$error", speechErrorMessage(error))
-                eventSink?.onVoiceEvent(ChatVoiceEvent.Error(voiceError))
-                listener?.onError(voiceError)
+                handleRecognitionError(session, error, speechErrorMessage(error), preferOffline = currentPreferOffline)
             }
 
             override fun onBeginningOfSpeech() = Unit
             override fun onEndOfSpeech() = Unit
             override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEvent(eventType: Int, params: Bundle?) = Unit
+        }
+
+    private fun handleRecognitionError(session: Int, code: Int, message: String, preferOffline: Boolean) {
+        if (session != sessionId) return
+        val sinceStart = System.currentTimeMillis() - listeningStartedAt
+        val engine = currentEngine
+        if (code == SpeechRecognizer.ERROR_RECOGNIZER_BUSY && engine != null && busyRetryOnSame < 2 && !sawAnyPartial) {
+            busyRetryOnSame += 1
+            retrySameEngine(session, preferOffline, 250L, resetEngine = false)
+            return
+        }
+        if (code == SpeechRecognizer.ERROR_CLIENT && sinceStart < 50L && engine != null && sessionConflictRetry < 2 && !sawAnyPartial) {
+            sessionConflictRetry += 1
+            retrySameEngine(session, preferOffline, if (sessionConflictRetry == 1) 600L else 1_200L, resetEngine = true)
+            return
+        }
+        if (code == ERROR_SERVER_DISCONNECTED && sinceStart in 0..200 && engine != null && coldStartRetryOnSame < 2 && !sawAnyPartial) {
+            coldStartRetryOnSame += 1
+            retrySameEngine(session, preferOffline, if (coldStartRetryOnSame == 1) 100L else 300L, resetEngine = false)
+            return
+        }
+        if (shouldTryNextEngine(code) && !sawAnyPartial && candidateIndex < candidates.lastIndex) {
+            engine?.let { ChatVoiceEngineHealthStore.markFailed(appContext, it.key(), code, message) }
+            candidateIndex += 1
+            busyRetryOnSame = 0
+            coldStartRetryOnSame = 0
+            sessionConflictRetry = 0
+            main.post { startWithCurrentCandidate(session, preferOffline) }
+            return
+        }
+        engine?.let { ChatVoiceEngineHealthStore.markFailed(appContext, it.key(), code, message) }
+        failActiveListener(ChatVoiceError("system_asr_$code", speechErrorMessage(code)))
+    }
+
+    private fun retrySameEngine(session: Int, preferOffline: Boolean, delayMs: Long, resetEngine: Boolean) {
+        main.postDelayed({
+            if (session != sessionId || activeListener == null) return@postDelayed
+            if (resetEngine) {
+                stopRecognizer(cancelOnly = true)
+            }
+            startWithCurrentCandidate(session, preferOffline, reuseCurrent = !resetEngine)
+        }, delayMs)
+    }
+
+    private fun shouldTryNextEngine(code: Int): Boolean =
+        when (code) {
+            SpeechRecognizer.ERROR_NO_MATCH,
+            SpeechRecognizer.ERROR_SPEECH_TIMEOUT,
+            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS,
+            SpeechRecognizer.ERROR_AUDIO -> false
+            else -> engineFallbackEnabled
+        }
+
+    private fun failActiveListener(error: ChatVoiceError) {
+        val listener = activeListener
+        stopRecognizer(cancelOnly = true)
+        activeListener = null
+        eventSink?.onVoiceEvent(ChatVoiceEvent.Error(error))
+        listener?.onError(error)
+    }
+
+    private fun emptyRecognitionListener(): RecognitionListener =
+        object : RecognitionListener {
+            override fun onReadyForSpeech(params: Bundle?) = Unit
+            override fun onBeginningOfSpeech() = Unit
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEndOfSpeech() = Unit
+            override fun onError(error: Int) = Unit
+            override fun onResults(results: Bundle?) = Unit
+            override fun onPartialResults(partialResults: Bundle?) = Unit
             override fun onEvent(eventType: Int, params: Bundle?) = Unit
         }
 
@@ -200,10 +351,19 @@ class SystemSpeechTranscriber(
             SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "识别服务正忙"
             SpeechRecognizer.ERROR_SERVER -> "系统语音服务异常"
             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "没有检测到语音"
+            ERROR_SERVER_DISCONNECTED -> "语音服务断开"
+            ERROR_LANGUAGE_NOT_SUPPORTED -> "系统不支持当前识别语言"
+            ERROR_LANGUAGE_UNAVAILABLE -> "当前识别语言不可用"
+            ERROR_CANNOT_CHECK_SUPPORT -> "无法检查系统识别能力"
             else -> String.format(Locale.ROOT, "系统语音识别失败(%d)", error)
         }
 
     companion object {
+        private const val PREWARM_WATCHDOG_MS: Long = 2_500L
+        private const val ERROR_SERVER_DISCONNECTED = 11
+        private const val ERROR_LANGUAGE_NOT_SUPPORTED = 12
+        private const val ERROR_LANGUAGE_UNAVAILABLE = 13
+        private const val ERROR_CANNOT_CHECK_SUPPORT = 14
         const val DEFAULT_STOP_TIMEOUT_MS: Long = 4_500L
     }
 }

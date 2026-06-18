@@ -68,6 +68,8 @@ data class VoiceComposerAsrConfig(
     val serverConfig: ChatVoiceConfig? = null,
     val serverOptions: ServerAsrOptions = ServerAsrOptions(),
     val localResultTimeoutMs: Long = 4_500L,
+    val localEngineFallbackEnabled: Boolean = true,
+    val prewarmLocalEngine: Boolean = true,
     val deleteRecordedFileAfterResult: Boolean = true,
 )
 
