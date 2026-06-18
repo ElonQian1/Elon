@@ -1,5 +1,5 @@
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::StatusCode,
     Json,
 };
@@ -53,21 +53,41 @@ pub(crate) struct DoctorSessionCreateRequest {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct DoctorSnapshotQuery {
+    session_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct DoctorMemorySaveRequest {
     problem: String,
     summary: String,
     fix: Option<String>,
     result: Option<String>,
+    session_id: Option<String>,
 }
 
 pub(crate) async fn snapshot_handler(
     State(_runtime): State<Arc<crate::NodeRuntime>>,
+    Query(query): Query<DoctorSnapshotQuery>,
 ) -> (StatusCode, Json<Value>) {
+    let snapshot = snapshot::collect_snapshot();
+    if let Some(session_id) = query.session_id.as_deref() {
+        let count = snapshot
+            .get("commands")
+            .and_then(Value::as_array)
+            .map(Vec::len)
+            .unwrap_or(0);
+        let content = format!("已完成只读体检，采集到 {count} 组系统状态。");
+        append_session_tool_message(session_id, &content, "tool");
+    }
     (
         StatusCode::OK,
         Json(json!({
             "ok": true,
-            "snapshot": snapshot::collect_snapshot(),
+            "snapshot": snapshot,
+            "session": query.session_id.as_deref().and_then(|id| sessions::read_session(id).ok().flatten()),
+            "sessions": sessions::list_session_summaries().unwrap_or_default(),
         })),
     )
 }
@@ -293,7 +313,24 @@ pub(crate) async fn memory_save_handler(
     }
 
     match memory::save_memory_item(&problem, &summary, req.fix, req.result) {
-        Ok(item) => json_status(StatusCode::OK, json!({"ok": true, "item": item})),
+        Ok(item) => {
+            if let Some(session_id) = req.session_id.as_deref() {
+                append_session_tool_message(
+                    session_id,
+                    "已把本次诊断保存为常见问题记忆，后续相似问题会优先复用。",
+                    "tool",
+                );
+            }
+            json_status(
+                StatusCode::OK,
+                json!({
+                    "ok": true,
+                    "item": item,
+                    "session": req.session_id.as_deref().and_then(|id| sessions::read_session(id).ok().flatten()),
+                    "sessions": sessions::list_session_summaries().unwrap_or_default(),
+                }),
+            )
+        }
         Err(error) => json_status(
             StatusCode::INTERNAL_SERVER_ERROR,
             json!({"ok": false, "error": format!("保存电脑问题记忆失败: {error}")}),
@@ -414,6 +451,13 @@ fn analysis_error_response(
         value["sessionSaveError"] = json!(save_error);
     }
     json_status(status, value)
+}
+
+fn append_session_tool_message(session_id: &str, content: &str, kind: &str) {
+    if let Ok(Some(mut session)) = sessions::read_session(session_id) {
+        sessions::push_message(&mut session, "assistant", content, Some(kind));
+        let _ = sessions::save_session(&session);
+    }
 }
 
 fn merge_json_object(target: &mut Value, extra: Value) {

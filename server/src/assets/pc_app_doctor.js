@@ -1,13 +1,13 @@
 (function () {
   const markdown = window.ElonPcMarkdown || {};
   const TOOL_SECTIONS = [
-    { id: 'snapshot', glyph: '查', title: '只读体检', sub: '网络、代理、DNS、服务状态' },
-    { id: 'repair', glyph: '修', title: '白名单修复', sub: '清 DNS、代理、重启网卡' },
-    { id: 'memory', glyph: '记', title: '问题记忆', sub: '常见电脑问题复用' }
+    { id: 'snapshot', glyph: '查', title: '体检快照', sub: '把系统快照写入会话' },
+    { id: 'repair', glyph: '修', title: '修复动作', sub: '清 DNS、代理、重启网卡' },
+    { id: 'memory', glyph: '记', title: '问题记忆', sub: '保存可复用结论' }
   ];
 
   function createDoctorController(deps) {
-    const { state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer, setRails, setDoctorMode } = deps;
+    const { state, els, $, clean, escapeHtml, setHeader, setComposer, setRails, setDoctorMode } = deps;
     state.doctorSection = state.doctorSection || 'diagnosis';
     state.doctorProblem = state.doctorProblem || '';
     state.doctorSnapshot = state.doctorSnapshot || null;
@@ -89,6 +89,27 @@
       return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
     }
 
+    function currentSessionSummary() {
+      return (state.doctorSessions || []).find((session) => clean(session.id) === state.doctorActiveSessionId) || null;
+    }
+
+    function currentSessionTitle() {
+      const summary = currentSessionSummary();
+      return clean(summary && summary.title) || clean(state.doctorProblem) || '新的电脑诊断';
+    }
+
+    async function ensureDoctorSession(title) {
+      if (state.doctorActiveSessionId) return state.doctorActiveSessionId;
+      const data = await doctorApi('/api/doctor/sessions', {
+        method: 'POST',
+        body: JSON.stringify({ title: clean(title) || '新的电脑诊断' })
+      });
+      if (Array.isArray(data.sessions)) state.doctorSessions = data.sessions;
+      applyDoctorSession(data.session || null);
+      deps.renderChannels();
+      return state.doctorActiveSessionId;
+    }
+
     function selectDoctor() {
       state.activeKind = 'doctor';
       state.activeProjectId = '';
@@ -101,12 +122,6 @@
       setComposer(true, '描述电脑问题，按 Enter 发送给电脑医生', false);
       deps.renderChannels();
       renderDoctorMain();
-      renderMembers('电脑医生权限', [
-        { name: '只读体检', sub: '默认读取系统状态' },
-        { name: '远程 AI 分析', sub: '使用登录态调用云端模型' },
-        { name: '白名单修复', sub: '执行前二次确认' },
-        { name: '问题记忆', sub: '保存在本机节点' }
-      ]);
       loadDoctorSessions(true);
       if (state.doctorMemories === null) loadDoctorMemory(true);
     }
@@ -114,8 +129,9 @@
     function selectSection(section) {
       state.doctorSection = section || 'diagnosis';
       deps.renderChannels();
-      const target = els.messageList.querySelector(`[data-doctor-panel="${state.doctorSection}"]`);
-      if (target) target.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      renderDoctorMain();
+      if (state.doctorSection === 'snapshot') loadDoctorSnapshot();
+      if (state.doctorSection === 'memory') loadDoctorMemory(false);
     }
 
     async function createDoctorSession() {
@@ -228,25 +244,6 @@
       return `<div class="doctor-output ${escapeHtml(state.doctorResult.kind || '')}">${escapeHtml(state.doctorResult.text || '')}</div>`;
     }
 
-    function doctorSnapshotHtml() {
-      if (!state.doctorSnapshot) return '尚未体检';
-      return escapeHtml(JSON.stringify(state.doctorSnapshot, null, 2));
-    }
-
-    function doctorMemoryHtml() {
-      if (state.doctorMemories === null) return '<div class="doctor-memory">加载中…</div>';
-      const items = Array.isArray(state.doctorMemories) ? state.doctorMemories.slice(0, 6) : [];
-      if (!items.length) return '<div class="doctor-memory">暂无电脑问题记忆</div>';
-      return `<div class="doctor-memory">${items.map((item) => {
-        const time = item.createdAtMs ? new Date(Number(item.createdAtMs)).toLocaleString('zh-CN') : '';
-        return `<div class="doctor-memory-item">
-          <time>${escapeHtml(time)}</time>
-          <strong>${escapeHtml(item.problem || '')}</strong>
-          <span>${escapeHtml((item.summary || '').slice(0, 180))}</span>
-        </div>`;
-      }).join('')}</div>`;
-    }
-
     function doctorActorName(message) {
       if (message.role === 'user') {
         return clean(state.user && (state.user.nickname || state.user.account || state.user.phone || state.user.email)) || '你';
@@ -294,58 +291,72 @@
       return message;
     }
 
+    function renderDoctorSidebar() {
+      const memoryCount = Array.isArray(state.doctorMemories) ? state.doctorMemories.length : 0;
+      const messageCount = state.doctorMessages.length;
+      const snapshotText = state.doctorSnapshot ? '已采集' : '未体检';
+      els.memberPanelTitle.textContent = '电脑医生';
+      els.memberList.innerHTML = `<div class="doctor-side">
+        <div class="doctor-side-block">
+          <span>当前会话</span>
+          <strong>${escapeHtml(currentSessionTitle())}</strong>
+          <small>${escapeHtml(messageCount ? `${messageCount} 条消息` : '还没有消息')}</small>
+        </div>
+        <div class="doctor-side-grid">
+          <div><span>只读快照</span><strong>${escapeHtml(snapshotText)}</strong></div>
+          <div><span>问题记忆</span><strong>${escapeHtml(`${memoryCount} 条`)}</strong></div>
+        </div>
+        <div class="doctor-side-block">
+          <span>会话动作</span>
+          <button class="text-button" id="doctorSideSnapshotBtn" type="button">只读体检</button>
+          <button class="text-button" id="doctorSideAnalyzeBtn" type="button" ${state.doctorProblem ? '' : 'disabled'}>分析最近问题</button>
+          <button class="text-button" id="doctorSideMemoryBtn" type="button" ${state.doctorAnalysis ? '' : 'disabled'}>保存为问题记忆</button>
+        </div>
+        <div class="doctor-side-block ${state.doctorSection === 'repair' ? 'active' : ''}">
+          <span>白名单修复</span>
+          <input id="doctorAdapterName" placeholder="网卡名称，如 Wi-Fi" />
+          <button class="text-button" data-doctor-repair="flush_dns" type="button">清 DNS 缓存</button>
+          <button class="text-button" data-doctor-repair="reset_winhttp_proxy" type="button">重置 WinHTTP 代理</button>
+          <button class="text-button" data-doctor-repair="clear_user_proxy" type="button">关闭当前用户代理</button>
+          <button class="text-button" data-doctor-repair="restart_adapter" type="button">重启指定网卡</button>
+        </div>
+        <div class="doctor-side-note">
+          <strong>安全边界</strong>
+          <span>默认只读；涉及网络、代理、DNS、网卡的修改动作都需要二次确认。</span>
+        </div>
+      </div>`;
+
+      $('doctorSideSnapshotBtn')?.addEventListener('click', loadDoctorSnapshot);
+      $('doctorSideAnalyzeBtn')?.addEventListener('click', () => doctorAnalyze());
+      $('doctorSideMemoryBtn')?.addEventListener('click', saveDoctorMemory);
+      els.memberList.querySelectorAll('[data-doctor-repair]').forEach((btn) => {
+        btn.addEventListener('click', () => doctorRepair(btn.dataset.doctorRepair));
+      });
+    }
+
     function renderDoctorMain() {
       setDoctorMode(true);
-      els.messageList.innerHTML = `<div class="doctor-page">
-        <section class="doctor-hero">
+      const subtitle = state.doctorActiveSessionId
+        ? '同一会话会保留上下文；继续追问时会带上最近消息。'
+        : '像 Codex 一样新建一个诊断会话，然后直接从底部输入问题。';
+      els.messageList.innerHTML = `<div class="doctor-page doctor-chat-page">
+        <section class="doctor-chat-header">
           <div>
-            <div class="doctor-kicker">Windows PC Project</div>
-            <h2>电脑医生</h2>
-            <p>它现在是 PC 工作台左侧的独立项目入口，不再藏在节点注册管理页里。默认只读诊断，修复动作只走白名单并要求确认。</p>
+            <div class="doctor-kicker">Windows PC Doctor Session</div>
+            <h2>${escapeHtml(currentSessionTitle())}</h2>
+            <p>${escapeHtml(subtitle)}</p>
           </div>
-          <button class="text-button" type="button" id="openDoctorLocalBtn">本机后台</button>
+          <div class="doctor-chat-actions">
+            <button class="text-button" type="button" id="doctorSnapshotBtn">只读体检</button>
+            <button class="text-button" id="doctorAnalyzeBtn" type="button" ${state.doctorProblem ? '' : 'disabled'}>分析最近问题</button>
+            <button class="text-button" id="doctorMemorySaveBtn" type="button" ${state.doctorAnalysis ? '' : 'disabled'}>保存记忆</button>
+            <button class="text-button" type="button" id="openDoctorLocalBtn">本机后台</button>
+          </div>
         </section>
 
-        <section class="doctor-panel" data-doctor-panel="diagnosis">
-          <h3>诊断对话</h3>
-          <div class="doctor-actions">
-            <button class="text-button" id="doctorSnapshotBtn" type="button">只读体检</button>
-            <button class="text-button" id="doctorAnalyzeBtn" type="button">分析最近问题</button>
-            <button class="text-button" id="doctorMemorySaveBtn" type="button">保存为问题记忆</button>
-          </div>
+        <section class="doctor-chat-feed" data-doctor-panel="diagnosis">
           ${doctorConversationHtml()}
           ${doctorStatusHtml()}
-        </section>
-
-        <div class="doctor-grid">
-          <section class="doctor-panel" data-doctor-panel="snapshot">
-            <h3>只读系统快照</h3>
-            <p>读取网络、代理、DNS、Windows 服务等系统状态，不执行修改。</p>
-            <pre class="doctor-snapshot">${doctorSnapshotHtml()}</pre>
-          </section>
-
-          <section class="doctor-panel" data-doctor-panel="repair">
-            <h3>白名单修复</h3>
-            <p>这些动作会修改本机网络状态，执行前会再次确认；重启网卡可能需要管理员权限。</p>
-            <div class="doctor-field">
-              <label for="doctorAdapterName">网卡名称</label>
-              <input id="doctorAdapterName" placeholder="如：Wi-Fi 或 以太网" />
-            </div>
-            <div class="doctor-repair-list">
-              <button class="text-button" data-doctor-repair="flush_dns" type="button">清 DNS 缓存</button>
-              <button class="text-button" data-doctor-repair="reset_winhttp_proxy" type="button">重置 WinHTTP 代理</button>
-              <button class="text-button" data-doctor-repair="clear_user_proxy" type="button">关闭当前用户代理</button>
-              <button class="text-button" data-doctor-repair="restart_adapter" type="button">重启指定网卡</button>
-            </div>
-          </section>
-        </div>
-
-        <section class="doctor-panel" data-doctor-panel="memory">
-          <div class="doctor-actions">
-            <h3 style="margin-right:auto">常见问题记忆</h3>
-            <button class="text-button" id="doctorMemoryRefreshBtn" type="button">刷新记忆</button>
-          </div>
-          ${doctorMemoryHtml()}
         </section>
       </div>`;
 
@@ -353,24 +364,25 @@
       $('doctorSnapshotBtn')?.addEventListener('click', loadDoctorSnapshot);
       $('doctorAnalyzeBtn')?.addEventListener('click', () => doctorAnalyze());
       $('doctorMemorySaveBtn')?.addEventListener('click', saveDoctorMemory);
-      $('doctorMemoryRefreshBtn')?.addEventListener('click', () => loadDoctorMemory(false));
-      els.messageList.querySelectorAll('[data-doctor-repair]').forEach((btn) => {
-        btn.addEventListener('click', () => doctorRepair(btn.dataset.doctorRepair));
-      });
       if (markdown.bindCopyButtons) markdown.bindCopyButtons(els.messageList);
+      renderDoctorSidebar();
     }
 
     async function loadDoctorSnapshot() {
       state.doctorResult = { kind: '', text: '正在采集只读系统快照…' };
       renderDoctorMain();
       try {
-        const data = await doctorApi('/api/doctor/snapshot');
+        const sessionId = await ensureDoctorSession('只读系统体检');
+        const data = await doctorApi(`/api/doctor/snapshot?sessionId=${encodeURIComponent(sessionId)}`);
         state.doctorSnapshot = data.snapshot || null;
+        if (Array.isArray(data.sessions)) state.doctorSessions = data.sessions;
+        if (data.session) applyDoctorSession(data.session);
         const count = Array.isArray(data.snapshot && data.snapshot.commands) ? data.snapshot.commands.length : 0;
-        state.doctorResult = { kind: 'ok', text: `只读体检完成，已采集 ${count} 组系统状态。` };
+        state.doctorResult = { kind: 'ok', text: `只读体检完成，已写入当前会话，采集 ${count} 组系统状态。` };
       } catch (error) {
         state.doctorResult = { kind: 'err', text: `只读体检失败：${error.message || error}` };
       }
+      deps.renderChannels();
       renderDoctorMain();
     }
 
@@ -443,13 +455,14 @@
       state.doctorResult = { kind: '', text: `正在执行：${label}…` };
       renderDoctorMain();
       try {
+        const sessionId = await ensureDoctorSession(`${label}${suffix}`);
         const data = await doctorApi('/api/doctor/repair', {
           method: 'POST',
           body: JSON.stringify({
             action,
             confirm: true,
             adapterName: adapterName || null,
-            sessionId: state.doctorActiveSessionId || null
+            sessionId
           })
         });
         const outcome = data.outcome || {};
@@ -459,7 +472,7 @@
           outcome.error ? `error:\n${outcome.error}` : ''
         ].filter(Boolean).join('\n\n') || '完成';
         state.doctorResult = { kind: 'ok', text: `${data.title || label} 已执行。\n\n${text}` };
-        if (state.doctorActiveSessionId) loadDoctorSession(state.doctorActiveSessionId);
+        if (state.doctorActiveSessionId) await loadDoctorSession(state.doctorActiveSessionId);
         setTimeout(loadDoctorSnapshot, 800);
       } catch (error) {
         const outcome = error.data && error.data.outcome ? error.data.outcome : {};
@@ -493,10 +506,13 @@
         return;
       }
       try {
-        await doctorApi('/api/doctor/memory', {
+        const sessionId = await ensureDoctorSession(problem);
+        const data = await doctorApi('/api/doctor/memory', {
           method: 'POST',
-          body: JSON.stringify({ problem, summary })
+          body: JSON.stringify({ problem, summary, sessionId })
         });
+        if (Array.isArray(data.sessions)) state.doctorSessions = data.sessions;
+        if (data.session) applyDoctorSession(data.session);
         state.doctorResult = { kind: 'ok', text: '已保存为电脑问题记忆。' };
         await loadDoctorMemory(true);
       } catch (error) {
