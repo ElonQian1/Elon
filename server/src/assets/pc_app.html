@@ -11,6 +11,7 @@
   <link rel="stylesheet" href="/assets/pc_app_doctor.css" />
   <link rel="stylesheet" href="/assets/pc_project_landing.css" />
   <link rel="stylesheet" href="/assets/pc_voice_project.css" />
+  <link rel="stylesheet" href="/assets/pc_app_models.css" />
 </head>
 <body>
   <main class="pc-shell" id="pcShell">
@@ -79,7 +80,7 @@
       <div class="message-list" id="messageList"></div>
 
       <form class="composer" id="composer">
-        <button class="composer-tool" type="button" id="aiTaskBtn" title="在 AI 开发频道发起任务">AI</button>
+        <button class="composer-tool model-selector" type="button" id="aiTaskBtn" title="选择 AI 模型">AI</button>
         <textarea id="messageInput" rows="1" placeholder="选择一个频道后开始输入"></textarea>
         <button class="send-button" id="sendBtn" type="submit">发送</button>
       </form>
@@ -147,6 +148,7 @@
   <script src="/assets/voice_tts_sdk.js"></script>
   <script src="/assets/pc_voice_project.js"></script>
   <script src="/assets/pc_app_notifications.js"></script>
+  <script src="/assets/pc_app_models.js"></script>
   <script src="/assets/pc_app.js"></script>
 </body>
 </html>

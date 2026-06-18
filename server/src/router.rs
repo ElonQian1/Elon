@@ -73,6 +73,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(web::pc_project_landing_css),
         )
         .route("/assets/pc_voice_project.css", get(web::pc_voice_project_css))
+        .route("/assets/pc_app_models.css", get(web::pc_app_models_css))
         .route("/assets/pc_app_utils.js", get(web::pc_app_utils_js))
         .route("/assets/pc_app_markdown.js", get(web::pc_app_markdown_js))
         .route("/assets/pc_app_node_admin.js", get(web::pc_app_node_admin_js))
@@ -88,6 +89,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/assets/pc_app_notifications.js",
             get(web::pc_app_notifications_js),
         )
+        .route("/assets/pc_app_models.js", get(web::pc_app_models_js))
         .route("/assets/pc_app.js", get(web::pc_app_js))
         .route("/health", get(api::health))
         .route("/healthz", get(api::health))

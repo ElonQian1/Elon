@@ -30,6 +30,7 @@
     settingsProjectResult: $('settingsProjectResult')
   };
 
+  let models = null;
   const doctor = window.ElonPcDoctor.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
     setRails, renderChannels, setDoctorMode
@@ -43,6 +44,7 @@
     state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
     channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode
   });
+  models = window.ElonPcModels.create({ state, els, clean, escapeHtml, api });
 
   function saveToken(token) {
     state.token = token || '';
@@ -297,9 +299,12 @@
   function setComposer(enabled, placeholder, aiEnabled) {
     els.input.disabled = !enabled;
     els.sendBtn.disabled = !enabled;
-    els.aiTaskBtn.disabled = !aiEnabled;
-    els.aiTaskBtn.classList.toggle('enabled', !!aiEnabled);
+    const canSelectModel = !!state.token && !!state.user;
+    els.aiTaskBtn.disabled = !canSelectModel;
+    els.aiTaskBtn.classList.toggle('enabled', canSelectModel);
+    els.aiTaskBtn.classList.toggle('task-ready', !!aiEnabled);
     els.input.placeholder = placeholder || '输入消息';
+    if (models) models.updateButton();
   }
 
   function clearSurfaceModes() {
@@ -323,6 +328,7 @@
       return;
     }
     await loadBaseData();
+    models.loadModelOptions(false);
     selectFriends();
   }
 
@@ -350,7 +356,7 @@
       event.preventDefault();
       sendCurrentMessage(false);
     });
-    els.aiTaskBtn.addEventListener('click', () => sendCurrentMessage(true));
+    els.aiTaskBtn.addEventListener('click', () => models.openModelPicker());
     els.input.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
       if (els.sendBtn.disabled) return;
@@ -777,10 +783,16 @@
         els.input.value = '';
         await selectPeer(state.activePeer.kind, state.activePeer.id);
       } else if (state.activeKind === 'project' && state.activeProjectId && state.activeChannelId) {
-        const path = useAiTask
+        const shouldUseAiTask = useAiTask || state.activeChannelKind === 'ai_development';
+        const path = shouldUseAiTask
           ? `/api/projects/${encodeURIComponent(state.activeProjectId)}/channels/${encodeURIComponent(state.activeChannelId)}/ai-tasks`
           : `/api/projects/${encodeURIComponent(state.activeProjectId)}/channels/${encodeURIComponent(state.activeChannelId)}/messages`;
-        await api(path, { method: 'POST', body: JSON.stringify({ content }) });
+        const body = { content };
+        if (shouldUseAiTask) {
+          const agent = models.selectedAgentForRequest();
+          if (agent) body.agent = agent;
+        }
+        await api(path, { method: 'POST', body: JSON.stringify(body) });
         els.input.value = '';
         await selectProjectChannel(state.activeChannelId);
       }
@@ -928,6 +940,7 @@
   async function refreshActive() {
     if (!state.token) return showLoginState();
     await loadBaseData();
+    models.loadModelOptions(false);
     if (state.activeKind === 'doctor') return doctor.selectDoctor();
     if (state.activeKind === 'node') return node.selectNode();
     if (state.activeKind === 'voice') return selectVoiceProject(state.activeVoiceChannel);
@@ -943,6 +956,7 @@
     state.friends = [];
     state.groups = [];
     state.nodes = [];
+    models.reset();
     showLoginState();
   }
 

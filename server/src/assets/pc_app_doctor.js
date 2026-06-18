@@ -400,9 +400,14 @@
       state.doctorResult = { kind: '', text: '正在采集只读快照，并请求远程 AI 分析…' };
       renderDoctorMain();
       try {
+        const agent = clean(state.selectedAgentName);
         const data = await doctorApi('/api/doctor/analyze', {
           method: 'POST',
-          body: JSON.stringify({ problem, sessionId: state.doctorActiveSessionId || null })
+          body: JSON.stringify({
+            problem,
+            sessionId: state.doctorActiveSessionId || null,
+            agent: agent || null
+          })
         });
         state.doctorAnalysis = data.analysis || '';
         state.doctorSnapshot = data.snapshot || state.doctorSnapshot;

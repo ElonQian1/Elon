@@ -1,10 +1,10 @@
 use axum::{
+    Json,
     extract::{Path, Query, State},
     http::StatusCode,
-    Json,
 };
 use serde::Deserialize;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::{
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
@@ -34,6 +34,7 @@ const DOCTOR_SYSTEM_PROMPT: &str = r#"你是一龙 Windows 电脑医生。你会
 pub(crate) struct DoctorAnalyzeRequest {
     problem: String,
     session_id: Option<String>,
+    agent: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -110,7 +111,7 @@ pub(crate) async fn analyze_handler(
             return json_status(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 json!({"ok": false, "error": format!("读取诊断会话失败: {error}")}),
-            )
+            );
         }
     };
     sessions::push_message(&mut session, "user", &problem, None);
@@ -135,12 +136,20 @@ pub(crate) async fn analyze_handler(
         memory::relevant_memories(&problem, &memory::read_memory_items().unwrap_or_default());
     let context_messages = sessions::context_messages(&session);
     let user_prompt = build_doctor_prompt(&problem, &snapshot, &memories, &context_messages);
-    let body = json!({
+    let mut body = json!({
         "messages": [
             { "role": "system", "content": DOCTOR_SYSTEM_PROMPT },
             { "role": "user", "content": user_prompt }
         ]
     });
+    if let Some(agent) = req
+        .agent
+        .as_deref()
+        .map(str::trim)
+        .filter(|s| !s.is_empty())
+    {
+        body["agent"] = json!(agent);
+    }
     let url = format!(
         "{}/api/agent/runtime/chat",
         runtime.cloud_http_url().trim_end_matches('/')
@@ -160,7 +169,7 @@ pub(crate) async fn analyze_handler(
                 &mut session,
                 format!("连接远程 AI 失败: {error}"),
                 None,
-            )
+            );
         }
     };
 
@@ -173,7 +182,7 @@ pub(crate) async fn analyze_handler(
                 &mut session,
                 format!("远程 AI 响应解析失败: {error}"),
                 None,
-            )
+            );
         }
     };
 
