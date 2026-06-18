@@ -331,6 +331,12 @@
       sendCurrentMessage(false);
     });
     els.aiTaskBtn.addEventListener('click', () => sendCurrentMessage(true));
+    els.input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter' || event.shiftKey || event.isComposing || event.keyCode === 229) return;
+      if (els.sendBtn.disabled) return;
+      event.preventDefault();
+      sendCurrentMessage(false);
+    });
     els.input.addEventListener('input', () => {
       els.input.style.height = '46px';
       els.input.style.height = Math.min(120, els.input.scrollHeight) + 'px';
