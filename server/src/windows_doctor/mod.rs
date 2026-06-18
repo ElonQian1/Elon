@@ -20,7 +20,9 @@ const DOCTOR_SYSTEM_PROMPT: &str = r#"你是一龙 Windows 电脑医生。你会
 2. 只能建议本系统白名单中的修复动作：flush_dns、reset_winhttp_proxy、clear_user_proxy、restart_adapter。
 3. 如果要改代理、DNS、注册表、网卡或服务，必须明确说明影响范围，并要求用户确认。
 4. 输出中文，先给结论，再给原因和建议动作。
-5. 不要编造快照中没有的事实。"#;
+5. 不要编造快照中没有的事实。
+6. 可以使用轻量 Markdown 方便阅读，但不要堆叠多级标题，不要为了排版使用大表格。
+7. 优先用 3 到 6 条短清单；命令、注册表路径、服务名和修复 action 用行内代码标注。"#;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -236,7 +238,7 @@ fn build_doctor_prompt(
     let memories_text = serde_json::to_string_pretty(memories).unwrap_or_else(|_| "[]".to_string());
     let snapshot_text = serde_json::to_string_pretty(snapshot).unwrap_or_else(|_| "{}".to_string());
     format!(
-        "用户问题：\n{problem}\n\n历史电脑问题记忆（可能为空）：\n{memories_text}\n\n本机只读快照：\n{snapshot_text}\n\n请给出诊断结论、证据、建议动作。若建议执行修复，只能使用 allowedRepairs 中的 action，并说明为什么需要用户确认。"
+        "用户问题：\n{problem}\n\n历史电脑问题记忆（可能为空）：\n{memories_text}\n\n本机只读快照：\n{snapshot_text}\n\n请给出诊断结论、证据、建议动作。若建议执行修复，只能使用 allowedRepairs 中的 action，并说明为什么需要用户确认。输出格式使用轻量 Markdown：少量短清单即可，避免大表格和多层标题。"
     )
 }
 

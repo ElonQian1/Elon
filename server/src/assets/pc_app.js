@@ -1,6 +1,7 @@
 (function () {
   const kit = window.ElonPcKit || {};
   const { readToken, safeNodeAdminUrl, escapeHtml, clean, firstChar, formatTime } = kit;
+  const markdown = window.ElonPcMarkdown || {};
   const TOKEN_KEYS = kit.TOKEN_KEYS || ['lodex_token', 'elon_token'];
   const $ = (id) => document.getElementById(id);
   const state = {
@@ -649,11 +650,19 @@
     </div>`;
   }
 
-  function renderMessageContent(message) {
+  function renderMessageContent(message, options) {
+    const opts = options || {};
     const raw = message.content || message.text || message.message || '';
     const share = parseProjectShareMessage(raw);
     if (share) return renderProjectShareCard(share, message);
-    return `<div class="message-content">${escapeHtml(raw)}</div>`;
+    if (markdown.renderMessage && opts.markdown) {
+      return markdown.renderMessage(raw, {
+        className: opts.className || '',
+        copy: !!opts.copy
+      });
+    }
+    const className = clean(opts.className);
+    return `<div class="message-content ${escapeHtml(className)}">${escapeHtml(raw)}</div>`;
   }
 
   function renderMessages(messages, scope) {
@@ -667,17 +676,23 @@
         (message.outgoing ? userName(state.user) : (scope === 'project' ? '项目成员' : '好友'));
       const role = clean(message.role || message.kind || message.message_kind);
       const tone = role.includes('assistant') || role.includes('ai') ? 'ai' : (role.includes('task') ? 'task' : '');
+      const contentHtml = renderMessageContent(message, {
+        className: tone,
+        markdown: !!tone,
+        copy: !!tone
+      });
       return `<article class="message-row">
         ${avatarElement('div', 'message-avatar', avatarForMessage(message, scope), name, '员')}
         <div class="message-body">
           <div class="message-meta"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(formatTime(message.created_at || message.createdAt))}</span></div>
-          ${tone ? renderMessageContent(message).replace('message-content', `message-content ${tone}`) : renderMessageContent(message)}
+          ${contentHtml}
         </div>
       </article>`;
     }).join('');
     els.messageList.querySelectorAll('.project-share-action').forEach((button) => {
       button.addEventListener('click', () => handleProjectShareAction(button));
     });
+    if (markdown.bindCopyButtons) markdown.bindCopyButtons(els.messageList);
     els.messageList.scrollTop = els.messageList.scrollHeight;
   }
 

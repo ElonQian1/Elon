@@ -1,4 +1,5 @@
 (function () {
+  const markdown = window.ElonPcMarkdown || {};
   const SECTIONS = [
     { id: 'diagnosis', glyph: '医', title: '诊断对话', sub: '描述问题并让远程 AI 分析' },
     { id: 'snapshot', glyph: '查', title: '只读体检', sub: '网络、代理、DNS、服务状态' },
@@ -130,11 +131,14 @@
       return `<div class="doctor-conversation">${state.doctorMessages.map((message) => {
         const name = doctorActorName(message);
         const tone = message.role === 'assistant' ? ` ai ${message.kind || ''}` : '';
+        const contentHtml = message.role === 'assistant' && markdown.renderMessage
+          ? markdown.renderMessage(message.content || '', { className: tone, copy: true })
+          : `<div class="message-content${tone}">${escapeHtml(message.content || '')}</div>`;
         return `<article class="message-row doctor-message-row">
           <div class="message-avatar fallback"><span>${escapeHtml(doctorMessageGlyph(message))}</span></div>
           <div class="message-body">
             <div class="message-meta"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(message.time || '')}</span></div>
-            <div class="message-content${tone}">${escapeHtml(message.content || '')}</div>
+            ${contentHtml}
           </div>
         </article>`;
       }).join('')}</div>`;
@@ -214,6 +218,7 @@
       els.messageList.querySelectorAll('[data-doctor-repair]').forEach((btn) => {
         btn.addEventListener('click', () => doctorRepair(btn.dataset.doctorRepair));
       });
+      if (markdown.bindCopyButtons) markdown.bindCopyButtons(els.messageList);
     }
 
     async function loadDoctorSnapshot() {

@@ -70,6 +70,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/assets/pc_app_doctor.css", get(web::pc_app_doctor_css))
         .route("/assets/pc_voice_project.css", get(web::pc_voice_project_css))
         .route("/assets/pc_app_utils.js", get(web::pc_app_utils_js))
+        .route("/assets/pc_app_markdown.js", get(web::pc_app_markdown_js))
         .route("/assets/pc_app_node.js", get(web::pc_app_node_js))
         .route("/assets/pc_app_doctor.js", get(web::pc_app_doctor_js))
         .route("/assets/voice_tts_sdk.js", get(web::voice_tts_sdk_js))

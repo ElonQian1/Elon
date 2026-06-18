@@ -497,6 +497,108 @@ button { cursor: pointer; }
 }
 .message-content.ai { color: #dfe8ff; }
 .message-content.task { color: #c9f2d7; }
+.message-content.markdown-body {
+  position: relative;
+  padding-right: 54px;
+  white-space: normal;
+}
+.markdown-rendered {
+  display: grid;
+  gap: 8px;
+}
+.markdown-rendered > * {
+  margin: 0;
+}
+.markdown-rendered h3,
+.markdown-rendered h4 {
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.35;
+}
+.markdown-rendered p,
+.markdown-rendered li,
+.markdown-rendered blockquote {
+  line-height: 1.6;
+}
+.markdown-rendered ul,
+.markdown-rendered ol {
+  margin: 0;
+  padding-left: 20px;
+}
+.markdown-rendered li + li {
+  margin-top: 4px;
+}
+.markdown-rendered code {
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: #1a1d23;
+  color: #eef1f6;
+  font-family: Consolas, "SFMono-Regular", monospace;
+  font-size: .92em;
+}
+.markdown-rendered pre {
+  max-width: min(780px, 100%);
+  overflow: auto;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: #15181d;
+}
+.markdown-rendered pre code {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  white-space: pre;
+}
+.markdown-rendered blockquote {
+  border-left: 3px solid #4d7c93;
+  padding-left: 10px;
+  color: var(--text-muted);
+}
+.markdown-rendered a {
+  color: #8ad7ff;
+  text-decoration: none;
+}
+.markdown-rendered a:hover {
+  text-decoration: underline;
+}
+.markdown-table-wrap {
+  max-width: min(780px, 100%);
+  overflow: auto;
+}
+.markdown-rendered table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.markdown-rendered th,
+.markdown-rendered td {
+  border: 1px solid rgba(255,255,255,.09);
+  padding: 7px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.markdown-rendered th {
+  background: rgba(255,255,255,.05);
+  color: var(--text);
+}
+.message-copy {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 25px;
+  min-width: 42px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 6px;
+  background: #2b2e36;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.message-copy:hover {
+  color: var(--text);
+  border-color: rgba(255,255,255,.18);
+}
 .message-content.project-share-wrap {
   width: min(330px, 100%);
   color: var(--text-soft);
