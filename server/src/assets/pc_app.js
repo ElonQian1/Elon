@@ -9,6 +9,7 @@
     activePeer: null, projectSpace: null,
     nodeAdminUrl: safeNodeAdminUrl()
   };
+  const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
 
   const els = {
     friendsRail: $('friendsRail'), nodeRail: $('nodeRail'), projectRailList: $('projectRailList'),
@@ -84,6 +85,10 @@
 
   function sameId(left, right) {
     return String(left || '') === String(right || '');
+  }
+
+  function projectById(id) {
+    return state.projects.find((project) => sameId(project && project.id, id)) || null;
   }
 
   function projectHue(project) {
@@ -485,11 +490,20 @@
     }).join('') || '<div class="empty-state">暂无成员</div>';
   }
 
+  function senderIdOf(message) {
+    return clean(message.sender_user_id || message.senderUserId || message.sender_id || message.senderId || message.user_id || message.userId);
+  }
+
+  function isOwnMessage(message) {
+    const senderId = senderIdOf(message);
+    return !!message.outgoing || !!(state.user && senderId && sameId(senderId, state.user.id));
+  }
+
   function avatarForMessage(message, scope) {
     const direct = avatarUrlOf(message);
     if (direct) return direct;
-    const senderId = clean(message.sender_user_id || message.senderUserId || message.sender_id || message.senderId || message.user_id || message.userId);
-    if (message.outgoing || (state.user && senderId && sameId(senderId, state.user.id))) return avatarUrlOf(state.user);
+    const senderId = senderIdOf(message);
+    if (isOwnMessage(message)) return avatarUrlOf(state.user);
     if (scope === 'friend') {
       const friend = state.friends.find((item) => senderId ? sameId(item.id, senderId) : (state.activePeer && sameId(item.id, state.activePeer.id)));
       return avatarUrlOf(friend);
@@ -509,6 +523,85 @@
     return '';
   }
 
+  function normalizeProjectJoinMode(value) {
+    const mode = clean(value).toLowerCase();
+    return ['open', 'approval', 'invite', 'readonly'].includes(mode) ? mode : 'open';
+  }
+
+  function parseProjectShareMessage(content) {
+    const text = clean(content);
+    if (!text.startsWith(PROJECT_SHARE_MARKER)) return null;
+    const jsonText = text.slice(PROJECT_SHARE_MARKER.length).trim();
+    if (!jsonText) return null;
+    try {
+      const data = JSON.parse(jsonText);
+      const id = clean(data.id || data.project_id || data.projectId);
+      const name = clean(data.name || data.display_name || data.displayName || data.title);
+      if (!id || !name) return null;
+      return {
+        id,
+        name,
+        description: clean(data.description || data.project_description || data.projectDescription),
+        ownerAccount: clean(data.owner_account || data.ownerAccount || data.created_by_account || data.owner),
+        memberCount: Math.max(1, Number(data.member_count || data.memberCount || data.members || 1) || 1),
+        joinMode: normalizeProjectJoinMode(data.join_mode || data.joinMode),
+        latestLog: clean(data.latest_log || data.latestLog || data.last_task_status || data.status),
+        icon: iconUrlOf(data),
+        source: clean(data.source || 'store') || 'store'
+      };
+    } catch (_) {
+      return null;
+    }
+  }
+
+  function projectShareModeLabel(mode) {
+    if (mode === 'approval') return '审批加入';
+    if (mode === 'invite') return '邀请协作';
+    if (mode === 'readonly') return '只读体验';
+    return '开放加入';
+  }
+
+  function projectShareActionLabel(share, message) {
+    if (isOwnMessage(message) || projectById(share.id)) return '打开项目';
+    if (share.source === 'local') return '查看项目';
+    if (share.joinMode === 'approval') return '申请加入';
+    if (share.joinMode === 'invite') return '接受邀请';
+    if (share.joinMode === 'readonly') return '进入体验';
+    return '加入项目';
+  }
+
+  function renderProjectShareCard(share, message) {
+    const hue = projectHue({ id: share.id, name: share.name });
+    const desc = share.description || share.latestLog || '暂无简介';
+    const owner = share.ownerAccount ? `<span>创建者：${escapeHtml(share.ownerAccount)}</span>` : '';
+    const icon = share.icon ? `<img src="${escapeHtml(share.icon)}" alt="" onerror="this.remove(); this.parentElement.classList.add('fallback')" />` : '';
+    return `<div class="message-content project-share-wrap">
+      <div class="project-share-card" style="--project-hue:${hue}">
+        <div class="project-share-banner">
+          <span class="project-share-icon ${share.icon ? '' : 'fallback'}" aria-hidden="true">${icon}<span>${escapeHtml(firstChar(share.name, 'P'))}</span></span>
+          <span class="project-share-pill">${escapeHtml(projectShareModeLabel(share.joinMode))}</span>
+        </div>
+        <div class="project-share-body">
+          <strong class="project-share-title">${escapeHtml(share.name)}</strong>
+          <div class="project-share-meta"><span>● ${escapeHtml(share.memberCount)} 位成员</span>${owner}</div>
+          <div class="project-share-desc">${escapeHtml(desc)}</div>
+          <button class="project-share-action" type="button"
+            data-project-share-id="${escapeHtml(share.id)}"
+            data-project-share-name="${escapeHtml(share.name)}"
+            data-project-share-join-mode="${escapeHtml(share.joinMode)}"
+            data-project-share-source="${escapeHtml(share.source)}">${escapeHtml(projectShareActionLabel(share, message))}</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  function renderMessageContent(message) {
+    const raw = message.content || message.text || message.message || '';
+    const share = parseProjectShareMessage(raw);
+    if (share) return renderProjectShareCard(share, message);
+    return `<div class="message-content">${escapeHtml(raw)}</div>`;
+  }
+
   function renderMessages(messages, scope) {
     setNodeMode(false);
     if (!messages.length) {
@@ -524,11 +617,58 @@
         ${avatarElement('div', 'message-avatar', avatarForMessage(message, scope), name, '员')}
         <div class="message-body">
           <div class="message-meta"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(formatTime(message.created_at || message.createdAt))}</span></div>
-          <div class="message-content ${tone}">${escapeHtml(message.content || message.text || message.message || '')}</div>
+          ${tone ? renderMessageContent(message).replace('message-content', `message-content ${tone}`) : renderMessageContent(message)}
         </div>
       </article>`;
     }).join('');
+    els.messageList.querySelectorAll('.project-share-action').forEach((button) => {
+      button.addEventListener('click', () => handleProjectShareAction(button));
+    });
     els.messageList.scrollTop = els.messageList.scrollHeight;
+  }
+
+  async function handleProjectShareAction(button) {
+    const share = {
+      id: clean(button.dataset.projectShareId),
+      name: clean(button.dataset.projectShareName),
+      joinMode: normalizeProjectJoinMode(button.dataset.projectShareJoinMode),
+      source: clean(button.dataset.projectShareSource || 'store') || 'store'
+    };
+    if (!share.id) return;
+    const existing = projectById(share.id);
+    if (existing) {
+      await selectProject(share.id);
+      return;
+    }
+    if (share.source === 'local') {
+      window.alert('这个卡片来自手机本地项目，请在手机端加入，或让对方重新发送协作项目卡片。');
+      return;
+    }
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = share.joinMode === 'approval' ? '提交申请中…' : '加入中…';
+    try {
+      if (share.joinMode === 'approval') {
+        const request = await api(`/api/projects/${encodeURIComponent(share.id)}/request-join`, {
+          method: 'POST',
+          body: JSON.stringify({ message: '' })
+        });
+        if (request.ok === false) throw new Error(request.message || '申请失败');
+        window.alert(request.message || '申请已提交，等待审核');
+        return;
+      }
+      const joined = await api(`/api/projects/${encodeURIComponent(share.id)}/join`, { method: 'POST' });
+      if (joined.ok === false) throw new Error(joined.message || '加入失败');
+      await loadBaseData();
+      const project = projectById(share.id);
+      if (project) await selectProject(share.id);
+      else window.alert(joined.message || `已加入「${share.name || '项目'}」`);
+    } catch (error) {
+      window.alert(error.message || '加入失败');
+    } finally {
+      button.disabled = false;
+      button.textContent = originalText;
+    }
   }
 
   async function sendCurrentMessage(useAiTask) {
