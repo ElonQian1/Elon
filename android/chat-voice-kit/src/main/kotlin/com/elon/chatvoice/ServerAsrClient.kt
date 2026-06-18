@@ -78,7 +78,7 @@ class ServerAsrClient(
                 audioFile.name,
                 audioFile.asRequestBody("audio/mp4".toMediaType()),
             )
-            .addTextPart("format", "m4a")
+            .addTextPart("format", "audio/mp4")
             .apply {
                 options.language?.let { addTextPart("language", it) }
                 options.beamSize?.let { addTextPart("beam_size", it.toString()) }
@@ -99,6 +99,7 @@ class ServerAsrClient(
             401, 403 -> "server_asr_unauthorized" to "语音服务登录已失效，请重新进入聊天后再试"
             402 -> "server_asr_payment_required" to "语音服务额度不足，请联系管理员处理"
             413 -> "server_asr_audio_too_large" to "语音太长，请缩短后再试"
+            in 500..599 -> "server_asr_unavailable" to "语音识别服务暂不可用，请稍后再试"
             else -> "server_asr_http_$status" to fallback
         }
         return ServerAsrException(code, message, status, raw)

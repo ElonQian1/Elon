@@ -7,7 +7,7 @@
 //!
 //! 请求：`multipart/form-data`
 //!   - `audio`  : 音频文件字节（任意格式，Whisper/OpenAI 均支持 m4a/aac/mp4/webm/ogg/wav/mp3）
-//!   - `format` : 可选，MIME 或后缀提示（如 "audio/m4a"），默认 "audio/m4a"
+//!   - `format` : 可选，MIME 或后缀提示（如 "audio/mp4" / "m4a"），默认 "audio/mp4"
 //!
 //! 响应：`{"text": "..."}`  ← 成功
 //!         `{"error": "..."}` ← 失败（4xx/5xx）
@@ -49,7 +49,7 @@ pub async fn asr_upload_handler(
 
     // 解析 multipart
     let mut audio_bytes: Option<Vec<u8>> = None;
-    let mut mime_hint = "audio/m4a".to_string();
+    let mut mime_hint = "audio/mp4".to_string();
     let mut language_override: Option<String> = None;
     let mut beam_size_override: Option<u8> = None;
     let mut vad_filter_override: Option<bool> = None;
@@ -64,7 +64,7 @@ pub async fn asr_upload_handler(
                 if file_name.ends_with(".wav") {
                     mime_hint = "audio/wav".to_string();
                 } else if file_name.ends_with(".mp4") || file_name.ends_with(".m4a") {
-                    mime_hint = "audio/m4a".to_string();
+                    mime_hint = "audio/mp4".to_string();
                 } else if file_name.ends_with(".ogg") || file_name.ends_with(".oga") {
                     mime_hint = "audio/ogg".to_string();
                 } else if file_name.ends_with(".webm") {
@@ -92,7 +92,7 @@ pub async fn asr_upload_handler(
                 if let Ok(s) = field.text().await {
                     let s = s.trim().to_string();
                     if !s.is_empty() {
-                        mime_hint = s;
+                        mime_hint = normalize_audio_mime_hint(&s);
                     }
                 }
             }
@@ -183,6 +183,8 @@ async fn transcribe_audio(
     vad_filter: Option<bool>,
     condition_on_previous_text: Option<bool>,
 ) -> anyhow::Result<String> {
+    let mime = normalize_audio_mime_hint(mime);
+
     // --- Tier 1: 本地 Whisper（直接发文件字节） ---
     if let Some(mut cfg) = voice_whisper_local::WhisperLocalConfig::from_env() {
         // 用户指定的语言覆盖服务器环境变量默认值
@@ -198,7 +200,7 @@ async fn transcribe_audio(
         if let Some(v) = condition_on_previous_text {
             cfg.condition_on_previous_text = v;
         }
-        match transcribe_raw_via_local_whisper(&cfg, audio, mime).await {
+        match transcribe_raw_via_local_whisper(&cfg, audio, &mime).await {
             Ok(t) => return Ok(t),
             Err(e) => {
                 warn!(target: "voice_asr", "本地 Whisper 失败，降级到 REST: {e:#}");
@@ -211,7 +213,7 @@ async fn transcribe_audio(
     let candidates = voice_whisper_rest::WhisperRestCandidate::collect(&agents_cfg);
     drop(agents_cfg);
     if !candidates.is_empty() {
-        return transcribe_raw_via_rest(&candidates, audio, mime).await;
+        return transcribe_raw_via_rest(&candidates, audio, &mime).await;
     }
 
     anyhow::bail!("未配置任何 ASR 后端（WHISPER_LOCAL_URL / OPENAI_API_KEY 均未设置）")
@@ -295,5 +297,36 @@ fn mime_to_ext(mime: &str) -> &'static str {
         "audio/mp3" | "audio/mpeg" => "mp3",
         "audio/aac" => "aac",
         _ => "m4a",
+    }
+}
+
+fn normalize_audio_mime_hint(value: &str) -> String {
+    let trimmed = value.trim();
+    let lower = trimmed.to_ascii_lowercase();
+    match lower.as_str() {
+        "" => "audio/mp4".to_string(),
+        "m4a" | "mp4" | "audio/m4a" | "audio/x-m4a" | "audio/mp4" => "audio/mp4".to_string(),
+        "wav" | "wave" | "audio/wav" | "audio/x-wav" => "audio/wav".to_string(),
+        "ogg" | "oga" | "audio/ogg" | "audio/oga" => "audio/ogg".to_string(),
+        "webm" | "audio/webm" => "audio/webm".to_string(),
+        "mp3" | "mpeg" | "audio/mp3" | "audio/mpeg" => "audio/mpeg".to_string(),
+        "aac" | "audio/aac" => "audio/aac".to_string(),
+        _ if lower.contains('/') => trimmed.to_string(),
+        _ => "audio/mp4".to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_audio_mime_hint;
+
+    #[test]
+    fn normalizes_audio_format_suffixes_to_valid_mime() {
+        assert_eq!(normalize_audio_mime_hint("m4a"), "audio/mp4");
+        assert_eq!(normalize_audio_mime_hint("mp4"), "audio/mp4");
+        assert_eq!(normalize_audio_mime_hint("audio/m4a"), "audio/mp4");
+        assert_eq!(normalize_audio_mime_hint("wav"), "audio/wav");
+        assert_eq!(normalize_audio_mime_hint("mp3"), "audio/mpeg");
+        assert_eq!(normalize_audio_mime_hint(""), "audio/mp4");
     }
 }
