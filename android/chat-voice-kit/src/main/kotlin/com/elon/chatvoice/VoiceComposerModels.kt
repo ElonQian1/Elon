@@ -14,6 +14,7 @@ enum class VoiceComposerState {
     RECORDING,
     CANCELING,
     PROCESSING,
+    SERVER_PROCESSING,
     TOO_SHORT,
     PERMISSION_DENIED,
     ERROR,
@@ -35,6 +36,7 @@ data class VoiceComposerCopy(
     val preparing: String = ChatVoiceInteractionContract.copy.preparing,
     val recording: String = ChatVoiceInteractionContract.copy.listening,
     val processing: String = ChatVoiceInteractionContract.copy.processing,
+    val serverProcessing: String = "云端识别中...",
     val tooShort: String = ChatVoiceInteractionContract.copy.tooShort,
     val permissionDenied: String = "需要麦克风权限",
     val recognitionFailed: String = ChatVoiceInteractionContract.copy.recognitionFailed,
@@ -61,11 +63,20 @@ data class VoiceComposerStyle(
     val icons: VoiceComposerIcons = VoiceComposerIcons(),
 )
 
+data class VoiceComposerAsrConfig(
+    val serverFallbackEnabled: Boolean = false,
+    val serverConfig: ChatVoiceConfig? = null,
+    val serverOptions: ServerAsrOptions = ServerAsrOptions(),
+    val localResultTimeoutMs: Long = 4_500L,
+    val deleteRecordedFileAfterResult: Boolean = true,
+)
+
 data class VoiceComposerConfig(
     val chatMode: ChatVoiceMode = ChatVoiceMode.FRIEND_CHAT,
     val releaseZone: ChatVoiceZone = ChatVoiceInteractionContract.defaultZone(chatMode),
     val languageTag: String = "zh-CN",
     val preferOfflineAsr: Boolean = false,
+    val asr: VoiceComposerAsrConfig = VoiceComposerAsrConfig(),
     val holdOptions: ChatVoiceHoldOptions = ChatVoiceInteractionContract.holdOptions,
     val copy: VoiceComposerCopy = VoiceComposerCopy(),
     val style: VoiceComposerStyle = VoiceComposerStyle(),
@@ -80,6 +91,7 @@ interface VoiceComposerCallbacks {
     fun onVoicePartial(transcript: SpeechTranscript) {}
     fun onVoiceRecognized(transcript: SpeechTranscript, zone: ChatVoiceZone) {}
     fun onVoiceReleased(zone: ChatVoiceZone) {}
+    fun onVoiceServerFallbackStarted(reason: ChatVoiceError?) {}
     fun onVoiceCanceled() {}
     fun onPermissionRequired() {}
     fun onVoiceError(error: ChatVoiceError) {}

@@ -7,7 +7,6 @@ import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.text.InputType
 import android.util.AttributeSet
 import android.view.Gravity
@@ -35,10 +34,9 @@ class VoiceComposerView @JvmOverloads constructor(
     private var inputMode = VoiceComposerInputMode.TEXT
     private var state = VoiceComposerState.IDLE
     private var currentZone = config.releaseZone
-    private var holdStartedAtMs = 0L
+    private var pendingReleaseZone = config.releaseZone
     private var permissionBlocked = false
-    private var suppressCancelCallback = false
-    private var transcriber = newTranscriber(config)
+    private var asrController = newAsrController(config)
     private var holdController = newHoldController(config)
 
     init {
@@ -49,11 +47,12 @@ class VoiceComposerView @JvmOverloads constructor(
     }
 
     fun applyConfig(next: VoiceComposerConfig) {
-        transcriber.release()
+        asrController.releaseResources()
         main.removeCallbacksAndMessages(null)
         config = next
         currentZone = next.releaseZone
-        transcriber = newTranscriber(next)
+        pendingReleaseZone = next.releaseZone
+        asrController = newAsrController(next)
         holdController = newHoldController(next).also { it.attachTo(holdButton) }
         applyStyle()
         updateModeUi()
@@ -104,7 +103,7 @@ class VoiceComposerView @JvmOverloads constructor(
     fun release() {
         main.removeCallbacksAndMessages(null)
         holdController.cancelActiveHold()
-        transcriber.release()
+        asrController.releaseResources()
     }
 
     private fun buildChildren() {
@@ -213,11 +212,10 @@ class VoiceComposerView @JvmOverloads constructor(
                         callbacks.onVoiceError(error)
                         return
                     }
-                    holdStartedAtMs = SystemClock.elapsedRealtime()
                     currentZone = next.releaseZone
                     next.eventSink?.onVoiceEvent(ChatVoiceEvent.Start)
                     callbacks.onVoicePressStart()
-                    transcriber.start(transcriberListener(), preferOffline = next.preferOfflineAsr)
+                    asrController.start()
                 }
 
                 override fun onCancelZoneChanged(inCancelZone: Boolean) {
@@ -252,76 +250,64 @@ class VoiceComposerView @JvmOverloads constructor(
         )
 
     private fun releaseHold() {
-        val durationMs = SystemClock.elapsedRealtime() - holdStartedAtMs
-        if (durationMs < config.holdOptions.minRecordDurationMs) {
-            showTooShort()
-            return
-        }
-        callbacks.onVoiceReleased(currentZone)
+        pendingReleaseZone = currentZone
+        callbacks.onVoiceReleased(pendingReleaseZone)
         showState(VoiceComposerState.PROCESSING, config.copy.processing)
-        transcriber.stop()
+        asrController.release()
     }
 
     private fun cancelHold() {
-        val shouldNotify = !suppressCancelCallback
-        suppressCancelCallback = true
-        transcriber.cancel()
-        if (shouldNotify) callbacks.onVoiceCanceled()
-        main.post { suppressCancelCallback = false }
+        asrController.cancel()
         resetVoiceState()
     }
 
-    private fun showTooShort() {
-        suppressCancelCallback = true
-        transcriber.cancel()
-        config.eventSink?.onVoiceEvent(
-            ChatVoiceEvent.TooShort(
-                config.holdOptions.minRecordDurationMs,
-                config.holdOptions.minVoiceBytes,
-            )
+    private fun newAsrController(next: VoiceComposerConfig): VoiceComposerAsrController =
+        VoiceComposerAsrController(
+            context = context,
+            config = next,
+            callbacks = object : VoiceComposerAsrController.Callbacks {
+                override fun onReady() {
+                    showState(VoiceComposerState.RECORDING, config.copy.recording)
+                }
+
+                override fun onVolume(value: Float) {
+                    callbacks.onVoiceVolume(value)
+                }
+
+                override fun onPartial(transcript: SpeechTranscript) {
+                    callbacks.onVoicePartial(transcript)
+                }
+
+                override fun onFinal(transcript: SpeechTranscript) {
+                    callbacks.onVoiceRecognized(transcript, pendingReleaseZone)
+                    resetVoiceState()
+                }
+
+                override fun onServerFallbackStarted(reason: ChatVoiceError?) {
+                    showState(VoiceComposerState.SERVER_PROCESSING, config.copy.serverProcessing)
+                    callbacks.onVoiceServerFallbackStarted(reason)
+                }
+
+                override fun onTooShort() {
+                    showState(VoiceComposerState.TOO_SHORT, config.copy.tooShort)
+                    callbacks.onVoiceCanceled()
+                    main.postDelayed({ resetVoiceState() }, 700L)
+                }
+
+                override fun onCanceled() {
+                    callbacks.onVoiceCanceled()
+                }
+
+                override fun onError(error: ChatVoiceError) {
+                    val permissionError = error.code == "record_audio_denied" || error.code == "system_asr_9"
+                    val text = if (permissionError) config.copy.permissionDenied else error.message.ifBlank { config.copy.recognitionFailed }
+                    showState(if (permissionError) VoiceComposerState.PERMISSION_DENIED else VoiceComposerState.ERROR, text)
+                    if (permissionError) callbacks.onPermissionRequired()
+                    callbacks.onVoiceError(error)
+                    main.postDelayed({ resetVoiceState() }, 900L)
+                }
+            },
         )
-        showState(VoiceComposerState.TOO_SHORT, config.copy.tooShort)
-        callbacks.onVoiceCanceled()
-        main.post { suppressCancelCallback = false }
-        main.postDelayed({ resetVoiceState() }, 700L)
-    }
-
-    private fun transcriberListener(): SystemSpeechTranscriber.Listener =
-        object : SystemSpeechTranscriber.Listener {
-            override fun onReady() {
-                showState(VoiceComposerState.RECORDING, config.copy.recording)
-            }
-
-            override fun onVolume(value: Float) {
-                callbacks.onVoiceVolume(value)
-            }
-
-            override fun onPartial(transcript: SpeechTranscript) {
-                callbacks.onVoicePartial(transcript)
-            }
-
-            override fun onFinal(transcript: SpeechTranscript) {
-                callbacks.onVoiceRecognized(transcript, currentZone)
-                resetVoiceState()
-            }
-
-            override fun onCanceled() {
-                if (!suppressCancelCallback) callbacks.onVoiceCanceled()
-                suppressCancelCallback = false
-            }
-
-            override fun onError(error: ChatVoiceError) {
-                val permissionError = error.code == "record_audio_denied" || error.code == "system_asr_9"
-                val text = if (permissionError) config.copy.permissionDenied else error.message.ifBlank { config.copy.recognitionFailed }
-                showState(if (permissionError) VoiceComposerState.PERMISSION_DENIED else VoiceComposerState.ERROR, text)
-                if (permissionError) callbacks.onPermissionRequired()
-                callbacks.onVoiceError(error)
-                main.postDelayed({ resetVoiceState() }, 900L)
-            }
-        }
-
-    private fun newTranscriber(next: VoiceComposerConfig): SystemSpeechTranscriber =
-        SystemSpeechTranscriber(context, next.languageTag, next.eventSink)
 
     private fun showState(nextState: VoiceComposerState, text: String = stateText(nextState)) {
         state = nextState
@@ -330,6 +316,7 @@ class VoiceComposerView @JvmOverloads constructor(
             VoiceComposerState.CANCELING -> rounded(config.style.cancelBackgroundColor, config.style.fieldCornerRadiusDp)
             VoiceComposerState.RECORDING -> rounded(config.style.accentColor, config.style.fieldCornerRadiusDp)
             VoiceComposerState.PROCESSING,
+            VoiceComposerState.SERVER_PROCESSING,
             VoiceComposerState.TTS_PLAYING -> rounded(config.style.fieldPressedColor, config.style.fieldCornerRadiusDp)
             else -> rounded(config.style.fieldBackgroundColor, config.style.fieldCornerRadiusDp)
         }
@@ -360,6 +347,7 @@ class VoiceComposerView @JvmOverloads constructor(
             VoiceComposerState.RECORDING -> config.copy.recording
             VoiceComposerState.CANCELING -> config.copy.canceling
             VoiceComposerState.PROCESSING -> config.copy.processing
+            VoiceComposerState.SERVER_PROCESSING -> config.copy.serverProcessing
             VoiceComposerState.TOO_SHORT -> config.copy.tooShort
             VoiceComposerState.PERMISSION_DENIED -> config.copy.permissionDenied
             VoiceComposerState.ERROR -> config.copy.recognitionFailed

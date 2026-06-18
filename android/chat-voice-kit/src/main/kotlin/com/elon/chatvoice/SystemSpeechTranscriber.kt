@@ -30,11 +30,13 @@ class SystemSpeechTranscriber(
     private val main = Handler(Looper.getMainLooper())
     private var recognizer: SpeechRecognizer? = null
     private var activeListener: Listener? = null
+    private var sessionId = 0
 
     fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(appContext)
 
     fun start(listener: Listener, preferOffline: Boolean = false) {
         main.post {
+            val session = ++sessionId
             if (!isAvailable()) {
                 listener.onError(ChatVoiceError("system_asr_unavailable", "手机系统语音识别不可用"))
                 return@post
@@ -52,18 +54,40 @@ class SystemSpeechTranscriber(
                 )
             )
             recognizer = SpeechRecognizer.createSpeechRecognizer(appContext).apply {
-                setRecognitionListener(createRecognitionListener())
+                setRecognitionListener(createRecognitionListener(session))
                 startListening(recognizerIntent(preferOffline))
             }
         }
     }
 
-    fun stop() {
-        main.post { recognizer?.stopListening() }
+    fun stop(finalTimeoutMs: Long = DEFAULT_STOP_TIMEOUT_MS) {
+        main.post {
+            val current = recognizer ?: return@post
+            val listener = activeListener ?: return@post
+            val session = sessionId
+            runCatching { current.stopListening() }.onFailure { error ->
+                val voiceError = ChatVoiceError("system_asr_stop_failed", error.message ?: "停止识别失败", error)
+                stopRecognizer(cancelOnly = true)
+                activeListener = null
+                eventSink?.onVoiceEvent(ChatVoiceEvent.Error(voiceError))
+                listener.onError(voiceError)
+                return@post
+            }
+            if (finalTimeoutMs <= 0L) return@post
+            main.postDelayed({
+                if (session != sessionId || activeListener !== listener || recognizer == null) return@postDelayed
+                val timeout = ChatVoiceError("system_asr_stop_timeout", "系统语音识别超时")
+                stopRecognizer(cancelOnly = true)
+                activeListener = null
+                eventSink?.onVoiceEvent(ChatVoiceEvent.Error(timeout))
+                listener.onError(timeout)
+            }, finalTimeoutMs)
+        }
     }
 
     fun cancel() {
         main.post {
+            sessionId += 1
             val listener = activeListener
             stopRecognizer(cancelOnly = true)
             activeListener = null
@@ -74,6 +98,7 @@ class SystemSpeechTranscriber(
 
     fun release() {
         main.post {
+            sessionId += 1
             stopRecognizer(cancelOnly = true)
             activeListener = null
         }
@@ -96,9 +121,10 @@ class SystemSpeechTranscriber(
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, languageTag)
         }
 
-    private fun createRecognitionListener(): RecognitionListener =
+    private fun createRecognitionListener(session: Int): RecognitionListener =
         object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
+                if (session != sessionId) return
                 eventSink?.onVoiceEvent(
                     ChatVoiceEvent.StateChanged(
                         ChatVoiceListeningState.LISTENING,
@@ -109,12 +135,14 @@ class SystemSpeechTranscriber(
             }
 
             override fun onRmsChanged(rmsdB: Float) {
+                if (session != sessionId) return
                 val normalized = ((rmsdB + 2f) / 12f).coerceIn(0f, 1f)
                 activeListener?.onVolume(normalized)
                 eventSink?.onVoiceEvent(ChatVoiceEvent.Volume(normalized))
             }
 
             override fun onPartialResults(partialResults: Bundle?) {
+                if (session != sessionId) return
                 val text = firstResult(partialResults) ?: return
                 val transcript = SpeechTranscript(text, isFinal = false, SpeechSource.SYSTEM_ASR)
                 activeListener?.onPartial(transcript)
@@ -122,6 +150,7 @@ class SystemSpeechTranscriber(
             }
 
             override fun onResults(results: Bundle?) {
+                if (session != sessionId) return
                 val text = firstResult(results).orEmpty()
                 val listener = activeListener
                 stopRecognizer(cancelOnly = false)
@@ -138,6 +167,7 @@ class SystemSpeechTranscriber(
             }
 
             override fun onError(error: Int) {
+                if (session != sessionId) return
                 val listener = activeListener
                 stopRecognizer(cancelOnly = true)
                 activeListener = null
@@ -172,4 +202,8 @@ class SystemSpeechTranscriber(
             SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "没有检测到语音"
             else -> String.format(Locale.ROOT, "系统语音识别失败(%d)", error)
         }
+
+    companion object {
+        const val DEFAULT_STOP_TIMEOUT_MS: Long = 4_500L
+    }
 }

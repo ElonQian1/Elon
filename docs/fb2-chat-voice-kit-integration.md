@@ -51,6 +51,12 @@ val composer = VoiceComposerView(requireContext()).apply {
             releaseZone = ChatVoiceZone.TRANSCRIBE,
             languageTag = "zh-CN",
             preferOfflineAsr = false,
+            asr = VoiceComposerAsrConfig(
+                serverFallbackEnabled = true,
+                serverConfig = config,
+                serverOptions = ServerAsrOptions(language = "auto"),
+                localResultTimeoutMs = 4_500L,
+            ),
             eventSink = sink,
         )
     )
@@ -83,7 +89,11 @@ val composer = VoiceComposerView(requireContext()).apply {
 }
 ```
 
-`VoiceComposerView` 默认用手机系统 ASR 完成“按住说话、松手识别”，这就是主项目本地回退机制的可复用入口。需要服务端 ASR 或语音消息时，fb2 仍可以在 `onVoicePressStart` / `onVoiceReleased` 中组合 `ChatVoiceRecorder` 和 `ServerAsrClient`，但输入栏 UI 和手势状态不再复制。
+`VoiceComposerView` 默认用手机系统 ASR 完成“按住说话、松手识别”。如果 fb2 需要主项目同款稳定链路，必须传 `VoiceComposerAsrConfig(serverFallbackEnabled = true, serverConfig = config)`：SDK 会在按下时同时保存一份录音，松手后先等系统 ASR；如果系统 ASR 报错、无结果或超过 `localResultTimeoutMs` 仍未返回，就自动上传录音到主项目 `/api/voice/asr`。这样 UI 不会长期停在 `识别中...`。
+
+如果 fb2 只传 `VoiceComposerView` 而不配置 `VoiceComposerAsrConfig.serverConfig`，SDK 会退化为“仅手机系统 ASR”，不会自动走云端兜底。
+
+小米/HyperOS 的 `com.xiaomi.mibrain.speech/.asr.AsrService` 等厂商 ASR 可能在收到 `SpeechRecognizer.StopCapture` 后不稳定返回 `onResults` / `onError`。SDK 已在 `SystemSpeechTranscriber.stop()` 内置 stop 后 final 超时；超时会主动 cancel/destroy 当前 recognizer，并抛出 `system_asr_stop_timeout`。`VoiceComposerView` 收到该错误后，如果已启用 `serverFallbackEnabled`，会进入 `SERVER_PROCESSING` 并走云端 ASR；否则会回到错误态，不会无限停在 `识别中...`。
 
 常用配置：
 
@@ -91,6 +101,9 @@ val composer = VoiceComposerView(requireContext()).apply {
 |---|---|
 | `chatMode` | `FRIEND_CHAT` 用于群聊/好友；`AGENT` 用于 AI 对话 |
 | `releaseZone` | 默认松手区域；群聊可用 `SEND`，转文字输入可用 `TRANSCRIBE`，直接问 AI 可用 `AI_REPLY` |
+| `asr.serverFallbackEnabled` | 是否启用云端 ASR 兜底 |
+| `asr.serverConfig` | 主项目 `ChatVoiceConfig`；包含 baseUrl 和 bearer token |
+| `asr.localResultTimeoutMs` | 松手后等待系统 ASR final 的最长时间，默认 `4500ms` |
 | `copy` | 文本框 hint、`按住 说话`、权限失败、识别中、语音/键盘/加号按钮文案 |
 | `style` | 输入栏背景、按钮颜色、文字颜色、圆角、间距、左侧/右侧图标 Drawable |
 | `eventSink` | 继续订阅 `Start`、`Volume`、`PartialResult`、`FinalResult`、`Cancel`、`Error` 等底层语音事件 |
@@ -101,6 +114,7 @@ val composer = VoiceComposerView(requireContext()).apply {
 |---|---|
 | `onTextSubmit(text)` | 文本发送 |
 | `onVoiceRecognized(transcript, zone)` | ASR final 后按区域决定填入输入框、发消息或问 AI |
+| `onVoiceServerFallbackStarted(reason)` | 系统 ASR 失败或超时后，SDK 开始上传录音走云端 ASR |
 | `onVoiceCanceled()` | 上滑取消、系统取消或太短时收尾 |
 | `onPermissionRequired()` | 申请 `RECORD_AUDIO` |
 | `onPlusClick()` | 打开附件/更多面板 |
