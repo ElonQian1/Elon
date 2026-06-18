@@ -49,14 +49,16 @@ impl Store {
             ],
         )?;
 
-        Ok(PublicUser {
+        let user = PublicUser {
             id,
             account,
             nickname: clean_optional(nickname).map(ToOwned::to_owned),
             role: role.to_string(),
             status: "active".into(),
             avatar_data_url: None,
-        })
+        };
+        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
+        Ok(user)
     }
 
     pub fn authenticate_password(&self, account: &str, password: &str) -> Result<PublicUser> {
@@ -87,14 +89,16 @@ impl Store {
             return Err(anyhow!("密码错误"));
         }
 
-        Ok(PublicUser {
+        let user = PublicUser {
             id: row.0,
             account: row.2.or(row.1).unwrap_or(account),
             nickname: row.4,
             role: row.5,
             status: row.6,
             avatar_data_url: None,
-        })
+        };
+        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
+        Ok(user)
     }
 
     pub fn create_session(
@@ -133,8 +137,9 @@ impl Store {
         }
 
         let token_hash = hash_token(token);
-        self.conn()?
-            .query_row(
+        let user = {
+            let conn = self.conn()?;
+            conn.query_row(
                 "SELECT u.id, u.phone, u.email, u.nickname, u.role, u.status, u.avatar_data_url
                  FROM sessions s
                  JOIN users u ON u.id = s.user_id
@@ -158,7 +163,10 @@ impl Store {
                 },
             )
             .optional()?
-            .ok_or_else(|| anyhow!("登录已过期，请重新登录"))
+            .ok_or_else(|| anyhow!("登录已过期，请重新登录"))?
+        };
+        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
+        Ok(user)
     }
 
     pub fn update_user_nickname(&self, user_id: &str, nickname: &str) -> Result<PublicUser> {

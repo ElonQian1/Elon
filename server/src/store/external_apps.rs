@@ -156,6 +156,8 @@ impl Store {
             main_user_id
         };
 
+        self.ensure_default_joint_project_memberships_for_user(&main_user_id)?;
+
         let user = self.public_user_by_id(&main_user_id)?;
         let (token, expires_at) = self.create_session(
             &main_user_id,

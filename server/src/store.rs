@@ -18,6 +18,7 @@ mod build_quota;
 mod common;
 mod compute_metering;
 mod conversations;
+pub(crate) mod default_joint_projects;
 mod external_apps;
 #[cfg(test)]
 mod external_apps_tests;
@@ -468,6 +469,9 @@ impl Store {
                 &now,
             )?;
             tx.commit()?;
+            default_joint_projects::ensure_default_joint_project_memberships_for_project_conn(
+                &conn, &id, &now,
+            )?;
             Ok::<(), anyhow::Error>(())
         };
         if let Err(err) = create_result {
@@ -569,7 +573,7 @@ impl Store {
             ],
         )?;
 
-        conn.query_row(
+        let user = conn.query_row(
             "SELECT id, phone, email, nickname, role, status FROM users WHERE id = ?1",
             params![safe_external_id(user_id, "default")],
             |row| {
@@ -586,8 +590,10 @@ impl Store {
                     avatar_data_url: None,
                 })
             },
-        )
-        .map_err(Into::into)
+        )?;
+        drop(conn);
+        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
+        Ok(user)
     }
 
     pub fn ensure_project_for_user(
@@ -1058,7 +1064,11 @@ fn update_external_project_binding(
     )?;
     tx.commit()?;
 
-    Ok(project)
+    default_joint_projects::ensure_default_joint_project_memberships_for_project_conn(
+        conn, project_id, now,
+    )?;
+    find_project_by_id_for_user(conn, user_id, project_id)?
+        .ok_or_else(|| anyhow!("项目绑定后无法读取"))
 }
 
 fn find_owner_project_by_name(

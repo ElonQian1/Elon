@@ -75,6 +75,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (53, "群聊 AI 文档、Context Pack 与总结帖", migration_v53),
     (54, "外部应用账号、默认群映射与授权码", migration_v54),
     (55, "项目代码身份去重索引", migration_v55),
+    (56, "所有用户默认加入指定联合开发项目", migration_v56),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2041,6 +2042,13 @@ fn migration_v55(conn: &Connection) -> Result<()> {
           AND TRIM(p.workspace_path) != ''
         ORDER BY p.updated_at DESC;
         "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v56(conn: &Connection) -> Result<()> {
+    crate::store::default_joint_projects::ensure_default_joint_project_memberships_for_all_users_conn(
+        conn,
     )?;
     Ok(())
 }
