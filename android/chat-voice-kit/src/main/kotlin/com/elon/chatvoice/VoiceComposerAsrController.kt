@@ -83,6 +83,25 @@ class VoiceComposerAsrController(
         if (localError != null) startServerFallbackOrError(localError)
     }
 
+    fun releaseRecording(): RecordedVoice? {
+        if (!active || completed) return null
+        released = true
+        runCatching { transcriber.cancel() }
+        if (!stopRecorderForRelease()) return null
+        val voice = recordedVoice
+        recordedVoice = null
+        active = false
+        released = false
+        completed = true
+        localError = null
+        localFinal = null
+        serverFallbackStarted = false
+        serverCall?.cancel()
+        serverCall = null
+        prewarmLocalEngine()
+        return voice
+    }
+
     fun cancel(notify: Boolean = true) {
         session += 1
         active = false

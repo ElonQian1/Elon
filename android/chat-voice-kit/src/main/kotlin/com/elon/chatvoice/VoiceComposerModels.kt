@@ -76,6 +76,7 @@ data class VoiceComposerAsrConfig(
 data class VoiceComposerConfig(
     val chatMode: ChatVoiceMode = ChatVoiceMode.FRIEND_CHAT,
     val releaseZone: ChatVoiceZone = ChatVoiceInteractionContract.defaultZone(chatMode),
+    val sendZoneSendsVoice: Boolean = true,
     val recordingOverlayEnabled: Boolean = true,
     val languageTag: String = "zh-CN",
     val preferOfflineAsr: Boolean = false,
@@ -93,6 +94,7 @@ interface VoiceComposerCallbacks {
     fun onVoiceVolume(value: Float) {}
     fun onVoicePartial(transcript: SpeechTranscript) {}
     fun onVoiceRecognized(transcript: SpeechTranscript, zone: ChatVoiceZone) {}
+    fun onVoiceRecorded(recording: RecordedVoice, zone: ChatVoiceZone) {}
     fun onVoiceReleased(zone: ChatVoiceZone) {}
     fun onVoiceServerFallbackStarted(reason: ChatVoiceError?) {}
     fun onVoiceCanceled() {}

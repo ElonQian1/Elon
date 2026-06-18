@@ -280,6 +280,14 @@ class VoiceComposerView @JvmOverloads constructor(
     private fun releaseHold() {
         pendingReleaseZone = currentZone
         callbacks.onVoiceReleased(pendingReleaseZone)
+        if (pendingReleaseZone == ChatVoiceZone.SEND && config.sendZoneSendsVoice) {
+            val recording = asrController.releaseRecording()
+            if (recording != null) {
+                callbacks.onVoiceRecorded(recording, pendingReleaseZone)
+                resetVoiceState()
+            }
+            return
+        }
         recordingOverlay.setListeningState(ChatVoiceListeningState.PROCESSING)
         showState(VoiceComposerState.PROCESSING, config.copy.processing)
         asrController.release()
