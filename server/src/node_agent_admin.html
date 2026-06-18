@@ -162,38 +162,15 @@
     </div>
   </div>
 
-  <h3>注册本地项目（绑定到本 PC 节点）</h3>
+  <h3>注册本地项目</h3>
   <div class="card">
-    <div id="tokenWarn" class="warn" style="display:none">
-      ⚠️ 尚未登录，无法注册项目。请先在上方「登录」卡片用账号密码登录。
+    <div class="muted">
+      本地项目注册已移动到一龙 PC 工作台左下角的设置按钮。那里会打开系统文件夹选择器，
+      自动读取项目目录、Git origin 和当前分支，不再要求手工填写一堆字段。
     </div>
-    <div class="form-row">
-      <label>项目名称（同名复用现有）</label>
-      <input id="regName" placeholder="如：江西吉安商会" />
+    <div class="action-row">
+      <a id="cloudPcSettingsLink" class="button-link" href="#" target="_blank" rel="noreferrer">打开 PC 工作台</a>
     </div>
-    <div class="form-row">
-      <label>本机绝对路径（必须存在且为目录）</label>
-      <input id="regPath" placeholder="如：D:\rust\active-projects\江西吉安商会" />
-    </div>
-    <div class="form-row">
-      <label>描述（可选）</label>
-      <textarea id="regDesc" rows="2" placeholder="一句话介绍这个项目"></textarea>
-    </div>
-    <div class="form-row">
-      <label>Git 远端（可选，留空自动读取 origin）</label>
-      <input id="regRepoUrl" placeholder="如：git@github.com:you/project.git" />
-    </div>
-    <div class="form-row">
-      <label>Git 分支（可选，留空自动读取当前分支）</label>
-      <input id="regBranch" placeholder="如：main" />
-    </div>
-    <button id="regBtn" onclick="registerProject()">注册到云端</button>
-    <div id="regResult"></div>
-    <p style="font-size:12px;color:#8b949e;margin-top:12px">
-      流程：本地校验路径存在 → 自动读取 Git origin/分支（也可手填）→ 调用云端
-      <code>POST /api/projects/external</code>（附 <code>node_id</code>，让服务器跳过本地路径校验）
-      → 项目自动绑定到本节点，owner = 你。注册成功后在 APK『项目广场 / 我的项目』可见。
-    </p>
   </div>
 
   <h3>项目硬盘服务（让本机保存项目母仓）</h3>
@@ -349,7 +326,10 @@ async function load() {
   const r = await fetch('/api/status').then(r => r.json()).catch(() => null);
   if (!r) { document.getElementById('connStatus').textContent = '加载失败'; return; }
   updateCloudWebLink(cloudWebUrl(r));
-  updatePcDoctorLink(pcWorkspaceUrl(r));
+  const pcUrl = pcWorkspaceUrl(r);
+  updatePcDoctorLink(pcUrl);
+  const pcLink = document.getElementById('cloudPcSettingsLink');
+  if (pcLink) pcLink.href = pcUrl;
   const s = document.getElementById('connStatus');
   s.className = 'status ' + (r.connected ? 'on' : 'off');
   s.textContent = (r.connected ? '🟢 已连接到云端' : '🔴 未连接到云端') + ' — ' + (r.last_event || '');
@@ -379,8 +359,10 @@ async function load() {
   for (const [k, v] of rows) {
     cfg.innerHTML += `<div class="label">${k}</div><div class="val">${v ?? ''}</div>`;
   }
-  document.getElementById('tokenWarn').style.display = r.logged_in ? 'none' : 'block';
-  document.getElementById('regBtn').disabled = !r.logged_in;
+  const tokenWarn = document.getElementById('tokenWarn');
+  if (tokenWarn) tokenWarn.style.display = r.logged_in ? 'none' : 'block';
+  const regBtn = document.getElementById('regBtn');
+  if (regBtn) regBtn.disabled = !r.logged_in;
 
   const tbody = document.querySelector('#models tbody');
   tbody.innerHTML = '';
@@ -441,51 +423,6 @@ function doLoginToken() {
 async function doLogout() {
   await fetch('/api/logout', { method: 'POST' }).catch(() => {});
   setTimeout(load, 300);
-}
-
-async function registerProject() {
-  const name = document.getElementById('regName').value.trim();
-  const path = document.getElementById('regPath').value.trim();
-  const desc = document.getElementById('regDesc').value.trim();
-  const repoUrl = document.getElementById('regRepoUrl').value.trim();
-  const branch = document.getElementById('regBranch').value.trim();
-  const out = document.getElementById('regResult');
-  out.innerHTML = '';
-  if (!name || !path) { out.innerHTML = '<div class="err-toast">名称和路径必填</div>'; return; }
-  const btn = document.getElementById('regBtn');
-  btn.disabled = true;
-  btn.textContent = '注册中…';
-  try {
-    const resp = await fetch('/api/register-project', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name,
-        workspace_path: path,
-        description: desc || null,
-        repo_url: repoUrl || null,
-        branch: branch || null,
-      }),
-    });
-    const j = await resp.json();
-    if (resp.ok && j.ok) {
-      const p = (j.cloud && j.cloud.project) || {};
-      const reused = j.cloud && j.cloud.reused_existing;
-      out.innerHTML = `<div class="ok-toast">${reused ? '已存在同名项目，复用' : '✅ 注册成功'}：<code>${p.name || name}</code> (id: <code>${p.id || '?'}</code>)</div>`;
-      document.getElementById('regName').value = '';
-      document.getElementById('regPath').value = '';
-      document.getElementById('regDesc').value = '';
-      document.getElementById('regRepoUrl').value = '';
-      document.getElementById('regBranch').value = '';
-    } else {
-      out.innerHTML = `<div class="err-toast">❌ ${j.error || ('HTTP ' + resp.status)}</div>`;
-    }
-  } catch (e) {
-    out.innerHTML = `<div class="err-toast">❌ 请求失败: ${e}</div>`;
-  } finally {
-    btn.disabled = false;
-    btn.textContent = '注册到云端';
-  }
 }
 
 // ── 项目硬盘服务配置 ───────────────────────────────────────────────────────

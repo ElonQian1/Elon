@@ -19,7 +19,13 @@
     userMeta: $('userMeta'), userDot: $('userDot'), friendBadge: $('friendBadge'), nodeBadge: $('nodeBadge'),
     sidebarSearch: $('sidebarSearch'), composer: $('composer'), input: $('messageInput'),
     sendBtn: $('sendBtn'), aiTaskBtn: $('aiTaskBtn'), memberPanelTitle: $('memberPanelTitle'),
-    railTooltip: $('railTooltip')
+    railTooltip: $('railTooltip'), userSettingsBtn: $('userSettingsBtn'), settingsBackdrop: $('settingsBackdrop'),
+    settingsCloseBtn: $('settingsCloseBtn'), chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
+    inspectProjectFolderBtn: $('inspectProjectFolderBtn'), registerProjectBtn: $('registerProjectBtn'),
+    settingsProjectPath: $('settingsProjectPath'), settingsProjectName: $('settingsProjectName'),
+    settingsProjectDesc: $('settingsProjectDesc'), settingsProjectRepo: $('settingsProjectRepo'),
+    settingsProjectBranch: $('settingsProjectBranch'), settingsProjectMeta: $('settingsProjectMeta'),
+    settingsProjectResult: $('settingsProjectResult')
   };
 
   const doctor = window.ElonPcDoctor.create({
@@ -53,6 +59,30 @@
     const text = await resp.text();
     const data = text ? JSON.parse(text) : {};
     if (!resp.ok) throw new Error(data.error || data.message || resp.statusText);
+    return data;
+  }
+
+  function nodeAdminEndpoint(path) {
+    const cleanPath = String(path || '').replace(/^\/+/, '');
+    return new URL(cleanPath, state.nodeAdminUrl).toString();
+  }
+
+  async function localNodeApi(path, options) {
+    const request = Object.assign({}, options || {});
+    if (request.body && !request.headers) {
+      request.headers = { 'Content-Type': 'application/json' };
+    }
+    let resp;
+    try {
+      resp = await fetch(nodeAdminEndpoint(path), request);
+    } catch (error) {
+      throw new Error(`无法连接本机 PC 节点 ${state.nodeAdminUrl}，请确认一龙 PC 节点正在运行并已更新。`);
+    }
+    const text = await resp.text();
+    const data = text ? JSON.parse(text) : {};
+    if (!resp.ok || data.ok === false) {
+      throw new Error(data.error || data.message || resp.statusText);
+    }
     return data;
   }
 
@@ -296,6 +326,14 @@
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLocalNodeBtn').addEventListener('click', () => window.open(state.nodeAdminUrl, '_blank'));
+    els.userSettingsBtn.addEventListener('click', openSettings);
+    els.settingsCloseBtn.addEventListener('click', closeSettings);
+    els.settingsBackdrop.addEventListener('click', (event) => {
+      if (event.target === els.settingsBackdrop) closeSettings();
+    });
+    els.chooseProjectFolderBtn.addEventListener('click', chooseLocalProjectFolder);
+    els.inspectProjectFolderBtn.addEventListener('click', inspectLocalProjectFolder);
+    els.registerProjectBtn.addEventListener('click', registerLocalProject);
     $('logoutBtn').addEventListener('click', logout);
     els.sidebarSearch.addEventListener('input', renderChannels);
     els.composer.addEventListener('submit', (event) => {
@@ -306,6 +344,9 @@
     els.input.addEventListener('input', () => {
       els.input.style.height = '46px';
       els.input.style.height = Math.min(120, els.input.scrollHeight) + 'px';
+    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && !els.settingsBackdrop.hidden) closeSettings();
     });
   }
 
@@ -717,6 +758,140 @@
       showError(error);
     } finally {
       els.sendBtn.disabled = false;
+    }
+  }
+
+  function openSettings() {
+    els.settingsBackdrop.hidden = false;
+    setSettingsResult('');
+    setTimeout(() => els.settingsProjectPath.focus(), 0);
+  }
+
+  function closeSettings() {
+    els.settingsBackdrop.hidden = true;
+  }
+
+  function setSettingsResult(message, kind) {
+    els.settingsProjectResult.innerHTML = message
+      ? `<div class="settings-result ${kind || 'ok'}">${message}</div>`
+      : '';
+  }
+
+  function setSettingsBusy(button, busy, label) {
+    if (!button) return;
+    if (busy) {
+      button.dataset.label = button.textContent;
+      button.disabled = true;
+      button.textContent = label || '处理中…';
+    } else {
+      button.disabled = false;
+      button.textContent = button.dataset.label || button.textContent;
+    }
+  }
+
+  function applyLocalProjectInfo(payload) {
+    const project = (payload && payload.project) || {};
+    const inspect = (payload && payload.inspect) || {};
+    const path = clean(project.workspace_path || inspect.workspace_path);
+    const name = clean(project.name);
+    const repo = clean(project.repo_url || inspect.git_remote_origin);
+    const branch = clean(project.branch || inspect.git_branch);
+    const desc = clean(project.description);
+    if (path) els.settingsProjectPath.value = path;
+    if (name) els.settingsProjectName.value = name;
+    els.settingsProjectRepo.value = repo;
+    els.settingsProjectBranch.value = branch;
+    if (desc && !clean(els.settingsProjectDesc.value)) els.settingsProjectDesc.value = desc;
+    const git = inspect.is_git_worktree || project.is_git_worktree
+      ? [branch || 'HEAD', clean(project.git_head || inspect.git_head), (project.has_uncommitted_changes || inspect.has_uncommitted_changes) ? '有未提交改动' : '干净']
+        .filter(Boolean).join(' · ')
+      : '未检测到 Git 工作区';
+    els.settingsProjectMeta.textContent = path ? `${path} · ${git}` : '尚未选择项目目录';
+  }
+
+  async function chooseLocalProjectFolder() {
+    setSettingsResult('正在打开本机文件夹选择器…');
+    setSettingsBusy(els.chooseProjectFolderBtn, true, '选择中…');
+    try {
+      const data = await localNodeApi('/api/project-folder/pick', { method: 'POST' });
+      if (data.cancelled) {
+        setSettingsResult('已取消选择。');
+        return;
+      }
+      applyLocalProjectInfo(data);
+      setSettingsResult('已读取项目目录、Git 远端和当前分支。');
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+    } finally {
+      setSettingsBusy(els.chooseProjectFolderBtn, false);
+    }
+  }
+
+  async function inspectLocalProjectFolder() {
+    const path = clean(els.settingsProjectPath.value);
+    if (!path) {
+      setSettingsResult('请先选择或填写项目目录。', 'error');
+      return;
+    }
+    setSettingsBusy(els.inspectProjectFolderBtn, true, '读取中…');
+    try {
+      const data = await localNodeApi('/api/project-folder/inspect', {
+        method: 'POST',
+        body: JSON.stringify({ workspace_path: path })
+      });
+      applyLocalProjectInfo(data);
+      setSettingsResult('已读取项目目录、Git 远端和当前分支。');
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+    } finally {
+      setSettingsBusy(els.inspectProjectFolderBtn, false);
+    }
+  }
+
+  async function ensureLocalNodeLogin() {
+    if (!state.token) throw new Error('请先登录一龙账号');
+    const status = await localNodeApi('/api/status');
+    if (status.logged_in && status.user_token_configured) return status;
+    return localNodeApi('/api/login', {
+      method: 'POST',
+      body: JSON.stringify({ token: state.token })
+    });
+  }
+
+  async function registerLocalProject() {
+    const name = clean(els.settingsProjectName.value);
+    const path = clean(els.settingsProjectPath.value);
+    if (!name || !path) {
+      setSettingsResult('请选择项目目录，确认项目名称已自动填写。', 'error');
+      return;
+    }
+    setSettingsBusy(els.registerProjectBtn, true, '注册中…');
+    try {
+      await ensureLocalNodeLogin();
+      const data = await localNodeApi('/api/register-project', {
+        method: 'POST',
+        body: JSON.stringify({
+          name,
+          workspace_path: path,
+          description: clean(els.settingsProjectDesc.value) || null,
+          repo_url: clean(els.settingsProjectRepo.value) || null,
+          branch: clean(els.settingsProjectBranch.value) || null
+        })
+      });
+      const project = (data.cloud && data.cloud.project) || {};
+      const reused = data.cloud && data.cloud.reused_existing;
+      setSettingsResult(`${reused ? '已复用现有项目' : '注册成功'}：${escapeHtml(project.name || name)}${project.id ? ` · ${escapeHtml(project.id)}` : ''}`);
+      await loadBaseData();
+      if (project.id) {
+        closeSettings();
+        await selectProject(project.id);
+      } else {
+        await refreshActive();
+      }
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+    } finally {
+      setSettingsBusy(els.registerProjectBtn, false);
     }
   }
 

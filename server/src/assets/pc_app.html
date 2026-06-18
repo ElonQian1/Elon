@@ -48,7 +48,10 @@
           <strong id="userName">未登录</strong>
           <span id="userMeta">请先登录网页版</span>
         </div>
-        <button class="icon-button" id="logoutBtn" type="button" title="退出登录">⎋</button>
+        <div class="user-actions">
+          <button class="icon-button" id="userSettingsBtn" type="button" title="设置">⚙</button>
+          <button class="icon-button" id="logoutBtn" type="button" title="退出登录">⎋</button>
+        </div>
       </div>
     </aside>
 
@@ -82,6 +85,52 @@
     </aside>
   </main>
   <div class="rail-tooltip" id="railTooltip" role="tooltip"></div>
+  <div class="settings-backdrop" id="settingsBackdrop" hidden>
+    <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+      <header class="settings-header">
+        <div>
+          <strong id="settingsTitle">设置</strong>
+          <span>本机项目绑定到当前 PC 节点</span>
+        </div>
+        <button class="icon-button" id="settingsCloseBtn" type="button" title="关闭">×</button>
+      </header>
+      <div class="settings-body">
+        <div class="settings-section-title">注册本地项目</div>
+        <label class="settings-field">
+          <span>项目目录</span>
+          <div class="input-action">
+            <input id="settingsProjectPath" placeholder="选择一个本机项目文件夹" />
+            <button class="text-button" id="chooseProjectFolderBtn" type="button">选择文件夹</button>
+          </div>
+        </label>
+        <label class="settings-field">
+          <span>项目名称</span>
+          <input id="settingsProjectName" placeholder="选择目录后自动填写" />
+        </label>
+        <details class="settings-advanced">
+          <summary>Git 和描述（自动读取，可修改）</summary>
+          <label class="settings-field">
+            <span>Git 远端 origin</span>
+            <input id="settingsProjectRepo" placeholder="选择目录后自动读取" />
+          </label>
+          <label class="settings-field">
+            <span>Git 当前分支</span>
+            <input id="settingsProjectBranch" placeholder="选择目录后自动读取" />
+          </label>
+          <label class="settings-field">
+            <span>描述</span>
+            <textarea id="settingsProjectDesc" rows="2" placeholder="可选"></textarea>
+          </label>
+        </details>
+        <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
+        <div class="settings-actions">
+          <button class="text-button" id="inspectProjectFolderBtn" type="button">读取目录信息</button>
+          <button class="send-button" id="registerProjectBtn" type="button">注册到云端</button>
+        </div>
+        <div id="settingsProjectResult"></div>
+      </div>
+    </section>
+  </div>
 
   <script src="/assets/pc_app_utils.js"></script>
   <script src="/assets/pc_app_doctor.js"></script>

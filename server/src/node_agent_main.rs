@@ -25,6 +25,7 @@
 //! 4. 断线后自动重连（指数退避 2s ~ 60s）；未登录时等待网页登录
 
 use anyhow::{anyhow, Result};
+use axum::http::{header::CONTENT_TYPE, HeaderValue, Method};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
     AgentToServer, CliWorkspaceStatus, ModelCapability, ServerToAgent, PROTO_VERSION,
@@ -35,11 +36,12 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tower_http::cors::{Any, CorsLayer};
+use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
 
 mod cli_usage;
 mod node_agent_admin_open;
+mod node_agent_project_picker;
 mod node_hardware_probe;
 mod pc_storage_git_http;
 mod pc_storage_repo;
@@ -2097,6 +2099,7 @@ impl NodeRuntime {
 fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
     let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
     tokio::spawn(async move {
+        let cors = local_admin_cors(&runtime.cfg.cloud_http_url);
         let app = axum::Router::new()
             .route("/", axum::routing::get(admin_index))
             .route("/api/status", axum::routing::get(admin_status))
@@ -2130,6 +2133,14 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::post(admin_register_project),
             )
             .route(
+                "/api/project-folder/pick",
+                axum::routing::post(node_agent_project_picker::pick_local_project_folder),
+            )
+            .route(
+                "/api/project-folder/inspect",
+                axum::routing::post(node_agent_project_picker::inspect_local_project_folder),
+            )
+            .route(
                 "/api/storage-config",
                 axum::routing::get(admin_storage_config_get).post(admin_storage_config_set),
             )
@@ -2142,13 +2153,8 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/tts-relay-config",
                 axum::routing::get(admin_tts_relay_get).post(admin_tts_relay_set),
             )
-            .layer(
-                CorsLayer::new()
-                    .allow_origin(Any)
-                    .allow_methods(Any)
-                    .allow_headers(Any),
-            )
-            .with_state(runtime);
+            .with_state(runtime)
+            .layer(cors);
         match tokio::net::TcpListener::bind(addr).await {
             Ok(listener) => {
                 info!("🖥️  本地管理页: http://127.0.0.1:{}/", port);
@@ -2159,6 +2165,36 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             Err(e) => warn!("admin server 无法监听 {addr}: {e}"),
         }
     });
+}
+
+fn local_admin_cors(cloud_http_url: &str) -> CorsLayer {
+    let mut origins = vec![
+        "http://43.139.149.158:8080".to_string(),
+        "http://127.0.0.1:8080".to_string(),
+        "http://localhost:8080".to_string(),
+        "http://127.0.0.1:3000".to_string(),
+        "http://localhost:3000".to_string(),
+    ];
+    if let Some(origin) = origin_from_url(cloud_http_url) {
+        if !origins.iter().any(|item| item == &origin) {
+            origins.push(origin);
+        }
+    }
+    let origins = origins
+        .into_iter()
+        .filter_map(|origin| HeaderValue::from_str(&origin).ok())
+        .collect::<Vec<_>>();
+
+    CorsLayer::new()
+        .allow_origin(AllowOrigin::list(origins))
+        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
+        .allow_headers([CONTENT_TYPE])
+}
+
+fn origin_from_url(raw: &str) -> Option<String> {
+    let url = reqwest::Url::parse(raw.trim()).ok()?;
+    let origin = url.origin().ascii_serialization();
+    (origin != "null").then_some(origin)
 }
 
 /// GET /api/tts-relay-config — 返回当前 TTS Worker URL 配置
