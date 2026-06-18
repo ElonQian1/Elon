@@ -182,7 +182,7 @@ fn project_space_response(
         "project": project,
         "channels": channels,
         "members": members,
-        "landing": project_landing_manifest(&state, &access),
+        "landing": project_landing_manifest(&state, &user.id, &access),
         "latest_apk_url": latest_project_apk_url(&state, &access),
     }))
     .into_response()
@@ -910,11 +910,33 @@ fn latest_project_apk_url(
 
 fn project_landing_manifest(
     state: &AppState,
+    user_id: &str,
     project: &crate::store::ProjectAccess,
 ) -> Option<serde_json::Value> {
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    project_landing::load_workspace_landing(&workspace)
+    let workspace_landing = project_landing::load_workspace_landing(&workspace);
+    if workspace_landing
+        .as_ref()
+        .is_some_and(project_landing::has_display_content)
+    {
+        return workspace_landing;
+    }
+
+    let snapshot = match state.store.project_landing_snapshot(user_id, &project.id) {
+        Ok(snapshot) => snapshot,
+        Err(error) => {
+            tracing::warn!(project_id = %project.id, "读取项目首页 landing 快照失败: {error}");
+            None
+        }
+    };
+    if snapshot
+        .as_ref()
+        .is_some_and(project_landing::has_display_content)
+    {
+        return snapshot;
+    }
+    workspace_landing.or(snapshot)
 }
 
 fn result_message(message: &str, apk_url: Option<&str>, status: Option<&str>) -> String {

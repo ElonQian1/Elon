@@ -77,6 +77,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (55, "项目代码身份去重索引", migration_v55),
     (56, "所有用户默认加入指定联合开发项目", migration_v56),
     (57, "fb2 外部应用 AI 回复试用额度配置", migration_v57),
+    (58, "项目首页 landing manifest 云端快照", migration_v58),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2054,6 +2055,11 @@ fn migration_v57(conn: &Connection) -> Result<()> {
          VALUES ('external_app_fb2_trial_credit_fen', '100', datetime('now'))",
         [],
     )?;
+    Ok(())
+}
+
+fn migration_v58(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "projects", "landing_json", "landing_json TEXT")?;
     Ok(())
 }
 

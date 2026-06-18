@@ -2548,6 +2548,7 @@ async fn admin_register_project(
         "node_id": creds.agent_id,
         "repo_url": repo_url,
         "branch": branch,
+        "landing": project_landing::load_workspace_landing(pb),
     });
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))

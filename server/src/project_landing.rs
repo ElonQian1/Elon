@@ -21,6 +21,39 @@ pub(crate) fn load_workspace_landing(workspace: &Path) -> Option<Value> {
     None
 }
 
+#[allow(dead_code)]
+pub(crate) fn normalize_landing_snapshot(value: &Value) -> Option<Value> {
+    let mut landing = normalize_manifest(value.clone())?;
+    if !has_display_content(&Value::Object(landing.clone())) {
+        return None;
+    }
+    landing.insert(
+        "source".to_string(),
+        json!({
+            "mode": "node_agent_snapshot",
+            "status": "available",
+        }),
+    );
+    Some(Value::Object(landing))
+}
+
+#[allow(dead_code)]
+pub(crate) fn has_display_content(value: &Value) -> bool {
+    let Some(object) = value.as_object() else {
+        return false;
+    };
+    object.iter().any(|(key, value)| {
+        key != "source"
+            && match value {
+                Value::Null => false,
+                Value::String(value) => !value.trim().is_empty(),
+                Value::Array(value) => !value.is_empty(),
+                Value::Object(value) => !value.is_empty(),
+                Value::Bool(_) | Value::Number(_) => true,
+            }
+    })
+}
+
 fn load_manifest_file(path: &Path, relative_path: &str) -> Value {
     let metadata = match fs::metadata(path) {
         Ok(metadata) => metadata,
@@ -283,6 +316,15 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
             );
             insert_string(
                 &mut object,
+                "size_bytes",
+                first_string(
+                    source,
+                    &["size_bytes", "sizeBytes", "file_size", "fileSize"],
+                    MAX_SHORT_TEXT,
+                ),
+            );
+            insert_string(
+                &mut object,
                 "note",
                 first_string(
                     source,
@@ -291,6 +333,7 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
                         "description",
                         "health_error",
                         "healthError",
+                        "changelog",
                         "release_notes",
                         "releaseNotes",
                     ],
@@ -489,9 +532,14 @@ fn normalize_status(value: Option<&str>, url: Option<&str>, manifest_url: Option
         .map(str::to_ascii_lowercase)
         .unwrap_or_default();
     match explicit.as_str() {
-        "available" | "external" | "unavailable" | "coming_soon" | "planned" | "pending" => {
-            explicit
-        }
+        "available"
+        | "external"
+        | "unavailable"
+        | "coming_soon"
+        | "needs_configuration"
+        | "third_party"
+        | "planned"
+        | "pending" => explicit,
         _ if url.is_some() => "available".to_string(),
         _ if manifest_url.is_some() => "pending".to_string(),
         _ => "planned".to_string(),
@@ -595,6 +643,46 @@ mod tests {
             .contains(workspace.to_string_lossy().as_ref()));
 
         let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn normalize_landing_snapshot_rewrites_source_and_filters_urls() {
+        let snapshot = normalize_landing_snapshot(&json!({
+            "source": { "mode": "workspace_manifest", "status": "available", "file": ".elon/project-landing.json" },
+            "title": "Demo",
+            "downloads": {
+                "windows": {
+                    "downloadUrl": "https://example.com/app.exe",
+                    "fileSize": 7141343,
+                    "changelog": "fix tun"
+                },
+                "ios": {
+                    "status": "needs_configuration",
+                    "url": "http://example.com/ios.html"
+                }
+            }
+        }))
+        .unwrap();
+
+        assert_eq!(snapshot["source"]["mode"], "node_agent_snapshot");
+        assert_eq!(snapshot["title"], "Demo");
+        let downloads = snapshot["downloads"].as_array().unwrap();
+        let windows = downloads
+            .iter()
+            .find(|download| download["platform"] == "windows")
+            .unwrap();
+        let ios = downloads
+            .iter()
+            .find(|download| download["platform"] == "ios")
+            .unwrap();
+        assert_eq!(
+            windows["url"],
+            "https://example.com/app.exe"
+        );
+        assert_eq!(windows["size_bytes"], "7141343");
+        assert_eq!(windows["note"], "fix tun");
+        assert_eq!(ios["status"], "needs_configuration");
+        assert!(has_display_content(&snapshot));
     }
 
     fn temp_workspace(label: &str) -> PathBuf {

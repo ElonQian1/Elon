@@ -62,6 +62,15 @@
       return '';
     }
 
+    function formatBytes(value) {
+      const size = Number(value);
+      if (!Number.isFinite(size) || size <= 0) return '';
+      if (size >= 1048576) {
+        const mb = size / 1048576;
+        return '约 ' + (mb >= 10 ? mb.toFixed(0) : mb.toFixed(1)) + ' MB';
+      }
+      return '约 ' + Math.max(1, Math.round(size / 1024)) + ' KB';
+    }
     function platformOf(value) {
       const raw = clean(value).toLowerCase().replace(/[_\s-]+/g, '');
       if (raw === 'win' || raw === 'window' || raw === 'windowsclient') return 'windows';
@@ -74,7 +83,7 @@
     function statusOf(item) {
       const explicit = clean(item.status || item.availability || item.health_status || item.healthStatus)
         .toLowerCase();
-      if (['available', 'external', 'unavailable', 'coming_soon', 'planned', 'pending'].includes(explicit)) {
+      if (['available', 'external', 'unavailable', 'coming_soon', 'needs_configuration', 'third_party', 'planned', 'pending'].includes(explicit)) {
         return explicit;
       }
       if (valueOf(item.url, item.download_url, item.downloadUrl, item.href)) return 'available';
@@ -87,7 +96,10 @@
       if (status === 'external') return '外部入口';
       if (status === 'unavailable') return '暂不可用';
       if (status === 'coming_soon') return '即将支持';
+      if (status === 'needs_configuration') return '待配置';
+      if (status === 'third_party') return '第三方方案';
       if (status === 'pending') return '待检查';
+      if (status === 'planned') return '计划中';
       return '待配置';
     }
 
@@ -95,6 +107,7 @@
       const platform = platformOf(item.platform || item.os || item.kind || item.type);
       if (!platform) return null;
       const meta = PLATFORM_META[platform];
+      const status = statusOf(item);
       return {
         platform,
         label: valueOf(item.label, item.name, meta.label),
@@ -102,10 +115,10 @@
         url: valueOf(item.url, item.download_url, item.downloadUrl, item.href),
         manifestUrl: valueOf(item.manifest_url, item.manifestUrl),
         version: valueOf(item.version_name, item.versionName, item.version, item.build),
-        size: valueOf(item.size_label, item.sizeLabel, item.size),
-        status: statusOf(item),
-        note: valueOf(item.note, item.description, item.health_error, item.healthError, item.release_notes, item.releaseNotes),
-        external: !!item.external || statusOf(item) === 'external'
+        size: valueOf(item.size_label, item.sizeLabel, item.size, formatBytes(item.size_bytes || item.sizeBytes || item.file_size || item.fileSize)),
+        status,
+        note: valueOf(item.note, item.description, item.health_error, item.healthError, item.changelog, item.release_notes, item.releaseNotes),
+        external: !!item.external || status === 'external'
       };
     }
 

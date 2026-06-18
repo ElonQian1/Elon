@@ -9,6 +9,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
+    project_landing,
     project_mobile::ensure_mobile_project,
     project_storage, project_workspace_provision,
     project_ws_session::handle_project_ws,
@@ -53,6 +54,8 @@ pub struct RegisterExternalProjectRequest {
     pub branch: Option<String>,
     /// "open" | "approval" | "invite" | "readonly"；默认 "readonly"。
     pub join_mode: Option<String>,
+    /// 可选：PC node-agent 从项目根目录 `.elon/project-landing.json` 读取到的项目首页快照。
+    pub landing: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize)]
@@ -449,6 +452,32 @@ pub async fn register_external_project(
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
 
+    let workspace_landing = if req.landing.is_none() && node_id.is_none() {
+        project_landing::load_workspace_landing(std::path::Path::new(workspace_path))
+    } else {
+        None
+    };
+    let landing_snapshot = req
+        .landing
+        .as_ref()
+        .or(workspace_landing.as_ref())
+        .and_then(|landing| {
+            match state.store.update_project_landing_snapshot(
+                &user.id,
+                &create_result.project.id,
+                landing,
+            ) {
+                Ok(snapshot) => snapshot,
+                Err(error) => {
+                    tracing::warn!(
+                        project_id = %create_result.project.id,
+                        "保存项目首页 landing 快照失败: {error}"
+                    );
+                    None
+                }
+            }
+        });
+
     let join_mode = req.join_mode.as_deref().unwrap_or("readonly").trim();
     if !["open", "approval", "invite", "readonly"].contains(&join_mode) {
         return json_error(
@@ -475,6 +504,7 @@ pub async fn register_external_project(
         "node_id": node_id,
         "is_public": effective_is_public,
         "join_mode": if effective_is_public { effective_join_mode } else { "invite" },
+        "landing": landing_snapshot,
     }))
     .into_response()
 }

@@ -40,6 +40,7 @@ mod pc_project_binding;
 mod project_branding;
 mod project_execution_sessions;
 mod project_identities;
+mod project_landing_snapshots;
 mod project_member_conversations;
 mod project_runtime_permissions;
 mod project_space;
@@ -1278,6 +1279,63 @@ mod tests {
             .get_project_access(&user.id, &second.project.id)
             .expect("project access should include node binding");
         assert_eq!(access.node_id.as_deref(), Some("node-b"));
+    }
+
+    #[test]
+    fn project_landing_snapshot_is_normalized_and_readable() {
+        let store = temp_store();
+        let user = store
+            .create_user("pc-project-landing@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .register_external_project(
+                &user.id,
+                None,
+                "Landing Project",
+                Some("from pc"),
+                r"D:\rust\active-projects\landing",
+                Some("node-a"),
+                None,
+                None,
+            )
+            .expect("external project should register");
+
+        let snapshot = store
+            .update_project_landing_snapshot(
+                &user.id,
+                &project.project.id,
+                &serde_json::json!({
+                    "title": "Landing Project",
+                    "downloads": {
+                        "windows": "https://example.com/app.exe",
+                        "ios": "javascript:alert(1)"
+                    }
+                }),
+            )
+            .expect("landing snapshot should update")
+            .expect("landing snapshot should have display content");
+        assert_eq!(snapshot["source"]["mode"], "node_agent_snapshot");
+        let downloads = snapshot["downloads"].as_array().unwrap();
+        let windows = downloads
+            .iter()
+            .find(|download| download["platform"] == "windows")
+            .unwrap();
+        let ios = downloads
+            .iter()
+            .find(|download| download["platform"] == "ios")
+            .unwrap();
+        assert_eq!(
+            windows["url"],
+            "https://example.com/app.exe"
+        );
+        assert!(ios.get("url").is_none());
+
+        let loaded = store
+            .project_landing_snapshot(&user.id, &project.project.id)
+            .expect("landing snapshot should load")
+            .expect("landing snapshot should exist");
+        assert_eq!(loaded["title"], "Landing Project");
+        assert_eq!(loaded["source"]["mode"], "node_agent_snapshot");
     }
 
     #[test]
