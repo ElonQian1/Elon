@@ -75,6 +75,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/assets/pc_app_doctor.js", get(web::pc_app_doctor_js))
         .route("/assets/voice_tts_sdk.js", get(web::voice_tts_sdk_js))
         .route("/assets/pc_voice_project.js", get(web::pc_voice_project_js))
+        .route(
+            "/assets/pc_app_notifications.js",
+            get(web::pc_app_notifications_js),
+        )
         .route("/assets/pc_app.js", get(web::pc_app_js))
         .route("/health", get(api::health))
         .route("/healthz", get(api::health))

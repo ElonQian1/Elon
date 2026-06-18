@@ -562,7 +562,7 @@ class TaskWorkService : Service() {
         const val PREF_QUEUED_TASK_EVENTS = "queued_task_events"
 
         const val ACTIVE_WORK_CHANNEL_ID = "active_task_work"
-        const val TASK_COMPLETE_CHANNEL_ID = "task_complete_alerts"
+        const val TASK_COMPLETE_CHANNEL_ID = "task_complete_alerts_v2"
         const val APP_UPDATE_CHANNEL_ID = "app_update_alerts"
         const val ACTIVE_WORK_NOTIFICATION_ID = 2400
         const val TASK_COMPLETE_NOTIFICATION_ID = 2401

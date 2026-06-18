@@ -33,6 +33,7 @@ const PC_APP_NODE_JS: &str = include_str!("assets/pc_app_node.js");
 const PC_APP_DOCTOR_JS: &str = include_str!("assets/pc_app_doctor.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const PC_VOICE_PROJECT_JS: &str = include_str!("assets/pc_voice_project.js");
+const PC_APP_NOTIFICATIONS_JS: &str = include_str!("assets/pc_app_notifications.js");
 const PC_APP_JS: &str = include_str!("assets/pc_app.js");
 
 pub async fn web_page() -> impl IntoResponse {
@@ -280,6 +281,19 @@ pub async fn pc_voice_project_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PC_VOICE_PROJECT_JS,
+    )
+}
+
+pub async fn pc_app_notifications_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_NOTIFICATIONS_JS,
     )
 }
 
