@@ -1260,10 +1260,6 @@ fn migration_v34(conn: &Connection) -> Result<()> {
         INSERT OR IGNORE INTO billing_config (key, value, updated_at)
           VALUES ('billing_image_min_reservation_fen', '1', datetime('now'));
         INSERT OR IGNORE INTO billing_config (key, value, updated_at)
-          VALUES ('billing_asr_min_reservation_fen', '1', datetime('now'));
-        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
-          VALUES ('billing_tts_min_reservation_fen', '1', datetime('now'));
-        INSERT OR IGNORE INTO billing_config (key, value, updated_at)
           VALUES ('billing_realtime_voice_min_reservation_fen', '1', datetime('now'));
         "#,
     )?;
@@ -1379,8 +1375,6 @@ fn migration_v37(conn: &Connection) -> Result<()> {
           ('bpr_seed_deepseek', 'deepseek', 0.14, 0.014, 0.28, 80, 1, '默认 DeepSeek 定价', datetime('now')),
           ('bpr_seed_metered_image', 'metered-image', 0.0, 0.0, 5.0, 100, 1, '图片算力内部计量单位', datetime('now')),
           ('bpr_seed_metered_realtime', 'metered-realtime', 1.0, 0.0, 2.0, 100, 1, '实时语音内部计量单位', datetime('now')),
-          ('bpr_seed_metered_asr', 'metered-asr', 1.0, 0.0, 1.0, 100, 1, 'ASR 内部计量单位', datetime('now')),
-          ('bpr_seed_metered_tts', 'metered-tts', 1.0, 0.0, 1.0, 100, 1, 'TTS 内部计量单位', datetime('now')),
           ('bpr_seed_default', '*', 3.0, 0.3, 15.0, -100, 1, '未知模型保守兜底定价', datetime('now'));
         "#,
     )?;

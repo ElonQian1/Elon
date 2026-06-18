@@ -14,19 +14,14 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use std::sync::Arc;
 use tracing::warn;
 
 use crate::{
-    agent_api_loop::resolve_agent,
-    agent_llm_call::call_chat_llm,
     project_auth::{auth_from_headers, json_error},
     types::AppState,
     voice_tts_catalog::{self, ResolvedTtsStyle, TtsProvider},
-    voice_tts_rewrite::{
-        clean_llm_rewrite, prepare_text_for_speech, take_chars, MAX_TTS_TEXT_CHARS,
-    },
+    voice_tts_rewrite::{prepare_text_for_speech, MAX_TTS_TEXT_CHARS},
     voice_tts_worker::{self, TtsWorkerConfig},
 };
 
@@ -38,8 +33,6 @@ pub struct TtsRequest {
     pub emotion_id: Option<String>,
     pub intensity: Option<String>,
     pub provider: Option<TtsProvider>,
-    pub rewrite: Option<bool>,
-    pub agent_name: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -64,35 +57,41 @@ pub async fn catalog_handler(
 ) -> Json<TtsCatalogResponse> {
     let worker = TtsWorkerConfig::from_env();
     // 尝试鉴权，成功则查询该用户是否有在线 PC 节点提供模型 TTS
-    let (pc_model_tts_available, pc_model_provider) = if let Ok(user) = auth_from_headers(&state, &headers) {
-        match state.node_registry.find_tts_node_for_user(&user.id).await {
-            Some((_node_id, _url)) => {
-                // 查询该节点的具体提供方
-                let provider = state.node_registry
-                    .list_online().await
-                    .into_iter()
-                    .find(|n| n.owner_user_id == user.id && n.tts_worker_url.is_some())
-                    .and_then(|n| {
-                        // 根据服务器 env ELON_TTS_MODEL_PROVIDER 或默认 cosyvoice3
-                        n.tts_worker_url.map(|_| 
-                            std::env::var("ELON_TTS_MODEL_PROVIDER")
-                                .unwrap_or_else(|_| "cosyvoice3".to_string())
-                        )
-                    });
-                (true, provider)
+    let (pc_model_tts_available, pc_model_provider) =
+        if let Ok(user) = auth_from_headers(&state, &headers) {
+            match state.node_registry.find_tts_node_for_user(&user.id).await {
+                Some((_node_id, _url)) => {
+                    // 查询该节点的具体提供方
+                    let provider = state
+                        .node_registry
+                        .list_online()
+                        .await
+                        .into_iter()
+                        .find(|n| n.owner_user_id == user.id && n.tts_worker_url.is_some())
+                        .and_then(|n| {
+                            // 根据服务器 env ELON_TTS_MODEL_PROVIDER 或默认 cosyvoice3
+                            n.tts_worker_url.map(|_| {
+                                std::env::var("ELON_TTS_MODEL_PROVIDER")
+                                    .unwrap_or_else(|_| "cosyvoice3".to_string())
+                            })
+                        });
+                    (true, provider)
+                }
+                None => (false, None),
             }
-            None => (false, None),
-        }
-    } else {
-        (false, None)
-    };
+        } else {
+            (false, None)
+        };
 
     // 云端 worker 的 provider 标签：优先读实际 ELON_TTS_EDGE_DEFAULT_VOICE（如果配置了 edge-tts）
     // 否则记为实际的 worker type
     let effective_provider = if pc_model_tts_available {
-        pc_model_provider.clone().unwrap_or_else(|| "cosyvoice3".to_string())
+        pc_model_provider
+            .clone()
+            .unwrap_or_else(|| "cosyvoice3".to_string())
     } else {
-        worker.as_ref()
+        worker
+            .as_ref()
             .map(|cfg| {
                 // 如果 worker URL 是 edge-tts，返回 edge_tts，不再用 env ELON_TTS_PROVIDER
                 let url = &cfg.base_url;
@@ -109,7 +108,7 @@ pub async fn catalog_handler(
         worker_configured: worker.is_some() || pc_model_tts_available,
         worker_url: worker.as_ref().map(|cfg| cfg.base_url.clone()),
         default_provider: effective_provider,
-        llm_rewrite_enabled: llm_rewrite_enabled(),
+        llm_rewrite_enabled: false,
         pc_model_tts_available,
         pc_model_provider,
         voices: voice_tts_catalog::voices(),
@@ -146,22 +145,7 @@ pub async fn synthesize_handler(
         req.provider,
         original_text,
     );
-    let mut spoken_text = prepare_text_for_speech(original_text, &style);
-    if req.rewrite.unwrap_or(true) && llm_rewrite_enabled() {
-        spoken_text = rewrite_with_llm(&state, &caller.id, &req, &style, &spoken_text).await;
-    }
-    let tts_key = crate::billing_lifecycle::new_compute_call_id("voice_tts_synthesis");
-    let mut tts_billing_call = match crate::compute_usage::reserve_tts_synthesis(
-        &state.store,
-        &caller.id,
-        &tts_key,
-        "voice_tts_synthesis",
-        style.provider.as_worker_id(),
-        &spoken_text,
-    ) {
-        Ok(call) => call,
-        Err(msg) => return json_error(StatusCode::PAYMENT_REQUIRED, msg),
-    };
+    let spoken_text = prepare_text_for_speech(original_text, &style);
 
     // ── 优先级：PC 节点 GPU 模型 TTS > 云端 Worker TTS ──────────────────────
     // 若用户有在线 PC 节点且配置了 TTS Worker URL，优先走 PC 节点（高质量模型 TTS）
@@ -189,16 +173,6 @@ pub async fn synthesize_handler(
                 use base64::Engine as _;
                 match B64.decode(audio_b64.as_bytes()) {
                     Ok(bytes) => {
-                        crate::compute_usage::record_tts_synthesis_with_key(
-                            &state.store,
-                            &caller.id,
-                            "voice_tts_synthesis",
-                            "pc_node",
-                            &spoken_text,
-                            bytes.len(),
-                            Some(tts_billing_call.key()),
-                        );
-                        tts_billing_call.mark_settled();
                         let audio = voice_tts_worker::TtsAudio {
                             bytes,
                             content_type: mime,
@@ -227,20 +201,6 @@ pub async fn synthesize_handler(
             .await
         {
             Ok(audio) => {
-                if audio.cache_status != "hit" {
-                    crate::compute_usage::record_tts_synthesis_with_key(
-                        &state.store,
-                        &caller.id,
-                        "voice_tts_synthesis",
-                        style.provider.as_worker_id(),
-                        &spoken_text,
-                        audio.bytes.len(),
-                        Some(tts_billing_call.key()),
-                    );
-                    tts_billing_call.mark_settled();
-                } else {
-                    tts_billing_call.release_no_usage();
-                }
                 return audio_response(audio, &style);
             }
             Err(err) => {
@@ -253,55 +213,6 @@ pub async fn synthesize_handler(
         StatusCode::SERVICE_UNAVAILABLE,
         "TTS 服务暂不可用（云端 Worker 未配置，且无在线 PC 节点提供 TTS）",
     )
-}
-
-async fn rewrite_with_llm(
-    state: &Arc<AppState>,
-    user_id: &str,
-    req: &TtsRequest,
-    style: &ResolvedTtsStyle,
-    fallback_text: &str,
-) -> String {
-    let agent_name = req
-        .agent_name
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let workspace = state.get_user_workspace(user_id);
-    let agent = match resolve_agent(state, &workspace, agent_name).await {
-        Ok(agent) => agent,
-        Err(err) => {
-            warn!(target: "voice_tts", "TTS LLM 改写没有可用代理: {err}");
-            return fallback_text.to_string();
-        }
-    };
-
-    let messages = vec![
-        json!({
-            "role": "system",
-            "content": format!(
-                "你是中文 TTS 台词改写器。把输入改成适合朗读的短台词，只输出改写文本。保持事实和含义，不新增承诺，不解释，不加引号。声音角色：{}。目标情绪：{}。文本风格：{}。最长 220 个汉字。",
-                style.voice.label, style.emotion.label, style.emotion.text_style
-            )
-        }),
-        json!({
-            "role": "user",
-            "content": fallback_text
-        }),
-    ];
-    let response = match call_chat_llm(state, &agent, &messages, user_id, "voice_tts_rewrite").await
-    {
-        Ok(response) => response,
-        Err(err) => {
-            warn!(target: "voice_tts", "TTS LLM 改写失败: {err}");
-            return fallback_text.to_string();
-        }
-    };
-    let rewritten = response["choices"][0]["message"]["content"]
-        .as_str()
-        .map(|value| clean_llm_rewrite(value, fallback_text))
-        .unwrap_or_else(|| fallback_text.to_string());
-    take_chars(&rewritten, 220)
 }
 
 fn audio_response(audio: voice_tts_worker::TtsAudio, style: &ResolvedTtsStyle) -> Response {
@@ -353,10 +264,4 @@ fn insert_header(headers: &mut HeaderMap, name: &'static str, value: &str) {
     if let Ok(value) = HeaderValue::from_str(value) {
         headers.insert(name, value);
     }
-}
-
-fn llm_rewrite_enabled() -> bool {
-    std::env::var("ELON_TTS_LLM_REWRITE_ENABLED")
-        .map(|value| matches!(value.trim().to_lowercase().as_str(), "1" | "true" | "on"))
-        .unwrap_or(false)
 }

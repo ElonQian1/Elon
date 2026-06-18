@@ -1,7 +1,7 @@
 //! TTS 前置文本整理与台词化。
 //!
 //! 目标是让普通 AI 回复更适合朗读：去掉 Markdown/代码噪声，压短句子，
-//! 再按情绪轻量调整停顿。真正的 LLM 改写由 API 层按配置调用。
+//! 再按情绪轻量调整停顿。这里不调用 LLM，TTS 作为输出通道保持免费。
 
 use crate::voice_tts_catalog::ResolvedTtsStyle;
 
@@ -11,21 +11,6 @@ pub fn prepare_text_for_speech(text: &str, style: &ResolvedTtsStyle) -> String {
     let compact = strip_markdown_noise(text);
     let limited = take_chars(&compact, MAX_TTS_TEXT_CHARS);
     apply_style(&limited, style)
-}
-
-pub fn clean_llm_rewrite(value: &str, fallback: &str) -> String {
-    let cleaned = value
-        .trim()
-        .trim_matches('"')
-        .trim_matches('“')
-        .trim_matches('”')
-        .trim()
-        .to_string();
-    if cleaned.is_empty() {
-        fallback.to_string()
-    } else {
-        take_chars(&cleaned, MAX_TTS_TEXT_CHARS)
-    }
 }
 
 pub fn take_chars(value: &str, max_chars: usize) -> String {
