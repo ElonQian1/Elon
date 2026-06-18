@@ -8,30 +8,45 @@
     state.nodeProbeSeq = state.nodeProbeSeq || 0;
     state.nodePollTimer = state.nodePollTimer || null;
     state.nodeLocalOnline = false;
+    state.activeNodeId = state.activeNodeId || '';
 
     function renderChannels(channelButton) {
       const onlineCount = state.nodes.filter((node) => node.online).length;
       els.channelList.innerHTML = `
         <div class="channel-section">本机</div>
-        ${channelButton({ id: 'local-node', kind: 'node', glyph: 'PC', title: '节点注册', sub: '下载、启动和注册 Win 端', active: true })}
+        ${channelButton({ id: 'local-node', kind: 'node', glyph: 'PC', title: '节点注册', sub: '下载、启动和注册 Win 端', active: !state.activeNodeId })}
         <div class="channel-section">我的节点</div>
         ${state.nodes.map((node) => channelButton({
           id: node.node_id || node.agent_id || '',
           kind: 'node-list',
           glyph: node.online ? '●' : '○',
           title: clean(node.display_name || node.device_name || node.short_id || node.node_id || 'PC 节点'),
-          sub: node.online ? '在线' : '离线',
-          online: !!node.online
+          sub: nodeSummaryLine(node),
+          online: !!node.online,
+          active: sameNode(node, state.activeNodeId)
         })).join('') || '<div class="empty-state">暂无节点</div>'}
         <div class="channel-section">状态</div>
         <div class="empty-state">${onlineCount}/${state.nodes.length} 台在线</div>`;
+      els.channelList.querySelectorAll('[data-peer-kind="node"]').forEach((btn) => {
+        btn.addEventListener('click', selectLocalNode);
+      });
+      els.channelList.querySelectorAll('[data-peer-kind="node-list"]').forEach((btn) => {
+        btn.addEventListener('click', () => selectNodeDetail(btn.dataset.itemId));
+      });
     }
 
     function selectNode() {
+      if (state.activeNodeId && findNode(state.activeNodeId)) return selectNodeDetail(state.activeNodeId);
+      return selectLocalNode();
+    }
+
+    function selectLocalNode() {
       state.activeKind = 'node';
       state.activeProjectId = '';
       state.activeChannelId = '';
+      state.activeChannelKind = '';
       state.activePeer = null;
+      state.activeNodeId = '';
       setRails('node');
       els.workspaceName.textContent = 'PC 节点';
       els.workspaceMeta.textContent = '下载、启动、注册';
@@ -43,6 +58,31 @@
         name: clean(node.display_name || node.device_name || node.short_id || node.node_id || 'PC 节点'),
         sub: node.online ? '在线' : '离线'
       })));
+    }
+
+    function selectNodeDetail(nodeId) {
+      const selected = findNode(nodeId);
+      if (!selected) return selectLocalNode();
+      state.activeKind = 'node';
+      state.activeProjectId = '';
+      state.activeChannelId = '';
+      state.activeChannelKind = '';
+      state.activePeer = null;
+      state.activeNodeId = selected.node_id || selected.agent_id || '';
+      stopNodePolling();
+      setRails('node');
+      els.workspaceName.textContent = 'PC 节点';
+      els.workspaceMeta.textContent = '我的节点';
+      setHeader(selected.online ? '●' : '○', nodeName(selected), nodeSummaryLine(selected));
+      setComposer(false, '节点详情只读', false);
+      deps.renderChannels();
+      renderNodeDetail(selected);
+      renderMembers('节点摘要', [
+        { name: '状态', sub: selected.online ? '在线' : '离线' },
+        { name: '项目容量', sub: capacityText(selected) },
+        { name: '硬盘服务', sub: selected.storage_ready ? '可用' : '未启用' },
+        { name: '开发运行时', sub: selected.workspace_provision_ready ? '可创建工作区' : '未就绪' }
+      ]);
     }
 
     function renderNodeMain() {
@@ -117,7 +157,7 @@
       let attempts = 0;
       state.nodePollTimer = window.setInterval(() => {
         attempts += 1;
-        if (state.activeKind !== 'node' || attempts > 24) {
+        if (state.activeKind !== 'node' || state.activeNodeId || attempts > 24) {
           window.clearInterval(state.nodePollTimer);
           state.nodePollTimer = null;
           return;
@@ -135,14 +175,14 @@
       }
       try {
         const status = await localNodeApi('/api/status', 2200);
-        if (seq !== state.nodeProbeSeq || state.activeKind !== 'node') return;
+        if (seq !== state.nodeProbeSeq || state.activeKind !== 'node' || state.activeNodeId) return;
         if (state.nodePollTimer) {
           window.clearInterval(state.nodePollTimer);
           state.nodePollTimer = null;
         }
         renderNodeConnected(status);
       } catch (error) {
-        if (seq !== state.nodeProbeSeq || state.activeKind !== 'node') return;
+        if (seq !== state.nodeProbeSeq || state.activeKind !== 'node' || state.activeNodeId) return;
         renderNodeSetup(error && error.name === 'AbortError'
           ? '本机节点暂时没有响应。'
           : '没有检测到正在运行的本机节点。');
@@ -203,6 +243,79 @@
         </div>`;
     }
 
+    function renderNodeDetail(node) {
+      setNodeMode(true);
+      const hardware = node.hardware || {};
+      const storage = node.storage || {};
+      const runtime = node.dev_runtime || {};
+      const warnings = (node.capacity_warnings || []).concat(runtime.issues || []).map(clean).filter(Boolean);
+      const toolchains = (runtime.toolchains || []).filter(Boolean);
+      const models = (node.models || []).filter(Boolean);
+      const remainingSlots = Number(node.project_slots_remaining);
+      els.messageList.innerHTML = `
+        <div class="node-page node-detail-page">
+          <section class="node-detail-hero">
+            <div>
+              <div class="node-kicker">我的节点</div>
+              <h2>${escapeHtml(nodeName(node))}</h2>
+              <p>${escapeHtml(node.node_id || node.agent_id || '')}</p>
+            </div>
+            <span class="node-status-chip ${node.online ? 'online' : 'offline'}">${node.online ? '在线' : '离线'}</span>
+          </section>
+          <section class="node-detail-metrics">
+            ${metricCard('连接', node.online ? '在线' : '离线', connectionText(node))}
+            ${metricCard('容量', capacityText(node), node.can_accept_project ? '可接新项目' : '暂不可接新项目')}
+            ${metricCard('硬盘', node.storage_ready ? '可用' : '未启用', storageStatusText(node))}
+            ${metricCard('运行时', runtimeStatusText(node), cliStatusText(node))}
+          </section>
+          ${warnings.length ? `<section class="node-warning-list">${warnings.map((item) => `<div>${escapeHtml(item)}</div>`).join('')}</section>` : ''}
+          <section class="node-detail-grid">
+            ${detailPanel('基础信息', [
+              ['显示名称', nodeName(node)],
+              ['设备名', clean(node.device_name) || '未上报'],
+              ['节点 ID', clean(node.node_id || node.agent_id) || '未知'],
+              ['短 ID', clean(node.short_id) || '未知'],
+              ['注册时间', formatDateTime(node.created_at) || '未知'],
+              ['最近连接', formatUnixTime(node.connected_at) || '未连接']
+            ])}
+            ${detailPanel('硬件画像', [
+              ['系统', clean(hardware.os) || '未上报'],
+              ['架构', clean(hardware.arch) || '未上报'],
+              ['CPU', hardware.cpu_brand ? `${hardware.cpu_brand}${hardware.cpu_cores ? ` · ${hardware.cpu_cores} 核` : ''}` : '未上报'],
+              ['内存', formatBytes(hardware.memory_total_bytes) || '未上报'],
+              ['显卡', (hardware.gpu_names || []).join('、') || '未上报'],
+              ['显存', formatBytes(hardware.gpu_memory_total_bytes) || '未上报']
+            ])}
+            ${detailPanel('项目与硬盘', [
+              ['项目数量', capacityText(node)],
+              ['剩余名额', Number.isFinite(remainingSlots) ? `${remainingSlots}` : '未知'],
+              ['可用磁盘', formatBytes(node.disk_free_bytes || storage.disk_free_bytes) || '未上报'],
+              ['工作目录', clean(storage.root_path) || '未配置'],
+              ['Git 地址', clean(storage.git_base_url) || (storage.relay_git_url_enabled ? '云端中继可用' : '未配置')],
+              ['跨 PC 仓库', node.storage_repo_url_configured ? '已配置' : '未配置']
+            ])}
+            ${detailPanel('开发运行时', [
+              ['工作区根目录', clean(runtime.workspace_root_path) || '未配置'],
+              ['目录可写', runtime.workspace_root_writable ? '是' : '否'],
+              ['Git', runtime.git_ready ? '可用' : '未就绪'],
+              ['创建工作区', node.workspace_provision_ready ? '可用' : '未就绪'],
+              ['开发环境', runtime.dev_env_ready ? '就绪' : '未就绪'],
+              ['AI CLI', node.ai_cli_ready ? '就绪' : '未就绪']
+            ])}
+          </section>
+          <section class="node-detail-grid compact">
+            ${listPanel('模型能力', models.length ? models.map(modelLine) : ['暂无模型能力'])}
+            ${listPanel('允许的 CLI', (node.allowed_clis || []).length ? node.allowed_clis : ['未连接本机 CLI'])}
+            ${listPanel('允许目录', (node.allowed_cwds || []).length ? node.allowed_cwds : ['未配置目录白名单'])}
+            ${listPanel('工具链', toolchains.length ? toolchains.map(toolchainLine) : ['未上报工具链'])}
+          </section>
+          <section class="node-actions-panel">
+            <button class="node-action" type="button" id="backToLocalNode">回到节点注册</button>
+          </section>
+        </div>`;
+      $('backToLocalNode')?.addEventListener('click', selectLocalNode);
+    }
+
     async function loadNodePackageVersion() {
       const line = $('nodeVersionLine');
       if (!line) return;
@@ -227,6 +340,104 @@
     function setLaunchButton(text) {
       const button = $('openNodeFrame');
       if (button) button.textContent = text;
+    }
+
+    function stopNodePolling() {
+      if (!state.nodePollTimer) return;
+      window.clearInterval(state.nodePollTimer);
+      state.nodePollTimer = null;
+    }
+
+    function findNode(nodeId) {
+      return state.nodes.find((node) => sameNode(node, nodeId));
+    }
+
+    function sameNode(node, nodeId) {
+      const id = clean(nodeId);
+      return !!id && [node.node_id, node.agent_id].some((value) => String(value || '') === id);
+    }
+
+    function nodeName(node) {
+      return clean(node.display_name || node.device_name || node.label || node.short_id || node.node_id || 'PC 节点');
+    }
+
+    function nodeSummaryLine(node) {
+      const status = node.online ? '在线' : '离线';
+      const capacity = clean(node.capacity_label);
+      return capacity ? `${status} · ${capacity}` : status;
+    }
+
+    function connectionText(node) {
+      if (!node.online) return '节点未连接云端';
+      if (node.registry_online && node.cli_connected) return '节点与 CLI 均在线';
+      if (node.registry_online) return '节点在线';
+      if (node.cli_connected) return 'CLI 在线';
+      return '在线';
+    }
+
+    function capacityText(node) {
+      const count = Number(node.project_count || 0);
+      const limit = Number(node.project_limit || 0);
+      if (limit > 0) return `${count}/${limit} 个项目`;
+      return `${count} 个项目`;
+    }
+
+    function storageStatusText(node) {
+      if (node.storage_ready) return '可保存项目代码';
+      return node.storage && node.storage.enabled ? '等待 CLI 连接' : '未启用硬盘节点';
+    }
+
+    function runtimeStatusText(node) {
+      if (node.workspace_provision_ready) return '可创建工作区';
+      if (node.cli_project_ready) return 'CLI 可用';
+      return '未就绪';
+    }
+
+    function cliStatusText(node) {
+      const clis = (node.allowed_clis || []).map(clean).filter(Boolean);
+      return clis.length ? clis.join(' / ') : '未连接本机 CLI';
+    }
+
+    function detailPanel(title, rows) {
+      return `<div class="node-info-panel"><h3>${escapeHtml(title)}</h3><div class="node-kv-list">
+        ${rows.map(([label, value]) => `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(clean(value) || '未上报')}</strong></div>`).join('')}
+      </div></div>`;
+    }
+
+    function listPanel(title, items) {
+      return `<div class="node-info-panel"><h3>${escapeHtml(title)}</h3><div class="node-pill-row">
+        ${items.map((item) => `<span class="node-pill">${escapeHtml(clean(item) || '未知')}</span>`).join('')}
+      </div></div>`;
+    }
+
+    function metricCard(label, value, sub) {
+      return `<div class="node-metric"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || '未知')}</strong><em>${escapeHtml(sub || '')}</em></div>`;
+    }
+
+    function modelLine(model) {
+      const name = clean(model.display_name || model.model_id || '模型');
+      const provider = clean(model.provider);
+      const context = Number(model.context_len || 0);
+      return `${name}${provider ? ` · ${provider}` : ''}${context ? ` · ${context} ctx` : ''}`;
+    }
+
+    function toolchainLine(toolchain) {
+      const name = clean(toolchain.name || '工具链');
+      const version = clean(toolchain.version);
+      return `${name}${toolchain.available ? ' 可用' : ' 不可用'}${version ? ` · ${version}` : ''}`;
+    }
+
+    function formatUnixTime(value) {
+      const timestamp = Number(value || 0);
+      if (!timestamp) return '';
+      return formatDateTime(new Date(timestamp * 1000).toISOString());
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return clean(value);
+      return date.toLocaleString('zh-CN', { hour12: false });
     }
 
     function formatBytes(value) {
