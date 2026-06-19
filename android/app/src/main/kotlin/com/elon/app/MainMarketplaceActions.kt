@@ -777,13 +777,13 @@ internal class MainMarketplaceActions(
         const val THUMB_SIZE_DP = 40
         const val DIVIDER_WIDTH_DP = 252
         const val DESC_WIDTH_DP = 260
-        const val CARD_BODY_CONTENT_TOP_DP = 18
-        const val CARD_TIME_TOP_DP = 38
+        const val CARD_BODY_CONTENT_TOP_DP = 12
+        const val CARD_TIME_TOP_DP = 32
         const val CARD_MAIN_RIGHT_MARGIN_DP = 24
         const val INFO_ROW_RIGHT_MARGIN_DP = 96
         const val ACTION_BUTTON_WIDTH_DP = 68
         const val ACTION_BUTTON_HEIGHT_DP = 32
         const val ACTION_BUTTON_GAP_DP = 10
-        const val ACTION_BUTTON_BOTTOM_DP = 16
+        const val ACTION_BUTTON_BOTTOM_DP = 8
     }
 }

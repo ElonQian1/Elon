@@ -165,7 +165,7 @@
   position: absolute;
   left: 24px;
   right: 24px;
-  top: 18px;
+  top: 12px;
 }
 
 .project-plaza-info-row {
@@ -244,7 +244,7 @@
 .project-plaza-time {
   position: absolute;
   right: 24px;
-  top: 38px;
+  top: 32px;
   color: #d9d9d9;
   font-size: 12px;
   line-height: 1;
@@ -255,7 +255,7 @@
   position: absolute;
   left: 24px;
   right: 24px;
-  bottom: 16px;
+  bottom: 8px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
