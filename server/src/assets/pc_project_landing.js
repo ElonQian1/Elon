@@ -98,15 +98,45 @@
 
     function statusLabel(status, platform) {
       if (platform === 'web' && (status === 'available' || status === 'external')) return '网页入口';
+      if (platform === 'ios' && (status === 'available' || status === 'external')) return 'PWA 入口';
       if (status === 'available') return '可下载';
       if (status === 'external') return '外部入口';
       if (status === 'unavailable') return '暂不可用';
       if (status === 'coming_soon') return '即将支持';
       if (status === 'needs_configuration') return '待配置';
-      if (status === 'third_party') return '第三方方案';
+      if (status === 'third_party') return '第三方入口';
       if (status === 'pending') return '待发布';
       if (status === 'planned') return '计划中';
       return '待配置';
+    }
+
+    function downloadGroupOf(item) {
+      if ((item.platform === 'web' || item.platform === 'ios') && ACTIVE_STATUSES.has(item.status)) return 'web';
+      if (item.status === 'third_party') return 'third-party';
+      if (item.status === 'available') return 'install';
+      return 'planned';
+    }
+
+    function downloadGroupLabel(group) {
+      if (group === 'install') return '可安装客户端';
+      if (group === 'web') return '网页与 PWA';
+      if (group === 'third-party') return '第三方方案';
+      return '待发布与计划中';
+    }
+
+    function downloadGroups(downloads) {
+      const grouped = [];
+      const byKey = new Map();
+      downloads.forEach((item) => {
+        const key = downloadGroupOf(item);
+        if (!byKey.has(key)) {
+          const group = { key, label: downloadGroupLabel(key), items: [] };
+          byKey.set(key, group);
+          grouped.push(group);
+        }
+        byKey.get(key).items.push(item);
+      });
+      return grouped;
     }
 
     function normalizeDownload(item) {
@@ -279,16 +309,25 @@
 
     function downloadCardHtml(item) {
       const enabled = ACTIVE_STATUSES.has(item.status) && item.url;
-      const detail = [item.version, item.size, item.note].filter(Boolean).join(' · ');
+      const versionDetail = [item.version, item.size].filter(Boolean).join(' · ');
+      const fallbackDetail = statusLabel(item.status, item.platform);
       return `<button class="project-landing-download ${enabled ? '' : 'disabled'} status-${escapeHtml(item.status)}" type="button"
           data-download-url="${escapeHtml(enabled ? item.url : '')}" aria-disabled="${enabled ? 'false' : 'true'}">
         <span class="project-landing-platform">${escapeHtml(item.short)}</span>
         <span class="project-landing-download-main">
           <strong>${escapeHtml(item.label)}</strong>
-          <span>${escapeHtml(detail || statusLabel(item.status, item.platform))}</span>
+          ${versionDetail ? `<span>${escapeHtml(versionDetail)}</span>` : `<span>${escapeHtml(fallbackDetail)}</span>`}
+          ${item.note ? `<small>${escapeHtml(item.note)}</small>` : ''}
         </span>
         <em>${escapeHtml(statusLabel(item.status, item.platform))}</em>
       </button>`;
+    }
+
+    function downloadGroupsHtml(downloads) {
+      return downloadGroups(downloads).map((group) => `<section class="project-landing-download-group group-${escapeHtml(group.key)}">
+        <h2>${escapeHtml(group.label)}</h2>
+        <div class="project-landing-downloads">${group.items.map(downloadCardHtml).join('')}</div>
+      </section>`).join('');
     }
 
     function resourceButtonsHtml(project, landing) {
@@ -431,7 +470,7 @@
           </div>
         </header>
         <div class="project-landing-summary">${escapeHtml(description)}</div>
-        <div class="project-landing-downloads">${downloads.map(downloadCardHtml).join('')}</div>
+        <div class="project-landing-download-groups">${downloadGroupsHtml(downloads)}</div>
         <div class="project-landing-section">
           <h2>核心信息</h2>
           <div class="project-landing-feature-grid">${features.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>
