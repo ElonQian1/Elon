@@ -104,7 +104,7 @@
       if (status === 'coming_soon') return '即将支持';
       if (status === 'needs_configuration') return '待配置';
       if (status === 'third_party') return '第三方方案';
-      if (status === 'pending') return '待检查';
+      if (status === 'pending') return '待发布';
       if (status === 'planned') return '计划中';
       return '待配置';
     }
@@ -164,17 +164,16 @@
     }
 
     function downloadsOf(project, landing) {
-      const byPlatform = new Map();
       const rawDownloads = [
         ...downloadArrayOf(state.projectSpace && state.projectSpace.downloads),
         ...downloadArrayOf(landing.downloads),
         ...downloadArrayOf(project && project.downloads)
       ];
-      rawDownloads.map(normalizeDownload).filter(Boolean).forEach((item) => byPlatform.set(item.platform, item));
+      const downloads = rawDownloads.map(normalizeDownload).filter(Boolean);
 
       const apkUrl = latestApkUrl(project);
-      if (apkUrl && !byPlatform.has('android')) {
-        byPlatform.set('android', {
+      if (apkUrl && !downloads.some((item) => item.platform === 'android' && item.url)) {
+        downloads.push({
           platform: 'android',
           label: PLATFORM_META.android.label,
           short: PLATFORM_META.android.short,
@@ -188,8 +187,8 @@
       }
 
       const webUrl = webUrlOf(project, landing);
-      if (webUrl && !byPlatform.has('web')) {
-        byPlatform.set('web', {
+      if (webUrl && !downloads.some((item) => item.platform === 'web' && item.url === webUrl)) {
+        downloads.push({
           platform: 'web',
           label: PLATFORM_META.web.label,
           short: PLATFORM_META.web.short,
@@ -202,7 +201,19 @@
         });
       }
 
-      return PLATFORM_ORDER.map((platform) => byPlatform.get(platform) || {
+      if (downloads.length) {
+        return downloads
+          .map((item, index) => Object.assign({ index }, item))
+          .sort((left, right) => {
+            const leftOrder = PLATFORM_ORDER.indexOf(left.platform);
+            const rightOrder = PLATFORM_ORDER.indexOf(right.platform);
+            const safeLeft = leftOrder >= 0 ? leftOrder : PLATFORM_ORDER.length;
+            const safeRight = rightOrder >= 0 ? rightOrder : PLATFORM_ORDER.length;
+            return safeLeft - safeRight || left.index - right.index;
+          });
+      }
+
+      return PLATFORM_ORDER.map((platform) => ({
         platform,
         label: PLATFORM_META[platform].label,
         short: PLATFORM_META[platform].short,
@@ -212,7 +223,7 @@
         size: '',
         status: 'planned',
         note: platform === 'android' ? '暂无 APK' : '等待项目配置'
-      });
+      }));
     }
 
     function descriptionOf(project, landing) {

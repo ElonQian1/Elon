@@ -144,6 +144,17 @@
   color: #ffd6d8;
 }
 
+.project-landing-download.status-pending .project-landing-platform,
+.project-landing-download.status-needs_configuration .project-landing-platform {
+  background: #463b28;
+  color: #ffe0b5;
+}
+
+.project-landing-download.status-planned .project-landing-platform {
+  background: #2f3d55;
+  color: #d8e6ff;
+}
+
 .project-landing-download-main {
   min-width: 0;
 }
