@@ -1311,8 +1311,8 @@ internal class ProjectSpaceController(
         const val DOCS_CHANNEL_KIND = "docs"
         const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
         const val PROJECT_SPACE_AI_ANIMATION_MS = 220L
-        const val PROJECT_SPACE_AI_COLLAPSED_SIZE_DP = 64
-        const val PROJECT_SPACE_AI_EXPANDED_HEIGHT_DP = 64
+        const val PROJECT_SPACE_AI_COLLAPSED_SIZE_DP = 60
+        const val PROJECT_SPACE_AI_EXPANDED_HEIGHT_DP = 60
         const val PROJECT_SPACE_AI_EXPANDED_WIDTH_DP = 156
         const val PROJECT_SPACE_AI_COLLAPSED_ICON_SIZE_DP = 24
         const val PROJECT_SPACE_AI_EXPANDED_ICON_SIZE_DP = 24
