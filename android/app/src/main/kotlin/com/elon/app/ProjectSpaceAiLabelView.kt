@@ -25,16 +25,17 @@ class ProjectSpaceAiLabelView @JvmOverloads constructor(
         val originalAlign = paint.textAlign
         val originalColor = paint.color
         val textWidth = paint.measureText(value)
-        val needsLeadingFade = contentWidth < textWidth - 1
-        if (needsLeadingFade) {
+        val needsTrailingFade = contentWidth < textWidth - 1
+        if (needsTrailingFade) {
             val fadeWidth = min(contentWidth.toFloat(), textFadeWidthPx())
+            val fadeEnd = (width - paddingRight).toFloat()
             paint.shader = LinearGradient(
-                paddingLeft.toFloat(),
+                fadeEnd - fadeWidth,
                 0f,
-                paddingLeft + fadeWidth,
+                fadeEnd,
                 0f,
-                transparentColor(currentTextColor),
                 currentTextColor,
+                transparentColor(currentTextColor),
                 Shader.TileMode.CLAMP
             )
         } else {
@@ -43,7 +44,7 @@ class ProjectSpaceAiLabelView @JvmOverloads constructor(
         }
 
         paint.textAlign = Paint.Align.LEFT
-        val x = paddingLeft + contentWidth - textWidth
+        val x = paddingLeft.toFloat()
         val metrics = paint.fontMetrics
         val baseline = paddingTop + (contentHeight - metrics.ascent - metrics.descent) / 2f
 

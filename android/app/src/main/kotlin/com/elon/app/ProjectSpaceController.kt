@@ -1222,7 +1222,7 @@ internal class ProjectSpaceController(
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED),
             View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
         )
-        return label.measuredWidth.coerceAtLeast(dp(PROJECT_SPACE_AI_LABEL_MIN_WIDTH_DP))
+        return label.measuredWidth
     }
 
     private fun renderMemberConversationMessages(
@@ -1317,8 +1317,7 @@ internal class ProjectSpaceController(
         const val PROJECT_SPACE_AI_COLLAPSED_ICON_SIZE_DP = 24
         const val PROJECT_SPACE_AI_EXPANDED_ICON_SIZE_DP = 24
         const val PROJECT_SPACE_AI_EXPAND_AT_TOP_DP = 4
-        const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 12
-        const val PROJECT_SPACE_AI_LABEL_MIN_WIDTH_DP = 64
+        const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 8
 
         fun canEditProjectDescription(role: String?): Boolean {
             return role?.trim()?.lowercase() in setOf("owner", "admin", "editor")
