@@ -9,9 +9,17 @@
     activeKind: 'friends', activeProjectId: '', activeChannelId: '', activeChannelKind: '',
     activeVoiceChannel: 'studio',
     activePeer: null, projectSpace: null,
+    plaza: { loaded: false, loading: false, projects: [], query: '', filterKey: 'all', busyId: '', error: '' },
     nodeAdminUrl: safeNodeAdminUrl()
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
+  const PLAZA_FILTERS = [
+    { key: 'all', label: '全部' },
+    { key: 'installable', label: '可安装', hasApk: true },
+    { key: 'no_approval', label: '无审批', noApprovalOnly: true },
+    { key: 'joined', label: '已加入', joinedOnly: true },
+    { key: 'popular', label: '最热门', sort: 'members' }
+  ];
   let pcAuthMode = 'login';
 
   const els = {
@@ -20,7 +28,8 @@
     pcAuthAccountInput: $('pcAuthAccountInput'), pcAuthNicknameField: $('pcAuthNicknameField'),
     pcAuthNicknameInput: $('pcAuthNicknameInput'), pcAuthPasswordInput: $('pcAuthPasswordInput'),
     pcAuthError: $('pcAuthError'), pcAuthSubmitBtn: $('pcAuthSubmitBtn'),
-    friendsRail: $('friendsRail'), doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), projectRailList: $('projectRailList'),
+    friendsRail: $('friendsRail'), projectsRail: $('projectsRail'), projectPlazaRail: $('projectPlazaRail'),
+    doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), projectRailList: $('projectRailList'),
     channelList: $('channelList'), memberList: $('memberList'), messageList: $('messageList'),
     workspaceName: $('workspaceName'), workspaceMeta: $('workspaceMeta'), channelGlyph: $('channelGlyph'),
     channelTitle: $('channelTitle'), channelSubtitle: $('channelSubtitle'), userName: $('userName'),
@@ -31,7 +40,16 @@
     accountMenu: $('accountMenu'), accountMenuAvatar: $('accountMenuAvatar'), accountMenuName: $('accountMenuName'),
     accountMenuMeta: $('accountMenuMeta'), profileCenterBtn: $('profileCenterBtn'), pcSettingsMenuBtn: $('pcSettingsMenuBtn'),
     logoutMenuBtn: $('logoutMenuBtn'), settingsBackdrop: $('settingsBackdrop'),
-    settingsCloseBtn: $('settingsCloseBtn'), chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
+    settingsCloseBtn: $('settingsCloseBtn'), settingsAccountTab: $('settingsAccountTab'), settingsWorkbenchTab: $('settingsWorkbenchTab'),
+    settingsNotificationsTab: $('settingsNotificationsTab'), settingsAccountPanel: $('settingsAccountPanel'),
+    settingsWorkbenchPanel: $('settingsWorkbenchPanel'), settingsNotificationsPanel: $('settingsNotificationsPanel'),
+    settingsPlaceholderPanel: $('settingsPlaceholderPanel'), settingsPlaceholderTitle: $('settingsPlaceholderTitle'),
+    settingsPlaceholderText: $('settingsPlaceholderText'), settingsSubtitle: $('settingsSubtitle'),
+    settingsUserAvatar: $('settingsUserAvatar'), settingsUserName: $('settingsUserName'), settingsUserMeta: $('settingsUserMeta'),
+    settingsDisplayName: $('settingsDisplayName'), settingsAccountValue: $('settingsAccountValue'), settingsUserId: $('settingsUserId'),
+    settingsVerifyBtn: $('settingsVerifyBtn'), settingsEditProfileBtn: $('settingsEditProfileBtn'), settingsLoginBtn: $('settingsLoginBtn'),
+    settingsSecurityBtn: $('settingsSecurityBtn'), settingsDevicesBtn: $('settingsDevicesBtn'), settingsLogoutBtn: $('settingsLogoutBtn'),
+    chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
     inspectProjectFolderBtn: $('inspectProjectFolderBtn'), registerProjectBtn: $('registerProjectBtn'),
     settingsProjectPath: $('settingsProjectPath'), settingsProjectName: $('settingsProjectName'),
     settingsProjectDesc: $('settingsProjectDesc'), settingsProjectRepo: $('settingsProjectRepo'),
@@ -169,6 +187,10 @@
     return state.token ? '在线' : '需要登录';
   }
 
+  function userAccountValue(user) {
+    return clean(user && (user.account || user.phone || user.email)) || (state.token ? '账号信息未完善' : '请先登录');
+  }
+
   function setBadge(el, value) {
     if (!el) return;
     const n = Number(value || 0);
@@ -278,6 +300,8 @@
 
   function setRails(kind) {
     els.friendsRail.classList.toggle('active', kind === 'friends');
+    els.projectsRail.classList.toggle('active', kind === 'projects');
+    els.projectPlazaRail.classList.toggle('active', kind === 'project-plaza');
     els.doctorRail.classList.toggle('active', kind === 'doctor');
     els.nodeRail.classList.toggle('active', kind === 'node');
     els.voiceRail.classList.toggle('active', kind === 'voice');
@@ -299,6 +323,15 @@
     if (els.accountMenuAvatar) {
       els.accountMenuAvatar.classList.toggle('fallback', !avatar);
       els.accountMenuAvatar.innerHTML = avatarContents(avatar, name, '龙');
+    }
+    if (els.settingsUserName) els.settingsUserName.textContent = name;
+    if (els.settingsUserMeta) els.settingsUserMeta.textContent = meta;
+    if (els.settingsDisplayName) els.settingsDisplayName.textContent = name;
+    if (els.settingsAccountValue) els.settingsAccountValue.textContent = userAccountValue(state.user);
+    if (els.settingsUserId) els.settingsUserId.textContent = clean(state.user && state.user.id) || '--';
+    if (els.settingsUserAvatar) {
+      els.settingsUserAvatar.classList.toggle('fallback', !avatar);
+      els.settingsUserAvatar.innerHTML = avatarContents(avatar, name, '龙');
     }
   }
 
@@ -325,6 +358,8 @@
   function renderChannels() {
     const query = filterText();
     if (state.activeKind === 'friends') return renderFriendChannels(query);
+    if (state.activeKind === 'projects') return renderProjectHomeChannels(query);
+    if (state.activeKind === 'project-plaza') return renderProjectPlazaChannels(query);
     if (state.activeKind === 'doctor') return doctor.renderChannels(channelButton);
     if (state.activeKind === 'node') return node.renderChannels(channelButton);
     if (state.activeKind === 'voice') return window.ElonVoiceProject.renderChannels(voiceContext());
@@ -350,6 +385,88 @@
     ].join('');
     els.channelList.querySelectorAll('[data-peer-kind]').forEach((btn) => {
       btn.addEventListener('click', () => selectPeer(btn.dataset.peerKind, btn.dataset.itemId));
+    });
+  }
+
+  function projectDescription(project) {
+    return clean(project.project_description || project.projectDescription || project.description || project.subtitle) || '暂无简介';
+  }
+
+  function projectRoleLabel(project) {
+    const role = clean(project.role || project.member_role || project.memberRole);
+    if (!role || role === 'owner') return '拥有者';
+    if (role === 'admin') return '管理员';
+    if (role === 'editor') return '协作者';
+    return role;
+  }
+
+  function projectMemberCount(project) {
+    const count = Number(project.member_count || project.memberCount || project.members || 0);
+    return Number.isFinite(count) && count > 0 ? count : 1;
+  }
+
+  function renderProjectHomeChannels(query) {
+    const projects = state.projects.filter((project) => titleOf(project).toLowerCase().includes(query));
+    els.channelList.innerHTML = [
+      '<div class="channel-section">项目</div>',
+      '<button class="channel-item" type="button" data-project-home-action="overview"><span class="glyph">项</span><span class="main"><strong>我的项目</strong><span>查看项目列表</span></span></button>',
+      '<button class="channel-item" type="button" data-project-home-action="plaza"><span class="glyph">广</span><span class="main"><strong>项目广场</strong><span>发现公开项目</span></span></button>',
+      '<div class="channel-section">项目列表</div>',
+      state.token
+        ? (projects.map((project) => channelButton({
+          id: project.id,
+          kind: 'project-entry',
+          avatar: iconUrlOf(project),
+          avatarFallback: titleOf(project),
+          glyph: '项',
+          title: titleOf(project),
+          sub: `${projectRoleLabel(project)} · ${projectMemberCount(project)} 位成员`,
+          active: state.activeProjectId && sameId(project.id, state.activeProjectId)
+        })).join('') || '<div class="empty-state">暂无项目</div>')
+        : '<div class="empty-state">登录后显示我的项目</div>'
+    ].join('');
+    els.channelList.querySelectorAll('[data-project-home-action]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        if (btn.dataset.projectHomeAction === 'plaza') selectProjectPlaza();
+        else renderProjectHomeSurface();
+      });
+    });
+    els.channelList.querySelectorAll('[data-peer-kind="project-entry"]').forEach((btn) => {
+      btn.addEventListener('click', () => selectProject(btn.dataset.itemId));
+    });
+  }
+
+  function renderProjectPlazaChannels(query) {
+    const joinedIds = new Set(state.projects.map((project) => project && project.id).filter(Boolean));
+    const joined = state.plaza.projects
+      .filter((project) => joinedIds.has(project.id) && titleOf(project).toLowerCase().includes(query))
+      .slice(0, 20);
+    els.channelList.innerHTML = [
+      '<div class="channel-section">项目广场</div>',
+      '<button class="channel-item active" type="button" data-plaza-channel="all"><span class="glyph">广</span><span class="main"><strong>全部公开项目</strong><span>搜索、加入和下载 APK</span></span></button>',
+      '<button class="channel-item" type="button" data-plaza-channel="mine"><span class="glyph">已</span><span class="main"><strong>已加入</strong><span>我已加入的公开项目</span></span></button>',
+      '<div class="channel-section">已加入</div>',
+      state.token
+        ? (joined.map((project) => channelButton({
+          id: project.id,
+          kind: 'project-entry',
+          avatar: iconUrlOf(project),
+          avatarFallback: titleOf(project),
+          glyph: '项',
+          title: titleOf(project),
+          sub: `${projectMemberCount(project)} 位成员`,
+          active: false
+        })).join('') || '<div class="empty-state">暂无已加入项目</div>')
+        : '<div class="empty-state">登录后查看已加入项目</div>'
+    ].join('');
+    els.channelList.querySelectorAll('[data-plaza-channel]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.plaza.filterKey = btn.dataset.plazaChannel === 'mine' ? 'joined' : 'all';
+        loadProjectPlaza(true);
+      });
+    });
+    els.channelList.querySelectorAll('[data-peer-kind="project-entry"]').forEach((btn) => {
+      btn.addEventListener('click', () => selectProject(btn.dataset.itemId));
     });
   }
 
@@ -474,6 +591,8 @@
 
   function bindEvents() {
     els.friendsRail.addEventListener('click', selectFriends);
+    els.projectsRail.addEventListener('click', selectProjectsHome);
+    els.projectPlazaRail.addEventListener('click', selectProjectPlaza);
     els.doctorRail.addEventListener('click', doctor.selectDoctor);
     els.nodeRail.addEventListener('click', node.selectNode);
     els.voiceRail.addEventListener('click', () => selectVoiceProject());
@@ -484,19 +603,31 @@
     els.pcAuthBackdrop.addEventListener('click', (event) => {
       if (event.target === els.pcAuthBackdrop) closeAuthModal();
     });
-    [els.friendsRail, els.doctorRail, els.nodeRail, els.voiceRail, $('openWebBtn')].forEach(attachRailTooltip);
+    [els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, $('openWebBtn')].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLocalNodeBtn').addEventListener('click', node.selectNode);
     els.userProfileBtn.addEventListener('click', toggleAccountMenu);
-    els.userSettingsBtn.addEventListener('click', toggleAccountMenu);
-    els.profileCenterBtn.addEventListener('click', openProfileCenter);
+    els.userSettingsBtn.addEventListener('click', () => openSettings('account'));
+    els.profileCenterBtn.addEventListener('click', () => openSettings('account'));
     els.pcSettingsMenuBtn.addEventListener('click', () => {
       setAccountMenu(false);
-      openSettings();
+      openSettings('workbench');
     });
     els.logoutMenuBtn.addEventListener('click', logout);
+    document.querySelectorAll('[data-settings-section]').forEach((button) => {
+      button.addEventListener('click', () => setSettingsSection(button.dataset.settingsSection));
+    });
+    els.settingsVerifyBtn.addEventListener('click', () => {
+      if (state.token) openProfileCenter();
+      else openAuthModal('register');
+    });
+    els.settingsEditProfileBtn.addEventListener('click', openProfileCenter);
+    els.settingsLoginBtn.addEventListener('click', () => openAuthModal('login'));
+    els.settingsSecurityBtn.addEventListener('click', () => setSettingsSection('security'));
+    els.settingsDevicesBtn.addEventListener('click', () => setSettingsSection('devices'));
+    els.settingsLogoutBtn.addEventListener('click', logout);
     els.settingsCloseBtn.addEventListener('click', closeSettings);
     els.settingsBackdrop.addEventListener('click', (event) => {
       if (event.target === els.settingsBackdrop) closeSettings();
@@ -623,6 +754,253 @@
       <button class="text-button" type="button" id="loginWeb">登录或注册账号</button>
     </div>`;
     $('loginWeb').addEventListener('click', () => openAuthModal('login'));
+  }
+
+  function selectProjectsHome() {
+    state.activeKind = 'projects';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activePeer = null;
+    state.projectSpace = null;
+    setAuthClaimBanner(!state.token);
+    setRails('projects');
+    els.workspaceName.textContent = '项目 / 我的项目';
+    els.workspaceMeta.textContent = state.token ? `${state.projects.length} 个项目` : '需要登录';
+    setHeader('项', '项目 / 我的项目', '查看你加入和创建的项目');
+    setComposer(false, '选择项目后开始输入', false);
+    setNodeMode(false);
+    renderProjectHomeChannels(filterText());
+    renderMembers('项目成员', []);
+    renderProjectHomeSurface();
+  }
+
+  function renderProjectHomeSurface() {
+    setHeader('项', '项目 / 我的项目', '查看你加入和创建的项目');
+    setComposer(false, '选择项目后开始输入', false);
+    setNodeMode(false);
+    const projects = state.projects.slice().sort((a, b) => String(b.updated_at || b.updatedAt || '').localeCompare(String(a.updated_at || a.updatedAt || '')));
+    if (!state.token) {
+      els.messageList.innerHTML = `<div class="empty-state">
+        <strong>登录后查看我的项目</strong>
+        <p>项目列表、协作空间和本机项目注册都需要登录账号。</p>
+        <button class="text-button" type="button" id="projectLoginBtn">登录或注册账号</button>
+      </div>`;
+      $('projectLoginBtn').addEventListener('click', () => openAuthModal('login'));
+      return;
+    }
+    els.messageList.innerHTML = `<section class="pc-project-view">
+      <div class="pc-project-hero">
+        <div>
+          <h2>我的项目</h2>
+          <p>集中管理个人项目、联合项目和已加入的协作空间。</p>
+        </div>
+        <button class="text-button" type="button" id="projectOpenWebBtn">打开网页版项目页</button>
+      </div>
+      ${projects.length ? `<div class="pc-project-grid">${projects.map(renderProjectCard).join('')}</div>` : '<div class="pc-project-empty">还没有项目<br>可以从项目广场加入，或在 PC 工作台设置里注册本地项目。</div>'}
+    </section>`;
+    const webBtn = $('projectOpenWebBtn');
+    if (webBtn) webBtn.addEventListener('click', () => window.open('/web', '_blank'));
+    els.messageList.querySelectorAll('[data-open-project-id]').forEach((button) => {
+      button.addEventListener('click', () => selectProject(button.dataset.openProjectId));
+    });
+  }
+
+  function renderProjectCard(project) {
+    const title = titleOf(project);
+    const icon = iconUrlOf(project);
+    const hue = projectHue(project);
+    const iconMarkup = icon ? `<img src="${escapeHtml(icon)}" alt="" onerror="this.remove()" />` : escapeHtml(firstChar(title, '项'));
+    return `<button class="pc-project-card" type="button" data-open-project-id="${escapeHtml(project.id)}" style="--project-hue:${hue}">
+      <span class="pc-project-icon">${iconMarkup}</span>
+      <span>
+        <strong>${escapeHtml(title)}</strong>
+        <p>${escapeHtml(projectDescription(project))}</p>
+        <span class="pc-project-meta">
+          <span>${escapeHtml(projectRoleLabel(project))}</span>
+          <span>${escapeHtml(projectMemberCount(project))} 位成员</span>
+        </span>
+      </span>
+    </button>`;
+  }
+
+  function selectProjectPlaza() {
+    state.activeKind = 'project-plaza';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activePeer = null;
+    state.projectSpace = null;
+    setAuthClaimBanner(!state.token);
+    setRails('project-plaza');
+    els.workspaceName.textContent = '项目广场';
+    els.workspaceMeta.textContent = state.plaza.loading ? '加载中' : `${state.plaza.projects.length} 个公开项目`;
+    setHeader('广', '项目广场', '发现、加入和下载公开项目');
+    setComposer(false, '加入项目后可输入消息', false);
+    setNodeMode(false);
+    renderMembers('项目广场', []);
+    renderProjectPlazaChannels(filterText());
+    renderProjectPlazaSurface();
+    if (!state.plaza.loaded && !state.plaza.loading) loadProjectPlaza(false);
+  }
+
+  function plazaFilter() {
+    return PLAZA_FILTERS.find((item) => item.key === state.plaza.filterKey) || PLAZA_FILTERS[0];
+  }
+
+  async function loadProjectPlaza(force) {
+    if (state.plaza.loading) return;
+    if (!force && state.plaza.loaded) {
+      renderProjectPlazaSurface();
+      return;
+    }
+    state.plaza.loading = true;
+    state.plaza.error = '';
+    renderProjectPlazaSurface();
+    const filter = plazaFilter();
+    const params = new URLSearchParams({ limit: '80', offset: '0' });
+    if (state.plaza.query) params.set('q', state.plaza.query);
+    if (filter.hasApk != null) params.set('has_apk', String(filter.hasApk));
+    if (filter.sort) params.set('sort', filter.sort);
+    try {
+      const data = await api('/api/store/projects?' + params.toString(), { cache: 'no-store' });
+      const projects = Array.isArray(data.projects) ? data.projects : [];
+      const joinedIds = new Set(state.projects.map((project) => project && project.id).filter(Boolean));
+      state.plaza.projects = projects.filter((project) => {
+        const joined = joinedIds.has(project.id);
+        return (!filter.joinedOnly || joined) &&
+          (!filter.noApprovalOnly || clean(project.join_mode || project.joinMode).toLowerCase() !== 'approval');
+      });
+      state.plaza.loaded = true;
+      els.workspaceMeta.textContent = `${state.plaza.projects.length} 个公开项目`;
+    } catch (error) {
+      state.plaza.projects = [];
+      state.plaza.error = error.message || '加载失败';
+    } finally {
+      state.plaza.loading = false;
+      renderProjectPlazaChannels(filterText());
+      renderProjectPlazaSurface();
+    }
+  }
+
+  function renderProjectPlazaSurface() {
+    setHeader('广', '项目广场', '发现、加入和下载公开项目');
+    setComposer(false, '加入项目后可输入消息', false);
+    setNodeMode(false);
+    const filterButtons = PLAZA_FILTERS.map((filter) => `<button class="pc-plaza-filter ${filter.key === state.plaza.filterKey ? 'active' : ''}" type="button" data-plaza-filter="${escapeHtml(filter.key)}">${escapeHtml(filter.label)}</button>`).join('');
+    const body = state.plaza.loading
+      ? '<div class="pc-project-empty">项目广场加载中...</div>'
+      : (state.plaza.error
+        ? `<div class="pc-project-empty">加载失败<br>${escapeHtml(state.plaza.error)}</div>`
+        : (state.plaza.projects.length
+          ? `<div class="pc-project-grid">${state.plaza.projects.map(renderPlazaCard).join('')}</div>`
+          : '<div class="pc-project-empty">暂无匹配项目</div>'));
+    els.messageList.innerHTML = `<section class="pc-project-view">
+      <div class="pc-project-hero">
+        <div>
+          <h2>项目广场</h2>
+          <p>浏览公开项目，加入协作空间或下载可安装 APK。</p>
+        </div>
+        <button class="text-button" type="button" id="projectPlazaRefreshBtn">刷新</button>
+      </div>
+      <div class="pc-plaza-toolbar">
+        <input class="pc-plaza-search" id="projectPlazaSearchInput" type="search" placeholder="搜索公开项目" value="${escapeHtml(state.plaza.query)}" />
+        <div class="pc-plaza-filter-row">${filterButtons}</div>
+      </div>
+      ${body}
+    </section>`;
+    const refreshBtn = $('projectPlazaRefreshBtn');
+    if (refreshBtn) refreshBtn.addEventListener('click', () => loadProjectPlaza(true));
+    const search = $('projectPlazaSearchInput');
+    if (search) search.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      state.plaza.query = clean(search.value);
+      loadProjectPlaza(true);
+    });
+    els.messageList.querySelectorAll('[data-plaza-filter]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.plaza.filterKey = button.dataset.plazaFilter || 'all';
+        loadProjectPlaza(true);
+      });
+    });
+    els.messageList.querySelectorAll('[data-plaza-action]').forEach((button) => {
+      button.addEventListener('click', () => handlePlazaAction(button));
+    });
+  }
+
+  function renderPlazaCard(project) {
+    const title = titleOf(project);
+    const icon = iconUrlOf(project);
+    const hue = projectHue(project);
+    const joined = state.projects.some((item) => item && sameId(item.id, project.id));
+    const mode = clean(project.join_mode || project.joinMode || 'open').toLowerCase();
+    const apkUrl = clean(project.latest_apk_url || project.last_apk_url);
+    const busy = state.plaza.busyId && sameId(state.plaza.busyId, project.id);
+    const primaryAction = joined ? 'open' : (mode === 'approval' ? 'apply' : 'join');
+    const primaryLabel = busy ? '处理中...' : (joined ? '进入空间' : (mode === 'approval' ? '申请加入' : '加入项目'));
+    const iconMarkup = icon ? `<img src="${escapeHtml(icon)}" alt="" onerror="this.remove()" />` : escapeHtml(firstChar(title, '项'));
+    return `<article class="pc-plaza-card" style="--project-hue:${hue}">
+      <div class="pc-plaza-card-head">
+        <span class="pc-project-icon">${iconMarkup}</span>
+        <span>
+          <strong>${escapeHtml(title)}</strong>
+          <p>${escapeHtml(projectDescription(project))}</p>
+        </span>
+      </div>
+      <div class="pc-project-meta">
+        <span class="pc-plaza-pill">${escapeHtml(mode === 'approval' ? '需审批' : '无需审批')}</span>
+        <span class="pc-plaza-pill">${escapeHtml(apkUrl ? '可安装' : '暂无 APK')}</span>
+        <span class="pc-plaza-pill">${escapeHtml(projectMemberCount(project))} 位成员</span>
+      </div>
+      <div class="pc-plaza-actions">
+        <button class="primary" type="button" data-plaza-action="${escapeHtml(primaryAction)}" data-project-id="${escapeHtml(project.id)}" ${busy ? 'disabled' : ''}>${escapeHtml(primaryLabel)}</button>
+        <button type="button" data-plaza-action="download" data-project-id="${escapeHtml(project.id)}" ${apkUrl ? '' : 'disabled'}>下载 APK</button>
+      </div>
+    </article>`;
+  }
+
+  async function handlePlazaAction(button) {
+    const id = clean(button.dataset.projectId);
+    const action = button.dataset.plazaAction;
+    if (!id) return;
+    const project = state.plaza.projects.find((item) => sameId(item.id, id));
+    if (action === 'download') {
+      const apkUrl = clean(project && (project.latest_apk_url || project.last_apk_url));
+      if (apkUrl) window.open(apkUrl, '_blank', 'noopener');
+      return;
+    }
+    if (action === 'open') {
+      const localProject = projectById(id);
+      if (localProject) await selectProject(id);
+      else window.alert('项目已加入，但当前列表还未同步，请刷新后重试。');
+      return;
+    }
+    if (!state.token) {
+      openAuthModal('login');
+      return;
+    }
+    state.plaza.busyId = id;
+    renderProjectPlazaSurface();
+    try {
+      if (action === 'apply') {
+        const request = await api(`/api/projects/${encodeURIComponent(id)}/request-join`, {
+          method: 'POST',
+          body: JSON.stringify({ message: '' })
+        });
+        window.alert(request.message || '申请已提交，等待审核');
+      } else if (action === 'join') {
+        const joined = await api(`/api/projects/${encodeURIComponent(id)}/join`, { method: 'POST' });
+        if (joined.ok === false) throw new Error(joined.message || '加入失败');
+        await loadBaseData();
+        await selectProject(id);
+      }
+    } catch (error) {
+      window.alert(error.message || '操作失败');
+    } finally {
+      state.plaza.busyId = '';
+      if (state.activeKind === 'project-plaza') {
+        renderProjectPlazaChannels(filterText());
+        renderProjectPlazaSurface();
+      }
+    }
   }
 
   function selectFriends() {
@@ -988,11 +1366,51 @@
     }
   }
 
-  function openSettings() {
+  function setSettingsSection(section) {
+    const selected = ['account', 'workbench', 'notifications'].includes(section) ? section : 'placeholder';
+    const placeholderTitles = {
+      security: ['密码和安全中心', '密码、多重认证和登录设备会在这里集中管理。'],
+      devices: ['已登录的设备', '这里会显示当前账号登录过的 PC 网页版和移动端设备。']
+    };
+    document.querySelectorAll('[data-settings-section]').forEach((button) => {
+      const active = button.dataset.settingsSection === section || (selected === 'account' && section === 'account' && button.dataset.settingsSection === 'account');
+      button.classList.toggle('active', active);
+      if (button.hasAttribute('aria-selected')) button.setAttribute('aria-selected', active ? 'true' : 'false');
+    });
+    [els.settingsAccountPanel, els.settingsWorkbenchPanel, els.settingsNotificationsPanel, els.settingsPlaceholderPanel].forEach((panel) => {
+      if (panel) panel.classList.remove('active');
+    });
+    if (selected === 'account') {
+      els.settingsAccountPanel.classList.add('active');
+      $('settingsTitle').textContent = '账户';
+      els.settingsSubtitle.textContent = '账号信息、登录状态和安全设置';
+    } else if (selected === 'workbench') {
+      els.settingsWorkbenchPanel.classList.add('active');
+      $('settingsTitle').textContent = 'PC 工作台设置';
+      els.settingsSubtitle.textContent = '本地项目注册和节点绑定';
+    } else if (selected === 'notifications') {
+      els.settingsNotificationsPanel.classList.add('active');
+      $('settingsTitle').textContent = '通知';
+      els.settingsSubtitle.textContent = '项目、节点和聊天提醒';
+    } else {
+      const copy = placeholderTitles[section] || ['设置', '这个分类会随着功能完善继续补充。'];
+      els.settingsPlaceholderPanel.classList.add('active');
+      els.settingsPlaceholderTitle.textContent = copy[0];
+      els.settingsPlaceholderText.textContent = copy[1];
+      $('settingsTitle').textContent = copy[0];
+      els.settingsSubtitle.textContent = copy[1];
+    }
+  }
+
+  function openSettings(section) {
     setAccountMenu(false);
+    renderUser();
+    setSettingsSection(section || 'workbench');
     els.settingsBackdrop.hidden = false;
     setSettingsResult('');
-    setTimeout(() => els.settingsProjectPath.focus(), 0);
+    setTimeout(() => {
+      if ((section || 'workbench') === 'workbench') els.settingsProjectPath.focus();
+    }, 0);
   }
 
   function closeSettings() {
@@ -1127,6 +1545,8 @@
     if (!state.token) return showLoginState();
     await loadBaseData();
     models.loadModelOptions(false);
+    if (state.activeKind === 'projects') return selectProjectsHome();
+    if (state.activeKind === 'project-plaza') return selectProjectPlaza();
     if (state.activeKind === 'doctor') return doctor.selectDoctor();
     if (state.activeKind === 'node') return node.selectNode();
     if (state.activeKind === 'voice') return selectVoiceProject(state.activeVoiceChannel);
@@ -1136,6 +1556,7 @@
 
   function logout() {
     setAccountMenu(false);
+    closeSettings();
     TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
     saveToken('');
     state.user = null;

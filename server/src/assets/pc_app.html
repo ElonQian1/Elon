@@ -20,6 +20,12 @@
         <span class="rail-icon friends-icon" aria-hidden="true"></span>
         <small id="friendBadge"></small>
       </button>
+      <button class="rail-avatar projects-home" id="projectsRail" type="button" data-label="项目 / 我的项目" aria-label="项目 / 我的项目">
+        <span class="rail-icon projects-icon" aria-hidden="true"></span>
+      </button>
+      <button class="rail-avatar projects-plaza" id="projectPlazaRail" type="button" data-label="项目广场" aria-label="项目广场">
+        <span class="rail-icon plaza-icon" aria-hidden="true"></span>
+      </button>
       <button class="rail-avatar doctor" id="doctorRail" type="button" data-label="电脑医生" aria-label="电脑医生">
         <span class="rail-icon doctor-icon" aria-hidden="true"></span>
       </button>
@@ -128,47 +134,149 @@
   <div class="rail-tooltip" id="railTooltip" role="tooltip"></div>
   <div class="settings-backdrop" id="settingsBackdrop" hidden>
     <section class="settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
-      <header class="settings-header">
-        <div>
-          <strong id="settingsTitle">设置</strong>
-          <span>本机项目绑定到当前 PC 节点</span>
-        </div>
-        <button class="icon-button" id="settingsCloseBtn" type="button" title="关闭">×</button>
-      </header>
-      <div class="settings-body">
-        <div class="settings-section-title">注册本地项目</div>
-        <label class="settings-field">
-          <span>项目目录</span>
-          <div class="input-action">
-            <input id="settingsProjectPath" placeholder="选择一个本机项目文件夹" />
-            <button class="text-button" id="chooseProjectFolderBtn" type="button">选择文件夹</button>
+      <aside class="settings-sidebar">
+        <div class="settings-user-card">
+          <div class="settings-user-avatar" id="settingsUserAvatar">龙</div>
+          <div>
+            <strong id="settingsUserName">未登录</strong>
+            <span id="settingsUserMeta">需要登录</span>
           </div>
-        </label>
-        <label class="settings-field">
-          <span>项目名称</span>
-          <input id="settingsProjectName" placeholder="选择目录后自动填写" />
-        </label>
-        <details class="settings-advanced">
-          <summary>Git 和描述（自动读取，可修改）</summary>
-          <label class="settings-field">
-            <span>Git 远端 origin</span>
-            <input id="settingsProjectRepo" placeholder="选择目录后自动读取" />
-          </label>
-          <label class="settings-field">
-            <span>Git 当前分支</span>
-            <input id="settingsProjectBranch" placeholder="选择目录后自动读取" />
-          </label>
-          <label class="settings-field">
-            <span>描述</span>
-            <textarea id="settingsProjectDesc" rows="2" placeholder="可选"></textarea>
-          </label>
-        </details>
-        <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
-        <div class="settings-actions">
-          <button class="text-button" id="inspectProjectFolderBtn" type="button">读取目录信息</button>
-          <button class="send-button" id="registerProjectBtn" type="button">注册到云端</button>
         </div>
-        <div id="settingsProjectResult"></div>
+        <div class="settings-search">
+          <span aria-hidden="true">⌕</span>
+          <input id="settingsSearchInput" placeholder="搜索" />
+        </div>
+        <div class="settings-nav" role="tablist" aria-label="设置分类">
+          <button class="settings-nav-item active" id="settingsAccountTab" type="button" data-settings-section="account" role="tab" aria-selected="true">
+            <span class="settings-nav-icon" aria-hidden="true">●</span>
+            <span>账户</span>
+          </button>
+          <button class="settings-nav-sub active" type="button" data-settings-section="account">账号信息</button>
+          <button class="settings-nav-sub" type="button" data-settings-section="security">密码和安全中心</button>
+          <button class="settings-nav-sub" type="button" data-settings-section="devices">已登录的设备</button>
+          <button class="settings-nav-item" id="settingsWorkbenchTab" type="button" data-settings-section="workbench" role="tab" aria-selected="false">
+            <span class="settings-nav-icon" aria-hidden="true">⚙</span>
+            <span>PC 工作台设置</span>
+          </button>
+          <button class="settings-nav-sub" type="button" data-settings-section="workbench">本地项目注册</button>
+          <button class="settings-nav-item" id="settingsNotificationsTab" type="button" data-settings-section="notifications" role="tab" aria-selected="false">
+            <span class="settings-nav-icon" aria-hidden="true">●</span>
+            <span>通知</span>
+          </button>
+        </div>
+      </aside>
+      <div class="settings-main">
+        <header class="settings-header">
+          <div>
+            <strong id="settingsTitle">账户</strong>
+            <span id="settingsSubtitle">账号信息、登录状态和安全设置</span>
+          </div>
+          <button class="settings-close" id="settingsCloseBtn" type="button" title="关闭">×</button>
+        </header>
+        <div class="settings-body">
+          <section class="settings-panel active" id="settingsAccountPanel" data-settings-panel="account">
+            <h2>账号信息</h2>
+            <div class="settings-warning" id="settingsUnverifiedBox">
+              <strong>未认证账号</strong>
+              <span>请添加电子邮件地址和密码验证您的账号，以防止账号丢失。</span>
+              <button class="text-button" id="settingsVerifyBtn" type="button">验证您的账号</button>
+            </div>
+            <div class="settings-info-list">
+              <div class="settings-info-row">
+                <div>
+                  <span>用户名</span>
+                  <strong id="settingsDisplayName">未登录</strong>
+                </div>
+                <button class="text-button" id="settingsEditProfileBtn" type="button">打开个人中心</button>
+              </div>
+              <div class="settings-info-row">
+                <div>
+                  <span>账号</span>
+                  <strong id="settingsAccountValue">请先登录</strong>
+                </div>
+                <button class="text-button" id="settingsLoginBtn" type="button">登录 / 注册</button>
+              </div>
+              <div class="settings-info-row">
+                <div>
+                  <span>用户 ID</span>
+                  <strong id="settingsUserId">--</strong>
+                </div>
+              </div>
+            </div>
+            <h2>密码和安全中心</h2>
+            <div class="settings-info-list">
+              <div class="settings-info-row">
+                <div>
+                  <span>密码</span>
+                  <strong>由账号密码登录保护</strong>
+                </div>
+                <button class="text-button" id="settingsSecurityBtn" type="button">管理</button>
+              </div>
+              <div class="settings-info-row">
+                <div>
+                  <span>已登录的设备</span>
+                  <strong>当前 PC 网页版</strong>
+                </div>
+                <button class="text-button" id="settingsDevicesBtn" type="button">查看</button>
+              </div>
+            </div>
+          </section>
+          <section class="settings-panel" id="settingsWorkbenchPanel" data-settings-panel="workbench">
+            <h2>PC 工作台设置</h2>
+            <p class="settings-panel-caption">把本机项目绑定到当前 PC 节点，注册后会出现在项目入口里。</p>
+            <div class="settings-section-title">注册本地项目</div>
+            <label class="settings-field">
+              <span>项目目录</span>
+              <div class="input-action">
+                <input id="settingsProjectPath" placeholder="选择一个本机项目文件夹" />
+                <button class="text-button" id="chooseProjectFolderBtn" type="button">选择文件夹</button>
+              </div>
+            </label>
+            <label class="settings-field">
+              <span>项目名称</span>
+              <input id="settingsProjectName" placeholder="选择目录后自动填写" />
+            </label>
+            <details class="settings-advanced">
+              <summary>Git 和描述（自动读取，可修改）</summary>
+              <label class="settings-field">
+                <span>Git 远端 origin</span>
+                <input id="settingsProjectRepo" placeholder="选择目录后自动读取" />
+              </label>
+              <label class="settings-field">
+                <span>Git 当前分支</span>
+                <input id="settingsProjectBranch" placeholder="选择目录后自动读取" />
+              </label>
+              <label class="settings-field">
+                <span>描述</span>
+                <textarea id="settingsProjectDesc" rows="2" placeholder="可选"></textarea>
+              </label>
+            </details>
+            <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
+            <div class="settings-actions">
+              <button class="text-button" id="inspectProjectFolderBtn" type="button">读取目录信息</button>
+              <button class="send-button" id="registerProjectBtn" type="button">注册到云端</button>
+            </div>
+            <div id="settingsProjectResult"></div>
+          </section>
+          <section class="settings-panel" id="settingsNotificationsPanel" data-settings-panel="notifications">
+            <h2>通知</h2>
+            <div class="settings-info-list">
+              <div class="settings-info-row">
+                <div>
+                  <span>PC 工作台通知</span>
+                  <strong>项目、节点和聊天提醒会显示在这里。</strong>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="settings-panel" id="settingsPlaceholderPanel" data-settings-panel="placeholder">
+            <h2 id="settingsPlaceholderTitle">设置</h2>
+            <p class="settings-panel-caption" id="settingsPlaceholderText">这个分类会随着功能完善继续补充。</p>
+          </section>
+          <div class="settings-danger-zone">
+            <button class="settings-logout-button" id="settingsLogoutBtn" type="button">退出登录</button>
+          </div>
+        </div>
       </div>
     </section>
   </div>
