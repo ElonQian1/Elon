@@ -55,15 +55,44 @@
       </div>
       <div class="channel-list" id="channelList"></div>
       <div class="user-strip">
-        <div class="user-dot" id="userDot">龙</div>
-        <div class="user-info">
-          <strong id="userName">未登录</strong>
-          <span id="userMeta">请先登录网页版</span>
-        </div>
+        <button class="user-profile-button" id="userProfileBtn" type="button" aria-haspopup="menu" aria-expanded="false" title="账号中心">
+          <span class="user-dot" id="userDot">龙</span>
+          <span class="user-info">
+            <strong id="userName">未登录</strong>
+            <span id="userMeta">请先登录网页版</span>
+          </span>
+        </button>
         <div class="user-actions">
-          <button class="icon-button" id="userSettingsBtn" type="button" title="设置">⚙</button>
-          <button class="icon-button" id="logoutBtn" type="button" title="退出登录">⎋</button>
+          <button class="icon-button" id="userSettingsBtn" type="button" title="账号中心">⚙</button>
+          <button class="icon-button logout-inline" id="logoutBtn" type="button" title="退出登录">退出</button>
         </div>
+      </div>
+      <div class="account-menu" id="accountMenu" role="menu" aria-label="账号中心" hidden>
+        <div class="account-menu-head">
+          <div class="account-menu-avatar" id="accountMenuAvatar">龙</div>
+          <div class="account-menu-user">
+            <strong id="accountMenuName">未登录</strong>
+            <span id="accountMenuMeta">请先登录网页版</span>
+          </div>
+        </div>
+        <button class="account-menu-row" id="profileCenterBtn" type="button" role="menuitem">
+          <span>
+            <strong>个人中心</strong>
+            <small>头像、账号、额度和更多设置</small>
+          </span>
+        </button>
+        <button class="account-menu-row" id="pcSettingsMenuBtn" type="button" role="menuitem">
+          <span>
+            <strong>PC 工作台设置</strong>
+            <small>本地项目注册和节点绑定</small>
+          </span>
+        </button>
+        <button class="account-menu-row danger" id="logoutMenuBtn" type="button" role="menuitem">
+          <span>
+            <strong>退出登录</strong>
+            <small>清除本机网页版登录态</small>
+          </span>
+        </button>
       </div>
     </aside>
 

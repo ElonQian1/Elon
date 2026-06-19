@@ -22,7 +22,10 @@
     userMeta: $('userMeta'), userDot: $('userDot'), friendBadge: $('friendBadge'), nodeBadge: $('nodeBadge'),
     sidebarSearch: $('sidebarSearch'), composer: $('composer'), input: $('messageInput'),
     sendBtn: $('sendBtn'), aiTaskBtn: $('aiTaskBtn'), memberPanelTitle: $('memberPanelTitle'),
-    railTooltip: $('railTooltip'), userSettingsBtn: $('userSettingsBtn'), settingsBackdrop: $('settingsBackdrop'),
+    railTooltip: $('railTooltip'), userProfileBtn: $('userProfileBtn'), userSettingsBtn: $('userSettingsBtn'),
+    accountMenu: $('accountMenu'), accountMenuAvatar: $('accountMenuAvatar'), accountMenuName: $('accountMenuName'),
+    accountMenuMeta: $('accountMenuMeta'), profileCenterBtn: $('profileCenterBtn'), pcSettingsMenuBtn: $('pcSettingsMenuBtn'),
+    logoutMenuBtn: $('logoutMenuBtn'), settingsBackdrop: $('settingsBackdrop'),
     settingsCloseBtn: $('settingsCloseBtn'), chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
     inspectProjectFolderBtn: $('inspectProjectFolderBtn'), registerProjectBtn: $('registerProjectBtn'),
     settingsProjectPath: $('settingsProjectPath'), settingsProjectName: $('settingsProjectName'),
@@ -153,6 +156,14 @@
     return clean(user && (user.nickname || user.phone || user.email || user.account || user.id)) || '未登录';
   }
 
+  function userAccountMeta(user) {
+    const account = clean(user && (user.account || user.phone || user.email));
+    const id = clean(user && user.id);
+    if (account && account !== userName(user)) return `账号：${account}`;
+    if (id) return `用户 ID：${id}`;
+    return state.token ? '在线' : '需要登录';
+  }
+
   function setBadge(el, value) {
     if (!el) return;
     const n = Number(value || 0);
@@ -179,10 +190,17 @@
   function renderUser() {
     const name = userName(state.user);
     const avatar = avatarUrlOf(state.user);
+    const meta = userAccountMeta(state.user);
     els.userName.textContent = name;
     els.userMeta.textContent = state.token ? '在线' : '需要登录';
     els.userDot.classList.toggle('fallback', !avatar);
     els.userDot.innerHTML = avatarContents(avatar, name, '龙');
+    if (els.accountMenuName) els.accountMenuName.textContent = name;
+    if (els.accountMenuMeta) els.accountMenuMeta.textContent = meta;
+    if (els.accountMenuAvatar) {
+      els.accountMenuAvatar.classList.toggle('fallback', !avatar);
+      els.accountMenuAvatar.innerHTML = avatarContents(avatar, name, '龙');
+    }
   }
 
   function renderProjectRail() {
@@ -328,6 +346,22 @@
     if (enabled) els.messageList.classList.add('doctor-mode');
   }
 
+  function setAccountMenu(open) {
+    if (!els.accountMenu) return;
+    const visible = !!open;
+    els.accountMenu.hidden = !visible;
+    if (els.userProfileBtn) els.userProfileBtn.setAttribute('aria-expanded', visible ? 'true' : 'false');
+  }
+
+  function toggleAccountMenu() {
+    setAccountMenu(els.accountMenu && els.accountMenu.hidden);
+  }
+
+  function openProfileCenter() {
+    setAccountMenu(false);
+    window.open('/web?tab=profile', '_blank');
+  }
+
   async function init() {
     bindEvents();
     if (!state.token) {
@@ -350,7 +384,14 @@
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLocalNodeBtn').addEventListener('click', node.selectNode);
-    els.userSettingsBtn.addEventListener('click', openSettings);
+    els.userProfileBtn.addEventListener('click', toggleAccountMenu);
+    els.userSettingsBtn.addEventListener('click', toggleAccountMenu);
+    els.profileCenterBtn.addEventListener('click', openProfileCenter);
+    els.pcSettingsMenuBtn.addEventListener('click', () => {
+      setAccountMenu(false);
+      openSettings();
+    });
+    els.logoutMenuBtn.addEventListener('click', logout);
     els.settingsCloseBtn.addEventListener('click', closeSettings);
     els.settingsBackdrop.addEventListener('click', (event) => {
       if (event.target === els.settingsBackdrop) closeSettings();
@@ -376,7 +417,16 @@
       els.input.style.height = Math.min(120, els.input.scrollHeight) + 'px';
     });
     document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && els.accountMenu && !els.accountMenu.hidden) {
+        setAccountMenu(false);
+        return;
+      }
       if (event.key === 'Escape' && !els.settingsBackdrop.hidden) closeSettings();
+    });
+    document.addEventListener('click', (event) => {
+      if (!els.accountMenu || els.accountMenu.hidden) return;
+      if (event.target.closest('#accountMenu') || event.target.closest('.user-strip')) return;
+      setAccountMenu(false);
     });
   }
 
@@ -432,6 +482,7 @@
   }
 
   function showLoginState() {
+    setAccountMenu(false);
     setAuthClaimBanner(true);
     renderUser();
     setRails('friends');
@@ -814,6 +865,7 @@
   }
 
   function openSettings() {
+    setAccountMenu(false);
     els.settingsBackdrop.hidden = false;
     setSettingsResult('');
     setTimeout(() => els.settingsProjectPath.focus(), 0);
@@ -959,6 +1011,7 @@
   }
 
   function logout() {
+    setAccountMenu(false);
     TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
     saveToken('');
     state.user = null;
