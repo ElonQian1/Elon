@@ -593,7 +593,22 @@
   function showLoginState() {
     setAccountMenu(false);
     setAuthClaimBanner(true);
+    hideRailTooltip();
+    state.user = null;
+    state.projects = [];
+    state.friends = [];
+    state.groups = [];
+    state.nodes = [];
+    state.activeKind = 'friends';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activeChannelKind = '';
+    state.activePeer = null;
+    state.projectSpace = null;
     renderUser();
+    renderProjectRail();
+    setBadge(els.friendBadge, 0);
+    setBadge(els.nodeBadge, 0);
     setRails('friends');
     els.workspaceName.textContent = '一龙 PC 工作台';
     els.workspaceMeta.textContent = '未登录';
