@@ -1625,7 +1625,7 @@
     .project-space-ai-menu {
       grid-area: tabs;
       background: transparent;
-      min-height: calc(56px + max(18px, env(safe-area-inset-bottom)));
+      min-height: calc(64px + max(18px, env(safe-area-inset-bottom)));
       padding: 0 8px max(18px, env(safe-area-inset-bottom)) 0;
       display: flex;
       align-items: flex-start;
@@ -1648,7 +1648,7 @@
       font-size: 16px;
       cursor: pointer;
       overflow: hidden;
-      transition: width 220ms ease, gap 220ms ease, background-color 160ms ease;
+      transition: width 220ms ease, height 220ms ease, gap 220ms ease, background-color 160ms ease, color 160ms ease;
     }
     .project-space-ai-menu button:hover { background: var(--brand); }
     .project-space-ai-menu svg {
@@ -1661,6 +1661,8 @@
       height: 24px;
       flex: none;
       object-fit: contain;
+      filter: none;
+      transition: width 220ms ease, height 220ms ease, filter 160ms ease;
     }
     .project-space-ai-menu span {
       display: inline-block;
@@ -1677,8 +1679,17 @@
       mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
     }
     .project-space-ai-menu.compact button {
-      width: 56px;
+      width: 64px;
+      height: 64px;
+      background: var(--project-space-info-bg);
+      color: var(--ink);
       gap: 0;
+    }
+    .project-space-ai-menu.compact button:hover { background: var(--project-space-info-bg); }
+    .project-space-ai-menu.compact .project-space-ai-icon {
+      width: 28px;
+      height: 28px;
+      filter: invert(1);
     }
     .project-space-ai-menu.compact span {
       opacity: 0;
