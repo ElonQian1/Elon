@@ -1116,7 +1116,7 @@ internal class ProjectSpaceController(
         projectSpaceAiAnimator?.cancel()
         projectSpaceAiAnimator = null
         if (expanded) syncProjectSpacePostEntry()
-        syncProjectSpaceAiMenuStyle(expanded)
+        syncProjectSpaceAiMenuStyle()
 
         val targetIconMargin = if (expanded) dp(PROJECT_SPACE_AI_ICON_MARGIN_END_DP) else 0
         label.visibility = View.VISIBLE
@@ -1209,13 +1209,9 @@ internal class ProjectSpaceController(
         label.translationX = 0f
     }
 
-    private fun syncProjectSpaceAiMenuStyle(expanded: Boolean) {
-        binding.projectSpaceAiMenu.setBackgroundResource(
-            if (expanded) R.drawable.bg_project_space_ai_menu_item else R.drawable.bg_project_space_fab
-        )
-        val iconColor = activity.getColor(
-            if (expanded) R.color.elon_button_primary_text else R.color.elon_text_primary
-        )
+    private fun syncProjectSpaceAiMenuStyle() {
+        binding.projectSpaceAiMenu.setBackgroundResource(R.drawable.bg_project_space_ai_menu_item)
+        val iconColor = activity.getColor(R.color.elon_button_primary_text)
         binding.projectSpaceAiIcon.setColorFilter(iconColor)
         binding.projectSpaceAiLabel.setTextColor(activity.getColor(R.color.elon_button_primary_text))
     }
@@ -1316,9 +1312,9 @@ internal class ProjectSpaceController(
         const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
         const val PROJECT_SPACE_AI_ANIMATION_MS = 220L
         const val PROJECT_SPACE_AI_COLLAPSED_SIZE_DP = 64
-        const val PROJECT_SPACE_AI_EXPANDED_HEIGHT_DP = 56
+        const val PROJECT_SPACE_AI_EXPANDED_HEIGHT_DP = 64
         const val PROJECT_SPACE_AI_EXPANDED_WIDTH_DP = 156
-        const val PROJECT_SPACE_AI_COLLAPSED_ICON_SIZE_DP = 28
+        const val PROJECT_SPACE_AI_COLLAPSED_ICON_SIZE_DP = 24
         const val PROJECT_SPACE_AI_EXPANDED_ICON_SIZE_DP = 24
         const val PROJECT_SPACE_AI_EXPAND_AT_TOP_DP = 4
         const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 12
