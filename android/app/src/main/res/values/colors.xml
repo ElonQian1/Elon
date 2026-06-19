@@ -41,6 +41,6 @@
     <color name="elon_badge_neutral_text">#D9D9D9</color>
     <color name="elon_status_danger">#E62129</color>
 
-    <color name="elon_nav_bg">#212121</color>
-    <color name="elon_nav_active_bg">#212121</color>
+    <color name="elon_nav_bg">#151515</color>
+    <color name="elon_nav_active_bg">#151515</color>
 </resources>
