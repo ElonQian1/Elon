@@ -135,9 +135,9 @@
                 android:background="@drawable/bg_top_add_button"
                 android:contentDescription="新增"
                 android:foreground="?attr/selectableItemBackgroundBorderless"
-                android:padding="12dp"
+                android:padding="7dp"
                 android:scaleType="center"
-                android:src="@drawable/ic_project_fab_plus"
+                android:src="@drawable/ic_add_circle_simple"
                 app:tint="@color/elon_icon_add_top" />
 
             <ImageButton
