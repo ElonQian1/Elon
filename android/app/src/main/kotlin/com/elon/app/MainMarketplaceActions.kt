@@ -303,8 +303,8 @@ internal class MainMarketplaceActions(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                marginStart = dp(16)
-                marginEnd = dp(16)
+                marginStart = dp(CARD_SIDE_MARGIN_DP)
+                marginEnd = dp(CARD_SIDE_MARGIN_DP)
                 topMargin = dp(if (index == 0) FIRST_CARD_TOP_MARGIN_DP else CARD_GAP_DP)
             }
             addView(createCardHeader(project), LinearLayout.LayoutParams(
@@ -365,7 +365,7 @@ internal class MainMarketplaceActions(
                 addView(View(activity).apply {
                     setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
                 }, LinearLayout.LayoutParams(dp(DIVIDER_WIDTH_DP), dp(1)).apply {
-                    topMargin = dp(10)
+                    topMargin = dp(12)
                 })
                 addView(TextView(activity).apply {
                     includeFontPadding = false
@@ -376,7 +376,7 @@ internal class MainMarketplaceActions(
                     setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                     setLineSpacing(dp(2).toFloat(), 1.0f)
                 }, LinearLayout.LayoutParams(dp(DESC_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = dp(8)
+                    topMargin = dp(10)
                 })
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
@@ -769,20 +769,21 @@ internal class MainMarketplaceActions(
         const val FILTER_SIDE_PADDING_DP = 20
         const val FILTER_ITEM_GAP_DP = 14
         const val CARD_RADIUS_DP = 18
-        const val CARD_HEADER_HEIGHT_DP = 44
-        const val CARD_BODY_HEIGHT_DP = 160
+        const val CARD_SIDE_MARGIN_DP = 10
+        const val CARD_HEADER_HEIGHT_DP = 52
+        const val CARD_BODY_HEIGHT_DP = 176
         const val FIRST_CARD_TOP_MARGIN_DP = 18
-        const val CARD_GAP_DP = 10
+        const val CARD_GAP_DP = 14
         const val THUMB_SIZE_DP = 40
-        const val DIVIDER_WIDTH_DP = 220
-        const val DESC_WIDTH_DP = 240
-        const val CARD_BODY_CONTENT_TOP_DP = 14
-        const val CARD_TIME_TOP_DP = 34
+        const val DIVIDER_WIDTH_DP = 252
+        const val DESC_WIDTH_DP = 260
+        const val CARD_BODY_CONTENT_TOP_DP = 18
+        const val CARD_TIME_TOP_DP = 38
         const val CARD_MAIN_RIGHT_MARGIN_DP = 24
         const val INFO_ROW_RIGHT_MARGIN_DP = 96
         const val ACTION_BUTTON_WIDTH_DP = 68
         const val ACTION_BUTTON_HEIGHT_DP = 32
         const val ACTION_BUTTON_GAP_DP = 10
-        const val ACTION_BUTTON_BOTTOM_DP = 10
+        const val ACTION_BUTTON_BOTTOM_DP = 16
     }
 }
