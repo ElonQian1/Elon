@@ -29,7 +29,7 @@
     pcAuthNicknameInput: $('pcAuthNicknameInput'), pcAuthPasswordInput: $('pcAuthPasswordInput'),
     pcAuthError: $('pcAuthError'), pcAuthSubmitBtn: $('pcAuthSubmitBtn'),
     friendsRail: $('friendsRail'), projectsRail: $('projectsRail'), projectPlazaRail: $('projectPlazaRail'),
-    doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), projectRailList: $('projectRailList'),
+    doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), apkRail: $('openWebBtn'), projectRailList: $('projectRailList'),
     channelList: $('channelList'), memberList: $('memberList'), messageList: $('messageList'),
     workspaceName: $('workspaceName'), workspaceMeta: $('workspaceMeta'), channelGlyph: $('channelGlyph'),
     channelTitle: $('channelTitle'), channelSubtitle: $('channelSubtitle'), userName: $('userName'),
@@ -299,12 +299,13 @@
   }
 
   function setRails(kind) {
-    els.friendsRail.classList.toggle('active', kind === 'friends');
+    els.friendsRail.classList.toggle('active', kind === 'friends' || kind === 'store' || kind === 'tasks');
     els.projectsRail.classList.toggle('active', kind === 'projects');
     els.projectPlazaRail.classList.toggle('active', kind === 'project-plaza');
     els.doctorRail.classList.toggle('active', kind === 'doctor');
     els.nodeRail.classList.toggle('active', kind === 'node');
     els.voiceRail.classList.toggle('active', kind === 'voice');
+    els.apkRail.classList.toggle('active', kind === 'apk');
     Array.from(els.projectRailList.children).forEach((btn) => {
       btn.classList.toggle('active', kind === 'project' && btn.dataset.projectId === state.activeProjectId);
     });
@@ -357,9 +358,10 @@
 
   function renderChannels() {
     const query = filterText();
-    if (state.activeKind === 'friends') return renderFriendChannels(query);
+    if (state.activeKind === 'friends' || state.activeKind === 'store' || state.activeKind === 'tasks') return renderFriendChannels(query);
     if (state.activeKind === 'projects') return renderProjectHomeChannels(query);
     if (state.activeKind === 'project-plaza') return renderProjectPlazaChannels(query);
+    if (state.activeKind === 'apk') return renderApkChannels();
     if (state.activeKind === 'doctor') return doctor.renderChannels(channelButton);
     if (state.activeKind === 'node') return node.renderChannels(channelButton);
     if (state.activeKind === 'voice') return window.ElonVoiceProject.renderChannels(voiceContext());
@@ -369,20 +371,38 @@
   function renderFriendChannels(query) {
     const friends = state.friends.filter((f) => userName(f).toLowerCase().includes(query));
     const groups = state.groups.filter((g) => clean(g.name || g.title || g.id).toLowerCase().includes(query));
-    els.channelList.innerHTML = [
-      '<div class="channel-section">好友</div>',
-      friends.map((friend) => channelButton({
+    const isFriends = state.activeKind === 'friends';
+    const sections = [
+      '<div class="channel-section">应用</div>',
+      `<button class="channel-item ${isFriends ? 'active' : ''}" type="button" data-app-channel="friends"><span class="glyph">友</span><span class="main"><strong>好友</strong><span>好友和群聊</span></span></button>`,
+      `<button class="channel-item ${state.activeKind === 'store' ? 'active' : ''}" type="button" data-app-channel="store"><span class="glyph">商</span><span class="main"><strong>商店</strong><span>项目和 APK</span></span></button>`,
+      `<button class="channel-item ${state.activeKind === 'tasks' ? 'active' : ''}" type="button" data-app-channel="tasks"><span class="glyph">任</span><span class="main"><strong>任务</strong><span>任务和提醒</span></span></button>`
+    ];
+    if (isFriends) {
+      sections.push(
+        '<div class="channel-section">好友</div>',
+        friends.map((friend) => channelButton({
         id: friend.id, kind: 'friend', avatar: avatarUrlOf(friend), avatarFallback: userName(friend), title: userName(friend),
         sub: friend.is_online ? '在线' : '离线', online: !!friend.is_online,
         active: state.activePeer && state.activePeer.kind === 'friend' && state.activePeer.id === friend.id
-      })).join('') || '<div class="empty-state">暂无好友</div>',
-      '<div class="channel-section">群聊</div>',
-      groups.map((group) => channelButton({
+        })).join('') || '<div class="empty-state">暂无好友</div>',
+        '<div class="channel-section">群聊</div>',
+        groups.map((group) => channelButton({
         id: group.id, kind: 'group', avatar: avatarUrlOf(group), avatarFallback: clean(group.name || group.title || '群聊'), glyph: '群', title: clean(group.name || group.title || '未命名群聊'),
         sub: `${Number(group.member_count || group.members_count || 0)} 位成员`,
         active: state.activePeer && state.activePeer.kind === 'group' && state.activePeer.id === group.id
-      })).join('') || '<div class="empty-state">暂无群聊</div>'
-    ].join('');
+        })).join('') || '<div class="empty-state">暂无群聊</div>'
+      );
+    }
+    els.channelList.innerHTML = sections.join('');
+    els.channelList.querySelectorAll('[data-app-channel]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const channel = btn.dataset.appChannel;
+        if (channel === 'store') selectStore();
+        else if (channel === 'tasks') selectTasks();
+        else selectFriends();
+      });
+    });
     els.channelList.querySelectorAll('[data-peer-kind]').forEach((btn) => {
       btn.addEventListener('click', () => selectPeer(btn.dataset.peerKind, btn.dataset.itemId));
     });
@@ -603,9 +623,9 @@
     els.pcAuthBackdrop.addEventListener('click', (event) => {
       if (event.target === els.pcAuthBackdrop) closeAuthModal();
     });
-    [els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, $('openWebBtn')].forEach(attachRailTooltip);
+    [els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, els.apkRail].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
-    $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
+    els.apkRail.addEventListener('click', selectApkDownload);
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
     $('openLocalNodeBtn').addEventListener('click', node.selectNode);
     els.userProfileBtn.addEventListener('click', toggleAccountMenu);
@@ -1001,6 +1021,178 @@
         renderProjectPlazaSurface();
       }
     }
+  }
+
+  function selectStore() {
+    state.activeKind = 'store';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activePeer = null;
+    state.projectSpace = null;
+    setAuthClaimBanner(!state.token);
+    setRails('store');
+    els.workspaceName.textContent = '好友';
+    els.workspaceMeta.textContent = '商店和任务入口';
+    renderChannels();
+    renderMembers('商店', []);
+    renderStoreSurface();
+  }
+
+  function renderStoreSurface() {
+    setHeader('商', '商店', '项目、APK 和移动端入口');
+    setComposer(false, '选择项目或下载入口后开始', false);
+    setNodeMode(false);
+    els.messageList.innerHTML = `<section class="pc-project-view">
+      <div class="pc-project-hero">
+        <div>
+          <h2>商店</h2>
+          <p>集中进入项目广场、可安装项目和手机端下载。</p>
+        </div>
+        <button class="text-button" type="button" data-store-action="refresh-plaza">刷新项目广场</button>
+      </div>
+      <div class="pc-feature-grid">
+        <button class="pc-feature-card" type="button" data-store-action="plaza">
+          <span class="pc-feature-glyph">广</span>
+          <span>
+            <strong>项目广场</strong>
+            <p>浏览公开项目，加入协作空间。</p>
+          </span>
+        </button>
+        <button class="pc-feature-card" type="button" data-store-action="installable">
+          <span class="pc-feature-glyph">APK</span>
+          <span>
+            <strong>可安装项目</strong>
+            <p>筛选带 APK 的公开项目。</p>
+          </span>
+        </button>
+        <button class="pc-feature-card" type="button" data-store-action="apk">
+          <span class="pc-feature-glyph">下</span>
+          <span>
+            <strong>APK 下载 / 手机端入口</strong>
+            <p>下载手机端，或打开移动网页版。</p>
+          </span>
+        </button>
+      </div>
+    </section>`;
+    els.messageList.querySelectorAll('[data-store-action]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const action = button.dataset.storeAction;
+        if (action === 'apk') return selectApkDownload();
+        if (action === 'installable') state.plaza.filterKey = 'installable';
+        else state.plaza.filterKey = 'all';
+        state.plaza.loaded = false;
+        selectProjectPlaza();
+      });
+    });
+  }
+
+  function selectTasks() {
+    state.activeKind = 'tasks';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activePeer = null;
+    state.projectSpace = null;
+    setAuthClaimBanner(!state.token);
+    setRails('tasks');
+    els.workspaceName.textContent = '好友';
+    els.workspaceMeta.textContent = '任务中心';
+    renderChannels();
+    renderMembers('任务', []);
+    renderTasksSurface();
+  }
+
+  function renderTasksSurface() {
+    setHeader('任', '任务', '任务和提醒');
+    setComposer(false, '选择项目频道后开始输入', false);
+    setNodeMode(false);
+    const loginAction = state.token
+      ? ''
+      : '<button class="text-button" type="button" id="taskLoginBtn">登录或注册账号</button>';
+    els.messageList.innerHTML = `<section class="pc-project-view">
+      <div class="pc-project-hero">
+        <div>
+          <h2>任务</h2>
+          <p>项目协作、审核和待处理提醒会在这里汇总。</p>
+        </div>
+        <button class="text-button" type="button" id="taskProjectsBtn">打开我的项目</button>
+      </div>
+      <div class="pc-task-panel">
+        <div class="pc-task-item">
+          <span class="pc-task-dot"></span>
+          <span>
+            <strong>${state.token ? '暂无待处理任务' : '登录后查看任务'}</strong>
+            <p>${state.token ? '当前没有项目审核、协作邀请或本机处理任务。' : '登录或注册后，任务中心会读取你的项目和账号提醒。'}</p>
+          </span>
+          ${loginAction}
+        </div>
+      </div>
+    </section>`;
+    $('taskProjectsBtn').addEventListener('click', selectProjectsHome);
+    const taskLoginBtn = $('taskLoginBtn');
+    if (taskLoginBtn) taskLoginBtn.addEventListener('click', () => openAuthModal('login'));
+  }
+
+  function renderApkChannels() {
+    els.channelList.innerHTML = [
+      '<div class="channel-section">手机端</div>',
+      '<button class="channel-item active" type="button" data-apk-channel="download"><span class="glyph">下</span><span class="main"><strong>APK 下载</strong><span>安装手机端</span></span></button>',
+      '<button class="channel-item" type="button" data-apk-channel="web"><span class="glyph">网</span><span class="main"><strong>移动网页版</strong><span>在浏览器打开</span></span></button>'
+    ].join('');
+    els.channelList.querySelectorAll('[data-apk-channel]').forEach((button) => {
+      button.addEventListener('click', () => {
+        if (button.dataset.apkChannel === 'web') window.open('/web', '_blank', 'noopener');
+        else renderApkDownloadSurface();
+      });
+    });
+  }
+
+  function selectApkDownload() {
+    state.activeKind = 'apk';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activePeer = null;
+    state.projectSpace = null;
+    setAuthClaimBanner(!state.token);
+    setRails('apk');
+    els.workspaceName.textContent = '手机端';
+    els.workspaceMeta.textContent = 'APK 下载 / 手机端入口';
+    renderApkChannels();
+    renderMembers('手机端', []);
+    renderApkDownloadSurface();
+  }
+
+  function renderApkDownloadSurface() {
+    setHeader('下', 'APK 下载 / 手机端入口', '安装手机端或打开移动网页版');
+    setComposer(false, '登录后可输入消息', false);
+    setNodeMode(false);
+    els.messageList.innerHTML = `<section class="pc-project-view">
+      <div class="pc-project-hero">
+        <div>
+          <h2>APK 下载 / 手机端入口</h2>
+          <p>手机端用于安装 APK；移动网页版用于快速登录和同步账号状态。</p>
+        </div>
+        <button class="text-button" type="button" id="apkOpenDownloadBtn">打开下载页</button>
+      </div>
+      <div class="pc-apk-panel">
+        <div class="pc-apk-device">
+          <span class="pc-apk-screen"></span>
+        </div>
+        <div class="pc-apk-copy">
+          <strong>一龙手机端</strong>
+          <p>下载 APK 后可在手机上使用项目、账号和工作台能力；网页版和 APK 数据互通。</p>
+          <div class="pc-apk-actions">
+            <button class="primary" type="button" id="apkDownloadBtn">下载 APK</button>
+            <button type="button" id="apkWebBtn">打开移动网页版</button>
+            ${state.token ? '' : '<button type="button" id="apkLoginBtn">登录或注册</button>'}
+          </div>
+        </div>
+      </div>
+    </section>`;
+    $('apkOpenDownloadBtn').addEventListener('click', () => window.open('/download', '_blank', 'noopener'));
+    $('apkDownloadBtn').addEventListener('click', () => window.open('/download', '_blank', 'noopener'));
+    $('apkWebBtn').addEventListener('click', () => window.open('/web', '_blank', 'noopener'));
+    const apkLoginBtn = $('apkLoginBtn');
+    if (apkLoginBtn) apkLoginBtn.addEventListener('click', () => openAuthModal('login'));
   }
 
   function selectFriends() {
@@ -1545,6 +1737,9 @@
     if (!state.token) return showLoginState();
     await loadBaseData();
     models.loadModelOptions(false);
+    if (state.activeKind === 'store') return selectStore();
+    if (state.activeKind === 'tasks') return selectTasks();
+    if (state.activeKind === 'apk') return selectApkDownload();
     if (state.activeKind === 'projects') return selectProjectsHome();
     if (state.activeKind === 'project-plaza') return selectProjectPlaza();
     if (state.activeKind === 'doctor') return doctor.selectDoctor();
