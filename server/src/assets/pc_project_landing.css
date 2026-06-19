@@ -238,6 +238,27 @@
   border-color: #4c5260;
 }
 
+.project-landing-resource:disabled {
+  cursor: default;
+  opacity: .62;
+}
+
+.project-landing-sync-result {
+  flex-basis: 100%;
+  min-height: 22px;
+  color: #aeb7c6;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.project-landing-sync-result.ok {
+  color: #9ee2b6;
+}
+
+.project-landing-sync-result.error {
+  color: #ffb5ba;
+}
+
 .project-landing-channel span {
   color: #9ba6b8;
   font-size: 12px;

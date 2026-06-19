@@ -69,7 +69,8 @@
   });
   const projectLanding = window.ElonPcProjectLanding.create({
     state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
-    channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode
+    channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode,
+    api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject
   });
   models = window.ElonPcModels.create({ state, els, clean, escapeHtml, api });
 

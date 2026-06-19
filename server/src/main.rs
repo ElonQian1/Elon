@@ -94,6 +94,7 @@ mod project_git;
 mod project_join_requests;
 mod project_keys;
 mod project_landing;
+mod project_landing_api;
 mod project_membership;
 mod project_mobile;
 mod project_prewarm;

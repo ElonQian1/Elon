@@ -13,7 +13,8 @@
   function create(ctx) {
     const {
       state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
-      channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode
+      channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode,
+      api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject
     } = ctx;
 
     function projectOf() {
@@ -60,6 +61,10 @@
         if (next) return next;
       }
       return '';
+    }
+
+    function projectField(project, snake, camel) {
+      return valueOf(project && (project[snake] || project[camel]));
     }
 
     function formatBytes(value) {
@@ -291,7 +296,89 @@
       });
       return resources.map((resource) =>
         `<button class="project-landing-resource" type="button" data-resource-url="${escapeHtml(resource.url)}">${escapeHtml(resource.label)}</button>`
-      ).join('');
+      ).join('') + syncLandingButtonHtml(project);
+    }
+
+    function canSyncLanding(project) {
+      const role = clean(project && (project.role || project.member_role || project.memberRole)).toLowerCase();
+      return !!(project && project.id && ['owner', 'admin', 'editor'].includes(role));
+    }
+
+    function syncLandingButtonHtml(project) {
+      if (!canSyncLanding(project)) return '';
+      return `<button class="project-landing-resource project-landing-sync" type="button" data-sync-landing="1">同步首页</button>`;
+    }
+
+    function syncPayload(project, landing) {
+      return {
+        project_id: project.id,
+        name: projectField(project, 'name', 'name') || titleOf(project),
+        workspace_path: projectField(project, 'workspace_path', 'workspacePath'),
+        description: valueOf(
+          project && (project.description || project.project_description || project.projectDescription),
+          landing.summary,
+          landing.description
+        ) || null,
+        repo_url: projectField(project, 'repo_url', 'repoUrl') || null,
+        branch: projectField(project, 'branch', 'branch') || null
+      };
+    }
+
+    function setSyncButtonState(button, busy, text) {
+      if (!button) return;
+      if (!button.dataset.originalText) button.dataset.originalText = button.textContent || '同步首页';
+      button.disabled = !!busy;
+      button.textContent = text || button.dataset.originalText;
+    }
+
+    function showSyncResult(message, kind) {
+      let target = els.messageList.querySelector('.project-landing-sync-result');
+      if (!target) {
+        const footer = els.messageList.querySelector('.project-landing-footer');
+        if (!footer) return;
+        target = document.createElement('div');
+        target.className = 'project-landing-sync-result';
+        footer.appendChild(target);
+      }
+      target.className = `project-landing-sync-result ${kind || ''}`.trim();
+      target.textContent = message;
+    }
+
+    async function syncLanding(button) {
+      const project = projectOf();
+      if (!project || !project.id) return;
+      const landing = landingOf(project);
+      setSyncButtonState(button, true, '同步中…');
+      showSyncResult('正在同步项目首页…');
+      try {
+        const payload = syncPayload(project, landing);
+        if (projectField(project, 'node_id', 'nodeId') && payload.workspace_path && localNodeApi && ensureLocalNodeLogin) {
+          await ensureLocalNodeLogin();
+          const data = await localNodeApi('/api/register-project', {
+            method: 'POST',
+            body: JSON.stringify(payload)
+          });
+          if (!(data.cloud && data.cloud.landing)) {
+            throw new Error('本机 PC 节点未返回项目首页快照，请更新一龙 PC 节点后重试。');
+          }
+        } else {
+          if (!api) throw new Error('当前页面缺少云端同步接口');
+          await api(`/api/projects/${encodeURIComponent(project.id)}/landing/sync`, {
+            method: 'POST',
+            body: JSON.stringify({})
+          });
+        }
+        if (loadBaseData) await loadBaseData();
+        if (selectProject) {
+          await selectProject(project.id);
+        } else {
+          showSyncResult('项目首页已同步。', 'ok');
+        }
+      } catch (error) {
+        showSyncResult(error.message || String(error), 'error');
+      } finally {
+        setSyncButtonState(button, false);
+      }
     }
 
     function quickChannelHtml(channel) {
@@ -363,6 +450,9 @@
           const url = clean(button.dataset.resourceUrl);
           if (url) window.open(url, '_blank', 'noreferrer');
         });
+      });
+      els.messageList.querySelectorAll('[data-sync-landing]').forEach((button) => {
+        button.addEventListener('click', () => syncLanding(button));
       });
     }
 

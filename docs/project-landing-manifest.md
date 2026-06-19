@@ -131,3 +131,22 @@ Manifest 最大 256 KB。字段只接受 JSON，不执行 HTML 或脚本。URL �
 子项目生成或发布客户端时，同步更新 `.elon/project-landing.json`。对于 bb64a 这类已有推广页的项目，推荐把现有 Windows Promote 页里的下载数据抽成 manifest，主项目首页展示“应用详情/下载”，Promote 页作为 `custom_landing_url` 的完整介绍入口。
 
 PC 本地项目的 manifest 更新后，重新在 PC 节点管理页执行项目注册/绑定流程即可刷新云端快照。后续如果需要更顺手的体验，可以再加独立“同步项目首页”按钮，但数据结构和云端保存能力已经就位。
+
+## 同步到主项目
+
+子项目会话完成 `.elon/project-landing.json` 后，主项目同步有两条路径：
+
+- PC 节点本地项目：在 PC 网页端打开项目首页，点击“同步首页”。网页会调用本机 node-agent 读取项目目录里的 manifest，再通过云端正式 API 写入 `landing_json` 快照。
+- 服务器本机可读项目：调用 `POST /api/projects/:project_id/landing/sync`，云端会直接读取工作区内的 `.elon/project-landing.json` 并刷新快照。
+
+`POST /api/projects/:project_id/landing/sync` 也接受请求体 `{ "landing": { ... } }`，适合脚本或子项目会话把已经健康检查过的 manifest 直接上报。接口只允许项目 `owner` / `admin` / `editor` 调用，并且仍会经过统一字段净化。
+
+推荐交接格式：
+
+```text
+项目：<project_id / display_name>
+manifest：<子项目仓库里的 .elon/project-landing.json>
+版本入口：<Android/Windows/Web manifest URL>
+当前状态：available / needs_configuration / planned
+需要主项目动作：点击“同步首页”或调用 landing sync API
+```
