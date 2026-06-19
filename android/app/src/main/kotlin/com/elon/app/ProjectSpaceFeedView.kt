@@ -67,7 +67,7 @@ internal class ProjectSpaceFeedView(
             minimumHeight = dp(464)
             setPadding(0, 0, 0, dp(34))
             background = roundedBackground(
-                colorHex = "#101010",
+                colorHex = "#000000",
                 topStartDp = 18,
                 topEndDp = 18,
                 bottomEndDp = 0,
@@ -598,7 +598,7 @@ internal class ProjectSpaceFeedView(
         const val MAX_FEED_POSTS = 40
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
-        const val PROJECT_SPACE_INFO_BG = "#1F2023"
+        const val PROJECT_SPACE_INFO_BG = "#212121"
         const val ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP = 104
         const val ANNOUNCEMENT_COLLAPSED_MAX_LINES = 2
         const val ANNOUNCEMENT_ANIMATION_MS = 220L
