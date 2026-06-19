@@ -14,6 +14,7 @@
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
 
   const els = {
+    pcShell: $('pcShell'), authClaimBanner: $('authClaimBanner'), authClaimBtn: $('authClaimBtn'),
     friendsRail: $('friendsRail'), doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), projectRailList: $('projectRailList'),
     channelList: $('channelList'), memberList: $('memberList'), messageList: $('messageList'),
     workspaceName: $('workspaceName'), workspaceMeta: $('workspaceMeta'), channelGlyph: $('channelGlyph'),
@@ -157,6 +158,12 @@
     const n = Number(value || 0);
     el.textContent = n > 99 ? '99+' : String(n);
     el.classList.toggle('show', n > 0);
+  }
+
+  function setAuthClaimBanner(visible) {
+    if (!els.authClaimBanner || !els.pcShell) return;
+    els.authClaimBanner.hidden = !visible;
+    els.pcShell.classList.toggle('has-auth-banner', !!visible);
   }
 
   function setRails(kind) {
@@ -337,6 +344,7 @@
     els.doctorRail.addEventListener('click', doctor.selectDoctor);
     els.nodeRail.addEventListener('click', node.selectNode);
     els.voiceRail.addEventListener('click', () => selectVoiceProject());
+    els.authClaimBtn.addEventListener('click', () => window.open('/web?auth=register', '_blank'));
     [els.friendsRail, els.doctorRail, els.nodeRail, els.voiceRail, $('openWebBtn')].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
@@ -399,6 +407,7 @@
   }
 
   async function loadBaseData() {
+    setAuthClaimBanner(false);
     const [me, projects, friends, groups, nodes] = await Promise.allSettled([
       api('/api/me'),
       api('/api/me/projects?include_system=true'),
@@ -423,6 +432,7 @@
   }
 
   function showLoginState() {
+    setAuthClaimBanner(true);
     renderUser();
     setRails('friends');
     els.workspaceName.textContent = '一龙 PC 工作台';
