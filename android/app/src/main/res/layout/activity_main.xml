@@ -588,8 +588,8 @@
 
         <LinearLayout
             android:id="@+id/projectSpaceAiMenu"
-            android:layout_width="176dp"
-            android:layout_height="64dp"
+            android:layout_width="156dp"
+            android:layout_height="56dp"
             android:layout_gravity="end|bottom"
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="18dp"
@@ -604,13 +604,13 @@
 
             <ImageView
                 android:id="@+id/projectSpaceAiIcon"
-                android:layout_width="28dp"
-                android:layout_height="28dp"
-                android:layout_marginEnd="14dp"
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_marginEnd="12dp"
                 android:contentDescription="@null"
                 android:scaleType="fitCenter"
                 android:src="@drawable/ic_project_ai_conversation"
-                app:tint="@color/elon_text_primary" />
+                app:tint="@color/elon_button_primary_text" />
 
             <com.elon.app.ProjectSpaceAiLabelView
                 android:id="@+id/projectSpaceAiLabel"
@@ -620,7 +620,7 @@
                 android:includeFontPadding="false"
                 android:maxLines="1"
                 android:text="Ai 会话"
-                android:textColor="@color/elon_text_primary"
+                android:textColor="@color/elon_button_primary_text"
                 android:textSize="16sp" />
         </LinearLayout>
 

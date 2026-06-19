@@ -161,22 +161,31 @@ internal class ProjectSpaceFeedView(
                     true
                 }
             }
-            addView(TextView(activity).apply {
-                text = "公告"
-                textSize = 15f
-                setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.parseColor("#D6D6D6"))
-            })
-            addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.CENTER_VERTICAL
-                setPadding(0, dp(7), 0, 0)
-                addView(TextView(activity).apply {
-                    text = displayText
-                    textSize = 14f
-                    setTextColor(Color.parseColor("#A8A8A8"))
-                    setLineSpacing(dp(3).toFloat(), 1f)
-                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(FrameLayout(activity).apply {
+                addView(LinearLayout(activity).apply {
+                    orientation = LinearLayout.VERTICAL
+                    addView(TextView(activity).apply {
+                        text = "公告"
+                        textSize = 15f
+                        setTypeface(typeface, Typeface.BOLD)
+                        setTextColor(Color.parseColor("#D6D6D6"))
+                    })
+                    addView(TextView(activity).apply {
+                        text = displayText
+                        textSize = 14f
+                        setTextColor(Color.parseColor("#A8A8A8"))
+                        setLineSpacing(dp(3).toFloat(), 1f)
+                        maxLines = if (expanded) Int.MAX_VALUE else ANNOUNCEMENT_COLLAPSED_MAX_LINES
+                        ellipsize = if (expanded) null else TextUtils.TruncateAt.END
+                        setPadding(0, dp(7), dp(60), 0)
+                    }, LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    ))
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+                ))
                 addView(projectSpaceAnnouncementMenuButton(
                     activity = activity,
                     dp = dp,
@@ -184,8 +193,8 @@ internal class ProjectSpaceFeedView(
                     onOpenDocuments = openProjectDocuments,
                     apkActionLabel = projectApkActionLabel,
                     onDownloadApk = downloadProjectApk
-                ), LinearLayout.LayoutParams(dp(44), dp(40)).apply {
-                    marginStart = dp(12)
+                ), FrameLayout.LayoutParams(dp(48), dp(48)).apply {
+                    gravity = Gravity.TOP or Gravity.END
                 })
             })
         }
@@ -589,8 +598,9 @@ internal class ProjectSpaceFeedView(
         const val MAX_FEED_POSTS = 40
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
-        const val PROJECT_SPACE_INFO_BG = "#202024"
-        const val ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP = 78
+        const val PROJECT_SPACE_INFO_BG = "#1F2023"
+        const val ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP = 104
+        const val ANNOUNCEMENT_COLLAPSED_MAX_LINES = 2
         const val ANNOUNCEMENT_ANIMATION_MS = 220L
     }
 

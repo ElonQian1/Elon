@@ -1286,11 +1286,11 @@ internal class ProjectSpaceController(
         const val DOCS_CHANNEL_KIND = "docs"
         const val SUGGESTIONS_CHANNEL_KIND = "suggestions"
         const val PROJECT_SPACE_AI_ANIMATION_MS = 220L
-        const val PROJECT_SPACE_AI_COLLAPSED_SIZE_DP = 64
-        const val PROJECT_SPACE_AI_EXPANDED_WIDTH_DP = 176
+        const val PROJECT_SPACE_AI_COLLAPSED_SIZE_DP = 56
+        const val PROJECT_SPACE_AI_EXPANDED_WIDTH_DP = 156
         const val PROJECT_SPACE_AI_EXPAND_AT_TOP_DP = 4
-        const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 14
-        const val PROJECT_SPACE_AI_LABEL_MIN_WIDTH_DP = 70
+        const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 12
+        const val PROJECT_SPACE_AI_LABEL_MIN_WIDTH_DP = 64
 
         fun canEditProjectDescription(role: String?): Boolean {
             return role?.trim()?.lowercase() in setOf("owner", "admin", "editor")

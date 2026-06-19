@@ -637,7 +637,7 @@
       min-height: 464px;
       background: var(--bg);
       border-radius: 18px 18px 0 0;
-      margin-top: -70px;
+      margin-top: -56px;
       padding: 0 0 34px;
       transition: margin-top 220ms ease;
       will-change: margin-top;
@@ -667,30 +667,40 @@
       color: var(--ink);
       font-size: 15px;
       font-weight: 700;
-      margin-bottom: 7px;
+    }
+    .project-space-announcement-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      min-height: 48px;
     }
     .project-space-announcement-body-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
+      display: block;
+      padding-top: 7px;
+      padding-right: 60px;
     }
     .project-space-announcement-body {
-      flex: 1;
-      min-width: 0;
       color: var(--project-space-info-ink-soft);
       font-size: 14px;
       line-height: 1.55;
       white-space: pre-wrap;
     }
+    .project-space-feed:not(.announcement-expanded) .project-space-announcement-body {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
     .project-space-announcement-menu-wrap {
       position: relative;
       flex: none;
-      width: 44px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
     }
     .project-space-announcement-menu-btn {
-      width: 44px;
-      height: 40px;
+      width: 48px;
+      height: 48px;
       border: 0;
       background: transparent;
       color: var(--ink);
@@ -1615,7 +1625,7 @@
     .project-space-ai-menu {
       grid-area: tabs;
       background: transparent;
-      min-height: calc(64px + max(18px, env(safe-area-inset-bottom)));
+      min-height: calc(56px + max(18px, env(safe-area-inset-bottom)));
       padding: 0 8px max(18px, env(safe-area-inset-bottom)) 0;
       display: flex;
       align-items: flex-start;
@@ -1623,32 +1633,32 @@
     }
     .project-space-ai-menu.hidden { display: none; }
     .project-space-ai-menu button {
-      width: 176px;
-      height: 64px;
+      width: 156px;
+      height: 56px;
       border: 0;
-      border-radius: 32px;
-      background: var(--project-space-info-bg);
-      color: var(--tab-active);
+      border-radius: 28px;
+      background: var(--brand);
+      color: var(--brand-ink);
       display: flex;
       flex-direction: row;
       align-items: center;
       justify-content: center;
-      gap: 14px;
+      gap: 12px;
       padding: 0;
       font-size: 16px;
       cursor: pointer;
       overflow: hidden;
       transition: width 220ms ease, gap 220ms ease, background-color 160ms ease;
     }
-    .project-space-ai-menu button:hover { background: var(--project-space-info-bg); }
+    .project-space-ai-menu button:hover { background: var(--brand); }
     .project-space-ai-menu svg {
       width: 32px;
       height: 32px;
       flex: none;
     }
     .project-space-ai-icon {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       flex: none;
       object-fit: contain;
     }
@@ -1667,7 +1677,7 @@
       mask-image: linear-gradient(90deg, transparent 0, #000 18px, #000 100%);
     }
     .project-space-ai-menu.compact button {
-      width: 64px;
+      width: 56px;
       gap: 0;
     }
     .project-space-ai-menu.compact span {
@@ -1968,9 +1978,8 @@
         </div>
         <div class="project-space-feed" id="projectSpaceFeed">
           <div class="project-space-announcement">
-            <div class="project-space-announcement-title">公告</div>
-            <div class="project-space-announcement-body-row">
-              <div class="project-space-announcement-body" id="projectSpaceAnnouncement">不得发布与主题内容不相关的帖子。</div>
+            <div class="project-space-announcement-header">
+              <div class="project-space-announcement-title">公告</div>
               <div class="project-space-announcement-menu-wrap">
                 <button class="project-space-announcement-menu-btn" id="projectSpaceAnnouncementMenuBtn" type="button" aria-label="项目快捷入口">
                   <svg viewBox="0 0 28 28" aria-hidden="true">
@@ -1982,6 +1991,9 @@
                   <button id="projectSpaceDownloadBtn" type="button">下载APK</button>
                 </div>
               </div>
+            </div>
+            <div class="project-space-announcement-body-row">
+              <div class="project-space-announcement-body" id="projectSpaceAnnouncement">不得发布与主题内容不相关的帖子。</div>
             </div>
           </div>
           <div class="project-space-post-area">
