@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
 import android.widget.LinearLayout
@@ -990,11 +991,16 @@ internal class MainNavigationController(
             it.setTextSize(TypedValue.COMPLEX_UNIT_SP, PROJECT_TOP_TAB_TEXT_SP)
         }
         listOf(binding.projectHomeTabIndicator, binding.projectPlazaTabIndicator).forEach {
-            it.layoutParams = it.layoutParams.apply {
+            val params = it.layoutParams as? FrameLayout.LayoutParams ?: FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            it.layoutParams = params.apply {
                 width = designPx(PROJECT_TOP_INDICATOR_WIDTH_PX)
                 height = designPx(PROJECT_TOP_INDICATOR_HEIGHT_PX)
+                gravity = Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                bottomMargin = designPx(PROJECT_TOP_INDICATOR_BOTTOM_PX)
             }
-            (it.layoutParams as? LinearLayout.LayoutParams)?.topMargin = designPx(PROJECT_TOP_INDICATOR_TOP_PX)
         }
         binding.addButton.setPadding(
             designPx(PROJECT_ADD_BUTTON_PADDING_PX),
@@ -1071,7 +1077,7 @@ internal class MainNavigationController(
         const val PROJECT_TOP_TAB_TEXT_SP = 16f
         const val PROJECT_TOP_INDICATOR_WIDTH_PX = 98
         const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
-        const val PROJECT_TOP_INDICATOR_TOP_PX = 14
+        const val PROJECT_TOP_INDICATOR_BOTTOM_PX = 18
         const val PROJECT_ADD_BUTTON_SIZE_PX = 156
         const val PROJECT_ADD_BUTTON_PADDING_PX = 46
     }

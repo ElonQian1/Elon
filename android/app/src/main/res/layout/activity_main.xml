@@ -54,20 +54,19 @@
                 android:paddingEnd="84dp"
                 android:visibility="gone">
 
-                <LinearLayout
+                <FrameLayout
                     android:id="@+id/projectHomeTopTabWrap"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:layout_marginEnd="52dp"
                     android:clickable="true"
-                    android:foreground="?attr/selectableItemBackgroundBorderless"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    android:foreground="?attr/selectableItemBackgroundBorderless">
 
                     <TextView
                         android:id="@+id/projectHomeTopTab"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
                         android:includeFontPadding="false"
                         android:maxLines="1"
                         android:singleLine="true"
@@ -80,23 +79,23 @@
                         android:id="@+id/projectHomeTabIndicator"
                         android:layout_width="32dp"
                         android:layout_height="2dp"
-                        android:layout_marginTop="5dp"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:layout_marginBottom="6dp"
                         android:background="@color/elon_text_primary" />
-                </LinearLayout>
+                </FrameLayout>
 
-                <LinearLayout
+                <FrameLayout
                     android:id="@+id/projectPlazaTopTabWrap"
                     android:layout_width="wrap_content"
                     android:layout_height="match_parent"
                     android:clickable="true"
-                    android:foreground="?attr/selectableItemBackgroundBorderless"
-                    android:gravity="center"
-                    android:orientation="vertical">
+                    android:foreground="?attr/selectableItemBackgroundBorderless">
 
                     <TextView
                         android:id="@+id/projectPlazaTopTab"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_gravity="center_vertical"
                         android:includeFontPadding="false"
                         android:maxLines="1"
                         android:singleLine="true"
@@ -109,10 +108,11 @@
                         android:id="@+id/projectPlazaTabIndicator"
                         android:layout_width="32dp"
                         android:layout_height="2dp"
-                        android:layout_marginTop="6dp"
+                        android:layout_gravity="bottom|center_horizontal"
+                        android:layout_marginBottom="6dp"
                         android:background="@color/elon_text_primary"
                         android:visibility="invisible" />
-                </LinearLayout>
+                </FrameLayout>
             </LinearLayout>
 
             <ImageButton
