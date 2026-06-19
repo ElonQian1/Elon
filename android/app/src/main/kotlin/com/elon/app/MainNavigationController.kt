@@ -996,10 +996,6 @@ internal class MainNavigationController(
             }
             (it.layoutParams as? LinearLayout.LayoutParams)?.topMargin = designPx(PROJECT_TOP_INDICATOR_TOP_PX)
         }
-        (binding.addButton.layoutParams as? FrameLayout.LayoutParams)?.let {
-            it.marginEnd = designPx(PROJECT_ADD_BUTTON_END_PX)
-            binding.addButton.layoutParams = it
-        }
         binding.addButton.setPadding(
             designPx(PROJECT_ADD_BUTTON_PADDING_PX),
             designPx(PROJECT_ADD_BUTTON_PADDING_PX),
@@ -1068,7 +1064,7 @@ internal class MainNavigationController(
     private companion object {
         const val DESIGN_WIDTH_PX = 1272
         const val PROJECT_TOOLBAR_HEIGHT_PX = 176
-        const val PROJECT_TOP_TOOLBAR_HEIGHT_PX = 224
+        const val PROJECT_TOP_TOOLBAR_HEIGHT_PX = PROJECT_TOOLBAR_HEIGHT_PX
         const val PROJECT_TOP_PADDING_START_PX = 78
         const val PROJECT_TOP_PADDING_END_PX = 250
         const val PROJECT_TOP_TAB_GAP_PX = 188
@@ -1077,7 +1073,6 @@ internal class MainNavigationController(
         const val PROJECT_TOP_INDICATOR_HEIGHT_PX = 6
         const val PROJECT_TOP_INDICATOR_TOP_PX = 14
         const val PROJECT_ADD_BUTTON_SIZE_PX = 156
-        const val PROJECT_ADD_BUTTON_END_PX = 70
         const val PROJECT_ADD_BUTTON_PADDING_PX = 46
     }
 }
