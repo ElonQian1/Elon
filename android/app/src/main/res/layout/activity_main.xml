@@ -552,11 +552,11 @@
 
         <LinearLayout
             android:id="@+id/projectSpaceFeedActionsOverlay"
-            android:layout_width="60dp"
+            android:layout_width="56dp"
             android:layout_height="wrap_content"
             android:layout_gravity="end|bottom"
             android:layout_marginEnd="8dp"
-            android:layout_marginBottom="92dp"
+            android:layout_marginBottom="88dp"
             android:elevation="10dp"
             android:gravity="center"
             android:orientation="vertical"
@@ -564,8 +564,8 @@
 
             <ImageButton
                 android:visibility="gone"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
                 android:background="@drawable/bg_project_space_ai_menu_item"
                 android:contentDescription="项目文档"
                 android:foreground="?attr/selectableItemBackgroundBorderless"
@@ -575,8 +575,8 @@
 
             <ImageButton
                 android:id="@+id/projectSpacePostFab"
-                android:layout_width="60dp"
-                android:layout_height="60dp"
+                android:layout_width="56dp"
+                android:layout_height="56dp"
                 android:background="@drawable/bg_project_space_ai_menu_item"
                 android:contentDescription="发布帖子"
                 android:foreground="?attr/selectableItemBackgroundBorderless"
@@ -588,8 +588,8 @@
 
         <LinearLayout
             android:id="@+id/projectSpaceAiMenu"
-            android:layout_width="156dp"
-            android:layout_height="60dp"
+            android:layout_width="128dp"
+            android:layout_height="56dp"
             android:layout_gravity="end|bottom"
             android:layout_marginEnd="8dp"
             android:layout_marginBottom="18dp"
