@@ -12,9 +12,14 @@
     nodeAdminUrl: safeNodeAdminUrl()
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
+  let pcAuthMode = 'login';
 
   const els = {
     pcShell: $('pcShell'), authClaimBanner: $('authClaimBanner'), authClaimBtn: $('authClaimBtn'),
+    pcAuthBackdrop: $('pcAuthBackdrop'), pcAuthForm: $('pcAuthForm'), pcAuthCloseBtn: $('pcAuthCloseBtn'),
+    pcAuthAccountInput: $('pcAuthAccountInput'), pcAuthNicknameField: $('pcAuthNicknameField'),
+    pcAuthNicknameInput: $('pcAuthNicknameInput'), pcAuthPasswordInput: $('pcAuthPasswordInput'),
+    pcAuthError: $('pcAuthError'), pcAuthSubmitBtn: $('pcAuthSubmitBtn'),
     friendsRail: $('friendsRail'), doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), projectRailList: $('projectRailList'),
     channelList: $('channelList'), memberList: $('memberList'), messageList: $('messageList'),
     workspaceName: $('workspaceName'), workspaceMeta: $('workspaceMeta'), channelGlyph: $('channelGlyph'),
@@ -175,6 +180,100 @@
     if (!els.authClaimBanner || !els.pcShell) return;
     els.authClaimBanner.hidden = !visible;
     els.pcShell.classList.toggle('has-auth-banner', !!visible);
+  }
+
+  function pcAuthTabs() {
+    return Array.from(document.querySelectorAll('[data-pc-auth-mode]'));
+  }
+
+  function updatePcAuthSubmitLabel(busy) {
+    if (!els.pcAuthSubmitBtn) return;
+    if (busy) {
+      els.pcAuthSubmitBtn.textContent = pcAuthMode === 'register' ? '创建中…' : '登录中…';
+      return;
+    }
+    els.pcAuthSubmitBtn.textContent = pcAuthMode === 'register' ? '创建账号' : '登录';
+  }
+
+  function setPcAuthMode(mode) {
+    pcAuthMode = mode === 'register' ? 'register' : 'login';
+    const isRegister = pcAuthMode === 'register';
+    pcAuthTabs().forEach((button) => {
+      button.classList.toggle('active', button.dataset.pcAuthMode === pcAuthMode);
+    });
+    if (els.pcAuthNicknameField) els.pcAuthNicknameField.hidden = !isRegister;
+    if (els.pcAuthPasswordInput) els.pcAuthPasswordInput.autocomplete = isRegister ? 'new-password' : 'current-password';
+    setPcAuthError('');
+    updatePcAuthSubmitLabel(false);
+  }
+
+  function setPcAuthError(message) {
+    if (!els.pcAuthError) return;
+    els.pcAuthError.textContent = message || '';
+    els.pcAuthError.classList.toggle('show', !!message);
+  }
+
+  function setPcAuthBusy(busy) {
+    if (!els.pcAuthSubmitBtn) return;
+    els.pcAuthSubmitBtn.disabled = !!busy;
+    updatePcAuthSubmitLabel(!!busy);
+  }
+
+  function openAuthModal(mode) {
+    setAccountMenu(false);
+    if (els.settingsBackdrop && !els.settingsBackdrop.hidden) closeSettings();
+    setPcAuthMode(mode);
+    if (els.pcAuthBackdrop) els.pcAuthBackdrop.hidden = false;
+    setTimeout(() => {
+      const target = pcAuthMode === 'register' && els.pcAuthNicknameInput && clean(els.pcAuthAccountInput.value)
+        ? els.pcAuthNicknameInput
+        : els.pcAuthAccountInput;
+      if (target) target.focus();
+    }, 0);
+  }
+
+  function closeAuthModal() {
+    if (els.pcAuthBackdrop) els.pcAuthBackdrop.hidden = true;
+    setPcAuthError('');
+  }
+
+  function authFetchWithTimeout(url, options, ms) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), ms || 15000);
+    return fetch(url, Object.assign({}, options || {}, { signal: ctrl.signal }))
+      .finally(() => clearTimeout(timer));
+  }
+
+  async function submitPcAuth(event) {
+    event.preventDefault();
+    setPcAuthBusy(true);
+    setPcAuthError('');
+    try {
+      const account = clean(els.pcAuthAccountInput.value);
+      const password = els.pcAuthPasswordInput.value || '';
+      if (!account) throw new Error('请输入账号');
+      if (!password) throw new Error('请输入密码');
+      if (pcAuthMode === 'register' && password.length < 6) throw new Error('密码至少 6 位');
+      const payload = { account, password, device_name: 'pc-web' };
+      if (pcAuthMode === 'register') payload.nickname = clean(els.pcAuthNicknameInput.value);
+      const res = await authFetchWithTimeout(pcAuthMode === 'register' ? '/api/auth/register' : '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      }, 15000);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || (pcAuthMode === 'register' ? '注册失败' : '登录失败'));
+      if (!data.token) throw new Error('登录态返回异常，请重试');
+      saveToken(data.token);
+      state.user = data.user || null;
+      await refreshActive();
+      closeAuthModal();
+    } catch (error) {
+      const message = error && error.name === 'AbortError' ? '请求超时，请检查网络后重试' : (error && error.message) || '网络错误';
+      setPcAuthError(message);
+    } finally {
+      setPcAuthBusy(false);
+    }
   }
 
   function setRails(kind) {
@@ -378,7 +477,13 @@
     els.doctorRail.addEventListener('click', doctor.selectDoctor);
     els.nodeRail.addEventListener('click', node.selectNode);
     els.voiceRail.addEventListener('click', () => selectVoiceProject());
-    els.authClaimBtn.addEventListener('click', () => window.open('/web?auth=register', '_blank'));
+    els.authClaimBtn.addEventListener('click', () => openAuthModal('register'));
+    pcAuthTabs().forEach((button) => button.addEventListener('click', () => setPcAuthMode(button.dataset.pcAuthMode)));
+    els.pcAuthForm.addEventListener('submit', submitPcAuth);
+    els.pcAuthCloseBtn.addEventListener('click', closeAuthModal);
+    els.pcAuthBackdrop.addEventListener('click', (event) => {
+      if (event.target === els.pcAuthBackdrop) closeAuthModal();
+    });
     [els.friendsRail, els.doctorRail, els.nodeRail, els.voiceRail, $('openWebBtn')].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
@@ -417,6 +522,10 @@
       els.input.style.height = Math.min(120, els.input.scrollHeight) + 'px';
     });
     document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && els.pcAuthBackdrop && !els.pcAuthBackdrop.hidden) {
+        closeAuthModal();
+        return;
+      }
       if (event.key === 'Escape' && els.accountMenu && !els.accountMenu.hidden) {
         setAccountMenu(false);
         return;
@@ -495,10 +604,10 @@
     setNodeMode(false);
     els.messageList.innerHTML = `<div class="empty-state">
       <strong>登录后一处使用好友、电脑医生、项目和 PC 节点</strong>
-      <p>PC 工作台读取网页版登录态。点击下方按钮登录后，刷新本页即可进入 Discord 风格工作区。</p>
-      <button class="text-button" type="button" id="loginWeb">打开网页版登录</button>
+      <p>PC 工作台读取账号登录态。点击下方按钮登录或注册后，即可进入 Discord 风格工作区。</p>
+      <button class="text-button" type="button" id="loginWeb">登录或注册账号</button>
     </div>`;
-    $('loginWeb').addEventListener('click', () => window.open('/web', '_blank'));
+    $('loginWeb').addEventListener('click', () => openAuthModal('login'));
   }
 
   function selectFriends() {

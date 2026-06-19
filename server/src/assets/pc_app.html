@@ -172,6 +172,36 @@
       </div>
     </section>
   </div>
+  <div class="pc-auth-backdrop" id="pcAuthBackdrop" hidden>
+    <section class="pc-auth-dialog" role="dialog" aria-modal="true" aria-labelledby="pcAuthTitle">
+      <button class="pc-auth-close" id="pcAuthCloseBtn" type="button" title="关闭">×</button>
+      <form class="pc-auth-card" id="pcAuthForm">
+        <div class="pc-auth-brand">
+          <div class="pc-auth-brand-icon"><img src="data:image/png;base64,__BRAND_PNG_B64__" alt="一龙" /></div>
+          <div class="pc-auth-brand-name" id="pcAuthTitle">一龙<small>云端 APK 开发平台</small></div>
+        </div>
+        <div class="pc-auth-tabs">
+          <button type="button" class="pc-auth-tab active" data-pc-auth-mode="login">登录</button>
+          <button type="button" class="pc-auth-tab" data-pc-auth-mode="register">注册</button>
+        </div>
+        <label class="pc-auth-field">
+          <span>账号</span>
+          <input id="pcAuthAccountInput" autocomplete="username" placeholder="手机号、邮箱或账号 ID" />
+        </label>
+        <label class="pc-auth-field" id="pcAuthNicknameField" hidden>
+          <span>昵称</span>
+          <input id="pcAuthNicknameInput" autocomplete="nickname" placeholder="工作台展示名" />
+        </label>
+        <label class="pc-auth-field">
+          <span>密码</span>
+          <input id="pcAuthPasswordInput" type="password" autocomplete="current-password" placeholder="至少 6 位" />
+        </label>
+        <div id="pcAuthError" class="pc-auth-error"></div>
+        <button id="pcAuthSubmitBtn" class="pc-auth-submit" type="submit">登录</button>
+        <div class="pc-auth-hint">网页版是 APK 版在电脑上的体现，所有数据与 APK 互通。</div>
+      </form>
+    </section>
+  </div>
 
   <script src="/assets/pc_app_utils.js"></script>
   <script src="/assets/pc_app_markdown.js"></script>
