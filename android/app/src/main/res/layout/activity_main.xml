@@ -24,7 +24,8 @@
             <TextView
                 android:id="@+id/backButton"
                 android:layout_width="50dp"
-                android:layout_height="match_parent"
+                android:layout_height="44dp"
+                android:layout_gravity="start|center_vertical"
                 android:gravity="center"
                 android:text="‹"
                 android:textColor="@color/elon_text_primary"
@@ -34,7 +35,7 @@
             <TextView
                 android:id="@+id/topTitleText"
                 android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_height="44dp"
                 android:layout_gravity="center"
                 android:gravity="center"
                 android:includeFontPadding="false"
@@ -45,7 +46,7 @@
             <LinearLayout
                 android:id="@+id/projectTopTabs"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
+                android:layout_height="44dp"
                 android:layout_gravity="start|center_vertical"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -117,7 +118,7 @@
             <ImageButton
                 android:id="@+id/searchButton"
                 android:layout_width="44dp"
-                android:layout_height="match_parent"
+                android:layout_height="44dp"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="92dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -142,7 +143,7 @@
             <ImageButton
                 android:id="@+id/projectMembersButton"
                 android:layout_width="44dp"
-                android:layout_height="match_parent"
+                android:layout_height="44dp"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -155,7 +156,7 @@
             <ImageButton
                 android:id="@+id/voiceCallButton"
                 android:layout_width="44dp"
-                android:layout_height="match_parent"
+                android:layout_height="44dp"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="92dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
@@ -169,7 +170,7 @@
             <ImageButton
                 android:id="@+id/moreButton"
                 android:layout_width="44dp"
-                android:layout_height="match_parent"
+                android:layout_height="44dp"
                 android:layout_gravity="end|center_vertical"
                 android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"

@@ -958,6 +958,24 @@ internal class MainNavigationController(
 
     private fun applyProjectManagementDesignMetrics() {
         setProjectToolbarExpanded(false)
+        val topControlSize = designPx(PROJECT_ADD_BUTTON_SIZE_PX)
+        fun alignFrameTopControl(view: View, resizeWidth: Boolean) {
+            (view.layoutParams as? FrameLayout.LayoutParams)?.let {
+                if (resizeWidth) it.width = topControlSize
+                it.height = topControlSize
+                view.layoutParams = it
+            }
+        }
+        listOf(
+            binding.backButton,
+            binding.searchButton,
+            binding.addButton,
+            binding.projectMembersButton,
+            binding.voiceCallButton,
+            binding.moreButton
+        ).forEach { alignFrameTopControl(it, resizeWidth = true) }
+        alignFrameTopControl(binding.topTitleText, resizeWidth = false)
+        alignFrameTopControl(binding.projectTopTabs, resizeWidth = false)
         binding.projectTopTabs.setPadding(
             designPx(PROJECT_TOP_PADDING_START_PX),
             0,
@@ -979,9 +997,6 @@ internal class MainNavigationController(
             (it.layoutParams as? LinearLayout.LayoutParams)?.topMargin = designPx(PROJECT_TOP_INDICATOR_TOP_PX)
         }
         (binding.addButton.layoutParams as? FrameLayout.LayoutParams)?.let {
-            val size = designPx(PROJECT_ADD_BUTTON_SIZE_PX)
-            it.width = size
-            it.height = size
             it.marginEnd = designPx(PROJECT_ADD_BUTTON_END_PX)
             binding.addButton.layoutParams = it
         }
