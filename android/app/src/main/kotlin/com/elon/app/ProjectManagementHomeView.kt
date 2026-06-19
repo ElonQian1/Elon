@@ -245,6 +245,18 @@ internal class ProjectManagementHomeView(
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
                 ))
+            } else {
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    gravity = Gravity.CENTER
+                    text = projectInitial(project)
+                    setTextColor(Color.parseColor(COLOR_THUMB_TEXT))
+                    setFontSizeSp(FONT_THUMB_INITIAL_SP)
+                    setTypeface(typeface, Typeface.BOLD)
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
             }
         }
     }
@@ -319,6 +331,14 @@ internal class ProjectManagementHomeView(
             ?: "暂无简介"
     }
 
+    private fun projectInitial(project: AppProject): String {
+        val text = cleanProjectText(project.title) ?: return "\u9879"
+        val index = text.indexOfFirst { !it.isWhitespace() }
+        if (index < 0) return "\u9879"
+        val codePoint = text.codePointAt(index)
+        return String(Character.toChars(codePoint)).uppercase()
+    }
+
     private fun cleanProjectText(value: String?): String? {
         val text = value?.trim().orEmpty()
         return text.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
@@ -385,6 +405,7 @@ internal class ProjectManagementHomeView(
         const val COLOR_TEXT_LIST_TITLE = "#FFFFFF"
         const val COLOR_TEXT_PLACEHOLDER = "#AFAFAF"
         const val COLOR_THUMB_BG = "#FFFFFF"
+        const val COLOR_THUMB_TEXT = "#000000"
 
         const val DESIGN_WIDTH_PX = 1272
         const val SEGMENT_SIDE_PX = 30
@@ -416,5 +437,6 @@ internal class ProjectManagementHomeView(
         const val FONT_META_SP = 12
         const val FONT_EMPTY_SP = 16
         const val FONT_CHEVRON_SP = 24
+        const val FONT_THUMB_INITIAL_SP = 24
     }
 }

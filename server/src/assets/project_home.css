@@ -91,10 +91,13 @@
   height: 52px;
   border-radius: 6px;
   background: #FFFFFF;
-  color: transparent;
+  color: #000000;
   display: grid;
   place-items: center;
   overflow: hidden;
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .project-home-thumb img {

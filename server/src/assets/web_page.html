@@ -560,6 +560,7 @@
       min-width: 0;
     }
     .project-space-icon {
+      position: relative;
       flex: none;
       width: 42px;
       height: 42px;
@@ -577,6 +578,8 @@
       display: none;
     }
     .project-space-icon img {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -4189,10 +4192,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function renderProjectSpaceIcon(project) {
     if (!projectSpaceIcon) return;
     const iconUrl = projectIconUrlOf(project);
-    projectSpaceIcon.classList.toggle('hidden', !iconUrl);
+    const fallback = escapeHtml(avatarInitial(projectTitleOf(project), '\u9879'));
+    projectSpaceIcon.classList.remove('hidden');
     projectSpaceIcon.innerHTML = iconUrl
-      ? '<img src="' + escapeHtml(iconUrl) + '" alt="" loading="lazy" onerror="this.closest(\'.project-space-icon\').classList.add(\'hidden\');this.remove()" />'
-      : '';
+      ? fallback + '<img src="' + escapeHtml(iconUrl) + '" alt="" loading="lazy" onerror="this.remove()" />'
+      : fallback;
   }
   function renderProjectIntroCard(project) {
     if (!projectIntroCard) return;

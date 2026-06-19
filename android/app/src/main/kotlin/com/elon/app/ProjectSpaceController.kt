@@ -846,11 +846,9 @@ internal class ProjectSpaceController(
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER_VERTICAL
                 val iconBitmap = UserProfileStore.decodeAvatar(space.project.iconDataUrl)
-                if (iconBitmap != null) {
-                    addView(projectSpaceIconView(iconBitmap), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
-                        marginEnd = dp(12)
-                    })
-                }
+                addView(projectSpaceIconView(space.project.name, iconBitmap), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                    marginEnd = dp(12)
+                })
                 addView(LinearLayout(activity).apply {
                     orientation = LinearLayout.VERTICAL
                     gravity = Gravity.CENTER_VERTICAL
@@ -883,21 +881,43 @@ internal class ProjectSpaceController(
         }
     }
 
-    private fun projectSpaceIconView(iconBitmap: android.graphics.Bitmap): View {
+    private fun projectSpaceIconView(projectTitle: String, iconBitmap: android.graphics.Bitmap?): View {
         return FrameLayout(activity).apply {
             background = GradientDrawable().apply {
                 cornerRadius = dp(8).toFloat()
                 setColor(Color.parseColor("#2A2A2A"))
             }
             clipToOutline = true
-            addView(ImageView(activity).apply {
-                setImageBitmap(iconBitmap)
-                scaleType = ImageView.ScaleType.CENTER_CROP
-            }, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ))
+            if (iconBitmap != null) {
+                addView(ImageView(activity).apply {
+                    setImageBitmap(iconBitmap)
+                    scaleType = ImageView.ScaleType.CENTER_CROP
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            } else {
+                addView(TextView(activity).apply {
+                    text = projectInitial(projectTitle)
+                    gravity = Gravity.CENTER
+                    includeFontPadding = false
+                    textSize = 20f
+                    setTypeface(typeface, android.graphics.Typeface.BOLD)
+                    setTextColor(Color.parseColor("#D6D6D6"))
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            }
         }
+    }
+
+    private fun projectInitial(title: String): String {
+        val text = title.trim().takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) } ?: return "\u9879"
+        val index = text.indexOfFirst { !it.isWhitespace() }
+        if (index < 0) return "\u9879"
+        val codePoint = text.codePointAt(index)
+        return String(Character.toChars(codePoint)).uppercase()
     }
 
     private fun ProjectSpace.withProjectIcon(iconDataUrl: String?, force: Boolean = false): ProjectSpace {
