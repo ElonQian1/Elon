@@ -7,6 +7,7 @@ const DEFAULT_MATCH_LIMIT: u32 = 30;
 const DEFAULT_DISCUSSION_LIMIT: u32 = 80;
 const DEFAULT_ORDER_LIMIT: u32 = 20;
 const DEFAULT_TIMEOUT_SECS: u64 = 6;
+const DEFAULT_TOOL_EXECUTION_TIMEOUT_SECS: u64 = 6;
 
 pub(crate) fn fb2_base_url() -> Option<String> {
     first_non_empty_env(&[
@@ -64,6 +65,18 @@ pub(crate) fn timeout_secs() -> u64 {
         .and_then(|value| value.trim().parse::<u64>().ok())
         .unwrap_or(DEFAULT_TIMEOUT_SECS)
         .clamp(2, 30)
+}
+
+pub(crate) fn tool_execution_enabled() -> bool {
+    env_flag("ELON_EXTERNAL_APP_FB2_TOOL_EXECUTION_ENABLED", true)
+}
+
+pub(crate) fn tool_execution_timeout_secs() -> u64 {
+    std::env::var("ELON_EXTERNAL_APP_FB2_TOOL_EXECUTION_TIMEOUT_SECS")
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(DEFAULT_TOOL_EXECUTION_TIMEOUT_SECS)
+        .clamp(1, 15)
 }
 
 pub(crate) fn infer_lottery_type(topic_hint: Option<&str>) -> Option<String> {

@@ -49,6 +49,7 @@ mod external_app_context_observability;
 mod external_app_context_quality;
 mod external_app_context_response;
 mod external_app_context_tool_execution;
+mod external_app_context_tool_runtime;
 mod external_app_context_tools;
 mod external_app_registry;
 mod external_app_usage_policy;

@@ -19,7 +19,7 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
         "fb2" => Some(json!({
             "app_id": "fb2",
             "schema": "fb2.tools.v1",
-            "execution_status": "declared_only",
+            "execution_status": "runtime_supported",
             "recommended_tools": recommended_fb2_tool_contract(),
             "required_context_fields": [
                 "context_pack",
@@ -35,11 +35,14 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
                 "ELON_EXTERNAL_APP_FB2_BASE_URL",
                 "ELON_EXTERNAL_APP_FB2_CONTEXT_TOKEN",
                 "ELON_EXTERNAL_APP_FB2_CONTEXT_PACK_ENABLED",
-                "ELON_EXTERNAL_APP_CONTEXT_MAX_CHARS"
+                "ELON_EXTERNAL_APP_CONTEXT_MAX_CHARS",
+                "ELON_EXTERNAL_APP_FB2_TOOL_EXECUTION_ENABLED",
+                "ELON_EXTERNAL_APP_FB2_TOOL_EXECUTION_TIMEOUT_SECS"
             ],
             "notes": [
-                "主项目当前只把工具作为规划和追问依据，不会自动执行 fb2 工具。",
+                "主项目群聊 AI 已支持按需执行 fb2 工具；执行失败会降级为普通 context_pack 回答。",
                 "工具执行请求和响应格式见同一 contract 响应中的 tool_execution_contract。",
+                "只有 executed_external_app_tools 中 status=ready 且 success=true 的结果可以作为已查询事实。",
                 "用户订单工具必须限制为 current_user_only。",
                 "群友观点必须返回 message_id，比赛和订单必须返回 source id。",
                 "审计工具只返回上下文来源和指标元数据，不返回完整订单、聊天正文或赔率明细。"
@@ -67,10 +70,10 @@ pub(crate) fn prompt_tool_contract_block(context: &Value) -> String {
     }
 
     format!(
-        "<available_external_app_tools status=\"declared_only\">\n\
+        "<available_external_app_tools status=\"runtime_supported\">\n\
          {}\n\
          <tool_rules>\n\
-         - 这些工具当前只作为后续追问/检索计划的契约提示，不能在回答中假装已经调用。\n\
+         - 主项目可以按需调用这些工具；只有 executed_external_app_tools 中 success=true 的结果才算已经查询。\n\
          - 如果当前 context_pack 信息不足，可以说明需要调用哪个工具补充，例如 get_match_detail 或 search_user_orders。\n\
          - 如果已有 context_audit_id，可以说明需要调用 get_context_audit 回查当次上下文来源和预算指标。\n\
          - 不能编造工具返回结果；未调用工具时只能基于现有上下文回答。\n\
@@ -134,7 +137,7 @@ fn readiness(status: &str, names: Vec<String>, missing: Vec<&str>) -> Value {
         "declared_count": names.len(),
         "recommended_tools": RECOMMENDED_FB2_TOOLS,
         "missing_recommended_tools": missing,
-        "execution_status": "declared_only"
+        "execution_status": "runtime_supported"
     })
 }
 
@@ -257,7 +260,8 @@ mod tests {
         }));
 
         assert!(block.contains("get_match_detail"));
-        assert!(block.contains("不能在回答中假装已经调用"));
+        assert!(block.contains("success=true"));
+        assert!(block.contains("未调用工具时只能基于现有上下文回答"));
     }
 
     #[test]

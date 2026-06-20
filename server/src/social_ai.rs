@@ -253,7 +253,8 @@ async fn reply_to_friend(state: Arc<AppState>, user_id: String, friend_id: Strin
         }
         return Ok(());
     }
-    let reply = social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history, None).await;
+    let reply =
+        social_ai_reply_or_fallback(&state, &user_id, "好友聊天", &history, None, None).await;
     let messages = state
         .store
         .insert_friend_social_ai_reply(&user_id, &friend_id, &reply)?;
@@ -275,8 +276,15 @@ async fn reply_to_direct_friend(state: Arc<AppState>, user_id: String) -> Result
         friend_events::publish_friend_bridge_message(&message, &summary);
         return Ok(DEVELOPMENT_REDIRECT_REPLY.to_string());
     }
-    let reply =
-        social_ai_reply_or_fallback(&state, &user_id, DIRECT_SOCIAL_AI_SCENE, &history, None).await;
+    let reply = social_ai_reply_or_fallback(
+        &state,
+        &user_id,
+        DIRECT_SOCIAL_AI_SCENE,
+        &history,
+        None,
+        None,
+    )
+    .await;
     let message = state
         .store
         .insert_direct_social_ai_reply(&user_id, &reply)?;
@@ -293,15 +301,33 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
     let reply = if is_development_intent(&history).is_some() {
         DEVELOPMENT_REDIRECT_REPLY.to_string()
     } else {
-        let external_context =
-            crate::external_app_context::group_context_for_chat(&state, &user_id, &group_id, None)
-                .await;
+        let topic_hint = latest_request_user_text(&history);
+        let external_context = crate::external_app_context::group_context_for_chat(
+            &state,
+            &user_id,
+            &group_id,
+            topic_hint.as_deref(),
+        )
+        .await;
+        let external_tool_results = if let Some(context) = external_context.as_ref() {
+            crate::external_app_context_tool_runtime::group_tool_results_for_chat(
+                &state,
+                &user_id,
+                &group_id,
+                context,
+                topic_hint.as_deref(),
+            )
+            .await
+        } else {
+            None
+        };
         social_ai_reply_or_fallback(
             &state,
             &user_id,
             "群聊",
             &history,
             external_context.as_ref(),
+            external_tool_results.as_ref(),
         )
         .await
     };
@@ -318,8 +344,18 @@ async fn social_ai_reply_or_fallback(
     scene: &str,
     history: &[SocialAiHistoryMessage],
     external_context: Option<&Value>,
+    external_tool_results: Option<&Value>,
 ) -> String {
-    match build_reply(state, user_id, scene, history, external_context).await {
+    match build_reply(
+        state,
+        user_id,
+        scene,
+        history,
+        external_context,
+        external_tool_results,
+    )
+    .await
+    {
         Ok(reply) => reply,
         Err(error) => {
             warn!("{scene} AI 生成失败: {}", error);
@@ -338,6 +374,7 @@ async fn build_reply(
     scene: &str,
     history: &[SocialAiHistoryMessage],
     external_context: Option<&Value>,
+    external_tool_results: Option<&Value>,
 ) -> Result<String> {
     if history.is_empty() {
         return Ok(if scene == DIRECT_SOCIAL_AI_SCENE {
@@ -353,7 +390,7 @@ async fn build_reply(
     } else {
         "请回答最后一次 @EL 触发的问题。"
     };
-    let external_context_block = format_external_context(external_context);
+    let external_context_block = format_external_context(external_context, external_tool_results);
     let prompt_text = format!(
         "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n{}{}\n\n{answer_instruction}",
         format_history(history),
@@ -404,11 +441,23 @@ async fn build_reply(
     }
 }
 
-fn format_external_context(external_context: Option<&Value>) -> String {
-    let Some(context) = external_context else {
-        return String::new();
-    };
-    crate::external_app_context_budget::prompt_context_block(context)
+fn format_external_context(
+    external_context: Option<&Value>,
+    external_tool_results: Option<&Value>,
+) -> String {
+    let context_block = external_context
+        .map(crate::external_app_context_budget::prompt_context_block)
+        .unwrap_or_default();
+    let tool_block = crate::external_app_context_tool_runtime::prompt_executed_tools_block(
+        external_tool_results,
+    );
+
+    match (context_block.is_empty(), tool_block.is_empty()) {
+        (true, true) => String::new(),
+        (false, true) => context_block,
+        (true, false) => tool_block,
+        (false, false) => format!("{context_block}\n\n{tool_block}"),
+    }
 }
 
 /// 使用本地 AI CLI（无工具、无项目工作区）生成社交聊天回复
