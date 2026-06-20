@@ -316,12 +316,23 @@ internal class MainHomeListActions(
             )
         }
         return (groupItems + friendItems)
-            .sortedWith(compareByDescending<HomeChatItem> { it.sortTime }.thenBy { item ->
-                when (item) {
-                    is HomeChatItem.FriendItem -> item.friend.name
-                    is HomeChatItem.GroupItem -> item.group.name
-                }
-            })
+            .sortedWith(
+                compareByDescending<HomeChatItem> { pinnedHomeChatPriority(it) }
+                    .thenByDescending { it.sortTime }
+                    .thenBy { item ->
+                        when (item) {
+                            is HomeChatItem.FriendItem -> item.friend.name
+                            is HomeChatItem.GroupItem -> item.group.name
+                        }
+                    }
+            )
+    }
+
+    private fun pinnedHomeChatPriority(item: HomeChatItem): Int {
+        return when (item) {
+            is HomeChatItem.FriendItem -> if (item.friend.id == SOCIAL_AI_USER_ID) 1 else 0
+            is HomeChatItem.GroupItem -> 0
+        }
     }
 
     private sealed class HomeChatItem(open val sortTime: Long) {
@@ -420,3 +431,5 @@ internal class MainHomeListActions(
     }
 
 }
+
+private const val SOCIAL_AI_USER_ID = "usr_elon_ai"
