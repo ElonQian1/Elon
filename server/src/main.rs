@@ -42,6 +42,7 @@ mod external_app_context;
 mod external_app_context_budget;
 mod external_app_context_contract;
 mod external_app_context_health;
+mod external_app_context_observability;
 mod external_app_context_tools;
 mod external_app_registry;
 mod friend_api;

@@ -12,10 +12,10 @@ use std::sync::Arc;
 
 use crate::{
     external_app_context_contract::{
-        public_context_observability_guidance, public_context_pack_example,
-        public_context_quality_guidance, public_usage_policy_guidance,
+        public_context_pack_example, public_context_quality_guidance, public_usage_policy_guidance,
     },
     external_app_context_health::public_context_health,
+    external_app_context_observability::public_context_observability_guidance,
     external_app_context_tools::public_tool_contract_guidance,
     external_app_registry::{
         external_app_by_id, group_seeds, public_external_app_config, service_token_env_names,
