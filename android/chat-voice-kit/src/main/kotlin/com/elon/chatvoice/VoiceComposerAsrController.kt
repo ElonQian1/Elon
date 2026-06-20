@@ -66,7 +66,11 @@ class VoiceComposerAsrController(
         recordResult.exceptionOrNull()?.let { error ->
             localError = ChatVoiceError("record_start_failed", error.message ?: "录音启动失败", error)
         }
-        transcriber.start(listener(current), preferOffline = config.preferOfflineAsr)
+        transcriber.start(
+            listener(current),
+            preferOffline = config.preferOfflineAsr,
+            startTimeoutMs = config.asr.localStartTimeoutMs,
+        )
         return true
     }
 

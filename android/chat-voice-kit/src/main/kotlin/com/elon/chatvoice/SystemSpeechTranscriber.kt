@@ -37,6 +37,7 @@ class SystemSpeechTranscriber(
     private var candidates: List<ChatVoiceRecognitionEngine> = emptyList()
     private var candidateIndex = 0
     private var sawAnyPartial = false
+    private var sawReady = false
     private var busyRetryOnSame = 0
     private var coldStartRetryOnSame = 0
     private var sessionConflictRetry = 0
@@ -44,6 +45,7 @@ class SystemSpeechTranscriber(
     private var currentEngine: ChatVoiceRecognitionEngine? = null
     private var prewarmedEngine: ComponentName? = null
     private var currentPreferOffline = false
+    private var currentStartTimeoutMs = DEFAULT_START_TIMEOUT_MS
 
     fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(appContext)
 
@@ -71,7 +73,11 @@ class SystemSpeechTranscriber(
         }
     }
 
-    fun start(listener: Listener, preferOffline: Boolean = false) {
+    fun start(
+        listener: Listener,
+        preferOffline: Boolean = false,
+        startTimeoutMs: Long = DEFAULT_START_TIMEOUT_MS,
+    ) {
         main.post {
             val session = ++sessionId
             if (!isAvailable()) {
@@ -87,6 +93,7 @@ class SystemSpeechTranscriber(
             }
             activeListener = listener
             currentPreferOffline = preferOffline
+            currentStartTimeoutMs = startTimeoutMs
             candidates = if (engineFallbackEnabled) {
                 ChatVoiceRecognitionEngineSelector.listForUse(appContext)
             } else {
@@ -94,6 +101,7 @@ class SystemSpeechTranscriber(
             }
             candidateIndex = 0
             sawAnyPartial = false
+            sawReady = false
             busyRetryOnSame = 0
             coldStartRetryOnSame = 0
             sessionConflictRetry = 0
@@ -167,6 +175,8 @@ class SystemSpeechTranscriber(
             return
         }
         currentEngine = engine
+        sawReady = false
+        sawAnyPartial = false
         val current = if (reuseCurrent && recognizer != null) {
             recognizer!!
         } else if (recognizer != null && prewarmedEngine == engine.component) {
@@ -184,6 +194,7 @@ class SystemSpeechTranscriber(
             .onFailure { error ->
                 handleRecognitionError(session, SpeechRecognizer.ERROR_CLIENT, error.message ?: "启动识别失败", preferOffline)
             }
+        scheduleStartWatchdog(session, preferOffline, currentStartTimeoutMs)
     }
 
     private fun createRecognizer(component: ComponentName?): SpeechRecognizer =
@@ -207,6 +218,7 @@ class SystemSpeechTranscriber(
         object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 if (session != sessionId) return
+                sawReady = true
                 eventSink?.onVoiceEvent(
                     ChatVoiceEvent.StateChanged(
                         ChatVoiceListeningState.LISTENING,
@@ -226,6 +238,7 @@ class SystemSpeechTranscriber(
             override fun onPartialResults(partialResults: Bundle?) {
                 if (session != sessionId) return
                 val text = firstResult(partialResults) ?: return
+                sawReady = true
                 sawAnyPartial = true
                 val transcript = SpeechTranscript(text, isFinal = false, SpeechSource.SYSTEM_ASR)
                 activeListener?.onPartial(transcript)
@@ -234,6 +247,7 @@ class SystemSpeechTranscriber(
 
             override fun onResults(results: Bundle?) {
                 if (session != sessionId) return
+                sawReady = true
                 val text = firstResult(results).orEmpty()
                 val listener = activeListener
                 stopRecognizer(cancelOnly = false)
@@ -358,12 +372,27 @@ class SystemSpeechTranscriber(
             else -> String.format(Locale.ROOT, "系统语音识别失败(%d)", error)
         }
 
+    private fun scheduleStartWatchdog(session: Int, preferOffline: Boolean, startTimeoutMs: Long) {
+        if (startTimeoutMs <= 0L) return
+        main.postDelayed({
+            if (session != sessionId || activeListener == null || recognizer == null) return@postDelayed
+            if (sawReady || sawAnyPartial) return@postDelayed
+            handleRecognitionError(
+                session,
+                SpeechRecognizer.ERROR_CLIENT,
+                "系统语音识别启动超时",
+                preferOffline,
+            )
+        }, startTimeoutMs)
+    }
+
     companion object {
         private const val PREWARM_WATCHDOG_MS: Long = 2_500L
         private const val ERROR_SERVER_DISCONNECTED = 11
         private const val ERROR_LANGUAGE_NOT_SUPPORTED = 12
         private const val ERROR_LANGUAGE_UNAVAILABLE = 13
         private const val ERROR_CANNOT_CHECK_SUPPORT = 14
+        const val DEFAULT_START_TIMEOUT_MS: Long = 2_500L
         const val DEFAULT_STOP_TIMEOUT_MS: Long = 4_500L
     }
 }

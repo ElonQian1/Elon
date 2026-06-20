@@ -97,7 +97,7 @@ class ServerAsrClient(
         val fallback = parsed.ifBlank { "云端语音识别失败" }
         val (code, message) = when (status) {
             401, 403 -> "server_asr_unauthorized" to "语音服务登录已失效，请重新进入聊天后再试"
-            402 -> "server_asr_payment_required" to "语音服务额度不足，请联系管理员处理"
+            402 -> "server_asr_rejected" to "语音识别服务暂不可用，请稍后再试"
             413 -> "server_asr_audio_too_large" to "语音太长，请缩短后再试"
             in 500..599 -> "server_asr_unavailable" to "语音识别服务暂不可用，请稍后再试"
             else -> "server_asr_http_$status" to fallback
