@@ -91,6 +91,8 @@ GET /api/external/apps/fb2/context-contract
 
 响应还包含 `context_quality_contract`，主项目会把 `missing_generated_at`、`missing_context_pack`、`empty_matches`、`missing_tool_contract` 等 warning 的含义、AI 影响和 fb2 修复建议结构化返回。fb2 代理可以直接读取这个目录做自检，不需要复制主项目内部逻辑。
 
+响应还包含 `context_pack_example`，提供主项目认可的最小请求参数、返回结构和 `minimum_required_fields`。fb2 每次调整 `/api/main-project/context/pack` 后，都应该先和这个示例对齐，再扩展更多业务字段。
+
 ## 主项目 Context Budget
 
 主项目收到 fb2 上下文后会先做预算裁剪：
