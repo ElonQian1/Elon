@@ -99,6 +99,7 @@ include_platform_orders=true|false
 - `missing_context_pack`：fb2 没有返回模型友好的 Markdown/XML 包，主项目只能退回结构化 JSON。
 - `missing_context_pack_version`：fb2 没有声明 pack 版本，后续 contract 演进难以追踪。
 - `empty_matches`：本次上下文没有比赛数据，AI 不能假设今日有可分析比赛。
+- `missing_tool_contract` / `empty_tool_contract`：fb2 暂未声明可按需查询的业务工具，AI 信息不足时只能说明缺口。
 
 这使 fb2 可以渐进式接入：接口先可用，再通过 warnings 不断补齐数据质量，而不是让模型静默使用残缺上下文。
 
@@ -125,6 +126,53 @@ source/status/generated_at
 - `context_quality.warnings` 非空时，必须在回答中说明相关数据缺口或新鲜度风险。
 
 群聊总结帖仍会把预算后的 `external_app_context` 放进 Context Pack，方便总结帖保留可审计源数据。
+
+## 主项目 Tool Contract 投影
+
+`tool_contract` 是长期演进到 MCP/tools 的过渡层。主项目当前会把它投影进 prompt，但状态是 `declared_only`：
+
+- AI 可以知道有哪些后续工具可用于补充证据。
+- AI 可以在信息不足时说明“需要调用 get_match_detail/search_user_orders 补充”。
+- AI 不能声称已经调用工具，不能编造工具返回结果。
+- 用户订单类工具必须遵守当前用户权限。
+
+推荐 fb2 返回：
+
+```json
+{
+  "tool_contract": {
+    "schema": "fb2.tools.v1",
+    "tools": [
+      {
+        "name": "get_match_detail",
+        "description": "按 match id 查询比赛、赔率、伤停和更新时间",
+        "input_schema": {
+          "type": "object",
+          "required": ["match_id"],
+          "properties": {
+            "match_id": { "type": "string" }
+          }
+        },
+        "permission": "group_context",
+        "when_to_use": "用户追问某一场比赛细节或 context_pack 被截断时"
+      },
+      {
+        "name": "search_user_orders",
+        "description": "查询当前登录用户自己的票据和订单摘要",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "date": { "type": "string" },
+            "match_id": { "type": "string" }
+          }
+        },
+        "permission": "current_user_only",
+        "when_to_use": "用户要求分析自己的票或订单风险时"
+      }
+    ]
+  }
+}
+```
 
 ## 主项目观测日志
 
