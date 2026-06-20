@@ -3,6 +3,7 @@
   const { readToken, safeNodeAdminUrl, escapeHtml, clean, firstChar, formatTime } = kit;
   const markdown = window.ElonPcMarkdown || {};
   const TOKEN_KEYS = kit.TOKEN_KEYS || ['lodex_token', 'elon_token'];
+  const SOCIAL_AI_USER_ID = 'usr_elon_ai';
   const $ = (id) => document.getElementById(id);
   const state = {
     token: readToken(), user: null, projects: [], friends: [], groups: [], nodes: [],
@@ -178,6 +179,10 @@
 
   function userName(user) {
     return clean(user && (user.nickname || user.phone || user.email || user.account || user.id)) || '未登录';
+  }
+
+  function socialAiFriend() {
+    return state.friends.find((friend) => sameId(friend && friend.id, SOCIAL_AI_USER_ID)) || null;
   }
 
   function userAccountMeta(user) {
@@ -370,12 +375,17 @@
   }
 
   function renderFriendChannels(query) {
-    const friends = state.friends.filter((f) => userName(f).toLowerCase().includes(query));
+    const aiFriend = socialAiFriend();
+    const friends = state.friends.filter((f) => !sameId(f && f.id, SOCIAL_AI_USER_ID) && userName(f).toLowerCase().includes(query));
     const groups = state.groups.filter((g) => clean(g.name || g.title || g.id).toLowerCase().includes(query));
     const isFriends = state.activeKind === 'friends';
     const sections = [
       '<div class="channel-section">应用</div>',
-      `<button class="channel-item ${isFriends ? 'active' : ''}" type="button" data-app-channel="friends"><span class="glyph">友</span><span class="main"><strong>好友</strong><span>好友和群聊</span></span></button>`,
+      aiFriend ? channelButton({
+        id: aiFriend.id, kind: 'friend', avatar: avatarUrlOf(aiFriend), avatarFallback: userName(aiFriend), title: userName(aiFriend),
+        sub: aiFriend.is_online ? '在线' : '离线', online: !!aiFriend.is_online,
+        active: state.activePeer && state.activePeer.kind === 'friend' && sameId(state.activePeer.id, aiFriend.id)
+      }) : '',
       `<button class="channel-item ${state.activeKind === 'store' ? 'active' : ''}" type="button" data-app-channel="store"><span class="glyph">商</span><span class="main"><strong>商店</strong><span>项目和 APK</span></span></button>`,
       `<button class="channel-item ${state.activeKind === 'tasks' ? 'active' : ''}" type="button" data-app-channel="tasks"><span class="glyph">任</span><span class="main"><strong>任务</strong><span>任务和提醒</span></span></button>`
     ];
@@ -1200,7 +1210,8 @@
     state.activeKind = 'friends';
     state.activeProjectId = '';
     state.activeChannelId = '';
-    state.activePeer = state.activePeer || null;
+    const aiFriend = socialAiFriend();
+    state.activePeer = state.activePeer || (aiFriend ? { kind: 'friend', id: aiFriend.id } : null);
     setRails('friends');
     els.workspaceName.textContent = '好友';
     els.workspaceMeta.textContent = `${state.friends.length} 位好友 · ${state.groups.length} 个群聊`;
