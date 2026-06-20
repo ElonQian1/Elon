@@ -9,7 +9,7 @@ Codex-specific overlay. All shared rules live in `copilot-instructions.md` — d
 1. Read `.github/copilot-instructions.md` — authoritative rules source (rules, task-start, deploy cheatsheet, APK build decision table).
 2. Read `AGENTS.md` — routing table to task-specific docs.
 3. Read this file — Codex runtime overrides only.
-4. Run preflight (`bash scripts/ai-task-preflight.sh --create-worktree`), inspect `git status --short --branch`.
+4. Run preflight (`powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree` on Windows, or `bash scripts/ai-task-preflight.sh --create-worktree` on Linux), inspect `git status --short --branch`.
 5. Read only the task-specific doc routed by `AGENTS.md`.
 
 ## Codex-Specific Routing
