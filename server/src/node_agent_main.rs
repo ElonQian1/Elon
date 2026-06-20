@@ -630,9 +630,8 @@ fn cli_done_error(cli_name: &str, stdout_text: &str, stderr_text: &str) -> Strin
 /// 检测本机有哪些 CLI 可用。
 /// 检测本机可用的 CLI，返回 (cli名称, 完整路径) 对。
 ///
-/// 两路并行扫描，取最优路径：
-///   1. `where`/`which` 从 PATH 查（快，但受启动时 PATH 限制）
-///   2. 直接扫描常见安装目录（健壮，不依赖 PATH 是否完整）
+/// 直接用 Rust 扫描 PATH 和常见安装目录，避免 GUI 启动时调用 `where`
+/// 这类控制台程序造成黑色命令窗口闪烁。
 ///
 /// 路径优先级（Windows）：
 ///   a. 常见目录里找到的 .cmd（最可靠）
@@ -644,78 +643,10 @@ fn detect_available_clis() -> Vec<(String, String)> {
     candidates
         .iter()
         .filter_map(|name| {
-            let mut candidates_paths: Vec<String> = Vec::new();
-
-            // ── 1. where/which ────────────────────────────────────────────────
-            let which_cmd = if cfg!(windows) { "where" } else { "which" };
-            if let Ok(out) = std::process::Command::new(which_cmd).arg(name).output() {
-                if out.status.success() {
-                    let from_path: Vec<String> = String::from_utf8_lossy(&out.stdout)
-                        .lines()
-                        .map(|l| l.trim().to_string())
-                        .filter(|l| !l.is_empty())
-                        .collect();
-                    candidates_paths.extend(from_path);
-                }
-            }
-
-            // ── 2. 直接扫描常见安装目录（不依赖 PATH）────────────────────────
-            #[cfg(windows)]
-            {
-                let appdata = std::env::var("APPDATA").unwrap_or_default();
-                let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-                let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
-                let common_dirs = [
-                    // npm global（最常见）
-                    format!("{}\\npm", appdata),
-                    // yarn global
-                    format!("{}\\Yarn\\bin", localappdata),
-                    // pnpm global
-                    format!("{}\\pnpm", appdata),
-                    // volta 管理的
-                    format!("{}\\.volta\\bin", userprofile),
-                    // nvm 管理的（n-v-m for Windows）
-                    format!("{}\\nvm", appdata),
-                    // GitHub CLI
-                    "C:\\Program Files\\GitHub CLI".to_string(),
-                    "C:\\Program Files (x86)\\GitHub CLI".to_string(),
-                    // Scoop
-                    format!("{}\\scoop\\shims", userprofile),
-                    // winget/直接装在 ProgramFiles
-                    "C:\\Program Files\\GitHub CLI".to_string(),
-                ];
-                for dir in &common_dirs {
-                    // 尝试 name.cmd / name.exe / name
-                    for ext in &[".cmd", ".exe", ""] {
-                        let p = format!("{}\\{}{}", dir, name, ext);
-                        if std::path::Path::new(&p).exists() {
-                            if !candidates_paths.contains(&p) {
-                                candidates_paths.push(p);
-                            }
-                        }
-                    }
-                }
-            }
-            #[cfg(not(windows))]
-            {
-                let home = std::env::var("HOME").unwrap_or_default();
-                let common_dirs = [
-                    "/usr/local/bin".to_string(),
-                    "/usr/bin".to_string(),
-                    format!("{}/.npm-global/bin", home),
-                    format!("{}/.local/bin", home),
-                    format!("{}/.yarn/bin", home),
-                    format!("{}/.volta/bin", home),
-                ];
-                for dir in &common_dirs {
-                    let p = format!("{}/{}", dir, name);
-                    if std::path::Path::new(&p).exists() {
-                        if !candidates_paths.contains(&p) {
-                            candidates_paths.push(p);
-                        }
-                    }
-                }
-            }
+            let candidates_paths: Vec<String> = elon_pc_dev_runtime::command_candidates(name)
+                .into_iter()
+                .map(|path| path.to_string_lossy().to_string())
+                .collect();
 
             if candidates_paths.is_empty() {
                 return None;
@@ -995,6 +926,7 @@ async fn run_cli_prompt(
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .stdin(std::process::Stdio::null());
+    hide_tokio_command_window(&mut cmd);
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -1340,6 +1272,7 @@ async fn run_exec(
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .stdin(std::process::Stdio::null());
+    hide_tokio_command_window(&mut cmd);
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -1382,6 +1315,14 @@ async fn run_exec(
 
     let code = child.wait().await.ok().and_then(|s| s.code());
     let _ = out_tx.send(ws_text(&AgentToServer::TaskExit { task_id, code }));
+}
+
+fn hide_tokio_command_window(command: &mut tokio::process::Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        command.creation_flags(CREATE_NO_WINDOW);
+    }
 }
 
 // ── 本机 TTS 合成（代理到本地 model-tts-worker）────────────────────────────
@@ -2698,11 +2639,7 @@ fn clean_optional_admin_field(value: Option<&str>) -> Option<String> {
 }
 
 fn git_value_at(path: &std::path::Path, args: &[&str]) -> Option<String> {
-    let output = std::process::Command::new("git")
-        .args(args)
-        .current_dir(path)
-        .output()
-        .ok()?;
+    let output = elon_pc_dev_runtime::command_output("git", args, Some(path)).ok()?;
     if !output.status.success() {
         return None;
     }
@@ -2722,59 +2659,8 @@ const SETUP_ENV_SCRIPT: &str = include_str!("../../scripts/setup-node-env.ps1");
 
 /// 检查单个命令行工具是否可用（PATH + 常见安装目录双路扫描）。
 fn tool_available(bin: &str) -> bool {
-    let which_cmd = if cfg!(windows) { "where" } else { "which" };
-    if std::process::Command::new(which_cmd)
-        .arg(bin)
-        .stdout(std::process::Stdio::null())
-        .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
-    {
+    if elon_pc_dev_runtime::command_path(bin).is_some() {
         return true;
-    }
-    // PATH 未命中时扫描常见安装目录
-    #[cfg(windows)]
-    {
-        let appdata = std::env::var("APPDATA").unwrap_or_default();
-        let localappdata = std::env::var("LOCALAPPDATA").unwrap_or_default();
-        let userprofile = std::env::var("USERPROFILE").unwrap_or_default();
-        let dirs = [
-            format!("{}\\npm", appdata),
-            format!("{}\\Yarn\\bin", localappdata),
-            format!("{}\\pnpm", appdata),
-            format!("{}\\.volta\\bin", userprofile),
-            "C:\\Program Files\\Git\\cmd".to_string(),
-            "C:\\Program Files\\Git\\bin".to_string(),
-            "C:\\Program Files\\nodejs".to_string(),
-            "C:\\Program Files\\Ollama".to_string(),
-            // JDK 常见路径
-            "C:\\Program Files\\Eclipse Adoptium".to_string(),
-            "C:\\Program Files\\Microsoft\\jdk-17.0.0.35-hotspot\\bin".to_string(),
-        ];
-        for dir in &dirs {
-            for ext in &[".cmd", ".exe", ""] {
-                let p = std::path::PathBuf::from(dir).join(format!("{}{}", bin, ext));
-                if p.exists() {
-                    return true;
-                }
-            }
-        }
-    }
-    #[cfg(not(windows))]
-    {
-        let home = std::env::var("HOME").unwrap_or_default();
-        for dir in &[
-            "/usr/local/bin".to_string(),
-            "/usr/bin".to_string(),
-            format!("{}/.npm-global/bin", home),
-            format!("{}/.local/bin", home),
-            format!("{}/.volta/bin", home),
-        ] {
-            if std::path::Path::new(&format!("{}/{}", dir, bin)).exists() {
-                return true;
-            }
-        }
     }
     false
 }

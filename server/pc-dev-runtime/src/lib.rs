@@ -1,3 +1,4 @@
+mod command_probe;
 mod paths;
 mod profile;
 mod project_agent_runtime;
@@ -7,6 +8,7 @@ mod project_git;
 mod project_scaffold;
 mod project_workflow;
 
+pub use command_probe::{command_candidates, command_output, command_path};
 pub use paths::{safe_path_part, workspace_root};
 pub use profile::{collect_dev_runtime_profile, collect_dev_runtime_profile_with_server_runtime};
 pub use project_git::{ensure_project_git_baseline, ProjectGitBaselineRequest};

@@ -1,8 +1,8 @@
-use crate::workspace_root;
+use crate::{command_probe, workspace_root};
 use homecli_proto::{DevToolchainStatus, NodeDevRuntimeProfile};
 use std::{
     path::PathBuf,
-    process::{Command, Output, Stdio},
+    process::{Output, Stdio},
     thread,
     time::{Duration, Instant},
 };
@@ -153,34 +153,58 @@ fn check_workspace_root(root: &PathBuf) -> (bool, Option<String>) {
 }
 
 fn command_status(name: &str, version_args: &[&str]) -> DevToolchainStatus {
-    let path = command_path(name);
+    let path = command_probe::command_path(name);
+    let path_string = path.as_ref().map(|path| path.to_string_lossy().to_string());
 
-    match run_version_command(name, version_args, VERSION_CHECK_TIMEOUT) {
+    if path.is_none() {
+        return DevToolchainStatus {
+            name: name.to_string(),
+            available: false,
+            version: None,
+            path: path_string,
+        };
+    }
+
+    if path_only_tool(name) {
+        return DevToolchainStatus {
+            name: name.to_string(),
+            available: true,
+            version: None,
+            path: path_string,
+        };
+    }
+
+    let program = path.as_deref().unwrap();
+    match run_version_command(program, version_args, VERSION_CHECK_TIMEOUT) {
         VersionCommandResult::Output(output) if output.status.success() => DevToolchainStatus {
             name: name.to_string(),
             available: true,
             version: first_non_empty_line(&output.stdout, &output.stderr),
-            path,
+            path: path_string,
         },
         VersionCommandResult::Output(output) => DevToolchainStatus {
             name: name.to_string(),
             available: false,
             version: first_non_empty_line(&output.stdout, &output.stderr),
-            path,
+            path: path_string,
         },
         VersionCommandResult::TimedOut => DevToolchainStatus {
             name: name.to_string(),
             available: false,
             version: Some("version check timed out".to_string()),
-            path,
+            path: path_string,
         },
         VersionCommandResult::Failed => DevToolchainStatus {
             name: name.to_string(),
             available: false,
             version: None,
-            path,
+            path: path_string,
         },
     }
+}
+
+fn path_only_tool(name: &str) -> bool {
+    matches!(name, "codex" | "claude" | "gemini" | "copilot")
 }
 
 enum VersionCommandResult {
@@ -190,16 +214,17 @@ enum VersionCommandResult {
 }
 
 fn run_version_command(
-    name: &str,
+    program: &std::path::Path,
     version_args: &[&str],
     timeout: Duration,
 ) -> VersionCommandResult {
-    let mut child = match Command::new(name)
+    let mut command = command_probe::command_from_path(program);
+    command
         .args(version_args)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .spawn()
-    {
+        .stdin(Stdio::null());
+    let mut child = match command.spawn() {
         Ok(child) => child,
         Err(_) => return VersionCommandResult::Failed,
     };
@@ -269,19 +294,6 @@ fn android_sdk_candidates() -> Vec<PathBuf> {
     }
 
     values
-}
-
-fn command_path(name: &str) -> Option<String> {
-    let which = if cfg!(windows) { "where" } else { "which" };
-    let output = Command::new(which).arg(name).output().ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty())
-        .map(ToOwned::to_owned)
 }
 
 fn first_non_empty_line(stdout: &[u8], stderr: &[u8]) -> Option<String> {

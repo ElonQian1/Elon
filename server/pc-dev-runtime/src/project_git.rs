@@ -1,8 +1,5 @@
-use std::{
-    fs, io,
-    path::Path,
-    process::{Command, Output},
-};
+use crate::command_probe;
+use std::{fs, io, path::Path, process::Output};
 
 pub struct ProjectGitBaselineRequest<'a> {
     pub branch: Option<&'a str>,
@@ -90,7 +87,7 @@ fn run_git(repo: &Path, args: &[&str]) -> io::Result<()> {
 }
 
 fn git_command(repo: &Path, args: &[&str]) -> io::Result<Output> {
-    Command::new("git").args(args).current_dir(repo).output()
+    command_probe::command_output("git", args, Some(repo))
 }
 
 fn git_error(args: &[&str], output: Output) -> io::Error {
