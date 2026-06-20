@@ -105,6 +105,7 @@ GET /api/external/apps/fb2/context-contract
 - 超预算时优先裁剪大数组：`group_messages`、`matches`、`user_orders`。
 - `context_pack` 过长时截断，并提示后续可通过工具接口继续查询细节。
 - 裁剪结果写入 `_context_budget`，包含 `before_chars`、`after_chars`、`trimmed`。
+- 如果 fb2 返回 `context_audit_id` 和 `metrics`，主项目会保留并投影到 prompt metadata，方便回答日志回链和即时预算判断。
 
 这一步是长期主义的基础：后续 fb2 能提供越来越多数据，但主项目不会让 prompt 无限膨胀。
 
@@ -144,6 +145,8 @@ context_pack
 usage_policy
 context_quality
 _context_budget
+metrics
+context_audit_id
 source/status/generated_at
 ```
 
@@ -156,6 +159,8 @@ source/status/generated_at
 - 引用群友观点必须带 `message id`。
 - 上下文缺少来源或更新时间时，必须说明信息不足，不能编造。
 - `context_quality.warnings` 非空时，必须在回答中说明相关数据缺口或新鲜度风险。
+- `metrics.budget_status` 为 `large`、`too_large` 或 `empty` 时，回答应更保守，并优先建议后续使用细分工具补证据。
+- `context_audit_id` 应进入回答日志或排障链路，便于回查 fb2 当次上下文来源。
 
 群聊总结帖仍会把预算后的 `external_app_context` 放进 Context Pack，方便总结帖保留可审计源数据。
 

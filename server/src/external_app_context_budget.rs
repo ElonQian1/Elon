@@ -52,6 +52,11 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         .get("context_quality")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    let external_metrics = context.get("metrics").cloned().unwrap_or_else(|| json!({}));
+    let context_audit_id = context
+        .get("context_audit_id")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
     let tool_contract = prompt_tool_contract_block(context);
 
     let body = context["context_pack"]
@@ -67,6 +72,8 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
          usage_policy={}\n\
          context_quality={}\n\
          context_budget={}\n\
+         external_metrics={}\n\
+         context_audit_id={}\n\
          </metadata>\n\n\
          {}\n\n\
          {}\n\n\
@@ -83,6 +90,8 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         serde_json::to_string(&usage_policy).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&context_quality).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&budget).unwrap_or_else(|_| "{}".into()),
+        serde_json::to_string(&external_metrics).unwrap_or_else(|_| "{}".into()),
+        context_audit_id,
         tool_contract,
         body.trim()
     )
@@ -153,10 +162,14 @@ mod tests {
             "status": "ready",
             "context_pack": "<fb2_context_pack>hello</fb2_context_pack>",
             "tool_contract": {"tools": [{"name": "get_match_detail"}]},
-            "usage_policy": {"no_guaranteed_win": true}
+            "usage_policy": {"no_guaranteed_win": true},
+            "context_audit_id": "audit-1",
+            "metrics": {"budget_status": "ok"}
         }));
         assert!(block.contains("<fb2_context_pack>hello</fb2_context_pack>"));
         assert!(block.contains("context_quality="));
+        assert!(block.contains("external_metrics="));
+        assert!(block.contains("context_audit_id=audit-1"));
         assert!(block.contains("get_match_detail"));
         assert!(block.contains("tool_readiness.status"));
         assert!(block.contains("必须区分"));

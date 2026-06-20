@@ -196,6 +196,7 @@ fn fb2_context_pack_example_data() -> Value {
     json!({
         "context_pack_version": "fb2-chat-pack-v1",
         "generated_at": "2026-06-20T12:00:00+08:00",
+        "context_audit_id": "2f6d1d5a-0000-0000-0000-000000000000",
         "context_pack": "<fb2_context_pack version=\"1.0\" project=\"fb2\">\n\n## 使用边界\n\n- 只作为比赛讨论和订单剖析参考。\n- 不承诺命中，不诱导投注。\n- 必须区分数据事实、群友观点和 AI 推断。\n\n## 今日/近期比赛与赔率\n\n- match_id=m-001 联赛示例 主队 vs 客队，赔率更新时间 2026-06-20T11:58:00+08:00。\n\n## 当前用户订单/票据\n\n- order_id=o-001 仅当前用户可见，用于风险拆解。\n\n## 群讨论观点\n\n- message_id=msg-001 群友观点示例。\n\n## 平台/店铺订单摘要\n\n- 仅匿名聚合，不暴露其他用户订单明细。\n\n</fb2_context_pack>",
         "matches": [
             {
@@ -236,6 +237,18 @@ fn fb2_context_pack_example_data() -> Value {
             "visibility": "anonymous_aggregate",
             "note": "普通群聊只返回匿名聚合数据"
         },
+        "metrics": {
+            "retrieved_source_count": 3,
+            "context_pack_chars": 2048,
+            "context_pack_latency_ms": 42,
+            "budget_status": "ok",
+            "budget_recommendation": "可以直接使用当前 Context Pack。",
+            "source_counts": [
+                {"source_type": "match", "count": 1},
+                {"source_type": "user_order", "count": 1},
+                {"source_type": "group_message", "count": 1}
+            ]
+        },
         "tool_contract": {
             "schema": "fb2.tools.v1",
             "tools": [
@@ -265,12 +278,14 @@ pub(crate) fn fb2_pack_context(app_id: &str, external_group_id: &str, data: Valu
         "status": "ready",
         "source": "fb2:/api/main-project/context/pack",
         "generated_at": data.get("generated_at"),
+        "context_audit_id": data.get("context_audit_id"),
         "context_pack_version": data.get("context_pack_version").or_else(|| data.get("version")),
         "context_pack": data.get("context_pack"),
         "matches": data.get("matches"),
         "user_orders": data.get("user_orders"),
         "group_messages": data.get("group_messages"),
         "platform_order_summary": data.get("platform_order_summary"),
+        "metrics": data.get("metrics"),
         "tool_contract": data.get("tool_contract"),
         "usage_policy": data.get("usage_policy").cloned().unwrap_or_else(default_usage_policy)
     });
@@ -475,6 +490,10 @@ mod tests {
         assert_eq!(
             example["response_shape"]["data"]["usage_policy"]["ai_reply_billable"],
             true
+        );
+        assert_eq!(
+            example["response_shape"]["data"]["metrics"]["budget_status"],
+            "ok"
         );
         assert!(public_context_pack_example("unknown").is_none());
     }
