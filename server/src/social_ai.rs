@@ -408,13 +408,7 @@ fn format_external_context(external_context: Option<&Value>) -> String {
     let Some(context) = external_context else {
         return String::new();
     };
-    match serde_json::to_string_pretty(context) {
-        Ok(context_json) => format!(
-            "外部项目业务上下文（只作为群聊讨论参考，不得承诺命中、不得诱导投注；涉及比赛预测时必须说明不确定性）：\n<external_app_context>\n{}\n</external_app_context>",
-            context_json
-        ),
-        Err(_) => String::new(),
-    }
+    crate::external_app_context_budget::prompt_context_block(context)
 }
 
 /// 使用本地 AI CLI（无工具、无项目工作区）生成社交聊天回复

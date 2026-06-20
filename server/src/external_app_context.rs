@@ -2,9 +2,10 @@
 
 use serde_json::{json, Value};
 use std::{sync::Arc, time::Duration};
-use tracing::warn;
+use tracing::{info, warn};
 
 use crate::{
+    external_app_context_budget::budgeted_context,
     external_app_registry::{external_group_by_group_id, public_external_app_config},
     types::AppState,
 };
@@ -24,10 +25,18 @@ pub(crate) async fn group_context_for_chat(
 ) -> Option<Value> {
     let (app, group) = external_group_by_group_id(group_id)?;
     match app.id {
-        FB2_APP_ID => Some(
-            fetch_fb2_business_context(state, app.id, user_id, group.external_group_id, topic_hint)
-                .await,
-        ),
+        FB2_APP_ID => {
+            let context = fetch_fb2_business_context(
+                state,
+                app.id,
+                user_id,
+                group.external_group_id,
+                topic_hint,
+            )
+            .await;
+            log_context_fetch(app.id, group_id, group.external_group_id, user_id, &context);
+            Some(budgeted_context(context))
+        }
         _ => None,
     }
 }
@@ -467,6 +476,35 @@ fn default_usage_policy() -> Value {
         "no_betting_commitment": true,
         "explain_uncertainty": true
     })
+}
+
+fn log_context_fetch(
+    app_id: &str,
+    group_id: &str,
+    external_group_id: &str,
+    user_id: &str,
+    context: &Value,
+) {
+    let status = context["status"].as_str().unwrap_or("unknown");
+    let source = context["source"].as_str().unwrap_or("unknown");
+    let has_external_user_id = context["user_orders"]
+        .as_array()
+        .map(|orders| !orders.is_empty())
+        .unwrap_or(false);
+    let context_chars = serde_json::to_string(context)
+        .map(|text| text.chars().count())
+        .unwrap_or(0);
+    info!(
+        app_id,
+        group_id,
+        external_group_id,
+        user_id,
+        status,
+        source,
+        has_external_user_id,
+        context_chars,
+        "external app context fetched"
+    );
 }
 
 #[cfg(test)]

@@ -23,6 +23,8 @@ fb2 业务数据
 - 优先请求 `GET /api/main-project/context/pack`。
 - pack 不可用时回退 `GET /api/main-project/context/today-matches`。
 - 控制 token budget、超时、失败降级和 AI 输出安全边界。
+- 将 fb2 返回的大 JSON 投影成模型友好的 XML-wrapped Markdown，不把重复原始数据无脑塞进 prompt。
+- 记录上下文来源、状态、字符量、是否回退、是否包含用户订单，便于后续优化慢查询和答非所问。
 - 只有 AI 生成回复扣额度；ASR、TTS、上下文拉取不扣 token。
 
 ## fb2 职责
@@ -46,6 +48,7 @@ ELON_EXTERNAL_APP_FB2_MATCH_CONTEXT_LIMIT=30
 ELON_EXTERNAL_APP_FB2_DISCUSSION_CONTEXT_LIMIT=80
 ELON_EXTERNAL_APP_FB2_ORDER_CONTEXT_LIMIT=20
 ELON_EXTERNAL_APP_FB2_PLATFORM_ORDER_CONTEXT=false
+ELON_EXTERNAL_APP_CONTEXT_MAX_CHARS=16000
 ```
 
 主项目请求：
@@ -69,6 +72,54 @@ include_platform_orders=true|false
 ```
 
 `include_platform_orders` 默认不开启，避免普通聊天无意拉取平台级经营数据。
+
+## 主项目 Context Budget
+
+主项目收到 fb2 上下文后会先做预算裁剪：
+
+- 默认最大上下文字符数：`16000`，可用 `ELON_EXTERNAL_APP_CONTEXT_MAX_CHARS` 调整。
+- 超预算时优先裁剪大数组：`group_messages`、`matches`、`user_orders`。
+- `context_pack` 过长时截断，并提示后续可通过工具接口继续查询细节。
+- 裁剪结果写入 `_context_budget`，包含 `before_chars`、`after_chars`、`trimmed`。
+
+这一步是长期主义的基础：后续 fb2 能提供越来越多数据，但主项目不会让 prompt 无限膨胀。
+
+## 主项目 Prompt 投影
+
+群聊 AI 不直接读取完整原始 JSON，而是优先读取：
+
+```text
+context_pack
+usage_policy
+_context_budget
+source/status/generated_at
+```
+
+并在 prompt 中强制：
+
+- 区分「数据事实」「群友观点」「AI推断」。
+- 涉及比赛预测时说明不确定性，不承诺命中，不诱导投注。
+- 引用比赛尽量带 `match id`。
+- 引用订单/票据尽量带 `order id` 或 `ticket id`。
+- 引用群友观点必须带 `message id`。
+- 上下文缺少来源或更新时间时，必须说明信息不足，不能编造。
+
+群聊总结帖仍会把预算后的 `external_app_context` 放进 Context Pack，方便总结帖保留可审计源数据。
+
+## 主项目观测日志
+
+每次拉取 fb2 上下文会记录：
+
+- `app_id`
+- `group_id`
+- `external_group_id`
+- `user_id`
+- `status`
+- `source`
+- `context_chars`
+- `has_external_user_id`
+
+后续 P5 评测会在此基础上扩展为结构化指标：延迟、回退原因、引用命中率、过期数据次数、权限拒绝次数。
 
 ## 返回要求
 
