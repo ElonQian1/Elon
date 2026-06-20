@@ -35,6 +35,8 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
          {body}\n\
          <tool_result_rules>\n\
          - 只有 status=ready 且 success=true 的单项结果可以当作已查询事实引用。\n\
+         - plan.planned_tools 只说明为什么选择工具；不能把计划本身当作已经查询到的比赛、订单或观点事实。\n\
+         - plan 中的 trigger、confidence、evidence 可用于解释本次为什么查询或为什么没有查询。\n\
          - skipped、failed、unavailable 结果只能作为数据缺口说明，不能编造成比赛、赔率、订单或群友观点事实。\n\
          - 引用工具结果时优先带 match_id、order_id、ticket_id、message_id 或 context_audit_id。\n\
          - 如果使用工具事实给出分析，回答中要自然写出关键来源 ID；没有 source_ids 时要说明 fb2 工具结果缺少可追溯 ID。\n\

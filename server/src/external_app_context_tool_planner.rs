@@ -4,19 +4,70 @@ use serde_json::{json, Value};
 
 use crate::external_app_context_config::infer_lottery_type;
 
+const PLANNER_SCHEMA: &str = "external_app.tool_plan.v1";
+const PLANNER_STRATEGY: &str = "deterministic_fb2_chat_v1";
+
 #[derive(Clone)]
 pub(crate) struct PlannedTool {
     pub(crate) name: &'static str,
     pub(crate) reason: &'static str,
     pub(crate) arguments: Value,
     pub(crate) requires_external_user: bool,
+    trigger: &'static str,
+    confidence: u8,
+    evidence: Vec<String>,
 }
 
-pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Vec<PlannedTool> {
+pub(crate) struct Fb2ToolPlan {
+    topic_hint: String,
+    pub(crate) tools: Vec<PlannedTool>,
+    skipped_reasons: Vec<&'static str>,
+}
+
+impl Fb2ToolPlan {
+    pub(crate) fn tool_names(&self) -> Vec<&'static str> {
+        self.tools.iter().map(|tool| tool.name).collect()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.tools.is_empty()
+    }
+
+    pub(crate) fn into_tools(self) -> Vec<PlannedTool> {
+        self.tools
+    }
+
+    pub(crate) fn to_metadata(&self) -> Value {
+        json!({
+            "schema": PLANNER_SCHEMA,
+            "strategy": PLANNER_STRATEGY,
+            "topic_hint": self.topic_hint,
+            "planned_count": self.tools.len(),
+            "planned_tools": self.tools.iter().map(PlannedTool::to_metadata).collect::<Vec<_>>(),
+            "skipped_reasons": self.skipped_reasons
+        })
+    }
+}
+
+impl PlannedTool {
+    fn to_metadata(&self) -> Value {
+        json!({
+            "name": self.name,
+            "reason": self.reason,
+            "trigger": self.trigger,
+            "confidence": self.confidence,
+            "requires_external_user": self.requires_external_user,
+            "evidence": self.evidence
+        })
+    }
+}
+
+pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Fb2ToolPlan {
     let query = topic_hint.unwrap_or("").trim();
     let mut plans = Vec::new();
+    let mut skipped_reasons = Vec::new();
 
-    if should_search_matches(context, query) {
+    if let Some(evidence) = match_evidence(context, query) {
         let mut arguments = json!({
             "query": query,
             "date": "today",
@@ -30,10 +81,13 @@ pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Vec<P
             reason: "用户在 fb2 群聊中询问比赛、赔率、预测或今日场次，需要补充可引用比赛候选。",
             arguments,
             requires_external_user: false,
+            trigger: "match_context_needed",
+            confidence: confidence_for(&evidence),
+            evidence,
         });
     }
 
-    if contains_any(
+    if let Some(evidence) = keyword_evidence(
         query,
         &[
             "订单",
@@ -54,10 +108,13 @@ pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Vec<P
                 "scope": "current_user"
             }),
             requires_external_user: true,
+            trigger: "current_user_order_needed",
+            confidence: confidence_for(&evidence),
+            evidence,
         });
     }
 
-    if contains_any(
+    if let Some(evidence) = keyword_evidence(
         query,
         &[
             "群友", "大家", "观点", "讨论", "分歧", "群里", "建议", "采纳",
@@ -70,10 +127,13 @@ pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Vec<P
                 "query": query
             }),
             requires_external_user: false,
+            trigger: "group_opinion_needed",
+            confidence: confidence_for(&evidence),
+            evidence,
         });
     }
 
-    if should_query_audit(context) {
+    if let Some(evidence) = audit_evidence(context) {
         if let Some(audit_id) = context.get("context_audit_id").and_then(Value::as_str) {
             plans.push(PlannedTool {
                 name: "get_context_audit",
@@ -82,16 +142,29 @@ pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Vec<P
                     "context_audit_id": audit_id
                 }),
                 requires_external_user: false,
+                trigger: "context_quality_audit_needed",
+                confidence: confidence_for(&evidence),
+                evidence,
             });
+        } else {
+            skipped_reasons.push("context_quality_warning_without_context_audit_id");
         }
     }
 
     plans.truncate(3);
-    plans
+    if plans.is_empty() {
+        skipped_reasons.push("no_fb2_tool_trigger_matched");
+    }
+    Fb2ToolPlan {
+        topic_hint: query.to_string(),
+        tools: plans,
+        skipped_reasons,
+    }
 }
 
-fn should_search_matches(context: &Value, query: &str) -> bool {
-    contains_any(
+fn match_evidence(context: &Value, query: &str) -> Option<Vec<String>> {
+    let mut evidence = Vec::new();
+    if let Some(keywords) = keyword_evidence(
         query,
         &[
             "今天",
@@ -110,14 +183,39 @@ fn should_search_matches(context: &Value, query: &str) -> bool {
             "大小分",
             "胜负",
         ],
-    ) || context_has_warning(context, "empty_matches")
-        || context_has_warning(context, "fb2_budget_too_large")
+    ) {
+        evidence.extend(keywords);
+    }
+    if context_has_warning(context, "empty_matches") {
+        evidence.push("context_quality.warning.empty_matches".to_string());
+    }
+    if context_has_warning(context, "fb2_budget_too_large") {
+        evidence.push("context_quality.warning.fb2_budget_too_large".to_string());
+    }
+
+    if evidence.is_empty() {
+        None
+    } else {
+        Some(evidence)
+    }
 }
 
-fn should_query_audit(context: &Value) -> bool {
-    context_has_warning(context, "fb2_budget_empty")
-        || context_has_warning(context, "fb2_budget_too_large")
-        || context_has_warning(context, "missing_context_pack")
+fn audit_evidence(context: &Value) -> Option<Vec<String>> {
+    let mut evidence = Vec::new();
+    for warning in [
+        "fb2_budget_empty",
+        "fb2_budget_too_large",
+        "missing_context_pack",
+    ] {
+        if context_has_warning(context, warning) {
+            evidence.push(format!("context_quality.warning.{warning}"));
+        }
+    }
+    if evidence.is_empty() {
+        None
+    } else {
+        Some(evidence)
+    }
 }
 
 fn context_has_warning(context: &Value, warning: &str) -> bool {
@@ -129,15 +227,28 @@ fn context_has_warning(context: &Value, warning: &str) -> bool {
         .unwrap_or(false)
 }
 
-fn contains_any(text: &str, needles: &[&str]) -> bool {
+fn keyword_evidence(text: &str, needles: &[&str]) -> Option<Vec<String>> {
     if text.is_empty() {
-        return false;
+        return None;
     }
     let lower = text.to_ascii_lowercase();
-    needles.iter().any(|needle| {
-        let needle_lower = needle.to_ascii_lowercase();
-        lower.contains(&needle_lower) || text.contains(needle)
-    })
+    let evidence = needles
+        .iter()
+        .filter(|needle| {
+            let needle_lower = needle.to_ascii_lowercase();
+            lower.contains(&needle_lower) || text.contains(**needle)
+        })
+        .map(|needle| format!("query.keyword.{needle}"))
+        .collect::<Vec<_>>();
+    if evidence.is_empty() {
+        None
+    } else {
+        Some(evidence)
+    }
+}
+
+fn confidence_for(evidence: &[String]) -> u8 {
+    (60 + evidence.len().saturating_sub(1) as u8 * 10).min(90)
 }
 
 #[cfg(test)]
@@ -146,14 +257,14 @@ mod tests {
 
     #[test]
     fn plans_match_order_and_opinion_tools_from_user_request() {
-        let plans = plan_fb2_tools(
+        let plan = plan_fb2_tools(
             &json!({
                 "context_quality": {"warnings": []}
             }),
             Some("今天比赛怎么预测？顺便看看我的票和群友观点"),
         );
 
-        let names = plans.iter().map(|plan| plan.name).collect::<Vec<_>>();
+        let names = plan.tool_names();
         assert_eq!(
             names,
             vec![
@@ -162,12 +273,16 @@ mod tests {
                 "search_group_opinions"
             ]
         );
-        assert!(plans[1].requires_external_user);
+        assert!(plan.tools[1].requires_external_user);
+        assert_eq!(
+            plan.to_metadata()["planned_tools"][0]["trigger"].as_str(),
+            Some("match_context_needed")
+        );
     }
 
     #[test]
     fn plans_audit_when_context_pack_quality_is_blocking() {
-        let plans = plan_fb2_tools(
+        let plan = plan_fb2_tools(
             &json!({
                 "context_audit_id": "audit-1",
                 "context_quality": {"warnings": ["missing_context_pack"]}
@@ -175,6 +290,24 @@ mod tests {
             Some("帮我看看"),
         );
 
-        assert!(plans.iter().any(|plan| plan.name == "get_context_audit"));
+        assert!(plan
+            .tools
+            .iter()
+            .any(|tool| tool.name == "get_context_audit"));
+        assert!(plan.to_metadata()["planned_tools"][0]["evidence"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("context_quality.warning.missing_context_pack")));
+    }
+
+    #[test]
+    fn records_skipped_reason_when_no_tool_matches() {
+        let plan = plan_fb2_tools(&json!({"context_quality": {"warnings": []}}), Some("你好"));
+
+        assert!(plan.is_empty());
+        assert!(plan.to_metadata()["skipped_reasons"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("no_fb2_tool_trigger_matched")));
     }
 }

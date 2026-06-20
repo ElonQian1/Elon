@@ -41,14 +41,13 @@ pub(crate) async fn group_tool_results_for_chat(
 
     let started_at = Instant::now();
     let execution_id = format!("fb2_exec_{}", uuid::Uuid::new_v4().simple());
-    let planned_tools = plan_fb2_tools(context, topic_hint);
-    if planned_tools.is_empty() {
+    let tool_plan = plan_fb2_tools(context, topic_hint);
+    if tool_plan.is_empty() {
         return None;
     }
-    let planned_tool_names = planned_tools
-        .iter()
-        .map(|tool| tool.name)
-        .collect::<Vec<_>>();
+    let plan_metadata = tool_plan.to_metadata();
+    let planned_tool_names = tool_plan.tool_names();
+    let planned_tools = tool_plan.into_tools();
 
     let Some(base_url) = fb2_base_url() else {
         return Some(unavailable_execution(
@@ -56,6 +55,7 @@ pub(crate) async fn group_tool_results_for_chat(
             app.id,
             group.external_group_id,
             &planned_tool_names,
+            plan_metadata,
             planned_tools,
             "missing_fb2_base_url",
             started_at.elapsed().as_millis(),
@@ -67,6 +67,7 @@ pub(crate) async fn group_tool_results_for_chat(
             app.id,
             group.external_group_id,
             &planned_tool_names,
+            plan_metadata,
             planned_tools,
             "missing_fb2_context_token",
             started_at.elapsed().as_millis(),
@@ -153,6 +154,7 @@ pub(crate) async fn group_tool_results_for_chat(
         "executed_at": Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
         "group_id": group.external_group_id,
         "context_audit_id": context_audit_id,
+        "plan": plan_metadata,
         "results": results,
         "ready_count": ready_count,
         "audit": audit
@@ -277,6 +279,7 @@ fn unavailable_execution(
     app_id: &str,
     external_group_id: &str,
     planned_tool_names: &[&str],
+    plan_metadata: Value,
     planned_tools: Vec<PlannedTool>,
     reason: &str,
     duration_ms: u128,
@@ -303,6 +306,7 @@ fn unavailable_execution(
         "status": "not_configured",
         "executed_at": Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
         "group_id": external_group_id,
+        "plan": plan_metadata,
         "results": results,
         "ready_count": 0,
         "audit": audit
