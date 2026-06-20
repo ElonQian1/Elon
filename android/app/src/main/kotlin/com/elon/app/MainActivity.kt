@@ -664,6 +664,9 @@ class MainActivity : AppCompatActivity() {
             openJointProject = { index ->
                 openProjectSpaceForProject(index, true)
             },
+            openRecentConversation = { projectIndex, conversationIndex ->
+                conversationOpenActions.openProjectSpaceConversation(projectIndex, conversationIndex)
+            },
             openProjectManagement = { navigationController.showProjectManagement(animate = true) },
             sendProjectShare = chatProjectShareActions::sendToCurrentChat,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },

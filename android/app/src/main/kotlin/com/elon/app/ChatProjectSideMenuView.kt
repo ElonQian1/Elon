@@ -24,8 +24,10 @@ internal class ChatProjectSideMenuView(
     context: Context,
     private val projects: () -> List<AppProject>,
     private val activeProjectIndex: () -> Int,
+    private val activeConversationIndex: () -> Int,
     private val openPersonalProject: (Int) -> Unit,
     private val openJointProject: (Int) -> Unit,
+    private val openRecentConversation: (Int, Int) -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
@@ -36,6 +38,7 @@ internal class ChatProjectSideMenuView(
     }
     private var personalProjectsExpanded = false
     private var jointProjectsExpanded = false
+    private var recentConversationsExpanded = true
 
     init {
         overScrollMode = OVER_SCROLL_NEVER
@@ -54,6 +57,7 @@ internal class ChatProjectSideMenuView(
         content.removeAllViews()
         addPersonalProjects()
         addJointProjects()
+        addRecentConversations()
     }
 
     private fun addPersonalProjects() {
@@ -103,6 +107,25 @@ internal class ChatProjectSideMenuView(
         }
     }
 
+    private fun addRecentConversations() {
+        val topGap = if (!personalProjectsExpanded && !jointProjectsExpanded) 132 else 28
+        content.addView(space(topGap))
+        content.addView(sectionHeader("最近会话", recentConversationsExpanded) {
+            recentConversationsExpanded = !recentConversationsExpanded
+            render()
+        })
+        if (!recentConversationsExpanded) return
+
+        val items = recentConversationItems()
+        if (items.isEmpty()) {
+            content.addView(emptyRow("暂无最近会话"))
+            return
+        }
+        items.forEach { entry ->
+            content.addView(recentConversationRow(entry))
+        }
+    }
+
     private fun sectionHeader(
         title: String,
         expanded: Boolean,
@@ -128,6 +151,22 @@ internal class ChatProjectSideMenuView(
         }
     }
 
+    private fun recentConversationItems(): List<RecentConversationEntry> {
+        return projects().flatMapIndexed { projectIndex, project ->
+            project.conversations.mapIndexedNotNull { conversationIndex, conversation ->
+                conversation.title.trim().takeIf { it.isNotBlank() }?.let { title ->
+                    RecentConversationEntry(
+                        projectIndex = projectIndex,
+                        conversationIndex = conversationIndex,
+                        title = title,
+                        updatedAt = conversation.updatedAt
+                    )
+                }
+            }
+        }.sortedByDescending { it.updatedAt }
+            .take(RECENT_CONVERSATION_LIMIT)
+    }
+
     private fun projectNameRow(project: AppProject, active: Boolean, onClick: () -> Unit): TextView {
         return menuText(project.title).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
@@ -144,6 +183,30 @@ internal class ChatProjectSideMenuView(
             setOnLongClickListener {
                 startProjectDrag(it, project.toChatProjectShare())
                 true
+            }
+        }
+    }
+
+    private fun recentConversationRow(entry: RecentConversationEntry): TextView {
+        val active = entry.projectIndex == activeProjectIndex() &&
+            entry.conversationIndex == activeConversationIndex()
+        return menuText(entry.title).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
+            setPadding(dp(10), 0, dp(10), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setTextColor(Color.parseColor(if (active) "#D6D6D6" else "#A8A8A8"))
+            if (active) {
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(8).toFloat()
+                    setColor(Color.parseColor("#222222"))
+                }
+            }
+            setOnClickListener {
+                requestClose(true)
+                postDelayed({
+                    openRecentConversation(entry.projectIndex, entry.conversationIndex)
+                }, CLOSE_DELAY_MS)
             }
         }
     }
@@ -188,8 +251,16 @@ internal class ChatProjectSideMenuView(
 
     private companion object {
         const val CLOSE_DELAY_MS = 220L
+        const val RECENT_CONVERSATION_LIMIT = 8
     }
 }
+
+private data class RecentConversationEntry(
+    val projectIndex: Int,
+    val conversationIndex: Int,
+    val title: String,
+    val updatedAt: Long
+)
 
 internal fun showChatProjectDropRipple(
     overlay: View,
