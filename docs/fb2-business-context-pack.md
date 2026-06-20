@@ -86,6 +86,7 @@ GET /api/external/apps/fb2/context-contract
 - `status=ready`：主项目已配置 fb2 base url、context token，并启用 context pack。
 - `status=degraded`：缺少 base url/token，或关闭了 context pack。
 - `checks`：只暴露布尔和数值配置，例如 `base_url_configured`、`context_token_configured`、`max_context_chars`。
+- `recommended_actions`：结构化修复建议，例如配置 base url、配置 context token、重新启用 context pack。
 - `secret_values_exposed=false`：接口只显示是否配置，不返回任何密钥值。
 
 ## 主项目 Context Budget

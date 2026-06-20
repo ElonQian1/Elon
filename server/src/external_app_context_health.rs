@@ -9,7 +9,8 @@ pub(crate) fn public_context_health(app_id: &str) -> Value {
             "app_id": app_id,
             "status": "not_configured",
             "checks": [],
-            "warnings": ["unknown_external_app_context_health"]
+            "warnings": ["unknown_external_app_context_health"],
+            "recommended_actions": []
         }),
     }
 }
@@ -38,6 +39,7 @@ fn fb2_context_health() -> Value {
     if !env_flag("ELON_EXTERNAL_APP_FB2_CONTEXT_PACK_ENABLED", true) {
         warnings.push("context_pack_disabled");
     }
+    let recommended_actions = recommended_actions(&warnings);
 
     let status = if warnings.is_empty() {
         "ready"
@@ -60,9 +62,42 @@ fn fb2_context_health() -> Value {
             "order_limit": env_u32("ELON_EXTERNAL_APP_FB2_ORDER_CONTEXT_LIMIT", 20, 1, 100)
         },
         "warnings": warnings,
+        "recommended_actions": recommended_actions,
         "safe_to_expose": true,
         "secret_values_exposed": false
     })
+}
+
+fn recommended_actions(warnings: &[&str]) -> Vec<Value> {
+    warnings
+        .iter()
+        .filter_map(|warning| match *warning {
+            "missing_base_url" => Some(json!({
+                "code": "set_fb2_base_url",
+                "severity": "blocking",
+                "message": "配置 ELON_EXTERNAL_APP_FB2_BASE_URL，指向 fb2 后端服务地址。",
+                "env": ["ELON_EXTERNAL_APP_FB2_BASE_URL", "ELON_FB2_BASE_URL", "FB2_BASE_URL"]
+            })),
+            "missing_context_token" => Some(json!({
+                "code": "set_fb2_context_token",
+                "severity": "blocking",
+                "message": "配置 fb2 context shared secret，并确保 fb2 后端校验 X-FB2-AI-CENTER-TOKEN。",
+                "env": [
+                    "ELON_EXTERNAL_APP_FB2_CONTEXT_TOKEN",
+                    "ELON_FB2_AI_CENTER_TOKEN",
+                    "ELON_EXTERNAL_APP_FB2_TOKEN",
+                    "FB2_MAIN_PROJECT_SHARED_SECRET"
+                ]
+            })),
+            "context_pack_disabled" => Some(json!({
+                "code": "enable_fb2_context_pack",
+                "severity": "degraded",
+                "message": "开启 ELON_EXTERNAL_APP_FB2_CONTEXT_PACK_ENABLED，优先使用完整业务 context pack。",
+                "env": ["ELON_EXTERNAL_APP_FB2_CONTEXT_PACK_ENABLED"]
+            })),
+            _ => None,
+        })
+        .collect()
 }
 
 fn first_non_empty_env(names: &[&str]) -> Option<String> {
@@ -119,11 +154,24 @@ mod tests {
         assert_eq!(health["secret_values_exposed"], false);
         assert!(health["checks"].get("context_token_configured").is_some());
         assert!(health.get("ELON_EXTERNAL_APP_FB2_CONTEXT_TOKEN").is_none());
+        assert!(health.get("recommended_actions").is_some());
     }
 
     #[test]
     fn unknown_app_reports_not_configured() {
         let health = public_context_health("unknown");
         assert_eq!(health["status"], "not_configured");
+    }
+
+    #[test]
+    fn health_actions_are_structured() {
+        let actions = recommended_actions(&["missing_base_url", "missing_context_token"]);
+        assert_eq!(actions.len(), 2);
+        assert_eq!(actions[0]["severity"], "blocking");
+        assert!(actions[1]["env"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|env| { env.as_str() == Some("ELON_EXTERNAL_APP_FB2_CONTEXT_TOKEN") }));
     }
 }
