@@ -10,6 +10,8 @@ const RECOMMENDED_FB2_TOOLS: &[&str] = &[
     "search_user_orders",
     "get_order_detail",
     "search_group_opinions",
+    "get_context_audit",
+    "context_audit_summary",
 ];
 
 pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
@@ -38,7 +40,8 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
             "notes": [
                 "主项目当前只把工具作为规划和追问依据，不会自动执行 fb2 工具。",
                 "用户订单工具必须限制为 current_user_only。",
-                "群友观点必须返回 message_id，比赛和订单必须返回 source id。"
+                "群友观点必须返回 message_id，比赛和订单必须返回 source id。",
+                "审计工具只返回上下文来源和指标元数据，不返回完整订单、聊天正文或赔率明细。"
             ]
         })),
         _ => None,
@@ -68,6 +71,7 @@ pub(crate) fn prompt_tool_contract_block(context: &Value) -> String {
          <tool_rules>\n\
          - 这些工具当前只作为后续追问/检索计划的契约提示，不能在回答中假装已经调用。\n\
          - 如果当前 context_pack 信息不足，可以说明需要调用哪个工具补充，例如 get_match_detail 或 search_user_orders。\n\
+         - 如果已有 context_audit_id，可以说明需要调用 get_context_audit 回查当次上下文来源和预算指标。\n\
          - 不能编造工具返回结果；未调用工具时只能基于现有上下文回答。\n\
          - 工具调用必须遵守用户权限，用户订单只能查询当前用户自己的数据。\n\
          </tool_rules>\n\
@@ -164,6 +168,18 @@ fn recommended_fb2_tool_contract() -> Value {
             "description": "按比赛或关键词检索群友观点，并返回 message_id。",
             "permission": "group_context",
             "when_to_use": "用户要求总结群友观点、分歧或采纳建议时"
+        },
+        {
+            "name": "get_context_audit",
+            "description": "按 context_audit_id 回查某次 Context Pack 的来源数量、预算状态、耗时和裁剪建议。",
+            "permission": "audit_metadata_only",
+            "when_to_use": "需要解释某次 AI 回答依据、排查空上下文或过大上下文时"
+        },
+        {
+            "name": "context_audit_summary",
+            "description": "按群、用户、时间和 budget_status 汇总 Context Pack 审计指标。",
+            "permission": "audit_metrics_only",
+            "when_to_use": "需要长期观察上下文为空、过大、变慢或回退趋势时"
         }
     ])
 }
@@ -263,17 +279,22 @@ mod tests {
             "tool_contract": {
                 "tools": [
                     {"name": "get_match_detail"},
-                    {"name": "search_user_orders"}
+                    {"name": "search_user_orders"},
+                    {"name": "get_context_audit"}
                 ]
             }
         }));
 
         assert_eq!(readiness["status"], "partial");
-        assert_eq!(readiness["declared_count"], 2);
+        assert_eq!(readiness["declared_count"], 3);
         assert!(readiness["missing_recommended_tools"]
             .as_array()
             .unwrap()
             .contains(&json!("search_group_opinions")));
+        assert!(readiness["missing_recommended_tools"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("context_audit_summary")));
     }
 
     #[test]
@@ -284,7 +305,7 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .any(|tool| tool["name"] == "search_group_opinions"));
+            .any(|tool| tool["name"] == "context_audit_summary"));
         assert!(public_tool_contract_guidance("unknown").is_none());
     }
 }

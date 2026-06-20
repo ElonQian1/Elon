@@ -214,13 +214,17 @@ source/status/generated_at
 }
 ```
 
-主项目推荐 fb2 长期补齐这 5 个工具：
+主项目推荐 fb2 长期补齐这些工具：
 
 - `search_matches`：按日期、联赛、球队、彩种搜索比赛。
 - `get_match_detail`：按 `match_id` 查比赛、赔率、伤停、更新时间和数据源。
 - `search_user_orders`：查询当前用户自己的票据/订单摘要。
 - `get_order_detail`：按订单或票据 ID 查询当前用户可见的明细。
 - `search_group_opinions`：按比赛或关键词检索群友观点，并返回 `message_id`。
+- `get_context_audit`：按 `context_audit_id` 回查某次 Context Pack 的来源数量、预算状态、耗时和裁剪建议。
+- `context_audit_summary`：按群、用户、时间和 `budget_status` 汇总 Context Pack 审计指标。
+
+审计工具只用于排障和质量评测，只返回来源与指标元数据，不返回完整订单、聊天正文或赔率明细。
 
 ## 主项目观测日志
 
