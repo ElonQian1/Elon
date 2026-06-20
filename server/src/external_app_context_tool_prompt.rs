@@ -34,7 +34,9 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
          <executed_external_app_tools app_id=\"{app_id}\" status=\"{status}\" executed_at=\"{executed_at}\">\n\
          {body}\n\
          <tool_result_rules>\n\
-         - 只有 status=ready 且 success=true 的单项结果可以当作已查询事实引用。\n\
+         - 只有 status=ready、success=true 且 grounding.status=grounded 的单项结果可以作为强事实引用。\n\
+         - grounding.status=weak 的结果只能谨慎使用，并必须说明缺少 source_ids、visibility 或其他追溯信息。\n\
+         - grounding.status=unsafe 的结果不能用于比赛、赔率、订单或群友观点事实。\n\
          - plan.planned_tools 只说明为什么选择工具；不能把计划本身当作已经查询到的比赛、订单或观点事实。\n\
          - plan 中的 trigger、confidence、evidence 可用于解释本次为什么查询或为什么没有查询。\n\
          - skipped、failed、unavailable 结果只能作为数据缺口说明，不能编造成比赛、赔率、订单或群友观点事实。\n\
@@ -58,11 +60,17 @@ mod tests {
             "app_id": "fb2",
             "status": "ready",
             "executed_at": "2026-06-21T00:00:00Z",
-            "results": [{"tool_name": "search_matches", "status": "ready", "success": true}]
+            "results": [{
+                "tool_name": "search_matches",
+                "status": "ready",
+                "success": true,
+                "grounding": {"status": "grounded"}
+            }]
         })));
 
         assert!(block.contains("<executed_external_app_tools"));
         assert!(block.contains("success=true"));
+        assert!(block.contains("grounding.status=grounded"));
         assert!(block.contains("不能编造"));
         assert!(block.contains("来源 ID"));
     }

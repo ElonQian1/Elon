@@ -17,6 +17,7 @@ use crate::{
     external_app_context_response::compact_error,
     external_app_context_tool_audit::{execution_audit, execution_status},
     external_app_context_tool_planner::{plan_fb2_tools, PlannedTool},
+    external_app_context_tool_result::normalize_parsed_tool_result,
     external_app_registry::external_group_by_group_id,
     types::AppState,
 };
@@ -258,20 +259,7 @@ async fn normalize_tool_response(
         }
     };
 
-    let success = parsed.get("success").and_then(Value::as_bool) == Some(true);
-    json!({
-        "tool_name": tool_name,
-        "request_id": parsed.get("request_id").cloned().unwrap_or_else(|| json!(request_id)),
-        "status": if success { "ready" } else { "failed" },
-        "success": success,
-        "data": parsed.get("data").cloned().unwrap_or(Value::Null),
-        "error": parsed.get("error").cloned().unwrap_or(Value::Null),
-        "generated_at": parsed.get("generated_at").cloned().unwrap_or(Value::Null),
-        "source_ids": parsed.get("source_ids").cloned().unwrap_or(Value::Array(Vec::new())),
-        "visibility": parsed.get("visibility").cloned().unwrap_or(Value::Null),
-        "metrics": parsed.get("metrics").cloned().unwrap_or_else(|| json!({})),
-        "reason": reason
-    })
+    normalize_parsed_tool_result(tool_name, reason, request_id, &parsed)
 }
 
 fn unavailable_execution(

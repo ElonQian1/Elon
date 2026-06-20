@@ -65,12 +65,25 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
                     "planned_tools": "array with tool name, trigger, confidence and evidence",
                     "skipped_reasons": "why main project did not plan a tool when applicable"
                 },
-                "results": "array of normalized per-tool results; only status=ready and success=true may ground facts",
+                "results": {
+                    "description": "array of normalized per-tool results",
+                    "fact_grounding_rule": "only status=ready, success=true and grounding.status=grounded may be used as strong facts",
+                    "grounding": {
+                        "schema": "external_app.tool_result_grounding.v1",
+                        "status": "grounded | weak | unsafe | unavailable",
+                        "warnings": ["missing_source_ids", "missing_visibility", "visibility_mismatch"],
+                        "facts_allowed": "boolean; false for unsafe/unavailable",
+                        "requires_caveat": "boolean; true for weak results"
+                    }
+                },
                 "audit": {
                     "schema": "external_app.tool_execution_audit.v1",
                     "planned_count": "number of tools main project planned",
                     "ready_count": "number of successful tool results",
                     "source_id_count": "number of returned source ids available for answer citations",
+                    "grounded_result_count": "number of ready results with grounding.status=grounded",
+                    "weak_result_count": "number of ready results needing caveats",
+                    "unsafe_result_count": "number of results main project must not use as facts",
                     "duration_ms": "main-project side elapsed time"
                 }
             },
@@ -100,6 +113,10 @@ mod tests {
         let contract = public_tool_execution_guidance("fb2").unwrap();
         assert_eq!(contract["schema"], "fb2.tool_execution.v1");
         assert_eq!(contract["transport"]["path"], FB2_TOOL_EXECUTE_PATH);
+        assert_eq!(
+            contract["main_project_execution_result"]["results"]["grounding"]["schema"],
+            "external_app.tool_result_grounding.v1"
+        );
         assert!(contract["allowed_tools"]
             .as_array()
             .unwrap()
