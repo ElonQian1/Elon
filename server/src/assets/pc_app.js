@@ -269,6 +269,13 @@
     setPcAuthError('');
   }
 
+  function keepAuthModalOpenOnOutsideClick(event) {
+    if (!els.pcAuthBackdrop || els.pcAuthBackdrop.hidden) return;
+    if (event.target.closest('.pc-auth-dialog')) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+  }
+
   function authFetchWithTimeout(url, options, ms) {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), ms || 15000);
@@ -687,6 +694,8 @@
     pcAuthTabs().forEach((button) => button.addEventListener('click', () => setPcAuthMode(button.dataset.pcAuthMode)));
     els.pcAuthForm.addEventListener('submit', submitPcAuth);
     els.pcAuthCloseBtn.addEventListener('click', closeAuthModal);
+    document.addEventListener('pointerdown', keepAuthModalOpenOnOutsideClick, true);
+    document.addEventListener('click', keepAuthModalOpenOnOutsideClick, true);
     [els.aiRail, els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, els.apkRail].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     els.apkRail.addEventListener('click', selectApkDownload);
