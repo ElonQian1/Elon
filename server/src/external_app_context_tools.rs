@@ -4,6 +4,13 @@ use serde_json::{json, Value};
 
 const MAX_TOOL_ENTRIES: usize = 8;
 const MAX_TOOL_JSON_CHARS: usize = 4_000;
+const RECOMMENDED_FB2_TOOLS: &[&str] = &[
+    "search_matches",
+    "get_match_detail",
+    "search_user_orders",
+    "get_order_detail",
+    "search_group_opinions",
+];
 
 pub(crate) fn prompt_tool_contract_block(context: &Value) -> String {
     let Some(contract) = context.get("tool_contract") else {
@@ -49,12 +56,48 @@ pub(crate) fn tool_contract_quality_warning(context: &Value) -> Option<&'static 
     }
 }
 
+pub(crate) fn tool_contract_readiness(context: &Value) -> Value {
+    let Some(contract) = context.get("tool_contract") else {
+        return readiness("missing", Vec::new(), RECOMMENDED_FB2_TOOLS.to_vec());
+    };
+    if contract.is_null() {
+        return readiness("missing", Vec::new(), RECOMMENDED_FB2_TOOLS.to_vec());
+    }
+
+    let names = tool_names(contract);
+    if names.is_empty() {
+        return readiness("empty", names, RECOMMENDED_FB2_TOOLS.to_vec());
+    }
+    let missing = RECOMMENDED_FB2_TOOLS
+        .iter()
+        .copied()
+        .filter(|name| !names.iter().any(|existing| existing == name))
+        .collect::<Vec<_>>();
+    let status = if missing.is_empty() {
+        "ready"
+    } else {
+        "partial"
+    };
+    readiness(status, names, missing)
+}
+
 fn no_tools_block(reason: &str) -> String {
     format!(
         "<available_external_app_tools status=\"unavailable\" reason=\"{reason}\">\n\
          当前外部项目没有声明可用工具。信息不足时只能说明缺口，不能假装查询了明细。\n\
          </available_external_app_tools>"
     )
+}
+
+fn readiness(status: &str, names: Vec<String>, missing: Vec<&str>) -> Value {
+    json!({
+        "status": status,
+        "declared_tools": names,
+        "declared_count": names.len(),
+        "recommended_tools": RECOMMENDED_FB2_TOOLS,
+        "missing_recommended_tools": missing,
+        "execution_status": "declared_only"
+    })
 }
 
 fn project_tool_contract(contract: &Value) -> Value {
@@ -77,6 +120,19 @@ fn project_tool_contract(contract: &Value) -> Value {
         projected["warning"] = json!("tool_contract_too_large");
     }
     projected
+}
+
+fn tool_names(contract: &Value) -> Vec<String> {
+    extract_tools(contract)
+        .into_iter()
+        .filter_map(|tool| {
+            tool.get("name")
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|name| !name.is_empty())
+                .map(ToOwned::to_owned)
+        })
+        .collect()
 }
 
 fn extract_tools(contract: &Value) -> Vec<Value> {
@@ -127,5 +183,28 @@ mod tests {
             tool_contract_quality_warning(&json!({"tool_contract": null})),
             Some("missing_tool_contract")
         );
+        assert_eq!(
+            tool_contract_readiness(&json!({}))["status"].as_str(),
+            Some("missing")
+        );
+    }
+
+    #[test]
+    fn reports_partial_tool_readiness() {
+        let readiness = tool_contract_readiness(&json!({
+            "tool_contract": {
+                "tools": [
+                    {"name": "get_match_detail"},
+                    {"name": "search_user_orders"}
+                ]
+            }
+        }));
+
+        assert_eq!(readiness["status"], "partial");
+        assert_eq!(readiness["declared_count"], 2);
+        assert!(readiness["missing_recommended_tools"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("search_group_opinions")));
     }
 }

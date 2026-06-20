@@ -2,7 +2,7 @@
 
 use serde_json::{json, Value};
 
-use crate::external_app_context_tools::tool_contract_quality_warning;
+use crate::external_app_context_tools::{tool_contract_quality_warning, tool_contract_readiness};
 
 pub(crate) fn fb2_pack_context(app_id: &str, external_group_id: &str, data: Value) -> Value {
     let mut context = json!({
@@ -72,7 +72,8 @@ fn context_quality(context: &Value, expects_context_pack: bool) -> Value {
         "warnings": warnings,
         "requires_source_citations": true,
         "requires_freshness_notice": warnings.contains(&"missing_generated_at"),
-        "schema": if expects_context_pack { "fb2.context_pack.v1" } else { "fb2.today_matches.v1" }
+        "schema": if expects_context_pack { "fb2.context_pack.v1" } else { "fb2.today_matches.v1" },
+        "tool_readiness": if expects_context_pack { tool_contract_readiness(context) } else { json!({"status": "not_applicable"}) }
     })
 }
 
@@ -121,6 +122,10 @@ mod tests {
         assert!(warnings.contains(&json!("missing_context_pack_version")));
         assert!(warnings.contains(&json!("missing_generated_at")));
         assert!(warnings.contains(&json!("missing_tool_contract")));
+        assert_eq!(
+            context["context_quality"]["tool_readiness"]["status"],
+            "missing"
+        );
         assert_eq!(context["context_quality"]["schema"], "fb2.context_pack.v1");
     }
 

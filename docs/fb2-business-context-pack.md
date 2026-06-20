@@ -101,6 +101,14 @@ include_platform_orders=true|false
 - `empty_matches`：本次上下文没有比赛数据，AI 不能假设今日有可分析比赛。
 - `missing_tool_contract` / `empty_tool_contract`：fb2 暂未声明可按需查询的业务工具，AI 信息不足时只能说明缺口。
 
+`context_quality.tool_readiness` 会给出工具契约成熟度：
+
+- `status=missing`：没有返回 `tool_contract`。
+- `status=empty`：返回了 `tool_contract`，但没有工具列表。
+- `status=partial`：已有部分工具，但缺少推荐工具。
+- `status=ready`：推荐工具已声明完整。
+- `execution_status=declared_only`：主项目当前只把工具作为规划和追问依据，尚不自动执行。
+
 这使 fb2 可以渐进式接入：接口先可用，再通过 warnings 不断补齐数据质量，而不是让模型静默使用残缺上下文。
 
 ## 主项目 Prompt 投影
@@ -173,6 +181,14 @@ source/status/generated_at
   }
 }
 ```
+
+主项目推荐 fb2 长期补齐这 5 个工具：
+
+- `search_matches`：按日期、联赛、球队、彩种搜索比赛。
+- `get_match_detail`：按 `match_id` 查比赛、赔率、伤停、更新时间和数据源。
+- `search_user_orders`：查询当前用户自己的票据/订单摘要。
+- `get_order_detail`：按订单或票据 ID 查询当前用户可见的明细。
+- `search_group_opinions`：按比赛或关键词检索群友观点，并返回 `message_id`。
 
 ## 主项目观测日志
 

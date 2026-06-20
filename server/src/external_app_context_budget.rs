@@ -77,6 +77,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
          - 如果上下文缺少用户订单、赔率更新时间或消息来源，必须说明信息不足，不能编造。\n\
          - 如果 context_quality.warnings 非空，回答中必须显式提示相关数据缺口或新鲜度风险。\n\
          - 如果需要更多比赛、订单或群友观点明细，只能提出需要调用的外部工具，不能把未调用工具的结果当事实。\n\
+         - 如果 context_quality.tool_readiness.status 不是 ready，说明外部项目按需检索能力还不完整，回答要更保守。\n\
          </answer_rules>\n\
          </external_app_context>",
         serde_json::to_string(&usage_policy).unwrap_or_else(|_| "{}".into()),
@@ -157,6 +158,7 @@ mod tests {
         assert!(block.contains("<fb2_context_pack>hello</fb2_context_pack>"));
         assert!(block.contains("context_quality="));
         assert!(block.contains("get_match_detail"));
+        assert!(block.contains("tool_readiness.status"));
         assert!(block.contains("必须区分"));
     }
 
