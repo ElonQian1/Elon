@@ -1,5 +1,6 @@
 use anyhow::{bail, Context, Result};
 use std::{
+    io::{Read, Write},
     net::TcpStream,
     path::Path,
     process::{Command, Stdio},
@@ -9,6 +10,9 @@ use std::{
 use super::{
     env_file, paths, AGENT_RUNTIME_ARG, CLIENT_EXE_NAME, DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
 };
+
+const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_millis(900);
+const ADMIN_PORT_FALLBACK_LIMIT: u16 = 20;
 
 pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     let client = paths::client_exe(install_dir);
@@ -21,18 +25,20 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         .get("NODE_ADMIN_PORT")
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(DEFAULT_ADMIN_PORT);
+    let port = select_admin_port(port);
 
-    if !is_port_open(port) {
+    if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
         let mut cmd = Command::new(&client);
         cmd.arg(AGENT_RUNTIME_ARG)
             .current_dir(install_dir)
             .envs(&env_values)
+            .env("NODE_ADMIN_PORT", port.to_string())
             .env("NODE_AUTO_OPEN_ADMIN", "0")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
         spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
-        wait_for_port(port, Duration::from_secs(15));
+        wait_for_admin_ready(port, Duration::from_secs(15));
     }
 
     open_pc_web_page(port, &env_values)
@@ -198,17 +204,6 @@ fn encode_query_component(value: &str) -> String {
     encoded
 }
 
-pub(crate) fn wait_for_port(port: u16, timeout: Duration) -> bool {
-    let deadline = std::time::Instant::now() + timeout;
-    while std::time::Instant::now() < deadline {
-        if is_port_open(port) {
-            return true;
-        }
-        std::thread::sleep(Duration::from_millis(300));
-    }
-    false
-}
-
 pub(crate) fn wait_for_port_closed(port: u16, timeout: Duration) -> bool {
     let deadline = std::time::Instant::now() + timeout;
     while std::time::Instant::now() < deadline {
@@ -222,6 +217,53 @@ pub(crate) fn wait_for_port_closed(port: u16, timeout: Duration) -> bool {
 
 pub(crate) fn is_port_open(port: u16) -> bool {
     TcpStream::connect(("127.0.0.1", port)).is_ok()
+}
+
+fn select_admin_port(preferred: u16) -> u16 {
+    if admin_healthy(preferred, ADMIN_HEALTH_TIMEOUT) || !is_port_open(preferred) {
+        return preferred;
+    }
+    for offset in 1..=ADMIN_PORT_FALLBACK_LIMIT {
+        let Some(port) = preferred.checked_add(offset) else {
+            break;
+        };
+        if admin_healthy(port, ADMIN_HEALTH_TIMEOUT) || !is_port_open(port) {
+            return port;
+        }
+    }
+    preferred
+}
+
+fn wait_for_admin_ready(port: u16, timeout: Duration) -> bool {
+    let deadline = std::time::Instant::now() + timeout;
+    while std::time::Instant::now() < deadline {
+        if admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(300));
+    }
+    admin_healthy(port, ADMIN_HEALTH_TIMEOUT)
+}
+
+fn admin_healthy(port: u16, timeout: Duration) -> bool {
+    let addr = std::net::SocketAddr::from(([127, 0, 0, 1], port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&addr, timeout) else {
+        return false;
+    };
+    let _ = stream.set_read_timeout(Some(timeout));
+    let _ = stream.set_write_timeout(Some(timeout));
+    let request = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    if stream.write_all(request).is_err() {
+        return false;
+    }
+    let mut buf = [0u8; 32];
+    match stream.read(&mut buf) {
+        Ok(n) if n > 0 => {
+            let head = String::from_utf8_lossy(&buf[..n]);
+            head.starts_with("HTTP/1.1 200") || head.starts_with("HTTP/1.0 200")
+        }
+        _ => false,
+    }
 }
 
 fn spawn_hidden(command: &mut Command) -> std::io::Result<std::process::Child> {
