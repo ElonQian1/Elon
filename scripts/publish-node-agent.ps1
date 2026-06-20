@@ -21,7 +21,7 @@ $ErrorActionPreference = 'Stop'
 $Server = "root@43.139.149.158"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
 $RemoteDir = "/opt/elon/data/downloads"
-$Bin = "elon-node-agent"
+$Bin = "elon-pc-node"
 $WindowsClientPackageName = "elon-node-agent-windows.zip"
 
 Write-Host "=== 一龙 PC 节点客户端构建 + 发布 ===" -ForegroundColor Cyan

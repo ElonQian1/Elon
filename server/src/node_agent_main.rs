@@ -1992,12 +1992,23 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 async fn main() -> Result<()> {
     #[cfg(windows)]
     {
-        if !std::env::args().any(|arg| arg == "--agent-runtime") {
+        let runtime_mode = std::env::args().any(|arg| arg == "--agent-runtime")
+            || running_as_legacy_agent_exe();
+        if !runtime_mode {
             return node_client_launcher::run();
         }
     }
 
     run_agent_runtime().await
+}
+
+#[cfg(windows)]
+fn running_as_legacy_agent_exe() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|path| path.file_name().map(|name| name.to_string_lossy().to_string()))
+        .map(|name| name.eq_ignore_ascii_case("elon-node-agent.exe"))
+        .unwrap_or(false)
 }
 
 async fn run_agent_runtime() -> Result<()> {
