@@ -3,7 +3,7 @@
 # read Chinese launcher filenames correctly.
 <#
 .SYNOPSIS
-    构建并上传 elon-node-agent 可执行文件到服务器。
+    构建并上传一龙 PC 节点客户端可执行文件到服务器。
 
 .DESCRIPTION
     1. 交叉编译 Linux musl 版本（x86_64-unknown-linux-musl）
@@ -22,10 +22,9 @@ $Server = "root@43.139.149.158"
 # data_dir = /opt/elon/data，downloads 子目录与 router.rs 中 state.data_dir.join("downloads") 一致
 $RemoteDir = "/opt/elon/data/downloads"
 $Bin = "elon-node-agent"
-$ClientBinName = "elon-node-client"
 $WindowsClientPackageName = "elon-node-agent-windows.zip"
 
-Write-Host "=== elon-node-agent 构建 + 发布 ===" -ForegroundColor Cyan
+Write-Host "=== 一龙 PC 节点客户端构建 + 发布 ===" -ForegroundColor Cyan
 
 function Compress-ArchiveWithRetry {
     param(
@@ -67,7 +66,7 @@ try {
 } finally { Pop-Location }
 if (-not $TargetDir) { throw "无法解析 cargo target 目录" }
 $PackageVersion = ($meta.packages | Where-Object { $_.name -eq "elon-server" } | Select-Object -First 1).version
-if (-not $PackageVersion) { throw "无法解析 elon-node-agent 版本号" }
+if (-not $PackageVersion) { throw "无法解析一龙 PC 节点版本号" }
 $GitSha = (git -C (Join-Path $PSScriptRoot "..") rev-parse HEAD).Trim()
 Write-Host "  target 目录: $TargetDir" -ForegroundColor DarkGray
 
@@ -105,7 +104,7 @@ try {
     $unitSeparator = [char]0x1f
     $env:CARGO_ENCODED_RUSTFLAGS = "-C${unitSeparator}target-cpu=x86-64"
     Write-Host "  Windows release rustflags: -C target-cpu=x86-64" -ForegroundColor DarkGray
-    cargo build --release --bin $Bin --bin $ClientBinName
+    cargo build --release --bin $Bin
     if ($LASTEXITCODE -ne 0) { throw "Windows 编译失败" }
 } finally {
     Remove-Item Env:\CARGO_ENCODED_RUSTFLAGS -ErrorAction SilentlyContinue
@@ -114,8 +113,6 @@ try {
 
 $WinBin = Join-Path $TargetDir "release\$Bin.exe"
 if (-not (Test-Path $WinBin)) { throw "Windows 二进制不存在：$WinBin" }
-$ClientBin = Join-Path $TargetDir "release\$ClientBinName.exe"
-if (-not (Test-Path $ClientBin)) { throw "Windows 客户端入口不存在：$ClientBin" }
 
 # ── 2.5 打包 Windows 客户端 ──────────────────────────────────────────────────
 Write-Host "[2.5/4] 打包 Windows 客户端..." -ForegroundColor Yellow
@@ -129,8 +126,8 @@ $PackageInternal = Join-Path $PackageRoot "_internal"
 $WindowsClientPackage = Join-Path $TargetDir "release\$WindowsClientPackageName"
 New-Item -ItemType Directory -Force -Path $PackageRoot, $PackageInternal | Out-Null
 try {
-    Copy-Item -LiteralPath $ClientBin -Destination (Join-Path $PackageRoot "一龙PC节点.exe") -Force
-    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageInternal "$Bin.exe") -Force
+    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "一龙PC节点.exe") -Force
+    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "卸载一龙PC节点.exe") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "node-agent.env.example") -Destination (Join-Path $PackageInternal "node-agent.env.example") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "README.txt") -Destination (Join-Path $PackageInternal "README.txt") -Force
     $PackageVersionInfo = [ordered]@{
@@ -190,7 +187,7 @@ Write-Host "  Windows client package size = $sizeWinClient bytes" -ForegroundCol
 Write-Host "  Version info gitSha = $GitSha" -ForegroundColor Green
 
 Write-Host ""
-Write-Host "✅ elon-node-agent 发布完成" -ForegroundColor Green
+Write-Host "✅ 一龙 PC 节点客户端发布完成" -ForegroundColor Green
 Write-Host "   下载地址（Linux）:   $LinuxDownloadUrl"
 Write-Host "   下载地址（Windows）: $WindowsDownloadUrl"
 Write-Host "   客户端包（Windows）: $WindowsClientDownloadUrl"

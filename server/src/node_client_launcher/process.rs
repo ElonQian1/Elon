@@ -6,13 +6,14 @@ use std::{
     time::Duration,
 };
 
-use super::{env_file, paths, DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL};
+use super::{
+    env_file, paths, AGENT_RUNTIME_ARG, CLIENT_EXE_NAME, DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
+};
 
 pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
-    let internal_dir = paths::internal_dir(install_dir);
-    let agent = paths::agent_exe(install_dir);
-    if !agent.exists() {
-        bail!("缺少内部节点程序：{}", agent.display());
+    let client = paths::client_exe(install_dir);
+    if !client.exists() {
+        bail!("缺少客户端主程序：{}", client.display());
     }
 
     let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
@@ -22,14 +23,15 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         .unwrap_or(DEFAULT_ADMIN_PORT);
 
     if !is_port_open(port) {
-        let mut cmd = Command::new(&agent);
-        cmd.current_dir(&internal_dir)
+        let mut cmd = Command::new(&client);
+        cmd.arg(AGENT_RUNTIME_ARG)
+            .current_dir(install_dir)
             .envs(&env_values)
             .env("NODE_AUTO_OPEN_ADMIN", "0")
             .stdin(Stdio::null())
             .stdout(Stdio::null())
             .stderr(Stdio::null());
-        spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", agent.display()))?;
+        spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
         wait_for_port(port, Duration::from_secs(15));
     }
 
@@ -39,6 +41,33 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
 pub(crate) fn stop_agent() {
     #[cfg(windows)]
     {
+        let script = format!(
+            r#"
+$targets = Get-CimInstance Win32_Process | Where-Object {{
+  ($_.Name -eq '{client}' -and $_.CommandLine -match '--agent-runtime') -or
+  ($_.Name -eq 'elon-node-agent.exe')
+}}
+foreach ($target in $targets) {{
+  Invoke-CimMethod -InputObject $target -MethodName Terminate | Out-Null
+}}
+"#,
+            client = ps_single_quote(CLIENT_EXE_NAME)
+        );
+        let mut ps = Command::new("powershell");
+        ps.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-WindowStyle",
+            "Hidden",
+            "-Command",
+            &script,
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+        let _ = status_hidden(&mut ps);
+
         let mut cmd = Command::new("taskkill");
         cmd.args(["/IM", "elon-node-agent.exe", "/F"])
             .stdin(Stdio::null())

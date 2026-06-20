@@ -1,9 +1,11 @@
+#![cfg_attr(windows, windows_subsystem = "windows")]
+
 //! elon-node-agent：用户 PC 端节点代理，将本机 LLM 算力贡献给 elon 平台。
 //!
 //! ## 使用方法（普通用户：零配置）
 //!
-//! 1. 普通用户只双击 `一龙PC节点.exe`。`_internal\elon-node-agent.exe` 是内部服务，
-//!    由启动器后台启动，不作为用户入口。
+//! 1. 普通用户只双击 `一龙PC节点.exe`。Windows 端只有这一个主程序入口，
+//!    后台节点 runtime 由同一个 exe 的内部启动模式承载。
 //! 2. 在管理页用 **账号 + 密码** 登录一次（也可直接粘贴 token）
 //! 3. 节点自动向云端注册，生成 agent_id + secret 并持久化到本地配置文件
 //! 4. 之后每次启动自动读取凭证、自动连接，无需再配置
@@ -44,6 +46,8 @@ mod cli_usage;
 mod node_agent_admin_open;
 mod node_agent_project_picker;
 mod node_agent_server_runtime;
+#[cfg(windows)]
+mod node_client_launcher;
 mod node_hardware_probe;
 mod pc_storage_git_http;
 mod pc_storage_repo;
@@ -1986,6 +1990,17 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    #[cfg(windows)]
+    {
+        if !std::env::args().any(|arg| arg == "--agent-runtime") {
+            return node_client_launcher::run();
+        }
+    }
+
+    run_agent_runtime().await
+}
+
+async fn run_agent_runtime() -> Result<()> {
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()))
