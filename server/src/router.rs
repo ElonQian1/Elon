@@ -67,6 +67,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/assets/project_home.js", get(web::project_home_js))
         .route("/assets/pc_app.css", get(web::pc_app_css))
         .route("/assets/pc_app_node.css", get(web::pc_app_node_css))
+        .route(
+            "/assets/pc_app_project_readiness.css",
+            get(web::pc_app_project_readiness_css),
+        )
         .route("/assets/pc_app_doctor.css", get(web::pc_app_doctor_css))
         .route(
             "/assets/pc_project_landing.css",
@@ -78,6 +82,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/assets/pc_app_markdown.js", get(web::pc_app_markdown_js))
         .route("/assets/pc_app_node_admin.js", get(web::pc_app_node_admin_js))
         .route("/assets/pc_app_node.js", get(web::pc_app_node_js))
+        .route(
+            "/assets/pc_app_project_readiness.js",
+            get(web::pc_app_project_readiness_js),
+        )
         .route("/assets/pc_app_doctor.js", get(web::pc_app_doctor_js))
         .route(
             "/assets/pc_project_landing.js",

@@ -69,6 +69,11 @@
     setRails, renderChannels, setNodeMode, localNodeApi, ensureLocalNodeLogin,
     openSettings, loadBaseData
   });
+  const projectReadiness = window.ElonPcProjectReadiness.create({
+    state, $, clean, escapeHtml, api, openSettings,
+    selectNode: () => node.selectNode(),
+    selectProject
+  });
   const projectLanding = window.ElonPcProjectLanding.create({
     state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
     channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode,
@@ -1414,7 +1419,10 @@
       renderMembers('项目成员', members.map((m) => Object.assign({}, m, {
         name: userName(m),
         sub: m.role || m.member_role || 'member'
-      })));
+      })), {
+        prefixHtml: projectReadiness.renderMemberPanel(projectById(projectId) || project)
+      });
+      projectReadiness.bindMemberPanel(projectById(projectId) || project);
       renderChannels();
       selectProjectLanding();
     } catch (error) {
@@ -1449,13 +1457,15 @@
     }
   }
 
-  function renderMembers(title, members) {
+  function renderMembers(title, members, options) {
     els.memberPanelTitle.textContent = title;
-    els.memberList.innerHTML = (members || []).map((member) => {
+    const prefix = options && options.prefixHtml ? options.prefixHtml : '';
+    const rows = (members || []).map((member) => {
       const name = clean(member.name || member.nickname || member.account || member.user_account || member.phone || member.email) || '成员';
       const sub = clean(member.sub || member.role || member.status || member.id) || '';
       return `<div class="member-row">${avatarElement('div', 'member-avatar', avatarUrlOf(member), name, '员')}<div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(sub)}</span></div></div>`;
     }).join('') || '<div class="empty-state">暂无成员</div>';
+    els.memberList.innerHTML = prefix + rows;
   }
 
   function senderIdOf(message) {
