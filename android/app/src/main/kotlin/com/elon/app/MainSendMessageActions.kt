@@ -11,6 +11,7 @@ internal class MainSendMessageActions(
     private val runningInputMode: () -> RunningInputMode,
     private val activeProject: () -> AppProject,
     private val activeConversation: () -> AppConversation,
+    private val prepareConversationTitle: (String) -> Unit,
     private val appendMessage: (ChatMessage) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val uploadAttachmentsThenSend: (String, String, SendTarget, ProjectRequestExecutionMode) -> Unit,
@@ -49,6 +50,7 @@ internal class MainSendMessageActions(
             }
             return
         }
+        prepareConversationTitle(text)
         val target = currentSendTarget()
         val executionMode = consumeExecutionModeForSend()
         collapseInputComposer()

@@ -23,6 +23,7 @@ internal class MainInputActions(
     private val preparedMessageActions: () -> MainPreparedMessageActions,
     private val activeWorkControlActions: () -> MainActiveWorkControlActions,
     private val messageActions: () -> MainMessageActions,
+    private val conversationPreviewActions: () -> MainConversationPreviewActions,
     private val navigationController: () -> MainNavigationController,
     private val stageHintShimmer: () -> MainStageHintShimmer,
     private val isFriendChatActive: () -> Boolean,
@@ -255,6 +256,7 @@ internal class MainInputActions(
             runningInputMode = { runningInputMode },
             activeProject = projectStateActions()::activeProject,
             activeConversation = projectStateActions()::activeConversation,
+            prepareConversationTitle = conversationPreviewActions()::prepareActiveConversationTitle,
             appendMessage = workflowActions().messageAppendActions::appendMessage,
             collapseInputComposer = { inputFocusActions.collapseInputComposer() },
             uploadAttachmentsThenSend = { visibleText, outgoingText, target, executionMode ->

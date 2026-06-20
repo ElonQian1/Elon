@@ -69,6 +69,13 @@ internal class MainConversationPreviewActions(
         }
     }
 
+    fun prepareActiveConversationTitle(messageText: String) {
+        if (updateConversationTitleFromUserMessage(activeConversation(), messageText)) {
+            saveConversations()
+            renderConversationList()
+        }
+    }
+
     fun updateActiveConversationPreview(message: ChatMessage) {
         val conversation = activeConversation()
         val project = activeProject()
@@ -95,9 +102,18 @@ internal class MainConversationPreviewActions(
     ) {
         conversation.subtitle = summarize(message.content, 30)
         project.subtitle = summarize(message.content, 34)
-        if (conversation.title.startsWith("新会话")) {
-            conversation.title = summarize(message.content, 12)
-            binding.topTitleText.text = conversation.title
-        }
+        updateConversationTitleFromUserMessage(conversation, message.content)
+    }
+
+    private fun updateConversationTitleFromUserMessage(
+        conversation: AppConversation,
+        messageText: String
+    ): Boolean {
+        if (!shouldAutoGenerateConversationTitle(conversation)) return false
+        val title = autoConversationTitleFromMessage(messageText)
+        if (title.isBlank()) return false
+        conversation.title = title
+        binding.topTitleText.text = title
+        return true
     }
 }

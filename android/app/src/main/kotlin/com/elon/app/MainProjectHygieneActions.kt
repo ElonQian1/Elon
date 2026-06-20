@@ -26,6 +26,7 @@ internal class MainProjectHygieneActions(
             removeLeakedAndRoutineWorkflowMessages(conversation.messages)
             compactWorkflowStatusMessages(conversation.messages)
             closeStaleWorkflowMessages(conversation.messages)
+            updateConversationTitleFromFirstUserMessage(conversation)
         }
         if (project.stage.isBlank()) project.stage = "待提交需求"
         if (project.subtitle.isBlank()) project.subtitle = "点击进入会话"

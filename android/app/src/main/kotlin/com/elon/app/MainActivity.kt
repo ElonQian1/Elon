@@ -204,6 +204,7 @@ class MainActivity : AppCompatActivity() {
             preparedMessageActions = { preparedMessageActions },
             activeWorkControlActions = { activeWorkControlActions },
             messageActions = { messageActions },
+            conversationPreviewActions = { conversationPreviewActions },
             navigationController = { navigationController },
             stageHintShimmer = { stageHintShimmer() },
             isFriendChatActive = {
