@@ -10,6 +10,7 @@ const MAX_SHORT_TEXT: usize = 160;
 const MAX_LONG_TEXT: usize = 1200;
 const MAX_URL: usize = 2048;
 const MAX_ITEMS: usize = 12;
+const MAX_VARIANTS: usize = 8;
 
 pub(crate) fn load_workspace_landing(workspace: &Path) -> Option<Value> {
     for relative_path in MANIFEST_PATHS {
@@ -292,6 +293,15 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
             );
             insert_string(
                 &mut object,
+                "kind",
+                first_string(
+                    source,
+                    &["kind", "client_kind", "clientKind"],
+                    MAX_SHORT_TEXT,
+                ),
+            );
+            insert_string(
+                &mut object,
                 "url",
                 first_url(
                     source,
@@ -351,7 +361,12 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
                 ),
             );
             insert_bool(&mut object, "external", source.get("external"));
-            let status = normalize_status(
+            let variants =
+                normalize_download_variants(first_value(source, &["options", "variants"]));
+            if !variants.is_empty() {
+                object.insert("variants".to_string(), Value::Array(variants.clone()));
+            }
+            let base_status = normalize_status(
                 first_string(
                     source,
                     &["status", "availability", "health_status", "healthStatus"],
@@ -361,6 +376,11 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
                 object.get("url").and_then(Value::as_str),
                 object.get("manifest_url").and_then(Value::as_str),
             );
+            let status = if variants.is_empty() {
+                base_status
+            } else {
+                aggregate_variant_status(&variants, &base_status)
+            };
             object.insert("status".to_string(), Value::String(status));
         }
         Value::String(url) => {
@@ -376,6 +396,185 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
         _ => return None,
     }
     Some(Value::Object(object))
+}
+
+fn normalize_download_variants(value: Option<&Value>) -> Vec<Value> {
+    let Some(value) = value else {
+        return Vec::new();
+    };
+    let mut variants = Vec::new();
+    match value {
+        Value::Array(items) => {
+            for item in items.iter().take(MAX_VARIANTS) {
+                if let Some(variant) = normalize_download_variant(item, None) {
+                    variants.push(variant);
+                }
+            }
+        }
+        Value::Object(items) => {
+            for (id, item) in items.iter().take(MAX_VARIANTS) {
+                if let Some(variant) = normalize_download_variant(item, Some(id)) {
+                    variants.push(variant);
+                }
+            }
+        }
+        _ => {}
+    }
+    variants
+}
+
+fn normalize_download_variant(value: &Value, id_hint: Option<&str>) -> Option<Value> {
+    let mut output = Map::new();
+    match value {
+        Value::Object(source) => {
+            insert_string(
+                &mut output,
+                "id",
+                first_string(source, &["id", "key"], MAX_SHORT_TEXT).or_else(|| {
+                    id_hint.and_then(|id| {
+                        clean_text_value(&Value::String(id.to_string()), MAX_SHORT_TEXT)
+                    })
+                }),
+            );
+            insert_string(
+                &mut output,
+                "label",
+                first_string(source, &["label", "name"], MAX_SHORT_TEXT),
+            );
+            insert_string(
+                &mut output,
+                "arch",
+                first_string(source, &["arch", "architecture", "cpu"], MAX_SHORT_TEXT),
+            );
+            insert_string(
+                &mut output,
+                "title",
+                first_string(source, &["title"], MAX_SHORT_TEXT),
+            );
+            insert_string(
+                &mut output,
+                "url",
+                first_url(
+                    source,
+                    &[
+                        "url",
+                        "download_url",
+                        "downloadUrl",
+                        "fallback_url",
+                        "fallbackUrl",
+                        "href",
+                    ],
+                ),
+            );
+            insert_string(
+                &mut output,
+                "version",
+                first_string(
+                    source,
+                    &["version", "version_name", "versionName", "build"],
+                    MAX_SHORT_TEXT,
+                ),
+            );
+            insert_string(
+                &mut output,
+                "size_label",
+                first_string(source, &["size_label", "sizeLabel", "size"], MAX_SHORT_TEXT),
+            );
+            insert_string(
+                &mut output,
+                "size_bytes",
+                first_string(
+                    source,
+                    &["size_bytes", "sizeBytes", "file_size", "fileSize"],
+                    MAX_SHORT_TEXT,
+                ),
+            );
+            insert_string(
+                &mut output,
+                "health_error",
+                first_string(
+                    source,
+                    &["health_error", "healthError", "error"],
+                    MAX_LONG_TEXT,
+                ),
+            );
+            insert_string(
+                &mut output,
+                "note",
+                first_string(
+                    source,
+                    &[
+                        "note",
+                        "description",
+                        "changelog",
+                        "release_notes",
+                        "releaseNotes",
+                    ],
+                    MAX_LONG_TEXT,
+                ),
+            );
+            let status = normalize_status(
+                first_string(
+                    source,
+                    &["status", "availability", "health_status", "healthStatus"],
+                    MAX_SHORT_TEXT,
+                )
+                .as_deref(),
+                output.get("url").and_then(Value::as_str),
+                None,
+            );
+            output.insert("status".to_string(), Value::String(status));
+        }
+        Value::String(url) => {
+            insert_string(
+                &mut output,
+                "id",
+                id_hint.and_then(|id| {
+                    clean_text_value(&Value::String(id.to_string()), MAX_SHORT_TEXT)
+                }),
+            );
+            if let Some(url) = clean_url(url) {
+                output.insert("url".to_string(), Value::String(url));
+                output.insert("status".to_string(), Value::String("available".to_string()));
+            } else {
+                output.insert("status".to_string(), Value::String("planned".to_string()));
+            }
+        }
+        _ => return None,
+    }
+    Some(Value::Object(output))
+}
+
+fn aggregate_variant_status(variants: &[Value], base_status: &str) -> String {
+    let mut available_count = 0;
+    let mut configured_missing_count = 0;
+    for variant in variants.iter().filter_map(Value::as_object) {
+        let status = variant
+            .get("status")
+            .and_then(Value::as_str)
+            .unwrap_or("planned");
+        if matches!(status, "available" | "external") {
+            available_count += 1;
+        } else if matches!(
+            status,
+            "needs_configuration" | "not_deployed" | "unavailable" | "pending"
+        ) {
+            configured_missing_count += 1;
+        }
+    }
+    if available_count == variants.len() && available_count > 0 {
+        return "available".to_string();
+    }
+    if available_count > 0 {
+        return "partial".to_string();
+    }
+    if configured_missing_count > 0 {
+        return "needs_configuration".to_string();
+    }
+    if base_status == "third_party" {
+        return "third_party".to_string();
+    }
+    "planned".to_string()
 }
 
 fn normalize_named_urls(value: Option<&Value>) -> Vec<Value> {
@@ -547,7 +746,9 @@ fn normalize_status(value: Option<&str>, url: Option<&str>, manifest_url: Option
         | "unavailable"
         | "coming_soon"
         | "needs_configuration"
+        | "not_deployed"
         | "third_party"
+        | "partial"
         | "planned"
         | "pending" => explicit,
         _ if url.is_some() => "available".to_string(),
@@ -669,6 +870,27 @@ mod tests {
                 "ios": {
                     "status": "needs_configuration",
                     "url": "http://example.com/ios.html"
+                },
+                "macos": {
+                    "kind": "third_party_client",
+                    "status": "needs_configuration",
+                    "options": [
+                        {
+                            "id": "apple_silicon",
+                            "label": "Apple M 芯片",
+                            "arch": "arm64",
+                            "url": "https://example.com/mac-arm.dmg",
+                            "status": "available",
+                            "file_size": 2048
+                        },
+                        {
+                            "id": "intel",
+                            "label": "Intel 芯片",
+                            "arch": "x64",
+                            "status": "not_deployed",
+                            "health_error": "404"
+                        }
+                    ]
                 }
             }
         }))
@@ -685,13 +907,23 @@ mod tests {
             .iter()
             .find(|download| download["platform"] == "ios")
             .unwrap();
-        assert_eq!(
-            windows["url"],
-            "https://example.com/app.exe"
-        );
+        let macos = downloads
+            .iter()
+            .find(|download| download["platform"] == "macos")
+            .unwrap();
+        assert_eq!(windows["url"], "https://example.com/app.exe");
         assert_eq!(windows["size_bytes"], "7141343");
         assert_eq!(windows["note"], "fix tun");
         assert_eq!(ios["status"], "needs_configuration");
+        assert_eq!(macos["kind"], "third_party_client");
+        assert_eq!(macos["status"], "partial");
+        let variants = macos["variants"].as_array().unwrap();
+        assert_eq!(variants.len(), 2);
+        assert_eq!(variants[0]["label"], "Apple M 芯片");
+        assert_eq!(variants[0]["status"], "available");
+        assert_eq!(variants[0]["size_bytes"], "2048");
+        assert_eq!(variants[1]["status"], "not_deployed");
+        assert_eq!(variants[1]["health_error"], "404");
         assert!(has_display_content(&snapshot));
     }
 

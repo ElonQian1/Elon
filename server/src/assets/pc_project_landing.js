@@ -88,7 +88,7 @@
     function statusOf(item) {
       const explicit = clean(item.status || item.availability || item.health_status || item.healthStatus)
         .toLowerCase();
-      if (['available', 'external', 'unavailable', 'coming_soon', 'needs_configuration', 'third_party', 'planned', 'pending'].includes(explicit)) {
+      if (['available', 'external', 'unavailable', 'coming_soon', 'needs_configuration', 'not_deployed', 'third_party', 'partial', 'planned', 'pending'].includes(explicit)) {
         return explicit;
       }
       if (valueOf(item.url, item.download_url, item.downloadUrl, item.fallback_url, item.fallbackUrl, item.href)) return 'available';
@@ -104,7 +104,9 @@
       if (status === 'unavailable') return '暂不可用';
       if (status === 'coming_soon') return '即将支持';
       if (status === 'needs_configuration') return '待配置';
+      if (status === 'not_deployed') return '未部署';
       if (status === 'third_party') return '第三方入口';
+      if (status === 'partial') return '部分可用';
       if (status === 'pending') return '待发布';
       if (status === 'planned') return '计划中';
       return '待配置';
@@ -113,7 +115,7 @@
     function downloadGroupOf(item) {
       if ((item.platform === 'web' || item.platform === 'ios') && ACTIVE_STATUSES.has(item.status)) return 'web';
       if (item.status === 'third_party') return 'third-party';
-      if (item.status === 'available') return 'install';
+      if (item.status === 'available' || item.status === 'partial') return 'install';
       return 'planned';
     }
 
@@ -144,17 +146,55 @@
       if (!platform) return null;
       const meta = PLATFORM_META[platform];
       const status = statusOf(item);
+      const variants = variantsOf(item);
       return {
         platform,
         label: valueOf(item.label, item.name, meta.label),
         short: valueOf(item.short, item.badge, meta.short),
+        kind: valueOf(item.kind, item.client_kind, item.clientKind),
         url: valueOf(item.url, item.download_url, item.downloadUrl, item.fallback_url, item.fallbackUrl, item.href),
         manifestUrl: valueOf(item.manifest_url, item.manifestUrl),
         version: valueOf(item.version_name, item.versionName, item.version, item.build),
         size: valueOf(item.size_label, item.sizeLabel, item.size, formatBytes(item.size_bytes || item.sizeBytes || item.file_size || item.fileSize)),
         status,
         note: valueOf(item.note, item.description, item.health_error, item.healthError, item.changelog, item.release_notes, item.releaseNotes),
-        external: !!item.external || status === 'external'
+        external: !!item.external || status === 'external',
+        variants
+      };
+    }
+
+    function variantsOf(item) {
+      const raw = variantArrayOf(item.variants).concat(variantArrayOf(item.options));
+      return raw.map(normalizeVariant).filter(Boolean);
+    }
+
+    function variantArrayOf(value) {
+      if (Array.isArray(value)) return value;
+      if (!value || typeof value !== 'object') return [];
+      return Object.entries(value).map(([id, item]) => {
+        if (item && typeof item === 'object' && !Array.isArray(item)) {
+          return Object.assign({ id }, item);
+        }
+        return { id, url: item };
+      });
+    }
+
+    function normalizeVariant(item) {
+      if (!item) return null;
+      const source = typeof item === 'string' ? { url: item } : item;
+      if (!source || typeof source !== 'object' || Array.isArray(source)) return null;
+      const status = statusOf(source);
+      const label = valueOf(source.label, source.name, source.title, source.arch, source.id, '版本');
+      return {
+        id: valueOf(source.id, source.key, source.arch, label),
+        label,
+        arch: valueOf(source.arch, source.architecture, source.cpu),
+        title: valueOf(source.title),
+        url: valueOf(source.url, source.download_url, source.downloadUrl, source.fallback_url, source.fallbackUrl, source.href),
+        version: valueOf(source.version_name, source.versionName, source.version, source.build),
+        size: valueOf(source.size_label, source.sizeLabel, source.size, formatBytes(source.size_bytes || source.sizeBytes || source.file_size || source.fileSize)),
+        status,
+        note: valueOf(source.note, source.description, source.health_error, source.healthError, source.changelog, source.release_notes, source.releaseNotes)
       };
     }
 
@@ -308,6 +348,7 @@
     }
 
     function downloadCardHtml(item) {
+      if (item.variants && item.variants.length) return downloadVariantCardHtml(item);
       const enabled = ACTIVE_STATUSES.has(item.status) && item.url;
       const versionDetail = [item.version, item.size].filter(Boolean).join(' · ');
       const fallbackDetail = statusLabel(item.status, item.platform);
@@ -321,6 +362,41 @@
         </span>
         <em>${escapeHtml(statusLabel(item.status, item.platform))}</em>
       </button>`;
+    }
+
+    function downloadVariantCardHtml(item) {
+      const versionDetail = [item.version, item.size].filter(Boolean).join(' · ');
+      const fallbackDetail = statusLabel(item.status, item.platform);
+      const hasEnabledVariant = item.variants.some((variant) => ACTIVE_STATUSES.has(variant.status) && variant.url);
+      return `<article class="project-landing-download has-variants ${hasEnabledVariant ? '' : 'disabled'} status-${escapeHtml(item.status)}">
+        <span class="project-landing-platform">${escapeHtml(item.short)}</span>
+        <span class="project-landing-download-main">
+          <strong>${escapeHtml(item.label)}</strong>
+          ${versionDetail ? `<span>${escapeHtml(versionDetail)}</span>` : `<span>${escapeHtml(fallbackDetail)}</span>`}
+          ${item.note ? `<small>${escapeHtml(item.note)}</small>` : ''}
+        </span>
+        <em>${escapeHtml(statusLabel(item.status, item.platform))}</em>
+        <div class="project-landing-variants">
+          ${item.variants.map((variant) => variantRowHtml(variant, item.platform)).join('')}
+        </div>
+      </article>`;
+    }
+
+    function variantRowHtml(variant, platform) {
+      const enabled = ACTIVE_STATUSES.has(variant.status) && variant.url;
+      const detail = [variant.arch, variant.version, variant.size].filter(Boolean).join(' · ');
+      const note = variant.note && variant.note !== detail ? variant.note : '';
+      return `<div class="project-landing-variant status-${escapeHtml(variant.status)}">
+        <span class="project-landing-variant-copy">
+          <strong>${escapeHtml(variant.label)}</strong>
+          <span>${escapeHtml(detail || statusLabel(variant.status, platform))}</span>
+          ${note ? `<small>${escapeHtml(note)}</small>` : ''}
+        </span>
+        <span class="project-landing-variant-actions">
+          ${enabled ? `<button type="button" data-copy-url="${escapeHtml(variant.url)}">复制</button>` : ''}
+          <button type="button" class="${enabled ? '' : 'disabled'}" data-download-url="${escapeHtml(enabled ? variant.url : '')}" aria-disabled="${enabled ? 'false' : 'true'}">${escapeHtml(statusLabel(variant.status, platform))}</button>
+        </span>
+      </div>`;
     }
 
     function downloadGroupsHtml(downloads) {
@@ -499,6 +575,15 @@
         button.addEventListener('click', () => {
           const url = clean(button.dataset.resourceUrl);
           if (url) window.open(url, '_blank', 'noreferrer');
+        });
+      });
+      els.messageList.querySelectorAll('[data-copy-url]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const url = clean(button.dataset.copyUrl);
+          if (!url || !navigator.clipboard) return;
+          await navigator.clipboard.writeText(url);
+          button.textContent = '已复制';
+          setTimeout(() => { button.textContent = '复制'; }, 1200);
         });
       });
       els.messageList.querySelectorAll('[data-sync-landing]').forEach((button) => {
