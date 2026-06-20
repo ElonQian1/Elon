@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const state = {
     token: readToken(), user: null, projects: [], friends: [], groups: [], nodes: [],
-    activeKind: 'friends', activeProjectId: '', activeChannelId: '', activeChannelKind: '',
+    activeKind: 'ai', activeProjectId: '', activeChannelId: '', activeChannelKind: '',
     activeVoiceChannel: 'studio',
     activePeer: null, projectSpace: null,
     plaza: { loaded: false, loading: false, projects: [], query: '', filterKey: 'all', busyId: '', error: '' },
@@ -29,12 +29,12 @@
     pcAuthAccountInput: $('pcAuthAccountInput'), pcAuthNicknameField: $('pcAuthNicknameField'),
     pcAuthNicknameInput: $('pcAuthNicknameInput'), pcAuthPasswordInput: $('pcAuthPasswordInput'),
     pcAuthError: $('pcAuthError'), pcAuthSubmitBtn: $('pcAuthSubmitBtn'),
-    friendsRail: $('friendsRail'), projectsRail: $('projectsRail'), projectPlazaRail: $('projectPlazaRail'),
+    aiRail: $('aiRail'), friendsRail: $('friendsRail'), projectsRail: $('projectsRail'), projectPlazaRail: $('projectPlazaRail'),
     doctorRail: $('doctorRail'), nodeRail: $('nodeRail'), voiceRail: $('voiceRail'), apkRail: $('openWebBtn'), projectRailList: $('projectRailList'),
     channelList: $('channelList'), memberList: $('memberList'), messageList: $('messageList'),
     workspaceName: $('workspaceName'), workspaceMeta: $('workspaceMeta'), channelGlyph: $('channelGlyph'),
     channelTitle: $('channelTitle'), channelSubtitle: $('channelSubtitle'), userName: $('userName'),
-    userMeta: $('userMeta'), userDot: $('userDot'), friendBadge: $('friendBadge'), nodeBadge: $('nodeBadge'),
+    userMeta: $('userMeta'), userDot: $('userDot'), aiBadge: $('aiBadge'), friendBadge: $('friendBadge'), nodeBadge: $('nodeBadge'),
     sidebarSearch: $('sidebarSearch'), composer: $('composer'), input: $('messageInput'),
     sendBtn: $('sendBtn'), aiTaskBtn: $('aiTaskBtn'), memberPanelTitle: $('memberPanelTitle'),
     railTooltip: $('railTooltip'), userProfileBtn: $('userProfileBtn'), userSettingsBtn: $('userSettingsBtn'),
@@ -185,6 +185,10 @@
     return state.friends.find((friend) => sameId(friend && friend.id, SOCIAL_AI_USER_ID)) || null;
   }
 
+  function socialFriends() {
+    return state.friends.filter((friend) => !sameId(friend && friend.id, SOCIAL_AI_USER_ID));
+  }
+
   function userAccountMeta(user) {
     const account = clean(user && (user.account || user.phone || user.email));
     const id = clean(user && user.id);
@@ -305,7 +309,8 @@
   }
 
   function setRails(kind) {
-    els.friendsRail.classList.toggle('active', kind === 'friends' || kind === 'store' || kind === 'tasks');
+    els.aiRail.classList.toggle('active', kind === 'ai' || kind === 'store' || kind === 'tasks');
+    els.friendsRail.classList.toggle('active', kind === 'friends');
     els.projectsRail.classList.toggle('active', kind === 'projects');
     els.projectPlazaRail.classList.toggle('active', kind === 'project-plaza');
     els.doctorRail.classList.toggle('active', kind === 'doctor');
@@ -362,9 +367,14 @@
     return clean(els.sidebarSearch.value).toLowerCase();
   }
 
+  function setSidebarPlaceholder(text) {
+    if (els.sidebarSearch) els.sidebarSearch.placeholder = text;
+  }
+
   function renderChannels() {
     const query = filterText();
-    if (state.activeKind === 'friends' || state.activeKind === 'store' || state.activeKind === 'tasks') return renderFriendChannels(query);
+    if (state.activeKind === 'ai' || state.activeKind === 'store' || state.activeKind === 'tasks') return renderAiSidebar(query);
+    if (state.activeKind === 'friends') return renderFriendChannels(query);
     if (state.activeKind === 'projects') return renderProjectHomeChannels(query);
     if (state.activeKind === 'project-plaza') return renderProjectPlazaChannels(query);
     if (state.activeKind === 'apk') return renderApkChannels();
@@ -374,46 +384,91 @@
     return renderProjectChannels(query);
   }
 
-  function renderFriendChannels(query) {
+  function aiSidebarButton(item) {
+    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${item.active ? 'active' : ''}" type="button" data-ai-action="${escapeHtml(item.id)}">
+      <span class="glyph">${escapeHtml(item.glyph || '#')}</span>
+      <span class="main"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.sub || '')}</span></span>
+    </button>`;
+  }
+
+  function renderAiSidebar(query) {
     const aiFriend = socialAiFriend();
-    const friends = state.friends.filter((f) => !sameId(f && f.id, SOCIAL_AI_USER_ID) && userName(f).toLowerCase().includes(query));
-    const groups = state.groups.filter((g) => clean(g.name || g.title || g.id).toLowerCase().includes(query));
-    const isFriends = state.activeKind === 'friends';
+    const actionMatches = (item) => !query || `${item.title} ${item.sub || ''}`.toLowerCase().includes(query);
+    const primaryActions = [
+      { id: 'new-chat', glyph: '+', title: '新对话', sub: aiFriend ? '直接问一龙AI' : '登录后开启', primary: true, active: state.activeKind === 'ai' },
+      { id: 'search', glyph: '搜', title: '搜索', sub: '搜索对话、项目和工具' },
+      { id: 'store', glyph: '插', title: '插件', sub: '项目和 APK 商店', active: state.activeKind === 'store' },
+      { id: 'tasks', glyph: '自', title: '自动化', sub: '任务和提醒', active: state.activeKind === 'tasks' },
+      { id: 'mobile', glyph: '手', title: '一龙移动版', sub: 'APK 和移动网页版', active: state.activeKind === 'apk' }
+    ].filter(actionMatches);
+    const workspaceActions = [
+      { id: 'projects', glyph: '项', title: '项目', sub: `${state.projects.length} 个项目`, active: state.activeKind === 'projects' },
+      { id: 'plaza', glyph: '广', title: '项目广场', sub: '浏览公开项目', active: state.activeKind === 'project-plaza' },
+      { id: 'doctor', glyph: '医', title: '电脑医生', sub: '检查和修复本机环境' },
+      { id: 'node', glyph: '节', title: 'PC 节点', sub: `${state.nodes.filter((n) => n.online).length} 台在线` }
+    ].filter(actionMatches);
+    const projects = state.projects
+      .filter((project) => !query || titleOf(project).toLowerCase().includes(query))
+      .slice(0, 8);
+    const projectItems = projects.map((project) => {
+      const title = titleOf(project);
+      const sub = project.updated_at || project.updatedAt ? `更新 ${formatTime(project.updated_at || project.updatedAt)}` : projectRoleLabel(project);
+      return `<button class="channel-item" type="button" data-ai-project-id="${escapeHtml(project.id)}">
+        ${avatarElement('span', 'glyph channel-avatar', iconUrlOf(project), title, firstChar(title, '项'))}
+        <span class="main"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(sub)}</span></span>
+      </button>`;
+    }).join('');
     const sections = [
-      '<div class="channel-section">应用</div>',
-      aiFriend ? channelButton({
-        id: aiFriend.id, kind: 'friend', avatar: avatarUrlOf(aiFriend), avatarFallback: userName(aiFriend), title: userName(aiFriend),
-        sub: aiFriend.is_online ? '在线' : '离线', online: !!aiFriend.is_online,
-        active: state.activePeer && state.activePeer.kind === 'friend' && sameId(state.activePeer.id, aiFriend.id)
-      }) : '',
-      `<button class="channel-item ${state.activeKind === 'store' ? 'active' : ''}" type="button" data-app-channel="store"><span class="glyph">商</span><span class="main"><strong>商店</strong><span>项目和 APK</span></span></button>`,
-      `<button class="channel-item ${state.activeKind === 'tasks' ? 'active' : ''}" type="button" data-app-channel="tasks"><span class="glyph">任</span><span class="main"><strong>任务</strong><span>任务和提醒</span></span></button>`
+      '<div class="channel-section">一龙AI</div>',
+      primaryActions.map(aiSidebarButton).join('') || '<div class="ai-sidebar-muted">没有匹配的功能</div>',
+      '<div class="ai-sidebar-spacer"></div>',
+      '<div class="channel-section">工作台</div>',
+      workspaceActions.map(aiSidebarButton).join(''),
+      '<div class="channel-section">项目</div>',
+      projectItems || '<div class="ai-sidebar-muted">暂无匹配项目</div>'
     ];
-    if (isFriends) {
-      sections.push(
-        '<div class="channel-section">好友</div>',
-        friends.map((friend) => channelButton({
-        id: friend.id, kind: 'friend', avatar: avatarUrlOf(friend), avatarFallback: userName(friend), title: userName(friend),
-        sub: friend.is_online ? '在线' : '离线', online: !!friend.is_online,
-        active: state.activePeer && state.activePeer.kind === 'friend' && state.activePeer.id === friend.id
-        })).join('') || '<div class="empty-state">暂无好友</div>',
-        '<div class="channel-section">群聊</div>',
-        groups.map((group) => channelButton({
-        id: group.id, kind: 'group', avatar: avatarUrlOf(group), avatarFallback: clean(group.name || group.title || '群聊'), glyph: '群', title: clean(group.name || group.title || '未命名群聊'),
-        sub: `${Number(group.member_count || group.members_count || 0)} 位成员`,
-        active: state.activePeer && state.activePeer.kind === 'group' && state.activePeer.id === group.id
-        })).join('') || '<div class="empty-state">暂无群聊</div>'
-      );
-    }
     els.channelList.innerHTML = sections.join('');
-    els.channelList.querySelectorAll('[data-app-channel]').forEach((btn) => {
+    els.channelList.querySelectorAll('[data-ai-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        const channel = btn.dataset.appChannel;
-        if (channel === 'store') selectStore();
-        else if (channel === 'tasks') selectTasks();
-        else selectFriends();
+        const action = btn.dataset.aiAction;
+        if (action === 'new-chat') return selectAiAssistant(true);
+        if (action === 'search') {
+          els.sidebarSearch.focus();
+          els.sidebarSearch.select();
+          return;
+        }
+        if (action === 'store') return selectStore();
+        if (action === 'tasks') return selectTasks();
+        if (action === 'mobile') return selectApkDownload();
+        if (action === 'projects') return selectProjectsHome();
+        if (action === 'plaza') return selectProjectPlaza();
+        if (action === 'doctor') return doctor.selectDoctor();
+        if (action === 'node') return node.selectNode();
       });
     });
+    els.channelList.querySelectorAll('[data-ai-project-id]').forEach((btn) => {
+      btn.addEventListener('click', () => selectProject(btn.dataset.aiProjectId));
+    });
+  }
+
+  function renderFriendChannels(query) {
+    const friends = socialFriends().filter((f) => userName(f).toLowerCase().includes(query));
+    const groups = state.groups.filter((g) => clean(g.name || g.title || g.id).toLowerCase().includes(query));
+    const sections = [
+      '<div class="channel-section">好友</div>',
+      friends.map((friend) => channelButton({
+      id: friend.id, kind: 'friend', avatar: avatarUrlOf(friend), avatarFallback: userName(friend), title: userName(friend),
+      sub: friend.is_online ? '在线' : '离线', online: !!friend.is_online,
+      active: state.activePeer && state.activePeer.kind === 'friend' && sameId(state.activePeer.id, friend.id)
+      })).join('') || '<div class="empty-state">暂无好友</div>',
+      '<div class="channel-section">群聊</div>',
+      groups.map((group) => channelButton({
+      id: group.id, kind: 'group', avatar: avatarUrlOf(group), avatarFallback: clean(group.name || group.title || '群聊'), glyph: '群', title: clean(group.name || group.title || '未命名群聊'),
+      sub: `${Number(group.member_count || group.members_count || 0)} 位成员`,
+      active: state.activePeer && state.activePeer.kind === 'group' && sameId(state.activePeer.id, group.id)
+      })).join('') || '<div class="empty-state">暂无群聊</div>'
+    ];
+    els.channelList.innerHTML = sections.join('');
     els.channelList.querySelectorAll('[data-peer-kind]').forEach((btn) => {
       btn.addEventListener('click', () => selectPeer(btn.dataset.peerKind, btn.dataset.itemId));
     });
@@ -617,10 +672,11 @@
     }
     await loadBaseData();
     models.loadModelOptions(false);
-    selectFriends();
+    selectAiAssistant();
   }
 
   function bindEvents() {
+    els.aiRail.addEventListener('click', () => selectAiAssistant(true));
     els.friendsRail.addEventListener('click', selectFriends);
     els.projectsRail.addEventListener('click', selectProjectsHome);
     els.projectPlazaRail.addEventListener('click', selectProjectPlaza);
@@ -634,7 +690,7 @@
     els.pcAuthBackdrop.addEventListener('click', (event) => {
       if (event.target === els.pcAuthBackdrop) closeAuthModal();
     });
-    [els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, els.apkRail].forEach(attachRailTooltip);
+    [els.aiRail, els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, els.apkRail].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     els.apkRail.addEventListener('click', selectApkDownload);
     $('openLegacyWebBtn').addEventListener('click', () => window.open('/web', '_blank'));
@@ -743,7 +799,8 @@
     state.nodes = valueOf(nodes).nodes || [];
     renderUser();
     renderProjectRail();
-    setBadge(els.friendBadge, state.friends.filter((f) => f.is_online).length);
+    setBadge(els.aiBadge, socialAiFriend() && socialAiFriend().unread_count);
+    setBadge(els.friendBadge, socialFriends().filter((f) => f.is_online).length);
     setBadge(els.nodeBadge, state.nodes.filter((n) => n.online).length);
   }
 
@@ -761,7 +818,7 @@
     state.friends = [];
     state.groups = [];
     state.nodes = [];
-    state.activeKind = 'friends';
+    state.activeKind = 'ai';
     state.activeProjectId = '';
     state.activeChannelId = '';
     state.activeChannelKind = '';
@@ -769,19 +826,21 @@
     state.projectSpace = null;
     renderUser();
     renderProjectRail();
+    setBadge(els.aiBadge, 0);
     setBadge(els.friendBadge, 0);
     setBadge(els.nodeBadge, 0);
-    setRails('friends');
-    els.workspaceName.textContent = '一龙 PC 工作台';
+    setRails('ai');
+    els.workspaceName.textContent = '一龙AI';
     els.workspaceMeta.textContent = '未登录';
-    setHeader('友', '需要登录', '先登录网页版，再回到 PC 工作台');
+    setSidebarPlaceholder('搜索对话、项目和工具');
+    setHeader('AI', '需要登录', '先登录网页版，再回到 PC 工作台');
     setComposer(false, '登录后可输入消息', false);
-    els.channelList.innerHTML = '<div class="empty-state">请先打开网页版登录账号</div>';
+    renderAiSidebar(filterText());
     els.memberList.innerHTML = '';
     setNodeMode(false);
     els.messageList.innerHTML = `<div class="empty-state">
-      <strong>登录后一处使用好友、电脑医生、项目和 PC 节点</strong>
-      <p>PC 工作台读取账号登录态。点击下方按钮登录或注册后，即可进入 Discord 风格工作区。</p>
+      <strong>登录后使用一龙AI、项目和 PC 工作台</strong>
+      <p>PC 工作台读取账号登录态。点击下方按钮登录或注册后，即可进入一龙AI工作区。</p>
       <button class="text-button" type="button" id="loginWeb">登录或注册账号</button>
     </div>`;
     $('loginWeb').addEventListener('click', () => openAuthModal('login'));
@@ -797,6 +856,7 @@
     setRails('projects');
     els.workspaceName.textContent = '项目 / 我的项目';
     els.workspaceMeta.textContent = state.token ? `${state.projects.length} 个项目` : '需要登录';
+    setSidebarPlaceholder('搜索项目');
     setHeader('项', '项目 / 我的项目', '查看你加入和创建的项目');
     setComposer(false, '选择项目后开始输入', false);
     setNodeMode(false);
@@ -864,6 +924,7 @@
     setRails('project-plaza');
     els.workspaceName.textContent = '项目广场';
     els.workspaceMeta.textContent = state.plaza.loading ? '加载中' : `${state.plaza.projects.length} 个公开项目`;
+    setSidebarPlaceholder('搜索项目广场');
     setHeader('广', '项目广场', '发现、加入和下载公开项目');
     setComposer(false, '加入项目后可输入消息', false);
     setNodeMode(false);
@@ -1042,8 +1103,9 @@
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
     setRails('store');
-    els.workspaceName.textContent = '好友';
-    els.workspaceMeta.textContent = '商店和任务入口';
+    els.workspaceName.textContent = '一龙AI';
+    els.workspaceMeta.textContent = '插件和商店';
+    setSidebarPlaceholder('搜索功能、项目和工具');
     renderChannels();
     renderMembers('商店', []);
     renderStoreSurface();
@@ -1105,8 +1167,9 @@
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
     setRails('tasks');
-    els.workspaceName.textContent = '好友';
-    els.workspaceMeta.textContent = '任务中心';
+    els.workspaceName.textContent = '一龙AI';
+    els.workspaceMeta.textContent = '自动化';
+    setSidebarPlaceholder('搜索自动化和项目');
     renderChannels();
     renderMembers('任务', []);
     renderTasksSurface();
@@ -1167,6 +1230,7 @@
     setRails('apk');
     els.workspaceName.textContent = '手机端';
     els.workspaceMeta.textContent = 'APK 下载 / 手机端入口';
+    setSidebarPlaceholder('搜索手机端入口');
     renderApkChannels();
     renderMembers('手机端', []);
     renderApkDownloadSurface();
@@ -1206,27 +1270,70 @@
     if (apkLoginBtn) apkLoginBtn.addEventListener('click', () => openAuthModal('login'));
   }
 
+  async function selectAiAssistant(focusComposer) {
+    state.activeKind = 'ai';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activeChannelKind = '';
+    state.projectSpace = null;
+    const aiFriend = socialAiFriend();
+    state.activePeer = aiFriend ? { kind: 'friend', id: aiFriend.id } : null;
+    setAuthClaimBanner(!state.token);
+    setRails('ai');
+    els.workspaceName.textContent = '一龙AI';
+    els.workspaceMeta.textContent = 'AI 助手和工作台';
+    setSidebarPlaceholder('搜索对话、项目和工具');
+    renderChannels();
+    renderMembers('一龙AI', aiFriend ? [Object.assign({}, aiFriend, { name: userName(aiFriend), sub: aiFriend.is_online ? '在线' : '离线' })] : []);
+    setHeader('AI', '一龙AI', aiFriend && aiFriend.is_online ? '在线助手' : 'AI 助手');
+    setComposer(!!aiFriend, aiFriend ? '发送给一龙AI' : '登录后可输入消息', false);
+    setNodeMode(false);
+    if (!aiFriend) {
+      els.messageList.innerHTML = `<div class="empty-state">
+        <strong>登录后使用一龙AI</strong>
+        <p>一龙AI 是独立的工作台入口，登录后可直接提问、打开项目和进入工具。</p>
+        <button class="text-button" type="button" id="aiLoginBtn">登录或注册账号</button>
+      </div>`;
+      const aiLoginBtn = $('aiLoginBtn');
+      if (aiLoginBtn) aiLoginBtn.addEventListener('click', () => openAuthModal('login'));
+      return;
+    }
+    els.messageList.innerHTML = '<div class="empty-state">加载一龙AI消息中…</div>';
+    try {
+      const data = await api(`/api/me/friends/${encodeURIComponent(aiFriend.id)}/messages?limit=100`);
+      renderMessages(data.messages || [], 'friend');
+      setBadge(els.aiBadge, 0);
+      if (focusComposer) setTimeout(() => els.input.focus(), 0);
+    } catch (error) {
+      showError(error);
+    }
+  }
+
   function selectFriends() {
     state.activeKind = 'friends';
     state.activeProjectId = '';
     state.activeChannelId = '';
-    const aiFriend = socialAiFriend();
-    state.activePeer = state.activePeer || (aiFriend ? { kind: 'friend', id: aiFriend.id } : null);
+    state.activeChannelKind = '';
+    if (!state.activePeer || (state.activePeer.kind === 'friend' && sameId(state.activePeer.id, SOCIAL_AI_USER_ID))) {
+      state.activePeer = null;
+    }
     setRails('friends');
     els.workspaceName.textContent = '好友';
-    els.workspaceMeta.textContent = `${state.friends.length} 位好友 · ${state.groups.length} 个群聊`;
+    els.workspaceMeta.textContent = `${socialFriends().length} 位好友 · ${state.groups.length} 个群聊`;
+    setSidebarPlaceholder('搜索好友或群聊');
     renderChannels();
-    renderMembers('好友在线', state.friends.map((f) => Object.assign({}, f, { name: userName(f), sub: f.is_online ? '在线' : '离线' })));
+    renderMembers('好友在线', socialFriends().map((f) => Object.assign({}, f, { name: userName(f), sub: f.is_online ? '在线' : '离线' })));
     if (state.activePeer) selectPeer(state.activePeer.kind, state.activePeer.id);
     else {
       setHeader('友', '好友列表', '选择左侧好友或群聊开始对话');
       setComposer(false, '选择好友或群聊后开始输入', false);
       setNodeMode(false);
-      els.messageList.innerHTML = '<div class="empty-state"><strong>好友和群聊</strong><p>左侧第一枚图标固定打开好友列表；电脑医生和 PC 节点是独立入口，项目图标排在固定入口下方。</p></div>';
+      els.messageList.innerHTML = '<div class="empty-state"><strong>好友和群聊</strong><p>这里只显示普通好友和群聊。一龙AI 已经移动到左侧最上方的独立入口。</p></div>';
     }
   }
 
   async function selectPeer(kind, id) {
+    if (kind === 'friend' && sameId(id, SOCIAL_AI_USER_ID)) return selectAiAssistant(true);
     const list = kind === 'group' ? state.groups : state.friends;
     const item = list.find((entry) => String(entry.id) === String(id));
     if (!item) return;
@@ -1265,6 +1372,7 @@
     setRails('voice');
     els.workspaceName.textContent = 'ai声音';
     els.workspaceMeta.textContent = '情绪女声 TTS';
+    setSidebarPlaceholder('搜索声音工具');
     renderChannels();
     return selectVoiceChannel(state.activeVoiceChannel);
   }
@@ -1284,6 +1392,7 @@
     setRails('project');
     els.workspaceName.textContent = titleOf(project);
     els.workspaceMeta.textContent = project.role || '项目';
+    setSidebarPlaceholder('搜索项目频道');
     setHeader('#', titleOf(project), '加载项目空间中…');
     setComposer(false, '加载项目频道中', false);
     setNodeMode(false);
@@ -1542,13 +1651,14 @@
         await doctor.sendComposerMessage(content);
         els.input.value = '';
         els.input.style.height = '46px';
-      } else if (state.activeKind === 'friends' && state.activePeer) {
+      } else if ((state.activeKind === 'friends' || state.activeKind === 'ai') && state.activePeer) {
         const path = state.activePeer.kind === 'group'
           ? `/api/me/groups/${encodeURIComponent(state.activePeer.id)}/messages`
           : `/api/me/friends/${encodeURIComponent(state.activePeer.id)}/messages`;
         await api(path, { method: 'POST', body: JSON.stringify({ content }) });
         els.input.value = '';
-        await selectPeer(state.activePeer.kind, state.activePeer.id);
+        if (state.activeKind === 'ai') await selectAiAssistant(true);
+        else await selectPeer(state.activePeer.kind, state.activePeer.id);
       } else if (state.activeKind === 'project' && state.activeProjectId && state.activeChannelId) {
         const shouldUseAiTask = useAiTask || state.activeChannelKind === 'ai_development';
         const path = shouldUseAiTask
@@ -1749,6 +1859,7 @@
     if (!state.token) return showLoginState();
     await loadBaseData();
     models.loadModelOptions(false);
+    if (state.activeKind === 'ai') return selectAiAssistant();
     if (state.activeKind === 'store') return selectStore();
     if (state.activeKind === 'tasks') return selectTasks();
     if (state.activeKind === 'apk') return selectApkDownload();
@@ -1758,7 +1869,7 @@
     if (state.activeKind === 'node') return node.selectNode();
     if (state.activeKind === 'voice') return selectVoiceProject(state.activeVoiceChannel);
     if (state.activeKind === 'project' && state.activeProjectId) return selectProject(state.activeProjectId);
-    return selectFriends();
+    return selectAiAssistant();
   }
 
   function logout() {

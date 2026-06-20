@@ -16,7 +16,11 @@
 <body>
   <main class="pc-shell" id="pcShell">
     <aside class="server-rail" aria-label="空间">
-      <button class="rail-avatar active" id="friendsRail" type="button" data-label="好友" aria-label="好友">
+      <button class="rail-avatar ai active" id="aiRail" type="button" data-label="一龙AI" aria-label="一龙AI">
+        <span class="rail-icon ai-icon" aria-hidden="true"></span>
+        <small id="aiBadge"></small>
+      </button>
+      <button class="rail-avatar" id="friendsRail" type="button" data-label="好友" aria-label="好友">
         <span class="rail-icon friends-icon" aria-hidden="true"></span>
         <small id="friendBadge"></small>
       </button>
@@ -51,7 +55,7 @@
     <aside class="channel-panel">
       <div class="workspace-title">
         <div>
-          <strong id="workspaceName">好友</strong>
+          <strong id="workspaceName">一龙AI</strong>
           <span id="workspaceMeta">加载中</span>
         </div>
         <button class="icon-button" id="refreshBtn" type="button" title="刷新">↻</button>

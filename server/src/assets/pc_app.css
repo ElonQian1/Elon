@@ -129,6 +129,14 @@ button { cursor: pointer; }
   border-radius: 16px;
   background: var(--green);
 }
+.rail-avatar.ai {
+  background: #243246;
+  color: #eaf2ff;
+}
+.rail-avatar.ai.active,
+.rail-avatar.ai:hover {
+  background: #3c6fa2;
+}
 .rail-avatar.node { background: #2c2e35; }
 .rail-avatar.node.active,
 .rail-avatar.node:hover { background: #365b44; }
@@ -361,6 +369,26 @@ button { cursor: pointer; }
   background: #31333a;
   flex: 0 0 auto;
 }
+.ai-icon::before {
+  content: "AI";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+.ai-icon::after {
+  content: "";
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  left: 11px;
+  top: 11px;
+  border: 2px solid rgba(234, 242, 255, .32);
+  border-radius: 9px;
+}
 .project-rail-list {
   display: flex;
   flex-direction: column;
@@ -458,6 +486,15 @@ button { cursor: pointer; }
 }
 .channel-item:hover,
 .channel-item.active { background: #303138; color: var(--text); }
+.channel-item.ai-primary {
+  min-height: 42px;
+  background: rgba(60, 111, 162, .13);
+  color: #eaf2ff;
+}
+.channel-item.ai-primary.active,
+.channel-item.ai-primary:hover {
+  background: rgba(87, 142, 199, .28);
+}
 .channel-item .glyph {
   width: 22px;
   color: var(--text-muted);
@@ -484,6 +521,19 @@ button { cursor: pointer; }
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.ai-sidebar-spacer {
+  height: 8px;
+}
+.ai-sidebar-project-meta {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+.ai-sidebar-muted {
+  margin: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
 }
 .presence-dot {
   width: 9px;
