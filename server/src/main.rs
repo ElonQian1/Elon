@@ -45,6 +45,7 @@ mod external_app_context_health;
 mod external_app_context_observability;
 mod external_app_context_tools;
 mod external_app_registry;
+mod external_app_usage_policy;
 mod friend_api;
 mod friend_events;
 mod global_ws;
