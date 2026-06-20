@@ -118,6 +118,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(external_app_api::get_external_app),
         )
         .route(
+            "/api/external/apps/:app_id/context-contract",
+            get(external_app_api::get_external_app_context_contract),
+        )
+        .route(
             "/api/external/apps/:app_id/chat-bootstrap",
             get(external_app_chat_bootstrap::get_chat_bootstrap),
         )

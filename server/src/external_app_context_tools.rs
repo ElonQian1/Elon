@@ -12,6 +12,39 @@ const RECOMMENDED_FB2_TOOLS: &[&str] = &[
     "search_group_opinions",
 ];
 
+pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
+    match app_id {
+        "fb2" => Some(json!({
+            "app_id": "fb2",
+            "schema": "fb2.tools.v1",
+            "execution_status": "declared_only",
+            "recommended_tools": recommended_fb2_tool_contract(),
+            "required_context_fields": [
+                "context_pack",
+                "context_pack_version",
+                "generated_at",
+                "matches",
+                "user_orders",
+                "group_messages",
+                "tool_contract",
+                "usage_policy"
+            ],
+            "recommended_env": [
+                "ELON_EXTERNAL_APP_FB2_BASE_URL",
+                "ELON_EXTERNAL_APP_FB2_CONTEXT_TOKEN",
+                "ELON_EXTERNAL_APP_FB2_CONTEXT_PACK_ENABLED",
+                "ELON_EXTERNAL_APP_CONTEXT_MAX_CHARS"
+            ],
+            "notes": [
+                "主项目当前只把工具作为规划和追问依据，不会自动执行 fb2 工具。",
+                "用户订单工具必须限制为 current_user_only。",
+                "群友观点必须返回 message_id，比赛和订单必须返回 source id。"
+            ]
+        })),
+        _ => None,
+    }
+}
+
 pub(crate) fn prompt_tool_contract_block(context: &Value) -> String {
     let Some(contract) = context.get("tool_contract") else {
         return no_tools_block("missing_tool_contract");
@@ -98,6 +131,41 @@ fn readiness(status: &str, names: Vec<String>, missing: Vec<&str>) -> Value {
         "missing_recommended_tools": missing,
         "execution_status": "declared_only"
     })
+}
+
+fn recommended_fb2_tool_contract() -> Value {
+    json!([
+        {
+            "name": "search_matches",
+            "description": "按日期、联赛、球队、彩种搜索比赛。",
+            "permission": "group_context",
+            "when_to_use": "用户询问今天、某联赛或某球队有哪些比赛可分析时"
+        },
+        {
+            "name": "get_match_detail",
+            "description": "按 match id 查询比赛、赔率、伤停、更新时间和数据源。",
+            "permission": "group_context",
+            "when_to_use": "用户追问某一场比赛细节或 context_pack 被截断时"
+        },
+        {
+            "name": "search_user_orders",
+            "description": "查询当前登录用户自己的票据和订单摘要。",
+            "permission": "current_user_only",
+            "when_to_use": "用户要求分析自己的票或订单风险时"
+        },
+        {
+            "name": "get_order_detail",
+            "description": "按订单或票据 ID 查询当前用户可见的明细。",
+            "permission": "current_user_only",
+            "when_to_use": "用户追问某张票的组合、赔率或风险拆解时"
+        },
+        {
+            "name": "search_group_opinions",
+            "description": "按比赛或关键词检索群友观点，并返回 message_id。",
+            "permission": "group_context",
+            "when_to_use": "用户要求总结群友观点、分歧或采纳建议时"
+        }
+    ])
 }
 
 fn project_tool_contract(contract: &Value) -> Value {
@@ -206,5 +274,17 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("search_group_opinions")));
+    }
+
+    #[test]
+    fn exposes_public_fb2_guidance() {
+        let guidance = public_tool_contract_guidance("fb2").unwrap();
+        assert_eq!(guidance["schema"], "fb2.tools.v1");
+        assert!(guidance["recommended_tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "search_group_opinions"));
+        assert!(public_tool_contract_guidance("unknown").is_none());
     }
 }

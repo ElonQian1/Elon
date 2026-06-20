@@ -73,6 +73,14 @@ include_platform_orders=true|false
 
 `include_platform_orders` 默认不开启，避免普通聊天无意拉取平台级经营数据。
 
+fb2 可读取主项目侧推荐契约：
+
+```http
+GET /api/external/apps/fb2/context-contract
+```
+
+该接口只返回主项目推荐的 context/tool contract、推荐环境变量和当前工具执行状态，不返回密钥，也不读取 fb2 业务数据。fb2 代理后续可以用它做接入自检，避免文档和代码逐渐漂移。
+
 ## 主项目 Context Budget
 
 主项目收到 fb2 上下文后会先做预算裁剪：

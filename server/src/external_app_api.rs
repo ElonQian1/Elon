@@ -11,6 +11,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    external_app_context_tools::public_tool_contract_guidance,
     external_app_registry::{
         external_app_by_id, group_seeds, public_external_app_config, service_token_env_names,
         ExternalAppDefinition,
@@ -61,6 +62,23 @@ pub async fn get_external_app(Path(app_id): Path<String>) -> Response {
         Err(response) => return response,
     };
     Json(json!({ "app": public_external_app_config(app) })).into_response()
+}
+
+pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Response {
+    let app = match resolve_external_app(&app_id) {
+        Ok(app) => app,
+        Err(response) => return response,
+    };
+    Json(json!({
+        "app": public_external_app_config(app),
+        "context_contract": public_tool_contract_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.context.v1",
+            "execution_status": "not_configured",
+            "recommended_tools": []
+        }))
+    }))
+    .into_response()
 }
 
 pub async fn lookup_external_account(
