@@ -13,7 +13,7 @@ use std::sync::Arc;
 use crate::{
     external_app_context_contract::{
         public_context_observability_guidance, public_context_pack_example,
-        public_context_quality_guidance,
+        public_context_quality_guidance, public_usage_policy_guidance,
     },
     external_app_context_health::public_context_health,
     external_app_context_tools::public_tool_contract_guidance,
@@ -91,6 +91,12 @@ pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Re
             "app_id": app.id,
             "schema": "external_app.context_observability.v1",
             "recommended_metrics": []
+        })),
+        "usage_policy_contract": public_usage_policy_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.usage_policy.v1",
+            "free_channels": [],
+            "billable_channels": []
         })),
         "context_contract": public_tool_contract_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

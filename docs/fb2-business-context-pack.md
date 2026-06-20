@@ -95,6 +95,8 @@ GET /api/external/apps/fb2/context-contract
 
 响应还包含 `context_observability_contract`，列出长期评测推荐指标，例如 `context_pack_latency_ms`、`source_counts`、`fallback_used`、`stale_source_count`、`permission_denied_count`、`citation_coverage`。fb2 后续做领域索引、观点记忆和复盘时，优先围绕这些指标优化，而不是只追求返回更多原始数据。
 
+响应还包含 `usage_policy_contract`，把免费和扣费边界做成机器可读规则：Android 系统 ASR、云端 ASR 兜底、TTS、fb2 context pack 拉取都免费；只有 AI 生成回复内容才消耗 token/额度。fb2 不应在 ASR/TTS 或上下文拉取前做 AI 余额拦截，免费试用额度应配置在模型回复层。
+
 ## 主项目 Context Budget
 
 主项目收到 fb2 上下文后会先做预算裁剪：
