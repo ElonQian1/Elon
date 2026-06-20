@@ -11,7 +11,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
-    external_app_context_contract::public_context_pack_example,
+    external_app_context_example::public_context_pack_example,
     external_app_context_health::public_context_health,
     external_app_context_observability::public_context_observability_guidance,
     external_app_context_quality::public_context_quality_guidance,
