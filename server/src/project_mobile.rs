@@ -4,6 +4,7 @@ use crate::{
     tools,
     types::AppState,
 };
+use std::path::Path;
 
 pub fn ensure_mobile_project(
     state: &AppState,
@@ -31,10 +32,66 @@ pub fn ensure_mobile_project(
     if project.source_type != "local_path" {
         let workspace = state
             .resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-        tools::create_project_workspace(&workspace, "android", &project.name, &user.id)?;
+        if should_initialize_mobile_workspace(&workspace) {
+            tools::create_project_workspace(&workspace, "android", &project.name, &user.id)?;
+        }
     }
 
     Ok((user, project))
+}
+
+fn should_initialize_mobile_workspace(workspace: &Path) -> bool {
+    !workspace.join(".git").exists()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_initialize_mobile_workspace;
+    use std::{
+        fs,
+        path::PathBuf,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    #[test]
+    fn missing_workspace_requires_initialization() {
+        let workspace = unique_temp_workspace("missing");
+        let _ = fs::remove_dir_all(&workspace);
+
+        assert!(should_initialize_mobile_workspace(&workspace));
+    }
+
+    #[test]
+    fn existing_git_workspace_skips_initialization() {
+        let workspace = unique_temp_workspace("git");
+        fs::create_dir_all(workspace.join(".git")).unwrap();
+
+        assert!(!should_initialize_mobile_workspace(&workspace));
+
+        let _ = fs::remove_dir_all(&workspace);
+    }
+
+    #[test]
+    fn existing_non_git_workspace_requires_repair() {
+        let workspace = unique_temp_workspace("non_git");
+        fs::create_dir_all(&workspace).unwrap();
+        fs::write(workspace.join("README.md"), "existing files").unwrap();
+
+        assert!(should_initialize_mobile_workspace(&workspace));
+
+        let _ = fs::remove_dir_all(&workspace);
+    }
+
+    fn unique_temp_workspace(label: &str) -> PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        std::env::temp_dir().join(format!(
+            "elon-mobile-workspace-{label}-{}-{nanos}",
+            std::process::id()
+        ))
+    }
 }
 
 struct MobileProjectSpec {
