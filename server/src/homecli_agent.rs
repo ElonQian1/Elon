@@ -810,6 +810,7 @@ async fn run_agent_session(
                             match &msg {
                                 AgentToServer::RegisterCapabilities {
                                     models,
+                                    allowed_clis,
                                     tts_worker_url,
                                     hardware,
                                     storage,
@@ -830,6 +831,23 @@ async fn run_agent_session(
                                                     error = %e,
                                                     "failed to update node hardware snapshot"
                                                 );
+                                            }
+                                        }
+                                    }
+                                    {
+                                        let mut agents = state.agent_manager.agents.write().await;
+                                        if let Some(entry) = agents.get_mut(&agent_id) {
+                                            if !allowed_clis.is_empty() {
+                                                entry.allowed_clis = allowed_clis.clone();
+                                            }
+                                            if hardware.is_some() {
+                                                entry.hardware = hardware.clone();
+                                            }
+                                            if storage.is_some() {
+                                                entry.storage = storage.clone();
+                                            }
+                                            if dev_runtime.is_some() {
+                                                entry.dev_runtime = dev_runtime.clone();
                                             }
                                         }
                                     }

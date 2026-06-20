@@ -380,6 +380,9 @@ pub enum AgentToServer {
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {
         models: Vec<ModelCapability>,
+        /// 能力刷新时更新本机可用的 AI/开发 CLI。
+        #[serde(default)]
+        allowed_clis: Vec<String>,
         /// 本机 TTS Worker HTTP 地址（如 http://127.0.0.1:5011），为空表示无 TTS 能力
         #[serde(default)]
         tts_worker_url: Option<String>,

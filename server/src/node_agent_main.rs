@@ -1524,6 +1524,25 @@ async fn run_session(
         let _ = sink.close().await;
     });
 
+    // The cloud requires the first WebSocket frame to be Register within 10s.
+    // Send a lightweight registration immediately, then refresh full capabilities
+    // after local model/CLI/toolchain discovery completes.
+    out_tx.send(ws_text(&AgentToServer::Register {
+        agent_id: creds.agent_id.clone(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        proto_version: PROTO_VERSION,
+        allowed_clis: vec![],
+        allowed_cwds: vec![],
+        owner_user_id: Some(creds.owner_user_id.clone()),
+        device_name: Some(machine_label()),
+        hardware: None,
+        storage: None,
+        dev_runtime: None,
+    }))?;
+    runtime
+        .set_connected(true, "已连接，正在扫描本机能力")
+        .await;
+
     // 扫描本地模型
     let models = discover_models(cfg).await;
     if models.is_empty() {
@@ -1578,30 +1597,17 @@ async fn run_session(
     let storage_settings = runtime.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
 
-    // 发送 Register
-    out_tx.send(ws_text(&AgentToServer::Register {
-        agent_id: creds.agent_id.clone(),
-        version: env!("CARGO_PKG_VERSION").to_string(),
-        proto_version: PROTO_VERSION,
-        allowed_clis: available_clis,
-        allowed_cwds: vec![],
-        owner_user_id: Some(creds.owner_user_id.clone()),
-        device_name: Some(machine_label()),
-        hardware: Some(hardware.clone()),
-        storage: Some(storage.clone()),
-        dev_runtime: Some(dev_runtime.clone()),
-    }))?;
-    runtime.set_connected(true, "已连接，贡献算力中").await;
-
     // 发送 RegisterCapabilities（含 TTS Worker URL）
     let tts_url = runtime.tts_worker_url.read().await.clone();
     out_tx.send(ws_text(&AgentToServer::RegisterCapabilities {
         models: models.clone(),
+        allowed_clis: available_clis,
         tts_worker_url: tts_url,
         hardware: Some(hardware),
         storage: Some(storage),
         dev_runtime: Some(dev_runtime),
     }))?;
+    runtime.set_connected(true, "已连接，贡献算力中").await;
 
     // WS ping 定时器
     let ping_tx = out_tx.clone();
