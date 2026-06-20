@@ -373,6 +373,7 @@
   color: #aeb7c6;
   font-size: 12px;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .project-landing-sync-result.ok {

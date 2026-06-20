@@ -41,6 +41,7 @@ mod project_branding;
 mod project_execution_sessions;
 mod project_identities;
 mod project_landing_snapshots;
+mod project_landing_upload_tokens;
 mod project_member_conversations;
 mod project_runtime_permissions;
 mod project_space;
@@ -1336,6 +1337,82 @@ mod tests {
             .expect("landing snapshot should exist");
         assert_eq!(loaded["title"], "Landing Project");
         assert_eq!(loaded["source"]["mode"], "node_agent_snapshot");
+    }
+
+    #[test]
+    fn project_landing_upload_token_is_project_scoped() {
+        let store = temp_store();
+        let user = store
+            .create_user(
+                "pc-project-landing-token@example.com",
+                "secret1",
+                None,
+                None,
+            )
+            .expect("user should be created");
+        let project = store
+            .register_external_project(
+                &user.id,
+                None,
+                "Landing Token Project",
+                Some("from pc"),
+                r"D:\rust\active-projects\landing-token",
+                Some("node-a"),
+                None,
+                None,
+            )
+            .expect("external project should register");
+        let other = store
+            .register_external_project(
+                &user.id,
+                None,
+                "Other Landing Token Project",
+                Some("from pc"),
+                r"D:\rust\active-projects\landing-token-other",
+                Some("node-a"),
+                None,
+                None,
+            )
+            .expect("other project should register");
+        let token = "plt_test_project_scoped_token";
+
+        let record = store
+            .rotate_project_landing_upload_token(&project.project.id, &user.id, token)
+            .expect("token should rotate");
+        assert!(store
+            .authenticate_project_landing_upload_token(&other.project.id, token)
+            .expect("token auth should run")
+            .is_none());
+        assert!(store
+            .authenticate_project_landing_upload_token(&project.project.id, "wrong-token")
+            .expect("token auth should run")
+            .is_none());
+
+        let authed = store
+            .authenticate_project_landing_upload_token(&project.project.id, token)
+            .expect("token auth should run")
+            .expect("token should authenticate for its project");
+        assert_eq!(authed.id, record.id);
+        let snapshot = store
+            .update_project_landing_snapshot_with_upload_token(
+                &project.project.id,
+                &authed.id,
+                &serde_json::json!({
+                    "title": "Landing Token Project",
+                    "release_manifest_url": "https://example.com/project-downloads.json",
+                    "downloads": [{
+                        "platform": "windows",
+                        "status": "available",
+                        "url": "https://example.com/app.exe"
+                    }]
+                }),
+            )
+            .expect("landing snapshot should update with upload token")
+            .expect("snapshot should have display content");
+        assert_eq!(
+            snapshot["release_manifest_url"],
+            "https://example.com/project-downloads.json"
+        );
     }
 
     #[test]

@@ -78,6 +78,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (56, "所有用户默认加入指定联合开发项目", migration_v56),
     (57, "fb2 外部应用 AI 回复试用额度配置", migration_v57),
     (58, "项目首页 landing manifest 云端快照", migration_v58),
+    (59, "项目首页上传凭证", migration_v59),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2060,6 +2061,27 @@ fn migration_v57(conn: &Connection) -> Result<()> {
 
 fn migration_v58(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "projects", "landing_json", "landing_json TEXT")?;
+    Ok(())
+}
+
+fn migration_v59(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_landing_upload_tokens (
+          id           TEXT PRIMARY KEY,
+          project_id   TEXT NOT NULL UNIQUE,
+          token_hash   TEXT NOT NULL UNIQUE,
+          created_by   TEXT,
+          created_at   TEXT NOT NULL,
+          last_used_at TEXT,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_landing_upload_tokens_project
+          ON project_landing_upload_tokens(project_id);
+        "#,
+    )?;
     Ok(())
 }
 

@@ -513,7 +513,7 @@
       });
       return resources.map((resource) =>
         `<button class="project-landing-resource" type="button" data-resource-url="${escapeHtml(resource.url)}">${escapeHtml(resource.label)}</button>`
-      ).join('') + syncLandingButtonHtml(project);
+      ).join('') + syncLandingButtonHtml(project) + landingTokenButtonHtml(project);
     }
 
     function canSyncLanding(project) {
@@ -524,6 +524,16 @@
     function syncLandingButtonHtml(project) {
       if (!canSyncLanding(project)) return '';
       return `<button class="project-landing-resource project-landing-sync" type="button" data-sync-landing="1">同步首页</button>`;
+    }
+
+    function canManageLandingToken(project) {
+      const role = clean(project && (project.role || project.member_role || project.memberRole)).toLowerCase();
+      return !!(project && project.id && ['owner', 'admin'].includes(role));
+    }
+
+    function landingTokenButtonHtml(project) {
+      if (!canManageLandingToken(project)) return '';
+      return `<button class="project-landing-resource project-landing-token" type="button" data-rotate-landing-token="1">生成上传凭证</button>`;
     }
 
     function syncPayload(project, landing) {
@@ -591,6 +601,31 @@
         } else {
           showSyncResult('项目首页已同步。', 'ok');
         }
+      } catch (error) {
+        showSyncResult(error.message || String(error), 'error');
+      } finally {
+        setSyncButtonState(button, false);
+      }
+    }
+
+    async function rotateLandingToken(button) {
+      const project = projectOf();
+      if (!project || !project.id || !api) return;
+      setSyncButtonState(button, true, '生成中…');
+      showSyncResult('正在生成项目首页上传凭证…');
+      try {
+        const data = await api(`/api/projects/${encodeURIComponent(project.id)}/landing/token`, {
+          method: 'POST',
+          body: JSON.stringify({})
+        });
+        const token = clean(data && data.token);
+        if (!token) throw new Error('服务端没有返回上传凭证');
+        let copied = false;
+        if (navigator.clipboard) {
+          await navigator.clipboard.writeText(token);
+          copied = true;
+        }
+        showSyncResult(`${copied ? '上传凭证已生成并复制。' : '上传凭证已生成。'}请保存到子项目 ELON_MAIN_PROJECT_TOKEN：${token}`, 'ok');
       } catch (error) {
         showSyncResult(error.message || String(error), 'error');
       } finally {
@@ -681,6 +716,9 @@
       });
       els.messageList.querySelectorAll('[data-sync-landing]').forEach((button) => {
         button.addEventListener('click', () => syncLanding(button));
+      });
+      els.messageList.querySelectorAll('[data-rotate-landing-token]').forEach((button) => {
+        button.addEventListener('click', () => rotateLandingToken(button));
       });
     }
 

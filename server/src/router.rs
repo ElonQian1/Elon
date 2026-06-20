@@ -344,6 +344,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(project_landing_api::sync_project_landing),
         )
         .route(
+            "/api/projects/:project_id/landing/token",
+            post(project_landing_api::rotate_project_landing_token),
+        )
+        .route(
             "/api/projects/:project_id/docs",
             get(project_docs::get_project_document),
         )
