@@ -89,6 +89,8 @@ GET /api/external/apps/fb2/context-contract
 - `recommended_actions`：结构化修复建议，例如配置 base url、配置 context token、重新启用 context pack。
 - `secret_values_exposed=false`：接口只显示是否配置，不返回任何密钥值。
 
+响应还包含 `context_quality_contract`，主项目会把 `missing_generated_at`、`missing_context_pack`、`empty_matches`、`missing_tool_contract` 等 warning 的含义、AI 影响和 fb2 修复建议结构化返回。fb2 代理可以直接读取这个目录做自检，不需要复制主项目内部逻辑。
+
 ## 主项目 Context Budget
 
 主项目收到 fb2 上下文后会先做预算裁剪：
