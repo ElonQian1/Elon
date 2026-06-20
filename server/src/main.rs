@@ -40,6 +40,7 @@ mod external_app_api;
 mod external_app_chat_bootstrap;
 mod external_app_context;
 mod external_app_context_budget;
+mod external_app_context_config;
 mod external_app_context_contract;
 mod external_app_context_example;
 mod external_app_context_health;
