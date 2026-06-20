@@ -355,6 +355,27 @@ fn context_quality_warning_catalog() -> Value {
             "meaning": "fb2 返回了 tool_contract，但工具列表为空。",
             "ai_impact": "主项目会视为工具不可用，回答仍只能依赖当前 context_pack。",
             "fb2_fix": "在 tool_contract.tools 中补充工具 name、description、input_schema、permission、when_to_use。"
+        },
+        {
+            "code": "fb2_budget_empty",
+            "severity": "blocking_for_fact_answer",
+            "meaning": "fb2 metrics.budget_status=empty，本次上下文没有有效业务来源。",
+            "ai_impact": "AI 必须说明缺少 fb2 业务上下文，不能基于空数据预测比赛或剖析订单。",
+            "fb2_fix": "检查比赛、订单、群观点召回链路；确实无数据时在 context_pack 中明确说明无可用来源。"
+        },
+        {
+            "code": "fb2_budget_large",
+            "severity": "degraded",
+            "meaning": "fb2 metrics.budget_status=large，本次上下文偏大。",
+            "ai_impact": "AI 可以回答，但应优先使用精选证据，后续追问建议转向细分工具查询。",
+            "fb2_fix": "优化 context_pack 摘要密度，减少重复原始数据，优先返回可引用的精选来源。"
+        },
+        {
+            "code": "fb2_budget_too_large",
+            "severity": "blocking_for_rich_answer",
+            "meaning": "fb2 metrics.budget_status=too_large，本次上下文过大。",
+            "ai_impact": "主项目可能截断上下文，AI 回答必须提示可能遗漏证据，并建议先用 search/detail 工具缩小范围。",
+            "fb2_fix": "先通过 search_matches/search_user_orders/search_group_opinions 缩小候选，再按需返回详情。"
         }
     ])
 }
@@ -382,6 +403,9 @@ fn context_quality(context: &Value, expects_context_pack: bool) -> Value {
         if let Some(warning) = tool_contract_quality_warning(context) {
             warnings.push(warning);
         }
+        if let Some(warning) = budget_status_quality_warning(context) {
+            warnings.push(warning);
+        }
     }
 
     json!({
@@ -391,6 +415,20 @@ fn context_quality(context: &Value, expects_context_pack: bool) -> Value {
         "schema": if expects_context_pack { "fb2.context_pack.v1" } else { "fb2.today_matches.v1" },
         "tool_readiness": if expects_context_pack { tool_contract_readiness(context) } else { json!({"status": "not_applicable"}) }
     })
+}
+
+fn budget_status_quality_warning(context: &Value) -> Option<&'static str> {
+    match context
+        .get("metrics")
+        .and_then(|metrics| metrics.get("budget_status"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+    {
+        Some("empty") => Some("fb2_budget_empty"),
+        Some("large") => Some("fb2_budget_large"),
+        Some("too_large") => Some("fb2_budget_too_large"),
+        _ => None,
+    }
 }
 
 fn slim_match(raw: &Value) -> Value {
@@ -526,5 +564,24 @@ mod tests {
             .any(|channel| channel["name"] == "cloud_asr_fallback"));
         assert_eq!(guidance["default_usage_policy"]["ai_reply_billable"], true);
         assert!(public_usage_policy_guidance("unknown").is_none());
+    }
+
+    #[test]
+    fn pack_context_promotes_budget_status_to_quality_warning() {
+        let context = fb2_pack_context(
+            "fb2",
+            "official",
+            json!({
+                "generated_at": "2026-06-20T16:00:00+08:00",
+                "context_pack_version": "fb2-chat-pack-v1",
+                "context_pack": "<fb2_context_pack>large</fb2_context_pack>",
+                "matches": [{"id": "m1"}],
+                "tool_contract": {"tools": [{"name": "get_match_detail"}]},
+                "metrics": {"budget_status": "too_large"}
+            }),
+        );
+
+        let warnings = context["context_quality"]["warnings"].as_array().unwrap();
+        assert!(warnings.contains(&json!("fb2_budget_too_large")));
     }
 }

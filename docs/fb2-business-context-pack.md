@@ -125,6 +125,9 @@ GET /api/external/apps/fb2/context-contract
 - `missing_context_pack_version`：fb2 没有声明 pack 版本，后续 contract 演进难以追踪。
 - `empty_matches`：本次上下文没有比赛数据，AI 不能假设今日有可分析比赛。
 - `missing_tool_contract` / `empty_tool_contract`：fb2 暂未声明可按需查询的业务工具，AI 信息不足时只能说明缺口。
+- `fb2_budget_empty`：fb2 返回 `metrics.budget_status=empty`，AI 不能基于空业务来源做预测或订单剖析。
+- `fb2_budget_large`：fb2 返回 `metrics.budget_status=large`，AI 应优先使用精选证据，并建议后续用细分工具追问。
+- `fb2_budget_too_large`：fb2 返回 `metrics.budget_status=too_large`，主项目可能截断上下文，AI 必须提示可能遗漏证据。
 
 `context_quality.tool_readiness` 会给出工具契约成熟度：
 
