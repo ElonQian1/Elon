@@ -45,6 +45,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_agent_admin_open;
 mod node_agent_project_picker;
+mod node_agent_proxy;
 mod node_agent_server_runtime;
 #[cfg(windows)]
 mod node_client_launcher;
@@ -1992,8 +1993,8 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 async fn main() -> Result<()> {
     #[cfg(windows)]
     {
-        let runtime_mode = std::env::args().any(|arg| arg == "--agent-runtime")
-            || running_as_legacy_agent_exe();
+        let runtime_mode =
+            std::env::args().any(|arg| arg == "--agent-runtime") || running_as_legacy_agent_exe();
         if !runtime_mode {
             return node_client_launcher::run();
         }
@@ -2006,13 +2007,17 @@ async fn main() -> Result<()> {
 fn running_as_legacy_agent_exe() -> bool {
     std::env::current_exe()
         .ok()
-        .and_then(|path| path.file_name().map(|name| name.to_string_lossy().to_string()))
+        .and_then(|path| {
+            path.file_name()
+                .map(|name| name.to_string_lossy().to_string())
+        })
         .map(|name| name.eq_ignore_ascii_case("elon-node-agent.exe"))
         .unwrap_or(false)
 }
 
 async fn run_agent_runtime() -> Result<()> {
     dotenvy::dotenv().ok();
+    node_agent_proxy::ensure_localhost_no_proxy();
     tracing_subscriber::fmt()
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()))
         .init();

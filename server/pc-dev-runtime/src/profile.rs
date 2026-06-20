@@ -2,8 +2,13 @@ use crate::workspace_root;
 use homecli_proto::{DevToolchainStatus, NodeDevRuntimeProfile};
 use std::{
     path::PathBuf,
-    process::{Command, Stdio},
+    process::{Command, Output, Stdio},
+    thread,
+    time::{Duration, Instant},
 };
+
+const VERSION_CHECK_TIMEOUT: Duration = Duration::from_secs(3);
+const VERSION_CHECK_POLL_INTERVAL: Duration = Duration::from_millis(50);
 
 pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimeProfile {
     collect_dev_runtime_profile_with_server_runtime(allowed_clis, false)
@@ -149,31 +154,77 @@ fn check_workspace_root(root: &PathBuf) -> (bool, Option<String>) {
 
 fn command_status(name: &str, version_args: &[&str]) -> DevToolchainStatus {
     let path = command_path(name);
-    let output = Command::new(name)
-        .args(version_args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .output();
 
-    match output {
-        Ok(output) if output.status.success() => DevToolchainStatus {
+    match run_version_command(name, version_args, VERSION_CHECK_TIMEOUT) {
+        VersionCommandResult::Output(output) if output.status.success() => DevToolchainStatus {
             name: name.to_string(),
             available: true,
             version: first_non_empty_line(&output.stdout, &output.stderr),
             path,
         },
-        Ok(output) => DevToolchainStatus {
+        VersionCommandResult::Output(output) => DevToolchainStatus {
             name: name.to_string(),
             available: false,
             version: first_non_empty_line(&output.stdout, &output.stderr),
             path,
         },
-        Err(_) => DevToolchainStatus {
+        VersionCommandResult::TimedOut => DevToolchainStatus {
+            name: name.to_string(),
+            available: false,
+            version: Some("version check timed out".to_string()),
+            path,
+        },
+        VersionCommandResult::Failed => DevToolchainStatus {
             name: name.to_string(),
             available: false,
             version: None,
             path,
         },
+    }
+}
+
+enum VersionCommandResult {
+    Output(Output),
+    TimedOut,
+    Failed,
+}
+
+fn run_version_command(
+    name: &str,
+    version_args: &[&str],
+    timeout: Duration,
+) -> VersionCommandResult {
+    let mut child = match Command::new(name)
+        .args(version_args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+    {
+        Ok(child) => child,
+        Err(_) => return VersionCommandResult::Failed,
+    };
+    let started_at = Instant::now();
+
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return child
+                    .wait_with_output()
+                    .map(VersionCommandResult::Output)
+                    .unwrap_or(VersionCommandResult::Failed);
+            }
+            Ok(None) if started_at.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait_with_output();
+                return VersionCommandResult::TimedOut;
+            }
+            Ok(None) => thread::sleep(VERSION_CHECK_POLL_INTERVAL),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return VersionCommandResult::Failed;
+            }
+        }
     }
 }
 
