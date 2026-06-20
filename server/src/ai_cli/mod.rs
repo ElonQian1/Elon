@@ -740,33 +740,37 @@ async fn run_via_pc_agent(
     };
 
     // extra_args：Copilot 用 --session-id + --model，Codex 用 --codex-model + --codex-effort
-    let extra_args: Vec<String> = if cli_name == "copilot" {
-        let mut args = if let Some(ref sid) = copilot_session_uuid {
-            vec![format!("--session-id={}", sid)]
-        } else {
-            vec![]
-        };
-        if let Some(model) = copilot_model {
-            if !model.is_empty() && model != "auto" {
-                args.push("--model".into());
-                args.push(model.to_string());
+    let extra_args: Vec<String> = match cli_name {
+        "copilot" => {
+            let mut args = if let Some(ref sid) = copilot_session_uuid {
+                vec![format!("--session-id={}", sid)]
+            } else {
+                vec![]
+            };
+            if let Some(model) = copilot_model {
+                if !model.is_empty() && model != "auto" {
+                    args.push("--model".into());
+                    args.push(model.to_string());
+                }
             }
+            args
         }
-        args
-    } else {
-        // Codex：传模型和 reasoning effort，node-agent 在 `exec` 前插入 `-m`/`-c`
-        let mut args = vec![];
-        if let Some(model) = copilot_model {
-            if !model.is_empty() && model != "auto" {
-                args.push(format!("--codex-model={}", model));
+        "codex" => {
+            // Codex：传模型和 reasoning effort，node-agent 在 `exec` 前插入 `-m`/`-c`
+            let mut args = vec![];
+            if let Some(model) = copilot_model {
+                if !model.is_empty() && model != "auto" {
+                    args.push(format!("--codex-model={}", model));
+                }
             }
-        }
-        if let Some(effort) = codex_reasoning_effort {
-            if !effort.is_empty() {
-                args.push(format!("--codex-effort={}", effort));
+            if let Some(effort) = codex_reasoning_effort {
+                if !effort.is_empty() {
+                    args.push(format!("--codex-effort={}", effort));
+                }
             }
+            args
         }
-        args
+        _ => vec![],
     };
 
     // dispatch 时节点可能刚好掉线重连

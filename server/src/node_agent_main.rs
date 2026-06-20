@@ -43,6 +43,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_agent_admin_open;
 mod node_agent_project_picker;
+mod node_agent_server_runtime;
 mod node_hardware_probe;
 mod pc_storage_git_http;
 mod pc_storage_repo;
@@ -838,9 +839,49 @@ async fn run_cli_prompt(
     cwd: Option<String>,
     conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
     prompt: String,
+    server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 ) {
     use tokio::io::AsyncBufReadExt;
+
+    if cli_name == "server-runtime" {
+        let result = match server_runtime_config {
+            Some(config) => {
+                crate::node_agent_server_runtime::run_server_runtime_prompt(
+                    &req_id,
+                    config,
+                    cwd.as_deref(),
+                    runtime_permission.as_deref(),
+                    &prompt,
+                    out_tx.clone(),
+                )
+                .await
+            }
+            None => crate::node_agent_server_runtime::ServerRuntimeRunResult {
+                exit_ok: false,
+                error: Some("server-runtime 缺少节点登录上下文".to_string()),
+                model: Some("server-runtime".to_string()),
+                prompt_tokens: None,
+                completion_tokens: None,
+                total_tokens: None,
+            },
+        };
+        let (exit_ok, error, workspace_status) =
+            finalize_cli_prompt_workspace(result.exit_ok, result.error, conversation_workspace);
+        let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+            req_id,
+            exit_ok,
+            error,
+            prompt_tokens: result.prompt_tokens,
+            cached_input_tokens: None,
+            completion_tokens: result.completion_tokens,
+            reasoning_tokens: None,
+            total_tokens: result.total_tokens,
+            model: result.model,
+            workspace_status,
+        }));
+        return;
+    }
 
     // Windows 上 .cmd 文件必须通过 cmd /c 启动，否则 tokio::process::Command 无法直接执行
     let (actual_bin, actual_args_prefix): (&str, Vec<&str>) =
@@ -1509,7 +1550,14 @@ async fn run_session(
     }
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
-    let dev_runtime = elon_pc_dev_runtime::collect_dev_runtime_profile(&available_clis);
+    let authenticated_server_runtime = creds
+        .user_token
+        .as_deref()
+        .is_some_and(|token| !token.trim().is_empty());
+    let dev_runtime = elon_pc_dev_runtime::collect_dev_runtime_profile_with_server_runtime(
+        &available_clis,
+        authenticated_server_runtime,
+    );
     if dev_runtime.workspace_provision_ready {
         info!(
             "📁 PC 开发运行时已就绪: {}",
@@ -1834,6 +1882,10 @@ async fn run_session(
                                     prepared_cwd.cwd,
                                     prepared_cwd.conversation_workspace,
                                     prompt,
+                                    Some(crate::node_agent_server_runtime::ServerRuntimeConfig {
+                                        server_url: rt_c.cloud_http_url(),
+                                        user_token: rt_c.user_token().await,
+                                    }),
                                     tx_c,
                                 )
                                 .await;

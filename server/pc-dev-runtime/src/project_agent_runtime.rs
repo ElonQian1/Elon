@@ -83,6 +83,7 @@ scripts\elon.ps1 agent -AgentMode server-runtime -Prompt "Create a docs note" -D
 ```
 
 Route C does not expose the server API key to this PC. The server only returns structured local actions; this PC runtime still applies the same workspace path, dry-run, command policy, and confirmation checks as Route B.
+When the Windows client is installed and logged in, Route C can reuse the local node login token automatically. Manual `ELON_SERVER_TOKEN` is only needed for advanced or portable setups.
 "#,
         req.project_id, req.template, req.user_id
     ))
@@ -129,6 +130,24 @@ function Get-FirstEnv {
     return ''
 }
 
+function Get-NodeAgentUserToken {
+    $path = ''
+    if ($env:APPDATA) {
+        $path = Join-Path $env:APPDATA 'elon-node-agent\node.json'
+    }
+    if (-not $path -or -not (Test-Path -LiteralPath $path -PathType Leaf)) {
+        return ''
+    }
+    try {
+        $state = Get-Content -LiteralPath $path -Raw | ConvertFrom-Json
+        $token = [string]$state.user_token
+        if ($token -and $token.Trim()) { return $token.Trim() }
+    } catch {
+        return ''
+    }
+    return ''
+}
+
 function Show-AgentStatus {
     $cliNames = @('codex', 'claude', 'gemini', 'copilot')
     Write-Host 'Elon local agent runtime'
@@ -154,10 +173,12 @@ function Show-AgentStatus {
     Write-Host ''
     Write-Host 'Route C: server-runtime'
     $server = if ($ServerUrl.Trim()) { $ServerUrl.Trim() } else { Get-FirstEnv @('ELON_SERVER_URL', 'ELON_AGENT_SERVER_URL') }
+    if (-not $server) { $server = 'http://43.139.149.158:8080' }
     $token = if ($ServerToken.Trim()) { $ServerToken.Trim() } else { Get-FirstEnv @('ELON_SERVER_TOKEN', 'ELON_AGENT_SERVER_TOKEN', 'OWNER_TOKEN') }
+    if (-not $token) { $token = Get-NodeAgentUserToken }
     $agent = if ($ServerAgent.Trim()) { $ServerAgent.Trim() } else { Get-FirstEnv @('ELON_SERVER_AGENT', 'ELON_AGENT_SERVER_AGENT') }
     if ($server) { Write-Host "[OK] server_url -> $server" } else { Write-Host '[WARN] server_url missing; set ELON_SERVER_URL or pass -ServerUrl' }
-    if ($token) { Write-Host '[OK] server_token -> configured' } else { Write-Host '[WARN] server_token missing; set ELON_SERVER_TOKEN or pass -ServerToken' }
+    if ($token) { Write-Host '[OK] server_token -> configured' } else { Write-Host '[WARN] server_token missing; install/login Windows client or set ELON_SERVER_TOKEN' }
     if ($agent) { Write-Host "[OK] server_agent -> $agent" } else { Write-Host '[INFO] server_agent not set; server default agent will be used' }
 }
 
@@ -221,8 +242,9 @@ function Resolve-ServerConfig {
     $resolvedUrl = if ($ServerUrl.Trim()) { $ServerUrl.Trim() } else { Get-FirstEnv @('ELON_SERVER_URL', 'ELON_AGENT_SERVER_URL') }
     $resolvedToken = if ($ServerToken.Trim()) { $ServerToken.Trim() } else { Get-FirstEnv @('ELON_SERVER_TOKEN', 'ELON_AGENT_SERVER_TOKEN', 'OWNER_TOKEN') }
     $resolvedAgent = if ($ServerAgent.Trim()) { $ServerAgent.Trim() } else { Get-FirstEnv @('ELON_SERVER_AGENT', 'ELON_AGENT_SERVER_AGENT') }
-    if (-not $resolvedUrl) { throw 'Missing server URL. Set ELON_SERVER_URL or pass -ServerUrl.' }
-    if (-not $resolvedToken) { throw 'Missing server token. Set ELON_SERVER_TOKEN or pass -ServerToken.' }
+    if (-not $resolvedUrl) { $resolvedUrl = 'http://43.139.149.158:8080' }
+    if (-not $resolvedToken) { $resolvedToken = Get-NodeAgentUserToken }
+    if (-not $resolvedToken) { throw 'Missing server token. Install/login Windows client, set ELON_SERVER_TOKEN, or pass -ServerToken.' }
     return [pscustomobject]@{
         Url = $resolvedUrl.TrimEnd('/')
         Token = $resolvedToken

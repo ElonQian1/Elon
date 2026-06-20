@@ -1,5 +1,4 @@
 use anyhow::Result;
-use serde_json::{json, Value};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
@@ -7,14 +6,15 @@ use tracing::{error, info, warn};
 use crate::{
     agent_api_loop::run_api_inner_with_workspace,
     agent_intent::{
-        has_origin_remote, is_project_delivery_request, is_project_workspace,
-        is_short_build_command, is_short_resume_command,
+        has_origin_remote, is_project_delivery_request, is_short_build_command,
+        is_short_resume_command,
     },
     agent_routing::{
         api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
     },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
+    pc_agent_runtime_choice::choose_pc_agent_runtime,
     source_hygiene,
     store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
@@ -69,48 +69,12 @@ pub async fn run_for_project_in_workspace(
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        // 从 agent_name 查 AiCliOption 获取 CLI 类型、Copilot model ID 和显示标签
-        let option = agent_name.and_then(|name| state.ai_cli.find_option(Some(name)).cloned());
-        let pc_cli = option
-            .as_ref()
-            .map(|o| {
-                if o.provider == "codex" || o.id.to_lowercase().contains("codex") {
-                    "codex"
-                } else {
-                    "copilot"
-                }
-            })
-            .or_else(|| {
-                agent_name.map(|name| {
-                    let lower = name.to_lowercase();
-                    if lower.contains("codex") {
-                        "codex"
-                    } else {
-                        "copilot"
-                    }
-                })
-            })
-            .unwrap_or("copilot");
-        // Copilot CLI 的 model ID（用于 --model 参数）
-        let copilot_model = option
-            .as_ref()
-            .and_then(|o| o.model.as_deref())
-            .map(String::from);
-        // Codex 的 reasoning_effort（用于 -c model_reasoning_effort="..." 参数）
-        let codex_reasoning_effort = option
-            .as_ref()
-            .and_then(|o| o.reasoning_effort.as_deref())
-            .map(String::from);
-        // 用户可见的模型标签（用于气泡属指）
-        let model_label = option
-            .as_ref()
-            .map(|o| o.label.clone())
-            .or_else(|| agent_name.map(String::from));
+        let runtime_choice = choose_pc_agent_runtime(state, agent_id, agent_name).await;
         let _ = tx.send(
             WsMessage::progress(format!(
                 "正在连接 PC 节点 {} 使用 {} 处理本地项目。",
                 agent_id,
-                model_label.as_deref().unwrap_or(pc_cli)
+                runtime_choice.progress_label()
             ))
             .to_json(),
         );
@@ -128,10 +92,10 @@ pub async fn run_for_project_in_workspace(
             None,
             ai_cli::AiCliRequestMode::Execute,
             session_scope,
-            Some(pc_cli),
-            copilot_model.as_deref(),
-            codex_reasoning_effort.as_deref(),
-            model_label.as_deref(),
+            Some(runtime_choice.cli_name.as_str()),
+            runtime_choice.copilot_model.as_deref(),
+            runtime_choice.codex_reasoning_effort.as_deref(),
+            runtime_choice.model_label.as_deref(),
             state,
             &tx,
         )
@@ -233,43 +197,12 @@ pub async fn plan_for_project_in_workspace(
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        let option = agent_name.and_then(|name| state.ai_cli.find_option(Some(name)).cloned());
-        let pc_cli = option
-            .as_ref()
-            .map(|o| {
-                if o.provider == "codex" || o.id.to_lowercase().contains("codex") {
-                    "codex"
-                } else {
-                    "copilot"
-                }
-            })
-            .or_else(|| {
-                agent_name.map(|name| {
-                    if name.to_lowercase().contains("codex") {
-                        "codex"
-                    } else {
-                        "copilot"
-                    }
-                })
-            })
-            .unwrap_or("copilot");
-        let copilot_model = option
-            .as_ref()
-            .and_then(|o| o.model.as_deref())
-            .map(String::from);
-        let codex_reasoning_effort = option
-            .as_ref()
-            .and_then(|o| o.reasoning_effort.as_deref())
-            .map(String::from);
-        let model_label = option
-            .as_ref()
-            .map(|o| o.label.clone())
-            .or_else(|| agent_name.map(String::from));
+        let runtime_choice = choose_pc_agent_runtime(state, agent_id, agent_name).await;
         let _ = tx.send(
             WsMessage::progress(format!(
                 "正在连接 PC 节点 {} 使用 {} 规划本地项目。",
                 agent_id,
-                model_label.as_deref().unwrap_or(pc_cli)
+                runtime_choice.progress_label()
             ))
             .to_json(),
         );
@@ -286,10 +219,10 @@ pub async fn plan_for_project_in_workspace(
                 conversation_id: cid.to_string(),
                 runtime_permission: project.runtime_permission.clone(),
             }),
-            Some(pc_cli),
-            copilot_model.as_deref(),
-            codex_reasoning_effort.as_deref(),
-            model_label.as_deref(),
+            Some(runtime_choice.cli_name.as_str()),
+            runtime_choice.copilot_model.as_deref(),
+            runtime_choice.codex_reasoning_effort.as_deref(),
+            runtime_choice.model_label.as_deref(),
             state,
             &tx,
         )
@@ -341,18 +274,6 @@ fn pc_project_binding(project: &ProjectAccess) -> Option<(&str, &str)> {
         }
         _ => None,
     }
-}
-
-fn pc_project_note(workspace: &str, planning: bool) -> String {
-    let mode = if planning {
-        "当前是 Plan 模式，只生成计划，不改文件、不运行发布。"
-    } else {
-        "当前是执行模式，可以按项目规则修改、验证、提交和发布。"
-    };
-    format!(
-        "当前项目绑定在 PC 节点本地工作区：{}。CLI 已以该目录作为当前工作目录启动；不要改到其他仓库。{}",
-        workspace, mode
-    )
 }
 
 async fn run_dispatch_with_workspace(

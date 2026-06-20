@@ -6,6 +6,13 @@ use std::{
 };
 
 pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimeProfile {
+    collect_dev_runtime_profile_with_server_runtime(allowed_clis, false)
+}
+
+pub fn collect_dev_runtime_profile_with_server_runtime(
+    allowed_clis: &[String],
+    authenticated_server_runtime: bool,
+) -> NodeDevRuntimeProfile {
     let root = workspace_root();
     let workspace_root_path = Some(root.to_string_lossy().to_string());
     let (workspace_root_writable, root_issue) = check_workspace_root(&root);
@@ -30,7 +37,7 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
     let dev_env_ready = android_ready || rust_ready || node_ready;
     let route_a_ready = route_a_cli_ready(allowed_clis);
     let api_runtime_ready = api_runtime_key_available();
-    let server_runtime_ready = server_runtime_available();
+    let server_runtime_ready = authenticated_server_runtime || server_runtime_available();
     let ai_cli_ready = route_a_ready || api_runtime_ready || server_runtime_ready;
 
     let mut issues = Vec::new();
@@ -59,6 +66,9 @@ pub fn collect_dev_runtime_profile(allowed_clis: &[String]) -> NodeDevRuntimePro
         workspace_provision_ready: workspace_root_writable && git_ready,
         dev_env_ready,
         ai_cli_ready,
+        route_a_ready,
+        api_runtime_ready,
+        server_runtime_ready,
         toolchains: vec![
             git,
             java,

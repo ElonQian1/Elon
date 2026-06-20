@@ -69,6 +69,17 @@ pub struct NodeDevRuntimeProfile {
     pub dev_env_ready: bool,
     #[serde(default)]
     pub ai_cli_ready: bool,
+    /// Route A: this PC has an installed coding CLI such as Codex, Claude,
+    /// Gemini, or Copilot.
+    #[serde(default)]
+    pub route_a_ready: bool,
+    /// Route B: this PC can call an OpenAI-compatible API with a local key.
+    #[serde(default)]
+    pub api_runtime_ready: bool,
+    /// Route C: this PC can ask the Elon server for model calls while keeping
+    /// file and command execution local.
+    #[serde(default)]
+    pub server_runtime_ready: bool,
     #[serde(default)]
     pub toolchains: Vec<DevToolchainStatus>,
     #[serde(default)]

@@ -91,6 +91,8 @@ pub async fn list_nodes(
             .as_ref()
             .map(|runtime| runtime.ai_cli_ready)
             .unwrap_or(cli_project_ready);
+        let (route_a_ready, api_runtime_ready, server_runtime_ready) =
+            runtime_route_flags(dev_runtime.as_ref(), cli_project_ready);
         let short_id = short_node_id(&node_id);
         let device_name = clean_string(node.device_name.as_deref()).or_else(|| {
             cli_agent
@@ -143,6 +145,9 @@ pub async fn list_nodes(
             cli_project_ready,
             workspace_provision_ready,
             ai_cli_ready,
+            route_a_ready,
+            api_runtime_ready,
+            server_runtime_ready,
             project_count,
             project_limit: capacity.project_limit,
             project_slots_remaining: capacity.project_slots_remaining,
@@ -170,6 +175,8 @@ pub async fn list_nodes(
             .as_ref()
             .map(|runtime| runtime.ai_cli_ready)
             .unwrap_or(cli_project_ready);
+        let (route_a_ready, api_runtime_ready, server_runtime_ready) =
+            runtime_route_flags(dev_runtime.as_ref(), cli_project_ready);
         let short_id = short_node_id(&node_id);
         let device_name = clean_string(agent.device_name.as_deref());
         let display_name = display_node_name("", device_name.as_deref(), &short_id);
@@ -224,6 +231,9 @@ pub async fn list_nodes(
             cli_project_ready,
             workspace_provision_ready,
             ai_cli_ready,
+            route_a_ready,
+            api_runtime_ready,
+            server_runtime_ready,
             project_count,
             project_limit: capacity.project_limit,
             project_slots_remaining: capacity.project_slots_remaining,
@@ -591,6 +601,8 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 .as_ref()
                 .map(|runtime| runtime.ai_cli_ready)
                 .unwrap_or(cli_project_ready);
+            let (route_a_ready, api_runtime_ready, server_runtime_ready) =
+                runtime_route_flags(node.dev_runtime.as_ref(), cli_project_ready);
             let global_project_count = state
                 .store
                 .count_active_pc_projects_for_node(&node.node_id)
@@ -629,6 +641,9 @@ pub async fn my_nodes(State(state): State<Arc<AppState>>, headers: HeaderMap) ->
                 cli_project_ready,
                 workspace_provision_ready,
                 ai_cli_ready,
+                route_a_ready,
+                api_runtime_ready,
+                server_runtime_ready,
                 project_count: capacity.project_count,
                 project_limit: capacity.project_limit,
                 project_slots_remaining: capacity.project_slots_remaining,
@@ -668,6 +683,9 @@ struct PublicNodeResponse {
     cli_project_ready: bool,
     workspace_provision_ready: bool,
     ai_cli_ready: bool,
+    route_a_ready: bool,
+    api_runtime_ready: bool,
+    server_runtime_ready: bool,
     project_count: i64,
     project_limit: i64,
     project_slots_remaining: i64,
@@ -702,6 +720,9 @@ struct MyNodeResponse {
     cli_project_ready: bool,
     workspace_provision_ready: bool,
     ai_cli_ready: bool,
+    route_a_ready: bool,
+    api_runtime_ready: bool,
+    server_runtime_ready: bool,
     project_count: i64,
     project_limit: i64,
     project_slots_remaining: i64,
@@ -715,6 +736,21 @@ struct MyNodeResponse {
     online: bool,
     registry_online: bool,
     cli_connected: bool,
+}
+
+fn runtime_route_flags(
+    runtime: Option<&NodeDevRuntimeProfile>,
+    legacy_cli_ready: bool,
+) -> (bool, bool, bool) {
+    runtime
+        .map(|runtime| {
+            (
+                runtime.route_a_ready,
+                runtime.api_runtime_ready,
+                runtime.server_runtime_ready,
+            )
+        })
+        .unwrap_or((legacy_cli_ready, false, false))
 }
 
 fn project_counts_for_user(state: &AppState, user_id: &str) -> HashMap<String, i64> {

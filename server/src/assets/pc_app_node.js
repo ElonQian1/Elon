@@ -335,7 +335,10 @@
               ['Git', runtime.git_ready ? '可用' : '未就绪'],
               ['创建工作区', node.workspace_provision_ready ? '可用' : '未就绪'],
               ['开发环境', runtime.dev_env_ready ? '就绪' : '未就绪'],
-              ['AI CLI', node.ai_cli_ready ? '就绪' : '未就绪']
+              ['AI Agent', node.ai_cli_ready ? '就绪' : '未就绪'],
+              ['Route A 本机 CLI', routeReady(node, runtime, 'route_a_ready') ? '可用' : '未就绪'],
+              ['Route B 自带 API Key', routeReady(node, runtime, 'api_runtime_ready') ? '可用' : '未就绪'],
+              ['Route C 服务器模型', routeReady(node, runtime, 'server_runtime_ready') ? '可用' : '未就绪']
             ])}
           </section>
           <section class="node-detail-grid compact">
@@ -430,7 +433,15 @@
 
     function cliStatusText(node) {
       const clis = (node.allowed_clis || []).map(clean).filter(Boolean);
-      return clis.length ? clis.join(' / ') : '未连接本机 CLI';
+      if (clis.length) return clis.join(' / ');
+      const runtime = node.dev_runtime || {};
+      if (routeReady(node, runtime, 'server_runtime_ready')) return 'Route C 服务器模型';
+      if (routeReady(node, runtime, 'api_runtime_ready')) return 'Route B API runtime';
+      return '未连接本机 CLI';
+    }
+
+    function routeReady(node, runtime, key) {
+      return !!(node[key] || (runtime && runtime[key]));
     }
 
     function detailPanel(title, rows) {
