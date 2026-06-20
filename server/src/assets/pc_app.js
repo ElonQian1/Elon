@@ -61,6 +61,8 @@
 
   let models = null;
   let devComposer = null;
+  let devTasks = null;
+  let devTaskRefreshTimer = 0;
   const doctor = window.ElonPcDoctor.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
     setRails, renderChannels, setDoctorMode
@@ -86,6 +88,10 @@
     state, els, clean, escapeHtml, openSettings,
     selectNode: () => node.selectNode(),
     openModelPicker: () => models.openModelPicker()
+  });
+  devTasks = window.ElonPcDevTasks.create({
+    clean, escapeHtml, markdown,
+    refreshActiveChannel: refreshActiveProjectChannel
   });
 
   function saveToken(token) {
@@ -1439,6 +1445,7 @@
   }
 
   function selectProjectLanding() {
+    clearDevTaskRefresh();
     state.activeChannelId = '';
     state.activeChannelKind = 'home';
     renderChannels();
@@ -1599,15 +1606,21 @@
   function renderMessages(messages, scope) {
     setNodeMode(false);
     if (!messages.length) {
+      clearDevTaskRefresh();
       els.messageList.innerHTML = '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
       return;
     }
+    const devTaskContext = scope === 'project' && devTasks ? devTasks.buildContext(messages) : null;
     els.messageList.innerHTML = messages.map((message) => {
-      const name = clean(message.sender_name || message.user_account || message.sender || message.author_name || message.from_name) ||
-        (message.outgoing ? userName(state.user) : (scope === 'project' ? '项目成员' : '好友'));
       const role = clean(message.role || message.kind || message.message_kind);
+      const fallbackName = role.startsWith('ai_')
+        ? '一龙开发Agent'
+        : (scope === 'project' ? '项目成员' : '好友');
+      const name = clean(message.sender_name || message.user_account || message.sender || message.author_name || message.from_name) ||
+        (message.outgoing ? userName(state.user) : fallbackName);
       const tone = role.includes('assistant') || role.includes('ai') ? 'ai' : (role.includes('task') ? 'task' : '');
-      const contentHtml = renderMessageContent(message, {
+      const devTaskHtml = devTaskContext ? devTasks.renderMessage(message, devTaskContext) : '';
+      const contentHtml = devTaskHtml || renderMessageContent(message, {
         className: tone,
         markdown: !!tone,
         copy: !!tone
@@ -1623,8 +1636,35 @@
     els.messageList.querySelectorAll('.project-share-action').forEach((button) => {
       button.addEventListener('click', () => handleProjectShareAction(button));
     });
+    if (devTasks) devTasks.bindActions(els.messageList);
     if (markdown.bindCopyButtons) markdown.bindCopyButtons(els.messageList);
+    scheduleDevTaskRefresh(messages, scope, devTaskContext);
     els.messageList.scrollTop = els.messageList.scrollHeight;
+  }
+
+  function clearDevTaskRefresh() {
+    if (devTaskRefreshTimer) {
+      clearTimeout(devTaskRefreshTimer);
+      devTaskRefreshTimer = 0;
+    }
+  }
+
+  function scheduleDevTaskRefresh(messages, scope, devTaskContext) {
+    clearDevTaskRefresh();
+    if (scope !== 'project' || state.activeChannelKind !== 'ai_development' || !devTasks) return;
+    if (!devTasks.hasOpenTasks(messages, devTaskContext)) return;
+    const projectId = state.activeProjectId;
+    const channelId = state.activeChannelId;
+    devTaskRefreshTimer = setTimeout(() => {
+      if (state.activeKind !== 'project') return;
+      if (!sameId(state.activeProjectId, projectId) || !sameId(state.activeChannelId, channelId)) return;
+      refreshActiveProjectChannel().catch(showError);
+    }, 4500);
+  }
+
+  async function refreshActiveProjectChannel() {
+    if (state.activeKind !== 'project' || !state.activeProjectId || !state.activeChannelId) return;
+    await selectProjectChannel(state.activeChannelId);
   }
 
   async function handleProjectShareAction(button) {
@@ -1952,9 +1992,17 @@
   }
 
   function showError(error) {
+    clearDevTaskRefresh();
     setNodeMode(false);
     els.messageList.innerHTML = `<div class="empty-state"><strong>加载失败</strong><p>${escapeHtml(error.message || error)}</p></div>`;
   }
+
+  window.addEventListener('elon:project-task-done', (event) => {
+    const detail = event.detail || {};
+    if (state.activeKind !== 'project' || !state.activeChannelId) return;
+    if (!sameId(detail.projectId || detail.project_id, state.activeProjectId)) return;
+    refreshActiveProjectChannel().catch(showError);
+  });
 
   window.addEventListener('storage', () => {
     const latest = readToken();

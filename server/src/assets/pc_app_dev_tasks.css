@@ -1,0 +1,113 @@
+.message-content.dev-task-wrap {
+  white-space: normal;
+}
+
+.dev-task-card {
+  max-width: 760px;
+  overflow: hidden;
+  border: 1px solid #353943;
+  border-radius: 8px;
+  background: #24272f;
+  color: var(--text-soft);
+}
+
+.dev-task-card.queued {
+  border-color: rgba(240, 178, 76, .38);
+}
+
+.dev-task-card.running {
+  border-color: rgba(88, 101, 242, .42);
+}
+
+.dev-task-card.done {
+  border-color: rgba(35, 165, 90, .48);
+}
+
+.dev-task-card.failed {
+  border-color: rgba(237, 66, 69, .52);
+}
+
+.dev-task-card-head {
+  display: grid;
+  gap: 4px;
+  padding: 12px 13px 9px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+.dev-task-card-head span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dev-task-card-head strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.dev-task-card-text {
+  padding: 11px 13px;
+  color: var(--text-soft);
+  line-height: 1.56;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dev-task-card .message-content.markdown-body {
+  padding: 11px 64px 11px 13px;
+  background: transparent;
+}
+
+.dev-task-card-foot {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 9px 8px 13px;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+}
+
+.dev-task-card-foot div {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dev-task-card-foot span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-task-card-foot button {
+  height: 28px;
+  flex: 0 0 auto;
+  border: 1px solid #40444f;
+  border-radius: 6px;
+  background: #2e323b;
+  color: var(--text-soft);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dev-task-card-foot button:hover {
+  background: #393e49;
+  color: var(--text);
+}
+
+@media (max-width: 720px) {
+  .dev-task-card-foot {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .dev-task-card-foot button {
+    align-self: flex-end;
+  }
+}
