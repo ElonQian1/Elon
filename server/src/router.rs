@@ -12,15 +12,15 @@ use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, context_compiler, external_app_api,
-    external_app_chat_bootstrap, friend_api, global_ws, group_chat_retrieval_api,
-    group_summary_api, lan_peer, lm_chat, node_api, node_compute_admin, node_payout_admin,
-    peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
-    project_deletion, project_docs, project_downloads, project_git, project_join_requests,
-    project_landing_api, project_membership, project_runtime_permission_api, project_space,
-    project_storage_git, project_store, project_workspace_health, project_workspace_recovery,
-    release_claim, server_agent_runtime, speech_translate, token_usage_api, user_api,
-    user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat,
-    voice_ws_transcribe, voice_ws_virtual_mic, web,
+    external_app_chat_bootstrap, external_app_tool_report_api, friend_api, global_ws,
+    group_chat_retrieval_api, group_summary_api, lan_peer, lm_chat, node_api, node_compute_admin,
+    node_payout_admin, peer_relay, project_api, project_attachments, project_chat,
+    project_conversation_identity, project_deletion, project_docs, project_downloads, project_git,
+    project_join_requests, project_landing_api, project_membership, project_runtime_permission_api,
+    project_space, project_storage_git, project_store, project_workspace_health,
+    project_workspace_recovery, release_claim, server_agent_runtime, speech_translate,
+    token_usage_api, user_api, user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api,
+    voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -634,6 +634,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/admin/token-stats/compute-meter-events",
             get(admin_token_stats::get_compute_meter_events),
+        )
+        .route(
+            "/api/admin/external-apps/tool-executions",
+            get(external_app_tool_report_api::get_tool_execution_report),
         )
         // ── 用户配额管理 ──────────────────────────────────────────────────────
         .route(
