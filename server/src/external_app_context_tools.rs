@@ -43,6 +43,7 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
                 "主项目群聊 AI 已支持按需执行 fb2 工具；执行失败会降级为普通 context_pack 回答。",
                 "工具执行请求和响应格式见同一 contract 响应中的 tool_execution_contract。",
                 "只有 executed_external_app_tools 中 status=ready 且 success=true 的结果可以作为已查询事实。",
+                "主项目会在 executed_external_app_tools.audit 中记录 planned_count、ready_count、source_id_count 和 duration_ms。",
                 "用户订单工具必须限制为 current_user_only。",
                 "群友观点必须返回 message_id，比赛和订单必须返回 source id。",
                 "审计工具只返回上下文来源和指标元数据，不返回完整订单、聊天正文或赔率明细。"
@@ -77,6 +78,7 @@ pub(crate) fn prompt_tool_contract_block(context: &Value) -> String {
          - 如果当前 context_pack 信息不足，可以说明需要调用哪个工具补充，例如 get_match_detail 或 search_user_orders。\n\
          - 如果已有 context_audit_id，可以说明需要调用 get_context_audit 回查当次上下文来源和预算指标。\n\
          - 不能编造工具返回结果；未调用工具时只能基于现有上下文回答。\n\
+         - 使用工具事实时尽量引用 executed_external_app_tools.audit.source_id_count 覆盖到的 source id。\n\
          - 工具调用必须遵守用户权限，用户订单只能查询当前用户自己的数据。\n\
          </tool_rules>\n\
          </available_external_app_tools>",

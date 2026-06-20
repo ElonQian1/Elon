@@ -448,9 +448,8 @@ fn format_external_context(
     let context_block = external_context
         .map(crate::external_app_context_budget::prompt_context_block)
         .unwrap_or_default();
-    let tool_block = crate::external_app_context_tool_runtime::prompt_executed_tools_block(
-        external_tool_results,
-    );
+    let tool_block =
+        crate::external_app_context_tool_prompt::prompt_executed_tools_block(external_tool_results);
 
     match (context_block.is_empty(), tool_block.is_empty()) {
         (true, true) => String::new(),
