@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use std::path::PathBuf;
 
-use super::{AGENT_EXE_NAME, CLIENT_EXE_NAME, INTERNAL_DIR_NAME, UNINSTALL_EXE_NAME};
+use super::{AGENT_EXE_NAME, CLIENT_EXE_NAME, INTERNAL_DIR_NAME};
 
 pub(crate) fn install_dir() -> Result<PathBuf> {
     let local_app_data =
@@ -15,10 +15,6 @@ pub(crate) fn internal_dir(install_dir: &std::path::Path) -> PathBuf {
 
 pub(crate) fn client_exe(install_dir: &std::path::Path) -> PathBuf {
     install_dir.join(CLIENT_EXE_NAME)
-}
-
-pub(crate) fn uninstall_exe(install_dir: &std::path::Path) -> PathBuf {
-    install_dir.join(UNINSTALL_EXE_NAME)
 }
 
 pub(crate) fn agent_exe(install_dir: &std::path::Path) -> PathBuf {
