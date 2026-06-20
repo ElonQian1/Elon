@@ -687,9 +687,6 @@
     pcAuthTabs().forEach((button) => button.addEventListener('click', () => setPcAuthMode(button.dataset.pcAuthMode)));
     els.pcAuthForm.addEventListener('submit', submitPcAuth);
     els.pcAuthCloseBtn.addEventListener('click', closeAuthModal);
-    els.pcAuthBackdrop.addEventListener('click', (event) => {
-      if (event.target === els.pcAuthBackdrop) closeAuthModal();
-    });
     [els.aiRail, els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, els.apkRail].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     els.apkRail.addEventListener('click', selectApkDownload);
