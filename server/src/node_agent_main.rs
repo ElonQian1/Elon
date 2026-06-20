@@ -31,7 +31,8 @@ use anyhow::{anyhow, Result};
 use axum::http::{header::CONTENT_TYPE, HeaderValue, Method};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
-    AgentToServer, CliWorkspaceStatus, ModelCapability, ServerToAgent, PROTO_VERSION,
+    AgentToServer, CliWorkspaceStatus, ModelCapability, NodeHardwareProfile, ServerToAgent,
+    PROTO_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -1534,7 +1535,7 @@ async fn run_session(
     } else {
         warn!("⚠️  PC 开发运行时未就绪: {}", dev_runtime.issues.join("；"));
     }
-    let hardware = crate::node_hardware_probe::collect_hardware_profile();
+    let hardware = runtime.refresh_hardware_profile().await;
     let storage_settings = runtime.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
 
@@ -2039,6 +2040,9 @@ pub(crate) struct NodeRuntime {
     cfg: NodeConfig,
     creds: RwLock<Option<Credentials>>,
     status: RwLock<NodeStatus>,
+    /// Hardware probing can spawn system commands on Windows; cache it so
+    /// status-page polling does not repeatedly hit WMI/PowerShell.
+    hardware_cached: RwLock<NodeHardwareProfile>,
     /// CLI 名称 → 完整路径映射（启动时检测，避免 PATH 不完整导致 program not found）
     cli_paths: RwLock<Vec<(String, String)>>,
     /// 本地 TTS Worker URL（如 http://127.0.0.1:5011）；由管理页或环境变量设置
@@ -2064,6 +2068,7 @@ impl NodeRuntime {
             cfg,
             creds: RwLock::new(creds),
             status: RwLock::new(NodeStatus::default()),
+            hardware_cached: RwLock::new(crate::node_hardware_probe::collect_hardware_profile()),
             cli_paths: RwLock::new(Vec::new()),
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
@@ -2089,6 +2094,16 @@ impl NodeRuntime {
 
     async fn set_cli_paths(&self, paths: Vec<(String, String)>) {
         *self.cli_paths.write().await = paths;
+    }
+
+    async fn hardware_profile(&self) -> NodeHardwareProfile {
+        self.hardware_cached.read().await.clone()
+    }
+
+    async fn refresh_hardware_profile(&self) -> NodeHardwareProfile {
+        let hardware = crate::node_hardware_probe::collect_hardware_profile();
+        *self.hardware_cached.write().await = hardware.clone();
+        hardware
     }
 
     /// CLI 名称 → 完整路径（找不到就返回原名称作备用）
@@ -2384,7 +2399,7 @@ async fn admin_status(
     rt.set_models(live.clone()).await;
     let creds = rt.creds().await;
     let st = rt.status.read().await;
-    let hardware = crate::node_hardware_probe::collect_hardware_profile();
+    let hardware = rt.hardware_profile().await;
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
     axum::Json(serde_json::json!({
