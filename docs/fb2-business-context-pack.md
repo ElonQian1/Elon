@@ -84,6 +84,24 @@ include_platform_orders=true|false
 
 这一步是长期主义的基础：后续 fb2 能提供越来越多数据，但主项目不会让 prompt 无限膨胀。
 
+## 主项目 Contract 归一化
+
+主项目不会把 fb2 原始响应直接交给模型，而是先归一化为内部 `external_app_context`：
+
+- `/context/pack` 归一化为 `fb2.context_pack.v1`。
+- `/context/today-matches` 回退数据归一化为 `fb2.today_matches.v1`。
+- 自动补充 `usage_policy`，明确 ASR/TTS/context fetch 免费，AI 回复扣额度。
+- 自动生成 `context_quality`，记录缺失字段和数据新鲜度风险。
+
+当前 `context_quality.warnings` 可能包含：
+
+- `missing_generated_at`：fb2 没有返回生成时间，AI 必须提示数据新鲜度不足。
+- `missing_context_pack`：fb2 没有返回模型友好的 Markdown/XML 包，主项目只能退回结构化 JSON。
+- `missing_context_pack_version`：fb2 没有声明 pack 版本，后续 contract 演进难以追踪。
+- `empty_matches`：本次上下文没有比赛数据，AI 不能假设今日有可分析比赛。
+
+这使 fb2 可以渐进式接入：接口先可用，再通过 warnings 不断补齐数据质量，而不是让模型静默使用残缺上下文。
+
 ## 主项目 Prompt 投影
 
 群聊 AI 不直接读取完整原始 JSON，而是优先读取：
@@ -91,6 +109,7 @@ include_platform_orders=true|false
 ```text
 context_pack
 usage_policy
+context_quality
 _context_budget
 source/status/generated_at
 ```
@@ -103,6 +122,7 @@ source/status/generated_at
 - 引用订单/票据尽量带 `order id` 或 `ticket id`。
 - 引用群友观点必须带 `message id`。
 - 上下文缺少来源或更新时间时，必须说明信息不足，不能编造。
+- `context_quality.warnings` 非空时，必须在回答中说明相关数据缺口或新鲜度风险。
 
 群聊总结帖仍会把预算后的 `external_app_context` 放进 Context Pack，方便总结帖保留可审计源数据。
 

@@ -6,6 +6,7 @@ use tracing::{info, warn};
 
 use crate::{
     external_app_context_budget::budgeted_context,
+    external_app_context_contract::{fb2_match_context, fb2_pack_context},
     external_app_registry::{external_group_by_group_id, public_external_app_config},
     types::AppState,
 };
@@ -284,21 +285,7 @@ async fn fb2_pack_response_to_context(
     }
 
     let data = parsed.get("data").cloned().unwrap_or_else(|| json!({}));
-    json!({
-        "app_id": app_id,
-        "group": external_group_id,
-        "status": "ready",
-        "source": "fb2:/api/main-project/context/pack",
-        "generated_at": data.get("generated_at"),
-        "context_pack_version": data.get("context_pack_version").or_else(|| data.get("version")),
-        "context_pack": data.get("context_pack"),
-        "matches": data.get("matches"),
-        "user_orders": data.get("user_orders"),
-        "group_messages": data.get("group_messages"),
-        "platform_order_summary": data.get("platform_order_summary"),
-        "tool_contract": data.get("tool_contract"),
-        "usage_policy": data.get("usage_policy").cloned().unwrap_or_else(default_usage_policy)
-    })
+    fb2_pack_context(app_id, external_group_id, data)
 }
 
 async fn fb2_response_to_context(
@@ -349,37 +336,7 @@ async fn fb2_response_to_context(
     }
 
     let data = parsed.get("data").cloned().unwrap_or_else(|| json!({}));
-    let matches = data["matches"]
-        .as_array()
-        .map(|matches| matches.iter().map(slim_match).collect::<Vec<_>>())
-        .unwrap_or_default();
-    json!({
-        "app_id": app_id,
-        "group": external_group_id,
-        "status": "ready",
-        "source": "fb2:/api/main-project/context/today-matches",
-        "generated_at": data.get("generated_at"),
-        "count": matches.len(),
-        "matches": matches,
-        "usage_policy": {
-            "no_guaranteed_win": true,
-            "no_betting_commitment": true,
-            "explain_uncertainty": true
-        }
-    })
-}
-
-fn slim_match(raw: &Value) -> Value {
-    json!({
-        "id": raw.get("id"),
-        "lottery_type": raw.get("lottery_type"),
-        "league": raw.get("league"),
-        "home_team": raw.get("home_team"),
-        "away_team": raw.get("away_team"),
-        "match_time": raw.get("match_time"),
-        "status": raw.get("status"),
-        "odds": raw.get("odds"),
-    })
+    fb2_match_context(app_id, external_group_id, data)
 }
 
 fn infer_lottery_type(topic_hint: Option<&str>) -> Option<String> {
@@ -464,18 +421,6 @@ fn clean_query_value(value: &str) -> Option<&str> {
     } else {
         Some(value)
     }
-}
-
-fn default_usage_policy() -> Value {
-    json!({
-        "asr_free": true,
-        "tts_free": true,
-        "context_fetch_free": true,
-        "ai_reply_billable": true,
-        "no_guaranteed_win": true,
-        "no_betting_commitment": true,
-        "explain_uncertainty": true
-    })
 }
 
 fn log_context_fetch(
