@@ -81,6 +81,13 @@ GET /api/external/apps/fb2/context-contract
 
 该接口只返回主项目推荐的 context/tool contract、推荐环境变量和当前工具执行状态，不返回密钥，也不读取 fb2 业务数据。fb2 代理后续可以用它做接入自检，避免文档和代码逐渐漂移。
 
+响应同时包含 `context_health`：
+
+- `status=ready`：主项目已配置 fb2 base url、context token，并启用 context pack。
+- `status=degraded`：缺少 base url/token，或关闭了 context pack。
+- `checks`：只暴露布尔和数值配置，例如 `base_url_configured`、`context_token_configured`、`max_context_chars`。
+- `secret_values_exposed=false`：接口只显示是否配置，不返回任何密钥值。
+
 ## 主项目 Context Budget
 
 主项目收到 fb2 上下文后会先做预算裁剪：

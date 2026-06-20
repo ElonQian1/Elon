@@ -11,6 +11,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    external_app_context_health::public_context_health,
     external_app_context_tools::public_tool_contract_guidance,
     external_app_registry::{
         external_app_by_id, group_seeds, public_external_app_config, service_token_env_names,
@@ -71,6 +72,7 @@ pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Re
     };
     Json(json!({
         "app": public_external_app_config(app),
+        "context_health": public_context_health(app.id),
         "context_contract": public_tool_contract_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,
             "schema": "external_app.context.v1",
