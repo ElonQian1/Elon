@@ -46,6 +46,7 @@ mod external_app_context_example;
 mod external_app_context_health;
 mod external_app_context_observability;
 mod external_app_context_quality;
+mod external_app_context_response;
 mod external_app_context_tools;
 mod external_app_registry;
 mod external_app_usage_policy;

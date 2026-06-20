@@ -11,7 +11,9 @@ use crate::{
         infer_lottery_type, match_limit, order_limit, platform_order_summary_enabled, timeout_secs,
         FB2_APP_ID, FB2_CONTEXT_HEADER,
     },
-    external_app_context_contract::{fb2_match_context, fb2_pack_context},
+    external_app_context_response::{
+        compact_error, fb2_pack_response_to_context, fb2_response_to_context,
+    },
     external_app_registry::{external_group_by_group_id, public_external_app_config},
     types::AppState,
 };
@@ -209,120 +211,6 @@ async fn fetch_fb2_match_context(
     }
 }
 
-async fn fb2_pack_response_to_context(
-    app_id: &str,
-    external_group_id: &str,
-    response: reqwest::Response,
-) -> Value {
-    let status = response.status();
-    let text = match response.text().await {
-        Ok(text) => text,
-        Err(error) => {
-            return json!({
-                "app_id": app_id,
-                "group": external_group_id,
-                "status": "unavailable",
-                "error": compact_error(&error.to_string())
-            });
-        }
-    };
-    if !status.is_success() {
-        return json!({
-            "app_id": app_id,
-            "group": external_group_id,
-            "status": "unavailable",
-            "status_code": status.as_u16(),
-            "error": truncate_chars(&text, 300)
-        });
-    }
-
-    let parsed = match serde_json::from_str::<Value>(&text) {
-        Ok(value) => value,
-        Err(error) => {
-            return json!({
-                "app_id": app_id,
-                "group": external_group_id,
-                "status": "unavailable",
-                "error": format!("fb2 context pack JSON 解析失败：{}", compact_error(&error.to_string()))
-            });
-        }
-    };
-    if parsed["success"].as_bool() != Some(true) {
-        return json!({
-            "app_id": app_id,
-            "group": external_group_id,
-            "status": "unavailable",
-            "error": parsed["error"].as_str().unwrap_or("fb2 返回失败状态")
-        });
-    }
-
-    let data = parsed.get("data").cloned().unwrap_or_else(|| json!({}));
-    fb2_pack_context(app_id, external_group_id, data)
-}
-
-async fn fb2_response_to_context(
-    app_id: &str,
-    external_group_id: &str,
-    response: reqwest::Response,
-) -> Value {
-    let status = response.status();
-    let text = match response.text().await {
-        Ok(text) => text,
-        Err(error) => {
-            return json!({
-                "app_id": app_id,
-                "group": external_group_id,
-                "status": "unavailable",
-                "error": compact_error(&error.to_string())
-            });
-        }
-    };
-    if !status.is_success() {
-        return json!({
-            "app_id": app_id,
-            "group": external_group_id,
-            "status": "unavailable",
-            "status_code": status.as_u16(),
-            "error": truncate_chars(&text, 300)
-        });
-    }
-
-    let parsed = match serde_json::from_str::<Value>(&text) {
-        Ok(value) => value,
-        Err(error) => {
-            return json!({
-                "app_id": app_id,
-                "group": external_group_id,
-                "status": "unavailable",
-                "error": format!("fb2 JSON 解析失败：{}", compact_error(&error.to_string()))
-            });
-        }
-    };
-    if parsed["success"].as_bool() != Some(true) {
-        return json!({
-            "app_id": app_id,
-            "group": external_group_id,
-            "status": "unavailable",
-            "error": parsed["error"].as_str().unwrap_or("fb2 返回失败状态")
-        });
-    }
-
-    let data = parsed.get("data").cloned().unwrap_or_else(|| json!({}));
-    fb2_match_context(app_id, external_group_id, data)
-}
-
-fn compact_error(error: &str) -> String {
-    truncate_chars(error, 220)
-}
-
-fn truncate_chars(value: &str, max_chars: usize) -> String {
-    let mut out = value.chars().take(max_chars).collect::<String>();
-    if value.chars().count() > max_chars {
-        out.push_str("...");
-    }
-    out
-}
-
 fn clean_query_value(value: &str) -> Option<&str> {
     let value = value.trim();
     if value.is_empty() {
@@ -359,16 +247,4 @@ fn log_context_fetch(
         context_chars,
         "external app context fetched"
     );
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn truncates_long_errors() {
-        let text = "a".repeat(300);
-        let truncated = truncate_chars(&text, 20);
-        assert_eq!(truncated, "aaaaaaaaaaaaaaaaaaaa...");
-    }
 }
