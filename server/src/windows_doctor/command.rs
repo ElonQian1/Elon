@@ -25,10 +25,10 @@ pub(super) fn run_command<S: AsRef<str>>(program: &str, args: &[S], max_output: 
         .iter()
         .map(|arg| arg.as_ref().to_string())
         .collect::<Vec<_>>();
-    match Command::new(program)
-        .args(args.iter().map(|arg| arg.as_ref()))
-        .output()
-    {
+    let mut command = Command::new(program);
+    command.args(args.iter().map(|arg| arg.as_ref()));
+    hide_command_window(&mut command);
+    match command.output() {
         Ok(output) => {
             let stdout = truncate_lossy(&output.stdout, max_output);
             let stderr = truncate_lossy(&output.stderr, max_output / 2);
@@ -58,4 +58,13 @@ fn truncate_lossy(bytes: &[u8], max_chars: usize) -> String {
     }
     let head = value.chars().take(max_chars).collect::<String>();
     format!("{head}\n... truncated {count} chars ...")
+}
+
+fn hide_command_window(_command: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        _command.creation_flags(CREATE_NO_WINDOW);
+    }
 }

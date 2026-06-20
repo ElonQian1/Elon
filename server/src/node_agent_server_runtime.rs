@@ -368,21 +368,20 @@ impl ToolGuard {
         if !command_allowed(command) {
             bail!("run_command denied by policy: {command}");
         }
-        let output = tokio::time::timeout(
-            Duration::from_secs(300),
-            Command::new("powershell")
-                .args([
-                    "-NoProfile",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-Command",
-                    command,
-                ])
-                .current_dir(&self.workspace)
-                .output(),
-        )
-        .await
-        .map_err(|_| anyhow!("run_command timed out after 300s"))??;
+        let mut child_command = Command::new("powershell");
+        child_command
+            .args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+            ])
+            .current_dir(&self.workspace);
+        hide_command_window(&mut child_command);
+        let output = tokio::time::timeout(Duration::from_secs(300), child_command.output())
+            .await
+            .map_err(|_| anyhow!("run_command timed out after 300s"))??;
         let combined = format!(
             "exit={}\nstdout:\n{}\nstderr:\n{}",
             output.status.code().unwrap_or(-1),
@@ -503,6 +502,14 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
     let mut truncated: String = value.chars().take(max_chars).collect();
     truncated.push_str("\n[truncated]");
     truncated
+}
+
+fn hide_command_window(_command: &mut Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        _command.creation_flags(CREATE_NO_WINDOW);
+    }
 }
 
 fn send_chunk(out_tx: &mpsc::UnboundedSender<Message>, req_id: &str, text: String) {

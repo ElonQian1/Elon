@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use homecli_proto::NodeStorageProfile;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Output};
 
 #[derive(Debug, Clone, Default)]
 pub struct StorageSettings {
@@ -221,12 +221,9 @@ fn prepare_owner_worktree(
 }
 
 fn clone_storage_repo(bare_repo: &Path, worktree: &Path) -> Result<()> {
-    let output = Command::new("git")
-        .arg("clone")
-        .arg(bare_repo)
-        .arg(worktree)
-        .output()
-        .context("failed to run git clone")?;
+    let mut command = Command::new("git");
+    command.arg("clone").arg(bare_repo).arg(worktree);
+    let output = command_output(&mut command).context("failed to run git clone")?;
     if !output.status.success() {
         return Err(anyhow!(
             "git clone failed: {}",
@@ -374,19 +371,17 @@ fn remote_branch_exists(repo: &Path, branch: &str) -> bool {
 }
 
 fn git_available() -> bool {
-    Command::new("git")
-        .arg("--version")
-        .output()
+    let mut command = Command::new("git");
+    command.arg("--version");
+    command_output(&mut command)
         .map(|output| output.status.success())
         .unwrap_or(false)
 }
 
 fn run_git(cwd: &Path, args: &[&str]) -> Result<()> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .context("failed to run git")?;
+    let mut command = Command::new("git");
+    command.args(args).current_dir(cwd);
+    let output = command_output(&mut command).context("failed to run git")?;
     if !output.status.success() {
         return Err(anyhow!(
             "git command failed: {}",
@@ -397,11 +392,9 @@ fn run_git(cwd: &Path, args: &[&str]) -> Result<()> {
 }
 
 fn git_output(cwd: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .context("failed to run git")?;
+    let mut command = Command::new("git");
+    command.args(args).current_dir(cwd);
+    let output = command_output(&mut command).context("failed to run git")?;
     if !output.status.success() {
         return Err(anyhow!(
             "git command failed: {}",
@@ -452,32 +445,44 @@ fn safe_path_part(value: &str, fallback: &str, max_len: usize) -> String {
 
 #[cfg(windows)]
 fn disk_free_bytes(path: &Path) -> Option<u64> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
     use std::path::{Component, Prefix};
 
-    let drive = path.components().find_map(|component| match component {
+    let drive_root = path.components().find_map(|component| match component {
         Component::Prefix(prefix) => match prefix.kind() {
             Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => {
-                Some((letter as char).to_ascii_uppercase())
+                Some(format!("{}:\\", (letter as char).to_ascii_uppercase()))
             }
             _ => None,
         },
         _ => None,
     })?;
-    let script = format!("(Get-PSDrive -Name '{}').Free", drive);
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            &script,
-        ])
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    String::from_utf8_lossy(&output.stdout).trim().parse().ok()
+    let wide_path = OsStr::new(&drive_root)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<u16>>();
+    let mut free_available = 0u64;
+    let ok = unsafe {
+        GetDiskFreeSpaceExW(
+            wide_path.as_ptr(),
+            &mut free_available,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    (ok != 0).then_some(free_available)
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetDiskFreeSpaceExW(
+        lpDirectoryName: *const u16,
+        lpFreeBytesAvailableToCaller: *mut u64,
+        lpTotalNumberOfBytes: *mut u64,
+        lpTotalNumberOfFreeBytes: *mut u64,
+    ) -> i32;
 }
 
 #[cfg(not(windows))]
@@ -495,6 +500,20 @@ fn disk_free_bytes(path: &Path) -> Option<u64> {
     let line = text.lines().nth(1)?;
     let available_kb = line.split_whitespace().nth(3)?.parse::<u64>().ok()?;
     available_kb.checked_mul(1024)
+}
+
+fn command_output(command: &mut Command) -> std::io::Result<Output> {
+    hide_command_window(command);
+    command.output()
+}
+
+fn hide_command_window(_command: &mut Command) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        _command.creation_flags(CREATE_NO_WINDOW);
+    }
 }
 
 #[cfg(test)]
