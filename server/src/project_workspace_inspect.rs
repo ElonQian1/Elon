@@ -1,9 +1,9 @@
 use anyhow::Result;
 use homecli_proto::ProjectWorkspaceInspectStatus;
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::path::{Path, PathBuf};
+
+#[cfg(not(windows))]
+use std::process::Command;
 
 pub fn inspect_project_workspace(workspace_path: &str) -> Result<ProjectWorkspaceInspectStatus> {
     let path = PathBuf::from(workspace_path);
@@ -59,11 +59,7 @@ pub fn inspect_project_workspace(workspace_path: &str) -> Result<ProjectWorkspac
 }
 
 fn git_output(cwd: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(cwd)
-        .output()
-        .ok()?;
+    let output = elon_pc_dev_runtime::command_output("git", args, Some(cwd)).ok()?;
     if !output.status.success() {
         return None;
     }
@@ -71,52 +67,50 @@ fn git_output(cwd: &Path, args: &[&str]) -> Option<String> {
     (!text.is_empty()).then_some(text)
 }
 
-#[cfg(windows)]
 fn command_available(name: &str) -> bool {
-    Command::new("where")
-        .arg(name)
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
-}
-
-#[cfg(not(windows))]
-fn command_available(name: &str) -> bool {
-    Command::new("sh")
-        .args(["-c", "command -v \"$1\" >/dev/null 2>&1", "sh", name])
-        .output()
-        .map(|output| output.status.success())
-        .unwrap_or(false)
+    elon_pc_dev_runtime::command_path(name).is_some()
 }
 
 #[cfg(windows)]
 fn disk_free_bytes(path: &Path) -> Option<u64> {
+    use std::ffi::OsStr;
+    use std::os::windows::ffi::OsStrExt;
     use std::path::{Component, Prefix};
 
-    let drive = path.components().find_map(|component| match component {
+    let drive_root = path.components().find_map(|component| match component {
         Component::Prefix(prefix) => match prefix.kind() {
             Prefix::Disk(letter) | Prefix::VerbatimDisk(letter) => {
-                Some((letter as char).to_ascii_uppercase())
+                Some(format!("{}:\\", (letter as char).to_ascii_uppercase()))
             }
             _ => None,
         },
         _ => None,
     })?;
-    let script = format!("(Get-PSDrive -Name '{}').Free", drive);
-    let output = Command::new("powershell")
-        .args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            &script,
-        ])
-        .output()
-        .ok()?;
-    if !output.status.success() {
-        return None;
-    }
-    String::from_utf8_lossy(&output.stdout).trim().parse().ok()
+    let wide_path = OsStr::new(&drive_root)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect::<Vec<u16>>();
+    let mut free_available = 0u64;
+    let ok = unsafe {
+        GetDiskFreeSpaceExW(
+            wide_path.as_ptr(),
+            &mut free_available,
+            std::ptr::null_mut(),
+            std::ptr::null_mut(),
+        )
+    };
+    (ok != 0).then_some(free_available)
+}
+
+#[cfg(windows)]
+#[link(name = "kernel32")]
+unsafe extern "system" {
+    fn GetDiskFreeSpaceExW(
+        lpDirectoryName: *const u16,
+        lpFreeBytesAvailableToCaller: *mut u64,
+        lpTotalNumberOfBytes: *mut u64,
+        lpTotalNumberOfFreeBytes: *mut u64,
+    ) -> i32;
 }
 
 #[cfg(not(windows))]

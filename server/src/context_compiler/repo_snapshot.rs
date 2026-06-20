@@ -2,7 +2,6 @@ use std::{
     fs,
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use super::repo_walk;
@@ -95,11 +94,7 @@ fn git_status_short(workspace: &Path) -> Vec<String> {
 }
 
 fn git_output(workspace: &Path, args: &[&str]) -> Option<String> {
-    let output = Command::new("git")
-        .args(args)
-        .current_dir(workspace)
-        .output()
-        .ok()?;
+    let output = elon_pc_dev_runtime::command_output("git", args, Some(workspace)).ok()?;
     if !output.status.success() {
         return None;
     }
