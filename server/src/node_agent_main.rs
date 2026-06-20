@@ -1317,11 +1317,11 @@ async fn run_exec(
     let _ = out_tx.send(ws_text(&AgentToServer::TaskExit { task_id, code }));
 }
 
-fn hide_tokio_command_window(command: &mut tokio::process::Command) {
+fn hide_tokio_command_window(_command: &mut tokio::process::Command) {
     #[cfg(windows)]
     {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        _command.creation_flags(CREATE_NO_WINDOW);
     }
 }
 

@@ -61,12 +61,12 @@ pub fn command_from_path(program: &Path) -> Command {
     command
 }
 
-pub fn apply_hidden_window(command: &mut Command) {
+pub fn apply_hidden_window(_command: &mut Command) {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        _command.creation_flags(CREATE_NO_WINDOW);
     }
 }
 
