@@ -93,6 +93,8 @@ GET /api/external/apps/fb2/context-contract
 
 响应还包含 `context_pack_example`，提供主项目认可的最小请求参数、返回结构和 `minimum_required_fields`。fb2 每次调整 `/api/main-project/context/pack` 后，都应该先和这个示例对齐，再扩展更多业务字段。
 
+响应还包含 `context_observability_contract`，列出长期评测推荐指标，例如 `context_pack_latency_ms`、`source_counts`、`fallback_used`、`stale_source_count`、`permission_denied_count`、`citation_coverage`。fb2 后续做领域索引、观点记忆和复盘时，优先围绕这些指标优化，而不是只追求返回更多原始数据。
+
 ## 主项目 Context Budget
 
 主项目收到 fb2 上下文后会先做预算裁剪：
@@ -223,7 +225,7 @@ source/status/generated_at
 - `context_chars`
 - `has_external_user_id`
 
-后续 P5 评测会在此基础上扩展为结构化指标：延迟、回退原因、引用命中率、过期数据次数、权限拒绝次数。
+后续 P5 评测会在此基础上扩展为结构化指标：延迟、回退原因、引用命中率、过期数据次数、权限拒绝次数。这些指标的机器可读版本见 `context_observability_contract`。
 
 ## 返回要求
 
