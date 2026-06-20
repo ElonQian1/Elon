@@ -33,6 +33,31 @@ impl Store {
         .map_err(Into::into)
     }
 
+    pub fn external_account_for_main_user(
+        &self,
+        app_id: &str,
+        main_user_id: &str,
+    ) -> Result<Option<ExternalAccountOrigin>> {
+        let app_id = normalize_app_id(app_id)?;
+        let main_user_id = main_user_id.trim();
+        if main_user_id.is_empty() {
+            return Ok(None);
+        }
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT app_id, external_user_id, account, display_name, avatar_url,
+                    main_user_id, status, updated_at
+             FROM external_app_accounts
+             WHERE app_id = ?1 AND main_user_id = ?2 AND status = 'active'
+             ORDER BY updated_at DESC
+             LIMIT 1",
+            params![app_id, main_user_id],
+            external_account_origin_from_row,
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
     pub fn upsert_external_app_account(
         &self,
         app_id: &str,

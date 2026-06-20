@@ -294,7 +294,8 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
         DEVELOPMENT_REDIRECT_REPLY.to_string()
     } else {
         let external_context =
-            crate::external_app_context::group_context_for_chat(&state, &group_id, None).await;
+            crate::external_app_context::group_context_for_chat(&state, &user_id, &group_id, None)
+                .await;
         social_ai_reply_or_fallback(
             &state,
             &user_id,

@@ -144,6 +144,7 @@ pub async fn create_group_summary_post(
     };
     let external_context = crate::external_app_context::group_context_for_chat(
         &state,
+        &user.id,
         &group_id,
         input.topic.as_deref(),
     )
@@ -250,6 +251,7 @@ pub async fn auto_split_group_summary_posts(
         };
         let external_context = crate::external_app_context::group_context_for_chat(
             &state,
+            &user.id,
             &group_id,
             input.topic.as_deref(),
         )
