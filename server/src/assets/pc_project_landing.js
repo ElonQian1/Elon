@@ -9,6 +9,9 @@
     linux: { label: 'Linux', short: 'Linux' }
   };
   const ACTIVE_STATUSES = new Set(['available', 'external']);
+  const RELEASE_MANIFEST_TTL_MS = 3 * 60 * 1000;
+  const RELEASE_MANIFEST_ERROR_TTL_MS = 60 * 1000;
+  const releaseManifestCache = new Map();
 
   function create(ctx) {
     const {
@@ -104,7 +107,7 @@
       if (status === 'unavailable') return '暂不可用';
       if (status === 'coming_soon') return '即将支持';
       if (status === 'needs_configuration') return '待配置';
-      if (status === 'not_deployed') return '未部署';
+      if (status === 'not_deployed') return '待配置';
       if (status === 'third_party') return '第三方入口';
       if (status === 'partial') return '部分可用';
       if (status === 'pending') return '待发布';
@@ -233,13 +236,99 @@
       );
     }
 
-    function downloadsOf(project, landing) {
+    function releaseManifestUrlOf(project, landing) {
+      return valueOf(
+        landing.release_manifest_url, landing.releaseManifestUrl,
+        project && (project.release_manifest_url || project.releaseManifestUrl)
+      );
+    }
+
+    function releaseManifestEntry(url) {
+      const entry = releaseManifestCache.get(url);
+      if (!entry || entry.expiresAt <= Date.now()) return null;
+      return entry;
+    }
+
+    function releaseManifestOf(project, landing) {
+      const url = releaseManifestUrlOf(project, landing);
+      const entry = url ? releaseManifestEntry(url) : null;
+      return entry && entry.data ? entry.data : null;
+    }
+
+    async function refreshReleaseManifest(project, landing) {
+      const url = releaseManifestUrlOf(project, landing);
+      if (!url || releaseManifestEntry(url)) return;
+      releaseManifestCache.set(url, { expiresAt: Date.now() + RELEASE_MANIFEST_ERROR_TTL_MS, data: null, pending: true });
+      try {
+        const response = await fetch(url, { cache: 'no-store' });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const data = await response.json();
+        releaseManifestCache.set(url, { expiresAt: Date.now() + RELEASE_MANIFEST_TTL_MS, data });
+        if (project && String(project.id) === String(state.activeProjectId)) render();
+      } catch (error) {
+        releaseManifestCache.set(url, { expiresAt: Date.now() + RELEASE_MANIFEST_ERROR_TTL_MS, data: null, error: error.message || String(error) });
+      }
+    }
+
+    function releaseDownloadsOf(releaseManifest) {
+      const manifest = objectOf(releaseManifest);
+      return downloadArrayOf(manifest.downloads || manifest.clients || manifest.platforms);
+    }
+
+    function mergeReleaseDownloads(downloads, releaseManifest) {
+      const releaseDownloads = releaseDownloadsOf(releaseManifest).map(normalizeDownload).filter(Boolean);
+      if (!releaseDownloads.length) return downloads;
+      const byPlatform = new Map();
+      releaseDownloads.forEach((item, index) => {
+        if (!byPlatform.has(item.platform)) byPlatform.set(item.platform, []);
+        byPlatform.get(item.platform).push(Object.assign({ releaseIndex: index }, item));
+      });
+      const used = new Set();
+      const merged = downloads.map((item) => {
+        const match = matchingReleaseDownload(item, byPlatform.get(item.platform) || [], used);
+        if (!match) return item;
+        used.add(match.releaseIndex);
+        return mergeDownloadItem(item, match);
+      });
+      releaseDownloads.forEach((item, index) => {
+        if (!used.has(index)) merged.push(item);
+      });
+      return merged;
+    }
+
+    function matchingReleaseDownload(item, candidates, used) {
+      const active = candidates.filter((candidate) => !used.has(candidate.releaseIndex));
+      if (active.length === 1) return active[0];
+      return active.find((candidate) => (
+        (item.kind && candidate.kind && item.kind === candidate.kind) ||
+        (item.label && candidate.label && item.label === candidate.label) ||
+        (item.short && candidate.short && item.short === candidate.short)
+      )) || null;
+    }
+
+    function mergeDownloadItem(base, release) {
+      return Object.assign({}, base, {
+        label: base.label || release.label,
+        short: base.short || release.short,
+        kind: base.kind || release.kind,
+        url: release.url || base.url,
+        manifestUrl: release.manifestUrl || base.manifestUrl,
+        version: release.version || base.version,
+        size: release.size || base.size,
+        status: release.status || base.status,
+        note: release.note || base.note,
+        external: base.external || release.external,
+        variants: release.variants && release.variants.length ? release.variants : base.variants
+      });
+    }
+
+    function downloadsOf(project, landing, releaseManifest) {
       const rawDownloads = [
         ...downloadArrayOf(state.projectSpace && state.projectSpace.downloads),
         ...downloadArrayOf(landing.downloads),
         ...downloadArrayOf(project && project.downloads)
       ];
-      const downloads = rawDownloads.map(normalizeDownload).filter(Boolean);
+      const downloads = mergeReleaseDownloads(rawDownloads.map(normalizeDownload).filter(Boolean), releaseManifest);
 
       const apkUrl = latestApkUrl(project);
       if (apkUrl && !downloads.some((item) => item.platform === 'android' && item.url)) {
@@ -410,6 +499,8 @@
       const customLandingUrl = customLandingUrlOf(project, landing);
       const resources = [];
       if (customLandingUrl) resources.push({ label: '完整介绍', url: customLandingUrl });
+      const releaseManifestUrl = releaseManifestUrlOf(project, landing);
+      if (releaseManifestUrl) resources.push({ label: '发布 Manifest', url: releaseManifestUrl });
       const manifestUrl = valueOf(landing.landing_manifest_url, landing.landingManifestUrl, project && (project.landing_manifest_url || project.landingManifestUrl));
       if (manifestUrl) resources.push({ label: 'Landing Manifest', url: manifestUrl });
       [
@@ -523,7 +614,8 @@
       const project = projectOf();
       if (!project) return;
       const landing = landingOf(project);
-      const downloads = downloadsOf(project, landing);
+      const releaseManifest = releaseManifestOf(project, landing);
+      const downloads = downloadsOf(project, landing, releaseManifest);
       const title = titleOf(project);
       const tagline = taglineOf(project, landing, downloads);
       const description = descriptionOf(project, landing);
@@ -559,6 +651,7 @@
       </section>`;
 
       bindActions();
+      refreshReleaseManifest(project, landing);
     }
 
     function bindActions() {

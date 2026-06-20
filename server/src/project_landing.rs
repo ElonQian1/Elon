@@ -165,6 +165,11 @@ fn normalize_manifest(value: Value) -> Option<Map<String, Value>> {
             &["landing_manifest_url", "landingManifestUrl", "manifest_url"],
         ),
     );
+    insert_string(
+        &mut output,
+        "release_manifest_url",
+        first_url(object, &["release_manifest_url", "releaseManifestUrl"]),
+    );
 
     insert_text_array(
         &mut output,
@@ -275,11 +280,7 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
     let mut object = Map::new();
     match value {
         Value::Object(source) => {
-            let platform = normalize_platform(
-                first_string(source, &["platform", "os", "kind", "type"], MAX_SHORT_TEXT)
-                    .as_deref()
-                    .or(platform_hint),
-            )?;
+            let platform = download_platform(source, platform_hint)?;
             object.insert("platform".to_string(), Value::String(platform));
             insert_string(
                 &mut object,
@@ -396,6 +397,18 @@ fn normalize_download(value: &Value, platform_hint: Option<&str>) -> Option<Valu
         _ => return None,
     }
     Some(Value::Object(object))
+}
+
+fn download_platform(source: &Map<String, Value>, platform_hint: Option<&str>) -> Option<String> {
+    first_string(source, &["platform", "os", "type"], MAX_SHORT_TEXT)
+        .as_deref()
+        .and_then(|value| normalize_platform(Some(value)))
+        .or_else(|| normalize_platform(platform_hint))
+        .or_else(|| {
+            first_string(source, &["kind"], MAX_SHORT_TEXT)
+                .as_deref()
+                .and_then(|value| normalize_platform(Some(value)))
+        })
 }
 
 fn normalize_download_variants(value: Option<&Value>) -> Vec<Value> {
@@ -799,6 +812,7 @@ mod tests {
             r#"{
               "title": "Demo",
               "tagline": "Fast client downloads",
+              "releaseManifestUrl": "https://example.com/project-downloads.json",
               "downloads": {
                 "apk": {
                   "url": "https://example.com/app.apk",
@@ -823,6 +837,10 @@ mod tests {
         let landing = load_workspace_landing(&workspace).unwrap();
         let object = landing.as_object().unwrap();
         assert_eq!(object["title"], "Demo");
+        assert_eq!(
+            object["release_manifest_url"],
+            "https://example.com/project-downloads.json"
+        );
         assert_eq!(object["source"]["status"], "available");
         assert_eq!(object["downloads"][0]["platform"], "android");
         assert_eq!(object["downloads"][0]["status"], "available");
