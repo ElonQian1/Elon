@@ -18,12 +18,22 @@
 
 卸载：
 
-- 双击「卸载一龙PC节点.exe」。
+- 在 PowerShell 或命令提示符运行：
+
+  .\一龙PC节点.exe --uninstall
+
+- 已经安装到本机后，也可以运行：
+
+  PowerShell:
+  & "$env:LOCALAPPDATA\ElonNode\一龙PC节点.exe" --uninstall
+
+  cmd:
+  "%LOCALAPPDATA%\ElonNode\一龙PC节点.exe" --uninstall
 
 目录说明：
 
-- 顶层只保留用户入口和卸载入口。
-- _internal 目录是程序内部文件，普通用户不需要打开。
+- 顶层只保留一个用户入口：「一龙PC节点.exe」。
+- _internal 目录是程序内部文件，普通用户和 AI 代理都不需要直接运行里面的 exe。
 
 高级配置：
 

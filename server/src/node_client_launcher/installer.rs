@@ -7,7 +7,7 @@ use std::{
 
 use super::{
     env_file, paths, process, windows_integration, AGENT_EXE_NAME, DEFAULT_ADMIN_PORT,
-    INTERNAL_DIR_NAME,
+    INTERNAL_DIR_NAME, LEGACY_UNINSTALL_EXE_NAME,
 };
 
 const INTERNAL_FILES: &[&str] = &[
@@ -21,6 +21,7 @@ const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
     "安装一龙PC节点.cmd",
     "启动一龙节点.cmd",
     "卸载一龙PC节点.cmd",
+    LEGACY_UNINSTALL_EXE_NAME,
     "install-elon-node.ps1",
     "start-node-agent.ps1",
     "tray-launcher.ps1",
@@ -54,7 +55,6 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
 
     let current_exe = std::env::current_exe().context("无法定位当前客户端 exe")?;
     copy_if_needed(&current_exe, &paths::client_exe(&install_dir))?;
-    copy_if_needed(&current_exe, &paths::uninstall_exe(&install_dir))?;
 
     let source_internal = resolve_source_internal_dir(&install_dir)?;
     copy_internal_files(&source_internal, &internal_dir)?;
@@ -93,9 +93,7 @@ pub(crate) fn uninstall() -> Result<()> {
 }
 
 fn install_layout_ready(install_dir: &Path) -> bool {
-    paths::client_exe(install_dir).exists()
-        && paths::uninstall_exe(install_dir).exists()
-        && paths::agent_exe(install_dir).exists()
+    paths::client_exe(install_dir).exists() && paths::agent_exe(install_dir).exists()
 }
 
 fn resolve_source_internal_dir(install_dir: &Path) -> Result<PathBuf> {
