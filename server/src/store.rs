@@ -19,6 +19,7 @@ mod common;
 mod compute_metering;
 mod conversations;
 pub(crate) mod default_joint_projects;
+mod external_app_tool_executions;
 mod external_apps;
 #[cfg(test)]
 mod external_apps_tests;
@@ -72,6 +73,7 @@ use common::{
     safe_external_id, validate_password, verify_password,
 };
 pub use compute_metering::ComputeMeterEvent;
+pub(crate) use external_app_tool_executions::ExternalAppToolExecutionWrite;
 pub use node_compute_runs::{
     NodeComputeRun, NodeComputeRunFinish, NodeComputeRunStart, NodeQualityScore,
 };

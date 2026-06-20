@@ -85,6 +85,12 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
                     "weak_result_count": "number of ready results needing caveats",
                     "unsafe_result_count": "number of results main project must not use as facts",
                     "duration_ms": "main-project side elapsed time"
+                },
+                "persistence": {
+                    "owner": "main_project",
+                    "table": "external_app_tool_executions",
+                    "purpose": "long-term evaluation of fb2 tool latency, grounding quality, source coverage and planner quality",
+                    "non_blocking": true
                 }
             },
             "permission_rules": [

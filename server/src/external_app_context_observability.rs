@@ -56,6 +56,13 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                     "owner": "main_project",
                     "meaning": "AI 回复中可追溯到 match_id/order_id/message_id 的关键判断比例。",
                     "target": "涉及比赛预测和订单剖析时应逐步提高。"
+                },
+                {
+                    "name": "external_tool_grounding",
+                    "type": "object",
+                    "owner": "main_project",
+                    "meaning": "主项目记录每次 fb2 工具执行的 grounded/weak/unsafe 结果数量、source_id 覆盖和耗时。",
+                    "target": "grounded_result_count 应逐步提高，unsafe_result_count 应保持为 0。"
                 }
             ],
             "recommended_log_fields": [
@@ -70,8 +77,36 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                 "source_counts",
                 "fallback_used",
                 "context_quality_warnings",
-                "tool_readiness_status"
+                "tool_readiness_status",
+                "tool_execution_id",
+                "grounded_result_count",
+                "weak_result_count",
+                "unsafe_result_count"
             ],
+            "main_project_persistence": {
+                "table": "external_app_tool_executions",
+                "retains": [
+                    "execution_id",
+                    "app_id",
+                    "main_group_id",
+                    "external_group_id",
+                    "main_user_id",
+                    "external_user_id",
+                    "context_audit_id",
+                    "topic_hint",
+                    "status",
+                    "planned_count",
+                    "ready_count",
+                    "grounded_result_count",
+                    "weak_result_count",
+                    "unsafe_result_count",
+                    "source_id_count",
+                    "duration_ms",
+                    "plan_json",
+                    "audit_json"
+                ],
+                "purpose": "支撑后续 planner 评测、工具召回质量、fb2 数据质量和回答 grounding 覆盖率优化。"
+            },
             "privacy_rules": [
                 "日志不得记录 shared secret、完整用户票据明细或其他用户订单。",
                 "普通群聊的平台订单只能记录匿名聚合指标。",
@@ -94,7 +129,11 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
-            .any(|metric| metric["name"] == "citation_coverage"));
+            .any(|metric| metric["name"] == "external_tool_grounding"));
+        assert_eq!(
+            guidance["main_project_persistence"]["table"],
+            "external_app_tool_executions"
+        );
         assert!(guidance["privacy_rules"]
             .as_array()
             .unwrap()

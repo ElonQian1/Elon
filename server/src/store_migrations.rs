@@ -79,6 +79,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (57, "fb2 外部应用 AI 回复试用额度配置", migration_v57),
     (58, "项目首页 landing manifest 云端快照", migration_v58),
     (59, "项目首页上传凭证", migration_v59),
+    (60, "外部应用工具执行审计", migration_v60),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2080,6 +2081,47 @@ fn migration_v59(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_landing_upload_tokens_project
           ON project_landing_upload_tokens(project_id);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v60(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS external_app_tool_executions (
+          execution_id           TEXT PRIMARY KEY,
+          app_id                 TEXT NOT NULL,
+          main_group_id          TEXT,
+          external_group_id      TEXT NOT NULL,
+          main_user_id           TEXT,
+          external_user_id       TEXT,
+          context_audit_id       TEXT,
+          topic_hint             TEXT,
+          status                 TEXT NOT NULL,
+          planned_count          INTEGER NOT NULL DEFAULT 0,
+          result_count           INTEGER NOT NULL DEFAULT 0,
+          ready_count            INTEGER NOT NULL DEFAULT 0,
+          grounded_result_count  INTEGER NOT NULL DEFAULT 0,
+          weak_result_count      INTEGER NOT NULL DEFAULT 0,
+          unsafe_result_count    INTEGER NOT NULL DEFAULT 0,
+          source_id_count        INTEGER NOT NULL DEFAULT 0,
+          duration_ms            INTEGER NOT NULL DEFAULT 0,
+          plan_json              TEXT NOT NULL,
+          results_json           TEXT NOT NULL,
+          audit_json             TEXT NOT NULL,
+          execution_json         TEXT NOT NULL,
+          created_at             TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_tool_exec_app_group_time
+          ON external_app_tool_executions(app_id, external_group_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_tool_exec_user_time
+          ON external_app_tool_executions(app_id, main_user_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_external_app_tool_exec_grounding
+          ON external_app_tool_executions(app_id, status, grounded_result_count, weak_result_count, unsafe_result_count);
         "#,
     )?;
     Ok(())

@@ -19,6 +19,7 @@ use crate::{
     external_app_context_tool_planner::{plan_fb2_tools, PlannedTool},
     external_app_context_tool_result::normalize_parsed_tool_result,
     external_app_registry::external_group_by_group_id,
+    store::ExternalAppToolExecutionWrite,
     types::AppState,
 };
 
@@ -49,9 +50,15 @@ pub(crate) async fn group_tool_results_for_chat(
     let plan_metadata = tool_plan.to_metadata();
     let planned_tool_names = tool_plan.tool_names();
     let planned_tools = tool_plan.into_tools();
+    let context_audit_id = context
+        .get("context_audit_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned);
 
     let Some(base_url) = fb2_base_url() else {
-        return Some(unavailable_execution(
+        let execution = unavailable_execution(
             &execution_id,
             app.id,
             group.external_group_id,
@@ -60,10 +67,22 @@ pub(crate) async fn group_tool_results_for_chat(
             planned_tools,
             "missing_fb2_base_url",
             started_at.elapsed().as_millis(),
-        ));
+        );
+        record_tool_execution(
+            state,
+            user_id,
+            group_id,
+            app.id,
+            group.external_group_id,
+            None,
+            context_audit_id.as_deref(),
+            topic_hint,
+            &execution,
+        );
+        return Some(execution);
     };
     let Some(token) = fb2_context_token() else {
-        return Some(unavailable_execution(
+        let execution = unavailable_execution(
             &execution_id,
             app.id,
             group.external_group_id,
@@ -72,7 +91,19 @@ pub(crate) async fn group_tool_results_for_chat(
             planned_tools,
             "missing_fb2_context_token",
             started_at.elapsed().as_millis(),
-        ));
+        );
+        record_tool_execution(
+            state,
+            user_id,
+            group_id,
+            app.id,
+            group.external_group_id,
+            None,
+            context_audit_id.as_deref(),
+            topic_hint,
+            &execution,
+        );
+        return Some(execution);
     };
 
     let external_user_id = state
@@ -85,13 +116,6 @@ pub(crate) async fn group_tool_results_for_chat(
         .ok()
         .flatten()
         .map(|account| account.external_user_id);
-
-    let context_audit_id = context
-        .get("context_audit_id")
-        .and_then(Value::as_str)
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned);
 
     let mut executable = Vec::new();
     let mut results = Vec::new();
@@ -147,7 +171,7 @@ pub(crate) async fn group_tool_results_for_chat(
         "external app tools executed"
     );
 
-    Some(json!({
+    let execution = json!({
         "schema": "external_app.executed_tools.v1",
         "execution_id": execution_id,
         "app_id": app.id,
@@ -159,7 +183,55 @@ pub(crate) async fn group_tool_results_for_chat(
         "results": results,
         "ready_count": ready_count,
         "audit": audit
-    }))
+    });
+    record_tool_execution(
+        state,
+        user_id,
+        group_id,
+        app.id,
+        group.external_group_id,
+        external_user_id.as_deref(),
+        context_audit_id.as_deref(),
+        topic_hint,
+        &execution,
+    );
+    Some(execution)
+}
+
+fn record_tool_execution(
+    state: &Arc<AppState>,
+    user_id: &str,
+    group_id: &str,
+    app_id: &str,
+    external_group_id: &str,
+    external_user_id: Option<&str>,
+    context_audit_id: Option<&str>,
+    topic_hint: Option<&str>,
+    execution: &Value,
+) {
+    if let Err(error) =
+        state
+            .store
+            .record_external_app_tool_execution(ExternalAppToolExecutionWrite {
+                execution,
+                app_id,
+                main_group_id: group_id,
+                external_group_id,
+                main_user_id: user_id,
+                external_user_id,
+                context_audit_id,
+                topic_hint,
+            })
+    {
+        warn!(
+            app_id,
+            group_id,
+            external_group_id,
+            user_id,
+            error = %error,
+            "failed to persist external app tool execution audit"
+        );
+    }
 }
 
 async fn execute_fb2_tool(
