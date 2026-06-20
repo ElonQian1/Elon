@@ -255,6 +255,14 @@
                 <textarea id="settingsProjectDesc" rows="2" placeholder="可选"></textarea>
               </label>
             </details>
+            <label class="settings-field">
+              <span>AI 运行权限</span>
+              <select id="settingsRuntimePermission">
+                <option value="project_write">仅项目内写入</option>
+                <option value="full_access">完全访问</option>
+              </select>
+            </label>
+            <p class="settings-panel-caption" id="settingsRuntimePermissionHint">AI 只能读写当前项目目录，并运行开发相关命令。</p>
             <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
             <div class="settings-actions">
               <button class="text-button" id="inspectProjectFolderBtn" type="button">读取目录信息</button>

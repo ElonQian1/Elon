@@ -1971,7 +1971,8 @@ button { cursor: pointer; }
   margin-bottom: 12px;
 }
 .settings-field input,
-.settings-field textarea {
+.settings-field textarea,
+.settings-field select {
   width: 100%;
   border: 1px solid #353842;
   border-radius: 6px;
@@ -1983,7 +1984,8 @@ button { cursor: pointer; }
   resize: vertical;
 }
 .settings-field input:focus,
-.settings-field textarea:focus {
+.settings-field textarea:focus,
+.settings-field select:focus {
   border-color: #5e8bff;
 }
 .input-action {

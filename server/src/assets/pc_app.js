@@ -55,7 +55,8 @@
     settingsProjectPath: $('settingsProjectPath'), settingsProjectName: $('settingsProjectName'),
     settingsProjectDesc: $('settingsProjectDesc'), settingsProjectRepo: $('settingsProjectRepo'),
     settingsProjectBranch: $('settingsProjectBranch'), settingsProjectMeta: $('settingsProjectMeta'),
-    settingsProjectResult: $('settingsProjectResult')
+    settingsProjectResult: $('settingsProjectResult'), settingsRuntimePermission: $('settingsRuntimePermission'),
+    settingsRuntimePermissionHint: $('settingsRuntimePermissionHint')
   };
 
   let models = null;
@@ -728,6 +729,10 @@
     els.chooseProjectFolderBtn.addEventListener('click', chooseLocalProjectFolder);
     els.inspectProjectFolderBtn.addEventListener('click', inspectLocalProjectFolder);
     els.registerProjectBtn.addEventListener('click', registerLocalProject);
+    if (els.settingsRuntimePermission) {
+      els.settingsRuntimePermission.addEventListener('change', syncSettingsRuntimePermissionHint);
+      syncSettingsRuntimePermissionHint();
+    }
     $('logoutBtn').addEventListener('click', logout);
     els.sidebarSearch.addEventListener('input', renderChannels);
     els.composer.addEventListener('submit', (event) => {
@@ -1775,6 +1780,29 @@
     els.settingsProjectMeta.textContent = path ? `${path} · ${git}` : '尚未选择项目目录';
   }
 
+  function normalizeRuntimePermission(value) {
+    return clean(value) === 'full_access' ? 'full_access' : 'project_write';
+  }
+
+  function syncSettingsRuntimePermissionHint() {
+    if (!els.settingsRuntimePermissionHint || !els.settingsRuntimePermission) return;
+    const mode = normalizeRuntimePermission(els.settingsRuntimePermission.value);
+    els.settingsRuntimePermissionHint.textContent = mode === 'full_access'
+      ? '完全访问会让 AI CLI 按用户授权绕过项目沙箱，可能读取或修改项目目录外的本机文件。'
+      : 'AI 只能读写当前项目目录，并运行开发相关命令。';
+  }
+
+  async function saveProjectRuntimePermission(project, requestedMode) {
+    const projectId = clean(project && project.id);
+    if (!projectId) return;
+    const mode = normalizeRuntimePermission(requestedMode);
+    const data = await api(`/api/projects/${encodeURIComponent(projectId)}/runtime-permission`, {
+      method: 'PATCH',
+      body: JSON.stringify({ mode, confirmFullAccess: mode === 'full_access' })
+    });
+    project.runtime_permission = data.mode || mode;
+  }
+
   async function chooseLocalProjectFolder() {
     setSettingsResult('正在打开本机文件夹选择器…');
     setSettingsBusy(els.chooseProjectFolderBtn, true, '选择中…');
@@ -1831,6 +1859,14 @@
       setSettingsResult('请选择项目目录，确认项目名称已自动填写。', 'error');
       return;
     }
+    const runtimeMode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
+    if (runtimeMode === 'full_access') {
+      const ok = window.confirm(`确认给项目「${name}」开启完全访问？AI CLI 可能读取或修改项目目录外的本机文件和系统设置。`);
+      if (!ok) {
+        setSettingsResult('已取消完全访问授权，项目尚未注册。');
+        return;
+      }
+    }
     setSettingsBusy(els.registerProjectBtn, true, '注册中…');
     try {
       await ensureLocalNodeLogin();
@@ -1846,6 +1882,7 @@
       });
       const project = (data.cloud && data.cloud.project) || {};
       const reused = data.cloud && data.cloud.reused_existing;
+      await saveProjectRuntimePermission(project, runtimeMode);
       setSettingsResult(`${reused ? '已复用现有项目' : '注册成功'}：${escapeHtml(project.name || name)}${project.id ? ` · ${escapeHtml(project.id)}` : ''}`);
       await loadBaseData();
       if (project.id) {

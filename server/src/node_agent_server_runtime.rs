@@ -471,6 +471,9 @@ fn command_allowed(command: &str) -> bool {
         "git status",
         "git diff",
         "git log",
+        "git show",
+        "git branch",
+        "git remote",
         "git fetch",
         "git pull --ff-only",
         "git add",
@@ -480,15 +483,48 @@ fn command_allowed(command: &str) -> bool {
         "cargo test",
         "cargo build",
         "cargo fmt",
+        "cargo clippy",
+        "cargo run",
         "rustfmt ",
         "npm test",
         "npm run lint",
         "npm run test",
         "npm run build",
+        "npm run check",
+        "npm run format",
+        "npm run typecheck",
+        "pnpm test",
+        "pnpm run lint",
+        "pnpm run test",
+        "pnpm run build",
+        "pnpm run check",
+        "pnpm run format",
+        "pnpm run typecheck",
+        "yarn test",
+        "yarn run lint",
+        "yarn run test",
+        "yarn run build",
+        "yarn run check",
+        "yarn run format",
+        "yarn run typecheck",
+        "bun test",
+        "bun run lint",
+        "bun run test",
+        "bun run build",
+        "bun run check",
+        "python -m pytest",
+        "python -m unittest",
+        "pytest",
+        "go test",
+        "go vet",
+        "go build",
+        "dotnet test",
+        "dotnet build",
         ".\\gradlew.bat test",
         ".\\gradlew.bat :app:assembledebug",
         ".\\gradlew.bat testdebugunittest",
         "gradle test",
+        "gradle build",
     ];
     allowed_prefixes
         .iter()
@@ -559,6 +595,10 @@ mod tests {
         assert!(command_allowed("git status --short"));
         assert!(command_allowed("cargo check"));
         assert!(command_allowed("npm run build"));
+        assert!(command_allowed("pnpm run typecheck"));
+        assert!(command_allowed("python -m pytest"));
+        assert!(command_allowed("go test ./..."));
+        assert!(command_allowed("dotnet build"));
     }
 
     #[test]
