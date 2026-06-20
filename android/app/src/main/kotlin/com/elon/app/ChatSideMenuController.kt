@@ -44,7 +44,6 @@ internal class ChatSideMenuController(
     private val openPersonalProject: (Int) -> Unit,
     private val openJointProject: (Int) -> Unit,
     private val openProjectManagement: () -> Unit,
-    private val showCreateJointProjectDialog: () -> Unit,
     private val sendProjectShare: (ChatProjectShare) -> Unit,
     private val showCreateConversationDialog: () -> Unit,
     private val confirmLogout: () -> Unit,
@@ -295,7 +294,6 @@ internal class ChatSideMenuController(
             activeProjectIndex = activeProjectIndex,
             openPersonalProject = openPersonalProject,
             openJointProject = openJointProject,
-            showCreateJointProjectDialog = showCreateJointProjectDialog,
             requestClose = { animate -> close(animate) },
             dp = dp,
             selectableForeground = selectableForeground

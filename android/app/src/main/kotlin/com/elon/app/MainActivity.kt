@@ -665,7 +665,6 @@ class MainActivity : AppCompatActivity() {
                 openProjectSpaceForProject(index, true)
             },
             openProjectManagement = { navigationController.showProjectManagement(animate = true) },
-            showCreateJointProjectDialog = { projectActions.showCreateJointProjectDialog() },
             sendProjectShare = chatProjectShareActions::sendToCurrentChat,
             showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
             confirmLogout = { accountActions().confirmLogout() },

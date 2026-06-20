@@ -14,12 +14,9 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
-import android.widget.ImageButton
-import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import kotlin.math.hypot
 import kotlin.math.max
 
@@ -29,7 +26,6 @@ internal class ChatProjectSideMenuView(
     private val activeProjectIndex: () -> Int,
     private val openPersonalProject: (Int) -> Unit,
     private val openJointProject: (Int) -> Unit,
-    private val showCreateJointProjectDialog: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
@@ -38,7 +34,8 @@ internal class ChatProjectSideMenuView(
         orientation = LinearLayout.VERTICAL
         setPadding(dp(32), dp(92), dp(18), dp(18))
     }
-    private val expandedProjectIds = linkedSetOf<String>()
+    private var personalProjectsExpanded = false
+    private var jointProjectsExpanded = false
 
     init {
         overScrollMode = OVER_SCROLL_NEVER
@@ -55,23 +52,17 @@ internal class ChatProjectSideMenuView(
 
     fun render() {
         content.removeAllViews()
-        addTopMenu()
         addPersonalProjects()
         addJointProjects()
     }
 
-    private fun addTopMenu() {
-        content.addView(menuRow("文件库", R.drawable.ic_side_menu_files) {
-            Toast.makeText(context, "文件库功能准备中", Toast.LENGTH_SHORT).show()
-        })
-        content.addView(menuRow("设备", R.drawable.ic_side_menu_device) {
-            Toast.makeText(context, "设备功能准备中", Toast.LENGTH_SHORT).show()
-        })
-        content.addView(space(70))
-    }
-
     private fun addPersonalProjects() {
-        content.addView(sectionHeader("个人项目", showAddButton = false))
+        content.addView(sectionHeader("个人项目", personalProjectsExpanded) {
+            personalProjectsExpanded = !personalProjectsExpanded
+            render()
+        })
+        if (!personalProjectsExpanded) return
+
         val list = projects()
             .mapIndexed { index, project -> index to project }
             .filter { (_, project) -> !project.isJointDevelopmentProject() }
@@ -93,7 +84,12 @@ internal class ChatProjectSideMenuView(
     }
 
     private fun addJointProjects() {
-        content.addView(sectionHeader("联合项目", showAddButton = true))
+        content.addView(sectionHeader("联合项目", jointProjectsExpanded) {
+            jointProjectsExpanded = !jointProjectsExpanded
+            render()
+        })
+        if (!jointProjectsExpanded) return
+
         val jointProjects = projects()
             .mapIndexed { index, project -> index to project }
             .filter { (_, project) -> project.isJointDevelopmentProject() }
@@ -107,55 +103,28 @@ internal class ChatProjectSideMenuView(
         }
     }
 
-    private fun sectionHeader(title: String, showAddButton: Boolean): LinearLayout {
+    private fun sectionHeader(
+        title: String,
+        expanded: Boolean,
+        onClick: () -> Unit
+    ): LinearLayout {
         return LinearLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(42)
+                dp(46)
             ).apply {
                 topMargin = dp(2)
             }
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = if (expanded) "收起$title" else "展开$title"
             addView(menuText(title).apply {
                 setTextColor(Color.parseColor("#D6D6D6"))
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
             })
-            if (showAddButton) {
-                addView(ImageButton(context).apply {
-                    setImageResource(R.drawable.ic_add_circle_simple)
-                    imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
-                    background = null
-                    scaleType = ImageView.ScaleType.CENTER
-                    contentDescription = "发起联合项目"
-                    foreground = selectableForeground()
-                    setPadding(dp(4), dp(4), dp(4), dp(4))
-                    setOnClickListener {
-                        requestClose(true)
-                        postDelayed({ showCreateJointProjectDialog() }, CLOSE_DELAY_MS)
-                    }
-                }, LinearLayout.LayoutParams(dp(38), dp(38)))
-            }
-        }
-    }
-
-    private fun menuRow(title: String, iconRes: Int, action: () -> Unit): LinearLayout {
-        return LinearLayout(context).apply {
-            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(46))
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            isClickable = true
-            foreground = selectableForeground()
-            addView(ImageView(context).apply {
-                setImageResource(iconRes)
-                imageTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#A8A8A8"))
-                scaleType = ImageView.ScaleType.CENTER
-            }, LinearLayout.LayoutParams(dp(26), dp(26)))
-            addView(menuText(title).apply {
-                setPadding(dp(16), 0, 0, 0)
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-            })
-            setOnClickListener { action() }
+            setOnClickListener { onClick() }
         }
     }
 
@@ -179,92 +148,16 @@ internal class ChatProjectSideMenuView(
         }
     }
 
-    private fun jointProjectRow(index: Int, project: AppProject): LinearLayout {
-        val share = project.toChatProjectShare()
-        val expanded = expandedProjectIds.contains(project.id)
-        return LinearLayout(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp(7)
-            }
-            orientation = LinearLayout.VERTICAL
-            addView(LinearLayout(context).apply {
-                gravity = Gravity.CENTER_VERTICAL
-                orientation = LinearLayout.HORIZONTAL
-                isClickable = true
-                foreground = selectableForeground()
-                setPadding(dp(10), 0, 0, 0)
-                setOnClickListener {
-                    requestClose(true)
-                    postDelayed({ openJointProject(index) }, CLOSE_DELAY_MS)
-                }
-                setOnLongClickListener {
-                    startProjectDrag(it, share)
-                    true
-                }
-                addView(LinearLayout(context).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(menuText(project.title).apply {
-                        layoutParams = LinearLayout.LayoutParams(
-                            LinearLayout.LayoutParams.MATCH_PARENT,
-                            dp(28)
-                        )
-                    })
-                    addView(TextView(context).apply {
-                        text = project.latestProjectLog()
-                        setTextColor(Color.parseColor("#777777"))
-                        textSize = 10.5f
-                        maxLines = 1
-                        ellipsize = TextUtils.TruncateAt.END
-                        includeFontPadding = false
-                    })
-                }, LinearLayout.LayoutParams(0, dp(46), 1f))
-                addView(TextView(context).apply {
-                    text = if (expanded) "⌃" else "⌄"
-                    gravity = Gravity.CENTER
-                    includeFontPadding = false
-                    setTextColor(Color.parseColor("#A8A8A8"))
-                    textSize = 16f
-                    isClickable = true
-                    foreground = selectableForeground()
-                    setOnClickListener {
-                        if (expanded) expandedProjectIds.remove(project.id) else expandedProjectIds.add(project.id)
-                        render()
-                    }
-                }, LinearLayout.LayoutParams(dp(34), dp(34)))
-            })
-            if (expanded) {
-                project.events.take(3).ifEmpty { listOf(project.subtitle) }.forEach { log ->
-                    addView(logRow(log))
-                }
-            }
+    private fun jointProjectRow(index: Int, project: AppProject): TextView {
+        return projectNameRow(project, active = index == activeProjectIndex()) {
+            requestClose(true)
+            postDelayed({ openJointProject(index) }, CLOSE_DELAY_MS)
         }
     }
 
     private fun startProjectDrag(source: View, share: ChatProjectShare) {
         val clip = ClipData.newPlainText("project", share.toMessageText())
         source.startDragAndDrop(clip, View.DragShadowBuilder(source), share, 0)
-    }
-
-    private fun logRow(text: String): TextView {
-        return TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                leftMargin = dp(10)
-                rightMargin = dp(18)
-                topMargin = dp(3)
-            }
-            maxLines = 2
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            setTextColor(Color.parseColor("#777777"))
-            textSize = 11.5f
-            this.text = text
-        }
     }
 
     private fun emptyRow(text: String): TextView {
@@ -291,12 +184,6 @@ internal class ChatProjectSideMenuView(
         return View(context).apply {
             layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(heightDp))
         }
-    }
-
-    private fun AppProject.latestProjectLog(): String {
-        return events.firstOrNull()?.trim()?.takeIf { it.isNotBlank() }
-            ?: subtitle.takeIf { it.isNotBlank() }
-            ?: "联合项目最新的项目日志内容"
     }
 
     private companion object {
