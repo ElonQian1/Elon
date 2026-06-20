@@ -39,6 +39,7 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
             ],
             "notes": [
                 "主项目当前只把工具作为规划和追问依据，不会自动执行 fb2 工具。",
+                "工具执行请求和响应格式见同一 contract 响应中的 tool_execution_contract。",
                 "用户订单工具必须限制为 current_user_only。",
                 "群友观点必须返回 message_id，比赛和订单必须返回 source id。",
                 "审计工具只返回上下文来源和指标元数据，不返回完整订单、聊天正文或赔率明细。"

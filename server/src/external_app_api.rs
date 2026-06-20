@@ -16,6 +16,7 @@ use crate::{
     external_app_context_health::public_context_health,
     external_app_context_observability::public_context_observability_guidance,
     external_app_context_quality::public_context_quality_guidance,
+    external_app_context_tool_execution::public_tool_execution_guidance,
     external_app_context_tools::public_tool_contract_guidance,
     external_app_registry::{
         external_app_by_id, group_seeds, public_external_app_config, service_token_env_names,
@@ -110,6 +111,12 @@ pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Re
             "schema": "external_app.context.v1",
             "execution_status": "not_configured",
             "recommended_tools": []
+        })),
+        "tool_execution_contract": public_tool_execution_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.tool_execution.v1",
+            "execution_status": "not_configured",
+            "allowed_tools": []
         }))
     }))
     .into_response()

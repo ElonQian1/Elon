@@ -1,0 +1,98 @@
+//! Tool execution contract for external app context lookups.
+
+use serde_json::{json, Value};
+
+const FB2_TOOL_EXECUTE_PATH: &str = "/api/main-project/tools/execute";
+
+const FB2_ALLOWED_TOOLS: &[&str] = &[
+    "search_matches",
+    "get_match_detail",
+    "search_user_orders",
+    "get_order_detail",
+    "search_group_opinions",
+    "get_context_audit",
+    "context_audit_summary",
+];
+
+pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
+    match app_id {
+        "fb2" => Some(json!({
+            "app_id": "fb2",
+            "schema": "fb2.tool_execution.v1",
+            "execution_status": "contract_ready",
+            "transport": {
+                "method": "POST",
+                "path": FB2_TOOL_EXECUTE_PATH,
+                "auth_header": "X-FB2-AI-CENTER-TOKEN",
+                "timeout_ms": 6000,
+                "idempotency": "request_id"
+            },
+            "allowed_tools": FB2_ALLOWED_TOOLS,
+            "request_shape": {
+                "request_id": "string, main-project generated id for tracing and retry dedupe",
+                "tool_name": "one of allowed_tools",
+                "group_id": "fb2 external group id, required for group_context tools",
+                "external_user_id": "fb2 user id, required for current_user_only tools",
+                "context_audit_id": "optional audit id from the current context_pack",
+                "arguments": "tool-specific object, ids and filters only",
+                "reason": "short natural-language reason why AI needs the tool",
+                "limits": {
+                    "max_items": "optional integer, fb2 may clamp",
+                    "max_chars": "optional integer, fb2 may clamp"
+                }
+            },
+            "response_shape": {
+                "success": "boolean",
+                "data": "tool-specific object or array; must include source ids when possible",
+                "error": "string when success=false",
+                "generated_at": "ISO-8601 timestamp",
+                "source_ids": ["match_id", "order_id", "ticket_id", "message_id", "context_audit_id"],
+                "visibility": "group_context | current_user_only | audit_metadata_only | audit_metrics_only",
+                "metrics": {
+                    "latency_ms": "optional integer",
+                    "result_count": "optional integer",
+                    "truncated": "optional boolean"
+                }
+            },
+            "permission_rules": [
+                "current_user_only 工具必须带 external_user_id，fb2 只能返回该用户自己的订单/票据。",
+                "group_context 工具必须带 group_id，fb2 只能返回该群可见的比赛和群友观点。",
+                "audit 工具只能返回来源数量、耗时、裁剪和预算指标，不返回其他用户明细。",
+                "主项目不得把未执行工具的预测结果当作事实。"
+            ],
+            "result_grounding_rules": [
+                "比赛结果必须尽量带 match_id 和 odds_updated_at。",
+                "订单/票据结果必须尽量带 order_id 或 ticket_id。",
+                "群友观点结果必须带 message_id。",
+                "返回被截断时必须设置 metrics.truncated=true，并提示可继续按 id 查详情。"
+            ]
+        })),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn exposes_fb2_tool_execution_contract() {
+        let contract = public_tool_execution_guidance("fb2").unwrap();
+        assert_eq!(contract["schema"], "fb2.tool_execution.v1");
+        assert_eq!(contract["transport"]["path"], FB2_TOOL_EXECUTE_PATH);
+        assert!(contract["allowed_tools"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("get_match_detail")));
+        assert!(contract["permission_rules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|rule| rule.as_str().unwrap_or("").contains("external_user_id")));
+    }
+
+    #[test]
+    fn unknown_app_has_no_tool_execution_contract() {
+        assert!(public_tool_execution_guidance("unknown").is_none());
+    }
+}
