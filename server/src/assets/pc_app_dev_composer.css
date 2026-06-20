@@ -1,0 +1,104 @@
+.dev-composer-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border-top: 1px solid rgba(255, 255, 255, .06);
+  background: #202329;
+  color: var(--text-soft);
+}
+
+.dev-composer-bar[hidden] {
+  display: none;
+}
+
+.dev-composer-bar.ready {
+  box-shadow: inset 3px 0 0 rgba(35, 165, 90, .78);
+}
+
+.dev-composer-bar.warning {
+  box-shadow: inset 3px 0 0 rgba(240, 178, 76, .78);
+}
+
+.dev-composer-bar.full-access {
+  box-shadow: inset 3px 0 0 rgba(237, 66, 69, .78);
+}
+
+.dev-composer-main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.dev-composer-main strong,
+.dev-composer-main span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-composer-main strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.dev-composer-main span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.dev-composer-kicker {
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: rgba(35, 165, 90, .16);
+  color: #baf3cf !important;
+  padding: 0 9px;
+  font-weight: 800;
+}
+
+.dev-composer-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.dev-composer-actions button {
+  height: 28px;
+  border: 1px solid #3b3e46;
+  border-radius: 6px;
+  background: #2b2e36;
+  color: var(--text-soft);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.dev-composer-actions button:hover {
+  color: var(--text);
+  background: #363a44;
+}
+
+@media (max-width: 720px) {
+  .dev-composer-bar {
+    align-items: stretch;
+    flex-direction: column;
+    padding-inline: 10px;
+  }
+
+  .dev-composer-main {
+    flex-wrap: wrap;
+  }
+
+  .dev-composer-actions {
+    justify-content: flex-end;
+  }
+}

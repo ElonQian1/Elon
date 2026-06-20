@@ -60,6 +60,7 @@
   };
 
   let models = null;
+  let devComposer = null;
   const doctor = window.ElonPcDoctor.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
     setRails, renderChannels, setDoctorMode
@@ -81,6 +82,11 @@
     api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject
   });
   models = window.ElonPcModels.create({ state, els, clean, escapeHtml, api });
+  devComposer = window.ElonPcDevComposer.create({
+    state, els, clean, escapeHtml, openSettings,
+    selectNode: () => node.selectNode(),
+    openModelPicker: () => models.openModelPicker()
+  });
 
   function saveToken(token) {
     state.token = token || '';
@@ -646,6 +652,7 @@
     els.aiTaskBtn.classList.toggle('task-ready', !!aiEnabled);
     els.input.placeholder = placeholder || '输入消息';
     if (models) models.updateButton();
+    if (devComposer) devComposer.render();
   }
 
   function clearSurfaceModes() {
@@ -1668,6 +1675,7 @@
     const content = clean(els.input.value);
     if (!content) return;
     els.sendBtn.disabled = true;
+    let submittingDevTask = false;
     try {
       if (state.activeKind === 'doctor') {
         await doctor.sendComposerMessage(content);
@@ -1688,6 +1696,8 @@
           : `/api/projects/${encodeURIComponent(state.activeProjectId)}/channels/${encodeURIComponent(state.activeChannelId)}/messages`;
         const body = { content };
         if (shouldUseAiTask) {
+          submittingDevTask = true;
+          if (devComposer) devComposer.setBusy(true);
           const agent = models.selectedAgentForRequest();
           if (agent) body.agent = agent;
         }
@@ -1698,6 +1708,7 @@
     } catch (error) {
       showError(error);
     } finally {
+      if (submittingDevTask && devComposer) devComposer.setBusy(false);
       els.sendBtn.disabled = false;
     }
   }
