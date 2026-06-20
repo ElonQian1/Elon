@@ -28,9 +28,20 @@ const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
     "README.txt",
 ];
 
+const LEGACY_INTERNAL_FILES: &[&str] = &[
+    "elon-node-agent.exe",
+    "elon-node-agent.exe.new",
+    "elon-node-client.exe",
+    "elon-node-client.exe.new",
+    "elon-pc-node.exe",
+    "elon-pc-node.exe.new",
+    "一龙PC节点.exe.new",
+];
+
 pub(crate) fn ensure_installed() -> Result<PathBuf> {
     let install_dir = paths::install_dir()?;
     if install_layout_ready(&install_dir) && paths::is_running_from_install_dir(&install_dir) {
+        cleanup_legacy_files(&install_dir)?;
         if let Err(error) = windows_integration::register_url_protocol(&install_dir) {
             eprintln!("警告：注册网页一键唤起入口失败：{error:#}");
         }
@@ -57,7 +68,7 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
         copy_internal_files(&source_internal, &internal_dir)?;
     }
     preserve_user_env(&install_dir, &internal_dir)?;
-    cleanup_legacy_top_level(&install_dir)?;
+    cleanup_legacy_files(&install_dir)?;
 
     if let Err(error) = windows_integration::create_desktop_shortcut(&install_dir) {
         eprintln!("警告：创建桌面快捷方式失败：{error:#}");
@@ -126,12 +137,20 @@ fn preserve_user_env(install_dir: &Path, internal_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-fn cleanup_legacy_top_level(install_dir: &Path) -> Result<()> {
+fn cleanup_legacy_files(install_dir: &Path) -> Result<()> {
     for file in LEGACY_TOP_LEVEL_FILES {
         let path = install_dir.join(file);
         if path.exists() {
             std::fs::remove_file(&path)
                 .with_context(|| format!("无法删除旧文件 {}", path.display()))?;
+        }
+    }
+    let internal_dir = paths::internal_dir(install_dir);
+    for file in LEGACY_INTERNAL_FILES {
+        let path = internal_dir.join(file);
+        if path.exists() {
+            std::fs::remove_file(&path)
+                .with_context(|| format!("无法删除旧内部文件 {}", path.display()))?;
         }
     }
     Ok(())
