@@ -1,14 +1,24 @@
 (function () {
   function createProjectReadiness(deps) {
-    const { state, $, clean, escapeHtml, api, openSettings, selectNode, selectProject } = deps;
+    const {
+      state, $, clean, escapeHtml, api, openSettings,
+      selectNode, selectProject, selectProjectChannel
+    } = deps;
 
     function renderMemberPanel(project) {
       const info = buildReadiness(project);
       const permission = runtimePermission(project);
       const permissionTone = permission === 'full_access' ? 'warn' : 'ok';
+      const devChannel = findDevelopmentChannel();
+      const devAction = devChannel
+        ? `<button class="dev-readiness-action primary" type="button" data-dev-readiness-action="development-channel" data-channel-id="${escapeHtml(devChannel.id)}">开发频道</button>`
+        : '';
       const nodeAction = info.node
         ? `<button class="dev-readiness-action" type="button" data-dev-readiness-action="node" data-node-id="${escapeHtml(info.nodeId)}">节点详情</button>`
         : `<button class="dev-readiness-action" type="button" data-dev-readiness-action="settings">绑定本机</button>`;
+      const settingsAction = info.node
+        ? '<button class="dev-readiness-action" type="button" data-dev-readiness-action="settings">项目设置</button>'
+        : '';
 
       return `
         <section class="dev-readiness ${escapeHtml(info.tone)}" data-dev-readiness-project="${escapeHtml(project.id || '')}">
@@ -25,6 +35,10 @@
             ${readinessRow('运行路线', info.routeLabel)}
             ${readinessRow('可用 CLI', info.cliLabel)}
           </div>
+          <div class="dev-readiness-next">
+            <span>下一步</span>
+            <strong>${escapeHtml(info.nextStep)}</strong>
+          </div>
           <label class="dev-readiness-permission ${permissionTone}">
             <span>AI 权限</span>
             <select data-dev-readiness-permission="${escapeHtml(project.id || '')}">
@@ -33,8 +47,9 @@
             </select>
           </label>
           <div class="dev-readiness-actions">
+            ${devAction}
             ${nodeAction}
-            <button class="dev-readiness-action" type="button" data-dev-readiness-action="settings">项目设置</button>
+            ${settingsAction}
             <button class="dev-readiness-action" type="button" data-dev-readiness-action="refresh" data-project-id="${escapeHtml(project.id || '')}">刷新</button>
           </div>
         </section>`;
@@ -50,6 +65,11 @@
             const nodeId = clean(button.dataset.nodeId);
             if (nodeId) state.activeNodeId = nodeId;
             selectNode();
+            return;
+          }
+          if (action === 'development-channel') {
+            const channelId = clean(button.dataset.channelId);
+            if (channelId) selectProjectChannel(channelId);
             return;
           }
           if (action === 'refresh') {
@@ -107,7 +127,8 @@
           workspace,
           nodeLabel: '未选择 PC 节点',
           routeLabel: '先绑定本地项目',
-          cliLabel: '未检查'
+          cliLabel: '未检查',
+          nextStep: '在项目设置里选择本机项目目录，绑定到当前 PC 节点。'
         };
       }
       if (!node) {
@@ -120,7 +141,8 @@
           workspace,
           nodeLabel: shortNodeId(nodeId),
           routeLabel: '等待节点上线或授权',
-          cliLabel: '未上报'
+          cliLabel: '未上报',
+          nextStep: '启动 Win 端并确认当前账号已登录，再刷新项目状态。'
         };
       }
       const route = routeInfo(node);
@@ -134,7 +156,8 @@
         workspace,
         nodeLabel: nodeLabel(node),
         routeLabel: route.label,
-        cliLabel: cliLabel(node)
+        cliLabel: cliLabel(node),
+        nextStep: nextStepForNode(node, route)
       };
     }
 
@@ -146,6 +169,22 @@
       if (node.server_runtime_ready) return { ready: true, label: 'Route C · 服务器模型' };
       if (routeA) return { ready: !!node.online, label: `本机 CLI · ${routeA}` };
       return { ready: false, label: '无可用运行时' };
+    }
+
+    function nextStepForNode(node, route) {
+      if (!node.online) return '启动或重新检测这台 PC 节点。';
+      if (route.ready) return '打开开发频道，直接描述要修改、检查或运行的任务。';
+      const clis = normalizedClis(node);
+      if (!clis.length) return '安装 Codex/Copilot/Claude/Gemini，或使用服务器模型兜底。';
+      return '检查节点运行时、账号授权和项目目录权限。';
+    }
+
+    function findDevelopmentChannel() {
+      const channels = (state.projectSpace && state.projectSpace.channels) || [];
+      return channels.find((channel) => {
+        const kind = clean(channel.kind || channel.channel_kind).toLowerCase();
+        return kind === 'ai_development';
+      }) || null;
     }
 
     function findNode(nodeId) {

@@ -72,7 +72,8 @@
   const projectReadiness = window.ElonPcProjectReadiness.create({
     state, $, clean, escapeHtml, api, openSettings,
     selectNode: () => node.selectNode(),
-    selectProject
+    selectProject,
+    selectProjectChannel
   });
   const projectLanding = window.ElonPcProjectLanding.create({
     state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
