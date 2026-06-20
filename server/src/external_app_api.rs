@@ -11,6 +11,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    external_app_context_answer_policy::public_answer_policy_guidance,
     external_app_context_example::public_context_pack_example,
     external_app_context_health::public_context_health,
     external_app_context_observability::public_context_observability_guidance,
@@ -97,6 +98,12 @@ pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Re
             "schema": "external_app.usage_policy.v1",
             "free_channels": [],
             "billable_channels": []
+        })),
+        "answer_policy_contract": public_answer_policy_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.answer_policy.v1",
+            "grounding_sections": [],
+            "forbidden_behaviors": []
         })),
         "context_contract": public_tool_contract_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

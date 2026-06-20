@@ -2,7 +2,10 @@
 
 use serde_json::{json, Value};
 
-use crate::external_app_context_tools::prompt_tool_contract_block;
+use crate::{
+    external_app_context_answer_policy::prompt_answer_rules_block,
+    external_app_context_tools::prompt_tool_contract_block,
+};
 
 const DEFAULT_MAX_CONTEXT_CHARS: usize = 16_000;
 const MIN_MAX_CONTEXT_CHARS: usize = 4_000;
@@ -58,6 +61,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         .and_then(Value::as_str)
         .unwrap_or("unknown");
     let tool_contract = prompt_tool_contract_block(context);
+    let answer_rules = prompt_answer_rules_block(context);
 
     let body = context["context_pack"]
         .as_str()
@@ -77,15 +81,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
          </metadata>\n\n\
          {}\n\n\
          {}\n\n\
-         <answer_rules>\n\
-         - 必须区分「数据事实」「群友观点」「AI推断」。\n\
-         - 涉及比赛预测时必须说明不确定性，不承诺命中，不诱导投注。\n\
-         - 引用比赛时尽量带 match id；引用订单/票据时尽量带 order id 或 ticket id；引用群友观点时必须带 message id。\n\
-         - 如果上下文缺少用户订单、赔率更新时间或消息来源，必须说明信息不足，不能编造。\n\
-         - 如果 context_quality.warnings 非空，回答中必须显式提示相关数据缺口或新鲜度风险。\n\
-         - 如果需要更多比赛、订单或群友观点明细，只能提出需要调用的外部工具，不能把未调用工具的结果当事实。\n\
-         - 如果 context_quality.tool_readiness.status 不是 ready，说明外部项目按需检索能力还不完整，回答要更保守。\n\
-         </answer_rules>\n\
+         {}\n\
          </external_app_context>",
         serde_json::to_string(&usage_policy).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&context_quality).unwrap_or_else(|_| "{}".into()),
@@ -93,7 +89,8 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         serde_json::to_string(&external_metrics).unwrap_or_else(|_| "{}".into()),
         context_audit_id,
         tool_contract,
-        body.trim()
+        body.trim(),
+        answer_rules
     )
 }
 
