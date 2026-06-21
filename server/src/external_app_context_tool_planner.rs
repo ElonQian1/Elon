@@ -129,18 +129,22 @@ fn plan_fb2_tools_with_platform_scope(
             "串关",
         ],
     ) {
-        plans.push(PlannedTool {
-            name: "search_user_orders",
-            reason: "用户提到自己的订单、票据或方案，需要只查询当前用户可见数据。",
-            arguments: json!({
-                "query": query,
-                "scope": "current_user"
-            }),
-            requires_external_user: true,
-            trigger: "current_user_order_needed",
-            confidence: confidence_for(&evidence),
-            evidence,
-        });
+        if context_has_current_user_orders(context) {
+            skipped_reasons.push("current_user_orders_already_in_context_pack");
+        } else {
+            plans.push(PlannedTool {
+                name: "search_user_orders",
+                reason: "用户提到自己的订单、票据或方案，需要只查询当前用户可见数据。",
+                arguments: json!({
+                    "query": query,
+                    "scope": "current_user"
+                }),
+                requires_external_user: true,
+                trigger: "current_user_order_needed",
+                confidence: confidence_for(&evidence),
+                evidence,
+            });
+        }
         if !match_analysis_brief_planned {
             plans.push(PlannedTool {
                 name: "match_analysis_brief",
@@ -458,6 +462,35 @@ fn context_has_warning(context: &Value, warning: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn context_has_current_user_orders(context: &Value) -> bool {
+    if context
+        .get("user_orders")
+        .and_then(Value::as_array)
+        .map(|orders| !orders.is_empty())
+        .unwrap_or(false)
+    {
+        return true;
+    }
+
+    context
+        .get("metrics")
+        .and_then(|metrics| metrics.get("source_counts"))
+        .and_then(Value::as_array)
+        .map(|counts| {
+            counts.iter().any(|entry| {
+                matches!(
+                    entry.get("source_type").and_then(Value::as_str),
+                    Some("user_order" | "user_orders")
+                ) && entry
+                    .get("count")
+                    .and_then(Value::as_u64)
+                    .unwrap_or_default()
+                    > 0
+            })
+        })
+        .unwrap_or(false)
+}
+
 fn has_any_keyword(text: &str, needles: &[&str]) -> bool {
     keyword_evidence(text, needles).is_some()
 }
@@ -515,6 +548,34 @@ mod tests {
             plan.to_metadata()["planned_tools"][0]["trigger"].as_str(),
             Some("match_analysis_brief_needed")
         );
+    }
+
+    #[test]
+    fn skips_user_order_search_when_context_pack_already_has_orders() {
+        let plan = plan_fb2_tools(
+            &json!({
+                "context_quality": {"warnings": []},
+                "user_orders": [{"order_id": "order-1", "visibility": "current_user_only"}],
+                "metrics": {"source_counts": [{"source_type": "user_order", "count": 1}]}
+            }),
+            Some("今天比赛怎么预测？顺便看看我的票和群友观点"),
+        );
+
+        let names = plan.tool_names();
+        assert_eq!(
+            names,
+            vec![
+                "match_analysis_brief",
+                "search_matches",
+                "group_opinion_summary",
+                "search_group_opinions",
+                "opinion_memories",
+            ]
+        );
+        assert!(plan.to_metadata()["skipped_reasons"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("current_user_orders_already_in_context_pack")));
     }
 
     #[test]

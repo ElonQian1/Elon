@@ -18,10 +18,7 @@ pub(crate) fn execution_audit(
         .filter_map(|result| result.get("source_ids").and_then(Value::as_array))
         .map(Vec::len)
         .sum::<usize>();
-    let has_current_user_only_result = results.iter().any(|result| {
-        result.get("status").and_then(Value::as_str) == Some("ready")
-            && result.get("visibility").and_then(Value::as_str) == Some("current_user_only")
-    });
+    let has_current_user_only_result = results.iter().any(result_has_current_user_order_data);
     let grounded_result_count = count_grounding_status(results, "grounded");
     let weak_result_count = count_grounding_status(results, "weak");
     let unsafe_result_count = count_grounding_status(results, "unsafe");
@@ -124,6 +121,22 @@ fn grounding_warnings(results: &[Value]) -> Vec<String> {
     warnings
 }
 
+fn result_has_current_user_order_data(result: &Value) -> bool {
+    if result.get("status").and_then(Value::as_str) != Some("ready") {
+        return false;
+    }
+    match result.get("visibility").and_then(Value::as_str) {
+        Some("current_user_only") => true,
+        Some("match_focused_brief") => result
+            .get("data")
+            .and_then(|data| data.get("user_orders"))
+            .and_then(Value::as_array)
+            .map(|orders| !orders.is_empty())
+            .unwrap_or(false),
+        _ => false,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -182,5 +195,26 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("missing_source_ids")));
+    }
+
+    #[test]
+    fn audit_counts_match_brief_user_orders_as_current_user_data() {
+        let results = vec![json!({
+            "tool_name": "match_analysis_brief",
+            "status": "ready",
+            "source_ids": ["match-1", "order-1"],
+            "visibility": "match_focused_brief",
+            "data": {
+                "user_orders": [{"order_id": "order-1"}]
+            },
+            "grounding": {"status": "grounded", "warnings": []}
+        })];
+        let audit = execution_audit("exec-1", &["match_analysis_brief"], &results, 42);
+
+        assert_eq!(audit["has_current_user_only_result"], true);
+        assert_eq!(
+            audit["answer_grounding"]["current_user_only_data_present"],
+            true
+        );
     }
 }

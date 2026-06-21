@@ -169,7 +169,7 @@ GET /api/main-project/context/tool-manifest
 - `generated_at` 存在。
 - 比赛、订单、群观点相关结论有 `match_id`、`order_id` 或 `message_id`。
 - `metrics.budget_status` 不能是 `empty`。
-- 用户问订单剖析时，必须有当前用户可见的 `current_user_only` 订单来源。
+- 用户问订单剖析时，必须有当前用户可见订单来源：优先使用 Context Pack `user_orders`，也允许使用已按 `external_user_id` + `X-FB2-AI-CONTEXT-USER-ID` 裁剪的 `match_analysis_brief.data.user_orders`；`search_user_orders` 只是补充展开工具。
 - 回答规则由主项目 `answer_policy_contract.prompt_answer_rules` 提供，fb2 的数据必须能支撑这些规则。
 - `answer_policy` 可由 fb2 返回，也可由主项目默认补齐。
 
@@ -220,6 +220,7 @@ GET /api/main-project/context/tool-manifest
 - 主项目优先拉 `/context/pack`，失败后回退 `/context/today-matches`。
 - 主项目拉 `/context/pack` 时会按 fb2 契约附加用户身份头和平台 scope 头；这些头只用于权限裁剪，不改变数据归属。
 - 主项目会做 token budget 裁剪，不把无限大 JSON 塞进 prompt。
+- 主项目会在 prompt metadata 增加 `context_fact_summary`，保留比赛、本人订单、群消息数量和少量来源 ID；这用于防止模型漏看 Context Pack 已有 `user_orders`。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
 - 主项目日志只记录 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
 - AI 回答必须区分事实、群友观点和推断；上下文不足时要明确说明。

@@ -64,6 +64,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         .get("context_audit_id")
         .and_then(Value::as_str)
         .unwrap_or("unknown");
+    let fact_summary = context_fact_summary(context);
     let tool_contract = prompt_tool_contract_block(context);
     let answer_rules = prompt_answer_rules_block(context);
 
@@ -82,6 +83,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
          context_quality={}\n\
          context_budget={}\n\
          external_metrics={}\n\
+         context_fact_summary={}\n\
          context_audit_id={}\n\
          </metadata>\n\n\
          {}\n\n\
@@ -93,6 +95,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         serde_json::to_string(&context_quality).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&budget).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&external_metrics).unwrap_or_else(|_| "{}".into()),
+        serde_json::to_string(&fact_summary).unwrap_or_else(|_| "{}".into()),
         context_audit_id,
         tool_contract,
         body.trim(),
@@ -154,6 +157,56 @@ fn value_as_prompt_string(value: &Value) -> Option<String> {
     })
 }
 
+fn context_fact_summary(context: &Value) -> Value {
+    json!({
+        "match_count": array_len(context, "matches"),
+        "user_order_count": array_len(context, "user_orders"),
+        "group_message_count": array_len(context, "group_messages"),
+        "source_id_samples": {
+            "match_ids": id_samples(context.get("matches"), &["id", "match_id"], 5),
+            "order_ids": id_samples(context.get("user_orders"), &["order_id", "id", "ticket_id"], 5),
+            "message_ids": id_samples(context.get("group_messages"), &["message_id", "id"], 5)
+        },
+        "user_orders_scope": if array_len(context, "user_orders") > 0 {
+            "current_user_only_after_external_user_id_header_check"
+        } else {
+            "none_in_context_pack"
+        }
+    })
+}
+
+fn array_len(context: &Value, field: &str) -> usize {
+    context
+        .get(field)
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or_default()
+}
+
+fn id_samples(value: Option<&Value>, fields: &[&str], limit: usize) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter_map(|item| first_string_field(item, fields))
+                .take(limit)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn first_string_field(value: &Value, fields: &[&str]) -> Option<String> {
+    fields.iter().find_map(|field| {
+        value
+            .get(*field)
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(ToOwned::to_owned)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -168,13 +221,19 @@ mod tests {
             "usage_policy": {"no_guaranteed_win": true},
             "answer_policy": {"schema": "fb2.answer_policy.v1"},
             "context_audit_id": "audit-1",
-            "metrics": {"budget_status": "ok"}
+            "metrics": {"budget_status": "ok"},
+            "matches": [{"id": "match-1"}],
+            "user_orders": [{"order_id": "order-1"}],
+            "group_messages": [{"message_id": "message-1"}]
         }));
         assert!(block.contains("<fb2_context_pack>hello</fb2_context_pack>"));
         assert!(block.contains("answer_policy="));
         assert!(block.contains("fb2.answer_policy.v1"));
         assert!(block.contains("context_quality="));
         assert!(block.contains("external_metrics="));
+        assert!(block.contains("context_fact_summary="));
+        assert!(block.contains("\"user_order_count\":1"));
+        assert!(block.contains("order-1"));
         assert!(block.contains("context_audit_id=audit-1"));
         assert!(block.contains("get_match_detail"));
         assert!(block.contains("tool_readiness.status"));

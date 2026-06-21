@@ -42,9 +42,10 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
          - skipped、failed、unavailable 结果只能作为数据缺口说明，不能编造成比赛、赔率、订单或群友观点事实。\n\
          - 引用工具结果时优先带 match_id、order_id、ticket_id、message_id 或 context_audit_id。\n\
          - 如果使用工具事实给出分析，回答中要自然写出关键来源 ID；没有 source_ids 时要说明 fb2 工具结果缺少可追溯 ID。\n\
-         - 当前用户订单只允许基于 current_user_only 结果分析，不能推断或暴露其他用户明细。\n\
+         - 当前用户订单只允许基于 current_user_only 结果，或已按 external_user_id + X-FB2-AI-CONTEXT-USER-ID 裁剪的 Context Pack user_orders / match_focused_brief.data.user_orders；不能推断或暴露其他用户明细。\n\
+         - 如果 Context Pack 或 match_focused_brief 已经包含 user_orders，后续 search_user_orders unavailable 只表示补充查询失败，不能否定已有本人订单事实。\n\
          - single_group_lightweight_memory 只代表本群轻量观点摘要；必须标注为群友观点，不得当作比赛事实。\n\
-         - match_focused_brief 是比赛候选、群观点和可选本人订单的组合简报；回答必须拆开说明比赛事实、群友观点、本人订单和 AI 推断。\n\
+         - match_focused_brief 是比赛候选、群观点和可选本人订单的组合简报；data.user_orders 非空时可作为当前用户订单来源，回答必须拆开说明比赛事实、群友观点、本人订单和 AI 推断。\n\
          - single_group_persistent_opinion_index 只代表群友历史观点记忆；可用于说明“群友过去怎么看”，不能当作比赛事实、赔率事实或命中承诺。\n\
          - answer_opinion_adoption_* 只代表主项目 AI 曾经采纳或引用过哪些群观点；它不是比赛事实，也不能证明观点正确。\n\
          - single_group_opinion_result_review_* 只代表历史赛后复盘或统计；可用于说明历史表现和样本限制，不能承诺未来投注命中。\n\
@@ -80,6 +81,8 @@ mod tests {
         assert!(block.contains("来源 ID"));
         assert!(block.contains("历史观点记忆"));
         assert!(block.contains("组合简报"));
+        assert!(block.contains("match_focused_brief.data.user_orders"));
+        assert!(block.contains("不能否定已有本人订单事实"));
         assert!(block.contains("历史赛后复盘"));
     }
 }
