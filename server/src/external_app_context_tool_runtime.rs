@@ -11,8 +11,8 @@ use tracing::{info, warn};
 
 use crate::{
     external_app_context_config::{
-        fb2_base_url, fb2_context_token, tool_execution_enabled, tool_execution_timeout_secs,
-        FB2_APP_ID, FB2_CONTEXT_HEADER,
+        fb2_base_url, fb2_context_token, fb2_request_context_headers, tool_execution_enabled,
+        tool_execution_timeout_secs, FB2_APP_ID, FB2_CONTEXT_HEADER,
     },
     external_app_context_response::compact_error,
     external_app_context_tool_audit::{execution_audit, execution_status},
@@ -260,14 +260,17 @@ async fn execute_fb2_tool(
         }
     });
 
-    let response = state
+    let mut request = state
         .http_client
         .post(&url)
         .header(FB2_CONTEXT_HEADER, token)
         .json(&payload)
-        .timeout(Duration::from_secs(tool_execution_timeout_secs()))
-        .send()
-        .await;
+        .timeout(Duration::from_secs(tool_execution_timeout_secs()));
+    for (header, value) in fb2_request_context_headers(external_user_id, false) {
+        request = request.header(header, value);
+    }
+
+    let response = request.send().await;
 
     match response {
         Ok(response) => {

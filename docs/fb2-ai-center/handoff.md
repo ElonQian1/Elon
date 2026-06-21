@@ -21,6 +21,9 @@
 - 长按群消息点击 `AI回复` 时，主项目会把被选中消息作为 `topic_hint` 拉取 fb2 Context Pack。
 - 群聊总结帖会把 `topic/title/instructions` 合成 `topic_hint`；Context Pack 回退到 today-matches 时也会继续传 `group_id/topic_hint`。
 - 主项目会保留 fb2 Context Pack 返回的 `citation_sources`，供 AI 回答引用来源和后续质量回填使用。
+- 主项目拉取 fb2 Context Pack 时，若当前主项目用户已绑定 fb2 账号，会同时传 `external_user_id` 和同值 `X-FB2-AI-CONTEXT-USER-ID`；这修复了 fb2 最新权限契约下“我的票/我的订单”上下文被 403 拦截的问题。
+- 主项目只有在 `ELON_EXTERNAL_APP_FB2_PLATFORM_ORDER_CONTEXT=true` 时才会请求 `include_platform_orders=true`，并同步传 `X-FB2-AI-CONTEXT-SCOPE: platform_order_summary`；fb2 侧仍可通过 `FB2_AI_CONTEXT_PLATFORM_ORDER_SUMMARY_ENABLED` 拒绝平台摘要，避免普通群聊越权读取平台经营数据。
+- 主项目按需执行 fb2 工具时，也会为用户订单工具带同值 `X-FB2-AI-CONTEXT-USER-ID`，避免工具调用绕过 fb2 的订单归属检查。
 - 群聊 `@EL` 和长按消息 `AI回复` 生成主项目 AI 回复后，会后台调用 fb2 `/api/main-project/context/feedback`，用 `context_audit_id`、主项目消息 ID、命中的引用来源和触发类型记录自动反馈样本；失败只写日志，不阻断聊天出消息。
 - 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
@@ -29,6 +32,7 @@
 当前仍需重点推进：
 
 - 用真实群聊消息和真实用户票据继续扩充联调样本，确认“我的票/平台订单风险/群观点”在不同账号权限下都返回期望数据。
+- 发布后抽样验证主项目群聊链路里 `user_order_context_present=true` 的日志，确认用户订单上下文已经从 fb2 进入 prompt；平台摘要仍应只在双端开关和 scope 同时开启时出现。
 - fb2 接入 `VoiceComposerView` 的完整输入栏，而不是只接 ASR/TTS。
 - fb2 真机验证小米/HyperOS 系统 ASR 超时后云端兜底。
 - 主项目和 fb2 建立固定 AI 数据回答评测集。

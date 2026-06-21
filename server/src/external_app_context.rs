@@ -8,8 +8,8 @@ use crate::{
     external_app_context_budget::budgeted_context,
     external_app_context_config::{
         context_pack_enabled, discussion_limit, fb2_base_url, fb2_context_token,
-        infer_lottery_type, match_limit, order_limit, platform_order_summary_enabled, timeout_secs,
-        FB2_APP_ID, FB2_CONTEXT_HEADER,
+        fb2_request_context_headers, infer_lottery_type, match_limit, order_limit,
+        platform_order_summary_enabled, timeout_secs, FB2_APP_ID, FB2_CONTEXT_HEADER,
     },
     external_app_context_response::{
         compact_error, fb2_pack_response_to_context, fb2_response_to_context,
@@ -143,11 +143,12 @@ async fn fetch_fb2_context_pack(
         ),
         ("order_limit".to_string(), order_limit().to_string()),
     ];
-    if let Some(account) = external_account.as_ref() {
-        query.push((
-            "external_user_id".to_string(),
-            account.external_user_id.clone(),
-        ));
+    let external_user_id = external_account
+        .as_ref()
+        .map(|account| account.external_user_id.trim())
+        .filter(|value| !value.is_empty());
+    if let Some(external_user_id) = external_user_id {
+        query.push(("external_user_id".to_string(), external_user_id.to_string()));
     }
     if let Some(topic) = topic_hint.and_then(clean_query_value) {
         query.push(("topic_hint".to_string(), topic.to_string()));
@@ -156,13 +157,17 @@ async fn fetch_fb2_context_pack(
         query.push(("lottery_type".to_string(), lottery_type));
     }
 
+    let include_platform_orders = platform_order_summary_enabled();
     let mut request = state
         .http_client
         .get(&url)
         .header(FB2_CONTEXT_HEADER, token)
         .query(&query)
         .timeout(Duration::from_secs(timeout_secs()));
-    if platform_order_summary_enabled() {
+    for (header, value) in fb2_request_context_headers(external_user_id, include_platform_orders) {
+        request = request.header(header, value);
+    }
+    if include_platform_orders {
         request = request.query(&[("include_platform_orders", "true")]);
     }
 

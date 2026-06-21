@@ -2,6 +2,9 @@
 
 pub(crate) const FB2_APP_ID: &str = "fb2";
 pub(crate) const FB2_CONTEXT_HEADER: &str = "X-FB2-AI-CENTER-TOKEN";
+pub(crate) const FB2_CONTEXT_USER_ID_HEADER: &str = "X-FB2-AI-CONTEXT-USER-ID";
+pub(crate) const FB2_CONTEXT_SCOPE_HEADER: &str = "X-FB2-AI-CONTEXT-SCOPE";
+pub(crate) const FB2_PLATFORM_ORDER_SUMMARY_SCOPE: &str = "platform_order_summary";
 
 const DEFAULT_MATCH_LIMIT: u32 = 30;
 const DEFAULT_DISCUSSION_LIMIT: u32 = 80;
@@ -57,6 +60,26 @@ pub(crate) fn context_pack_enabled() -> bool {
 
 pub(crate) fn platform_order_summary_enabled() -> bool {
     env_flag("ELON_EXTERNAL_APP_FB2_PLATFORM_ORDER_CONTEXT", false)
+}
+
+pub(crate) fn fb2_request_context_headers(
+    external_user_id: Option<&str>,
+    include_platform_order_summary: bool,
+) -> Vec<(&'static str, String)> {
+    let mut headers = Vec::new();
+    if let Some(user_id) = external_user_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        headers.push((FB2_CONTEXT_USER_ID_HEADER, user_id.to_string()));
+    }
+    if include_platform_order_summary {
+        headers.push((
+            FB2_CONTEXT_SCOPE_HEADER,
+            FB2_PLATFORM_ORDER_SUMMARY_SCOPE.to_string(),
+        ));
+    }
+    headers
 }
 
 pub(crate) fn timeout_secs() -> u64 {
@@ -128,5 +151,20 @@ mod tests {
     fn env_flag_defaults_when_missing() {
         assert!(env_flag("__ELON_TEST_MISSING_FLAG__", true));
         assert!(!env_flag("__ELON_TEST_MISSING_FLAG__", false));
+    }
+
+    #[test]
+    fn builds_fb2_permission_headers_for_user_and_platform_scope() {
+        assert_eq!(
+            fb2_request_context_headers(Some("  user-1  "), true),
+            vec![
+                (FB2_CONTEXT_USER_ID_HEADER, "user-1".to_string()),
+                (
+                    FB2_CONTEXT_SCOPE_HEADER,
+                    FB2_PLATFORM_ORDER_SUMMARY_SCOPE.to_string()
+                )
+            ]
+        );
+        assert_eq!(fb2_request_context_headers(Some(""), false), Vec::new());
     }
 }

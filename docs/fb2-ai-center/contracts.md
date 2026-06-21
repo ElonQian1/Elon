@@ -80,6 +80,8 @@ GET /api/external/apps/fb2/context-contract
 ```http
 GET /api/main-project/context/pack
 X-FB2-AI-CENTER-TOKEN: <shared-secret>
+X-FB2-AI-CONTEXT-USER-ID: <same fb2-user-id-if-external_user_id-present>
+X-FB2-AI-CONTEXT-SCOPE: platform_order_summary  # only when include_platform_orders=true
 ```
 
 推荐 query：
@@ -94,6 +96,11 @@ order_limit=20
 lottery_type=JingCai|BeiDan
 include_platform_orders=false
 ```
+
+权限头规则：
+
+- 当主项目传 `external_user_id` 时，必须同步传同值 `X-FB2-AI-CONTEXT-USER-ID`，否则 fb2 会按 `missing_context_user_id` 或 `context_user_mismatch` 拒绝，避免普通用户读取他人订单。
+- 主项目默认不请求平台订单摘要；只有 `ELON_EXTERNAL_APP_FB2_PLATFORM_ORDER_CONTEXT=true` 且请求带 `X-FB2-AI-CONTEXT-SCOPE: platform_order_summary` 时，才允许请求 `include_platform_orders=true`。fb2 服务端仍可用自己的开关拒绝该范围。
 
 主项目群聊 AI 会从最后一次有效 @EL 用户问题中提取 `topic_hint`。例如用户说 `@EL 帮我分析今天比赛和我的票`，主项目会传：
 
@@ -188,6 +195,7 @@ fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如�
 ## 主项目处理规则
 
 - 主项目优先拉 `/context/pack`，失败后回退 `/context/today-matches`。
+- 主项目拉 `/context/pack` 时会按 fb2 契约附加用户身份头和平台 scope 头；这些头只用于权限裁剪，不改变数据归属。
 - 主项目会做 token budget 裁剪，不把无限大 JSON 塞进 prompt。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
 - 主项目日志只记录 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
