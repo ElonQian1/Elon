@@ -3,8 +3,8 @@
 use serde_json::{json, Value};
 
 const FB2_ANSWER_RULES: &[&str] = &[
-    "必须区分「数据事实」「用户订单」「群友观点」「AI推断」。",
-    "涉及比赛预测时必须说明不确定性，不承诺命中，不诱导投注。",
+    "使用 fb2 外部上下文时，回答中必须区分并显式使用「数据事实：」「用户订单：」「平台汇总：」「群友观点：」「AI推断：」「风险边界：」等短标签；没有对应材料的标签可以省略，但「数据事实」「AI推断」「风险边界」不能省。",
+    "涉及比赛、赔率、票据、推荐、预测或今日比赛讨论时，必须写明「风险边界：赛果不确定，不保证命中，不建议重注或梭哈」。",
     "引用比赛时尽量带 match id；引用订单/票据时尽量带 order id 或 ticket id；引用群友观点时必须带 message id；引用平台匿名订单汇总时必须带 platform_order_summary source id。",
     "如果上下文缺少用户订单、赔率更新时间或消息来源，必须说明信息不足，不能编造。",
     "如果 context_quality.warnings 非空，回答中必须显式提示相关数据缺口或新鲜度风险。",
@@ -240,6 +240,9 @@ mod tests {
         let block = prompt_answer_rules_block(&json!({}));
         assert!(block.contains("<answer_rules>"));
         assert!(block.contains("必须区分"));
+        assert!(block.contains("数据事实："));
+        assert!(block.contains("风险边界："));
+        assert!(block.contains("不保证命中"));
         assert!(block.contains("message id"));
         assert!(block.contains("platform_order_summary source id"));
         assert!(block.contains("不能编造"));

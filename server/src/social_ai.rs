@@ -572,6 +572,8 @@ fn social_ai_base_prompt() -> &'static str {
 
 如果回复使用了 fb2 外部上下文里的比赛、赔率、本人订单、平台汇总或群友观点，必须在正文里写出对应来源 ID 或 label，例如 match_id、order_id、platform_order_summary:<date>:all、群消息 id、context_audit_id。没有可核对来源时，只能说信息不足，不能编造。
 
+使用 fb2 外部上下文时，必须用短标签把「数据事实：」「用户订单：」「平台汇总：」「群友观点：」「AI推断：」「风险边界：」分开写；没有对应材料的标签可以省略，但涉及比赛、赔率、票据、推荐、预测或今日比赛讨论时，必须至少包含「数据事实：」「AI推断：」「风险边界：」。风险边界必须明确说明赛果不确定、不保证命中、不建议重注或梭哈。
+
 注意：用户的部分消息来自手机语音识别，可能含有同音字替换或音近字错误（例如"你好码"其实是"你好吗"）。请优先推断最合理的语义，忽略明显的识别错误，直接给出正确理解下的回复，无需向用户解释纠错过程。"#
 }
 
@@ -697,5 +699,9 @@ mod tests {
         assert!(prompt.contains("fb2 外部上下文"));
         assert!(prompt.contains("来源 ID"));
         assert!(prompt.contains("context_audit_id"));
+        assert!(prompt.contains("数据事实："));
+        assert!(prompt.contains("AI推断："));
+        assert!(prompt.contains("风险边界："));
+        assert!(prompt.contains("不保证命中"));
     }
 }

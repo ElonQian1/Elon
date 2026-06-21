@@ -250,7 +250,7 @@ async fn build_selected_reply(
             json!({
                 "role": "system",
                 "content": format!(
-                    "{}\n\n本次触发来自用户长按历史消息后点击「AI回复」，不是 @EL 文本触发。请优先根据被选择的消息作答，必要时只把最近聊天作为上下文参考。回答末尾必须用一行短句标注来源，至少包含 selected_message_id={selected_message_id}；如果使用了 fb2 外部数据，也要同时列出对应 match_id/order_id/context_audit_id 等来源。",
+                    "{}\n\n本次触发来自用户长按历史消息后点击「AI回复」，不是 @EL 文本触发。请优先根据被选择的消息作答，必要时只把最近聊天作为上下文参考。回答末尾必须用一行短句标注来源，至少包含 selected_message_id={selected_message_id}；如果使用了 fb2 外部数据，也要同时列出对应 match_id/order_id/context_audit_id 等来源。若被选择消息包含“肯定赢盘、稳赢、稳赚、包赢、重注、梭哈”等表述，必须明确指出这是过度确定或诱导投注，只能在「数据事实」「AI推断」「风险边界」标签下说明。",
                     social_ai_prompt()
                 )
             }),
