@@ -85,6 +85,7 @@ fn voice_contract() -> Value {
             "package": "com.elon.chatvoice",
             "publicComponents": [
                 "VoiceComposerView",
+                "VoiceComposerBootstrap",
                 "VoiceComposerConfig",
                 "VoiceComposerAsrConfig",
                 "VoiceComposerCallbacks",
@@ -102,6 +103,7 @@ fn voice_contract() -> Value {
         "composer": {
             "component": "com.elon.chatvoice.VoiceComposerView",
             "requiredForMainProjectLikeExperience": true,
+            "recommendedConfigApi": "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)",
             "inputModes": ["TEXT", "VOICE"],
             "voiceModeCenterControl": "整条按住 说话按钮",
             "overlayComponent": "com.elon.chatvoice.ChatVoiceRecordingOverlay",
@@ -301,6 +303,7 @@ fn experience_contract() -> Value {
             "load this bootstrap contract",
             "render defaultGroupId as the first chat room",
             "use android/chat-voice-kit VoiceComposerView for the input bar",
+            "prefer VoiceComposerBootstrap.applyFb2GroupChatConfig(...) to map chat-bootstrap into SDK config",
             "configure VoiceComposerAsrConfig with serverFallbackEnabled=true and serverConfig",
             "use /api/voice/tts after AI replies and fall back to device TTS",
             "only check AI quota immediately before model reply generation"
@@ -344,6 +347,14 @@ mod tests {
         assert_eq!(
             voice["composer"]["component"],
             "com.elon.chatvoice.VoiceComposerView"
+        );
+        assert!(voice["androidSdk"]["publicComponents"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("VoiceComposerBootstrap")));
+        assert_eq!(
+            voice["composer"]["recommendedConfigApi"],
+            "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)"
         );
         assert_eq!(
             voice["composer"]["defaultConfig"]["asr"]["serverFallbackEnabled"],

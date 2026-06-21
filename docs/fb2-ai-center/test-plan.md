@@ -8,7 +8,9 @@
 - `POST /api/external/apps/fb2/accounts/session` 能创建主项目用户会话，并默认加入官方群。
 - 首次 fb2 会话能按配置发放 AI 试用额度。
 - `GET /api/external/apps/fb2/chat-bootstrap` 返回聊天、ASR、TTS、WebSocket 和体验协议。
+- `chat-bootstrap.voice.androidSdk.publicComponents` 包含 `VoiceComposerBootstrap`。
 - `chat-bootstrap.voice.composer.requiredForMainProjectLikeExperience=true`。
+- `chat-bootstrap.voice.composer.recommendedConfigApi=VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`。
 - `chat-bootstrap.voice.composer.defaultConfig.asr.serverFallbackEnabled=true`。
 - `chat-bootstrap.aiReply.schema=external_app.ai_reply.v1`。
 - `chat-bootstrap.aiReply.externalContext.queryFields` 包含 `topic_hint`。
@@ -21,6 +23,7 @@
 - `context-contract.answer_policy_contract` 返回引用规则和固定评测问题。
 - `context-contract.context_readiness_contract` 返回 required fields、prompt metadata 和 blocked/degraded/ready 判定标准。
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1` 通过，确认主项目健康、版本、实时 manifest 和主项目聊天自动工具覆盖。
+- `cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 通过，确认 fb2 可引用最新 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 设置 `FB2_AI_CENTER_TOKEN` 后，上述巡检脚本能验证 fb2 live Context Pack、比赛分析、群观点和赛后复盘摘要；加 `-IncludePlatformOrderSummary` 后验证平台匿名订单摘要。
 - 主项目工具 planner 对“今天比赛/预测/赔率/我的票”优先规划 `match_analysis_brief`，并保留 `search_matches`、`search_user_orders` 等补充工具。
 - 主项目工具 planner 对“群里大家怎么看/群友观点/讨论分歧”优先规划 `group_opinion_summary`，并保留 `search_group_opinions`、`opinion_memories` 等补充工具。

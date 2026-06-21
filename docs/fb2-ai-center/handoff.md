@@ -35,6 +35,7 @@
 - fb2 首次登录试用额度配置。
 - `chat-bootstrap` 输出聊天、语音、ASR/TTS 和推荐体验协议。
 - `chat-bootstrap` 已输出机器可读 `voice.composer` 契约，明确 fb2 应接 `VoiceComposerView`、开启录音浮层、系统 ASR 超时后走云端兜底。
+- `android/chat-voice-kit` 已新增 `VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`，fb2 可直接把主项目 `chat-bootstrap` JSON 映射为 `VoiceComposerConfig`，默认开启系统 ASR 预热、stop 后超时、云端 ASR 兜底和主项目录音浮层，避免业务页漏配 `serverFallbackEnabled/serverConfig`。
 - `chat-bootstrap` 已输出机器可读 `aiReply` 契约，明确 `@EL`、长按 `AI回复`、群聊总结入口都走主项目 Context Pack + AI 回复链路。
 - `chat-bootstrap` 已输出机器可读 `billing` 契约，明确 `/api/me/balance`、试用额度来源和“ASR/TTS 免费、AI 回复扣费”的检查点。
 - `context-contract` 输出 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
@@ -60,7 +61,7 @@
 - 主项目新增 `scripts/smoke-fb2-ai-center.ps1`，用于不往生产群聊发消息的 live smoke：默认验证主项目健康、版本、context-contract 和工具覆盖；传 `FB2_AI_CENTER_TOKEN` 后验证 fb2 Context Pack、比赛分析、群观点、赛后复盘摘要；传 `-IncludePlatformOrderSummary` 后验证平台匿名摘要；传 `-ExternalUserId` 后验证本人订单上下文。
 - 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
-- `android/chat-voice-kit` 已输出 `VoiceComposerView`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
+- `android/chat-voice-kit` 已输出 `VoiceComposerView`、`VoiceComposerBootstrap`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
 
 当前仍需重点推进：
 
@@ -68,7 +69,7 @@
 - 发布后抽样验证主项目群聊链路里 `user_order_context_present=true` 的日志，确认用户订单上下文已经从 fb2 进入 prompt；平台摘要仍应只在双端开关和 scope 同时开启时出现。
 - 用更多账号继续抽样主项目真实群聊入口触发 `@EL` 和长按消息 `AI回复`；当前账号 `123qwe` 已验证 AI 回答能显式区分比赛事实、本人订单、群观点和 AI 推断。
 - 用已完赛比赛样本验证 `opinion_result_review_summary` 和 `opinion_result_reviews` 在主项目真实群聊回答中只被描述为历史复盘/样本统计，不被写成未来命中承诺。
-- fb2 接入 `VoiceComposerView` 的完整输入栏，而不是只接 ASR/TTS。
+- fb2 接入 `VoiceComposerView` 的完整输入栏，并优先使用 `VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`，而不是只接 ASR/TTS 或手写临时 Web 浮层。
 - fb2 真机验证小米/HyperOS 系统 ASR 超时后云端兜底。
 - 主项目和 fb2 建立固定 AI 数据回答评测集。
 - 后续把 fb2 工具执行从当前的 Context Pack + 轻量工具调用继续升级为更细粒度的可评测工具链。

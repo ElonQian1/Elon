@@ -5,6 +5,7 @@ fb2 想要主项目同款聊天操控感，应接主项目 `android/chat-voice-k
 ## fb2 应使用的公共 API
 
 - `VoiceComposerView`
+- `VoiceComposerBootstrap`
 - `VoiceComposerConfig`
 - `VoiceComposerAsrConfig`
 - `VoiceComposerCallbacks`
@@ -21,6 +22,41 @@ fb2 想要主项目同款聊天操控感，应接主项目 `android/chat-voice-k
 - 主 App 页面里的好友/群聊实现细节
 
 ## 推荐配置
+
+fb2 常规聊天页优先用 `VoiceComposerBootstrap`，不要在业务页面里手写 ASR 超时、预热和云端兜底参数：
+
+```kotlin
+val composer = VoiceComposerView(context).apply {
+    VoiceComposerBootstrap.applyFb2GroupChatConfig(
+        composer = this,
+        baseUrl = mainProjectBaseUrl,
+        bearerTokenProvider = { mainProjectToken },
+        bootstrapJson = chatBootstrapJson,
+        eventSink = ChatVoiceEventSink { event ->
+            // 可选：记录 start、volume、partialResult、finalResult、cancel、error、ttsStart、ttsEnd 等事件。
+        },
+    )
+    setCallbacks(object : VoiceComposerCallbacks {
+        override fun onTextSubmit(text: String) {
+            sendTextMessage(text)
+        }
+
+        override fun onVoiceRecognized(transcript: SpeechTranscript, zone: ChatVoiceZone) {
+            routeTranscript(transcript.text, zone)
+        }
+
+        override fun onVoiceRecorded(recording: RecordedVoice, zone: ChatVoiceZone) {
+            sendVoiceMessage(recording)
+        }
+
+        override fun onVoiceServerFallbackStarted(reason: ChatVoiceError?) {
+            // UI 会自动进入 SERVER_PROCESSING，这里只做埋点或 toast。
+        }
+    })
+}
+```
+
+如果宿主不能传 `chatBootstrapJson`，也必须使用等价配置：
 
 ```kotlin
 val composer = VoiceComposerView(context).apply {
@@ -83,6 +119,8 @@ val composer = VoiceComposerView(context).apply {
 - 设备系统 ASR 是否不回 `onResults/onError`，例如部分小米/HyperOS。
 
 SDK 正确状态应该是：系统 ASR 超时后进入 `SERVER_PROCESSING`，再走云端兜底，不应无限停在 `PROCESSING`。
+
+fb2 最稳的接法是使用 `VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`。这个 helper 会把 `chat-bootstrap.voice.composer.defaultConfig` 映射成 SDK 配置，并默认打开 `serverFallbackEnabled=true`、`localResultTimeoutMs=4500`、`localEngineFallbackEnabled=true` 和 `prewarmLocalEngine=true`。
 
 ### 3. 同一手机主项目 APK 正常，fb2 不正常
 
