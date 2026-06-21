@@ -27,6 +27,10 @@
 - 本轮 live smoke 已验证：主项目健康和版本、fb2 live tool manifest、Context Pack、比赛分析简报、群观点摘要、赛后复盘摘要、平台匿名订单摘要、统一工具执行 `group_opinion_summary`/`match_analysis_brief` 及其 visibility。
 - 本轮已获授权在真实群 `ext_fb2_official` 发送可见 `@EL` 联调消息，并验证“我的票”正例、本人订单引用、AI 回复计费、工具执行、source reference 匹配和 fb2 feedback 自动回写。
 - 测试账号 `123qwe` 对应 fb2 用户 `6fe5aa17-0403-427a-8e91-7f414beca35d`、主项目用户 `usr_13c9832b7cad4b26b50768fa961e0de4`；线上已配置大额测试余额 `balance_fen=1000000000`，无 `user_token_quota` 月限额行，`/api/me/balance` 已验证可见。
+- 2026-06-21 复核：`123qwe` 是 fb2 账号，主项目直登 `account=123qwe` 返回“账号不存在或已停用”；正确链路是 fb2 `/api/main-project/session` 桥接到主项目账号 `15692409898`，当前 `/api/me/balance` 返回 `balance_fen=999999876`，足够继续 AI 回复联调。
+- 2026-06-21 复核：`GET /api/external/apps/fb2/chat-bootstrap` 对桥接 token 返回 `defaultGroupId=ext_fb2_official`、`voice.asr.billing=free_auth_and_limits_only`、`voice.tts.billing=free_auth_and_limits_only`、`billing.gates.beforeAiReplyGeneration=check_balance_or_trial_credit`、`VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`。
+- 2026-06-21 复核：fb2 `/context/pack?external_user_id=6fe5aa17-0403-427a-8e91-7f414beca35d&topic_hint=帮我分析我的票` 返回 `success=true`、`user_orders=6`、`matches=6`、`citation_sources=13`、`context_audit_id=028e2d63-f42b-4483-a607-9567e2114abf`；带 `X-FB2-AI-CONTEXT-SCOPE: platform_order_summary` 后平台匿名摘要也返回成功。
+- 2026-06-21 真实群复核通过：可见消息 `gmsg_4c0b8693032f418d9ee38d2010aaeaa9` 触发 AI 回复 `gai_d80ab422454345b78f6db70264cfdd25`，约 10 秒完成；回复按“数据事实 / 我的订单 / 平台汇总 / 群友观点 / AI推断”分层，并继续保持不承诺命中。
 - 长按 `AI回复` 后端入口已验证；APK 侧仍需确认 UI 长按菜单能调用该接口，并检查 AI 回答 source references、fb2 feedback、opinion adoption 和权限审计。
 
 主项目当前已经具备：
