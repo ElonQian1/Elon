@@ -136,7 +136,12 @@ fn api_runtime_config_from_lookup(
     )?;
     let api_base = first_value(
         &lookup,
-        &["ELON_AGENT_API_BASE", "OPENAI_API_BASE", "HUNYUAN_API_BASE"],
+        &[
+            "ELON_AGENT_API_BASE",
+            "OPENAI_API_BASE",
+            "OPENAI_BASE_URL",
+            "HUNYUAN_API_BASE",
+        ],
     )
     .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
     let model = first_value(

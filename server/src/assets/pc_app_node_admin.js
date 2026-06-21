@@ -82,8 +82,10 @@
               </div>
               <div class="node-env-grid" id="nodeEnvGrid"><span>检查中...</span></div>
               <div class="node-admin-actions"><button class="node-action primary" type="button" id="nodeEnvInstall">一键安装 / 修复</button></div>
-              <label class="node-form-field"><span>OPENAI_API_KEY</span><input id="nodeOpenAiKey" type="password" placeholder="sk-..." autocomplete="off" /></label>
-              <div class="node-admin-actions"><button class="node-action" type="button" id="nodeSaveOpenAiKey">保存 API Key</button></div>
+              <label class="node-form-field"><span>API Key</span><input id="nodeOpenAiKey" type="password" placeholder="sk-..." autocomplete="off" /></label>
+              <label class="node-form-field"><span>Route B 模型</span><input id="nodeApiRuntimeModel" placeholder="如 gpt-5.4-mini" autocomplete="off" /></label>
+              <label class="node-form-field"><span>API Base URL</span><input id="nodeApiRuntimeBase" placeholder="默认 https://api.openai.com/v1" autocomplete="off" /></label>
+              <div class="node-admin-actions"><button class="node-action" type="button" id="nodeSaveOpenAiKey">保存 Route B 配置</button></div>
               <div class="node-inline-result" id="nodeEnvResult"></div>
             </div>
           </section>
@@ -226,12 +228,18 @@
 
     async function saveOpenAiKey() {
       const key = clean($('#nodeOpenAiKey')?.value);
+      const model = clean($('#nodeApiRuntimeModel')?.value);
+      const apiBase = clean($('#nodeApiRuntimeBase')?.value);
       if (!key) return setResult('nodeEnvResult', '请输入 API Key。', 'error');
+      if (!model) return setResult('nodeEnvResult', '请输入 Route B 模型。', 'error');
       await withBusy('nodeSaveOpenAiKey', '保存中...', async () => {
         try {
-          await api('/api/save-openai-key', { method: 'POST', body: JSON.stringify({ api_key: key }) });
+          const result = await api('/api/save-openai-key', {
+            method: 'POST',
+            body: JSON.stringify({ api_key: key, model, api_base: apiBase || null })
+          });
           $('#nodeOpenAiKey').value = '';
-          setResult('nodeEnvResult', 'API Key 已保存，Codex CLI 可立即使用。');
+          setResult('nodeEnvResult', result.msg || 'Route B 配置已保存。');
           await loadEnvCheck(true);
         } catch (error) {
           setResult('nodeEnvResult', error.message || error, 'error');
@@ -297,13 +305,19 @@
     }
 
     function renderEnvGrid(env) {
+      const modelInput = $('#nodeApiRuntimeModel');
+      const baseInput = $('#nodeApiRuntimeBase');
+      if (modelInput && !modelInput.value && env.api_runtime_model) modelInput.value = env.api_runtime_model;
+      if (baseInput && !baseInput.value && env.api_runtime_base) baseInput.value = env.api_runtime_base;
       const items = [
         ['Git', env.git, '代码操作'],
         ['JDK 17', env.java, 'Android 编译'],
         ['Node.js', env.node, '工具运行时'],
         ['npm', env.npm, '包管理'],
         ['Codex CLI', env.codex, 'AI 编码'],
-        ['OPENAI_API_KEY', env.openai_key, 'Codex 鉴权'],
+        ['API Key', env.api_runtime_key || env.openai_key, 'Route A/B 鉴权'],
+        ['Route B 模型', env.api_runtime_model_configured, env.api_runtime_model || '未配置'],
+        ['Route B Runtime', env.api_runtime_ready, env.api_runtime_ready ? '可用' : '需要 Key + 模型'],
         ['Android SDK', env.android_sdk, 'APK 构建'],
         ['Ollama', env.ollama, '本地模型'],
         ['Claude CLI', env.claude, '可选'],

@@ -443,6 +443,13 @@ function testLocalAdminTokenWiring() {
   const nodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_admin.html'), 'utf8');
   assert.ok(nodeAdmin.includes('X-Elon-Local-Admin-Token'), 'standalone node admin page should send local admin token header');
   assert.ok(nodeAdmin.includes('localFetch'), 'standalone node admin page should route API calls through localFetch');
+  assert.ok(nodeAdmin.includes('apiModelInput'), 'standalone node admin page should expose Route B model input');
+  assert.ok(nodeAdmin.includes('api_base: apiBase || null'), 'standalone node admin page should save Route B API base');
+
+  const nativeNodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node_admin.js'), 'utf8');
+  assert.ok(nativeNodeAdmin.includes('nodeApiRuntimeModel'), 'PC node panel should expose Route B model input');
+  assert.ok(nativeNodeAdmin.includes('api_runtime_ready'), 'PC node panel should show Route B readiness');
+  assert.ok(nativeNodeAdmin.includes('api_base: apiBase || null'), 'PC node panel should persist Route B API base');
 
   const doctor = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_doctor.js'), 'utf8');
   assert.ok(doctor.includes('localNodeApi(path, options || {})'), 'doctor project should reuse the protected local node API');

@@ -22,6 +22,7 @@
 14. 审批 ACK 闭环：服务端派发审批决定后等待 PC 节点 ACK，只有对应 `dispatch_id` 被接受后才落为已决定，迟到 ACK、拒收和超时都可重试。
 15. Route A 完全访问本机门禁：完全访问必须在 Win 节点本机写入项目级授权记录，云端字段不能单独触发 Codex/Copilot 沙箱绕过。
 16. 审批状态恢复：服务端内存审批丢失时从 `task_events` 重建 pending/decided 状态，PC 任务卡刷新后不再给已处理审批显示可重复点击按钮。
+17. Route B 配置闭环：PC 节点管理页可保存 API key、模型和 API Base，`/api/env-check` 明确返回 Route B 是否真正就绪，配置持久化到启动器实际读取的 `_internal/node-agent.env`。
 
 ## 风险
 
@@ -38,6 +39,7 @@
 - 新 PC 节点对旧服务器消息保留 `dispatch_id` 默认值兼容，避免节点包先更新时反序列化失败。
 - Route A `full_access` 授权记录是本机文件态；换机器、删除本机配置或换项目目录后需要用户在 PC 工作台重新确认。
 - 审批恢复只能恢复已持久化的任务事件；当前服务启动逻辑仍会把 running 任务标记为 interrupted，真正跨重启继续运行需要后续任务恢复阶段单独处理。
+- Route B 配置会把 API key 写入用户本机 `_internal/node-agent.env`；这是本机明文配置文件，后续若要面向更严格安全场景，需要接入 Windows 凭据管理器或 DPAPI。
 
 ## 验证命令
 
@@ -60,6 +62,7 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server node_agent_cli_security`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_api_runtime_config`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_full_access`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approval_recovery`

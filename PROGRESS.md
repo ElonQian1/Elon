@@ -88,11 +88,18 @@
 - 本轮已让 PC 任务卡在刷新历史消息后识别同一 `task_id + approval_id` 的后续审批决定，旧审批卡显示“已批准/已拒绝/已过期/已取消”，不再渲染批准/拒绝按钮。
 - 本轮顺手修复默认项目文档 seed 列表与 `.elon/default-docs.json` manifest 不一致，补齐 AI_* 与 `.aiignore`，并更新项目文档扫描测试期望。
 - 本轮已通过阶段性验证：`node --check server\src\assets\pc_app_dev_tasks.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml tool_approval -- --nocapture`、`cargo test --manifest-path server\homecli-proto\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node project_default_docs::tests::default_docs_manifest_matches_seeded_files -- --nocapture`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node project_docs_scan::tests::project_docs_can_seed_missing_default_docs -- --nocapture`、`cargo fmt --manifest-path server\Cargo.toml --all -- --check`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
-- 本轮尝试过 `cargo test --manifest-path server\Cargo.toml` 和串行 `cargo test --manifest-path server\Cargo.toml -- --test-threads=1`；前者曾遇到 `pc_workspace_git_remote` 并发偶发失败且单跑通过，后者跑到后半段时 `%TEMP%`/C 盘空间耗尽，失败原因是“磁盘空间不足”。已清理本轮 `%TEMP%\elon-*` 临时目录约 328 个，目前 C 盘仍只剩约 200MB，不适合继续全量测试或大构建。
+- 本轮尝试过 `cargo test --manifest-path server\Cargo.toml` 和串行 `cargo test --manifest-path server\Cargo.toml -- --test-threads=1`；前者曾遇到 `pc_workspace_git_remote` 并发偶发失败且单跑通过，后者跑到后半段时 `%TEMP%`/C 盘空间耗尽，失败原因是“磁盘空间不足”。已清理本轮 `%TEMP%\elon-*` 临时目录约 328 个，后续再次确认 C 盘约 9.5GB 可用，可以支撑本轮发布构建。
+- 已发布最新主线 `54120dd83c2705f50637f8f1e5d79d429210a77b`：服务器版本 `v0.3.563`，`/api/server/version` 返回对应 SHA。
+- 已发布 Windows 节点包到 `54120dd83c2705f50637f8f1e5d79d429210a77b`，`/api/node-agent/version`、raw exe 和 Windows client zip 均可访问，zip 内 `_internal/node-agent-version.json` 为对应 SHA。
+- 已通过本机 `%LOCALAPPDATA%\ElonNode\一龙PC节点.exe --update` 刷新安装目录；本机安装的 `一龙PC节点.exe` 与 `卸载一龙PC节点.exe` 大小更新为 9,538,560 bytes，`_internal/node-agent-version.json` 为 `54120dd8`，且只有一个 `--agent-runtime` 进程。
+- 本轮已新增 `server/src/node_agent_api_runtime_config.rs`：统一 Route B API key/model/base 的校验、状态上报和 `_internal/node-agent.env` 持久化，拒绝换行/NUL 注入，API Base 支持 `OPENAI_BASE_URL` 兼容名。
+- 本轮已把本地 `/api/env-check` 从单一 `openai_key` 升级为 `api_runtime_key/api_runtime_model/api_runtime_base/api_runtime_ready`，并修正 `/api/save-openai-key` 持久化路径，不再写到启动器不会读取的 exe 同级 `node-agent.env`。
+- 本轮已更新 PC 工作台内嵌节点管理页和独立 `node_agent_admin.html`：用户可填写 API Key、Route B 模型、API Base URL，环境检查能直接显示 Route B Runtime 是否可用。
+- 本轮已通过验证：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_api_runtime_config -- --nocapture`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config -- --nocapture`、`node --check server\src\assets\pc_app_node_admin.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo fmt --manifest-path server\Cargo.toml --all -- --check`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
-验证并发布审批状态恢复：服务端审批内存丢失后可从任务事件恢复，PC 历史审批卡不会重复点击。
+补齐 Route B 配置闭环：用户没有本机 Codex/Claude/Gemini CLI 时，可在 Win 节点管理页配置 API Key、模型和 API Base，让本机 API runtime 真正就绪。
 
 ## 待完成
 

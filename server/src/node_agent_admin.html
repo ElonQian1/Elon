@@ -182,10 +182,18 @@
     </div>
     <div id="installResult"></div>
     <div class="form-row" style="margin-top:14px">
-      <label>OPENAI_API_KEY（Codex CLI 鉴权，可稍后再填）</label>
+      <label>API Key（Route A CLI 与 Route B 本机 API runtime 共用）</label>
       <input id="apiKeyInput" type="password" placeholder="sk-..." autocomplete="off" />
     </div>
-    <button class="secondary" type="button" onclick="saveApiKey()">保存 API Key</button>
+    <div class="form-row">
+      <label>Route B 模型</label>
+      <input id="apiModelInput" placeholder="如 gpt-5.4-mini" autocomplete="off" />
+    </div>
+    <div class="form-row">
+      <label>API Base URL</label>
+      <input id="apiBaseInput" placeholder="默认 https://api.openai.com/v1" autocomplete="off" />
+    </div>
+    <button class="secondary" type="button" onclick="saveApiKey()">保存 Route B 配置</button>
     <div id="apiKeyResult"></div>
   </div>
 
@@ -210,6 +218,9 @@ NODE_PRICE_PER_1K    每 1k tokens 收取的积分（默认 0.1）
 NODE_STORAGE_ENABLED 启用项目硬盘服务（true/false）
 NODE_STORAGE_ROOT    项目硬盘服务存储根目录
 NODE_STORAGE_GIT_BASE_URL 外部 Git 服务基础地址（可选；默认使用云端 relay）
+ELON_AGENT_API_KEY   Route B 本机 API runtime 的 API Key
+ELON_AGENT_MODEL     Route B 本机 API runtime 的模型
+ELON_AGENT_API_BASE  Route B OpenAI-compatible API 地址
 NODE_ADMIN_PORT      本管理页端口（默认 7799）</pre>
 
 <script>
@@ -456,8 +467,14 @@ async function loadEnvCheck() {
     { name: 'Android SDK',    key: 'android_sdk',  note: 'APK 编译必需',        required: true },
     { name: 'Gradle 镜像',    key: 'gradle_mirror',note: '国内加速（阿里云）',   required: false },
     { name: 'Ollama',         key: 'ollama',       note: '本地 LLM（可选）',    required: false },
-    { name: 'OPENAI_API_KEY', key: 'openai_key',   note: 'Codex 鉴权',         required: true },
+    { name: 'API Key',        key: 'api_runtime_key',   note: 'Route A/B 鉴权', required: true },
+    { name: 'Route B 模型',   key: 'api_runtime_model_configured', note: r.api_runtime_model || '未配置', required: true },
+    { name: 'Route B Runtime',key: 'api_runtime_ready', note: r.api_runtime_ready ? '可用' : '需要 Key + 模型', required: true },
   ];
+  const modelInput = document.getElementById('apiModelInput');
+  const baseInput = document.getElementById('apiBaseInput');
+  if (modelInput && !modelInput.value && r.api_runtime_model) modelInput.value = r.api_runtime_model;
+  if (baseInput && !baseInput.value && r.api_runtime_base) baseInput.value = r.api_runtime_base;
   grid.innerHTML = items.map(i => {
     const ok  = r[i.key];
     const sym = ok ? '✅' : (i.required ? '❌' : '⬜');
@@ -491,18 +508,21 @@ async function installEnv(btn) {
 
 async function saveApiKey() {
   const key = document.getElementById('apiKeyInput').value.trim();
+  const model = document.getElementById('apiModelInput').value.trim();
+  const apiBase = document.getElementById('apiBaseInput').value.trim();
   const out = document.getElementById('apiKeyResult');
   out.innerHTML = '';
   if (!key) { out.innerHTML = '<div class="err-toast" style="margin-top:8px">请输入 API Key</div>'; return; }
+  if (!model) { out.innerHTML = '<div class="err-toast" style="margin-top:8px">请输入 Route B 模型</div>'; return; }
   try {
     const resp = await localFetch('/api/save-openai-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: key }),
+      body: JSON.stringify({ api_key: key, model, api_base: apiBase || null }),
     });
     const j = await resp.json();
     if (j.ok) {
-      out.innerHTML = '<div class="ok-toast" style="margin-top:8px">✅ API Key 已保存，Codex CLI 立即可用</div>';
+      out.innerHTML = `<div class="ok-toast" style="margin-top:8px">✅ ${j.msg || 'Route B 配置已保存'}</div>`;
       document.getElementById('apiKeyInput').value = '';
       loadEnvCheck();
     } else {

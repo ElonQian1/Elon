@@ -47,6 +47,7 @@ use tracing::{info, warn};
 
 mod cli_usage;
 mod node_agent_admin_open;
+mod node_agent_api_runtime_config;
 mod node_agent_cli_security;
 mod node_agent_file_range;
 mod node_agent_full_access;
@@ -2939,6 +2940,7 @@ async fn admin_env_check(
     axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> axum::Json<serde_json::Value> {
     let result = tokio::task::spawn_blocking(|| {
+        let api_runtime = node_agent_api_runtime_config::status_from_env();
         serde_json::json!({
             "git":          tool_available("git"),
             "java":         tool_available("java"),
@@ -2951,9 +2953,12 @@ async fn admin_env_check(
             "android_sdk":  android_sdk_ready(),
             "gradle_mirror": gradle_mirror_ok(),
             "ollama":       tool_available("ollama"),
-            "openai_key":   std::env::var("OPENAI_API_KEY")
-                                .map(|k| k.starts_with("sk-"))
-                                .unwrap_or(false),
+            "openai_key":   api_runtime.key_configured,
+            "api_runtime_key": api_runtime.key_configured,
+            "api_runtime_model": api_runtime.model,
+            "api_runtime_model_configured": api_runtime.model_configured,
+            "api_runtime_base": api_runtime.api_base,
+            "api_runtime_ready": api_runtime.ready,
         })
     })
     .await
@@ -3020,78 +3025,73 @@ async fn admin_install_env(
 #[derive(Deserialize)]
 struct SaveOpenAiKeyReq {
     api_key: String,
+    model: Option<String>,
+    api_base: Option<String>,
+    base_url: Option<String>,
 }
 
-/// POST /api/save-openai-key — 保存 OPENAI_API_KEY 到进程环境变量及 node-agent.env。
+/// POST /api/save-openai-key — 保存 Route B / Codex CLI 共用的 OpenAI-compatible 配置。
 async fn admin_save_openai_key(
     axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
     axum::Json(req): axum::Json<SaveOpenAiKeyReq>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     use axum::http::StatusCode;
 
-    let key = req.api_key.trim().to_string();
-    if key.is_empty() {
-        return (
-            StatusCode::BAD_REQUEST,
-            axum::Json(serde_json::json!({ "ok": false, "error": "API Key 不能为空" })),
-        );
-    }
-    if !key.starts_with("sk-") {
-        return (
-            StatusCode::BAD_REQUEST,
-            axum::Json(serde_json::json!({
-                "ok": false,
-                "error": "API Key 格式不正确，需以 sk- 开头"
-            })),
-        );
+    let base = req.api_base.as_deref().or(req.base_url.as_deref());
+    let save = match node_agent_api_runtime_config::validate_save(
+        &req.api_key,
+        req.model.as_deref(),
+        base,
+    ) {
+        Ok(save) => save,
+        Err(error) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": error.to_string()
+                })),
+            );
+        }
+    };
+
+    // 当前进程立即生效：Route B 内置 runtime 和 Route A CLI 子进程都会继承。
+    node_agent_api_runtime_config::apply_to_process(&save);
+
+    // 持久化到启动器实际读取的 _internal/node-agent.env，避免重启后 Route B 丢配置。
+    if let Some(env_file) = node_agent_env_file_path() {
+        if let Err(error) = node_agent_api_runtime_config::persist_to_env_file(&env_file, &save) {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                axum::Json(serde_json::json!({
+                    "ok": false,
+                    "error": error.to_string()
+                })),
+            );
+        }
     }
 
-    // 当前进程立即生效（Codex CLI 子进程会继承）
-    std::env::set_var("OPENAI_API_KEY", &key);
-
-    // 持久化到 exe 同目录的 node-agent.env
-    if let Some(env_file) = std::env::current_exe()
-        .ok()
-        .and_then(|p| p.parent().map(|d| d.join("node-agent.env")))
-    {
-        upsert_env_file(&env_file, "OPENAI_API_KEY", &key);
-    }
-
+    let status = node_agent_api_runtime_config::status_from_env();
+    let msg = if status.ready {
+        "Route B 本机 API runtime 已就绪，Codex CLI 也会继承该 API Key"
+    } else {
+        "API Key 已保存；Route B 还需要配置模型后才会就绪"
+    };
     (
         StatusCode::OK,
         axum::Json(serde_json::json!({
             "ok": true,
-            "msg": "OPENAI_API_KEY 已保存，Codex CLI 立即可用"
+            "msg": msg,
+            "api_runtime_ready": status.ready,
+            "api_runtime_model": status.model,
+            "api_runtime_base": status.api_base,
         })),
     )
 }
 
-/// 更新或追加 key=value 到 .env 文件（注释行也会被激活）。
-fn upsert_env_file(path: &std::path::Path, key: &str, value: &str) {
-    let existing = std::fs::read_to_string(path).unwrap_or_default();
-    let prefix = format!("{}=", key);
-    let mut found = false;
-    let new_lines: Vec<String> = existing
-        .lines()
-        .map(|line| {
-            let stripped = line.trim_start_matches('#').trim_start();
-            if stripped.starts_with(&prefix) {
-                found = true;
-                format!("{}={}", key, value)
-            } else {
-                line.to_string()
-            }
-        })
-        .collect();
-
-    let mut content = new_lines.join("\n");
-    if !found {
-        if !content.is_empty() && !content.ends_with('\n') {
-            content.push('\n');
-        }
-        content.push_str(&format!("{}={}\n", key, value));
-    } else if !content.ends_with('\n') {
-        content.push('\n');
-    }
-    let _ = std::fs::write(path, content);
+fn node_agent_env_file_path() -> Option<std::path::PathBuf> {
+    std::env::current_exe().ok().and_then(|path| {
+        path.parent()
+            .map(|dir| dir.join("_internal").join("node-agent.env"))
+    })
 }
