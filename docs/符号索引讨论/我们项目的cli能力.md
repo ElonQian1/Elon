@@ -978,6 +978,56 @@ CLI：执行完成，结果如下...
 
 它可以操控 PC，但不是 API key 在操控 PC，而是你的 Rust 程序在操控 PC。AI 只负责决定“下一步想做什么”，Rust CLI 负责判断“能不能做、要不要问用户、怎么安全执行”。
 
+## 2026-06-21 项目实现状态映射
+
+当前项目不是只做理论 CLI，已经有三条执行路线：
+
+```text
+Route A：套壳本机 CLI
+一龙 PC 节点
+  ↓
+只允许已发现的 codex / copilot / claude / gemini
+  ↓
+本机 CLI 自己调用模型、读写文件、执行命令
+
+Route B：本机 API runtime
+一龙 PC 节点
+  ↓
+读取用户本机 OpenAI-compatible API 配置
+  ↓
+节点自己的工具层执行 list/read/write/run_command
+
+Route C：服务器 runtime
+一龙 PC 节点
+  ↓
+调用我们服务器托管的模型能力
+  ↓
+节点自己的工具层执行 list/read/write/run_command
+```
+
+已完成的边界：
+
+```text
+项目绑定、开发频道、Route A/B/C 选择
+read_only / project_write / full_access 权限字段
+Route B/C 本机工具白名单
+Route B/C 工具调用时间线
+本机 7799 管理 API token 保护
+Route A CLI 名称、路径、参数、cwd fail-closed 校验
+legacy relay 同步拒绝任意 CLI 和内置 runtime
+```
+
+还不能说完全等同 Codex Desktop。下一步必须补：
+
+```text
+Route B/C apply_patch
+diff preview
+逐工具审批 approve/deny
+full_access 本机确认
+任务恢复
+read_file_range
+```
+
 我建议你下一步直接做 **v0.1：生成脚本 + 预览 + 写入 + 手动确认运行**。这个版本安全、可控，而且已经能完成很多真实 PC 自动化任务。
 
 [1]: https://developers.openai.com/codex/cli "CLI – Codex | OpenAI Developers"

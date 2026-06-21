@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：补齐 Route B/C 工具调用时间线，让 AI 开发频道能持久化并展示 `tool_call/tool_result`，同时继续收紧本机 `/api/status` 管理 token 暴露。
+- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route A/legacy relay 的本机 CLI 执行边界，避免云端把 PC 节点当任意远程命令通道。
 - 当前分支：`main`，提交前需要先与最新 `origin/main` 对齐。
 
 ## 已完成
@@ -50,17 +50,25 @@
 - 已把 PC 工作台、电脑医生、节点页 fallback 和独立 `node_agent_admin.html` 接入本机 token 自动刷新、授权头注入和 403 后重试一次。
 - 已补 `scripts/test-pc-dev-assets.js` 静态断言，防止以后删掉本机 admin token wiring。
 - 已通过本阶段验证：`rustfmt --edition 2021 server\src\node_agent_main.rs server\src\node_agent_local_admin.rs`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`、`node --check server\src\assets\pc_app.js`、`node --check server\src\assets\pc_app_doctor.js`、`node --check server\src\assets\pc_app_node.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 本轮新增 `server/src/node_agent_cli_security.rs`，统一 Route A/B/C CLI 名称、路径、cwd 和参数校验：未知 CLI、路径型 CLI、危险提权参数、裸 cwd、相对 cwd 都会 fail-closed。
+- 本轮已让 `elon-pc-node` 的 Route A 执行只使用本机发现并 canonicalize 后的 `codex` / `copilot` / `claude` / `gemini` 路径；`api-runtime` / `server-runtime` 仍走内置 runtime，不需要本机外部可执行文件。
+- 本轮已让 plan 模式继续携带项目上下文，但权限降为 `read_only`；节点侧 read-only 不再创建会话 worktree，`project_write/full_access` 才进入隔离 worktree。
+- 本轮已把 Codex session 持久化 key 扩展为 `session_id + permission + cwd hash`，避免同一个会话 ID 在不同权限或不同项目目录之间串用。
+- 本轮已同步收紧 legacy `pc_relay_client`：复用同一套 CLI 白名单和参数/cwd 校验，明确拒绝内置 runtime，并隐藏 Windows 子进程窗口。
+- 本轮已从 PC 节点能力上报里移除 `gh`，避免前端显示一个实际会被安全层拒绝的 CLI。
+- 已通过本轮验证：`rustfmt --edition 2021 server/src/main.rs server/src/node_agent_main.rs server/src/node_agent_cli_security.rs server/src/pc_relay_client.rs server/src/ai_cli/mod.rs`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`、`cargo test --manifest-path server\Cargo.toml --bin elon-server node_agent_cli_security`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
-先发布并验证本机管理 API 授权硬化；下一阶段继续推进工具时间线、逐工具审批、apply_patch/diff 预览和持久任务恢复。
+先发布并验证本机 CLI 执行边界硬化；下一阶段继续推进 Route B/C 的 `apply_patch`、diff preview、逐工具审批、full_access 本机确认和持久任务恢复。
 
 ## 待完成
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 下一阶段实现 Route B/C 工具时间线和逐工具审批，而不是只输出 `[tool] xxx` 粗粒度文本。
-- 下一阶段补 `apply_patch` / diff preview / read_file_range 等更像 Codex Desktop 的文件编辑工具。
+- 下一阶段实现 Route B/C 的 `apply_patch` / diff preview / 逐工具审批，而不是只让模型直接调用 `write_file`。
+- 下一阶段补 Route A `full_access` 的本机确认页或原生确认弹窗，不能只由云端请求字段决定。
+- 下一阶段补 read_file_range、任务恢复和更完整的工具时间线筛选。
 
 ## 当前阻塞
 

@@ -14,6 +14,8 @@
 6. 发布闭环：提交到 `origin/main`，发布服务器和 Windows 节点包，验证线上版本和本机安装态。
 7. 本机管理安全：7799 本地管理/电脑医生写接口要求启动期随机 token 和 trusted origin 校验，前端自动刷新并携带授权头。
 8. 工具时间线：Route B/C 本机 runtime 把 `tool_call/tool_result` 结构化回传，AI 开发频道持久化并在 PC 页面以工具卡片展示。
+9. 本机 CLI 执行边界：Route A 只允许已发现的 `codex` / `copilot` / `claude` / `gemini`，拒绝云端传来的任意可执行名、危险提权参数和裸 cwd；legacy relay 同步收紧。
+10. Codex Desktop 体验补齐：Route B/C 增加 `apply_patch`、diff preview、逐工具审批、超时/拒绝回传和可恢复任务。
 
 ## 风险
 
@@ -23,6 +25,8 @@
 - 并行任务可能继续推进 `origin/main`，发布时必须以最新主线为准。
 - Route B/C 仍不是完整 OS 沙箱；本阶段只减少 shell 注入和命令解析歧义，不把 B/C 扩展成通用 PowerShell。
 - 本机 `/api/status` 只应向受信任云端来源或本机同源页面返回启动期随机 token；若可信 PC 网页自身出现 XSS，仍需要后续补本机确认弹窗/原生授权页进一步收紧。
+- Route A 的 `full_access` 不能只靠云端字段放大权限，后续需要本机原生确认或配对确认，避免网页/XSS 直接触发全盘级开发能力。
+- legacy relay 是兼容路径，不应承载 Route B/C 内置 runtime；若收到内置 runtime 请求必须 fail-closed，让用户升级到一龙 PC 节点客户端。
 
 ## 验证命令
 
@@ -33,6 +37,8 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_runtime_events`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server node_agent_cli_security`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`
 - `cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`

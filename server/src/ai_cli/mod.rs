@@ -811,17 +811,17 @@ async fn run_via_pc_agent(
         let mut result = Err(last_err);
         const MAX_ATTEMPTS: u32 = 25;
         for attempt in 0..MAX_ATTEMPTS {
-            let project_context = if request_mode.is_plan() {
-                None
-            } else {
-                native_session_scope
-                    .as_ref()
-                    .map(|scope| CliProjectContext {
-                        project_id: scope.project_id.clone(),
-                        conversation_id: scope.conversation_id.clone(),
-                        runtime_permission: Some(scope.runtime_permission.clone()),
-                    })
-            };
+            let project_context = native_session_scope
+                .as_ref()
+                .map(|scope| CliProjectContext {
+                    project_id: scope.project_id.clone(),
+                    conversation_id: scope.conversation_id.clone(),
+                    runtime_permission: Some(if request_mode.is_plan() {
+                        "read_only".to_string()
+                    } else {
+                        scope.runtime_permission.clone()
+                    }),
+                });
             match state
                 .agent_manager
                 .dispatch_cli_prompt_with_context_control(

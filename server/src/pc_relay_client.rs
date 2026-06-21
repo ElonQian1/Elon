@@ -415,29 +415,33 @@ async fn handle_cli_prompt(
         cwd.as_deref().unwrap_or("<default>"),
         req_id
     );
+    let resolved_cli = match resolve_relay_cli(&cli) {
+        Ok(resolved) => resolved,
+        Err(e) => {
+            warn!("[relay-client] 拒绝 CLI 请求: {e:#}");
+            send_cli_done_error(out, req_id, e.to_string());
+            return;
+        }
+    };
+    if let Err(e) =
+        crate::node_agent_cli_security::validate_cli_extra_args(resolved_cli.name(), &extra_args)
+    {
+        warn!("[relay-client] 拒绝 CLI 参数: {e:#}");
+        send_cli_done_error(out, req_id, e.to_string());
+        return;
+    }
     let prepared_cwd = match prepare_cli_cwd(cwd, project_context) {
         Ok(cwd) => cwd,
         Err(e) => {
             warn!("[relay-client] 准备 CLI 工作目录失败: {e:#}");
-            let done = AgentToServer::CliDone {
-                req_id,
-                exit_ok: false,
-                error: Some(e.to_string()),
-                prompt_tokens: None,
-                cached_input_tokens: None,
-                completion_tokens: None,
-                reasoning_tokens: None,
-                total_tokens: None,
-                model: None,
-                workspace_status: None,
-            };
-            let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
+            send_cli_done_error(out, req_id, e.to_string());
             return;
         }
     };
     let (exit_ok, error) = match run_cli_and_stream(
         &req_id,
-        &cli,
+        resolved_cli.name(),
+        resolved_cli.bin(),
         &extra_args,
         prepared_cwd.cwd.as_deref(),
         &prompt,
@@ -468,6 +472,22 @@ async fn handle_cli_prompt(
     let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
 }
 
+fn send_cli_done_error(out: mpsc::UnboundedSender<Message>, req_id: String, error: String) {
+    let done = AgentToServer::CliDone {
+        req_id,
+        exit_ok: false,
+        error: Some(error),
+        prompt_tokens: None,
+        cached_input_tokens: None,
+        completion_tokens: None,
+        reasoning_tokens: None,
+        total_tokens: None,
+        model: None,
+        workspace_status: None,
+    };
+    let _ = out.send(Message::Text(serde_json::to_string(&done).unwrap()));
+}
+
 struct PreparedCliCwd {
     cwd: Option<String>,
     conversation_workspace: Option<crate::pc_workspace_provisioner::ConversationWorkspaceResult>,
@@ -477,20 +497,16 @@ fn prepare_cli_cwd(
     cwd: Option<String>,
     project_context: Option<homecli_proto::CliProjectContext>,
 ) -> Result<PreparedCliCwd> {
-    let Some(base_cwd) = cwd else {
+    let (base_cwd, context) =
+        crate::node_agent_cli_security::prepare_cli_base_cwd(cwd, project_context)?;
+    if relay_cli_read_only(context.runtime_permission.as_deref()) {
         return Ok(PreparedCliCwd {
-            cwd: None,
+            cwd: Some(base_cwd.to_string_lossy().to_string()),
             conversation_workspace: None,
         });
-    };
-    let Some(context) = project_context else {
-        return Ok(PreparedCliCwd {
-            cwd: Some(base_cwd),
-            conversation_workspace: None,
-        });
-    };
+    }
     let workspace = crate::pc_workspace_provisioner::prepare_conversation_workspace(
-        &base_cwd,
+        base_cwd.to_string_lossy().as_ref(),
         &context.project_id,
         &context.conversation_id,
     )?;
@@ -574,43 +590,43 @@ fn workspace_status(
     }
 }
 
-fn resolve_cli_program(cli: &str) -> String {
-    if cli.eq_ignore_ascii_case("copilot") {
-        if let Ok(v) = std::env::var("COPILOT_CLI_BIN") {
-            let v = v.trim();
-            if !v.is_empty() {
-                return v.to_string();
-            }
-        }
+fn relay_cli_read_only(runtime_permission: Option<&str>) -> bool {
+    !matches!(
+        runtime_permission,
+        Some("project_write" | "full_access" | "danger_full_access")
+    )
+}
 
-        #[cfg(windows)]
-        {
-            let mut candidates = Vec::new();
-            if let Ok(appdata) = std::env::var("APPDATA") {
-                candidates.push(format!(
-                    r"{}\Code\User\globalStorage\github.copilot-chat\copilotCli\copilot.bat",
-                    appdata
-                ));
-                candidates.push(format!(
-                    r"{}\Code\User\globalStorage\github.copilot-chat\copilotCli\copilot",
-                    appdata
-                ));
-                candidates.push(format!(r"{}\npm\copilot.cmd", appdata));
-                candidates.push(format!(r"{}\npm\copilot", appdata));
-            }
-            for p in candidates {
-                if std::path::Path::new(&p).exists() {
-                    return p;
-                }
-            }
-        }
+fn resolve_relay_cli(cli: &str) -> Result<crate::node_agent_cli_security::ResolvedCli> {
+    let paths = detect_relay_cli_paths();
+    let resolved = crate::node_agent_cli_security::resolve_cli_request(cli, &paths)?;
+    if matches!(
+        resolved,
+        crate::node_agent_cli_security::ResolvedCli::BuiltIn { .. }
+    ) {
+        return Err(anyhow!(
+            "legacy relay 模式不支持内置 runtime，请使用一龙 PC 节点客户端。"
+        ));
     }
-    cli.to_string()
+    Ok(resolved)
+}
+
+fn detect_relay_cli_paths() -> Vec<(String, String)> {
+    ["copilot", "codex", "claude", "gemini"]
+        .iter()
+        .filter_map(|name| {
+            let path = elon_pc_dev_runtime::command_candidates(name)
+                .into_iter()
+                .next()?;
+            Some((name.to_string(), path.to_string_lossy().to_string()))
+        })
+        .collect()
 }
 
 async fn run_cli_and_stream(
     req_id: &str,
-    cli: &str,
+    cli_name: &str,
+    program: &str,
     extra_args: &[String],
     cwd: Option<&str>,
     prompt: &str,
@@ -619,10 +635,10 @@ async fn run_cli_and_stream(
     use tokio::io::AsyncBufReadExt;
     use tokio::process::Command;
 
-    let program = resolve_cli_program(cli);
-    if program != cli {
-        info!("[relay-client] cli={} 使用可执行路径: {}", cli, program);
-    }
+    info!(
+        "[relay-client] cli={} 使用可执行路径: {}",
+        cli_name, program
+    );
     #[cfg(windows)]
     let is_batch = {
         let p = program.to_ascii_lowercase();
@@ -638,7 +654,7 @@ async fn run_cli_and_stream(
         c.arg("/C").arg(&program);
         c
     } else {
-        Command::new(&program)
+        Command::new(program)
     };
     for arg in extra_args {
         cmd.arg(arg);
@@ -650,6 +666,7 @@ async fn run_cli_and_stream(
     cmd.stdout(std::process::Stdio::piped());
     cmd.stderr(std::process::Stdio::null()); // 不转发 stderr（包含 stats/warning）
     cmd.kill_on_drop(true);
+    hide_relay_command_window(&mut cmd);
 
     let mut child = cmd
         .spawn()
@@ -681,6 +698,14 @@ async fn run_cli_and_stream(
     let status = child.wait().await?;
     let _ = stream_task.await;
     Ok(status.success())
+}
+
+fn hide_relay_command_window(_command: &mut tokio::process::Command) {
+    #[cfg(windows)]
+    {
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        _command.creation_flags(CREATE_NO_WINDOW);
+    }
 }
 
 // ── HTTP 请求转发 ─────────────────────────────────────────────────────────────

@@ -76,6 +76,7 @@ mod intent_router;
 mod join_request_events;
 mod lan_peer;
 mod lm_chat;
+mod node_agent_cli_security;
 mod node_api;
 mod node_compute_admin;
 mod node_hardware_probe;

@@ -47,6 +47,7 @@ use tracing::{info, warn};
 
 mod cli_usage;
 mod node_agent_admin_open;
+mod node_agent_cli_security;
 mod node_agent_local_admin;
 mod node_agent_project_picker;
 mod node_agent_proxy;
@@ -645,7 +646,7 @@ fn cli_done_error(cli_name: &str, stdout_text: &str, stderr_text: &str) -> Strin
 ///   c. 其他非 globalStorage 路径
 ///   d. 兜底：任何找到的路径
 fn detect_available_clis() -> Vec<(String, String)> {
-    let candidates = ["copilot", "codex", "claude", "gemini", "gh"];
+    let candidates = ["copilot", "codex", "claude", "gemini"];
     candidates
         .iter()
         .filter_map(|name| {
@@ -772,6 +773,13 @@ fn cli_prompt_full_access(runtime_permission: Option<&str>) -> bool {
     )
 }
 
+fn cli_prompt_read_only(runtime_permission: Option<&str>) -> bool {
+    !matches!(
+        runtime_permission.map(str::trim),
+        Some("project_write" | "full_access" | "danger_full_access")
+    )
+}
+
 async fn run_cli_prompt(
     req_id: String,
     bin: &str,
@@ -786,6 +794,24 @@ async fn run_cli_prompt(
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 ) {
     use tokio::io::AsyncBufReadExt;
+
+    if let Err(error) =
+        node_agent_cli_security::validate_cli_extra_args(cli_name, extra_args.as_slice())
+    {
+        let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+            req_id,
+            exit_ok: false,
+            error: Some(error.to_string()),
+            prompt_tokens: None,
+            cached_input_tokens: None,
+            completion_tokens: None,
+            reasoning_tokens: None,
+            total_tokens: None,
+            model: None,
+            workspace_status: None,
+        }));
+        return;
+    }
 
     if cli_name == "api-runtime" {
         let result = crate::node_agent_server_runtime::run_api_runtime_prompt(
@@ -887,17 +913,11 @@ async fn run_cli_prompt(
         cmd.arg("exec");
         // 检查本地是否有已保存的真实 Codex session id
         let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
-        let our_key = extra_args
-            .iter()
-            .find(|a| a.starts_with("--session-id="))
-            .and_then(|a| a.strip_prefix("--session-id="))
-            .map(|key| {
-                if full_access {
-                    format!("{key}:full_access")
-                } else {
-                    key.to_string()
-                }
-            });
+        let our_key = node_agent_cli_security::codex_session_scope_key(
+            &extra_args,
+            runtime_permission.as_deref(),
+            cwd.as_deref(),
+        );
         let real_codex_session_id = our_key.as_ref().and_then(|key| {
             std::fs::read_to_string(&codex_sessions_file)
                 .ok()
@@ -914,6 +934,10 @@ async fn run_cli_prompt(
             // 首次执行：默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
             if full_access {
                 cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+            } else if cli_prompt_read_only(runtime_permission.as_deref()) {
+                cmd.arg("--sandbox");
+                cmd.arg("read-only");
+                cmd.arg("--skip-git-repo-check");
             } else {
                 cmd.arg("--sandbox");
                 cmd.arg("workspace-write");
@@ -994,11 +1018,11 @@ async fn run_cli_prompt(
     // 对 Codex：从 stdout 提取真实 session id（格式: "session id: <uuid>"）
     // 并持久化到本地，以便下次用 exec resume <real_id> 续接
     let codex_key = if cli_name == "codex" {
-        extra_args
-            .iter()
-            .find(|a| a.starts_with("--session-id="))
-            .and_then(|a| a.strip_prefix("--session-id="))
-            .map(str::to_owned)
+        node_agent_cli_security::codex_session_scope_key(
+            &extra_args,
+            runtime_permission.as_deref(),
+            cwd.as_deref(),
+        )
     } else {
         None
     };
@@ -1152,20 +1176,15 @@ fn prepare_cli_prompt_cwd(
     cwd: Option<String>,
     project_context: Option<homecli_proto::CliProjectContext>,
 ) -> anyhow::Result<PreparedCliPromptCwd> {
-    let Some(base_cwd) = cwd else {
+    let (base_cwd, context) = node_agent_cli_security::prepare_cli_base_cwd(cwd, project_context)?;
+    if cli_prompt_read_only(context.runtime_permission.as_deref()) {
         return Ok(PreparedCliPromptCwd {
-            cwd: None,
+            cwd: Some(base_cwd.to_string_lossy().to_string()),
             conversation_workspace: None,
         });
-    };
-    let Some(context) = project_context else {
-        return Ok(PreparedCliPromptCwd {
-            cwd: Some(base_cwd),
-            conversation_workspace: None,
-        });
-    };
+    }
     let workspace = pc_workspace_provisioner::prepare_conversation_workspace(
-        &base_cwd,
+        base_cwd.to_string_lossy().as_ref(),
         &context.project_id,
         &context.conversation_id,
     )?;
@@ -1846,13 +1865,31 @@ async fn run_session(
                                 let (cancel_tx, cancel_rx) = watch::channel(false);
                                 rt_c.register_cli_prompt_cancel(&req_id_for_cleanup, cancel_tx)
                                     .await;
-                                let full_path = rt_c.resolve_cli(&cli).await;
+                                let resolved_cli = match rt_c.resolve_cli(&cli).await {
+                                    Ok(resolved) => resolved,
+                                    Err(e) => {
+                                        rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
+                                        let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
+                                            req_id,
+                                            exit_ok: false,
+                                            error: Some(e.to_string()),
+                                            prompt_tokens: None,
+                                            cached_input_tokens: None,
+                                            completion_tokens: None,
+                                            reasoning_tokens: None,
+                                            total_tokens: None,
+                                            model: None,
+                                            workspace_status: None,
+                                        }));
+                                        return;
+                                    }
+                                };
                                 // 处理 --attachment URL：下载图片到本地临时文件
                                 // Copilot: --attachment <url> → 下载后 --attachment <local_path>
                                 // Codex:   --attachment <url> → 下载后 -i <local_path>
                                 let resolved_args = resolve_attachment_args(
                                     extra_args,
-                                    &cli,
+                                    resolved_cli.name(),
                                     rt_c.creds
                                         .read()
                                         .await
@@ -1886,8 +1923,8 @@ async fn run_session(
                                     };
                                 run_cli_prompt(
                                     req_id,
-                                    &full_path,
-                                    &cli,
+                                    resolved_cli.bin(),
+                                    resolved_cli.name(),
                                     resolved_args,
                                     runtime_permission,
                                     prepared_cwd.cwd,
@@ -2200,15 +2237,13 @@ impl NodeRuntime {
         hardware
     }
 
-    /// CLI 名称 → 完整路径（找不到就返回原名称作备用）
-    async fn resolve_cli(&self, name: &str) -> String {
-        self.cli_paths
-            .read()
-            .await
-            .iter()
-            .find(|(n, _)| n == name)
-            .map(|(_, p)| p.clone())
-            .unwrap_or_else(|| name.to_string())
+    /// CLI 名称 → 本机允许执行的路径。找不到时直接拒绝，避免云端把 PC 节点当通用远程命令通道。
+    async fn resolve_cli(
+        &self,
+        name: &str,
+    ) -> anyhow::Result<crate::node_agent_cli_security::ResolvedCli> {
+        let paths = self.cli_paths.read().await;
+        crate::node_agent_cli_security::resolve_cli_request(name, paths.as_slice())
     }
 
     /// 更新凭证（同时持久化），并唤醒连接循环重新评估。
