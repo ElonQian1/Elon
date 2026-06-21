@@ -613,9 +613,10 @@ if (-not $SkipBuild) {
         $env:ELON_BUILD_VERSION  = $AssignedVersion
         $savedReleaseRustflags = Enable-PortableReleaseRustflags -RepoRoot $RepoRoot -Target $Target
         cargo zigbuild --release --target $Target --bin elon-server
+        $cargoExitCode = $LASTEXITCODE
         Restore-ReleaseRustflags -Saved $savedReleaseRustflags
         $savedReleaseRustflags = $null
-        if ($LASTEXITCODE -ne 0) {
+        if ($cargoExitCode -ne 0) {
             Remove-Item Env:ELON_SERVER_GIT_SHA -ErrorAction SilentlyContinue
             Remove-Item Env:ELON_BUILD_VERSION  -ErrorAction SilentlyContinue
             Remove-Item Env:CARGO_TARGET_DIR -ErrorAction SilentlyContinue
