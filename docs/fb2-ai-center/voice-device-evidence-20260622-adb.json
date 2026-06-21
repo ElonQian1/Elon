@@ -1,0 +1,109 @@
+{
+  "schema": "fb2.voice_device_evidence.v1",
+  "finalAcceptanceReady": false,
+  "recordedAt": "2026-06-22T01:47:15+08:00",
+  "tester": "codex-main-project-adb",
+  "device": {
+    "manufacturer": "Xiaomi",
+    "model": "23116PN5BC",
+    "osVersion": "Android 16 / HyperOS OS3.0",
+    "androidApi": 36,
+    "speechRecognizerService": "com.xiaomi.mibrain.speech/.asr.AsrService"
+  },
+  "apk": {
+    "packageName": "com.duoguan.football",
+    "versionName": "1.1.48",
+    "versionCode": 96,
+    "lastUpdateTime": "2026-06-21 20:55:11",
+    "recordAudioPermission": "granted=true",
+    "recordAudioAppOps": "foreground"
+  },
+  "sdk": {
+    "mainProjectCommit": "2e8db5da",
+    "voiceKit": "android/chat-voice-kit",
+    "bootstrapApi": "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)",
+    "installedApkClassNameProbe": {
+      "searched": [
+        "com/elon/chatvoice/VoiceComposerView",
+        "VoiceComposerBootstrap",
+        "ServerAsrClient",
+        "ChatVoiceRecordingOverlay"
+      ],
+      "result": "not_found_in_raw_apk_strings",
+      "interpretation": "R8/minify may hide class names, so this run uses UI and behavior evidence instead of class-string evidence."
+    }
+  },
+  "checks": {
+    "usesVoiceComposerView": true,
+    "textVoiceToggle": true,
+    "holdToTalkButton": true,
+    "recordingOverlay": true,
+    "slideToCancel": true,
+    "zoneSend": true,
+    "zoneAiReply": true,
+    "zoneTranscribe": true,
+    "tooShort": false,
+    "systemAsrSuccess": false,
+    "systemAsrTimeoutServerFallback": false,
+    "serverAsrSuccess": false,
+    "serverAsrFailureRecoversUi": false,
+    "ttsPlayback": false,
+    "asrTtsFreeWithZeroAiBalance": false
+  },
+  "observations": [
+    "ADB connected device e0d909c3 product=shennong model=23116PN5BC.",
+    "fb2 package com.duoguan.football is installed as versionName=1.1.48 versionCode=96.",
+    "Microphone permission and appops are usable: RECORD_AUDIO granted=true and appops mode=foreground.",
+    "The chat tab opens the group list and the official group '夺冠体育官方群'.",
+    "The group page shows a native bottom composer with text/voice toggle and '按住 说话'.",
+    "Tapping the left composer icon switches to text mode with '发送消息...' and tapping it again switches back to '按住 说话'.",
+    "Holding the talk button shows the green recording bubble and the three-zone control surface: 取消 / AI回复 / 转文字 plus center 发送.",
+    "Sliding to cancel dismisses the overlay and returns the composer to '按住 说话'.",
+    "Releasing over 转文字 after a silent hold returns to '按住 说话' within 10 seconds; no permanent '识别中' state was observed in this ADB run.",
+    "Logcat records com.duoguan.football microphone AudioRecord activity and Xiaomi system speech service activity, but this run did not include human speech and did not prove a successful final ASR transcript."
+  ],
+  "artifacts": [
+    {
+      "type": "screenshot",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-group.png",
+      "note": "Official group page with '按住 说话' composer."
+    },
+    {
+      "type": "screenshot",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-cancel-hold.png",
+      "note": "Hold-to-talk overlay with green listening bubble and three-zone control surface."
+    },
+    {
+      "type": "screenshot",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-cancel-after.png",
+      "note": "Composer recovered to idle after slide cancel."
+    },
+    {
+      "type": "screenshot",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-transcribe-after10s.png",
+      "note": "Composer recovered to idle after silent 转文字 release."
+    },
+    {
+      "type": "screenshot",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-text-mode.png",
+      "note": "Text mode after tapping composer toggle."
+    },
+    {
+      "type": "logcat",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-cancel-logcat.txt",
+      "note": "Shows microphone AudioRecord activity for com.duoguan.football and system speech engine candidate."
+    },
+    {
+      "type": "logcat",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-transcribe-logcat.txt",
+      "note": "Shows silent ASR/transcribe attempt and UI recovery window."
+    }
+  ],
+  "remainingForFinalAcceptance": [
+    "Run a human-spoken ASR sample and confirm system ASR finalResult or server ASR fallback result.",
+    "Force or observe a system ASR timeout/no-result path and confirm /api/voice/asr server fallback succeeds.",
+    "Force server ASR failure and confirm the composer leaves processing state with an error.",
+    "Play a TTS sample from an AI reply and confirm ttsStart/ttsEnd or audible playback.",
+    "Verify ASR/TTS still work when AI reply balance is zero, because ASR/TTS are free channel features."
+  ]
+}

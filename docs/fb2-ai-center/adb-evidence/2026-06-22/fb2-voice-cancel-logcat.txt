@@ -1,0 +1,832 @@
+--------- beginning of main
+06-22 01:44:22.411  1692  4665 I PAL: StreamSoundTrigger: Resume: 823: Exit, status 0
+06-22 01:44:22.411  1692  4665 D PAL: ResourceManager: isStreamActive: 4064: Enter.
+06-22 01:44:22.411  1692  4665 D PAL: ResourceManager: isStreamActive: 4071: Exit, ret 1
+06-22 01:44:22.411  1692  4665 D PAL: ResourceManager: HandleDetectionStreamAction: 5664: Exit, status 0
+06-22 01:44:22.411  1692  4665 D PAL: ResourceManager: GetConcurrencyInfo: 5729: pause on audio capture concurrency
+06-22 01:44:22.412  1692  4665 I PAL: ResourceManager: GetConcurrencyInfo: 5744: stream type 3 (PAL_STREAM_COMPRESSED) Tx conc 1, Rx conc 0, concurrency not allowed
+06-22 01:44:22.412  1692  4665 D PAL: ResourceManager: GetConcurrencyInfo: 5729: pause on audio capture concurrency
+06-22 01:44:22.412  1692  4665 I PAL: ResourceManager: GetConcurrencyInfo: 5744: stream type 3 (PAL_STREAM_COMPRESSED) Tx conc 1, Rx conc 0, concurrency not allowed
+06-22 01:44:22.412  1692  4665 D PAL: ResourceManager: HandleConcurrencyForSoundTriggerStreams: 5971: Exit
+06-22 01:44:22.412  1692  4665 D PAL: ResourceManager: eraseStreamUserCounter: 4121: stream counter for 0xb400006fab0a5610 is erased.
+06-22 01:44:22.412  1692  4665 D PAL: ResourceManager: deregisterStream: 3890: Enter. stream 0xb400006fab0a5610K
+06-22 01:44:22.412  1692  4665 D PAL: Stream: getStreamType: 528: streamType - 3 (PAL_STREAM_COMPRESSED)
+06-22 01:44:22.412  1692  4665 I PAL: ResourceManager: deregisterStream: 3898: stream type 3 (PAL_STREAM_COMPRESSED)
+06-22 01:44:22.412  1692  4665 D PAL: ResourceManager: deregisterStream: 4055: Exit. ret 0
+06-22 01:44:22.412  1692  4665 D PAL: Device: removeStreamDeviceAttr: 1275: found entry for stream:3
+06-22 01:44:22.413  1692  4665 D PAL: Device: removeStreamDeviceAttr: 1284: dev: 27 attr removed are: priority: 0x3, stream type: 3, ch: 2, sr: 48000, bit_width: 16, fmt: 1, sndDev: handset-dmic-endfire, custom_key: 
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: restoreDevice: 15820: Enter
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: restoreDevice: 15850: current device: 27 running at, ch 2, sr 48000, bit_width 16, fmt 1, sndDev handset-dmic-endfire
+06-22 01:44:22.413  1692  4665 D PAL: Stream: getAssociatedDevices: 638: no. of devices 0
+06-22 01:44:22.413  1692  4665 D PAL: Stream: getAssociatedDevices: 638: no. of devices 1
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: getSharedBEActiveStreamDevs: 7800: got dev 27 (PAL_DEVICE_IN_HANDSET_MIC) active streams on dev is 0
+06-22 01:44:22.413  1692  4665 D PAL: Stream: getAssociatedDevices: 638: no. of devices 0
+06-22 01:44:22.413  1692  4665 D PAL: Stream: getAssociatedDevices: 638: no. of devices 1
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: getSharedBEActiveStreamDevs: 7800: got dev 28 (PAL_DEVICE_IN_SPEAKER_MIC) active streams on dev is 0
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: restoreDevice: 15916: no active device, switch un-needed
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: restoreDevice: 15924: Exit
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: controlMixerCtl: 13032: isZeroDataNum:0 allStreamNum:0 isForceOpenStream:0 devicetype:1 
+06-22 01:44:22.413  1692  4665 D PAL: ResourceManager: closeMixerCtl: 13221: close GLOBAL_EN Control:1
+06-22 01:44:22.413  1692  4665 I PAL: API: pal_stream_close: 393: Exit. status 0
+06-22 01:44:22.413  1692  4665 D AHAL: AudioStream: Standby: 5886: Exit ret: 0
+06-22 01:44:22.413  1692  4665 D AHAL: AudioStream: astream_in_standby: 2056: Exit ret: 0
+06-22 01:44:22.416  2457  2519 E PowerInsightPolicy: sPowerInsightService null!
+06-22 01:44:22.416  2457  2519 D BatteryStatsManagerStub: noteStopAudioInNeed uid is 10572, pid is 12629, session is 78649, port is 15485, type is 1
+06-22 01:44:22.417  1979 15826 D APM_AudioPolicyManager: stopInput portId 15485
+06-22 01:44:22.417  1979 15826 V audio_utils::mutex: mutex_impl: audio_mutex initialized: ret:0  order:6
+06-22 01:44:22.418  1979  2955 V audio_utils::mutex: mutex_impl: audio_mutex initialized: ret:0  order:21
+06-22 01:44:22.419  1692  4665 D AHAL: AudioStreamCustom: SetAggregateSourceMetadataV7: 1788: Aggregated Source metadataV7 usage: 0 content_type: 0 channel_mask: 0  tags:  gain: 0.000000
+06-22 01:44:22.419  1692  4665 D AHAL: AudioDeviceCustom: CheckInputDevice: 1678: stream_in_list_.size() 1 isneedblemic 0 
+06-22 01:44:22.419  1692  4665 D AHAL: AudioStreamCustom: isNeedChangeBleToHandset: 1593: mAndroidInDevicesCustom 0x80000004
+06-22 01:44:22.419  1692  4665 D PAL: API: pal_set_param: 1306: Enter: param id 60 (PAL_PARAM_ID_SET_SOURCE_METADATA)
+06-22 01:44:22.419  1692  4665 D PAL: ResourceManager: setParameter: 11146: Enter param id: 60 (PAL_PARAM_ID_SET_SOURCE_METADATA)
+06-22 01:44:22.419  1692  4665 D PAL: ResourceManager: isDeviceAvailable: 14357: Device 22 (PAL_DEVICE_OUT_BLUETOOTH_BLE), is_available = 0
+06-22 01:44:22.419  1692  4665 D PAL: ResourceManager: isDeviceAvailable: 14357: Device 8 (PAL_DEVICE_OUT_BLUETOOTH_A2DP), is_available = 0
+06-22 01:44:22.419  1692  4665 D PAL: ResourceManager: setParameter: 12748: Exit status: 0
+06-22 01:44:22.419  1692  4665 D PAL: API: pal_set_param: 1323: Exit, status 0
+06-22 01:44:22.419  1692  4665 D AHAL: AudioDeviceCustom: CheckInputDevice: 1678: stream_in_list_.size() 1 isneedblemic 0 
+06-22 01:44:22.419  1692  4665 D AHAL: AudioStreamCustom: isNeedChangeBleToHandset: 1593: mAndroidInDevicesCustom 0x80000004
+06-22 01:44:22.420  1692  4655 D AHAL: AudioDevice: ReleaseAudioPatch: 673: Release patch with handle 2845
+06-22 01:44:22.420  1692  4655 D AHAL: AudioDevice: ReleaseAudioPatch: 691: Audio Patch type: 1
+06-22 01:44:22.420  1692  4655 I AHAL: AudioDevice: InGetStream: 1606: Found existing stream associated with iohandle 17670
+06-22 01:44:22.420  1692  4655 I AHAL: AudioStream: RouteStream: 6140: Enter: InPrimary usecase(22: audio-record-compress)
+06-22 01:44:22.420  1692  4655 D AHAL: AudioStream: RouteStream: 6151: mAndroidInDevices 0x80000004, mNoOfInDevices 1, new_devices 0x0, num new_devices: 1
+06-22 01:44:22.420  1692  4655 D AHAL: AudioStream: RouteStream: 6576: Exit 0
+06-22 01:44:22.420  1692  4655 D AHAL: AudioDevice: ReleaseAudioPatch: 731: Exiting ReleaseAudioPatch
+06-22 01:44:22.420  1692  4655 D AHAL: AudioDevice: ReleaseAudioPatch: 736: Successfully released patch 2845
+06-22 01:44:22.420  1692  4655 D AHAL: AudioDevice: ReleaseAudioPatch: 738: Exit ret: 0
+06-22 01:44:22.421  1979 15826 V audio_utils::mutex: mutex_impl: audio_mutex initialized: ret:0  order:6
+06-22 01:44:22.421 31337 31916 W MIUISafety-Monitor: sync com.duoguan.football,userId:0,op:27,active:false,isNote:false,isTerminal:false,notify:true
+06-22 01:44:22.424  1979 15826 W AudioPolicyClientImpl: setSoundTriggerCaptureState active 0
+06-22 01:44:22.425  1979 15826 D APM_AudioPolicyManager: stopInput: setCaptureState false for sva/voicetrigger
+06-22 01:44:22.425  1979 15826 V audio_utils::mutex: mutex_impl: audio_mutex initialized: ret:0  order:6
+06-22 01:44:22.426  1979  2955 D AudioFlingerImpl: meetingpowerpolicy showMap from other ++++++
+06-22 01:44:22.426  1979  2955 D AudioFlingerImpl: meetingpowerpolicy mVoipTxAppCount 0 mTargetRecordMode 1 mSupportMeetingPower 0 mIsSpeakerMic 1
+06-22 01:44:22.426  1979  2955 D AudioFlingerImpl: meetingpowerpolicy showMap from other ------
+06-22 01:44:22.426  1979  2955 V audio_utils::mutex: mutex_impl: audio_mutex initialized: ret:0  order:21
+06-22 01:44:22.427  1979 15256 D AudioFlinger: updateWakeLockUids_l AudioIn_4506 uids:
+06-22 01:44:22.427  1979 15256 D AudioFlingerImpl: checkForGameParameter_l() set events appname=-com.duoguan.football
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStream: astream_in_set_parameters: 2067: Enter: appname=-com.duoguan.football
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStreamCustom: SetParameters: 1085: Enter: kvpairs is appname=-com.duoguan.football
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStreamCustom: SetParameters: 1119: SetParameters app_types_ is (0)
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStreamCustom: SetParameters: 1166: [hal_apptype] is sing app input 0
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStreamCustom: SetParameters: 1167: [hal_apptype] is singing app on 0
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStream: SetParameters: 6597: enter: kvpairs: appname=-com.duoguan.football
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStream: SetParameters: 6621: Exit 0
+06-22 01:44:22.427  1692  4333 D AHAL: AudioStreamCustom: SetParameters: 1295: Exit:0 
+06-22 01:44:22.428  1979  2158 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.429  1979  4325 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.429  1979  2159 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.431  2918 13161 D MPEG4Writer: Audio track source stopped
+06-22 01:44:22.431  2918 15263 V MediaWriter: Track event err/info msg:101, trackId:1, type:1000,val:0
+06-22 01:44:22.432  1979 22775 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.432  1979  4325 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.432  2918 15263 I MPEG4Writer: Received total/0-length (267/0) buffers and encoded 267 frames. - Audio
+06-22 01:44:22.432  2918 15263 I MPEG4Writer: Audio track drift time: 6151891 us
+06-22 01:44:22.432  2918 13161 D MPEG4Writer: Audio track stopped. Status:0. Stop source
+06-22 01:44:22.433  2918 15257 D MPEG4Writer: 0 chunks are written in the last batch
+06-22 01:44:22.433  2918 13161 D MPEG4Writer: WriterThread stopped. Status:0
+06-22 01:44:22.433  1979 15824 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.434  2918 13161 I MPEG4Writer: Adjust the moov start time from 114416 us -> 114416 us
+06-22 01:44:22.434  2918 13161 I MPEG4Writer: The mp4 file will not be streamable.
+06-22 01:44:22.436  2918 13161 I MPEG4Writer: MOOV atom was written to the file
+06-22 01:44:22.436  2918 13161 D MPEG4Writer: release()
+06-22 01:44:22.436  2918 13161 D MPEG4Writer: ftruncate mPreAllocateFileEndOffset:51983 mOffset:51231 mMdatEndOffset:49435 diff:752
+06-22 01:44:22.438  2457  6642 D AudioServiceStubImpl: event: 1
+06-22 01:44:22.438  2457  6642 D AudioServiceStubImpl: audioConfig: null
+06-22 01:44:22.439  2457  2477 D MiSound.MQSUtils: report record event.{"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.duoguan.football", "record_source":"MIC", "record_encoding":"10", "record_channel_num":"1", "record_sample_rate":"44100", "record_time_during":"7"},"dgt":"null","audio_ext":"null"}
+06-22 01:44:22.439  2457  2477 D system_server: xlog_init
+06-22 01:44:22.439  2457  2477 D system_server:  _xog_get_handle 
+06-22 01:44:22.417  9486 18390 I PowerKeeper.Event: noteStopAudioInNeed uid is 10572, sessionid is 78649, port is 15485, type is 1
+06-22 01:44:22.439  9486 18390 I PowerCheckerService: uid:10572change to inactive
+06-22 01:44:22.440  9486  9725 I AppActiveChecker: uid:10572change to inactive
+06-22 01:44:22.440  1979 16339 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.441  2918 13161 D MPEG4Writer: final fsync() takes 4 ms, file size 51231
+06-22 01:44:22.441 13929 13929 D LeAudioService: Recording mode changed: true -> false
+06-22 01:44:22.441  2457  2477 D system_server: get xlog handle
+06-22 01:44:22.441  2457  2477 V xlog_client:  xlog_send_java  JNI test, msg is {"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.duoguan.football", "record_source":"MIC", "record_encoding":"10", "record_channel_num":"1", "record_sample_rate":"44100", "record_time_during":"7"},"dgt":"null","audio_ext":"null"}
+06-22 01:44:22.441  2918 13161 D MPEG4Writer: MP4WtrCtrlHlpLooper stopped
+06-22 01:44:22.441  2457  2477 D xlog_client: xlog_open: Error in open xlog
+06-22 01:44:22.441  2457  2477 D xlog_client: xlog open fail
+06-22 01:44:22.441  2918 13161 D MPEG4Writer: Top 5 write durations(microseconds): #1:57 #2:76 #3:152 #4:338 #5:411
+06-22 01:44:22.441  2918 13161 D MPEG4Writer: reset(1 1)
+06-22 01:44:22.441  2918 13161 D MPEG4Writer: Audio track stopping. Stop source
+06-22 01:44:22.441  2918 13161 E MPEG4Writer: Stop() called but track is not started or stopped
+06-22 01:44:22.441  1979 16339 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.441  2918 13161 D StagefrightRecorder: stop-
+06-22 01:44:22.442 12629 12629 D MediaRecorder: stop- 0xb400006ec2ae7010
+06-22 01:44:22.442 12629 12629 D MediaRecorder: release+ 0xb400006ec2ae7010
+06-22 01:44:22.442  2457  2477 D system_server: EventReporter , EventReporter init failed
+06-22 01:44:22.442  2457  2477 E xlog_client: xlog_send_java:fail to  send msg {"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.duoguan.football", "record_source":"MIC", "record_encoding":"10", "record_channel_num":"1", "record_sample_rate":"44100", "record_time_during":"7"},"dgt":"null","audio_ext":"null"}
+06-22 01:44:22.442  2457  2477 D system_server:  xlog_deinit 
+06-22 01:44:22.442  2457  2477 D MiuiXlog: write dev/xlog result is : -1
+06-22 01:44:22.442  2457  2477 D MiSound.MQSUtils: result: -1
+06-22 01:44:22.442  2918  2918 D StagefrightRecorder: Destructor+
+06-22 01:44:22.442  2918  2918 D StagefrightRecorder: stop+
+06-22 01:44:22.442  2918  2918 W StagefrightRecorder: stop while neither recording nor paused
+06-22 01:44:22.442  2918  2918 D StagefrightRecorder: stop-
+06-22 01:44:22.442  2918  2918 D StagefrightRecorder: Destructor-
+06-22 01:44:22.442  2918  2918 I AudioRecord: stop mSessionID=78649, mPortID=15485, mActice: 0 packageName: com.duoguan.football
+06-22 01:44:22.442  2918  2918 D AudioRecord: stop(15485): mActive:0
+06-22 01:44:22.443 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=2, mLastMiuiPromptInfo=2, mShowPrivacy=true, mIsNewMiuiPromptInfo=false, mFirstUseLocationPrompt=true, mReducePromptInfo=false, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.443 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=2, mLastMiuiPromptInfo=2, mShowPrivacy=true, mIsNewMiuiPromptInfo=false, mFirstUseLocationPrompt=true, mReducePromptInfo=false, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.443 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=2, mLastMiuiPromptInfo=2, mShowPrivacy=true, mIsNewMiuiPromptInfo=false, mFirstUseLocationPrompt=true, mReducePromptInfo=false, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.443 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=2, mLastMiuiPromptInfo=2, mShowPrivacy=true, mIsNewMiuiPromptInfo=false, mFirstUseLocationPrompt=true, mReducePromptInfo=false, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.443 24290 24290 D PrivacyNewController: updateDotVisibility, mStatusBarVisible:true,mIsShadeState:truemPromptInfo.getFullscreenDotVisibility() == View.VISIBLE:true
+06-22 01:44:22.443  1979 31708 W AudioFlinger: session id 78649 not found for pid 12629
+06-22 01:44:22.443  1979 15824 D APM_AudioPolicyManager: releaseInput portId 15485
+06-22 01:44:22.443  2918  2918 D AudioRecordStub: ~AudioRecordStub() destroy
+06-22 01:44:22.443  1979 15824 D APM_AudioPolicyManager: closeInput(17670)
+06-22 01:44:22.444 12629 12629 D MediaRecorder: release- 0xb400006ec2ae7010
+06-22 01:44:22.444 12629 12629 D MediaRecorder: destructor+ 0xb400006ec2ae7010
+06-22 01:44:22.444  1692  4333 D AHAL: AudioStream: astream_dump: 795: dump function not implemented
+06-22 01:44:22.444 12629 12629 D MediaRecorder: destructor- 0xb400006ec2ae7010
+06-22 01:44:22.447  1979 15256 D AudioFlinger: updateWakeLockUids_l AudioIn_4506 uids:
+06-22 01:44:22.447  1979 15256 V audio_utils::mutex: remove_from_registry: unregistered for 15256
+--------- beginning of system
+06-22 01:44:22.447 15250 15250 W BpBinder: PerfMonitor binderTransact: time=6681ms interface=android.hardware.input.IInputManager code=1598246212
+06-22 01:44:22.448  1692  4333 D AHAL: AudioDevice: adev_close_input_stream: 943: Enter:stream_handle(0xb400006fcb0adb70)
+06-22 01:44:22.448  1692  4333 D AHAL: AudioDevice: adev_close_input_stream: 948: Exit
+06-22 01:44:22.448 12629 12629 W MediaRecorder: mediarecorder went away with unhandled events
+06-22 01:44:22.448  1979 15824 W AudioPolicyClientImpl: setSoundTriggerCaptureState active 0
+06-22 01:44:22.448  1979 15824 V audio_utils::mutex: mutex_impl: audio_mutex initialized: ret:0  order:6
+06-22 01:44:22.449 12629 12629 I ChatVoiceEngineSelector: 候选引擎(1): 系统语音引擎(系统默认)(com.xiaomi.mibrain.speech)
+06-22 01:44:22.449  1979 15824 D ClientInfoStub: ~ClientInfoStub()
+06-22 01:44:22.449  1979 15824 D ClientInfoStub: ~ClientInfoStub()
+06-22 01:44:22.449  1979 15824 D ClientInfoStub: ~ClientInfoStub()
+06-22 01:44:22.450  1979 31708 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.450  1979 15824 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.451  1979 22775 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.451  1979 15824 D NativePermissionController: checkPermission: missing 13 for 10125
+06-22 01:44:22.452 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:22.452 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:22.453  1979 20940 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.454 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:22.454  1979 20940 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.454  1979 22775 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.455  1979  2159 D NativePermissionController: checkPermission: missing 13 for 10572
+06-22 01:44:22.470  2457  2467 I system_server: This is sticky GC, maxfree is 33554432 minfree is 8388608
+06-22 01:44:22.470  2016  2016 D RefreshRateSelector: Touch Boost
+06-22 01:44:22.470  2016  2016 D MI-SF   : modeGroup0 mIsSupportAutomodeForMaxFpsSetting is 1(1), getCurrentBrightness() = 173(528), mIsKeepAutoMode 0 isAutoModeAllowed() 1
+06-22 01:44:22.470  2016  2016 D RefreshRateSelector: fixedMode_group: 0, isFindModeGroup 0
+06-22 01:44:22.470  2016  2016 D RefreshRateSelector: find max refresh rate:60, mode Group:0
+06-22 01:44:22.472  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:22.473  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:22.473  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:22.473  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:22.473  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:22.474  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:22.478 31337 31916 I ElectricCommonUtils: getIfProtectScreenIsEnable: status = true
+06-22 01:44:22.479 31337 31916 I ElectricCommonUtils: getIfProtectScreenIsEnable: status = true
+06-22 01:44:22.479 31337 31916 W MIUISafety-Flares: setStatus event:0,content:null,type:0-0-0-0
+06-22 01:44:22.480 24290  2242 D CommandQueueExt: setStatus: setStatus: what = 0, action = action_update_prompt, ext = null
+06-22 01:44:22.480 24290 24290 W PrivacyNewController: MIUILOG onLocationActiveChanged active: false
+06-22 01:44:22.481 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=0, mLastMiuiPromptInfo=2, mShowPrivacy=false, mIsNewMiuiPromptInfo=true, mFirstUseLocationPrompt=true, mReducePromptInfo=true, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.481 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=0, mLastMiuiPromptInfo=2, mShowPrivacy=false, mIsNewMiuiPromptInfo=true, mFirstUseLocationPrompt=true, mReducePromptInfo=true, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.481 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=0, mLastMiuiPromptInfo=2, mShowPrivacy=false, mIsNewMiuiPromptInfo=true, mFirstUseLocationPrompt=true, mReducePromptInfo=true, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.481 24290 24290 D MiuiHomePrivacyController: updateStatusBarHomePrivacyVisibilities: hide
+06-22 01:44:22.481 24290 24290 I MiuiHomePrivacyController: onPromptInfoChanged: newMiuiPromptInfo=0, mLastMiuiPromptInfo=2, mShowPrivacy=false, mIsNewMiuiPromptInfo=true, mFirstUseLocationPrompt=true, mReducePromptInfo=true, mOnlyUpdateLocation=false, mLessLocationTip=1
+06-22 01:44:22.481 24290 24290 D MiuiHomePrivacyController: updateStatusBarHomePrivacyVisibilities: hide
+06-22 01:44:22.482 24290 24290 I PrivacyNewController: isDelayCheck,return
+06-22 01:44:22.482 24290 24290 D PrivacyNewController: Clear the last privacy type.
+06-22 01:44:22.482 24290 24290 E DeviceNotificationListenerImpl: setStatus bundle is null or error:true,model is null or error:true
+06-22 01:44:22.485 24290 24290 D MiuiHomePrivacyController: hidePrivacyView onBegin: 
+06-22 01:44:22.487 24290 24290 D MiuiCarrierTextLayout: normal_control_center handleTwoCarriers: widthLeft:191 widthRight:191 availableWidth:846
+06-22 01:44:22.487 24290 24290 D MiuiCarrierTextLayout: normal_control_center onMeasure: availableWidth=875 resultWidth=875
+06-22 01:44:22.487 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:22.488 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:22.488 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:22.499  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.617748 0.113061 9.458230 74.547966 1.568177 0.000000 1 1.568177 1 1.568177 1.568177
+06-22 01:44:22.521  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:22.524  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:22.524  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:22.525  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:22.525  3200  4844 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:22.582 10701 10792 D JavaheapMonitor: Java heap used=7M max=256M, proc: com.xiaomi.xmsf:kit7
+06-22 01:44:22.583 10701 10792 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:22.603  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:7129.6,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:108.7,R:56.1,G:39.1,B:23.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:22.646  2457  4643 D AurogonImmobulusMode:  update wallpaper pacakge name status mLockWallPaperPackageName =  mLockWallPaperUid = -1 mDeskWallPaperPackageName = com.miui.miwallpaper mDeskWallPaperUid = 10183
+06-22 01:44:22.659  2457  4643 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-22 01:44:22.662  2457  4643 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-22 01:44:22.662  2457  4643 D InetDiagMessage: Destroyed live tcp sockets for uids={10380} in 8ms
+06-22 01:44:22.662  2457  4643 D ActionExecute: frozen uid = 10380 reason=check binder
+06-22 01:44:22.667  2457  4643 D ExternalInterface: setUidState, uid = 10380 allow = false
+06-22 01:44:22.668  2457  4643 D MiSensorServiceImpl: PowerKeeperSensor stop iUid:10380 but app has Controlled
+06-22 01:44:22.686  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:22.687  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:22.687  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:22.688  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:22.700  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.122632 9.458230 74.546349 1.568177 0.000000 1 1.568177 1 1.568177 1.568177
+06-22 01:44:22.707  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:22.720  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:22.723  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:22.723  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:22.724  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:22.725  3200  4844 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:22.793 15283 15283 I app_process: hook_module_exit libgui_unisoc_utils.so over, handle:0x0
+06-22 01:44:22.803 24290 24290 D MiuiHomePrivacyController: hidePrivacyView onComplete: 
+06-22 01:44:22.807  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:8261.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:113.7,R:56.9,G:39.3,B:26.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:22.886  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:22.887  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:22.887  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:22.888  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:22.900  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.603391 0.103490 9.448658 74.550446 1.568177 0.000000 1 1.568177 1 1.568177 1.568177
+06-22 01:44:22.903  2457  4648 D ProcessManager: real remove inactive uid : 10572 flag : 1
+06-22 01:44:22.905  2457  2501 D BatteryStatsManagerStub: audio off uid=10572
+06-22 01:44:22.906  2457  4640 D AurogonImmobulusMode: updateAppScore uid =10572 add=false type=8
+06-22 01:44:22.923  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:22.923  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:22.924  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:22.924  3200  3248 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:22.977  1791  1925 I SDM     : DisplayBase::CommitThread: Received idle timeout, panel: cmd, timeout: 70000 us
+06-22 01:44:22.985 24290 24290 D PrivacyNewController: handleMessage:13
+06-22 01:44:23.003  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:8860.0,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.9,R:58.5,G:40.7,B:27.4Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.056  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 1
+06-22 01:44:23.057  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:23.058  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:23.059  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:23.073  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:23.089  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:23.090  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:23.090  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:23.092  3200  3248 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:23.100  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.117847 9.458230 74.527405 1.568177 0.000000 1 1.568177 1 1.568177 1.568177
+06-22 01:44:23.106  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7784.1,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:116.2,R:57.4,G:41.0,B:26.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.113  2457  2550 D AurogonBandwidthController: skinTemperature:31.908
+06-22 01:44:23.142  1791  1925 I SDM     : DisplayBase::CommitThread: Received idle timeout, panel: cmd, timeout: 70000 us
+06-22 01:44:23.152  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:7890.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:116.2,R:56.9,G:38.8,B:26.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.202  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7584.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:112.9,R:57.7,G:40.2,B:25.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.247  2457  4366 W ActivityManagerServiceImpl: Sending non-protected broadcast miui.intent.action.CYCLE_CHECK from system uid 1000 pkg android. Callers=com.android.server.am.BroadcastController.checkBroadcastFromSystem:2218 com.android.server.am.BroadcastController.broadcastIntentLockedTraced:1703 com.android.server.am.BroadcastController.broadcastIntentLocked:857 com.android.server.am.BroadcastController.broadcastIntentInPackage:824 com.android.server.am.ActivityManagerService$LocalService.broadcastIntentInPackage:18839 
+06-22 01:44:23.250  2457  4366 D AlarmManager: mBroadcastRefCount -> 1
+06-22 01:44:23.253  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7174.8,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:113.4,R:59.0,G:39.9,B:24.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.261  2457  2457 E AlarmManager: not align this alarm: Alarm{2a1b837 type 2 origWhen 1439037605 whenElapsed 1439037605 android}, reason=0
+06-22 01:44:23.263  2457  2457 D AlarmManager: mBroadcastRefCount -> 0
+06-22 01:44:23.263  2457  2457 D AlarmManager: mPendingIntent -> PendingIntent{971b07f: PendingIntentRecord{a69084c android broadcastIntent}}
+06-22 01:44:23.265  1850  1850 I vendor.xiaomi.hardware.micharge-service: ReadFilePathValue path = /sys/class/power_supply/battery/temp value = 319
+06-22 01:44:23.267  2457  2476 E IMiCharge: MiCharge method 9 val = 319
+06-22 01:44:23.269  1850  1850 I vendor.xiaomi.hardware.micharge-service: ReadFilePathValue path = /sys/class/power_supply/battery/charge_control_limit value = 0
+06-22 01:44:23.270  2457  2476 E IMiCharge: MiCharge method 10 val = 0
+06-22 01:44:23.301  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.117847 9.448658 74.557083 1.568177 0.000000 1 1.568177 1 1.568177 1.568177
+06-22 01:44:23.302  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7356.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:114.8,R:57.9,G:39.1,B:25.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.303  3200  4576 I libsensor-boledalgo: ##### the value of lux: 1.742140, cct: 5193.000000
+06-22 01:44:23.303  3200  4576 I libsensor-qshcalapi: value of set_lux: 1.742140, set r: 5193.000000
+06-22 01:44:23.308  1843  4363 D SRE     : sensorCallback mDisplayId = 0 dataCallback value=<   1.7500,   0.0000,   0.0000>,time=1439007650012035, sensor=5, temperature(K)=   0.0000
+06-22 01:44:23.351  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6483.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:111.5,R:56.9,G:37.7,B:23.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.356  2457  5498 I ActivityManager: unbindService com.android.server.am.ActiveServices@9807af3 conn=android.os.BinderProxy@8df84f7 callingPid=20087
+06-22 01:44:23.357  1813  1813 I vendor.qti.hardware.servicetrackeraidl-service: unbindService is called for service : com.google.android.gms/.chimera.PersistentDirectBootAwareApiService and for client com.google.android.gms.persistent
+06-22 01:44:23.357  1813  1813 I vendor.qti.hardware.servicetrackeraidl-service: size of service connections for service: com.google.android.gms/.chimera.PersistentDirectBootAwareApiServiceafter removal is 1
+06-22 01:44:23.360 20087 20087 D BoundBrokerSvc: onUnbind: Intent { act=com.google.android.gms.libs.gmscorelogger.service.START dat=chimera-action:/... xflg=0x4 cmp=com.google.android.gms/.chimera.PersistentDirectBootAwareApiService }
+06-22 01:44:23.403  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6357.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:109.8,R:57.2,G:38.3,B:22.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.451  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6483.9,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:112.6,R:58.5,G:39.1,B:23.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.500  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.598605 0.122632 9.448658 74.559174 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:23.502  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:6607.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:110.4,R:57.7,G:38.3,B:23.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.504  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6225.4,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:109.5,R:57.4,G:39.1,B:22.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.505  2457  6778 I NetworkAccelerateSwitchService: EVENT_RSSI_POLL. mRssiPoll=true
+06-22 01:44:23.506  2457  6778 I NetworkAccelerateSwitchService: checkWifiRssiAndLinkSpeed rssi:30
+06-22 01:44:23.506  2457  6778 I NetworkAccelerateSwitchService: checkWifiRssiAndLinkSpeed mWifiFastFade:false mWifiFastFadeAdjustThreshold:false
+06-22 01:44:23.506  2457  6778 I NetworkAccelerateSwitchService: getAverageWifiRssi:29
+06-22 01:44:23.507  2457  6778 D NetworkAccelerateSwitchService: checkIntervalModeChange mMovementState:false mIntervalMode:0 mIsBadLinkLayerQoE:false mBadLinkLayerQoETimes = 0
+06-22 01:44:23.524  2457  4580 D MiuiNM  : tcp fail rate reach: 100
+06-22 01:44:23.526  2457  4580 W ContextImpl: Calling a method in the system process without a qualified user: android.app.ContextImpl.sendBroadcast:1280 android.content.ContextWrapper.sendBroadcast:522 com.android.server.wifi.MiuiNetworkMonitor.sendBroadcastForNetwork:838 com.android.server.wifi.MiuiNetworkMonitor.notifyNetworkWarning:746 com.android.server.wifi.MiuiNetworkMonitor.evaluateNetworkQoE:658 
+06-22 01:44:23.550  2457  4540 D MiuiWifiCommonBase: band: 4, compensate: 0
+06-22 01:44:23.552  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6322.8,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:108.7,R:56.9,G:38.8,B:22.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.603  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6077.8,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:110.9,R:58.2,G:38.8,B:22.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.649  3310  3785 W lyra-mdns-core: _deal_timeout query _lyra-mdns._udp.local[0C] timeout!
+06-22 01:44:23.651  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6223.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:110.9,R:58.2,G:38.8,B:22.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.702  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.617748 0.113061 9.458230 74.566971 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:23.751  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6062.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:108.4,R:58.5,G:38.0,B:21.8Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.802  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:5266.0,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:105.4,R:57.9,G:37.2,B:19.7Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.803  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.9,cct:5188.6,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:109.3,R:58.2,G:38.5,B:20.2Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.885  8556  9034 D JavaheapMonitor: Java heap used=8M max=512M, proc: com.android.providers.media.module
+06-22 01:44:23.885  8556  9034 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:23.898 31092 32538 D JavaheapMonitor: Java heap used=8M max=256M, proc: com.xiaomi.xmsf
+06-22 01:44:23.898 31092 32538 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:23.901  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.117847 9.448658 74.530632 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:23.902  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.9,cct:5047.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:106.8,R:56.9,G:38.3,B:19.5Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.951  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:4875.8,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:104.3,R:58.7,G:38.0,B:18.7Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:23.970 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:23.972 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:23.972 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:23.983  2016  2016 D RefreshRateSelector: Touch Boost
+06-22 01:44:23.983  2016  2016 D MI-SF   : modeGroup0 mIsSupportAutomodeForMaxFpsSetting is 1(1), getCurrentBrightness() = 173(528), mIsKeepAutoMode 0 isAutoModeAllowed() 1
+06-22 01:44:23.983  2016  2016 D RefreshRateSelector: fixedMode_group: 0, isFindModeGroup 0
+06-22 01:44:23.983  2016  2016 D RefreshRateSelector: find max refresh rate:60, mode Group:0
+06-22 01:44:23.986  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:23.988  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:23.989  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:23.990  2457  2550 D AurogonBandwidthController: skinTemperature:31.826
+06-22 01:44:23.991  2457  2550 D AurogonBandwidthController: skinTemperature:31.826
+06-22 01:44:23.993  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:23.993  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:23.995  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:23.998 27455 27604 I dist:vtcamera:PhoneTemperatureReader: onEvent: null
+06-22 01:44:24.001 27455 28057 I dist:vtcamera:PhoneTemperatureReader: read-temp:31826
+06-22 01:44:24.001 27455 28057 D dist:vtcamera:PhoneTemperatureNotifier: tempV=31826, highTemperature state=false
+06-22 01:44:24.003  3200  4576 I libsensor-boledalgo: dbv:100,lux:2.0,cct:4154.9,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:105.7,R:59.0,G:37.4,B:17.2Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.037  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:24.038  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:24.038  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:24.038  3200  4844 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:24.088  1791  1925 I SDM     : DisplayBase::CommitThread: Received idle timeout, panel: cmd, timeout: 70000 us
+06-22 01:44:24.093  2457  6387 D SLM-SRV-SLAService: checktemp temperature = 31826 temperature_average = 31916 isPerformanceMode = false thermal_enable_slm = true
+06-22 01:44:24.100  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.603391 0.122632 9.448658 74.543648 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:24.102  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.9,cct:4762.1,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:106.0,R:57.4,G:37.7,B:18.7Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.170  2457  4643 D AurogonImmobulusMode:  update wallpaper pacakge name status mLockWallPaperPackageName =  mLockWallPaperUid = -1 mDeskWallPaperPackageName = com.miui.miwallpaper mDeskWallPaperUid = 10183
+06-22 01:44:24.171  2457  4643 D PolicyMaker: fg uid=10567
+06-22 01:44:24.171  2457  4643 D PolicyMaker: HasForegroundService pkgName=com.elon.app uid:10567
+06-22 01:44:24.171  2457  4643 D PolicyMaker: uid =10567 pkg=com.elon.app reason=fgservice
+06-22 01:44:24.207 19763 20644 E PhoneAdapter: get ntnphones failed, exception: java.lang.IllegalStateException: not support satellite!
+06-22 01:44:24.215  2457  4580 E AmlWifiScoreReportInjector: current network is in roaming environment
+06-22 01:44:24.273  7193  7216 D QLM-Service: check_headroom_zone: Timer EVT, Temp: 36240
+06-22 01:44:24.301  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.603391 0.113061 9.448658 74.572166 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:24.330  9486  9773 D JavaheapMonitor: Java heap used=19M max=256M, proc: com.miui.powerkeeper
+06-22 01:44:24.330  9486  9773 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:24.435  2457  4518 I MiuiNetworkPolicy: bandwidth: 4 KB/s, Max bandwidth: 200 KB/s
+06-22 01:44:24.436 23460 23586 D JavaheapMonitor: Java heap used=9M max=256M, proc: com.android.nfc
+06-22 01:44:24.436 23460 23586 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:24.465 23260 26844 D JavaheapMonitor: Java heap used=8M max=512M, proc: com.miui.securitycore
+06-22 01:44:24.465 23260 26844 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:24.500  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.622534 0.117847 9.448658 74.526627 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:24.651  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6566.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:109.3,R:55.8,G:38.8,B:22.8Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.664  9371 21267 D JavaheapMonitor: Java heap used=8M max=256M, proc: com.xiaomi.metoknlp
+06-22 01:44:24.668  9371 21267 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:24.700  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.608177 0.122632 9.448658 74.523911 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:24.702  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6998.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:110.9,R:56.6,G:39.3,B:23.8Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.752  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6573.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:111.8,R:57.2,G:39.3,B:23.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.851  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7586.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:114.3,R:58.5,G:39.9,B:25.4Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.899  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.117847 9.472587 74.555649 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:24.902  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7506.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.6,R:58.5,G:41.3,B:25.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.950  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:8419.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:114.5,R:56.9,G:41.0,B:26.7Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:24.967  4876 20993 D JavaheapMonitor: Java heap used=3M max=256M, proc: com.miui.miwallpaper
+06-22 01:44:24.967  4876 20993 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:25.000  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:8602.6,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.4,R:57.9,G:39.6,B:26.9Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.050  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:8568.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:118.7,R:56.9,G:40.4,B:27.7Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.074  8607  9201 D JavaheapMonitor: Java heap used=20M max=256M, proc: com.miui.daemon
+06-22 01:44:25.074  8607  9201 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:25.081 15325 15325 W libc    : Access denied finding property "persist.vendor.audio.cpupror.schedDy"
+06-22 01:44:25.077 15325 15325 W screencap: type=1400 audit(0.0:2487392): avc:  denied  { read } for  name="u:object_r:vendor_audio_prop:s0" dev="tmpfs" ino=459 scontext=u:r:shell:s0 tcontext=u:object_r:vendor_audio_prop:s0 tclass=file permissive=0
+06-22 01:44:25.091 15325 15325 W screencap: Thread Pool max thread count is 0. Cannot cache binder as linkToDeath cannot be implemented. serviceName: SurfaceFlingerAIDL
+06-22 01:44:25.091 15325 15325 W BpBinder: Linking to death on android.gui.ISurfaceComposer but there are no threads (yet?) listening to incoming transactions. See ProcessState::startThreadPool and ProcessState::setThreadPoolMaxThreadCount. Generally you should setup the binder threadpool before other initialization steps.
+06-22 01:44:25.091 15325 15325 W ProcessState: Extra binder thread started, but 0 threads requested. Do not use *startThreadPool when zero threads are requested.
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerNames:(no_layer_names), blurRadius:0, scale:(1.000000,1.000000), blends:(no_color_mode)
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:com.duoguan.football/com.duoguan.football.MainActivity#200139
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:StatusBar1#119436
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:Miui Bottom Caption of Task=1223#200137
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:GestureStubHome#76
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:GestureStubLeft#73
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:GestureStubRight#77
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:RoundCornerTop#119411
+06-22 01:44:25.092  2016  2016 I SurfaceFlinger: SF-MICapture: mode:0, layerName:RoundCornerBottom#119412
+06-22 01:44:25.097  2016  4376 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:25.099  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.603391 0.127418 9.448658 74.553795 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:25.104  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:8432.9,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.6,R:57.7,G:41.3,B:26.9Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.117  2457  2550 D AurogonBandwidthController: skinTemperature:31.826
+06-22 01:44:25.152  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7651.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:116.2,R:59.3,G:40.4,B:25.9Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.155 15325 15326 I AdrenoUtils: <ReadGpuID:357>: Reading chip ID through GSL
+06-22 01:44:25.156 15325 15325 W qdgralloc: Failed to load libubwcp.so
+06-22 01:44:25.149 15325 15325 W screencap: type=1400 audit(0.0:2487393): avc:  denied  { read } for  name="libubwcp.so" dev="dm-13" ino=10989252 scontext=u:r:shell:s0 tcontext=u:object_r:vendor_file:s0 tclass=file permissive=0
+06-22 01:44:25.201  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7595.1,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.1,R:56.1,G:40.4,B:25.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.206  2016  2016 D MI-SF   : isTpIdleScene ,mAverageFrameRate is 0, 0 
+06-22 01:44:25.206  2016  2016 D MI-SF   : modeGroup0 mIsSupportAutomodeForMaxFpsSetting is 1(1), getCurrentBrightness() = 173(528), mIsKeepAutoMode 0 isAutoModeAllowed() 1
+06-22 01:44:25.206  2016  2016 D RefreshRateSelector: fixedMode_group: 0, isFindModeGroup 0
+06-22 01:44:25.206  2016  2016 D RefreshRateSelector: find max refresh rate:60, mode Group:0
+06-22 01:44:25.251  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.9,cct:6355.2,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:114.8,R:57.9,G:40.7,B:23.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.301  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.603391 0.127418 9.453444 74.601097 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:25.302  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:7929.4,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:113.1,R:57.4,G:39.9,B:25.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.302  2457  6648 W ActivityManagerServiceImpl: Sending non-protected broadcast com.modemenhance.ACTION_MODEMWIFI_RSSI_POLL from system 19763:com.android.phone/1001 pkg com.android.phone. Callers=
+06-22 01:44:25.303  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7195.9,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:112.0,R:57.2,G:39.3,B:24.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.310 19763 19763 D SlaveWifiManager: getWifiSlaveConnectionInfo
+06-22 01:44:25.352  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:8067.4,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:114.3,R:57.7,G:41.3,B:26.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.353  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6757.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:111.5,R:56.9,G:39.6,B:23.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.360 15325 15325 I screencap: hook_module_exit libgui_unisoc_utils.so over, handle:0x0
+06-22 01:44:25.401  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6475.6,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:110.1,R:57.4,G:38.5,B:22.8Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.407 29541 29541 I adbd    : in ShellService: uiautomator dump /sdcard/fb2-voice-cancel-after.xml
+06-22 01:44:25.410  2457  2475 D NetworkManagement: wlan0 <====> 1
+06-22 01:44:25.410  2457  2475 I MiuiNetworkPolicy: label wlan0, uid -1, active false, tsNanos 1439009750397546
+06-22 01:44:25.411  2457  4518 D MiuiNetworkPolicy: updateLimit mLimitEnabled=true,enabled=false,mNetworkPriorityMode=1,mThermalForceMode=0
+06-22 01:44:25.451  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6729.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:111.8,R:56.6,G:39.3,B:23.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.499  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.603391 0.113061 9.458230 74.595566 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:25.501  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6991.2,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:110.9,R:56.9,G:39.6,B:23.8Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.551  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:5780.0,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:107.1,R:56.6,G:38.8,B:21.0Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.553 15327 15327 W libc    : Access denied finding property "persist.vendor.audio.cpupror.schedDy"
+06-22 01:44:25.549 15327 15327 W app_process: type=1400 audit(0.0:2487394): avc:  denied  { read } for  name="u:object_r:vendor_audio_prop:s0" dev="tmpfs" ino=459 scontext=u:r:shell:s0 tcontext=u:object_r:vendor_audio_prop:s0 tclass=file permissive=0
+06-22 01:44:25.565 15327 15327 D AndroidRuntime: >>>>>> START com.android.internal.os.RuntimeInit uid 2000 <<<<<<
+06-22 01:44:25.571 15327 15327 I AndroidRuntime: Using default boot image
+06-22 01:44:25.571 15327 15327 I AndroidRuntime: Leaving lock profiling enabled
+06-22 01:44:25.573 15327 15327 I app_process: Using CollectorTypeCC GC.
+06-22 01:44:25.601  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6470.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:111.5,R:59.3,G:38.5,B:23.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.623 15327 15327 D nativeloader: InitDefaultPublicLibraries for_preload=1: libandroid.so:libaaudio.so:libamidi.so:libbinder_ndk.so:libc.so:libcamera2ndk.so:libdl.so:libEGL.so:libGLESv1_CM.so:libGLESv2.so:libGLESv3.so:libicu.so:libicui18n.so:libicuuc.so:libjnigraphics.so:liblog.so:libmediandk.so:libm.so:libnativehelper.so:libnativewindow.so:libOpenMAXAL.so:libOpenSLES.so:libRS.so:libstdc++.so:libsync.so:libvulkan.so:libwebviewchromium_plat_support.so:libz.so
+06-22 01:44:25.629 15327 15327 D nativeloader: Load libicu_jni.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+06-22 01:44:25.630 15327 15327 D app_process: u_setTimeZoneFilesDirectory("/apex/com.android.tzdata/etc/tz/versioned/9/icu") succeeded. 
+06-22 01:44:25.630 15327 15327 D app_process: I18n APEX ICU file found: /apex/com.android.i18n/etc/icu/icudt76l.dat
+06-22 01:44:25.630 15327 15327 D nativeloader: Load libjavacore.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+06-22 01:44:25.631 15327 15327 D nativeloader: Load libopenjdk.so using APEX ns com_android_art for caller /apex/com.android.art/javalib/core-oj.jar: ok
+06-22 01:44:25.632 15327 15327 W app_process: ClassLoaderContext shared library size mismatch. Expected=2, found=0 (PCL[]{PCL[/system/framework/android.test.base.jar*2789897741]#PCL[/system/framework/android.test.mock.jar*3361312393]} | PCL[])
+06-22 01:44:25.633 15327 15327 W app_process: ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[]{PCL[/system/framework/android.test.runner.jar*895143020]#PCL[/system/framework/android.test.base.jar*2789897741]} | PCL[/system/framework/android.test.runner.jar*895143020])
+06-22 01:44:25.644 15327 15327 W libc    : Access denied finding property "ro.vendor.mtk.hbt_binfmt_misc_support"
+06-22 01:44:25.644 15327 15327 W libc    : Access denied finding property "ro.vendor.mtk.app32_boost_support"
+06-22 01:44:25.644 15327 15327 W libc    : Access denied finding property "ro.vendor.mtk.hbt_dyn_type"
+06-22 01:44:25.644 15327 15327 W libc    : Access denied finding property "persist.vendor.mtk.hbt_dyn_type"
+06-22 01:44:25.650  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.9,cct:6124.0,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:111.8,R:58.2,G:39.6,B:22.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.651 15327 15327 D nativeloader: Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+06-22 01:44:25.652 15327 15327 D AndroidRuntime: Calling main entry com.android.commands.uiautomator.Launcher
+06-22 01:44:25.656 15327 15327 W app_process: ClassLoaderContext classpath size mismatch. expected=0, found=1 (PCL[] | PCL[/system_ext/framework/miui-framework.autoui.jar*2881616845])
+06-22 01:44:25.658 15327 15327 I MessageMonitor: Load libmiui_runtime
+06-22 01:44:25.658 15327 15327 D nativeloader: Load libmiui_runtime.so using system ns (caller=/system_ext/framework/miui-framework.jar): ok
+06-22 01:44:25.658 15327 15327 E app_process: register_android_view_SurfaceRuntimeShader  
+06-22 01:44:25.658 15327 15327 E app_process: register_android_view_SurfaceRuntimeShader  0
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.admin.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.database.sqlite is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.power.feature.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.performance.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.contextualsearch.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.ondeviceintelligence.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.projection.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.companion is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.service.controls.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.text.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.providers.contactkeys.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.companion.virtualdevice.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.uprobestats.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.net.thread.platform.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.view.contentprotection.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.skia.ddreflags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.dreams is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.surfaceflinger.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.hardware.input is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.sdk is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.wm.shell.transition is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.input.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.tracing is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.biometrics is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.view.contentcapture.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.content.pm.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.job is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.content.res is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.net.platform.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.aconfig.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.server.app is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.speech.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.stats is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.hardware.biometrics is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.car.feature is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.adpf is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.location.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settingslib.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.managedprovisioning.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.assist.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.net is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settingslib.widget.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.internal.camera.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.hardware.libsensor.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.thirdappopt is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.internal.jank is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.providers.settings is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.multiuser is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.power.optimization is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.calllogbackup is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.battery is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.libvulkan.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.appfunctions.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.smartspace.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.providers.contacts.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.stability.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.shell.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.aaudio is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.hardware.radio is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: suspend_service.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.media.midi is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.libcore.readonly is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settingslib.widget.selectorwithwidgetpreference.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.service.notification is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.systemui.shared is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.jank is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.wearable is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.audio is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.service.chooser is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.compat is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.alarm is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.apex.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.service.quickaccesswallet is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.usage is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.accessibility is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app.supervision.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.utils is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.chre.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.content.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.media.codec is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.internal.os is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.nfc.nci.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.app is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.security.keystore2 is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.crashrecovery.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.tradeinmode.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.hardware.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.telecom.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settingslib.media.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.policy is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.media.audiopolicy is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.egg.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.internal.compat.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.security is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.service.autofill is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.example.android.aconfig.demo.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.view.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.companion.virtual.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.aconfig_new_storage is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.wm.shell.recents is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.feature.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.systemui is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.skia.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.power.batterysaver is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.widget.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.editing.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.codec.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.powerstats is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.egl.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.audioserver is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.deviceidle is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.nfc is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.logmanager is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.permission.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.service.voice.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.content.pm is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.power.hint is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.wm is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.navimmersive.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.os is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.service.dreams is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: xiaomi.platform.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.libgui.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.hardware.usb.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.provider is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.job is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.internal.foldables.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.internal.telephony.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.webkit is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.credentials.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.display.feature.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.notification is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.appwidget.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.frameworks.sensorservice.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.window.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.adaptiveauth is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.net.wifi.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.media.tv.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.usb.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.os.vibrator is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.hardware.devicestate.feature.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.usage is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.server is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.wm.shell is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.view.inputmethod is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.graphics.hwui.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.backup is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.internal.pm.pkg.component.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.view.accessibility is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: android.media.audio is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.am is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.playback.flags is mapped to system
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settings.accessibility is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settings.keyboard is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settings.factory_reset is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.systemui.accessibility.accessibilitymenu is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.server.policy.feature.flags is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settings.flags is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.settings.media_drm is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.launcher3 is mapped to system_ext
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.extractor.flags is mapped to com.android.media
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.media.mainline.flags is mapped to com.android.media
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.ipsec.flags is mapped to com.android.ipsec
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.adservices.ondevicepersonalization.flags is mapped to com.android.ondevicepersonalization
+06-22 01:44:25.660 15327 15327 I AconfigPackage: com.android.wifi.flags is mapped to com.android.wifi
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.graphics.pdf.flags is mapped to com.android.mediaprovider
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.providers.media.flags is mapped to com.android.mediaprovider
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.graphics.pdf.flags.readonly is mapped to com.android.mediaprovider
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.permission.flags is mapped to com.android.permission
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.art.flags is mapped to com.android.art
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.libcore is mapped to com.android.art
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.uwb.flags is mapped to com.android.uwb
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.ranging.flags is mapped to com.android.uwb
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.org.conscrypt.flags is mapped to com.android.conscrypt
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.adservices.flags is mapped to com.android.adservices
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.sdksandbox.flags is mapped to com.android.adservices
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.uprobestats.mainline.flags is mapped to com.android.uprobestats
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.media.swcodec.flags is mapped to com.android.media.swcodec
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.os.profiling is mapped to com.android.profiling
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.net.ct.flags is mapped to com.android.tethering
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.net.flags is mapped to com.android.tethering
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.net.vcn is mapped to com.android.tethering
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.nearby.flags is mapped to com.android.tethering
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.net.http is mapped to com.android.tethering
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.net.thread.flags is mapped to com.android.tethering
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.appsearch.flags is mapped to com.android.appsearch
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.os.statsd.flags is mapped to com.android.os.statsd
+06-22 01:44:25.661 15327 15327 I AconfigPackage: android.provider.flags is mapped to com.android.configinfrastructure
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.server.deviceconfig is mapped to com.android.configinfrastructure
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.system.virtualmachine.flags is mapped to com.android.virt
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.bluetooth.flags is mapped to com.android.bt
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.devicelock.flags is mapped to com.android.devicelock
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.icu is mapped to com.android.i18n
+06-22 01:44:25.661 15327 15327 I AconfigPackage: com.android.healthfitness.flags is mapped to com.android.healthfitness
+06-22 01:44:25.661 15327 15327 E FeatureFlagsImplExport: android.os.flagging.AconfigStorageReadException: ERROR_PACKAGE_NOT_FOUND: package android.xr cannot be found on the device
+06-22 01:44:25.662 15327 15327 D UiAutomationConnection: Created on user UserHandle{0}
+06-22 01:44:25.662 15327 15327 I UiAutomation: Initialized for user 0 on display 0
+06-22 01:44:25.662 15327 15327 W UiAutomation: Created with deprecatead constructor, assumes DEFAULT_DISPLAY
+06-22 01:44:25.663  2457  6648 D AccessibilityManagerService: changeCurrentUserForTestAutomationIfNeededLocked(0): ignoring because device doesn't support visible background users
+06-22 01:44:25.663  2457  6648 I UiAutomationManager: Registering UiTestAutomationService (id=com.android.server.accessibility/UiAutomation, flags=0x0) when called by user 0
+06-22 01:44:25.664  2457  6648 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+06-22 01:44:25.670  2457  4346 W SettingsProvider: Failed to notify for 999: content://settings/secure/accessibility_enabled
+06-22 01:44:25.670  2457  4346 W SettingsProvider: java.lang.SecurityException: Failed to find provider settings for user 999; expected to find a valid ContentProvider for this authority
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at com.android.server.content.ContentService.notifyChange(ContentService.java:463)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2946)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2935)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2929)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at com.android.providers.settings.SettingsProvider$SettingsRegistry$MyHandler.handleMessage(SettingsProvider.java:4238)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at android.os.Handler.dispatchMessage(Handler.java:114)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at android.os.Looper.loopOnce(Looper.java:274)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at android.os.Looper.loop(Looper.java:369)
+06-22 01:44:25.670  2457  4346 W SettingsProvider: 	at android.os.HandlerThread.run(HandlerThread.java:85)
+06-22 01:44:25.678  2457  6648 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+06-22 01:44:25.679  2016  2016 D MI-SF   : isTpIdleScene ,mAverageFrameRate is 0, 0 
+06-22 01:44:25.679  2016  2016 D MI-SF   : modeGroup0 mIsSupportAutomodeForMaxFpsSetting is 1(1), getCurrentBrightness() = 173(528), mIsKeepAutoMode 0 isAutoModeAllowed() 1
+06-22 01:44:25.679  2016  2016 D RefreshRateSelector: fixedMode_group: 0, isFindModeGroup 0
+06-22 01:44:25.679  2016  2016 D RefreshRateSelector: find max refresh rate:60, mode Group:0
+06-22 01:44:25.681  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:25.683  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:25.687  2457  4346 W SettingsProvider: Failed to notify for 999: content://settings/secure/accessibility_enabled
+06-22 01:44:25.687  2457  4346 W SettingsProvider: java.lang.SecurityException: Failed to find provider settings for user 999; expected to find a valid ContentProvider for this authority
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at com.android.server.content.ContentService.notifyChange(ContentService.java:463)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2946)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2935)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2929)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at com.android.providers.settings.SettingsProvider$SettingsRegistry$MyHandler.handleMessage(SettingsProvider.java:4238)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at android.os.Handler.dispatchMessage(Handler.java:114)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at android.os.Looper.loopOnce(Looper.java:274)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at android.os.Looper.loop(Looper.java:369)
+06-22 01:44:25.687  2457  4346 W SettingsProvider: 	at android.os.HandlerThread.run(HandlerThread.java:85)
+06-22 01:44:25.687  2457  2457 D BatterySaverPolicy: accessibility changed to true, updating policy.
+06-22 01:44:25.688  2457  2457 D AS.AudioService: Accessibility volume enabled = false
+06-22 01:44:25.693  2457  6642 W WindowManager: Cannot find window which accessibility connection is added to
+06-22 01:44:25.695  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:25.696  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:25.696  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:25.697 29007 29007 I SafetyCenterAccessibilityListener: accessibility event occurred, safety center feature not enabled.
+06-22 01:44:25.698 28181 28181 I SafetyCenterAccessibilityListener: accessibility event occurred, safety center feature not enabled.
+06-22 01:44:25.698  1791  2347 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:25.699  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.113061 9.443872 74.569054 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:25.701  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6512.1,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:107.1,R:56.6,G:39.1,B:22.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.716  9211  9275 I od.sogou.xiaomi: This is sticky GC, maxfree is 33554432 minfree is 8388608
+06-22 01:44:25.717  9211 16544 D JavaheapMonitor: Java heap used=17M max=512M, proc: com.sohu.inputmethod.sogou.xiaomi
+06-22 01:44:25.717  9211 16544 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:25.734  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:25.735  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:25.735  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:25.735  3200  3248 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:25.784  1791  1925 I SDM     : DisplayBase::CommitThread: Received idle timeout, panel: cmd, timeout: 70000 us
+06-22 01:44:25.802  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.9,cct:5411.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:106.8,R:56.9,G:38.5,B:20.2Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:25.865 12006 12209 D JavaheapMonitor: Java heap used=4M max=512M, proc: com.miui.core
+06-22 01:44:25.866 12006 12209 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:25.900  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.108275 9.463016 74.559341 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:26.085  2457  2475 D NetworkManagement: wlan0 <====> 1
+06-22 01:44:26.086  2457  2475 I MiuiNetworkPolicy: label wlan0, uid 10572, active true, tsNanos 1439010428174994
+06-22 01:44:26.086  2457  4518 I MiuiNetworkPolicy: getEnableLimitTimeout when thermal mode is:0
+06-22 01:44:26.087  2457  4518 D MiuiNetworkPolicy: updateLimit mLimitEnabled=false,enabled=true,mNetworkPriorityMode=1,mThermalForceMode=0
+06-22 01:44:26.099  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.122632 9.463016 74.566620 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:26.300  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.122632 9.458230 74.567497 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:26.339 24290 24482 D MiuiDecorationMoveHelper: BottomCaption tag = UP, taskId=1223, posY=2369
+06-22 01:44:26.349  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:26.350  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:26.352  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:26.352  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:26.352  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:26.353  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:26.355  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:6183.5,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:107.3,R:57.9,G:38.3,B:21.8Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:26.400  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:26.401  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:26.401  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:5811.2,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:105.4,R:57.2,G:37.7,B:20.8Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:26.402  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:26.402  3200 14872 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:26.402  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:6252.6,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:109.3,R:56.6,G:39.3,B:22.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:26.451  1791  1925 I SDM     : DisplayBase::CommitThread: Received idle timeout, panel: cmd, timeout: 70000 us
+06-22 01:44:26.453  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.9,cct:5332.2,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:109.0,R:57.7,G:37.7,B:20.5Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:26.459 11444 21250 D JavaheapMonitor: Java heap used=8M max=256M, proc: com.miui.voicetrigger
+06-22 01:44:26.460 11444 21250 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:26.499  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.603391 0.113061 9.453444 74.570969 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:26.511  2457  6778 I NetworkAccelerateSwitchService: EVENT_RSSI_POLL. mRssiPoll=true
+06-22 01:44:26.512  2457  6778 I NetworkAccelerateSwitchService: checkWifiRssiAndLinkSpeed rssi:32
+06-22 01:44:26.512  2457  6778 I NetworkAccelerateSwitchService: checkWifiRssiAndLinkSpeed mWifiFastFade:false mWifiFastFadeAdjustThreshold:false
+06-22 01:44:26.512  2457  6778 I NetworkAccelerateSwitchService: getAverageWifiRssi:30
+06-22 01:44:26.513  2457  6778 D NetworkAccelerateSwitchService: checkIntervalModeChange mMovementState:false mIntervalMode:0 mIsBadLinkLayerQoE:false mBadLinkLayerQoETimes = 0
+06-22 01:44:26.540  2457  4580 D MiuiNM  : tcp fail rate reach: 100
+06-22 01:44:26.570 15120 15796 D JavaheapMonitor: Java heap used=5M max=256M, proc: com.xiaomi.joyose
+06-22 01:44:26.570 15120 15796 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:26.577  2457  4540 D MiuiWifiCommonBase: band: 4, compensate: 0
+06-22 01:44:26.699 15327 15327 W libc    : Access denied finding property "qemu.sf.lcd_density"
+06-22 01:44:26.699 15327 15327 W libc    : Access denied finding property "qemu.sf.lcd_density"
+06-22 01:44:26.700  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.598605 0.103490 9.453444 74.581276 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:26.693 15327 15327 W uiautomator: type=1400 audit(0.0:2487395): avc:  denied  { read } for  name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=365 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-22 01:44:26.693 15327 15327 W uiautomator: type=1400 audit(0.0:2487396): avc:  denied  { read } for  name="u:object_r:qemu_sf_lcd_density_prop:s0" dev="tmpfs" ino=365 scontext=u:r:shell:s0 tcontext=u:object_r:qemu_sf_lcd_density_prop:s0 tclass=file permissive=0
+06-22 01:44:26.711 12629 12629 W BpBinder: Large outgoing transaction of 63848 bytes, interface descriptor android.view.accessibility.IAccessibilityInteractionConnectionCallback, code 3 was sent
+06-22 01:44:26.714  8556  9261 W MediaProvider: isAppCloneUserPair for user 0: false
+06-22 01:44:26.900  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.098704 9.443872 74.559929 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:27.050  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:8496.8,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:117.0,R:57.7,G:39.9,B:27.2Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:27.099  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.122632 9.458230 74.546669 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:27.100  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:8048.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.9,R:55.8,G:39.9,B:26.4Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:27.120  2457  2550 D AurogonBandwidthController: skinTemperature:31.826
+06-22 01:44:27.147  5586 17695 D JavaheapMonitor: Java heap used=8M max=256M, proc: android.ext.services
+06-22 01:44:27.147  5586 17695 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:27.150  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7911.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.4,R:57.7,G:41.0,B:26.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:27.201  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7524.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:115.9,R:57.2,G:39.6,B:25.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:27.230 19763 20644 E PhoneAdapter: get ntnphones failed, exception: java.lang.IllegalStateException: not support satellite!
+06-22 01:44:27.235  2457  4580 E AmlWifiScoreReportInjector: current network is in roaming environment
+06-22 01:44:27.250  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:7872.7,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:113.7,R:58.5,G:39.6,B:25.6Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:27.274 15327 15327 W AccessibilityNodeInfoDumper: Fetch time: 566ms
+06-22 01:44:27.280  2457  5738 W MagnificationConnectionManager: requestConnection duplicated request: connect=false, mConnectionState=DISCONNECTED
+06-22 01:44:27.281  2457  5738 D AccessibilityManagerService: restoreCurrentUserForTestAutomationIfNeededLocked(): ignoring because device doesn't support visible background users
+06-22 01:44:27.285 15327 15327 D AndroidRuntime: callMain: return with no error.
+06-22 01:44:27.286 15327 15351 W IPCThreadState: call to talkWithDriver in joinThreadPool returned error: -9 (Bad file descriptor), FD: -1
+06-22 01:44:27.286 15327 15344 W IPCThreadState: call to talkWithDriver in joinThreadPool returned error: -9 (Bad file descriptor), FD: -1
+06-22 01:44:27.286 15327 15346 W IPCThreadState: call to talkWithDriver in joinThreadPool returned error: -9 (Bad file descriptor), FD: -1
+06-22 01:44:27.287 15327 15327 D AndroidRuntime: Shutting down VM
+06-22 01:44:27.288  2457  4346 W SettingsProvider: Failed to notify for 999: content://settings/secure/accessibility_enabled
+06-22 01:44:27.288  2457  4346 W SettingsProvider: java.lang.SecurityException: Failed to find provider settings for user 999; expected to find a valid ContentProvider for this authority
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at com.android.server.content.ContentService.notifyChange(ContentService.java:463)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2946)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2935)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at android.content.ContentResolver.notifyChange(ContentResolver.java:2929)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at com.android.providers.settings.SettingsProvider$SettingsRegistry$MyHandler.handleMessage(SettingsProvider.java:4238)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at android.os.Handler.dispatchMessage(Handler.java:114)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at android.os.Looper.loopOnce(Looper.java:274)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at android.os.Looper.loop(Looper.java:369)
+06-22 01:44:27.288  2457  4346 W SettingsProvider: 	at android.os.HandlerThread.run(HandlerThread.java:85)
+06-22 01:44:27.294  2457  2457 D BatterySaverPolicy: accessibility changed to false, updating policy.
+06-22 01:44:27.298  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:27.299  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:27.299  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.608177 0.122632 9.463016 74.543892 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:27.299  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:27.299  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:27.300  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:27.300  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:27.303  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:7771.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:111.8,R:57.2,G:39.6,B:25.1Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:27.307  2457  6288 W WindowManager: Cannot find window which accessibility connection is added to
+06-22 01:44:27.349  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:27.350  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:27.351  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:27.351  3200 14872 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:27.401  1791  1925 I SDM     : DisplayBase::CommitThread: Received idle timeout, panel: cmd, timeout: 70000 us
+06-22 01:44:27.402  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:7584.0,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:114.3,R:57.2,G:39.6,B:25.4Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:27.437  2457  4518 I MiuiNetworkPolicy: bandwidth: 5 KB/s, Max bandwidth: 200 KB/s
+06-22 01:44:27.499  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.598605 0.122632 9.448658 74.561478 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:27.592  4845  5821 D JavaheapMonitor: Java heap used=26M max=512M, proc: com.miui.home
+06-22 01:44:27.593  4845  5821 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:27.671  6612  6664 E Finsky  : [84182] BulkPrefetch request failed: kotlinx.coroutines.TimeoutCancellationException: Timed out waiting for 10000 ms
+06-22 01:44:27.673  6612  6612 E Finsky  : [2] Entries in batch 1 fetch failed: kotlinx.coroutines.TimeoutCancellationException: Timed out waiting for 10000 ms
+06-22 01:44:27.674  2457  4643 D AurogonImmobulusMode:  update wallpaper pacakge name status mLockWallPaperPackageName =  mLockWallPaperUid = -1 mDeskWallPaperPackageName = com.miui.miwallpaper mDeskWallPaperUid = 10183
+06-22 01:44:27.679  2457  4643 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET, states=14
+06-22 01:44:27.682  2457  4643 D InetDiagMessage: Destroyed 0 sockets, proto=IPPROTO_TCP, family=AF_INET6, states=14
+06-22 01:44:27.682  2457  4643 D InetDiagMessage: Destroyed live tcp sockets for uids={10380} in 5ms
+06-22 01:44:27.682  2457  4643 D ActionExecute: frozen uid = 10380 reason=check binder
+06-22 01:44:27.685  2457  4643 D ExternalInterface: setUidState, uid = 10380 allow = false
+06-22 01:44:27.685  2457  4643 D MiSensorServiceImpl: PowerKeeperSensor stop iUid:10380 but app has Controlled
+06-22 01:44:27.698  1813  1813 I vendor.qti.hardware.servicetrackeraidl-service: bindService is called for service : com.google.android.gms/.auth.account.authenticator.GoogleAccountAuthenticatorService and for client system
+06-22 01:44:27.699  1813  1813 I vendor.qti.hardware.servicetrackeraidl-service: total connections for service : com.google.android.gms/.auth.account.authenticator.GoogleAccountAuthenticatorServiceare :1
+06-22 01:44:27.699  1813  1813 I vendor.qti.hardware.servicetrackeraidl-service: total connections for client : systemare :27
+06-22 01:44:27.699  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.608177 0.108275 9.458230 74.579842 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:27.707  9408 20977 D JavaheapMonitor: Java heap used=9M max=256M, proc: com.xiaomi.location.fused
+06-22 01:44:27.707  9408 20977 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:27.713  5961 14422 D JavaheapMonitor: Java heap used=12M max=256M, proc: com.xiaomi.mirror
+06-22 01:44:27.714  5961 14422 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:27.899  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.617748 0.108275 9.458230 74.568901 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:27.984 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:27.987 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:27.987 24290 24290 D ControlCenterHeaderExpandController: onExpansionChanged: progress =  0.0
+06-22 01:44:28.004  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.8,cct:5410.2,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:106.8,R:56.6,G:37.7,B:20.2Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:28.009  2016  2016 D MI-SF   : isTpIdleScene ,mAverageFrameRate is 0, 0 
+06-22 01:44:28.010  2016  2016 D MI-SF   : modeGroup0 mIsSupportAutomodeForMaxFpsSetting is 1(1), getCurrentBrightness() = 173(528), mIsKeepAutoMode 0 isAutoModeAllowed() 1
+06-22 01:44:28.010  2016  2016 D RefreshRateSelector: fixedMode_group: 0, isFindModeGroup 0
+06-22 01:44:28.010  2016  2016 D RefreshRateSelector: find max refresh rate:60, mode Group:0
+06-22 01:44:28.013  1791  1925 D SDM     : HWDeviceDRM::SetupConcurrentWriteback: Tear down the Concurrent Writeback topology
+06-22 01:44:28.013  1791  2401 I vendor.qti.hardware.display.composer-service: Sensor: notify citsensorservice to trigger cwb, misForced = 0
+06-22 01:44:28.014  3200  4570 I libsensor-parseRGB: request dump start for mRequestDisplayId 0
+06-22 01:44:28.014  3200  4570 D vendor.xiaomi.sensor.citsensorservice.aidl: handle id:22 wxh:1536x3200 uwxuh:1440x3200 size: 14745600 fd:17 fd_meta:18 flags:0x228 usage:0x33  format:0x3 layer_count: 1 reserved_size = 0 custom_content_md_reserved_size = 0
+06-22 01:44:28.015  1791 11908 D SDM     : HWCSession::PostBuffer: CWB config passed by cwb_client : tappoint 1  CWB_ROI : (579.000000 213.000000 820.000000 454.000000)
+06-22 01:44:28.017  2016  2355 E HwcComposer: getLuts failed Status(-129, EX_TRANSACTION_FAILED): 'UNKNOWN_TRANSACTION: '
+06-22 01:44:28.053  3200  4576 I libsensor-boledalgo: dbv:100,lux:2.0,cct:4392.3,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:105.4,R:56.6,G:37.4,B:17.7Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:28.064  1791 12843 D SDM     : CompManager::NotifyCwbDone: display 0 notify cwb callback, status = 0
+06-22 01:44:28.064  1791  4765 D SDM     : HWCSession::NotifyCWBStatus: Notify the client about buffer status 0.
+06-22 01:44:28.065  1791  4765 D SDM     : HWCSession::ProcessCWBStatus: CWB queue is empty. Display: 0
+06-22 01:44:28.066  3200  4844 E libsensor-parseRGB: CWB NotifyCWBBufferDone  error 0
+06-22 01:44:28.100  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.122632 9.453444 74.542259 1.742140 0.000000 1 1.742140 1 1.742140 1.742140
+06-22 01:44:28.102  3200  4576 I libsensor-boledalgo: dbv:100,lux:1.7,cct:6721.0,hsv:-1.0,CWB R:1910.7,G:2029.5,B:3342.4Event C:105.7,R:57.4,G:37.7,B:22.3Cali C:5.0,R:2.3,G:1.4,B:1.3 
+06-22 01:44:28.115  1791  1925 I SDM     : DisplayBase::CommitThread: Received idle timeout, panel: cmd, timeout: 70000 us
+06-22 01:44:28.164 15327 15327 I app_process: hook_module_exit libgui_unisoc_utils.so over, handle:0x0
+06-22 01:44:28.250 31337 31836 D JavaheapMonitor: Java heap used=17M max=256M, proc: com.miui.securitycenter.remote
+06-22 01:44:28.250 31337 31836 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:28.268 10201 10908 D JavaheapMonitor: Java heap used=8M max=256M, proc: com.xiaomi.account
+06-22 01:44:28.268 10201 10908 V JavaheapMonitor: Check java heap usage finished! Next check delay: 300000
+06-22 01:44:28.278 29541 29541 I adbd    : in ShellService: export ANDROID_LOG_TAGS=''; exec logcat '-d' '-t' '800'
+06-22 01:44:28.301  2457  4330 I MiSensorServiceImpl: LightFovOptimizationSensor::screen_angle: 2.612962 0.108275 9.448658 74.540993 1.742140 0.000000 1 1.742140 1 1.742140 1.742140

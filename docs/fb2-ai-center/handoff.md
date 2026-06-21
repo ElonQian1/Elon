@@ -6,6 +6,8 @@
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-22 ADB 真机阶段验证：主项目会话在 `Xiaomi 23116PN5BC / Android 16 / HyperOS OS3.0` 上验证 fb2 APK `com.duoguan.football 1.1.48(96)`，系统 ASR 为 `com.xiaomi.mibrain.speech/.asr.AsrService`，录音权限和 appops 正常。已确认 `夺冠体育官方群` 页面具备主项目式 `按住 说话` 输入栏，文本/语音切换、绿色录音气泡、`取消 / AI回复 / 转文字 / 发送` 控制区、上滑取消和静音转文字后 UI 恢复均可用；证据文件为 `docs/fb2-ai-center/voice-device-evidence-20260622-adb.json`。该证据明确 `finalAcceptanceReady=false`，因为本轮未包含人工语音样本，尚未证明 system ASR final、云端 ASR 成功、TTS 播放和余额为 0 时 ASR/TTS 免费。
+- 2026-06-22 语音证据门槛复核：使用上述 JSON 运行 `scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence`，脚本正确通过 UI/录音项，并在 `tooShort`、system ASR final、云端 ASR 兜底、服务端 ASR 成功/失败恢复、TTS 播放、ASR/TTS 免费策略 7 项失败，结果 `failed=7 skipped=2`。这份 ADB 证据只能证明“主项目式语音 UI 已在 fb2 APK 出现且不会静音卡死”，不能替代最终真机语音完成证据。
 - 2026-06-21 质量门槛补强：主项目 `scripts/smoke-fb2-ai-center.ps1` 新增 `-CheckQuality`、`-RequireFeedbackCoverage`、`-QualitySince/-QualityUntil`、`-MaxLargeContextPackRate`、`-MaxCitationUnmatchedRate`、`-MaxMissingContextRate`、`-MaxWrongContextRate`、`-MinFeedbackCount`、`-MinMatchedCitedSourceCount`。日常无副作用 smoke 仍默认轻量；携带 `FB2_AI_CENTER_TOKEN` 后可升级验证 fb2 `/context/quality-summary` 和 `/context/feedbacks`，把 missing/wrong context、引用未命中、大包率和反馈覆盖变成自动门槛。
 - 2026-06-21 完整场景 smoke 补强：`scripts/smoke-fb2-ai-center.ps1 -RequireAllScenarios` 现在会要求 Context Pack 有 `context_audit_id`，今日比赛/比赛分析/我的票等场景有实际数据数量，并要求关键场景存在 `citation_sources`，减少只检查字段存在导致的假通过。
 - 2026-06-21 chat-bootstrap 语音契约 smoke 补强：`scripts/smoke-fb2-ai-center.ps1` 现在可通过 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN` 无副作用桥接主项目 token，并在 authenticated `chat-bootstrap` 中自动检查 `VoiceComposerView`、`VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`、`SERVER_PROCESSING`、`AI_REPLY`、系统 ASR 本地优先、云端 ASR 兜底、ASR/TTS 免费和 AI 回复扣费门槛，防止 fb2 再退化成只接 ASR/TTS 能力。

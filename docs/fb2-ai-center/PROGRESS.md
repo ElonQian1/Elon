@@ -10,6 +10,8 @@
 
 ## 已完成
 
+- 2026-06-22 ADB 真机阶段验证已完成并记录到 `docs/fb2-ai-center/voice-device-evidence-20260622-adb.json`：设备 `Xiaomi 23116PN5BC / Android 16 / HyperOS OS3.0`，fb2 APK `com.duoguan.football 1.1.48(96)`，系统 ASR `com.xiaomi.mibrain.speech/.asr.AsrService`，录音权限和 appops 正常。实测进入 `夺冠体育官方群` 后可见主项目式 `按住 说话` 输入栏，文本/语音切换可用，按住后出现绿色录音气泡和 `取消 / AI回复 / 转文字 / 发送` 控制区，上滑取消可恢复，静音释放到 `转文字` 后 10 秒内回到 `按住 说话`，未复现永久卡在“识别中”。本轮没有人工语音样本，未证明 system ASR final、云端 ASR 成功、TTS 播放和余额为 0 时 ASR/TTS 免费，因此该 JSON 明确 `finalAcceptanceReady=false`，不能作为最终完成证据。
+- 2026-06-22 已用 `smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence-20260622-adb.json` 复核这份半成品证据：脚本正确通过 UI/录音相关项，并在 `tooShort`、`systemAsrSuccess`、`systemAsrTimeoutServerFallback`、`serverAsrSuccess`、`serverAsrFailureRecoversUi`、`ttsPlayback`、`asrTtsFreeWithZeroAiBalance` 7 项上失败，结果为 `failed=7 skipped=2`。这证明最终验收不会被 ADB 静音阶段证据误放行。
 - 主项目已建立 `docs/fb2-ai-center/` 工作台，固定主项目与 fb2 的分工：主项目提供 AI Center 和聊天/语音能力，fb2 提供业务数据。
 - 主项目已提供 fb2 `chat-bootstrap` 和 `context-contract` 验收项，覆盖聊天、ASR、TTS、AI 回复、计费和 answer policy。
 - 主项目 smoke 脚本已能验证 live fb2 tool manifest、工具执行策略、六类固定评测场景和主项目聊天自动工具覆盖。
