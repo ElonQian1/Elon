@@ -41,3 +41,5 @@
 - `handoff.md`：7*24 协作交接记录模板和当前状态。
 
 常规巡检先跑无副作用脚本 `scripts/smoke-fb2-ai-center.ps1`。只有拿到明确授权后，才运行有副作用脚本 `scripts/smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`，它会向真实群聊发送可见消息。
+
+最终验收使用 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages`。这个 wrapper 会把真实群聊可见触发和 `smoke-fb2-ai-center.ps1 -FinalAcceptance` 绑定到同一批证据，并输出机器可读 summary；缺 `FB2_AI_CENTER_TOKEN`、有订单的 `ExternalUserId`、真机语音证据或显式写群授权时必须失败。
