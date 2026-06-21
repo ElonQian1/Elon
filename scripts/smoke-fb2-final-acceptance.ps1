@@ -213,6 +213,32 @@ function Find-FeedbackEvidence {
     return $items
 }
 
+function Build-AiCenterEvidence {
+    param([string[]]$Lines)
+
+    [ordered]@{
+        main_version = Find-CheckDetail $Lines "main version"
+        live_manifest_ready = Find-CheckDetail $Lines "live manifest ready"
+        fb2_apk_version = Find-CheckDetail $Lines "fb2 APK version present"
+        fb2_apk_download_head = Find-CheckDetail $Lines "fb2 APK download head"
+        local_voice_sdk_build = Find-CheckDetail $Lines "local voice SDK build"
+        voice_evidence_schema = Find-CheckDetail $Lines "voice evidence schema"
+        voice_evidence_asr_fallback = Find-CheckDetail $Lines "voice evidence ASR timeout fallback"
+        scenario_today_context_audit = Find-CheckDetail $Lines "scenario: today matches context audit"
+        scenario_my_ticket_context_audit = Find-CheckDetail $Lines "scenario: my ticket context audit"
+        scenario_my_ticket_orders = Find-CheckDetail $Lines "scenario: my ticket has user orders"
+        scenario_platform_order_summary = Find-CheckDetail $Lines "scenario: platform order has summary data"
+        permission_total_blocks = Find-CheckDetail $Lines "permission summary total blocks"
+        permission_user_blocks = Find-CheckDetail $Lines "permission summary user blocks"
+        permission_platform_blocks = Find-CheckDetail $Lines "permission summary platform blocks"
+        quality_feedback_count = Find-CheckDetail $Lines "quality feedback count"
+        quality_matched_cited_sources = Find-CheckDetail $Lines "quality matched cited sources"
+        quality_unmatched_cited_sources = Find-CheckDetail $Lines "quality unmatched cited sources"
+        quality_missing_context_count = Find-CheckDetail $Lines "quality missing context count"
+        quality_wrong_context_count = Find-CheckDetail $Lines "quality wrong context count"
+    }
+}
+
 if ($PreflightOnly -and $AllowVisibleMessages) {
     Fail-FinalAcceptance "Use either -PreflightOnly or -AllowVisibleMessages, not both."
 }
@@ -315,6 +341,7 @@ if ($PreflightOnly) {
         fb2_app_version = $fb2Version
         preflight_exit_code = $preflightResult.exit_code
         preflight_log_path = $preflightResult.log_path
+        preflight_evidence = Build-AiCenterEvidence $preflightResult.output
         success = ($preflightResult.exit_code -eq 0)
     }
 
@@ -384,6 +411,7 @@ Add-Arg $centerArgs "-MaxWrongContextRate" $MaxWrongContextRate
 Add-SwitchArg $centerArgs "-FinalAcceptance" $true
 
 $centerResult = Invoke-SmokeScript "final no-skip acceptance" $centerArgs $centerLogPath
+$centerLines = @($centerResult.output)
 
 $completedAt = (Get-Date).ToUniversalTime().ToString("o")
 $feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
@@ -411,6 +439,7 @@ $summary = [ordered]@{
     selected_message_seed_id = Find-CheckDetail $visibleLines "selected-message seed sent"
     selected_message_reply_id = Find-CheckDetail $visibleLines "selected-message ai reply"
     feedback_evidence = $feedbackEvidence
+    final_acceptance_evidence = Build-AiCenterEvidence $centerLines
     success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0)
 }
 

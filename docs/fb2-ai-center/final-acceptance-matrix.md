@@ -18,7 +18,7 @@
 | 工具执行和审计 | `-RequireAllScenarios` + `-CheckPermissionBoundaries` + visible chat final acceptance 的 feedback/audit evidence | 需要最终验收绑定同一批 `QualitySince` |
 | answer policy | 默认 smoke 检查 `fb2.answer_policy.v1` 和 6 个 canonical eval scenarios | 已覆盖 |
 | billing policy | `chat-bootstrap.billing` 验证 ASR/TTS/context fetch 免费，AI 回复生成前扣费 | 需要 authenticated bootstrap 验证 |
-| observability | `PROGRESS.md`/`handoff.md` 记录 server version、summary JSON、log path、feedback evidence | 已有记录要求，最终验收未闭环 |
+| observability | `PROGRESS.md`/`handoff.md` 记录 server version、summary JSON、log path、feedback evidence、`preflight_evidence`、`final_acceptance_evidence` | 已有记录要求，最终验收未闭环 |
 
 ## fb2 必须提供
 
@@ -50,5 +50,5 @@
 
 - 缺真实 `FB2_AI_CENTER_TOKEN`，不能完成 live Context Pack、平台匿名摘要、质量汇总和 feedback 样本的最终验收。
 - 缺真实 fb2 真机语音证据 JSON，不能证明小米/HyperOS 等设备上主项目 `VoiceComposerView`、系统 ASR、云端兜底和 TTS 已完整可用。
-- 缺最终 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages` summary，不能把真实群聊可见消息、AI 回复、source references 和 feedback evidence 绑定为同一批证据。
+- 缺最终 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages` summary，不能把真实群聊可见消息、AI 回复、source references、feedback evidence 和 `final_acceptance_evidence` 绑定为同一批证据。
 - 缺带真实 token 的 `-CheckPermissionBoundaries` 当前运行结果，不能把历史权限负向验证当成本次最终完成证据。
