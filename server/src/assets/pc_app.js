@@ -9,8 +9,10 @@
   const state = {
     token: readToken(), user: null, projects: [], friends: [], groups: [], nodes: [],
     activeKind: 'ai', activeProjectId: '', activeChannelId: '', activeChannelKind: '',
+    activeConversationId: '', activeMemberUserId: '',
     activeVoiceChannel: 'studio',
     activePeer: null, projectSpace: null,
+    aiProjectConversations: { userId: '', items: {}, errors: {}, loadingIds: {}, expandedIds: {} },
     plaza: { loaded: false, loading: false, projects: [], query: '', filterKey: 'all', busyId: '', error: '' },
     nodeAdminUrl: safeNodeAdminUrl(),
     localAdminToken: '',
@@ -236,6 +238,15 @@
     return state.projects.find((project) => sameId(project && project.id, id)) || null;
   }
 
+  function isSystemProject(project) {
+    const sourceType = clean(project && (project.source_type || project.sourceType)).toLowerCase();
+    const template = clean(project && project.template).toLowerCase();
+    if (sourceType === 'agent_balloon' || sourceType === 'chat_memory') return true;
+    if (template === 'agent_balloon' || template === 'chat_memory') return true;
+    const title = titleOf(project);
+    return title === '手机控制' || title === '聊天记忆';
+  }
+
   function projectHue(project) {
     const seed = `${project.id || ''}:${titleOf(project)}`;
     let hash = 0;
@@ -384,7 +395,7 @@
   }
 
   function setRails(kind) {
-    els.aiRail.classList.toggle('active', kind === 'ai' || kind === 'store' || kind === 'tasks');
+    els.aiRail.classList.toggle('active', kind === 'ai' || kind === 'store' || kind === 'tasks' || kind === 'project-conversation');
     els.friendsRail.classList.toggle('active', kind === 'friends');
     els.projectsRail.classList.toggle('active', kind === 'projects');
     els.projectPlazaRail.classList.toggle('active', kind === 'project-plaza');
@@ -448,7 +459,7 @@
 
   function renderChannels() {
     const query = filterText();
-    if (state.activeKind === 'ai' || state.activeKind === 'store' || state.activeKind === 'tasks') return renderAiSidebar(query);
+    if (state.activeKind === 'ai' || state.activeKind === 'store' || state.activeKind === 'tasks' || state.activeKind === 'project-conversation') return renderAiSidebar(query);
     if (state.activeKind === 'friends') return renderFriendChannels(query);
     if (state.activeKind === 'projects') return renderProjectHomeChannels(query);
     if (state.activeKind === 'project-plaza') return renderProjectPlazaChannels(query);
@@ -466,6 +477,155 @@
     </button>`;
   }
 
+  function aiSidebarProjects() {
+    return state.projects
+      .filter((project) => project && project.id && !isSystemProject(project))
+      .slice()
+      .sort((left, right) => String(right.updated_at || right.updatedAt || '').localeCompare(String(left.updated_at || left.updatedAt || '')));
+  }
+
+  function currentUserId() {
+    return clean(state.user && (state.user.id || state.user.user_id || state.user.userId));
+  }
+
+  function aiConversationCache() {
+    const userId = currentUserId();
+    const cache = state.aiProjectConversations;
+    if (cache.userId !== userId) {
+      cache.userId = userId;
+      cache.items = {};
+      cache.errors = {};
+      cache.loadingIds = {};
+      cache.expandedIds = {};
+    }
+    return cache;
+  }
+
+  function aiSidebarVisible() {
+    return state.activeKind === 'ai' || state.activeKind === 'store' || state.activeKind === 'tasks' || state.activeKind === 'project-conversation';
+  }
+
+  async function loadAiProjectConversations(project, force) {
+    const userId = currentUserId();
+    const projectId = clean(project && project.id);
+    if (!state.token || !userId || !projectId) return;
+    const cache = aiConversationCache();
+    if (!force && (cache.items[projectId] || cache.errors[projectId] || cache.loadingIds[projectId])) return;
+    cache.loadingIds[projectId] = true;
+    if (force) {
+      delete cache.items[projectId];
+      delete cache.errors[projectId];
+    }
+    try {
+      const data = await api(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}/conversations?limit=20`, { cache: 'no-store' });
+      cache.items[projectId] = Array.isArray(data.conversations) ? data.conversations : [];
+      delete cache.errors[projectId];
+    } catch (error) {
+      cache.errors[projectId] = clean(error && error.message) || '最近会话加载失败';
+    } finally {
+      delete cache.loadingIds[projectId];
+    }
+  }
+
+  function ensureAiProjectConversations(projects) {
+    if (!state.token || !currentUserId()) return;
+    const cache = aiConversationCache();
+    const missing = projects.filter((project) => {
+      const projectId = clean(project && project.id);
+      return projectId && !cache.items[projectId] && !cache.errors[projectId] && !cache.loadingIds[projectId];
+    });
+    if (!missing.length) return;
+    Promise.allSettled(missing.map((project) => loadAiProjectConversations(project, false))).then(() => {
+      if (aiSidebarVisible()) renderAiSidebar(filterText());
+    });
+  }
+
+  function compactText(value, maxLength) {
+    const text = clean(value).replace(/\s+/g, ' ');
+    const max = maxLength || 32;
+    return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+  }
+
+  function conversationTitle(conversation) {
+    const title = clean(conversation && (conversation.title || conversation.conversation_title || conversation.conversationTitle));
+    if (title && title !== '项目开发会话') return title;
+    const last = compactText(conversation && (conversation.last_message || conversation.lastMessage || conversation.message), 30);
+    return last || title || '项目 AI 会话';
+  }
+
+  function conversationTimeValue(conversation) {
+    return clean(conversation && (conversation.last_message_at || conversation.lastMessageAt || conversation.updated_at || conversation.updatedAt || conversation.created_at || conversation.createdAt));
+  }
+
+  function relativeTimeLabel(value) {
+    if (!value) return '';
+    const date = new Date(Number(value) || value);
+    if (Number.isNaN(date.getTime())) return formatTime(value);
+    const diffMs = Math.max(0, Date.now() - date.getTime());
+    const minute = 60 * 1000;
+    const hour = 60 * minute;
+    const day = 24 * hour;
+    if (diffMs < minute) return '刚刚';
+    if (diffMs < hour) return `${Math.max(1, Math.floor(diffMs / minute))} 分钟`;
+    if (diffMs < day) return `${Math.max(1, Math.floor(diffMs / hour))} 小时`;
+    if (diffMs < 7 * day) return `${Math.max(1, Math.floor(diffMs / day))} 天`;
+    if (diffMs < 31 * day) return `${Math.max(1, Math.floor(diffMs / (7 * day)))} 周`;
+    if (diffMs < 365 * day) return `${Math.max(1, Math.floor(diffMs / (31 * day)))} 个月`;
+    return `${Math.max(1, Math.floor(diffMs / (365 * day)))} 年`;
+  }
+
+  function conversationMatches(conversation, query) {
+    if (!query) return true;
+    const text = [
+      conversationTitle(conversation),
+      conversation && (conversation.last_message || conversation.lastMessage),
+      conversation && (conversation.last_task_status || conversation.lastTaskStatus)
+    ].map(clean).join(' ').toLowerCase();
+    return text.includes(query);
+  }
+
+  function renderAiProjectGroup(project, query) {
+    const cache = aiConversationCache();
+    const projectId = clean(project && project.id);
+    const title = titleOf(project);
+    const projectText = `${title} ${project.workspace_path || project.workspacePath || ''}`.toLowerCase();
+    const loadedConversations = cache.items[projectId] || [];
+    const projectMatched = !query || projectText.includes(query);
+    const conversations = projectMatched
+      ? loadedConversations
+      : loadedConversations.filter((conversation) => conversationMatches(conversation, query));
+    if (query && !projectMatched && !conversations.length) return '';
+    const expanded = !!cache.expandedIds[projectId];
+    const visibleConversations = expanded ? conversations : conversations.slice(0, 5);
+    const conversationRows = visibleConversations.map((conversation) => {
+      const conversationId = clean(conversation.id || conversation.conversation_id || conversation.conversationId);
+      const active = state.activeKind === 'project-conversation'
+        && sameId(projectId, state.activeProjectId)
+        && sameId(conversationId, state.activeConversationId);
+      return `<button class="ai-project-thread ${active ? 'active' : ''}" type="button" data-ai-project-id="${escapeHtml(projectId)}" data-ai-conversation-id="${escapeHtml(conversationId)}">
+        <span class="ai-project-thread-title">${escapeHtml(conversationTitle(conversation))}</span>
+        <span class="ai-project-thread-time">${escapeHtml(relativeTimeLabel(conversationTimeValue(conversation)))}</span>
+      </button>`;
+    }).join('');
+    const expandRow = conversations.length > 5
+      ? `<button class="ai-project-expand" type="button" data-ai-project-expand-id="${escapeHtml(projectId)}">${expanded ? '收起' : '展开显示'}</button>`
+      : '';
+    const loading = cache.loadingIds[projectId] ? '<div class="ai-project-loading">加载最近任务…</div>' : '';
+    const error = cache.errors[projectId] ? `<div class="ai-project-loading">${escapeHtml(cache.errors[projectId])}</div>` : '';
+    const empty = !loading && !error && cache.items[projectId] && !conversations.length
+      ? '<div class="ai-project-empty">暂无最近任务</div>'
+      : '';
+    const folderActive = state.activeKind === 'project' && sameId(projectId, state.activeProjectId);
+    return `<div class="ai-project-group">
+      <button class="ai-project-folder ${folderActive ? 'active' : ''}" type="button" data-ai-project-folder-id="${escapeHtml(projectId)}">
+        <span class="ai-project-folder-icon" aria-hidden="true"></span>
+        <span class="ai-project-folder-title">${escapeHtml(title)}</span>
+      </button>
+      ${conversationRows || loading || error || empty}
+      ${expandRow}
+    </div>`;
+  }
+
   function renderAiSidebar(query) {
     const aiFriend = socialAiFriend();
     const actionMatches = (item) => !query || `${item.title} ${item.sub || ''}`.toLowerCase().includes(query);
@@ -476,29 +636,15 @@
       { id: 'tasks', glyph: '自', title: '自动化', sub: '任务和提醒', active: state.activeKind === 'tasks' },
       { id: 'mobile', glyph: '手', title: '一龙移动版', sub: 'APK 和移动网页版', active: state.activeKind === 'apk' }
     ].filter(actionMatches);
-    const workspaceActions = [
-      { id: 'projects', glyph: '项', title: '项目', sub: `${state.projects.length} 个项目`, active: state.activeKind === 'projects' },
-      { id: 'plaza', glyph: '广', title: '项目广场', sub: '浏览公开项目', active: state.activeKind === 'project-plaza' },
-      { id: 'doctor', glyph: '医', title: '电脑医生', sub: '检查和修复本机环境' },
-      { id: 'node', glyph: '节', title: 'PC 节点', sub: `${state.nodes.filter((n) => n.online).length} 台在线` }
-    ].filter(actionMatches);
-    const projects = state.projects
-      .filter((project) => !query || titleOf(project).toLowerCase().includes(query))
-      .slice(0, 8);
-    const projectItems = projects.map((project) => {
-      const title = titleOf(project);
-      const sub = project.updated_at || project.updatedAt ? `更新 ${formatTime(project.updated_at || project.updatedAt)}` : projectRoleLabel(project);
-      return `<button class="channel-item" type="button" data-ai-project-id="${escapeHtml(project.id)}">
-        ${avatarElement('span', 'glyph channel-avatar', iconUrlOf(project), title, firstChar(title, '项'))}
-        <span class="main"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(sub)}</span></span>
-      </button>`;
-    }).join('');
+    const projects = aiSidebarProjects();
+    ensureAiProjectConversations(projects);
+    const projectItems = state.token
+      ? projects.map((project) => renderAiProjectGroup(project, query)).filter(Boolean).join('')
+      : '<div class="ai-sidebar-muted">登录后显示本地项目和最近任务</div>';
     const sections = [
       '<div class="channel-section">一龙AI</div>',
       primaryActions.map(aiSidebarButton).join('') || '<div class="ai-sidebar-muted">没有匹配的功能</div>',
       '<div class="ai-sidebar-spacer"></div>',
-      '<div class="channel-section">工作台</div>',
-      workspaceActions.map(aiSidebarButton).join(''),
       '<div class="channel-section">项目</div>',
       projectItems || '<div class="ai-sidebar-muted">暂无匹配项目</div>'
     ];
@@ -515,14 +661,21 @@
         if (action === 'store') return selectStore();
         if (action === 'tasks') return selectTasks();
         if (action === 'mobile') return selectApkDownload();
-        if (action === 'projects') return selectProjectsHome();
-        if (action === 'plaza') return selectProjectPlaza();
-        if (action === 'doctor') return doctor.selectDoctor();
-        if (action === 'node') return node.selectNode();
       });
     });
-    els.channelList.querySelectorAll('[data-ai-project-id]').forEach((btn) => {
-      btn.addEventListener('click', () => selectProject(btn.dataset.aiProjectId));
+    els.channelList.querySelectorAll('[data-ai-project-folder-id]').forEach((btn) => {
+      btn.addEventListener('click', () => selectProject(btn.dataset.aiProjectFolderId));
+    });
+    els.channelList.querySelectorAll('[data-ai-conversation-id]').forEach((btn) => {
+      btn.addEventListener('click', () => selectProjectConversation(btn.dataset.aiProjectId, btn.dataset.aiConversationId));
+    });
+    els.channelList.querySelectorAll('[data-ai-project-expand-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const projectId = clean(btn.dataset.aiProjectExpandId);
+        const cache = aiConversationCache();
+        cache.expandedIds[projectId] = !cache.expandedIds[projectId];
+        renderAiSidebar(filterText());
+      });
     });
   }
 
@@ -660,6 +813,11 @@
     els.channelList.querySelectorAll('[data-project-home]').forEach((btn) => {
       btn.addEventListener('click', selectProjectLanding);
     });
+  }
+
+  function cachedProjectConversation(projectId, conversationId) {
+    const conversations = aiConversationCache().items[clean(projectId)] || [];
+    return conversations.find((conversation) => sameId(conversation.id || conversation.conversation_id || conversation.conversationId, conversationId)) || null;
   }
 
   function channelButton(item) {
@@ -900,6 +1058,8 @@
     state.activeKind = 'ai';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activeChannelKind = '';
     state.activePeer = null;
     state.projectSpace = null;
@@ -929,6 +1089,8 @@
     state.activeKind = 'projects';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
@@ -997,6 +1159,8 @@
     state.activeKind = 'project-plaza';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
@@ -1178,6 +1342,8 @@
     state.activeKind = 'store';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
@@ -1242,6 +1408,8 @@
     state.activeKind = 'tasks';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
@@ -1303,6 +1471,8 @@
     state.activeKind = 'apk';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
@@ -1353,6 +1523,8 @@
     state.activeKind = 'ai';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activeChannelKind = '';
     state.projectSpace = null;
     const aiFriend = socialAiFriend();
@@ -1392,6 +1564,8 @@
     state.activeKind = 'friends';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activeChannelKind = '';
     if (!state.activePeer || (state.activePeer.kind === 'friend' && sameId(state.activePeer.id, SOCIAL_AI_USER_ID))) {
       state.activePeer = null;
@@ -1417,6 +1591,11 @@
     const item = list.find((entry) => String(entry.id) === String(id));
     if (!item) return;
     state.activeKind = 'friends';
+    state.activeProjectId = '';
+    state.activeChannelId = '';
+    state.activeChannelKind = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = { kind, id };
     renderChannels();
     const title = kind === 'group' ? clean(item.name || item.title || '群聊') : userName(item);
@@ -1446,6 +1625,8 @@
     state.activeKind = 'voice';
     state.activeProjectId = '';
     state.activeChannelId = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = null;
     state.activeVoiceChannel = channelId || state.activeVoiceChannel || 'studio';
     setRails('voice');
@@ -1467,6 +1648,10 @@
     if (!project) return;
     state.activeKind = 'project';
     state.activeProjectId = String(projectId);
+    state.activeChannelId = '';
+    state.activeChannelKind = '';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     state.activePeer = null;
     setRails('project');
     els.workspaceName.textContent = titleOf(project);
@@ -1493,10 +1678,54 @@
     }
   }
 
+  async function selectProjectConversation(projectId, conversationId) {
+    const project = projectById(projectId);
+    const userId = currentUserId();
+    const cleanConversationId = clean(conversationId);
+    if (!project || !userId || !cleanConversationId) return;
+    const conversation = cachedProjectConversation(projectId, cleanConversationId);
+    state.activeKind = 'project-conversation';
+    state.activeProjectId = String(projectId);
+    state.activeConversationId = cleanConversationId;
+    state.activeMemberUserId = userId;
+    state.activeChannelId = '';
+    state.activeChannelKind = 'member_conversation';
+    state.activePeer = null;
+    setAuthClaimBanner(false);
+    setRails('project-conversation');
+    els.workspaceName.textContent = titleOf(project);
+    els.workspaceMeta.textContent = '最近任务';
+    setSidebarPlaceholder('搜索项目和会话');
+    setHeader('项', conversationTitle(conversation), titleOf(project));
+    setComposer(true, '在这个项目会话下留言', false);
+    setNodeMode(false);
+    renderChannels();
+    els.messageList.innerHTML = '<div class="empty-state">加载项目会话中…</div>';
+    try {
+      try {
+        state.projectSpace = await api(`/api/projects/${encodeURIComponent(projectId)}/space`);
+        const members = state.projectSpace.members || [];
+        renderMembers('项目成员', members.map((m) => Object.assign({}, m, {
+          name: userName(m),
+          sub: m.role || m.member_role || 'member'
+        })));
+      } catch (_) {
+        state.projectSpace = null;
+        renderMembers('项目会话', [{ name: userName(state.user), sub: '当前账号' }]);
+      }
+      const data = await api(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}/conversations/${encodeURIComponent(cleanConversationId)}/messages?limit=120`, { cache: 'no-store' });
+      renderMessages(data.messages || [], 'project');
+    } catch (error) {
+      showError(error);
+    }
+  }
+
   function selectProjectLanding() {
     clearDevTaskRefresh();
     state.activeChannelId = '';
     state.activeChannelKind = 'home';
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     renderChannels();
     projectLanding.render();
   }
@@ -1507,6 +1736,8 @@
     if (!channel) return;
     state.activeChannelId = String(channelId);
     state.activeChannelKind = clean(channel.kind || channel.channel_kind).toLowerCase();
+    state.activeConversationId = '';
+    state.activeMemberUserId = '';
     renderChannels();
     setHeader(channelGlyph(channel), channelName(channel), channel.kind || channel.channel_kind || '项目频道');
     const canWrite = state.activeChannelKind !== 'docs';
@@ -1810,6 +2041,16 @@
         els.input.value = '';
         if (state.activeKind === 'ai') await selectAiAssistant(true);
         else await selectPeer(state.activePeer.kind, state.activePeer.id);
+      } else if (state.activeKind === 'project-conversation' && state.activeProjectId && state.activeConversationId) {
+        const memberUserId = state.activeMemberUserId || currentUserId();
+        if (!memberUserId) throw new Error('请先登录一龙账号');
+        await api(`/api/projects/${encodeURIComponent(state.activeProjectId)}/members/${encodeURIComponent(memberUserId)}/conversations/${encodeURIComponent(state.activeConversationId)}/messages`, {
+          method: 'POST',
+          body: JSON.stringify({ content })
+        });
+        els.input.value = '';
+        await loadAiProjectConversations(projectById(state.activeProjectId), true);
+        await selectProjectConversation(state.activeProjectId, state.activeConversationId);
       } else if (state.activeKind === 'project' && state.activeProjectId && state.activeChannelId) {
         const shouldUseAiTask = useAiTask || state.activeChannelKind === 'ai_development';
         const path = shouldUseAiTask
@@ -2058,6 +2299,9 @@
     if (state.activeKind === 'doctor') return doctor.selectDoctor();
     if (state.activeKind === 'node') return node.selectNode();
     if (state.activeKind === 'voice') return selectVoiceProject(state.activeVoiceChannel);
+    if (state.activeKind === 'project-conversation' && state.activeProjectId && state.activeConversationId) {
+      return selectProjectConversation(state.activeProjectId, state.activeConversationId);
+    }
     if (state.activeKind === 'project' && state.activeProjectId) return selectProject(state.activeProjectId);
     return selectAiAssistant();
   }
