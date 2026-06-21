@@ -62,6 +62,34 @@ pub(crate) fn platform_order_summary_enabled() -> bool {
     env_flag("ELON_EXTERNAL_APP_FB2_PLATFORM_ORDER_CONTEXT", false)
 }
 
+pub(crate) fn platform_order_summary_requested(topic_hint: Option<&str>) -> bool {
+    let Some(text) = topic_hint.map(str::trim).filter(|value| !value.is_empty()) else {
+        return false;
+    };
+    let lower = text.to_ascii_lowercase();
+    let platform_scope_terms = [
+        "平台",
+        "全平台",
+        "全站",
+        "店铺",
+        "经营",
+        "汇总",
+        "整体",
+        "所有用户",
+        "全体用户",
+        "匿名汇总",
+        "大盘",
+        "platform",
+        "aggregate",
+    ];
+    let order_risk_terms = [
+        "订单", "投注", "下单", "风险", "赔付", "毛利", "销量", "成交", "集中", "派奖", "order",
+        "risk",
+    ];
+    has_any_term(text, &lower, &platform_scope_terms)
+        && has_any_term(text, &lower, &order_risk_terms)
+}
+
 pub(crate) fn fb2_request_context_headers(
     external_user_id: Option<&str>,
     include_platform_order_summary: bool,
@@ -133,6 +161,13 @@ fn env_flag(name: &str, default_value: bool) -> bool {
         .unwrap_or(default_value)
 }
 
+fn has_any_term(text: &str, lower: &str, terms: &[&str]) -> bool {
+    terms.iter().any(|term| {
+        let term_lower = term.to_ascii_lowercase();
+        lower.contains(&term_lower) || text.contains(*term)
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -145,6 +180,23 @@ mod tests {
         );
         assert_eq!(infer_lottery_type(Some("北单赛事")), Some("BeiDan".into()));
         assert_eq!(infer_lottery_type(Some("足球比赛")), None);
+    }
+
+    #[test]
+    fn detects_platform_order_summary_intent() {
+        assert!(platform_order_summary_requested(Some(
+            "平台今天订单风险怎么样？只用匿名汇总"
+        )));
+        assert!(platform_order_summary_requested(Some(
+            "全站投注集中在哪些方向"
+        )));
+        assert!(!platform_order_summary_requested(Some(
+            "帮我分析我的票有什么风险"
+        )));
+        assert!(!platform_order_summary_requested(Some(
+            "群里大家怎么看西班牙这场"
+        )));
+        assert!(!platform_order_summary_requested(Some("这条消息说得对吗")));
     }
 
     #[test]

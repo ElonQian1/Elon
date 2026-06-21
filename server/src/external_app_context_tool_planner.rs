@@ -2,7 +2,9 @@
 
 use serde_json::{json, Value};
 
-use crate::external_app_context_config::{infer_lottery_type, platform_order_summary_enabled};
+use crate::external_app_context_config::{
+    infer_lottery_type, platform_order_summary_enabled, platform_order_summary_requested,
+};
 
 const PLANNER_SCHEMA: &str = "external_app.tool_plan.v1";
 const PLANNER_STRATEGY: &str = "deterministic_fb2_chat_v1";
@@ -333,23 +335,35 @@ fn plan_fb2_tools_with_platform_scope(
         }
     }
 
-    if let Some(evidence) = keyword_evidence(
-        query,
-        &[
-            "平台",
-            "全平台",
-            "店铺",
-            "订单风险",
-            "投注集中",
-            "集中",
-            "派奖",
-            "毛利",
-            "销量",
-            "成交",
-            "赔付",
-            "风险",
-        ],
-    ) {
+    if platform_order_summary_requested(Some(query)) {
+        let evidence = keyword_evidence(
+            query,
+            &[
+                "平台",
+                "全平台",
+                "全站",
+                "店铺",
+                "经营",
+                "汇总",
+                "整体",
+                "所有用户",
+                "全体用户",
+                "匿名汇总",
+                "大盘",
+                "订单",
+                "订单风险",
+                "投注集中",
+                "投注",
+                "集中",
+                "派奖",
+                "毛利",
+                "销量",
+                "成交",
+                "赔付",
+                "风险",
+            ],
+        )
+        .unwrap_or_else(|| vec!["query.intent.platform_order_summary".to_string()]);
         if allow_platform_orders {
             plans.push(PlannedTool {
                 name: "platform_orders",
@@ -632,6 +646,28 @@ mod tests {
             platform_tool["trigger"].as_str(),
             Some("platform_order_summary_needed")
         );
+    }
+
+    #[test]
+    fn does_not_plan_platform_orders_for_personal_or_group_risk_questions() {
+        for query in [
+            "帮我分析我的票有什么风险",
+            "群里大家怎么看西班牙这场风险",
+            "这条消息说得对吗，有没有重注风险",
+        ] {
+            let plan = plan_fb2_tools_with_platform_scope(
+                &json!({
+                    "context_quality": {"warnings": []}
+                }),
+                Some(query),
+                true,
+            );
+
+            assert!(
+                !plan.tool_names().contains(&"platform_orders"),
+                "personal/group query should not plan platform summary: {query}"
+            );
+        }
     }
 
     #[test]

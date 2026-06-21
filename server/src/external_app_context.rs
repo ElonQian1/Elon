@@ -9,7 +9,8 @@ use crate::{
     external_app_context_config::{
         context_pack_enabled, discussion_limit, fb2_base_url, fb2_context_token,
         fb2_request_context_headers, infer_lottery_type, match_limit, order_limit,
-        platform_order_summary_enabled, timeout_secs, FB2_APP_ID, FB2_CONTEXT_HEADER,
+        platform_order_summary_enabled, platform_order_summary_requested, timeout_secs, FB2_APP_ID,
+        FB2_CONTEXT_HEADER,
     },
     external_app_context_response::{
         compact_error, fb2_pack_response_to_context, fb2_response_to_context,
@@ -150,7 +151,8 @@ async fn fetch_fb2_context_pack(
         query.push(("lottery_type".to_string(), lottery_type));
     }
 
-    let include_platform_orders = platform_order_summary_enabled();
+    let include_platform_orders =
+        platform_order_summary_enabled() && platform_order_summary_requested(topic_hint);
     let mut request = fb2_direct_client()
         .get(&url)
         .header(FB2_CONTEXT_HEADER, token)
