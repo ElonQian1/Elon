@@ -12,6 +12,7 @@ param(
     [string]$ExternalUserId = "",
     [int]$RequestTimeoutSec = 45,
     [int]$RetryCount = 1,
+    [switch]$FinalAcceptance,
     [switch]$IncludePlatformOrderSummary,
     [switch]$RequireFb2Live,
     [switch]$RequireAllScenarios,
@@ -69,6 +70,17 @@ $Fb2Base = $Fb2Base.TrimEnd("/")
 $amp = [char]38
 $script:Failed = 0
 $script:Skipped = 0
+
+if ($FinalAcceptance) {
+    $IncludePlatformOrderSummary = $true
+    $RequireFb2Live = $true
+    $RequireAllScenarios = $true
+    $CheckFb2ApkVersion = $true
+    $CheckLocalVoiceSdkBuild = $true
+    $CheckQuality = $true
+    $RequireFeedbackCoverage = $true
+    $RequireNoSkips = $true
+}
 
 if ($RequireFeedbackCoverage) {
     if (-not $PSBoundParameters.ContainsKey("MinFeedbackCount")) {
