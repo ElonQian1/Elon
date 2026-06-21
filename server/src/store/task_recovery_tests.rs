@@ -1,0 +1,279 @@
+// server/src/store/task_recovery_tests.rs
+
+use crate::store::Store;
+use uuid::Uuid;
+
+fn temp_store() -> Store {
+    let path = std::env::temp_dir().join(format!(
+        "elon_task_recovery_test_{}.db",
+        Uuid::new_v4().simple()
+    ));
+    Store::open(&path).expect("store should open")
+}
+
+fn temp_channel_task(store: &Store, account: &str) -> (String, String, String, String) {
+    let user = store
+        .create_user(account, "secret1", None, None)
+        .expect("user should be created");
+    let project = store
+        .create_project(&user.id, "Channel Task Recovery", None, None)
+        .expect("project should be created")
+        .project;
+    let channel = store
+        .list_project_space_channels(&user.id, &project.id)
+        .expect("channels should list")
+        .into_iter()
+        .find(|channel| channel.kind == "ai_development")
+        .expect("ai development channel should exist");
+    let task_id = store
+        .create_task(&project.id, &user.id, Some("channel-dev"), "修复任务")
+        .expect("task should be created");
+    store
+        .insert_project_channel_message(
+            &project.id,
+            &channel.id,
+            Some(&user.id),
+            "ai_task",
+            "发起 AI 开发任务：修复任务",
+            Some(&task_id),
+            None,
+        )
+        .expect("ai task message should insert");
+
+    (user.id, project.id, channel.id, task_id)
+}
+
+fn result_messages_for_task(
+    store: &Store,
+    user_id: &str,
+    project_id: &str,
+    channel_id: &str,
+    task_id: &str,
+) -> Vec<String> {
+    store
+        .list_project_channel_messages(user_id, project_id, channel_id, 50)
+        .expect("messages should list")
+        .into_iter()
+        .filter(|message| {
+            message.kind == "ai_result" && message.task_id.as_deref() == Some(task_id)
+        })
+        .map(|message| message.content)
+        .collect()
+}
+
+fn task_status_and_error(store: &Store, task_id: &str) -> (String, Option<String>) {
+    store
+        .conn()
+        .expect("store lock should be healthy")
+        .query_row(
+            "SELECT status, error FROM tasks WHERE id = ?1",
+            rusqlite::params![task_id],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .expect("task should exist")
+}
+
+#[test]
+fn interrupted_running_channel_task_gets_terminal_result_once() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "interrupted-channel-task@example.com");
+
+    let changed = store
+        .mark_interrupted_running_tasks_with_channel_results()
+        .expect("running tasks should be interrupted");
+    assert_eq!(changed, 1);
+    let (status, error) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "interrupted");
+    assert_eq!(
+        error.as_deref(),
+        Some("server restarted before task finished")
+    );
+
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results.len(), 1);
+    assert!(results[0].contains("任务已中断"));
+    assert!(results[0].contains("继续"));
+
+    let changed_again = store
+        .mark_interrupted_running_tasks_with_channel_results()
+        .expect("second pass should be safe");
+    assert_eq!(changed_again, 0);
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results.len(), 1);
+}
+
+#[test]
+fn stale_running_channel_task_gets_terminal_result_once() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "stale-channel-task@example.com");
+    let old_created_at = (chrono::Utc::now() - chrono::Duration::minutes(20)).to_rfc3339();
+    store
+        .conn()
+        .expect("store lock should be healthy")
+        .execute(
+            "UPDATE tasks SET created_at = ?1 WHERE id = ?2",
+            rusqlite::params![old_created_at, task_id],
+        )
+        .expect("task should become stale");
+
+    let changed = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("stale tasks should fail");
+    assert_eq!(changed, 1);
+    let (status, error) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "failed");
+    assert_eq!(error.as_deref(), Some("PC节点断线或任务超时自动终止"));
+
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results.len(), 1);
+    assert!(results[0].contains("任务失败"));
+    assert!(results[0].contains("继续"));
+
+    let changed_again = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("second pass should be safe");
+    assert_eq!(changed_again, 0);
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results.len(), 1);
+}
+
+#[test]
+fn stale_running_channel_task_can_be_excluded_from_cleanup() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "active-channel-task@example.com");
+    let old_created_at = (chrono::Utc::now() - chrono::Duration::minutes(20)).to_rfc3339();
+    store
+        .conn()
+        .expect("store lock should be healthy")
+        .execute(
+            "UPDATE tasks SET created_at = ?1 WHERE id = ?2",
+            rusqlite::params![old_created_at, task_id],
+        )
+        .expect("task should become stale");
+
+    let changed = store
+        .mark_stale_running_tasks_with_channel_results_excluding(
+            10 * 60,
+            std::slice::from_ref(&task_id),
+        )
+        .expect("active task should be excluded");
+    assert_eq!(changed, 0);
+    let (status, error) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "running");
+    assert!(error.is_none());
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert!(results.is_empty());
+
+    let changed = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("non-excluded stale task should fail");
+    assert_eq!(changed, 1);
+}
+
+#[test]
+fn interrupted_channel_task_with_existing_result_is_not_duplicated() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "interrupted-existing-result@example.com");
+    assert!(store
+        .insert_project_channel_ai_result_once(&project_id, &channel_id, "已有终态结果", &task_id)
+        .expect("existing result should insert"));
+
+    let changed = store
+        .mark_interrupted_running_tasks_with_channel_results()
+        .expect("running task should be interrupted");
+    assert_eq!(changed, 1);
+    let (status, _) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "interrupted");
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results, vec!["已有终态结果".to_string()]);
+}
+
+#[test]
+fn recovered_terminal_task_is_not_overwritten_by_late_runner_finish() {
+    let store = temp_store();
+    let (_, _, _, task_id) = temp_channel_task(&store, "late-runner-finish@example.com");
+
+    store
+        .mark_interrupted_running_tasks_with_channel_results()
+        .expect("running task should be interrupted");
+
+    let changed = store
+        .finish_running_task(&task_id, "done", Some("迟到的完成消息"), None, None)
+        .expect("late finish should be ignored safely");
+    assert!(!changed);
+
+    let (status, error) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "interrupted");
+    assert_eq!(
+        error.as_deref(),
+        Some("server restarted before task finished")
+    );
+}
+
+#[test]
+fn stale_channel_task_with_existing_result_is_not_duplicated() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "stale-existing-result@example.com");
+    let old_created_at = (chrono::Utc::now() - chrono::Duration::minutes(20)).to_rfc3339();
+    store
+        .conn()
+        .expect("store lock should be healthy")
+        .execute(
+            "UPDATE tasks SET created_at = ?1 WHERE id = ?2",
+            rusqlite::params![old_created_at, task_id],
+        )
+        .expect("task should become stale");
+    assert!(store
+        .insert_project_channel_ai_result_once(&project_id, &channel_id, "已有失败结果", &task_id)
+        .expect("existing result should insert"));
+
+    let changed = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("stale task should fail");
+    assert_eq!(changed, 1);
+    let (status, _) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "failed");
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results, vec!["已有失败结果".to_string()]);
+}
+
+#[test]
+fn fresh_running_channel_task_is_not_stale_cleaned() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "fresh-channel-task@example.com");
+
+    let changed = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("fresh task should remain running");
+    assert_eq!(changed, 0);
+    let (status, error) = task_status_and_error(&store, &task_id);
+    assert_eq!(status, "running");
+    assert!(error.is_none());
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert!(results.is_empty());
+}
+
+#[test]
+fn channel_ai_result_is_inserted_once_per_task() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "ai-result-once@example.com");
+
+    let inserted = store
+        .insert_project_channel_ai_result_once(&project_id, &channel_id, "第一次结果", &task_id)
+        .expect("first result should insert");
+    let inserted_again = store
+        .insert_project_channel_ai_result_once(&project_id, &channel_id, "第二次结果", &task_id)
+        .expect("second result should be ignored");
+
+    assert!(inserted);
+    assert!(!inserted_again);
+    let results = result_messages_for_task(&store, &user_id, &project_id, &channel_id, &task_id);
+    assert_eq!(results, vec!["第一次结果".to_string()]);
+}

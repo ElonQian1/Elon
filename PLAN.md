@@ -12,12 +12,14 @@
 4. 旧入口清理：安装/修复/关闭自启时清理旧 Run 项、旧计划任务、Startup 快捷方式。
 5. CLI 隐藏执行：Route A 和 legacy relay 的 `.cmd/.bat` shim 统一包装，避免只隐藏外层却让子进程开控制台。
 6. 回归验证：跑 PC 节点目标 clippy、相关单测、全量测试和格式检查；记录全量 clippy 的仓库历史缺口。
+7. 任务恢复补强：服务重启或 PC 节点超时把 running 任务标记为 interrupted/failed 时，同步补写频道 `ai_result`，并避免活跃 runner 双终态。
 
 ## 风险
 
 - GUI 黑窗是否可见最终依赖 Windows 桌面烟测，自动化主要验证启动条件、隐藏 flags 和防重复逻辑。
 - 全量 `cargo clippy --all-targets --all-features -- -D warnings` 当前被服务端/测试历史 lint 阻塞，未在本次黑窗任务中大范围清理。
 - 原主工作区存在未提交改动，本任务只在隔离 worktree 修改并只 stage 本任务文件。
+- 任务终态可见恢复不是同进程续跑；Codex Desktop 级恢复仍需要持久 run handle、PC 节点 journal、attach 协议和审批 waiter 重绑定。
 
 ## 验证命令
 
@@ -27,6 +29,8 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_server_runtime`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server task_recovery_tests -- --nocapture`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server store::tasks::tests -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --all-features`
 - `git diff --check`
 

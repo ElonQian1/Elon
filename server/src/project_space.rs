@@ -1198,14 +1198,11 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     .and_then(|v| v.as_str())
                                     .map(ToOwned::to_owned);
                                 let result = result_message(message, apk_url.as_deref(), None);
-                                let _ = task.state.store.insert_project_channel_message(
+                                let _ = task.state.store.insert_project_channel_ai_result_once(
                                     &task.project_id,
                                     &task.channel_id,
-                                    None,
-                                    "ai_result",
                                     &result,
-                                    Some(&task.task_id),
-                                    None,
+                                    &task.task_id,
                                 );
                             }
                             "error" => {
@@ -1215,14 +1212,11 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                 let msg = message.if_blank("AI 开发任务失败。").to_string();
                                 final_reply = msg.clone();
                                 error = Some(msg.clone());
-                                let _ = task.state.store.insert_project_channel_message(
+                                let _ = task.state.store.insert_project_channel_ai_result_once(
                                     &task.project_id,
                                     &task.channel_id,
-                                    None,
-                                    "ai_result",
                                     &result_message(&msg, None, Some("失败")),
-                                    Some(&task.task_id),
-                                    None,
+                                    &task.task_id,
                                 );
                             }
                             _ => {}
@@ -1236,14 +1230,11 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                         final_status = "canceled".to_string();
                         final_reply = CHANNEL_AI_CANCEL_MESSAGE.to_string();
                         error = Some(CHANNEL_AI_CANCEL_MESSAGE.to_string());
-                        let _ = task.state.store.insert_project_channel_message(
+                        let _ = task.state.store.insert_project_channel_ai_result_once(
                             &task.project_id,
                             &task.channel_id,
-                            None,
-                            "ai_result",
                             &result_message(CHANNEL_AI_CANCEL_MESSAGE, None, Some("已停止")),
-                            Some(&task.task_id),
-                            None,
+                            &task.task_id,
                         );
                         break;
                     }
@@ -1256,7 +1247,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         if final_reply.is_empty() {
             final_reply = "AI 开发任务已结束。".to_string();
         }
-        let _ = task.state.store.finish_task(
+        let _ = task.state.store.finish_running_task(
             &task.task_id,
             &final_status,
             Some(&final_reply),
@@ -1282,6 +1273,13 @@ fn register_channel_ai_task_control(
             },
         );
     }
+}
+
+pub(crate) fn active_channel_ai_task_ids() -> Vec<String> {
+    CHANNEL_AI_TASKS
+        .lock()
+        .map(|tasks| tasks.keys().cloned().collect())
+        .unwrap_or_default()
 }
 
 fn take_channel_ai_task_control(

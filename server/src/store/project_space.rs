@@ -307,6 +307,67 @@ impl Store {
         .map_err(Into::into)
     }
 
+    pub fn insert_project_channel_ai_result_once(
+        &self,
+        project_id: &str,
+        channel_id: &str,
+        content: &str,
+        task_id: &str,
+    ) -> Result<bool> {
+        let content = content.trim();
+        if content.is_empty() {
+            return Err(anyhow!("消息内容不能为空"));
+        }
+        let created_at = now();
+        let conn = self.conn()?;
+        let exists: Option<String> = conn
+            .query_row(
+                "SELECT id
+                 FROM project_channel_messages
+                 WHERE project_id = ?1
+                   AND channel_id = ?2
+                   AND task_id = ?3
+                   AND kind = 'ai_result'
+                 LIMIT 1",
+                params![project_id, channel_id, task_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if exists.is_some() {
+            return Ok(false);
+        }
+        let channel_exists: Option<String> = conn
+            .query_row(
+                "SELECT id FROM project_channels WHERE project_id = ?1 AND id = ?2",
+                params![project_id, channel_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if channel_exists.is_none() {
+            return Err(anyhow!("频道不存在"));
+        }
+
+        conn.execute(
+            "INSERT INTO project_channel_messages (
+                id, project_id, channel_id, sender_user_id, kind, content, task_id, created_at
+             )
+             VALUES (?1, ?2, ?3, NULL, 'ai_result', ?4, ?5, ?6)",
+            params![
+                new_id("pcm"),
+                project_id,
+                channel_id,
+                content,
+                task_id,
+                created_at
+            ],
+        )?;
+        conn.execute(
+            "UPDATE project_channels SET updated_at = ?1 WHERE project_id = ?2 AND id = ?3",
+            params![created_at, project_id, channel_id],
+        )?;
+        Ok(true)
+    }
+
     pub fn mark_project_suggestion_updated(
         &self,
         user_id: &str,

@@ -219,7 +219,10 @@ async fn main() -> Result<()> {
     if interrupted > 0 {
         info!("{} 个进行中的任务因服务器重启被标记为已中断", interrupted);
     }
-    let interrupted_tasks = state.store.mark_interrupted_running_tasks().unwrap_or(0);
+    let interrupted_tasks = state
+        .store
+        .mark_interrupted_running_tasks_with_channel_results()
+        .unwrap_or(0);
     if interrupted_tasks > 0 {
         info!(
             "{} 个数据库运行中任务因服务器重启被标记为已中断",
@@ -235,7 +238,13 @@ async fn main() -> Result<()> {
             let mut interval = tokio::time::interval(std::time::Duration::from_secs(120));
             loop {
                 interval.tick().await;
-                match state_cleanup.store.mark_stale_running_tasks(10 * 60) {
+                let active_channel_tasks = project_space::active_channel_ai_task_ids();
+                match state_cleanup
+                    .store
+                    .mark_stale_running_tasks_with_channel_results_excluding(
+                        10 * 60,
+                        &active_channel_tasks,
+                    ) {
                     Ok(n) if n > 0 => {
                         info!("{n} 个超时 running 任务已自动标记为 failed")
                     }
