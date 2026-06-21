@@ -13,7 +13,6 @@ use tokio::sync::mpsc::UnboundedSender;
 use tracing::{info, warn};
 
 use crate::{
-    agent_llm_call::call_chat_llm,
     friend_events, intent_router,
     store::{SocialAiHistoryMessage, SocialAiPendingMention, SOCIAL_AI_USER_ID},
     types::{AgentConfig, AppState, WsMessage},
@@ -417,19 +416,18 @@ async fn build_reply(
         },
     );
 
-    match resolve_social_agent(state).await {
-        Ok(agent) => {
-            let response = call_chat_llm(
-                state,
-                &agent,
-                &[
-                    json!({ "role": "system", "content": social_ai_prompt() }),
-                    json!({ "role": "user", "content": prompt_text }),
-                ],
-                user_id,
-                "social_ai",
-            )
-            .await?;
+    match crate::social_ai_agents::call_social_chat_llm_with_fallback(
+        state,
+        &[
+            json!({ "role": "system", "content": social_ai_prompt() }),
+            json!({ "role": "user", "content": prompt_text }),
+        ],
+        user_id,
+        "social_ai",
+    )
+    .await
+    {
+        Ok(response) => {
             let reply = response["choices"][0]["message"]["content"]
                 .as_str()
                 .unwrap_or(if scene == DIRECT_SOCIAL_AI_SCENE {
@@ -523,13 +521,7 @@ async fn build_reply_with_cli(
 }
 
 pub(crate) async fn resolve_social_agent(state: &Arc<AppState>) -> Result<AgentConfig> {
-    state
-        .agents_config
-        .read()
-        .await
-        .get_agent(None)
-        .cloned()
-        .ok_or_else(|| anyhow!("未配置可用 AI 代理，请先在后台配置 API 代理"))
+    crate::social_ai_agents::resolve_social_agent(state).await
 }
 
 pub(crate) fn social_ai_prompt() -> String {

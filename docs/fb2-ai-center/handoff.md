@@ -39,6 +39,7 @@
 - 本轮修复了两个可见群 smoke 暴露的问题：`latest_unanswered_group_social_ai_mention` 现在排除 `usr_elon_ai` 自己发出的群消息，避免失败兜底文案里的 `@EL` 再次触发群聊 AI；`scripts/smoke-fb2-visible-chat.ps1` 在配置 `FB2_AI_CENTER_TOKEN` 后改为通过 fb2 feedback 的 `main_request_id` 反查 `social_group_message:*` 和 `social_group_selected_message:*`，避免群里并发回复时误抓其它 `gai_*` 消息。
 - 本轮本地验证通过：`cargo test social_ai_pending`、`cargo fmt --check`、`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted>`。完整真实群 smoke 仍需等主项目模型生成层恢复后再跑，否则会继续因无引用来源而失败。
 - 本轮已发布主项目服务端：提交 `c797bf2d`，服务器版本 `v0.3.559`，线上 `/health=OK`，`/api/server/version.gitSha=c797bf2d309aaac8e248c1c26c7f9b67a27a0145`。发布后可见群单条 `@EL` smoke 发送 `gmsg_3f34e14c9ae945b18ae0f7780d53ac34`，收到回复 `gai_5840b26ede824f0bb5289bf7f9396e5e`；日志确认仍是模型生成层不可用导致兜底文案，但 8 秒后未出现 `trigger_message_id=gai_5840...`，说明 AI 自己回复不再二次触发 `@EL`。
+- 2026-06-21 20:51 本地新增主项目 `social_ai` 多代理 fallback：`@EL` 与长按 `AI回复` 先用默认代理，遇到模型供应/接口类错误（例如“当前 AI 模型额度已用尽或接口不可用”、provider 超时、rate limit、endpoint inactive）会按已配置代理顺序尝试备用代理；用户余额不足、封禁、token 月限额、计费系统错误不会 fallback。本地验证已通过 `cargo fmt --check`、`cargo test social_ai_agents`、`cargo test social_ai`、`cargo check --bin elon-server`。该修复仍需提交、发布并重新跑真实群 visible smoke，才能确认线上 AI 生成层恢复。
 
 主项目当前已经具备：
 

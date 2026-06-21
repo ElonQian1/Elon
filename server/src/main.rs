@@ -150,6 +150,7 @@ mod router;
 mod server_agent_runtime;
 mod server_trace;
 mod social_ai;
+mod social_ai_agents;
 mod social_ai_message_reply;
 mod source_hygiene;
 mod speech_translate;

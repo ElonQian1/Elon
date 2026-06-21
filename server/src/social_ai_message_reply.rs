@@ -9,11 +9,8 @@ use std::{
 use tracing::{info, warn};
 
 use crate::{
-    agent_llm_call::call_chat_llm,
     friend_events, intent_router,
-    social_ai::{
-        format_history, resolve_social_agent, social_ai_prompt, DEVELOPMENT_REDIRECT_REPLY,
-    },
+    social_ai::{format_history, social_ai_prompt, DEVELOPMENT_REDIRECT_REPLY},
     store::SocialAiHistoryMessage,
     types::AppState,
 };
@@ -223,7 +220,6 @@ async fn build_selected_reply(
         return Ok(DEVELOPMENT_REDIRECT_REPLY.into());
     }
 
-    let agent = resolve_social_agent(state).await?;
     let external_context_block =
         crate::social_ai::format_external_context(external_context, external_tool_results);
     let external_context_section = if external_context_block.trim().is_empty() {
@@ -231,9 +227,8 @@ async fn build_selected_reply(
     } else {
         format!("\n\n{}", external_context_block)
     };
-    let response = call_chat_llm(
+    let response = crate::social_ai_agents::call_social_chat_llm_with_fallback(
         state,
-        &agent,
         &[
             json!({
                 "role": "system",

@@ -1,0 +1,154 @@
+//! social_ai_agents.rs - social chat model selection and fallback.
+//!
+//! 群聊 AI 是面向用户的实时能力，不能因为默认 provider 单点不可用就直接失败。
+//! 这里仅在模型供应/接口类错误时切换备用代理；用户余额、封禁、计费系统错误仍直接返回。
+
+use anyhow::{anyhow, Result};
+use serde_json::Value;
+use std::sync::Arc;
+use tracing::warn;
+
+use crate::{
+    agent_llm_call::call_chat_llm,
+    types::{AgentConfig, AgentsConfig, AppState},
+};
+
+pub(crate) async fn resolve_social_agent(state: &Arc<AppState>) -> Result<AgentConfig> {
+    social_agents_in_fallback_order(state)
+        .await
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("未配置可用 AI 代理，请先在后台配置 API 代理"))
+}
+
+pub(crate) async fn call_social_chat_llm_with_fallback(
+    state: &Arc<AppState>,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+) -> Result<Value> {
+    let agents = social_agents_in_fallback_order(state).await;
+    if agents.is_empty() {
+        return Err(anyhow!("未配置可用 AI 代理，请先在后台配置 API 代理"));
+    }
+
+    let mut last_retryable_error = None;
+    for (index, agent) in agents.iter().enumerate() {
+        match call_chat_llm(state, agent, messages, user_id, feature).await {
+            Ok(response) => return Ok(response),
+            Err(error) => {
+                let message = error.to_string();
+                let has_next = index + 1 < agents.len();
+                if !is_retryable_social_agent_error(&message) || !has_next {
+                    return Err(anyhow!(message));
+                }
+                warn!(
+                    feature,
+                    agent = %agent.name,
+                    model = %agent.model,
+                    "social AI agent failed, trying fallback: {}",
+                    message
+                );
+                last_retryable_error = Some(message);
+            }
+        }
+    }
+
+    Err(anyhow!(
+        "{}",
+        last_retryable_error.unwrap_or_else(|| "未配置可用 AI 代理".to_string())
+    ))
+}
+
+async fn social_agents_in_fallback_order(state: &Arc<AppState>) -> Vec<AgentConfig> {
+    let config = state.agents_config.read().await;
+    ordered_social_agents(&config)
+}
+
+fn ordered_social_agents(config: &AgentsConfig) -> Vec<AgentConfig> {
+    let mut result = Vec::new();
+    if let Some(default) = config.agents.get(&config.default_agent) {
+        result.push(default.clone());
+    }
+
+    let mut names = config.agents.keys().cloned().collect::<Vec<_>>();
+    names.sort();
+    for name in names {
+        if name == config.default_agent {
+            continue;
+        }
+        if let Some(agent) = config.agents.get(&name) {
+            result.push(agent.clone());
+        }
+    }
+    result
+}
+
+fn is_retryable_social_agent_error(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    if lower.contains("余额不足")
+        || lower.contains("用户已被封禁")
+        || lower.contains("token 用量已达上限")
+        || lower.contains("计费系统暂时不可用")
+    {
+        return false;
+    }
+
+    lower.contains("当前 ai 模型额度已用尽")
+        || lower.contains("当前 ai 模型密钥无效")
+        || lower.contains("ai 服务暂时不可用")
+        || lower.contains("ai 服务返回错误")
+        || lower.contains("ai 请求失败")
+        || lower.contains("ai 请求超时")
+        || lower.contains("endpoint is inactive")
+        || lower.contains("free_quota_exhausted")
+        || lower.contains("payment required")
+        || lower.contains("rate limit")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    fn agent(name: &str, model: &str) -> AgentConfig {
+        AgentConfig {
+            name: name.to_string(),
+            api_base: "https://example.invalid/v1".to_string(),
+            api_key: "test-key".to_string(),
+            model: model.to_string(),
+            embedding_model: None,
+            usage_mode: None,
+        }
+    }
+
+    #[test]
+    fn orders_default_agent_first_then_stable_names() {
+        let mut agents = HashMap::new();
+        agents.insert("zeta".to_string(), agent("zeta", "z"));
+        agents.insert("default".to_string(), agent("default", "d"));
+        agents.insert("alpha".to_string(), agent("alpha", "a"));
+        let config = AgentsConfig {
+            agents,
+            default_agent: "default".to_string(),
+        };
+
+        let names = ordered_social_agents(&config)
+            .into_iter()
+            .map(|agent| agent.name)
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["default", "alpha", "zeta"]);
+    }
+
+    #[test]
+    fn retryable_errors_exclude_user_billing_failures() {
+        assert!(is_retryable_social_agent_error(
+            "当前 AI 模型额度已用尽或接口不可用，请切换可用模型"
+        ));
+        assert!(is_retryable_social_agent_error("AI 请求超时，请稍后重试"));
+        assert!(!is_retryable_social_agent_error(
+            "余额不足（当前 0 分），请联系管理员充值后继续使用"
+        ));
+        assert!(!is_retryable_social_agent_error("用户已被封禁"));
+    }
+}
