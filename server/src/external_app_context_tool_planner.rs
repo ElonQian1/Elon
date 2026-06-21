@@ -653,6 +653,7 @@ mod tests {
         for query in [
             "帮我分析我的票有什么风险",
             "群里大家怎么看西班牙这场风险",
+            "群里大家怎么看西班牙这场？只说群友观点和AI推断，不要平台订单汇总。",
             "这条消息说得对吗，有没有重注风险",
         ] {
             let plan = plan_fb2_tools_with_platform_scope(

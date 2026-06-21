@@ -67,6 +67,9 @@ pub(crate) fn platform_order_summary_requested(topic_hint: Option<&str>) -> bool
         return false;
     };
     let lower = text.to_ascii_lowercase();
+    if has_explicit_platform_summary_exclusion(text, &lower) {
+        return false;
+    }
     let platform_scope_terms = [
         "平台",
         "全平台",
@@ -88,6 +91,34 @@ pub(crate) fn platform_order_summary_requested(topic_hint: Option<&str>) -> bool
     ];
     has_any_term(text, &lower, &platform_scope_terms)
         && has_any_term(text, &lower, &order_risk_terms)
+}
+
+fn has_explicit_platform_summary_exclusion(text: &str, lower: &str) -> bool {
+    let exclusion_terms = [
+        "不要平台订单",
+        "不要平台订单汇总",
+        "不要平台汇总",
+        "不要平台风险",
+        "不要匿名汇总",
+        "不需要平台订单",
+        "不需要平台订单汇总",
+        "不需要平台汇总",
+        "不查平台订单",
+        "不查平台订单汇总",
+        "别查平台订单",
+        "别查平台订单汇总",
+        "无需平台订单",
+        "无需平台订单汇总",
+        "无须平台订单",
+        "无须平台订单汇总",
+        "只说群友观点",
+        "只看群友观点",
+        "without platform",
+        "no platform summary",
+        "no platform orders",
+        "exclude platform",
+    ];
+    has_any_term(text, lower, &exclusion_terms)
 }
 
 pub(crate) fn fb2_request_context_headers(
@@ -189,6 +220,12 @@ mod tests {
         )));
         assert!(platform_order_summary_requested(Some(
             "全站投注集中在哪些方向"
+        )));
+        assert!(!platform_order_summary_requested(Some(
+            "群里大家怎么看西班牙这场？只说群友观点和AI推断，不要平台订单汇总。"
+        )));
+        assert!(!platform_order_summary_requested(Some(
+            "今天比赛怎么看？不需要平台订单汇总"
         )));
         assert!(!platform_order_summary_requested(Some(
             "帮我分析我的票有什么风险"
