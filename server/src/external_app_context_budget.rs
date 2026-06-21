@@ -167,6 +167,7 @@ fn context_fact_summary(context: &Value) -> Value {
             "order_ids": id_samples(context.get("user_orders"), &["order_id", "id", "ticket_id"], 5),
             "message_ids": id_samples(context.get("group_messages"), &["message_id", "id"], 5)
         },
+        "user_order_samples": order_samples(context.get("user_orders"), 3),
         "user_orders_scope": if array_len(context, "user_orders") > 0 {
             "current_user_only_after_external_user_id_header_check"
         } else {
@@ -207,6 +208,61 @@ fn first_string_field(value: &Value, fields: &[&str]) -> Option<String> {
     })
 }
 
+fn order_samples(value: Option<&Value>, limit: usize) -> Vec<Value> {
+    value
+        .and_then(Value::as_array)
+        .map(|orders| {
+            orders
+                .iter()
+                .take(limit)
+                .map(|order| {
+                    json!({
+                        "order_id": first_prompt_value(order, &["order_id", "id", "ticket_id"]),
+                        "status": first_prompt_value(order, &["status", "order_status"]),
+                        "amount": first_prompt_value(order, &["total_amount", "amount", "stake"]),
+                        "bet_slip_count": order
+                            .get("bet_slips")
+                            .or_else(|| order.get("slips"))
+                            .and_then(Value::as_array)
+                            .map(Vec::len)
+                            .unwrap_or_default(),
+                        "first_slip": order
+                            .get("bet_slips")
+                            .or_else(|| order.get("slips"))
+                            .and_then(Value::as_array)
+                            .and_then(|slips| slips.first())
+                            .map(compact_slip_value)
+                            .unwrap_or(Value::Null)
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn compact_slip_value(slip: &Value) -> Value {
+    json!({
+        "match_id": first_prompt_value(slip, &["match_id", "id"]),
+        "home_team": first_prompt_value(slip, &["home_team"]),
+        "away_team": first_prompt_value(slip, &["away_team"]),
+        "selection": first_prompt_value(slip, &["selection", "pick", "bet_selection"]),
+        "odds": first_prompt_value(slip, &["odds", "actual_odds", "original_odds"])
+    })
+}
+
+fn first_prompt_value(value: &Value, fields: &[&str]) -> Value {
+    fields
+        .iter()
+        .find_map(|field| value.get(*field))
+        .map(|value| match value {
+            Value::String(text) => Value::String(text.trim().to_string()),
+            Value::Number(_) | Value::Bool(_) => value.clone(),
+            _ => Value::Null,
+        })
+        .filter(|value| !matches!(value, Value::String(text) if text.is_empty()))
+        .unwrap_or(Value::Null)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -223,7 +279,18 @@ mod tests {
             "context_audit_id": "audit-1",
             "metrics": {"budget_status": "ok"},
             "matches": [{"id": "match-1"}],
-            "user_orders": [{"order_id": "order-1"}],
+            "user_orders": [{
+                "order_id": "order-1",
+                "status": "pending",
+                "total_amount": 54,
+                "bet_slips": [{
+                    "match_id": "match-1",
+                    "home_team": "主队",
+                    "away_team": "客队",
+                    "selection": "主胜",
+                    "odds": 1.96
+                }]
+            }],
             "group_messages": [{"message_id": "message-1"}]
         }));
         assert!(block.contains("<fb2_context_pack>hello</fb2_context_pack>"));
@@ -234,6 +301,8 @@ mod tests {
         assert!(block.contains("context_fact_summary="));
         assert!(block.contains("\"user_order_count\":1"));
         assert!(block.contains("order-1"));
+        assert!(block.contains("\"bet_slip_count\":1"));
+        assert!(block.contains("\"selection\":\"主胜\""));
         assert!(block.contains("context_audit_id=audit-1"));
         assert!(block.contains("get_match_detail"));
         assert!(block.contains("tool_readiness.status"));

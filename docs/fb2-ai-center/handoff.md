@@ -9,6 +9,7 @@
 - 真实群聊补充验证：账号 `123qwe` 已通过 fb2 外部应用会话绑定到主项目用户，群 `ext_fb2_official` 可发送可见 `@EL` 消息；实测 `Context Pack` 和 `match_analysis_brief` 已返回该用户本人订单，但 AI 回复曾被超时的补充 `search_user_orders` 结果干扰。
 - 主项目已修复提示和工具规划规则：Context Pack `user_orders` 与 `match_analysis_brief.data.user_orders` 都算当前用户订单来源；`search_user_orders unavailable` 只表示补充展开失败，不能否定已有本人订单事实。
 - 主项目 prompt metadata 新增 `context_fact_summary`，把比赛/本人订单/群消息数量及少量 source id 投影到 metadata，避免模型漏看长 Context Pack 中已有的订单来源。
+- 第二轮真实群聊验证发现 `match_analysis_brief` 成功返回 8 条本人订单，但 executed tool JSON 因大赔率数据在 6000 字处截断，导致 `data.user_orders` 明细没进入 prompt；主项目已补 `tool_fact_summary` 和更详细的 `context_fact_summary.user_order_samples`，把本人订单样例提前投影到截断前。
 - 主项目服务端已发布：`v0.3.541`，线上 `/api/server/version` 返回 `gitSha=d5326564eb5c1cdb1b79019abdf346fa9b52dea1`。
 - fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
 - 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据。

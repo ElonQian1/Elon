@@ -28,10 +28,12 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
             .collect::<String>();
         body.push_str("\n... [external app tool results truncated]");
     }
+    let fact_summary = prompt_tool_fact_summary(execution);
 
     format!(
         "按需执行的外部项目工具：\n\
          <executed_external_app_tools app_id=\"{app_id}\" status=\"{status}\" executed_at=\"{executed_at}\">\n\
+         {fact_summary}\
          {body}\n\
          <tool_result_rules>\n\
          - 只有 status=ready、success=true 且 grounding.status=grounded 的单项结果可以作为强事实引用。\n\
@@ -52,6 +54,119 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
          </tool_result_rules>\n\
          </executed_external_app_tools>"
     )
+}
+
+fn prompt_tool_fact_summary(execution: &Value) -> String {
+    let lines = execution
+        .get("results")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|result| result.get("status").and_then(Value::as_str) == Some("ready"))
+        .filter_map(order_fact_summary_for_result)
+        .collect::<Vec<_>>();
+
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<tool_fact_summary>\n{}\n</tool_fact_summary>\n",
+            lines.join("\n")
+        )
+    }
+}
+
+fn order_fact_summary_for_result(result: &Value) -> Option<String> {
+    let tool_name = result
+        .get("tool_name")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown_tool");
+    let visibility = result
+        .get("visibility")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let orders = result
+        .get("data")
+        .and_then(|data| data.get("user_orders").or_else(|| data.get("orders")))
+        .and_then(Value::as_array)?;
+    if orders.is_empty() {
+        return None;
+    }
+
+    let samples = orders
+        .iter()
+        .filter_map(compact_order_sample)
+        .take(4)
+        .collect::<Vec<_>>();
+    if samples.is_empty() {
+        return None;
+    }
+
+    Some(format!(
+        "- {tool_name}: current_user_order_count={}, visibility={visibility}; samples=[{}]. 这些订单已由 fb2 按当前用户权限裁剪，可用于“我的票”分析。",
+        orders.len(),
+        samples.join(" | ")
+    ))
+}
+
+fn compact_order_sample(order: &Value) -> Option<String> {
+    let id = first_value_as_string(order, &["order_id", "id", "ticket_id"])?;
+    let status = first_value_as_string(order, &["status", "order_status"])
+        .unwrap_or_else(|| "unknown".to_string());
+    let amount = first_value_as_string(order, &["total_amount", "amount", "stake"])
+        .unwrap_or_else(|| "unknown".to_string());
+    let slip_count = order
+        .get("bet_slips")
+        .or_else(|| order.get("slips"))
+        .and_then(Value::as_array)
+        .map(Vec::len)
+        .unwrap_or_default();
+    let first_slip = order
+        .get("bet_slips")
+        .or_else(|| order.get("slips"))
+        .and_then(Value::as_array)
+        .and_then(|slips| slips.first())
+        .and_then(compact_slip_sample);
+
+    let mut parts = vec![
+        format!("order_id={id}"),
+        format!("status={status}"),
+        format!("amount={amount}"),
+        format!("slips={slip_count}"),
+    ];
+    if let Some(slip) = first_slip {
+        parts.push(format!("first_slip={slip}"));
+    }
+    Some(parts.join(", "))
+}
+
+fn compact_slip_sample(slip: &Value) -> Option<String> {
+    let home = first_value_as_string(slip, &["home_team"])?;
+    let away = first_value_as_string(slip, &["away_team"])?;
+    let selection = first_value_as_string(slip, &["selection", "pick", "bet_selection"])
+        .unwrap_or_else(|| "unknown".to_string());
+    let odds = first_value_as_string(slip, &["odds", "actual_odds", "original_odds"])
+        .unwrap_or_else(|| "unknown".to_string());
+    Some(format!("{home} vs {away} {selection} odds={odds}"))
+}
+
+fn first_value_as_string(value: &Value, fields: &[&str]) -> Option<String> {
+    fields.iter().find_map(|field| {
+        let raw = value.get(*field)?;
+        match raw {
+            Value::String(text) => {
+                let trimmed = text.trim();
+                if trimmed.is_empty() {
+                    None
+                } else {
+                    Some(trimmed.to_string())
+                }
+            }
+            Value::Number(number) => Some(number.to_string()),
+            Value::Bool(flag) => Some(flag.to_string()),
+            _ => None,
+        }
+    })
 }
 
 #[cfg(test)]
@@ -84,5 +199,45 @@ mod tests {
         assert!(block.contains("match_focused_brief.data.user_orders"));
         assert!(block.contains("不能否定已有本人订单事实"));
         assert!(block.contains("历史赛后复盘"));
+    }
+
+    #[test]
+    fn rendered_tool_block_summarizes_user_orders_before_truncation() {
+        let block = prompt_executed_tools_block(Some(&json!({
+            "schema": "external_app.executed_tools.v1",
+            "app_id": "fb2",
+            "status": "partial",
+            "executed_at": "2026-06-21T00:00:00Z",
+            "results": [{
+                "tool_name": "match_analysis_brief",
+                "status": "ready",
+                "success": true,
+                "visibility": "match_focused_brief",
+                "data": {
+                    "matches": [{"id": "match-1", "odds": "x".repeat(20_000)}],
+                    "user_orders": [{
+                        "order_id": "order-1",
+                        "status": "pending",
+                        "total_amount": 54,
+                        "bet_slips": [{
+                            "home_team": "主队",
+                            "away_team": "客队",
+                            "selection": "主胜",
+                            "odds": 1.96
+                        }]
+                    }]
+                },
+                "source_ids": ["match-1", "order-1"],
+                "grounding": {"status": "grounded"}
+            }]
+        })));
+
+        let summary_index = block.find("<tool_fact_summary>").unwrap();
+        let truncated_index = block.find("[external app tool results truncated]").unwrap();
+        assert!(summary_index < truncated_index);
+        assert!(block.contains("current_user_order_count=1"));
+        assert!(block.contains("order_id=order-1"));
+        assert!(block.contains("first_slip=主队 vs 客队 主胜 odds=1.96"));
+        assert!(block.contains("可用于“我的票”分析"));
     }
 }

@@ -220,7 +220,8 @@ GET /api/main-project/context/tool-manifest
 - 主项目优先拉 `/context/pack`，失败后回退 `/context/today-matches`。
 - 主项目拉 `/context/pack` 时会按 fb2 契约附加用户身份头和平台 scope 头；这些头只用于权限裁剪，不改变数据归属。
 - 主项目会做 token budget 裁剪，不把无限大 JSON 塞进 prompt。
-- 主项目会在 prompt metadata 增加 `context_fact_summary`，保留比赛、本人订单、群消息数量和少量来源 ID；这用于防止模型漏看 Context Pack 已有 `user_orders`。
+- 主项目会在 prompt metadata 增加 `context_fact_summary`，保留比赛、本人订单、群消息数量、少量来源 ID 和简短本人订单样例；这用于防止模型漏看 Context Pack 已有 `user_orders`。
+- 主项目会在 executed tool JSON 前增加 `tool_fact_summary`，把 `match_analysis_brief.data.user_orders` 等当前用户订单样例提前投影，避免大赔率 JSON 被截断时丢失“我的票”结构信息。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
 - 主项目日志只记录 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
 - AI 回答必须区分事实、群友观点和推断；上下文不足时要明确说明。
