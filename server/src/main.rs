@@ -127,6 +127,7 @@ mod project_mobile;
 mod project_prewarm;
 mod project_runtime_permission_api;
 mod project_space;
+mod project_space_task_snapshot;
 mod project_storage;
 mod project_storage_git;
 mod project_store;

@@ -1,3 +1,4 @@
+// server/src/store/store_types.rs
 //! Store 层公共数据结构定义。
 //!
 //! 所有 `Store` 方法的输入/输出类型集中在此文件，避免 store.rs 因类型膨胀超限。
@@ -714,7 +715,7 @@ pub struct ProjectDeletionTarget {
     pub node_id: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TaskSnapshot {
     pub id: String,
     pub project_id: String,
@@ -724,4 +725,11 @@ pub struct TaskSnapshot {
     pub status: String,
     pub apk_url: Option<String>,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct TaskEventRecord {
+    pub seq: i64,
+    pub event_json: String,
+    pub created_at: String,
 }

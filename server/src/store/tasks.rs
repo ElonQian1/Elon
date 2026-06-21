@@ -4,7 +4,8 @@ use anyhow::Result;
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    clean_optional, new_id, now, safe_external_id, Store, TaskSnapshot, MAX_TASK_EVENTS_PER_TASK,
+    clean_optional, new_id, now, safe_external_id, Store, TaskEventRecord, TaskSnapshot,
+    MAX_TASK_EVENTS_PER_TASK,
 };
 
 const CHANNEL_TASK_INTERRUPTED_RESULT: &str =
@@ -108,6 +109,45 @@ impl Store {
                  ORDER BY created_at DESC
                  LIMIT 1",
                 params![project_id, user_id, conversation_id, client_request_id],
+                |row| {
+                    Ok(TaskSnapshot {
+                        id: row.get(0)?,
+                        project_id: row.get(1)?,
+                        user_id: row.get(2)?,
+                        conversation_id: row.get(3)?,
+                        message: row.get(4)?,
+                        status: row.get(5)?,
+                        apk_url: row.get(6)?,
+                        error: row.get(7)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
+    pub fn get_channel_task_snapshot(
+        &self,
+        project_id: &str,
+        channel_id: &str,
+        task_id: &str,
+    ) -> Result<Option<TaskSnapshot>> {
+        self.conn()?
+            .query_row(
+                "SELECT t.id, t.project_id, t.user_id, t.conversation_id,
+                        t.message, t.status, t.apk_url, t.error
+                 FROM tasks t
+                 WHERE t.id = ?3
+                   AND t.project_id = ?1
+                   AND EXISTS (
+                     SELECT 1
+                     FROM project_channel_messages m
+                     WHERE m.project_id = ?1
+                       AND m.channel_id = ?2
+                       AND m.task_id = t.id
+                   )
+                 LIMIT 1",
+                params![project_id, channel_id, task_id],
                 |row| {
                     Ok(TaskSnapshot {
                         id: row.get(0)?,
@@ -308,6 +348,47 @@ impl Store {
         )?;
         let events = stmt
             .query_map(params![task_id, limit], |row| row.get(0))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(events)
+    }
+
+    pub fn latest_task_event_seq(&self, task_id: &str) -> Result<i64> {
+        self.conn()?
+            .query_row(
+                "SELECT COALESCE(MAX(rowid), 0)
+                 FROM task_events
+                 WHERE task_id = ?1",
+                params![task_id],
+                |row| row.get(0),
+            )
+            .map_err(Into::into)
+    }
+
+    pub fn list_task_events_after(
+        &self,
+        task_id: &str,
+        since_seq: i64,
+        limit: usize,
+    ) -> Result<Vec<TaskEventRecord>> {
+        let since_seq = since_seq.max(0);
+        let limit = limit.clamp(1, MAX_TASK_EVENTS_PER_TASK as usize) as i64;
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT rowid, event_json, created_at
+             FROM task_events
+             WHERE task_id = ?1
+               AND rowid > ?2
+             ORDER BY rowid ASC
+             LIMIT ?3",
+        )?;
+        let events = stmt
+            .query_map(params![task_id, since_seq, limit], |row| {
+                Ok(TaskEventRecord {
+                    seq: row.get(0)?,
+                    event_json: row.get(1)?,
+                    created_at: row.get(2)?,
+                })
+            })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(events)
     }
@@ -634,6 +715,96 @@ mod tests {
         assert_eq!(events.len(), MAX_TASK_EVENTS_PER_TASK as usize);
         assert_eq!(event_message(events.first().unwrap()), "step 5");
         assert_eq!(event_message(events.last().unwrap()), "step 1004");
+    }
+
+    #[test]
+    fn lists_task_events_after_stable_rowid_cursor() {
+        let store = temp_store();
+        let task_id = temp_task(&store);
+
+        for step in 0..4 {
+            store
+                .record_task_event(
+                    &task_id,
+                    &format!(r#"{{"type":"progress","message":"step {step}"}}"#),
+                )
+                .expect("event should be recorded");
+        }
+
+        let first_page = store
+            .list_task_events_after(&task_id, 0, 2)
+            .expect("events should list");
+        assert_eq!(first_page.len(), 2);
+        assert_eq!(event_message(&first_page[0].event_json), "step 0");
+        assert_eq!(event_message(&first_page[1].event_json), "step 1");
+
+        let second_page = store
+            .list_task_events_after(&task_id, first_page[1].seq, 10)
+            .expect("events after cursor should list");
+        let messages = second_page
+            .iter()
+            .map(|event| event_message(&event.event_json))
+            .collect::<Vec<_>>();
+        assert_eq!(messages, vec!["step 2", "step 3"]);
+        assert_eq!(
+            store
+                .latest_task_event_seq(&task_id)
+                .expect("latest seq should load"),
+            second_page.last().expect("event should exist").seq
+        );
+    }
+
+    #[test]
+    fn channel_task_snapshot_requires_channel_task_link() {
+        let store = temp_store();
+        let user = store
+            .create_user("channel-task-snapshot@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Channel Task Snapshot", None, None)
+            .expect("project should be created")
+            .project;
+        let channels = store
+            .list_project_space_channels(&user.id, &project.id)
+            .expect("channels should list");
+        let ai_channel = channels
+            .iter()
+            .find(|channel| channel.kind == "ai_development")
+            .expect("ai channel should exist");
+        let discussion_channel = channels
+            .iter()
+            .find(|channel| channel.kind == "discussion")
+            .expect("discussion channel should exist");
+        let task_id = store
+            .create_task(&project.id, &user.id, Some("channel-dev"), "继续修复")
+            .expect("task should create");
+
+        assert!(store
+            .get_channel_task_snapshot(&project.id, &ai_channel.id, &task_id)
+            .expect("snapshot query should work")
+            .is_none());
+        store
+            .insert_project_channel_message(
+                &project.id,
+                &ai_channel.id,
+                Some(&user.id),
+                "ai_task",
+                "发起 AI 开发任务：继续修复",
+                Some(&task_id),
+                None,
+            )
+            .expect("task message should insert");
+
+        let snapshot = store
+            .get_channel_task_snapshot(&project.id, &ai_channel.id, &task_id)
+            .expect("snapshot should query")
+            .expect("linked task should be visible");
+        assert_eq!(snapshot.id, task_id);
+        assert_eq!(snapshot.status, "running");
+        assert!(store
+            .get_channel_task_snapshot(&project.id, &discussion_channel.id, &snapshot.id)
+            .expect("snapshot query should work")
+            .is_none());
     }
 
     mod task_recovery_tests {

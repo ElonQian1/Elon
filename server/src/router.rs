@@ -1,3 +1,5 @@
+// server/src/router.rs
+
 use axum::{
     extract::DefaultBodyLimit,
     routing::{delete, get, post},
@@ -17,10 +19,11 @@ use crate::{
     node_payout_admin, peer_relay, project_api, project_attachments, project_chat,
     project_conversation_identity, project_deletion, project_docs, project_downloads, project_git,
     project_join_requests, project_landing_api, project_membership, project_runtime_permission_api,
-    project_space, project_storage_git, project_store, project_workspace_health,
-    project_workspace_recovery, release_claim, server_agent_runtime, speech_translate,
-    token_usage_api, user_api, user_archive_api, user_memory_api, voice_asr_upload, voice_tts_api,
-    voice_ws_realtime_chat, voice_ws_transcribe, voice_ws_virtual_mic, web,
+    project_space, project_space_task_snapshot, project_storage_git, project_store,
+    project_workspace_health, project_workspace_recovery, release_claim, server_agent_runtime,
+    speech_translate, token_usage_api, user_api, user_archive_api, user_memory_api,
+    voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
+    voice_ws_virtual_mic, web,
 };
 
 /// 读取 `CORS_ALLOW_ORIGINS` 环境变量构造 CORS 策略。
@@ -409,6 +412,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(project_space::cancel_channel_ai_task),
         )
         .route(
+            "/api/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/snapshot",
+            get(project_space_task_snapshot::snapshot_channel_ai_task),
+        )
+        .route(
+            "/api/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/events",
+            get(project_space_task_snapshot::list_channel_ai_task_events),
+        )
+        .route(
             "/api/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/tool-approvals/:approval_id/decision",
             post(project_space::decide_channel_ai_tool_approval),
         )
@@ -506,6 +517,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/cancel",
             post(project_space::cancel_user_project_channel_ai_task),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/snapshot",
+            get(project_space_task_snapshot::snapshot_user_channel_ai_task),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/events",
+            get(project_space_task_snapshot::list_user_channel_ai_task_events),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/tool-approvals/:approval_id/decision",

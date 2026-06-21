@@ -30,6 +30,7 @@
 - 已新增 `server/src/store/task_recovery_tests.rs`，覆盖 interrupted/stale 状态和 error、重复清理幂等、已有 `ai_result` 不重复、未超时任务不清理、活跃任务排除、通用 once helper。
 - 已新增 `finish_running_task`，频道 AI runner 结束时只允许从 `running` 状态写入最终结果，避免恢复逻辑已写入 `interrupted/failed` 后又被迟到 runner 覆盖。
 - 已新增频道消息任务状态投影：`ProjectChannelMessage` 返回 `task_status`、`task_error`、`task_apk_url`，PC 任务卡优先使用后端任务状态判断是否仍在运行，终态任务的历史审批按钮会失效并提供继续入口。
+- 已新增 PC 开发任务现场快照 API：`/ai-tasks/:task_id/snapshot` 和 `/ai-tasks/:task_id/events` 返回持久任务信息、频道消息、事件 `rowid` 游标、`has_more` 以及 `live/detached/terminal` attach 状态，作为后续 PC node journal/attach 的服务端骨架。
 
 ## 验证结果
 
@@ -42,6 +43,8 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml --all-features`，503 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server task_recovery_tests -- --nocapture`，7 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server store::tasks::tests -- --nocapture`，11 passed（新增频道消息任务状态投影）
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server store::tasks::tests -- --nocapture`，13 passed（新增事件游标与频道任务快照绑定）
+- 通过：`cargo test --manifest-path server\Cargo.toml project_tool_approval -- --nocapture`，8 passed
 - 通过：`node scripts\test-pc-dev-assets.js`
 - 通过：`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
 - 通过：`cargo clippy --manifest-path server\Cargo.toml --bin elon-pc-node -- -D warnings`
@@ -55,7 +58,7 @@
 - 只 stage 本任务文件，commit、push。
 - 按发布脚本发布服务端；本追加阶段未改 Windows 节点包和 PC 静态资源，原则上不需要重新发布节点包。
 - 下一阶段实现真正任务恢复：定义持久 run handle，绑定 `task_id/pc_req_id/node_id/route/cwd/codex_session_id/lease/last_event_seq/resume_strategy`。
-- 下一阶段给 PC 节点增加本地任务 registry/jsonl journal，并扩展 homecli attach/snapshot/since 协议，避免把 `codex resume` 误认为同进程恢复。
+- 下一阶段给 PC 节点增加本地任务 registry/jsonl journal，并扩展 homecli attach 协议，避免把 `codex resume` 误认为同进程恢复。
 
 ## 剩余风险
 

@@ -1282,6 +1282,18 @@ pub(crate) fn active_channel_ai_task_ids() -> Vec<String> {
         .unwrap_or_default()
 }
 
+pub(crate) fn is_channel_ai_task_active(task_id: &str, project_id: &str, channel_id: &str) -> bool {
+    CHANNEL_AI_TASKS
+        .lock()
+        .ok()
+        .and_then(|tasks| {
+            tasks
+                .get(task_id)
+                .map(|task| task.project_id == project_id && task.channel_id == channel_id)
+        })
+        .unwrap_or(false)
+}
+
 fn take_channel_ai_task_control(
     task_id: &str,
     project_id: &str,
