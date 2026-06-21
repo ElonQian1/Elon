@@ -14,7 +14,8 @@
 - 第四轮真实群聊验证定位到线上主项目有 `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY`，且 fb2 固定 IP 不在 `NO_PROXY`；curl 直连 fb2 feedback 15ms 成功，但 reqwest POST 走代理后 10 秒超时。主项目已给 fb2 Context Pack、today-matches、tool manifest、tools/execute、feedback 和 opinion-adoption 增加统一 no-proxy direct client。
 - 第五轮真实群聊验证通过：可见消息 `gmsg_237cff0200a94f6d94aa61e339feaa37` 触发 AI 回复 `gai_94f0083cd1ac4a1a92c34181e40f52ef`，回复引用本人订单 `531cee5c-382a-4513-b297-5939b024fcd9` 并提示不承诺命中；主项目日志显示 `fb2 generated-answer feedback callback recorded`，fb2 `/context/feedbacks` 返回自动反馈 `68ab0efb-0660-4466-8acf-27aeaa6c3433`，`matched_cited_source_count=1`。
 - 长按 `AI回复` 后端入口验证通过：对消息 `gmsg_237cff0200a94f6d94aa61e339feaa37` 调用 `/api/me/groups/ext_fb2_official/messages/{messageId}/ai-reply` 后生成 AI 回复 `gai_596b1a4309a54bf4bdaa2c398ab4eccc`；fb2 自动反馈 `dbc25e69-d677-4503-a3bf-d97638866a62` 落库，`trigger=selected_message_ai_reply`，`matched_cited_source_count=1`。
-- 主项目服务端已发布：`v0.3.551`，线上 `/api/server/version` 返回 `gitSha=f422fe58f2a992aa31167587a4c383f548fe0ecc`。
+- 第六轮平台匿名订单摘要验证通过：可见消息 `gmsg_2413b6fb2c8a47e1a8bc6e8b3614b827` 触发 AI 回复 `gai_e258e05fc0b54a45991ce7d92843fd8f`，回复显式引用 `platform_order_summary:2026-06-21:all`，未泄露单个用户订单且未承诺命中；fb2 audit `a4343000-cd19-4757-9bab-5ca75f8c79aa` 含 `platform_order_summary` citation source，自动反馈 `69290519-e5ba-45da-bddf-a08945b1bd9d` 返回 `cited_source_count=1`、`matched_cited_source_count=1`。
+- 主项目服务端已发布：`v0.3.552`，线上 `/api/server/version` 返回 `gitSha=4afafcd797e3b4e719d133e180d26318ff07321d`。
 - fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
 - 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据。
 - 本轮 live smoke 已验证：主项目健康和版本、fb2 live tool manifest、Context Pack、比赛分析简报、群观点摘要、赛后复盘摘要、平台匿名订单摘要、统一工具执行 `group_opinion_summary`/`match_analysis_brief` 及其 visibility。
