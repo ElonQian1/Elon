@@ -612,7 +612,7 @@ if (-not $SkipBuild) {
         $env:ELON_SERVER_GIT_SHA = $ShaBig
         $env:ELON_BUILD_VERSION  = $AssignedVersion
         $savedReleaseRustflags = Enable-PortableReleaseRustflags -RepoRoot $RepoRoot -Target $Target
-        cargo zigbuild --release --target $Target
+        cargo zigbuild --release --target $Target --bin elon-server
         Restore-ReleaseRustflags -Saved $savedReleaseRustflags
         $savedReleaseRustflags = $null
         if ($LASTEXITCODE -ne 0) {
