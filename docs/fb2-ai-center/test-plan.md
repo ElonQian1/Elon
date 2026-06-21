@@ -9,15 +9,23 @@
 - 首次 fb2 会话能按配置发放 AI 试用额度。
 - `GET /api/external/apps/fb2/chat-bootstrap` 返回聊天、ASR、TTS、WebSocket 和体验协议。
 - `chat-bootstrap.voice.androidSdk.publicComponents` 包含 `VoiceComposerBootstrap`。
+- `chat-bootstrap.voice.androidSdk.publicComponents` 包含 `VoiceComposerView` 和 `ChatVoiceEventSink`。
 - `chat-bootstrap.voice.composer.requiredForMainProjectLikeExperience=true`。
 - `chat-bootstrap.voice.composer.recommendedConfigApi=VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`。
 - `chat-bootstrap.voice.composer.defaultConfig.asr.serverFallbackEnabled=true`。
+- `chat-bootstrap.voice.composer.defaultConfig.asr.serverConfigRequired=true`。
+- `chat-bootstrap.voice.composer.defaultConfig.asr.localEngineFallbackEnabled=true` 且 `prewarmLocalEngine=true`。
+- `chat-bootstrap.voice.composer.states` 包含 `SERVER_PROCESSING`，`zones` 包含 `AI_REPLY`，`callbacks` 包含 `onVoiceServerFallbackStarted`。
+- `chat-bootstrap.voice.asr.localFirst=true`、`serverFallback=true`、`uploadEndpoint=/api/voice/asr`、`billing=free_auth_and_limits_only`。
+- `chat-bootstrap.voice.tts.billing=free_auth_and_limits_only`。
 - `chat-bootstrap.aiReply.schema=external_app.ai_reply.v1`。
 - `chat-bootstrap.aiReply.externalContext.queryFields` 包含 `topic_hint`。
-- `chat-bootstrap.aiReply.freePreparationSteps` 包含 `external_context_fetch`，且 `billableUnit=ai_reply_generation`。
+- `chat-bootstrap.aiReply.freePreparationSteps` 包含 `asr`、`tts`、`external_context_fetch`，且 `billableUnit=ai_reply_generation`。
 - `chat-bootstrap.experience.usagePolicy.asr=free` 且 `aiReplyGeneration=billable`。
+- `chat-bootstrap.experience.controls.fullWidthHoldToTalkButton=true`。
 - `chat-bootstrap.billing.balanceEndpoint=/api/me/balance`。
 - `chat-bootstrap.billing.gates.beforeAsr=never_check_ai_balance`。
+- `chat-bootstrap.billing.gates.beforeTts=never_check_ai_balance`。
 - `chat-bootstrap.billing.gates.beforeAiReplyGeneration=check_balance_or_trial_credit`。
 - `GET /api/external/apps/fb2/context-contract` 返回 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
 - `context-contract.answer_policy_contract` 返回引用规则和固定评测问题。
@@ -25,6 +33,7 @@
 - 默认 `scripts\smoke-fb2-ai-center.ps1` 会检查 `eval_scenarios` 的场景 id、权限边界、必需来源、必需引用和禁止输出，避免评测矩阵退化成只有标题。
 - `context-contract.context_readiness_contract` 返回 required fields、prompt metadata 和 blocked/degraded/ready 判定标准。
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1` 通过，确认主项目健康、版本、实时 manifest 和主项目聊天自动工具覆盖。
+- 需要验证 authenticated `chat-bootstrap` 时，脚本支持直接传 `-MainToken`，也支持传 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN`，通过 fb2 `/api/main-project/session` 桥接主项目 token；这条路径无副作用，不会发送群消息。
 - `cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 通过，确认 fb2 可引用最新 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 设置 `FB2_AI_CENTER_TOKEN` 后，上述巡检脚本能验证 fb2 live Context Pack、比赛分析、群观点和赛后复盘摘要；加 `-IncludePlatformOrderSummary` 后验证平台匿名订单摘要。
 - 完整场景验收必须加 `-RequireAllScenarios`；此时脚本不仅要求参数存在，还会要求 Context Pack 有 `context_audit_id`、比赛/订单等数据数量达到门槛，并且关键场景有 `citation_sources`。

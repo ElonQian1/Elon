@@ -5,6 +5,9 @@ param(
     [string]$MainToken = "",
     [string]$Fb2Base = "",
     [string]$Fb2Token = "",
+    [string]$Fb2UserToken = "",
+    [string]$Fb2Username = "",
+    [string]$Fb2Password = "",
     [string]$GroupId = "official",
     [string]$ExternalUserId = "",
     [int]$RequestTimeoutSec = 45,
@@ -44,6 +47,15 @@ if (-not $Fb2Base) {
 }
 if (-not $Fb2Token) {
     $Fb2Token = $env:FB2_AI_CENTER_TOKEN
+}
+if (-not $Fb2UserToken) {
+    $Fb2UserToken = $env:FB2_USER_TOKEN
+}
+if (-not $Fb2Username) {
+    $Fb2Username = $env:FB2_VISIBLE_SMOKE_USERNAME
+}
+if (-not $Fb2Password) {
+    $Fb2Password = $env:FB2_VISIBLE_SMOKE_PASSWORD
 }
 
 $MainBase = $MainBase.TrimEnd("/")
@@ -149,6 +161,15 @@ function Assert-MinCount {
     Assert-True ($count -ge $Minimum) $Name "count=$count min=$Minimum"
 }
 
+function Assert-ContainsValue {
+    param(
+        [object]$Value,
+        [string]$Expected,
+        [string]$Name
+    )
+    Assert-True (@($Value) -contains $Expected) $Name $Expected
+}
+
 function Find-EvalScenario {
     param(
         [object[]]$Scenarios,
@@ -215,6 +236,59 @@ function Fb2-Headers {
     $headers
 }
 
+function Resolve-MainTokenFromFb2 {
+    if ($MainToken) {
+        return [pscustomobject]@{
+            Token = $MainToken.Trim()
+            Source = "main-token"
+            Fb2UserId = $ExternalUserId
+        }
+    }
+
+    if (-not $Fb2UserToken) {
+        if (-not $Fb2Username -or -not $Fb2Password) {
+            return $null
+        }
+        $login = Invoke-Json -Url "$Fb2Base/api/auth/login" -Method "POST" -Body @{
+            username = $Fb2Username
+            password = $Fb2Password
+        }
+        if (-not $login.success -or -not $login.data.token.access_token) {
+            throw "fb2 login failed"
+        }
+        $Fb2UserToken = [string]$login.data.token.access_token
+        $script:Fb2LoginUserId = [string]$login.data.user.id
+    }
+
+    $fb2UserHeaders = @{ Authorization = "Bearer $($Fb2UserToken.Trim())" }
+    $session = Invoke-Json -Url "$Fb2Base/api/main-project/session" -Headers $fb2UserHeaders -Method "POST" -Body @{
+        deviceName = "main-ai-center-smoke"
+    }
+    if (-not $session.success -or -not $session.data.token) {
+        throw "fb2 main-project session bridge failed"
+    }
+
+    return [pscustomobject]@{
+        Token = [string]$session.data.token
+        Source = "fb2-session-bridge"
+        Fb2UserId = [string]$script:Fb2LoginUserId
+    }
+}
+
+try {
+    $resolvedMainToken = Resolve-MainTokenFromFb2
+    if ($resolvedMainToken) {
+        $MainToken = [string]$resolvedMainToken.Token
+        Write-Output "OK`tmain token resolved`t$($resolvedMainToken.Source)"
+        if (-not $ExternalUserId -and $resolvedMainToken.Fb2UserId) {
+            $ExternalUserId = [string]$resolvedMainToken.Fb2UserId
+            Write-Output "OK`tfb2 external user`t$ExternalUserId"
+        }
+    }
+} catch {
+    Fail "main token resolved" $_.Exception.Message
+}
+
 Write-Output "== Main project contract =="
 
 try {
@@ -238,6 +312,36 @@ if ($MainToken) {
         Assert-True ($bootstrap.aiReply.schema -eq "external_app.ai_reply.v1") "chat-bootstrap aiReply"
         Assert-True ([bool]$bootstrap.voice.composer) "chat-bootstrap voice composer"
         Assert-True ([bool]$bootstrap.billing) "chat-bootstrap billing"
+        Assert-True ($bootstrap.voice.androidSdk.module -eq "android/chat-voice-kit") "chat-bootstrap voice sdk module" "$($bootstrap.voice.androidSdk.module)"
+        Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "VoiceComposerView" "chat-bootstrap voice sdk exposes VoiceComposerView"
+        Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "VoiceComposerBootstrap" "chat-bootstrap voice sdk exposes VoiceComposerBootstrap"
+        Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "ChatVoiceEventSink" "chat-bootstrap voice sdk exposes events"
+        Assert-True ($bootstrap.voice.composer.requiredForMainProjectLikeExperience -eq $true) "chat-bootstrap requires voice composer"
+        Assert-True ($bootstrap.voice.composer.recommendedConfigApi -eq "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)") "chat-bootstrap recommended voice config" "$($bootstrap.voice.composer.recommendedConfigApi)"
+        Assert-True ($bootstrap.voice.composer.defaultConfig.recordingOverlayEnabled -eq $true) "chat-bootstrap recording overlay enabled"
+        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.serverFallbackEnabled -eq $true) "chat-bootstrap server ASR fallback enabled"
+        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.serverConfigRequired -eq $true) "chat-bootstrap server ASR config required"
+        Assert-True ([int]$bootstrap.voice.composer.defaultConfig.asr.localResultTimeoutMs -gt 0) "chat-bootstrap local ASR result timeout" "$($bootstrap.voice.composer.defaultConfig.asr.localResultTimeoutMs)ms"
+        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.localEngineFallbackEnabled -eq $true) "chat-bootstrap local engine fallback enabled"
+        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.prewarmLocalEngine -eq $true) "chat-bootstrap local ASR prewarm enabled"
+        Assert-ContainsValue $bootstrap.voice.composer.states "SERVER_PROCESSING" "chat-bootstrap exposes server processing state"
+        Assert-ContainsValue $bootstrap.voice.composer.zones "AI_REPLY" "chat-bootstrap exposes AI reply zone"
+        Assert-ContainsValue $bootstrap.voice.composer.callbacks "onVoiceServerFallbackStarted" "chat-bootstrap exposes fallback callback"
+        Assert-True ($bootstrap.voice.asr.localFirst -eq $true) "chat-bootstrap ASR local first"
+        Assert-True ($bootstrap.voice.asr.serverFallback -eq $true) "chat-bootstrap ASR server fallback"
+        Assert-True ($bootstrap.voice.asr.uploadEndpoint -eq "/api/voice/asr") "chat-bootstrap ASR endpoint" "$($bootstrap.voice.asr.uploadEndpoint)"
+        Assert-True ($bootstrap.voice.asr.billing -eq "free_auth_and_limits_only") "chat-bootstrap ASR free billing"
+        Assert-True ($bootstrap.voice.tts.billing -eq "free_auth_and_limits_only") "chat-bootstrap TTS free billing"
+        Assert-True ($bootstrap.experience.usagePolicy.asr -eq "free") "chat-bootstrap experience ASR free"
+        Assert-True ($bootstrap.experience.usagePolicy.tts -eq "free") "chat-bootstrap experience TTS free"
+        Assert-True ($bootstrap.experience.usagePolicy.aiReplyGeneration -eq "billable") "chat-bootstrap experience AI billable"
+        Assert-True ($bootstrap.experience.controls.fullWidthHoldToTalkButton -eq $true) "chat-bootstrap hold-to-talk full-width"
+        Assert-True ($bootstrap.billing.gates.beforeAsr -eq "never_check_ai_balance") "chat-bootstrap before ASR gate"
+        Assert-True ($bootstrap.billing.gates.beforeTts -eq "never_check_ai_balance") "chat-bootstrap before TTS gate"
+        Assert-True ($bootstrap.billing.gates.beforeAiReplyGeneration -eq "check_balance_or_trial_credit") "chat-bootstrap before AI reply gate"
+        Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "asr" "chat-bootstrap AI reply keeps ASR free"
+        Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "tts" "chat-bootstrap AI reply keeps TTS free"
+        Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "external_context_fetch" "chat-bootstrap AI reply keeps context fetch free"
     } catch {
         Fail "chat-bootstrap" $_.Exception.Message
     }
