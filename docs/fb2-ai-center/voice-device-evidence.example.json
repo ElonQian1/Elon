@@ -1,0 +1,52 @@
+{
+  "schema": "fb2.voice_device_evidence.v1",
+  "recordedAt": "2026-06-22T00:00:00+08:00",
+  "tester": "fb2-ai-agent",
+  "device": {
+    "manufacturer": "Xiaomi",
+    "model": "example-device",
+    "osVersion": "HyperOS",
+    "androidApi": 35,
+    "speechRecognizerService": "com.xiaomi.mibrain.speech/.asr.AsrService"
+  },
+  "apk": {
+    "packageName": "com.duoguan.football",
+    "versionName": "1.1.48",
+    "versionCode": 96
+  },
+  "sdk": {
+    "mainProjectCommit": "b4d96f4b",
+    "voiceKit": "android/chat-voice-kit",
+    "bootstrapApi": "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)"
+  },
+  "checks": {
+    "usesVoiceComposerView": true,
+    "textVoiceToggle": true,
+    "holdToTalkButton": true,
+    "recordingOverlay": true,
+    "slideToCancel": true,
+    "zoneSend": true,
+    "zoneAiReply": true,
+    "zoneTranscribe": true,
+    "tooShort": true,
+    "systemAsrSuccess": true,
+    "systemAsrTimeoutServerFallback": true,
+    "serverAsrSuccess": true,
+    "serverAsrFailureRecoversUi": true,
+    "ttsPlayback": true,
+    "asrTtsFreeWithZeroAiBalance": true
+  },
+  "artifacts": [
+    {
+      "type": "logcat",
+      "ref": "adb logcat excerpt or saved file path",
+      "note": "Shows system ASR timeout or result, server fallback callback, and UI leaving processing state."
+    },
+    {
+      "type": "screenshot_or_video",
+      "ref": "screenshot/video path or artifact URL",
+      "note": "Shows VoiceComposerView hold-to-talk overlay, cancel zone, AI reply zone, and transcribe zone."
+    }
+  ],
+  "notes": "Replace this example with real fb2 APK device evidence before final acceptance."
+}

@@ -21,6 +21,8 @@ param(
     [string]$ExpectedFb2UpdateKind = "full_apk",
     [switch]$CheckLocalVoiceSdkBuild,
     [string]$VoiceSdkGradleTask = ":chat-voice-kit:assembleDebug",
+    [switch]$RequireVoiceDeviceEvidence,
+    [string]$VoiceDeviceEvidencePath = "",
     [switch]$CheckQuality,
     [switch]$RequireFeedbackCoverage,
     [string]$QualitySince = "",
@@ -77,6 +79,7 @@ if ($FinalAcceptance) {
     $RequireAllScenarios = $true
     $CheckFb2ApkVersion = $true
     $CheckLocalVoiceSdkBuild = $true
+    $RequireVoiceDeviceEvidence = $true
     $CheckQuality = $true
     $RequireFeedbackCoverage = $true
     $RequireNoSkips = $true
@@ -214,6 +217,24 @@ function Resolve-AbsoluteUrl {
         return "$Fb2Base$Url"
     }
     return "$Fb2Base/$Url"
+}
+
+function Assert-JsonBool {
+    param(
+        [object]$Value,
+        [string]$Field,
+        [string]$Name
+    )
+    Assert-True ($Value.$Field -eq $true) $Name "$Field=$($Value.$Field)"
+}
+
+function Assert-NonEmptyField {
+    param(
+        [object]$Value,
+        [string]$Field,
+        [string]$Name
+    )
+    Assert-True (-not [string]::IsNullOrWhiteSpace([string]$Value.$Field)) $Name "$Field=$($Value.$Field)"
 }
 
 function Find-EvalScenario {
@@ -492,6 +513,51 @@ if ($CheckLocalVoiceSdkBuild) {
             Fail "local voice SDK build" $_.Exception.Message
         } finally {
             Pop-Location
+        }
+    }
+}
+
+if ($RequireVoiceDeviceEvidence) {
+    Write-Output ""
+    Write-Output "== fb2 voice device evidence =="
+
+    if (-not $VoiceDeviceEvidencePath) {
+        Fail "voice device evidence" "Pass -VoiceDeviceEvidencePath with fb2.voice_device_evidence.v1 JSON"
+    } elseif (-not (Test-Path $VoiceDeviceEvidencePath)) {
+        Fail "voice device evidence" "file not found: $VoiceDeviceEvidencePath"
+    } else {
+        try {
+            $evidence = Get-Content -Raw -Path $VoiceDeviceEvidencePath | ConvertFrom-Json
+            Assert-True ($evidence.schema -eq "fb2.voice_device_evidence.v1") "voice evidence schema" "$($evidence.schema)"
+            Assert-NonEmptyField $evidence "recordedAt" "voice evidence recordedAt"
+            Assert-NonEmptyField $evidence "tester" "voice evidence tester"
+            Assert-NonEmptyField $evidence.device "manufacturer" "voice evidence device manufacturer"
+            Assert-NonEmptyField $evidence.device "model" "voice evidence device model"
+            Assert-NonEmptyField $evidence.device "osVersion" "voice evidence OS"
+            Assert-NonEmptyField $evidence.device "speechRecognizerService" "voice evidence recognizer"
+            Assert-NonEmptyField $evidence.apk "versionName" "voice evidence APK versionName"
+            Assert-True ((Compare-VersionParts ([string]$evidence.apk.versionName) $MinFb2ApkVersion) -ge 0) "voice evidence APK version" "version=$($evidence.apk.versionName) min=$MinFb2ApkVersion"
+            Assert-NonEmptyField $evidence.apk "versionCode" "voice evidence APK versionCode"
+            Assert-NonEmptyField $evidence.sdk "mainProjectCommit" "voice evidence main project commit"
+            Assert-JsonBool $evidence.checks "usesVoiceComposerView" "voice evidence uses VoiceComposerView"
+            Assert-JsonBool $evidence.checks "textVoiceToggle" "voice evidence text/voice toggle"
+            Assert-JsonBool $evidence.checks "holdToTalkButton" "voice evidence hold-to-talk"
+            Assert-JsonBool $evidence.checks "recordingOverlay" "voice evidence recording overlay"
+            Assert-JsonBool $evidence.checks "slideToCancel" "voice evidence slide cancel"
+            Assert-JsonBool $evidence.checks "zoneSend" "voice evidence send zone"
+            Assert-JsonBool $evidence.checks "zoneAiReply" "voice evidence AI reply zone"
+            Assert-JsonBool $evidence.checks "zoneTranscribe" "voice evidence transcribe zone"
+            Assert-JsonBool $evidence.checks "tooShort" "voice evidence too short"
+            Assert-JsonBool $evidence.checks "systemAsrSuccess" "voice evidence system ASR success"
+            Assert-JsonBool $evidence.checks "systemAsrTimeoutServerFallback" "voice evidence ASR timeout fallback"
+            Assert-JsonBool $evidence.checks "serverAsrSuccess" "voice evidence server ASR success"
+            Assert-JsonBool $evidence.checks "serverAsrFailureRecoversUi" "voice evidence server ASR failure recovery"
+            Assert-JsonBool $evidence.checks "ttsPlayback" "voice evidence TTS playback"
+            Assert-JsonBool $evidence.checks "asrTtsFreeWithZeroAiBalance" "voice evidence ASR/TTS free"
+            $artifactCount = @($evidence.artifacts | Where-Object { $_ }).Count
+            Assert-True ($artifactCount -gt 0) "voice evidence artifacts" "count=$artifactCount"
+        } catch {
+            Fail "voice device evidence" $_.Exception.Message
         }
     }
 }

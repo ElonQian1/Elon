@@ -36,8 +36,9 @@
 - 需要验证 authenticated `chat-bootstrap` 时，脚本支持直接传 `-MainToken`，也支持传 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN`，通过 fb2 `/api/main-project/session` 桥接主项目 token；这条路径无副作用，不会发送群消息。
 - 需要验证 fb2 用户端 APK 是否已发布到可下载版本时，加 `-CheckFb2ApkVersion`；脚本会检查 fb2 `/api/app-version` 至少达到 `1.1.48`、`update_kind=full_apk`、checksum/size 有效，并对 `apk_url` 做 HEAD 验证。
 - 需要把主项目 SDK 编译纳入同一次巡检时，加 `-CheckLocalVoiceSdkBuild`；脚本会执行 `android\gradlew.bat :chat-voice-kit:assembleDebug --quiet`。
+- 需要把 fb2 真机语音链路纳入验收时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；JSON 格式参考 `docs/fb2-ai-center/voice-device-evidence.example.json`，必须覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
 - 正式最终验收可加 `-RequireNoSkips`，确保缺少 token 或未覆盖的检查不会以 skip 形式被误判为完成。
-- 最终总验收优先使用 `-FinalAcceptance`；它会自动打开 `-RequireFb2Live`、`-RequireAllScenarios`、`-IncludePlatformOrderSummary`、`-CheckQuality`、`-RequireFeedbackCoverage`、`-CheckFb2ApkVersion`、`-CheckLocalVoiceSdkBuild` 和 `-RequireNoSkips`，缺少主项目登录或 `FB2_AI_CENTER_TOKEN` 时必须失败。
+- 最终总验收优先使用 `-FinalAcceptance`；它会自动打开 `-RequireFb2Live`、`-RequireAllScenarios`、`-IncludePlatformOrderSummary`、`-CheckQuality`、`-RequireFeedbackCoverage`、`-CheckFb2ApkVersion`、`-CheckLocalVoiceSdkBuild`、`-RequireVoiceDeviceEvidence` 和 `-RequireNoSkips`，缺少主项目登录、`FB2_AI_CENTER_TOKEN` 或 `-VoiceDeviceEvidencePath` 时必须失败。
 - `cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 通过，确认 fb2 可引用最新 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 设置 `FB2_AI_CENTER_TOKEN` 后，上述巡检脚本能验证 fb2 live Context Pack、比赛分析、群观点和赛后复盘摘要；加 `-IncludePlatformOrderSummary` 后验证平台匿名订单摘要。
 - 完整场景验收必须加 `-RequireAllScenarios`；此时脚本不仅要求参数存在，还会要求 Context Pack 有 `context_audit_id`、比赛/订单等数据数量达到门槛，并且关键场景有 `citation_sources`。
@@ -79,6 +80,8 @@
 9. 系统 ASR 无 final/error，超时后云端 ASR。
 10. 云端 ASR 失败，UI 恢复且不永久卡住。
 11. AI 余额为 0 时 ASR/TTS 仍可用。
+
+真机证据必须沉淀为 `fb2.voice_device_evidence.v1` JSON，并至少附一条 logcat 或截图/录屏 artifact。主项目最终验收脚本只接受机器可读证据，避免用口头描述替代小米/HyperOS 等设备上的实际验证。
 
 ## AI 数据回答测试
 
@@ -153,7 +156,7 @@
 - `chat-bootstrap` 鉴权正例：需要主项目用户 token。
 - “帮我分析我的票”正例：需要明确授权的 fb2 测试用户 UUID，并且该用户确实有可分析订单。
 - 真实群聊 `@EL`、长按消息 `AI回复`、总结帖入口：需要沙盒群，或用户明确允许在生产群产生可见 AI 消息。
-- 真机语音链路：需要 fb2 引用 `android/chat-voice-kit` 后重打 APK，并覆盖小米/HyperOS 系统 ASR 超时兜底。
+- 真机语音链路：需要 fb2 引用 `android/chat-voice-kit` 后重打 APK，并用 `docs/fb2-ai-center/voice-device-evidence.example.json` 同格式回传小米/HyperOS 系统 ASR 超时兜底、录音浮层、直接发语音、转文字、AI 回复区和 TTS 证据。
 
 当前可见群聊脚本：
 

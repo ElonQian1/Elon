@@ -99,6 +99,7 @@
 - 用更多账号继续抽样主项目真实群聊入口触发 `@EL` 和长按消息 `AI回复`；当前账号 `123qwe` 已验证 AI 回答能显式区分比赛事实、本人订单、群观点和 AI 推断。
 - 用已完赛比赛样本验证 `opinion_result_review_summary` 和 `opinion_result_reviews` 在主项目真实群聊回答中只被描述为历史复盘/样本统计，不被写成未来命中承诺。
 - fb2 `1.1.48` 已接入主项目群聊可见回复刷新和长按 `AI回复` 客户端入口；仍需在小米/HyperOS 真机上验证系统 ASR 超时后云端兜底、录音浮层、直接发语音、转文字和 APK UI 长按菜单。
+- 主项目最终验收脚本已把 fb2 真机语音证据纳入 `-FinalAcceptance`，证据格式见 `docs/fb2-ai-center/voice-device-evidence.example.json`；没有 `-VoiceDeviceEvidencePath` 时最终验收必须失败。
 - 主项目和 fb2 建立固定 AI 数据回答评测集。
 - 后续把 fb2 工具执行从当前的 Context Pack + 轻量工具调用继续升级为更细粒度的可评测工具链。
 
@@ -114,7 +115,8 @@
 - 需要验证 fb2 用户端 APK 发布状态时加 `-CheckFb2ApkVersion`；默认最低版本为 `1.1.48`，可用 `-MinFb2ApkVersion` 临时提高门槛。
 - 需要把主项目本地语音 SDK 编译也纳入验收时加 `-CheckLocalVoiceSdkBuild`。
 - 最终验收或 CI 不允许跳过任何检查时加 `-RequireNoSkips`。
-- 最终总验收直接跑 `-FinalAcceptance`，并同时提供主项目登录来源和 `FB2_AI_CENTER_TOKEN`；否则必须失败，不能把 skip 当成完成。
+- 需要验证 fb2 真机语音链路时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；正式证据必须覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
+- 最终总验收直接跑 `-FinalAcceptance`，并同时提供主项目登录来源、`FB2_AI_CENTER_TOKEN` 和 `-VoiceDeviceEvidencePath`；否则必须失败，不能把 skip 当成完成。
 - 需要验证长期质量门槛时加：
   `-CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339> -MaxLargeContextPackRate 0.75`
   该检查会读取 fb2 `/context/quality-summary` 和 `/context/feedbacks`，用于发现 missing/wrong context、引用未命中和 Context Pack 大包率退化。
