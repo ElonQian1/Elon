@@ -170,6 +170,7 @@ async fn reply_to_selected_group_message(
         format!("social_group_selected_message:{}", message.id),
         "selected_message_ai_reply",
         external_context,
+        external_tool_results,
         reply.clone(),
     );
     friend_events::publish_group_message(&message, recipient_user_ids);

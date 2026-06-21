@@ -27,6 +27,7 @@
 - 主项目按需执行 fb2 `platform_orders` 工具时，会同步带 `X-FB2-AI-CONTEXT-SCOPE: platform_order_summary`；线上已验证 fb2 返回 `visibility=privileged_summary`、`redaction=anonymous_aggregate_only` 和 `platform_order_summary:<date>:all` source id。
 - fb2 已提供统一工具执行入口 `POST /api/main-project/tools/execute`，线上 smoke 已验证 `search_matches` 可返回比赛来源、`search_user_orders` 缺少上下文用户头会 403、带同值头只返回本人订单、不支持工具会 400。
 - 群聊 `@EL` 和长按消息 `AI回复` 生成主项目 AI 回复后，会后台调用 fb2 `/api/main-project/context/feedback`，用 `context_audit_id`、主项目消息 ID、命中的引用来源和触发类型记录自动反馈样本；失败只写日志，不阻断聊天出消息。
+- 当主项目工具结果包含已 grounded 的 fb2 `opinion_memories`，且 AI 回复正文显式提到对应观点记忆 source id 或原群消息 id 时，主项目会继续调用 fb2 `record_opinion_adoption`，把这次“群观点被采纳进回答”的证据写回 fb2 质量闭环；未显式引用则不自动采纳，避免把群友观点误当事实。
 - 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
 - `android/chat-voice-kit` 已输出 `VoiceComposerView`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
@@ -46,7 +47,7 @@
 - 保持 `/api/external/apps/fb2/context-contract` 与文档同步。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
-- 观察 `auto_generated_answer_feedback` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。
+- 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。
 - 维护 `android/chat-voice-kit` 的公共 API，不让 fb2 复制主 App 内部代码。
 - 明确发布 commit 和 fb2 重新编译要求。
 

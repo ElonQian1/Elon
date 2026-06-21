@@ -298,6 +298,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
     let mut feedback_context = None;
+    let mut feedback_tool_results = None;
     // 方案6: 统一使用 classify() 检测开发意图；方案4: 开发意图走桥接（群聊暂只发文字，无桥接卡片）
     let reply = if is_development_intent(&history).is_some() {
         DEVELOPMENT_REDIRECT_REPLY.to_string()
@@ -332,6 +333,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
         )
         .await;
         feedback_context = external_context;
+        feedback_tool_results = external_tool_results;
         reply
     };
     let message = state
@@ -344,6 +346,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
         format!("social_group_message:{}", message.id),
         "group_mention",
         feedback_context,
+        feedback_tool_results,
         reply.clone(),
     );
     friend_events::publish_group_message(&message, recipient_user_ids);
