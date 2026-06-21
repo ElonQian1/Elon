@@ -644,6 +644,80 @@ function testDevTasksUsesResumeContractForSnapshotContinue() {
   assert.ok(!approvalHtml.includes('data-decision="approve"'), 'detached task should close stale approval buttons');
 }
 
+function testDevTasksRequiresActiveApprovalHandle() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    approveTool: async () => {},
+    cancelTask: () => {}
+  });
+  const messages = [
+    { kind: 'ai_task', task_id: 'tsk_live_approval', content: '发起 AI 开发任务：审批测试' },
+    {
+      kind: 'ai_progress',
+      task_id: 'tsk_live_approval',
+      content: JSON.stringify({
+        type: 'tool_approval_required',
+        tool: 'run_command',
+        approval_id: 'tap_live',
+        status: 'pending'
+      })
+    }
+  ];
+  const staleSnapshots = new Map([[
+    'tsk_live_approval',
+    {
+      task: { id: 'tsk_live_approval', status: 'running' },
+      attach: { status: 'live', live: true, source: 'local_journal' },
+      resume: {
+        status: 'live',
+        can_reconnect: true,
+        can_cancel: true,
+        can_approve_tools: false,
+        active_approval_ids: [],
+        can_stream_live_output: false,
+        can_replay_journal_events: true,
+        next_action: 'wait_or_cancel',
+        run_handle: { id: 'req-live', route: 'route_c_server_runtime', os_pid: 4321 },
+        strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
+      }
+    }
+  ]]);
+  const staleContext = devTasks.buildContext(messages, { snapshots: staleSnapshots });
+  const taskHtml = devTasks.renderMessage(messages[0], staleContext);
+  const staleApprovalHtml = devTasks.renderMessage(messages[1], staleContext);
+  assert.ok(taskHtml.includes('PID 4321'), 'live task card should expose the run handle pid');
+  assert.ok(staleApprovalHtml.includes('本机没有活动审批等待器'), 'live task without waiter should explain stale approval');
+  assert.ok(!staleApprovalHtml.includes('data-decision="approve"'), 'live task without waiter must not expose approval buttons');
+
+  const activeSnapshots = new Map([[
+    'tsk_live_approval',
+    {
+      task: { id: 'tsk_live_approval', status: 'running' },
+      attach: { status: 'live', live: true, source: 'local_journal' },
+      resume: {
+        status: 'live',
+        can_reconnect: true,
+        can_cancel: true,
+        can_approve_tools: true,
+        active_approval_ids: ['tap_live'],
+        can_stream_live_output: false,
+        can_replay_journal_events: true,
+        next_action: 'wait_or_cancel',
+        run_handle: { id: 'req-live', route: 'route_c_server_runtime' },
+        strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
+      }
+    }
+  ]]);
+  const activeContext = devTasks.buildContext(messages, { snapshots: activeSnapshots });
+  const activeApprovalHtml = devTasks.renderMessage(messages[1], activeContext);
+  assert.ok(activeApprovalHtml.includes('data-decision="approve"'), 'active waiter should keep approval buttons available');
+  assert.ok(activeApprovalHtml.includes('data-approval-id="tap_live"'), 'approval button should keep the active approval id');
+}
+
 function testProjectReadinessChecklist() {
   const sandbox = loadAsset('server/src/assets/pc_app_project_readiness.js');
   const create = (state) => sandbox.window.ElonPcProjectReadiness.create({
@@ -806,6 +880,7 @@ function testLocalAdminTokenWiring() {
   testDevTasksUsesSnapshotAttachState();
   testDevTasksUsesLocalJournalAttachLabel();
   testDevTasksUsesResumeContractForSnapshotContinue();
+  testDevTasksRequiresActiveApprovalHandle();
   testDevTasksToolTimeline();
   await testDevTasksToolApprovalButtons();
   await testTaskSnapshotsPollsSnapshotEndpoint();

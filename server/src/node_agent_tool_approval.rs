@@ -1,18 +1,37 @@
 // server/src/node_agent_tool_approval.rs
 
-use std::{collections::HashMap, sync::Arc};
+use serde::Serialize;
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use tokio::sync::{watch, RwLock};
 
 #[derive(Clone, Default)]
 pub(crate) struct ToolApprovalState {
-    pending: Arc<RwLock<HashMap<String, watch::Sender<Option<ToolApprovalDecision>>>>>,
+    pending: Arc<RwLock<HashMap<String, PendingToolApproval>>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ToolApprovalDecision {
     Approve,
     Deny,
+}
+
+#[derive(Clone)]
+struct PendingToolApproval {
+    tx: watch::Sender<Option<ToolApprovalDecision>>,
+    req_id: String,
+    approval_id: String,
+    registered_at_ms: u128,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct PendingToolApprovalView {
+    pub approval_id: String,
+    pub registered_at_ms: u128,
 }
 
 pub(crate) struct ToolApprovalWaiter {
@@ -25,7 +44,15 @@ impl ToolApprovalState {
     pub(crate) async fn register(&self, req_id: &str, approval_id: &str) -> ToolApprovalWaiter {
         let key = approval_key(req_id, approval_id);
         let (tx, rx) = watch::channel(None);
-        self.pending.write().await.insert(key.clone(), tx);
+        self.pending.write().await.insert(
+            key.clone(),
+            PendingToolApproval {
+                tx,
+                req_id: req_id.to_string(),
+                approval_id: approval_id.to_string(),
+                registered_at_ms: now_ms(),
+            },
+        );
         ToolApprovalWaiter {
             key,
             rx,
@@ -38,9 +65,30 @@ impl ToolApprovalState {
             return false;
         };
         let key = approval_key(req_id, approval_id);
-        let tx = self.pending.write().await.remove(&key);
-        tx.map(|tx| tx.send(Some(decision)).is_ok())
+        let pending = self.pending.write().await.remove(&key);
+        pending
+            .map(|pending| pending.tx.send(Some(decision)).is_ok())
             .unwrap_or(false)
+    }
+
+    pub(crate) async fn pending_for_req(&self, req_id: &str) -> Vec<PendingToolApprovalView> {
+        let mut approvals: Vec<_> = self
+            .pending
+            .read()
+            .await
+            .values()
+            .filter(|pending| pending.req_id == req_id)
+            .map(|pending| PendingToolApprovalView {
+                approval_id: pending.approval_id.clone(),
+                registered_at_ms: pending.registered_at_ms,
+            })
+            .collect();
+        approvals.sort_by(|left, right| {
+            left.registered_at_ms
+                .cmp(&right.registered_at_ms)
+                .then_with(|| left.approval_id.cmp(&right.approval_id))
+        });
+        approvals
     }
 
     async fn remove_key(&self, key: &str) {
@@ -74,6 +122,13 @@ fn normalize_decision(value: &str) -> Option<ToolApprovalDecision> {
     }
 }
 
+fn now_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default()
+}
+
 #[cfg(test)]
 mod tests {
     use super::{ToolApprovalDecision, ToolApprovalState};
@@ -104,5 +159,19 @@ mod tests {
 
         assert!(state.decide("req", "tap_1_1", "approve").await);
         assert!(!state.decide("req", "tap_1_1", "approve").await);
+    }
+
+    #[tokio::test]
+    async fn pending_for_req_lists_only_live_waiters() {
+        let state = ToolApprovalState::default();
+        let _first = state.register("req", "tap_1_1").await;
+        let _other = state.register("other", "tap_2_1").await;
+
+        let pending = state.pending_for_req("req").await;
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].approval_id, "tap_1_1");
+
+        assert!(state.decide("req", "tap_1_1", "deny").await);
+        assert!(state.pending_for_req("req").await.is_empty());
     }
 }

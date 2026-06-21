@@ -2,7 +2,9 @@
 
 use serde::Serialize;
 
-use crate::node_agent_task_journal::TaskJournalRecord;
+use crate::{
+    node_agent_active_task::ActiveCliPromptView, node_agent_task_journal::TaskJournalRecord,
+};
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct TaskAttachState {
@@ -12,6 +14,7 @@ pub(crate) struct TaskAttachState {
     continue_mode: &'static str,
     source: &'static str,
     reason: &'static str,
+    run_handle: Option<ActiveCliPromptView>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -21,7 +24,10 @@ pub(crate) struct TaskResumeContract {
     can_cancel: bool,
     can_stream_live_output: bool,
     can_replay_journal_events: bool,
+    can_approve_tools: bool,
+    active_approval_ids: Vec<String>,
     continue_mode: &'static str,
+    run_handle: Option<TaskResumeRunHandle>,
     strategy: TaskResumeStrategy,
     limitations: Vec<&'static str>,
     next_action: &'static str,
@@ -38,18 +44,28 @@ struct TaskResumeStrategy {
     uses_local_journal: bool,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct TaskResumeRunHandle {
+    id: String,
+    route: String,
+    os_pid: Option<u32>,
+    control_lease_expires_at_ms: u128,
+}
+
 pub(crate) fn task_attach_state(
     record: Option<&TaskJournalRecord>,
-    active: bool,
+    active: Option<ActiveCliPromptView>,
 ) -> TaskAttachState {
-    if active {
+    if let Some(handle) = active {
         return TaskAttachState {
             status: "live",
             live: true,
             can_reconnect: true,
             continue_mode: "reconnect_original_process",
             source: "local_journal",
-            reason: "本机节点仍持有该任务的运行控制句柄，可以重连控制面，但当前版本还不能回放 stdout/stderr。",
+            reason:
+                "本机节点仍持有该任务的运行控制句柄，可以重连控制面并处理当前内存中的审批 waiter。",
+            run_handle: Some(handle),
         };
     }
     match record.map(|record| record.status.as_str()) {
@@ -60,6 +76,7 @@ pub(crate) fn task_attach_state(
             continue_mode: "snapshot_continue",
             source: "local_journal",
             reason: "本机 journal 显示任务未终态，但当前节点已没有运行句柄，只能基于快照继续。",
+            run_handle: None,
         },
         Some(_) => TaskAttachState {
             status: "terminal",
@@ -68,6 +85,7 @@ pub(crate) fn task_attach_state(
             continue_mode: "snapshot_continue",
             source: "local_journal",
             reason: "本机进程已经结束，只能基于任务快照继续新一轮处理。",
+            run_handle: None,
         },
         None => TaskAttachState {
             status: "missing",
@@ -76,11 +94,15 @@ pub(crate) fn task_attach_state(
             continue_mode: "snapshot_continue",
             source: "local_journal",
             reason: "本机没有该任务的 journal 记录，前端只能使用云端任务快照。",
+            run_handle: None,
         },
     }
 }
 
 pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContract {
+    let active_approval_ids = active_approval_ids(attach);
+    let can_approve_tools = !active_approval_ids.is_empty();
+    let run_handle = resume_run_handle(attach);
     match attach.status {
         "live" => TaskResumeContract {
             status: attach.status,
@@ -88,11 +110,14 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_cancel: true,
             can_stream_live_output: false,
             can_replay_journal_events: true,
+            can_approve_tools,
+            active_approval_ids,
             continue_mode: attach.continue_mode,
+            run_handle,
             strategy: TaskResumeStrategy {
                 kind: "control_handle_reconnect",
                 label: "重连本机控制句柄",
-                reason: "当前本机节点还保留运行句柄，可查询状态、停止任务，并通过本机 journal 轮询回放输出事件；直接接管 CLI TTY 仍需后续 attach 协议。",
+                reason: "当前本机节点还保留运行句柄，可查询状态、停止任务、处理仍在内存中的工具审批，并通过本机 journal 轮询回放输出事件；直接接管 CLI TTY 仍需后续 attach 协议。",
                 requires_new_task: false,
                 uses_cloud_snapshot: true,
                 uses_local_journal: true,
@@ -107,7 +132,10 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_cancel: false,
             can_stream_live_output: false,
             can_replay_journal_events: true,
+            can_approve_tools: false,
+            active_approval_ids: Vec::new(),
             continue_mode: attach.continue_mode,
+            run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
                 label: "基于快照继续",
@@ -126,7 +154,10 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_cancel: false,
             can_stream_live_output: false,
             can_replay_journal_events: true,
+            can_approve_tools: false,
+            active_approval_ids: Vec::new(),
             continue_mode: attach.continue_mode,
+            run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
                 label: "基于终态快照继续",
@@ -145,7 +176,10 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_cancel: false,
             can_stream_live_output: false,
             can_replay_journal_events: false,
+            can_approve_tools: false,
+            active_approval_ids: Vec::new(),
             continue_mode: "snapshot_continue",
+            run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "cloud_snapshot_only",
                 label: "仅使用云端快照",
@@ -165,22 +199,55 @@ fn shared_limitations() -> Vec<&'static str> {
     vec![
         "本机 journal 不保存 prompt 或 API key。",
         "输出回放来自本机 journal 快照/轮询，不是直接接管原 CLI TTY。",
-        "当前版本不持久化审批 waiter，页面刷新后只能从历史事件重建审批卡。",
-        "节点重启后不能恢复原进程 pid，只能基于快照新开任务继续。",
+        "审批 waiter 只在当前节点进程内有效；节点重启后历史审批卡会失效。",
+        "节点重启后不能重新绑定原进程控制句柄，只能基于快照新开任务继续。",
     ]
+}
+
+fn active_approval_ids(attach: &TaskAttachState) -> Vec<String> {
+    attach
+        .run_handle
+        .as_ref()
+        .map(|handle| {
+            handle
+                .pending_approvals
+                .iter()
+                .map(|approval| approval.approval_id.clone())
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn resume_run_handle(attach: &TaskAttachState) -> Option<TaskResumeRunHandle> {
+    attach
+        .run_handle
+        .as_ref()
+        .map(|handle| TaskResumeRunHandle {
+            id: handle.run_handle_id.clone(),
+            route: handle.route.clone(),
+            os_pid: handle.os_pid,
+            control_lease_expires_at_ms: handle.control_lease_expires_at_ms,
+        })
 }
 
 #[cfg(test)]
 mod tests {
     use super::{task_attach_state, task_resume_contract};
-    use crate::node_agent_task_journal::TaskJournalRecord;
+    use crate::{
+        node_agent_active_task::ActiveCliPromptView, node_agent_task_journal::TaskJournalRecord,
+        node_agent_tool_approval::PendingToolApprovalView,
+    };
 
     fn record(status: &str) -> TaskJournalRecord {
         TaskJournalRecord {
             req_id: "task-1".to_string(),
             cli_name: "codex".to_string(),
+            route: Some("route_a_external_cli".to_string()),
+            run_handle_id: Some("task-1".to_string()),
             cwd: Some("D:/demo".to_string()),
             runtime_permission: Some("project_write".to_string()),
+            os_pid: Some(4242),
+            process_started_at_ms: Some(1),
             status: status.to_string(),
             started_at_ms: 1,
             updated_at_ms: 2,
@@ -188,10 +255,30 @@ mod tests {
         }
     }
 
+    fn active_handle() -> ActiveCliPromptView {
+        ActiveCliPromptView {
+            req_id: "task-1".to_string(),
+            run_handle_id: "task-1".to_string(),
+            cli_name: "server-runtime".to_string(),
+            route: "route_c_server_runtime".to_string(),
+            cwd: Some("D:/demo".to_string()),
+            runtime_permission: Some("project_write".to_string()),
+            started_at_ms: 1,
+            last_heartbeat_ms: 2,
+            control_lease_expires_at_ms: 47_000,
+            os_pid: None,
+            control_handle_live: true,
+            pending_approvals: vec![PendingToolApprovalView {
+                approval_id: "tap_1_1".to_string(),
+                registered_at_ms: 3,
+            }],
+        }
+    }
+
     #[test]
     fn live_contract_is_honest_about_stream_replay() {
         let running = record("running");
-        let attach = task_attach_state(Some(&running), true);
+        let attach = task_attach_state(Some(&running), Some(active_handle()));
         let resume = task_resume_contract(&attach);
 
         assert_eq!(resume.status, "live");
@@ -199,6 +286,15 @@ mod tests {
         assert!(resume.can_cancel);
         assert!(!resume.can_stream_live_output);
         assert!(resume.can_replay_journal_events);
+        assert!(resume.can_approve_tools);
+        assert_eq!(resume.active_approval_ids, vec!["tap_1_1"]);
+        assert_eq!(
+            resume
+                .run_handle
+                .as_ref()
+                .map(|handle| handle.route.as_str()),
+            Some("route_c_server_runtime")
+        );
         assert_eq!(resume.next_action, "wait_or_cancel");
         assert_eq!(resume.strategy.kind, "control_handle_reconnect");
     }
@@ -206,12 +302,14 @@ mod tests {
     #[test]
     fn detached_contract_requires_snapshot_continue() {
         let running = record("running");
-        let attach = task_attach_state(Some(&running), false);
+        let attach = task_attach_state(Some(&running), None);
         let resume = task_resume_contract(&attach);
 
         assert_eq!(attach.status, "detached");
         assert!(!resume.can_reconnect);
         assert!(!resume.can_cancel);
+        assert!(!resume.can_approve_tools);
+        assert!(resume.active_approval_ids.is_empty());
         assert_eq!(resume.next_action, "continue_from_snapshot");
         assert_eq!(resume.strategy.kind, "snapshot_continue");
         assert!(resume.strategy.requires_new_task);
@@ -220,8 +318,8 @@ mod tests {
     #[test]
     fn terminal_and_missing_contracts_do_not_claim_reconnect() {
         let finished = record("finished");
-        let terminal = task_resume_contract(&task_attach_state(Some(&finished), false));
-        let missing = task_resume_contract(&task_attach_state(None, false));
+        let terminal = task_resume_contract(&task_attach_state(Some(&finished), None));
+        let missing = task_resume_contract(&task_attach_state(None, None));
 
         assert_eq!(terminal.status, "terminal");
         assert_eq!(terminal.next_action, "continue_from_snapshot");

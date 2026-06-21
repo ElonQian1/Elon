@@ -22,6 +22,8 @@ pub(crate) struct TaskJournal {
 pub(crate) struct TaskJournalStart<'a> {
     pub req_id: &'a str,
     pub cli_name: &'a str,
+    pub route: Option<&'a str>,
+    pub run_handle_id: Option<&'a str>,
     pub cwd: Option<&'a str>,
     pub runtime_permission: Option<&'a str>,
 }
@@ -30,8 +32,16 @@ pub(crate) struct TaskJournalStart<'a> {
 pub(crate) struct TaskJournalRecord {
     pub req_id: String,
     pub cli_name: String,
+    #[serde(default)]
+    pub route: Option<String>,
+    #[serde(default)]
+    pub run_handle_id: Option<String>,
     pub cwd: Option<String>,
     pub runtime_permission: Option<String>,
+    #[serde(default)]
+    pub os_pid: Option<u32>,
+    #[serde(default)]
+    pub process_started_at_ms: Option<u128>,
     pub status: String,
     pub started_at_ms: u128,
     pub updated_at_ms: u128,
@@ -68,8 +78,12 @@ impl TaskJournal {
         let record = TaskJournalRecord {
             req_id: start.req_id.to_string(),
             cli_name: start.cli_name.to_string(),
+            route: start.route.map(str::to_string),
+            run_handle_id: start.run_handle_id.map(str::to_string),
             cwd: start.cwd.map(str::to_string),
             runtime_permission: start.runtime_permission.map(str::to_string),
+            os_pid: None,
+            process_started_at_ms: None,
             status: "running".to_string(),
             started_at_ms: now,
             updated_at_ms: now,
@@ -81,8 +95,27 @@ impl TaskJournal {
             "type": "started",
             "req_id": start.req_id,
             "cli": start.cli_name,
+            "route": start.route,
+            "run_handle_id": start.run_handle_id,
             "cwd": start.cwd,
             "runtime_permission": start.runtime_permission,
+            "at_ms": now
+        }))
+    }
+
+    pub(crate) fn record_process_started(&self, req_id: &str, pid: u32) -> Result<()> {
+        let now = now_ms();
+        let mut registry = self.load_registry()?;
+        if let Some(record) = registry.get_mut(req_id) {
+            record.os_pid = Some(pid);
+            record.process_started_at_ms = Some(now);
+            record.updated_at_ms = now;
+        }
+        self.save_registry(&registry)?;
+        self.append_event(json!({
+            "type": "process_started",
+            "req_id": req_id,
+            "pid": pid,
             "at_ms": now
         }))
     }
@@ -313,6 +346,8 @@ mod tests {
             .record_started(TaskJournalStart {
                 req_id: "req-1",
                 cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("req-1"),
                 cwd: Some("D:/demo"),
                 runtime_permission: Some("project_write"),
             })
@@ -330,6 +365,8 @@ mod tests {
         let record = registry.get("req-1").expect("record should exist");
         assert_eq!(record.status, "finished");
         assert_eq!(record.cli_name, "codex");
+        assert_eq!(record.route.as_deref(), Some("route_a_external_cli"));
+        assert_eq!(record.run_handle_id.as_deref(), Some("req-1"));
         assert_eq!(record.cwd.as_deref(), Some("D:/demo"));
         assert!(record.cancel_requested_at_ms.is_some());
 
@@ -348,6 +385,8 @@ mod tests {
             .record_started(TaskJournalStart {
                 req_id: "req-1",
                 cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("req-1"),
                 cwd: Some("D:/demo"),
                 runtime_permission: Some("project_write"),
             })
@@ -379,6 +418,8 @@ mod tests {
             .record_started(TaskJournalStart {
                 req_id: "req-1",
                 cli_name: "server-runtime",
+                route: Some("route_c_server_runtime"),
+                run_handle_id: Some("req-1"),
                 cwd: Some("D:/demo"),
                 runtime_permission: Some("project_write"),
             })
@@ -414,6 +455,8 @@ mod tests {
             .record_started(TaskJournalStart {
                 req_id: "req-1",
                 cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("req-1"),
                 cwd: Some("D:/demo"),
                 runtime_permission: Some("project_write"),
             })
@@ -422,6 +465,8 @@ mod tests {
             .record_started(TaskJournalStart {
                 req_id: "req-2",
                 cli_name: "claude",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("req-2"),
                 cwd: Some("D:/other"),
                 runtime_permission: Some("read_only"),
             })
@@ -451,6 +496,37 @@ mod tests {
             .expect("latest records should read");
         assert_eq!(latest.len(), 2);
         assert_eq!(latest[0].req_id, "req-1");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn records_process_pid_for_active_route_a_handle() {
+        let dir = unique_test_dir("pid");
+        let journal = TaskJournal::new(&dir);
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-1",
+                cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("req-1"),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("start event should persist");
+        journal
+            .record_process_started("req-1", 4242)
+            .expect("pid event should persist");
+
+        let snapshot = journal
+            .snapshot("req-1", 0, 20)
+            .expect("snapshot should read");
+        let record = snapshot.record.expect("record should exist");
+        assert_eq!(record.os_pid, Some(4242));
+        assert!(record.process_started_at_ms.is_some());
+        assert!(snapshot.events.iter().any(|event| {
+            event.event.get("type").and_then(|value| value.as_str()) == Some("process_started")
+                && event.event.get("pid").and_then(|value| value.as_u64()) == Some(4242)
+        }));
         let _ = fs::remove_dir_all(dir);
     }
 

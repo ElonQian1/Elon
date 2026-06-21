@@ -425,6 +425,9 @@ impl Store {
                     u.avatar_data_url,
                     m.reply_to_message_id,
                     m.kind, m.content, m.task_id,
+                    t.status AS task_status,
+                    t.error AS task_error,
+                    t.apk_url AS task_apk_url,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
@@ -433,7 +436,8 @@ impl Store {
                     m.created_at
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
-            LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
+             LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
+             LEFT JOIN tasks t ON t.id = m.task_id
             WHERE m.project_id = ?1 AND m.channel_id = ?2 AND m.id = ?3",
             params![project_id, channel_id, message_id],
             |row| project_channel_message_from_row(row, user_id),

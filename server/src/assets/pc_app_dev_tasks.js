@@ -248,9 +248,12 @@
       const approvalId = clean(event.approval_id);
       const recoveredState = approvalStateFor(context, taskId, approvalId);
       const snapshotContinue = taskNeedsSnapshotContinue(task);
-      const closedState = recoveredState && recoveredState.status !== 'pending'
+      let closedState = recoveredState && recoveredState.status !== 'pending'
         ? recoveredState
         : (snapshotContinue ? taskSnapshotContinueApprovalState() : (taskIsTerminal(task) ? taskTerminalApprovalState(task) : null));
+      if (!closedState && approvalId && !approvalIsActionable(task, approvalId)) {
+        closedState = taskApprovalUnavailableState();
+      }
       return cardHtml({
         tone: closedState ? closedState.tone : 'approval',
         eyebrow: '工具审批',
@@ -525,12 +528,27 @@
       return { status: 'detached', tone: 'failed', label: '已失效', meta: '现场已脱离，请基于快照继续' };
     }
 
+    function taskApprovalUnavailableState() {
+      return { status: 'unavailable', tone: 'failed', label: '已失效', meta: '本机没有活动审批等待器' };
+    }
+
+    function approvalIsActionable(task, approvalId) {
+      const resume = task && task.resume ? task.resume : null;
+      if (!resume) return true;
+      if (resume.can_approve_tools !== true) return false;
+      const activeIds = Array.isArray(resume.active_approval_ids)
+        ? resume.active_approval_ids.map(clean).filter(Boolean)
+        : [];
+      return activeIds.includes(clean(approvalId));
+    }
+
     function attachMeta(task, fallback) {
       const attach = task && task.attach ? task.attach : null;
       const status = clean(attach && attach.status).toLowerCase();
       const local = clean(attach && attach.source).toLowerCase() === 'local_journal';
       const hint = resumeHint(task);
-      if (status === 'live') return `${local ? '本机现场可连接' : '现场可连接'}${hint} · ${fallback}`;
+      const handle = runHandleMeta(task);
+      if (status === 'live') return `${local ? '本机现场可连接' : '现场可连接'}${hint}${handle} · ${fallback}`;
       if (status === 'detached') return `${local ? '本机现场已脱离' : '现场已脱离'}${hint} · ${fallback}`;
       if (status === 'terminal') return `${local ? '本机终态快照' : '终态快照'}${hint} · ${fallback}`;
       return fallback;
@@ -572,6 +590,17 @@
       if (action === 'wait_or_cancel' && !canStream) return '（暂不回放输出）';
       if (action === 'continue_from_snapshot') return '（基于快照继续）';
       if (action === 'refresh_snapshot') return '（仅云端快照）';
+      return '';
+    }
+
+    function runHandleMeta(task) {
+      const resume = task && task.resume ? task.resume : null;
+      const handle = resume && resume.run_handle ? resume.run_handle : null;
+      if (!handle) return '';
+      const pid = Number(handle.os_pid || 0);
+      const route = clean(handle.route);
+      if (pid > 0) return ` · PID ${pid}`;
+      if (route) return ` · ${route}`;
       return '';
     }
 

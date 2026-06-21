@@ -79,11 +79,7 @@ async fn get_task_journal(
 
     let since = query.since.unwrap_or(0);
     let limit = query.limit.unwrap_or(100);
-    let active = runtime
-        .active_cli_prompts
-        .read()
-        .await
-        .contains_key(&task_id);
+    let active = runtime.active_cli_prompt_view(&task_id).await;
     match runtime.task_journal.snapshot(&task_id, since, limit) {
         Ok(snapshot) => {
             // 本地 API 只暴露进程恢复所需的最小字段；prompt/API key 从未写入 journal。

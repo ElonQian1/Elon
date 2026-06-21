@@ -46,6 +46,7 @@ use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
 
 mod cli_usage;
+mod node_agent_active_task;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_cli_security;
@@ -796,6 +797,7 @@ struct CliPromptRun {
     server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
     approval_state: node_agent_tool_approval::ToolApprovalState,
     task_journal: node_agent_task_journal::TaskJournal,
+    runtime: Arc<NodeRuntime>,
     cancel_rx: watch::Receiver<bool>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 }
@@ -815,6 +817,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         server_runtime_config,
         approval_state,
         task_journal,
+        runtime,
         mut cancel_rx,
         out_tx,
     } = run;
@@ -1034,6 +1037,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
             return;
         }
     };
+    if let Some(pid) = child.id() {
+        runtime.set_cli_prompt_os_pid(&req_id, Some(pid)).await;
+        if let Err(error) = task_journal.record_process_started(&req_id, pid) {
+            warn!("PC 任务 journal 写入进程 pid 失败: {error}");
+        }
+    }
 
     let stdout = child.stdout.take().expect("stdout");
     let stderr = child.stderr.take().expect("stderr");
@@ -1910,8 +1919,6 @@ async fn run_session(
                             tokio::spawn(async move {
                                 let req_id_for_cleanup = req_id.clone();
                                 let (cancel_tx, cancel_rx) = watch::channel(false);
-                                rt_c.register_cli_prompt_cancel(&req_id_for_cleanup, cancel_tx)
-                                    .await;
                                 let resolved_cli = match rt_c.resolve_cli(&cli).await {
                                     Ok(resolved) => resolved,
                                     Err(e) => {
@@ -1997,12 +2004,27 @@ async fn run_session(
                                     node_agent_task_journal::TaskJournalStart {
                                         req_id: &req_id_for_cleanup,
                                         cli_name: resolved_cli.name(),
+                                        route: Some(node_agent_active_task::route_for_cli(
+                                            resolved_cli.name(),
+                                        )),
+                                        run_handle_id: Some(&req_id_for_cleanup),
                                         cwd: prepared_cwd.cwd.as_deref(),
                                         runtime_permission: runtime_permission.as_deref(),
                                     },
                                 ) {
                                     warn!("PC 任务 journal 写入开始事件失败: {error}");
                                 }
+                                rt_c.register_cli_prompt(
+                                    node_agent_active_task::ActiveCliPromptHandle::new(
+                                        req_id_for_cleanup.clone(),
+                                        resolved_cli.name().to_string(),
+                                        node_agent_active_task::route_for_cli(resolved_cli.name()),
+                                        prepared_cwd.cwd.clone(),
+                                        runtime_permission.clone(),
+                                        cancel_tx,
+                                    ),
+                                )
+                                .await;
                                 run_cli_prompt(CliPromptRun {
                                     req_id,
                                     bin: resolved_cli.bin().to_string(),
@@ -2020,6 +2042,7 @@ async fn run_session(
                                     ),
                                     approval_state: rt_c.tool_approvals.clone(),
                                     task_journal: rt_c.task_journal.clone(),
+                                    runtime: rt_c.clone(),
                                     cancel_rx,
                                     out_tx: tx_c,
                                 })
@@ -2274,7 +2297,7 @@ pub(crate) struct NodeRuntime {
     /// 本机项目代码硬盘服务配置。
     storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     /// 正在执行的 CLI prompt 请求，用于接收云端 stop/cancel 后终止子进程。
-    active_cli_prompts: RwLock<HashMap<String, watch::Sender<bool>>>,
+    active_cli_prompts: RwLock<HashMap<String, node_agent_active_task::ActiveCliPromptHandle>>,
     /// 本地任务 registry/jsonl，用于后续重启后恢复任务现场和 attach。
     task_journal: node_agent_task_journal::TaskJournal,
     /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
@@ -2339,22 +2362,41 @@ impl NodeRuntime {
         *self.cli_paths.write().await = paths;
     }
 
-    async fn register_cli_prompt_cancel(&self, req_id: &str, tx: watch::Sender<bool>) {
+    async fn register_cli_prompt(&self, handle: node_agent_active_task::ActiveCliPromptHandle) {
         self.active_cli_prompts
             .write()
             .await
-            .insert(req_id.to_string(), tx);
+            .insert(handle.req_id().to_string(), handle);
     }
 
     async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
-        let tx = self.active_cli_prompts.read().await.get(req_id).cloned();
-        let canceled = tx.map(|tx| tx.send(true).is_ok()).unwrap_or(false);
+        let handle = self.active_cli_prompts.read().await.get(req_id).cloned();
+        let canceled = handle
+            .map(|handle| handle.cancel_tx().send(true).is_ok())
+            .unwrap_or(false);
         if canceled {
             if let Err(error) = self.task_journal.record_cancel_requested(req_id) {
                 warn!("PC 任务 journal 写入取消事件失败: {error}");
             }
         }
         canceled
+    }
+
+    pub(crate) async fn active_cli_prompt_view(
+        &self,
+        req_id: &str,
+    ) -> Option<node_agent_active_task::ActiveCliPromptView> {
+        let pending_approvals = self.tool_approvals.pending_for_req(req_id).await;
+        let mut prompts = self.active_cli_prompts.write().await;
+        let handle = prompts.get_mut(req_id)?;
+        handle.touch();
+        Some(handle.view(pending_approvals))
+    }
+
+    async fn set_cli_prompt_os_pid(&self, req_id: &str, pid: Option<u32>) {
+        if let Some(handle) = self.active_cli_prompts.write().await.get_mut(req_id) {
+            handle.set_os_pid(pid);
+        }
     }
 
     async fn decide_tool_approval(&self, req_id: &str, approval_id: &str, decision: &str) -> bool {
