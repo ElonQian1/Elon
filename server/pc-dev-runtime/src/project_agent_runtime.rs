@@ -67,7 +67,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of low-risk commands. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of project commands. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -343,7 +343,13 @@ function Resolve-SafePath {
     $raw = $RelativePath.Trim()
     if (-not $raw) { throw 'Path cannot be empty.' }
     if ([System.IO.Path]::IsPathRooted($raw)) { throw "Absolute paths are not allowed: $raw" }
-    if ($raw -eq '.git' -or $raw.StartsWith('.git/') -or $raw.StartsWith('.git\')) { throw "Path cannot target .git: $raw" }
+    $parts = @($raw -split '[\\/]' | Where-Object { $_ -and $_ -ne '.' })
+    foreach ($part in $parts) {
+        if ($part -eq '..') { throw "Parent path segments are not allowed: $raw" }
+        if ($part.Equals('.git', [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "Path cannot target .git: $raw"
+        }
+    }
 
     $rootFull = [System.IO.Path]::GetFullPath($ProjectRoot)
     $rootPrefix = $rootFull
@@ -354,6 +360,16 @@ function Resolve-SafePath {
     $full = [System.IO.Path]::GetFullPath((Join-Path $ProjectRoot $raw))
     if ($full -ne $rootFull -and -not $full.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
         throw "Path escapes project root: $raw"
+    }
+    $current = $rootFull
+    foreach ($part in $parts) {
+        $current = Join-Path $current $part
+        if (Test-Path -LiteralPath $current) {
+            $item = Get-Item -LiteralPath $current -Force
+            if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+                throw "Path crosses a symlink or junction: $raw"
+            }
+        }
     }
     return $full
 }
@@ -374,10 +390,17 @@ function Test-AgentCommandAllowed {
     param([Parameter(Mandatory = $true)][string]$Command)
     $trimmed = $Command.Trim()
     $lower = $trimmed.ToLowerInvariant()
+    if (-not $lower) { return $false }
+    $shellMarkers = @(';', '&&', '||', '|', "`n", "`r", '>', '<', '$', '`')
+    foreach ($marker in $shellMarkers) {
+        if ($lower.Contains($marker)) { return $false }
+    }
+    if ([regex]::IsMatch($trimmed, '(^|\s|")([a-zA-Z]:[\\/]|\\\\)')) { return $false }
     $blockedPatterns = @(
         'remove-item', ' del ', ' rmdir ', 'format ', 'shutdown', 'restart-computer',
         'set-executionpolicy', 'reg delete', 'sc delete', 'takeown', 'icacls',
-        'invoke-webrequest', ' iwr ', 'curl ', '| iex', 'invoke-expression'
+        'invoke-webrequest', ' iwr ', 'curl ', 'invoke-expression',
+        'start-process', 'powershell', 'pwsh', 'cmd ', 'cmd.exe'
     )
     foreach ($pattern in $blockedPatterns) {
         if ($lower.Contains($pattern)) { return $false }
@@ -572,6 +595,10 @@ mod tests {
         assert!(script.contains("Invoke-ServerRuntime"));
         assert!(script.contains("/api/agent/runtime/chat"));
         assert!(script.contains("Resolve-SafePath"));
+        assert!(script.contains("Parent path segments are not allowed"));
+        assert!(script.contains("ReparsePoint"));
+        assert!(script.contains("$shellMarkers"));
+        assert!(script.contains("[regex]::IsMatch"));
     }
 
     #[test]

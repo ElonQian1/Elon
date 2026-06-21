@@ -93,7 +93,7 @@
       const next = normalizePermission(select.value);
       if (!projectId || next === previous) return;
       if (next === 'full_access') {
-        const ok = window.confirm(`确认给项目「${projectTitle(project)}」开启完全访问？AI CLI 可能读取或修改项目目录外的本机文件和系统设置。`);
+        const ok = window.confirm(`确认给项目「${projectTitle(project)}」开启完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。`);
         if (!ok) {
           select.value = previous;
           return;
@@ -230,8 +230,8 @@
           optional: true,
           tone: input.permission === 'full_access' ? 'warn' : 'ok',
           label: '执行权限',
-          detail: input.permission === 'full_access' ? 'Route A 可绕过项目沙箱' : '限制在项目目录内写入',
-          action: input.permission === 'full_access' ? 'Route B/C 仍保留本机白名单' : '需要跨目录操作时再开启完全访问'
+          detail: input.permission === 'full_access' ? 'Route A 全权限；B/C 保留白名单' : '限制在项目目录内写入',
+          action: input.permission === 'full_access' ? 'Route B/C 仍保留本机白名单；build/test 会执行项目代码' : '需要跨目录操作时再开启完全访问'
         }
       ];
     }

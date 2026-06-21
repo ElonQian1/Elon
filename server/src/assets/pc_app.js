@@ -1872,7 +1872,7 @@
     if (!els.settingsRuntimePermissionHint || !els.settingsRuntimePermission) return;
     const mode = normalizeRuntimePermission(els.settingsRuntimePermission.value);
     els.settingsRuntimePermissionHint.textContent = mode === 'full_access'
-      ? 'Route A 的 Codex/Copilot 会按用户授权绕过项目沙箱；Route B/C 仍保留本机路径和命令白名单。'
+      ? 'Route A 的 Codex/Copilot 会按用户授权绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
       : 'AI 只能读写当前项目目录，并运行开发相关命令。';
   }
 
@@ -1945,7 +1945,7 @@
     }
     const runtimeMode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
     if (runtimeMode === 'full_access') {
-      const ok = window.confirm(`确认给项目「${name}」开启完全访问？AI CLI 可能读取或修改项目目录外的本机文件和系统设置。`);
+      const ok = window.confirm(`确认给项目「${name}」开启完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。`);
       if (!ok) {
         setSettingsResult('已取消完全访问授权，项目尚未注册。');
         return;

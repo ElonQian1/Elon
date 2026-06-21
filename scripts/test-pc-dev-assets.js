@@ -84,6 +84,14 @@ function testProjectReadinessChecklist() {
   assert.ok(readyHtml.includes('AI 开发频道可用'), 'ready checklist should include development channel');
   assert.ok(readyHtml.includes('Route A · codex'), 'ready checklist should show selected route');
 
+  const fullAccessHtml = create(readyState).renderMemberPanel({
+    id: 'p1',
+    node_id: 'node-1',
+    workspace_path: 'D:/demo',
+    runtime_permission: 'full_access'
+  });
+  assert.ok(fullAccessHtml.includes('B/C 保留白名单'), 'full access copy should explain Route B/C boundaries');
+
   const blockedHtml = create({ nodes: [], projectSpace: { channels: [] } }).renderMemberPanel({ id: 'p2' });
   assert.ok(blockedHtml.includes('未绑定本机'), 'unbound project should not be marked ready');
   assert.ok(blockedHtml.includes('未绑定本机项目目录'), 'blocked checklist should explain missing workspace');

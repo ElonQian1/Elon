@@ -25,16 +25,22 @@
 - 已把 Route B/C 的本地工具权限改成只认可 `project_write` / `full_access` 两个已知值；未知权限默认只读。
 - 已修正 PC 和网页端 Route B/权限文案：Route B 显示为“本机 API runtime”，`full_access` 明确说明 Route B/C 仍保留本机路径和命令白名单。
 - 已通过 `node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml --bin elon-server route_`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`、`command_policy`、`tool_guard_only_known_runtime_permissions_enable_project_tools`、`safe_path_stays_inside_workspace`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 已将 PC 节点 Route B/C 本地工具守卫拆到 `server/src/node_agent_tool_guard.rs`，让权限模式、路径限制、命令白名单和测试不再堆在 runtime loop 大文件里。
+- 已短期硬化 Route B/C 命令与路径边界：拒绝 PowerShell 元字符、绝对路径参数、`..` 路径段、大小写变体 `.git` 以及 symlink/reparse-point 祖先路径。
+- 已同步硬化 `pc-dev-runtime` 生成的 `scripts\elon-agent.ps1`，新生成项目不会继续使用更松的 PowerShell 白名单。
+- 已把 PC/网页端 `full_access` 确认语改成真实边界：Route A 可按授权绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。
+- 已通过本阶段验证：`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
-补齐 PC 项目“开发就绪”的逐项核验显示，让用户能直接判断当前安装和项目是否可以像 Codex 桌面版一样开发。
+先完成 Route B/C 权限层模块化和短期安全硬化，再继续推进“更像 Codex Desktop”的持久任务控制、显式路线选择和工具审批。
 
 ## 待完成
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 下一阶段继续评估 Route B/C 是否要做任务级二次确认后再开放真正跨目录/full-access 工具，而不是直接取消本机白名单。
+- 下一阶段实现显式 Route A/B/C 选择，避免“自动回退”让用户误以为自己强制选了某条路线。
+- 下一阶段继续评估 Route B/C 是否要改成结构化 `{program,args}` 命令协议、任务级动作审批和 patch/apply_patch 工具，而不是直接取消本机白名单。
 
 ## 当前阻塞
 
