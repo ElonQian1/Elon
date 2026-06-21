@@ -4,6 +4,15 @@
 
 日期：2026-06-21
 
+## 2026-06-21 线上验证快照
+
+- 主项目服务端已发布：`v0.3.541`，线上 `/api/server/version` 返回 `gitSha=d5326564eb5c1cdb1b79019abdf346fa9b52dea1`。
+- fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
+- 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据。
+- 本轮 live smoke 已验证：主项目健康和版本、fb2 live tool manifest、Context Pack、比赛分析简报、群观点摘要、赛后复盘摘要、平台匿名订单摘要、统一工具执行 `group_opinion_summary`/`match_analysis_brief` 及其 visibility。
+- 本轮没有向生产群聊发送真实 `@EL` 消息，也没有读取真实用户的私有订单；`chat-bootstrap` 鉴权场景和“我的票”正例仍需要主项目用户 token、fb2 测试用户 UUID 或沙盒群授权。
+- 后续如果要证明“真实群聊端到端已完成”，必须用沙盒群或明确授权的生产群触发一次 `@EL` / 长按 `AI回复`，并检查 AI 回答的 source references、fb2 feedback、opinion adoption 和权限审计。
+
 主项目当前已经具备：
 
 - fb2 外部应用注册、默认群和品牌配置。
