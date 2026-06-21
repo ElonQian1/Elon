@@ -81,6 +81,78 @@ function Invoke-JsonOrNull {
     }
 }
 
+function Invoke-Json {
+    param(
+        [string]$Url,
+        [hashtable]$Headers = @{},
+        [string]$Method = "GET",
+        [object]$Body = $null
+    )
+
+    $params = @{
+        Uri = $Url
+        Method = $Method
+        Headers = $Headers
+        TimeoutSec = 30
+    }
+    if ($null -ne $Body) {
+        $params.ContentType = "application/json"
+        $params.Body = ($Body | ConvertTo-Json -Depth 8)
+    }
+    Invoke-RestMethod @params
+}
+
+function Resolve-Fb2ExternalUser {
+    if ($ExternalUserId) {
+        return
+    }
+    if (-not $Fb2Username -or -not $Fb2Password) {
+        return
+    }
+
+    try {
+        $login = Invoke-Json -Url "$Fb2Base/api/auth/login" -Method "POST" -Body @{
+            username = $Fb2Username
+            password = $Fb2Password
+        }
+    } catch {
+        Fail-FinalAcceptance "fb2 login failed before visible smoke: $($_.Exception.Message)"
+    }
+    if (-not $login.success -or -not $login.data.user.id) {
+        Fail-FinalAcceptance "fb2 login did not return a user id."
+    }
+
+    $script:ExternalUserId = [string]$login.data.user.id
+    if (-not $script:Fb2UserToken -and $login.data.token.access_token) {
+        $script:Fb2UserToken = [string]$login.data.token.access_token
+    }
+    Write-Output "OK`tfinal acceptance external user`t$script:ExternalUserId"
+}
+
+function Test-UserOrderContextBeforeVisibleSmoke {
+    $topic = [System.Uri]::EscapeDataString("帮我分析我的票")
+    $group = [System.Uri]::EscapeDataString($GroupId)
+    $user = [System.Uri]::EscapeDataString($ExternalUserId)
+    $headers = @{
+        "X-FB2-AI-CENTER-TOKEN" = $Fb2AiCenterToken.Trim()
+        "X-FB2-AI-CONTEXT-USER-ID" = $ExternalUserId
+    }
+    $url = "$Fb2Base/api/main-project/context/pack?group_id=$group&external_user_id=$user&topic_hint=$topic&limit=3&order_limit=1"
+    try {
+        $pack = Invoke-Json -Url $url -Headers $headers
+    } catch {
+        Fail-FinalAcceptance "fb2 user order context preflight failed before visible smoke: $($_.Exception.Message)"
+    }
+    if (-not $pack.success) {
+        Fail-FinalAcceptance "fb2 user order context preflight failed."
+    }
+    $orderCount = @($pack.data.user_orders | Where-Object { $_ }).Count
+    if ($orderCount -lt 1) {
+        Fail-FinalAcceptance "fb2 user order context preflight found no user_orders for ExternalUserId=$ExternalUserId."
+    }
+    Write-Output "OK`tfinal acceptance user order preflight`torders=$orderCount audit=$($pack.data.context_audit_id)"
+}
+
 function Invoke-SmokeScript {
     param(
         [string]$Name,
@@ -146,9 +218,6 @@ if (-not $AllowVisibleMessages) {
 if (-not $Fb2AiCenterToken) {
     Fail-FinalAcceptance "FB2_AI_CENTER_TOKEN or -Fb2AiCenterToken is required."
 }
-if (-not $ExternalUserId) {
-    Fail-FinalAcceptance "FB2_AI_CONTEXT_EXTERNAL_USER_ID or -ExternalUserId is required for user order verification."
-}
 if (-not $VoiceDeviceEvidencePath) {
     Fail-FinalAcceptance "FB2_VOICE_DEVICE_EVIDENCE_PATH or -VoiceDeviceEvidencePath is required."
 }
@@ -158,6 +227,15 @@ if (-not (Test-Path $VoiceDeviceEvidencePath)) {
 if (-not $MainToken -and -not $Fb2UserToken -and (-not $Fb2Username -or -not $Fb2Password)) {
     Fail-FinalAcceptance "Set ELON_MAIN_TOKEN, FB2_USER_TOKEN, or -Fb2Username/-Fb2Password for authenticated chat flows."
 }
+if (-not $ExternalUserId -and (-not $Fb2Username -or -not $Fb2Password)) {
+    Fail-FinalAcceptance "Set FB2_AI_CONTEXT_EXTERNAL_USER_ID or provide -Fb2Username/-Fb2Password so the wrapper can resolve the fb2 user id."
+}
+
+Resolve-Fb2ExternalUser
+if (-not $ExternalUserId) {
+    Fail-FinalAcceptance "Unable to resolve fb2 external user id from credentials; pass -ExternalUserId explicitly."
+}
+Test-UserOrderContextBeforeVisibleSmoke
 
 $startedAt = (Get-Date).ToUniversalTime().ToString("o")
 $qualitySince = $startedAt
@@ -208,6 +286,7 @@ Add-Arg $visibleArgs "-PollIntervalSec" $PollIntervalSec
 Add-SwitchArg $visibleArgs "-AllowVisibleMessages" $true
 
 $visibleResult = Invoke-SmokeScript "visible group chat smoke" $visibleArgs $visibleLogPath
+$visibleLines = @($visibleResult.output)
 
 $centerArgs = [System.Collections.Generic.List[string]]::new()
 [void]$centerArgs.Add("-NoProfile")
@@ -239,7 +318,6 @@ Add-SwitchArg $centerArgs "-FinalAcceptance" $true
 $centerResult = Invoke-SmokeScript "final no-skip acceptance" $centerArgs $centerLogPath
 
 $completedAt = (Get-Date).ToUniversalTime().ToString("o")
-$visibleLines = @($visibleResult.output)
 $feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"

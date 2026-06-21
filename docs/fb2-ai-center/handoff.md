@@ -124,8 +124,8 @@
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
   没有 `-AllowVisibleMessages` 时脚本必须保持失败退出。
 - 最终总验收优先运行：
-  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -ExternalUserId <uuid> -VoiceDeviceEvidencePath <json>`
-  该 wrapper 会把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON。
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
+  该 wrapper 会自动从 fb2 登录解析 `ExternalUserId`，在写群前预检该用户有订单上下文，再把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
 - 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。
