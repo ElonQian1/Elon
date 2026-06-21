@@ -130,9 +130,12 @@ GET /api/main-project/context/tool-manifest
 - `context_pack_version`
 - `has_usage_policy`
 - `has_tool_selection_policy`
+- `main_project_tool_execution_policy.chat_auto_executable_tool_ids`: 主项目群聊 AI 允许自动规划并执行的 fb2 工具。
+- `main_project_tool_execution_policy.manifest_only_tool_ids`: fb2 manifest 已暴露、但主项目聊天 AI 仍只当发现信息/回调/直接 Context endpoint 的工具或接口。
+- `main_project_tool_execution_policy.main_project_allowed_missing_tool_ids`: 主项目静态 allowlist 里有、但 fb2 实时 manifest 当前没暴露的工具；出现时按契约漂移处理。
 - `secret_values_exposed=false`
 
-这个字段用于确认 fb2 侧当前真实工具契约是否可用。读取失败不能让 AI 假装工具存在；主项目仍保留静态契约作为降级说明。
+这个字段用于确认 fb2 侧当前真实工具契约是否可用，并区分“已发现”和“聊天 AI 可自动执行”。读取失败或 allowlist 漂移时不能让 AI 假装工具存在；主项目仍保留静态契约作为降级说明。
 - 创建群聊总结帖：优先使用用户填写的 `topic`，并补充 `title`、`instructions`。
 - 自动拆分群聊总结帖：使用主项目拆出的议题 topic。
 - `/context/pack` 不可用回退 `/context/today-matches` 时，主项目仍会传 `group_id` 和 `topic_hint`。

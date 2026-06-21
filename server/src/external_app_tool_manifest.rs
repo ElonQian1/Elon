@@ -9,6 +9,7 @@ use crate::{
         fb2_base_url, fb2_context_token, timeout_secs, FB2_APP_ID, FB2_CONTEXT_HEADER,
     },
     external_app_context_response::compact_error,
+    external_app_context_tool_execution::FB2_ALLOWED_TOOLS,
     types::AppState,
 };
 
@@ -101,6 +102,7 @@ async fn fetch_fb2_tool_manifest(state: &Arc<AppState>) -> Value {
         .filter_map(normalize_fb2_tool_id)
         .take(MAX_TOOL_IDS)
         .collect::<Vec<_>>();
+    let tool_execution_policy = fb2_tool_execution_policy(&tool_ids);
 
     json!({
         "app_id": FB2_APP_ID,
@@ -114,6 +116,7 @@ async fn fetch_fb2_tool_manifest(state: &Arc<AppState>) -> Value {
         "context_pack_version": data.get("context_pack_version").cloned().unwrap_or(Value::Null),
         "has_usage_policy": data.get("usage_policy").is_some(),
         "has_tool_selection_policy": tool_contract.get("tool_selection_policy").is_some(),
+        "main_project_tool_execution_policy": tool_execution_policy,
         "secret_values_exposed": false
     })
 }
@@ -149,6 +152,42 @@ fn normalize_fb2_tool_id(value: &str) -> Option<String> {
     Some(value.strip_prefix("fb2.").unwrap_or(value).to_string())
 }
 
+fn fb2_tool_execution_policy(live_tool_ids: &[String]) -> Value {
+    let auto_executable_tool_ids = FB2_ALLOWED_TOOLS
+        .iter()
+        .filter(|tool| live_tool_ids.iter().any(|live| live == **tool))
+        .map(|tool| (*tool).to_string())
+        .collect::<Vec<_>>();
+    let manifest_only_tool_ids = live_tool_ids
+        .iter()
+        .filter(|tool| {
+            !FB2_ALLOWED_TOOLS
+                .iter()
+                .any(|allowed| allowed == &tool.as_str())
+        })
+        .cloned()
+        .collect::<Vec<_>>();
+    let allowed_missing_tool_ids = FB2_ALLOWED_TOOLS
+        .iter()
+        .filter(|tool| !live_tool_ids.iter().any(|live| live == **tool))
+        .map(|tool| (*tool).to_string())
+        .collect::<Vec<_>>();
+    let coverage_status = if allowed_missing_tool_ids.is_empty() {
+        "ready"
+    } else {
+        "degraded"
+    };
+
+    json!({
+        "schema": "external_app.live_tool_execution_policy.v1",
+        "chat_auto_executable_tool_ids": auto_executable_tool_ids,
+        "manifest_only_tool_ids": manifest_only_tool_ids,
+        "main_project_allowed_missing_tool_ids": allowed_missing_tool_ids,
+        "coverage_status": coverage_status,
+        "rule": "Only chat_auto_executable_tool_ids may be planned and executed by main-project chat AI. manifest_only_tool_ids are discovery/callback/direct-context endpoints until explicitly allowlisted and grounded."
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -172,5 +211,40 @@ mod tests {
 
         assert_eq!(status["secret_values_exposed"], false);
         assert!(status.get("FB2_MAIN_PROJECT_SHARED_SECRET").is_none());
+    }
+
+    #[test]
+    fn live_manifest_marks_manifest_only_tools_as_non_executable() {
+        let policy = fb2_tool_execution_policy(&[
+            "search_matches".to_string(),
+            "record_context_feedback".to_string(),
+            "context_quality_summary".to_string(),
+        ]);
+
+        assert_eq!(
+            policy["schema"],
+            "external_app.live_tool_execution_policy.v1"
+        );
+        assert_eq!(
+            policy["chat_auto_executable_tool_ids"]
+                .as_array()
+                .unwrap()
+                .first()
+                .and_then(Value::as_str),
+            Some("search_matches")
+        );
+        assert!(policy["manifest_only_tool_ids"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("record_context_feedback")));
+        assert!(policy["manifest_only_tool_ids"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("context_quality_summary")));
+        assert!(policy["main_project_allowed_missing_tool_ids"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("get_match_detail")));
+        assert_eq!(policy["coverage_status"], "degraded");
     }
 }

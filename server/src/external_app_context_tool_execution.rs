@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 
 const FB2_TOOL_EXECUTE_PATH: &str = "/api/main-project/tools/execute";
 
-const FB2_ALLOWED_TOOLS: &[&str] = &[
+pub(crate) const FB2_ALLOWED_TOOLS: &[&str] = &[
     "search_matches",
     "get_match_detail",
     "search_user_orders",
