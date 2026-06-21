@@ -239,6 +239,25 @@ function Build-AiCenterEvidence {
     }
 }
 
+function Build-VisibleAnswerEvidence {
+    param([string[]]$Lines)
+
+    [ordered]@{
+        visible_mention_reply_text = Find-CheckDetail $Lines "visible @EL reply text present"
+        visible_mention_sources = Find-CheckDetail $Lines "visible @EL reply cites sources"
+        visible_mention_fact_split = Find-CheckDetail $Lines "visible @EL reply separates facts and inference"
+        visible_mention_risk_boundary = Find-CheckDetail $Lines "visible @EL reply includes risk boundary"
+        visible_mention_no_guarantee = Find-CheckDetail $Lines "visible @EL reply avoids betting guarantees"
+        selected_message_reply_text = Find-CheckDetail $Lines "selected-message reply text present"
+        selected_message_sources = Find-CheckDetail $Lines "selected-message reply cites sources"
+        selected_message_fact_split = Find-CheckDetail $Lines "selected-message reply separates facts and inference"
+        selected_message_risk_boundary = Find-CheckDetail $Lines "selected-message reply includes risk boundary"
+        selected_message_no_guarantee = Find-CheckDetail $Lines "selected-message reply avoids betting guarantees"
+        selected_message_rejects_claim = Find-CheckDetail $Lines "selected-message rejects guarantee claim"
+        selected_message_references_claim = Find-CheckDetail $Lines "selected-message references reviewed claim"
+    }
+}
+
 if ($PreflightOnly -and $AllowVisibleMessages) {
     Fail-FinalAcceptance "Use either -PreflightOnly or -AllowVisibleMessages, not both."
 }
@@ -439,6 +458,7 @@ $summary = [ordered]@{
     selected_message_seed_id = Find-CheckDetail $visibleLines "selected-message seed sent"
     selected_message_reply_id = Find-CheckDetail $visibleLines "selected-message ai reply"
     feedback_evidence = $feedbackEvidence
+    visible_answer_policy_evidence = Build-VisibleAnswerEvidence $visibleLines
     final_acceptance_evidence = Build-AiCenterEvidence $centerLines
     success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0)
 }

@@ -94,6 +94,8 @@
 - `live_tool_manifest.main_project_tool_execution_policy` 会把 fb2 实时 manifest 拆成 `chat_auto_executable_tool_ids`、`manifest_only_tool_ids` 和 `main_project_allowed_missing_tool_ids`。fb2 新增工具后，只有进入 `chat_auto_executable_tool_ids` 才代表主项目群聊 AI 会自动规划执行；其它工具只是发现信息、回调端点或待接入能力。
 - 主项目新增 `scripts/smoke-fb2-ai-center.ps1`，用于不往生产群聊发消息的 live smoke：默认验证主项目健康、版本、context-contract 和工具覆盖；传 `FB2_AI_CENTER_TOKEN` 后验证 fb2 Context Pack、比赛分析、群观点、赛后复盘摘要；传 `-IncludePlatformOrderSummary` 后验证平台匿名摘要；传 `-ExternalUserId` 后验证本人订单上下文。
 - 主项目新增 `scripts/smoke-fb2-visible-chat.ps1`，用于获得明确授权后验证真实群聊可见入口：发送 `@EL`、调用 selected-message `/ai-reply`、等待 `usr_elon_ai`/`gai_*` 回复；默认没有 `-AllowVisibleMessages` 时会失败退出，避免无意写入生产群。
+- `scripts/smoke-fb2-visible-chat.ps1` 现在还会检查真实 AI 回复正文：`@EL` 和 selected-message `AI回复` 都必须带来源标记、事实/观点/推断分层、风险边界，并避免“肯定命中/稳赢/重注/包赢”等投注保证；selected-message 场景还必须明确反驳被测消息里的“肯定赢盘、重注”说法。
+- `scripts/smoke-fb2-final-acceptance.ps1` 的最终 summary 已新增 `visible_answer_policy_evidence`，把真实群聊回复正文策略证据和 `feedback_evidence`、`final_acceptance_evidence` 放在同一批验收 JSON 中。
 - 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
 - `android/chat-voice-kit` 已输出 `VoiceComposerView`、`VoiceComposerBootstrap`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
@@ -131,7 +133,7 @@
   该检查会读取 fb2 `/context/permission-summary`，用于证明未授权订单/平台摘要请求会被拒绝并记录审计。
 - 需要验证真实群聊可见入口时，必须确认用户已授权写生产群或提供沙盒群，再运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
-  没有 `-AllowVisibleMessages` 时脚本必须保持失败退出。
+  没有 `-AllowVisibleMessages` 时脚本必须保持失败退出；有授权执行时，脚本必须同时通过回复正文策略检查，不能只看 AI 回复消息 ID。
 - 最终总验收优先运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
