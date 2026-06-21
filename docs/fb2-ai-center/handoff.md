@@ -16,6 +16,7 @@
 - 长按 `AI回复` 后端入口验证通过：对消息 `gmsg_237cff0200a94f6d94aa61e339feaa37` 调用 `/api/me/groups/ext_fb2_official/messages/{messageId}/ai-reply` 后生成 AI 回复 `gai_596b1a4309a54bf4bdaa2c398ab4eccc`；fb2 自动反馈 `dbc25e69-d677-4503-a3bf-d97638866a62` 落库，`trigger=selected_message_ai_reply`，`matched_cited_source_count=1`。
 - 第六轮平台匿名订单摘要验证通过：可见消息 `gmsg_2413b6fb2c8a47e1a8bc6e8b3614b827` 触发 AI 回复 `gai_e258e05fc0b54a45991ce7d92843fd8f`，回复显式引用 `platform_order_summary:2026-06-21:all`，未泄露单个用户订单且未承诺命中；fb2 audit `a4343000-cd19-4757-9bab-5ca75f8c79aa` 含 `platform_order_summary` citation source，自动反馈 `69290519-e5ba-45da-bddf-a08945b1bd9d` 返回 `cited_source_count=1`、`matched_cited_source_count=1`。
 - 第七轮群友观点验证通过：可见消息 `gmsg_35c1be9597c14098ace5a50e07beb7b9` 触发 AI 回复 `gai_530ea615bafb4215b317f200c619eaa0`，回复区分“群友观点”和“AI推断”，引用群消息 `c0910321-77b5-4ac1-a398-40615f32051e` 与比赛 `EXT-2589467`，且在 fb2 未展开具体群观点内容时明确说明信息不足；fb2 自动反馈 `116d8041-4283-4a84-9a97-ec0c73055413` 返回 `cited_source_count=2`、`matched_cited_source_count=2`。
+- 第八轮“这条消息说得对吗”验证通过：先发送不带 `@EL` 的可见消息 `gmsg_7f808244d0084bf8b441fac80bf3e12a`，内容包含“西班牙让两球肯定赢盘、可以重注”，再调用长按 `AI回复` 后端入口；AI 回复 `gai_54627ba13175499ea2eef77085da3837` 基于 `EXT-2589467` 赔率和盘口事实纠正该说法，明确不承诺命中且提示重注风险；fb2 自动反馈 `062d14b9-bdba-4e43-a1f9-7bcd9c07b5b4` 返回 `trigger=selected_message_ai_reply`、`matched_cited_source_count=1`。
 - 主项目服务端已发布：`v0.3.552`，线上 `/api/server/version` 返回 `gitSha=4afafcd797e3b4e719d133e180d26318ff07321d`。
 - fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
 - 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据。
@@ -61,7 +62,7 @@
 
 - 用真实群聊消息和真实用户票据继续扩充联调样本，确认“我的票/群观点”在不同账号权限下都返回期望数据；平台订单风险工具的匿名聚合和单群轻量群观点正向 smoke 已通过。
 - 发布后抽样验证主项目群聊链路里 `user_order_context_present=true` 的日志，确认用户订单上下文已经从 fb2 进入 prompt；平台摘要仍应只在双端开关和 scope 同时开启时出现。
-- 用主项目真实群聊入口触发 `@EL` 和长按消息 `AI回复`，确认主项目工具执行结果进入 prompt 后，AI 回答能显式区分比赛事实、本人订单、群观点和 AI 推断。
+- 用更多账号继续抽样主项目真实群聊入口触发 `@EL` 和长按消息 `AI回复`；当前账号 `123qwe` 已验证 AI 回答能显式区分比赛事实、本人订单、群观点和 AI 推断。
 - 用已完赛比赛样本验证 `opinion_result_review_summary` 和 `opinion_result_reviews` 在主项目真实群聊回答中只被描述为历史复盘/样本统计，不被写成未来命中承诺。
 - fb2 接入 `VoiceComposerView` 的完整输入栏，而不是只接 ASR/TTS。
 - fb2 真机验证小米/HyperOS 系统 ASR 超时后云端兜底。
