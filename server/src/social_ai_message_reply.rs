@@ -232,11 +232,10 @@ async fn build_selected_reply(
         &[
             json!({
                 "role": "system",
-                "content": social_ai_prompt()
-            }),
-            json!({
-                "role": "system",
-                "content": "本次触发来自用户长按历史消息后点击「AI回复」，不是 @EL 文本触发。请优先根据被选择的消息作答，必要时只把最近聊天作为上下文参考。"
+                "content": format!(
+                    "{}\n\n本次触发来自用户长按历史消息后点击「AI回复」，不是 @EL 文本触发。请优先根据被选择的消息作答，必要时只把最近聊天作为上下文参考。",
+                    social_ai_prompt()
+                )
             }),
             json!({
                 "role": "user",

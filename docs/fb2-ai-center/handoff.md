@@ -40,6 +40,7 @@
 - 本轮本地验证通过：`cargo test social_ai_pending`、`cargo fmt --check`、`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted>`。完整真实群 smoke 仍需等主项目模型生成层恢复后再跑，否则会继续因无引用来源而失败。
 - 本轮已发布主项目服务端：提交 `c797bf2d`，服务器版本 `v0.3.559`，线上 `/health=OK`，`/api/server/version.gitSha=c797bf2d309aaac8e248c1c26c7f9b67a27a0145`。发布后可见群单条 `@EL` smoke 发送 `gmsg_3f34e14c9ae945b18ae0f7780d53ac34`，收到回复 `gai_5840b26ede824f0bb5289bf7f9396e5e`；日志确认仍是模型生成层不可用导致兜底文案，但 8 秒后未出现 `trigger_message_id=gai_5840...`，说明 AI 自己回复不再二次触发 `@EL`。
 - 2026-06-21 20:51 本地新增主项目 `social_ai` 多代理 fallback：`@EL` 与长按 `AI回复` 先用默认代理，遇到模型供应/接口类错误（例如“当前 AI 模型额度已用尽或接口不可用”、provider 超时、rate limit、endpoint inactive）会按已配置代理顺序尝试备用代理；用户余额不足、封禁、token 月限额、计费系统错误不会 fallback。本地验证已通过 `cargo fmt --check`、`cargo test social_ai_agents`、`cargo test social_ai`、`cargo check --bin elon-server`。该修复仍需提交、发布并重新跑真实群 visible smoke，才能确认线上 AI 生成层恢复。
+- 2026-06-21 21:12 线上复核发现 `@EL` 在多代理 fallback 后已能生成真实回答，但长按 `AI回复` 的 selected-message 链路仍返回兜底文案；服务器日志定位为备用模型要求 `system` 消息只能出现在最开始，而 selected-message 请求构造了两个连续 `system` 消息。主项目已改为把长按专用指令合并进首个 `system` prompt，本地验证通过 `cargo fmt --check`、`cargo test social_ai_message_reply`、`cargo check --bin elon-server`；仍需提交、发布并重新跑 selected-message visible smoke。
 
 主项目当前已经具备：
 
