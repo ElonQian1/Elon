@@ -42,6 +42,7 @@
 - 2026-06-21 20:51 本地新增主项目 `social_ai` 多代理 fallback：`@EL` 与长按 `AI回复` 先用默认代理，遇到模型供应/接口类错误（例如“当前 AI 模型额度已用尽或接口不可用”、provider 超时、rate limit、endpoint inactive）会按已配置代理顺序尝试备用代理；用户余额不足、封禁、token 月限额、计费系统错误不会 fallback。本地验证已通过 `cargo fmt --check`、`cargo test social_ai_agents`、`cargo test social_ai`、`cargo check --bin elon-server`。该修复仍需提交、发布并重新跑真实群 visible smoke，才能确认线上 AI 生成层恢复。
 - 2026-06-21 21:12 线上复核发现 `@EL` 在多代理 fallback 后已能生成真实回答，但长按 `AI回复` 的 selected-message 链路仍返回兜底文案；服务器日志定位为备用模型要求 `system` 消息只能出现在最开始，而 selected-message 请求构造了两个连续 `system` 消息。主项目已改为把长按专用指令合并进首个 `system` prompt，本地验证通过 `cargo fmt --check`、`cargo test social_ai_message_reply`、`cargo check --bin elon-server`；仍需提交、发布并重新跑 selected-message visible smoke。
 - 2026-06-21 21:35 线上 selected-message 复核已能生成真实回答并正常计费，但反馈日志显示 `cited_source_count=0`，原因是回复使用了 fb2 比赛/赔率上下文却未显式写出 `EXT-*` 或其它 source id。主项目已把“使用 fb2 外部上下文必须写出来源 ID 或 label，否则说信息不足”的规则加入 `social_ai` 基础 prompt，并补 `base_prompt_requires_fb2_source_references` 测试；本地验证通过 `cargo fmt --check`、该单测和 `cargo check --bin elon-server`，仍需发布并重新跑 visible smoke 验证 cited source 计数。
+- 2026-06-21 21:52 线上 selected-message 复核再次超时，日志显示 fallback 仍按字典序尝试 `copilot:*` 代理，其中 `copilot:gpt-4o` 请求拖到约 2 分钟。主项目已把 `social_ai` fallback 候选限制为 `usage_mode=server_api_key` 且排除 `copilot:*` / `api.githubcopilot.com`，避免用户 token/CLI 类代理进入实时群聊 AI 生成链路；本地验证通过 `cargo fmt`、`cargo test social_ai_agents`、`cargo check --bin elon-server`，仍需发布后重新跑 visible smoke。
 
 主项目当前已经具备：
 

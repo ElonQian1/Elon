@@ -67,7 +67,11 @@ async fn social_agents_in_fallback_order(state: &Arc<AppState>) -> Vec<AgentConf
 
 fn ordered_social_agents(config: &AgentsConfig) -> Vec<AgentConfig> {
     let mut result = Vec::new();
-    if let Some(default) = config.agents.get(&config.default_agent) {
+    if let Some(default) = config
+        .agents
+        .get(&config.default_agent)
+        .filter(|agent| social_agent_is_eligible(agent))
+    {
         result.push(default.clone());
     }
 
@@ -77,11 +81,24 @@ fn ordered_social_agents(config: &AgentsConfig) -> Vec<AgentConfig> {
         if name == config.default_agent {
             continue;
         }
-        if let Some(agent) = config.agents.get(&name) {
+        if let Some(agent) = config
+            .agents
+            .get(&name)
+            .filter(|agent| social_agent_is_eligible(agent))
+        {
             result.push(agent.clone());
         }
     }
     result
+}
+
+fn social_agent_is_eligible(agent: &AgentConfig) -> bool {
+    if agent.usage_mode() != "server_api_key" {
+        return false;
+    }
+    let name = agent.name.to_ascii_lowercase();
+    let base = agent.api_base.to_ascii_lowercase();
+    !name.starts_with("copilot:") && !base.contains("api.githubcopilot.com")
 }
 
 fn is_retryable_social_agent_error(message: &str) -> bool {
@@ -122,6 +139,13 @@ mod tests {
         }
     }
 
+    fn agent_with_usage(name: &str, model: &str, usage_mode: Option<&str>) -> AgentConfig {
+        AgentConfig {
+            usage_mode: usage_mode.map(str::to_string),
+            ..agent(name, model)
+        }
+    }
+
     #[test]
     fn orders_default_agent_first_then_stable_names() {
         let mut agents = HashMap::new();
@@ -138,6 +162,31 @@ mod tests {
             .map(|agent| agent.name)
             .collect::<Vec<_>>();
         assert_eq!(names, ["default", "alpha", "zeta"]);
+    }
+
+    #[test]
+    fn orders_only_server_side_social_agents() {
+        let mut agents = HashMap::new();
+        agents.insert("default".to_string(), agent("default", "d"));
+        agents.insert(
+            "copilot:gpt-4o".to_string(),
+            agent("copilot:gpt-4o", "gpt-4o"),
+        );
+        agents.insert(
+            "user-proxy".to_string(),
+            agent_with_usage("user-proxy", "u", Some("user_api_key_proxy")),
+        );
+        agents.insert("server-alt".to_string(), agent("server-alt", "s"));
+        let config = AgentsConfig {
+            agents,
+            default_agent: "default".to_string(),
+        };
+
+        let names = ordered_social_agents(&config)
+            .into_iter()
+            .map(|agent| agent.name)
+            .collect::<Vec<_>>();
+        assert_eq!(names, ["default", "server-alt"]);
     }
 
     #[test]
