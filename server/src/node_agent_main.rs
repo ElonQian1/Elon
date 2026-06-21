@@ -58,6 +58,7 @@ mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
 mod node_agent_server_runtime;
+mod node_agent_task_journal;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_write_preview;
@@ -1970,6 +1971,16 @@ async fn run_session(
                                             return;
                                         }
                                     };
+                                if let Err(error) = rt_c.task_journal.record_started(
+                                    node_agent_task_journal::TaskJournalStart {
+                                        req_id: &req_id_for_cleanup,
+                                        cli_name: resolved_cli.name(),
+                                        cwd: prepared_cwd.cwd.as_deref(),
+                                        runtime_permission: runtime_permission.as_deref(),
+                                    },
+                                ) {
+                                    warn!("PC 任务 journal 写入开始事件失败: {error}");
+                                }
                                 run_cli_prompt(CliPromptRun {
                                     req_id,
                                     bin: resolved_cli.bin().to_string(),
@@ -1990,6 +2001,11 @@ async fn run_session(
                                     out_tx: tx_c,
                                 })
                                 .await;
+                                if let Err(error) =
+                                    rt_c.task_journal.record_finished(&req_id_for_cleanup)
+                                {
+                                    warn!("PC 任务 journal 写入结束事件失败: {error}");
+                                }
                                 rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
                             });
                         }
@@ -2236,6 +2252,8 @@ pub(crate) struct NodeRuntime {
     storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     /// 正在执行的 CLI prompt 请求，用于接收云端 stop/cancel 后终止子进程。
     active_cli_prompts: RwLock<HashMap<String, watch::Sender<bool>>>,
+    /// 本地任务 registry/jsonl，用于后续重启后恢复任务现场和 attach。
+    task_journal: node_agent_task_journal::TaskJournal,
     /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
     tool_approvals: node_agent_tool_approval::ToolApprovalState,
     /// Route A 完全访问的本机项目级授权记录。
@@ -2266,6 +2284,7 @@ impl NodeRuntime {
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
             active_cli_prompts: RwLock::new(HashMap::new()),
+            task_journal: node_agent_task_journal::TaskJournal::default(),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
             wake: Notify::new(),
@@ -2306,7 +2325,13 @@ impl NodeRuntime {
 
     async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
         let tx = self.active_cli_prompts.read().await.get(req_id).cloned();
-        tx.map(|tx| tx.send(true).is_ok()).unwrap_or(false)
+        let canceled = tx.map(|tx| tx.send(true).is_ok()).unwrap_or(false);
+        if canceled {
+            if let Err(error) = self.task_journal.record_cancel_requested(req_id) {
+                warn!("PC 任务 journal 写入取消事件失败: {error}");
+            }
+        }
+        canceled
     }
 
     async fn decide_tool_approval(&self, req_id: &str, approval_id: &str, decision: &str) -> bool {

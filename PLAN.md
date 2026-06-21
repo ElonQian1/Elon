@@ -17,6 +17,7 @@
 9. Route C 兜底可靠性：Route A 不再只因发现 CLI 路径就抢占自动路由；新节点必须通过 CLI 版本探测才算 Route A ready，残留坏 CLI 会自动落到 Route B/C。
 10. Route C 云端健康预检：服务器提供 `/api/agent/runtime/status`，PC 节点用登录 token 预检服务器模型是否真实可用，避免只因有 token 就显示 Route C ready。
 11. PC 前端任务现场接入：AI 开发频道前端消费 `snapshot` 接口缓存 attach/事件游标，用轻量快照轮询替代纯整频道刷新，并在任务卡显示 live/detached/terminal 现场状态。
+12. PC 节点本地 journal：节点本机写入 CLI prompt registry/jsonl，记录 started/cancel_requested/finished，作为后续重启恢复和 attach 协议的数据底座。
 
 ## 风险
 
@@ -38,6 +39,7 @@
 - `cargo test --manifest-path server\Cargo.toml project_tool_approval -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`
 - `cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`
 - `node scripts\test-pc-dev-assets.js`
 - `cargo test --manifest-path server\Cargo.toml --all-features`

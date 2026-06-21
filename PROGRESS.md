@@ -34,6 +34,7 @@
 - 已修复 Route A 假 ready 抢占 Route C 的一类问题：PC 节点 profile 现在要求 CLI 版本探测成功才标记 Route A ready；服务端自动/强制 Route A 会尊重该状态，坏的本机 CLI 会让自动路线继续落到 Route B/C。
 - 已新增 Route C 云端健康预检：服务端暴露 `/api/agent/runtime/status`，PC 节点启动时用登录 token 验证服务器模型 runtime 是否真实 ready，避免“有 token 但服务器模型未配置”时误报可用。
 - 已把 PC 任务 `snapshot` 接入前端并补齐 `/assets` 路由：AI 开发频道现在会按任务快照游标轮询，缓存 attach 状态，并在任务卡展示“现场可连接 / 现场已脱离 / 终态快照”。
+- 已新增 PC 节点本地任务 journal 基础：节点本机写入 CLI prompt `registry.json` 与 `events.jsonl`，记录 started / cancel_requested / finished，给后续重启恢复和 attach 协议使用。
 
 ## 验证结果
 
@@ -50,6 +51,7 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml project_tool_approval -- --nocapture`，8 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`，9 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`，1 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，1 passed
 - 通过：`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`，2 passed
 - 通过：`node scripts\test-pc-dev-assets.js`
 - 通过：`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
@@ -65,7 +67,7 @@
 - 按发布脚本发布服务端；本阶段改动了 Windows 节点启动侧 Route C ready 判断，需要同步重新发布 Windows 节点包。
 - 下一阶段实现真正任务恢复：定义持久 run handle，绑定 `task_id/pc_req_id/node_id/route/cwd/codex_session_id/lease/last_event_seq/resume_strategy`。
 - 下一阶段给 PC 节点增加本地任务 registry/jsonl journal，并扩展 homecli attach 协议，避免把 `codex resume` 误认为同进程恢复。
-- 下一阶段继续推进 PC node 本地 registry/jsonl journal，并扩展 homecli attach 协议，避免把 `codex resume` 误认为同进程恢复。
+- 下一阶段扩展 homecli attach 协议，让前端能查询本机 journal 并区分“重连原进程”和“基于快照继续”。
 
 ## 剩余风险
 
