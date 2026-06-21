@@ -27,6 +27,7 @@
 
 - 无 token 的 smoke 只能证明主项目契约和 live manifest 可读，不能证明最终完成。
 - `-FinalAcceptance` 必须同时具备主项目登录、`FB2_AI_CENTER_TOKEN`、fb2 live 数据、质量反馈样本、fb2 APK 发布检查、主项目语音 SDK 构建和 fb2 真机语音证据。
+- `scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly` 是进入真实群聊前的无副作用强门禁，必须先验证 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip。
 - 真机语音证据必须使用 `docs/fb2-ai-center/voice-device-evidence.example.json` 同格式回传，不能只用口头描述。
 - 最终总验收使用 `scripts\smoke-fb2-final-acceptance.ps1`，把真实群聊可见触发和 `-FinalAcceptance` 绑定成同一批证据，避免拿历史反馈或旧群聊记录凑数。
 

@@ -42,4 +42,4 @@
 
 常规巡检先跑无副作用脚本 `scripts/smoke-fb2-ai-center.ps1`。只有拿到明确授权后，才运行有副作用脚本 `scripts/smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`，它会向真实群聊发送可见消息。
 
-最终验收使用 `scripts/smoke-fb2-final-acceptance.ps1`。先用 `-PreflightOnly` 做无副作用预检：解析 `ExternalUserId`、确认该用户有订单上下文、校验真机语音证据，但不发送群消息。预检通过后，再用 `-AllowVisibleMessages` 把真实群聊可见触发和 `smoke-fb2-ai-center.ps1 -FinalAcceptance` 绑定到同一批证据，并输出机器可读 summary；summary 会记录子脚本日志路径、`@EL` 消息 ID、AI 回复 ID、长按 `AI回复` 消息 ID 和 feedback evidence。传 `-Fb2Username/-Fb2Password` 时会自动解析 `ExternalUserId`；缺 `FB2_AI_CENTER_TOKEN`、无法解析或手工提供有订单的 `ExternalUserId`、真机语音证据或显式写群授权时必须失败。
+最终验收使用 `scripts/smoke-fb2-final-acceptance.ps1`。先用 `-PreflightOnly` 做无副作用预检：解析 `ExternalUserId`、确认该用户有订单上下文，并在不发送群消息的前提下强制验证 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 门槛。预检通过后，再用 `-AllowVisibleMessages` 把真实群聊可见触发和 `smoke-fb2-ai-center.ps1 -FinalAcceptance` 绑定到同一批证据，并输出机器可读 summary；summary 会记录子脚本日志路径、`@EL` 消息 ID、AI 回复 ID、长按 `AI回复` 消息 ID 和 feedback evidence。传 `-Fb2Username/-Fb2Password` 时会自动解析 `ExternalUserId`；缺 `FB2_AI_CENTER_TOKEN`、无法解析或手工提供有订单的 `ExternalUserId`、真机语音证据或显式写群授权时必须失败。

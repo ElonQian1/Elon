@@ -286,7 +286,13 @@ if ($PreflightOnly) {
     Add-Arg $preflightArgs "-ExternalUserId" $ExternalUserId
     Add-Arg $preflightArgs "-RequestTimeoutSec" $RequestTimeoutSec
     Add-Arg $preflightArgs "-VoiceDeviceEvidencePath" $VoiceDeviceEvidencePath
+    Add-SwitchArg $preflightArgs "-RequireFb2Live" $true
+    Add-SwitchArg $preflightArgs "-RequireAllScenarios" $true
+    Add-SwitchArg $preflightArgs "-IncludePlatformOrderSummary" $true
+    Add-SwitchArg $preflightArgs "-CheckFb2ApkVersion" $true
+    Add-SwitchArg $preflightArgs "-CheckLocalVoiceSdkBuild" $true
     Add-SwitchArg $preflightArgs "-RequireVoiceDeviceEvidence" $true
+    Add-SwitchArg $preflightArgs "-RequireNoSkips" $true
 
     $preflightLogPath = Join-Path $summaryDir "final-acceptance-$stamp-preflight.log"
     $preflightResult = Invoke-SmokeScript "final preflight without visible messages" $preflightArgs $preflightLogPath

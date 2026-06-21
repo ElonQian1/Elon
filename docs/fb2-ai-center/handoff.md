@@ -13,6 +13,7 @@
 - 2026-06-21 本地语音 SDK 构建 smoke 补强：`scripts/smoke-fb2-ai-center.ps1 -CheckLocalVoiceSdkBuild` 会执行 `android\gradlew.bat :chat-voice-kit:assembleDebug --quiet`，把 `VoiceComposerBootstrap`/`VoiceComposerView` 是否仍可被 fb2 编译引用纳入同一巡检脚本。
 - 2026-06-21 最终验收门槛补强：`scripts/smoke-fb2-ai-center.ps1 -RequireNoSkips` 会在任何检查被 skip 时失败，避免缺少主项目 token、`FB2_AI_CENTER_TOKEN` 或 live 覆盖时误判“终极目标已完成”。
 - 2026-06-22 最终总验收开关补强：`scripts/smoke-fb2-ai-center.ps1 -FinalAcceptance` 会自动打开 live fb2 场景、完整场景、平台摘要、质量反馈、fb2 APK 发布、主项目语音 SDK 构建和 no-skip 门槛。当前环境没有 `FB2_AI_CENTER_TOKEN` 时该命令应失败，这代表终极验收条件仍未满足，而不是脚本异常。
+- 2026-06-22 最终预检门槛补强：`scripts/smoke-fb2-final-acceptance.ps1 -PreflightOnly` 现在会在不发送真实群消息的情况下，先强制跑 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 门槛；通过后才进入 `-AllowVisibleMessages` 的真实群聊验收。
 - 2026-06-21 SDK 构建复核通过：`cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 成功，确认主项目当前 `android/chat-voice-kit` 可产出 debug AAR，fb2 可继续引用 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 真实群聊补充验证：账号 `123qwe` 已通过 fb2 外部应用会话绑定到主项目用户，群 `ext_fb2_official` 可发送可见 `@EL` 消息；实测 `Context Pack` 和 `match_analysis_brief` 已返回该用户本人订单，但 AI 回复曾被超时的补充 `search_user_orders` 结果干扰。
 - 主项目已修复提示和工具规划规则：Context Pack `user_orders` 与 `match_analysis_brief.data.user_orders` 都算当前用户订单来源；`search_user_orders unavailable` 只表示补充展开失败，不能否定已有本人订单事实。
@@ -126,7 +127,7 @@
 - 最终总验收优先运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
-  先用 `-PreflightOnly` 做无副作用预检；通过后再用 `-AllowVisibleMessages` 写真实群聊。该 wrapper 会自动从 fb2 登录解析 `ExternalUserId`，在写群前预检该用户有订单上下文，再把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON。
+  先用 `-PreflightOnly` 做无副作用预检；该阶段会自动从 fb2 登录解析 `ExternalUserId`，预检该用户有订单上下文，并要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 全部通过。预检通过后再用 `-AllowVisibleMessages` 写真实群聊，把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
 - 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。
