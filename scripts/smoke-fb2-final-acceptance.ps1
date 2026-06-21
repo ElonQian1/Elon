@@ -84,16 +84,60 @@ function Invoke-JsonOrNull {
 function Invoke-SmokeScript {
     param(
         [string]$Name,
-        [System.Collections.Generic.List[string]]$Args
+        [System.Collections.Generic.List[string]]$Args,
+        [string]$LogPath
     )
 
     Write-Output ""
     Write-Output "== $Name =="
-    & pwsh @Args
+    $lines = [System.Collections.Generic.List[string]]::new()
+    & pwsh @Args 2>&1 | ForEach-Object {
+        $line = [string]$_
+        [void]$lines.Add($line)
+        Write-Output $line
+    }
     $exitCode = $LASTEXITCODE
     if ($null -eq $exitCode) { $exitCode = 0 }
+    if ($LogPath) {
+        Set-Content -Path $LogPath -Value $lines -Encoding UTF8
+    }
     Write-Output "== $Name exit_code=$exitCode =="
-    return [int]$exitCode
+    return [pscustomobject]@{
+        exit_code = [int]$exitCode
+        log_path = $LogPath
+        output = @($lines)
+    }
+}
+
+function Find-CheckDetail {
+    param(
+        [string[]]$Lines,
+        [string]$CheckName
+    )
+
+    $prefix = "OK`t$CheckName`t"
+    foreach ($line in $Lines) {
+        if ($line.StartsWith($prefix)) {
+            return $line.Substring($prefix.Length).Trim()
+        }
+    }
+    return ""
+}
+
+function Find-FeedbackEvidence {
+    param([string[]]$Lines)
+
+    $items = @()
+    foreach ($line in $Lines) {
+        if ($line -match '^OK\t(?<scenario>.+ fb2 feedback)\t(?<request>\S+) feedback=(?<feedback>\S+)') {
+            $items += [pscustomobject]@{
+                scenario = $Matches.scenario
+                main_request_id = $Matches.request
+                feedback_id = $Matches.feedback
+            }
+        }
+    }
+    return $items
 }
 
 if (-not $AllowVisibleMessages) {
@@ -120,6 +164,20 @@ $qualitySince = $startedAt
 $root = Split-Path -Parent $PSScriptRoot
 $visibleScript = Join-Path $PSScriptRoot "smoke-fb2-visible-chat.ps1"
 $centerScript = Join-Path $PSScriptRoot "smoke-fb2-ai-center.ps1"
+$stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
+
+if (-not $SummaryPath) {
+    $summaryDir = Join-Path $root "target\fb2-ai-center"
+    $SummaryPath = Join-Path $summaryDir "final-acceptance-$stamp.json"
+} else {
+    $summaryDir = Split-Path -Parent $SummaryPath
+    if (-not $summaryDir) {
+        $summaryDir = "."
+    }
+}
+New-Item -ItemType Directory -Force -Path $summaryDir | Out-Null
+$visibleLogPath = Join-Path $summaryDir "final-acceptance-$stamp-visible-chat.log"
+$centerLogPath = Join-Path $summaryDir "final-acceptance-$stamp-ai-center.log"
 
 $mainHead = ""
 try { $mainHead = (& git -C $root rev-parse HEAD).Trim() } catch { $mainHead = "" }
@@ -149,7 +207,7 @@ Add-Arg $visibleArgs "-FeedbackPollTimeoutSec" $FeedbackPollTimeoutSec
 Add-Arg $visibleArgs "-PollIntervalSec" $PollIntervalSec
 Add-SwitchArg $visibleArgs "-AllowVisibleMessages" $true
 
-$visibleExit = Invoke-SmokeScript "visible group chat smoke" $visibleArgs
+$visibleResult = Invoke-SmokeScript "visible group chat smoke" $visibleArgs $visibleLogPath
 
 $centerArgs = [System.Collections.Generic.List[string]]::new()
 [void]$centerArgs.Add("-NoProfile")
@@ -178,9 +236,11 @@ Add-Arg $centerArgs "-MaxMissingContextRate" $MaxMissingContextRate
 Add-Arg $centerArgs "-MaxWrongContextRate" $MaxWrongContextRate
 Add-SwitchArg $centerArgs "-FinalAcceptance" $true
 
-$centerExit = Invoke-SmokeScript "final no-skip acceptance" $centerArgs
+$centerResult = Invoke-SmokeScript "final no-skip acceptance" $centerArgs $centerLogPath
 
 $completedAt = (Get-Date).ToUniversalTime().ToString("o")
+$visibleLines = @($visibleResult.output)
+$feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"
     started_at = $startedAt
@@ -195,16 +255,16 @@ $summary = [ordered]@{
     main_project_status = $mainStatus
     main_server_version = $mainVersion
     fb2_app_version = $fb2Version
-    visible_chat_exit_code = $visibleExit
-    final_acceptance_exit_code = $centerExit
-    success = ($visibleExit -eq 0 -and $centerExit -eq 0)
-}
-
-if (-not $SummaryPath) {
-    $summaryDir = Join-Path $root "target\fb2-ai-center"
-    New-Item -ItemType Directory -Force -Path $summaryDir | Out-Null
-    $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
-    $SummaryPath = Join-Path $summaryDir "final-acceptance-$stamp.json"
+    visible_chat_exit_code = $visibleResult.exit_code
+    final_acceptance_exit_code = $centerResult.exit_code
+    visible_chat_log_path = $visibleResult.log_path
+    final_acceptance_log_path = $centerResult.log_path
+    visible_mention_message_id = Find-CheckDetail $visibleLines "visible @EL sent"
+    visible_mention_reply_id = Find-CheckDetail $visibleLines "visible @EL ai reply"
+    selected_message_seed_id = Find-CheckDetail $visibleLines "selected-message seed sent"
+    selected_message_reply_id = Find-CheckDetail $visibleLines "selected-message ai reply"
+    feedback_evidence = $feedbackEvidence
+    success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0)
 }
 
 $summaryJson = $summary | ConvertTo-Json -Depth 8

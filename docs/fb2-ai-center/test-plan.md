@@ -45,7 +45,7 @@
 - 设置 `FB2_AI_CENTER_TOKEN` 后，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality` 能验证 fb2 `/context/quality-summary`：`missing_context_rate`、`wrong_context_rate`、`citation_unmatched_rate` 不超过阈值，`large_context_pack_rate` 不超过预算阈值。
 - 需要验证自动反馈闭环时，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339>` 必须确认最近反馈样本存在，且 `matched_cited_source_count` 达到门槛、`unmatched_cited_source_count=0`。
 - 获得明确授权后，`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages` 能发送真实群聊 `@EL` 消息、调用 selected-message `/ai-reply`，并等到 `usr_elon_ai`/`gai_*` 回复；没有 `-AllowVisibleMessages` 时脚本必须拒绝写群。
-- 最终验收优先跑 `scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages`，它会先记录 `QualitySince`，再发送真实群聊 `@EL` 和 selected-message `AI回复`，最后跑 `smoke-fb2-ai-center.ps1 -FinalAcceptance`；输出的 summary 必须显示 visible chat 和 final acceptance 两个 exit code 都为 0。
+- 最终验收优先跑 `scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages`，它会先记录 `QualitySince`，再发送真实群聊 `@EL` 和 selected-message `AI回复`，最后跑 `smoke-fb2-ai-center.ps1 -FinalAcceptance`；输出的 summary 必须显示 visible chat 和 final acceptance 两个 exit code 都为 0，并包含可见消息 ID、AI 回复 ID、子脚本日志路径和 feedback evidence。
 - 主项目工具 planner 对“今天比赛/预测/赔率/我的票”优先规划 `match_analysis_brief`，并保留 `search_matches`、`search_user_orders` 等补充工具。
 - 主项目工具 planner 对“群里大家怎么看/群友观点/讨论分歧”优先规划 `group_opinion_summary`，并保留 `search_group_opinions`、`opinion_memories` 等补充工具。
 - `match_analysis_brief` 归一化结果必须校验 `visibility=match_focused_brief`；`group_opinion_summary` 必须校验 `visibility=single_group_lightweight_memory`。
