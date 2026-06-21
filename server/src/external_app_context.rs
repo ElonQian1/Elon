@@ -35,7 +35,14 @@ pub(crate) async fn group_context_for_chat(
                 topic_hint,
             )
             .await;
-            log_context_fetch(app.id, group_id, group.external_group_id, user_id, &context);
+            log_context_fetch(
+                app.id,
+                group_id,
+                group.external_group_id,
+                user_id,
+                topic_hint,
+                &context,
+            );
             Some(budgeted_context(context))
         }
         _ => None,
@@ -185,15 +192,22 @@ async fn fetch_fb2_match_context(
 ) -> Value {
     let limit = match_limit();
     let url = format!("{base_url}/api/main-project/context/today-matches");
-    let mut request = state
+    let mut query = vec![
+        ("group_id".to_string(), external_group_id.to_string()),
+        ("limit".to_string(), limit.to_string()),
+    ];
+    if let Some(topic) = topic_hint.and_then(clean_query_value) {
+        query.push(("topic_hint".to_string(), topic.to_string()));
+    }
+    if let Some(lottery_type) = infer_lottery_type(topic_hint) {
+        query.push(("lottery_type".to_string(), lottery_type));
+    }
+    let request = state
         .http_client
         .get(&url)
         .header(FB2_CONTEXT_HEADER, token)
-        .query(&[("limit", limit.to_string())])
+        .query(&query)
         .timeout(Duration::from_secs(timeout_secs()));
-    if let Some(lottery_type) = infer_lottery_type(topic_hint) {
-        request = request.query(&[("lottery_type", lottery_type)]);
-    }
 
     match request.send().await {
         Ok(response) => fb2_response_to_context(app_id, external_group_id, response).await,
@@ -225,11 +239,20 @@ fn log_context_fetch(
     group_id: &str,
     external_group_id: &str,
     user_id: &str,
+    topic_hint: Option<&str>,
     context: &Value,
 ) {
     let status = context["status"].as_str().unwrap_or("unknown");
     let source = context["source"].as_str().unwrap_or("unknown");
-    let has_external_user_id = context["user_orders"]
+    let topic_hint_present = topic_hint.and_then(clean_query_value).is_some();
+    let fallback_used = context_fallback_used(context);
+    let context_pack_version = context["context_pack_version"]
+        .as_str()
+        .unwrap_or("unknown");
+    let context_audit_id = context["context_audit_id"].as_str().unwrap_or("unknown");
+    let context_quality_warning_count = context_quality_warning_count(context);
+    let tool_readiness_status = context_tool_readiness_status(context);
+    let user_order_context_present = context["user_orders"]
         .as_array()
         .map(|orders| !orders.is_empty())
         .unwrap_or(false);
@@ -243,8 +266,54 @@ fn log_context_fetch(
         user_id,
         status,
         source,
-        has_external_user_id,
+        topic_hint_present,
+        fallback_used,
+        user_order_context_present,
+        context_pack_version,
+        context_audit_id,
+        context_quality_warning_count,
+        tool_readiness_status,
         context_chars,
         "external app context fetched"
     );
+}
+
+fn context_fallback_used(context: &Value) -> bool {
+    context["source"]
+        .as_str()
+        .map(|source| source.contains("/today-matches"))
+        .unwrap_or(false)
+}
+
+fn context_quality_warning_count(context: &Value) -> usize {
+    context["context_quality"]["warnings"]
+        .as_array()
+        .map(Vec::len)
+        .unwrap_or(0)
+}
+
+fn context_tool_readiness_status(context: &Value) -> &str {
+    context["context_quality"]["tool_readiness"]["status"]
+        .as_str()
+        .unwrap_or("unknown")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn context_log_helpers_extract_observability_fields() {
+        let context = json!({
+            "source": "fb2:/api/main-project/context/today-matches",
+            "context_quality": {
+                "warnings": ["missing_context_pack", "missing_tool_contract"],
+                "tool_readiness": {"status": "partial"}
+            }
+        });
+
+        assert!(context_fallback_used(&context));
+        assert_eq!(context_quality_warning_count(&context), 2);
+        assert_eq!(context_tool_readiness_status(&context), "partial");
+    }
 }

@@ -441,7 +441,7 @@ async fn build_reply(
     }
 }
 
-fn format_external_context(
+pub(crate) fn format_external_context(
     external_context: Option<&Value>,
     external_tool_results: Option<&Value>,
 ) -> String {

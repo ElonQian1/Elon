@@ -37,6 +37,20 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                     "target": "长期应降低回退率，回退时回答更保守。"
                 },
                 {
+                    "name": "topic_hint_present",
+                    "type": "boolean",
+                    "owner": "main_project",
+                    "meaning": "本次群聊 AI 上下文拉取是否带入用户问题、长按消息或总结议题。",
+                    "target": "需要比赛/订单/观点定向分析时应为 true；false 时 fb2 只能按默认召回。"
+                },
+                {
+                    "name": "context_quality_warning_count",
+                    "type": "integer",
+                    "owner": "main_project",
+                    "meaning": "主项目归一化后的 context_quality.warnings 数量。",
+                    "target": "大于 0 时 AI 回答必须说明对应数据缺口或新鲜度风险。"
+                },
+                {
                     "name": "stale_source_count",
                     "type": "integer",
                     "owner": "fb2",
@@ -69,13 +83,16 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                 "app_id",
                 "group_id",
                 "external_group_id",
-                "external_user_id_present",
+                "topic_hint_present",
+                "user_order_context_present",
                 "context_pack_version",
+                "context_audit_id",
                 "generated_at",
                 "context_pack_latency_ms",
                 "context_chars",
                 "source_counts",
                 "fallback_used",
+                "context_quality_warning_count",
                 "context_quality_warnings",
                 "tool_readiness_status",
                 "tool_execution_id",
@@ -130,6 +147,15 @@ mod tests {
             .unwrap()
             .iter()
             .any(|metric| metric["name"] == "external_tool_grounding"));
+        assert!(guidance["recommended_metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|metric| metric["name"] == "topic_hint_present"));
+        assert!(guidance["recommended_log_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("context_quality_warning_count")));
         assert_eq!(
             guidance["main_project_persistence"]["table"],
             "external_app_tool_executions"

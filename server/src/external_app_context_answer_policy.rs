@@ -47,6 +47,14 @@ pub(crate) fn public_answer_policy_guidance(app_id: &str) -> Option<Value> {
                 "不能承诺命中、诱导投注或代替用户决策。",
                 "不能暴露其他用户的订单明细。"
             ],
+            "canonical_eval_questions": [
+                "总结今天有哪些比赛值得讨论？",
+                "分析 match_id=m-001 这场，赔率变化说明什么？",
+                "帮我看看我今天的票风险在哪里？",
+                "总结群里大家对这场比赛的不同观点。",
+                "平台今天订单集中在哪些方向？只说匿名聚合。",
+                "你刚才依据了哪些比赛、订单和群消息？"
+            ],
             "prompt_answer_rules": FB2_ANSWER_RULES
         })),
         _ => None,
@@ -80,6 +88,10 @@ mod tests {
             .unwrap()
             .iter()
             .any(|rule| rule.as_str().unwrap_or("").contains("编造")));
+        assert!(guidance["canonical_eval_questions"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("帮我看看我今天的票风险在哪里？")));
         assert!(public_answer_policy_guidance("unknown").is_none());
     }
 

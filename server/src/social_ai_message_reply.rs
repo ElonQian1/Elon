@@ -1,7 +1,7 @@
 //! Long-press selected-message AI replies for friend chats and groups.
 
 use anyhow::{anyhow, Result};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{
     collections::HashSet,
     sync::{Arc, Mutex, OnceLock},
@@ -101,7 +101,16 @@ async fn reply_to_selected_friend_message(
     let history = state
         .store
         .list_recent_friend_messages_for_social_ai(&user_id, &friend_id, 18)?;
-    let reply = selected_reply_or_fallback(&state, &user_id, "好友聊天", &history, &selected).await;
+    let reply = selected_reply_or_fallback(
+        &state,
+        &user_id,
+        "好友聊天",
+        &history,
+        &selected,
+        None,
+        None,
+    )
+    .await;
     let messages = state
         .store
         .insert_friend_social_ai_reply(&user_id, &friend_id, &reply)?;
@@ -121,7 +130,36 @@ async fn reply_to_selected_group_message(
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
-    let reply = selected_reply_or_fallback(&state, &user_id, "群聊", &history, &selected).await;
+    let topic_hint = selected_message_topic_hint(&selected);
+    let external_context = crate::external_app_context::group_context_for_chat(
+        &state,
+        &user_id,
+        &group_id,
+        topic_hint.as_deref(),
+    )
+    .await;
+    let external_tool_results = if let Some(context) = external_context.as_ref() {
+        crate::external_app_context_tool_runtime::group_tool_results_for_chat(
+            &state,
+            &user_id,
+            &group_id,
+            context,
+            topic_hint.as_deref(),
+        )
+        .await
+    } else {
+        None
+    };
+    let reply = selected_reply_or_fallback(
+        &state,
+        &user_id,
+        "群聊",
+        &history,
+        &selected,
+        external_context.as_ref(),
+        external_tool_results.as_ref(),
+    )
+    .await;
     let message = state
         .store
         .insert_group_social_ai_reply(&group_id, &reply)?;
@@ -135,8 +173,20 @@ async fn selected_reply_or_fallback(
     scene: &str,
     history: &[SocialAiHistoryMessage],
     selected: &SocialAiHistoryMessage,
+    external_context: Option<&Value>,
+    external_tool_results: Option<&Value>,
 ) -> String {
-    match build_selected_reply(state, user_id, scene, history, selected).await {
+    match build_selected_reply(
+        state,
+        user_id,
+        scene,
+        history,
+        selected,
+        external_context,
+        external_tool_results,
+    )
+    .await
+    {
         Ok(reply) => reply,
         Err(error) => {
             warn!("{scene} selected-message AI generation failed: {}", error);
@@ -152,6 +202,8 @@ async fn build_selected_reply(
     scene: &str,
     history: &[SocialAiHistoryMessage],
     selected: &SocialAiHistoryMessage,
+    external_context: Option<&Value>,
+    external_tool_results: Option<&Value>,
 ) -> Result<String> {
     let selected_content = selected.content.trim();
     if selected_content.is_empty() {
@@ -162,6 +214,13 @@ async fn build_selected_reply(
     }
 
     let agent = resolve_social_agent(state).await?;
+    let external_context_block =
+        crate::social_ai::format_external_context(external_context, external_tool_results);
+    let external_context_section = if external_context_block.trim().is_empty() {
+        String::new()
+    } else {
+        format!("\n\n{}", external_context_block)
+    };
     let response = call_chat_llm(
         state,
         &agent,
@@ -177,8 +236,9 @@ async fn build_selected_reply(
             json!({
                 "role": "user",
                 "content": format!(
-                    "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}\n\n用户长按选择的消息：\n{}：{}\n\n请直接回复这条被选择的消息，输出要发到聊天框里的中文文本。",
+                    "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}{}\n\n用户长按选择的消息：\n{}：{}\n\n请直接回复这条被选择的消息，输出要发到聊天框里的中文文本。",
                     format_history(history),
+                    external_context_section,
                     selected.speaker,
                     selected_content
                 )
@@ -199,6 +259,19 @@ async fn build_selected_reply(
     })
 }
 
+fn selected_message_topic_hint(selected: &SocialAiHistoryMessage) -> Option<String> {
+    let mut text = selected.content.replace('＠', "@");
+    for mention in ["@EL", "@El", "@el"] {
+        text = text.replace(mention, "");
+    }
+    let text = text.trim();
+    if text.is_empty() {
+        None
+    } else {
+        Some(text.chars().take(500).collect())
+    }
+}
+
 fn mark_in_flight(key: &str) -> bool {
     with_in_flight(|items| items.insert(key.to_string()))
 }
@@ -215,4 +288,23 @@ fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> T) -> T {
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     operation(&mut guard)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn selected_message_topic_hint_removes_mentions() {
+        let selected = SocialAiHistoryMessage {
+            speaker: "用户".into(),
+            content: " @EL 帮我看今天这张票 ".into(),
+            from_request_user: true,
+        };
+
+        assert_eq!(
+            selected_message_topic_hint(&selected).as_deref(),
+            Some("帮我看今天这张票")
+        );
+    }
 }

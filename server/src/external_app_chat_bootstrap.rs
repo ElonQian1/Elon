@@ -10,7 +10,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 use std::sync::Arc;
 
 use crate::{
@@ -70,73 +70,343 @@ pub async fn get_chat_bootstrap(
             "mentionToTriggerAi": "@EL",
             "externalGroups": app.default_groups,
         },
-        "voice": {
-            "asr": {
-                "uploadEndpoint": "/api/voice/asr",
-                "method": "POST",
-                "contentType": "multipart/form-data",
-                "audioField": "audio",
-                "resultField": "text",
-                "maxAudioBytes": MAX_ASR_UPLOAD_BYTES,
-                "optionalFields": ["format", "language", "beam_size", "vad_filter", "condition_on_previous_text"]
-            },
-            "tts": {
-                "catalogEndpoint": "/api/voice/tts/catalog",
-                "synthesizeEndpoint": "/api/voice/tts",
-                "method": "POST",
-                "contentType": "application/json",
-                "maxTextChars": MAX_TTS_TEXT_CHARS,
-                "requestFields": ["text", "voiceId", "emotionId", "intensity", "provider", "rewrite", "agentName"],
-                "responseKind": "audio",
-                "diagnosticHeaders": [
-                    "x-elon-tts-provider",
-                    "x-elon-tts-voice",
-                    "x-elon-tts-emotion",
-                    "x-elon-tts-worker",
-                    "x-elon-tts-worker-voice",
-                    "x-elon-tts-worker-fallback"
-                ],
-                "clientFallback": "android_system_or_browser_speech_synthesis"
-            },
-            "realtimeTranscribe": {
-                "websocketEndpoint": "/ws/voice/transcribe",
-                "sampleRate": 24000,
-                "channels": 1,
-                "pcmFormat": "pcm16le",
-                "helloTargets": [
-                    {
-                        "target": VOICE_TARGET_TRANSCRIBE_ONLY,
-                        "description": "only return transcript_final; fb2 decides where to send it"
-                    },
-                    {
-                        "target": VOICE_TARGET_EXTERNAL_GROUP,
-                        "groupIdField": "group_id",
-                        "description": "send transcript as a group message; @EL triggers main-project group AI"
-                    },
-                    {
-                        "target": VOICE_TARGET_SOCIAL_AI_DIRECT,
-                        "description": "direct one-on-one AI voice input"
-                    }
-                ]
-            }
-        },
-        "experience": {
-            "inputModes": ["text", "hold_to_talk", "voice_message", "realtime_transcribe", "auto_tts"],
-            "controls": {
-                "holdToTalk": true,
-                "slideToCancel": true,
-                "tapAiMessageToReplayTts": true,
-                "stopTtsWhenRecordingStarts": true,
-                "editableTranscriptBeforeSend": true
-            },
-            "recommendedFlow": [
-                "create main-project session from fb2 backend",
-                "load this bootstrap contract",
-                "render defaultGroupId as the first chat room",
-                "use /api/voice/asr for stable first-version voice input",
-                "use /api/voice/tts after AI replies and fall back to device TTS"
-            ]
-        }
+        "voice": voice_contract(),
+        "aiReply": ai_reply_contract(),
+        "billing": billing_contract(),
+        "experience": experience_contract()
     }))
     .into_response()
+}
+
+fn voice_contract() -> Value {
+    json!({
+        "androidSdk": {
+            "module": "android/chat-voice-kit",
+            "package": "com.elon.chatvoice",
+            "publicComponents": [
+                "VoiceComposerView",
+                "VoiceComposerConfig",
+                "VoiceComposerAsrConfig",
+                "VoiceComposerCallbacks",
+                "ChatVoiceRecordingOverlay",
+                "ChatVoiceInteractionContract",
+                "ChatVoiceEventSink",
+                "ChatVoiceSpeaker"
+            ],
+            "doNotCopyMainAppInternals": [
+                "com.elon.app.MainSpeechInputActions",
+                "com.elon.app.VoiceRecordingOverlay",
+                "主项目聊天页面内部类"
+            ]
+        },
+        "composer": {
+            "component": "com.elon.chatvoice.VoiceComposerView",
+            "requiredForMainProjectLikeExperience": true,
+            "inputModes": ["TEXT", "VOICE"],
+            "voiceModeCenterControl": "整条按住 说话按钮",
+            "overlayComponent": "com.elon.chatvoice.ChatVoiceRecordingOverlay",
+            "defaultConfig": {
+                "chatMode": "FRIEND_CHAT",
+                "releaseZone": "SEND",
+                "recordingOverlayEnabled": true,
+                "languageTag": "zh-CN",
+                "preferOfflineAsr": false,
+                "asr": {
+                    "serverFallbackEnabled": true,
+                    "serverConfigRequired": true,
+                    "localResultTimeoutMs": 4500,
+                    "localEngineFallbackEnabled": true,
+                    "prewarmLocalEngine": true
+                }
+            },
+            "states": [
+                "IDLE",
+                "PREPARING",
+                "RECORDING",
+                "CANCELING",
+                "PROCESSING",
+                "SERVER_PROCESSING",
+                "TOO_SHORT",
+                "PERMISSION_DENIED",
+                "ERROR",
+                "TTS_PLAYING"
+            ],
+            "zones": ["SEND", "AI_REPLY", "TRANSCRIBE", "CANCEL"],
+            "callbacks": [
+                "onTextSubmit",
+                "onVoiceRecognized",
+                "onVoiceRecorded",
+                "onVoiceServerFallbackStarted",
+                "onVoiceCanceled",
+                "onPermissionRequired",
+                "onVoiceError",
+                "onStateChanged",
+                "onPlusClick"
+            ],
+            "acceptanceRules": [
+                "fb2 常规聊天页必须接 VoiceComposerView，而不是只接 ASR/TTS 接口。",
+                "按住说话时必须显示 SDK 内置录音浮层，除非页面按 ChatVoiceInteractionContract 完整还原。",
+                "系统 ASR 无 final/error 或超时时，必须进入 SERVER_PROCESSING 并上传录音到 /api/voice/asr。",
+                "ASR/TTS 不因 AI 余额为 0 被阻断。"
+            ]
+        },
+        "asr": {
+            "localFirst": true,
+            "serverFallback": true,
+            "uploadEndpoint": "/api/voice/asr",
+            "method": "POST",
+            "contentType": "multipart/form-data",
+            "audioField": "audio",
+            "resultField": "text",
+            "maxAudioBytes": MAX_ASR_UPLOAD_BYTES,
+            "optionalFields": ["format", "language", "beam_size", "vad_filter", "condition_on_previous_text"],
+            "billing": "free_auth_and_limits_only"
+        },
+        "tts": {
+            "catalogEndpoint": "/api/voice/tts/catalog",
+            "synthesizeEndpoint": "/api/voice/tts",
+            "method": "POST",
+            "contentType": "application/json",
+            "maxTextChars": MAX_TTS_TEXT_CHARS,
+            "requestFields": ["text", "voiceId", "emotionId", "intensity", "provider", "rewrite", "agentName"],
+            "responseKind": "audio",
+            "diagnosticHeaders": [
+                "x-elon-tts-provider",
+                "x-elon-tts-voice",
+                "x-elon-tts-emotion",
+                "x-elon-tts-worker",
+                "x-elon-tts-worker-voice",
+                "x-elon-tts-worker-fallback"
+            ],
+            "clientFallback": "android_system_or_browser_speech_synthesis",
+            "billing": "free_auth_and_limits_only"
+        },
+        "realtimeTranscribe": {
+            "websocketEndpoint": "/ws/voice/transcribe",
+            "sampleRate": 24000,
+            "channels": 1,
+            "pcmFormat": "pcm16le",
+            "helloTargets": [
+                {
+                    "target": VOICE_TARGET_TRANSCRIBE_ONLY,
+                    "description": "only return transcript_final; fb2 decides where to send it"
+                },
+                {
+                    "target": VOICE_TARGET_EXTERNAL_GROUP,
+                    "groupIdField": "group_id",
+                    "description": "send transcript as a group message; @EL triggers main-project group AI"
+                },
+                {
+                    "target": VOICE_TARGET_SOCIAL_AI_DIRECT,
+                    "description": "direct one-on-one AI voice input"
+                }
+            ]
+        }
+    })
+}
+
+fn ai_reply_contract() -> Value {
+    json!({
+        "schema": "external_app.ai_reply.v1",
+        "owner": "main_project",
+        "billableUnit": "ai_reply_generation",
+        "quotaGate": "before_model_call",
+        "freePreparationSteps": ["asr", "tts", "external_context_fetch", "context_budgeting"],
+        "triggers": [
+            {
+                "name": "group_mention",
+                "entry": "group message containing @EL",
+                "endpoint": "/api/me/groups/{groupId}/messages",
+                "topicHintSource": "latest meaningful user text after removing @EL",
+                "contextSource": "fb2 Context Pack when group is mapped to fb2"
+            },
+            {
+                "name": "selected_message_ai_reply",
+                "entry": "long press group message and choose AI回复",
+                "endpoint": "/api/me/groups/{groupId}/messages/{messageId}/ai-reply",
+                "topicHintSource": "selected message body after removing @EL",
+                "contextSource": "fb2 Context Pack when group is mapped to fb2"
+            },
+            {
+                "name": "group_summary",
+                "entry": "create group summary or auto-split summary topic",
+                "endpoint": "main-project group summary APIs",
+                "topicHintSource": "topic, title, instructions, or split topic",
+                "contextSource": "fb2 Context Pack when group is mapped to fb2"
+            }
+        ],
+        "externalContext": {
+            "contractEndpoint": "/api/external/apps/fb2/context-contract",
+            "primarySource": "fb2:/api/main-project/context/pack",
+            "fallbackSource": "fb2:/api/main-project/context/today-matches",
+            "queryFields": [
+                "group_id",
+                "external_user_id",
+                "topic_hint",
+                "limit",
+                "discussion_limit",
+                "order_limit",
+                "lottery_type",
+                "include_platform_orders"
+            ],
+            "promptMetadata": [
+                "usage_policy",
+                "answer_rules",
+                "context_quality",
+                "context_budget",
+                "external_metrics",
+                "context_audit_id",
+                "tool_contract",
+                "executed_external_app_tools"
+            ]
+        },
+        "answerRules": [
+            "必须区分 fb2 数据事实、群友观点和 AI 推断。",
+            "涉及比赛预测时必须说明不确定性，不承诺命中。",
+            "订单剖析只能使用当前用户可见订单；平台订单默认只能使用匿名聚合。",
+            "没有 fb2 上下文时不能编造比赛、赔率、订单或群友观点。"
+        ],
+        "failureBehavior": {
+            "contextUnavailable": "继续基于群聊历史保守回答，并说明 fb2 业务数据暂不可用。",
+            "insufficientBalance": "只阻断 AI 生成回复；ASR/TTS 和上下文拉取仍允许。",
+            "missingCurrentUserOrders": "可以分析公开比赛和群观点，但必须说明当前用户订单不可见。"
+        }
+    })
+}
+
+fn experience_contract() -> Value {
+    json!({
+        "inputModes": ["text", "hold_to_talk", "voice_message", "realtime_transcribe", "auto_tts"],
+        "controls": {
+            "holdToTalk": true,
+            "slideToCancel": true,
+            "voiceTextModeToggle": true,
+            "fullWidthHoldToTalkButton": true,
+            "recordingOverlay": true,
+            "aiReplyZone": true,
+            "transcribeZone": true,
+            "tapAiMessageToReplayTts": true,
+            "stopTtsWhenRecordingStarts": true,
+            "editableTranscriptBeforeSend": true
+        },
+        "usagePolicy": {
+            "asr": "free",
+            "tts": "free",
+            "contextFetch": "free",
+            "aiReplyGeneration": "billable"
+        },
+        "recommendedFlow": [
+            "create main-project session from fb2 backend",
+            "load this bootstrap contract",
+            "render defaultGroupId as the first chat room",
+            "use android/chat-voice-kit VoiceComposerView for the input bar",
+            "configure VoiceComposerAsrConfig with serverFallbackEnabled=true and serverConfig",
+            "use /api/voice/tts after AI replies and fall back to device TTS",
+            "only check AI quota immediately before model reply generation"
+        ]
+    })
+}
+
+fn billing_contract() -> Value {
+    json!({
+        "balanceEndpoint": "/api/me/balance",
+        "billingEventsEndpoint": "/api/me/billing",
+        "usageStatsEndpointTemplate": "/api/user/{userId}/usage/stats",
+        "trialCredit": {
+            "grantedBy": "POST /api/external/apps/{app_id}/accounts/session",
+            "configKey": "external_app_fb2_trial_credit_fen",
+            "appliesTo": ["ai_reply_generation", "social_ai", "match_analysis_text", "order_analysis_text"],
+            "doesNotApplyTo": ["android_system_asr", "cloud_asr_fallback", "tts", "context_fetch"]
+        },
+        "gates": {
+            "beforeAsr": "never_check_ai_balance",
+            "beforeTts": "never_check_ai_balance",
+            "beforeContextFetch": "auth_and_limits_only",
+            "beforeAiReplyGeneration": "check_balance_or_trial_credit"
+        },
+        "insufficientBalanceBehavior": {
+            "block": ["ai_reply_generation"],
+            "allow": ["asr", "tts", "context_fetch", "text_chat_without_model_generation"],
+            "message": "AI 回复额度不足，请领取试用额度、充值或联系管理员；语音转文字和语音播放仍可继续使用。"
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn voice_contract_requires_full_composer_and_server_fallback() {
+        let voice = voice_contract();
+
+        assert_eq!(
+            voice["composer"]["component"],
+            "com.elon.chatvoice.VoiceComposerView"
+        );
+        assert_eq!(
+            voice["composer"]["defaultConfig"]["asr"]["serverFallbackEnabled"],
+            true
+        );
+        assert_eq!(
+            voice["composer"]["defaultConfig"]["recordingOverlayEnabled"],
+            true
+        );
+        assert_eq!(voice["asr"]["billing"], "free_auth_and_limits_only");
+        assert!(voice["composer"]["callbacks"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("onVoiceServerFallbackStarted")));
+    }
+
+    #[test]
+    fn ai_reply_contract_declares_context_and_billing_boundary() {
+        let ai_reply = ai_reply_contract();
+
+        assert_eq!(ai_reply["schema"], "external_app.ai_reply.v1");
+        assert_eq!(ai_reply["billableUnit"], "ai_reply_generation");
+        assert_eq!(
+            ai_reply["externalContext"]["primarySource"],
+            "fb2:/api/main-project/context/pack"
+        );
+        assert!(ai_reply["externalContext"]["queryFields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("topic_hint")));
+        assert!(ai_reply["freePreparationSteps"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("external_context_fetch")));
+        assert!(ai_reply["triggers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|trigger| trigger["name"] == "selected_message_ai_reply"));
+    }
+
+    #[test]
+    fn experience_contract_keeps_voice_free_and_ai_billable() {
+        let experience = experience_contract();
+
+        assert_eq!(experience["usagePolicy"]["asr"], "free");
+        assert_eq!(experience["usagePolicy"]["tts"], "free");
+        assert_eq!(experience["usagePolicy"]["aiReplyGeneration"], "billable");
+        assert_eq!(experience["controls"]["fullWidthHoldToTalkButton"], true);
+    }
+
+    #[test]
+    fn billing_contract_separates_voice_from_ai_reply_quota() {
+        let billing = billing_contract();
+
+        assert_eq!(billing["balanceEndpoint"], "/api/me/balance");
+        assert_eq!(billing["gates"]["beforeAsr"], "never_check_ai_balance");
+        assert_eq!(
+            billing["gates"]["beforeAiReplyGeneration"],
+            "check_balance_or_trial_credit"
+        );
+        assert!(billing["trialCredit"]["doesNotApplyTo"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("cloud_asr_fallback")));
+    }
 }

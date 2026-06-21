@@ -17,6 +17,7 @@
 | 向量检索 | `server/src/context_compiler/symbol_index_vector.rs` |
 | embedding provider | `server/src/context_compiler/symbol_index_embedding_provider.rs` |
 | SQLite 符号库 schema | `server/src/context_compiler/symbol_index_store.rs`、`symbol_index_embeddings.rs` |
+| fb2 AI Center / 子项目聊天语音和业务上下文 | `docs/fb2-ai-center/`、`server/src/external_app_*`、`android/chat-voice-kit/` |
 
 ## Android 核心入口
 

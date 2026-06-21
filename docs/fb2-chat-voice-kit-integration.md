@@ -1,5 +1,7 @@
 # fb2 语音聊天体验接入
 
+长期协作入口：`docs/fb2-ai-center/`。本文件保留语音 SDK 接入细节，整体聊天、AI 回复、计费和验收以新工作台为准。
+
 主项目提供 `android/chat-voice-kit` 作为可复用 Android Library，fb2 不需要复制主项目聊天页或语音实现。
 
 ## 接入方式

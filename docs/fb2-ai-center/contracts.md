@@ -1,0 +1,190 @@
+# fb2 AI Center 契约
+
+## 主项目对 fb2 输出
+
+### 1. 外部应用信息
+
+```http
+GET /api/external/apps/fb2
+```
+
+用途：
+
+- 返回 fb2 中文名、logo、默认群、功能开关。
+- fb2 注册过的账号在主项目注册时，应提示使用 fb2 账号登录，并显示 fb2 品牌信息。
+
+### 2. fb2 用户创建主项目会话
+
+```http
+POST /api/external/apps/fb2/accounts/session
+X-External-App-Token: <shared-secret>
+```
+
+fb2 后端调用。主项目返回：
+
+- 主项目 bearer token
+- 主项目用户信息
+- fb2 账号绑定信息
+- 默认加入的群聊
+- 首次试用额度信息
+
+### 3. 主项目用户授权登录 fb2
+
+```http
+POST /api/external/apps/fb2/authorize
+Authorization: Bearer <main-project-token>
+
+POST /api/external/apps/fb2/authorize/exchange
+X-External-App-Token: <shared-secret>
+```
+
+用途：
+
+- 主项目用户可以授权登录 fb2。
+- fb2 只拿到授权交换结果，不读取主项目内部密码或会话实现。
+
+### 4. 聊天和语音启动协议
+
+```http
+GET /api/external/apps/fb2/chat-bootstrap
+Authorization: Bearer <main-project-token>
+```
+
+用途：
+
+- 告诉 fb2 默认群、消息接口、AI 回复接口、ASR/TTS 接口、WebSocket 语音协议和推荐交互。
+- fb2 客户端应优先读这个接口，而不是硬编码主项目路径。
+- `voice.composer` 会声明完整微信式输入栏要求：`VoiceComposerView`、录音浮层、状态、区域、回调和系统 ASR 到云端 ASR 的兜底配置。
+- `aiReply` 会声明 `@EL`、长按 `AI回复`、群聊总结等入口如何触发主项目模型回复，以及 `topic_hint`、Context Pack、回答规则和失败降级策略。
+- `billing` 会声明余额接口、试用额度来源和检查点：ASR/TTS/context fetch 不检查 AI 余额，AI 回复生成前才检查。
+
+### 5. 业务上下文契约
+
+```http
+GET /api/external/apps/fb2/context-contract
+```
+
+用途：
+
+- 给 fb2 代理读取主项目认可的 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
+- 给 fb2 代理读取 `answer_policy_contract`（`fb2.answer_policy.v1`），用于固定 AI 回答边界、引用规则和评测问题。
+- 给 fb2 代理读取 `context_readiness_contract`，用于自动判断本次 Context Pack 是 `blocked`、`degraded` 还是 `ready`。
+- 这个接口不返回密钥，不读取 fb2 业务数据。
+
+主项目实际拉取 fb2 上下文后，会把 `answer_policy_contract.prompt_answer_rules` 投影成 prompt 里的 `<answer_rules>`。fb2 不需要返回 `answer_policy`，但必须让 Context Pack 和工具结果满足这些回答边界。
+
+## fb2 对主项目输出
+
+### 1. Context Pack
+
+```http
+GET /api/main-project/context/pack
+X-FB2-AI-CENTER-TOKEN: <shared-secret>
+```
+
+推荐 query：
+
+```text
+group_id=official
+external_user_id=<fb2-user-id-if-linked>
+topic_hint=<user-question-or-summary-topic>
+limit=30
+discussion_limit=80
+order_limit=20
+lottery_type=JingCai|BeiDan
+include_platform_orders=false
+```
+
+主项目群聊 AI 会从最后一次有效 @EL 用户问题中提取 `topic_hint`。例如用户说 `@EL 帮我分析今天比赛和我的票`，主项目会传：
+
+```text
+topic_hint=帮我分析今天比赛和我的票
+```
+
+fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如果用户只是单独发送 `@EL`，主项目会回退使用前一条真实用户问题。
+
+其他入口也会传 `topic_hint`：
+
+- 长按群消息点击 `AI回复`：使用被选中消息正文。
+- 创建群聊总结帖：优先使用用户填写的 `topic`，并补充 `title`、`instructions`。
+- 自动拆分群聊总结帖：使用主项目拆出的议题 topic。
+- `/context/pack` 不可用回退 `/context/today-matches` 时，主项目仍会传 `group_id` 和 `topic_hint`。
+
+最低返回字段：
+
+```json
+{
+  "success": true,
+  "data": {
+    "context_pack_version": "fb2-chat-pack-v1",
+    "generated_at": "2026-06-20T12:00:00+08:00",
+    "context_audit_id": "audit-id",
+    "context_pack": "<fb2_context_pack>...</fb2_context_pack>",
+    "matches": [],
+    "user_orders": [],
+    "group_messages": [],
+    "platform_order_summary": {},
+    "metrics": {},
+    "tool_contract": {},
+    "usage_policy": {}
+  }
+}
+```
+
+`context_readiness_contract` 的核心检查：
+
+- `context_pack` 非空。
+- `generated_at` 存在。
+- 比赛、订单、群观点相关结论有 `match_id`、`order_id` 或 `message_id`。
+- `metrics.budget_status` 不能是 `empty`。
+- 用户问订单剖析时，必须有当前用户可见的 `current_user_only` 订单来源。
+- 回答规则由主项目 `answer_policy_contract.prompt_answer_rules` 提供，fb2 的数据必须能支撑这些规则。
+
+### 2. Context Pack 内容边界
+
+`context_pack` 使用 Markdown 正文，外层使用 XML 风格标签：
+
+```md
+<fb2_context_pack version="1.0" project="fb2">
+
+## 使用边界
+
+- 只作为比赛讨论和订单剖析参考。
+- 不承诺命中，不诱导投注。
+- 必须区分数据事实、群友观点和 AI 推断。
+
+## 今日/近期比赛与赔率
+
+## 当前用户订单/票据
+
+## 群讨论观点
+
+## 平台/店铺订单摘要
+
+## 数据缺口和更新时间
+
+</fb2_context_pack>
+```
+
+每条事实尽量带 source id：
+
+- 比赛：`match_id`
+- 赔率：`odds_id` 或 `odds_updated_at`
+- 订单：`order_id` / `ticket_id`
+- 群观点：`message_id`
+- 审计：`context_audit_id`
+
+## 权限规则
+
+- 当前用户订单只能返回当前登录用户自己的票据。
+- 平台订单默认只返回匿名聚合，除非主项目显式传 `include_platform_orders=true` 且 fb2 服务端确认权限。
+- 群友观点必须可审计，至少包含 `message_id`、时间和摘要。
+- fb2 不把数据库连接、内部表结构或其他用户明细交给主项目。
+
+## 主项目处理规则
+
+- 主项目优先拉 `/context/pack`，失败后回退 `/context/today-matches`。
+- 主项目会做 token budget 裁剪，不把无限大 JSON 塞进 prompt。
+- 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
+- 主项目日志只记录 `topic_hint_present`、`fallback_used`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
+- AI 回答必须区分事实、群友观点和推断；上下文不足时要明确说明。

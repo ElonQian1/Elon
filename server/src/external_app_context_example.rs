@@ -29,7 +29,8 @@ pub(crate) fn public_context_pack_example(app_id: &str) -> Option<Value> {
                 "matches",
                 "user_orders",
                 "group_messages",
-                "tool_contract"
+                "tool_contract",
+                "metrics"
             ]
         })),
         _ => None,
@@ -127,6 +128,10 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("context_pack")));
+        assert!(example["minimum_required_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("metrics")));
         assert_eq!(
             example["response_shape"]["data"]["usage_policy"]["ai_reply_billable"],
             true

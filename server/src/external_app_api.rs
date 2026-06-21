@@ -16,6 +16,7 @@ use crate::{
     external_app_context_health::public_context_health,
     external_app_context_observability::public_context_observability_guidance,
     external_app_context_quality::public_context_quality_guidance,
+    external_app_context_readiness::public_context_readiness_guidance,
     external_app_context_tool_execution::public_tool_execution_guidance,
     external_app_context_tools::public_tool_contract_guidance,
     external_app_registry::{
@@ -89,6 +90,11 @@ pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Re
             "app_id": app.id,
             "schema": "external_app.context_quality.v1",
             "warning_catalog": []
+        })),
+        "context_readiness_contract": public_context_readiness_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.context_readiness.v1",
+            "automated_checks": []
         })),
         "context_observability_contract": public_context_observability_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,
