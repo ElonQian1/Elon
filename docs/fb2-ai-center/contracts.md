@@ -70,6 +70,7 @@ GET /api/external/apps/fb2/context-contract
 
 - 给 fb2 代理读取主项目认可的 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
 - 给 fb2 代理读取 `answer_policy_contract`（`fb2.answer_policy.v1`），用于固定 AI 回答边界、引用规则和评测问题。
+- `answer_policy_contract.eval_scenarios` 是机器可读评测矩阵，覆盖 `today_matches_analysis`、`my_ticket_analysis`、`platform_order_risk`、`group_opinion_summary`、`selected_message_review`、`source_reference_audit`，声明每个场景的入口、优先上下文、必需来源、引用和禁止输出。
 - 给 fb2 代理读取 `context_readiness_contract`，用于自动判断本次 Context Pack 是 `blocked`、`degraded` 还是 `ready`。
 - 这个接口不返回密钥，不读取 fb2 业务数据。
 

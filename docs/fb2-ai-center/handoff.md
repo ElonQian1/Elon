@@ -61,6 +61,7 @@
 - `chat-bootstrap` 已输出机器可读 `billing` 契约，明确 `/api/me/balance`、试用额度来源和“ASR/TTS 免费、AI 回复扣费”的检查点。
 - `context-contract` 输出 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
 - `context-contract` 已输出 `answer_policy_contract`（`fb2.answer_policy.v1`），明确 AI 回答要区分数据事实、群友观点和 AI 推断，并带固定评测问题。
+- `answer_policy_contract.eval_scenarios` 固定六个机器可读验收场景：今日比赛、我的票、平台匿名订单摘要、群友观点、长按消息复核、来源审计；`scripts/smoke-fb2-ai-center.ps1` 默认检查这些场景 id，避免契约漂移。
 - `context-contract` 已输出 `context_readiness_contract`，用于自动判断 fb2 Context Pack 是否足够支撑 AI 回答。
 - fb2 Context Pack 进入 prompt 后会附加 `<answer_rules>`，这些规则来自主项目 `answer_policy_contract.prompt_answer_rules`；归一化上下文也会带 `answer_policy` metadata。
 - 群聊 AI 拉取 fb2 Context Pack 时，会把最后一次有效 @EL 用户问题作为 `topic_hint` 传给 fb2。
