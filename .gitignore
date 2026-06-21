@@ -1,4 +1,5 @@
 # Rust
+/target/
 server/target/
 server/cargo-config.toml
 server/Cargo.lock
