@@ -50,6 +50,7 @@ mod node_agent_admin_open;
 mod node_agent_project_picker;
 mod node_agent_proxy;
 mod node_agent_server_runtime;
+mod node_agent_tool_guard;
 #[cfg(windows)]
 mod node_client_launcher;
 mod node_hardware_probe;
