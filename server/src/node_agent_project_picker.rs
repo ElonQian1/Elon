@@ -1,3 +1,5 @@
+// server/src/node_agent_project_picker.rs
+
 use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -126,6 +128,7 @@ fn pick_folder() -> anyhow::Result<Option<String>> {
     use std::process::Command;
 
     const CREATE_NO_WINDOW: u32 = 0x08000000;
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x00000200;
     let script = r#"
 [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
 Add-Type -AssemblyName System.Windows.Forms
@@ -145,7 +148,8 @@ if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
             "-Command",
             script,
         ])
-        .creation_flags(CREATE_NO_WINDOW)
+        // PowerShell 仅用于系统文件夹选择器；隐藏并隔离控制台，避免用户看到黑窗。
+        .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)
         .output()?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();

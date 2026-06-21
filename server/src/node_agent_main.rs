@@ -523,77 +523,70 @@ async fn run_llm_inference(
         buf.push_str(&String::from_utf8_lossy(&bytes));
 
         // SSE 每行 "data: {...}\n\n" 或 Ollama JSON lines
-        loop {
-            if let Some(pos) = buf.find('\n') {
-                let line = buf[..pos].trim().to_string();
-                buf.drain(..=pos);
+        while let Some(pos) = buf.find('\n') {
+            let line = buf[..pos].trim().to_string();
+            buf.drain(..=pos);
 
-                if line.is_empty() || line == "data: [DONE]" {
-                    continue;
-                }
+            if line.is_empty() || line == "data: [DONE]" {
+                continue;
+            }
 
-                let json_str = line.strip_prefix("data: ").unwrap_or(&line);
-                if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
-                    // OpenAI-compatible delta
-                    if let Some(delta) = val
-                        .pointer("/choices/0/delta/content")
-                        .and_then(|v| v.as_str())
-                    {
-                        if !delta.is_empty() {
-                            completion_tokens += 1; // 近似计数
-                            let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamChunk {
-                                req_id: req_id.clone(),
-                                delta: delta.to_string(),
-                            }));
-                        }
-                    }
-                    // Ollama message.content
-                    if let Some(content) = val.pointer("/message/content").and_then(|v| v.as_str())
-                    {
-                        if !content.is_empty() {
-                            completion_tokens += 1;
-                            let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamChunk {
-                                req_id: req_id.clone(),
-                                delta: content.to_string(),
-                            }));
-                        }
-                    }
-                    // 完成信号
-                    if let Some(r) = val
-                        .pointer("/choices/0/finish_reason")
-                        .and_then(|v| v.as_str())
-                    {
-                        if !r.is_empty() && r != "null" {
-                            finish_reason = r.to_string();
-                        }
-                    }
-                    if val.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
-                        prompt_tokens = val
-                            .pointer("/prompt_eval_count")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(0) as u32;
-                        completion_tokens = val
-                            .pointer("/eval_count")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(completion_tokens as u64)
-                            as u32;
-                    }
-                    // token usage from OpenAI response
-                    if let Some(usage) = val.get("usage") {
-                        prompt_tokens = usage
-                            .get("prompt_tokens")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(prompt_tokens as u64)
-                            as u32;
-                        completion_tokens = usage
-                            .get("completion_tokens")
-                            .and_then(|v| v.as_u64())
-                            .unwrap_or(completion_tokens as u64)
-                            as u32;
+            let json_str = line.strip_prefix("data: ").unwrap_or(&line);
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(json_str) {
+                // OpenAI-compatible delta
+                if let Some(delta) = val
+                    .pointer("/choices/0/delta/content")
+                    .and_then(|v| v.as_str())
+                {
+                    if !delta.is_empty() {
+                        completion_tokens += 1; // 近似计数
+                        let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamChunk {
+                            req_id: req_id.clone(),
+                            delta: delta.to_string(),
+                        }));
                     }
                 }
-            } else {
-                break;
+                // Ollama message.content
+                if let Some(content) = val.pointer("/message/content").and_then(|v| v.as_str()) {
+                    if !content.is_empty() {
+                        completion_tokens += 1;
+                        let _ = out_tx.send(ws_text(&AgentToServer::LlmStreamChunk {
+                            req_id: req_id.clone(),
+                            delta: content.to_string(),
+                        }));
+                    }
+                }
+                // 完成信号
+                if let Some(r) = val
+                    .pointer("/choices/0/finish_reason")
+                    .and_then(|v| v.as_str())
+                {
+                    if !r.is_empty() && r != "null" {
+                        finish_reason = r.to_string();
+                    }
+                }
+                if val.get("done").and_then(|v| v.as_bool()).unwrap_or(false) {
+                    prompt_tokens = val
+                        .pointer("/prompt_eval_count")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(0) as u32;
+                    completion_tokens =
+                        val.pointer("/eval_count")
+                            .and_then(|v| v.as_u64())
+                            .unwrap_or(completion_tokens as u64) as u32;
+                }
+                // token usage from OpenAI response
+                if let Some(usage) = val.get("usage") {
+                    prompt_tokens = usage
+                        .get("prompt_tokens")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(prompt_tokens as u64) as u32;
+                    completion_tokens = usage
+                        .get("completion_tokens")
+                        .and_then(|v| v.as_u64())
+                        .unwrap_or(completion_tokens as u64)
+                        as u32;
+                }
             }
         }
     }
@@ -787,10 +780,10 @@ fn cli_prompt_read_only(runtime_permission: Option<&str>) -> bool {
     )
 }
 
-async fn run_cli_prompt(
+struct CliPromptRun {
     req_id: String,
-    bin: &str,
-    cli_name: &str,
+    bin: String,
+    cli_name: String,
     extra_args: Vec<String>,
     runtime_permission: Option<String>,
     cwd: Option<String>,
@@ -798,10 +791,29 @@ async fn run_cli_prompt(
     prompt: String,
     server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
     approval_state: node_agent_tool_approval::ToolApprovalState,
-    mut cancel_rx: watch::Receiver<bool>,
+    cancel_rx: watch::Receiver<bool>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
-) {
+}
+
+async fn run_cli_prompt(run: CliPromptRun) {
     use tokio::io::AsyncBufReadExt;
+
+    let CliPromptRun {
+        req_id,
+        bin,
+        cli_name,
+        extra_args,
+        runtime_permission,
+        cwd,
+        conversation_workspace,
+        prompt,
+        server_runtime_config,
+        approval_state,
+        mut cancel_rx,
+        out_tx,
+    } = run;
+    let bin = bin.as_str();
+    let cli_name = cli_name.as_str();
 
     if let Err(error) =
         node_agent_cli_security::validate_cli_extra_args(cli_name, extra_args.as_slice())
@@ -823,13 +835,15 @@ async fn run_cli_prompt(
 
     if cli_name == "api-runtime" {
         let result = crate::node_agent_server_runtime::run_api_runtime_prompt(
-            &req_id,
-            cwd.as_deref(),
-            runtime_permission.as_deref(),
-            &prompt,
-            Some(approval_state.clone()),
-            cancel_rx,
-            out_tx.clone(),
+            crate::node_agent_server_runtime::RuntimePromptOptions {
+                req_id: &req_id,
+                cwd: cwd.as_deref(),
+                runtime_permission: runtime_permission.as_deref(),
+                prompt: &prompt,
+                approval_state: Some(approval_state.clone()),
+                cancel_rx,
+                out_tx: out_tx.clone(),
+            },
         )
         .await;
         let (exit_ok, error, workspace_status) =
@@ -853,14 +867,16 @@ async fn run_cli_prompt(
         let result = match server_runtime_config {
             Some(config) => {
                 crate::node_agent_server_runtime::run_server_runtime_prompt(
-                    &req_id,
                     config,
-                    cwd.as_deref(),
-                    runtime_permission.as_deref(),
-                    &prompt,
-                    Some(approval_state.clone()),
-                    cancel_rx,
-                    out_tx.clone(),
+                    crate::node_agent_server_runtime::RuntimePromptOptions {
+                        req_id: &req_id,
+                        cwd: cwd.as_deref(),
+                        runtime_permission: runtime_permission.as_deref(),
+                        prompt: &prompt,
+                        approval_state: Some(approval_state.clone()),
+                        cancel_rx,
+                        out_tx: out_tx.clone(),
+                    },
                 )
                 .await
             }
@@ -890,13 +906,12 @@ async fn run_cli_prompt(
         return;
     }
 
-    // Windows 上 .cmd 文件必须通过 cmd /c 启动，否则 tokio::process::Command 无法直接执行
-    let (actual_bin, actual_args_prefix): (&str, Vec<&str>) =
-        if cfg!(windows) && bin.to_lowercase().ends_with(".cmd") {
-            ("cmd", vec!["/c", bin])
-        } else {
-            (bin, vec![])
-        };
+    // Windows 上 .cmd/.bat shim 必须通过 cmd 启动；统一包装，避免不同调用点遗漏隐藏策略。
+    let batch_wrapper = node_agent_cli_security::windows_batch_wrapper(bin);
+    let actual_bin = batch_wrapper
+        .as_ref()
+        .map(|(program, _)| *program)
+        .unwrap_or(bin);
 
     // 构建命令
     // Copilot: copilot --allow-all [extra_args] -p "<prompt>"
@@ -905,8 +920,8 @@ async fn run_cli_prompt(
     // Codex 续接: codex exec resume <session-uuid> "<prompt>"
     let full_access = cli_prompt_full_access(runtime_permission.as_deref());
     let mut cmd = tokio::process::Command::new(actual_bin);
-    for a in &actual_args_prefix {
-        cmd.arg(a);
+    if let Some((_, args)) = batch_wrapper.as_ref() {
+        cmd.args(args);
     }
     if cli_name == "codex" {
         // 从 extra_args 提取 --codex-model=xxx 和 --codex-effort=yyy，在 exec 前插入
@@ -968,10 +983,6 @@ async fn run_cli_prompt(
         if full_access {
             cmd.arg("--allow-all");
         }
-        for a in &extra_args {
-            cmd.arg(a);
-        }
-    } else if cli_name == "claude" || cli_name == "gemini" {
         for a in &extra_args {
             cmd.arg(a);
         }
@@ -1404,7 +1415,8 @@ fn hide_tokio_command_window(_command: &mut tokio::process::Command) {
     #[cfg(windows)]
     {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        _command.creation_flags(CREATE_NO_WINDOW);
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        _command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
     }
 }
 
@@ -1956,23 +1968,25 @@ async fn run_session(
                                             return;
                                         }
                                     };
-                                run_cli_prompt(
+                                run_cli_prompt(CliPromptRun {
                                     req_id,
-                                    resolved_cli.bin(),
-                                    resolved_cli.name(),
-                                    resolved_args,
+                                    bin: resolved_cli.bin().to_string(),
+                                    cli_name: resolved_cli.name().to_string(),
+                                    extra_args: resolved_args,
                                     runtime_permission,
-                                    prepared_cwd.cwd,
-                                    prepared_cwd.conversation_workspace,
+                                    cwd: prepared_cwd.cwd,
+                                    conversation_workspace: prepared_cwd.conversation_workspace,
                                     prompt,
-                                    Some(crate::node_agent_server_runtime::ServerRuntimeConfig {
-                                        server_url: rt_c.cloud_http_url(),
-                                        user_token: rt_c.user_token().await,
-                                    }),
-                                    rt_c.tool_approvals.clone(),
+                                    server_runtime_config: Some(
+                                        crate::node_agent_server_runtime::ServerRuntimeConfig {
+                                            server_url: rt_c.cloud_http_url(),
+                                            user_token: rt_c.user_token().await,
+                                        },
+                                    ),
+                                    approval_state: rt_c.tool_approvals.clone(),
                                     cancel_rx,
-                                    tx_c,
-                                )
+                                    out_tx: tx_c,
+                                })
                                 .await;
                                 rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
                             });

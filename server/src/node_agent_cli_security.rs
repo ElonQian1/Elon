@@ -145,6 +145,22 @@ pub(crate) fn codex_session_scope_key(
     Some(format!("{base}|perm={permission}|cwd={cwd_hash}"))
 }
 
+pub(crate) fn windows_batch_wrapper(program: &str) -> Option<(&'static str, Vec<String>)> {
+    if !cfg!(windows) || !is_windows_batch_file(program) {
+        return None;
+    }
+    // cmd 的 /S 需要脚本路径自带引号，避免空格路径被二次解析成新窗口或错误命令。
+    Some((
+        "cmd",
+        vec![
+            "/D".to_string(),
+            "/S".to_string(),
+            "/C".to_string(),
+            format!("\"{program}\""),
+        ],
+    ))
+}
+
 fn normalize_cli_name(cli: &str) -> Result<&'static str> {
     let clean = cli.trim().to_ascii_lowercase();
     if clean.is_empty()
@@ -162,6 +178,11 @@ fn normalize_cli_name(cli: &str) -> Result<&'static str> {
         .copied()
         .find(|name| *name == clean)
         .ok_or_else(|| anyhow!("不支持的 PC CLI: {cli}"))
+}
+
+fn is_windows_batch_file(program: &str) -> bool {
+    let lower = program.trim().to_ascii_lowercase();
+    lower.ends_with(".cmd") || lower.ends_with(".bat")
 }
 
 fn canonical_cli_path(path: &str) -> Result<PathBuf> {
@@ -326,5 +347,23 @@ mod tests {
         let full = codex_session_scope_key(&args, Some("full_access"), Some("C:/repo"));
         assert_ne!(project, full);
         assert!(full.unwrap().contains("perm=full_access"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn batch_wrapper_quotes_cli_shim_path() {
+        let (program, args) =
+            super::windows_batch_wrapper(r"C:\Users\me\AppData\Roaming\npm\codex.cmd").unwrap();
+
+        assert_eq!(program, "cmd");
+        assert_eq!(
+            args,
+            vec![
+                "/D".to_string(),
+                "/S".to_string(),
+                "/C".to_string(),
+                r#""C:\Users\me\AppData\Roaming\npm\codex.cmd""#.to_string()
+            ]
+        );
     }
 }

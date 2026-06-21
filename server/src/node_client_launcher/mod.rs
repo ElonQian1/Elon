@@ -1,3 +1,6 @@
+// server/src/node_client_launcher/mod.rs
+
+mod command;
 mod env_file;
 mod installer;
 mod paths;

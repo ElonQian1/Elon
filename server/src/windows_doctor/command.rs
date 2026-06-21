@@ -1,3 +1,5 @@
+// server/src/windows_doctor/command.rs
+
 use serde_json::{json, Value};
 use std::process::Command;
 
@@ -65,6 +67,7 @@ fn hide_command_window(_command: &mut Command) {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        _command.creation_flags(CREATE_NO_WINDOW);
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        _command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
     }
 }

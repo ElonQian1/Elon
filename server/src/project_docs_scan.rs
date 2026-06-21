@@ -1,3 +1,5 @@
+// server/src/project_docs_scan.rs
+
 //! Shared Markdown discovery for project documentation surfaces.
 use anyhow::{anyhow, Result};
 use homecli_proto::{ProjectDocumentEntry, ProjectDocumentsSnapshot};
@@ -123,13 +125,7 @@ fn discover_document_candidates(workspace: &FsPath, warnings: &mut Vec<String>) 
         &mut candidates,
     );
     for (dir, priority, depth) in DOC_DIRS {
-        collect_markdown_dir(
-            workspace,
-            &workspace.join(dir),
-            *priority,
-            *depth,
-            &mut candidates,
-        );
+        collect_markdown_dir(&workspace.join(dir), *priority, *depth, &mut candidates);
     }
 
     candidates.sort_by_key(|(priority, path)| (*priority, relative_path(workspace, path)));
@@ -186,7 +182,6 @@ fn push_if_markdown(workspace: &FsPath, relative: &str, candidates: &mut Vec<(us
 }
 
 fn collect_markdown_dir(
-    workspace: &FsPath,
     dir: &FsPath,
     priority: usize,
     max_depth: usize,
@@ -210,7 +205,7 @@ fn collect_markdown_dir(
             if should_skip_dir(&path) {
                 continue;
             }
-            collect_markdown_dir(workspace, &path, priority + 1, max_depth - 1, candidates);
+            collect_markdown_dir(&path, priority + 1, max_depth - 1, candidates);
         } else if is_markdown_file(&path) {
             candidates.push((priority, path));
         }

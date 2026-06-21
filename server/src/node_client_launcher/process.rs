@@ -1,18 +1,21 @@
+// server/src/node_client_launcher/process.rs
+
 use anyhow::{bail, Context, Result};
 use std::{
     io::{Read, Write},
     net::TcpStream,
     path::Path,
-    process::{Command, Stdio},
     time::Duration,
 };
 
 use super::{
-    env_file, paths, AGENT_RUNTIME_ARG, CLIENT_EXE_NAME, DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
+    command as launcher_command, env_file, paths, AGENT_RUNTIME_ARG, CLIENT_EXE_NAME,
+    DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
 };
 
 const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_millis(900);
 const ADMIN_PORT_FALLBACK_LIMIT: u16 = 20;
+const ADMIN_HEALTH_READ_LIMIT: usize = 4096;
 
 pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     let client = paths::client_exe(install_dir);
@@ -27,17 +30,15 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         .unwrap_or(DEFAULT_ADMIN_PORT);
     let port = select_admin_port(port);
 
-    if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
-        let mut cmd = Command::new(&client);
+    if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) && !agent_runtime_running(install_dir) {
+        let mut cmd = launcher_command::silent_command(&client);
         cmd.arg(AGENT_RUNTIME_ARG)
             .current_dir(install_dir)
             .envs(&env_values)
             .env("NODE_ADMIN_PORT", port.to_string())
-            .env("NODE_AUTO_OPEN_ADMIN", "0")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
+            .env("NODE_AUTO_OPEN_ADMIN", "0");
+        launcher_command::spawn_hidden(&mut cmd)
+            .with_context(|| format!("无法启动 {}", client.display()))?;
         wait_for_admin_ready(port, Duration::from_secs(15));
     }
 
@@ -57,38 +58,20 @@ foreach ($target in $targets) {{
   Invoke-CimMethod -InputObject $target -MethodName Terminate | Out-Null
 }}
 "#,
-            client = ps_single_quote(CLIENT_EXE_NAME)
+            client = launcher_command::ps_single_quote(CLIENT_EXE_NAME)
         );
-        let mut ps = Command::new("powershell");
-        ps.args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-WindowStyle",
-            "Hidden",
-            "-Command",
-            &script,
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-        let _ = status_hidden(&mut ps);
+        let mut ps = launcher_command::powershell_hidden_command(&script);
+        let _ = launcher_command::status_hidden(&mut ps);
 
-        let mut cmd = Command::new("taskkill");
-        cmd.args(["/IM", "elon-node-agent.exe", "/F"])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        let _ = status_hidden(&mut cmd);
+        let mut cmd = launcher_command::silent_command("taskkill");
+        cmd.args(["/IM", "elon-node-agent.exe", "/F"]);
+        let _ = launcher_command::status_hidden(&mut cmd);
     }
     #[cfg(not(windows))]
     {
-        let mut cmd = Command::new("pkill");
-        cmd.arg("elon-node-agent")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        let _ = status_hidden(&mut cmd);
+        let mut cmd = launcher_command::silent_command("pkill");
+        cmd.arg("elon-node-agent");
+        let _ = launcher_command::status_hidden(&mut cmd);
     }
 }
 
@@ -97,43 +80,12 @@ pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
     if !client.exists() {
         bail!("缺少客户端启动器：{}", client.display());
     }
-    #[cfg(windows)]
-    {
-        let command = format!(
-            "Start-Sleep -Seconds 2; Start-Process -FilePath '{}'",
-            ps_single_quote(&client.to_string_lossy())
-        );
-        let mut cmd = Command::new("powershell");
-        cmd.args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-WindowStyle",
-            "Hidden",
-            "-Command",
-            &command,
-        ])
-        .current_dir(install_dir)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-        spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
-    }
-    #[cfg(not(windows))]
-    {
-        let mut cmd = Command::new(&client);
-        cmd.current_dir(install_dir)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        spawn_hidden(&mut cmd).with_context(|| format!("无法启动 {}", client.display()))?;
-    }
+    // 安装完成后直接启动目标 exe，不再经 PowerShell 二次拉起，降低黑窗和重复启动风险。
+    let mut cmd = launcher_command::silent_command(&client);
+    cmd.current_dir(install_dir);
+    launcher_command::spawn_hidden(&mut cmd)
+        .with_context(|| format!("无法启动 {}", client.display()))?;
     Ok(())
-}
-
-#[cfg(windows)]
-fn ps_single_quote(value: &str) -> String {
-    value.replace('\'', "''")
 }
 
 pub(crate) fn open_pc_web_page(
@@ -161,21 +113,15 @@ pub(crate) fn open_pc_web_page(
 fn open_url(url: &str) -> Result<()> {
     #[cfg(windows)]
     {
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", "start", "", url])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        spawn_hidden(&mut cmd).with_context(|| format!("无法打开管理页 {url}"))?;
+        let mut cmd = launcher_command::open_url_command(url);
+        launcher_command::spawn_hidden(&mut cmd)
+            .with_context(|| format!("无法打开管理页 {url}"))?;
     }
     #[cfg(not(windows))]
     {
-        Command::new("xdg-open")
-            .arg(url)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn()
+        let mut cmd = launcher_command::silent_command("xdg-open");
+        cmd.arg(url);
+        launcher_command::spawn_hidden(&mut cmd)
             .with_context(|| format!("无法打开管理页 {url}"))?;
     }
     Ok(())
@@ -234,6 +180,47 @@ fn select_admin_port(preferred: u16) -> u16 {
     preferred
 }
 
+fn agent_runtime_running(install_dir: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        let script = agent_runtime_query_script(&paths::client_exe(install_dir));
+        let mut command = launcher_command::powershell_hidden_command(&script);
+        let Ok(output) = launcher_command::output_hidden(&mut command) else {
+            return false;
+        };
+        output.status.success() && String::from_utf8_lossy(&output.stdout).contains("running")
+    }
+    #[cfg(not(windows))]
+    {
+        false
+    }
+}
+
+#[cfg(windows)]
+fn agent_runtime_query_script(client: &Path) -> String {
+    format!(
+        r#"
+$target = [System.IO.Path]::GetFullPath('{client}')
+$targets = Get-CimInstance Win32_Process | Where-Object {{
+  $line = if ($_.CommandLine) {{ [string]$_.CommandLine }} else {{ '' }}
+  $exe = if ($_.ExecutablePath) {{ [string]$_.ExecutablePath }} else {{ '' }}
+  $exeMatch = $false
+  if ($exe) {{
+    try {{
+      $exeMatch = [System.IO.Path]::GetFullPath($exe).Equals($target, [StringComparison]::OrdinalIgnoreCase)
+    }} catch {{
+      $exeMatch = $false
+    }}
+  }}
+  $lineMatch = $line.IndexOf($target, [StringComparison]::OrdinalIgnoreCase) -ge 0
+  ($line -match '--agent-runtime') -and ($exeMatch -or $lineMatch)
+}}
+if ($targets) {{ Write-Output 'running' }}
+"#,
+        client = launcher_command::ps_single_quote(&client.to_string_lossy())
+    )
+}
+
 fn wait_for_admin_ready(port: u16, timeout: Duration) -> bool {
     let deadline = std::time::Instant::now() + timeout;
     while std::time::Instant::now() < deadline {
@@ -252,36 +239,61 @@ fn admin_healthy(port: u16, timeout: Duration) -> bool {
     };
     let _ = stream.set_read_timeout(Some(timeout));
     let _ = stream.set_write_timeout(Some(timeout));
-    let request = b"GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
+    let request = b"GET /api/status HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n";
     if stream.write_all(request).is_err() {
         return false;
     }
-    let mut buf = [0u8; 32];
-    match stream.read(&mut buf) {
-        Ok(n) if n > 0 => {
-            let head = String::from_utf8_lossy(&buf[..n]);
-            head.starts_with("HTTP/1.1 200") || head.starts_with("HTTP/1.0 200")
+    let mut response = Vec::new();
+    let mut buf = [0u8; 512];
+    while response.len() < ADMIN_HEALTH_READ_LIMIT {
+        match stream.read(&mut buf) {
+            Ok(0) => break,
+            Ok(n) => response.extend_from_slice(&buf[..n]),
+            Err(_) => break,
         }
-        _ => false,
     }
+    let response = String::from_utf8_lossy(&response);
+    admin_status_response_healthy(&response)
 }
 
-fn spawn_hidden(command: &mut Command) -> std::io::Result<std::process::Child> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
-    }
-    command.spawn()
+fn admin_status_response_healthy(response: &str) -> bool {
+    let status_ok = response.starts_with("HTTP/1.1 200") || response.starts_with("HTTP/1.0 200");
+    // 只把本节点的 /api/status 当作健康，避免随机占用 7799 的网页服务误判为已就绪。
+    status_ok && response.contains("\"local_admin_token_header\"")
 }
 
-fn status_hidden(command: &mut Command) -> std::io::Result<std::process::ExitStatus> {
-    #[cfg(windows)]
-    {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encoded_query_escapes_local_admin_url() {
+        assert_eq!(
+            encode_query_component("http://127.0.0.1:7799/?a=1&b=2"),
+            "http%3A%2F%2F127.0.0.1%3A7799%2F%3Fa%3D1%26b%3D2"
+        );
     }
-    command.status()
+
+    #[test]
+    fn admin_health_requires_node_status_marker() {
+        assert!(admin_status_response_healthy(
+            "HTTP/1.1 200 OK\r\n\r\n{\"local_admin_token_header\":\"X-Elon-Local-Admin-Token\"}"
+        ));
+        assert!(!admin_status_response_healthy(
+            "HTTP/1.1 200 OK\r\n\r\n<html>not our service</html>"
+        ));
+        assert!(!admin_status_response_healthy(
+            "HTTP/1.1 404 Not Found\r\n\r\n{\"local_admin_token_header\":\"x\"}"
+        ));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn runtime_query_matches_current_client_only() {
+        let script = agent_runtime_query_script(Path::new(r"C:\ElonNode\一龙PC节点.exe"));
+
+        assert!(script.contains("--agent-runtime"));
+        assert!(script.contains(r"C:\ElonNode\一龙PC节点.exe"));
+        assert!(!script.contains("elon-node-agent.exe"));
+    }
 }

@@ -1,81 +1,37 @@
-# Win 端 Codex 桌面版开发能力计划
+# PC 节点黑窗风暴修复计划
 
 ## 目标
 
-让用户安装 Win 端一龙 PC 节点后，可以在 PC 网页端绑定本机项目，选择运行路线和权限，在 AI 开发频道中像 Codex 桌面版一样发起、停止、继续开发任务，并能清楚看到当前是否真正开发就绪。
+修复 Windows PC 端 `一龙PC节点.exe` 在启动、自更新、协议唤起、开机自启和本机 CLI 执行时可能疯狂弹出黑色 cmd/终端窗口的问题，重点处理几十到上百个黑窗的进程风暴。
 
 ## 里程碑
 
-1. 核验当前能力：安装包、节点进程、本机状态接口、项目绑定、运行路线、权限和任务卡。
-2. 补齐可见就绪证据：在 PC 项目成员栏显示逐项检查，而不是只显示粗略 Ready/Check。
-3. 强化任务闭环：保留停止、继续草稿、刷新和运行中状态。
-4. 显式运行路线：PC AI 开发栏提供 Auto / Route A / Route B / Route C 选择，并把选择传到后端执行链路。
-5. 结构化工具协议：Route B/C 的 `run_command` 优先使用 `program + args`，保留旧 `command` 兼容。
-6. 发布闭环：提交到 `origin/main`，发布服务器和 Windows 节点包，验证线上版本和本机安装态。
-7. 本机管理安全：7799 本地管理/电脑医生写接口要求启动期随机 token 和 trusted origin 校验，前端自动刷新并携带授权头。
-8. 工具时间线：Route B/C 本机 runtime 把 `tool_call/tool_result` 结构化回传，AI 开发频道持久化并在 PC 页面以工具卡片展示。
-9. 本机 CLI 执行边界：Route A 只允许已发现的 `codex` / `copilot` / `claude` / `gemini`，拒绝云端传来的任意可执行名、危险提权参数和裸 cwd；legacy relay 同步收紧。
-10. Codex Desktop 体验补齐：Route B/C 增加 `apply_patch`、diff preview、逐工具审批、超时/拒绝回传和可恢复任务。
-11. 范围读取和补丁安全：Route B/C 增加 `read_file_range`，并收紧 `apply_patch` 对 Windows `.git` 大小写变体的拒绝。
-12. `write_file` 安全审批：Route B/C 的整文件写入审批显示真实 diff，敏感/过大/二进制内容 fail-closed，批准后复查 base hash。
-13. 审批并发状态机：PC 工具审批在服务端原子认领，重复/冲突决策不会重复派发，发送失败可回滚重试。
-14. 审批 ACK 闭环：服务端派发审批决定后等待 PC 节点 ACK，只有对应 `dispatch_id` 被接受后才落为已决定，迟到 ACK、拒收和超时都可重试。
-15. Route A 完全访问本机门禁：完全访问必须在 Win 节点本机写入项目级授权记录，云端字段不能单独触发 Codex/Copilot 沙箱绕过。
-16. 审批状态恢复：服务端内存审批丢失时从 `task_events` 重建 pending/decided 状态，PC 任务卡刷新后不再给已处理审批显示可重复点击按钮。
-17. Route B 配置闭环：PC 节点管理页可保存 API key、模型和 API Base，`/api/env-check` 明确返回 Route B 是否真正就绪，配置持久化到启动器实际读取的 `_internal/node-agent.env`。
+1. 启动器防重复：管理端口未健康时先识别当前安装目录已有的 `--agent-runtime` 进程，避免每次协议唤起都继续 spawn 新 runtime。
+2. 启动链路隐藏：统一 launcher 的 PowerShell、cmd、浏览器打开、普通子进程隐藏策略，并加 `CREATE_NEW_PROCESS_GROUP`。
+3. 自更新防风暴：替换脚本失败即停，成功后只隐藏重启一次，避免失败循环反复拉起旧 exe。
+4. 旧入口清理：安装/修复/关闭自启时清理旧 Run 项、旧计划任务、Startup 快捷方式。
+5. CLI 隐藏执行：Route A 和 legacy relay 的 `.cmd/.bat` shim 统一包装，避免只隐藏外层却让子进程开控制台。
+6. 回归验证：跑 PC 节点目标 clippy、相关单测、全量测试和格式检查；记录全量 clippy 的仓库历史缺口。
 
 ## 风险
 
-- 主工作区存在未推送本地提交和冲突中间态，所有新改动必须在干净 worktree 中完成。
-- 完全访问模式会扩大本机读写和命令执行范围，必须保留显式确认和可见提示。
-- 服务器运行时代码变更需要服务器发布；PC 前端或节点行为变更还需要刷新 Windows 客户端包。
-- 并行任务可能继续推进 `origin/main`，发布时必须以最新主线为准。
-- Route B/C 仍不是完整 OS 沙箱；本阶段只减少 shell 注入和命令解析歧义，不把 B/C 扩展成通用 PowerShell。
-- 本机 `/api/status` 只应向受信任云端来源或本机同源页面返回启动期随机 token；若可信 PC 网页自身出现 XSS，仍需要后续补本机确认弹窗/原生授权页进一步收紧。
-- Route A 的 `full_access` 不能只靠云端字段放大权限，后续需要本机原生确认或配对确认，避免网页/XSS 直接触发全盘级开发能力。
-- legacy relay 是兼容路径，不应承载 Route B/C 内置 runtime；若收到内置 runtime 请求必须 fail-closed，让用户升级到一龙 PC 节点客户端。
-- 目前审批状态仍是服务端内存态；本阶段先解决单进程并发竞态，后续若要支持服务重启恢复、多实例和审计追责，需要把审批记录、决策人、diff/hash 写入持久存储。
-- ACK 协议升级后，旧 PC 节点能收到审批决定但不会回 ACK，服务端会 fail-closed 并释放认领；因此发布服务器后必须刷新 Windows 节点包。
-- 新 PC 节点对旧服务器消息保留 `dispatch_id` 默认值兼容，避免节点包先更新时反序列化失败。
-- Route A `full_access` 授权记录是本机文件态；换机器、删除本机配置或换项目目录后需要用户在 PC 工作台重新确认。
-- 审批恢复只能恢复已持久化的任务事件；当前服务启动逻辑仍会把 running 任务标记为 interrupted，真正跨重启继续运行需要后续任务恢复阶段单独处理。
-- Route B 配置会把 API key 写入用户本机 `_internal/node-agent.env`；这是本机明文配置文件，后续若要面向更严格安全场景，需要接入 Windows 凭据管理器或 DPAPI。
+- GUI 黑窗是否可见最终依赖 Windows 桌面烟测，自动化主要验证启动条件、隐藏 flags 和防重复逻辑。
+- 全量 `cargo clippy --all-targets --all-features -- -D warnings` 当前被服务端/测试历史 lint 阻塞，未在本次黑窗任务中大范围清理。
+- 原主工作区存在未提交改动，本任务只在隔离 worktree 修改并只 stage 本任务文件。
 
 ## 验证命令
 
-- `node --check server\src\assets\pc_app_project_readiness.js`
-- `node --check server\src\assets\pc_app_dev_composer.js`
-- `node --check server\src\assets\pc_app.js`
-- `node scripts\test-pc-dev-assets.js`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_runtime_events`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approvals`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval`
-- `cargo test --manifest-path server\homecli-proto\Cargo.toml`
-- `cargo test --manifest-path server\Cargo.toml homecli_agent::tests::tool_approval_decision_waits_for_matching_ack`
-- `cargo test --manifest-path server\Cargo.toml homecli_agent::tests::stale_tool_approval_ack_does_not_complete_new_dispatch`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_file_range`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_write_preview`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-server tools_patch`
+- `cargo fmt --manifest-path server\Cargo.toml --all --check`
+- `cargo clippy --manifest-path server\Cargo.toml --bin elon-pc-node -- -D warnings`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_client_launcher`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-server node_agent_cli_security`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_api_runtime_config`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_full_access`
-- `cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approval_recovery`
-- `cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_server_runtime`
+- `cargo test --manifest-path server\Cargo.toml --all-features`
 - `git diff --check`
-- `cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
-- `powershell -ExecutionPolicy Bypass -File scripts\publish-server.ps1`
-- `powershell -ExecutionPolicy Bypass -File scripts\publish-node-agent.ps1`
-- 验证 `/api/server/version`、`/api/node-agent/version`、`/assets/pc_app_project_readiness.js` 和本机 `http://127.0.0.1:7799/api/status`
 
 ## 回滚策略
 
-- 前端 UI 回滚：撤回本阶段提交并重新发布服务器静态资源。
-- 节点包回滚：重新执行 `scripts\publish-node-agent.ps1` 于上一稳定 SHA。
-- 本机安装回滚：从上一稳定 Windows client zip 重新同步 `%LOCALAPPDATA%\ElonNode`，只保留一个 `--agent-runtime` 进程。
-- 主工作区不同步：不 reset、不 stash、不覆盖，保留现状并报告阻塞文件。
+- 回滚本次提交即可恢复旧启动器、CLI shim 和隐藏窗口行为。
+- 如节点包已经发布，回滚后基于上一稳定 SHA 重新运行 `scripts\publish-node-agent.ps1`。
+- 不 reset 原主工作区，不覆盖用户或其他 AI 的未提交改动。

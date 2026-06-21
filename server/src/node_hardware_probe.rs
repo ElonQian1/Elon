@@ -1,3 +1,5 @@
+// server/src/node_hardware_probe.rs
+
 use homecli_proto::NodeHardwareProfile;
 use std::{collections::HashSet, process::Command};
 
@@ -185,7 +187,8 @@ fn run_command(program: &str, args: &[&str]) -> Option<String> {
     {
         use std::os::windows::process::CommandExt;
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        command.creation_flags(CREATE_NO_WINDOW);
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
     }
     let output = command.output().ok()?;
     if !output.status.success() {

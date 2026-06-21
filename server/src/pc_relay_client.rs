@@ -643,19 +643,11 @@ async fn run_cli_and_stream(
         "[relay-client] cli={} 使用可执行路径: {}",
         cli_name, program
     );
-    #[cfg(windows)]
-    let is_batch = {
-        let p = program.to_ascii_lowercase();
-        p.ends_with(".cmd") || p.ends_with(".bat")
-    };
-
-    #[cfg(not(windows))]
-    let is_batch = false;
-
-    let mut cmd = if is_batch {
-        // .cmd/.bat 通过 cmd /C 执行，避免 CreateProcess 直接调用批处理导致参数异常。
-        let mut c = Command::new("cmd");
-        c.arg("/C").arg(&program);
+    let batch_wrapper = crate::node_agent_cli_security::windows_batch_wrapper(program);
+    let mut cmd = if let Some((actual_program, args)) = batch_wrapper.as_ref() {
+        // .cmd/.bat 通过统一包装执行，隐藏窗口策略由 hide_relay_command_window 兜底。
+        let mut c = Command::new(actual_program);
+        c.args(args);
         c
     } else {
         Command::new(program)
@@ -708,7 +700,8 @@ fn hide_relay_command_window(_command: &mut tokio::process::Command) {
     #[cfg(windows)]
     {
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        _command.creation_flags(CREATE_NO_WINDOW);
+        const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+        _command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
     }
 }
 

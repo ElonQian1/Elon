@@ -43,28 +43,21 @@ pub(crate) struct ServerRuntimeRunResult {
     pub total_tokens: Option<u64>,
 }
 
+pub(crate) struct RuntimePromptOptions<'a> {
+    pub req_id: &'a str,
+    pub cwd: Option<&'a str>,
+    pub runtime_permission: Option<&'a str>,
+    pub prompt: &'a str,
+    pub approval_state: Option<ToolApprovalState>,
+    pub cancel_rx: watch::Receiver<bool>,
+    pub out_tx: mpsc::UnboundedSender<Message>,
+}
+
 pub(crate) async fn run_server_runtime_prompt(
-    req_id: &str,
     config: ServerRuntimeConfig,
-    cwd: Option<&str>,
-    runtime_permission: Option<&str>,
-    prompt: &str,
-    approval_state: Option<ToolApprovalState>,
-    cancel_rx: watch::Receiver<bool>,
-    out_tx: mpsc::UnboundedSender<Message>,
+    options: RuntimePromptOptions<'_>,
 ) -> ServerRuntimeRunResult {
-    match run_server_runtime_inner(
-        req_id,
-        config,
-        cwd,
-        runtime_permission,
-        prompt,
-        approval_state,
-        cancel_rx,
-        out_tx,
-    )
-    .await
-    {
+    match run_server_runtime_inner(config, options).await {
         Ok(result) => result,
         Err(error) => ServerRuntimeRunResult {
             exit_ok: false,
@@ -78,13 +71,7 @@ pub(crate) async fn run_server_runtime_prompt(
 }
 
 pub(crate) async fn run_api_runtime_prompt(
-    req_id: &str,
-    cwd: Option<&str>,
-    runtime_permission: Option<&str>,
-    prompt: &str,
-    approval_state: Option<ToolApprovalState>,
-    cancel_rx: watch::Receiver<bool>,
-    out_tx: mpsc::UnboundedSender<Message>,
+    options: RuntimePromptOptions<'_>,
 ) -> ServerRuntimeRunResult {
     let Some(config) = api_runtime_config_from_env() else {
         return ServerRuntimeRunResult {
@@ -99,18 +86,7 @@ pub(crate) async fn run_api_runtime_prompt(
             total_tokens: None,
         };
     };
-    match run_api_runtime_inner(
-        req_id,
-        config,
-        cwd,
-        runtime_permission,
-        prompt,
-        approval_state,
-        cancel_rx,
-        out_tx,
-    )
-    .await
-    {
+    match run_api_runtime_inner(config, options).await {
         Ok(result) => result,
         Err(error) => ServerRuntimeRunResult {
             exit_ok: false,
@@ -156,15 +132,18 @@ fn api_runtime_config_from_lookup(
 }
 
 async fn run_server_runtime_inner(
-    req_id: &str,
     config: ServerRuntimeConfig,
-    cwd: Option<&str>,
-    runtime_permission: Option<&str>,
-    prompt: &str,
-    approval_state: Option<ToolApprovalState>,
-    cancel_rx: watch::Receiver<bool>,
-    out_tx: mpsc::UnboundedSender<Message>,
+    options: RuntimePromptOptions<'_>,
 ) -> Result<ServerRuntimeRunResult> {
+    let RuntimePromptOptions {
+        req_id,
+        cwd,
+        runtime_permission,
+        prompt,
+        approval_state,
+        cancel_rx,
+        out_tx,
+    } = options;
     let token = config
         .user_token
         .as_deref()
@@ -180,14 +159,16 @@ async fn run_server_runtime_inner(
     let server_url = config.server_url.clone();
     let token = token.to_string();
     run_runtime_loop(
-        req_id,
-        "server-runtime",
-        guard,
-        prompt,
-        approval_state,
-        cancel_rx,
-        out_tx,
-        Some("server-runtime".to_string()),
+        RuntimeLoopOptions {
+            req_id,
+            label: "server-runtime",
+            guard,
+            prompt,
+            approval_state,
+            cancel_rx,
+            out_tx,
+            initial_model: Some("server-runtime".to_string()),
+        },
         move |messages| {
             let client = client.clone();
             let server_url = server_url.clone();
@@ -199,15 +180,18 @@ async fn run_server_runtime_inner(
 }
 
 async fn run_api_runtime_inner(
-    req_id: &str,
     config: ApiRuntimeConfig,
-    cwd: Option<&str>,
-    runtime_permission: Option<&str>,
-    prompt: &str,
-    approval_state: Option<ToolApprovalState>,
-    cancel_rx: watch::Receiver<bool>,
-    out_tx: mpsc::UnboundedSender<Message>,
+    options: RuntimePromptOptions<'_>,
 ) -> Result<ServerRuntimeRunResult> {
+    let RuntimePromptOptions {
+        req_id,
+        cwd,
+        runtime_permission,
+        prompt,
+        approval_state,
+        cancel_rx,
+        out_tx,
+    } = options;
     let workspace = resolve_workspace(cwd)?;
     let guard = ToolGuard::new(workspace, runtime_permission);
     let client = reqwest::Client::builder()
@@ -216,14 +200,16 @@ async fn run_api_runtime_inner(
         .unwrap_or_default();
     let initial_model = Some(config.model.clone());
     run_runtime_loop(
-        req_id,
-        "api-runtime",
-        guard,
-        prompt,
-        approval_state,
-        cancel_rx,
-        out_tx,
-        initial_model,
+        RuntimeLoopOptions {
+            req_id,
+            label: "api-runtime",
+            guard,
+            prompt,
+            approval_state,
+            cancel_rx,
+            out_tx,
+            initial_model,
+        },
         move |messages| {
             let client = client.clone();
             let config = config.clone();
@@ -233,21 +219,35 @@ async fn run_api_runtime_inner(
     .await
 }
 
-async fn run_runtime_loop<F, Fut>(
-    req_id: &str,
-    label: &str,
-    mut guard: ToolGuard,
-    prompt: &str,
+struct RuntimeLoopOptions<'a> {
+    req_id: &'a str,
+    label: &'a str,
+    guard: ToolGuard,
+    prompt: &'a str,
     approval_state: Option<ToolApprovalState>,
-    mut cancel_rx: watch::Receiver<bool>,
+    cancel_rx: watch::Receiver<bool>,
     out_tx: mpsc::UnboundedSender<Message>,
     initial_model: Option<String>,
+}
+
+async fn run_runtime_loop<F, Fut>(
+    options: RuntimeLoopOptions<'_>,
     mut call_chat: F,
 ) -> Result<ServerRuntimeRunResult>
 where
     F: FnMut(Vec<Value>) -> Fut,
     Fut: Future<Output = Result<Value>>,
 {
+    let RuntimeLoopOptions {
+        req_id,
+        label,
+        mut guard,
+        prompt,
+        approval_state,
+        mut cancel_rx,
+        out_tx,
+        initial_model,
+    } = options;
     let mut messages = vec![
         json!({"role": "system", "content": system_prompt(guard.read_only())}),
         json!({"role": "user", "content": prompt}),
@@ -649,9 +649,8 @@ fn extract_assistant_content(response: &Value) -> Result<String> {
 
 fn parse_agent_response(content: &str) -> Result<Value> {
     let trimmed = content.trim();
-    match serde_json::from_str(trimmed) {
-        Ok(value) => return Ok(value),
-        Err(_) => {}
+    if let Ok(value) = serde_json::from_str(trimmed) {
+        return Ok(value);
     }
     let start = trimmed
         .find('{')
@@ -701,7 +700,7 @@ impl RuntimeUsage {
 
 #[cfg(test)]
 mod tests {
-    use super::{api_runtime_config_from_lookup, run_runtime_loop};
+    use super::{api_runtime_config_from_lookup, run_runtime_loop, RuntimeLoopOptions};
     use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
     use homecli_proto::AgentToServer;
     use serde_json::{json, Value};
@@ -765,14 +764,16 @@ mod tests {
         let runtime_req_id = req_id.clone();
         let runtime = tokio::spawn(async move {
             run_runtime_loop(
-                &runtime_req_id,
-                "test-runtime",
-                ToolGuard::new(workspace, Some("project_write")),
-                "write a file",
-                Some(approval_state),
-                cancel_rx,
-                out_tx,
-                Some("test-model".to_string()),
+                RuntimeLoopOptions {
+                    req_id: &runtime_req_id,
+                    label: "test-runtime",
+                    guard: ToolGuard::new(workspace, Some("project_write")),
+                    prompt: "write a file",
+                    approval_state: Some(approval_state),
+                    cancel_rx,
+                    out_tx,
+                    initial_model: Some("test-model".to_string()),
+                },
                 move |_| {
                     let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
                     async move {
@@ -852,14 +853,16 @@ mod tests {
         let runtime_req_id = req_id.clone();
         let runtime = tokio::spawn(async move {
             run_runtime_loop(
-                &runtime_req_id,
-                "test-runtime",
-                ToolGuard::new(workspace, Some("project_write")),
-                "write a file",
-                Some(approval_state),
-                cancel_rx,
-                out_tx,
-                Some("test-model".to_string()),
+                RuntimeLoopOptions {
+                    req_id: &runtime_req_id,
+                    label: "test-runtime",
+                    guard: ToolGuard::new(workspace, Some("project_write")),
+                    prompt: "write a file",
+                    approval_state: Some(approval_state),
+                    cancel_rx,
+                    out_tx,
+                    initial_model: Some("test-model".to_string()),
+                },
                 move |_| {
                     let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
                     async move {
@@ -927,14 +930,16 @@ mod tests {
         let runtime_req_id = req_id.clone();
         let runtime = tokio::spawn(async move {
             run_runtime_loop(
-                &runtime_req_id,
-                "test-runtime",
-                ToolGuard::new(workspace, Some("project_write")),
-                "write a file",
-                Some(approval_state),
-                cancel_rx,
-                out_tx,
-                Some("test-model".to_string()),
+                RuntimeLoopOptions {
+                    req_id: &runtime_req_id,
+                    label: "test-runtime",
+                    guard: ToolGuard::new(workspace, Some("project_write")),
+                    prompt: "write a file",
+                    approval_state: Some(approval_state),
+                    cancel_rx,
+                    out_tx,
+                    initial_model: Some("test-model".to_string()),
+                },
                 move |_| {
                     let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
                     async move {

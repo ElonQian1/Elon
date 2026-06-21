@@ -124,7 +124,7 @@ fn reject_sensitive_path(display_path: &str) -> Result<()> {
         part == ".env"
             || part.starts_with(".env.")
             || part.starts_with(".env-")
-            || sensitive_names.iter().any(|name| part == *name)
+            || sensitive_names.contains(&part)
     }) || path.ends_with(".pem")
         || path.ends_with(".key")
         || path.ends_with(".p12")

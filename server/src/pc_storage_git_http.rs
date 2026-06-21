@@ -1,3 +1,5 @@
+// server/src/pc_storage_git_http.rs
+
 use axum::{
     body::Body,
     http::{HeaderName, HeaderValue, Request, StatusCode},
@@ -132,7 +134,6 @@ fn parse_cgi_response(raw: &[u8]) -> Result<Response, String> {
         };
         if name.eq_ignore_ascii_case("Status") {
             if let Some(code) = value
-                .trim()
                 .split_whitespace()
                 .next()
                 .and_then(|code| code.parse::<u16>().ok())

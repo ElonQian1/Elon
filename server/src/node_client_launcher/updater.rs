@@ -1,11 +1,10 @@
+// server/src/node_client_launcher/updater.rs
+
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::{
-    path::Path,
-    process::{Command, Stdio},
-};
+use std::path::Path;
 
-use super::{env_file, paths, process, DEFAULT_BASE_URL};
+use super::{command as launcher_command, env_file, paths, process, DEFAULT_BASE_URL};
 
 #[derive(Debug, Deserialize)]
 struct VersionInfo {
@@ -140,8 +139,29 @@ fn schedule_self_replace(
 ) -> Result<()> {
     #[cfg(windows)]
     {
-        let script = format!(
-            r#"
+        let script = self_replace_script(tmp_exe, client, uninstall, tmp_version, version_file);
+        // 自替换必须等当前进程退出，脚本保留但入口和重启都强制隐藏窗口。
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        launcher_command::spawn_hidden(&mut cmd).context("无法安排客户端自更新")?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        replace_client_files(tmp_exe, client, uninstall, tmp_version, version_file)
+    }
+}
+
+#[cfg(windows)]
+fn self_replace_script(
+    tmp_exe: &Path,
+    client: &Path,
+    uninstall: &Path,
+    tmp_version: &Path,
+    version_file: &Path,
+) -> String {
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
 $pidToWait = {pid}
 $tmpExe = '{tmp_exe}'
 $client = '{client}'
@@ -152,48 +172,15 @@ Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
 Move-Item -LiteralPath $tmpExe -Destination $client -Force
 Copy-Item -LiteralPath $client -Destination $uninstall -Force
 Move-Item -LiteralPath $tmpVersion -Destination $versionFile -Force
-Start-Process -FilePath $client
+Start-Process -FilePath $client -WindowStyle Hidden
 "#,
-            pid = std::process::id(),
-            tmp_exe = ps_single_quote(&tmp_exe.to_string_lossy()),
-            client = ps_single_quote(&client.to_string_lossy()),
-            uninstall = ps_single_quote(&uninstall.to_string_lossy()),
-            tmp_version = ps_single_quote(&tmp_version.to_string_lossy()),
-            version_file = ps_single_quote(&version_file.to_string_lossy())
-        );
-        let mut cmd = Command::new("powershell");
-        cmd.args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-WindowStyle",
-            "Hidden",
-            "-Command",
-            &script,
-        ])
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-        spawn_hidden(&mut cmd).context("无法安排客户端自更新")?;
-        Ok(())
-    }
-    #[cfg(not(windows))]
-    {
-        replace_client_files(tmp_exe, client, uninstall, tmp_version, version_file)
-    }
-}
-
-#[cfg(windows)]
-fn spawn_hidden(command: &mut Command) -> std::io::Result<std::process::Child> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW);
-    command.spawn()
-}
-
-#[cfg(windows)]
-fn ps_single_quote(value: &str) -> String {
-    value.replace('\'', "''")
+        pid = std::process::id(),
+        tmp_exe = launcher_command::ps_single_quote(&tmp_exe.to_string_lossy()),
+        client = launcher_command::ps_single_quote(&client.to_string_lossy()),
+        uninstall = launcher_command::ps_single_quote(&uninstall.to_string_lossy()),
+        tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy()),
+        version_file = launcher_command::ps_single_quote(&version_file.to_string_lossy())
+    )
 }
 
 fn update_base_url(env_values: &std::collections::HashMap<String, String>) -> String {
@@ -210,4 +197,28 @@ fn read_local_git_sha(path: &Path) -> Option<String> {
         .get("gitSha")
         .and_then(|value| value.as_str())
         .map(str::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    #[cfg(windows)]
+    #[test]
+    fn self_replace_script_stops_on_failure_before_restart() {
+        use std::path::Path;
+
+        let script = super::self_replace_script(
+            Path::new(r"C:\ElonNode\_internal\一龙PC节点.exe.new"),
+            Path::new(r"C:\ElonNode\一龙PC节点.exe"),
+            Path::new(r"C:\ElonNode\卸载一龙PC节点.exe"),
+            Path::new(r"C:\ElonNode\_internal\node-agent-version.json.new"),
+            Path::new(r"C:\ElonNode\_internal\node-agent-version.json"),
+        );
+
+        assert!(script.contains("$ErrorActionPreference = 'Stop'"));
+        assert!(script.contains("Start-Process -FilePath $client -WindowStyle Hidden"));
+        assert!(
+            script.find("Move-Item -LiteralPath $tmpExe").unwrap()
+                < script.find("Start-Process -FilePath $client").unwrap()
+        );
+    }
 }

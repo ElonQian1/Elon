@@ -1,11 +1,14 @@
+// server/src/node_client_launcher/installer.rs
+
 use anyhow::{Context, Result};
 use std::{
     path::{Path, PathBuf},
-    process::{Command, Stdio},
     time::Duration,
 };
 
-use super::{env_file, paths, process, windows_integration, DEFAULT_ADMIN_PORT};
+use super::{
+    command as launcher_command, env_file, paths, process, windows_integration, DEFAULT_ADMIN_PORT,
+};
 
 const INTERNAL_FILES: &[&str] = &[
     "node-agent-version.json",
@@ -188,21 +191,13 @@ fn same_path(left: &Path, right: &Path) -> bool {
 fn schedule_self_delete(install_dir: &Path) -> Result<()> {
     #[cfg(windows)]
     {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-
         let command = format!(
             "timeout /t 1 /nobreak >nul & rmdir /s /q \"{}\"",
             install_dir.display()
         );
-        let mut cmd = Command::new("cmd");
-        cmd.args(["/C", &command])
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        cmd.creation_flags(CREATE_NO_WINDOW)
-            .spawn()
-            .context("无法安排卸载清理")?;
+        // 自删除必须等当前进程退出，仍保留 cmd，但统一走隐藏启动 helper。
+        let mut cmd = launcher_command::cmd_hidden_command(&command);
+        launcher_command::spawn_hidden(&mut cmd).context("无法安排卸载清理")?;
     }
     #[cfg(not(windows))]
     {

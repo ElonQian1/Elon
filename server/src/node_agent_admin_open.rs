@@ -1,3 +1,5 @@
+// server/src/node_agent_admin_open.rs
+
 #[cfg(windows)]
 use std::time::Duration;
 
@@ -21,10 +23,9 @@ pub fn maybe_open_admin_page(port: u16) {
     std::thread::spawn(move || {
         wait_for_admin_port(port);
         let url = admin_url(port);
-        let mut cmd = std::process::Command::new("cmd");
-        cmd.arg("/C")
-            .arg("start")
-            .arg("")
+        let mut cmd = std::process::Command::new("explorer.exe");
+        cmd
+            // 避免 cmd /C start 额外拉起 shell，减少旧系统上闪黑窗的概率。
             .arg(&url)
             .stdin(std::process::Stdio::null())
             .stdout(std::process::Stdio::null())
@@ -64,5 +65,8 @@ fn auto_open_enabled() -> bool {
 fn spawn_hidden(command: &mut std::process::Command) -> std::io::Result<std::process::Child> {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW).spawn()
+    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+    command
+        .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)
+        .spawn()
 }

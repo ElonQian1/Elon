@@ -1,21 +1,26 @@
+// server/src/node_client_launcher/windows_integration.rs
+
 #[cfg(windows)]
 use anyhow::Context;
 use anyhow::Result;
 use std::path::Path;
-#[cfg(windows)]
-use std::process::Command;
 
 #[cfg(windows)]
-use super::{paths, APP_NAME};
+use super::{command as launcher_command, paths, APP_NAME};
 
-#[cfg(windows)]
-use std::process::{ExitStatus, Stdio};
 #[cfg(windows)]
 const RUN_VALUE_NAME: &str = "ElonNodeAgent";
 #[cfg(windows)]
 const LEGACY_TASK_NAME: &str = "ElonNodeAgentTray";
 #[cfg(windows)]
 const PROTOCOL_SCHEME: &str = "elon-node";
+#[cfg(windows)]
+const LEGACY_RUN_VALUE_NAMES: &[&str] = &[
+    "ElonNodeAgentTray",
+    "ElonNodeClient",
+    "一龙PC节点",
+    "elon-node-agent",
+];
 
 pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
     #[cfg(not(windows))]
@@ -25,7 +30,9 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
         let client = paths::client_exe(install_dir);
         let value = format!("\"{}\"", client.display());
         remove_legacy_scheduled_task();
-        let mut cmd = silent_command("reg");
+        remove_legacy_run_values();
+        remove_legacy_startup_shortcuts();
+        let mut cmd = launcher_command::silent_command("reg");
         cmd.args([
             "add",
             r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -37,7 +44,7 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
             &value,
             "/f",
         ]);
-        let status = hidden_status(&mut cmd).context("无法注册开机自启")?;
+        let status = launcher_command::status_hidden(&mut cmd).context("无法注册开机自启")?;
         if !status.success() {
             anyhow::bail!("注册开机自启失败");
         }
@@ -92,16 +99,16 @@ pub(crate) fn remove_url_protocol() {
     #[cfg(windows)]
     {
         let key = format!(r"HKCU\Software\Classes\{}", PROTOCOL_SCHEME);
-        let mut cmd = silent_command("reg");
+        let mut cmd = launcher_command::silent_command("reg");
         cmd.args(["delete", &key, "/f"]);
-        let _ = hidden_status(&mut cmd);
+        let _ = launcher_command::status_hidden(&mut cmd);
     }
 }
 
 pub(crate) fn disable_autostart() {
     #[cfg(windows)]
     {
-        let mut cmd = silent_command("reg");
+        let mut cmd = launcher_command::silent_command("reg");
         cmd.args([
             "delete",
             r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -109,8 +116,10 @@ pub(crate) fn disable_autostart() {
             RUN_VALUE_NAME,
             "/f",
         ]);
-        let _ = hidden_status(&mut cmd);
+        let _ = launcher_command::status_hidden(&mut cmd);
+        remove_legacy_run_values();
         remove_legacy_scheduled_task();
+        remove_legacy_startup_shortcuts();
     }
 }
 
@@ -137,19 +146,12 @@ $link.WorkingDirectory = $workdir
 $link.IconLocation = $target
 $link.Save()
 "#,
-            ps_single_quote(APP_NAME),
-            ps_single_quote(&target.to_string_lossy()),
-            ps_single_quote(&workdir.to_string_lossy())
+            launcher_command::ps_single_quote(APP_NAME),
+            launcher_command::ps_single_quote(&target.to_string_lossy()),
+            launcher_command::ps_single_quote(&workdir.to_string_lossy())
         );
-        let mut cmd = silent_command("powershell");
-        cmd.args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            &script,
-        ]);
-        let status = hidden_status(&mut cmd).context("无法创建桌面快捷方式")?;
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        let status = launcher_command::status_hidden(&mut cmd).context("无法创建桌面快捷方式")?;
         if !status.success() {
             anyhow::bail!("创建桌面快捷方式失败");
         }
@@ -166,55 +168,56 @@ $desktop = [Environment]::GetFolderPath('Desktop')
 $shortcut = Join-Path $desktop '{}.lnk'
 Remove-Item -LiteralPath $shortcut -Force -ErrorAction SilentlyContinue
 "#,
-            ps_single_quote(APP_NAME)
+            launcher_command::ps_single_quote(APP_NAME)
         );
-        let mut cmd = silent_command("powershell");
-        cmd.args([
-            "-NoProfile",
-            "-ExecutionPolicy",
-            "Bypass",
-            "-Command",
-            &script,
-        ]);
-        let _ = hidden_status(&mut cmd);
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        let _ = launcher_command::status_hidden(&mut cmd);
     }
 }
 
 #[cfg(windows)]
 fn remove_legacy_scheduled_task() {
-    let mut cmd = silent_command("schtasks");
+    let mut cmd = launcher_command::silent_command("schtasks");
     cmd.args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"]);
-    let _ = hidden_status(&mut cmd);
+    let _ = launcher_command::status_hidden(&mut cmd);
+}
+
+#[cfg(windows)]
+fn remove_legacy_run_values() {
+    for value_name in LEGACY_RUN_VALUE_NAMES {
+        let mut cmd = launcher_command::silent_command("reg");
+        cmd.args([
+            "delete",
+            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+            "/v",
+            value_name,
+            "/f",
+        ]);
+        let _ = launcher_command::status_hidden(&mut cmd);
+    }
+}
+
+#[cfg(windows)]
+fn remove_legacy_startup_shortcuts() {
+    let script = r#"
+$startup = [Environment]::GetFolderPath('Startup')
+if (Test-Path -LiteralPath $startup) {
+  '一龙PC节点.lnk','ElonNodeAgentTray.lnk','elon-node-agent.lnk' | ForEach-Object {
+    Remove-Item -LiteralPath (Join-Path $startup $_) -Force -ErrorAction SilentlyContinue
+  }
+}
+"#;
+    let mut cmd = launcher_command::powershell_hidden_command(script);
+    let _ = launcher_command::status_hidden(&mut cmd);
 }
 
 #[cfg(windows)]
 fn reg_add(args: &[&str], message: &str) -> Result<()> {
-    let mut cmd = silent_command("reg");
+    let mut cmd = launcher_command::silent_command("reg");
     cmd.args(args);
-    let status = hidden_status(&mut cmd).with_context(|| message.to_string())?;
+    let status = launcher_command::status_hidden(&mut cmd).with_context(|| message.to_string())?;
     if !status.success() {
         anyhow::bail!("{message}");
     }
     Ok(())
-}
-
-#[cfg(windows)]
-fn silent_command(program: &str) -> Command {
-    let mut cmd = Command::new(program);
-    cmd.stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null());
-    cmd
-}
-
-#[cfg(windows)]
-fn hidden_status(command: &mut Command) -> std::io::Result<ExitStatus> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    command.creation_flags(CREATE_NO_WINDOW).status()
-}
-
-#[cfg(windows)]
-fn ps_single_quote(value: &str) -> String {
-    value.replace('\'', "''")
 }
