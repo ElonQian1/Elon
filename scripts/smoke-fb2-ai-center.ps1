@@ -149,6 +149,26 @@ function Assert-MinCount {
     Assert-True ($count -ge $Minimum) $Name "count=$count min=$Minimum"
 }
 
+function Find-EvalScenario {
+    param(
+        [object[]]$Scenarios,
+        [string]$Id
+    )
+    @($Scenarios | Where-Object { $_.id -eq $Id } | Select-Object -First 1)[0]
+}
+
+function Assert-ScenarioContains {
+    param(
+        [object]$Scenario,
+        [string]$Field,
+        [string[]]$ExpectedValues,
+        [string]$Name
+    )
+    $actual = @($Scenario.$Field)
+    $missing = @($ExpectedValues | Where-Object { $actual -notcontains $_ })
+    Assert-True (@($missing).Count -eq 0) $Name "missing=$($missing -join ',')"
+}
+
 function Invoke-Json {
     param(
         [string]$Url,
@@ -229,7 +249,8 @@ try {
     $contract = Invoke-Json "$MainBase/api/external/apps/fb2/context-contract"
     $policy = $contract.live_tool_manifest.main_project_tool_execution_policy
     $answerPolicy = $contract.answer_policy_contract
-    $evalScenarioIds = @($answerPolicy.eval_scenarios | ForEach-Object { $_.id })
+    $evalScenarios = @($answerPolicy.eval_scenarios)
+    $evalScenarioIds = @($evalScenarios | ForEach-Object { $_.id })
     Assert-True ($contract.live_tool_manifest.status -eq "ready") "live manifest ready" "tool_count=$($contract.live_tool_manifest.tool_count)"
     Assert-True ($policy.schema -eq "external_app.live_tool_execution_policy.v1") "live manifest execution policy"
     Assert-True (($policy.chat_auto_executable_tool_ids -contains "search_matches") -and ($policy.chat_auto_executable_tool_ids -contains "search_group_opinions")) "auto executable core tools"
@@ -241,6 +262,41 @@ try {
     Assert-True (($evalScenarioIds -contains "today_matches_analysis") -and ($evalScenarioIds -contains "my_ticket_analysis")) "answer policy core eval scenarios"
     Assert-True (($evalScenarioIds -contains "platform_order_risk") -and ($evalScenarioIds -contains "group_opinion_summary")) "answer policy aggregate eval scenarios"
     Assert-True (($evalScenarioIds -contains "selected_message_review") -and ($evalScenarioIds -contains "source_reference_audit")) "answer policy audit eval scenarios"
+
+    $todayScenario = Find-EvalScenario $evalScenarios "today_matches_analysis"
+    Assert-ScenarioContains $todayScenario "required_source_kinds" @("match", "odds") "eval scenario today source kinds"
+    Assert-ScenarioContains $todayScenario "required_citations" @("match_id", "context_audit_id") "eval scenario today citations"
+    Assert-ScenarioContains $todayScenario "forbidden_outputs" @("guaranteed_win", "fabricated_odds") "eval scenario today forbidden outputs"
+
+    $ticketScenario = Find-EvalScenario $evalScenarios "my_ticket_analysis"
+    Assert-True ($ticketScenario.permission_boundary -eq "current_user_only") "eval scenario my ticket permission" "$($ticketScenario.permission_boundary)"
+    Assert-ScenarioContains $ticketScenario "required_headers" @("X-FB2-AI-CONTEXT-USER-ID") "eval scenario my ticket headers"
+    Assert-ScenarioContains $ticketScenario "required_query_fields" @("external_user_id") "eval scenario my ticket query fields"
+    Assert-ScenarioContains $ticketScenario "required_citations" @("order_id", "match_id", "context_audit_id") "eval scenario my ticket citations"
+    Assert-ScenarioContains $ticketScenario "forbidden_outputs" @("other_user_order_detail", "guaranteed_win") "eval scenario my ticket forbidden outputs"
+
+    $platformScenario = Find-EvalScenario $evalScenarios "platform_order_risk"
+    Assert-True ($platformScenario.permission_boundary -eq "anonymous_aggregate_only") "eval scenario platform permission" "$($platformScenario.permission_boundary)"
+    Assert-ScenarioContains $platformScenario "required_headers" @("X-FB2-AI-CONTEXT-SCOPE=platform_order_summary") "eval scenario platform headers"
+    Assert-ScenarioContains $platformScenario "required_query_fields" @("include_platform_orders=true") "eval scenario platform query fields"
+    Assert-ScenarioContains $platformScenario "required_citations" @("platform_order_summary", "context_audit_id") "eval scenario platform citations"
+    Assert-ScenarioContains $platformScenario "forbidden_outputs" @("single_user_order_detail", "user_identity_leak") "eval scenario platform forbidden outputs"
+
+    $opinionScenario = Find-EvalScenario $evalScenarios "group_opinion_summary"
+    Assert-ScenarioContains $opinionScenario "required_source_kinds" @("group_message", "opinion_memory") "eval scenario opinion source kinds"
+    Assert-ScenarioContains $opinionScenario "required_citations" @("message_id", "context_audit_id") "eval scenario opinion citations"
+    Assert-ScenarioContains $opinionScenario "forbidden_outputs" @("group_opinion_as_fact", "fabricated_group_view") "eval scenario opinion forbidden outputs"
+
+    $selectedScenario = Find-EvalScenario $evalScenarios "selected_message_review"
+    Assert-ScenarioContains $selectedScenario "entrypoints" @("selected_message_ai_reply") "eval scenario selected entrypoint"
+    Assert-ScenarioContains $selectedScenario "required_query_fields" @("selected_message_id", "topic_hint") "eval scenario selected query fields"
+    Assert-ScenarioContains $selectedScenario "required_citations" @("selected_message_id", "match_id", "context_audit_id") "eval scenario selected citations"
+    Assert-ScenarioContains $selectedScenario "forbidden_outputs" @("unsupported_claim_verdict", "guaranteed_win") "eval scenario selected forbidden outputs"
+
+    $auditScenario = Find-EvalScenario $evalScenarios "source_reference_audit"
+    Assert-ScenarioContains $auditScenario "required_source_kinds" @("citation_sources") "eval scenario source audit source kinds"
+    Assert-ScenarioContains $auditScenario "required_citations" @("context_audit_id") "eval scenario source audit citations"
+    Assert-ScenarioContains $auditScenario "forbidden_outputs" @("uncited_claim", "invented_source_id") "eval scenario source audit forbidden outputs"
 } catch {
     Fail "context-contract" $_.Exception.Message
 }
