@@ -23,6 +23,7 @@ use crate::{
         external_app_by_id, group_seeds, public_external_app_config, service_token_env_names,
         ExternalAppDefinition,
     },
+    external_app_tool_manifest::public_live_tool_manifest,
     external_app_tool_report_contract::public_tool_quality_report_guidance,
     external_app_usage_policy::public_usage_policy_guidance,
     project_auth::{auth_from_headers, json_error},
@@ -73,14 +74,19 @@ pub async fn get_external_app(Path(app_id): Path<String>) -> Response {
     Json(json!({ "app": public_external_app_config(app) })).into_response()
 }
 
-pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Response {
+pub async fn get_external_app_context_contract(
+    State(state): State<Arc<AppState>>,
+    Path(app_id): Path<String>,
+) -> Response {
     let app = match resolve_external_app(&app_id) {
         Ok(app) => app,
         Err(response) => return response,
     };
+    let live_tool_manifest = public_live_tool_manifest(&state, app.id).await;
     Json(json!({
         "app": public_external_app_config(app),
         "context_health": public_context_health(app.id),
+        "live_tool_manifest": live_tool_manifest,
         "context_pack_example": public_context_pack_example(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,
             "response_shape": {},

@@ -29,6 +29,7 @@
 - 群聊 `@EL` 和长按消息 `AI回复` 生成主项目 AI 回复后，会后台调用 fb2 `/api/main-project/context/feedback`，用 `context_audit_id`、主项目消息 ID、命中的引用来源和触发类型记录自动反馈样本；失败只写日志，不阻断聊天出消息。
 - 当主项目工具结果包含已 grounded 的 fb2 `opinion_memories`，且 AI 回复正文显式提到对应观点记忆 source id 或原群消息 id 时，主项目会继续调用 fb2 `record_opinion_adoption`，把这次“群观点被采纳进回答”的证据写回 fb2 质量闭环；未显式引用则不自动采纳，避免把群友观点误当事实。
 - 主项目工具契约、planner、grounding 和 prompt 已接入 fb2 的只读质量工具：`list_opinion_adoptions`、`opinion_adoption_summary`、`opinion_result_reviews`、`opinion_result_review_summary`；聊天 AI 不会自动触发 `refresh_opinion_result_reviews` 这类刷新/写入工具。
+- 主项目 `/api/external/apps/fb2/context-contract` 会主动读取 fb2 `/api/main-project/context/tool-manifest`，并以 `live_tool_manifest` 返回脱敏摘要（状态、工具数量、工具 id、usage_policy/tool_selection_policy 可用性），不暴露 token 或完整大 payload。
 - 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
 - `android/chat-voice-kit` 已输出 `VoiceComposerView`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
@@ -47,6 +48,7 @@
 ## 主项目负责人待办
 
 - 保持 `/api/external/apps/fb2/context-contract` 与文档同步。
+- 观察 `live_tool_manifest.status`，如果 fb2 manifest 变成 degraded/unavailable，要先修 fb2 contract 或 token/base_url，而不是让 AI 编造工具能力。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
 - 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。

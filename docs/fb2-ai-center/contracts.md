@@ -113,6 +113,26 @@ fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如�
 其他入口也会传 `topic_hint`：
 
 - 长按群消息点击 `AI回复`：使用被选中消息正文。
+
+## Live Tool Manifest
+
+主项目 `GET /api/external/apps/fb2/context-contract` 会主动读取 fb2：
+
+```text
+GET /api/main-project/context/tool-manifest
+```
+
+返回字段 `live_tool_manifest` 只保留脱敏摘要：
+
+- `status`: `ready | degraded | unavailable | not_configured`
+- `tool_count`
+- `tool_ids`
+- `context_pack_version`
+- `has_usage_policy`
+- `has_tool_selection_policy`
+- `secret_values_exposed=false`
+
+这个字段用于确认 fb2 侧当前真实工具契约是否可用。读取失败不能让 AI 假装工具存在；主项目仍保留静态契约作为降级说明。
 - 创建群聊总结帖：优先使用用户填写的 `topic`，并补充 `title`、`instructions`。
 - 自动拆分群聊总结帖：使用主项目拆出的议题 topic。
 - `/context/pack` 不可用回退 `/context/today-matches` 时，主项目仍会传 `group_id` 和 `topic_hint`。
