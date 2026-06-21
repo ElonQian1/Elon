@@ -39,3 +39,5 @@
 - `billing-policy.md`：免费通道和扣费通道的固定口径。
 - `test-plan.md`：端到端验收和长期评测清单。
 - `handoff.md`：7*24 协作交接记录模板和当前状态。
+
+常规巡检先跑无副作用脚本 `scripts/smoke-fb2-ai-center.ps1`。只有拿到明确授权后，才运行有副作用脚本 `scripts/smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`，它会向真实群聊发送可见消息。

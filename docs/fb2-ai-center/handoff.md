@@ -32,6 +32,9 @@
 - 2026-06-21 复核：fb2 `/context/pack?external_user_id=6fe5aa17-0403-427a-8e91-7f414beca35d&topic_hint=帮我分析我的票` 返回 `success=true`、`user_orders=6`、`matches=6`、`citation_sources=13`、`context_audit_id=028e2d63-f42b-4483-a607-9567e2114abf`；带 `X-FB2-AI-CONTEXT-SCOPE: platform_order_summary` 后平台匿名摘要也返回成功。
 - 2026-06-21 真实群复核通过：可见消息 `gmsg_4c0b8693032f418d9ee38d2010aaeaa9` 触发 AI 回复 `gai_d80ab422454345b78f6db70264cfdd25`，约 10 秒完成；回复按“数据事实 / 我的订单 / 平台汇总 / 群友观点 / AI推断”分层，并继续保持不承诺命中。
 - 长按 `AI回复` 后端入口已验证；APK 侧仍需确认 UI 长按菜单能调用该接口，并检查 AI 回答 source references、fb2 feedback、opinion adoption 和权限审计。
+- fb2 用户端完整 APK 已发布 `1.1.48 / versionCode 96`，代码提交 `41f8fbc3 feat(chat): surface main project AI replies` 和 `e2202266 docs(ai-center): record chat ai apk release` 已推到 fb2 `origin/main`；线上 `/api/app-version` 返回 `update_kind=full_apk`、`checksum=sha256:1456304d1275b8333a93c82c46c019a068e566edcf494bbdffe1a01c8787141d`，远端 `football-user-v1.1.48.apk` 与 `football-user-latest.apk` hash 一致。
+- 主项目已新增显式授权可见群聊 smoke：`scripts/smoke-fb2-visible-chat.ps1`。脚本默认拒绝写群，只有传 `-AllowVisibleMessages` 才会发送真实消息；支持用 fb2 用户账号桥接主项目 token，不需要手工复制 bearer。
+- 2026-06-21 可见群聊 smoke 已通过：命令 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120`；`@EL` 消息 `gmsg_b0760a14e0b54d508043a7da1d46e2d4` 触发回复 `gai_64dea8a838864730aff30fccb1f27069`，selected-message seed `gmsg_42443de0304f4975b46248f0417d5708` 触发 `AI回复` 回复 `gai_512c68f7355942f1b9e111c8250fcc16`，结果 `failed=0 skipped=0`。
 
 主项目当前已经具备：
 
@@ -64,6 +67,7 @@
 - 主项目 `/api/external/apps/fb2/context-contract` 会主动读取 fb2 `/api/main-project/context/tool-manifest`，并以 `live_tool_manifest` 返回脱敏摘要（状态、工具数量、工具 id、usage_policy/tool_selection_policy 可用性），不暴露 token 或完整大 payload。
 - `live_tool_manifest.main_project_tool_execution_policy` 会把 fb2 实时 manifest 拆成 `chat_auto_executable_tool_ids`、`manifest_only_tool_ids` 和 `main_project_allowed_missing_tool_ids`。fb2 新增工具后，只有进入 `chat_auto_executable_tool_ids` 才代表主项目群聊 AI 会自动规划执行；其它工具只是发现信息、回调端点或待接入能力。
 - 主项目新增 `scripts/smoke-fb2-ai-center.ps1`，用于不往生产群聊发消息的 live smoke：默认验证主项目健康、版本、context-contract 和工具覆盖；传 `FB2_AI_CENTER_TOKEN` 后验证 fb2 Context Pack、比赛分析、群观点、赛后复盘摘要；传 `-IncludePlatformOrderSummary` 后验证平台匿名摘要；传 `-ExternalUserId` 后验证本人订单上下文。
+- 主项目新增 `scripts/smoke-fb2-visible-chat.ps1`，用于获得明确授权后验证真实群聊可见入口：发送 `@EL`、调用 selected-message `/ai-reply`、等待 `usr_elon_ai`/`gai_*` 回复；默认没有 `-AllowVisibleMessages` 时会失败退出，避免无意写入生产群。
 - 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
 - `android/chat-voice-kit` 已输出 `VoiceComposerView`、`VoiceComposerBootstrap`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
@@ -74,7 +78,7 @@
 - 发布后抽样验证主项目群聊链路里 `user_order_context_present=true` 的日志，确认用户订单上下文已经从 fb2 进入 prompt；平台摘要仍应只在双端开关和 scope 同时开启时出现。
 - 用更多账号继续抽样主项目真实群聊入口触发 `@EL` 和长按消息 `AI回复`；当前账号 `123qwe` 已验证 AI 回答能显式区分比赛事实、本人订单、群观点和 AI 推断。
 - 用已完赛比赛样本验证 `opinion_result_review_summary` 和 `opinion_result_reviews` 在主项目真实群聊回答中只被描述为历史复盘/样本统计，不被写成未来命中承诺。
-- fb2 `1.1.46` 已接入 `VoiceComposerBootstrap.fb2GroupChatConfig(...)` 并把 `chat-bootstrap` JSON 传入 Android 原生桥；仍需在小米/HyperOS 真机上验证系统 ASR 超时后云端兜底、录音浮层、直接发语音、转文字和 `AI回复` 手势。
+- fb2 `1.1.48` 已接入主项目群聊可见回复刷新和长按 `AI回复` 客户端入口；仍需在小米/HyperOS 真机上验证系统 ASR 超时后云端兜底、录音浮层、直接发语音、转文字和 APK UI 长按菜单。
 - 主项目和 fb2 建立固定 AI 数据回答评测集。
 - 后续把 fb2 工具执行从当前的 Context Pack + 轻量工具调用继续升级为更细粒度的可评测工具链。
 
@@ -86,6 +90,9 @@
 - 每次 fb2 或主项目 AI Center 改动后运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1`
   需要验证 live fb2 数据时先设置 `FB2_AI_CENTER_TOKEN`；需要验证平台摘要时加 `-IncludePlatformOrderSummary`；需要验证“我的票”时加 `-ExternalUserId <fb2_user_uuid>`。
+- 需要验证真实群聊可见入口时，必须确认用户已授权写生产群或提供沙盒群，再运行：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
+  没有 `-AllowVisibleMessages` 时脚本必须保持失败退出。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
 - 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。
