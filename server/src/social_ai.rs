@@ -437,7 +437,7 @@ async fn build_reply(
                     "我在，但刚才没组织好回复。你可以换个说法再 @EL 一次。"
                 })
                 .trim();
-            Ok(if reply.is_empty() {
+            let reply: String = if reply.is_empty() {
                 if scene == DIRECT_SOCIAL_AI_SCENE {
                     "我在，但刚才没组织好回复。你可以换个说法再发一次。".into()
                 } else {
@@ -445,7 +445,8 @@ async fn build_reply(
                 }
             } else {
                 reply.chars().take(1400).collect()
-            })
+            };
+            Ok(ensure_fb2_grounded_answer_shape(&reply, external_context))
         }
         Err(api_err) if state.ai_cli.enabled => {
             info!("social AI 无 API 代理，回退到本地 CLI: {}", api_err);
@@ -471,6 +472,54 @@ pub(crate) fn format_external_context(
         (true, false) => tool_block,
         (false, false) => format!("{context_block}\n\n{tool_block}"),
     }
+}
+
+pub(crate) fn ensure_fb2_grounded_answer_shape(
+    reply: &str,
+    external_context: Option<&Value>,
+) -> String {
+    let reply = reply.trim();
+    if reply.is_empty() || !is_fb2_external_context(external_context) {
+        return reply.to_string();
+    }
+
+    let has_data_label = contains_any(reply, &["数据事实：", "数据事实:"]);
+    let has_inference_label = contains_any(reply, &["AI推断：", "AI 推断：", "AI推断:"]);
+    let has_risk_label = contains_any(reply, &["风险边界：", "风险边界:"]);
+
+    if has_data_label && has_inference_label && has_risk_label {
+        return reply.to_string();
+    }
+
+    let mut sections = Vec::new();
+    if has_data_label {
+        sections.push(reply.to_string());
+    } else {
+        sections.push(format!("数据事实：{reply}"));
+    }
+    if !has_inference_label {
+        sections.push("AI推断：以上分析仅基于当前 fb2 上下文和已引用来源。".to_string());
+    }
+    if !has_risk_label {
+        sections.push("风险边界：赛果不确定，不保证命中，不建议重注或梭哈。".to_string());
+    }
+
+    sections.join("\n")
+}
+
+fn is_fb2_external_context(external_context: Option<&Value>) -> bool {
+    let Some(context) = external_context else {
+        return false;
+    };
+    context["answer_policy"]["schema"].as_str() == Some("fb2.answer_policy.v1")
+        || context["app_id"].as_str() == Some("fb2")
+        || context["context_pack"]
+            .as_str()
+            .is_some_and(|pack| pack.contains("<fb2_context_pack"))
+}
+
+fn contains_any(text: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| text.contains(needle))
 }
 
 /// 使用本地 AI CLI（无工具、无项目工作区）生成社交聊天回复
@@ -650,8 +699,12 @@ fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> T) -> T {
 
 #[cfg(test)]
 mod tests {
-    use super::{contains_el_mention, latest_request_user_text, social_ai_base_prompt};
+    use super::{
+        contains_el_mention, ensure_fb2_grounded_answer_shape, latest_request_user_text,
+        social_ai_base_prompt,
+    };
     use crate::store::SocialAiHistoryMessage;
+    use serde_json::json;
 
     #[test]
     fn detects_half_and_full_width_mentions() {
@@ -703,5 +756,27 @@ mod tests {
         assert!(prompt.contains("AI推断："));
         assert!(prompt.contains("风险边界："));
         assert!(prompt.contains("不保证命中"));
+    }
+
+    #[test]
+    fn fb2_grounded_answer_shape_adds_required_labels() {
+        let context = json!({"answer_policy": {"schema": "fb2.answer_policy.v1"}});
+        let reply = ensure_fb2_grounded_answer_shape(
+            "今天有比赛，来源：match_id EXT-1，context_audit_id audit-1",
+            Some(&context),
+        );
+
+        assert!(reply.contains("数据事实："));
+        assert!(reply.contains("AI推断："));
+        assert!(reply.contains("风险边界："));
+        assert!(reply.contains("不保证命中"));
+        assert!(reply.contains("match_id EXT-1"));
+    }
+
+    #[test]
+    fn fb2_grounded_answer_shape_keeps_plain_chat_unchanged() {
+        let reply = "普通朋友聊天回复";
+
+        assert_eq!(ensure_fb2_grounded_answer_shape(reply, None), reply);
     }
 }

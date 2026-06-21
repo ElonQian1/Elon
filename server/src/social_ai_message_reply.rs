@@ -279,7 +279,8 @@ async fn build_selected_reply(
         reply.chars().take(1400).collect()
     };
     let reply = ensure_selected_message_source(&reply, selected_message_id);
-    Ok(ensure_current_context_audit_source(
+    let reply = ensure_current_context_audit_source(&reply, external_context);
+    Ok(crate::social_ai::ensure_fb2_grounded_answer_shape(
         &reply,
         external_context,
     ))
