@@ -17,7 +17,7 @@ GET /api/external/apps/fb2
 
 ```http
 POST /api/external/apps/fb2/accounts/session
-X-External-App-Token: <shared-secret>
+X-Elon-External-App-Token: <shared-secret>
 ```
 
 fb2 后端调用。主项目返回：
@@ -28,6 +28,8 @@ fb2 后端调用。主项目返回：
 - 默认加入的群聊
 - 首次试用额度信息
 
+认证 header 以线上实现为准：`X-Elon-External-App-Token: <shared-secret>`，也可使用 `Authorization: Bearer <shared-secret>`。旧文档中的 `X-External-App-Token` 不再作为接入示例。
+
 ### 3. 主项目用户授权登录 fb2
 
 ```http
@@ -35,7 +37,7 @@ POST /api/external/apps/fb2/authorize
 Authorization: Bearer <main-project-token>
 
 POST /api/external/apps/fb2/authorize/exchange
-X-External-App-Token: <shared-secret>
+X-Elon-External-App-Token: <shared-secret>
 ```
 
 用途：
