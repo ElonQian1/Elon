@@ -131,6 +131,24 @@ function Add-QueryParam {
     }
 }
 
+function Get-ItemCount {
+    param([object]$Value)
+    if ($null -eq $Value) {
+        return 0
+    }
+    return @($Value).Count
+}
+
+function Assert-MinCount {
+    param(
+        [object]$Value,
+        [int]$Minimum,
+        [string]$Name
+    )
+    $count = Get-ItemCount $Value
+    Assert-True ($count -ge $Minimum) $Name "count=$count min=$Minimum"
+}
+
 function Invoke-Json {
     param(
         [string]$Url,
@@ -244,8 +262,13 @@ if (-not $Fb2Token) {
         $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)topic_hint=$topic$($amp)limit=10$($amp)discussion_limit=20"
         $pack = Invoke-Json -Url $url -Headers $fb2Headers
         Assert-True ($pack.success -eq $true) "scenario: today matches context pack"
+        Assert-True ([bool]$pack.data.context_audit_id) "scenario: today matches context audit" "$($pack.data.context_audit_id)"
         Assert-True ([bool]$pack.data.context_pack) "scenario: today matches context body"
-        Assert-True (@($pack.data.citation_sources).Count -ge 0) "scenario: today matches citation sources" "count=$(@($pack.data.citation_sources).Count)"
+        Assert-True ($null -ne $pack.data.citation_sources) "scenario: today matches citation sources field"
+        if ($RequireAllScenarios) {
+            Assert-MinCount $pack.data.matches 1 "scenario: today matches has match data"
+            Assert-MinCount $pack.data.citation_sources 1 "scenario: today matches has citation sources"
+        }
     } catch {
         Fail "scenario: today matches" $_.Exception.Message
     }
@@ -256,6 +279,10 @@ if (-not $Fb2Token) {
         $brief = Invoke-Json -Url $url -Headers $fb2Headers
         Assert-True ($brief.success -eq $true) "scenario: match analysis brief"
         Assert-True ($null -ne $brief.data.matches) "scenario: match analysis has matches field"
+        Assert-True ($null -ne $brief.data.usage_policy) "scenario: match analysis usage policy"
+        if ($RequireAllScenarios) {
+            Assert-MinCount $brief.data.matches 1 "scenario: match analysis has match data"
+        }
     } catch {
         Fail "scenario: match analysis brief" $_.Exception.Message
     }
@@ -266,6 +293,10 @@ if (-not $Fb2Token) {
         $opinions = Invoke-Json -Url $url -Headers $fb2Headers
         Assert-True ($opinions.success -eq $true) "scenario: group opinions summary"
         Assert-True ($null -ne $opinions.data.opinion_summary) "scenario: group opinions summary field"
+        Assert-True ($null -ne $opinions.data.usage_policy) "scenario: group opinions usage policy"
+        if ($RequireAllScenarios) {
+            Assert-MinCount $opinions.data.opinion_summary 1 "scenario: group opinions has summary data"
+        }
     } catch {
         Fail "scenario: group opinions summary" $_.Exception.Message
     }
@@ -274,6 +305,7 @@ if (-not $Fb2Token) {
         $reviews = Invoke-Json "$Fb2Base/api/main-project/context/opinion-result-review-summary?group_id=$GroupId" $fb2Headers
         Assert-True ($reviews.success -eq $true) "scenario: message correctness review summary"
         Assert-True ($null -ne $reviews.data.summary) "scenario: result review summary field"
+        Assert-True ($null -ne $reviews.data.usage_policy) "scenario: result review usage policy"
     } catch {
         Fail "scenario: message correctness review summary" $_.Exception.Message
     }
@@ -316,7 +348,12 @@ if (-not $Fb2Token) {
             $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)external_user_id=$ExternalUserId$($amp)topic_hint=$topic$($amp)limit=10$($amp)order_limit=10"
             $orders = Invoke-Json -Url $url -Headers $userHeaders
             Assert-True ($orders.success -eq $true) "scenario: my ticket context pack"
+            Assert-True ([bool]$orders.data.context_audit_id) "scenario: my ticket context audit" "$($orders.data.context_audit_id)"
             Assert-True ($null -ne $orders.data.user_orders) "scenario: my ticket user_orders field"
+            if ($RequireAllScenarios) {
+                Assert-MinCount $orders.data.user_orders 1 "scenario: my ticket has user orders"
+                Assert-MinCount $orders.data.citation_sources 1 "scenario: my ticket has citation sources"
+            }
         } catch {
             Fail "scenario: my ticket" $_.Exception.Message
         }
@@ -334,6 +371,10 @@ if (-not $Fb2Token) {
             $platform = Invoke-Json "$Fb2Base/api/main-project/context/platform-orders" $platformHeaders
             Assert-True ($platform.success -eq $true) "scenario: platform order risk"
             Assert-True ($null -ne $platform.data.summary) "scenario: platform order summary field"
+            Assert-True ($null -ne $platform.data.usage_policy) "scenario: platform order usage policy"
+            if ($RequireAllScenarios) {
+                Assert-MinCount $platform.data.summary 1 "scenario: platform order has summary data"
+            }
         } catch {
             Fail "scenario: platform order risk" $_.Exception.Message
         }
