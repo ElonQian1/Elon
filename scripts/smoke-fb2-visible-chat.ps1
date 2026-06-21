@@ -5,6 +5,8 @@ param(
     [string]$MainToken = "",
     [string]$Fb2Base = "",
     [string]$Fb2Token = "",
+    [string]$Fb2AiCenterToken = "",
+    [string]$Fb2UserId = "",
     [string]$Fb2Username = "",
     [string]$Fb2Password = "",
     [string]$GroupId = "",
@@ -12,6 +14,7 @@ param(
     [string]$SelectedMessageText = "",
     [int]$RequestTimeoutSec = 45,
     [int]$PollTimeoutSec = 90,
+    [int]$FeedbackPollTimeoutSec = 45,
     [int]$PollIntervalSec = 3,
     [switch]$AllowVisibleMessages,
     [switch]$SkipMention,
@@ -26,6 +29,8 @@ if (-not $MainToken) { $MainToken = $env:ELON_MAIN_TOKEN }
 if (-not $Fb2Base) { $Fb2Base = $env:FB2_API_BASE }
 if (-not $Fb2Base) { $Fb2Base = "http://123.207.48.146:8080" }
 if (-not $Fb2Token) { $Fb2Token = $env:FB2_USER_TOKEN }
+if (-not $Fb2AiCenterToken) { $Fb2AiCenterToken = $env:FB2_AI_CENTER_TOKEN }
+if (-not $Fb2UserId) { $Fb2UserId = $env:FB2_AI_CONTEXT_EXTERNAL_USER_ID }
 if (-not $Fb2Username) { $Fb2Username = $env:FB2_VISIBLE_SMOKE_USERNAME }
 if (-not $Fb2Password) { $Fb2Password = $env:FB2_VISIBLE_SMOKE_PASSWORD }
 
@@ -112,6 +117,12 @@ function Get-Messages {
     return @($payload.messages)
 }
 
+function Get-MessageById {
+    param([string]$BearerToken, [string]$TargetGroupId, [string]$MessageId)
+    $messages = Get-Messages -BearerToken $BearerToken -TargetGroupId $TargetGroupId
+    return @($messages | Where-Object { [string]$_.id -eq $MessageId } | Select-Object -First 1)
+}
+
 function Wait-For-AiReply {
     param(
         [string]$BearerToken,
@@ -150,11 +161,103 @@ function Wait-For-AiReply {
     throw "$Scenario did not receive an AI reply within $PollTimeoutSec seconds"
 }
 
+function Get-Fb2LocalGroupId {
+    param([string]$MainGroupId)
+    if ($MainGroupId.StartsWith("ext_fb2_")) {
+        return $MainGroupId.Substring("ext_fb2_".Length)
+    }
+    return $MainGroupId
+}
+
+function Feedback-Items {
+    param([object]$Payload)
+    if ($Payload.data.feedbacks) { return @($Payload.data.feedbacks) }
+    if ($Payload.feedbacks) { return @($Payload.feedbacks) }
+    return @()
+}
+
+function Wait-For-Fb2Feedback {
+    param(
+        [string]$MainRequestId = "",
+        [string]$MainRequestPrefix = "",
+        [string]$ExpectedTrigger,
+        [string]$FeedbackSince,
+        [string]$Scenario,
+        [ref]$FeedbackOut = $null
+    )
+
+    if (-not $Fb2AiCenterToken) {
+        Skip "$Scenario fb2 feedback" "FB2_AI_CENTER_TOKEN not set; source feedback verification skipped"
+        return
+    }
+
+    $localGroupId = Get-Fb2LocalGroupId $GroupId
+    $deadline = (Get-Date).AddSeconds($FeedbackPollTimeoutSec)
+    $headers = @{ "X-FB2-AI-CENTER-TOKEN" = $Fb2AiCenterToken.Trim() }
+
+    while ((Get-Date) -lt $deadline) {
+        $query = @(
+            "group_id=$([uri]::EscapeDataString($localGroupId))",
+            "from=$([uri]::EscapeDataString($FeedbackSince))",
+            "limit=50"
+        )
+        if ($Fb2UserId) {
+            $query += "external_user_id=$([uri]::EscapeDataString($Fb2UserId))"
+        }
+
+        $payload = Invoke-Json -Url "$Fb2Base/api/main-project/context/feedbacks?$($query -join '&')" -Headers $headers
+        $feedback = Feedback-Items $payload |
+            Where-Object {
+                $requestId = [string]$_.main_request_id
+                if ($MainRequestId) {
+                    $requestId -eq $MainRequestId
+                } elseif ($MainRequestPrefix) {
+                    $requestId.StartsWith($MainRequestPrefix)
+                } else {
+                    $false
+                }
+            } |
+            Where-Object {
+                if ($ExpectedTrigger) {
+                    [string]$_.note -like "*trigger=$ExpectedTrigger*"
+                } else {
+                    $true
+                }
+            } |
+            Sort-Object created_at -Descending |
+            Select-Object -First 1
+
+        if ($feedback) {
+            $matched = [int]$feedback.matched_cited_source_count
+            $unmatched = [int]$feedback.unmatched_cited_source_count
+            $requestLabel = [string]$feedback.main_request_id
+            Pass "$Scenario fb2 feedback" "$requestLabel feedback=$($feedback.id)"
+            Assert-True ($matched -ge 1) "$Scenario matched source refs" "matched=$matched"
+            Assert-True ($unmatched -eq 0) "$Scenario unmatched source refs" "unmatched=$unmatched"
+            if ($ExpectedTrigger) {
+                Assert-True ([string]$feedback.note -like "*trigger=$ExpectedTrigger*") "$Scenario feedback trigger" $ExpectedTrigger
+            }
+            if ($FeedbackOut) {
+                $FeedbackOut.Value = $feedback
+            }
+            return
+        }
+
+        Start-Sleep -Seconds $PollIntervalSec
+    }
+
+    $requestLabel = if ($MainRequestId) { $MainRequestId } else { "$MainRequestPrefix*" }
+    Fail "$Scenario fb2 feedback" "no feedback found for $requestLabel within $FeedbackPollTimeoutSec seconds"
+    if ($FeedbackOut) {
+        $FeedbackOut.Value = $null
+    }
+}
+
 function Resolve-MainToken {
     if ($MainToken) {
         return [pscustomobject]@{
             Token = $MainToken.Trim()
-            Fb2UserId = ""
+            Fb2UserId = $Fb2UserId
             Source = "main-token"
         }
     }
@@ -204,6 +307,9 @@ $token = $resolved.Token
 $headers = @{ Authorization = "Bearer $token" }
 Pass "main token resolved" $resolved.Source
 if ($resolved.Fb2UserId) {
+    if (-not $Fb2UserId) {
+        $Fb2UserId = [string]$resolved.Fb2UserId
+    }
     Pass "fb2 user" $resolved.Fb2UserId
 }
 
@@ -225,6 +331,7 @@ $trace = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
 if ($SkipMention) {
     Skip "visible @EL mention" "skipped by caller"
 } else {
+    $mentionFeedbackSince = (Get-Date).ToUniversalTime().AddSeconds(-5).ToString("o")
     if (-not $MentionText) {
         $MentionText = "@EL 可见smoke ${trace}: 请用 fb2 数据简短说明今天比赛怎么看，并引用来源。"
     }
@@ -234,8 +341,18 @@ if ($SkipMention) {
     }
     $sentId = Get-MessageId $sent
     Assert-True ([bool]$sentId) "visible @EL sent" $sentId
-    $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $sentId -KnownMessageIds $baselineIds -Scenario "@EL mention"
-    Assert-True ([bool]$reply.id) "visible @EL ai reply" "$($reply.id)"
+    if ($Fb2AiCenterToken) {
+        $feedback = $null
+        Wait-For-Fb2Feedback -MainRequestPrefix "social_group_message:" -ExpectedTrigger "group_mention" -FeedbackSince $mentionFeedbackSince -Scenario "visible @EL" -FeedbackOut ([ref]$feedback)
+        if ($feedback) {
+            $replyId = ([string]$feedback.main_request_id).Substring("social_group_message:".Length)
+            $reply = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $replyId
+            Assert-True ([bool]$reply.id) "visible @EL ai reply" "$replyId"
+        }
+    } else {
+        $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $sentId -KnownMessageIds $baselineIds -Scenario "@EL mention"
+        Assert-True ([bool]$reply.id) "visible @EL ai reply" "$($reply.id)"
+    }
 }
 
 $latestMessages = Get-Messages -BearerToken $token -TargetGroupId $GroupId
@@ -244,6 +361,7 @@ $knownIdsForSelected = @($latestMessages | ForEach-Object { [string]$_.id })
 if ($SkipSelectedMessage) {
     Skip "selected-message AI回复" "skipped by caller"
 } else {
+    $selectedFeedbackSince = (Get-Date).ToUniversalTime().AddSeconds(-5).ToString("o")
     if (-not $SelectedMessageText) {
         $SelectedMessageText = "可见smoke ${trace}: 这条消息用于长按 AI回复 验证，请判断这句说法是否合理：西班牙让两球肯定赢盘、可以重注。"
     }
@@ -253,12 +371,23 @@ if ($SkipSelectedMessage) {
     }
     $plainId = Get-MessageId $plain
     Assert-True ([bool]$plainId) "selected-message seed sent" $plainId
+    $knownIdsForSelected = @(Get-Messages -BearerToken $token -TargetGroupId $GroupId | ForEach-Object { [string]$_.id })
 
     $messagePath = Encode-PathSegment $plainId
     $request = Invoke-Json -Url "$MainBase/api/me/groups/$groupPath/messages/$messagePath/ai-reply" -Headers $headers -Method "POST"
     Assert-True (($request.ok -eq $true) -or ($null -ne $request)) "selected-message ai-reply accepted" $plainId
-    $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $plainId -KnownMessageIds $knownIdsForSelected -Scenario "selected-message ai-reply"
-    Assert-True ([bool]$reply.id) "selected-message ai reply" "$($reply.id)"
+    if ($Fb2AiCenterToken) {
+        $feedback = $null
+        Wait-For-Fb2Feedback -MainRequestPrefix "social_group_selected_message:" -ExpectedTrigger "selected_message_ai_reply" -FeedbackSince $selectedFeedbackSince -Scenario "selected-message AI回复" -FeedbackOut ([ref]$feedback)
+        if ($feedback) {
+            $replyId = ([string]$feedback.main_request_id).Substring("social_group_selected_message:".Length)
+            $reply = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $replyId
+            Assert-True ([bool]$reply.id) "selected-message ai reply" "$replyId"
+        }
+    } else {
+        $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $plainId -KnownMessageIds $knownIdsForSelected -Scenario "selected-message ai-reply"
+        Assert-True ([bool]$reply.id) "selected-message ai reply" "$($reply.id)"
+    }
 }
 
 Write-Output ""

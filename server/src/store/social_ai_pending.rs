@@ -60,6 +60,7 @@ impl Store {
             "SELECT candidate.id, candidate.content
              FROM friend_group_messages candidate
              WHERE candidate.group_id = ?1
+               AND candidate.sender_user_id != ?2
                AND LOWER(REPLACE(candidate.content, '＠', '@')) LIKE '%@el%'
                AND NOT EXISTS (
                    SELECT 1
@@ -181,6 +182,13 @@ mod tests {
         store
             .insert_group_social_ai_reply(&group.id, "group answer")
             .expect("group ai reply should be stored");
+        assert!(store
+            .latest_unanswered_group_social_ai_mention(&alice.id, &group.id)
+            .expect("pending lookup should work")
+            .is_none());
+        store
+            .insert_group_social_ai_reply(&group.id, "EL fallback asks user to retry @EL")
+            .expect("group ai fallback reply should be stored");
         assert!(store
             .latest_unanswered_group_social_ai_mention(&alice.id, &group.id)
             .expect("pending lookup should work")

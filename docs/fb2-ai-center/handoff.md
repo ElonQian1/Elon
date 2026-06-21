@@ -35,6 +35,9 @@
 - fb2 用户端完整 APK 已发布 `1.1.48 / versionCode 96`，代码提交 `41f8fbc3 feat(chat): surface main project AI replies` 和 `e2202266 docs(ai-center): record chat ai apk release` 已推到 fb2 `origin/main`；线上 `/api/app-version` 返回 `update_kind=full_apk`、`checksum=sha256:1456304d1275b8333a93c82c46c019a068e566edcf494bbdffe1a01c8787141d`，远端 `football-user-v1.1.48.apk` 与 `football-user-latest.apk` hash 一致。
 - 主项目已新增显式授权可见群聊 smoke：`scripts/smoke-fb2-visible-chat.ps1`。脚本默认拒绝写群，只有传 `-AllowVisibleMessages` 才会发送真实消息；支持用 fb2 用户账号桥接主项目 token，不需要手工复制 bearer。
 - 2026-06-21 可见群聊 smoke 已通过：命令 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120`；`@EL` 消息 `gmsg_b0760a14e0b54d508043a7da1d46e2d4` 触发回复 `gai_64dea8a838864730aff30fccb1f27069`，selected-message seed `gmsg_42443de0304f4975b46248f0417d5708` 触发 `AI回复` 回复 `gai_512c68f7355942f1b9e111c8250fcc16`，结果 `failed=0 skipped=0`。
+- 2026-06-21 后续真实群复核发现：Context Pack 和工具链仍能拉到 `123qwe` 的 fb2 数据，但主项目模型生成层返回“当前 AI 模型额度已用尽或接口不可用”，因此真实群只生成失败兜底文案，fb2 feedback 里 `matched_cited_source_count=0`。这是模型供应/运行配置层问题，不是 fb2 用户余额问题；`123qwe` 桥接主项目余额仍足够。
+- 本轮修复了两个可见群 smoke 暴露的问题：`latest_unanswered_group_social_ai_mention` 现在排除 `usr_elon_ai` 自己发出的群消息，避免失败兜底文案里的 `@EL` 再次触发群聊 AI；`scripts/smoke-fb2-visible-chat.ps1` 在配置 `FB2_AI_CENTER_TOKEN` 后改为通过 fb2 feedback 的 `main_request_id` 反查 `social_group_message:*` 和 `social_group_selected_message:*`，避免群里并发回复时误抓其它 `gai_*` 消息。
+- 本轮本地验证通过：`cargo test social_ai_pending`、`cargo fmt --check`、`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted>`。完整真实群 smoke 仍需等主项目模型生成层恢复后再跑，否则会继续因无引用来源而失败。
 
 主项目当前已经具备：
 
