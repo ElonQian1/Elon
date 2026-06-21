@@ -15,6 +15,7 @@ pub(crate) struct TaskAttachState {
     source: &'static str,
     reason: &'static str,
     run_handle: Option<ActiveCliPromptView>,
+    codex_session: Option<TaskResumeCodexSession>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -26,6 +27,8 @@ pub(crate) struct TaskResumeContract {
     can_replay_journal_events: bool,
     can_approve_tools: bool,
     active_approval_ids: Vec<String>,
+    can_resume_codex_session: bool,
+    codex_session: Option<TaskResumeCodexSession>,
     continue_mode: &'static str,
     run_handle: Option<TaskResumeRunHandle>,
     strategy: TaskResumeStrategy,
@@ -52,10 +55,18 @@ struct TaskResumeRunHandle {
     control_lease_expires_at_ms: u128,
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct TaskResumeCodexSession {
+    id: String,
+    scope_key: String,
+    updated_at_ms: Option<u128>,
+}
+
 pub(crate) fn task_attach_state(
     record: Option<&TaskJournalRecord>,
     active: Option<ActiveCliPromptView>,
 ) -> TaskAttachState {
+    let codex_session = codex_session_from_record(record);
     if let Some(handle) = active {
         return TaskAttachState {
             status: "live",
@@ -66,6 +77,7 @@ pub(crate) fn task_attach_state(
             reason:
                 "本机节点仍持有该任务的运行控制句柄，可以重连控制面并处理当前内存中的审批 waiter。",
             run_handle: Some(handle),
+            codex_session,
         };
     }
     match record.map(|record| record.status.as_str()) {
@@ -77,6 +89,7 @@ pub(crate) fn task_attach_state(
             source: "local_journal",
             reason: "本机 journal 显示任务未终态，但当前节点已没有运行句柄，只能基于快照继续。",
             run_handle: None,
+            codex_session,
         },
         Some(_) => TaskAttachState {
             status: "terminal",
@@ -86,6 +99,7 @@ pub(crate) fn task_attach_state(
             source: "local_journal",
             reason: "本机进程已经结束，只能基于任务快照继续新一轮处理。",
             run_handle: None,
+            codex_session,
         },
         None => TaskAttachState {
             status: "missing",
@@ -95,6 +109,7 @@ pub(crate) fn task_attach_state(
             source: "local_journal",
             reason: "本机没有该任务的 journal 记录，前端只能使用云端任务快照。",
             run_handle: None,
+            codex_session: None,
         },
     }
 }
@@ -103,6 +118,8 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
     let active_approval_ids = active_approval_ids(attach);
     let can_approve_tools = !active_approval_ids.is_empty();
     let run_handle = resume_run_handle(attach);
+    let codex_session = attach.codex_session.clone();
+    let can_resume_codex_session = codex_session.is_some();
     match attach.status {
         "live" => TaskResumeContract {
             status: attach.status,
@@ -112,6 +129,8 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: true,
             can_approve_tools,
             active_approval_ids,
+            can_resume_codex_session,
+            codex_session,
             continue_mode: attach.continue_mode,
             run_handle,
             strategy: TaskResumeStrategy {
@@ -134,6 +153,8 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: true,
             can_approve_tools: false,
             active_approval_ids: Vec::new(),
+            can_resume_codex_session,
+            codex_session,
             continue_mode: attach.continue_mode,
             run_handle: None,
             strategy: TaskResumeStrategy {
@@ -156,6 +177,8 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: true,
             can_approve_tools: false,
             active_approval_ids: Vec::new(),
+            can_resume_codex_session,
+            codex_session,
             continue_mode: attach.continue_mode,
             run_handle: None,
             strategy: TaskResumeStrategy {
@@ -178,6 +201,8 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: false,
             can_approve_tools: false,
             active_approval_ids: Vec::new(),
+            can_resume_codex_session: false,
+            codex_session: None,
             continue_mode: "snapshot_continue",
             run_handle: None,
             strategy: TaskResumeStrategy {
@@ -199,9 +224,29 @@ fn shared_limitations() -> Vec<&'static str> {
     vec![
         "本机 journal 不保存 prompt 或 API key。",
         "输出回放来自本机 journal 快照/轮询，不是直接接管原 CLI TTY。",
+        "Codex session id 只用于本机 Codex CLI 续接，不包含 prompt 或 API key。",
         "审批 waiter 只在当前节点进程内有效；节点重启后历史审批卡会失效。",
         "节点重启后不能重新绑定原进程控制句柄，只能基于快照新开任务继续。",
     ]
+}
+
+fn codex_session_from_record(record: Option<&TaskJournalRecord>) -> Option<TaskResumeCodexSession> {
+    let record = record?;
+    let id = record
+        .codex_session_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    let scope_key = record
+        .codex_session_scope_key
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    Some(TaskResumeCodexSession {
+        id: id.to_string(),
+        scope_key: scope_key.to_string(),
+        updated_at_ms: record.codex_session_updated_at_ms,
+    })
 }
 
 fn active_approval_ids(attach: &TaskAttachState) -> Vec<String> {
@@ -248,11 +293,22 @@ mod tests {
             runtime_permission: Some("project_write".to_string()),
             os_pid: Some(4242),
             process_started_at_ms: Some(1),
+            codex_session_id: None,
+            codex_session_scope_key: None,
+            codex_session_updated_at_ms: None,
             status: status.to_string(),
             started_at_ms: 1,
             updated_at_ms: 2,
             cancel_requested_at_ms: None,
         }
+    }
+
+    fn codex_record(status: &str) -> TaskJournalRecord {
+        let mut record = record(status);
+        record.codex_session_id = Some("session-uuid".to_string());
+        record.codex_session_scope_key = Some("scope-a".to_string());
+        record.codex_session_updated_at_ms = Some(9);
+        record
     }
 
     fn active_handle() -> ActiveCliPromptView {
@@ -287,6 +343,8 @@ mod tests {
         assert!(!resume.can_stream_live_output);
         assert!(resume.can_replay_journal_events);
         assert!(resume.can_approve_tools);
+        assert!(!resume.can_resume_codex_session);
+        assert!(resume.codex_session.is_none());
         assert_eq!(resume.active_approval_ids, vec!["tap_1_1"]);
         assert_eq!(
             resume
@@ -313,6 +371,29 @@ mod tests {
         assert_eq!(resume.next_action, "continue_from_snapshot");
         assert_eq!(resume.strategy.kind, "snapshot_continue");
         assert!(resume.strategy.requires_new_task);
+    }
+
+    #[test]
+    fn codex_session_is_exposed_for_snapshot_continue() {
+        let running = codex_record("running");
+        let resume = task_resume_contract(&task_attach_state(Some(&running), None));
+
+        assert_eq!(resume.status, "detached");
+        assert!(resume.can_resume_codex_session);
+        assert_eq!(
+            resume
+                .codex_session
+                .as_ref()
+                .map(|session| session.id.as_str()),
+            Some("session-uuid")
+        );
+        assert_eq!(
+            resume
+                .codex_session
+                .as_ref()
+                .map(|session| session.scope_key.as_str()),
+            Some("scope-a")
+        );
     }
 
     #[test]

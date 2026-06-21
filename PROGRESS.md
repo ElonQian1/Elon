@@ -44,6 +44,8 @@
 - 本轮已新增同进程 live run handle：PC 节点把活跃 `CliPrompt` 从裸 `watch::Sender` 升级为 `ActiveCliPromptHandle`，本机 journal API 可返回 route、run_handle_id、PID、lease 和当前 pending approvals。
 - 本轮已把工具审批按钮绑定到真实本机 waiter：Route B/C 工具审批注册后可被本机 resume 契约列出，前端只有在 `can_approve_tools=true` 且 `approval_id` 仍处于 active 列表中时才显示批准/拒绝按钮，避免历史审批卡误导用户。
 - 本轮全量测试暴露并修复了一个非 PC 节点的历史门禁问题：`mark_project_suggestion_updated` 复用统一频道消息 row mapper，但 SELECT 少返回 `task_status/task_error/task_apk_url` 三列，导致建议消息标记更新测试报 `Invalid column index: 15`；已补齐列和 `LEFT JOIN tasks`。
+- 本轮已补齐 PC Codex 会话续接锚点：云端 PC Codex 分发现在和 Copilot 一样下发稳定 `--session-id`，PC 节点按 `session-id + 权限 + cwd` 保存真实 Codex session，并优先从 task journal 读取后执行 `codex exec resume <session>`。
+- 本轮已把 Codex session 元数据写入本机 journal 与 resume 契约：`registry.json` 保存 `codex_session_id/scope_key/updated_at_ms`，`codex-sessions.json` 保存 scope 到真实 session 的映射，前端任务卡显示“Codex 会话可续接”。
 
 ## 验证结果
 
@@ -62,19 +64,24 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`，1 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_resume -- --nocapture`，3 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，6 passed（新增本机输出、工具事件回放和 Route A pid 记录）
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_resume -- --nocapture`，4 passed（新增 Codex session resume 契约）
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，7 passed（新增 Codex session 持久化）
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval -- --nocapture`，4 passed（新增 pending waiter 查询）
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_server_runtime -- --nocapture`，5 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough -- --nocapture`，4 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough -- --nocapture`，7 passed（新增 Codex/Copilot Route A session 参数测试）
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server project_space_task_snapshot -- --nocapture`，2 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server store::project_space::tests::suggestion_message_can_be_marked_updated -- --nocapture`，1 passed
 - 通过：`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`，2 passed
 - 通过：`node scripts\test-pc-dev-assets.js`
 - 通过：`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
 - 通过：`cargo clippy --manifest-path server\Cargo.toml --bin elon-pc-node -- -D warnings`
-- 通过：`cargo test --manifest-path server\Cargo.toml --all-features -- --test-threads=1`，`elon-pc-node` 111 passed，`elon-server` 527 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --all-features -- --test-threads=1`，`elon-pc-node` 113 passed，`elon-server` 532 passed
 - 通过：`git diff --check`，仅有 Git 的 CRLF 工作区提示
+- 通过：`cargo fmt --manifest-path server\Cargo.toml --all --check`
 - 未通过：`cargo clippy --manifest-path server\Cargo.toml --all-targets --all-features -- -D warnings`，退出 101；剩余为服务端历史 lint（例如 `billing_pay.rs`、`agent.rs`、`store.rs`、`tools.rs`、`project_membership.rs`、`project_mobile.rs` 等），不属于本次恢复补丁。
 - 未通过后复核：`cargo test --manifest-path server\Cargo.toml --all-features` 默认并发模式曾出现 `tools_patch::tests::apply_patch_changes_file` 偶发失败；该用例单独重跑通过，单线程全量测试通过。
+- 未通过后复核：本轮第一次 `cargo test --manifest-path server\Cargo.toml --all-features -- --test-threads=1` 在 `elon-server` 进程阶段异常退出；停靠点附近的 `store::node_ledger::tests::unbilled_usage_does_not_increase_provider_balance` 单独重跑通过，随后全量单线程重跑通过。
 
 ## 剩余任务
 
@@ -89,5 +96,4 @@
 - 自动化无法直接证明 GUI 黑窗肉眼不可见，仍建议发布后在干净 Windows 用户环境做一次双击、协议唤起、自更新和开机自启烟测。
 - 全量 clippy 历史债未在本任务内清理，避免把本次用户可见故障修复扩大成仓库治理。
 - 任务终态可见恢复只是让 UI 收到明确终态和“继续”提示，不是接回同一个 Codex/CLI 进程继续执行。
-- 本轮 journal 查询能区分 live/detached/terminal，但 journal 仍只保存生命周期事件，不保存 stdout/stderr、完整工具流、pid 和 Codex thread 元数据；因此距离完整 Codex Desktop 恢复仍有缺口。
-- 本机事件回放已经保存 stdout/stderr 与 B/C 工具事件；同一节点进程内可查询 live handle、Route A pid 和 pending approval waiter，但仍不是完整 TTY attach，节点重启后的进程控制、Codex thread 元数据和跨节点恢复仍是缺口。
+- 本机事件回放已经保存 stdout/stderr 与 B/C 工具事件；同一节点进程内可查询 live handle、Route A pid、pending approval waiter 和 Codex session 元数据，但仍不是完整 TTY attach，节点重启后的进程控制和跨节点恢复仍是缺口。

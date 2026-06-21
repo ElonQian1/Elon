@@ -955,12 +955,19 @@ async fn run_cli_prompt(run: CliPromptRun) {
             cwd.as_deref(),
         );
         let real_codex_session_id = our_key.as_ref().and_then(|key| {
-            std::fs::read_to_string(&codex_sessions_file)
+            task_journal
+                .load_codex_session(key)
                 .ok()
-                .and_then(|s| {
-                    serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&s).ok()
+                .flatten()
+                .or_else(|| {
+                    std::fs::read_to_string(&codex_sessions_file)
+                        .ok()
+                        .and_then(|s| {
+                            serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&s)
+                                .ok()
+                        })
+                        .and_then(|map| map.get(key).and_then(|v| v.as_str()).map(str::to_owned))
                 })
-                .and_then(|map| map.get(key).and_then(|v| v.as_str()).map(str::to_owned))
         });
         if let Some(ref real_sid) = real_codex_session_id {
             // 续接已有会话
@@ -1076,7 +1083,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     if cli_name == "codex" {
                         if let Some(real_id) = l.strip_prefix("session id: ").map(str::trim) {
                             if let Some(ref key) = codex_key {
-                                // 持久化 key→real_id 映射
+                                // 新版本把 Codex session 写入 task journal，临时文件仅保留为旧版本兼容。
+                                if let Err(error) =
+                                    task_journal.record_codex_session(&req_id, key, real_id)
+                                {
+                                    warn!("PC 任务 journal 写入 Codex session 失败: {error}");
+                                }
                                 let mut map: serde_json::Map<String, serde_json::Value> =
                                     tokio::fs::read_to_string(&codex_sessions_file).await
                                         .ok()

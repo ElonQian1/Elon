@@ -586,7 +586,13 @@
       const action = clean(resume && resume.next_action).toLowerCase();
       const canStream = resume && resume.can_stream_live_output !== false;
       const canReplay = resume && resume.can_replay_journal_events === true;
-      if (canReplay) return '（本机事件可回放）';
+      const canCodex = resume && resume.can_resume_codex_session === true;
+      if (canReplay || canCodex) {
+        const parts = [];
+        if (canReplay) parts.push('本机事件可回放');
+        if (canCodex) parts.push('Codex 会话可续接');
+        return `（${parts.join('，')}）`;
+      }
       if (action === 'wait_or_cancel' && !canStream) return '（暂不回放输出）';
       if (action === 'continue_from_snapshot') return '（基于快照继续）';
       if (action === 'refresh_snapshot') return '（仅云端快照）';
@@ -608,7 +614,8 @@
       if (!resume) return '';
       const label = clean(resume.strategy && resume.strategy.label);
       const reason = clean(resume.reason || (resume.strategy && resume.strategy.reason));
-      return [label, reason].filter(Boolean).join('：');
+      const codex = resume.can_resume_codex_session === true ? '本机 Codex session 已记录，可由节点自动续接。' : '';
+      return [label, reason, codex].filter(Boolean).join('：');
     }
 
     function compactForDraft(value, limit) {

@@ -579,6 +579,8 @@ function testDevTasksUsesLocalJournalAttachLabel() {
         status: 'live',
         can_stream_live_output: false,
         can_replay_journal_events: true,
+        can_resume_codex_session: true,
+        codex_session: { id: 'session-uuid', scope_key: 'scope-a', updated_at_ms: 9 },
         next_action: 'wait_or_cancel',
         strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
       }
@@ -588,6 +590,7 @@ function testDevTasksUsesLocalJournalAttachLabel() {
   const html = devTasks.renderMessage(messages[0], context);
   assert.ok(html.includes('本机现场可连接'), 'task card should label local journal live attach state');
   assert.ok(html.includes('本机事件可回放'), 'task card should expose local journal replay');
+  assert.ok(html.includes('Codex 会话可续接'), 'task card should expose codex session resume capability');
 }
 
 function testDevTasksUsesResumeContractForSnapshotContinue() {

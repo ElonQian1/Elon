@@ -716,6 +716,79 @@ pub async fn run_with_pc_agent_workspace(
     .await
 }
 
+fn native_session_uuid(cli_name: &str, scope: &NativeSessionScope) -> String {
+    use sha2::Digest;
+
+    let cli_prefix = match cli_name {
+        "copilot" => "copilot-session",
+        "codex" => "codex-session",
+        other => other,
+    };
+    let seed = format!(
+        "{}/{}/{}/{}",
+        cli_prefix, scope.project_id, scope.user_id, scope.conversation_id
+    );
+    let hash = sha2::Sha256::digest(seed.as_bytes());
+    format!(
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        hash[0],
+        hash[1],
+        hash[2],
+        hash[3],
+        hash[4],
+        hash[5],
+        hash[6] & 0x0f,
+        hash[7],
+        (hash[8] & 0x3f) | 0x80,
+        hash[9],
+        hash[10],
+        hash[11],
+        hash[12],
+        hash[13],
+        hash[14],
+        hash[15]
+    )
+}
+
+fn pc_route_a_extra_args(
+    cli_name: &str,
+    native_session_id: Option<&str>,
+    model: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
+) -> Vec<String> {
+    match cli_name {
+        "copilot" => {
+            let mut args = native_session_id
+                .map(|sid| vec![format!("--session-id={}", sid)])
+                .unwrap_or_default();
+            if let Some(model) = model {
+                if !model.is_empty() && model != "auto" {
+                    args.push("--model".into());
+                    args.push(model.to_string());
+                }
+            }
+            args
+        }
+        "codex" => {
+            let mut args = native_session_id
+                .map(|sid| vec![format!("--session-id={}", sid)])
+                .unwrap_or_default();
+            if let Some(model) = model {
+                if !model.is_empty() && model != "auto" {
+                    args.push(format!("--codex-model={}", model));
+                }
+            }
+            if let Some(effort) = codex_reasoning_effort {
+                if !effort.is_empty() {
+                    args.push(format!("--codex-effort={}", effort));
+                }
+            }
+            args
+        }
+        _ => vec![],
+    }
+}
+
 /// 把 AI 请求委托给通过 WS 连接的 PC agent，在 PC 上执行指定 CLI（copilot 或 codex）。
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
 async fn run_via_pc_agent(
@@ -752,58 +825,18 @@ async fn run_via_pc_agent(
         }
     };
 
-    // Copilot CLI 专用：--session-id 保证用户隔离+上下文复用
-    let copilot_session_uuid = if cli_name != "copilot" {
-        None
-    } else {
-        native_session_scope.as_ref().map(|scope| {
-            use sha2::Digest;
-            let seed = format!("copilot-session/{}/{}/{}", scope.project_id, scope.user_id, scope.conversation_id);
-            let hash = sha2::Sha256::digest(seed.as_bytes());
-            format!(
-                "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
-                hash[0], hash[1], hash[2], hash[3],
-                hash[4], hash[5],
-                hash[6] & 0x0f, hash[7],
-                (hash[8] & 0x3f) | 0x80, hash[9],
-                hash[10], hash[11], hash[12], hash[13], hash[14], hash[15]
-            )
-        })
-    };
+    // Route A CLI 会话锚点：服务器只下发稳定 scope，本机节点再按权限 + cwd 分桶。
+    let native_cli_session_uuid = native_session_scope
+        .as_ref()
+        .map(|scope| native_session_uuid(cli_name, scope));
 
-    // extra_args：Copilot 用 --session-id + --model，Codex 用 --codex-model + --codex-effort
-    let extra_args: Vec<String> = match cli_name {
-        "copilot" => {
-            let mut args = if let Some(ref sid) = copilot_session_uuid {
-                vec![format!("--session-id={}", sid)]
-            } else {
-                vec![]
-            };
-            if let Some(model) = copilot_model {
-                if !model.is_empty() && model != "auto" {
-                    args.push("--model".into());
-                    args.push(model.to_string());
-                }
-            }
-            args
-        }
-        "codex" => {
-            // Codex：传模型和 reasoning effort，node-agent 在 `exec` 前插入 `-m`/`-c`
-            let mut args = vec![];
-            if let Some(model) = copilot_model {
-                if !model.is_empty() && model != "auto" {
-                    args.push(format!("--codex-model={}", model));
-                }
-            }
-            if let Some(effort) = codex_reasoning_effort {
-                if !effort.is_empty() {
-                    args.push(format!("--codex-effort={}", effort));
-                }
-            }
-            args
-        }
-        _ => vec![],
-    };
+    // extra_args：Copilot/Codex 用 --session-id 绑定会话；Codex model/effort 由节点翻译成 exec 参数。
+    let extra_args = pc_route_a_extra_args(
+        cli_name,
+        native_cli_session_uuid.as_deref(),
+        copilot_model,
+        codex_reasoning_effort,
+    );
 
     // dispatch 时节点可能刚好掉线重连
     let (pc_req_id, mut rx, cancel_handle) = {
@@ -1549,8 +1582,20 @@ fn extract_codex_reply(output: &str) -> String {
 
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
-    use super::{pc_cli_passthrough_event, pc_dispatch_started_event, AiCliRequestMode};
+    use super::{
+        native_session_uuid, pc_cli_passthrough_event, pc_dispatch_started_event,
+        pc_route_a_extra_args, AiCliRequestMode, NativeSessionScope,
+    };
     use serde_json::Value;
+
+    fn test_scope(conversation_id: &str) -> NativeSessionScope {
+        NativeSessionScope {
+            project_id: "project-1".to_string(),
+            user_id: "user-1".to_string(),
+            conversation_id: conversation_id.to_string(),
+            runtime_permission: "project_write".to_string(),
+        }
+    }
 
     #[test]
     fn pc_cli_passthrough_keeps_tool_approval_events() {
@@ -1585,5 +1630,49 @@ mod pc_cli_passthrough_tests {
         assert_eq!(value["req_id"], "req-1");
         assert!(value.get("prompt").is_none());
         assert!(value.get("api_key").is_none());
+    }
+
+    #[test]
+    fn native_session_uuid_is_stable_and_cli_scoped() {
+        let scope = test_scope("conversation-1");
+        let codex = native_session_uuid("codex", &scope);
+        let same_codex = native_session_uuid("codex", &scope);
+        let copilot = native_session_uuid("copilot", &scope);
+        let other_conversation = native_session_uuid("codex", &test_scope("conversation-2"));
+
+        assert_eq!(codex, same_codex);
+        assert_ne!(codex, copilot);
+        assert_ne!(codex, other_conversation);
+        assert!(codex.chars().all(|ch| ch.is_ascii_hexdigit() || ch == '-'));
+    }
+
+    #[test]
+    fn pc_codex_extra_args_include_stable_session_and_runtime_options() {
+        let session_id = native_session_uuid("codex", &test_scope("conversation-1"));
+        let args = pc_route_a_extra_args(
+            "codex",
+            Some(&session_id),
+            Some("gpt-5.3-codex"),
+            Some("medium"),
+        );
+
+        assert_eq!(args[0], format!("--session-id={session_id}"));
+        assert!(args.contains(&"--codex-model=gpt-5.3-codex".to_string()));
+        assert!(args.contains(&"--codex-effort=medium".to_string()));
+    }
+
+    #[test]
+    fn pc_copilot_extra_args_keep_session_and_model_flags() {
+        let session_id = native_session_uuid("copilot", &test_scope("conversation-1"));
+        let args = pc_route_a_extra_args("copilot", Some(&session_id), Some("gpt-5"), None);
+
+        assert_eq!(
+            args,
+            vec![
+                format!("--session-id={session_id}"),
+                "--model".to_string(),
+                "gpt-5".to_string()
+            ]
+        );
     }
 }
