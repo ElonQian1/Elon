@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     fs::{self, File, OpenOptions},
@@ -10,6 +10,8 @@ use std::{
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+const MAX_CHUNK_CHARS: usize = 12_000;
 
 #[derive(Clone, Debug)]
 pub(crate) struct TaskJournal {
@@ -112,6 +114,24 @@ impl TaskJournal {
         self.append_event(json!({
             "type": "finished",
             "req_id": req_id,
+            "at_ms": now
+        }))
+    }
+
+    pub(crate) fn record_cli_chunk(&self, req_id: &str, stream: &str, text: &str) -> Result<()> {
+        let text = truncate_chars(text, MAX_CHUNK_CHARS);
+        if text.trim().is_empty() {
+            return Ok(());
+        }
+        let now = now_ms();
+        if let Some(event) = parse_runtime_event(req_id, stream, &text, now) {
+            return self.append_event(event);
+        }
+        self.append_event(json!({
+            "type": "cli_chunk",
+            "req_id": req_id,
+            "stream": normalize_stream(stream),
+            "text": text,
             "at_ms": now
         }))
     }
@@ -230,11 +250,47 @@ impl TaskJournal {
     }
 }
 
-fn event_belongs_to_task(event: &serde_json::Value, task_id: &str) -> bool {
+fn event_belongs_to_task(event: &Value, task_id: &str) -> bool {
     event
         .get("req_id")
         .and_then(|value| value.as_str())
         .is_some_and(|req_id| req_id == task_id)
+}
+
+fn parse_runtime_event(req_id: &str, stream: &str, text: &str, at_ms: u128) -> Option<Value> {
+    let parsed: Value = serde_json::from_str(text.trim()).ok()?;
+    let event_type = parsed.get("type").and_then(Value::as_str)?;
+    if !matches!(
+        event_type,
+        "tool_call" | "tool_result" | "tool_approval_required" | "tool_approval_decision"
+    ) {
+        return None;
+    }
+    Some(json!({
+        "type": "tool_event",
+        "req_id": req_id,
+        "stream": normalize_stream(stream),
+        "event": parsed,
+        "text": text,
+        "at_ms": at_ms
+    }))
+}
+
+fn normalize_stream(stream: &str) -> &'static str {
+    match stream.trim().to_ascii_lowercase().as_str() {
+        "stderr" => "stderr",
+        "runtime" => "runtime",
+        _ => "stdout",
+    }
+}
+
+fn truncate_chars(text: &str, max_chars: usize) -> String {
+    if text.chars().count() <= max_chars {
+        return text.to_string();
+    }
+    let mut out: String = text.chars().take(max_chars).collect();
+    out.push_str("\n...（本机 journal 输出已截断）");
+    out
 }
 
 fn now_ms() -> u128 {
@@ -281,6 +337,72 @@ mod tests {
         assert!(events.contains(r#""type":"started""#));
         assert!(events.contains(r#""type":"cancel_requested""#));
         assert!(events.contains(r#""type":"finished""#));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn records_cli_chunks_without_prompt_or_secret_fields() {
+        let dir = unique_test_dir("chunks");
+        let journal = TaskJournal::new(&dir);
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-1",
+                cli_name: "codex",
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("start event should persist");
+        journal
+            .record_cli_chunk("req-1", "stdout", "hello from cli\n")
+            .expect("chunk should persist");
+
+        let snapshot = journal
+            .snapshot("req-1", 0, 20)
+            .expect("snapshot should read");
+        let chunk = snapshot
+            .events
+            .iter()
+            .find(|event| {
+                event.event.get("type").and_then(|value| value.as_str()) == Some("cli_chunk")
+            })
+            .expect("chunk event should be present");
+        assert_eq!(chunk.event["text"], "hello from cli\n");
+        assert!(chunk.event.get("prompt").is_none());
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn records_structured_tool_events_for_replay() {
+        let dir = unique_test_dir("tool-event");
+        let journal = TaskJournal::new(&dir);
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-1",
+                cli_name: "server-runtime",
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("start event should persist");
+        journal
+            .record_cli_chunk(
+                "req-1",
+                "runtime",
+                r#"{"type":"tool_call","tool":"run_command","args":{"program":"git"}}"#,
+            )
+            .expect("tool event should persist");
+
+        let snapshot = journal
+            .snapshot("req-1", 0, 20)
+            .expect("snapshot should read");
+        let tool_event = snapshot
+            .events
+            .iter()
+            .find(|event| {
+                event.event.get("type").and_then(|value| value.as_str()) == Some("tool_event")
+            })
+            .expect("tool event should be present");
+        assert_eq!(tool_event.event["event"]["type"], "tool_call");
+        assert_eq!(tool_event.event["event"]["tool"], "run_command");
         let _ = fs::remove_dir_all(dir);
     }
 

@@ -39,7 +39,8 @@
 - 本轮已修正云端 `task_id` 与本机 `pc_req_id` 的映射：PC CLI dispatch 开始时写入非敏感 `pc_dispatch_started` 事件，云端任务 snapshot/events 响应返回 `pc_req_id`，前端只用该 ID 查询本机 journal，不再误把 `tsk_*` 当成本机 key。
 - 本轮已让 PC AI 开发任务卡合并本机 journal 状态：本机仍持有 active handle 时显示“本机现场可连接”，本机 journal 残留 running 但无 handle 时显示“本机现场已脱离”，终态时显示“本机终态快照”。
 - 本轮已新增恢复契约：本机 journal API 返回 `resume`，明确 live 只能重连控制句柄且暂不回放 stdout/stderr；detached/terminal/missing 不能重连原进程，只能基于快照或云端快照继续。
-- 本轮已让 PC AI 开发任务卡消费 `resume`：live 卡提示“暂不回放输出”，detached 卡改为“需要基于快照继续”，关闭无效停止/审批按钮，并从开放任务轮询列表移除，避免无限轮询已经丢失句柄的任务。
+- 本轮已让 PC AI 开发任务卡消费 `resume`：live 卡提示本机 journal 能回放事件，detached 卡改为“需要基于快照继续”，关闭无效停止/审批按钮，并从开放任务轮询列表移除，避免无限轮询已经丢失句柄的任务。
+- 本轮已新增本机事件回放：Route A stdout/stderr、Route B/C 工具事件和运行时进度会写入本机 journal；PC 前端把 local journal 的 `cli_chunk/tool_event` 转成 `ai_progress` 补进任务消息，任务卡提示“本机事件可回放”。
 
 ## 验证结果
 
@@ -56,8 +57,9 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml project_tool_approval -- --nocapture`，8 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`，9 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`，1 passed
-- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，3 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_resume -- --nocapture`，3 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，5 passed（新增本机输出与工具事件回放）
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_server_runtime -- --nocapture`，5 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough -- --nocapture`，4 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server project_space_task_snapshot -- --nocapture`，2 passed
 - 通过：`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`，2 passed
@@ -83,3 +85,4 @@
 - 全量 clippy 历史债未在本任务内清理，避免把本次用户可见故障修复扩大成仓库治理。
 - 任务终态可见恢复只是让 UI 收到明确终态和“继续”提示，不是接回同一个 Codex/CLI 进程继续执行。
 - 本轮 journal 查询能区分 live/detached/terminal，但 journal 仍只保存生命周期事件，不保存 stdout/stderr、完整工具流、pid 和 Codex thread 元数据；因此距离完整 Codex Desktop 恢复仍有缺口。
+- 本机事件回放已经保存 stdout/stderr 与 B/C 工具事件，但仍不是完整 TTY attach；pid、审批 waiter 重绑定、Codex thread 元数据和跨节点恢复仍是缺口。

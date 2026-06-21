@@ -20,6 +20,7 @@
 12. PC 节点本地 journal：节点本机写入 CLI prompt registry/jsonl，记录 started/cancel_requested/finished，作为后续重启恢复和 attach 协议的数据底座。
 13. 本机 journal 查询闭环：7799 本地管理 API 暴露受 token 保护的 task journal 查询；云端 snapshot 返回 `pc_req_id`，PC 前端按该映射合并本机 live/detached/terminal 状态，区分“重连原进程”和“基于快照继续”。
 14. 恢复契约显式化：7799 journal API 返回 `resume` 合同，明确 live 只能重连控制句柄、暂不回放 stdout/stderr；detached/terminal 只能基于快照新开任务继续，前端据此关闭无效停止/审批入口和无限轮询。
+15. 本机事件回放：PC 节点把 Route A stdout/stderr 与 Route B/C 结构化工具事件写入本机 journal；PC 前端按 `pc_req_id + since` 把本机 journal 事件补进任务消息时间线，提供快照/轮询式事件回放。
 
 ## 风险
 
@@ -28,7 +29,7 @@
 - 原主工作区存在未提交改动，本任务只在隔离 worktree 修改并只 stage 本任务文件。
 - 任务终态可见恢复不是同进程续跑；Codex Desktop 级恢复仍需要持久 run handle、PC 节点 journal、attach 协议和审批 waiter 重绑定。
 - 云端 `task_id` 与本机 PC 节点 `req_id` 不是同一个 ID；前端必须使用云端 snapshot 返回的 `pc_req_id` 查询本机 journal，不能把 `tsk_*` 当作本机 key。
-- 当前 `resume` 合同是能力边界，不是完整 attach 实现；live 仍不能回放 stdout/stderr，页面刷新后的审批 waiter 仍需后续持久化。
+- 当前 `resume` 合同和事件回放仍不是完整 TTY attach；输出来自本机 journal 快照/轮询，不是直接接管原 CLI 进程的 stdout/stderr 句柄，页面刷新后的审批 waiter 仍需后续持久化。
 
 ## 验证命令
 

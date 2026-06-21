@@ -20,6 +20,7 @@ pub(crate) struct TaskResumeContract {
     can_reconnect: bool,
     can_cancel: bool,
     can_stream_live_output: bool,
+    can_replay_journal_events: bool,
     continue_mode: &'static str,
     strategy: TaskResumeStrategy,
     limitations: Vec<&'static str>,
@@ -86,11 +87,12 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_reconnect: true,
             can_cancel: true,
             can_stream_live_output: false,
+            can_replay_journal_events: true,
             continue_mode: attach.continue_mode,
             strategy: TaskResumeStrategy {
                 kind: "control_handle_reconnect",
                 label: "重连本机控制句柄",
-                reason: "当前本机节点还保留运行句柄，可继续查询状态或停止任务；stdout/stderr 回放仍需后续 attach 协议。",
+                reason: "当前本机节点还保留运行句柄，可查询状态、停止任务，并通过本机 journal 轮询回放输出事件；直接接管 CLI TTY 仍需后续 attach 协议。",
                 requires_new_task: false,
                 uses_cloud_snapshot: true,
                 uses_local_journal: true,
@@ -104,6 +106,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_reconnect: false,
             can_cancel: false,
             can_stream_live_output: false,
+            can_replay_journal_events: true,
             continue_mode: attach.continue_mode,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
@@ -122,6 +125,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_reconnect: false,
             can_cancel: false,
             can_stream_live_output: false,
+            can_replay_journal_events: true,
             continue_mode: attach.continue_mode,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
@@ -140,6 +144,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_reconnect: false,
             can_cancel: false,
             can_stream_live_output: false,
+            can_replay_journal_events: false,
             continue_mode: "snapshot_continue",
             strategy: TaskResumeStrategy {
                 kind: "cloud_snapshot_only",
@@ -159,7 +164,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
 fn shared_limitations() -> Vec<&'static str> {
     vec![
         "本机 journal 不保存 prompt 或 API key。",
-        "当前版本不回放 CLI stdout/stderr 历史流。",
+        "输出回放来自本机 journal 快照/轮询，不是直接接管原 CLI TTY。",
         "当前版本不持久化审批 waiter，页面刷新后只能从历史事件重建审批卡。",
         "节点重启后不能恢复原进程 pid，只能基于快照新开任务继续。",
     ]
@@ -193,6 +198,7 @@ mod tests {
         assert!(resume.can_reconnect);
         assert!(resume.can_cancel);
         assert!(!resume.can_stream_live_output);
+        assert!(resume.can_replay_journal_events);
         assert_eq!(resume.next_action, "wait_or_cancel");
         assert_eq!(resume.strategy.kind, "control_handle_reconnect");
     }

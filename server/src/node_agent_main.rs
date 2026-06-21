@@ -795,6 +795,7 @@ struct CliPromptRun {
     prompt: String,
     server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
     approval_state: node_agent_tool_approval::ToolApprovalState,
+    task_journal: node_agent_task_journal::TaskJournal,
     cancel_rx: watch::Receiver<bool>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 }
@@ -813,6 +814,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         prompt,
         server_runtime_config,
         approval_state,
+        task_journal,
         mut cancel_rx,
         out_tx,
     } = run;
@@ -847,6 +849,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                 approval_state: Some(approval_state.clone()),
                 cancel_rx,
                 out_tx: out_tx.clone(),
+                task_journal: Some(task_journal.clone()),
             },
         )
         .await;
@@ -880,6 +883,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                         approval_state: Some(approval_state.clone()),
                         cancel_rx,
                         out_tx: out_tx.clone(),
+                        task_journal: Some(task_journal.clone()),
                     },
                 )
                 .await
@@ -1080,7 +1084,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                             continue;
                         }
                     }
-                    let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
+                    send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &(l + "\n"));
                 }
                 Ok(None) => { stdout_done = true; }
                 Err(e) => {
@@ -1097,12 +1101,13 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     stderr_text.push('\n');
                     if cli_name == "codex" {
                         // Codex stderr 有"Reading additional input from stdin..."等噪音，不发给用户
-                        // 但记录到日志方便诊断
+                        // 但写入本机 journal，页面恢复时可在本机上下文里回放诊断信息。
                         if !l.trim().is_empty() {
                             info!("[codex stderr] {}", l);
+                            let _ = task_journal.record_cli_chunk(&req_id, "stderr", &(l + "\n"));
                         }
                     } else {
-                        let _ = out_tx.send(ws_text(&AgentToServer::CliChunk { req_id: req_id.clone(), text: l + "\n" }));
+                        send_cli_chunk(&out_tx, &task_journal, &req_id, "stderr", &(l + "\n"));
                     }
                 }
                 Ok(None) => { stderr_done = true; }
@@ -1168,6 +1173,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             req_id: req_id.clone(),
             text: format!("codex\n{diagnostic}\n"),
         }));
+        let _ = task_journal.record_cli_chunk(&req_id, "stdout", &format!("codex\n{diagnostic}\n"));
     }
     let error = if exit_ok {
         None
@@ -1190,6 +1196,20 @@ async fn run_cli_prompt(run: CliPromptRun) {
         model,
         workspace_status,
     )));
+}
+
+fn send_cli_chunk(
+    out_tx: &tokio::sync::mpsc::UnboundedSender<Message>,
+    task_journal: &node_agent_task_journal::TaskJournal,
+    req_id: &str,
+    stream: &str,
+    text: &str,
+) {
+    let _ = task_journal.record_cli_chunk(req_id, stream, text);
+    let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
+        req_id: req_id.to_string(),
+        text: text.to_string(),
+    }));
 }
 
 struct PreparedCliPromptCwd {
@@ -1999,6 +2019,7 @@ async fn run_session(
                                         },
                                     ),
                                     approval_state: rt_c.tool_approvals.clone(),
+                                    task_journal: rt_c.task_journal.clone(),
                                     cancel_rx,
                                     out_tx: tx_c,
                                 })

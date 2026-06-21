@@ -567,6 +567,8 @@
       const resume = task && task.resume ? task.resume : null;
       const action = clean(resume && resume.next_action).toLowerCase();
       const canStream = resume && resume.can_stream_live_output !== false;
+      const canReplay = resume && resume.can_replay_journal_events === true;
+      if (canReplay) return '（本机事件可回放）';
       if (action === 'wait_or_cancel' && !canStream) return '（暂不回放输出）';
       if (action === 'continue_from_snapshot') return '（基于快照继续）';
       if (action === 'refresh_snapshot') return '（仅云端快照）';

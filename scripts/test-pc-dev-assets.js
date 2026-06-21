@@ -474,6 +474,7 @@ async function testTaskSnapshotsMergeLocalJournal() {
           can_reconnect: true,
           can_cancel: true,
           can_stream_live_output: false,
+          can_replay_journal_events: true,
           next_action: 'wait_or_cancel',
           strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
         }
@@ -490,6 +491,69 @@ async function testTaskSnapshotsMergeLocalJournal() {
   assert.strictEqual(snapshot.attach.source, 'local_journal', 'local journal source should be retained');
   assert.strictEqual(snapshot.local_journal.last_event_seq, 2, 'local journal cursor should be cached');
   assert.strictEqual(snapshot.resume.next_action, 'wait_or_cancel', 'local resume contract should be cached');
+}
+
+async function testTaskSnapshotsReplaysLocalJournalMessages() {
+  let scheduled = null;
+  let rendered = null;
+  const sandbox = loadAsset('server/src/assets/pc_app_task_snapshots.js', {
+    setTimeout: (callback) => {
+      scheduled = callback;
+      return 9;
+    },
+    clearTimeout: () => {},
+    console: { warn: () => {} }
+  });
+  const state = {
+    activeKind: 'project',
+    activeProjectId: 'p1',
+    activeChannelId: 'ch-dev',
+    activeChannelKind: 'ai_development'
+  };
+  const snapshots = sandbox.window.ElonPcTaskSnapshots.create({
+    state,
+    clean,
+    sameId: (a, b) => String(a || '') === String(b || ''),
+    devTasks: { openTaskIds: () => ['tsk_replay'] },
+    api: async () => ({
+      task: { id: 'tsk_replay', status: 'running' },
+      pc_req_id: 'req-replay',
+      messages: [{ kind: 'ai_task', task_id: 'tsk_replay', content: '发起 AI 开发任务：回放本机事件' }],
+      events: [],
+      last_event_seq: 1,
+      attach: { status: 'live', live: true }
+    }),
+    localNodeApi: async () => ({
+      ok: true,
+      task_id: 'req-replay',
+      events: [
+        { seq: 2, event: { type: 'cli_chunk', req_id: 'req-replay', text: '本机 stdout\\n' } },
+        { seq: 3, event: { type: 'tool_event', req_id: 'req-replay', text: JSON.stringify({ type: 'tool_call', tool: 'run_command' }) } },
+        {
+          seq: 4,
+          event: {
+            type: 'tool_event',
+            req_id: 'req-replay',
+            text: JSON.stringify({ type: 'tool_approval_required', tool: 'write_file', approval_id: 'tap_local' }),
+            event: { type: 'tool_approval_required', tool: 'write_file', approval_id: 'tap_local' }
+          }
+        }
+      ],
+      last_event_seq: 4,
+      attach: { status: 'live', live: true, source: 'local_journal' },
+      resume: { status: 'live', can_replay_journal_events: true, next_action: 'wait_or_cancel' }
+    }),
+    renderMessages: (messages) => {
+      rendered = messages;
+    },
+    refreshActiveChannel: async () => {}
+  });
+
+  assert.strictEqual(snapshots.schedule([], 'project', {}), true, 'snapshot scheduler should accept replay task');
+  await scheduled();
+  assert.ok(rendered.some((message) => clean(message.content).includes('本机 stdout')), 'local stdout should be appended as progress');
+  assert.ok(rendered.some((message) => message.content.includes('"tool_call"')), 'local tool event should be appended as progress');
+  assert.ok(rendered.some((message) => message.content.includes('[本机回放] write_file 等待审批')), 'local-only approval should be read-only replay text');
 }
 
 function testDevTasksUsesLocalJournalAttachLabel() {
@@ -514,6 +578,7 @@ function testDevTasksUsesLocalJournalAttachLabel() {
       resume: {
         status: 'live',
         can_stream_live_output: false,
+        can_replay_journal_events: true,
         next_action: 'wait_or_cancel',
         strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
       }
@@ -522,7 +587,7 @@ function testDevTasksUsesLocalJournalAttachLabel() {
   const context = devTasks.buildContext(messages, { snapshots });
   const html = devTasks.renderMessage(messages[0], context);
   assert.ok(html.includes('本机现场可连接'), 'task card should label local journal live attach state');
-  assert.ok(html.includes('暂不回放输出'), 'task card should not imply stdout/stderr replay is ready');
+  assert.ok(html.includes('本机事件可回放'), 'task card should expose local journal replay');
 }
 
 function testDevTasksUsesResumeContractForSnapshotContinue() {
@@ -560,6 +625,7 @@ function testDevTasksUsesResumeContractForSnapshotContinue() {
         can_reconnect: false,
         can_cancel: false,
         can_stream_live_output: false,
+        can_replay_journal_events: true,
         next_action: 'continue_from_snapshot',
         strategy: { kind: 'snapshot_continue', label: '基于快照继续' }
       }
@@ -744,6 +810,7 @@ function testLocalAdminTokenWiring() {
   await testDevTasksToolApprovalButtons();
   await testTaskSnapshotsPollsSnapshotEndpoint();
   await testTaskSnapshotsMergeLocalJournal();
+  await testTaskSnapshotsReplaysLocalJournalMessages();
   testProjectReadinessChecklist();
   testDevComposerRouteLabels();
   testDevComposerForcedRoutePreference();

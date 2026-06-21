@@ -8,6 +8,7 @@ use crate::{
         tool_approval_decision_chunk, tool_approval_id, tool_approval_required_chunk,
         tool_approval_required_chunk_with_diff, tool_call_chunk, tool_name, tool_result_chunk,
     },
+    node_agent_task_journal::TaskJournal,
     node_agent_tool_approval::ToolApprovalState,
     node_agent_tool_guard::{truncate_chars, ToolGuard},
 };
@@ -51,6 +52,7 @@ pub(crate) struct RuntimePromptOptions<'a> {
     pub approval_state: Option<ToolApprovalState>,
     pub cancel_rx: watch::Receiver<bool>,
     pub out_tx: mpsc::UnboundedSender<Message>,
+    pub task_journal: Option<TaskJournal>,
 }
 
 pub(crate) async fn run_server_runtime_prompt(
@@ -143,6 +145,7 @@ async fn run_server_runtime_inner(
         approval_state,
         cancel_rx,
         out_tx,
+        task_journal,
     } = options;
     let token = config
         .user_token
@@ -167,6 +170,7 @@ async fn run_server_runtime_inner(
             approval_state,
             cancel_rx,
             out_tx,
+            task_journal,
             initial_model: Some("server-runtime".to_string()),
         },
         move |messages| {
@@ -191,6 +195,7 @@ async fn run_api_runtime_inner(
         approval_state,
         cancel_rx,
         out_tx,
+        task_journal,
     } = options;
     let workspace = resolve_workspace(cwd)?;
     let guard = ToolGuard::new(workspace, runtime_permission);
@@ -208,6 +213,7 @@ async fn run_api_runtime_inner(
             approval_state,
             cancel_rx,
             out_tx,
+            task_journal,
             initial_model,
         },
         move |messages| {
@@ -227,6 +233,7 @@ struct RuntimeLoopOptions<'a> {
     approval_state: Option<ToolApprovalState>,
     cancel_rx: watch::Receiver<bool>,
     out_tx: mpsc::UnboundedSender<Message>,
+    task_journal: Option<TaskJournal>,
     initial_model: Option<String>,
 }
 
@@ -246,6 +253,7 @@ where
         approval_state,
         mut cancel_rx,
         out_tx,
+        task_journal,
         initial_model,
     } = options;
     let mut messages = vec![
@@ -259,7 +267,12 @@ where
         if *cancel_rx.borrow() {
             return Ok(canceled_runtime_result(label, model, &usage));
         }
-        send_chunk(&out_tx, req_id, format!("[{label}] turn {turn}\n"));
+        send_chunk(
+            &out_tx,
+            task_journal.as_ref(),
+            req_id,
+            format!("[{label}] turn {turn}\n"),
+        );
         let call_messages = messages.clone();
         let response = tokio::select! {
             result = call_chat(call_messages.clone()) => {
@@ -290,7 +303,12 @@ where
             .and_then(Value::as_str)
             .filter(|value| !value.trim().is_empty())
         {
-            send_chunk(&out_tx, req_id, format!("{message}\n"));
+            send_chunk(
+                &out_tx,
+                task_journal.as_ref(),
+                req_id,
+                format!("{message}\n"),
+            );
         }
 
         let actions = agent
@@ -324,6 +342,7 @@ where
                         );
                         send_chunk(
                             &out_tx,
+                            task_journal.as_ref(),
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
@@ -341,6 +360,7 @@ where
                             format!("error: {tool} approval unavailable; tool was not executed");
                         send_chunk(
                             &out_tx,
+                            task_journal.as_ref(),
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
@@ -353,6 +373,7 @@ where
                 };
                 send_chunk(
                     &out_tx,
+                    task_journal.as_ref(),
                     req_id,
                     match write_file_approval_diff.as_ref() {
                         Some(diff) => tool_approval_required_chunk_with_diff(
@@ -377,6 +398,7 @@ where
                         approved_write_file_diff = write_file_approval_diff;
                         send_chunk(
                             &out_tx,
+                            task_journal.as_ref(),
                             req_id,
                             tool_approval_decision_chunk(
                                 req_id,
@@ -392,6 +414,7 @@ where
                     ApprovalOutcome::Denied(reason) => {
                         send_chunk(
                             &out_tx,
+                            task_journal.as_ref(),
                             req_id,
                             tool_approval_decision_chunk(
                                 req_id,
@@ -406,6 +429,7 @@ where
                         let result = format!("error: {tool} denied by user: {reason}");
                         send_chunk(
                             &out_tx,
+                            task_journal.as_ref(),
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
@@ -418,6 +442,7 @@ where
                     ApprovalOutcome::TimedOut => {
                         send_chunk(
                             &out_tx,
+                            task_journal.as_ref(),
                             req_id,
                             tool_approval_decision_chunk(
                                 req_id,
@@ -433,6 +458,7 @@ where
                             format!("error: {tool} approval timed out; tool was not executed");
                         send_chunk(
                             &out_tx,
+                            task_journal.as_ref(),
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
@@ -457,6 +483,7 @@ where
                     );
                     send_chunk(
                         &out_tx,
+                        task_journal.as_ref(),
                         req_id,
                         tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                     );
@@ -469,12 +496,14 @@ where
             }
             send_chunk(
                 &out_tx,
+                task_journal.as_ref(),
                 req_id,
                 tool_call_chunk(req_id, turn, tool_index, &action),
             );
             let result = guard.invoke_action(&action).await;
             send_chunk(
                 &out_tx,
+                task_journal.as_ref(),
                 req_id,
                 tool_result_chunk(req_id, turn, tool_index, &tool, &result),
             );
@@ -661,7 +690,15 @@ fn parse_agent_response(content: &str) -> Result<Value> {
     serde_json::from_str(&trimmed[start..=end]).context("server-runtime JSON 解析失败")
 }
 
-fn send_chunk(out_tx: &mpsc::UnboundedSender<Message>, req_id: &str, text: String) {
+fn send_chunk(
+    out_tx: &mpsc::UnboundedSender<Message>,
+    task_journal: Option<&TaskJournal>,
+    req_id: &str,
+    text: String,
+) {
+    if let Some(journal) = task_journal {
+        let _ = journal.record_cli_chunk(req_id, "runtime", &text);
+    }
     let _ = out_tx.send(Message::Text(
         serde_json::to_string(&AgentToServer::CliChunk {
             req_id: req_id.to_string(),
@@ -772,6 +809,7 @@ mod tests {
                     approval_state: Some(approval_state),
                     cancel_rx,
                     out_tx,
+                    task_journal: None,
                     initial_model: Some("test-model".to_string()),
                 },
                 move |_| {
@@ -861,6 +899,7 @@ mod tests {
                     approval_state: Some(approval_state),
                     cancel_rx,
                     out_tx,
+                    task_journal: None,
                     initial_model: Some("test-model".to_string()),
                 },
                 move |_| {
@@ -938,6 +977,7 @@ mod tests {
                     approval_state: Some(approval_state),
                     cancel_rx,
                     out_tx,
+                    task_journal: None,
                     initial_model: Some("test-model".to_string()),
                 },
                 move |_| {

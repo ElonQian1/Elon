@@ -100,6 +100,7 @@
         snapshot.local_journal = journal;
         snapshot.attach = mergeAttach(snapshot, journal);
         snapshot.resume = mergeResume(snapshot, journal);
+        appendLocalJournalMessages(snapshot, journal, taskId);
         if (journal.last_event_seq > since) localCursors.set(journalTaskId, journal.last_event_seq);
         localFailures.delete(journalTaskId);
       } catch (error) {
@@ -142,6 +143,45 @@
       return snapshot.resume || null;
     }
 
+    function appendLocalJournalMessages(snapshot, journal, taskId) {
+      const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
+      const seen = new Set(messages.map(messageKey));
+      (journal && Array.isArray(journal.events) ? journal.events : []).forEach((entry) => {
+        const message = localJournalMessage(entry, taskId);
+        if (!message) return;
+        const key = messageKey(message);
+        if (seen.has(key)) return;
+        seen.add(key);
+        messages.push(message);
+      });
+      snapshot.messages = messages;
+    }
+
+    function localJournalMessage(entry, taskId) {
+      const event = entry && entry.event ? entry.event : null;
+      const type = clean(event && event.type).toLowerCase();
+      if (!['cli_chunk', 'tool_event'].includes(type)) return null;
+      const inner = event && event.event ? event.event : null;
+      const innerType = clean(inner && inner.type).toLowerCase();
+      const content = innerType === 'tool_approval_required'
+        ? localApprovalReplayText(inner)
+        : clean(event.text || (inner ? JSON.stringify(inner) : ''));
+      if (!content) return null;
+      return {
+        kind: 'ai_progress',
+        task_id: taskId,
+        content,
+        local_journal_seq: Number(entry.seq || 0),
+        local_journal: true
+      };
+    }
+
+    function localApprovalReplayText(event) {
+      const tool = clean(event && event.tool) || 'tool';
+      const approvalId = clean(event && event.approval_id);
+      return `[本机回放] ${tool} 等待审批${approvalId ? `（${approvalId}）` : ''}`;
+    }
+
     function shouldRenderSnapshot(previous, snapshot, since) {
       if (!previous) return true;
       if (lastSeqOf(snapshot) > since) return true;
@@ -163,6 +203,14 @@
       const status = clean(attach && attach.status).toLowerCase();
       const source = clean(attach && attach.source).toLowerCase();
       return `${status}:${source}`;
+    }
+
+    function messageKey(message) {
+      return [
+        clean(message && (message.kind || message.role || message.message_kind)).toLowerCase(),
+        clean(message && (message.task_id || message.taskId)),
+        clean(message && (message.content || message.text || message.message))
+      ].join(':');
     }
 
     function resumeStatus(resume) {
