@@ -163,6 +163,15 @@ async fn reply_to_selected_group_message(
     let message = state
         .store
         .insert_group_social_ai_reply(&group_id, &reply)?;
+    crate::external_app_context_feedback::spawn_generated_answer_feedback(
+        Arc::clone(&state),
+        user_id,
+        group_id.clone(),
+        format!("social_group_selected_message:{}", message.id),
+        "selected_message_ai_reply",
+        external_context,
+        reply.clone(),
+    );
     friend_events::publish_group_message(&message, recipient_user_ids);
     Ok(())
 }

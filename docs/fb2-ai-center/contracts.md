@@ -124,6 +124,7 @@ fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如�
     "user_orders": [],
     "group_messages": [],
     "platform_order_summary": {},
+    "citation_sources": [],
     "metrics": {},
     "tool_contract": {},
     "usage_policy": {},
@@ -175,6 +176,7 @@ fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如�
 - 订单：`order_id` / `ticket_id`
 - 群观点：`message_id`
 - 审计：`context_audit_id`
+- 回填引用候选：`citation_sources[]`，每项至少包含 `kind`、`id`、`label`，主项目会用 AI 回复中出现的来源 ID/标签回写 `/context/feedback`
 
 ## 权限规则
 

@@ -22,6 +22,7 @@ pub(crate) fn fb2_pack_context(app_id: &str, external_group_id: &str, data: Valu
         "user_orders": data.get("user_orders"),
         "group_messages": data.get("group_messages"),
         "platform_order_summary": data.get("platform_order_summary"),
+        "citation_sources": data.get("citation_sources"),
         "metrics": data.get("metrics"),
         "tool_contract": data.get("tool_contract"),
         "usage_policy": data.get("usage_policy").cloned().unwrap_or_else(default_usage_policy),

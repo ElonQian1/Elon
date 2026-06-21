@@ -297,6 +297,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
     let history = state
         .store
         .list_recent_group_messages_for_social_ai(&user_id, &group_id, 50)?;
+    let mut feedback_context = None;
     // 方案6: 统一使用 classify() 检测开发意图；方案4: 开发意图走桥接（群聊暂只发文字，无桥接卡片）
     let reply = if is_development_intent(&history).is_some() {
         DEVELOPMENT_REDIRECT_REPLY.to_string()
@@ -321,7 +322,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
         } else {
             None
         };
-        social_ai_reply_or_fallback(
+        let reply = social_ai_reply_or_fallback(
             &state,
             &user_id,
             "群聊",
@@ -329,11 +330,22 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
             external_context.as_ref(),
             external_tool_results.as_ref(),
         )
-        .await
+        .await;
+        feedback_context = external_context;
+        reply
     };
     let message = state
         .store
         .insert_group_social_ai_reply(&group_id, &reply)?;
+    crate::external_app_context_feedback::spawn_generated_answer_feedback(
+        Arc::clone(&state),
+        user_id,
+        group_id.clone(),
+        format!("social_group_message:{}", message.id),
+        "group_mention",
+        feedback_context,
+        reply.clone(),
+    );
     friend_events::publish_group_message(&message, recipient_user_ids);
     Ok(())
 }
