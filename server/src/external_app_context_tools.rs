@@ -28,6 +28,7 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
                 "matches",
                 "user_orders",
                 "group_messages",
+                "citation_sources",
                 "tool_contract",
                 "usage_policy",
                 "answer_policy",
@@ -324,6 +325,10 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("answer_policy")));
+        assert!(guidance["required_context_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("citation_sources")));
         assert!(public_tool_contract_guidance("unknown").is_none());
     }
 }

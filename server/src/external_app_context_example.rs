@@ -29,6 +29,7 @@ pub(crate) fn public_context_pack_example(app_id: &str) -> Option<Value> {
                 "matches",
                 "user_orders",
                 "group_messages",
+                "citation_sources",
                 "tool_contract",
                 "metrics"
             ]
@@ -82,6 +83,11 @@ fn fb2_context_pack_example_data() -> Value {
             "visibility": "anonymous_aggregate",
             "note": "普通群聊只返回匿名聚合数据"
         },
+        "citation_sources": [
+            {"kind": "match", "id": "m-001", "label": "示例联赛 主队 vs 客队"},
+            {"kind": "order", "id": "o-001", "label": "当前用户票据 o-001"},
+            {"kind": "group_message", "id": "msg-001", "label": "群友观点 msg-001"}
+        ],
         "metrics": {
             "retrieved_source_count": 3,
             "context_pack_chars": 2048,
@@ -132,6 +138,14 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("metrics")));
+        assert!(example["minimum_required_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("citation_sources")));
+        assert_eq!(
+            example["response_shape"]["data"]["citation_sources"][0]["id"],
+            "m-001"
+        );
         assert_eq!(
             example["response_shape"]["data"]["usage_policy"]["ai_reply_billable"],
             true

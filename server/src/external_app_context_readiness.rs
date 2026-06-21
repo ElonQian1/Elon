@@ -15,6 +15,7 @@ pub(crate) fn public_context_readiness_guidance(app_id: &str) -> Option<Value> {
                 "matches",
                 "user_orders",
                 "group_messages",
+                "citation_sources",
                 "tool_contract",
                 "metrics"
             ],
@@ -32,6 +33,7 @@ pub(crate) fn public_context_readiness_guidance(app_id: &str) -> Option<Value> {
                 "context_budget",
                 "external_metrics",
                 "context_audit_id",
+                "citation_sources",
                 "tool_contract",
                 "executed_external_app_tools"
             ],
@@ -121,7 +123,12 @@ mod tests {
         let metadata = guidance["main_project_prompt_metadata"].as_array().unwrap();
         assert!(metadata.contains(&json!("answer_policy")));
         assert!(metadata.contains(&json!("answer_rules")));
+        assert!(metadata.contains(&json!("citation_sources")));
         assert!(metadata.contains(&json!("executed_external_app_tools")));
+        assert!(guidance["required_response_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("citation_sources")));
         assert!(guidance["automated_checks"]
             .as_array()
             .unwrap()
