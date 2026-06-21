@@ -165,6 +165,94 @@ fn plan_fb2_tools_with_platform_scope(
     if let Some(evidence) = keyword_evidence(
         query,
         &[
+            "采纳",
+            "引用",
+            "采用",
+            "被采纳",
+            "AI采纳",
+            "AI 回复",
+            "AI回答",
+        ],
+    ) {
+        plans.push(PlannedTool {
+            name: "opinion_adoption_summary",
+            reason: "用户询问主项目 AI 回答采纳过哪些群观点或采纳质量，需要查询本群观点采纳汇总。",
+            arguments: json!({
+                "query": query
+            }),
+            requires_external_user: false,
+            trigger: "opinion_adoption_summary_needed",
+            confidence: confidence_for(&evidence),
+            evidence: evidence.clone(),
+        });
+        if has_any_keyword(
+            query,
+            &["哪些", "明细", "样本", "列表", "谁", "哪条", "具体"],
+        ) {
+            plans.push(PlannedTool {
+                name: "list_opinion_adoptions",
+                reason: "用户要求查看被 AI 采纳的群观点样本，需要查询本群观点采纳记录列表。",
+                arguments: json!({
+                    "query": query,
+                    "limit": 12
+                }),
+                requires_external_user: false,
+                trigger: "opinion_adoption_samples_needed",
+                confidence: confidence_for(&evidence),
+                evidence,
+            });
+        }
+    }
+
+    if let Some(evidence) = keyword_evidence(
+        query,
+        &[
+            "赛后复盘",
+            "复盘",
+            "命中",
+            "准不准",
+            "说对",
+            "说错",
+            "是否正确",
+            "质量",
+            "权重",
+            "结果验证",
+            "历史表现",
+        ],
+    ) {
+        plans.push(PlannedTool {
+            name: "opinion_result_review_summary",
+            reason: "用户询问群友历史观点是否被赛果支持，需要查询本群观点赛后复盘汇总。",
+            arguments: json!({
+                "query": query
+            }),
+            requires_external_user: false,
+            trigger: "opinion_result_review_summary_needed",
+            confidence: confidence_for(&evidence),
+            evidence: evidence.clone(),
+        });
+        if has_any_keyword(
+            query,
+            &["哪些", "明细", "样本", "列表", "谁", "哪条", "具体"],
+        ) {
+            plans.push(PlannedTool {
+                name: "opinion_result_reviews",
+                reason: "用户要求查看群友观点赛后复盘样本，需要查询本群观点复盘记录列表。",
+                arguments: json!({
+                    "query": query,
+                    "limit": 12
+                }),
+                requires_external_user: false,
+                trigger: "opinion_result_review_samples_needed",
+                confidence: confidence_for(&evidence),
+                evidence,
+            });
+        }
+    }
+
+    if let Some(evidence) = keyword_evidence(
+        query,
+        &[
             "平台",
             "全平台",
             "店铺",
@@ -289,6 +377,10 @@ fn context_has_warning(context: &Value, warning: &str) -> bool {
         .and_then(Value::as_array)
         .map(|warnings| warnings.iter().any(|value| value.as_str() == Some(warning)))
         .unwrap_or(false)
+}
+
+fn has_any_keyword(text: &str, needles: &[&str]) -> bool {
+    keyword_evidence(text, needles).is_some()
 }
 
 fn keyword_evidence(text: &str, needles: &[&str]) -> Option<Vec<String>> {
@@ -421,6 +513,44 @@ mod tests {
                 tool["name"].as_str() == Some("opinion_memories")
                     && tool["trigger"].as_str() == Some("group_opinion_memory_needed")
             }));
+    }
+
+    #[test]
+    fn plans_opinion_result_review_tools_for_quality_questions() {
+        let plan = plan_fb2_tools(
+            &json!({
+                "context_quality": {"warnings": []}
+            }),
+            Some("群里大家以前观点复盘准不准？具体哪些观点说对了？"),
+        );
+
+        let names = plan.tool_names();
+        assert!(names.contains(&"opinion_memories"));
+        assert!(names.contains(&"opinion_result_review_summary"));
+        assert!(names.contains(&"opinion_result_reviews"));
+        let metadata = plan.to_metadata();
+        assert!(metadata["planned_tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| {
+                tool["name"].as_str() == Some("opinion_result_review_summary")
+                    && tool["trigger"].as_str() == Some("opinion_result_review_summary_needed")
+            }));
+    }
+
+    #[test]
+    fn plans_opinion_adoption_tools_for_adoption_questions() {
+        let plan = plan_fb2_tools(
+            &json!({
+                "context_quality": {"warnings": []}
+            }),
+            Some("AI 之前采纳了哪些群友观点？列出具体样本"),
+        );
+
+        let names = plan.tool_names();
+        assert!(names.contains(&"opinion_adoption_summary"));
+        assert!(names.contains(&"list_opinion_adoptions"));
     }
 
     #[test]

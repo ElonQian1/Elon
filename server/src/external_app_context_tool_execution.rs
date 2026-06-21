@@ -11,6 +11,10 @@ const FB2_ALLOWED_TOOLS: &[&str] = &[
     "get_order_detail",
     "search_group_opinions",
     "opinion_memories",
+    "list_opinion_adoptions",
+    "opinion_adoption_summary",
+    "opinion_result_reviews",
+    "opinion_result_review_summary",
     "platform_orders",
     "get_context_audit",
     "context_audit_summary",
@@ -50,7 +54,7 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
                 "error": "string when success=false",
                 "generated_at": "ISO-8601 timestamp",
                 "source_ids": ["match_id", "order_id", "ticket_id", "message_id", "context_audit_id"],
-                "visibility": "group_context | current_user_only | single_group_persistent_opinion_index | privileged_summary | audit_metadata_only | audit_metrics_only",
+                "visibility": "group_context | current_user_only | single_group_persistent_opinion_index | answer_opinion_adoption_samples | answer_opinion_adoption_metrics | single_group_opinion_result_review_samples | single_group_opinion_result_review_metrics | privileged_summary | audit_metadata_only | audit_metrics_only",
                 "metrics": {
                     "latency_ms": "optional integer",
                     "result_count": "optional integer",
@@ -99,6 +103,8 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
                 "current_user_only 工具必须带 external_user_id，fb2 只能返回该用户自己的订单/票据。",
                 "group_context 工具必须带 group_id，fb2 只能返回该群可见的比赛和群友观点。",
                 "single_group_persistent_opinion_index 工具必须带 group_id，只能返回该群可见的长期观点记忆，不能当作赛果事实。",
+                "answer_opinion_adoption_* 工具必须带 group_id，只能返回本群 AI 回答采纳过哪些群观点的样本或汇总。",
+                "single_group_opinion_result_review_* 工具必须带 group_id，只能返回本群历史观点赛后复盘，不能用于承诺未来命中。",
                 "privileged_summary 工具默认禁用；平台订单摘要必须双端开关和 platform_order_summary scope 同时允许，且只能返回匿名聚合。",
                 "audit 工具只能返回来源数量、耗时、裁剪和预算指标，不返回其他用户明细。",
                 "主项目不得把未执行工具的预测结果当作事实。"
@@ -108,6 +114,7 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
                 "订单/票据结果必须尽量带 order_id 或 ticket_id。",
                 "群友观点结果必须带 message_id。",
                 "长期观点记忆结果必须带 opinion_memory_id 或 source_message_id，并标记为群友观点证据。",
+                "观点采纳样本和赛后复盘样本必须尽量带 opinion_memory_id；汇总指标可以不带 source_ids，但只能作为统计口径使用。",
                 "返回被截断时必须设置 metrics.truncated=true，并提示可继续按 id 查详情。"
             ]
         })),
@@ -140,6 +147,10 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("opinion_memories")));
+        assert!(contract["allowed_tools"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("opinion_result_review_summary")));
         assert!(contract["permission_rules"]
             .as_array()
             .unwrap()

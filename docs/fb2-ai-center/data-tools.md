@@ -43,6 +43,10 @@ fb2 在 Context Pack 里声明可用工具，主项目先把它们投影给模�
 | `get_order_detail` | `current_user_only` | 查当前用户可见的单个订单明细 |
 | `search_group_opinions` | `group_context` | 按比赛或关键词检索群友观点 |
 | `opinion_memories` | `single_group_persistent_opinion_index` | 查单群长期观点记忆，作为群友历史观点证据 |
+| `list_opinion_adoptions` | `answer_opinion_adoption_samples` | 查本群主项目 AI 曾采纳的观点样本 |
+| `opinion_adoption_summary` | `answer_opinion_adoption_metrics` | 查本群观点采纳次数、来源和意图汇总 |
+| `opinion_result_reviews` | `single_group_opinion_result_review_samples` | 查本群观点赛后复盘样本 |
+| `opinion_result_review_summary` | `single_group_opinion_result_review_metrics` | 查本群观点赛后复盘质量汇总 |
 | `platform_orders` | `privileged_summary` | 查平台/店铺匿名聚合订单摘要，默认禁用 |
 | `get_context_audit` | `audit_metadata_only` | 回查某次 Context Pack 来源、预算、耗时 |
 | `context_audit_summary` | `audit_metrics_only` | 长期汇总上下文质量指标 |

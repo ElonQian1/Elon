@@ -107,6 +107,10 @@ fn expected_visibility(tool_name: &str) -> Option<&'static str> {
     match tool_name {
         "search_matches" | "get_match_detail" | "search_group_opinions" => Some("group_context"),
         "opinion_memories" => Some("single_group_persistent_opinion_index"),
+        "list_opinion_adoptions" => Some("answer_opinion_adoption_samples"),
+        "opinion_adoption_summary" => Some("answer_opinion_adoption_metrics"),
+        "opinion_result_reviews" => Some("single_group_opinion_result_review_samples"),
+        "opinion_result_review_summary" => Some("single_group_opinion_result_review_metrics"),
         "search_user_orders" | "get_order_detail" => Some("current_user_only"),
         "platform_orders" => Some("privileged_summary"),
         "get_context_audit" => Some("audit_metadata_only"),
@@ -124,6 +128,8 @@ fn source_ids_required(tool_name: &str) -> bool {
             | "get_order_detail"
             | "search_group_opinions"
             | "opinion_memories"
+            | "list_opinion_adoptions"
+            | "opinion_result_reviews"
             | "platform_orders"
     )
 }
@@ -225,5 +231,44 @@ mod tests {
             result["grounding"]["expected_visibility"].as_str(),
             Some("single_group_persistent_opinion_index")
         );
+    }
+
+    #[test]
+    fn opinion_result_review_summary_accepts_metrics_visibility_without_source_ids() {
+        let result = normalize_parsed_tool_result(
+            "opinion_result_review_summary",
+            "reason",
+            "req-1",
+            &json!({
+                "success": true,
+                "visibility": "single_group_opinion_result_review_metrics"
+            }),
+        );
+
+        assert_eq!(result["grounding"]["status"], "grounded");
+        assert_eq!(
+            result["grounding"]["expected_visibility"].as_str(),
+            Some("single_group_opinion_result_review_metrics")
+        );
+        assert_eq!(result["grounding"]["source_ids_required"], false);
+    }
+
+    #[test]
+    fn opinion_result_review_samples_require_source_ids() {
+        let result = normalize_parsed_tool_result(
+            "opinion_result_reviews",
+            "reason",
+            "req-1",
+            &json!({
+                "success": true,
+                "visibility": "single_group_opinion_result_review_samples"
+            }),
+        );
+
+        assert_eq!(result["grounding"]["status"], "weak");
+        assert!(result["grounding"]["warnings"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("missing_source_ids")));
     }
 }
