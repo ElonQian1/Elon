@@ -18,6 +18,8 @@ param(
     [switch]$CheckFb2ApkVersion,
     [string]$MinFb2ApkVersion = "1.1.48",
     [string]$ExpectedFb2UpdateKind = "full_apk",
+    [switch]$CheckLocalVoiceSdkBuild,
+    [string]$VoiceSdkGradleTask = ":chat-voice-kit:assembleDebug",
     [switch]$CheckQuality,
     [switch]$RequireFeedbackCoverage,
     [string]$QualitySince = "",
@@ -457,6 +459,27 @@ if ($CheckFb2ApkVersion) {
         Assert-True (($contentType -like "*android.package-archive*") -or ($contentDisposition -like "*.apk*")) "fb2 APK download head" "contentType=$contentType disposition=$contentDisposition"
     } catch {
         Fail "fb2 APK release" $_.Exception.Message
+    }
+}
+
+if ($CheckLocalVoiceSdkBuild) {
+    Write-Output ""
+    Write-Output "== Local Android voice SDK build =="
+
+    $androidDir = Join-Path $PSScriptRoot "..\android"
+    $gradleBat = Join-Path $androidDir "gradlew.bat"
+    if (-not (Test-Path $gradleBat)) {
+        Fail "local voice SDK build" "gradlew.bat not found: $gradleBat"
+    } else {
+        Push-Location $androidDir
+        try {
+            & $gradleBat $VoiceSdkGradleTask --quiet
+            Assert-True ($LASTEXITCODE -eq 0) "local voice SDK build" $VoiceSdkGradleTask
+        } catch {
+            Fail "local voice SDK build" $_.Exception.Message
+        } finally {
+            Pop-Location
+        }
     }
 }
 

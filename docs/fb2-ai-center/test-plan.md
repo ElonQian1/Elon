@@ -35,6 +35,7 @@
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1` 通过，确认主项目健康、版本、实时 manifest 和主项目聊天自动工具覆盖。
 - 需要验证 authenticated `chat-bootstrap` 时，脚本支持直接传 `-MainToken`，也支持传 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN`，通过 fb2 `/api/main-project/session` 桥接主项目 token；这条路径无副作用，不会发送群消息。
 - 需要验证 fb2 用户端 APK 是否已发布到可下载版本时，加 `-CheckFb2ApkVersion`；脚本会检查 fb2 `/api/app-version` 至少达到 `1.1.48`、`update_kind=full_apk`、checksum/size 有效，并对 `apk_url` 做 HEAD 验证。
+- 需要把主项目 SDK 编译纳入同一次巡检时，加 `-CheckLocalVoiceSdkBuild`；脚本会执行 `android\gradlew.bat :chat-voice-kit:assembleDebug --quiet`。
 - `cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 通过，确认 fb2 可引用最新 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 设置 `FB2_AI_CENTER_TOKEN` 后，上述巡检脚本能验证 fb2 live Context Pack、比赛分析、群观点和赛后复盘摘要；加 `-IncludePlatformOrderSummary` 后验证平台匿名订单摘要。
 - 完整场景验收必须加 `-RequireAllScenarios`；此时脚本不仅要求参数存在，还会要求 Context Pack 有 `context_audit_id`、比赛/订单等数据数量达到门槛，并且关键场景有 `citation_sources`。
