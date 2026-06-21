@@ -3,7 +3,7 @@ use std::{
     path::Path,
 };
 
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use serde::Serialize;
 use serde_json::Value;
 

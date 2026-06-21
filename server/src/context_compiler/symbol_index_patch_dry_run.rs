@@ -9,10 +9,10 @@ use serde::Serialize;
 use sha2::{Digest, Sha256};
 
 use super::{
-    symbol_index_patch_check::{SymbolPatchDiffCheck, check_symbol_patch_diff},
+    symbol_index_patch_check::{check_symbol_patch_diff, SymbolPatchDiffCheck},
     symbol_index_patch_generation_types::SymbolPatchGeneration,
-    symbol_index_patch_repair::{PatchRepairContext, build_patch_repair_context},
-    symbol_index_patch_verification::{PatchVerificationPlan, build_patch_verification_plan},
+    symbol_index_patch_repair::{build_patch_repair_context, PatchRepairContext},
+    symbol_index_patch_verification::{build_patch_verification_plan, PatchVerificationPlan},
 };
 
 const COMMAND_OUTPUT_LIMIT: usize = 4_000;

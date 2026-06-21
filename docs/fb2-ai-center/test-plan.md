@@ -21,11 +21,12 @@
 - `context-contract.answer_policy_contract` 返回引用规则和固定评测问题。
 - `context-contract.context_readiness_contract` 返回 required fields、prompt metadata 和 blocked/degraded/ready 判定标准。
 - 群聊 AI prompt 包含 `<answer_rules>`，并由 `answer_policy_contract.prompt_answer_rules` 生成。
+- 群聊 AI prompt metadata 包含 `answer_policy`。
 - 群聊 AI 拉取 fb2 Context Pack 时，query 包含最后一次有效用户问题的 `topic_hint`。
 - 长按群消息 `AI回复` 拉取 fb2 Context Pack 时，query 包含被选中消息的 `topic_hint`。
 - 群聊总结帖拉取 fb2 Context Pack 时，query 包含由 `topic/title/instructions` 合成的 `topic_hint`。
 - 回退 `/api/main-project/context/today-matches` 时，query 仍包含 `group_id/topic_hint`。
-- 主项目拉取 fb2 上下文后，日志包含 `topic_hint_present`、`fallback_used`、`context_quality_warning_count`、`tool_readiness_status`。
+- 主项目拉取 fb2 上下文后，日志包含 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`。
 - 日志不得包含 shared secret、完整订单明细或用户问题原文。
 - 群聊 AI 拉取 fb2 Context Pack 失败时能回退，不影响普通群聊回答。
 

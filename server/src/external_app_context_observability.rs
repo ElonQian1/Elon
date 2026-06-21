@@ -51,6 +51,13 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                     "target": "大于 0 时 AI 回答必须说明对应数据缺口或新鲜度风险。"
                 },
                 {
+                    "name": "answer_policy_schema",
+                    "type": "string",
+                    "owner": "main_project",
+                    "meaning": "本次 prompt metadata 中使用的 AI 回答策略 schema。",
+                    "target": "fb2 应稳定为 fb2.answer_policy.v1。"
+                },
+                {
                     "name": "stale_source_count",
                     "type": "integer",
                     "owner": "fb2",
@@ -92,6 +99,7 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                 "context_chars",
                 "source_counts",
                 "fallback_used",
+                "answer_policy_schema",
                 "context_quality_warning_count",
                 "context_quality_warnings",
                 "tool_readiness_status",
@@ -160,6 +168,24 @@ mod tests {
             guidance["main_project_persistence"]["table"],
             "external_app_tool_executions"
         );
+        assert!(guidance["recommended_metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|metric| metric["name"] == "citation_coverage"));
+        assert!(guidance["recommended_metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|metric| metric["name"] == "topic_hint_present"));
+        assert!(guidance["recommended_log_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("answer_policy_schema")));
+        assert!(guidance["recommended_log_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("context_quality_warning_count")));
         assert!(guidance["privacy_rules"]
             .as_array()
             .unwrap()

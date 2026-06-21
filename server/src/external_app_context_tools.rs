@@ -29,7 +29,9 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
                 "user_orders",
                 "group_messages",
                 "tool_contract",
-                "usage_policy"
+                "usage_policy",
+                "answer_policy",
+                "metrics"
             ],
             "recommended_env": [
                 "ELON_EXTERNAL_APP_FB2_BASE_URL",
@@ -318,6 +320,10 @@ mod tests {
             .unwrap()
             .iter()
             .any(|tool| tool["name"] == "context_audit_summary"));
+        assert!(guidance["required_context_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("answer_policy")));
         assert!(public_tool_contract_guidance("unknown").is_none());
     }
 }

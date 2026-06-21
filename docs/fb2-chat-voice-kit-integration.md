@@ -4,6 +4,8 @@
 
 主项目提供 `android/chat-voice-kit` 作为可复用 Android Library，fb2 不需要复制主项目聊天页或语音实现。
 
+长期协作入口见 `docs/fb2-ai-center/README.md`。本文件保留语音 SDK 接入细节，路线图、交接、计费和整体验收统一维护在 `docs/fb2-ai-center/`。
+
 ## 接入方式
 
 fb2 Android 工程可以把主项目仓库作为 Git submodule、subtree，或在同一工作区中通过 Gradle `includeBuild`/`include` 引用 `android/chat-voice-kit`。

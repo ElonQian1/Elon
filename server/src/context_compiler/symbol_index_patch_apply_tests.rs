@@ -89,14 +89,12 @@ fn apply_workflow_commits_patch_on_isolated_branch_and_removes_worktree() {
     assert_eq!(result.branch_name.as_deref(), Some(branch.as_str()));
     assert!(result.commit_sha.is_some());
     assert!(result.run_workspace_removed);
-    assert!(
-        result
-            .rollback
-            .revert_commit_command
-            .as_deref()
-            .unwrap_or_default()
-            .contains("git -C")
-    );
+    assert!(result
+        .rollback
+        .revert_commit_command
+        .as_deref()
+        .unwrap_or_default()
+        .contains("git -C"));
     assert!(read_file(&workspace, "src/auth.rs").contains("status = 500"));
     assert_git_clean(&workspace);
 
@@ -118,12 +116,10 @@ fn rollback_reverse_patch_allows_dirty_uncommitted_apply() {
 
     let dry_run = rollback_symbol_patch(&workspace, Some(diff), None, false);
     assert_eq!(dry_run.status, PatchRollbackStatus::DryRunReady);
-    assert!(
-        dry_run
-            .reverse_check
-            .as_ref()
-            .is_some_and(|check| check.success)
-    );
+    assert!(dry_run
+        .reverse_check
+        .as_ref()
+        .is_some_and(|check| check.success));
 
     let rollback = rollback_symbol_patch(&workspace, Some(diff), None, true);
     assert_eq!(rollback.status, PatchRollbackStatus::ReversePatchApplied);

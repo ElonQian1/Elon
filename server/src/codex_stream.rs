@@ -1,4 +1,4 @@
-﻿//! Codex CLI `--json` 流式事件解析。
+//! Codex CLI `--json` 流式事件解析。
 //!
 //! 单一职责：把 codex CLI 输出的一行 JSON 翻译成 0~N 条 WebSocket 消息
 //! （`tool_call` / `tool_result` / `usage` / `progress`）。
@@ -36,7 +36,9 @@ pub(crate) fn stream_event_to_ws_messages(line: &str, model_used: Option<&str>) 
 
     match event_type {
         "item.started" => handle_item_started(&value, &mut out, push_progress),
-        "item.completed" => handle_item_completed(&value, &mut out, push_progress, model_used_owned.as_deref()),
+        "item.completed" => {
+            handle_item_completed(&value, &mut out, push_progress, model_used_owned.as_deref())
+        }
         // codex --json 在每次 turn 完成时会发出 token_count 事件，
         // 或在 turn.completed 里携带 usage 字段。两种格式都尝试解析。
         "token_count" | "turn.completed" => handle_usage_event(&value, &mut out),
@@ -109,8 +111,12 @@ where
     }
 }
 
-fn handle_item_completed<F>(value: &Value, out: &mut Vec<String>, push_progress: F, model_used: Option<&str>)
-where
+fn handle_item_completed<F>(
+    value: &Value,
+    out: &mut Vec<String>,
+    push_progress: F,
+    model_used: Option<&str>,
+) where
     F: Fn(&mut Vec<String>, String),
 {
     let Some(item) = value.get("item") else {

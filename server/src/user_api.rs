@@ -10,10 +10,10 @@
 ///   PUT /api/user/:user_id/agent   → 保存配置
 ///   POST /api/user/:user_id/agent/test → 测试自定义 API 模型连通性
 use axum::{
-    Json,
     extract::{Path, State},
-    http::{HeaderMap, StatusCode, header},
+    http::{header, HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::Deserialize;
 use std::sync::Arc;
@@ -21,8 +21,8 @@ use std::sync::Arc;
 use crate::project_auth::{auth_from_headers, json_error};
 use crate::types::{AiBackend, AiCliOption, AppState, UserAgentConfig};
 use crate::user_agent_probe::{
-    UserAgentProbeConfig, UserAgentProbeRequest, normalize_api_base,
-    probe_development_agent_capability, probe_openai_compatible_api, resolve_probe_config,
+    normalize_api_base, probe_development_agent_capability, probe_openai_compatible_api,
+    resolve_probe_config, UserAgentProbeConfig, UserAgentProbeRequest,
 };
 use crate::user_agent_readiness::build_user_agent_rag_readiness;
 use crate::user_agent_secrets::user_byok_api_enabled;
@@ -153,7 +153,11 @@ pub async fn set_user_agent(
     // 校验：如果指定了全局代理名，必须存在
     let use_agent = req.use_agent.and_then(|s| {
         let s = s.trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     });
     let api_base = match req.api_base.as_deref().map(str::trim) {
         Some(value) if value.is_empty() => None,
@@ -171,15 +175,27 @@ pub async fn set_user_agent(
     };
     let mut api_key = req.api_key.and_then(|s| {
         let s = s.trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     });
     let model = req.model.and_then(|s| {
         let s = s.trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     });
     let embedding_model = req.embedding_model.and_then(|s| {
         let s = s.trim().to_string();
-        if s.is_empty() { None } else { Some(s) }
+        if s.is_empty() {
+            None
+        } else {
+            Some(s)
+        }
     });
     let custom_api_requested =
         api_base.is_some() || api_key.is_some() || model.is_some() || embedding_model.is_some();
@@ -264,7 +280,11 @@ pub async fn set_user_agent(
         embedding_model,
         nickname: req.nickname.and_then(|s| {
             let s = s.trim().to_string();
-            if s.is_empty() { None } else { Some(s) }
+            if s.is_empty() {
+                None
+            } else {
+                Some(s)
+            }
         }),
         updated_at: Some(now),
         ..Default::default()
@@ -559,7 +579,7 @@ pub async fn get_user_avatar(
         None => ("image/png".to_string(), data_url.as_str()),
     };
 
-    use base64::{Engine, engine::general_purpose};
+    use base64::{engine::general_purpose, Engine};
     let bytes = match general_purpose::STANDARD.decode(b64.trim()) {
         Ok(b) => b,
         Err(_) => return json_error(StatusCode::BAD_REQUEST, "头像数据无效"),
@@ -668,10 +688,8 @@ mod tests {
             .find(|agent| agent["name"].as_str() == Some("copilot:gpt-4o"))
             .expect("copilot option should remain");
         assert_eq!(copilot["backend"].as_str(), Some("cli"));
-        assert!(
-            deduped
-                .iter()
-                .any(|agent| agent["name"].as_str() == Some("openai"))
-        );
+        assert!(deduped
+            .iter()
+            .any(|agent| agent["name"].as_str() == Some("openai")));
     }
 }

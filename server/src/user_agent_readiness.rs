@@ -130,7 +130,8 @@ pub(crate) fn build_user_agent_rag_readiness(
         label,
         detail,
         required_capability: "OpenAI tools/function calling",
-        embedding_model_format: "openai:<embedding-model> / remote:<embedding-model> / agent:<embedding-model>",
+        embedding_model_format:
+            "openai:<embedding-model> / remote:<embedding-model> / agent:<embedding-model>",
         tools: [
             "repo_context_status",
             "repo_symbol_search",

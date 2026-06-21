@@ -1,17 +1,17 @@
 use std::sync::Arc;
 
 use axum::{
-    Json,
     extract::{Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::Deserialize;
 
 use crate::{admin, types::AppState};
 
 use super::symbol_index_eval_compare::{
-    SymbolRetrievalRunCompareQuery, compare_latest_retrieval_runs,
+    compare_latest_retrieval_runs, SymbolRetrievalRunCompareQuery,
 };
 
 #[derive(Debug, Deserialize)]

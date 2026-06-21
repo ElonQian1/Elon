@@ -65,12 +65,10 @@ fn repair_generation_messages_include_repair_contract() {
     );
     let prompt = messages[1]["content"].as_str().unwrap();
 
-    assert!(
-        messages[0]["content"]
-            .as_str()
-            .unwrap()
-            .contains("unified diff")
-    );
+    assert!(messages[0]["content"]
+        .as_str()
+        .unwrap()
+        .contains("unified diff"));
     assert!(prompt.contains("Attempt: 1/2"));
     assert!(prompt.contains("src/auth.rs"));
     assert!(prompt.contains("Do not emit forbidden pattern"));

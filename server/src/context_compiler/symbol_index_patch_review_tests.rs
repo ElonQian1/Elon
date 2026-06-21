@@ -32,12 +32,10 @@ fn review_rejects_patch_that_violates_allowed_files() {
     let review = build_symbol_patch_review(&plan, &generation, diff, None);
 
     assert_eq!(review.decision, PatchReviewDecision::Reject);
-    assert!(
-        review
-            .findings
-            .iter()
-            .any(|finding| finding.severity == PatchReviewSeverity::Critical)
-    );
+    assert!(review
+        .findings
+        .iter()
+        .any(|finding| finding.severity == PatchReviewSeverity::Critical));
 }
 
 #[test]
@@ -58,12 +56,10 @@ fn review_requires_human_when_required_test_file_is_missing() {
     let review = build_symbol_patch_review(&plan, &generation, diff, None);
 
     assert_eq!(review.decision, PatchReviewDecision::NeedsHumanReview);
-    assert!(
-        review
-            .findings
-            .iter()
-            .any(|finding| finding.code == "required_file_missing")
-    );
+    assert!(review
+        .findings
+        .iter()
+        .any(|finding| finding.code == "required_file_missing"));
 }
 
 #[test]
@@ -92,12 +88,10 @@ diff --git a/tests/auth_login_test.rs b/tests/auth_login_test.rs
     assert_eq!(review.decision, PatchReviewDecision::ApproveWithNotes);
     assert_eq!(review.plan_compliance.required_files_missing.len(), 0);
     assert!(review.review_report_markdown.contains("<patch_review>"));
-    assert!(
-        review
-            .affected_symbols
-            .iter()
-            .any(|symbol| symbol == "auth")
-    );
+    assert!(review
+        .affected_symbols
+        .iter()
+        .any(|symbol| symbol == "auth"));
 }
 
 #[test]
@@ -115,12 +109,10 @@ fn review_requires_human_when_patch_adds_unsafe_code() {
     let review = build_symbol_patch_review(&plan, &generation, diff, None);
 
     assert_eq!(review.decision, PatchReviewDecision::NeedsHumanReview);
-    assert!(
-        review
-            .findings
-            .iter()
-            .any(|finding| finding.code == "unsafe_added")
-    );
+    assert!(review
+        .findings
+        .iter()
+        .any(|finding| finding.code == "unsafe_added"));
 }
 
 fn sample_plan(include_test: bool) -> SymbolPatchPlan {

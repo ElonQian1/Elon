@@ -8,19 +8,19 @@ use std::{
 use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_patch_check::PatchDiffCheckStatus,
-    symbol_index_patch_dry_run::{PatchApplyGateStatus, dry_run_symbol_patch},
+    symbol_index_patch_dry_run::{dry_run_symbol_patch, PatchApplyGateStatus},
     symbol_index_patch_repair_attempt::{
-        PatchRepairAttemptStatus, build_symbol_patch_repair_attempt_response,
+        build_symbol_patch_repair_attempt_response, PatchRepairAttemptStatus,
     },
     symbol_index_patch_verification::PatchVerificationStatus,
     symbol_index_patch_verification_repair::{
-        PatchVerificationCommandResultInput, PatchVerificationRepairStatus,
-        build_patch_verification_repair_context,
+        build_patch_verification_repair_context, PatchVerificationCommandResultInput,
+        PatchVerificationRepairStatus,
     },
     symbol_index_patch_verification_run::run_symbol_patch_verification,
     symbol_index_patch_verification_run_types::PatchVerificationExecutionStatus,
-    symbol_index_store::{SYMBOL_INDEX_DB_FILE, write_symbol_index_sqlite},
-    symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack},
+    symbol_index_store::{write_symbol_index_sqlite, SYMBOL_INDEX_DB_FILE},
+    symbol_index_task_pack::{build_latest_symbol_task_pack, SymbolTaskPackQuery},
 };
 
 #[test]
@@ -67,13 +67,11 @@ fn patch_dry_run_accepts_diff_that_git_can_apply() {
     assert!(dry_run.apply_check.success);
     assert_eq!(dry_run.apply_gate.status, PatchApplyGateStatus::Blocked);
     assert!(!dry_run.apply_gate.ready_to_apply);
-    assert!(
-        dry_run
-            .apply_gate
-            .blockers
-            .iter()
-            .any(|blocker| blocker == "workspace_not_clean")
-    );
+    assert!(dry_run
+        .apply_gate
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "workspace_not_clean"));
     assert_eq!(dry_run.repair_context.failure_kind, "workspace_not_clean");
     assert!(!dry_run.repair_context.model_repair_required);
     assert!(dry_run.repair_context.retry_prompt.is_none());
@@ -82,29 +80,23 @@ fn patch_dry_run_accepts_diff_that_git_can_apply() {
         PatchVerificationStatus::Blocked
     );
     assert!(!dry_run.verification_plan.ready_to_verify_after_apply);
-    assert!(
-        dry_run
-            .verification_plan
-            .blocked_reasons
-            .iter()
-            .any(|reason| reason == "workspace_not_clean")
-    );
-    assert!(
-        dry_run
-            .verification_plan
-            .commands
-            .iter()
-            .all(|command| !command.auto_runnable_after_apply)
-    );
+    assert!(dry_run
+        .verification_plan
+        .blocked_reasons
+        .iter()
+        .any(|reason| reason == "workspace_not_clean"));
+    assert!(dry_run
+        .verification_plan
+        .commands
+        .iter()
+        .all(|command| !command.auto_runnable_after_apply));
     assert_eq!(dry_run.apply_gate.patch_sha256.len(), 64);
-    assert!(
-        dry_run
-            .apply_check
-            .command
-            .as_deref()
-            .unwrap_or_default()
-            .contains("git -C")
-    );
+    assert!(dry_run
+        .apply_check
+        .command
+        .as_deref()
+        .unwrap_or_default()
+        .contains("git -C"));
     let patch_file = dry_run.apply_check.patch_file.as_deref().unwrap();
     assert!(
         !Path::new(patch_file).exists(),
@@ -151,13 +143,11 @@ fn patch_dry_run_reports_git_apply_check_failure_without_applying() {
     assert!(dry_run.apply_check.attempted);
     assert!(!dry_run.apply_check.success);
     assert!(!dry_run.apply_gate.ready_to_apply);
-    assert!(
-        dry_run
-            .apply_gate
-            .blockers
-            .iter()
-            .any(|blocker| blocker == "git_apply_check_failed")
-    );
+    assert!(dry_run
+        .apply_gate
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "git_apply_check_failed"));
     assert!(
         dry_run.apply_check.stderr.contains("patch failed")
             || dry_run.apply_check.stderr.contains("does not apply")
@@ -167,21 +157,17 @@ fn patch_dry_run_reports_git_apply_check_failure_without_applying() {
         "git_apply_check_failed"
     );
     assert!(dry_run.repair_context.model_repair_required);
-    assert!(
-        dry_run
-            .repair_context
-            .retry_prompt
-            .as_deref()
-            .unwrap_or_default()
-            .contains("<patch_repair_task>")
-    );
-    assert!(
-        dry_run
-            .repair_context
-            .repair_instructions
-            .iter()
-            .any(|instruction| instruction.contains("current workspace file contents"))
-    );
+    assert!(dry_run
+        .repair_context
+        .retry_prompt
+        .as_deref()
+        .unwrap_or_default()
+        .contains("<patch_repair_task>"));
+    assert!(dry_run
+        .repair_context
+        .repair_instructions
+        .iter()
+        .any(|instruction| instruction.contains("current workspace file contents")));
     assert!(actual.contains("let status = 500;"));
 
     fs::remove_dir_all(data_dir).unwrap();
@@ -223,32 +209,26 @@ fn patch_dry_run_does_not_run_git_when_contract_rejects_diff() {
     assert!(!dry_run.accepted_for_apply_check);
     assert!(!dry_run.apply_check.attempted);
     assert!(!dry_run.apply_gate.ready_to_apply);
-    assert!(
-        dry_run
-            .apply_gate
-            .blockers
-            .iter()
-            .any(|blocker| blocker == "diff_contract_not_accepted")
-    );
-    assert!(
-        dry_run
-            .contract_check
-            .violations
-            .iter()
-            .any(|violation| violation.code == "file_not_allowed")
-    );
+    assert!(dry_run
+        .apply_gate
+        .blockers
+        .iter()
+        .any(|blocker| blocker == "diff_contract_not_accepted"));
+    assert!(dry_run
+        .contract_check
+        .violations
+        .iter()
+        .any(|violation| violation.code == "file_not_allowed"));
     assert_eq!(
         dry_run.repair_context.failure_kind,
         "diff_contract_rejected"
     );
     assert!(dry_run.repair_context.model_repair_required);
-    assert!(
-        dry_run
-            .repair_context
-            .contract_violations
-            .iter()
-            .any(|violation| violation.code == "file_not_allowed")
-    );
+    assert!(dry_run
+        .repair_context
+        .contract_violations
+        .iter()
+        .any(|violation| violation.code == "file_not_allowed"));
 
     fs::remove_dir_all(data_dir).unwrap();
     fs::remove_dir_all(workspace).unwrap();
@@ -295,21 +275,17 @@ fn patch_dry_run_marks_clean_workspace_ready_for_apply() {
     assert!(dry_run.apply_gate.ready_to_apply);
     assert_eq!(dry_run.apply_gate.status, PatchApplyGateStatus::Ready);
     assert!(dry_run.apply_gate.blockers.is_empty());
-    assert!(
-        dry_run
-            .apply_gate
-            .safe_apply_command
-            .as_deref()
-            .unwrap_or_default()
-            .contains("git -C")
-    );
-    assert!(
-        dry_run
-            .apply_gate
-            .verification_commands
-            .iter()
-            .any(|command| command.contains("git status --short"))
-    );
+    assert!(dry_run
+        .apply_gate
+        .safe_apply_command
+        .as_deref()
+        .unwrap_or_default()
+        .contains("git -C"));
+    assert!(dry_run
+        .apply_gate
+        .verification_commands
+        .iter()
+        .any(|command| command.contains("git status --short")));
     assert_eq!(dry_run.repair_context.failure_kind, "none");
     assert!(!dry_run.repair_context.model_repair_required);
     assert!(dry_run.repair_context.retry_prompt.is_none());
@@ -331,13 +307,11 @@ fn patch_dry_run_marks_clean_workspace_ready_for_apply() {
     assert!(dry_run.verification_plan.commands.iter().any(
         |command| command.category == "test" && command.failure_kind == "targeted_tests_failed"
     ));
-    assert!(
-        dry_run
-            .verification_plan
-            .commands
-            .iter()
-            .any(|command| command.category == "diff_hygiene" && command.auto_runnable_after_apply)
-    );
+    assert!(dry_run
+        .verification_plan
+        .commands
+        .iter()
+        .any(|command| command.category == "diff_hygiene" && command.auto_runnable_after_apply));
     assert!(
         dry_run
             .verification_plan
@@ -389,26 +363,20 @@ fn verification_repair_context_prompts_for_failed_targeted_test() {
     );
     assert!(context.failed_commands[0].matched_plan);
     assert!(context.passed_commands.is_empty());
-    assert!(
-        context
-            .allowed_files
-            .iter()
-            .any(|file| file == "server/src/context_compiler/context_pack.rs")
-    );
-    assert!(
-        context
-            .retry_prompt
-            .as_deref()
-            .unwrap_or_default()
-            .contains("<patch_verification_repair_task>")
-    );
-    assert!(
-        context
-            .retry_prompt
-            .as_deref()
-            .unwrap_or_default()
-            .contains("targeted_tests_failed")
-    );
+    assert!(context
+        .allowed_files
+        .iter()
+        .any(|file| file == "server/src/context_compiler/context_pack.rs"));
+    assert!(context
+        .retry_prompt
+        .as_deref()
+        .unwrap_or_default()
+        .contains("<patch_verification_repair_task>"));
+    assert!(context
+        .retry_prompt
+        .as_deref()
+        .unwrap_or_default()
+        .contains("targeted_tests_failed"));
 
     fs::remove_dir_all(data_dir).unwrap();
     fs::remove_dir_all(workspace).unwrap();
@@ -515,21 +483,17 @@ fn verification_run_builds_repair_context_when_auto_command_fails() {
         PatchVerificationRepairStatus::ReadyForRepair
     );
     assert!(result.verification_repair_context.model_repair_required);
-    assert!(
-        result
-            .verification_repair_context
-            .failed_commands
-            .iter()
-            .any(|command| command.failure_kind == "targeted_tests_failed")
-    );
-    assert!(
-        result
-            .verification_repair_context
-            .retry_prompt
-            .as_deref()
-            .unwrap_or_default()
-            .contains("<patch_verification_repair_task>")
-    );
+    assert!(result
+        .verification_repair_context
+        .failed_commands
+        .iter()
+        .any(|command| command.failure_kind == "targeted_tests_failed"));
+    assert!(result
+        .verification_repair_context
+        .retry_prompt
+        .as_deref()
+        .unwrap_or_default()
+        .contains("<patch_verification_repair_task>"));
 
     fs::remove_dir_all(data_dir).unwrap();
     fs::remove_dir_all(workspace).unwrap();
@@ -632,13 +596,11 @@ fn repair_attempt_rejects_patch_outside_allowed_files() {
 
     assert_eq!(result.status, PatchRepairAttemptStatus::AttemptRejected);
     assert!(result.repaired_verification.is_none());
-    assert!(
-        result
-            .repair_diff_check
-            .violations
-            .iter()
-            .any(|violation| violation.code == "file_not_allowed")
-    );
+    assert!(result
+        .repair_diff_check
+        .violations
+        .iter()
+        .any(|violation| violation.code == "file_not_allowed"));
     assert_git_clean(&workspace);
 
     fs::remove_dir_all(data_dir).unwrap();

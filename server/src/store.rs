@@ -294,13 +294,11 @@ impl Store {
                     anyhow::bail!("该本地路径已绑定到项目「{}」，请直接打开该项目", display);
                 }
             }
-            if let Some(existing) =
-                project_identities::find_owner_project_by_identity(
-                    &conn,
-                    user_id,
-                    &identity_candidates,
-                )?
-            {
+            if let Some(existing) = project_identities::find_owner_project_by_identity(
+                &conn,
+                user_id,
+                &identity_candidates,
+            )? {
                 if existing.id != project_id {
                     return Err(project_identities::identity_conflict_error(&existing));
                 }
@@ -332,9 +330,11 @@ impl Store {
             });
         }
 
-        if let Some(project) =
-            project_identities::find_owner_project_by_identity(&conn, user_id, &identity_candidates)?
-        {
+        if let Some(project) = project_identities::find_owner_project_by_identity(
+            &conn,
+            user_id,
+            &identity_candidates,
+        )? {
             let project = update_external_project_binding(
                 &conn,
                 user_id,
@@ -481,13 +481,11 @@ impl Store {
             Ok::<(), anyhow::Error>(())
         };
         if let Err(err) = create_result {
-            if let Some(project) =
-                project_identities::find_owner_project_by_identity(
-                    &conn,
-                    user_id,
-                    &identity_candidates,
-                )?
-            {
+            if let Some(project) = project_identities::find_owner_project_by_identity(
+                &conn,
+                user_id,
+                &identity_candidates,
+            )? {
                 let project = update_external_project_binding(
                     &conn,
                     user_id,
@@ -1329,10 +1327,7 @@ mod tests {
             .iter()
             .find(|download| download["platform"] == "ios")
             .unwrap();
-        assert_eq!(
-            windows["url"],
-            "https://example.com/app.exe"
-        );
+        assert_eq!(windows["url"], "https://example.com/app.exe");
         assert!(ios.get("url").is_none());
 
         let loaded = store
@@ -1571,7 +1566,12 @@ mod tests {
     fn register_external_project_prefers_existing_path_over_same_name() {
         let store = temp_store();
         let user = store
-            .create_user("pc-project-path-priority@example.com", "secret1", None, None)
+            .create_user(
+                "pc-project-path-priority@example.com",
+                "secret1",
+                None,
+                None,
+            )
             .expect("user should be created");
         let project_a = store
             .register_external_project(

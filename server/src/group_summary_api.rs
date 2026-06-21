@@ -365,61 +365,63 @@ fn clean_optional(value: Option<String>) -> Option<String> {
 
 fn summary_topic_hint(input: &GroupSummaryCreateInput) -> Option<String> {
     let mut parts = Vec::new();
-    for value in [
-        input.topic.as_deref(),
-        input.title.as_deref(),
-        input.instructions.as_deref(),
-    ]
-    .into_iter()
-    .flatten()
-    {
-        let value = value.trim();
-        if !value.is_empty() && !parts.iter().any(|existing| *existing == value) {
-            parts.push(value);
-        }
-    }
-    if parts.is_empty() {
+    push_unique_hint(&mut parts, input.topic.as_deref());
+    push_unique_hint(&mut parts, input.title.as_deref());
+    push_unique_hint(&mut parts, input.instructions.as_deref());
+    let hint = parts.join("；");
+    if hint.is_empty() {
         None
     } else {
-        Some(parts.join(" / ").chars().take(500).collect())
+        Some(hint.chars().take(500).collect())
+    }
+}
+
+fn push_unique_hint(parts: &mut Vec<String>, value: Option<&str>) {
+    let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) else {
+        return;
+    };
+    if !parts.iter().any(|existing| existing == value) {
+        parts.push(value.to_string());
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::summary_topic_hint;
+    use crate::store::GroupSummaryCreateInput;
 
-    fn summary_input(
-        topic: Option<&str>,
-        title: Option<&str>,
-        instructions: Option<&str>,
-    ) -> GroupSummaryCreateInput {
-        GroupSummaryCreateInput {
-            title: title.map(ToOwned::to_owned),
-            topic: topic.map(ToOwned::to_owned),
-            instructions: instructions.map(ToOwned::to_owned),
+    #[test]
+    fn summary_topic_hint_prefers_topic_and_adds_instructions() {
+        let input = GroupSummaryCreateInput {
+            title: Some("今日比赛复盘".into()),
+            topic: Some("竞彩焦点".into()),
+            instructions: Some("重点看我的票和群友观点".into()),
             message_ids: Vec::new(),
             start_at: None,
             end_at: None,
             limit: 120,
             pin: false,
-        }
-    }
-
-    #[test]
-    fn summary_topic_hint_combines_topic_title_and_instructions() {
-        let input = summary_input(Some("竞彩"), Some("今晚比赛"), Some("重点看订单风险"));
+        };
 
         assert_eq!(
             summary_topic_hint(&input).as_deref(),
-            Some("竞彩 / 今晚比赛 / 重点看订单风险")
+            Some("竞彩焦点；今日比赛复盘；重点看我的票和群友观点")
         );
     }
 
     #[test]
-    fn summary_topic_hint_deduplicates_values() {
-        let input = summary_input(Some("竞彩"), Some("竞彩"), None);
+    fn summary_topic_hint_deduplicates_empty_values() {
+        let input = GroupSummaryCreateInput {
+            title: Some("今日比赛".into()),
+            topic: Some("今日比赛".into()),
+            instructions: Some(" ".into()),
+            message_ids: Vec::new(),
+            start_at: None,
+            end_at: None,
+            limit: 120,
+            pin: false,
+        };
 
-        assert_eq!(summary_topic_hint(&input).as_deref(), Some("竞彩"));
+        assert_eq!(summary_topic_hint(&input).as_deref(), Some("今日比赛"));
     }
 }

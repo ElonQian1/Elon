@@ -37,10 +37,7 @@ pub enum WsMessage {
     },
     /// 流式追加到已有气泡（需配合 AssistantMessage 的 stream_id 使用）。
     /// APK 找到对应 stream_id 的气泡并追加 text，实现打字机效果。
-    AssistantChunk {
-        stream_id: String,
-        text: String,
-    },
+    AssistantChunk { stream_id: String, text: String },
     /// AI 正在执行的工具
     ToolCall {
         tool: String,

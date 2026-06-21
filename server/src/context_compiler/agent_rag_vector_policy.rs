@@ -1,7 +1,7 @@
 use serde::Serialize;
 
 use super::{
-    symbol_index_retrieval_plan::{QueryIntent, build_retrieval_plan},
+    symbol_index_retrieval_plan::{build_retrieval_plan, QueryIntent},
     symbol_index_vector_types::LOCAL_HASH_VECTOR_MODEL,
 };
 

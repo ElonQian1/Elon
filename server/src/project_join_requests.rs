@@ -113,15 +113,17 @@ pub async fn list_join_requests(
     // 仅 owner/admin 可查看申请列表
     match state.store.get_project_access(&user.id, &project_id) {
         Ok(access) if can_manage_project_members(&access.role) => {}
-        Ok(_) => return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可管理加入申请"),
+        Ok(_) => {
+            return json_error(
+                StatusCode::FORBIDDEN,
+                "只有项目 owner 或管理员才可管理加入申请",
+            )
+        }
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
 
     let only_pending = q.pending_only.unwrap_or(true);
-    match state
-        .store
-        .list_join_requests(&project_id, only_pending)
-    {
+    match state.store.list_join_requests(&project_id, only_pending) {
         Ok(requests) => Json(serde_json::json!({
             "requests": requests,
             "total": requests.len(),
@@ -147,7 +149,12 @@ pub async fn review_join_request(
     // 仅 owner/admin 可审批
     match state.store.get_project_access(&user.id, &project_id) {
         Ok(access) if can_manage_project_members(&access.role) => {}
-        Ok(_) => return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可审批加入申请"),
+        Ok(_) => {
+            return json_error(
+                StatusCode::FORBIDDEN,
+                "只有项目 owner 或管理员才可审批加入申请",
+            )
+        }
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
 
@@ -194,10 +201,7 @@ pub async fn review_join_request(
 }
 
 /// GET /api/me/join-requests — 当前用户查看自己的申请
-pub async fn my_join_requests(
-    State(state): State<Arc<AppState>>,
-    headers: HeaderMap,
-) -> Response {
+pub async fn my_join_requests(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
     let user = match auth_from_headers(&state, &headers) {
         Ok(u) => u,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
@@ -240,7 +244,10 @@ pub async fn owned_projects_pending_counts(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    match state.store.list_owned_projects_with_pending_counts(&user.id) {
+    match state
+        .store
+        .list_owned_projects_with_pending_counts(&user.id)
+    {
         Ok(rows) => Json(serde_json::json!({ "projects": rows })).into_response(),
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }

@@ -1,4 +1,4 @@
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use super::{
     symbol_index_eval_compare::compare_retrieval_run_details,
@@ -126,12 +126,10 @@ fn compare_retrieval_runs_reports_case_regressions_and_improvements() {
         .find(|delta| delta.metric == "meanNoiseRateAtK")
         .unwrap();
     assert_eq!(noise_delta.status, "regressed");
-    assert!(
-        response
-            .recommendations
-            .iter()
-            .any(|item| item.contains("回归 case"))
-    );
+    assert!(response
+        .recommendations
+        .iter()
+        .any(|item| item.contains("回归 case")));
 }
 
 #[test]

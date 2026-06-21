@@ -51,6 +51,10 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         .get("usage_policy")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    let answer_policy = context
+        .get("answer_policy")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
     let context_quality = context
         .get("context_quality")
         .cloned()
@@ -74,6 +78,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
          <external_app_context source=\"{source}\" status=\"{status}\" generated_at=\"{generated_at}\">\n\
          <metadata>\n\
          usage_policy={}\n\
+         answer_policy={}\n\
          context_quality={}\n\
          context_budget={}\n\
          external_metrics={}\n\
@@ -84,6 +89,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
          {}\n\
          </external_app_context>",
         serde_json::to_string(&usage_policy).unwrap_or_else(|_| "{}".into()),
+        serde_json::to_string(&answer_policy).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&context_quality).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&budget).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&external_metrics).unwrap_or_else(|_| "{}".into()),
@@ -160,10 +166,13 @@ mod tests {
             "context_pack": "<fb2_context_pack>hello</fb2_context_pack>",
             "tool_contract": {"tools": [{"name": "get_match_detail"}]},
             "usage_policy": {"no_guaranteed_win": true},
+            "answer_policy": {"schema": "fb2.answer_policy.v1"},
             "context_audit_id": "audit-1",
             "metrics": {"budget_status": "ok"}
         }));
         assert!(block.contains("<fb2_context_pack>hello</fb2_context_pack>"));
+        assert!(block.contains("answer_policy="));
+        assert!(block.contains("fb2.answer_policy.v1"));
         assert!(block.contains("context_quality="));
         assert!(block.contains("external_metrics="));
         assert!(block.contains("context_audit_id=audit-1"));

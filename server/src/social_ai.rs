@@ -667,4 +667,17 @@ mod tests {
             Some("这句话是什么意思？")
         );
     }
+
+    #[test]
+    fn latest_request_user_text_removes_mention_for_topic_hint() {
+        let history = vec![SocialAiHistoryMessage {
+            speaker: "我".into(),
+            content: "@EL 帮我分析今天比赛和我的票".into(),
+            from_request_user: true,
+        }];
+        assert_eq!(
+            latest_request_user_text(&history).as_deref(),
+            Some("帮我分析今天比赛和我的票")
+        );
+    }
 }

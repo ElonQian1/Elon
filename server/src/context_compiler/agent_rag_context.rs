@@ -1,23 +1,23 @@
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{bail, Context, Result};
 use rusqlite::{Connection, OpenFlags};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::types::AgentConfig;
 
 use super::{
     agent_rag_project_docs::{load_agent_project_docs, prepend_project_docs_to_pack},
-    agent_rag_vector_policy::{AgentVectorPolicy, choose_agent_vector_policy},
+    agent_rag_vector_policy::{choose_agent_vector_policy, AgentVectorPolicy},
     symbol_index_embedding_provider::{
-        SymbolEmbeddingProviderContext, is_remote_embedding_model, resolve_embedding_provider,
+        is_remote_embedding_model, resolve_embedding_provider, SymbolEmbeddingProviderContext,
     },
-    symbol_index_embeddings::{SymbolEmbeddingStatus, load_latest_symbol_embedding_status},
+    symbol_index_embeddings::{load_latest_symbol_embedding_status, SymbolEmbeddingStatus},
     symbol_index_query::{
-        SymbolIndexSearch, find_symbol_index_db, load_metadata, search_latest_symbol_index,
+        find_symbol_index_db, load_metadata, search_latest_symbol_index, SymbolIndexSearch,
     },
-    symbol_index_task_pack::{SymbolTaskPackQuery, build_latest_symbol_task_pack_with_context},
-    symbol_index_vector::{SymbolVectorBackfill, backfill_latest_symbol_vectors_with_context},
+    symbol_index_task_pack::{build_latest_symbol_task_pack_with_context, SymbolTaskPackQuery},
+    symbol_index_vector::{backfill_latest_symbol_vectors_with_context, SymbolVectorBackfill},
     symbol_index_vector_types::{LOCAL_HASH_VECTOR_MODEL, SUPPORTED_EMBEDDING_MODELS},
 };
 

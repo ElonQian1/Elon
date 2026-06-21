@@ -251,6 +251,7 @@ fn ai_reply_contract() -> Value {
             ],
             "promptMetadata": [
                 "usage_policy",
+                "answer_policy",
                 "answer_rules",
                 "context_quality",
                 "context_budget",

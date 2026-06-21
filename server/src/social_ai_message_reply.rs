@@ -261,7 +261,7 @@ async fn build_selected_reply(
 
 fn selected_message_topic_hint(selected: &SocialAiHistoryMessage) -> Option<String> {
     let mut text = selected.content.replace('＠', "@");
-    for mention in ["@EL", "@El", "@el"] {
+    for mention in ["@EL", "@El", "@eL", "@el"] {
         text = text.replace(mention, "");
     }
     let text = text.trim();

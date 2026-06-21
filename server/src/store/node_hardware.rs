@@ -58,14 +58,15 @@ impl Store {
             return Ok(None);
         }
         let conn = self.conn()?;
-        Ok(conn.query_row(
-            "SELECT node_id, owner_user_id, device_name, hardware_json, created_at, updated_at
+        Ok(conn
+            .query_row(
+                "SELECT node_id, owner_user_id, device_name, hardware_json, created_at, updated_at
              FROM node_hardware_snapshots
              WHERE node_id = ?1",
-            params![node_id],
-            read_node_hardware_snapshot,
-        )
-        .optional()?)
+                params![node_id],
+                read_node_hardware_snapshot,
+            )
+            .optional()?)
     }
 }
 

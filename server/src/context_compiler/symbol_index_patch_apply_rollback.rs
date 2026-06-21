@@ -2,8 +2,8 @@ use std::{fs, path::Path, path::PathBuf};
 
 use super::{
     symbol_index_patch_apply_git::{
-        DEFAULT_TIMEOUT_SECS, dedupe, git_first_line, inspect_git_source, run_git, sha256_hex,
-        temp_patch_file,
+        dedupe, git_first_line, inspect_git_source, run_git, sha256_hex, temp_patch_file,
+        DEFAULT_TIMEOUT_SECS,
     },
     symbol_index_patch_apply_types::{PatchRollbackStatus, SymbolPatchRollbackResponse},
 };

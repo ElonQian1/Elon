@@ -231,11 +231,7 @@ async fn cleanup_pc_workspace(
 
     match state
         .agent_manager
-        .dispatch_project_workspace_cleanup(
-            node_id,
-            target.id.clone(),
-            workspace_path.to_string(),
-        )
+        .dispatch_project_workspace_cleanup(node_id, target.id.clone(), workspace_path.to_string())
         .await?
     {
         AgentToServer::ProjectWorkspaceCleaned {

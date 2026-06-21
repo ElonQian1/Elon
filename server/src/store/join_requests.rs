@@ -385,10 +385,8 @@ mod tests {
     use uuid::Uuid;
 
     fn temp_store() -> Store {
-        let path = std::env::temp_dir().join(format!(
-            "elon_join_request_{}.db",
-            Uuid::new_v4().simple()
-        ));
+        let path =
+            std::env::temp_dir().join(format!("elon_join_request_{}.db", Uuid::new_v4().simple()));
         Store::open(&path).expect("store should open")
     }
 

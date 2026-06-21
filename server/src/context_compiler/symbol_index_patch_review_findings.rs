@@ -2,9 +2,9 @@ use super::{
     symbol_index_patch_check::SymbolPatchDiffCheck,
     symbol_index_patch_review_analysis::{diff_added_line, diff_removed_line},
     symbol_index_patch_review_types::{
-        PatchReviewCategory, PatchReviewDecision, PatchReviewFinding, PatchReviewPlanCompliance,
-        PatchReviewScope, PatchReviewSeverity, PatchReviewTestAdequacy,
-        PatchReviewVerificationSummary, finding,
+        finding, PatchReviewCategory, PatchReviewDecision, PatchReviewFinding,
+        PatchReviewPlanCompliance, PatchReviewScope, PatchReviewSeverity, PatchReviewTestAdequacy,
+        PatchReviewVerificationSummary,
     },
     symbol_index_patch_verification_run_types::PatchVerificationExecutionStatus,
 };

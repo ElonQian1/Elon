@@ -71,7 +71,7 @@ GET /api/external/apps/fb2/context-contract
 - 给 fb2 代理读取 `context_readiness_contract`，用于自动判断本次 Context Pack 是 `blocked`、`degraded` 还是 `ready`。
 - 这个接口不返回密钥，不读取 fb2 业务数据。
 
-主项目实际拉取 fb2 上下文后，会把 `answer_policy_contract.prompt_answer_rules` 投影成 prompt 里的 `<answer_rules>`。fb2 不需要返回 `answer_policy`，但必须让 Context Pack 和工具结果满足这些回答边界。
+主项目实际拉取 fb2 上下文后，会把 `answer_policy_contract.prompt_answer_rules` 投影成 prompt 里的 `<answer_rules>`，也会给归一化结果补 `answer_policy` 并放进 prompt metadata。fb2 不返回 `answer_policy` 时，主项目使用默认策略，但 fb2 的 Context Pack 和工具结果必须能支撑这些回答边界。
 
 ## fb2 对主项目输出
 
@@ -126,7 +126,8 @@ fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如�
     "platform_order_summary": {},
     "metrics": {},
     "tool_contract": {},
-    "usage_policy": {}
+    "usage_policy": {},
+    "answer_policy": {}
   }
 }
 ```
@@ -139,6 +140,7 @@ fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如�
 - `metrics.budget_status` 不能是 `empty`。
 - 用户问订单剖析时，必须有当前用户可见的 `current_user_only` 订单来源。
 - 回答规则由主项目 `answer_policy_contract.prompt_answer_rules` 提供，fb2 的数据必须能支撑这些规则。
+- `answer_policy` 可由 fb2 返回，也可由主项目默认补齐。
 
 ### 2. Context Pack 内容边界
 
@@ -186,5 +188,5 @@ fb2 应该用 `topic_hint` 缩小比赛、订单、群观点召回范围；如�
 - 主项目优先拉 `/context/pack`，失败后回退 `/context/today-matches`。
 - 主项目会做 token budget 裁剪，不把无限大 JSON 塞进 prompt。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
-- 主项目日志只记录 `topic_hint_present`、`fallback_used`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
+- 主项目日志只记录 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
 - AI 回答必须区分事实、群友观点和推断；上下文不足时要明确说明。

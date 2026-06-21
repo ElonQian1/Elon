@@ -3,7 +3,7 @@ use std::path::Path;
 use serde::{Deserialize, Serialize};
 
 use super::{
-    symbol_index_patch_dry_run::{SymbolPatchDryRunResponse, dry_run_symbol_patch},
+    symbol_index_patch_dry_run::{dry_run_symbol_patch, SymbolPatchDryRunResponse},
     symbol_index_patch_generation_types::SymbolPatchGeneration,
     symbol_index_patch_verification::PatchVerificationCommand,
 };

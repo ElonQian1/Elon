@@ -47,6 +47,13 @@ pub(crate) fn public_answer_policy_guidance(app_id: &str) -> Option<Value> {
                 "不能承诺命中、诱导投注或代替用户决策。",
                 "不能暴露其他用户的订单明细。"
             ],
+            "prompt_answer_rules": FB2_ANSWER_RULES,
+            "preferred_answer_shape": [
+                "先给结论和风险等级。",
+                "再列数据依据：比赛、赔率、订单或群观点 source id。",
+                "再区分群友观点和 AI 推断。",
+                "最后给下一步建议：需要补查哪场比赛、哪个订单或哪些群观点。"
+            ],
             "canonical_eval_questions": [
                 "总结今天有哪些比赛值得讨论？",
                 "分析 match_id=m-001 这场，赔率变化说明什么？",
@@ -55,10 +62,28 @@ pub(crate) fn public_answer_policy_guidance(app_id: &str) -> Option<Value> {
                 "平台今天订单集中在哪些方向？只说匿名聚合。",
                 "你刚才依据了哪些比赛、订单和群消息？"
             ],
-            "prompt_answer_rules": FB2_ANSWER_RULES
+            "default_answer_policy": default_answer_policy()
         })),
         _ => None,
     }
+}
+
+pub(crate) fn default_answer_policy() -> Value {
+    json!({
+        "schema": "fb2.answer_policy.v1",
+        "must_distinguish": ["data_facts", "user_orders", "group_opinions", "ai_inference"],
+        "required_citations": ["match_id", "order_id", "ticket_id", "message_id", "context_audit_id"],
+        "risk_rules": {
+            "no_guaranteed_win": true,
+            "no_betting_inducement": true,
+            "explain_uncertainty": true
+        },
+        "permission_rules": {
+            "user_orders": "current_user_only",
+            "platform_orders": "anonymous_aggregate_only_by_default"
+        },
+        "prompt_answer_rules": FB2_ANSWER_RULES
+    })
 }
 
 pub(crate) fn prompt_answer_rules_block(_context: &Value) -> String {
@@ -92,6 +117,10 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("帮我看看我今天的票风险在哪里？")));
+        assert_eq!(
+            guidance["default_answer_policy"]["risk_rules"]["no_guaranteed_win"],
+            true
+        );
         assert!(public_answer_policy_guidance("unknown").is_none());
     }
 

@@ -7,7 +7,7 @@ use std::{
 };
 
 use super::{
-    symbol_index_patch_dry_run::{SymbolPatchDryRunResponse, dry_run_symbol_patch},
+    symbol_index_patch_dry_run::{dry_run_symbol_patch, SymbolPatchDryRunResponse},
     symbol_index_patch_generation_types::SymbolPatchGeneration,
     symbol_index_patch_verification::PatchVerificationCommand,
     symbol_index_patch_verification_repair::build_patch_verification_repair_context,

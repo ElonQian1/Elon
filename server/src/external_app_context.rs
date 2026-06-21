@@ -250,6 +250,7 @@ fn log_context_fetch(
         .as_str()
         .unwrap_or("unknown");
     let context_audit_id = context["context_audit_id"].as_str().unwrap_or("unknown");
+    let answer_policy_schema = context_answer_policy_schema(context);
     let context_quality_warning_count = context_quality_warning_count(context);
     let tool_readiness_status = context_tool_readiness_status(context);
     let user_order_context_present = context["user_orders"]
@@ -271,6 +272,7 @@ fn log_context_fetch(
         user_order_context_present,
         context_pack_version,
         context_audit_id,
+        answer_policy_schema,
         context_quality_warning_count,
         tool_readiness_status,
         context_chars,
@@ -298,14 +300,31 @@ fn context_tool_readiness_status(context: &Value) -> &str {
         .unwrap_or("unknown")
 }
 
+fn context_answer_policy_schema(context: &Value) -> &str {
+    context["answer_policy"]["schema"]
+        .as_str()
+        .unwrap_or("unknown")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
+    fn infers_fb2_lottery_type_from_topic_hint() {
+        assert_eq!(
+            infer_lottery_type(Some("今天竞彩怎么看")),
+            Some("JingCai".into())
+        );
+        assert_eq!(infer_lottery_type(Some("北单赛事")), Some("BeiDan".into()));
+        assert_eq!(infer_lottery_type(Some("足球比赛")), None);
+    }
+
+    #[test]
     fn context_log_helpers_extract_observability_fields() {
         let context = json!({
             "source": "fb2:/api/main-project/context/today-matches",
+            "answer_policy": {"schema": "fb2.answer_policy.v1"},
             "context_quality": {
                 "warnings": ["missing_context_pack", "missing_tool_contract"],
                 "tool_readiness": {"status": "partial"}
@@ -315,5 +334,9 @@ mod tests {
         assert!(context_fallback_used(&context));
         assert_eq!(context_quality_warning_count(&context), 2);
         assert_eq!(context_tool_readiness_status(&context), "partial");
+        assert_eq!(
+            context_answer_policy_schema(&context),
+            "fb2.answer_policy.v1"
+        );
     }
 }

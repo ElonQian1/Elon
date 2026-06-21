@@ -149,7 +149,13 @@ pub(crate) fn record_api_usage(
             idempotency_key: None,
         };
         if let Err(e) = store.record_token_usage(&record) {
-            tracing::warn!(user_id, feature, usage_mode, "BYOK token 用量记录失败: {}", e);
+            tracing::warn!(
+                user_id,
+                feature,
+                usage_mode,
+                "BYOK token 用量记录失败: {}",
+                e
+            );
         }
         return;
     }

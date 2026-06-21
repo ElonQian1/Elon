@@ -1,4 +1,4 @@
-use anyhow::{Result, bail};
+use anyhow::{bail, Result};
 use sha2::{Digest, Sha256};
 
 use super::{

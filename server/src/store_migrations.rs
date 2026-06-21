@@ -41,8 +41,16 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (19, "项目加入申请表（approval 审批流程）", migration_v19),
     (20, "PC 本地项目绑定节点 ID", migration_v20),
     (21, "分布式节点积分账本与节点凭证表", migration_v21),
-    (22, "conversations.locked_agent_name 会话首次 CLI 锁定", migration_v22),
-    (23, "node_credentials.device_name PC 设备展示名", migration_v23),
+    (
+        22,
+        "conversations.locked_agent_name 会话首次 CLI 锁定",
+        migration_v22,
+    ),
+    (
+        23,
+        "node_credentials.device_name PC 设备展示名",
+        migration_v23,
+    ),
     (24, "user_memories 记忆作用域", migration_v24),
     (25, "收紧一龙自项目默认成员与加入权限", migration_v25),
     (26, "指定钱一龙账号为一龙自项目管理员", migration_v26),
@@ -1419,7 +1427,12 @@ fn migration_v39(conn: &Connection) -> Result<()> {
         "version",
         "version INTEGER NOT NULL DEFAULT 1",
     )?;
-    add_column_if_missing(conn, "billing_events", "price_rule_id", "price_rule_id TEXT")?;
+    add_column_if_missing(
+        conn,
+        "billing_events",
+        "price_rule_id",
+        "price_rule_id TEXT",
+    )?;
     add_column_if_missing(
         conn,
         "billing_events",
@@ -1756,8 +1769,18 @@ fn migration_v47(conn: &Connection) -> Result<()> {
 
 fn migration_v48(conn: &Connection) -> Result<()> {
     add_column_if_missing(conn, "projects", "storage_node_id", "storage_node_id TEXT")?;
-    add_column_if_missing(conn, "projects", "storage_repo_path", "storage_repo_path TEXT")?;
-    add_column_if_missing(conn, "projects", "storage_repo_url", "storage_repo_url TEXT")?;
+    add_column_if_missing(
+        conn,
+        "projects",
+        "storage_repo_path",
+        "storage_repo_path TEXT",
+    )?;
+    add_column_if_missing(
+        conn,
+        "projects",
+        "storage_repo_url",
+        "storage_repo_url TEXT",
+    )?;
     add_column_if_missing(
         conn,
         "projects",

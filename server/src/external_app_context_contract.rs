@@ -3,7 +3,9 @@
 use serde_json::{json, Value};
 
 use crate::{
-    external_app_context_quality::context_quality, external_app_usage_policy::default_usage_policy,
+    external_app_context_answer_policy::default_answer_policy,
+    external_app_context_quality::context_quality,
+    external_app_usage_policy::default_usage_policy,
 };
 
 pub(crate) fn fb2_pack_context(app_id: &str, external_group_id: &str, data: Value) -> Value {
@@ -22,7 +24,8 @@ pub(crate) fn fb2_pack_context(app_id: &str, external_group_id: &str, data: Valu
         "platform_order_summary": data.get("platform_order_summary"),
         "metrics": data.get("metrics"),
         "tool_contract": data.get("tool_contract"),
-        "usage_policy": data.get("usage_policy").cloned().unwrap_or_else(default_usage_policy)
+        "usage_policy": data.get("usage_policy").cloned().unwrap_or_else(default_usage_policy),
+        "answer_policy": data.get("answer_policy").cloned().unwrap_or_else(default_answer_policy)
     });
     context["context_quality"] = context_quality(&context, true);
     context
@@ -41,7 +44,8 @@ pub(crate) fn fb2_match_context(app_id: &str, external_group_id: &str, data: Val
         "generated_at": data.get("generated_at"),
         "count": matches.len(),
         "matches": matches,
-        "usage_policy": default_usage_policy()
+        "usage_policy": default_usage_policy(),
+        "answer_policy": default_answer_policy()
     });
     context["context_quality"] = context_quality(&context, false);
     context
@@ -84,5 +88,26 @@ mod tests {
         assert_eq!(context["context_quality"]["schema"], "fb2.today_matches.v1");
         assert!(context["matches"][0].get("internal_field").is_none());
         assert_eq!(context["count"], 1);
+        assert_eq!(context["answer_policy"]["schema"], "fb2.answer_policy.v1");
+    }
+
+    #[test]
+    fn pack_context_promotes_budget_status_to_quality_warning() {
+        let context = fb2_pack_context(
+            "fb2",
+            "official",
+            json!({
+                "generated_at": "2026-06-20T16:00:00+08:00",
+                "context_pack_version": "fb2-chat-pack-v1",
+                "context_pack": "<fb2_context_pack>large</fb2_context_pack>",
+                "matches": [{"id": "m1"}],
+                "tool_contract": {"tools": [{"name": "get_match_detail"}]},
+                "metrics": {"budget_status": "too_large"}
+            }),
+        );
+
+        let warnings = context["context_quality"]["warnings"].as_array().unwrap();
+        assert!(warnings.contains(&json!("fb2_budget_too_large")));
+        assert_eq!(context["answer_policy"]["schema"], "fb2.answer_policy.v1");
     }
 }

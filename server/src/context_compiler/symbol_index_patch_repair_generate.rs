@@ -1,7 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 
 use crate::{
     agent_llm_call::call_chat_llm_with_options,
@@ -12,8 +12,8 @@ use super::{
     config::ContextCompilerConfig,
     symbol_index_patch_generation_types::SymbolPatchGeneration,
     symbol_index_patch_repair_attempt::{
-        PatchRepairAttemptStatus, SymbolPatchRepairAttemptResponse,
-        build_symbol_patch_repair_attempt_response,
+        build_symbol_patch_repair_attempt_response, PatchRepairAttemptStatus,
+        SymbolPatchRepairAttemptResponse,
     },
     symbol_index_patch_verification_run::run_symbol_patch_verification,
     symbol_index_patch_verification_run_types::SymbolPatchVerificationRunResponse,

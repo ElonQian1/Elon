@@ -307,7 +307,11 @@ impl UserAgentConfig {
 
 fn clean_optional(value: String) -> Option<String> {
     let value = value.trim().to_string();
-    if value.is_empty() { None } else { Some(value) }
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
 }
 
 #[cfg(test)]

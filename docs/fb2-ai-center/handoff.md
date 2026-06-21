@@ -16,11 +16,11 @@
 - `context-contract` 输出 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
 - `context-contract` 已输出 `answer_policy_contract`（`fb2.answer_policy.v1`），明确 AI 回答要区分数据事实、群友观点和 AI 推断，并带固定评测问题。
 - `context-contract` 已输出 `context_readiness_contract`，用于自动判断 fb2 Context Pack 是否足够支撑 AI 回答。
-- fb2 Context Pack 进入 prompt 后会附加 `<answer_rules>`，这些规则来自主项目 `answer_policy_contract.prompt_answer_rules`。
+- fb2 Context Pack 进入 prompt 后会附加 `<answer_rules>`，这些规则来自主项目 `answer_policy_contract.prompt_answer_rules`；归一化上下文也会带 `answer_policy` metadata。
 - 群聊 AI 拉取 fb2 Context Pack 时，会把最后一次有效 @EL 用户问题作为 `topic_hint` 传给 fb2。
 - 长按群消息点击 `AI回复` 时，主项目会把被选中消息作为 `topic_hint` 拉取 fb2 Context Pack。
 - 群聊总结帖会把 `topic/title/instructions` 合成 `topic_hint`；Context Pack 回退到 today-matches 时也会继续传 `group_id/topic_hint`。
-- 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
+- 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
 - `android/chat-voice-kit` 已输出 `VoiceComposerView`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
 

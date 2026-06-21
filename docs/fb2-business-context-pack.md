@@ -4,6 +4,8 @@
 
 fb2 是主项目的外部子项目。主项目负责 AI 调度、聊天体验、计费和 prompt 注入；fb2 负责提供可审计、可权限裁剪、可逐步索引的业务上下文。
 
+长期协作入口见 `docs/fb2-ai-center/README.md`。本文件保留 Context Pack 细节说明，路线图、交接、计费、语音 SDK 和验收计划统一维护在 `docs/fb2-ai-center/`。
+
 ## 协作结论
 
 第一阶段不做 MCP。先用服务令牌保护的 HTTP Context Pack，主项目把它转成 `external_app_context` 注入群聊 AI、选中消息 AI 回复和群聊总结帖。

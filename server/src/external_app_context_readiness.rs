@@ -21,10 +21,12 @@ pub(crate) fn public_context_readiness_guidance(app_id: &str) -> Option<Value> {
             "recommended_response_fields": [
                 "context_audit_id",
                 "platform_order_summary",
-                "usage_policy"
+                "usage_policy",
+                "answer_policy"
             ],
             "main_project_prompt_metadata": [
                 "usage_policy",
+                "answer_policy",
                 "answer_rules",
                 "context_quality",
                 "context_budget",
@@ -91,6 +93,12 @@ pub(crate) fn public_context_readiness_guidance(app_id: &str) -> Option<Value> {
                     "failure_warning": "missing_or_partial_tool_contract"
                 },
                 {
+                    "name": "answer_policy_available",
+                    "field": "answer_policy",
+                    "pass_when": "provided_by_fb2_or_defaulted_by_main_project",
+                    "failure_warning": "none"
+                },
+                {
                     "name": "answer_rules_available",
                     "field": "answer_policy_contract.prompt_answer_rules",
                     "pass_when": "provided_by_main_project_context_contract",
@@ -110,10 +118,10 @@ mod tests {
     fn exposes_public_context_readiness_guidance() {
         let guidance = public_context_readiness_guidance("fb2").unwrap();
         assert_eq!(guidance["schema"], "fb2.context_readiness.v1");
-        assert!(guidance["main_project_prompt_metadata"]
-            .as_array()
-            .unwrap()
-            .contains(&json!("answer_rules")));
+        let metadata = guidance["main_project_prompt_metadata"].as_array().unwrap();
+        assert!(metadata.contains(&json!("answer_policy")));
+        assert!(metadata.contains(&json!("answer_rules")));
+        assert!(metadata.contains(&json!("executed_external_app_tools")));
         assert!(guidance["automated_checks"]
             .as_array()
             .unwrap()

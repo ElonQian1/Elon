@@ -2,8 +2,8 @@ use std::{fs, path::Path};
 
 use super::{
     symbol_index_patch_apply_git::{
-        DEFAULT_TIMEOUT_SECS, cleanup_worktree, commit_message, default_branch_name,
-        git_first_line, normalize_branch_name, run_git, temp_patch_file, temp_run_dir,
+        cleanup_worktree, commit_message, default_branch_name, git_first_line,
+        normalize_branch_name, run_git, temp_patch_file, temp_run_dir, DEFAULT_TIMEOUT_SECS,
     },
     symbol_index_patch_apply_policy::{
         base_apply_response, block_apply, dry_run_next_steps, policy_block, policy_next_steps,
