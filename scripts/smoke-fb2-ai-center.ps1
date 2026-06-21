@@ -15,6 +15,9 @@ param(
     [switch]$IncludePlatformOrderSummary,
     [switch]$RequireFb2Live,
     [switch]$RequireAllScenarios,
+    [switch]$CheckFb2ApkVersion,
+    [string]$MinFb2ApkVersion = "1.1.48",
+    [string]$ExpectedFb2UpdateKind = "full_apk",
     [switch]$CheckQuality,
     [switch]$RequireFeedbackCoverage,
     [string]$QualitySince = "",
@@ -168,6 +171,34 @@ function Assert-ContainsValue {
         [string]$Name
     )
     Assert-True (@($Value) -contains $Expected) $Name $Expected
+}
+
+function Compare-VersionParts {
+    param(
+        [string]$Actual,
+        [string]$Minimum
+    )
+    $actualParts = @($Actual -split '[^0-9]+' | Where-Object { $_ -ne "" } | ForEach-Object { [int]$_ })
+    $minimumParts = @($Minimum -split '[^0-9]+' | Where-Object { $_ -ne "" } | ForEach-Object { [int]$_ })
+    $max = [Math]::Max($actualParts.Count, $minimumParts.Count)
+    for ($i = 0; $i -lt $max; $i += 1) {
+        $a = if ($i -lt $actualParts.Count) { $actualParts[$i] } else { 0 }
+        $m = if ($i -lt $minimumParts.Count) { $minimumParts[$i] } else { 0 }
+        if ($a -gt $m) { return 1 }
+        if ($a -lt $m) { return -1 }
+    }
+    return 0
+}
+
+function Resolve-AbsoluteUrl {
+    param([string]$Url)
+    if ($Url -match '^https?://') {
+        return $Url
+    }
+    if ($Url.StartsWith("/")) {
+        return "$Fb2Base$Url"
+    }
+    return "$Fb2Base/$Url"
 }
 
 function Find-EvalScenario {
@@ -403,6 +434,30 @@ try {
     Assert-ScenarioContains $auditScenario "forbidden_outputs" @("uncited_claim", "invented_source_id") "eval scenario source audit forbidden outputs"
 } catch {
     Fail "context-contract" $_.Exception.Message
+}
+
+if ($CheckFb2ApkVersion) {
+    Write-Output ""
+    Write-Output "== fb2 APK release =="
+
+    try {
+        $appVersion = Invoke-Json "$Fb2Base/api/app-version"
+        $versionText = [string]$appVersion.version
+        $apkUrl = Resolve-AbsoluteUrl ([string]$appVersion.apk_url)
+        Assert-True ([bool]$versionText) "fb2 APK version present" $versionText
+        Assert-True ((Compare-VersionParts $versionText $MinFb2ApkVersion) -ge 0) "fb2 APK minimum version" "version=$versionText min=$MinFb2ApkVersion"
+        Assert-True ([string]$appVersion.update_kind -eq $ExpectedFb2UpdateKind) "fb2 APK update kind" "$($appVersion.update_kind)"
+        Assert-True ([string]$appVersion.checksum -like "sha256:*") "fb2 APK checksum" "$($appVersion.checksum)"
+        Assert-True ([int64]$appVersion.size -gt 0) "fb2 APK size" "$($appVersion.size)"
+        Assert-True ([bool]$apkUrl) "fb2 APK url" $apkUrl
+
+        $head = Invoke-WebRequest -UseBasicParsing -Uri $apkUrl -Method Head -TimeoutSec $RequestTimeoutSec
+        $contentType = [string]$head.Headers["Content-Type"]
+        $contentDisposition = [string]$head.Headers["Content-Disposition"]
+        Assert-True (($contentType -like "*android.package-archive*") -or ($contentDisposition -like "*.apk*")) "fb2 APK download head" "contentType=$contentType disposition=$contentDisposition"
+    } catch {
+        Fail "fb2 APK release" $_.Exception.Message
+    }
 }
 
 if (-not $Fb2Token) {

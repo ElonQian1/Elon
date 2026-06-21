@@ -9,6 +9,7 @@
 - 2026-06-21 质量门槛补强：主项目 `scripts/smoke-fb2-ai-center.ps1` 新增 `-CheckQuality`、`-RequireFeedbackCoverage`、`-QualitySince/-QualityUntil`、`-MaxLargeContextPackRate`、`-MaxCitationUnmatchedRate`、`-MaxMissingContextRate`、`-MaxWrongContextRate`、`-MinFeedbackCount`、`-MinMatchedCitedSourceCount`。日常无副作用 smoke 仍默认轻量；携带 `FB2_AI_CENTER_TOKEN` 后可升级验证 fb2 `/context/quality-summary` 和 `/context/feedbacks`，把 missing/wrong context、引用未命中、大包率和反馈覆盖变成自动门槛。
 - 2026-06-21 完整场景 smoke 补强：`scripts/smoke-fb2-ai-center.ps1 -RequireAllScenarios` 现在会要求 Context Pack 有 `context_audit_id`，今日比赛/比赛分析/我的票等场景有实际数据数量，并要求关键场景存在 `citation_sources`，减少只检查字段存在导致的假通过。
 - 2026-06-21 chat-bootstrap 语音契约 smoke 补强：`scripts/smoke-fb2-ai-center.ps1` 现在可通过 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN` 无副作用桥接主项目 token，并在 authenticated `chat-bootstrap` 中自动检查 `VoiceComposerView`、`VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`、`SERVER_PROCESSING`、`AI_REPLY`、系统 ASR 本地优先、云端 ASR 兜底、ASR/TTS 免费和 AI 回复扣费门槛，防止 fb2 再退化成只接 ASR/TTS 能力。
+- 2026-06-21 fb2 APK 发布 smoke 补强：`scripts/smoke-fb2-ai-center.ps1 -CheckFb2ApkVersion` 会检查 fb2 `/api/app-version` 至少达到 `1.1.48`、`update_kind=full_apk`、checksum/size 有效，并 HEAD 实际 `apk_url` 确认为 APK 下载响应，用来防止只验证后端而漏掉用户端完整 APK 发布。
 - 2026-06-21 SDK 构建复核通过：`cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 成功，确认主项目当前 `android/chat-voice-kit` 可产出 debug AAR，fb2 可继续引用 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 真实群聊补充验证：账号 `123qwe` 已通过 fb2 外部应用会话绑定到主项目用户，群 `ext_fb2_official` 可发送可见 `@EL` 消息；实测 `Context Pack` 和 `match_analysis_brief` 已返回该用户本人订单，但 AI 回复曾被超时的补充 `search_user_orders` 结果干扰。
 - 主项目已修复提示和工具规划规则：Context Pack `user_orders` 与 `match_analysis_brief.data.user_orders` 都算当前用户订单来源；`search_user_orders unavailable` 只表示补充展开失败，不能否定已有本人订单事实。
@@ -107,6 +108,7 @@
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1`
   需要验证 live fb2 数据时先设置 `FB2_AI_CENTER_TOKEN`；需要验证平台摘要时加 `-IncludePlatformOrderSummary`；需要验证“我的票”时加 `-ExternalUserId <fb2_user_uuid>`。
 - 需要验证 authenticated `chat-bootstrap` 的语音 SDK 契约时，传 `-MainToken <token>`，或传 `-Fb2Username/-Fb2Password` 让脚本通过 fb2 session bridge 自动获取主项目 token；这条 smoke 不会写真实群聊。
+- 需要验证 fb2 用户端 APK 发布状态时加 `-CheckFb2ApkVersion`；默认最低版本为 `1.1.48`，可用 `-MinFb2ApkVersion` 临时提高门槛。
 - 需要验证长期质量门槛时加：
   `-CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339> -MaxLargeContextPackRate 0.75`
   该检查会读取 fb2 `/context/quality-summary` 和 `/context/feedbacks`，用于发现 missing/wrong context、引用未命中和 Context Pack 大包率退化。
