@@ -23,6 +23,7 @@ param(
     [double]$MaxCitationUnmatchedRate = 0,
     [double]$MaxMissingContextRate = 0,
     [double]$MaxWrongContextRate = 0,
+    [switch]$PreflightOnly,
     [switch]$AllowVisibleMessages
 )
 
@@ -212,7 +213,10 @@ function Find-FeedbackEvidence {
     return $items
 }
 
-if (-not $AllowVisibleMessages) {
+if ($PreflightOnly -and $AllowVisibleMessages) {
+    Fail-FinalAcceptance "Use either -PreflightOnly or -AllowVisibleMessages, not both."
+}
+if (-not $PreflightOnly -and -not $AllowVisibleMessages) {
     Fail-FinalAcceptance "Pass -AllowVisibleMessages after explicit authorization; this wrapper sends visible group messages."
 }
 if (-not $Fb2AiCenterToken) {
@@ -263,6 +267,63 @@ $mainStatus = ""
 try { $mainStatus = (& git -C $root status --short --branch) -join "`n" } catch { $mainStatus = "" }
 $mainVersion = Invoke-JsonOrNull "$MainBase/api/server/version"
 $fb2Version = Invoke-JsonOrNull "$Fb2Base/api/app-version"
+
+if ($PreflightOnly) {
+    $preflightArgs = [System.Collections.Generic.List[string]]::new()
+    [void]$preflightArgs.Add("-NoProfile")
+    [void]$preflightArgs.Add("-ExecutionPolicy")
+    [void]$preflightArgs.Add("Bypass")
+    [void]$preflightArgs.Add("-File")
+    [void]$preflightArgs.Add($centerScript)
+    Add-Arg $preflightArgs "-MainBase" $MainBase
+    Add-Arg $preflightArgs "-MainToken" $MainToken
+    Add-Arg $preflightArgs "-Fb2Base" $Fb2Base
+    Add-Arg $preflightArgs "-Fb2Token" $Fb2AiCenterToken
+    Add-Arg $preflightArgs "-Fb2UserToken" $Fb2UserToken
+    Add-Arg $preflightArgs "-Fb2Username" $Fb2Username
+    Add-Arg $preflightArgs "-Fb2Password" $Fb2Password
+    Add-Arg $preflightArgs "-GroupId" $GroupId
+    Add-Arg $preflightArgs "-ExternalUserId" $ExternalUserId
+    Add-Arg $preflightArgs "-RequestTimeoutSec" $RequestTimeoutSec
+    Add-Arg $preflightArgs "-VoiceDeviceEvidencePath" $VoiceDeviceEvidencePath
+    Add-SwitchArg $preflightArgs "-RequireVoiceDeviceEvidence" $true
+
+    $preflightLogPath = Join-Path $summaryDir "final-acceptance-$stamp-preflight.log"
+    $preflightResult = Invoke-SmokeScript "final preflight without visible messages" $preflightArgs $preflightLogPath
+    $completedAt = (Get-Date).ToUniversalTime().ToString("o")
+    $summary = [ordered]@{
+        schema = "fb2.main_project.final_acceptance.v1"
+        mode = "preflight_only"
+        started_at = $startedAt
+        completed_at = $completedAt
+        quality_since = $qualitySince
+        main_base = $MainBase
+        fb2_base = $Fb2Base
+        group_id = $GroupId
+        external_user_id = $ExternalUserId
+        voice_device_evidence_path = $VoiceDeviceEvidencePath
+        main_project_head = $mainHead
+        main_project_status = $mainStatus
+        main_server_version = $mainVersion
+        fb2_app_version = $fb2Version
+        preflight_exit_code = $preflightResult.exit_code
+        preflight_log_path = $preflightResult.log_path
+        success = ($preflightResult.exit_code -eq 0)
+    }
+
+    $summaryJson = $summary | ConvertTo-Json -Depth 8
+    Set-Content -Path $SummaryPath -Value $summaryJson -Encoding UTF8
+
+    Write-Output ""
+    Write-Output "== final acceptance summary =="
+    Write-Output $summaryJson
+    Write-Output "summary_path=$SummaryPath"
+
+    if (-not $summary.success) {
+        exit 1
+    }
+    exit 0
+}
 
 $visibleArgs = [System.Collections.Generic.List[string]]::new()
 [void]$visibleArgs.Add("-NoProfile")
@@ -321,6 +382,7 @@ $completedAt = (Get-Date).ToUniversalTime().ToString("o")
 $feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"
+    mode = "visible_final_acceptance"
     started_at = $startedAt
     completed_at = $completedAt
     quality_since = $qualitySince
