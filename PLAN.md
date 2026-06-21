@@ -12,6 +12,7 @@
 4. 显式运行路线：PC AI 开发栏提供 Auto / Route A / Route B / Route C 选择，并把选择传到后端执行链路。
 5. 结构化工具协议：Route B/C 的 `run_command` 优先使用 `program + args`，保留旧 `command` 兼容。
 6. 发布闭环：提交到 `origin/main`，发布服务器和 Windows 节点包，验证线上版本和本机安装态。
+7. 本机管理安全：7799 本地管理/电脑医生写接口要求启动期随机 token 和 trusted origin 校验，前端自动刷新并携带授权头。
 
 ## 风险
 
@@ -20,6 +21,7 @@
 - 服务器运行时代码变更需要服务器发布；PC 前端或节点行为变更还需要刷新 Windows 客户端包。
 - 并行任务可能继续推进 `origin/main`，发布时必须以最新主线为准。
 - Route B/C 仍不是完整 OS 沙箱；本阶段只减少 shell 注入和命令解析歧义，不把 B/C 扩展成通用 PowerShell。
+- 本机 `/api/status` 会把启动期随机 token 暴露给允许来源的 PC 工作台，能防普通跨站请求和误触发；若可信 PC 网页自身出现 XSS，仍需要后续补本机确认弹窗/原生授权页进一步收紧。
 
 ## 验证命令
 
@@ -30,6 +32,7 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`
 - `cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`
 - `git diff --check`
 - `cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`

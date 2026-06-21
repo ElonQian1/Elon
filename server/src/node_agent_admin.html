@@ -237,13 +237,51 @@ function pcWorkspaceUrl(r) {
   const adminUrl = location.origin + '/';
   return base + '/pc?node_admin=' + encodeURIComponent(adminUrl);
 }
+const LOCAL_ADMIN_HEADER_FALLBACK = 'X-Elon-Local-Admin-Token';
+let localAdminToken = '';
+let localAdminTokenHeader = LOCAL_ADMIN_HEADER_FALLBACK;
+function rememberLocalAdmin(data) {
+  if (data && data.local_admin_token) localAdminToken = String(data.local_admin_token);
+  if (data && data.local_admin_token_header) localAdminTokenHeader = String(data.local_admin_token_header);
+}
+function localNeedsAdmin(path) {
+  return String(path || '').replace(/^\/+/, '') !== 'api/status';
+}
+async function refreshLocalAdminToken() {
+  const resp = await fetch('/api/status', { cache: 'no-store' });
+  const data = await resp.json().catch(() => ({}));
+  if (resp.ok) rememberLocalAdmin(data);
+  return data;
+}
+async function localFetch(path, options) {
+  const opts = Object.assign({ cache: 'no-store' }, options || {});
+  const needsAdmin = localNeedsAdmin(path);
+  if (needsAdmin && !localAdminToken) await refreshLocalAdminToken();
+  const headers = Object.assign({}, opts.headers || {});
+  if (opts.body && !Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
+    headers['Content-Type'] = 'application/json';
+  }
+  if (needsAdmin && localAdminToken) headers[localAdminTokenHeader || LOCAL_ADMIN_HEADER_FALLBACK] = localAdminToken;
+  opts.headers = headers;
+  let resp = await fetch(path, opts);
+  if (needsAdmin && resp.status === 403) {
+    localAdminToken = '';
+    await refreshLocalAdminToken();
+    opts.headers[localAdminTokenHeader || LOCAL_ADMIN_HEADER_FALLBACK] = localAdminToken;
+    resp = await fetch(path, opts);
+  }
+  if (!needsAdmin && resp.ok) {
+    resp.clone().json().then(rememberLocalAdmin).catch(() => {});
+  }
+  return resp;
+}
 function updatePcDoctorLink(url) {
   const link = document.getElementById('pcDoctorLink');
   if (link) link.href = url;
 }
 async function load() {
   if (window.__elonDup) return;
-  const r = await fetch('/api/status').then(r => r.json()).catch(() => null);
+  const r = await localFetch('/api/status').then(r => r.json()).catch(() => null);
   if (!r) { document.getElementById('connStatus').textContent = '加载失败'; return; }
   const pcUrl = pcWorkspaceUrl(r);
   updatePcDoctorLink(pcUrl);
@@ -305,7 +343,7 @@ async function postLogin(payload, btn, out) {
   out.innerHTML = '';
   if (btn) { btn.disabled = true; btn.dataset.t = btn.textContent; btn.textContent = '登录中…'; }
   try {
-    const resp = await fetch('/api/login', {
+    const resp = await localFetch('/api/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -340,13 +378,13 @@ function doLoginToken() {
 }
 
 async function doLogout() {
-  await fetch('/api/logout', { method: 'POST' }).catch(() => {});
+  await localFetch('/api/logout', { method: 'POST' }).catch(() => {});
   setTimeout(load, 300);
 }
 
 // ── 项目硬盘服务配置 ───────────────────────────────────────────────────────
 async function loadStorageConfig() {
-  const r = await fetch('/api/storage-config').then(r => r.json()).catch(() => null);
+  const r = await localFetch('/api/storage-config').then(r => r.json()).catch(() => null);
   if (!r) return;
   const enabled = document.getElementById('storageEnabledInput');
   const root = document.getElementById('storageRootInput');
@@ -373,7 +411,7 @@ async function saveStorageConfig() {
   out.innerHTML = '';
   btn.disabled = true; btn.textContent = '保存中…';
   try {
-    const resp = await fetch('/api/storage-config', {
+    const resp = await localFetch('/api/storage-config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -401,7 +439,7 @@ async function saveStorageConfig() {
 
 // ── AI 编码工具环境检查 ─────────────────────────────────────────────────────
 async function loadEnvCheck() {
-  const r = await fetch('/api/env-check').then(r => r.json()).catch(() => null);
+  const r = await localFetch('/api/env-check').then(r => r.json()).catch(() => null);
   const grid = document.getElementById('envCheckGrid');
   if (!grid) return;
   if (!r) {
@@ -434,7 +472,7 @@ async function installEnv(btn) {
   const out = document.getElementById('installResult');
   out.innerHTML = '';
   try {
-    const resp = await fetch('/api/install-env', { method: 'POST' });
+    const resp = await localFetch('/api/install-env', { method: 'POST' });
     const j = await resp.json();
     if (j.ok) {
       out.innerHTML = `<div class="ok-toast" style="margin-top:8px">✅ ${j.msg}</div>`;
@@ -457,7 +495,7 @@ async function saveApiKey() {
   out.innerHTML = '';
   if (!key) { out.innerHTML = '<div class="err-toast" style="margin-top:8px">请输入 API Key</div>'; return; }
   try {
-    const resp = await fetch('/api/save-openai-key', {
+    const resp = await localFetch('/api/save-openai-key', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ api_key: key }),

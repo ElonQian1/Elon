@@ -195,9 +195,24 @@ function testDevComposerForcedRoutePreference() {
   assert.strictEqual(composer.selectedRouteForRequest(), 'route_c', 'forced route should be sent to backend');
 }
 
+function testLocalAdminTokenWiring() {
+  const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
+  assert.ok(pcApp.includes('X-Elon-Local-Admin-Token'), 'PC app should send local admin token header');
+  assert.ok(pcApp.includes('refreshLocalAdminToken'), 'PC app should refresh the local admin token');
+  assert.ok(pcApp.includes('resp.status === 403'), 'PC app should retry once after a stale local token');
+
+  const nodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_admin.html'), 'utf8');
+  assert.ok(nodeAdmin.includes('X-Elon-Local-Admin-Token'), 'standalone node admin page should send local admin token header');
+  assert.ok(nodeAdmin.includes('localFetch'), 'standalone node admin page should route API calls through localFetch');
+
+  const doctor = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_doctor.js'), 'utf8');
+  assert.ok(doctor.includes('localNodeApi(path, options || {})'), 'doctor project should reuse the protected local node API');
+}
+
 testDevTasksContinueAction();
 testProjectReadinessChecklist();
 testDevComposerRouteLabels();
 testDevComposerForcedRoutePreference();
+testLocalAdminTokenWiring();
 
 console.log('pc-dev-assets tests passed');

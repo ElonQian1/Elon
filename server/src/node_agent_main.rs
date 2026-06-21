@@ -30,7 +30,7 @@
 //! 4. 断线后自动重连（指数退避 2s ~ 60s）；未登录时等待网页登录
 
 use anyhow::{anyhow, Result};
-use axum::http::{header::CONTENT_TYPE, HeaderValue, Method};
+use axum::http::{header::CONTENT_TYPE, HeaderName, Method};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{
     AgentToServer, CliWorkspaceStatus, ModelCapability, NodeHardwareProfile, ServerToAgent,
@@ -47,6 +47,7 @@ use tracing::{info, warn};
 
 mod cli_usage;
 mod node_agent_admin_open;
+mod node_agent_local_admin;
 mod node_agent_project_picker;
 mod node_agent_proxy;
 mod node_agent_server_runtime;
@@ -2119,6 +2120,8 @@ pub(crate) struct NodeRuntime {
     active_cli_prompts: RwLock<HashMap<String, watch::Sender<bool>>>,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
+    /// 本机 7799 管理 API 的启动期随机授权 token，只通过本机 /api/status 暴露给 PC 工作台。
+    local_admin_token: String,
 }
 
 impl NodeRuntime {
@@ -2142,6 +2145,7 @@ impl NodeRuntime {
             storage_settings: RwLock::new(storage_settings),
             active_cli_prompts: RwLock::new(HashMap::new()),
             wake: Notify::new(),
+            local_admin_token: node_agent_local_admin::generate_local_admin_token(),
         }
     }
 
@@ -2151,6 +2155,10 @@ impl NodeRuntime {
 
     pub(crate) fn cloud_http_url(&self) -> String {
         self.cfg.cloud_http_url.clone()
+    }
+
+    pub(crate) fn local_admin_token(&self) -> &str {
+        &self.local_admin_token
     }
 
     pub(crate) async fn user_token(&self) -> Option<String> {
@@ -2232,9 +2240,11 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
     let addr: std::net::SocketAddr = ([127, 0, 0, 1], port).into();
     tokio::spawn(async move {
         let cors = local_admin_cors(&runtime.cfg.cloud_http_url);
-        let app = axum::Router::new()
-            .route("/", axum::routing::get(admin_index))
-            .route("/api/status", axum::routing::get(admin_status))
+        let local_admin_guard = axum::middleware::from_fn_with_state(
+            runtime.clone(),
+            node_agent_local_admin::require_local_admin,
+        );
+        let protected_routes = axum::Router::new()
             .route("/api/env-check", axum::routing::get(admin_env_check))
             .route("/api/install-env", axum::routing::post(admin_install_env))
             .route(
@@ -2286,15 +2296,20 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/storage-config",
                 axum::routing::get(admin_storage_config_get).post(admin_storage_config_set),
             )
-            .route(
-                "/storage/git/:token/*path",
-                axum::routing::any(admin_storage_git_http),
-            )
             .route("/api/tts-status", axum::routing::get(admin_tts_status))
             .route(
                 "/api/tts-relay-config",
                 axum::routing::get(admin_tts_relay_get).post(admin_tts_relay_set),
             )
+            .route_layer(local_admin_guard);
+        let app = axum::Router::new()
+            .route("/", axum::routing::get(admin_index))
+            .route("/api/status", axum::routing::get(admin_status))
+            .route(
+                "/storage/git/:token/*path",
+                axum::routing::any(admin_storage_git_http),
+            )
+            .merge(protected_routes)
             .with_state(runtime)
             .layer(cors);
         match tokio::net::TcpListener::bind(addr).await {
@@ -2310,33 +2325,15 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
 }
 
 fn local_admin_cors(cloud_http_url: &str) -> CorsLayer {
-    let mut origins = vec![
-        "http://43.139.149.158:8080".to_string(),
-        "http://127.0.0.1:8080".to_string(),
-        "http://localhost:8080".to_string(),
-        "http://127.0.0.1:3000".to_string(),
-        "http://localhost:3000".to_string(),
-    ];
-    if let Some(origin) = origin_from_url(cloud_http_url) {
-        if !origins.iter().any(|item| item == &origin) {
-            origins.push(origin);
-        }
-    }
-    let origins = origins
-        .into_iter()
-        .filter_map(|origin| HeaderValue::from_str(&origin).ok())
-        .collect::<Vec<_>>();
+    let origins = node_agent_local_admin::trusted_origin_header_values(cloud_http_url);
 
     CorsLayer::new()
         .allow_origin(AllowOrigin::list(origins))
-        .allow_methods([Method::GET, Method::POST, Method::OPTIONS])
-        .allow_headers([CONTENT_TYPE])
-}
-
-fn origin_from_url(raw: &str) -> Option<String> {
-    let url = reqwest::Url::parse(raw.trim()).ok()?;
-    let origin = url.origin().ascii_serialization();
-    (origin != "null").then_some(origin)
+        .allow_methods([Method::GET, Method::POST, Method::DELETE, Method::OPTIONS])
+        .allow_headers([
+            CONTENT_TYPE,
+            HeaderName::from_static(node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER),
+        ])
 }
 
 /// GET /api/tts-relay-config — 返回当前 TTS Worker URL 配置
@@ -2489,6 +2486,8 @@ async fn admin_status(
     let storage = pc_storage_repo::storage_profile(&storage_settings);
     axum::Json(serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
+        "local_admin_token": rt.local_admin_token(),
+        "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
         "logged_in": creds.is_some(),
         "agent_id": creds.as_ref().map(|c| c.agent_id.clone()),
         "device_name": machine_label(),

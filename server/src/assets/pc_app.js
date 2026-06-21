@@ -4,6 +4,7 @@
   const markdown = window.ElonPcMarkdown || {};
   const TOKEN_KEYS = kit.TOKEN_KEYS || ['lodex_token', 'elon_token'];
   const SOCIAL_AI_USER_ID = 'usr_elon_ai';
+  const LOCAL_ADMIN_HEADER_FALLBACK = 'X-Elon-Local-Admin-Token';
   const $ = (id) => document.getElementById(id);
   const state = {
     token: readToken(), user: null, projects: [], friends: [], groups: [], nodes: [],
@@ -11,7 +12,9 @@
     activeVoiceChannel: 'studio',
     activePeer: null, projectSpace: null,
     plaza: { loaded: false, loading: false, projects: [], query: '', filterKey: 'all', busyId: '', error: '' },
-    nodeAdminUrl: safeNodeAdminUrl()
+    nodeAdminUrl: safeNodeAdminUrl(),
+    localAdminToken: '',
+    localAdminTokenHeader: LOCAL_ADMIN_HEADER_FALLBACK
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
   const PLAZA_FILTERS = [
@@ -65,7 +68,7 @@
   let devTaskRefreshTimer = 0;
   const doctor = window.ElonPcDoctor.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
-    setRails, renderChannels, setDoctorMode
+    setRails, renderChannels, setDoctorMode, localNodeApi
   });
   const node = window.ElonPcNode.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
@@ -132,20 +135,63 @@
 
   async function localNodeApi(path, options) {
     const request = Object.assign({}, options || {});
-    if (request.body && !request.headers) {
-      request.headers = { 'Content-Type': 'application/json' };
+    const needsAdmin = localNodeNeedsAdmin(path);
+    if (needsAdmin && !state.localAdminToken) await refreshLocalAdminToken();
+    localNodeApplyHeaders(request, needsAdmin);
+    let resp = await localNodeFetch(path, request);
+    if (needsAdmin && resp.status === 403) {
+      state.localAdminToken = '';
+      await refreshLocalAdminToken();
+      localNodeApplyHeaders(request, needsAdmin);
+      resp = await localNodeFetch(path, request);
     }
-    let resp;
+    const text = await resp.text();
+    const data = text ? JSON.parse(text) : {};
+    rememberLocalAdmin(data);
+    if (!resp.ok || data.ok === false) {
+      throw new Error(data.error || data.message || resp.statusText);
+    }
+    return data;
+  }
+
+  async function localNodeFetch(path, request) {
     try {
-      resp = await fetch(nodeAdminEndpoint(path), request);
+      return await fetch(nodeAdminEndpoint(path), request);
     } catch (error) {
       throw new Error(`无法连接本机 PC 节点 ${state.nodeAdminUrl}，请确认一龙 PC 节点正在运行并已更新。`);
     }
+  }
+
+  function localNodeNeedsAdmin(path) {
+    return String(path || '').replace(/^\/+/, '') !== 'api/status';
+  }
+
+  function localNodeApplyHeaders(request, needsAdmin) {
+    const headers = Object.assign({}, request.headers || {});
+    if (request.body && !Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
+      headers['Content-Type'] = 'application/json';
+    }
+    if (needsAdmin && state.localAdminToken) {
+      headers[state.localAdminTokenHeader || LOCAL_ADMIN_HEADER_FALLBACK] = state.localAdminToken;
+    }
+    request.headers = headers;
+  }
+
+  function rememberLocalAdmin(data) {
+    const token = clean(data && data.local_admin_token);
+    const header = clean(data && data.local_admin_token_header);
+    if (token) state.localAdminToken = token;
+    if (header) state.localAdminTokenHeader = header;
+  }
+
+  async function refreshLocalAdminToken() {
+    const resp = await localNodeFetch('/api/status', { cache: 'no-store' });
     const text = await resp.text();
     const data = text ? JSON.parse(text) : {};
     if (!resp.ok || data.ok === false) {
       throw new Error(data.error || data.message || resp.statusText);
     }
+    rememberLocalAdmin(data);
     return data;
   }
 

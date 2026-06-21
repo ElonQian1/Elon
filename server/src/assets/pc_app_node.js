@@ -2,6 +2,7 @@
   const DOWNLOAD_URL = '/api/node-agent/download/windows-client';
   const VERSION_URL = '/api/node-agent/version';
   const LAUNCH_URL = 'elon-node://open';
+  const LOCAL_ADMIN_HEADER_FALLBACK = 'X-Elon-Local-Admin-Token';
 
   function createNodeController(deps) {
     const { state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer, setRails, setNodeMode } = deps;
@@ -190,6 +191,7 @@
           window.clearInterval(state.nodePollTimer);
           state.nodePollTimer = null;
         }
+        rememberLocalAdmin(status);
         renderNodeConnected(status);
       } catch (error) {
         if (seq !== state.nodeProbeSeq || state.activeKind !== 'node' || state.activeNodeId) return;
@@ -204,15 +206,26 @@
         ? Object.assign({}, optionsOrTimeout)
         : {};
       const timeout = typeof optionsOrTimeout === 'number' ? optionsOrTimeout : (timeoutMs || 8000);
-      if (request.body && !request.headers) request.headers = { 'Content-Type': 'application/json' };
+      const needsAdmin = localNodeNeedsAdmin(path);
+      if (needsAdmin && !state.localAdminToken) await refreshLocalAdminToken(timeout);
+      applyLocalAdminHeaders(request, needsAdmin);
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), timeout);
       try {
-        const resp = await fetch(localNodeApiUrl(path), Object.assign({ cache: 'no-store' }, request, {
+        let resp = await fetch(localNodeApiUrl(path), Object.assign({ cache: 'no-store' }, request, {
           signal: controller.signal
         }));
+        if (needsAdmin && resp.status === 403) {
+          state.localAdminToken = '';
+          await refreshLocalAdminToken(timeout);
+          applyLocalAdminHeaders(request, needsAdmin);
+          resp = await fetch(localNodeApiUrl(path), Object.assign({ cache: 'no-store' }, request, {
+            signal: controller.signal
+          }));
+        }
         const text = await resp.text();
         const data = text ? JSON.parse(text) : {};
+        rememberLocalAdmin(data);
         if (!resp.ok) throw new Error(data.error || data.message || `HTTP ${resp.status}`);
         return data;
       } finally {
@@ -223,6 +236,46 @@
     function localNodeApiUrl(path) {
       const base = state.nodeAdminUrl.endsWith('/') ? state.nodeAdminUrl : `${state.nodeAdminUrl}/`;
       return new URL(String(path || '').replace(/^\//, ''), base).toString();
+    }
+
+    function localNodeNeedsAdmin(path) {
+      return String(path || '').replace(/^\/+/, '') !== 'api/status';
+    }
+
+    function applyLocalAdminHeaders(request, needsAdmin) {
+      const headers = Object.assign({}, request.headers || {});
+      if (request.body && !Object.keys(headers).some((key) => key.toLowerCase() === 'content-type')) {
+        headers['Content-Type'] = 'application/json';
+      }
+      if (needsAdmin && state.localAdminToken) {
+        headers[state.localAdminTokenHeader || LOCAL_ADMIN_HEADER_FALLBACK] = state.localAdminToken;
+      }
+      request.headers = headers;
+    }
+
+    function rememberLocalAdmin(data) {
+      const token = clean(data && data.local_admin_token);
+      const header = clean(data && data.local_admin_token_header);
+      if (token) state.localAdminToken = token;
+      if (header) state.localAdminTokenHeader = header;
+    }
+
+    async function refreshLocalAdminToken(timeout) {
+      const controller = new AbortController();
+      const timer = window.setTimeout(() => controller.abort(), timeout || 8000);
+      try {
+        const resp = await fetch(localNodeApiUrl('/api/status'), {
+          cache: 'no-store',
+          signal: controller.signal
+        });
+        const text = await resp.text();
+        const data = text ? JSON.parse(text) : {};
+        if (!resp.ok) throw new Error(data.error || data.message || `HTTP ${resp.status}`);
+        rememberLocalAdmin(data);
+        return data;
+      } finally {
+        window.clearTimeout(timer);
+      }
     }
 
     async function adminNodeApi(path, options) {

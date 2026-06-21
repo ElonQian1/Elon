@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：把 Route B/C 的 `run_command` 从优先 shell 字符串推进到结构化 `program + args` 协议，减少命令注入和解析歧义。
+- 本阶段目标：给 Win 本地 7799 管理 API 增加本机 admin token 和 trusted origin 校验，先堵住网页侧误触发高权限本机动作的缺口。
 - 当前分支：`main`，提交前需要先与最新 `origin/main` 对齐。
 
 ## 已完成
@@ -41,10 +41,15 @@
 - 已补结构化命令策略测试：允许 `git status --short`、`cargo test --all-features`、`npm run build`、Gradle assembleDebug；拒绝未知程序、shell 连接符、绝对路径和 `..` 路径。
 - 子代理复核结论：当前已有本地节点、Route A/B/C、工具守卫、会话 worktree 和任务卡片骨架；距离 Codex Desktop 最大差距仍是工具时间线、逐工具审批、持久恢复和 apply_patch/diff 体验。
 - 已通过本阶段验证：`rustfmt --edition 2021` 针对本次 Rust 文件、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`、`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 已新增 `server/src/node_agent_local_admin.rs`：启动期随机 `X-Elon-Local-Admin-Token`、trusted origin 校验、缺失/过期 token 拒绝和单测。
+- 已把 7799 本地管理路由拆成公开探测和受保护管理两组：`/api/status` 继续用于发现节点，环境安装、登录登出、项目绑定、电脑医生快照/修复/记忆、存储配置、TTS 配置等都要先通过本机 admin guard。
+- 已把 PC 工作台、电脑医生、节点页 fallback 和独立 `node_agent_admin.html` 接入本机 token 自动刷新、授权头注入和 403 后重试一次。
+- 已补 `scripts/test-pc-dev-assets.js` 静态断言，防止以后删掉本机 admin token wiring。
+- 已通过本阶段验证：`rustfmt --edition 2021 server\src\node_agent_main.rs server\src\node_agent_local_admin.rs`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`、`node --check server\src\assets\pc_app.js`、`node --check server\src\assets\pc_app_doctor.js`、`node --check server\src\assets\pc_app_node.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
-先发布并验证 Route B/C 结构化命令协议；下一阶段继续推进工具时间线、逐工具审批、apply_patch/diff 预览和持久任务恢复。
+先发布并验证本机管理 API 授权硬化；下一阶段继续推进工具时间线、逐工具审批、apply_patch/diff 预览和持久任务恢复。
 
 ## 待完成
 

@@ -7,7 +7,7 @@
   ];
 
   function createDoctorController(deps) {
-    const { state, els, $, clean, escapeHtml, setHeader, setComposer, setRails, setDoctorMode } = deps;
+    const { state, els, $, clean, escapeHtml, setHeader, setComposer, setRails, setDoctorMode, localNodeApi } = deps;
     state.doctorSection = state.doctorSection || 'diagnosis';
     state.doctorProblem = state.doctorProblem || '';
     state.doctorSnapshot = state.doctorSnapshot || null;
@@ -25,6 +25,7 @@
     }
 
     async function doctorApi(path, options) {
+      if (typeof localNodeApi === 'function') return localNodeApi(path, options || {});
       const opts = Object.assign({}, options || {});
       if (opts.body && !opts.headers) opts.headers = { 'Content-Type': 'application/json' };
       const resp = await fetch(localNodeApiUrl(path), opts);
