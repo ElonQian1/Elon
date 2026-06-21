@@ -555,6 +555,11 @@ function testDevComposerForcedRoutePreference() {
 }
 
 function testLocalAdminTokenWiring() {
+  const webRs = fs.readFileSync(path.join(repoRoot, 'server/src/web.rs'), 'utf8');
+  const routerRs = fs.readFileSync(path.join(repoRoot, 'server/src/router.rs'), 'utf8');
+  assert.ok(webRs.includes('pc_app_task_snapshots.js'), 'PC task snapshot asset should be embedded in web.rs');
+  assert.ok(routerRs.includes('/assets/pc_app_task_snapshots.js'), 'PC task snapshot asset should be routed');
+
   const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
   assert.ok(pcApp.includes('X-Elon-Local-Admin-Token'), 'PC app should send local admin token header');
   assert.ok(pcApp.includes('refreshLocalAdminToken'), 'PC app should refresh the local admin token');
