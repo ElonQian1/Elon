@@ -73,7 +73,9 @@ use common::{
     safe_external_id, validate_password, verify_password,
 };
 pub use compute_metering::ComputeMeterEvent;
-pub(crate) use external_app_tool_executions::ExternalAppToolExecutionWrite;
+pub(crate) use external_app_tool_executions::{
+    AdminExternalAppToolExecutionSummary, ExternalAppToolExecutionWrite,
+};
 pub use node_compute_runs::{
     NodeComputeRun, NodeComputeRunFinish, NodeComputeRunStart, NodeQualityScore,
 };
