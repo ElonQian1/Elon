@@ -33,6 +33,7 @@
 - 已新增 PC 开发任务现场快照 API：`/ai-tasks/:task_id/snapshot` 和 `/ai-tasks/:task_id/events` 返回持久任务信息、频道消息、事件 `rowid` 游标、`has_more` 以及 `live/detached/terminal` attach 状态，作为后续 PC node journal/attach 的服务端骨架。
 - 已修复 Route A 假 ready 抢占 Route C 的一类问题：PC 节点 profile 现在要求 CLI 版本探测成功才标记 Route A ready；服务端自动/强制 Route A 会尊重该状态，坏的本机 CLI 会让自动路线继续落到 Route B/C。
 - 已新增 Route C 云端健康预检：服务端暴露 `/api/agent/runtime/status`，PC 节点启动时用登录 token 验证服务器模型 runtime 是否真实 ready，避免“有 token 但服务器模型未配置”时误报可用。
+- 已把 PC 任务 `snapshot` 接入前端：AI 开发频道现在会按任务快照游标轮询，缓存 attach 状态，并在任务卡展示“现场可连接 / 现场已脱离 / 终态快照”。
 
 ## 验证结果
 
@@ -64,7 +65,7 @@
 - 按发布脚本发布服务端；本阶段改动了 Windows 节点启动侧 Route C ready 判断，需要同步重新发布 Windows 节点包。
 - 下一阶段实现真正任务恢复：定义持久 run handle，绑定 `task_id/pc_req_id/node_id/route/cwd/codex_session_id/lease/last_event_seq/resume_strategy`。
 - 下一阶段给 PC 节点增加本地任务 registry/jsonl journal，并扩展 homecli attach 协议，避免把 `codex resume` 误认为同进程恢复。
-- 下一阶段把 PC 任务 snapshot/events 接入前端刷新流程，并继续推进 PC node 本地 registry/jsonl journal。
+- 下一阶段继续推进 PC node 本地 registry/jsonl journal，并扩展 homecli attach 协议，避免把 `codex resume` 误认为同进程恢复。
 
 ## 剩余风险
 

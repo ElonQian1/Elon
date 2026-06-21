@@ -143,6 +143,37 @@ function testDevTasksUsesPersistedTaskStatus() {
   assert.ok(approvalHtml.includes('已失效'), 'stale approval should show invalid state');
 }
 
+function testDevTasksUsesSnapshotAttachState() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    approveTool: async () => {},
+    draftContinuation: () => {}
+  });
+  const snapshots = new Map([[
+    'tsk_detached',
+    {
+      task: { id: 'tsk_detached', status: 'interrupted', error: 'server restarted' },
+      attach: { status: 'detached', live: false },
+      last_event_seq: 12
+    }
+  ]]);
+  const messages = [
+    { kind: 'ai_task', task_id: 'tsk_detached', content: '发起 AI 开发任务：恢复现场' }
+  ];
+  const context = devTasks.buildContext(messages, { snapshots });
+  const html = devTasks.renderMessage(messages[0], context);
+
+  assert.strictEqual(devTasks.hasOpenTasks(messages, context), false, 'snapshot terminal status should close task');
+  assert.strictEqual(devTasks.openTaskIds(messages, context).length, 0, 'snapshot terminal status should remove task from polling');
+  assert.ok(html.includes('现场已脱离'), 'task card should expose detached snapshot state');
+  assert.ok(html.includes('data-dev-task-action="continue"'), 'detached terminal task should offer continue action');
+}
+
 function testDevTasksToolTimeline() {
   const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
   const devTasks = sandbox.window.ElonPcDevTasks.create({
@@ -351,6 +382,55 @@ async function testDevTasksToolApprovalButtons() {
   }]);
 }
 
+async function testTaskSnapshotsPollsSnapshotEndpoint() {
+  let scheduled = null;
+  const sandbox = loadAsset('server/src/assets/pc_app_task_snapshots.js', {
+    setTimeout: (callback) => {
+      scheduled = callback;
+      return 7;
+    },
+    clearTimeout: () => {},
+    console: { warn: () => {} }
+  });
+  const state = {
+    activeKind: 'project',
+    activeProjectId: 'p1',
+    activeChannelId: 'ch-dev',
+    activeChannelKind: 'ai_development'
+  };
+  const calls = [];
+  let rendered = null;
+  const snapshots = sandbox.window.ElonPcTaskSnapshots.create({
+    state,
+    clean,
+    sameId: (a, b) => String(a || '') === String(b || ''),
+    devTasks: { openTaskIds: () => ['tsk_live'] },
+    api: async (path) => {
+      calls.push(path);
+      return {
+        task: { id: 'tsk_live', status: 'running' },
+        messages: [{ kind: 'ai_task', task_id: 'tsk_live', content: '发起 AI 开发任务：测试快照' }],
+        events: [{ seq: 5, event: { type: 'tool_call' } }],
+        last_event_seq: 5,
+        attach: { status: 'live', live: true }
+      };
+    },
+    renderMessages: (messages, scope) => {
+      rendered = { messages, scope };
+    },
+    refreshActiveChannel: async () => {}
+  });
+
+  assert.strictEqual(snapshots.schedule([], 'project', {}), true, 'snapshot scheduler should accept active dev tasks');
+  assert.ok(scheduled, 'snapshot scheduler should create a timer');
+  await scheduled();
+
+  assert.ok(calls[0].includes('/api/projects/p1/channels/ch-dev/ai-tasks/tsk_live/snapshot'), 'scheduler should call task snapshot endpoint');
+  assert.ok(calls[0].includes('since=0'), 'first snapshot poll should start from cursor 0');
+  assert.strictEqual(rendered.scope, 'project', 'snapshot response should rerender project messages');
+  assert.strictEqual(snapshots.contextExtras().snapshots.get('tsk_live').attach.status, 'live', 'snapshot attach state should be cached for task cards');
+}
+
 function testProjectReadinessChecklist() {
   const sandbox = loadAsset('server/src/assets/pc_app_project_readiness.js');
   const create = (state) => sandbox.window.ElonPcProjectReadiness.create({
@@ -501,8 +581,10 @@ function testLocalAdminTokenWiring() {
   testDevTasksContinueAction();
   testDevTasksHasOpenPendingApproval();
   testDevTasksUsesPersistedTaskStatus();
+  testDevTasksUsesSnapshotAttachState();
   testDevTasksToolTimeline();
   await testDevTasksToolApprovalButtons();
+  await testTaskSnapshotsPollsSnapshotEndpoint();
   testProjectReadinessChecklist();
   testDevComposerRouteLabels();
   testDevComposerForcedRoutePreference();

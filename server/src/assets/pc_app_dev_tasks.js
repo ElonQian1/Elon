@@ -9,7 +9,7 @@
     const draftContinuation = deps.draftContinuation;
     const continuationDrafts = new Map();
 
-    function buildContext(messages) {
+    function buildContext(messages, extras) {
       continuationDrafts.clear();
       const tasks = new Map();
       const approvals = new Map();
@@ -18,18 +18,7 @@
         const taskId = taskIdOf(message);
         if (!taskId) return;
         if (!tasks.has(taskId)) {
-          tasks.set(taskId, {
-            taskId,
-            progressCount: 0,
-            result: null,
-            request: '',
-            resultText: '',
-            failed: false,
-            canceled: false,
-            status: '',
-            error: '',
-            apkUrl: ''
-          });
+          tasks.set(taskId, emptyTask(taskId));
         }
         const task = tasks.get(taskId);
         const status = taskStatusOf(message);
@@ -51,7 +40,46 @@
           task.failed = !task.canceled && /失败|错误|error|failed/i.test(content);
         }
       });
+      mergeSnapshotState(tasks, extras && extras.snapshots);
       return { tasks, approvals };
+    }
+
+    function emptyTask(taskId) {
+      return {
+        taskId,
+        progressCount: 0,
+        result: null,
+        request: '',
+        resultText: '',
+        failed: false,
+        canceled: false,
+        status: '',
+        error: '',
+        apkUrl: '',
+        attach: null,
+        lastEventSeq: 0
+      };
+    }
+
+    function mergeSnapshotState(tasks, snapshots) {
+      if (!snapshots || typeof snapshots.forEach !== 'function') return;
+      snapshots.forEach((snapshot, snapshotTaskId) => {
+        const taskId = clean(snapshotTaskId || (snapshot && snapshot.task && snapshot.task.id));
+        if (!taskId) return;
+        if (!tasks.has(taskId)) tasks.set(taskId, emptyTask(taskId));
+        const task = tasks.get(taskId);
+        const snapshotTask = snapshot && snapshot.task ? snapshot.task : {};
+        const status = clean(snapshotTask.status).toLowerCase();
+        if (status) task.status = status;
+        const error = clean(snapshotTask.error);
+        if (error) task.error = error;
+        const apkUrl = clean(snapshotTask.apk_url || snapshotTask.apkUrl);
+        if (apkUrl) task.apkUrl = apkUrl;
+        const attach = snapshot && snapshot.attach ? snapshot.attach : null;
+        if (attach) task.attach = attach;
+        const seq = Number(snapshot && (snapshot.last_event_seq || snapshot.lastEventSeq || 0));
+        if (Number.isFinite(seq) && seq > 0) task.lastEventSeq = seq;
+      });
     }
 
     function renderMessage(message, context) {
@@ -126,6 +154,15 @@
       return Array.from(built.tasks.values()).some((task) => !taskIsTerminal(task));
     }
 
+    function openTaskIds(messages, context) {
+      if (!Array.isArray(messages) || !messages.length) return [];
+      const built = context || buildContext(messages);
+      return Array.from(built.tasks.values())
+        .filter((task) => !taskIsTerminal(task))
+        .map((task) => task.taskId)
+        .filter(Boolean);
+    }
+
     function renderTaskStart(message, context) {
       const taskId = taskIdOf(message);
       const task = taskId ? context.tasks.get(taskId) : null;
@@ -137,7 +174,7 @@
         title: status.label,
         body: request || '已提交开发任务。',
         taskId,
-        meta: task && task.progressCount ? `${task.progressCount} 条进度` : '等待执行回写',
+        meta: attachMeta(task, task && task.progressCount ? `${task.progressCount} 条进度` : '等待执行回写'),
         actions: true,
         canCancel: !!taskId && !taskIsTerminal(task),
         continueDraft: taskIsTerminal(task) && !(task && task.result)
@@ -478,6 +515,15 @@
       return { status: 'done', tone: 'done', label: '已失效', meta: '任务已结束' };
     }
 
+    function attachMeta(task, fallback) {
+      const attach = task && task.attach ? task.attach : null;
+      const status = clean(attach && attach.status).toLowerCase();
+      if (status === 'live') return `现场可连接 · ${fallback}`;
+      if (status === 'detached') return `现场已脱离 · ${fallback}`;
+      if (status === 'terminal') return `终态快照 · ${fallback}`;
+      return fallback;
+    }
+
     function taskRequest(content) {
       return clean(content).replace(/^发起\s*AI\s*开发任务[:：]\s*/i, '');
     }
@@ -511,7 +557,7 @@
       return value.length > 12 ? `${value.slice(0, 8)}...` : value;
     }
 
-    return { buildContext, renderMessage, bindActions, hasOpenTasks };
+    return { buildContext, renderMessage, bindActions, hasOpenTasks, openTaskIds };
   }
 
   window.ElonPcDevTasks = { create };

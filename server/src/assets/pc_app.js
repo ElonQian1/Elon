@@ -67,6 +67,7 @@
   let models = null;
   let devComposer = null;
   let devTasks = null;
+  let devTaskSnapshots = null;
   let devTaskRefreshTimer = 0;
   const doctor = window.ElonPcDoctor.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
@@ -100,6 +101,12 @@
     cancelTask: cancelProjectAiTask,
     approveTool: approveProjectTool,
     draftContinuation: draftProjectAiContinuation
+  });
+  devTaskSnapshots = window.ElonPcTaskSnapshots && window.ElonPcTaskSnapshots.create({
+    state, api, clean, sameId, devTasks,
+    renderMessages,
+    refreshActiveChannel: refreshActiveProjectChannel,
+    logError: (error) => console.warn('PC task snapshot refresh failed', error)
   });
 
   function saveToken(token) {
@@ -2050,7 +2057,9 @@
       els.messageList.innerHTML = '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
       return;
     }
-    const devTaskContext = scope === 'project' && devTasks ? devTasks.buildContext(messages) : null;
+    const devTaskContext = scope === 'project' && devTasks
+      ? devTasks.buildContext(messages, devTaskSnapshots ? devTaskSnapshots.contextExtras() : null)
+      : null;
     els.messageList.innerHTML = messages.map((message) => {
       const role = clean(message.role || message.kind || message.message_kind);
       const fallbackName = role.startsWith('ai_')
@@ -2087,12 +2096,14 @@
       clearTimeout(devTaskRefreshTimer);
       devTaskRefreshTimer = 0;
     }
+    if (devTaskSnapshots) devTaskSnapshots.clear();
   }
 
   function scheduleDevTaskRefresh(messages, scope, devTaskContext) {
     clearDevTaskRefresh();
     if (scope !== 'project' || state.activeChannelKind !== 'ai_development' || !devTasks) return;
     if (!devTasks.hasOpenTasks(messages, devTaskContext)) return;
+    if (devTaskSnapshots && devTaskSnapshots.schedule(messages, scope, devTaskContext)) return;
     const projectId = state.activeProjectId;
     const channelId = state.activeChannelId;
     devTaskRefreshTimer = setTimeout(() => {

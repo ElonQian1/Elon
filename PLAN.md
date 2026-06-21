@@ -16,6 +16,7 @@
 8. 任务现场快照：为 PC 开发频道任务提供只读 `snapshot/events` API，返回持久 task、频道消息、事件游标和 live/detached/terminal attach 状态，作为后续真正 attach/journal 的服务端骨架。
 9. Route C 兜底可靠性：Route A 不再只因发现 CLI 路径就抢占自动路由；新节点必须通过 CLI 版本探测才算 Route A ready，残留坏 CLI 会自动落到 Route B/C。
 10. Route C 云端健康预检：服务器提供 `/api/agent/runtime/status`，PC 节点用登录 token 预检服务器模型是否真实可用，避免只因有 token 就显示 Route C ready。
+11. PC 前端任务现场接入：AI 开发频道前端消费 `snapshot` 接口缓存 attach/事件游标，用轻量快照轮询替代纯整频道刷新，并在任务卡显示 live/detached/terminal 现场状态。
 
 ## 风险
 
