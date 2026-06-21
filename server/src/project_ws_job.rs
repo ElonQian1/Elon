@@ -1,3 +1,4 @@
+// server/src/project_ws_job.rs
 //! 项目 WebSocket 任务调度器：管理同一项目/用户/请求的运行中任务。
 //!
 //! 从 `project_api.rs` 抽出，避免单文件继续膨胀。`handle_project_ws` 调用
@@ -322,6 +323,7 @@ async fn run_project_ws_job(
             task_agent_name,
             task_attachments,
             execution_mode,
+            None,
             task_trace_id,
             tx,
         )

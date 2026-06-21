@@ -1,3 +1,4 @@
+// server/src/project_channel_summary.rs
 //! Background AI summaries for selected project channel messages.
 
 use std::sync::Arc;
@@ -46,6 +47,7 @@ pub(crate) fn spawn_channel_summary(task: ChannelSummaryTask) {
                 Some(&summary_conversation_id),
                 &run_prompt,
                 run_agent.as_deref(),
+                None,
                 Some(&run_trace_id),
                 &run_state,
                 tx,

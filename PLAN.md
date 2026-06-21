@@ -9,7 +9,8 @@
 1. 核验当前能力：安装包、节点进程、本机状态接口、项目绑定、运行路线、权限和任务卡。
 2. 补齐可见就绪证据：在 PC 项目成员栏显示逐项检查，而不是只显示粗略 Ready/Check。
 3. 强化任务闭环：保留停止、继续草稿、刷新和运行中状态。
-4. 发布闭环：提交到 `origin/main`，发布服务器和 Windows 节点包，验证线上版本和本机安装态。
+4. 显式运行路线：PC AI 开发栏提供 Auto / Route A / Route B / Route C 选择，并把选择传到后端执行链路。
+5. 发布闭环：提交到 `origin/main`，发布服务器和 Windows 节点包，验证线上版本和本机安装态。
 
 ## 风险
 
@@ -23,6 +24,8 @@
 - `node --check server\src\assets\pc_app_project_readiness.js`
 - `node --check server\src\assets\pc_app_dev_composer.js`
 - `node --check server\src\assets\pc_app.js`
+- `node scripts\test-pc-dev-assets.js`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`
 - `git diff --check`
 - `cargo check --manifest-path server\Cargo.toml --bin elon-server`
 - `powershell -ExecutionPolicy Bypass -File scripts\publish-server.ps1`

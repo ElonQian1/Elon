@@ -1,3 +1,4 @@
+// server/src/voice_to_cli.rs
 //! 方案 B：转写完成后把文本投递到项目聊天或一龙AI 私聊。
 //!
 //! 入参：user_id / voice_target / project_id / conversation_id / transcript / ai_reply_tx
@@ -116,6 +117,7 @@ async fn dispatch_to_project_chat(
         None, // agent_name
         None, // attachments
         ProjectExecutionMode::Execute,
+        None, // pc_runtime_route
         None, // trace_id
         ai_reply_tx,
     )

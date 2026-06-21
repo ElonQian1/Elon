@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：把 Route B 自研 API runtime 接入 PC 项目开发真实链路，并校准 Route B/C 权限与前端文案。
+- 本阶段目标：让 PC AI 开发栏可以显式选择自动 / Route A / Route B / Route C，并把选择传到真实执行链路。
 - 当前分支：`main`，提交前需要先与最新 `origin/main` 对齐。
 
 ## 已完成
@@ -30,16 +30,20 @@
 - 已同步硬化 `pc-dev-runtime` 生成的 `scripts\elon-agent.ps1`，新生成项目不会继续使用更松的 PowerShell 白名单。
 - 已把 PC/网页端 `full_access` 确认语改成真实边界：Route A 可按授权绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。
 - 已通过本阶段验证：`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 已在 PC AI 开发栏新增自动 / A / B / C 分段路线选择：自动模式不传参，强制 A/B/C 时通过 `runtimeRoute` 进入频道 AI 任务 API。
+- 已让后端 `StartChannelAiTaskRequest` 解析 `runtimeRoute`，并在 PC 项目快速路径里强制选择对应 Route；Route 不可用时返回可读错误，不再悄悄回退到 Route A。
+- 已补 Route 选择单测：强制 Route B 会跳过可用 Route A；强制不可用 Route C 会返回明确“未就绪”错误。
+- 已补 PC 前端资产测试：默认自动模式、Route B 标签、强制 Route C 本地偏好和请求参数输出。
+- 已通过本阶段验证：`node --check server\src\assets\pc_app_dev_composer.js`、`node --check server\src\assets\pc_app.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
-先完成 Route B/C 权限层模块化和短期安全硬化，再继续推进“更像 Codex Desktop”的持久任务控制、显式路线选择和工具审批。
+先发布并验证显式 Route A/B/C 选择；下一阶段继续推进“更像 Codex Desktop”的持久任务控制、任务级动作审批和结构化工具协议。
 
 ## 待完成
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 下一阶段实现显式 Route A/B/C 选择，避免“自动回退”让用户误以为自己强制选了某条路线。
 - 下一阶段继续评估 Route B/C 是否要改成结构化 `{program,args}` 命令协议、任务级动作审批和 patch/apply_patch 工具，而不是直接取消本机白名单。
 
 ## 当前阻塞

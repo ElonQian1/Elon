@@ -6,13 +6,31 @@ const vm = require('vm');
 
 const repoRoot = path.resolve(__dirname, '..');
 
+function createMemoryStorage(initial = {}) {
+  const entries = new Map(Object.entries(initial));
+  return {
+    getItem(key) {
+      return entries.has(key) ? entries.get(key) : null;
+    },
+    setItem(key, value) {
+      entries.set(key, String(value));
+    },
+    removeItem(key) {
+      entries.delete(key);
+    }
+  };
+}
+
 function loadAsset(relativePath, extraSandbox = {}) {
   const code = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+  const localStorage = extraSandbox.localStorage || createMemoryStorage();
   const sandbox = {
     window: {},
     document: { querySelector: () => null, createElement: () => ({ querySelectorAll: () => [] }) },
+    localStorage,
     ...extraSandbox
   };
+  if (!sandbox.window.localStorage) sandbox.window.localStorage = sandbox.localStorage;
   vm.runInNewContext(code, sandbox, { filename: relativePath });
   return sandbox;
 }
@@ -132,10 +150,54 @@ function testDevComposerRouteLabels() {
   assert.strictEqual(inserted.hidden, false, 'composer bar should be visible in AI development channel');
   assert.ok(inserted.className.includes('full-access'), 'composer should expose full access tone');
   assert.ok(inserted.innerHTML.includes('Route B · 本机 API runtime'), 'composer should show API runtime route');
+  assert.ok(inserted.innerHTML.includes('data-dev-composer-route="route_b"'), 'composer should expose Route B selector');
+  assert.strictEqual(composer.selectedRouteForRequest(), '', 'auto route should not be sent to backend');
+}
+
+function testDevComposerForcedRoutePreference() {
+  let inserted = null;
+  const fakeParent = {
+    insertBefore(element) {
+      inserted = element;
+    }
+  };
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_composer.js', {
+    localStorage: createMemoryStorage({ elon_pc_dev_runtime_route: 'route_c' }),
+    document: {
+      createElement: () => ({ hidden: true, className: '', innerHTML: '', querySelectorAll: () => [] })
+    }
+  });
+  const state = {
+    activeKind: 'project',
+    activeChannelKind: 'ai_development',
+    activeProjectId: 'p1',
+    projects: [{ id: 'p1', node_id: 'node-1', workspace_path: 'D:/demo', runtime_permission: 'project_write' }],
+    nodes: [{
+      node_id: 'node-1',
+      online: true,
+      route_a_ready: true,
+      server_runtime_ready: true,
+      allowed_clis: ['codex']
+    }]
+  };
+  const composer = sandbox.window.ElonPcDevComposer.create({
+    state,
+    els: { composer: { parentElement: fakeParent } },
+    clean,
+    escapeHtml,
+    openSettings: () => {},
+    selectNode: () => {},
+    openModelPicker: () => {}
+  });
+
+  composer.render();
+  assert.ok(inserted.innerHTML.includes('Route C · 服务器模型'), 'forced Route C should control the displayed route');
+  assert.strictEqual(composer.selectedRouteForRequest(), 'route_c', 'forced route should be sent to backend');
 }
 
 testDevTasksContinueAction();
 testProjectReadinessChecklist();
 testDevComposerRouteLabels();
+testDevComposerForcedRoutePreference();
 
 console.log('pc-dev-assets tests passed');

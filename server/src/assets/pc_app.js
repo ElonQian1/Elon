@@ -1762,6 +1762,10 @@
           if (devComposer) devComposer.setBusy(true);
           const agent = models.selectedAgentForRequest();
           if (agent) body.agent = agent;
+          const runtimeRoute = devComposer && devComposer.selectedRouteForRequest
+            ? clean(devComposer.selectedRouteForRequest())
+            : '';
+          if (runtimeRoute) body.runtimeRoute = runtimeRoute;
         }
         await api(path, { method: 'POST', body: JSON.stringify(body) });
         els.input.value = '';

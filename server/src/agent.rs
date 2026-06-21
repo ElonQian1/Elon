@@ -1,3 +1,5 @@
+// server/src/agent.rs
+
 use anyhow::Result;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
@@ -14,7 +16,7 @@ use crate::{
     },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
-    pc_agent_runtime_choice::choose_pc_agent_runtime,
+    pc_agent_runtime_choice::{choose_pc_agent_runtime, PcRuntimeRoutePreference},
     source_hygiene,
     store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
@@ -35,6 +37,7 @@ pub async fn run_for_project(
     conversation_id: Option<&str>,
     user_message: &str,
     agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<&str>,
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
@@ -49,6 +52,7 @@ pub async fn run_for_project(
         conversation_id,
         user_message,
         agent_name,
+        pc_runtime_route,
         trace_id,
         state,
         tx,
@@ -64,12 +68,18 @@ pub async fn run_for_project_in_workspace(
     conversation_id: Option<&str>,
     user_message: &str,
     agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<&str>,
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        let runtime_choice = choose_pc_agent_runtime(state, agent_id, agent_name).await;
+        let runtime_choice =
+            choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
+        if let Some(error) = runtime_choice.error {
+            let _ = tx.send(WsMessage::error(error).to_json());
+            return;
+        }
         let _ = tx.send(
             WsMessage::progress(format!(
                 "正在连接 PC 节点 {} 使用 {} 处理本地项目。",
@@ -192,12 +202,18 @@ pub async fn plan_for_project_in_workspace(
     conversation_id: Option<&str>,
     user_message: &str,
     agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<&str>,
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
     if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        let runtime_choice = choose_pc_agent_runtime(state, agent_id, agent_name).await;
+        let runtime_choice =
+            choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
+        if let Some(error) = runtime_choice.error {
+            let _ = tx.send(WsMessage::error(error).to_json());
+            return;
+        }
         let _ = tx.send(
             WsMessage::progress(format!(
                 "正在连接 PC 节点 {} 使用 {} 规划本地项目。",

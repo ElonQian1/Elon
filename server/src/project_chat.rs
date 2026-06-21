@@ -1,3 +1,5 @@
+// server/src/project_chat.rs
+
 use axum::{
     extract::{Path as AxumPath, State},
     http::{HeaderMap, StatusCode},
@@ -14,6 +16,7 @@ use crate::{
     agent, agent_intent,
     agent_routing::is_local_cli_option,
     ai_cli, billing, intent_router,
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_attachment_notes::{
         append_project_attachment_notes, append_project_cli_attachment_artifacts,
     },
@@ -116,6 +119,7 @@ pub async fn chat_project(
             Some(&conversation_id),
             &message,
             req.agent.as_deref(),
+            None,
             Some(trace_id.as_str()),
             &state,
             tx,
@@ -133,6 +137,7 @@ pub async fn chat_project(
             req.agent,
             attachments,
             ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
+            None,
             Some(trace_id.clone()),
             tx,
         )
@@ -309,6 +314,7 @@ pub async fn chat_project_stream(
         req.agent,
         attachments,
         ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
+        None,
         Some(trace_id),
         tx,
     )
@@ -432,6 +438,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
@@ -461,6 +468,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
                     .is_some_and(|value| !value.trim().is_empty()),
                 "agent": agent_name.as_deref(),
                 "execution_mode": execution_mode.as_str(),
+                "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
             }),
         );
     }
@@ -548,6 +556,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
             Some(&conversation_id),
             &message,
             agent_name.as_deref(),
+            pc_runtime_route,
             trace_id.as_deref(),
             &state,
             tx,
@@ -598,6 +607,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
             Some(&conversation_id),
             &message,
             agent_name.as_deref(),
+            None,
             trace_id.as_deref(),
             &state,
             tx,

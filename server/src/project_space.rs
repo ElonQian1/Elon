@@ -16,6 +16,7 @@ use std::{
 use tokio::sync::watch;
 
 use crate::{
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_chat::run_project_agent_with_scheduler,
@@ -72,6 +73,8 @@ pub struct UpdateProjectDescriptionRequest {
 pub struct StartChannelAiTaskRequest {
     pub content: String,
     pub agent: Option<String>,
+    #[serde(default, alias = "runtimeRoute", alias = "pcRoute", alias = "pc_route")]
+    pub runtime_route: Option<String>,
     pub trace_id: Option<String>,
 }
 
@@ -611,7 +614,10 @@ fn cancel_channel_ai_task_response(
         return json_error(StatusCode::FORBIDDEN, "当前成员角色不能停止项目 AI 开发");
     }
     let project_id = project.id.clone();
-    let channel_kind = match state.store.get_project_channel_kind(&project_id, &channel_id) {
+    let channel_kind = match state
+        .store
+        .get_project_channel_kind(&project_id, &channel_id)
+    {
         Ok(kind) => kind,
         Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
     };
@@ -663,6 +669,13 @@ fn start_channel_ai_task_response(
     if content.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "content 不能为空");
     }
+    let runtime_route = match req.runtime_route.as_deref() {
+        Some(value) => match PcRuntimeRoutePreference::from_request(value) {
+            Ok(route) => route,
+            Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+        },
+        None => None,
+    };
 
     let conversation_id = format!("channel-{}", channel_id);
     let conversation_title = format!("项目频道 {}", channel_id);
@@ -716,6 +729,7 @@ fn start_channel_ai_task_response(
         download_base,
         content,
         agent: req.agent,
+        runtime_route,
         trace_id: trace_id.clone(),
     });
 
@@ -864,6 +878,7 @@ struct ChannelAiTask {
     download_base: String,
     content: String,
     agent: Option<String>,
+    runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: String,
 }
 
@@ -883,6 +898,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let run_conversation_id = task.conversation_id.clone();
         let run_content = task.content.clone();
         let run_agent = task.agent.clone();
+        let run_runtime_route = task.runtime_route;
         let run_trace_id = task.trace_id.clone();
         let download_base = task.download_base.clone();
         let runner = tokio::spawn(async move {
@@ -897,6 +913,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                 run_agent,
                 None,
                 ProjectExecutionMode::Execute,
+                run_runtime_route,
                 Some(run_trace_id),
                 tx,
             )
