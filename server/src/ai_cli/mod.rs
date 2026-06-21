@@ -1175,7 +1175,12 @@ fn pc_cli_passthrough_event(text: &str) -> Option<String> {
     }
     let value = serde_json::from_str::<Value>(trimmed).ok()?;
     match value.get("type").and_then(Value::as_str)? {
-        "tool_call" | "tool_result" | "usage" | "progress" => serde_json::to_string(&value).ok(),
+        "tool_approval_required"
+        | "tool_approval_decision"
+        | "tool_call"
+        | "tool_result"
+        | "usage"
+        | "progress" => serde_json::to_string(&value).ok(),
         _ => None,
     }
 }
@@ -1509,4 +1514,27 @@ fn extract_codex_reply(output: &str) -> String {
     }
 
     reply_lines.join("\n").trim().to_string()
+}
+
+#[cfg(test)]
+mod pc_cli_passthrough_tests {
+    use super::pc_cli_passthrough_event;
+    use serde_json::Value;
+
+    #[test]
+    fn pc_cli_passthrough_keeps_tool_approval_events() {
+        let line =
+            r#"{"type":"tool_approval_required","tool":"write_file","approval_id":"tap_1_1"}"#;
+        let out = pc_cli_passthrough_event(line).expect("approval event should pass through");
+        let value: Value = serde_json::from_str(&out).unwrap();
+
+        assert_eq!(value["type"], "tool_approval_required");
+        assert_eq!(value["approval_id"], "tap_1_1");
+    }
+
+    #[test]
+    fn pc_cli_passthrough_rejects_unknown_json_events() {
+        assert!(pc_cli_passthrough_event(r#"{"type":"unknown","message":"x"}"#).is_none());
+        assert!(pc_cli_passthrough_event("not json").is_none());
+    }
 }

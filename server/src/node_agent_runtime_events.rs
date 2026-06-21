@@ -71,6 +71,24 @@ pub(crate) fn tool_approval_required_chunk(
     approval_id: &str,
     action: &Value,
 ) -> String {
+    tool_approval_required_chunk_with_diff(
+        req_id,
+        turn,
+        index,
+        approval_id,
+        action,
+        diff_preview(action),
+    )
+}
+
+pub(crate) fn tool_approval_required_chunk_with_diff(
+    req_id: &str,
+    turn: usize,
+    index: usize,
+    approval_id: &str,
+    action: &Value,
+    diff: Value,
+) -> String {
     let tool = tool_name(action);
     let event = json!({
         "type": "tool_approval_required",
@@ -80,7 +98,7 @@ pub(crate) fn tool_approval_required_chunk(
         "tool": tool,
         "risk": tool_risk(&tool),
         "args": action_preview(action),
-        "diff": diff_preview(action),
+        "diff": diff,
         "call_id": call_id(req_id, turn, index),
         "turn": turn,
         "index": index,
@@ -276,7 +294,10 @@ fn is_secret_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{tool_approval_required_chunk, tool_call_chunk, tool_result_chunk};
+    use super::{
+        tool_approval_required_chunk, tool_approval_required_chunk_with_diff, tool_call_chunk,
+        tool_result_chunk,
+    };
     use serde_json::{json, Value};
 
     #[test]
@@ -350,5 +371,37 @@ mod tests {
         assert_eq!(event["diff"]["files"][0], "src/main.rs");
         assert!(event["args"]["patch_sha256"].as_str().unwrap().len() >= 64);
         assert!(event["args"].get("patch").is_none());
+    }
+
+    #[test]
+    fn write_file_approval_can_include_diff_without_content() {
+        let line = tool_approval_required_chunk_with_diff(
+            "req",
+            1,
+            2,
+            "tap_1_2",
+            &json!({
+                "tool": "write_file",
+                "path": "src/main.rs",
+                "content": "new secret body"
+            }),
+            json!({
+                "format": "unified",
+                "source": "write_file",
+                "preview": "--- a/src/main.rs\n+++ b/src/main.rs\n-old\n+new\n",
+                "truncated": false,
+                "files": ["src/main.rs"]
+            }),
+        );
+
+        let event: Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(event["type"], "tool_approval_required");
+        assert_eq!(event["tool"], "write_file");
+        assert_eq!(event["args"]["path"], "src/main.rs");
+        assert_eq!(event["args"]["content_chars"], 15);
+        assert!(event["args"].get("content").is_none());
+        assert_eq!(event["diff"]["source"], "write_file");
+        assert_eq!(event["diff"]["files"][0], "src/main.rs");
+        assert!(event["diff"]["preview"].as_str().unwrap().contains("+new"));
     }
 }

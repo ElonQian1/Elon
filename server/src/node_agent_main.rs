@@ -57,6 +57,7 @@ mod node_agent_runtime_events;
 mod node_agent_server_runtime;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
+mod node_agent_write_preview;
 #[cfg(windows)]
 mod node_client_launcher;
 mod node_hardware_probe;

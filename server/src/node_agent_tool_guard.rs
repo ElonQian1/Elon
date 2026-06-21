@@ -168,6 +168,59 @@ impl ToolGuard {
         Ok(format!("write_file ok: {path} ({} chars)", content.len()))
     }
 
+    pub(crate) async fn write_file_diff_preview(&self, action: &Value) -> Result<Option<Value>> {
+        if action.get("tool").and_then(Value::as_str) != Some("write_file") {
+            return Ok(None);
+        }
+        let path = required_str(action, "path")?;
+        let content = required_str(action, "content")?;
+        let full = self.resolve_safe_path(path)?;
+        // 预览必须走同一套路径守卫，避免审批卡展示的是安全路径、
+        // 实际执行却写到另一个位置。
+        crate::node_agent_write_preview::write_file_diff_preview(&full, path, content)
+            .await
+            .map(Some)
+    }
+
+    pub(crate) async fn verify_write_file_preview_unchanged(
+        &self,
+        action: &Value,
+        diff: &Value,
+    ) -> Result<()> {
+        if action.get("tool").and_then(Value::as_str) != Some("write_file") {
+            return Ok(());
+        }
+        let path = required_str(action, "path")?;
+        let content = required_str(action, "content")?;
+        let full = self.resolve_safe_path(path)?;
+        let current_content = match tokio::fs::read_to_string(&full).await {
+            Ok(content) => Some(content),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => {
+                return Err(error).with_context(|| format!("write_file base check failed: {path}"))
+            }
+        };
+
+        let expected_old = diff.get("old_sha256").and_then(Value::as_str);
+        let actual_old = current_content
+            .as_deref()
+            .map(crate::node_agent_write_preview::sha256_hex);
+        if expected_old != actual_old.as_deref() {
+            bail!("write_file base changed since approval preview: {path}");
+        }
+
+        let expected_new = diff
+            .get("new_sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| anyhow!("write_file approval preview missing new_sha256"))?;
+        let actual_new = crate::node_agent_write_preview::sha256_hex(content);
+        if expected_new != actual_new {
+            bail!("write_file content changed since approval preview: {path}");
+        }
+
+        Ok(())
+    }
+
     async fn apply_patch(&self, patch: &str, check_only: bool) -> Result<String> {
         let workspace = self.workspace.clone();
         let patch = patch.to_string();
@@ -629,7 +682,7 @@ mod tests {
         command_allowed, normalize_path, structured_command_allowed, RuntimeToolMode, ToolGuard,
     };
     use serde_json::json;
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     #[test]
     fn command_policy_allows_project_checks() {
@@ -781,6 +834,150 @@ mod tests {
             }))
             .await;
         assert!(unsafe_result.contains("parent path segments are not allowed"));
+    }
+
+    #[tokio::test]
+    async fn write_file_diff_preview_reports_existing_and_new_files() {
+        let temp = temp_test_dir("write_file_diff_preview_reports_existing_and_new_files");
+        fs::write(temp.join("note.txt"), "old\n").unwrap();
+        let guard = ToolGuard::new(temp, Some("project_write"));
+
+        let existing = guard
+            .write_file_diff_preview(&json!({
+                "tool": "write_file",
+                "path": "note.txt",
+                "content": "new\n"
+            }))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(existing["kind"], "replace");
+        assert_eq!(existing["files"][0], "note.txt");
+        assert!(existing["preview"].as_str().unwrap().contains("-old"));
+        assert!(existing["preview"].as_str().unwrap().contains("+new"));
+
+        let created = guard
+            .write_file_diff_preview(&json!({
+                "tool": "write_file",
+                "path": "new.txt",
+                "content": "hello\n"
+            }))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(created["kind"], "create");
+        assert!(created["preview"]
+            .as_str()
+            .unwrap()
+            .contains("--- /dev/null"));
+        assert!(created["preview"].as_str().unwrap().contains("+hello"));
+    }
+
+    #[tokio::test]
+    async fn write_file_diff_preview_reuses_path_guard_and_fails_on_binary() {
+        let temp = temp_test_dir("write_file_diff_preview_reuses_path_guard_and_fails_on_binary");
+        fs::write(temp.join("binary.bin"), [0xff, 0xfe, 0xfd]).unwrap();
+        let guard = ToolGuard::new(temp, Some("project_write"));
+
+        let unsafe_result = guard
+            .write_file_diff_preview(&json!({
+                "tool": "write_file",
+                "path": "../outside.txt",
+                "content": "new\n"
+            }))
+            .await;
+        assert!(unsafe_result
+            .unwrap_err()
+            .to_string()
+            .contains("parent path segments are not allowed"));
+
+        let binary_result = guard
+            .write_file_diff_preview(&json!({
+                "tool": "write_file",
+                "path": "binary.bin",
+                "content": "new\n"
+            }))
+            .await;
+        assert!(binary_result
+            .unwrap_err()
+            .to_string()
+            .contains("write_file diff preview failed"));
+    }
+
+    #[tokio::test]
+    async fn write_file_preview_base_check_detects_races() {
+        let temp = temp_test_dir("write_file_preview_base_check_detects_races");
+        fs::write(temp.join("note.txt"), "old\n").unwrap();
+        let guard = ToolGuard::new(temp.clone(), Some("project_write"));
+        let action = json!({
+            "tool": "write_file",
+            "path": "note.txt",
+            "content": "new\n"
+        });
+        let diff = guard
+            .write_file_diff_preview(&action)
+            .await
+            .unwrap()
+            .unwrap();
+
+        guard
+            .verify_write_file_preview_unchanged(&action, &diff)
+            .await
+            .unwrap();
+
+        fs::write(temp.join("note.txt"), "changed elsewhere\n").unwrap();
+        let result = guard
+            .verify_write_file_preview_unchanged(&action, &diff)
+            .await;
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("base changed since approval preview"));
+    }
+
+    #[tokio::test]
+    async fn write_file_preview_base_check_detects_created_or_deleted_files() {
+        let temp = temp_test_dir("write_file_preview_base_check_detects_created_or_deleted_files");
+        let guard = ToolGuard::new(temp.clone(), Some("project_write"));
+
+        let create_action = json!({
+            "tool": "write_file",
+            "path": "new.txt",
+            "content": "new\n"
+        });
+        let create_diff = guard
+            .write_file_diff_preview(&create_action)
+            .await
+            .unwrap()
+            .unwrap();
+        fs::write(temp.join("new.txt"), "created elsewhere\n").unwrap();
+        let created_result = guard
+            .verify_write_file_preview_unchanged(&create_action, &create_diff)
+            .await;
+        assert!(created_result
+            .unwrap_err()
+            .to_string()
+            .contains("base changed since approval preview"));
+
+        fs::write(temp.join("delete.txt"), "old\n").unwrap();
+        let delete_action = json!({
+            "tool": "write_file",
+            "path": "delete.txt",
+            "content": "new\n"
+        });
+        let delete_diff = guard
+            .write_file_diff_preview(&delete_action)
+            .await
+            .unwrap()
+            .unwrap();
+        fs::remove_file(temp.join("delete.txt")).unwrap();
+        let deleted_result = guard
+            .verify_write_file_preview_unchanged(&delete_action, &delete_diff)
+            .await;
+        assert!(deleted_result
+            .unwrap_err()
+            .to_string()
+            .contains("base changed since approval preview"));
     }
 
     #[tokio::test]

@@ -157,6 +157,32 @@ async function testDevTasksToolApprovalButtons() {
   assert.ok(html.includes('data-approval-id="tap_1_1"'), 'approval button should keep approval id');
   assert.ok(html.includes('&lt;old&gt;'), 'diff preview should be HTML escaped');
 
+  const writeApproval = {
+    kind: 'ai_progress',
+    task_id: 'tsk_write_approval',
+    content: JSON.stringify({
+      type: 'tool_approval_required',
+      tool: 'write_file',
+      approval_id: 'tap_1_2',
+      status: 'pending',
+      args: { path: 'docs/note.md', content_chars: 6 },
+      diff: {
+        source: 'write_file',
+        preview: '--- /dev/null\\n+++ b/docs/note.md\\n+<new>',
+        files: ['docs/note.md']
+      }
+    })
+  };
+  const writeContext = devTasks.buildContext([
+    { kind: 'ai_task', task_id: 'tsk_write_approval', content: '发起 AI 开发任务：写文档' },
+    writeApproval
+  ]);
+  const writeHtml = devTasks.renderMessage(writeApproval, writeContext);
+  assert.ok(writeHtml.includes('write_file'), 'write_file approval should render tool name');
+  assert.ok(writeHtml.includes('docs/note.md'), 'write_file approval should render file chip');
+  assert.ok(writeHtml.includes('Diff 预览'), 'write_file approval should render diff preview');
+  assert.ok(writeHtml.includes('&lt;new&gt;'), 'write_file diff preview should be HTML escaped');
+
   let handler = null;
   const buttons = [{
     dataset: { taskId: 'tsk_approval', approvalId: 'tap_1_1', decision: 'approve' },
