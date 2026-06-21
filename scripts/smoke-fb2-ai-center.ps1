@@ -419,6 +419,7 @@ if ($MainToken) {
 try {
     $contract = Invoke-Json "$MainBase/api/external/apps/fb2/context-contract"
     $policy = $contract.live_tool_manifest.main_project_tool_execution_policy
+    $liveToolIds = @($contract.live_tool_manifest.tool_ids)
     $answerPolicy = $contract.answer_policy_contract
     $evalScenarios = @($answerPolicy.eval_scenarios)
     $evalScenarioIds = @($evalScenarios | ForEach-Object { $_.id })
@@ -428,6 +429,24 @@ try {
     Assert-True (($policy.chat_auto_executable_tool_ids -contains "match_analysis_brief") -and ($policy.chat_auto_executable_tool_ids -contains "group_opinion_summary")) "auto executable aggregate tools"
     Assert-True ($policy.manifest_only_tool_ids -contains "record_context_feedback") "callback tool is not chat-auto-executable"
     Assert-True (@($policy.main_project_allowed_missing_tool_ids).Count -eq 0) "no allowed tool missing in live fb2 manifest"
+    foreach ($toolId in @(
+        "context_pack",
+        "today_matches",
+        "match_analysis_brief",
+        "group_opinion_summary",
+        "search_matches",
+        "search_user_orders",
+        "user_orders",
+        "platform_orders",
+        "record_context_feedback",
+        "list_context_feedbacks",
+        "context_quality_summary",
+        "context_permission_summary",
+        "context_audit_summary",
+        "tool_manifest"
+    )) {
+        Assert-ContainsValue $liveToolIds $toolId "live manifest required tool: $toolId"
+    }
     Assert-True ($answerPolicy.schema -eq "fb2.answer_policy.v1") "answer policy schema"
     Assert-True (@($answerPolicy.canonical_eval_questions).Count -ge 6) "answer policy canonical eval questions" "count=$(@($answerPolicy.canonical_eval_questions).Count)"
     Assert-True (($evalScenarioIds -contains "today_matches_analysis") -and ($evalScenarioIds -contains "my_ticket_analysis")) "answer policy core eval scenarios"

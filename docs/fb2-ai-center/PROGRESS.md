@@ -20,6 +20,8 @@
 - 脚本已支持 `-FinalAcceptance`，自动打开 live 数据、完整场景、平台摘要、质量反馈、APK、语音 SDK 构建、真机语音证据和 no-skip 门槛。
 - 已新增 `scripts/smoke-fb2-final-acceptance.ps1`，支持 `-PreflightOnly` 无副作用预检，也会在写群前解析 `ExternalUserId` 并预检用户订单上下文，再把真实群聊可见触发和 `-FinalAcceptance` 绑定为同一批 `QualitySince` 证据，并输出机器可读 summary、子脚本日志路径、可见消息 ID、AI 回复 ID 和 feedback evidence。
 - `-PreflightOnly` 已升级为进入真实群聊前的无副作用强门禁：除用户订单上下文和真机语音证据外，还会要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建和 no-skip 全部通过。
+- 已新增 `docs/fb2-ai-center/final-acceptance-matrix.md`，把终极目标拆成上下文格式、主项目能力、fb2 能力、用户场景和剩余证据缺口，作为宣布完成前的逐项审计入口。
+- 默认 smoke 已新增 live manifest 必需工具检查，覆盖 `context_pack`、`today_matches`、`match_analysis_brief`、`group_opinion_summary`、用户订单、平台摘要、feedback、quality、permission audit 和 `tool_manifest`。
 - 已新增 `docs/fb2-ai-center/voice-device-evidence.example.json`，要求 fb2 真机验证 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
 - `scripts/smoke-fb2-visible-chat.ps1` 已作为有副作用真实群聊 smoke，只有传 `-AllowVisibleMessages` 后才会发送 `@EL` 和 selected-message `ai-reply`。
 - 最近一次无副作用 smoke 通过，主项目线上版本返回 `0.3.579 8106b0cca6bbe95370625def93f32a2716fb56ca`，fb2 live manifest 返回 `tool_count=30`。
