@@ -1,7 +1,7 @@
-//! Admin-only reports for external app tool execution quality.
+//! Reports for external app tool execution quality.
 
 use axum::{
-    extract::{Query, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -12,7 +12,10 @@ use std::sync::Arc;
 
 use crate::{
     admin::check_auth,
-    external_app_registry::{external_app_by_id, public_external_app_config},
+    external_app_api::require_external_app_service_token,
+    external_app_registry::{
+        external_app_by_id, public_external_app_config, ExternalAppDefinition,
+    },
     project_auth::json_error,
     store::AdminExternalAppToolExecutionSummary,
     types::AppState,
@@ -38,6 +41,14 @@ struct ToolExecutionRecommendation {
     next_action: &'static str,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ToolExecutionReportFilters<'a> {
+    days: i64,
+    limit: i64,
+    external_group_id: Option<&'a str>,
+    status: Option<&'a str>,
+}
+
 fn default_days() -> i64 {
     7
 }
@@ -58,32 +69,64 @@ pub async fn get_tool_execution_report(
     let app_id = q
         .app_id
         .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
+        .and_then(trimmed_non_empty)
         .unwrap_or("fb2");
     let app = match external_app_by_id(app_id) {
         Some(app) => app,
         None => return json_error(StatusCode::NOT_FOUND, format!("未知外部应用：{app_id}")),
     };
-    let days = q.days.clamp(1, 365);
-    let limit = q.limit.clamp(1, 500);
-    let external_group_id = q
-        .external_group_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
-    let status = q
-        .status
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty());
+    tool_execution_report_response(
+        state.as_ref(),
+        app,
+        report_filters_from_query(&q),
+        json!({
+            "mode": "admin_token",
+            "scope": "selected_app",
+            "app_id_source": "query_or_default"
+        }),
+    )
+}
 
+/// GET /api/external/apps/:app_id/tool-executions?days=7&limit=50
+pub async fn get_external_app_tool_execution_report(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(app_id): Path<String>,
+    Query(q): Query<ExternalAppToolExecutionReportQuery>,
+) -> Response {
+    let app_id = app_id.trim();
+    let app = match external_app_by_id(app_id) {
+        Some(app) => app,
+        None => return json_error(StatusCode::NOT_FOUND, format!("未知外部应用：{app_id}")),
+    };
+    if let Err(response) = require_external_app_service_token(app.id, &headers) {
+        return response;
+    }
+    tool_execution_report_response(
+        state.as_ref(),
+        app,
+        report_filters_from_query(&q),
+        json!({
+            "mode": "external_app_service_token",
+            "scope": "own_app_only",
+            "app_id_source": "path",
+            "query_app_id_ignored": q.app_id.as_deref().and_then(trimmed_non_empty)
+        }),
+    )
+}
+
+fn tool_execution_report_response(
+    state: &AppState,
+    app: &ExternalAppDefinition,
+    filters: ToolExecutionReportFilters<'_>,
+    access: serde_json::Value,
+) -> Response {
     match state.store.admin_external_app_tool_execution_report(
         app.id,
-        days,
-        limit,
-        external_group_id,
-        status,
+        filters.days,
+        filters.limit,
+        filters.external_group_id,
+        filters.status,
     ) {
         Ok(report) => {
             let recommendations = quality_recommendations(&report.summary);
@@ -92,18 +135,19 @@ pub async fn get_tool_execution_report(
                 "app": public_external_app_config(app),
                 "filters": {
                     "app_id": app.id,
-                    "days": days,
-                    "limit": limit,
-                    "external_group_id": external_group_id,
-                    "status": status
+                    "days": filters.days,
+                    "limit": filters.limit,
+                    "external_group_id": filters.external_group_id,
+                    "status": filters.status
                 },
+                "access": access,
                 "summary": report.summary,
                 "recent_executions": report.rows,
                 "recommendations": recommendations,
                 "privacy": {
                     "raw_payloads_exposed": false,
                     "raw_payloads_retained_in_table": "external_app_tool_executions",
-                    "note": "管理列表只返回执行元数据和质量统计，不返回 results_json 中的订单或票据明细。"
+                    "note": "该报告只返回执行元数据和质量统计，不返回 results_json 中的订单或票据明细。"
                 }
             }))
             .into_response()
@@ -112,13 +156,33 @@ pub async fn get_tool_execution_report(
             tracing::warn!(
                 app_id = app.id,
                 error = %error,
-                "admin external app tool execution report failed"
+                "external app tool execution report failed"
             );
             json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
                 "查询外部应用工具执行报告失败",
             )
         }
+    }
+}
+
+fn report_filters_from_query(
+    q: &ExternalAppToolExecutionReportQuery,
+) -> ToolExecutionReportFilters<'_> {
+    ToolExecutionReportFilters {
+        days: q.days.clamp(1, 365),
+        limit: q.limit.clamp(1, 500),
+        external_group_id: q.external_group_id.as_deref().and_then(trimmed_non_empty),
+        status: q.status.as_deref().and_then(trimmed_non_empty),
+    }
+}
+
+fn trimmed_non_empty(value: &str) -> Option<&str> {
+    let value = value.trim();
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
     }
 }
 
@@ -299,5 +363,23 @@ mod tests {
 
         assert_eq!(recommendations.len(), 1);
         assert_eq!(recommendations[0].code, "tool_quality_healthy");
+    }
+
+    #[test]
+    fn report_filters_clamp_and_trim_query_values() {
+        let q = ExternalAppToolExecutionReportQuery {
+            app_id: Some("other".to_string()),
+            days: 0,
+            limit: 999,
+            external_group_id: Some(" fb2-main ".to_string()),
+            status: Some("   ".to_string()),
+        };
+
+        let filters = report_filters_from_query(&q);
+
+        assert_eq!(filters.days, 1);
+        assert_eq!(filters.limit, 500);
+        assert_eq!(filters.external_group_id, Some("fb2-main"));
+        assert_eq!(filters.status, None);
     }
 }

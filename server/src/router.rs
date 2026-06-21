@@ -150,6 +150,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(external_app_chat_bootstrap::get_chat_bootstrap),
         )
         .route(
+            "/api/external/apps/:app_id/tool-executions",
+            get(external_app_tool_report_api::get_external_app_tool_execution_report),
+        )
+        .route(
             "/api/external/apps/:app_id/accounts/lookup",
             post(external_app_api::lookup_external_account),
         )

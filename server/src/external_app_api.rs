@@ -284,7 +284,10 @@ fn resolve_external_app(app_id: &str) -> Result<&'static ExternalAppDefinition, 
     })
 }
 
-fn require_external_app_service_token(app_id: &str, headers: &HeaderMap) -> Result<(), Response> {
+pub(crate) fn require_external_app_service_token(
+    app_id: &str,
+    headers: &HeaderMap,
+) -> Result<(), Response> {
     let supplied = external_app_service_token_from_headers(headers).ok_or_else(|| {
         json_error(
             StatusCode::UNAUTHORIZED,
