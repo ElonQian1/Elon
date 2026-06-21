@@ -12,7 +12,7 @@
     activeConversationId: '', activeMemberUserId: '',
     activeVoiceChannel: 'studio',
     activePeer: null, projectSpace: null,
-    aiProjectConversations: { userId: '', items: {}, errors: {}, loadingIds: {}, expandedIds: {} },
+    aiProjectConversations: { userId: '', items: {}, errors: {}, loadingIds: {}, expandedIds: {}, drafts: {} },
     plaza: { loaded: false, loading: false, projects: [], query: '', filterKey: 'all', busyId: '', error: '' },
     nodeAdminUrl: safeNodeAdminUrl(),
     localAdminToken: '',
@@ -488,6 +488,21 @@
     return clean(state.user && (state.user.id || state.user.user_id || state.user.userId));
   }
 
+  function conversationIdOf(conversation) {
+    return clean(conversation && (conversation.id || conversation.conversation_id || conversation.conversationId));
+  }
+
+  function projectConversationDraftKey(projectId, conversationId) {
+    return `${clean(projectId)}::${clean(conversationId)}`;
+  }
+
+  function draftProjectConversationId() {
+    const raw = window.crypto && window.crypto.randomUUID
+      ? window.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+    return `pc-${String(raw).replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 48)}`;
+  }
+
   function aiConversationCache() {
     const userId = currentUserId();
     const cache = state.aiProjectConversations;
@@ -497,8 +512,83 @@
       cache.errors = {};
       cache.loadingIds = {};
       cache.expandedIds = {};
+      cache.drafts = {};
     }
     return cache;
+  }
+
+  function aiProjectDrafts(projectId) {
+    const cache = aiConversationCache();
+    return Object.values(cache.drafts || {})
+      .filter((draft) => sameId(draft && draft.project_id, projectId))
+      .sort((left, right) => String(right.updated_at || '').localeCompare(String(left.updated_at || '')));
+  }
+
+  function mergeAiProjectDrafts(projectId, conversations) {
+    const items = Array.isArray(conversations) ? conversations.slice() : [];
+    const ids = new Set(items.map(conversationIdOf).filter(Boolean));
+    const drafts = aiProjectDrafts(projectId).filter((draft) => !ids.has(conversationIdOf(draft)));
+    return drafts.concat(items);
+  }
+
+  function isDraftProjectConversation(projectId, conversationId) {
+    return !!aiConversationCache().drafts[projectConversationDraftKey(projectId, conversationId)];
+  }
+
+  function rememberAiProject(projectId) {
+    const cleanProjectId = clean(projectId);
+    if (!cleanProjectId) return;
+    try {
+      localStorage.setItem('elon_pc_last_ai_project_id', cleanProjectId);
+    } catch (_) {}
+  }
+
+  function preferredAiProjectForNewConversation(projectId) {
+    const projects = aiSidebarProjects();
+    if (!projects.length) return null;
+    const explicit = clean(projectId);
+    if (explicit) {
+      const project = projects.find((item) => sameId(item.id, explicit));
+      if (project) return project;
+    }
+    if (state.activeProjectId) {
+      const active = projects.find((item) => sameId(item.id, state.activeProjectId));
+      if (active) return active;
+    }
+    try {
+      const lastProjectId = clean(localStorage.getItem('elon_pc_last_ai_project_id'));
+      const last = projects.find((item) => sameId(item.id, lastProjectId));
+      if (last) return last;
+    } catch (_) {}
+    return projects[0];
+  }
+
+  function createDraftProjectConversation(project) {
+    const projectId = clean(project && project.id);
+    const userId = currentUserId();
+    if (!projectId || !userId) return null;
+    const cache = aiConversationCache();
+    const id = draftProjectConversationId();
+    const nowIso = new Date().toISOString();
+    const draft = {
+      id,
+      project_id: projectId,
+      user_id: userId,
+      user_account: userName(state.user),
+      title: '新对话',
+      status: 'draft',
+      is_draft: true,
+      message_count: 0,
+      task_count: 0,
+      created_at: nowIso,
+      updated_at: nowIso,
+      last_message_at: nowIso
+    };
+    cache.drafts[projectConversationDraftKey(projectId, id)] = draft;
+    cache.items[projectId] = mergeAiProjectDrafts(projectId, cache.items[projectId] || []);
+    cache.expandedIds[projectId] = true;
+    rememberAiProject(projectId);
+    return draft;
   }
 
   function aiSidebarVisible() {
@@ -518,7 +608,15 @@
     }
     try {
       const data = await api(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}/conversations?limit=20`, { cache: 'no-store' });
-      cache.items[projectId] = Array.isArray(data.conversations) ? data.conversations : [];
+      const serverConversations = Array.isArray(data.conversations) ? data.conversations : [];
+      const serverIds = new Set(serverConversations.map(conversationIdOf).filter(Boolean));
+      Object.keys(cache.drafts || {}).forEach((key) => {
+        const draft = cache.drafts[key];
+        if (sameId(draft && draft.project_id, projectId) && serverIds.has(conversationIdOf(draft))) {
+          delete cache.drafts[key];
+        }
+      });
+      cache.items[projectId] = mergeAiProjectDrafts(projectId, serverConversations);
       delete cache.errors[projectId];
     } catch (error) {
       cache.errors[projectId] = clean(error && error.message) || '最近会话加载失败';
@@ -598,13 +696,14 @@
     const expanded = !!cache.expandedIds[projectId];
     const visibleConversations = expanded ? conversations : conversations.slice(0, 5);
     const conversationRows = visibleConversations.map((conversation) => {
-      const conversationId = clean(conversation.id || conversation.conversation_id || conversation.conversationId);
+      const conversationId = conversationIdOf(conversation);
+      const draft = isDraftProjectConversation(projectId, conversationId);
       const active = state.activeKind === 'project-conversation'
         && sameId(projectId, state.activeProjectId)
         && sameId(conversationId, state.activeConversationId);
-      return `<button class="ai-project-thread ${active ? 'active' : ''}" type="button" data-ai-project-id="${escapeHtml(projectId)}" data-ai-conversation-id="${escapeHtml(conversationId)}">
+      return `<button class="ai-project-thread ${active ? 'active' : ''} ${draft ? 'draft' : ''}" type="button" data-ai-project-id="${escapeHtml(projectId)}" data-ai-conversation-id="${escapeHtml(conversationId)}">
         <span class="ai-project-thread-title">${escapeHtml(conversationTitle(conversation))}</span>
-        <span class="ai-project-thread-time">${escapeHtml(relativeTimeLabel(conversationTimeValue(conversation)))}</span>
+        <span class="ai-project-thread-time">${escapeHtml(draft ? '草稿' : relativeTimeLabel(conversationTimeValue(conversation)))}</span>
       </button>`;
     }).join('');
     const expandRow = conversations.length > 5
@@ -615,22 +714,25 @@
     const empty = !loading && !error && cache.items[projectId] && !conversations.length
       ? '<div class="ai-project-empty">暂无最近任务</div>'
       : '';
-    const folderActive = state.activeKind === 'project' && sameId(projectId, state.activeProjectId);
+    const folderActive = (state.activeKind === 'project' || state.activeKind === 'project-conversation') && sameId(projectId, state.activeProjectId);
     return `<div class="ai-project-group">
-      <button class="ai-project-folder ${folderActive ? 'active' : ''}" type="button" data-ai-project-folder-id="${escapeHtml(projectId)}">
-        <span class="ai-project-folder-icon" aria-hidden="true"></span>
-        <span class="ai-project-folder-title">${escapeHtml(title)}</span>
-      </button>
+      <div class="ai-project-folder-row">
+        <button class="ai-project-folder ${folderActive ? 'active' : ''}" type="button" data-ai-project-folder-id="${escapeHtml(projectId)}">
+          <span class="ai-project-folder-icon" aria-hidden="true"></span>
+          <span class="ai-project-folder-title">${escapeHtml(title)}</span>
+        </button>
+        <button class="ai-project-new-chat" type="button" title="在 ${escapeHtml(title)} 下新建对话" aria-label="在 ${escapeHtml(title)} 下新建对话" data-ai-project-new-chat-id="${escapeHtml(projectId)}">+</button>
+      </div>
       ${conversationRows || loading || error || empty}
       ${expandRow}
     </div>`;
   }
 
   function renderAiSidebar(query) {
-    const aiFriend = socialAiFriend();
+    const targetProject = preferredAiProjectForNewConversation();
     const actionMatches = (item) => !query || `${item.title} ${item.sub || ''}`.toLowerCase().includes(query);
     const primaryActions = [
-      { id: 'new-chat', glyph: '+', title: '新对话', sub: aiFriend ? '直接问一龙AI' : '登录后开启', primary: true, active: state.activeKind === 'ai' },
+      { id: 'new-chat', glyph: '+', title: '新对话', sub: targetProject ? `${titleOf(targetProject)} 下新建` : (state.token ? '先创建或加入项目' : '登录后开启'), primary: true, active: state.activeKind === 'project-conversation' && state.activeConversationId && isDraftProjectConversation(state.activeProjectId, state.activeConversationId) },
       { id: 'search', glyph: '搜', title: '搜索', sub: '搜索对话、项目和工具' },
       { id: 'store', glyph: '插', title: '插件', sub: '项目和 APK 商店', active: state.activeKind === 'store' },
       { id: 'tasks', glyph: '自', title: '自动化', sub: '任务和提醒', active: state.activeKind === 'tasks' },
@@ -652,7 +754,7 @@
     els.channelList.querySelectorAll('[data-ai-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const action = btn.dataset.aiAction;
-        if (action === 'new-chat') return selectAiAssistant(true);
+        if (action === 'new-chat') return startProjectConversationFromSidebar();
         if (action === 'search') {
           els.sidebarSearch.focus();
           els.sidebarSearch.select();
@@ -665,6 +767,9 @@
     });
     els.channelList.querySelectorAll('[data-ai-project-folder-id]').forEach((btn) => {
       btn.addEventListener('click', () => selectProject(btn.dataset.aiProjectFolderId));
+    });
+    els.channelList.querySelectorAll('[data-ai-project-new-chat-id]').forEach((btn) => {
+      btn.addEventListener('click', () => startProjectConversationFromSidebar(btn.dataset.aiProjectNewChatId));
     });
     els.channelList.querySelectorAll('[data-ai-conversation-id]').forEach((btn) => {
       btn.addEventListener('click', () => selectProjectConversation(btn.dataset.aiProjectId, btn.dataset.aiConversationId));
@@ -817,7 +922,7 @@
 
   function cachedProjectConversation(projectId, conversationId) {
     const conversations = aiConversationCache().items[clean(projectId)] || [];
-    return conversations.find((conversation) => sameId(conversation.id || conversation.conversation_id || conversation.conversationId, conversationId)) || null;
+    return conversations.find((conversation) => sameId(conversationIdOf(conversation), conversationId)) || null;
   }
 
   function channelButton(item) {
@@ -1560,6 +1665,22 @@
     }
   }
 
+  async function startProjectConversationFromSidebar(projectId) {
+    if (!state.token || !currentUserId()) {
+      openAuthModal('login');
+      return;
+    }
+    const project = preferredAiProjectForNewConversation(projectId);
+    if (!project) {
+      window.alert('请先注册或加入一个项目，新对话会显示在对应项目下面。');
+      selectProjectsHome();
+      return;
+    }
+    const draft = createDraftProjectConversation(project);
+    if (!draft) return;
+    await selectProjectConversation(project.id, draft.id, { focusComposer: true, draftOnly: true });
+  }
+
   function selectFriends() {
     state.activeKind = 'friends';
     state.activeProjectId = '';
@@ -1678,12 +1799,13 @@
     }
   }
 
-  async function selectProjectConversation(projectId, conversationId) {
+  async function selectProjectConversation(projectId, conversationId, options) {
     const project = projectById(projectId);
     const userId = currentUserId();
     const cleanConversationId = clean(conversationId);
     if (!project || !userId || !cleanConversationId) return;
     const conversation = cachedProjectConversation(projectId, cleanConversationId);
+    const isDraft = isDraftProjectConversation(projectId, cleanConversationId) || (conversation && conversation.is_draft);
     state.activeKind = 'project-conversation';
     state.activeProjectId = String(projectId);
     state.activeConversationId = cleanConversationId;
@@ -1694,12 +1816,22 @@
     setAuthClaimBanner(false);
     setRails('project-conversation');
     els.workspaceName.textContent = titleOf(project);
-    els.workspaceMeta.textContent = '最近任务';
+    els.workspaceMeta.textContent = '项目 AI 会话';
     setSidebarPlaceholder('搜索项目和会话');
     setHeader('项', conversationTitle(conversation), titleOf(project));
-    setComposer(true, '在这个项目会话下留言', false);
+    setComposer(true, '向一龙AI说明这个项目要做什么', true);
     setNodeMode(false);
     renderChannels();
+    rememberAiProject(projectId);
+    if (isDraft || (options && options.draftOnly)) {
+      renderMembers('项目会话', [{ name: userName(state.user), sub: titleOf(project) }]);
+      els.messageList.innerHTML = `<div class="empty-state">
+        <strong>新项目对话</strong>
+        <p>发送第一条消息后，它会正式保存到「${escapeHtml(titleOf(project))}」下面。</p>
+      </div>`;
+      if (options && options.focusComposer) setTimeout(() => els.input.focus(), 0);
+      return;
+    }
     els.messageList.innerHTML = '<div class="empty-state">加载项目会话中…</div>';
     try {
       try {
@@ -1715,6 +1847,7 @@
       }
       const data = await api(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}/conversations/${encodeURIComponent(cleanConversationId)}/messages?limit=120`, { cache: 'no-store' });
       renderMessages(data.messages || [], 'project');
+      if (options && options.focusComposer) setTimeout(() => els.input.focus(), 0);
     } catch (error) {
       showError(error);
     }
@@ -2042,14 +2175,28 @@
         if (state.activeKind === 'ai') await selectAiAssistant(true);
         else await selectPeer(state.activePeer.kind, state.activePeer.id);
       } else if (state.activeKind === 'project-conversation' && state.activeProjectId && state.activeConversationId) {
-        const memberUserId = state.activeMemberUserId || currentUserId();
-        if (!memberUserId) throw new Error('请先登录一龙账号');
-        await api(`/api/projects/${encodeURIComponent(state.activeProjectId)}/members/${encodeURIComponent(memberUserId)}/conversations/${encodeURIComponent(state.activeConversationId)}/messages`, {
-          method: 'POST',
-          body: JSON.stringify({ content })
-        });
+        const project = projectById(state.activeProjectId);
+        const conversation = cachedProjectConversation(state.activeProjectId, state.activeConversationId);
+        const body = {
+          message: content,
+          conversation_id: state.activeConversationId
+        };
+        if (conversation && isDraftProjectConversation(state.activeProjectId, state.activeConversationId)) {
+          body.conversation_title = compactText(content, 28);
+        }
+        const agent = models.selectedAgentForRequest();
+        if (agent) body.agent = agent;
         els.input.value = '';
-        await loadAiProjectConversations(projectById(state.activeProjectId), true);
+        els.input.style.height = '46px';
+        els.messageList.innerHTML = `<div class="empty-state">
+          <strong>一龙AI正在处理</strong>
+          <p>这条对话会保存在「${escapeHtml(project ? titleOf(project) : '当前项目')}」下面。</p>
+        </div>`;
+        await api(`/api/projects/${encodeURIComponent(state.activeProjectId)}/chat`, {
+          method: 'POST',
+          body: JSON.stringify(body)
+        });
+        await loadAiProjectConversations(project, true);
         await selectProjectConversation(state.activeProjectId, state.activeConversationId);
       } else if (state.activeKind === 'project' && state.activeProjectId && state.activeChannelId) {
         const shouldUseAiTask = useAiTask || state.activeChannelKind === 'ai_development';

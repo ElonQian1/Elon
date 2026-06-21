@@ -538,6 +538,12 @@ button { cursor: pointer; }
 .ai-project-group {
   margin: 4px 0 10px;
 }
+.ai-project-folder-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  gap: 4px;
+  align-items: center;
+}
 .ai-project-folder,
 .ai-project-thread,
 .ai-project-expand {
@@ -562,6 +568,20 @@ button { cursor: pointer; }
 .ai-project-folder.active,
 .ai-project-thread:hover,
 .ai-project-thread.active {
+  background: #303138;
+  color: var(--text);
+}
+.ai-project-new-chat {
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 18px;
+  line-height: 1;
+}
+.ai-project-new-chat:hover {
   background: #303138;
   color: var(--text);
 }
@@ -607,6 +627,12 @@ button { cursor: pointer; }
   max-width: 58px;
   color: var(--text-muted);
   font-size: 12px;
+}
+.ai-project-thread.draft .ai-project-thread-title {
+  color: var(--text);
+}
+.ai-project-thread.draft .ai-project-thread-time {
+  color: #8fb4ff;
 }
 .ai-project-expand,
 .ai-project-loading,
