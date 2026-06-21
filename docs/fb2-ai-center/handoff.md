@@ -93,6 +93,7 @@
 - 主项目 `/api/external/apps/fb2/context-contract` 会主动读取 fb2 `/api/main-project/context/tool-manifest`，并以 `live_tool_manifest` 返回脱敏摘要（状态、工具数量、工具 id、usage_policy/tool_selection_policy 可用性），不暴露 token 或完整大 payload。
 - `live_tool_manifest.main_project_tool_execution_policy` 会把 fb2 实时 manifest 拆成 `chat_auto_executable_tool_ids`、`manifest_only_tool_ids` 和 `main_project_allowed_missing_tool_ids`。fb2 新增工具后，只有进入 `chat_auto_executable_tool_ids` 才代表主项目群聊 AI 会自动规划执行；其它工具只是发现信息、回调端点或待接入能力。
 - 主项目新增 `scripts/smoke-fb2-ai-center.ps1`，用于不往生产群聊发消息的 live smoke：默认验证主项目健康、版本、context-contract 和工具覆盖；传 `FB2_AI_CENTER_TOKEN` 后验证 fb2 Context Pack、比赛分析、群观点、赛后复盘摘要；传 `-IncludePlatformOrderSummary` 后验证平台匿名摘要；传 `-ExternalUserId` 后验证本人订单上下文。
+- `scripts/smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe` 已验证 fb2 session bridge 能换取主项目 token，`ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`，authenticated `chat-bootstrap` 能返回主项目语音 composer、ASR/TTS 免费策略和 AI 回复扣费策略；这条 smoke 不发送群聊消息。
 - 主项目新增 `scripts/smoke-fb2-visible-chat.ps1`，用于获得明确授权后验证真实群聊可见入口：发送 `@EL`、调用 selected-message `/ai-reply`、等待 `usr_elon_ai`/`gai_*` 回复；默认没有 `-AllowVisibleMessages` 时会失败退出，避免无意写入生产群。
 - `scripts/smoke-fb2-visible-chat.ps1` 现在还会检查真实 AI 回复正文：`@EL` 和 selected-message `AI回复` 都必须带来源标记、事实/观点/推断分层、风险边界，并避免“肯定命中/稳赢/重注/包赢”等投注保证；selected-message 场景还必须明确反驳被测消息里的“肯定赢盘、重注”说法。
 - `scripts/smoke-fb2-final-acceptance.ps1` 的最终 summary 已新增 `visible_answer_policy_evidence`，把真实群聊回复正文策略证据和 `feedback_evidence`、`final_acceptance_evidence` 放在同一批验收 JSON 中。

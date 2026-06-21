@@ -11,7 +11,7 @@
 
 | 要求 | 验收证据 | 当前状态 |
 |---|---|---|
-| `chat-bootstrap` | `smoke-fb2-ai-center.ps1 -MainToken` 或 `-Fb2Username/-Fb2Password` 检查默认群、语音 composer、AI 回复、计费策略 | 已有脚本覆盖，最终验收需带真实登录来源 |
+| `chat-bootstrap` | `smoke-fb2-ai-center.ps1 -MainToken` 或 `-Fb2Username/-Fb2Password` 检查默认群、语音 composer、AI 回复、计费策略 | 已用 `123qwe/123qwe` 验证 fb2 session bridge 和 authenticated bootstrap；最终验收仍需与 live Context Pack、语音证据、真实群聊写入绑定 |
 | `context-contract` | 默认 smoke 检查 answer policy、六类评测场景、live manifest execution policy | 已覆盖 |
 | Context Pack 拉取 | `-RequireFb2Live -RequireAllScenarios -ExternalUserId <uuid>` | 需要真实 `FB2_AI_CENTER_TOKEN` 完成最终验证 |
 | tool manifest 读取 | 默认 smoke 检查 `live_tool_manifest.status=ready`、必需 tool ids、无 missing allowed tool | 已覆盖并新增必需工具清单 |
