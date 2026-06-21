@@ -30,7 +30,8 @@ param(
     [double]$MaxWrongContextRate = 0,
     [int]$MinFeedbackCount = 0,
     [int]$MinMatchedCitedSourceCount = 0,
-    [int]$QualityFeedbackSampleLimit = 5
+    [int]$QualityFeedbackSampleLimit = 5,
+    [switch]$RequireNoSkips
 )
 
 $ErrorActionPreference = "Stop"
@@ -691,6 +692,10 @@ if (-not $Fb2Token) {
 Write-Output ""
 Write-Output "== Summary =="
 Write-Output "failed=$script:Failed skipped=$script:Skipped"
+if ($RequireNoSkips -and $script:Skipped -gt 0) {
+    Write-Check "FAIL" "no skipped checks" "skipped=$script:Skipped"
+    exit 1
+}
 if ($script:Failed -gt 0) {
     exit 1
 }
