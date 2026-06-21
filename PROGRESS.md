@@ -29,6 +29,7 @@
 - 已把频道 AI 任务的 done/error/cancel 结果写入统一改为 `insert_project_channel_ai_result_once`，正常完成、取消、恢复补写都遵守同一任务只写一条 `ai_result` 的规则。
 - 已新增 `server/src/store/task_recovery_tests.rs`，覆盖 interrupted/stale 状态和 error、重复清理幂等、已有 `ai_result` 不重复、未超时任务不清理、活跃任务排除、通用 once helper。
 - 已新增 `finish_running_task`，频道 AI runner 结束时只允许从 `running` 状态写入最终结果，避免恢复逻辑已写入 `interrupted/failed` 后又被迟到 runner 覆盖。
+- 已新增频道消息任务状态投影：`ProjectChannelMessage` 返回 `task_status`、`task_error`、`task_apk_url`，PC 任务卡优先使用后端任务状态判断是否仍在运行，终态任务的历史审批按钮会失效并提供继续入口。
 
 ## 验证结果
 
@@ -40,7 +41,7 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_server_runtime`，5 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --all-features`，503 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server task_recovery_tests -- --nocapture`，7 passed
-- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server store::tasks::tests -- --nocapture`，10 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server store::tasks::tests -- --nocapture`，11 passed（新增频道消息任务状态投影）
 - 通过：`node scripts\test-pc-dev-assets.js`
 - 通过：`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
 - 通过：`cargo clippy --manifest-path server\Cargo.toml --bin elon-pc-node -- -D warnings`

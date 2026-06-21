@@ -25,10 +25,19 @@
             request: '',
             resultText: '',
             failed: false,
-            canceled: false
+            canceled: false,
+            status: '',
+            error: '',
+            apkUrl: ''
           });
         }
         const task = tasks.get(taskId);
+        const status = taskStatusOf(message);
+        if (status) task.status = status;
+        const taskError = taskErrorOf(message);
+        if (taskError) task.error = taskError;
+        const apkUrl = taskApkUrlOf(message);
+        if (apkUrl) task.apkUrl = apkUrl;
         if (kind === 'ai_task') task.request = taskRequest(messageText(message)) || task.request;
         if (kind === 'ai_progress') {
           task.progressCount += 1;
@@ -114,7 +123,7 @@
     function hasOpenTasks(messages, context) {
       if (!Array.isArray(messages) || !messages.length) return false;
       const built = context || buildContext(messages);
-      return Array.from(built.tasks.values()).some((task) => !task.result);
+      return Array.from(built.tasks.values()).some((task) => !taskIsTerminal(task));
     }
 
     function renderTaskStart(message, context) {
@@ -130,7 +139,10 @@
         taskId,
         meta: task && task.progressCount ? `${task.progressCount} 条进度` : '等待执行回写',
         actions: true,
-        canCancel: !!taskId && !(task && task.result)
+        canCancel: !!taskId && !taskIsTerminal(task),
+        continueDraft: taskIsTerminal(task) && !(task && task.result)
+          ? continuationDraft(request, task && (task.error || task.status), taskIsCanceled(task), taskIsFailed(task))
+          : null
       });
     }
 
@@ -147,7 +159,7 @@
         taskId,
         meta: '来自运行时',
         actions: true,
-        canCancel: !!taskId && !(task && task.result)
+        canCancel: !!taskId && !taskIsTerminal(task)
       });
     }
 
@@ -169,7 +181,7 @@
           taskId,
           meta: finalState.meta,
           actions: true,
-          canCancel: !!taskId && !(task && task.result)
+          canCancel: !!taskId && !taskIsTerminal(task)
         });
       }
       const isResult = event.type === 'tool_result';
@@ -184,7 +196,7 @@
         taskId,
         meta: isResult ? (failed ? '工具返回错误' : '工具已完成') : '等待工具返回',
         actions: true,
-        canCancel: !!taskId && !(task && task.result)
+        canCancel: !!taskId && !taskIsTerminal(task)
       });
     }
 
@@ -194,18 +206,20 @@
       const tool = clean(event.tool) || 'tool';
       const approvalId = clean(event.approval_id);
       const recoveredState = approvalStateFor(context, taskId, approvalId);
-      const closed = recoveredState && recoveredState.status !== 'pending';
+      const closedState = recoveredState && recoveredState.status !== 'pending'
+        ? recoveredState
+        : (taskIsTerminal(task) ? taskTerminalApprovalState(task) : null);
       return cardHtml({
-        tone: closed ? recoveredState.tone : 'approval',
+        tone: closedState ? closedState.tone : 'approval',
         eyebrow: '工具审批',
-        title: closed ? `${tool} ${recoveredState.label}` : `确认 ${tool}`,
+        title: closedState ? `${tool} ${closedState.label}` : `确认 ${tool}`,
         body: renderApprovalBody(event),
         bodyIsHtml: true,
         taskId,
-        meta: closed ? recoveredState.meta : '批准前不会执行',
+        meta: closedState ? closedState.meta : '批准前不会执行',
         actions: true,
-        canCancel: !!taskId && !(task && task.result),
-        approval: approvalId && !closed ? { approvalId } : null
+        canCancel: !!taskId && !taskIsTerminal(task),
+        approval: approvalId && !closedState ? { approvalId } : null
       });
     }
 
@@ -394,6 +408,12 @@
     }
 
     function statusForTask(task) {
+      if (taskIsTerminal(task)) {
+        if (taskIsCanceled(task)) return { tone: 'canceled', label: taskStatusOfValue(task) === 'interrupted' ? '已中断' : '已停止' };
+        return taskIsFailed(task)
+          ? { tone: 'failed', label: '任务失败' }
+          : { tone: 'done', label: '任务完成' };
+      }
       if (task && task.result) {
         if (task.canceled) return { tone: 'canceled', label: '已停止' };
         return task.failed
@@ -414,6 +434,48 @@
 
     function taskIdOf(message) {
       return clean(message.task_id || message.taskId);
+    }
+
+    function taskStatusOf(message) {
+      return clean(message.task_status || message.taskStatus).toLowerCase();
+    }
+
+    function taskErrorOf(message) {
+      return clean(message.task_error || message.taskError);
+    }
+
+    function taskApkUrlOf(message) {
+      return clean(message.task_apk_url || message.taskApkUrl);
+    }
+
+    function taskStatusOfValue(task) {
+      return clean(task && task.status).toLowerCase();
+    }
+
+    function taskIsTerminal(task) {
+      if (!task) return false;
+      if (task.result) return true;
+      return ['done', 'failed', 'canceled', 'cancelled', 'interrupted'].includes(taskStatusOfValue(task));
+    }
+
+    function taskIsCanceled(task) {
+      const status = taskStatusOfValue(task);
+      return !!(task && task.canceled) || ['canceled', 'cancelled', 'interrupted'].includes(status);
+    }
+
+    function taskIsFailed(task) {
+      const status = taskStatusOfValue(task);
+      return !!(task && task.failed) || ['failed', 'interrupted'].includes(status);
+    }
+
+    function taskTerminalApprovalState(task) {
+      if (taskIsCanceled(task)) {
+        return { status: 'canceled', tone: 'canceled', label: '已失效', meta: '任务已结束' };
+      }
+      if (taskIsFailed(task)) {
+        return { status: 'failed', tone: 'failed', label: '已失效', meta: '任务失败，审批不会继续执行' };
+      }
+      return { status: 'done', tone: 'done', label: '已失效', meta: '任务已结束' };
     }
 
     function taskRequest(content) {

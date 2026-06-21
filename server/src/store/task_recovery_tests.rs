@@ -104,6 +104,32 @@ fn interrupted_running_channel_task_gets_terminal_result_once() {
 }
 
 #[test]
+fn channel_messages_include_persisted_task_terminal_state() {
+    let store = temp_store();
+    let (user_id, project_id, channel_id, task_id) =
+        temp_channel_task(&store, "channel-message-task-state@example.com");
+
+    store
+        .mark_interrupted_running_tasks_with_channel_results()
+        .expect("running task should be interrupted");
+
+    let messages = store
+        .list_project_channel_messages(&user_id, &project_id, &channel_id, 50)
+        .expect("messages should list");
+    let task_message = messages
+        .iter()
+        .find(|message| {
+            message.kind == "ai_task" && message.task_id.as_deref() == Some(task_id.as_str())
+        })
+        .expect("task message should exist");
+    assert_eq!(task_message.task_status.as_deref(), Some("interrupted"));
+    assert_eq!(
+        task_message.task_error.as_deref(),
+        Some("server restarted before task finished")
+    );
+}
+
+#[test]
 fn stale_running_channel_task_gets_terminal_result_once() {
     let store = temp_store();
     let (user_id, project_id, channel_id, task_id) =

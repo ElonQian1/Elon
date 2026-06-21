@@ -101,6 +101,48 @@ function testDevTasksHasOpenPendingApproval() {
   assert.strictEqual(devTasks.hasOpenTasks(messages, context), true, 'pending approval without result should be considered open');
 }
 
+function testDevTasksUsesPersistedTaskStatus() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    approveTool: async () => {},
+    draftContinuation: () => {}
+  });
+  const messages = [
+    {
+      kind: 'ai_task',
+      task_id: 'tsk_interrupted_status',
+      task_status: 'interrupted',
+      task_error: 'server restarted before task finished',
+      content: '发起 AI 开发任务：继续恢复'
+    },
+    {
+      kind: 'ai_progress',
+      task_id: 'tsk_interrupted_status',
+      task_status: 'interrupted',
+      content: JSON.stringify({
+        type: 'tool_approval_required',
+        tool: 'run_command',
+        approval_id: 'tap_stale',
+        status: 'pending'
+      })
+    }
+  ];
+  const context = devTasks.buildContext(messages);
+  const startHtml = devTasks.renderMessage(messages[0], context);
+  const approvalHtml = devTasks.renderMessage(messages[1], context);
+
+  assert.strictEqual(devTasks.hasOpenTasks(messages, context), false, 'terminal task status should close the task even without ai_result');
+  assert.ok(startHtml.includes('已中断'), 'task card should use persisted interrupted status');
+  assert.ok(startHtml.includes('data-dev-task-action="continue"'), 'terminal status card should offer continue action');
+  assert.ok(!approvalHtml.includes('data-decision="approve"'), 'terminal task should not keep stale approve button');
+  assert.ok(approvalHtml.includes('已失效'), 'stale approval should show invalid state');
+}
+
 function testDevTasksToolTimeline() {
   const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
   const devTasks = sandbox.window.ElonPcDevTasks.create({
@@ -458,6 +500,7 @@ function testLocalAdminTokenWiring() {
 (async () => {
   testDevTasksContinueAction();
   testDevTasksHasOpenPendingApproval();
+  testDevTasksUsesPersistedTaskStatus();
   testDevTasksToolTimeline();
   await testDevTasksToolApprovalButtons();
   testProjectReadinessChecklist();

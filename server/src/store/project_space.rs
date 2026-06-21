@@ -40,11 +40,14 @@ fn project_channel_message_from_row(
         kind: row.get(7)?,
         content: row.get(8)?,
         task_id: row.get(9)?,
-        suggestion_status: row.get(10)?,
-        suggestion_resolved_by: row.get(11)?,
-        suggestion_resolved_by_name: row.get(12)?,
-        suggestion_resolved_at: row.get(13)?,
-        created_at: row.get(14)?,
+        task_status: row.get(10)?,
+        task_error: row.get(11)?,
+        task_apk_url: row.get(12)?,
+        suggestion_status: row.get(13)?,
+        suggestion_resolved_by: row.get(14)?,
+        suggestion_resolved_by_name: row.get(15)?,
+        suggestion_resolved_at: row.get(16)?,
+        created_at: row.get(17)?,
     })
 }
 
@@ -201,6 +204,9 @@ impl Store {
                     u.avatar_data_url,
                     m.reply_to_message_id,
                     m.kind, m.content, m.task_id,
+                    t.status AS task_status,
+                    t.error AS task_error,
+                    t.apk_url AS task_apk_url,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
@@ -210,6 +216,7 @@ impl Store {
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
+             LEFT JOIN tasks t ON t.id = m.task_id
              WHERE m.project_id = ?1 AND m.channel_id = ?2
              ORDER BY m.created_at DESC
              LIMIT ?3",
@@ -291,6 +298,9 @@ impl Store {
                     u.avatar_data_url,
                     m.reply_to_message_id,
                     m.kind, m.content, m.task_id,
+                    t.status AS task_status,
+                    t.error AS task_error,
+                    t.apk_url AS task_apk_url,
                     m.suggestion_status,
                     m.suggestion_resolved_by,
                     COALESCE(resolver.nickname, resolver.phone, resolver.email, m.suggestion_resolved_by)
@@ -300,6 +310,7 @@ impl Store {
              FROM project_channel_messages m
              LEFT JOIN users u ON u.id = m.sender_user_id
              LEFT JOIN users resolver ON resolver.id = m.suggestion_resolved_by
+             LEFT JOIN tasks t ON t.id = m.task_id
              WHERE m.project_id = ?1 AND m.channel_id = ?2 AND m.id = ?3",
             params![project_id, channel_id, id],
             |row| project_channel_message_from_row(row, sender_user_id.unwrap_or_default()),
