@@ -5,8 +5,11 @@
     const markdown = deps.markdown || {};
     const refreshActiveChannel = deps.refreshActiveChannel;
     const cancelTask = deps.cancelTask;
+    const draftContinuation = deps.draftContinuation;
+    const continuationDrafts = new Map();
 
     function buildContext(messages) {
+      continuationDrafts.clear();
       const tasks = new Map();
       (messages || []).forEach((message) => {
         const kind = messageKind(message);
@@ -17,15 +20,19 @@
             taskId,
             progressCount: 0,
             result: null,
+            request: '',
+            resultText: '',
             failed: false,
             canceled: false
           });
         }
         const task = tasks.get(taskId);
+        if (kind === 'ai_task') task.request = taskRequest(messageText(message)) || task.request;
         if (kind === 'ai_progress') task.progressCount += 1;
         if (kind === 'ai_result') {
           const content = messageText(message);
           task.result = message;
+          task.resultText = content;
           task.canceled = /停止|取消|canceled|cancelled/i.test(content);
           task.failed = !task.canceled && /失败|错误|error|failed/i.test(content);
         }
@@ -38,7 +45,7 @@
       if (!['ai_task', 'ai_progress', 'ai_result'].includes(kind)) return '';
       if (kind === 'ai_task') return renderTaskStart(message, context);
       if (kind === 'ai_progress') return renderProgress(message, context);
-      return renderResult(message);
+      return renderResult(message, context);
     }
 
     function bindActions(root) {
@@ -63,6 +70,14 @@
             button.disabled = false;
             button.textContent = '停止';
           }
+        });
+      });
+      root.querySelectorAll('[data-dev-task-action="continue"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const taskId = clean(button.dataset.taskId);
+          const draft = taskId ? continuationDrafts.get(taskId) : '';
+          if (!draft || typeof draftContinuation !== 'function') return;
+          draftContinuation(draft);
         });
       });
     }
@@ -105,7 +120,9 @@
       });
     }
 
-    function renderResult(message) {
+    function renderResult(message, context) {
+      const taskId = taskIdOf(message);
+      const task = taskId ? context.tasks.get(taskId) : null;
       const content = messageText(message);
       const canceled = /停止|取消|canceled|cancelled/i.test(content);
       const failed = !canceled && /失败|错误|error|failed/i.test(content);
@@ -115,9 +132,10 @@
         title: canceled ? '任务已停止' : (failed ? '任务失败' : '任务完成'),
         body: renderBody(content, true),
         bodyIsHtml: true,
-        taskId: taskIdOf(message),
+        taskId,
         meta: canceled ? '已中断运行' : (failed ? '需要继续处理' : '可以检查变更'),
-        actions: true
+        actions: true,
+        continueDraft: continuationDraft(task && task.request, content, canceled, failed)
       });
     }
 
@@ -129,8 +147,12 @@
       const taskMeta = taskId
         ? `<span title="${escapeHtml(taskId)}">任务 ${escapeHtml(shortId(taskId))}</span>`
         : '';
+      if (taskId && card.continueDraft) continuationDrafts.set(taskId, card.continueDraft);
       const actions = card.actions
-        ? taskActionsHtml(taskId, !!card.canCancel)
+        ? taskActionsHtml(taskId, {
+          canCancel: !!card.canCancel,
+          canContinue: !!card.continueDraft
+        })
         : '';
       return `<div class="message-content dev-task-wrap">
         <section class="dev-task-card ${escapeHtml(card.tone || 'running')}">
@@ -147,11 +169,14 @@
       </div>`;
     }
 
-    function taskActionsHtml(taskId, canCancel) {
-      const stop = canCancel && taskId
+    function taskActionsHtml(taskId, options) {
+      const stop = options.canCancel && taskId
         ? `<button class="danger" type="button" data-dev-task-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>`
         : '';
-      return `<div class="dev-task-card-actions">${stop}<button type="button" data-dev-task-action="refresh">刷新</button></div>`;
+      const cont = options.canContinue && taskId
+        ? `<button class="primary" type="button" data-dev-task-action="continue" data-task-id="${escapeHtml(taskId)}">继续</button>`
+        : '';
+      return `<div class="dev-task-card-actions">${cont}${stop}<button type="button" data-dev-task-action="refresh">刷新</button></div>`;
     }
 
     function renderBody(content, allowMarkdown) {
@@ -189,6 +214,30 @@
 
     function taskRequest(content) {
       return clean(content).replace(/^发起\s*AI\s*开发任务[:：]\s*/i, '');
+    }
+
+    function continuationDraft(request, result, canceled, failed) {
+      const original = compactForDraft(request || '', 1200);
+      const lastResult = compactForDraft(result || '', 1600);
+      const statusLine = canceled
+        ? '上次任务被我停止了。'
+        : (failed ? '上次任务失败了。' : '上次任务已完成，我要继续迭代。');
+      return [
+        '继续处理这个 AI 开发任务。',
+        statusLine,
+        original ? `原始需求：\n${original}` : '',
+        lastResult ? `上次结果：\n${lastResult}` : '',
+        '请先检查当前项目工作区状态，保护已有改动，再继续完成剩余开发或下一步迭代。'
+      ].filter(Boolean).join('\n\n');
+    }
+
+    function compactForDraft(value, limit) {
+      const text = clean(value)
+        .replace(/```[\s\S]*?```/g, '[代码块已省略，请从仓库实际文件检查]')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+      if (text.length <= limit) return text;
+      return `${text.slice(0, limit)}\n...（已截断，请结合频道上下文继续）`;
     }
 
     function shortId(taskId) {

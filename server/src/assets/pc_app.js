@@ -92,7 +92,8 @@
   devTasks = window.ElonPcDevTasks.create({
     clean, escapeHtml, markdown,
     refreshActiveChannel: refreshActiveProjectChannel,
-    cancelTask: cancelProjectAiTask
+    cancelTask: cancelProjectAiTask,
+    draftContinuation: draftProjectAiContinuation
   });
 
   function saveToken(token) {
@@ -1675,6 +1676,17 @@
       method: 'POST'
     });
     await refreshActiveProjectChannel();
+  }
+
+  function draftProjectAiContinuation(content) {
+    const draft = clean(content);
+    if (!draft || !els.input) return;
+    els.input.value = draft;
+    els.input.dispatchEvent(new Event('input', { bubbles: true }));
+    els.input.focus();
+    try {
+      els.input.selectionStart = els.input.selectionEnd = els.input.value.length;
+    } catch (_) {}
   }
 
   async function handleProjectShareAction(button) {
