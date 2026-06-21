@@ -22,6 +22,7 @@
 - 质量汇总验证通过：fb2 `/context/quality-summary?from=2026-06-21T09:20:00Z` 返回 `total_packs=10`、`total_feedback=6`、`matched_cited_source_count=6`、`unmatched_cited_source_count=0`、`permission_block_rate=0.23076923076923078`；`missing_context_count=0`、`wrong_context_count=0`，但 `large_context_pack_rate=0.6` 仍提示后续要继续做上下文预算压缩。
 - 主项目服务端已发布：`v0.3.556`，线上 `/api/server/version` 返回 `gitSha=78e6c17f7a4e9c48d7794b6d3d06ee280dc78742`。
 - fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
+- fb2 用户端完整 APK 已发布：`1.1.46 / versionCode 94`，代码提交 `add05196 feat(chat): use main voice composer bootstrap` 和 `782a2c1e chore(user): publish apk 1.1.46` 已推到 fb2 `origin/main`；线上 `/api/app-version` 返回 `update_kind=full_apk`、`checksum=sha256:b4b65bec80ed69455ac4f0ef4b82c0a8a0ce5ed93fc6de26d8678947ab73b84e`，远端 `football-user-v1.1.46.apk` 与 `football-user-latest.apk` hash 一致。
 - 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -MainToken <123qwe主项目会话token> -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据；最新结果 `failed=0 skipped=0`，覆盖 `chat-bootstrap aiReply / voice composer / billing`。
 - 本轮 live smoke 已验证：主项目健康和版本、fb2 live tool manifest、Context Pack、比赛分析简报、群观点摘要、赛后复盘摘要、平台匿名订单摘要、统一工具执行 `group_opinion_summary`/`match_analysis_brief` 及其 visibility。
 - 本轮已获授权在真实群 `ext_fb2_official` 发送可见 `@EL` 联调消息，并验证“我的票”正例、本人订单引用、AI 回复计费、工具执行、source reference 匹配和 fb2 feedback 自动回写。
@@ -69,8 +70,7 @@
 - 发布后抽样验证主项目群聊链路里 `user_order_context_present=true` 的日志，确认用户订单上下文已经从 fb2 进入 prompt；平台摘要仍应只在双端开关和 scope 同时开启时出现。
 - 用更多账号继续抽样主项目真实群聊入口触发 `@EL` 和长按消息 `AI回复`；当前账号 `123qwe` 已验证 AI 回答能显式区分比赛事实、本人订单、群观点和 AI 推断。
 - 用已完赛比赛样本验证 `opinion_result_review_summary` 和 `opinion_result_reviews` 在主项目真实群聊回答中只被描述为历史复盘/样本统计，不被写成未来命中承诺。
-- fb2 接入 `VoiceComposerView` 的完整输入栏，并优先使用 `VoiceComposerBootstrap.applyFb2GroupChatConfig(...)`，而不是只接 ASR/TTS 或手写临时 Web 浮层。
-- fb2 真机验证小米/HyperOS 系统 ASR 超时后云端兜底。
+- fb2 `1.1.46` 已接入 `VoiceComposerBootstrap.fb2GroupChatConfig(...)` 并把 `chat-bootstrap` JSON 传入 Android 原生桥；仍需在小米/HyperOS 真机上验证系统 ASR 超时后云端兜底、录音浮层、直接发语音、转文字和 `AI回复` 手势。
 - 主项目和 fb2 建立固定 AI 数据回答评测集。
 - 后续把 fb2 工具执行从当前的 Context Pack + 轻量工具调用继续升级为更细粒度的可评测工具链。
 
