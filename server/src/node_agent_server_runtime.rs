@@ -352,7 +352,7 @@ Schema:
     {"tool": "list_dir", "path": "."},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
-    {"tool": "run_command", "command": "git status --short", "reason": "inspect git state"}
+    {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
   ]
 }
 
@@ -362,6 +362,7 @@ Rules:
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Use write_file for intentional project files.
 - Use run_command only for project Git, build, format, lint, or test commands.
+- Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
 - Set done=true when no further tool action is needed.
 "#
     .to_string();

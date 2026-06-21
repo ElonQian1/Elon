@@ -86,8 +86,8 @@ impl ToolGuard {
                 if self.read_only() {
                     bail!("run_command denied: read-only planning mode");
                 }
-                let command = required_str(action, "command")?;
-                self.run_command(command).await
+                let request = RuntimeCommandRequest::from_action(action)?;
+                self.run_command(&request).await
             }
             _ => bail!("unknown tool: {tool}"),
         }
@@ -141,20 +141,34 @@ impl ToolGuard {
         Ok(format!("write_file ok: {path} ({} chars)", content.len()))
     }
 
-    async fn run_command(&self, command: &str) -> Result<String> {
-        if !command_allowed(command) {
-            bail!("run_command denied by policy: {command}");
-        }
-        let mut child_command = Command::new("powershell");
-        child_command
-            .args([
+    async fn run_command(&self, request: &RuntimeCommandRequest) -> Result<String> {
+        let mut child_command = if let Some(command) = request.legacy_command.as_deref() {
+            if !command_allowed(command) {
+                bail!("run_command denied by policy: {command}");
+            }
+            // 旧版模型只会返回 command 字符串。为了兼容旧输出仍保留 PowerShell
+            // 执行路径，但新的提示词会优先要求 program + args，避免 shell 解析歧义。
+            let mut command_runner = Command::new("powershell");
+            command_runner.args([
                 "-NoProfile",
                 "-ExecutionPolicy",
                 "Bypass",
                 "-Command",
                 command,
-            ])
-            .current_dir(&self.workspace);
+            ]);
+            command_runner
+        } else {
+            if !structured_command_allowed(&request.program, &request.args) {
+                bail!(
+                    "run_command denied by policy: {}",
+                    request.display_command()
+                );
+            }
+            let mut command_runner = Command::new(&request.program);
+            command_runner.args(&request.args);
+            command_runner
+        };
+        child_command.current_dir(&self.workspace);
         hide_command_window(&mut child_command);
         let output = tokio::time::timeout(Duration::from_secs(300), child_command.output())
             .await
@@ -204,6 +218,63 @@ impl ToolGuard {
             }
         }
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct RuntimeCommandRequest {
+    program: String,
+    args: Vec<String>,
+    legacy_command: Option<String>,
+}
+
+impl RuntimeCommandRequest {
+    fn from_action(action: &Value) -> Result<Self> {
+        if let Some(program) = action
+            .get("program")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            let args = action
+                .get("args")
+                .and_then(Value::as_array)
+                .map(|values| {
+                    values
+                        .iter()
+                        .map(|value| {
+                            value
+                                .as_str()
+                                .map(|item| item.to_string())
+                                .ok_or_else(|| anyhow!("args must be strings"))
+                        })
+                        .collect::<Result<Vec<_>>>()
+                })
+                .transpose()?
+                .unwrap_or_default();
+            return Ok(Self {
+                program: program.to_string(),
+                args,
+                legacy_command: None,
+            });
+        }
+
+        let command = required_str(action, "command")?.trim().to_string();
+        Ok(Self {
+            program: String::new(),
+            args: Vec::new(),
+            legacy_command: Some(command),
+        })
+    }
+
+    fn display_command(&self) -> String {
+        if let Some(command) = self.legacy_command.as_deref() {
+            return command.to_string();
+        }
+        std::iter::once(self.program.as_str())
+            .chain(self.args.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -351,6 +422,118 @@ fn command_allowed(command: &str) -> bool {
         .any(|prefix| lower.starts_with(prefix))
 }
 
+fn structured_command_allowed(program: &str, args: &[String]) -> bool {
+    let program = program.trim().to_ascii_lowercase();
+    if !program_name_allowed(&program) || args.iter().any(|arg| !command_arg_safe(arg)) {
+        return false;
+    }
+
+    match program.as_str() {
+        "git" => git_args_allowed(args),
+        "cargo" => first_arg_in(args, &["check", "test", "build", "fmt", "clippy", "run"]),
+        "rustfmt" => !args.is_empty(),
+        "npm" => package_manager_args_allowed(args, false),
+        "pnpm" | "yarn" | "bun" => package_manager_args_allowed(args, true),
+        "python" => {
+            args.len() >= 2 && args[0] == "-m" && matches!(args[1].as_str(), "pytest" | "unittest")
+        }
+        "pytest" => true,
+        "go" => first_arg_in(args, &["test", "vet", "build"]),
+        "dotnet" => first_arg_in(args, &["test", "build"]),
+        "gradle" | ".\\gradlew.bat" | "./gradlew" | "./gradlew.bat" | "gradlew.bat" => {
+            first_arg_in(
+                args,
+                &["test", "build", "testDebugUnitTest", ":app:assembleDebug"],
+            )
+        }
+        _ => false,
+    }
+}
+
+fn program_name_allowed(program: &str) -> bool {
+    matches!(
+        program,
+        "git"
+            | "cargo"
+            | "rustfmt"
+            | "npm"
+            | "pnpm"
+            | "yarn"
+            | "bun"
+            | "python"
+            | "pytest"
+            | "go"
+            | "dotnet"
+            | "gradle"
+            | ".\\gradlew.bat"
+            | "./gradlew"
+            | "./gradlew.bat"
+            | "gradlew.bat"
+    )
+}
+
+fn first_arg_in(args: &[String], allowed: &[&str]) -> bool {
+    args.first()
+        .is_some_and(|arg| allowed.iter().any(|item| arg == item))
+}
+
+fn git_args_allowed(args: &[String]) -> bool {
+    let Some(first) = args.first().map(String::as_str) else {
+        return false;
+    };
+    match first {
+        "status" | "diff" | "log" | "show" | "branch" | "remote" | "fetch" | "add" | "commit"
+        | "push" => true,
+        "pull" => args.iter().any(|arg| arg == "--ff-only"),
+        _ => false,
+    }
+}
+
+fn package_manager_args_allowed(args: &[String], run_required: bool) -> bool {
+    let Some(first) = args.first().map(String::as_str) else {
+        return false;
+    };
+    if first == "test" && !run_required {
+        return true;
+    }
+    first == "run"
+        && args
+            .get(1)
+            .is_some_and(|script| allowed_package_script(script))
+}
+
+fn allowed_package_script(script: &str) -> bool {
+    matches!(
+        script,
+        "lint" | "test" | "build" | "check" | "format" | "typecheck"
+    )
+}
+
+fn command_arg_safe(arg: &str) -> bool {
+    let lower = arg.trim().to_ascii_lowercase();
+    if lower.is_empty() || lower.contains('\0') {
+        return false;
+    }
+    let shell_markers = [";", "&&", "||", "|", "\n", "\r", ">", "<", "$", "`"];
+    if shell_markers.iter().any(|marker| lower.contains(marker)) {
+        return false;
+    }
+    if contains_absolute_path_argument(&lower) {
+        return false;
+    }
+    let path_like = lower.contains('/') || lower.contains('\\');
+    if path_like {
+        let normalized = lower.replace('\\', "/");
+        if normalized
+            .split('/')
+            .any(|part| part == ".." || part == ".git")
+        {
+            return false;
+        }
+    }
+    true
+}
+
 fn contains_absolute_path_argument(command: &str) -> bool {
     let bytes = command.as_bytes();
     if bytes.starts_with(b"\\\\") {
@@ -390,7 +573,9 @@ fn hide_command_window(_command: &mut Command) {
 
 #[cfg(test)]
 mod tests {
-    use super::{command_allowed, normalize_path, RuntimeToolMode, ToolGuard};
+    use super::{
+        command_allowed, normalize_path, structured_command_allowed, RuntimeToolMode, ToolGuard,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -416,6 +601,50 @@ mod tests {
             "cargo test --manifest-path C:\\outside\\Cargo.toml"
         ));
         assert!(!command_allowed("npm run build `n Remove-Item -Recurse ."));
+    }
+
+    #[test]
+    fn structured_command_policy_allows_project_checks() {
+        assert!(structured_command_allowed(
+            "git",
+            &["status".to_string(), "--short".to_string()]
+        ));
+        assert!(structured_command_allowed(
+            "cargo",
+            &["test".to_string(), "--all-features".to_string()]
+        ));
+        assert!(structured_command_allowed(
+            "npm",
+            &["run".to_string(), "build".to_string()]
+        ));
+        assert!(structured_command_allowed(
+            ".\\gradlew.bat",
+            &[":app:assembleDebug".to_string()]
+        ));
+    }
+
+    #[test]
+    fn structured_command_policy_blocks_shell_and_absolute_paths() {
+        assert!(!structured_command_allowed(
+            "powershell",
+            &["Get-ChildItem".to_string()]
+        ));
+        assert!(!structured_command_allowed(
+            "git",
+            &["status".to_string(), "&&".to_string(), "cargo".to_string()]
+        ));
+        assert!(!structured_command_allowed(
+            "cargo",
+            &[
+                "test".to_string(),
+                "--manifest-path".to_string(),
+                "C:\\outside\\Cargo.toml".to_string()
+            ]
+        ));
+        assert!(!structured_command_allowed(
+            "rustfmt",
+            &["src/../main.rs".to_string()]
+        ));
     }
 
     #[test]

@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：让 PC AI 开发栏可以显式选择自动 / Route A / Route B / Route C，并把选择传到真实执行链路。
+- 本阶段目标：把 Route B/C 的 `run_command` 从优先 shell 字符串推进到结构化 `program + args` 协议，减少命令注入和解析歧义。
 - 当前分支：`main`，提交前需要先与最新 `origin/main` 对齐。
 
 ## 已完成
@@ -35,16 +35,23 @@
 - 已补 Route 选择单测：强制 Route B 会跳过可用 Route A；强制不可用 Route C 会返回明确“未就绪”错误。
 - 已补 PC 前端资产测试：默认自动模式、Route B 标签、强制 Route C 本地偏好和请求参数输出。
 - 已通过本阶段验证：`node --check server\src\assets\pc_app_dev_composer.js`、`node --check server\src\assets\pc_app.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 已让 Win 节点内置 Route B/C `ToolGuard` 支持结构化 `run_command`：模型可返回 `program` 和 `args`，节点直接用 `Command::new(program).args(args)` 执行，不再需要 shell 拼接。
+- 已保留旧版 `command` 字符串兼容路径，但提示词和脚手架文档改为优先 `program + args`。
+- 已同步 `pc-dev-runtime` 生成的 `scripts\elon-agent.ps1`：项目本地 Route B/C 也支持结构化命令，并沿用确认、DryRun、路径和命令白名单。
+- 已补结构化命令策略测试：允许 `git status --short`、`cargo test --all-features`、`npm run build`、Gradle assembleDebug；拒绝未知程序、shell 连接符、绝对路径和 `..` 路径。
+- 子代理复核结论：当前已有本地节点、Route A/B/C、工具守卫、会话 worktree 和任务卡片骨架；距离 Codex Desktop 最大差距仍是工具时间线、逐工具审批、持久恢复和 apply_patch/diff 体验。
+- 已通过本阶段验证：`rustfmt --edition 2021` 针对本次 Rust 文件、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`、`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
-先发布并验证显式 Route A/B/C 选择；下一阶段继续推进“更像 Codex Desktop”的持久任务控制、任务级动作审批和结构化工具协议。
+先发布并验证 Route B/C 结构化命令协议；下一阶段继续推进工具时间线、逐工具审批、apply_patch/diff 预览和持久任务恢复。
 
 ## 待完成
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 下一阶段继续评估 Route B/C 是否要改成结构化 `{program,args}` 命令协议、任务级动作审批和 patch/apply_patch 工具，而不是直接取消本机白名单。
+- 下一阶段实现 Route B/C 工具时间线和逐工具审批，而不是只输出 `[tool] xxx` 粗粒度文本。
+- 下一阶段补 `apply_patch` / diff preview / read_file_range 等更像 Codex Desktop 的文件编辑工具。
 
 ## 当前阻塞
 

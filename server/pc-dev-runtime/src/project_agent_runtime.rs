@@ -1,3 +1,5 @@
+// server/pc-dev-runtime/src/project_agent_runtime.rs
+
 use crate::project_scaffold::ProjectScaffoldRequest;
 use std::{
     fs, io,
@@ -67,7 +69,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of project commands. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -265,7 +267,7 @@ Schema:
     {"tool": "list_dir", "path": "."},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
-    {"tool": "run_command", "command": "git status --short", "reason": "inspect git state"}
+    {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
   ]
 }
 
@@ -275,6 +277,7 @@ Rules:
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Use write_file only for intentional project files.
 - Use run_command only for low-risk project checks such as git status/diff/log, cargo check/test, npm test/run lint, or Gradle test/assembleDebug.
+- Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
 - Set done=true when no further tool action is needed.
 '@
 }
@@ -417,6 +420,78 @@ function Test-AgentCommandAllowed {
     return $false
 }
 
+function Test-AgentArgSafe {
+    param([Parameter(Mandatory = $true)][string]$Arg)
+    $trimmed = $Arg.Trim()
+    if (-not $trimmed) { return $false }
+    $lower = $trimmed.ToLowerInvariant()
+    $shellMarkers = @(';', '&&', '||', '|', "`n", "`r", '>', '<', '$', '`')
+    foreach ($marker in $shellMarkers) {
+        if ($lower.Contains($marker)) { return $false }
+    }
+    if ([regex]::IsMatch($trimmed, '(^|\s|")([a-zA-Z]:[\\/]|\\\\)')) { return $false }
+    $normalized = $lower.Replace('\', '/')
+    if ($normalized -match '(^|/)(\.\.|\.git)(/|$)') { return $false }
+    return $true
+}
+
+function Test-AgentFirstArgIn {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Args,
+        [Parameter(Mandatory = $true)][string[]]$Allowed
+    )
+    if ($Args.Count -lt 1) { return $false }
+    return $Allowed -contains $Args[0]
+}
+
+function Test-AgentPackageArgsAllowed {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Args,
+        [switch]$RunRequired
+    )
+    if ($Args.Count -lt 1) { return $false }
+    if (-not $RunRequired -and $Args[0] -eq 'test') { return $true }
+    $scripts = @('lint', 'test', 'build', 'check', 'format', 'typecheck')
+    return $Args.Count -ge 2 -and $Args[0] -eq 'run' -and ($scripts -contains $Args[1])
+}
+
+function Test-AgentGitArgsAllowed {
+    param([Parameter(Mandatory = $true)][string[]]$Args)
+    if ($Args.Count -lt 1) { return $false }
+    $first = $Args[0]
+    $simple = @('status', 'diff', 'log', 'show', 'branch', 'remote', 'fetch', 'add', 'commit', 'push')
+    if ($simple -contains $first) { return $true }
+    return $first -eq 'pull' -and ($Args -contains '--ff-only')
+}
+
+function Test-AgentCommandAllowedParts {
+    param(
+        [Parameter(Mandatory = $true)][string]$Program,
+        [string[]]$Args = @()
+    )
+    $programName = $Program.Trim().ToLowerInvariant()
+    $allowedPrograms = @('git', 'cargo', 'rustfmt', 'npm', 'pnpm', 'yarn', 'bun', 'python', 'pytest', 'go', 'dotnet', 'gradle', '.\gradlew.bat', './gradlew', './gradlew.bat', 'gradlew.bat')
+    if (-not ($allowedPrograms -contains $programName)) { return $false }
+    foreach ($arg in $Args) {
+        if (-not (Test-AgentArgSafe $arg)) { return $false }
+    }
+
+    switch ($programName) {
+        'git' { return Test-AgentGitArgsAllowed $Args }
+        'cargo' { return Test-AgentFirstArgIn $Args @('check', 'test', 'build', 'fmt', 'clippy', 'run') }
+        'rustfmt' { return $Args.Count -gt 0 }
+        'npm' { return Test-AgentPackageArgsAllowed $Args }
+        'pnpm' { return Test-AgentPackageArgsAllowed $Args -RunRequired }
+        'yarn' { return Test-AgentPackageArgsAllowed $Args -RunRequired }
+        'bun' { return Test-AgentPackageArgsAllowed $Args -RunRequired }
+        'python' { return ($Args.Count -ge 2) -and ($Args[0] -eq '-m') -and (@('pytest', 'unittest') -contains $Args[1]) }
+        'pytest' { return $true }
+        'go' { return Test-AgentFirstArgIn $Args @('test', 'vet', 'build') }
+        'dotnet' { return Test-AgentFirstArgIn $Args @('test', 'build') }
+        default { return Test-AgentFirstArgIn $Args @('test', 'build', 'testDebugUnitTest', ':app:assembleDebug') }
+    }
+}
+
 function Invoke-AgentAction {
     param([Parameter(Mandatory = $true)]$Action)
     $tool = [string]$Action.tool
@@ -459,18 +534,37 @@ function Invoke-AgentAction {
             return "write_file ok: $path"
         }
         'run_command' {
-            $command = [string]$Action.command
-            if (-not (Test-AgentCommandAllowed $command)) {
-                return "run_command denied by policy: $command"
+            $program = [string]$Action.program
+            $args = @()
+            if ($Action.args) {
+                $args = @($Action.args | ForEach-Object { [string]$_ })
             }
-            if ($DryRun) {
-                Write-Host "[dry-run] run_command $command"
-                return "dry-run: would run $command"
+            if ($program.Trim()) {
+                if (-not (Test-AgentCommandAllowedParts $program $args)) {
+                    return "run_command denied by policy: $program $($args -join ' ')"
+                }
+                if ($DryRun) {
+                    Write-Host "[dry-run] run_command $program $($args -join ' ')"
+                    return "dry-run: would run $program $($args -join ' ')"
+                }
+                if (-not (Confirm-AgentAction 'run_command' "$program $($args -join ' ')")) {
+                    return "run_command denied by user: $program $($args -join ' ')"
+                }
+                $output = & $program @args 2>&1 | Out-String
+            } else {
+                $command = [string]$Action.command
+                if (-not (Test-AgentCommandAllowed $command)) {
+                    return "run_command denied by policy: $command"
+                }
+                if ($DryRun) {
+                    Write-Host "[dry-run] run_command $command"
+                    return "dry-run: would run $command"
+                }
+                if (-not (Confirm-AgentAction 'run_command' $command)) {
+                    return "run_command denied by user: $command"
+                }
+                $output = powershell -NoProfile -ExecutionPolicy Bypass -Command $command 2>&1 | Out-String
             }
-            if (-not (Confirm-AgentAction 'run_command' $command)) {
-                return "run_command denied by user: $command"
-            }
-            $output = powershell -NoProfile -ExecutionPolicy Bypass -Command $command 2>&1 | Out-String
             if ($LASTEXITCODE -ne 0) {
                 return "run_command exit=$LASTEXITCODE`n$output"
             }
@@ -597,6 +691,8 @@ mod tests {
         assert!(script.contains("Resolve-SafePath"));
         assert!(script.contains("Parent path segments are not allowed"));
         assert!(script.contains("ReparsePoint"));
+        assert!(script.contains("Test-AgentCommandAllowedParts"));
+        assert!(script.contains("\"program\": \"git\""));
         assert!(script.contains("$shellMarkers"));
         assert!(script.contains("[regex]::IsMatch"));
     }
@@ -609,6 +705,8 @@ mod tests {
         assert!(doc.contains("Route C"));
         assert!(doc.contains("ELON_AGENT_API_KEY"));
         assert!(doc.contains("ELON_SERVER_TOKEN"));
+        assert!(doc.contains("program"));
+        assert!(doc.contains("args"));
     }
 
     fn request() -> ProjectScaffoldRequest<'static> {
