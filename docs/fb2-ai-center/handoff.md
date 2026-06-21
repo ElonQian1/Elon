@@ -22,6 +22,7 @@
 - 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据。
 - 本轮 live smoke 已验证：主项目健康和版本、fb2 live tool manifest、Context Pack、比赛分析简报、群观点摘要、赛后复盘摘要、平台匿名订单摘要、统一工具执行 `group_opinion_summary`/`match_analysis_brief` 及其 visibility。
 - 本轮已获授权在真实群 `ext_fb2_official` 发送可见 `@EL` 联调消息，并验证“我的票”正例、本人订单引用、AI 回复计费、工具执行、source reference 匹配和 fb2 feedback 自动回写。
+- 测试账号 `123qwe` 对应 fb2 用户 `6fe5aa17-0403-427a-8e91-7f414beca35d`、主项目用户 `usr_13c9832b7cad4b26b50768fa961e0de4`；线上已配置大额测试余额 `balance_fen=1000000000`，无 `user_token_quota` 月限额行，`/api/me/balance` 已验证可见。
 - 长按 `AI回复` 后端入口已验证；APK 侧仍需确认 UI 长按菜单能调用该接口，并检查 AI 回答 source references、fb2 feedback、opinion adoption 和权限审计。
 
 主项目当前已经具备：
