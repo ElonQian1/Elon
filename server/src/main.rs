@@ -57,6 +57,7 @@ mod external_app_context_tool_runtime;
 mod external_app_context_tools;
 mod external_app_registry;
 mod external_app_tool_report_api;
+mod external_app_tool_report_contract;
 mod external_app_usage_policy;
 mod friend_api;
 mod friend_events;

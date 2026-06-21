@@ -22,6 +22,7 @@ use crate::{
         external_app_by_id, group_seeds, public_external_app_config, service_token_env_names,
         ExternalAppDefinition,
     },
+    external_app_tool_report_contract::public_tool_quality_report_guidance,
     external_app_usage_policy::public_usage_policy_guidance,
     project_auth::{auth_from_headers, json_error},
     store::{ExternalAccountSessionInput, ExternalAccountUpsert},
@@ -117,6 +118,12 @@ pub async fn get_external_app_context_contract(Path(app_id): Path<String>) -> Re
             "schema": "external_app.tool_execution.v1",
             "execution_status": "not_configured",
             "allowed_tools": []
+        })),
+        "tool_quality_report_contract": public_tool_quality_report_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.tool_quality_report.v1",
+            "status": "not_configured",
+            "endpoint": null
         }))
     }))
     .into_response()

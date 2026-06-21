@@ -97,6 +97,17 @@ GET /api/external/apps/fb2/context-contract
 
 响应还包含 `usage_policy_contract`，把免费和扣费边界做成机器可读规则：Android 系统 ASR、云端 ASR 兜底、TTS、fb2 context pack 拉取都免费；只有 AI 生成回复内容才消耗 token/额度。fb2 不应在 ASR/TTS 或上下文拉取前做 AI 余额拦截，免费试用额度应配置在模型回复层。
 
+响应还包含 `tool_quality_report_contract`，用于让 fb2 代理发现主项目侧的工具质量自查接口。fb2 可以用自己的外部应用 service token 调用：
+
+```http
+GET /api/external/apps/fb2/tool-executions?days=7&limit=50
+X-Elon-External-App-Token: <fb2-service-token>
+```
+
+主项目读取的 service token 环境变量为 `ELON_EXTERNAL_APP_FB2_TOKEN`，也兼容通用兜底 `ELON_EXTERNAL_APP_TOKEN`。
+
+该接口只返回工具执行元数据、质量统计和 `recommendations`，不返回订单、票据、赔率或聊天正文等原始 payload。fb2 每次调整 `/api/main-project/tools/execute` 后，应先看这个报告里的 `grounding_rate`、`source_id_count`、`unsafe_result_count`、`avg_duration_ms`，再决定补 source id、权限裁剪、索引缓存或字段新鲜度。
+
 ## 主项目 Context Budget
 
 主项目收到 fb2 上下文后会先做预算裁剪：
@@ -135,7 +146,7 @@ GET /api/external/apps/fb2/context-contract
 - `status=empty`：返回了 `tool_contract`，但没有工具列表。
 - `status=partial`：已有部分工具，但缺少推荐工具。
 - `status=ready`：推荐工具已声明完整。
-- `execution_status=declared_only`：主项目当前只把工具作为规划和追问依据，尚不自动执行。
+- `execution_status=runtime_supported`：主项目已支持按需执行 fb2 工具；执行失败会降级为普通 context pack 回答。
 
 这使 fb2 可以渐进式接入：接口先可用，再通过 warnings 不断补齐数据质量，而不是让模型静默使用残缺上下文。
 
@@ -169,11 +180,13 @@ source/status/generated_at
 
 ## 主项目 Tool Contract 投影
 
-`tool_contract` 是长期演进到 MCP/tools 的过渡层。主项目当前会把它投影进 prompt，但状态是 `declared_only`：
+`tool_contract` 是长期演进到 MCP/tools 的过渡层。主项目当前会把它投影进 prompt，并在配置允许时按 deterministic planner 执行：
 
 - AI 可以知道有哪些后续工具可用于补充证据。
-- AI 可以在信息不足时说明“需要调用 get_match_detail/search_user_orders 补充”。
-- AI 不能声称已经调用工具，不能编造工具返回结果。
+- AI 可以在信息不足时规划 `get_match_detail`、`search_user_orders`、`search_group_opinions` 等工具。
+- 工具没有执行或执行失败时，AI 不能声称已经拿到工具结果，不能编造工具返回内容。
+- 只有 `executed_external_app_tools.results` 中 `success=true` 且 `grounding.status=grounded` 的结果可以作为强事实。
+- `grounding.status=weak` 的结果必须说明追溯信息不足；`grounding.status=unsafe` 不能用于事实回答。
 - 用户订单类工具必须遵守当前用户权限。
 
 推荐 fb2 返回：
