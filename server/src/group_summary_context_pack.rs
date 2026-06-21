@@ -26,11 +26,16 @@ pub(crate) fn spawn_group_summary_generation(
         );
         let result = generate_group_summary(&state, &user_id, &context_pack).await;
         let (summary, status, model_used, error) = match result {
-            Ok((summary, model)) => (summary, "ready", Some(model), None),
+            Ok((summary, model)) => (
+                ensure_fb2_summary_policy_shape(&summary, &context_pack),
+                "ready",
+                Some(model),
+                None,
+            ),
             Err(error) => {
                 let fallback = fallback_summary(&sources, &error.to_string());
                 (
-                    fallback,
+                    ensure_fb2_summary_policy_shape(&fallback, &context_pack),
                     "ready_with_fallback",
                     None,
                     Some(error.to_string()),
@@ -105,9 +110,25 @@ pub(crate) fn build_context_pack(
         "external_app_context": external_context,
         "output_contract": {
             "format": "markdown",
-            "required_sections": ["摘要", "已达成结论", "待确认问题", "行动项", "相关发言"],
+            "required_sections": [
+                "数据事实",
+                "群友观点",
+                "AI推断",
+                "风险边界",
+                "摘要",
+                "已达成结论",
+                "待确认问题",
+                "行动项",
+                "相关发言"
+            ],
             "citation_required": true,
-            "no_fabrication": true
+            "no_fabrication": true,
+            "source_reference_required": ["message_id"],
+            "fb2_answer_policy": {
+                "when_external_app_context_is_fb2": true,
+                "must_distinguish": ["比赛事实", "用户订单", "平台汇总", "群友观点", "AI推断"],
+                "risk_boundary": "赛果不确定，不保证命中，不建议重注或梭哈"
+            }
         }
     })
 }
@@ -124,7 +145,7 @@ async fn generate_group_summary(
         &[
             json!({
                 "role": "system",
-                "content": "你是群聊总结帖 AI。你只能根据 Context Pack 和群聊 AI 文档总结，不得编造。输出中文 Markdown，包含：摘要、已达成结论、待确认问题、行动项、相关发言。相关发言必须引用消息 ID。若 Context Pack 包含外部赛事/赔率上下文，只能作为讨论背景，必须说明不保证结果，不诱导投注。"
+                "content": "你是群聊总结帖 AI。你只能根据 Context Pack 和群聊 AI 文档总结，不得编造。输出中文 Markdown。若 Context Pack 来自 fb2 或包含赛事/赔率/订单/群观点上下文，必须使用这些小节：数据事实、用户订单、平台汇总、群友观点、AI推断、风险边界、摘要、已达成结论、待确认问题、行动项、相关发言；没有对应材料的小节可以写“未在当前来源中出现”。相关发言必须引用消息 ID；涉及比赛、赔率、票据、推荐、预测或今日比赛讨论时，风险边界必须说明赛果不确定、不保证命中、不建议重注或梭哈。"
             }),
             json!({
                 "role": "user",
@@ -174,4 +195,60 @@ fn fallback_summary(messages: &[GroupSummarySourceMessage], error: &str) -> Stri
     out.push_str("\n## 生成状态\n");
     out.push_str(&format!("- AI 调用失败：{}\n", error));
     out
+}
+
+pub(crate) fn ensure_fb2_summary_policy_shape(summary: &str, context_pack: &str) -> String {
+    let summary = summary.trim();
+    if summary.is_empty() || !context_pack_has_fb2_external_context(context_pack) {
+        return summary.to_string();
+    }
+
+    let has_data = contains_any(summary, &["数据事实", "比赛事实"]);
+    let has_opinion = contains_any(summary, &["群友观点", "相关发言"]);
+    let has_inference = contains_any(summary, &["AI推断", "AI 推断"]);
+    let has_risk = contains_any(summary, &["风险边界", "不保证", "不能保证"]);
+
+    if has_data && has_opinion && has_inference && has_risk {
+        return summary.to_string();
+    }
+
+    let mut sections = Vec::new();
+    if !has_data {
+        sections.push(
+            "## 数据事实\n- 以下总结仅基于 Context Pack 中的 fb2 比赛、赔率、订单摘要和群聊消息；未在来源中出现的信息不作事实断言。"
+                .to_string(),
+        );
+    }
+    if !has_opinion {
+        sections.push(
+            "## 群友观点\n- 群友观点以「相关发言」中列出的消息 ID 为准；未引用的观点不作为结论。"
+                .to_string(),
+        );
+    }
+    sections.push(summary.to_string());
+    if !has_inference {
+        sections
+            .push("## AI推断\n- 以上分析只基于当前 fb2 上下文、群聊内容和已引用来源。".to_string());
+    }
+    if !has_risk {
+        sections.push("## 风险边界\n- 赛果不确定，不保证命中，不建议重注或梭哈。".to_string());
+    }
+
+    sections.join("\n\n")
+}
+
+fn context_pack_has_fb2_external_context(context_pack: &str) -> bool {
+    contains_any(
+        context_pack,
+        &[
+            "fb2.answer_policy.v1",
+            "<fb2_context_pack",
+            "\"app_id\": \"fb2\"",
+            "\"app_id\":\"fb2\"",
+        ],
+    )
+}
+
+fn contains_any(text: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| text.contains(needle))
 }

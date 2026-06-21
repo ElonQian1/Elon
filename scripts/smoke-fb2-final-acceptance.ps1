@@ -255,6 +255,11 @@ function Build-VisibleAnswerEvidence {
         selected_message_no_guarantee = Find-CheckDetail $Lines "selected-message reply avoids betting guarantees"
         selected_message_rejects_claim = Find-CheckDetail $Lines "selected-message rejects guarantee claim"
         selected_message_references_claim = Find-CheckDetail $Lines "selected-message references reviewed claim"
+        summary_post_text = Find-CheckDetail $Lines "summary-post text present"
+        summary_post_sources = Find-CheckDetail $Lines "summary-post cites sources"
+        summary_post_fact_split = Find-CheckDetail $Lines "summary-post separates facts and inference"
+        summary_post_risk_boundary = Find-CheckDetail $Lines "summary-post includes risk boundary"
+        summary_post_no_guarantee = Find-CheckDetail $Lines "summary-post avoids betting guarantees"
     }
 }
 
@@ -457,6 +462,8 @@ $summary = [ordered]@{
     visible_mention_reply_id = Find-CheckDetail $visibleLines "visible @EL ai reply"
     selected_message_seed_id = Find-CheckDetail $visibleLines "selected-message seed sent"
     selected_message_reply_id = Find-CheckDetail $visibleLines "selected-message ai reply"
+    summary_post_id = Find-CheckDetail $visibleLines "summary-post created"
+    summary_post_status = Find-CheckDetail $visibleLines "summary-post ready"
     feedback_evidence = $feedbackEvidence
     visible_answer_policy_evidence = Build-VisibleAnswerEvidence $visibleLines
     final_acceptance_evidence = Build-AiCenterEvidence $centerLines
