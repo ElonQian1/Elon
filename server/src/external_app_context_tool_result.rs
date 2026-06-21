@@ -107,6 +107,7 @@ fn expected_visibility(tool_name: &str) -> Option<&'static str> {
     match tool_name {
         "search_matches" | "get_match_detail" | "search_group_opinions" => Some("group_context"),
         "search_user_orders" | "get_order_detail" => Some("current_user_only"),
+        "platform_orders" => Some("privileged_summary"),
         "get_context_audit" => Some("audit_metadata_only"),
         "context_audit_summary" => Some("audit_metrics_only"),
         _ => None,
@@ -121,6 +122,7 @@ fn source_ids_required(tool_name: &str) -> bool {
             | "search_user_orders"
             | "get_order_detail"
             | "search_group_opinions"
+            | "platform_orders"
     )
 }
 
@@ -181,5 +183,25 @@ mod tests {
 
         assert_eq!(result["grounding"]["status"], "unsafe");
         assert_eq!(result["grounding"]["facts_allowed"], false);
+    }
+
+    #[test]
+    fn platform_orders_require_privileged_visibility_and_source_ids() {
+        let result = normalize_parsed_tool_result(
+            "platform_orders",
+            "reason",
+            "req-1",
+            &json!({
+                "success": true,
+                "source_ids": ["platform_order_summary:2026-06-21:all"],
+                "visibility": "privileged_summary"
+            }),
+        );
+
+        assert_eq!(result["grounding"]["status"], "grounded");
+        assert_eq!(
+            result["grounding"]["expected_visibility"].as_str(),
+            Some("privileged_summary")
+        );
     }
 }

@@ -2,7 +2,7 @@
 
 use serde_json::{json, Value};
 
-use crate::external_app_context_config::infer_lottery_type;
+use crate::external_app_context_config::{infer_lottery_type, platform_order_summary_enabled};
 
 const PLANNER_SCHEMA: &str = "external_app.tool_plan.v1";
 const PLANNER_STRATEGY: &str = "deterministic_fb2_chat_v1";
@@ -63,6 +63,14 @@ impl PlannedTool {
 }
 
 pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Fb2ToolPlan {
+    plan_fb2_tools_with_platform_scope(context, topic_hint, platform_order_summary_enabled())
+}
+
+fn plan_fb2_tools_with_platform_scope(
+    context: &Value,
+    topic_hint: Option<&str>,
+    allow_platform_orders: bool,
+) -> Fb2ToolPlan {
     let query = topic_hint.unwrap_or("").trim();
     let mut plans = Vec::new();
     let mut skipped_reasons = Vec::new();
@@ -133,6 +141,41 @@ pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Fb2To
         });
     }
 
+    if let Some(evidence) = keyword_evidence(
+        query,
+        &[
+            "平台",
+            "全平台",
+            "店铺",
+            "订单风险",
+            "投注集中",
+            "集中",
+            "派奖",
+            "毛利",
+            "销量",
+            "成交",
+            "赔付",
+            "风险",
+        ],
+    ) {
+        if allow_platform_orders {
+            plans.push(PlannedTool {
+                name: "platform_orders",
+                reason: "用户要求平台或店铺维度订单风险概览，只能查询匿名聚合摘要。",
+                arguments: json!({
+                    "scope": "platform_order_summary",
+                    "redaction": "anonymous_aggregate_only"
+                }),
+                requires_external_user: false,
+                trigger: "platform_order_summary_needed",
+                confidence: confidence_for(&evidence),
+                evidence,
+            });
+        } else {
+            skipped_reasons.push("platform_order_summary_disabled");
+        }
+    }
+
     if let Some(evidence) = audit_evidence(context) {
         if let Some(audit_id) = context.get("context_audit_id").and_then(Value::as_str) {
             plans.push(PlannedTool {
@@ -151,7 +194,7 @@ pub(crate) fn plan_fb2_tools(context: &Value, topic_hint: Option<&str>) -> Fb2To
         }
     }
 
-    plans.truncate(3);
+    plans.truncate(4);
     if plans.is_empty() {
         skipped_reasons.push("no_fb2_tool_trigger_matched");
     }
@@ -298,6 +341,42 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("context_quality.warning.missing_context_pack")));
+    }
+
+    #[test]
+    fn plans_platform_orders_only_when_privileged_scope_is_enabled() {
+        let disabled = plan_fb2_tools_with_platform_scope(
+            &json!({
+                "context_quality": {"warnings": []}
+            }),
+            Some("平台今天订单风险集中在哪些方向？"),
+            false,
+        );
+        assert!(!disabled.tool_names().contains(&"platform_orders"));
+        assert!(disabled.to_metadata()["skipped_reasons"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("platform_order_summary_disabled")));
+
+        let enabled = plan_fb2_tools_with_platform_scope(
+            &json!({
+                "context_quality": {"warnings": []}
+            }),
+            Some("平台今天订单风险集中在哪些方向？"),
+            true,
+        );
+        assert!(enabled.tool_names().contains(&"platform_orders"));
+        let metadata = enabled.to_metadata();
+        let platform_tool = metadata["planned_tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|tool| tool["name"].as_str() == Some("platform_orders"))
+            .unwrap();
+        assert_eq!(
+            platform_tool["trigger"].as_str(),
+            Some("platform_order_summary_needed")
+        );
     }
 
     #[test]
