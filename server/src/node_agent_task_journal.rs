@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{
     collections::BTreeMap,
-    fs::{self, OpenOptions},
-    io::Write,
+    fs::{self, File, OpenOptions},
+    io::{BufRead, BufReader, Write},
     path::PathBuf,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -34,6 +34,21 @@ pub(crate) struct TaskJournalRecord {
     pub started_at_ms: u128,
     pub updated_at_ms: u128,
     pub cancel_requested_at_ms: Option<u128>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TaskJournalEventView {
+    pub seq: usize,
+    pub event: serde_json::Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TaskJournalSnapshot {
+    pub task_id: String,
+    pub record: Option<TaskJournalRecord>,
+    pub events: Vec<TaskJournalEventView>,
+    pub last_event_seq: usize,
+    pub has_more: bool,
 }
 
 impl TaskJournal {
@@ -101,6 +116,54 @@ impl TaskJournal {
         }))
     }
 
+    pub(crate) fn latest_records(&self, limit: usize) -> Result<Vec<TaskJournalRecord>> {
+        let mut records: Vec<_> = self.load_registry()?.into_values().collect();
+        records.sort_by(|left, right| {
+            right
+                .updated_at_ms
+                .cmp(&left.updated_at_ms)
+                .then_with(|| right.started_at_ms.cmp(&left.started_at_ms))
+        });
+        records.truncate(limit.min(100));
+        Ok(records)
+    }
+
+    pub(crate) fn snapshot(
+        &self,
+        task_id: &str,
+        since: usize,
+        limit: usize,
+    ) -> Result<TaskJournalSnapshot> {
+        let registry = self.load_registry()?;
+        let record = registry.get(task_id).cloned();
+        let event_limit = limit.clamp(1, 200);
+        let mut events = Vec::new();
+        let mut last_event_seq = 0usize;
+        let mut has_more = false;
+
+        // Journal 只保存本机进程状态，不写入 prompt/API key；读取时仍按 req_id 过滤，避免
+        // 前端把其他任务的本机路径混进当前任务卡片。
+        for (seq, event) in self.read_events()?.into_iter() {
+            last_event_seq = last_event_seq.max(seq);
+            if seq <= since || !event_belongs_to_task(&event, task_id) {
+                continue;
+            }
+            if events.len() >= event_limit {
+                has_more = true;
+                continue;
+            }
+            events.push(TaskJournalEventView { seq, event });
+        }
+
+        Ok(TaskJournalSnapshot {
+            task_id: task_id.to_string(),
+            record,
+            events,
+            last_event_seq,
+            has_more,
+        })
+    }
+
     fn load_registry(&self) -> Result<BTreeMap<String, TaskJournalRecord>> {
         let path = self.registry_path();
         if !path.exists() {
@@ -141,10 +204,37 @@ impl TaskJournal {
         self.dir.join("events.jsonl")
     }
 
+    fn read_events(&self) -> Result<Vec<(usize, serde_json::Value)>> {
+        let path = self.events_path();
+        if !path.exists() {
+            return Ok(Vec::new());
+        }
+        let file = File::open(&path).with_context(|| format!("打开 {:?}", path))?;
+        let reader = BufReader::new(file);
+        let mut events = Vec::new();
+        for (index, line) in reader.lines().enumerate() {
+            let line = line.with_context(|| format!("读取 {:?}", path))?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let event = serde_json::from_str(&line)
+                .with_context(|| format!("解析 {:?} 第 {} 行", path, index + 1))?;
+            events.push((index + 1, event));
+        }
+        Ok(events)
+    }
+
     #[cfg(test)]
     fn read_registry_for_test(&self) -> Result<BTreeMap<String, TaskJournalRecord>> {
         self.load_registry()
     }
+}
+
+fn event_belongs_to_task(event: &serde_json::Value, task_id: &str) -> bool {
+    event
+        .get("req_id")
+        .and_then(|value| value.as_str())
+        .is_some_and(|req_id| req_id == task_id)
 }
 
 fn now_ms() -> u128 {
@@ -161,7 +251,7 @@ mod tests {
 
     #[test]
     fn records_started_cancel_and_finished_events() {
-        let dir = unique_test_dir();
+        let dir = unique_test_dir("lifecycle");
         let journal = TaskJournal::new(&dir);
         journal
             .record_started(TaskJournalStart {
@@ -194,7 +284,59 @@ mod tests {
         let _ = fs::remove_dir_all(dir);
     }
 
-    fn unique_test_dir() -> PathBuf {
-        std::env::temp_dir().join(format!("elon-task-journal-test-{}", std::process::id()))
+    #[test]
+    fn snapshot_filters_events_by_task_and_cursor() {
+        let dir = unique_test_dir("snapshot");
+        let journal = TaskJournal::new(&dir);
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-1",
+                cli_name: "codex",
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("first task should persist");
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-2",
+                cli_name: "claude",
+                cwd: Some("D:/other"),
+                runtime_permission: Some("read_only"),
+            })
+            .expect("second task should persist");
+        journal
+            .record_finished("req-1")
+            .expect("finish event should persist");
+
+        let snapshot = journal
+            .snapshot("req-1", 1, 20)
+            .expect("snapshot should read");
+        assert_eq!(snapshot.task_id, "req-1");
+        assert_eq!(snapshot.record.as_ref().unwrap().status, "finished");
+        assert_eq!(snapshot.events.len(), 1);
+        assert_eq!(
+            snapshot.events[0]
+                .event
+                .get("type")
+                .and_then(|value| value.as_str()),
+            Some("finished")
+        );
+        assert!(snapshot.last_event_seq >= 3);
+        assert!(!snapshot.has_more);
+
+        let latest = journal
+            .latest_records(10)
+            .expect("latest records should read");
+        assert_eq!(latest.len(), 2);
+        assert_eq!(latest[0].req_id, "req-1");
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    fn unique_test_dir(suffix: &str) -> PathBuf {
+        std::env::temp_dir().join(format!(
+            "elon-task-journal-test-{}-{}",
+            std::process::id(),
+            suffix
+        ))
     }
 }

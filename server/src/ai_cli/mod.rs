@@ -907,6 +907,14 @@ async fn run_via_pc_agent(
         cwd,
         model_label.or(copilot_model),
     );
+    let _ = tx.send(pc_dispatch_started_event(
+        &pc_req_id,
+        agent_id,
+        cli_name,
+        cwd,
+        native_session_scope.as_ref(),
+        request_mode,
+    ));
 
     let mut full_text = String::new();
     let stream_id = Uuid::new_v4().to_string();
@@ -1183,6 +1191,29 @@ fn pc_cli_passthrough_event(text: &str) -> Option<String> {
         | "progress" => serde_json::to_string(&value).ok(),
         _ => None,
     }
+}
+
+fn pc_dispatch_started_event(
+    pc_req_id: &str,
+    agent_id: &str,
+    cli_name: &str,
+    cwd: Option<&str>,
+    native_session_scope: Option<&NativeSessionScope>,
+    request_mode: AiCliRequestMode,
+) -> String {
+    serde_json::json!({
+        "type": "pc_dispatch_started",
+        "pc_req_id": pc_req_id,
+        "req_id": pc_req_id,
+        "agent_id": agent_id,
+        "cli": cli_name,
+        "cwd_configured": cwd.is_some(),
+        "project_id": native_session_scope.map(|scope| scope.project_id.as_str()),
+        "conversation_id": native_session_scope.map(|scope| scope.conversation_id.as_str()),
+        "runtime_permission": native_session_scope.map(|scope| scope.runtime_permission.as_str()),
+        "mode": if request_mode.is_plan() { "plan" } else { "execute" }
+    })
+    .to_string()
 }
 
 fn pc_cli_progress_label(cli_name: &str) -> &'static str {
@@ -1518,7 +1549,7 @@ fn extract_codex_reply(output: &str) -> String {
 
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
-    use super::pc_cli_passthrough_event;
+    use super::{pc_cli_passthrough_event, pc_dispatch_started_event, AiCliRequestMode};
     use serde_json::Value;
 
     #[test]
@@ -1536,5 +1567,23 @@ mod pc_cli_passthrough_tests {
     fn pc_cli_passthrough_rejects_unknown_json_events() {
         assert!(pc_cli_passthrough_event(r#"{"type":"unknown","message":"x"}"#).is_none());
         assert!(pc_cli_passthrough_event("not json").is_none());
+    }
+
+    #[test]
+    fn pc_dispatch_started_event_exposes_local_req_id_without_prompt() {
+        let event = pc_dispatch_started_event(
+            "req-1",
+            "agent-1",
+            "codex",
+            Some("D:/workspace"),
+            None,
+            AiCliRequestMode::Execute,
+        );
+        let value: Value = serde_json::from_str(&event).unwrap();
+        assert_eq!(value["type"], "pc_dispatch_started");
+        assert_eq!(value["pc_req_id"], "req-1");
+        assert_eq!(value["req_id"], "req-1");
+        assert!(value.get("prompt").is_none());
+        assert!(value.get("api_key").is_none());
     }
 }

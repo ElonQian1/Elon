@@ -431,6 +431,84 @@ async function testTaskSnapshotsPollsSnapshotEndpoint() {
   assert.strictEqual(snapshots.contextExtras().snapshots.get('tsk_live').attach.status, 'live', 'snapshot attach state should be cached for task cards');
 }
 
+async function testTaskSnapshotsMergeLocalJournal() {
+  let scheduled = null;
+  const sandbox = loadAsset('server/src/assets/pc_app_task_snapshots.js', {
+    setTimeout: (callback) => {
+      scheduled = callback;
+      return 8;
+    },
+    clearTimeout: () => {},
+    console: { warn: () => {} }
+  });
+  const state = {
+    activeKind: 'project',
+    activeProjectId: 'p1',
+    activeChannelId: 'ch-dev',
+    activeChannelKind: 'ai_development'
+  };
+  const snapshots = sandbox.window.ElonPcTaskSnapshots.create({
+    state,
+    clean,
+    sameId: (a, b) => String(a || '') === String(b || ''),
+    devTasks: { openTaskIds: () => ['tsk_local'] },
+    api: async () => ({
+      task: { id: 'tsk_local', status: 'running' },
+      pc_req_id: 'req-local-1',
+      messages: [{ kind: 'ai_task', task_id: 'tsk_local', content: '发起 AI 开发任务：测试本机恢复' }],
+      events: [],
+      last_event_seq: 1,
+      attach: { status: 'detached', live: false }
+    }),
+    localNodeApi: async (path) => {
+      assert.ok(path.includes('/api/task-journal/req-local-1'), 'local journal endpoint should use cloud pc_req_id mapping');
+      return {
+        ok: true,
+        task_id: 'req-local-1',
+        record: { req_id: 'req-local-1', status: 'running' },
+        events: [{ seq: 2, event: { type: 'started', req_id: 'req-local-1' } }],
+        last_event_seq: 2,
+        attach: { status: 'live', live: true, source: 'local_journal' }
+      };
+    },
+    renderMessages: () => {},
+    refreshActiveChannel: async () => {}
+  });
+
+  assert.strictEqual(snapshots.schedule([], 'project', {}), true, 'snapshot scheduler should accept local journal tasks');
+  await scheduled();
+  const snapshot = snapshots.contextExtras().snapshots.get('tsk_local');
+  assert.strictEqual(snapshot.attach.status, 'live', 'local journal live state should override detached cloud attach');
+  assert.strictEqual(snapshot.attach.source, 'local_journal', 'local journal source should be retained');
+  assert.strictEqual(snapshot.local_journal.last_event_seq, 2, 'local journal cursor should be cached');
+}
+
+function testDevTasksUsesLocalJournalAttachLabel() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    draftContinuation: () => {}
+  });
+
+  const messages = [
+    { kind: 'ai_task', task_id: 'tsk_local', content: '发起 AI 开发任务：测试本机标签' }
+  ];
+  const snapshots = new Map([[
+    'tsk_local',
+    {
+      task: { id: 'tsk_local', status: 'running' },
+      attach: { status: 'live', live: true, source: 'local_journal' }
+    }
+  ]]);
+  const context = devTasks.buildContext(messages, { snapshots });
+  const html = devTasks.renderMessage(messages[0], context);
+  assert.ok(html.includes('本机现场可连接'), 'task card should label local journal live attach state');
+}
+
 function testProjectReadinessChecklist() {
   const sandbox = loadAsset('server/src/assets/pc_app_project_readiness.js');
   const create = (state) => sandbox.window.ElonPcProjectReadiness.create({
@@ -565,7 +643,11 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('refreshLocalAdminToken'), 'PC app should refresh the local admin token');
   assert.ok(pcApp.includes('resp.status === 403'), 'PC app should retry once after a stale local token');
   assert.ok(pcApp.includes('/api/full-access/grants'), 'PC app should write local full-access grants');
+  assert.ok(pcApp.includes('localNodeApi, clean'), 'PC app should pass protected local node API into task snapshots');
   assert.ok(pcApp.includes('confirm_full_access: true'), 'full-access grant request should include explicit confirmation');
+
+  const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
+  assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
 
   const nodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_admin.html'), 'utf8');
   assert.ok(nodeAdmin.includes('X-Elon-Local-Admin-Token'), 'standalone node admin page should send local admin token header');
@@ -587,9 +669,11 @@ function testLocalAdminTokenWiring() {
   testDevTasksHasOpenPendingApproval();
   testDevTasksUsesPersistedTaskStatus();
   testDevTasksUsesSnapshotAttachState();
+  testDevTasksUsesLocalJournalAttachLabel();
   testDevTasksToolTimeline();
   await testDevTasksToolApprovalButtons();
   await testTaskSnapshotsPollsSnapshotEndpoint();
+  await testTaskSnapshotsMergeLocalJournal();
   testProjectReadinessChecklist();
   testDevComposerRouteLabels();
   testDevComposerForcedRoutePreference();

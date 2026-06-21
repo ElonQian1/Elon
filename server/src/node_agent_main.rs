@@ -59,6 +59,7 @@ mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
 mod node_agent_server_runtime;
 mod node_agent_task_journal;
+mod node_agent_task_journal_api;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_write_preview;
@@ -2437,6 +2438,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/register-project",
                 axum::routing::post(admin_register_project),
             )
+            .merge(node_agent_task_journal_api::routes())
             .route(
                 "/api/project-folder/pick",
                 axum::routing::post(node_agent_project_picker::pick_local_project_folder),
@@ -2644,9 +2646,13 @@ async fn admin_status(
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
     let full_access_grant_count = rt.full_access_grants.list().await.len();
+    let active_cli_prompt_count = rt.active_cli_prompts.read().await.len();
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
+        "task_journal_supported": true,
+        "task_journal_schema_version": 1,
+        "active_cli_prompt_count": active_cli_prompt_count,
         "logged_in": creds.is_some(),
         "agent_id": creds.as_ref().map(|c| c.agent_id.clone()),
         "device_name": machine_label(),

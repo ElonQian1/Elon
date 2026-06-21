@@ -103,7 +103,7 @@
     draftContinuation: draftProjectAiContinuation
   });
   devTaskSnapshots = window.ElonPcTaskSnapshots && window.ElonPcTaskSnapshots.create({
-    state, api, clean, sameId, devTasks,
+    state, api, localNodeApi, clean, sameId, devTasks,
     renderMessages,
     refreshActiveChannel: refreshActiveProjectChannel,
     logError: (error) => console.warn('PC task snapshot refresh failed', error)

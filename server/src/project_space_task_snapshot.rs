@@ -47,6 +47,8 @@ struct RuntimeEventView {
 #[derive(Debug, Serialize)]
 struct RuntimeEventsResponse {
     task_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pc_req_id: Option<String>,
     events: Vec<RuntimeEventView>,
     last_event_seq: i64,
     has_more: bool,
@@ -56,6 +58,8 @@ struct RuntimeEventsResponse {
 #[derive(Debug, Serialize)]
 struct RuntimeSnapshotResponse {
     task: TaskSnapshot,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pc_req_id: Option<String>,
     messages: Vec<ProjectChannelMessage>,
     events: Vec<RuntimeEventView>,
     last_event_seq: i64,
@@ -69,6 +73,7 @@ struct TaskSnapshotContext {
     messages: Vec<ProjectChannelMessage>,
     events: Vec<TaskEventRecord>,
     last_event_seq: i64,
+    pc_req_id: Option<String>,
 }
 
 pub async fn snapshot_channel_ai_task(
@@ -193,6 +198,7 @@ fn snapshot_response(
     let returned_last_seq = events.last().map(|event| event.seq).unwrap_or(since.max(0));
     Json(RuntimeSnapshotResponse {
         task: context.task,
+        pc_req_id: context.pc_req_id,
         messages: context.messages,
         events,
         last_event_seq: context.last_event_seq,
@@ -228,6 +234,7 @@ fn events_response(
     let returned_last_seq = events.last().map(|event| event.seq).unwrap_or(since.max(0));
     Json(RuntimeEventsResponse {
         task_id: context.task.id,
+        pc_req_id: context.pc_req_id,
         events,
         last_event_seq: context.last_event_seq,
         has_more: context.last_event_seq > returned_last_seq,
@@ -272,12 +279,18 @@ fn load_task_snapshot_context(
         .store
         .latest_task_event_seq(task_id)
         .map_err(|e| json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let pc_req_id = state
+        .store
+        .list_task_events(task_id, usize::MAX)
+        .ok()
+        .and_then(|events| derive_pc_req_id(events.iter().map(String::as_str)));
     Ok(TaskSnapshotContext {
         project,
         task,
         messages,
         events,
         last_event_seq,
+        pc_req_id,
     })
 }
 
@@ -344,4 +357,59 @@ fn render_events(events: Vec<TaskEventRecord>) -> Vec<RuntimeEventView> {
                 .unwrap_or_else(|_| json!({ "type": "invalid_json", "raw": event.event_json })),
         })
         .collect()
+}
+
+fn derive_pc_req_id<'a>(events: impl IntoIterator<Item = &'a str>) -> Option<String> {
+    for raw in events {
+        let Ok(value) = serde_json::from_str::<Value>(raw) else {
+            continue;
+        };
+        if let Some(req_id) = pc_req_id_from_event(&value) {
+            return Some(req_id);
+        }
+    }
+    None
+}
+
+fn pc_req_id_from_event(value: &Value) -> Option<String> {
+    let event_type = value.get("type").and_then(Value::as_str).unwrap_or("");
+    let is_pc_event = matches!(
+        event_type,
+        "pc_dispatch_started"
+            | "tool_approval_required"
+            | "tool_approval_decision"
+            | "tool_call"
+            | "tool_result"
+            | "usage"
+    );
+    if !is_pc_event {
+        return None;
+    }
+    value
+        .get("pc_req_id")
+        .or_else(|| value.get("req_id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|req_id| !req_id.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::derive_pc_req_id;
+
+    #[test]
+    fn derives_pc_req_id_from_dispatch_event() {
+        let events = [
+            r#"{"type":"progress","message":"running"}"#,
+            r#"{"type":"pc_dispatch_started","pc_req_id":"req-local","task_id":"tsk-cloud"}"#,
+        ];
+        assert_eq!(derive_pc_req_id(events), Some("req-local".to_string()));
+    }
+
+    #[test]
+    fn ignores_non_pc_req_ids() {
+        let events = [r#"{"type":"progress","req_id":"not-local"}"#];
+        assert_eq!(derive_pc_req_id(events), None);
+    }
 }

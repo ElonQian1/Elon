@@ -7,7 +7,7 @@
 - 基线：已 rebase 到 `origin/main` 的 `13e06854`
 - 目标：修复 PC 端 exe 启动/更新/协议唤起/CLI 执行时几十到上百个黑色 cmd 窗口的问题。
 - 追加阶段工作目录：`D:\rust\active-projects\elon-win-task-recovery-20260621`
-- 追加阶段目标：补齐服务重启/PC 节点超时后的频道 AI 任务终态可见恢复，避免 PC 任务卡永久停在运行中。
+- 追加阶段目标：补齐服务重启/PC 节点超时后的频道 AI 任务终态可见恢复，并继续补强 PC 节点本机 journal 查询，让前端能区分“重连原进程”和“基于快照继续”。
 
 ## 已完成
 
@@ -35,6 +35,9 @@
 - 已新增 Route C 云端健康预检：服务端暴露 `/api/agent/runtime/status`，PC 节点启动时用登录 token 验证服务器模型 runtime 是否真实 ready，避免“有 token 但服务器模型未配置”时误报可用。
 - 已把 PC 任务 `snapshot` 接入前端并补齐 `/assets` 路由：AI 开发频道现在会按任务快照游标轮询，缓存 attach 状态，并在任务卡展示“现场可连接 / 现场已脱离 / 终态快照”。
 - 已新增 PC 节点本地任务 journal 基础：节点本机写入 CLI prompt `registry.json` 与 `events.jsonl`，记录 started / cancel_requested / finished，给后续重启恢复和 attach 协议使用。
+- 本轮已新增 PC 节点本地 journal 查询闭环：`/api/task-journal`、`/api/task-journal/:pc_req_id` 挂在 7799 local-admin token 保护链路下，返回 record、events、游标和 `live/detached/terminal/missing` attach 状态。
+- 本轮已修正云端 `task_id` 与本机 `pc_req_id` 的映射：PC CLI dispatch 开始时写入非敏感 `pc_dispatch_started` 事件，云端任务 snapshot/events 响应返回 `pc_req_id`，前端只用该 ID 查询本机 journal，不再误把 `tsk_*` 当成本机 key。
+- 本轮已让 PC AI 开发任务卡合并本机 journal 状态：本机仍持有 active handle 时显示“本机现场可连接”，本机 journal 残留 running 但无 handle 时显示“本机现场已脱离”，终态时显示“本机终态快照”。
 
 ## 验证结果
 
@@ -51,7 +54,9 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml project_tool_approval -- --nocapture`，8 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`，9 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`，1 passed
-- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，1 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，4 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough -- --nocapture`，4 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server project_space_task_snapshot -- --nocapture`，2 passed
 - 通过：`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`，2 passed
 - 通过：`node scripts\test-pc-dev-assets.js`
 - 通过：`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
@@ -66,11 +71,12 @@
 - 只 stage 本任务文件，commit、push。
 - 按发布脚本发布服务端；本阶段改动了 Windows 节点启动侧 Route C ready 判断，需要同步重新发布 Windows 节点包。
 - 下一阶段实现真正任务恢复：定义持久 run handle，绑定 `task_id/pc_req_id/node_id/route/cwd/codex_session_id/lease/last_event_seq/resume_strategy`。
-- 下一阶段给 PC 节点增加本地任务 registry/jsonl journal，并扩展 homecli attach 协议，避免把 `codex resume` 误认为同进程恢复。
-- 下一阶段扩展 homecli attach 协议，让前端能查询本机 journal 并区分“重连原进程”和“基于快照继续”。
+- 下一阶段扩展 homecli attach 协议，把 `pc_req_id/node_id/pid-or-handle/lease` 纳入可恢复控制面；当前只能判断状态，尚不能真正把浏览器重连到原 CLI stdout 流。
+- 下一阶段持久化审批 waiter 状态并支持刷新恢复，避免页面刷新后审批卡只依赖历史事件重建。
 
 ## 剩余风险
 
 - 自动化无法直接证明 GUI 黑窗肉眼不可见，仍建议发布后在干净 Windows 用户环境做一次双击、协议唤起、自更新和开机自启烟测。
 - 全量 clippy 历史债未在本任务内清理，避免把本次用户可见故障修复扩大成仓库治理。
 - 任务终态可见恢复只是让 UI 收到明确终态和“继续”提示，不是接回同一个 Codex/CLI 进程继续执行。
+- 本轮 journal 查询能区分 live/detached/terminal，但 journal 仍只保存生命周期事件，不保存 stdout/stderr、完整工具流、pid 和 Codex thread 元数据；因此距离完整 Codex Desktop 恢复仍有缺口。

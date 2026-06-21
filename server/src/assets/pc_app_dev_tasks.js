@@ -518,9 +518,10 @@
     function attachMeta(task, fallback) {
       const attach = task && task.attach ? task.attach : null;
       const status = clean(attach && attach.status).toLowerCase();
-      if (status === 'live') return `现场可连接 · ${fallback}`;
-      if (status === 'detached') return `现场已脱离 · ${fallback}`;
-      if (status === 'terminal') return `终态快照 · ${fallback}`;
+      const local = clean(attach && attach.source).toLowerCase() === 'local_journal';
+      if (status === 'live') return `${local ? '本机现场可连接' : '现场可连接'} · ${fallback}`;
+      if (status === 'detached') return `${local ? '本机现场已脱离' : '现场已脱离'} · ${fallback}`;
+      if (status === 'terminal') return `${local ? '本机终态快照' : '终态快照'} · ${fallback}`;
       return fallback;
     }
 

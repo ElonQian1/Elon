@@ -18,6 +18,7 @@
 10. Route C 云端健康预检：服务器提供 `/api/agent/runtime/status`，PC 节点用登录 token 预检服务器模型是否真实可用，避免只因有 token 就显示 Route C ready。
 11. PC 前端任务现场接入：AI 开发频道前端消费 `snapshot` 接口缓存 attach/事件游标，用轻量快照轮询替代纯整频道刷新，并在任务卡显示 live/detached/terminal 现场状态。
 12. PC 节点本地 journal：节点本机写入 CLI prompt registry/jsonl，记录 started/cancel_requested/finished，作为后续重启恢复和 attach 协议的数据底座。
+13. 本机 journal 查询闭环：7799 本地管理 API 暴露受 token 保护的 task journal 查询；云端 snapshot 返回 `pc_req_id`，PC 前端按该映射合并本机 live/detached/terminal 状态，区分“重连原进程”和“基于快照继续”。
 
 ## 风险
 
@@ -25,6 +26,7 @@
 - 全量 `cargo clippy --all-targets --all-features -- -D warnings` 当前被服务端/测试历史 lint 阻塞，未在本次黑窗任务中大范围清理。
 - 原主工作区存在未提交改动，本任务只在隔离 worktree 修改并只 stage 本任务文件。
 - 任务终态可见恢复不是同进程续跑；Codex Desktop 级恢复仍需要持久 run handle、PC 节点 journal、attach 协议和审批 waiter 重绑定。
+- 云端 `task_id` 与本机 PC 节点 `req_id` 不是同一个 ID；前端必须使用云端 snapshot 返回的 `pc_req_id` 查询本机 journal，不能把 `tsk_*` 当作本机 key。
 
 ## 验证命令
 
@@ -40,6 +42,8 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough -- --nocapture`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server project_space_task_snapshot -- --nocapture`
 - `cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`
 - `node scripts\test-pc-dev-assets.js`
 - `cargo test --manifest-path server\Cargo.toml --all-features`

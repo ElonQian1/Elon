@@ -3,11 +3,14 @@
   function create(deps) {
     const state = deps.state;
     const api = deps.api;
+    const localNodeApi = deps.localNodeApi;
     const clean = deps.clean;
     const sameId = deps.sameId;
     const devTasks = deps.devTasks;
     const snapshots = new Map();
     const cursors = new Map();
+    const localCursors = new Map();
+    const localFailures = new Set();
     let timer = 0;
 
     function clear() {
@@ -50,6 +53,7 @@
         if (stillViewing(projectId, channelId)) scheduleTask(projectId, channelId, taskId, 8000);
         return;
       }
+      await mergeLocalJournal(snapshot, taskId);
       const previous = snapshots.get(taskId) || null;
       snapshots.set(taskId, snapshot);
       const nextSeq = lastSeqOf(snapshot);
@@ -77,8 +81,57 @@
         messages: Array.isArray(data.messages) ? data.messages : [],
         events: Array.isArray(data.events) ? data.events : [],
         last_event_seq: Number(data.last_event_seq || data.lastEventSeq || 0),
+        pc_req_id: clean(data.pc_req_id || data.pcReqId),
+        attach: data.attach || null,
+        local_journal: null
+      };
+    }
+
+    async function mergeLocalJournal(snapshot, taskId) {
+      if (typeof localNodeApi !== 'function' || !taskId) return;
+      const journalTaskId = clean(snapshot && (snapshot.pc_req_id || snapshot.pcReqId));
+      if (!journalTaskId) return;
+      const since = localCursors.get(journalTaskId) || 0;
+      try {
+        const data = await localNodeApi(`/api/task-journal/${encodeURIComponent(journalTaskId)}?since=${encodeURIComponent(String(since))}&limit=100`, { cache: 'no-store' });
+        const journal = normalizeLocalJournal(data);
+        if (!journal) return;
+        snapshot.local_journal = journal;
+        snapshot.attach = mergeAttach(snapshot, journal);
+        if (journal.last_event_seq > since) localCursors.set(journalTaskId, journal.last_event_seq);
+        localFailures.delete(journalTaskId);
+      } catch (error) {
+        // 本机 journal 是恢复增强，不是云端 snapshot 的必要条件；节点未启动或版本旧时继续展示云端状态。
+        if (!localFailures.has(journalTaskId) && typeof deps.logLocalError === 'function') {
+          deps.logLocalError(error);
+        }
+        localFailures.add(journalTaskId);
+      }
+    }
+
+    function normalizeLocalJournal(data) {
+      if (!data || data.ok === false) return null;
+      const lastSeq = Number(data.last_event_seq || data.lastEventSeq || 0);
+      return {
+        task_id: clean(data.task_id || data.taskId),
+        record: data.record || null,
+        events: Array.isArray(data.events) ? data.events : [],
+        last_event_seq: Number.isFinite(lastSeq) ? lastSeq : 0,
+        has_more: !!(data.has_more || data.hasMore),
         attach: data.attach || null
       };
+    }
+
+    function mergeAttach(snapshot, journal) {
+      const localAttach = journal && journal.attach ? journal.attach : null;
+      const localStatus = clean(localAttach && localAttach.status).toLowerCase();
+      if (!localStatus || localStatus === 'missing') return snapshot.attach || null;
+      if (localStatus === 'live') return Object.assign({}, snapshot.attach || {}, localAttach, { source: 'local_journal' });
+      const cloudAttach = snapshot.attach || null;
+      const cloudStatus = clean(cloudAttach && cloudAttach.status).toLowerCase();
+      if (cloudStatus === 'live') return cloudAttach;
+      if (taskIsTerminal(snapshot.task) && localStatus !== 'terminal') return cloudAttach;
+      return Object.assign({}, cloudAttach || {}, localAttach, { source: 'local_journal' });
     }
 
     function shouldRenderSnapshot(previous, snapshot, since) {
@@ -98,7 +151,9 @@
     }
 
     function attachStatus(attach) {
-      return clean(attach && attach.status).toLowerCase();
+      const status = clean(attach && attach.status).toLowerCase();
+      const source = clean(attach && attach.source).toLowerCase();
+      return `${status}:${source}`;
     }
 
     function taskIsTerminal(task) {
