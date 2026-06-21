@@ -1,0 +1,133 @@
+// scripts/test-pc-dev-assets.js
+const assert = require('assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+
+const repoRoot = path.resolve(__dirname, '..');
+
+function loadAsset(relativePath, extraSandbox = {}) {
+  const code = fs.readFileSync(path.join(repoRoot, relativePath), 'utf8');
+  const sandbox = {
+    window: {},
+    document: { querySelector: () => null, createElement: () => ({ querySelectorAll: () => [] }) },
+    ...extraSandbox
+  };
+  vm.runInNewContext(code, sandbox, { filename: relativePath });
+  return sandbox;
+}
+
+function clean(value) {
+  return String(value || '').trim();
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function testDevTasksContinueAction() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    draftContinuation: () => {}
+  });
+
+  const messages = [
+    { kind: 'ai_task', task_id: 'tsk_1234567890', content: '发起 AI 开发任务：修复登录按钮' },
+    { kind: 'ai_progress', task_id: 'tsk_1234567890', content: '正在检查项目' },
+    { kind: 'ai_result', task_id: 'tsk_1234567890', content: '任务失败：测试未通过' }
+  ];
+  const context = devTasks.buildContext(messages);
+  const html = devTasks.renderMessage(messages[2], context);
+
+  assert.ok(html.includes('data-dev-task-action="continue"'), 'result card should expose continue action');
+  assert.ok(html.includes('data-dev-task-action="refresh"'), 'result card should keep refresh action');
+  assert.strictEqual(devTasks.hasOpenTasks(messages, context), false, 'finished task should not be considered open');
+}
+
+function testProjectReadinessChecklist() {
+  const sandbox = loadAsset('server/src/assets/pc_app_project_readiness.js');
+  const create = (state) => sandbox.window.ElonPcProjectReadiness.create({
+    state,
+    $: () => null,
+    clean,
+    escapeHtml,
+    api: async () => ({}),
+    openSettings: () => {},
+    selectNode: () => {},
+    selectProject: () => {},
+    selectProjectChannel: () => {}
+  });
+
+  const readyState = {
+    nodes: [{ node_id: 'node-1', online: true, route_a_ready: true, allowed_clis: ['codex'], device_name: 'PC' }],
+    projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
+  };
+  const readyHtml = create(readyState).renderMemberPanel({
+    id: 'p1',
+    node_id: 'node-1',
+    workspace_path: 'D:/demo',
+    runtime_permission: 'project_write'
+  });
+
+  assert.ok(readyHtml.includes('可以开发'), 'ready project should be marked developable');
+  assert.ok(readyHtml.includes('AI 开发频道可用'), 'ready checklist should include development channel');
+  assert.ok(readyHtml.includes('Route A · codex'), 'ready checklist should show selected route');
+
+  const blockedHtml = create({ nodes: [], projectSpace: { channels: [] } }).renderMemberPanel({ id: 'p2' });
+  assert.ok(blockedHtml.includes('未绑定本机'), 'unbound project should not be marked ready');
+  assert.ok(blockedHtml.includes('未绑定本机项目目录'), 'blocked checklist should explain missing workspace');
+  assert.ok(blockedHtml.includes('未找到 AI 开发频道'), 'blocked checklist should explain missing dev channel');
+}
+
+function testDevComposerRouteLabels() {
+  let inserted = null;
+  const fakeParent = {
+    insertBefore(element) {
+      inserted = element;
+    }
+  };
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_composer.js', {
+    document: {
+      createElement: () => ({ hidden: true, className: '', innerHTML: '', querySelectorAll: () => [] })
+    }
+  });
+  const state = {
+    activeKind: 'project',
+    activeChannelKind: 'ai_development',
+    activeProjectId: 'p1',
+    projects: [{ id: 'p1', node_id: 'node-1', workspace_path: 'D:/demo', runtime_permission: 'full_access' }],
+    nodes: [{ node_id: 'node-1', online: true, api_runtime_ready: true, allowed_clis: [] }]
+  };
+  const composer = sandbox.window.ElonPcDevComposer.create({
+    state,
+    els: { composer: { parentElement: fakeParent } },
+    clean,
+    escapeHtml,
+    openSettings: () => {},
+    selectNode: () => {},
+    openModelPicker: () => {}
+  });
+
+  composer.render();
+  assert.ok(inserted, 'composer bar should be inserted');
+  assert.strictEqual(inserted.hidden, false, 'composer bar should be visible in AI development channel');
+  assert.ok(inserted.className.includes('full-access'), 'composer should expose full access tone');
+  assert.ok(inserted.innerHTML.includes('Route B · 远程 API Key'), 'composer should show API runtime route');
+}
+
+testDevTasksContinueAction();
+testProjectReadinessChecklist();
+testDevComposerRouteLabels();
+
+console.log('pc-dev-assets tests passed');

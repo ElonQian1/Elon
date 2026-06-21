@@ -9,9 +9,8 @@
       const info = buildReadiness(project);
       const permission = runtimePermission(project);
       const permissionTone = permission === 'full_access' ? 'warn' : 'ok';
-      const devChannel = findDevelopmentChannel();
-      const devAction = devChannel
-        ? `<button class="dev-readiness-action primary" type="button" data-dev-readiness-action="development-channel" data-channel-id="${escapeHtml(devChannel.id)}">开发频道</button>`
+      const devAction = info.devChannel
+        ? `<button class="dev-readiness-action primary" type="button" data-dev-readiness-action="development-channel" data-channel-id="${escapeHtml(info.devChannel.id)}">开发频道</button>`
         : '';
       const nodeAction = info.node
         ? `<button class="dev-readiness-action" type="button" data-dev-readiness-action="node" data-node-id="${escapeHtml(info.nodeId)}">节点详情</button>`
@@ -38,6 +37,9 @@
           <div class="dev-readiness-next">
             <span>下一步</span>
             <strong>${escapeHtml(info.nextStep)}</strong>
+          </div>
+          <div class="dev-readiness-checks">
+            ${readinessChecksHtml(info.checks)}
           </div>
           <label class="dev-readiness-permission ${permissionTone}">
             <span>AI 权限</span>
@@ -116,48 +118,61 @@
     function buildReadiness(project) {
       const nodeId = clean(project.node_id || project.nodeId || project.agent_id || project.agentId);
       const node = findNode(nodeId);
-      const workspace = clean(project.workspace_path || project.workspacePath) || '未绑定本机目录';
+      const workspaceRaw = clean(project.workspace_path || project.workspacePath);
+      const workspace = workspaceRaw || '未绑定本机目录';
+      const workspaceReady = !!workspaceRaw;
+      const devChannel = findDevelopmentChannel();
+      const permission = runtimePermission(project);
       if (!nodeId) {
+        const checks = readinessChecks({ workspaceReady, nodeBound: false, nodeOnline: false, route: null, devChannel, permission });
         return {
           tone: 'missing',
           title: '未绑定本机',
           badge: '未就绪',
           nodeId,
           node: null,
+          devChannel,
+          checks,
           workspace,
           nodeLabel: '未选择 PC 节点',
           routeLabel: '先绑定本地项目',
           cliLabel: '未检查',
-          nextStep: '在项目设置里选择本机项目目录，绑定到当前 PC 节点。'
+          nextStep: nextStepForReadiness(checks)
         };
       }
       if (!node) {
+        const checks = readinessChecks({ workspaceReady, nodeBound: true, nodeOnline: false, route: null, devChannel, permission });
         return {
           tone: 'warning',
           title: '节点不可见',
           badge: '需检查',
           nodeId,
           node: null,
+          devChannel,
+          checks,
           workspace,
           nodeLabel: shortNodeId(nodeId),
           routeLabel: '等待节点上线或授权',
           cliLabel: '未上报',
-          nextStep: '启动 Win 端并确认当前账号已登录，再刷新项目状态。'
+          nextStep: nextStepForReadiness(checks)
         };
       }
       const route = routeInfo(node);
-      const ready = !!node.online && route.ready;
+      const checks = readinessChecks({ workspaceReady, nodeBound: true, nodeOnline: !!node.online, route, devChannel, permission });
+      const ready = checks.every((check) => check.ok || check.optional);
       return {
         tone: ready ? 'ready' : 'warning',
         title: ready ? '可以开发' : '运行时未就绪',
         badge: ready ? 'Ready' : 'Check',
         nodeId,
         node,
+        devChannel,
+        checks,
         workspace,
         nodeLabel: nodeLabel(node),
         routeLabel: route.label,
         cliLabel: cliLabel(node),
-        nextStep: nextStepForNode(node, route)
+        nextStep: nextStepForReadiness(checks)
       };
     }
 
@@ -171,12 +186,60 @@
       return { ready: false, label: '无可用运行时' };
     }
 
-    function nextStepForNode(node, route) {
-      if (!node.online) return '启动或重新检测这台 PC 节点。';
-      if (route.ready) return '打开开发频道，直接描述要修改、检查或运行的任务。';
-      const clis = normalizedClis(node);
-      if (!clis.length) return '安装 Codex/Copilot/Claude/Gemini，或使用服务器模型兜底。';
-      return '检查节点运行时、账号授权和项目目录权限。';
+    function readinessChecks(input) {
+      const route = input.route || { ready: false, label: '无可用运行时' };
+      return [
+        {
+          key: 'workspace',
+          ok: input.workspaceReady,
+          label: '项目目录',
+          detail: input.workspaceReady ? '已绑定本机目录' : '未绑定本机项目目录',
+          action: '在项目设置里选择项目文件夹'
+        },
+        {
+          key: 'node',
+          ok: input.nodeBound,
+          label: 'PC 节点',
+          detail: input.nodeBound ? '已绑定执行节点' : '未绑定当前 PC 节点',
+          action: '先绑定本机节点'
+        },
+        {
+          key: 'online',
+          ok: input.nodeOnline,
+          label: '节点在线',
+          detail: input.nodeOnline ? '节点正在连接云端' : 'Win 端未在线或账号未登录',
+          action: '启动 Win 端并确认已登录'
+        },
+        {
+          key: 'route',
+          ok: route.ready,
+          label: '运行路线',
+          detail: route.ready ? route.label : 'Route A/B/C 都未就绪',
+          action: '安装本机 CLI 或启用服务器模型兜底'
+        },
+        {
+          key: 'channel',
+          ok: !!input.devChannel,
+          label: '开发频道',
+          detail: input.devChannel ? 'AI 开发频道可用' : '未找到 AI 开发频道',
+          action: '刷新项目空间或重新创建项目频道'
+        },
+        {
+          key: 'permission',
+          ok: true,
+          optional: true,
+          tone: input.permission === 'full_access' ? 'warn' : 'ok',
+          label: '执行权限',
+          detail: input.permission === 'full_access' ? '完全访问已开启' : '限制在项目目录内写入',
+          action: input.permission === 'full_access' ? '确认只给可信项目使用' : '需要跨目录操作时再开启完全访问'
+        }
+      ];
+    }
+
+    function nextStepForReadiness(checks) {
+      const blocked = checks.find((check) => !check.ok && !check.optional);
+      if (blocked) return blocked.action;
+      return '打开开发频道，直接描述要修改、检查或运行的任务。';
     }
 
     function findDevelopmentChannel() {
@@ -230,6 +293,20 @@
 
     function readinessRow(label, value) {
       return `<div><span>${escapeHtml(label)}</span><strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong></div>`;
+    }
+
+    function readinessChecksHtml(checks) {
+      return (checks || []).map((check) => {
+        const tone = check.tone || (check.ok ? 'ok' : 'bad');
+        const mark = check.ok ? '✓' : '!';
+        return `<div class="dev-readiness-check ${escapeHtml(tone)}">
+          <span>${escapeHtml(mark)}</span>
+          <div>
+            <strong>${escapeHtml(check.label)}</strong>
+            <em>${escapeHtml(check.detail)}</em>
+          </div>
+        </div>`;
+      }).join('');
     }
 
     return { renderMemberPanel, bindMemberPanel };
