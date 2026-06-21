@@ -38,6 +38,7 @@
 - 2026-06-21 后续真实群复核发现：Context Pack 和工具链仍能拉到 `123qwe` 的 fb2 数据，但主项目模型生成层返回“当前 AI 模型额度已用尽或接口不可用”，因此真实群只生成失败兜底文案，fb2 feedback 里 `matched_cited_source_count=0`。这是模型供应/运行配置层问题，不是 fb2 用户余额问题；`123qwe` 桥接主项目余额仍足够。
 - 本轮修复了两个可见群 smoke 暴露的问题：`latest_unanswered_group_social_ai_mention` 现在排除 `usr_elon_ai` 自己发出的群消息，避免失败兜底文案里的 `@EL` 再次触发群聊 AI；`scripts/smoke-fb2-visible-chat.ps1` 在配置 `FB2_AI_CENTER_TOKEN` 后改为通过 fb2 feedback 的 `main_request_id` 反查 `social_group_message:*` 和 `social_group_selected_message:*`，避免群里并发回复时误抓其它 `gai_*` 消息。
 - 本轮本地验证通过：`cargo test social_ai_pending`、`cargo fmt --check`、`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted>`。完整真实群 smoke 仍需等主项目模型生成层恢复后再跑，否则会继续因无引用来源而失败。
+- 本轮已发布主项目服务端：提交 `c797bf2d`，服务器版本 `v0.3.559`，线上 `/health=OK`，`/api/server/version.gitSha=c797bf2d309aaac8e248c1c26c7f9b67a27a0145`。发布后可见群单条 `@EL` smoke 发送 `gmsg_3f34e14c9ae945b18ae0f7780d53ac34`，收到回复 `gai_5840b26ede824f0bb5289bf7f9396e5e`；日志确认仍是模型生成层不可用导致兜底文案，但 8 秒后未出现 `trigger_message_id=gai_5840...`，说明 AI 自己回复不再二次触发 `@EL`。
 
 主项目当前已经具备：
 
