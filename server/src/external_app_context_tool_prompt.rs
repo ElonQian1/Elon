@@ -43,6 +43,7 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
          - 引用工具结果时优先带 match_id、order_id、ticket_id、message_id 或 context_audit_id。\n\
          - 如果使用工具事实给出分析，回答中要自然写出关键来源 ID；没有 source_ids 时要说明 fb2 工具结果缺少可追溯 ID。\n\
          - 当前用户订单只允许基于 current_user_only 结果分析，不能推断或暴露其他用户明细。\n\
+         - single_group_persistent_opinion_index 只代表群友历史观点记忆；可用于说明“群友过去怎么看”，不能当作比赛事实、赔率事实或命中承诺。\n\
          </tool_result_rules>\n\
          </executed_external_app_tools>"
     )
@@ -73,5 +74,6 @@ mod tests {
         assert!(block.contains("grounding.status=grounded"));
         assert!(block.contains("不能编造"));
         assert!(block.contains("来源 ID"));
+        assert!(block.contains("历史观点记忆"));
     }
 }

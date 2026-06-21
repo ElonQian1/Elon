@@ -144,6 +144,27 @@ fn plan_fb2_tools_with_platform_scope(
     if let Some(evidence) = keyword_evidence(
         query,
         &[
+            "群友", "大家", "观点", "建议", "采纳", "记住", "记忆", "长期", "以前", "之前", "历史",
+            "复盘",
+        ],
+    ) {
+        plans.push(PlannedTool {
+            name: "opinion_memories",
+            reason: "用户要求参考群友历史观点、建议或长期记忆，需要检索 fb2 群观点记忆索引。",
+            arguments: json!({
+                "query": query,
+                "include_expired": false
+            }),
+            requires_external_user: false,
+            trigger: "group_opinion_memory_needed",
+            confidence: confidence_for(&evidence),
+            evidence,
+        });
+    }
+
+    if let Some(evidence) = keyword_evidence(
+        query,
+        &[
             "平台",
             "全平台",
             "店铺",
@@ -194,7 +215,7 @@ fn plan_fb2_tools_with_platform_scope(
         }
     }
 
-    plans.truncate(4);
+    plans.truncate(5);
     if plans.is_empty() {
         skipped_reasons.push("no_fb2_tool_trigger_matched");
     }
@@ -313,7 +334,8 @@ mod tests {
             vec![
                 "search_matches",
                 "search_user_orders",
-                "search_group_opinions"
+                "search_group_opinions",
+                "opinion_memories"
             ]
         );
         assert!(plan.tools[1].requires_external_user);
@@ -377,6 +399,28 @@ mod tests {
             platform_tool["trigger"].as_str(),
             Some("platform_order_summary_needed")
         );
+    }
+
+    #[test]
+    fn plans_opinion_memories_for_group_history_questions() {
+        let plan = plan_fb2_tools(
+            &json!({
+                "context_quality": {"warnings": []}
+            }),
+            Some("群里大家以前对这场有什么观点和建议？"),
+        );
+
+        assert!(plan.tool_names().contains(&"search_group_opinions"));
+        assert!(plan.tool_names().contains(&"opinion_memories"));
+        let metadata = plan.to_metadata();
+        assert!(metadata["planned_tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| {
+                tool["name"].as_str() == Some("opinion_memories")
+                    && tool["trigger"].as_str() == Some("group_opinion_memory_needed")
+            }));
     }
 
     #[test]

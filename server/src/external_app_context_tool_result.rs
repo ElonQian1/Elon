@@ -106,6 +106,7 @@ fn source_id_value(value: &Value) -> Option<String> {
 fn expected_visibility(tool_name: &str) -> Option<&'static str> {
     match tool_name {
         "search_matches" | "get_match_detail" | "search_group_opinions" => Some("group_context"),
+        "opinion_memories" => Some("single_group_persistent_opinion_index"),
         "search_user_orders" | "get_order_detail" => Some("current_user_only"),
         "platform_orders" => Some("privileged_summary"),
         "get_context_audit" => Some("audit_metadata_only"),
@@ -122,6 +123,7 @@ fn source_ids_required(tool_name: &str) -> bool {
             | "search_user_orders"
             | "get_order_detail"
             | "search_group_opinions"
+            | "opinion_memories"
             | "platform_orders"
     )
 }
@@ -202,6 +204,26 @@ mod tests {
         assert_eq!(
             result["grounding"]["expected_visibility"].as_str(),
             Some("privileged_summary")
+        );
+    }
+
+    #[test]
+    fn opinion_memories_require_persistent_index_visibility_and_source_ids() {
+        let result = normalize_parsed_tool_result(
+            "opinion_memories",
+            "reason",
+            "req-1",
+            &json!({
+                "success": true,
+                "source_ids": ["opinion-memory-1"],
+                "visibility": "single_group_persistent_opinion_index"
+            }),
+        );
+
+        assert_eq!(result["grounding"]["status"], "grounded");
+        assert_eq!(
+            result["grounding"]["expected_visibility"].as_str(),
+            Some("single_group_persistent_opinion_index")
         );
     }
 }
