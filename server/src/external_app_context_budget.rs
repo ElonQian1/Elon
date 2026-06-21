@@ -165,8 +165,14 @@ fn context_fact_summary(context: &Value) -> Value {
         "source_id_samples": {
             "match_ids": id_samples(context.get("matches"), &["id", "match_id"], 5),
             "order_ids": id_samples(context.get("user_orders"), &["order_id", "id", "ticket_id"], 5),
-            "message_ids": id_samples(context.get("group_messages"), &["message_id", "id"], 5)
+            "message_ids": id_samples(context.get("group_messages"), &["message_id", "id"], 5),
+            "platform_summary_ids": citation_ids_by_kind(
+                context.get("citation_sources"),
+                "platform_order_summary",
+                3
+            )
         },
+        "citation_source_samples": citation_source_samples(context.get("citation_sources"), 8),
         "user_order_samples": order_samples(context.get("user_orders"), 3),
         "user_orders_scope": if array_len(context, "user_orders") > 0 {
             "current_user_only_after_external_user_id_header_check"
@@ -206,6 +212,55 @@ fn first_string_field(value: &Value, fields: &[&str]) -> Option<String> {
             .filter(|value| !value.is_empty())
             .map(ToOwned::to_owned)
     })
+}
+
+fn citation_ids_by_kind(value: Option<&Value>, kind: &str, limit: usize) -> Vec<String> {
+    value
+        .and_then(Value::as_array)
+        .map(|items| {
+            items
+                .iter()
+                .filter(|item| item.get("kind").and_then(Value::as_str) == Some(kind))
+                .filter_map(|item| first_string_field(item, &["id"]))
+                .take(limit)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn citation_source_samples(value: Option<&Value>, limit: usize) -> Vec<Value> {
+    value
+        .and_then(Value::as_array)
+        .map(|sources| {
+            let mut selected = sources
+                .iter()
+                .filter(|source| {
+                    source.get("kind").and_then(Value::as_str) == Some("platform_order_summary")
+                })
+                .take(2)
+                .collect::<Vec<_>>();
+            let remaining = limit.saturating_sub(selected.len());
+            selected.extend(
+                sources
+                    .iter()
+                    .filter(|source| {
+                        source.get("kind").and_then(Value::as_str) != Some("platform_order_summary")
+                    })
+                    .take(remaining),
+            );
+            selected
+                .into_iter()
+                .take(limit)
+                .map(|source| {
+                    json!({
+                        "kind": first_prompt_value(source, &["kind"]),
+                        "id": first_prompt_value(source, &["id"]),
+                        "label": first_prompt_value(source, &["label"])
+                    })
+                })
+                .collect()
+        })
+        .unwrap_or_default()
 }
 
 fn order_samples(value: Option<&Value>, limit: usize) -> Vec<Value> {
@@ -279,6 +334,10 @@ mod tests {
             "context_audit_id": "audit-1",
             "metrics": {"budget_status": "ok"},
             "matches": [{"id": "match-1"}],
+            "citation_sources": [
+                {"kind": "match", "id": "match-1", "label": "比赛 match-1"},
+                {"kind": "platform_order_summary", "id": "platform_order_summary:2026-06-21:all", "label": "平台订单摘要"}
+            ],
             "user_orders": [{
                 "order_id": "order-1",
                 "status": "pending",
@@ -300,6 +359,8 @@ mod tests {
         assert!(block.contains("external_metrics="));
         assert!(block.contains("context_fact_summary="));
         assert!(block.contains("\"user_order_count\":1"));
+        assert!(block.contains("platform_order_summary:2026-06-21:all"));
+        assert!(block.contains("\"kind\":\"platform_order_summary\""));
         assert!(block.contains("order-1"));
         assert!(block.contains("\"bet_slip_count\":1"));
         assert!(block.contains("\"selection\":\"主胜\""));

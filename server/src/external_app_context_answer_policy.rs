@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 const FB2_ANSWER_RULES: &[&str] = &[
     "必须区分「数据事实」「用户订单」「群友观点」「AI推断」。",
     "涉及比赛预测时必须说明不确定性，不承诺命中，不诱导投注。",
-    "引用比赛时尽量带 match id；引用订单/票据时尽量带 order id 或 ticket id；引用群友观点时必须带 message id。",
+    "引用比赛时尽量带 match id；引用订单/票据时尽量带 order id 或 ticket id；引用群友观点时必须带 message id；引用平台匿名订单汇总时必须带 platform_order_summary source id。",
     "如果上下文缺少用户订单、赔率更新时间或消息来源，必须说明信息不足，不能编造。",
     "如果 context_quality.warnings 非空，回答中必须显式提示相关数据缺口或新鲜度风险。",
     "如果需要更多比赛、订单或群友观点明细，只能提出需要调用的外部工具，不能把未调用工具的结果当事实。",
@@ -34,6 +34,12 @@ pub(crate) fn public_answer_policy_guidance(app_id: &str) -> Option<Value> {
                     "description": "群友围绕比赛、赔率或订单的观点摘要。",
                     "required_source_ids": ["message_id"],
                     "visibility": "group_visible"
+                },
+                {
+                    "name": "platform_order_summary",
+                    "description": "平台/店铺匿名聚合订单摘要，不包含单个用户订单明细。",
+                    "required_source_ids": ["platform_order_summary"],
+                    "visibility": "anonymous_aggregate_only"
                 },
                 {
                     "name": "ai_inference",
@@ -72,7 +78,7 @@ pub(crate) fn default_answer_policy() -> Value {
     json!({
         "schema": "fb2.answer_policy.v1",
         "must_distinguish": ["data_facts", "user_orders", "group_opinions", "ai_inference"],
-        "required_citations": ["match_id", "order_id", "ticket_id", "message_id", "context_audit_id"],
+        "required_citations": ["match_id", "order_id", "ticket_id", "message_id", "platform_order_summary", "context_audit_id"],
         "risk_rules": {
             "no_guaranteed_win": true,
             "no_betting_inducement": true,
@@ -108,6 +114,12 @@ mod tests {
             .unwrap()
             .iter()
             .any(|section| section["name"] == "group_opinions"));
+        assert!(guidance["grounding_sections"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|section| section["name"] == "platform_order_summary"
+                && section["visibility"] == "anonymous_aggregate_only"));
         assert!(guidance["forbidden_behaviors"]
             .as_array()
             .unwrap()
@@ -130,6 +142,7 @@ mod tests {
         assert!(block.contains("<answer_rules>"));
         assert!(block.contains("必须区分"));
         assert!(block.contains("message id"));
+        assert!(block.contains("platform_order_summary source id"));
         assert!(block.contains("不能编造"));
     }
 }
