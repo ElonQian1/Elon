@@ -9,6 +9,7 @@ use crate::{
         fb2_base_url, fb2_context_token, fb2_request_context_headers, timeout_secs, FB2_APP_ID,
         FB2_CONTEXT_HEADER,
     },
+    external_app_http_client::{build_fb2_direct_client, fb2_direct_client},
     types::AppState,
 };
 
@@ -96,14 +97,8 @@ async fn post_generated_answer_feedback(
     };
 
     let url = format!("{base_url}/api/main-project/context/feedback");
-    let response = send_feedback_request(
-        state,
-        &url,
-        token.as_str(),
-        external_user_id.as_deref(),
-        &payload,
-    )
-    .await?;
+    let response =
+        send_feedback_request(&url, token.as_str(), external_user_id.as_deref(), &payload).await?;
 
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
@@ -133,7 +128,6 @@ async fn post_generated_answer_feedback(
     }
 
     if let Err(error) = post_opinion_adoption_if_needed(
-        state,
         external_user_id.as_deref(),
         main_request_id,
         trigger,
@@ -157,7 +151,6 @@ async fn post_generated_answer_feedback(
 }
 
 async fn post_opinion_adoption_if_needed(
-    state: &Arc<AppState>,
     external_user_id: Option<&str>,
     main_request_id: &str,
     trigger: &str,
@@ -230,8 +223,7 @@ async fn post_opinion_adoption_if_needed(
         "reason": "main_project_generated_answer_used_fb2_opinion_memory"
     });
     let url = format!("{base_url}/api/main-project/tools/execute");
-    let mut request = state
-        .http_client
+    let mut request = fb2_direct_client()
         .post(&url)
         .header(FB2_CONTEXT_HEADER, token)
         .json(&payload)
@@ -274,13 +266,12 @@ async fn post_opinion_adoption_if_needed(
 }
 
 async fn send_feedback_request(
-    state: &Arc<AppState>,
     url: &str,
     token: &str,
     external_user_id: Option<&str>,
     payload: &Value,
 ) -> anyhow::Result<reqwest::Response> {
-    send_feedback_request_with_client(&state.http_client, url, token, external_user_id, payload)
+    send_feedback_request_with_client(fb2_direct_client(), url, token, external_user_id, payload)
         .await
 }
 
@@ -308,9 +299,7 @@ async fn send_feedback_request_with_client(
                 error = %first_error,
                 "fb2 generated-answer feedback callback initial send failed; retrying with fresh client"
             );
-            let client = reqwest::Client::builder()
-                .pool_max_idle_per_host(0)
-                .build()?;
+            let client = build_fb2_direct_client()?;
             let mut retry = client
                 .post(url)
                 .header(FB2_CONTEXT_HEADER, token)

@@ -14,6 +14,7 @@ use crate::{
     external_app_context_response::{
         compact_error, fb2_pack_response_to_context, fb2_response_to_context,
     },
+    external_app_http_client::fb2_direct_client,
     external_app_registry::{external_group_by_group_id, public_external_app_config},
     types::AppState,
 };
@@ -103,15 +104,7 @@ async fn fetch_fb2_business_context(
         );
     }
 
-    fetch_fb2_match_context(
-        state,
-        app_id,
-        external_group_id,
-        topic_hint,
-        &base_url,
-        &token,
-    )
-    .await
+    fetch_fb2_match_context(app_id, external_group_id, topic_hint, &base_url, &token).await
 }
 
 async fn fetch_fb2_context_pack(
@@ -158,8 +151,7 @@ async fn fetch_fb2_context_pack(
     }
 
     let include_platform_orders = platform_order_summary_enabled();
-    let mut request = state
-        .http_client
+    let mut request = fb2_direct_client()
         .get(&url)
         .header(FB2_CONTEXT_HEADER, token)
         .query(&query)
@@ -188,7 +180,6 @@ async fn fetch_fb2_context_pack(
 }
 
 async fn fetch_fb2_match_context(
-    state: &Arc<AppState>,
     app_id: &str,
     external_group_id: &str,
     topic_hint: Option<&str>,
@@ -207,8 +198,7 @@ async fn fetch_fb2_match_context(
     if let Some(lottery_type) = infer_lottery_type(topic_hint) {
         query.push(("lottery_type".to_string(), lottery_type));
     }
-    let request = state
-        .http_client
+    let request = fb2_direct_client()
         .get(&url)
         .header(FB2_CONTEXT_HEADER, token)
         .query(&query)

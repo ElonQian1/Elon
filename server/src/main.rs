@@ -57,6 +57,7 @@ mod external_app_context_tool_prompt;
 mod external_app_context_tool_result;
 mod external_app_context_tool_runtime;
 mod external_app_context_tools;
+mod external_app_http_client;
 mod external_app_registry;
 mod external_app_tool_manifest;
 mod external_app_tool_report_api;

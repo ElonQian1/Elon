@@ -10,15 +10,16 @@ use crate::{
     },
     external_app_context_response::compact_error,
     external_app_context_tool_execution::FB2_ALLOWED_TOOLS,
+    external_app_http_client::fb2_direct_client,
     types::AppState,
 };
 
 const FB2_TOOL_MANIFEST_PATH: &str = "/api/main-project/context/tool-manifest";
 const MAX_TOOL_IDS: usize = 32;
 
-pub(crate) async fn public_live_tool_manifest(state: &Arc<AppState>, app_id: &str) -> Value {
+pub(crate) async fn public_live_tool_manifest(_state: &Arc<AppState>, app_id: &str) -> Value {
     match app_id {
-        FB2_APP_ID => fetch_fb2_tool_manifest(state).await,
+        FB2_APP_ID => fetch_fb2_tool_manifest().await,
         _ => json!({
             "app_id": app_id,
             "schema": "external_app.live_tool_manifest.v1",
@@ -29,7 +30,7 @@ pub(crate) async fn public_live_tool_manifest(state: &Arc<AppState>, app_id: &st
     }
 }
 
-async fn fetch_fb2_tool_manifest(state: &Arc<AppState>) -> Value {
+async fn fetch_fb2_tool_manifest() -> Value {
     let Some(base_url) = fb2_base_url() else {
         return manifest_status("not_configured", "missing_fb2_base_url");
     };
@@ -38,8 +39,7 @@ async fn fetch_fb2_tool_manifest(state: &Arc<AppState>) -> Value {
     };
 
     let url = format!("{base_url}{FB2_TOOL_MANIFEST_PATH}");
-    let response = state
-        .http_client
+    let response = fb2_direct_client()
         .get(&url)
         .header(FB2_CONTEXT_HEADER, token)
         .timeout(Duration::from_secs(timeout_secs()))

@@ -11,6 +11,7 @@
 - 主项目 prompt metadata 新增 `context_fact_summary`，把比赛/本人订单/群消息数量及少量 source id 投影到 metadata，避免模型漏看长 Context Pack 中已有的订单来源。
 - 第二轮真实群聊验证发现 `match_analysis_brief` 成功返回 8 条本人订单，但 executed tool JSON 因大赔率数据在 6000 字处截断，导致 `data.user_orders` 明细没进入 prompt；主项目已补 `tool_fact_summary` 和更详细的 `context_fact_summary.user_order_samples`，把本人订单样例提前投影到截断前。
 - 第三轮真实群聊验证已成功让 AI 引用并分析本人订单 `order_id`、金额、状态和首个选项；随后发现自动反馈回写偶发 `send request` 失败，主项目已把 generated-answer feedback callback 改为携带 `X-FB2-AI-CONTEXT-USER-ID`，并在首次 HTTP 传输失败后使用 fresh client 重试。
+- 第四轮真实群聊验证定位到线上主项目有 `HTTP_PROXY/HTTPS_PROXY/ALL_PROXY`，且 fb2 固定 IP 不在 `NO_PROXY`；curl 直连 fb2 feedback 15ms 成功，但 reqwest POST 走代理后 10 秒超时。主项目已给 fb2 Context Pack、today-matches、tool manifest、tools/execute、feedback 和 opinion-adoption 增加统一 no-proxy direct client。
 - 主项目服务端已发布：`v0.3.541`，线上 `/api/server/version` 返回 `gitSha=d5326564eb5c1cdb1b79019abdf346fa9b52dea1`。
 - fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
 - 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据。

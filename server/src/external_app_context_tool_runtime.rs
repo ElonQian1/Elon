@@ -18,6 +18,7 @@ use crate::{
     external_app_context_tool_audit::{execution_audit, execution_status},
     external_app_context_tool_planner::{plan_fb2_tools, PlannedTool},
     external_app_context_tool_result::normalize_parsed_tool_result,
+    external_app_http_client::fb2_direct_client,
     external_app_registry::external_group_by_group_id,
     store::ExternalAppToolExecutionWrite,
     types::AppState,
@@ -136,7 +137,6 @@ pub(crate) async fn group_tool_results_for_chat(
 
     let executions = executable.into_iter().map(|plan| {
         execute_fb2_tool(
-            state,
             app.id,
             group.external_group_id,
             external_user_id.as_deref(),
@@ -235,7 +235,6 @@ fn record_tool_execution(
 }
 
 async fn execute_fb2_tool(
-    state: &Arc<AppState>,
     app_id: &str,
     external_group_id: &str,
     external_user_id: Option<&str>,
@@ -260,8 +259,7 @@ async fn execute_fb2_tool(
         }
     });
 
-    let mut request = state
-        .http_client
+    let mut request = fb2_direct_client()
         .post(&url)
         .header(FB2_CONTEXT_HEADER, token)
         .json(&payload)
