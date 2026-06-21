@@ -57,6 +57,7 @@
         error: '',
         apkUrl: '',
         attach: null,
+        resume: null,
         lastEventSeq: 0
       };
     }
@@ -77,6 +78,8 @@
         if (apkUrl) task.apkUrl = apkUrl;
         const attach = snapshot && snapshot.attach ? snapshot.attach : null;
         if (attach) task.attach = attach;
+        const resume = snapshot && snapshot.resume ? snapshot.resume : null;
+        if (resume) task.resume = resume;
         const seq = Number(snapshot && (snapshot.last_event_seq || snapshot.lastEventSeq || 0));
         if (Number.isFinite(seq) && seq > 0) task.lastEventSeq = seq;
       });
@@ -151,14 +154,14 @@
     function hasOpenTasks(messages, context) {
       if (!Array.isArray(messages) || !messages.length) return false;
       const built = context || buildContext(messages);
-      return Array.from(built.tasks.values()).some((task) => !taskIsTerminal(task));
+      return Array.from(built.tasks.values()).some((task) => !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task));
     }
 
     function openTaskIds(messages, context) {
       if (!Array.isArray(messages) || !messages.length) return [];
       const built = context || buildContext(messages);
       return Array.from(built.tasks.values())
-        .filter((task) => !taskIsTerminal(task))
+        .filter((task) => !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task))
         .map((task) => task.taskId)
         .filter(Boolean);
     }
@@ -168,6 +171,7 @@
       const task = taskId ? context.tasks.get(taskId) : null;
       const status = statusForTask(task);
       const request = taskRequest(messageText(message));
+      const snapshotContinue = taskNeedsSnapshotContinue(task);
       return cardHtml({
         tone: status.tone,
         eyebrow: 'AI 开发任务',
@@ -176,9 +180,9 @@
         taskId,
         meta: attachMeta(task, task && task.progressCount ? `${task.progressCount} 条进度` : '等待执行回写'),
         actions: true,
-        canCancel: !!taskId && !taskIsTerminal(task),
-        continueDraft: taskIsTerminal(task) && !(task && task.result)
-          ? continuationDraft(request, task && (task.error || task.status), taskIsCanceled(task), taskIsFailed(task))
+        canCancel: !!taskId && !taskIsTerminal(task) && !snapshotContinue,
+        continueDraft: (taskIsTerminal(task) || snapshotContinue) && !(task && task.result)
+          ? continuationDraft(request, task && (task.error || task.status), taskIsCanceled(task), taskIsFailed(task), task && task.resume)
           : null
       });
     }
@@ -196,7 +200,7 @@
         taskId,
         meta: '来自运行时',
         actions: true,
-        canCancel: !!taskId && !taskIsTerminal(task)
+        canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task)
       });
     }
 
@@ -218,7 +222,7 @@
           taskId,
           meta: finalState.meta,
           actions: true,
-          canCancel: !!taskId && !taskIsTerminal(task)
+          canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task)
         });
       }
       const isResult = event.type === 'tool_result';
@@ -233,7 +237,7 @@
         taskId,
         meta: isResult ? (failed ? '工具返回错误' : '工具已完成') : '等待工具返回',
         actions: true,
-        canCancel: !!taskId && !taskIsTerminal(task)
+        canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task)
       });
     }
 
@@ -243,9 +247,10 @@
       const tool = clean(event.tool) || 'tool';
       const approvalId = clean(event.approval_id);
       const recoveredState = approvalStateFor(context, taskId, approvalId);
+      const snapshotContinue = taskNeedsSnapshotContinue(task);
       const closedState = recoveredState && recoveredState.status !== 'pending'
         ? recoveredState
-        : (taskIsTerminal(task) ? taskTerminalApprovalState(task) : null);
+        : (snapshotContinue ? taskSnapshotContinueApprovalState() : (taskIsTerminal(task) ? taskTerminalApprovalState(task) : null));
       return cardHtml({
         tone: closedState ? closedState.tone : 'approval',
         eyebrow: '工具审批',
@@ -255,7 +260,7 @@
         taskId,
         meta: closedState ? closedState.meta : '批准前不会执行',
         actions: true,
-        canCancel: !!taskId && !taskIsTerminal(task),
+        canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task),
         approval: approvalId && !closedState ? { approvalId } : null
       });
     }
@@ -275,7 +280,7 @@
         taskId,
         meta: canceled ? '已中断运行' : (failed ? '需要继续处理' : '可以检查变更'),
         actions: true,
-        continueDraft: continuationDraft(task && task.request, content, canceled, failed)
+        continueDraft: continuationDraft(task && task.request, content, canceled, failed, task && task.resume)
       });
     }
 
@@ -451,6 +456,7 @@
           ? { tone: 'failed', label: '任务失败' }
           : { tone: 'done', label: '任务完成' };
       }
+      if (taskNeedsSnapshotContinue(task)) return { tone: 'failed', label: '需要基于快照继续' };
       if (task && task.result) {
         if (task.canceled) return { tone: 'canceled', label: '已停止' };
         return task.failed
@@ -515,13 +521,18 @@
       return { status: 'done', tone: 'done', label: '已失效', meta: '任务已结束' };
     }
 
+    function taskSnapshotContinueApprovalState() {
+      return { status: 'detached', tone: 'failed', label: '已失效', meta: '现场已脱离，请基于快照继续' };
+    }
+
     function attachMeta(task, fallback) {
       const attach = task && task.attach ? task.attach : null;
       const status = clean(attach && attach.status).toLowerCase();
       const local = clean(attach && attach.source).toLowerCase() === 'local_journal';
-      if (status === 'live') return `${local ? '本机现场可连接' : '现场可连接'} · ${fallback}`;
-      if (status === 'detached') return `${local ? '本机现场已脱离' : '现场已脱离'} · ${fallback}`;
-      if (status === 'terminal') return `${local ? '本机终态快照' : '终态快照'} · ${fallback}`;
+      const hint = resumeHint(task);
+      if (status === 'live') return `${local ? '本机现场可连接' : '现场可连接'}${hint} · ${fallback}`;
+      if (status === 'detached') return `${local ? '本机现场已脱离' : '现场已脱离'}${hint} · ${fallback}`;
+      if (status === 'terminal') return `${local ? '本机终态快照' : '终态快照'}${hint} · ${fallback}`;
       return fallback;
     }
 
@@ -529,19 +540,44 @@
       return clean(content).replace(/^发起\s*AI\s*开发任务[:：]\s*/i, '');
     }
 
-    function continuationDraft(request, result, canceled, failed) {
+    function continuationDraft(request, result, canceled, failed, resume) {
       const original = compactForDraft(request || '', 1200);
       const lastResult = compactForDraft(result || '', 1600);
+      const resumeLine = resumeDraftLine(resume);
       const statusLine = canceled
         ? '上次任务被我停止了。'
         : (failed ? '上次任务失败了。' : '上次任务已完成，我要继续迭代。');
       return [
         '继续处理这个 AI 开发任务。',
         statusLine,
+        resumeLine ? `恢复方式：${resumeLine}` : '',
         original ? `原始需求：\n${original}` : '',
         lastResult ? `上次结果：\n${lastResult}` : '',
         '请先检查当前项目工作区状态，保护已有改动，再继续完成剩余开发或下一步迭代。'
       ].filter(Boolean).join('\n\n');
+    }
+
+    function taskNeedsSnapshotContinue(task) {
+      const resume = task && task.resume ? task.resume : null;
+      const action = clean(resume && resume.next_action).toLowerCase();
+      return action === 'continue_from_snapshot';
+    }
+
+    function resumeHint(task) {
+      const resume = task && task.resume ? task.resume : null;
+      const action = clean(resume && resume.next_action).toLowerCase();
+      const canStream = resume && resume.can_stream_live_output !== false;
+      if (action === 'wait_or_cancel' && !canStream) return '（暂不回放输出）';
+      if (action === 'continue_from_snapshot') return '（基于快照继续）';
+      if (action === 'refresh_snapshot') return '（仅云端快照）';
+      return '';
+    }
+
+    function resumeDraftLine(resume) {
+      if (!resume) return '';
+      const label = clean(resume.strategy && resume.strategy.label);
+      const reason = clean(resume.reason || (resume.strategy && resume.strategy.reason));
+      return [label, reason].filter(Boolean).join('：');
     }
 
     function compactForDraft(value, limit) {

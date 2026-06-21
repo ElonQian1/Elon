@@ -468,7 +468,15 @@ async function testTaskSnapshotsMergeLocalJournal() {
         record: { req_id: 'req-local-1', status: 'running' },
         events: [{ seq: 2, event: { type: 'started', req_id: 'req-local-1' } }],
         last_event_seq: 2,
-        attach: { status: 'live', live: true, source: 'local_journal' }
+        attach: { status: 'live', live: true, source: 'local_journal' },
+        resume: {
+          status: 'live',
+          can_reconnect: true,
+          can_cancel: true,
+          can_stream_live_output: false,
+          next_action: 'wait_or_cancel',
+          strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
+        }
       };
     },
     renderMessages: () => {},
@@ -481,6 +489,7 @@ async function testTaskSnapshotsMergeLocalJournal() {
   assert.strictEqual(snapshot.attach.status, 'live', 'local journal live state should override detached cloud attach');
   assert.strictEqual(snapshot.attach.source, 'local_journal', 'local journal source should be retained');
   assert.strictEqual(snapshot.local_journal.last_event_seq, 2, 'local journal cursor should be cached');
+  assert.strictEqual(snapshot.resume.next_action, 'wait_or_cancel', 'local resume contract should be cached');
 }
 
 function testDevTasksUsesLocalJournalAttachLabel() {
@@ -501,12 +510,72 @@ function testDevTasksUsesLocalJournalAttachLabel() {
     'tsk_local',
     {
       task: { id: 'tsk_local', status: 'running' },
-      attach: { status: 'live', live: true, source: 'local_journal' }
+      attach: { status: 'live', live: true, source: 'local_journal' },
+      resume: {
+        status: 'live',
+        can_stream_live_output: false,
+        next_action: 'wait_or_cancel',
+        strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
+      }
     }
   ]]);
   const context = devTasks.buildContext(messages, { snapshots });
   const html = devTasks.renderMessage(messages[0], context);
   assert.ok(html.includes('本机现场可连接'), 'task card should label local journal live attach state');
+  assert.ok(html.includes('暂不回放输出'), 'task card should not imply stdout/stderr replay is ready');
+}
+
+function testDevTasksUsesResumeContractForSnapshotContinue() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    approveTool: async () => {},
+    draftContinuation: () => {}
+  });
+
+  const messages = [
+    { kind: 'ai_task', task_id: 'tsk_detached_local', content: '发起 AI 开发任务：继续修复 Win 客户端' },
+    {
+      kind: 'ai_progress',
+      task_id: 'tsk_detached_local',
+      content: JSON.stringify({
+        type: 'tool_approval_required',
+        tool: 'run_command',
+        approval_id: 'tap_detached',
+        status: 'pending'
+      })
+    }
+  ];
+  const snapshots = new Map([[
+    'tsk_detached_local',
+    {
+      task: { id: 'tsk_detached_local', status: 'running' },
+      attach: { status: 'detached', live: false, source: 'local_journal' },
+      resume: {
+        status: 'detached',
+        can_reconnect: false,
+        can_cancel: false,
+        can_stream_live_output: false,
+        next_action: 'continue_from_snapshot',
+        strategy: { kind: 'snapshot_continue', label: '基于快照继续' }
+      }
+    }
+  ]]);
+  const context = devTasks.buildContext(messages, { snapshots });
+  const taskHtml = devTasks.renderMessage(messages[0], context);
+  const approvalHtml = devTasks.renderMessage(messages[1], context);
+
+  assert.strictEqual(devTasks.hasOpenTasks(messages, context), false, 'detached resume contract should close polling');
+  assert.strictEqual(devTasks.openTaskIds(messages, context).length, 0, 'detached resume contract should remove task from open IDs');
+  assert.ok(taskHtml.includes('需要基于快照继续'), 'detached task should not look normally running');
+  assert.ok(taskHtml.includes('基于快照继续'), 'detached task should expose snapshot continuation mode');
+  assert.ok(taskHtml.includes('data-dev-task-action="continue"'), 'detached task should offer continue action');
+  assert.ok(!taskHtml.includes('data-dev-task-action="cancel"'), 'detached task should not offer stop action');
+  assert.ok(!approvalHtml.includes('data-decision="approve"'), 'detached task should close stale approval buttons');
 }
 
 function testProjectReadinessChecklist() {
@@ -670,6 +739,7 @@ function testLocalAdminTokenWiring() {
   testDevTasksUsesPersistedTaskStatus();
   testDevTasksUsesSnapshotAttachState();
   testDevTasksUsesLocalJournalAttachLabel();
+  testDevTasksUsesResumeContractForSnapshotContinue();
   testDevTasksToolTimeline();
   await testDevTasksToolApprovalButtons();
   await testTaskSnapshotsPollsSnapshotEndpoint();

@@ -13,6 +13,9 @@ use std::sync::Arc;
 
 use crate::{
     node_agent_task_journal::{TaskJournalEventView, TaskJournalRecord},
+    node_agent_task_resume::{
+        task_attach_state, task_resume_contract, TaskAttachState, TaskResumeContract,
+    },
     NodeRuntime,
 };
 
@@ -20,16 +23,6 @@ use crate::{
 struct JournalQuery {
     since: Option<usize>,
     limit: Option<usize>,
-}
-
-#[derive(Debug, Serialize)]
-struct LocalTaskAttachState {
-    status: &'static str,
-    live: bool,
-    can_reconnect: bool,
-    continue_mode: &'static str,
-    source: &'static str,
-    reason: &'static str,
 }
 
 #[derive(Debug, Serialize)]
@@ -46,7 +39,8 @@ struct LocalTaskJournalResponse {
     events: Vec<TaskJournalEventView>,
     last_event_seq: usize,
     has_more: bool,
-    attach: LocalTaskAttachState,
+    attach: TaskAttachState,
+    resume: TaskResumeContract,
 }
 
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
@@ -93,7 +87,8 @@ async fn get_task_journal(
     match runtime.task_journal.snapshot(&task_id, since, limit) {
         Ok(snapshot) => {
             // 本地 API 只暴露进程恢复所需的最小字段；prompt/API key 从未写入 journal。
-            let attach = local_attach_state(snapshot.record.as_ref(), active);
+            let attach = task_attach_state(snapshot.record.as_ref(), active);
+            let resume = task_resume_contract(&attach);
             Json(LocalTaskJournalResponse {
                 ok: true,
                 task_id: snapshot.task_id,
@@ -102,6 +97,7 @@ async fn get_task_journal(
                 last_event_seq: snapshot.last_event_seq,
                 has_more: snapshot.has_more,
                 attach,
+                resume,
             })
             .into_response()
         }
@@ -125,45 +121,6 @@ fn validate_task_id(task_id: &str) -> Result<(), &'static str> {
     Ok(())
 }
 
-fn local_attach_state(record: Option<&TaskJournalRecord>, active: bool) -> LocalTaskAttachState {
-    if active {
-        return LocalTaskAttachState {
-            status: "live",
-            live: true,
-            can_reconnect: true,
-            continue_mode: "reconnect_original_process",
-            source: "local_journal",
-            reason: "本机节点仍持有该任务的运行控制句柄，可以重连原进程现场。",
-        };
-    }
-    match record.map(|record| record.status.as_str()) {
-        Some("running" | "cancel_requested") => LocalTaskAttachState {
-            status: "detached",
-            live: false,
-            can_reconnect: false,
-            continue_mode: "snapshot_continue",
-            source: "local_journal",
-            reason: "本机 journal 显示任务未终态，但当前节点已没有运行句柄，只能基于快照继续。",
-        },
-        Some(_) => LocalTaskAttachState {
-            status: "terminal",
-            live: false,
-            can_reconnect: false,
-            continue_mode: "snapshot_continue",
-            source: "local_journal",
-            reason: "本机进程已经结束，只能基于任务快照继续新一轮处理。",
-        },
-        None => LocalTaskAttachState {
-            status: "missing",
-            live: false,
-            can_reconnect: false,
-            continue_mode: "snapshot_continue",
-            source: "local_journal",
-            reason: "本机没有该任务的 journal 记录，前端只能使用云端任务快照。",
-        },
-    }
-}
-
 fn internal_error(error: anyhow::Error) -> Response {
     (
         StatusCode::INTERNAL_SERVER_ERROR,
@@ -177,21 +134,7 @@ fn internal_error(error: anyhow::Error) -> Response {
 
 #[cfg(test)]
 mod tests {
-    use super::{local_attach_state, validate_task_id};
-    use crate::node_agent_task_journal::TaskJournalRecord;
-
-    fn record(status: &str) -> TaskJournalRecord {
-        TaskJournalRecord {
-            req_id: "task-1".to_string(),
-            cli_name: "codex".to_string(),
-            cwd: Some("D:/demo".to_string()),
-            runtime_permission: Some("project_write".to_string()),
-            status: status.to_string(),
-            started_at_ms: 1,
-            updated_at_ms: 2,
-            cancel_requested_at_ms: None,
-        }
-    }
+    use super::validate_task_id;
 
     #[test]
     fn rejects_unsafe_task_ids() {
@@ -199,21 +142,5 @@ mod tests {
         assert!(validate_task_id("").is_err());
         assert!(validate_task_id("task/1").is_err());
         assert!(validate_task_id("task\\1").is_err());
-    }
-
-    #[test]
-    fn attach_state_distinguishes_live_detached_and_snapshot() {
-        let running = record("running");
-        let finished = record("finished");
-        let live = local_attach_state(Some(&running), true);
-        assert_eq!(live.status, "live");
-        assert!(live.can_reconnect);
-        assert_eq!(live.continue_mode, "reconnect_original_process");
-        assert_eq!(local_attach_state(Some(&running), false).status, "detached");
-        assert_eq!(
-            local_attach_state(Some(&finished), false).status,
-            "terminal"
-        );
-        assert_eq!(local_attach_state(None, false).status, "missing");
     }
 }

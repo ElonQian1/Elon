@@ -83,6 +83,7 @@
         last_event_seq: Number(data.last_event_seq || data.lastEventSeq || 0),
         pc_req_id: clean(data.pc_req_id || data.pcReqId),
         attach: data.attach || null,
+        resume: data.resume || null,
         local_journal: null
       };
     }
@@ -98,6 +99,7 @@
         if (!journal) return;
         snapshot.local_journal = journal;
         snapshot.attach = mergeAttach(snapshot, journal);
+        snapshot.resume = mergeResume(snapshot, journal);
         if (journal.last_event_seq > since) localCursors.set(journalTaskId, journal.last_event_seq);
         localFailures.delete(journalTaskId);
       } catch (error) {
@@ -118,7 +120,8 @@
         events: Array.isArray(data.events) ? data.events : [],
         last_event_seq: Number.isFinite(lastSeq) ? lastSeq : 0,
         has_more: !!(data.has_more || data.hasMore),
-        attach: data.attach || null
+        attach: data.attach || null,
+        resume: data.resume || null
       };
     }
 
@@ -134,11 +137,17 @@
       return Object.assign({}, cloudAttach || {}, localAttach, { source: 'local_journal' });
     }
 
+    function mergeResume(snapshot, journal) {
+      if (journal && journal.resume) return journal.resume;
+      return snapshot.resume || null;
+    }
+
     function shouldRenderSnapshot(previous, snapshot, since) {
       if (!previous) return true;
       if (lastSeqOf(snapshot) > since) return true;
       if (taskStatus(previous.task) !== taskStatus(snapshot.task)) return true;
-      return attachStatus(previous.attach) !== attachStatus(snapshot.attach);
+      return attachStatus(previous.attach) !== attachStatus(snapshot.attach)
+        || resumeStatus(previous.resume) !== resumeStatus(snapshot.resume);
     }
 
     function lastSeqOf(snapshot) {
@@ -154,6 +163,13 @@
       const status = clean(attach && attach.status).toLowerCase();
       const source = clean(attach && attach.source).toLowerCase();
       return `${status}:${source}`;
+    }
+
+    function resumeStatus(resume) {
+      const status = clean(resume && resume.status).toLowerCase();
+      const action = clean(resume && resume.next_action).toLowerCase();
+      const strategy = clean(resume && resume.strategy && resume.strategy.kind).toLowerCase();
+      return `${status}:${action}:${strategy}`;
     }
 
     function taskIsTerminal(task) {
