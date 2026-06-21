@@ -280,6 +280,7 @@ function testDevComposerRouteLabels() {
   assert.ok(inserted, 'composer bar should be inserted');
   assert.strictEqual(inserted.hidden, false, 'composer bar should be visible in AI development channel');
   assert.ok(inserted.className.includes('full-access'), 'composer should expose full access tone');
+  assert.ok(inserted.innerHTML.includes('完全访问（本机确认）'), 'composer should label full access as locally confirmed');
   assert.ok(inserted.innerHTML.includes('Route B · 本机 API runtime'), 'composer should show API runtime route');
   assert.ok(inserted.innerHTML.includes('data-dev-composer-route="route_b"'), 'composer should expose Route B selector');
   assert.strictEqual(composer.selectedRouteForRequest(), '', 'auto route should not be sent to backend');
@@ -331,6 +332,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('X-Elon-Local-Admin-Token'), 'PC app should send local admin token header');
   assert.ok(pcApp.includes('refreshLocalAdminToken'), 'PC app should refresh the local admin token');
   assert.ok(pcApp.includes('resp.status === 403'), 'PC app should retry once after a stale local token');
+  assert.ok(pcApp.includes('/api/full-access/grants'), 'PC app should write local full-access grants');
+  assert.ok(pcApp.includes('confirm_full_access: true'), 'full-access grant request should include explicit confirmation');
 
   const nodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_admin.html'), 'utf8');
   assert.ok(nodeAdmin.includes('X-Elon-Local-Admin-Token'), 'standalone node admin page should send local admin token header');

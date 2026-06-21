@@ -103,7 +103,7 @@
         tone: route.ready ? (permission === 'full_access' ? 'full-access' : 'ready') : 'warning',
         routeLabel: route.label,
         routeOptions: route.options,
-        permissionLabel: permission === 'full_access' ? '完全访问' : '仅项目内写入',
+        permissionLabel: permission === 'full_access' ? '完全访问（本机确认）' : '仅项目内写入',
         workspace: clean(project.workspace_path || project.workspacePath) || '未绑定本机目录',
         settingsLabel: permission === 'full_access' ? '权限' : '设置'
       };

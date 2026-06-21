@@ -2350,7 +2350,7 @@
     if (!els.settingsRuntimePermissionHint || !els.settingsRuntimePermission) return;
     const mode = normalizeRuntimePermission(els.settingsRuntimePermission.value);
     els.settingsRuntimePermissionHint.textContent = mode === 'full_access'
-      ? 'Route A 的 Codex/Copilot 会按用户授权绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
+      ? 'Route A 的 Codex/Copilot 需要本机确认后才会绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
       : 'AI 只能读写当前项目目录，并运行开发相关命令。';
   }
 
@@ -2363,6 +2363,19 @@
       body: JSON.stringify({ mode, confirmFullAccess: mode === 'full_access' })
     });
     project.runtime_permission = data.mode || mode;
+  }
+
+  async function grantLocalProjectFullAccess(project, workspacePath) {
+    const projectId = clean(project && project.id);
+    if (!projectId) throw new Error('云端项目 ID 缺失，无法写入本机完全访问授权。');
+    await localNodeApi('/api/full-access/grants', {
+      method: 'POST',
+      body: JSON.stringify({
+        project_id: projectId,
+        workspace_path: workspacePath,
+        confirm_full_access: true
+      })
+    });
   }
 
   async function chooseLocalProjectFolder() {
@@ -2423,7 +2436,7 @@
     }
     const runtimeMode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
     if (runtimeMode === 'full_access') {
-      const ok = window.confirm(`确认给项目「${name}」开启完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。`);
+      const ok = window.confirm(`确认给项目「${name}」开启本机完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；这次确认会写入当前 PC 节点的本机授权记录。`);
       if (!ok) {
         setSettingsResult('已取消完全访问授权，项目尚未注册。');
         return;
@@ -2444,8 +2457,11 @@
       });
       const project = (data.cloud && data.cloud.project) || {};
       const reused = data.cloud && data.cloud.reused_existing;
+      if (runtimeMode === 'full_access') {
+        await grantLocalProjectFullAccess(project, path);
+      }
       await saveProjectRuntimePermission(project, runtimeMode);
-      setSettingsResult(`${reused ? '已复用现有项目' : '注册成功'}：${escapeHtml(project.name || name)}${project.id ? ` · ${escapeHtml(project.id)}` : ''}`);
+      setSettingsResult(`${reused ? '已复用现有项目' : '注册成功'}：${escapeHtml(project.name || name)}${project.id ? ` · ${escapeHtml(project.id)}` : ''}${runtimeMode === 'full_access' ? ' · 本机完全访问已授权' : ''}`);
       await loadBaseData();
       if (project.id) {
         closeSettings();

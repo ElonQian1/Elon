@@ -20,6 +20,7 @@
 12. `write_file` 安全审批：Route B/C 的整文件写入审批显示真实 diff，敏感/过大/二进制内容 fail-closed，批准后复查 base hash。
 13. 审批并发状态机：PC 工具审批在服务端原子认领，重复/冲突决策不会重复派发，发送失败可回滚重试。
 14. 审批 ACK 闭环：服务端派发审批决定后等待 PC 节点 ACK，只有对应 `dispatch_id` 被接受后才落为已决定，迟到 ACK、拒收和超时都可重试。
+15. Route A 完全访问本机门禁：完全访问必须在 Win 节点本机写入项目级授权记录，云端字段不能单独触发 Codex/Copilot 沙箱绕过。
 
 ## 风险
 
@@ -34,6 +35,7 @@
 - 目前审批状态仍是服务端内存态；本阶段先解决单进程并发竞态，后续若要支持服务重启恢复、多实例和审计追责，需要把审批记录、决策人、diff/hash 写入持久存储。
 - ACK 协议升级后，旧 PC 节点能收到审批决定但不会回 ACK，服务端会 fail-closed 并释放认领；因此发布服务器后必须刷新 Windows 节点包。
 - 新 PC 节点对旧服务器消息保留 `dispatch_id` 默认值兼容，避免节点包先更新时反序列化失败。
+- Route A `full_access` 授权记录是本机文件态；换机器、删除本机配置或换项目目录后需要用户在 PC 工作台重新确认。
 
 ## 验证命令
 
@@ -57,6 +59,7 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server node_agent_cli_security`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_full_access`
 - `cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`
 - `git diff --check`
 - `cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`

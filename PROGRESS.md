@@ -3,8 +3,8 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon-stage5-approval-ack-20260621`
-- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 PC 工具审批 ACK 闭环，避免服务端在节点未接收审批决定时误标为已批准。
-- 当前分支：`codex/win-codex-parity-stage5-approval-ack-20260621`，从 `origin/main` 独立 worktree 创建；当前需 rebase 最新主线后再提交发布。
+- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route A `full_access` 本机门禁，避免云端字段单独触发 Codex/Copilot 沙箱绕过。
+- 当前分支：`codex/win-codex-parity-stage6-full-access-confirm-20260621`，从已发布的 `4f121db9` 继续创建。
 
 ## 已完成
 
@@ -79,17 +79,19 @@
 - 本轮已让服务端 `send_tool_approval_decision` 等待节点 ACK：只有匹配 `req_id + approval_id + dispatch_id` 且 `accepted=true` 时，`project_space` 才 `mark_decided`；节点拒收、断连或 ACK 超时都会 `mark_dispatch_failed` 并允许用户重试。
 - 本轮已给新节点兼容旧服务器审批消息：旧消息缺少 `dispatch_id` 时默认空字符串，避免节点包先更新导致反序列化失败。
 - 本轮已在 rebase 最新 `origin/main` 后通过验证：`cargo test --manifest-path server\homecli-proto\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml homecli_agent::tests::tool_approval_decision_waits_for_matching_ack`、`cargo test --manifest-path server\Cargo.toml homecli_agent::tests::stale_tool_approval_ack_does_not_complete_new_dispatch`、`cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approvals`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval`、`runtime_denies_write_without_executing_tool`、`runtime_rejects_stale_write_file_after_approval`、`runtime_writes_file_after_approval_when_preview_is_current`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`cargo fmt --manifest-path server\Cargo.toml --check`、`git diff --check`。
+- 本轮已发布 ACK 阶段：提交 `4f121db9` 已推送 `origin/main`，服务器版本 `v0.3.557`，Windows 节点包和本机 `%LOCALAPPDATA%\ElonNode` 均刷新到 `4f121db9`。
+- 本轮已新增 `server/src/node_agent_full_access.rs`：本机持久化 `project_id + workspace_path` 完全访问授权，Route A full_access 执行前必须匹配本机授权，否则 fail-closed。
+- 本轮已在 PC 工作台注册本地项目流程里接入 `/api/full-access/grants`，用户确认完全访问后会先写入当前 PC 节点本机授权，再保存云端项目权限。
+- 本轮已通过阶段性验证：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_full_access`、`node --check server\src\assets\pc_app.js`、`node --check server\src\assets\pc_app_dev_composer.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`cargo fmt --manifest-path server\Cargo.toml --check`、`git diff --check`。
 
 ## 本轮小目标
 
-验证并发布 PC 工具审批 ACK 闭环：服务端派发审批决定后必须等 PC 节点确认 accepted，迟到 ACK 不得误确认后续重试。
+验证并发布 Route A 完全访问本机门禁：Codex/Copilot 只有在当前 PC 已授权该项目目录时才允许绕过沙箱。
 
 ## 待完成
 
-- 提交、推送、同步主线。
-- 发布服务器和 Windows 节点包；验证 `/api/server/version`、`/api/node-agent/version`、Windows client 下载和本机 `http://127.0.0.1:7799/api/status`。
+- 提交、推送、发布服务器和 Windows 节点包；验证 `/api/server/version`、`/api/node-agent/version`、Windows client 下载和本机 `http://127.0.0.1:7799/api/status`。
 - 下一阶段评估审批落库/恢复：目前 ACK 闭环仍是单进程内存态，服务重启或多实例审计需要持久化。
-- 下一阶段补 Route A `full_access` 的本机确认页或原生确认弹窗，不能只由云端请求字段决定。
 - 下一阶段补任务恢复和更完整的工具时间线筛选。
 
 ## 当前阻塞

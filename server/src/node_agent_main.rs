@@ -49,6 +49,7 @@ mod cli_usage;
 mod node_agent_admin_open;
 mod node_agent_cli_security;
 mod node_agent_file_range;
+mod node_agent_full_access;
 mod node_agent_local_admin;
 mod node_agent_project_picker;
 mod node_agent_proxy;
@@ -1909,6 +1910,31 @@ async fn run_session(
                                 let runtime_permission = project_context
                                     .as_ref()
                                     .and_then(|ctx| ctx.runtime_permission.clone());
+                                if let Err(e) =
+                                    node_agent_full_access::require_route_a_full_access_grant(
+                                        &rt_c.full_access_grants,
+                                        resolved_cli.name(),
+                                        runtime_permission.as_deref(),
+                                        project_context.as_ref(),
+                                        cwd.as_deref(),
+                                    )
+                                    .await
+                                {
+                                    rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
+                                    let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
+                                        req_id,
+                                        exit_ok: false,
+                                        error: Some(e.to_string()),
+                                        prompt_tokens: None,
+                                        cached_input_tokens: None,
+                                        completion_tokens: None,
+                                        reasoning_tokens: None,
+                                        total_tokens: None,
+                                        model: None,
+                                        workspace_status: None,
+                                    }));
+                                    return;
+                                }
                                 let prepared_cwd =
                                     match prepare_cli_prompt_cwd(cwd, project_context) {
                                         Ok(cwd) => cwd,
@@ -2195,6 +2221,8 @@ pub(crate) struct NodeRuntime {
     active_cli_prompts: RwLock<HashMap<String, watch::Sender<bool>>>,
     /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
     tool_approvals: node_agent_tool_approval::ToolApprovalState,
+    /// Route A 完全访问的本机项目级授权记录。
+    full_access_grants: node_agent_full_access::FullAccessGrantState,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
     /// 本机 7799 管理 API 的启动期随机授权 token，只通过本机 /api/status 暴露给 PC 工作台。
@@ -2222,6 +2250,7 @@ impl NodeRuntime {
             storage_settings: RwLock::new(storage_settings),
             active_cli_prompts: RwLock::new(HashMap::new()),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
+            full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
             wake: Notify::new(),
             local_admin_token: node_agent_local_admin::generate_local_admin_token(),
         }
@@ -2373,6 +2402,11 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route(
                 "/api/project-folder/inspect",
                 axum::routing::post(node_agent_project_picker::inspect_local_project_folder),
+            )
+            .route(
+                "/api/full-access/grants",
+                axum::routing::get(node_agent_full_access::list_handler)
+                    .post(node_agent_full_access::grant_handler),
             )
             .route(
                 "/api/storage-config",
@@ -2567,6 +2601,7 @@ async fn admin_status(
     let hardware = rt.hardware_profile().await;
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
+    let full_access_grant_count = rt.full_access_grants.list().await.len();
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
@@ -2585,6 +2620,7 @@ async fn admin_status(
         "last_event": st.last_event,
         "hardware": hardware,
         "storage": storage,
+        "full_access_grant_count": full_access_grant_count,
         "models": live,
     });
     if node_agent_local_admin::can_expose_local_admin_token(&headers, &rt.cloud_http_url()) {
