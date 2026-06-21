@@ -337,7 +337,7 @@
               ['开发环境', runtime.dev_env_ready ? '就绪' : '未就绪'],
               ['AI Agent', node.ai_cli_ready ? '就绪' : '未就绪'],
               ['Route A 本机 CLI', routeReady(node, runtime, 'route_a_ready') ? '可用' : '未就绪'],
-              ['Route B 自带 API Key', routeReady(node, runtime, 'api_runtime_ready') ? '可用' : '未就绪'],
+              ['Route B 本机 API runtime', routeReady(node, runtime, 'api_runtime_ready') ? '可用' : '未就绪'],
               ['Route C 服务器模型', routeReady(node, runtime, 'server_runtime_ready') ? '可用' : '未就绪']
             ])}
           </section>

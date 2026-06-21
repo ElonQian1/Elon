@@ -1872,7 +1872,7 @@
     if (!els.settingsRuntimePermissionHint || !els.settingsRuntimePermission) return;
     const mode = normalizeRuntimePermission(els.settingsRuntimePermission.value);
     els.settingsRuntimePermissionHint.textContent = mode === 'full_access'
-      ? '完全访问会让 AI CLI 按用户授权绕过项目沙箱，可能读取或修改项目目录外的本机文件。'
+      ? 'Route A 的 Codex/Copilot 会按用户授权绕过项目沙箱；Route B/C 仍保留本机路径和命令白名单。'
       : 'AI 只能读写当前项目目录，并运行开发相关命令。';
   }
 

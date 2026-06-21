@@ -41,7 +41,7 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
     let node_ready = node.available;
     let dev_env_ready = android_ready || rust_ready || node_ready;
     let route_a_ready = route_a_cli_ready(allowed_clis);
-    let api_runtime_ready = api_runtime_key_available();
+    let api_runtime_ready = api_runtime_available();
     let server_runtime_ready = authenticated_server_runtime || server_runtime_available();
     let ai_cli_ready = route_a_ready || api_runtime_ready || server_runtime_ready;
 
@@ -60,7 +60,7 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
 
     if !ai_cli_ready {
         issues.push(
-            "未检测到 Route A AI CLI、Route B API key 或 Route C 服务器 token；项目仍可创建，但本机 AI agent 入口暂不可用".to_string(),
+            "未检测到 Route A AI CLI、Route B API key/model 或 Route C 服务器 token；项目仍可创建，但本机 AI agent 入口暂不可用".to_string(),
         );
     }
 
@@ -101,14 +101,18 @@ fn route_a_cli_ready(allowed_clis: &[String]) -> bool {
     })
 }
 
-fn api_runtime_key_available() -> bool {
-    ["ELON_AGENT_API_KEY", "OPENAI_API_KEY", "HUNYUAN_API_KEY"]
+fn api_runtime_available() -> bool {
+    api_runtime_available_from_lookup(|key| std::env::var(key).ok())
+}
+
+fn api_runtime_available_from_lookup(lookup: impl Fn(&str) -> Option<String>) -> bool {
+    let has_key = ["ELON_AGENT_API_KEY", "OPENAI_API_KEY", "HUNYUAN_API_KEY"]
         .iter()
-        .any(|key| {
-            std::env::var(key)
-                .map(|value| !value.trim().is_empty())
-                .unwrap_or(false)
-        })
+        .any(|key| lookup(key).is_some_and(|value| !value.trim().is_empty()));
+    let has_model = ["ELON_AGENT_MODEL", "OPENAI_MODEL", "HUNYUAN_MODEL"]
+        .iter()
+        .any(|key| lookup(key).is_some_and(|value| !value.trim().is_empty()));
+    has_key && has_model
 }
 
 fn server_runtime_available() -> bool {
@@ -129,6 +133,28 @@ fn env_present(key: &str) -> bool {
     std::env::var(key)
         .map(|value| !value.trim().is_empty())
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::api_runtime_available_from_lookup;
+
+    #[test]
+    fn api_runtime_requires_key_and_model() {
+        assert!(!api_runtime_available_from_lookup(|key| match key {
+            "ELON_AGENT_API_KEY" => Some("secret".to_string()),
+            _ => None,
+        }));
+        assert!(!api_runtime_available_from_lookup(|key| match key {
+            "ELON_AGENT_MODEL" => Some("gpt-test".to_string()),
+            _ => None,
+        }));
+        assert!(api_runtime_available_from_lookup(|key| match key {
+            "OPENAI_API_KEY" => Some("secret".to_string()),
+            "OPENAI_MODEL" => Some("gpt-test".to_string()),
+            _ => None,
+        }));
+    }
 }
 
 fn check_workspace_root(root: &PathBuf) -> (bool, Option<String>) {

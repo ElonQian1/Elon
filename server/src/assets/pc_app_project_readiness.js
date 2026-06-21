@@ -180,7 +180,7 @@
       const clis = normalizedClis(node);
       const routeA = ['codex', 'copilot', 'claude', 'gemini'].find((cli) => clis.includes(cli));
       if (node.route_a_ready && routeA) return { ready: true, label: `Route A · ${routeA}` };
-      if (node.api_runtime_ready) return { ready: true, label: 'Route B · 远程 API Key' };
+      if (node.api_runtime_ready) return { ready: true, label: 'Route B · 本机 API runtime' };
       if (node.server_runtime_ready) return { ready: true, label: 'Route C · 服务器模型' };
       if (routeA) return { ready: !!node.online, label: `本机 CLI · ${routeA}` };
       return { ready: false, label: '无可用运行时' };
@@ -230,8 +230,8 @@
           optional: true,
           tone: input.permission === 'full_access' ? 'warn' : 'ok',
           label: '执行权限',
-          detail: input.permission === 'full_access' ? '完全访问已开启' : '限制在项目目录内写入',
-          action: input.permission === 'full_access' ? '确认只给可信项目使用' : '需要跨目录操作时再开启完全访问'
+          detail: input.permission === 'full_access' ? 'Route A 可绕过项目沙箱' : '限制在项目目录内写入',
+          action: input.permission === 'full_access' ? 'Route B/C 仍保留本机白名单' : '需要跨目录操作时再开启完全访问'
         }
       ];
     }

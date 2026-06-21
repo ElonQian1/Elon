@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-- 工作目录：`D:\rust\active-projects\elon-win-codex-parity-audit-20260621`
-- 基线：`origin/main` / `f8c776a1`
-- 主工作区状态：存在未推送本地提交和未合并冲突痕迹，不在主工作区直接修改。
+- 工作目录：`D:\rust\active-projects\elon cli`
+- 本阶段目标：把 Route B 自研 API runtime 接入 PC 项目开发真实链路，并校准 Route B/C 权限与前端文案。
+- 当前分支：`main`，提交前需要先与最新 `origin/main` 对齐。
 
 ## 已完成
 
@@ -18,6 +18,13 @@
 - Reviewer 发现 Codex resume 会丢 `project_write` sandbox；已修复 `codex_resume_args` 保留 `--sandbox workspace-write`，并补测试。
 - Explorer 标出的 P0 已处理：server 侧 PC CLI 调用现在带取消守卫，节点侧按 `req_id` 登记运行中 CLI 子进程并在收到 `Cancel` 后 kill。
 - 已通过 `cargo test --manifest-path server\Cargo.toml --bin elon-server cli_prompt_cancel_handle_sends_cancel_for_req_id` 和 `cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`。
+- 已把 Route B `api-runtime` 接入 PC 节点真实执行链路：网页/PC 项目开发触发时可在无 Route A CLI 的情况下选择本机 OpenAI-compatible API runtime。
+- 已调整运行路线选择顺序：显式可用 CLI 优先，其次 Route A CLI，再 Route B API runtime，最后 Route C 服务器模型。
+- 已给 Route C/server-runtime 和 Route B/api-runtime 共用的 runtime loop 接入取消信号，停止任务时不再只停 UI。
+- 已将 Route B readiness 与实际执行对齐：必须同时存在 API key 和 model，API base 可默认 `https://api.openai.com/v1`。
+- 已把 Route B/C 的本地工具权限改成只认可 `project_write` / `full_access` 两个已知值；未知权限默认只读。
+- 已修正 PC 和网页端 Route B/权限文案：Route B 显示为“本机 API runtime”，`full_access` 明确说明 Route B/C 仍保留本机路径和命令白名单。
+- 已通过 `node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml --bin elon-server route_`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node api_runtime_config`、`command_policy`、`tool_guard_only_known_runtime_permissions_enable_project_tools`、`safe_path_stays_inside_workspace`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
@@ -27,9 +34,9 @@
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 继续审查 Route B 自研 runtime 与 full_access 权限语义是否还需要下一阶段补齐。
+- 下一阶段继续评估 Route B/C 是否要做任务级二次确认后再开放真正跨目录/full-access 工具，而不是直接取消本机白名单。
 
 ## 当前阻塞
 
 - 无功能实现阻塞。
-- 主工作区不能安全快进同步，必须保持隔离 worktree 开发。
+- 无工作区阻塞。

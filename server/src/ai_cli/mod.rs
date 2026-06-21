@@ -1,3 +1,5 @@
+// server/src/ai_cli/mod.rs
+
 mod ai_cli_chat;
 mod ai_cli_environment;
 mod ai_cli_intent_gate;
@@ -912,7 +914,7 @@ async fn run_via_pc_agent(
 
     // 进度心跳：每 5s 发一次"正在处理"，避免用户以为卡死（之前 15s 太长）
     let progress_tx = tx.clone();
-    let cli_label = if is_codex { "Codex" } else { "Copilot" };
+    let cli_label = pc_cli_progress_label(cli_name);
     let disp_model_clone = display_model.clone();
     let progress_handle = tokio::spawn(async move {
         let mut elapsed: u64 = 0;
@@ -1158,6 +1160,18 @@ async fn run_via_pc_agent(
     );
     pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
+}
+
+fn pc_cli_progress_label(cli_name: &str) -> &'static str {
+    match cli_name {
+        "codex" => "Codex",
+        "copilot" => "Copilot",
+        "claude" => "Claude",
+        "gemini" => "Gemini",
+        "api-runtime" => "Route B",
+        "server-runtime" => "Route C",
+        _ => "PC AI",
+    }
 }
 
 fn start_pc_node_compute_run(

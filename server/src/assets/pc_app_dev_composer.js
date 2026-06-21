@@ -88,7 +88,7 @@
       const clis = normalizedClis(node);
       const routeA = ['codex', 'copilot', 'claude', 'gemini'].find((cli) => clis.includes(cli));
       if (node.route_a_ready && routeA) return { ready: true, label: `Route A · ${routeA}` };
-      if (node.api_runtime_ready) return { ready: true, label: 'Route B · 远程 API Key' };
+      if (node.api_runtime_ready) return { ready: true, label: 'Route B · 本机 API runtime' };
       if (node.server_runtime_ready) return { ready: true, label: 'Route C · 服务器模型' };
       if (routeA) return { ready: true, label: `本机 CLI · ${routeA}` };
       return { ready: false, label: '运行时未就绪' };

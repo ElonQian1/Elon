@@ -1,3 +1,5 @@
+// server/src/node_agent_main.rs
+
 #![cfg_attr(windows, windows_subsystem = "windows")]
 
 //! elon-node-agent：用户 PC 端节点代理，将本机 LLM 算力贡献给 elon 平台。
@@ -782,6 +784,33 @@ async fn run_cli_prompt(
 ) {
     use tokio::io::AsyncBufReadExt;
 
+    if cli_name == "api-runtime" {
+        let result = crate::node_agent_server_runtime::run_api_runtime_prompt(
+            &req_id,
+            cwd.as_deref(),
+            runtime_permission.as_deref(),
+            &prompt,
+            cancel_rx,
+            out_tx.clone(),
+        )
+        .await;
+        let (exit_ok, error, workspace_status) =
+            finalize_cli_prompt_workspace(result.exit_ok, result.error, conversation_workspace);
+        let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+            req_id,
+            exit_ok,
+            error,
+            prompt_tokens: result.prompt_tokens,
+            cached_input_tokens: None,
+            completion_tokens: result.completion_tokens,
+            reasoning_tokens: None,
+            total_tokens: result.total_tokens,
+            model: result.model,
+            workspace_status,
+        }));
+        return;
+    }
+
     if cli_name == "server-runtime" {
         let result = match server_runtime_config {
             Some(config) => {
@@ -791,6 +820,7 @@ async fn run_cli_prompt(
                     cwd.as_deref(),
                     runtime_permission.as_deref(),
                     &prompt,
+                    cancel_rx,
                     out_tx.clone(),
                 )
                 .await

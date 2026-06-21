@@ -6611,7 +6611,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function syncProjectRuntimePermissionHint() {
     const mode = normalizeProjectRuntimePermission(projectRuntimePermissionMode.value);
     projectRuntimePermissionHint.textContent = mode === 'full_access'
-      ? '允许 AI CLI 在用户授权的项目会话中访问和修改本机更大范围内容。'
+      ? 'Route A 的 Codex/Copilot 可按授权绕过项目沙箱；Route B/C 仍保留本机路径和命令白名单。'
       : '默认限制在项目工作区内读写，适合普通开发项目。';
     projectRuntimePermissionHint.style.color = mode === 'full_access' ? '#b45309' : 'var(--ink-soft)';
   }

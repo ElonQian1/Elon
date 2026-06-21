@@ -123,7 +123,7 @@ function testDevComposerRouteLabels() {
   assert.ok(inserted, 'composer bar should be inserted');
   assert.strictEqual(inserted.hidden, false, 'composer bar should be visible in AI development channel');
   assert.ok(inserted.className.includes('full-access'), 'composer should expose full access tone');
-  assert.ok(inserted.innerHTML.includes('Route B · 远程 API Key'), 'composer should show API runtime route');
+  assert.ok(inserted.innerHTML.includes('Route B · 本机 API runtime'), 'composer should show API runtime route');
 }
 
 testDevTasksContinueAction();
