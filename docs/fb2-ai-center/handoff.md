@@ -20,7 +20,7 @@
 - 第九轮平台摘要排除验证通过：真实群 `ext_fb2_official` 可见消息 `gmsg_3bb5b3f52a644068acab708ea89eb4f4` 内容为“群里大家怎么看西班牙这场？只说群友观点和AI推断，不要平台订单汇总。”，触发 AI 回复 `gai_4e94761bf6b9439d97b4e5155dd39860`；fb2 audit 返回 `include_platform_orders=false`、`platform_summary_count=0`，说明主项目已尊重明确排除平台订单汇总的群聊意图。
 - 权限负向验证通过：平台摘要缺少 `X-FB2-AI-CONTEXT-SCOPE: platform_order_summary` 返回 403；用户订单工具缺少 `X-FB2-AI-CONTEXT-USER-ID` 返回 403；Context Pack 携带 `external_user_id` 但缺少同值上下文用户头返回 403；随后 fb2 `/context/permission-summary?from=2026-06-21T09:47:00Z` 返回 `total_blocks=3`、`missing_external_user_id_count=2`、`platform_scope_count=1`。
 - 质量汇总验证通过：fb2 `/context/quality-summary?from=2026-06-21T09:20:00Z` 返回 `total_packs=10`、`total_feedback=6`、`matched_cited_source_count=6`、`unmatched_cited_source_count=0`、`permission_block_rate=0.23076923076923078`；`missing_context_count=0`、`wrong_context_count=0`，但 `large_context_pack_rate=0.6` 仍提示后续要继续做上下文预算压缩。
-- 主项目服务端已发布：`v0.3.555`，线上 `/api/server/version` 返回 `gitSha=89c1b4a45167e9704b10321f005d8d4bd561d0e8`。
+- 主项目服务端已发布：`v0.3.556`，线上 `/api/server/version` 返回 `gitSha=78e6c17f7a4e9c48d7794b6d3d06ee280dc78742`。
 - fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
 - 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -MainToken <123qwe主项目会话token> -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据；最新结果 `failed=0 skipped=0`，覆盖 `chat-bootstrap aiReply / voice composer / billing`。
 - 本轮 live smoke 已验证：主项目健康和版本、fb2 live tool manifest、Context Pack、比赛分析简报、群观点摘要、赛后复盘摘要、平台匿名订单摘要、统一工具执行 `group_opinion_summary`/`match_analysis_brief` 及其 visibility。
