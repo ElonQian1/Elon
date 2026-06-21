@@ -213,7 +213,18 @@ fn plan_fb2_tools_with_platform_scope(
             "准不准",
             "说对",
             "说错",
+            "对吗",
+            "对不对",
             "是否正确",
+            "靠谱吗",
+            "靠谱不",
+            "合理吗",
+            "有没有道理",
+            "这条消息",
+            "这句",
+            "这段",
+            "判断对不对",
+            "说法对不对",
             "质量",
             "权重",
             "结果验证",
@@ -233,7 +244,10 @@ fn plan_fb2_tools_with_platform_scope(
         });
         if has_any_keyword(
             query,
-            &["哪些", "明细", "样本", "列表", "谁", "哪条", "具体"],
+            &[
+                "哪些", "明细", "样本", "列表", "谁", "哪条", "这条", "这句", "这段", "消息",
+                "具体",
+            ],
         ) {
             plans.push(PlannedTool {
                 name: "opinion_result_reviews",
@@ -537,6 +551,30 @@ mod tests {
                 tool["name"].as_str() == Some("opinion_result_review_summary")
                     && tool["trigger"].as_str() == Some("opinion_result_review_summary_needed")
             }));
+    }
+
+    #[test]
+    fn plans_opinion_result_review_for_message_correctness_questions() {
+        let plan = plan_fb2_tools(
+            &json!({
+                "context_quality": {"warnings": []}
+            }),
+            Some("这条消息说得对吗？靠谱吗？"),
+        );
+
+        let names = plan.tool_names();
+        assert!(names.contains(&"opinion_result_review_summary"));
+        assert!(names.contains(&"opinion_result_reviews"));
+        assert!(plan
+            .tools
+            .iter()
+            .filter(|tool| {
+                matches!(
+                    tool.name,
+                    "opinion_result_review_summary" | "opinion_result_reviews"
+                )
+            })
+            .all(|tool| !tool.requires_external_user));
     }
 
     #[test]

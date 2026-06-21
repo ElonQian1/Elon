@@ -27,6 +27,7 @@
 - 群聊 AI 拉取 fb2 Context Pack 时，query 包含最后一次有效用户问题的 `topic_hint`。
 - 长按群消息 `AI回复` 拉取 fb2 Context Pack 时，query 包含被选中消息的 `topic_hint`。
 - 群聊总结帖拉取 fb2 Context Pack 时，query 包含由 `topic/title/instructions` 合成的 `topic_hint`。
+- “这条消息说得对吗 / 靠谱吗 / 合理吗”这类长按消息评估问法会规划 `opinion_result_review_summary`，需要样本时规划 `opinion_result_reviews`。
 - 回退 `/api/main-project/context/today-matches` 时，query 仍包含 `group_id/topic_hint`。
 - 主项目拉取 fb2 上下文后，日志包含 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`。
 - 日志不得包含 shared secret、完整订单明细或用户问题原文。
