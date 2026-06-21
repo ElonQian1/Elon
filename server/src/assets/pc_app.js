@@ -91,7 +91,8 @@
   });
   devTasks = window.ElonPcDevTasks.create({
     clean, escapeHtml, markdown,
-    refreshActiveChannel: refreshActiveProjectChannel
+    refreshActiveChannel: refreshActiveProjectChannel,
+    cancelTask: cancelProjectAiTask
   });
 
   function saveToken(token) {
@@ -1665,6 +1666,15 @@
   async function refreshActiveProjectChannel() {
     if (state.activeKind !== 'project' || !state.activeProjectId || !state.activeChannelId) return;
     await selectProjectChannel(state.activeChannelId);
+  }
+
+  async function cancelProjectAiTask(taskId) {
+    const cleanTaskId = clean(taskId);
+    if (!cleanTaskId || state.activeKind !== 'project' || !state.activeProjectId || !state.activeChannelId) return;
+    await api(`/api/projects/${encodeURIComponent(state.activeProjectId)}/channels/${encodeURIComponent(state.activeChannelId)}/ai-tasks/${encodeURIComponent(cleanTaskId)}/cancel`, {
+      method: 'POST'
+    });
+    await refreshActiveProjectChannel();
   }
 
   async function handleProjectShareAction(button) {

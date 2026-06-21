@@ -27,6 +27,10 @@
   border-color: rgba(237, 66, 69, .52);
 }
 
+.dev-task-card.canceled {
+  border-color: rgba(148, 155, 164, .52);
+}
+
 .dev-task-card-head {
   display: grid;
   gap: 4px;
@@ -84,6 +88,13 @@
   white-space: nowrap;
 }
 
+.dev-task-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
 .dev-task-card-foot button {
   height: 28px;
   flex: 0 0 auto;
@@ -101,13 +112,22 @@
   color: var(--text);
 }
 
+.dev-task-card-foot button.danger {
+  border-color: rgba(237, 66, 69, .42);
+  color: #ffd6d6;
+}
+
+.dev-task-card-foot button.danger:hover {
+  background: rgba(237, 66, 69, .16);
+}
+
 @media (max-width: 720px) {
   .dev-task-card-foot {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .dev-task-card-foot button {
+  .dev-task-card-actions {
     align-self: flex-end;
   }
 }

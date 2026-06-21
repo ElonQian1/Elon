@@ -401,6 +401,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(project_space::start_channel_ai_task),
         )
         .route(
+            "/api/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/cancel",
+            post(project_space::cancel_channel_ai_task),
+        )
+        .route(
             "/api/projects/:project_id/channels/:channel_id/summaries",
             post(project_space::summarize_channel_selection),
         )
@@ -490,6 +494,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks",
             post(project_space::start_user_project_channel_ai_task),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/channels/:channel_id/ai-tasks/:task_id/cancel",
+            post(project_space::cancel_user_project_channel_ai_task),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/channels/:channel_id/summaries",

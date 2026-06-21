@@ -4,6 +4,7 @@
     const escapeHtml = deps.escapeHtml;
     const markdown = deps.markdown || {};
     const refreshActiveChannel = deps.refreshActiveChannel;
+    const cancelTask = deps.cancelTask;
 
     function buildContext(messages) {
       const tasks = new Map();
@@ -16,7 +17,8 @@
             taskId,
             progressCount: 0,
             result: null,
-            failed: false
+            failed: false,
+            canceled: false
           });
         }
         const task = tasks.get(taskId);
@@ -24,7 +26,8 @@
         if (kind === 'ai_result') {
           const content = messageText(message);
           task.result = message;
-          task.failed = /失败|错误|error|failed/i.test(content);
+          task.canceled = /停止|取消|canceled|cancelled/i.test(content);
+          task.failed = !task.canceled && /失败|错误|error|failed/i.test(content);
         }
       });
       return { tasks };
@@ -34,7 +37,7 @@
       const kind = messageKind(message);
       if (!['ai_task', 'ai_progress', 'ai_result'].includes(kind)) return '';
       if (kind === 'ai_task') return renderTaskStart(message, context);
-      if (kind === 'ai_progress') return renderProgress(message);
+      if (kind === 'ai_progress') return renderProgress(message, context);
       return renderResult(message);
     }
 
@@ -43,6 +46,23 @@
       root.querySelectorAll('[data-dev-task-action="refresh"]').forEach((button) => {
         button.addEventListener('click', () => {
           if (typeof refreshActiveChannel === 'function') refreshActiveChannel();
+        });
+      });
+      root.querySelectorAll('[data-dev-task-action="cancel"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const taskId = clean(button.dataset.taskId);
+          if (!taskId || typeof cancelTask !== 'function') return;
+          const ok = window.confirm('停止这个 AI 开发任务？当前运行中的命令会被中断。');
+          if (!ok) return;
+          button.disabled = true;
+          button.textContent = '停止中...';
+          try {
+            await cancelTask(taskId);
+          } catch (error) {
+            window.alert(error.message || error);
+            button.disabled = false;
+            button.textContent = '停止';
+          }
         });
       });
     }
@@ -65,32 +85,38 @@
         body: request || '已提交开发任务。',
         taskId,
         meta: task && task.progressCount ? `${task.progressCount} 条进度` : '等待执行回写',
-        actions: true
+        actions: true,
+        canCancel: !!taskId && !(task && task.result)
       });
     }
 
-    function renderProgress(message) {
+    function renderProgress(message, context) {
+      const taskId = taskIdOf(message);
+      const task = taskId ? context.tasks.get(taskId) : null;
       return cardHtml({
         tone: 'running',
         eyebrow: '执行进度',
         title: 'Agent 正在处理',
         body: messageText(message),
-        taskId: taskIdOf(message),
-        meta: '来自运行时'
+        taskId,
+        meta: '来自运行时',
+        actions: true,
+        canCancel: !!taskId && !(task && task.result)
       });
     }
 
     function renderResult(message) {
       const content = messageText(message);
-      const failed = /失败|错误|error|failed/i.test(content);
+      const canceled = /停止|取消|canceled|cancelled/i.test(content);
+      const failed = !canceled && /失败|错误|error|failed/i.test(content);
       return cardHtml({
-        tone: failed ? 'failed' : 'done',
+        tone: canceled ? 'canceled' : (failed ? 'failed' : 'done'),
         eyebrow: '执行结果',
-        title: failed ? '任务失败' : '任务完成',
+        title: canceled ? '任务已停止' : (failed ? '任务失败' : '任务完成'),
         body: renderBody(content, true),
         bodyIsHtml: true,
         taskId: taskIdOf(message),
-        meta: failed ? '需要继续处理' : '可以检查变更',
+        meta: canceled ? '已中断运行' : (failed ? '需要继续处理' : '可以检查变更'),
         actions: true
       });
     }
@@ -104,7 +130,7 @@
         ? `<span title="${escapeHtml(taskId)}">任务 ${escapeHtml(shortId(taskId))}</span>`
         : '';
       const actions = card.actions
-        ? '<button type="button" data-dev-task-action="refresh">刷新</button>'
+        ? taskActionsHtml(taskId, !!card.canCancel)
         : '';
       return `<div class="message-content dev-task-wrap">
         <section class="dev-task-card ${escapeHtml(card.tone || 'running')}">
@@ -121,6 +147,13 @@
       </div>`;
     }
 
+    function taskActionsHtml(taskId, canCancel) {
+      const stop = canCancel && taskId
+        ? `<button class="danger" type="button" data-dev-task-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>`
+        : '';
+      return `<div class="dev-task-card-actions">${stop}<button type="button" data-dev-task-action="refresh">刷新</button></div>`;
+    }
+
     function renderBody(content, allowMarkdown) {
       if (allowMarkdown && markdown.renderMessage) {
         return markdown.renderMessage(content, {
@@ -133,6 +166,7 @@
 
     function statusForTask(task) {
       if (task && task.result) {
+        if (task.canceled) return { tone: 'canceled', label: '已停止' };
         return task.failed
           ? { tone: 'failed', label: '任务失败' }
           : { tone: 'done', label: '任务完成' };

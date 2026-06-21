@@ -9,7 +9,11 @@ use axum::{
     Json,
 };
 use serde::Deserialize;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, LazyLock, Mutex},
+};
+use tokio::sync::watch;
 
 use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
@@ -26,6 +30,17 @@ use crate::{
 };
 
 const DOCS_CHANNEL_KIND: &str = "docs";
+const CHANNEL_AI_CANCEL_MESSAGE: &str = "用户已停止 AI 开发任务。";
+
+static CHANNEL_AI_TASKS: LazyLock<Mutex<HashMap<String, ChannelAiTaskControl>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+#[derive(Clone)]
+struct ChannelAiTaskControl {
+    project_id: String,
+    channel_id: String,
+    cancel_tx: watch::Sender<bool>,
+}
 
 #[derive(Deserialize)]
 pub struct ChannelMessagesQuery {
@@ -550,6 +565,75 @@ pub async fn start_channel_ai_task(
     start_channel_ai_task_response(state, user.id, project, channel_id, req, false)
 }
 
+pub async fn cancel_user_project_channel_ai_task(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id, task_id)): Path<(String, String, String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let (user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    cancel_channel_ai_task_response(state, user.id, project, channel_id, task_id)
+}
+
+pub async fn cancel_channel_ai_task(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, channel_id, task_id)): Path<(String, String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    cancel_channel_ai_task_response(state, user.id, project, channel_id, task_id)
+}
+
+fn cancel_channel_ai_task_response(
+    state: Arc<AppState>,
+    _user_id: String,
+    project: ProjectAccess,
+    channel_id: String,
+    task_id: String,
+) -> Response {
+    if !can_start_channel_ai(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前成员角色不能停止项目 AI 开发");
+    }
+    let project_id = project.id.clone();
+    let channel_kind = match state.store.get_project_channel_kind(&project_id, &channel_id) {
+        Ok(kind) => kind,
+        Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
+    };
+    if channel_kind != "ai_development" {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "只有 AI开发 频道可以停止项目 AI 开发任务",
+        );
+    }
+    let control = match take_channel_ai_task_control(&task_id, &project_id, &channel_id) {
+        Some(control) => control,
+        None => return json_error(StatusCode::NOT_FOUND, "任务不在运行中或已结束"),
+    };
+    let _ = control.cancel_tx.send(true);
+    Json(serde_json::json!({
+        "ok": true,
+        "task_id": task_id,
+        "status": "cancel_requested",
+    }))
+    .into_response()
+}
+
 fn start_channel_ai_task_response(
     state: Arc<AppState>,
     user_id: String,
@@ -786,6 +870,13 @@ struct ChannelAiTask {
 fn spawn_channel_ai_task(task: ChannelAiTask) {
     tokio::spawn(async move {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (cancel_tx, mut cancel_rx) = watch::channel(false);
+        register_channel_ai_task_control(
+            &task.task_id,
+            &task.project_id,
+            &task.channel_id,
+            cancel_tx,
+        );
         let run_state = task.state.clone();
         let run_project = task.project.clone();
         let run_user_id = task.user_id.clone();
@@ -816,63 +907,89 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let mut final_status = "done".to_string();
         let mut apk_url = None;
         let mut error = None;
-        while let Some(raw) = rx.recv().await {
-            if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
-                let event_type = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
-                let message = value
-                    .get("message")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("")
-                    .trim();
-                match event_type {
-                    "progress" if !message.is_empty() => {
-                        let _ = task.state.store.insert_project_channel_message(
-                            &task.project_id,
-                            &task.channel_id,
-                            None,
-                            "ai_progress",
-                            message,
-                            Some(&task.task_id),
-                            None,
-                        );
-                    }
-                    "done" => {
-                        final_reply = message.if_blank("AI 开发任务已完成。").to_string();
-                        apk_url = value
-                            .get("apk_url")
+        loop {
+            tokio::select! {
+                raw = rx.recv() => {
+                    let Some(raw) = raw else { break };
+                    if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
+                        let event_type = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                        let message = value
+                            .get("message")
                             .and_then(|v| v.as_str())
-                            .map(ToOwned::to_owned);
-                        let result = result_message(message, apk_url.as_deref(), None);
+                            .unwrap_or("")
+                            .trim();
+                        match event_type {
+                            "progress" if !message.is_empty() => {
+                                let _ = task.state.store.insert_project_channel_message(
+                                    &task.project_id,
+                                    &task.channel_id,
+                                    None,
+                                    "ai_progress",
+                                    message,
+                                    Some(&task.task_id),
+                                    None,
+                                );
+                            }
+                            "done" => {
+                                remove_channel_ai_task_control(&task.task_id);
+                                final_reply = message.if_blank("AI 开发任务已完成。").to_string();
+                                apk_url = value
+                                    .get("apk_url")
+                                    .and_then(|v| v.as_str())
+                                    .map(ToOwned::to_owned);
+                                let result = result_message(message, apk_url.as_deref(), None);
+                                let _ = task.state.store.insert_project_channel_message(
+                                    &task.project_id,
+                                    &task.channel_id,
+                                    None,
+                                    "ai_result",
+                                    &result,
+                                    Some(&task.task_id),
+                                    None,
+                                );
+                            }
+                            "error" => {
+                                remove_channel_ai_task_control(&task.task_id);
+                                final_status = "failed".to_string();
+                                let msg = message.if_blank("AI 开发任务失败。").to_string();
+                                final_reply = msg.clone();
+                                error = Some(msg.clone());
+                                let _ = task.state.store.insert_project_channel_message(
+                                    &task.project_id,
+                                    &task.channel_id,
+                                    None,
+                                    "ai_result",
+                                    &result_message(&msg, None, Some("失败")),
+                                    Some(&task.task_id),
+                                    None,
+                                );
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+                changed = cancel_rx.changed() => {
+                    if changed.is_ok() && *cancel_rx.borrow() {
+                        runner.abort();
+                        final_status = "canceled".to_string();
+                        final_reply = CHANNEL_AI_CANCEL_MESSAGE.to_string();
+                        error = Some(CHANNEL_AI_CANCEL_MESSAGE.to_string());
                         let _ = task.state.store.insert_project_channel_message(
                             &task.project_id,
                             &task.channel_id,
                             None,
                             "ai_result",
-                            &result,
+                            &result_message(CHANNEL_AI_CANCEL_MESSAGE, None, Some("已停止")),
                             Some(&task.task_id),
                             None,
                         );
+                        break;
                     }
-                    "error" => {
-                        final_status = "failed".to_string();
-                        let msg = message.if_blank("AI 开发任务失败。").to_string();
-                        final_reply = msg.clone();
-                        error = Some(msg.clone());
-                        let _ = task.state.store.insert_project_channel_message(
-                            &task.project_id,
-                            &task.channel_id,
-                            None,
-                            "ai_result",
-                            &result_message(&msg, None, Some("失败")),
-                            Some(&task.task_id),
-                            None,
-                        );
-                    }
-                    _ => {}
                 }
             }
         }
         let _ = runner.await;
+        remove_channel_ai_task_control(&task.task_id);
         if final_reply.is_empty() {
             final_reply = "AI 开发任务已结束。".to_string();
         }
@@ -884,6 +1001,47 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
             error.as_deref(),
         );
     });
+}
+
+fn register_channel_ai_task_control(
+    task_id: &str,
+    project_id: &str,
+    channel_id: &str,
+    cancel_tx: watch::Sender<bool>,
+) {
+    if let Ok(mut tasks) = CHANNEL_AI_TASKS.lock() {
+        tasks.insert(
+            task_id.to_string(),
+            ChannelAiTaskControl {
+                project_id: project_id.to_string(),
+                channel_id: channel_id.to_string(),
+                cancel_tx,
+            },
+        );
+    }
+}
+
+fn take_channel_ai_task_control(
+    task_id: &str,
+    project_id: &str,
+    channel_id: &str,
+) -> Option<ChannelAiTaskControl> {
+    let mut tasks = CHANNEL_AI_TASKS.lock().ok()?;
+    let matches = tasks
+        .get(task_id)
+        .map(|task| task.project_id == project_id && task.channel_id == channel_id)
+        .unwrap_or(false);
+    if matches {
+        tasks.remove(task_id)
+    } else {
+        None
+    }
+}
+
+fn remove_channel_ai_task_control(task_id: &str) {
+    if let Ok(mut tasks) = CHANNEL_AI_TASKS.lock() {
+        tasks.remove(task_id);
+    }
 }
 
 fn can_start_channel_ai(role: &str) -> bool {
