@@ -171,6 +171,7 @@ try {
     Assert-True ($contract.live_tool_manifest.status -eq "ready") "live manifest ready" "tool_count=$($contract.live_tool_manifest.tool_count)"
     Assert-True ($policy.schema -eq "external_app.live_tool_execution_policy.v1") "live manifest execution policy"
     Assert-True (($policy.chat_auto_executable_tool_ids -contains "search_matches") -and ($policy.chat_auto_executable_tool_ids -contains "search_group_opinions")) "auto executable core tools"
+    Assert-True (($policy.chat_auto_executable_tool_ids -contains "match_analysis_brief") -and ($policy.chat_auto_executable_tool_ids -contains "group_opinion_summary")) "auto executable aggregate tools"
     Assert-True ($policy.manifest_only_tool_ids -contains "record_context_feedback") "callback tool is not chat-auto-executable"
     Assert-True (@($policy.main_project_allowed_missing_tool_ids).Count -eq 0) "no allowed tool missing in live fb2 manifest"
 } catch {
@@ -233,6 +234,37 @@ if (-not $Fb2Token) {
         Assert-True ($null -ne $reviews.data.summary) "scenario: result review summary field"
     } catch {
         Fail "scenario: message correctness review summary" $_.Exception.Message
+    }
+
+    try {
+        $summaryTool = Invoke-Json -Url "$Fb2Base/api/main-project/tools/execute" -Headers $fb2Headers -Method "POST" -Body @{
+            request_id = "main-smoke-group-opinion-summary"
+            tool_name = "group_opinion_summary"
+            group_id = $GroupId
+            arguments = @{
+                query = "群里大家怎么看这场"
+                limit = 5
+            }
+            reason = "main smoke"
+        }
+        Assert-True ($summaryTool.success -eq $true) "tool execute: group_opinion_summary"
+        Assert-True ($summaryTool.visibility -eq "single_group_lightweight_memory") "tool execute: group_opinion_summary visibility"
+
+        $briefTool = Invoke-Json -Url "$Fb2Base/api/main-project/tools/execute" -Headers $fb2Headers -Method "POST" -Body @{
+            request_id = "main-smoke-match-analysis-brief"
+            tool_name = "match_analysis_brief"
+            group_id = $GroupId
+            arguments = @{
+                topic_hint = "今天比赛怎么看"
+                limit = 5
+                order_limit = 1
+            }
+            reason = "main smoke"
+        }
+        Assert-True ($briefTool.success -eq $true) "tool execute: match_analysis_brief"
+        Assert-True ($briefTool.visibility -eq "match_focused_brief") "tool execute: match_analysis_brief visibility"
+    } catch {
+        Fail "tool execute aggregate tools" $_.Exception.Message
     }
 
     if ($ExternalUserId) {

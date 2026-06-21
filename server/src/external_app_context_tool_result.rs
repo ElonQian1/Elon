@@ -106,6 +106,8 @@ fn source_id_value(value: &Value) -> Option<String> {
 fn expected_visibility(tool_name: &str) -> Option<&'static str> {
     match tool_name {
         "search_matches" | "get_match_detail" | "search_group_opinions" => Some("group_context"),
+        "group_opinion_summary" => Some("single_group_lightweight_memory"),
+        "match_analysis_brief" => Some("match_focused_brief"),
         "opinion_memories" => Some("single_group_persistent_opinion_index"),
         "list_opinion_adoptions" => Some("answer_opinion_adoption_samples"),
         "opinion_adoption_summary" => Some("answer_opinion_adoption_metrics"),
@@ -127,6 +129,8 @@ fn source_ids_required(tool_name: &str) -> bool {
             | "search_user_orders"
             | "get_order_detail"
             | "search_group_opinions"
+            | "group_opinion_summary"
+            | "match_analysis_brief"
             | "opinion_memories"
             | "list_opinion_adoptions"
             | "opinion_result_reviews"
@@ -230,6 +234,41 @@ mod tests {
         assert_eq!(
             result["grounding"]["expected_visibility"].as_str(),
             Some("single_group_persistent_opinion_index")
+        );
+    }
+
+    #[test]
+    fn aggregate_opinion_and_match_brief_have_dedicated_visibility() {
+        let opinion_summary = normalize_parsed_tool_result(
+            "group_opinion_summary",
+            "reason",
+            "req-1",
+            &json!({
+                "success": true,
+                "source_ids": ["message-1"],
+                "visibility": "single_group_lightweight_memory"
+            }),
+        );
+        assert_eq!(opinion_summary["grounding"]["status"], "grounded");
+        assert_eq!(
+            opinion_summary["grounding"]["expected_visibility"].as_str(),
+            Some("single_group_lightweight_memory")
+        );
+
+        let match_brief = normalize_parsed_tool_result(
+            "match_analysis_brief",
+            "reason",
+            "req-2",
+            &json!({
+                "success": true,
+                "source_ids": ["match-1", "message-1"],
+                "visibility": "match_focused_brief"
+            }),
+        );
+        assert_eq!(match_brief["grounding"]["status"], "grounded");
+        assert_eq!(
+            match_brief["grounding"]["expected_visibility"].as_str(),
+            Some("match_focused_brief")
         );
     }
 

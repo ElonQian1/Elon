@@ -74,8 +74,29 @@ fn plan_fb2_tools_with_platform_scope(
     let query = topic_hint.unwrap_or("").trim();
     let mut plans = Vec::new();
     let mut skipped_reasons = Vec::new();
+    let mut match_analysis_brief_planned = false;
+    let mut group_opinion_summary_planned = false;
 
     if let Some(evidence) = match_evidence(context, query) {
+        let mut brief_arguments = json!({
+            "topic_hint": query,
+            "limit": 6,
+            "order_limit": 8
+        });
+        if let Some(lottery_type) = infer_lottery_type(Some(query)) {
+            brief_arguments["lottery_type"] = json!(lottery_type);
+        }
+        plans.push(PlannedTool {
+            name: "match_analysis_brief",
+            reason: "用户询问 fb2 比赛、预测、赔率或今日场次，优先读取比赛候选、群观点摘要和可选本人订单简报。",
+            arguments: brief_arguments,
+            requires_external_user: false,
+            trigger: "match_analysis_brief_needed",
+            confidence: confidence_for(&evidence),
+            evidence: evidence.clone(),
+        });
+        match_analysis_brief_planned = true;
+
         let mut arguments = json!({
             "query": query,
             "date": "today",
@@ -120,6 +141,21 @@ fn plan_fb2_tools_with_platform_scope(
             confidence: confidence_for(&evidence),
             evidence,
         });
+        if !match_analysis_brief_planned {
+            plans.push(PlannedTool {
+                name: "match_analysis_brief",
+                reason: "用户要求分析自己的票，需要补充相关比赛候选和群观点简报；若已绑定 fb2 用户则只混入本人订单。",
+                arguments: json!({
+                    "topic_hint": query,
+                    "limit": 6,
+                    "order_limit": 8
+                }),
+                requires_external_user: false,
+                trigger: "user_ticket_match_brief_needed",
+                confidence: 70,
+                evidence: vec!["query.intent.current_user_ticket_review".to_string()],
+            });
+        }
     }
 
     if let Some(evidence) = keyword_evidence(
@@ -128,6 +164,20 @@ fn plan_fb2_tools_with_platform_scope(
             "群友", "大家", "观点", "讨论", "分歧", "群里", "建议", "采纳",
         ],
     ) {
+        plans.push(PlannedTool {
+            name: "group_opinion_summary",
+            reason: "用户要求总结群友观点、讨论分歧或采纳建议，优先读取本群轻量观点摘要。",
+            arguments: json!({
+                "query": query,
+                "limit": 12
+            }),
+            requires_external_user: false,
+            trigger: "group_opinion_summary_needed",
+            confidence: confidence_for(&evidence),
+            evidence: evidence.clone(),
+        });
+        group_opinion_summary_planned = true;
+
         plans.push(PlannedTool {
             name: "search_group_opinions",
             reason: "用户要求总结群友观点、讨论分歧或采纳建议，需要检索群聊观点来源。",
@@ -148,6 +198,21 @@ fn plan_fb2_tools_with_platform_scope(
             "复盘",
         ],
     ) {
+        if !group_opinion_summary_planned {
+            plans.push(PlannedTool {
+                name: "group_opinion_summary",
+                reason:
+                    "用户要求参考群友历史观点或长期记忆，先读取本群轻量观点摘要作为当前讨论概览。",
+                arguments: json!({
+                    "query": query,
+                    "limit": 12
+                }),
+                requires_external_user: false,
+                trigger: "group_opinion_summary_needed",
+                confidence: confidence_for(&evidence),
+                evidence: evidence.clone(),
+            });
+        }
         plans.push(PlannedTool {
             name: "opinion_memories",
             reason: "用户要求参考群友历史观点、建议或长期记忆，需要检索 fb2 群观点记忆索引。",
@@ -438,16 +503,17 @@ mod tests {
         assert_eq!(
             names,
             vec![
+                "match_analysis_brief",
                 "search_matches",
                 "search_user_orders",
+                "group_opinion_summary",
                 "search_group_opinions",
-                "opinion_memories"
             ]
         );
-        assert!(plan.tools[1].requires_external_user);
+        assert!(plan.tools[2].requires_external_user);
         assert_eq!(
             plan.to_metadata()["planned_tools"][0]["trigger"].as_str(),
-            Some("match_context_needed")
+            Some("match_analysis_brief_needed")
         );
     }
 

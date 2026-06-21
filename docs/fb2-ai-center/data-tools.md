@@ -42,6 +42,8 @@ fb2 在 Context Pack 里声明可用工具，主项目先把它们投影给模�
 | `search_user_orders` | `current_user_only` | 查当前用户自己的票据/订单摘要 |
 | `get_order_detail` | `current_user_only` | 查当前用户可见的单个订单明细 |
 | `search_group_opinions` | `group_context` | 按比赛或关键词检索群友观点 |
+| `group_opinion_summary` | `single_group_lightweight_memory` | 生成本群轻量观点摘要，优先服务“群里怎么看/大家怎么看” |
+| `match_analysis_brief` | `match_focused_brief` | 组合比赛候选、群观点摘要和可选本人订单，优先服务“今天比赛/某场/我的票” |
 | `opinion_memories` | `single_group_persistent_opinion_index` | 查单群长期观点记忆，作为群友历史观点证据 |
 | `list_opinion_adoptions` | `answer_opinion_adoption_samples` | 查本群主项目 AI 曾采纳的观点样本 |
 | `opinion_adoption_summary` | `answer_opinion_adoption_metrics` | 查本群观点采纳次数、来源和意图汇总 |
@@ -56,6 +58,12 @@ fb2 在 Context Pack 里声明可用工具，主项目先把它们投影给模�
 ## 阶段 3：Tool Execution
 
 等 Context Pack 和权限稳定后，主项目再做工具执行层。
+
+当前主项目群聊 AI 已自动规划并执行：
+
+- `match_analysis_brief`：比赛、赔率、预测、今日场次和“我的票”问题的首选聚合工具。
+- `group_opinion_summary`：群友观点、大家怎么看、讨论分歧问题的首选聚合工具。
+- `search_matches` / `search_user_orders` / `search_group_opinions` / `opinion_memories` 等细分工具仍作为可追溯展开或补充来源。
 
 执行前置条件：
 
