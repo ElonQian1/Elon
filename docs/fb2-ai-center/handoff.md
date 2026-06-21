@@ -31,6 +31,7 @@
 - 主项目工具契约、planner、grounding 和 prompt 已接入 fb2 的只读质量工具：`list_opinion_adoptions`、`opinion_adoption_summary`、`opinion_result_reviews`、`opinion_result_review_summary`；聊天 AI 不会自动触发 `refresh_opinion_result_reviews` 这类刷新/写入工具。
 - 主项目 `/api/external/apps/fb2/context-contract` 会主动读取 fb2 `/api/main-project/context/tool-manifest`，并以 `live_tool_manifest` 返回脱敏摘要（状态、工具数量、工具 id、usage_policy/tool_selection_policy 可用性），不暴露 token 或完整大 payload。
 - `live_tool_manifest.main_project_tool_execution_policy` 会把 fb2 实时 manifest 拆成 `chat_auto_executable_tool_ids`、`manifest_only_tool_ids` 和 `main_project_allowed_missing_tool_ids`。fb2 新增工具后，只有进入 `chat_auto_executable_tool_ids` 才代表主项目群聊 AI 会自动规划执行；其它工具只是发现信息、回调端点或待接入能力。
+- 主项目新增 `scripts/smoke-fb2-ai-center.ps1`，用于不往生产群聊发消息的 live smoke：默认验证主项目健康、版本、context-contract 和工具覆盖；传 `FB2_AI_CENTER_TOKEN` 后验证 fb2 Context Pack、比赛分析、群观点、赛后复盘摘要；传 `-IncludePlatformOrderSummary` 后验证平台匿名摘要；传 `-ExternalUserId` 后验证本人订单上下文。
 - 主项目上下文日志已补 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status`，用于排查 fb2 AI 为什么没用上业务数据。
 - 群聊 AI 可拉取 fb2 Context Pack 并做预算裁剪。
 - `android/chat-voice-kit` 已输出 `VoiceComposerView`、录音浮层、系统 ASR、云端 ASR 兜底和 TTS。
@@ -51,6 +52,9 @@
 - 保持 `/api/external/apps/fb2/context-contract` 与文档同步。
 - 观察 `live_tool_manifest.status`，如果 fb2 manifest 变成 degraded/unavailable，要先修 fb2 contract 或 token/base_url，而不是让 AI 编造工具能力。
 - 观察 `live_tool_manifest.main_project_tool_execution_policy.coverage_status`。如果出现 `main_project_allowed_missing_tool_ids`，说明主项目静态 allowlist 与 fb2 线上 manifest 漂移；如果 fb2 新工具长期停在 `manifest_only_tool_ids`，需要单独评估是否接入 planner、grounding 和权限规则。
+- 每次 fb2 或主项目 AI Center 改动后运行：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1`
+  需要验证 live fb2 数据时先设置 `FB2_AI_CENTER_TOKEN`；需要验证平台摘要时加 `-IncludePlatformOrderSummary`；需要验证“我的票”时加 `-ExternalUserId <fb2_user_uuid>`。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
 - 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。
