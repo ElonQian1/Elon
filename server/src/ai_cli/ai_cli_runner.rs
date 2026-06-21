@@ -134,8 +134,9 @@ pub(crate) fn codex_resume_args(raw_args: &[String], session_id: &str) -> Option
             | "--strict-config"
             | "--dangerously-bypass-approvals-and-sandbox"
             | "--dangerously-bypass-hook-trust" => args.push(arg.clone()),
+            arg if arg.starts_with("--sandbox=") => args.push(arg.to_string()),
             "-m" | "--model" | "-c" | "--config" | "-p" | "--profile" | "--profile-v2"
-            | "--output-schema" => {
+            | "--output-schema" | "-s" | "--sandbox" => {
                 args.push(arg.clone());
                 if let Some(value) = iter.next() {
                     args.push(value.clone());
@@ -245,6 +246,33 @@ mod tests {
                 "--json",
                 "--dangerously-bypass-approvals-and-sandbox",
                 "--skip-git-repo-check"
+            ]
+        );
+    }
+
+    #[test]
+    fn codex_project_write_resume_keeps_workspace_sandbox() {
+        let option = option(
+            "codex_cli",
+            "codex",
+            &[
+                "exec",
+                "--sandbox",
+                "workspace-write",
+                "--skip-git-repo-check",
+            ],
+        );
+        let args = cli_args_for_run(&option, Some("thread-1"), Some("project_write"));
+        assert_eq!(
+            args,
+            vec![
+                "exec",
+                "resume",
+                "--sandbox",
+                "workspace-write",
+                "--skip-git-repo-check",
+                "--json",
+                "thread-1"
             ]
         );
     }

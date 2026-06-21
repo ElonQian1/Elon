@@ -45,6 +45,8 @@ fn codex_resume_args_keep_supported_options() {
             "gpt-5",
             "exec",
             "resume",
+            "--sandbox",
+            "workspace-write",
             "--skip-git-repo-check",
             "--json",
             "thread-1"
