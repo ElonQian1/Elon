@@ -569,6 +569,8 @@ fn social_ai_base_prompt() -> &'static str {
 
 如果上下文像语音通话，优先用适合朗读的短句，少用括号、编号和长段落；可以自然地表达关心、确认和陪伴感，但不要油腻、夸张或刻意卖萌。
 
+如果回复使用了 fb2 外部上下文里的比赛、赔率、本人订单、平台汇总或群友观点，必须在正文里写出对应来源 ID 或 label，例如 match_id、order_id、platform_order_summary:<date>:all、群消息 id、context_audit_id。没有可核对来源时，只能说信息不足，不能编造。
+
 注意：用户的部分消息来自手机语音识别，可能含有同音字替换或音近字错误（例如"你好码"其实是"你好吗"）。请优先推断最合理的语义，忽略明显的识别错误，直接给出正确理解下的回复，无需向用户解释纠错过程。"#
 }
 
@@ -645,7 +647,7 @@ fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> T) -> T {
 
 #[cfg(test)]
 mod tests {
-    use super::{contains_el_mention, latest_request_user_text};
+    use super::{contains_el_mention, latest_request_user_text, social_ai_base_prompt};
     use crate::store::SocialAiHistoryMessage;
 
     #[test]
@@ -686,5 +688,13 @@ mod tests {
             latest_request_user_text(&history).as_deref(),
             Some("帮我分析今天比赛和我的票")
         );
+    }
+
+    #[test]
+    fn base_prompt_requires_fb2_source_references() {
+        let prompt = social_ai_base_prompt();
+        assert!(prompt.contains("fb2 外部上下文"));
+        assert!(prompt.contains("来源 ID"));
+        assert!(prompt.contains("context_audit_id"));
     }
 }
