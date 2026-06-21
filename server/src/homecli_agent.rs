@@ -55,6 +55,44 @@ pub struct AgentEntry {
     pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
 }
 
+pub struct CliPromptDispatch {
+    pub req_id: String,
+    pub rx: mpsc::UnboundedReceiver<AgentToServer>,
+    cancel_handle: CliPromptCancelHandle,
+}
+
+impl CliPromptDispatch {
+    pub fn into_parts(
+        self,
+    ) -> (
+        String,
+        mpsc::UnboundedReceiver<AgentToServer>,
+        CliPromptCancelHandle,
+    ) {
+        (self.req_id, self.rx, self.cancel_handle)
+    }
+}
+
+#[derive(Clone)]
+pub struct CliPromptCancelHandle {
+    req_id: String,
+    cmd_tx: mpsc::UnboundedSender<ServerToAgent>,
+}
+
+impl CliPromptCancelHandle {
+    pub fn req_id(&self) -> &str {
+        &self.req_id
+    }
+
+    pub fn cancel(&self) -> bool {
+        self.cmd_tx
+            .send(ServerToAgent::Cancel {
+                task_id: self.req_id.clone(),
+            })
+            .is_ok()
+    }
+}
+
 #[derive(Default)]
 pub struct AgentManager {
     agents: RwLock<HashMap<String, AgentEntry>>,
@@ -105,6 +143,28 @@ impl AgentManager {
         project_context: Option<homecli_proto::CliProjectContext>,
         prompt: String,
     ) -> Result<(String, mpsc::UnboundedReceiver<AgentToServer>)> {
+        let dispatch = self
+            .dispatch_cli_prompt_with_context_control(
+                agent_id,
+                cli,
+                extra_args,
+                cwd,
+                project_context,
+                prompt,
+            )
+            .await?;
+        Ok((dispatch.req_id, dispatch.rx))
+    }
+
+    pub async fn dispatch_cli_prompt_with_context_control(
+        &self,
+        agent_id: &str,
+        cli: String,
+        extra_args: Vec<String>,
+        cwd: Option<String>,
+        project_context: Option<homecli_proto::CliProjectContext>,
+        prompt: String,
+    ) -> Result<CliPromptDispatch> {
         let req_id = Uuid::new_v4().to_string();
         let agents = self.agents.read().await;
         let agent = agents
@@ -112,6 +172,10 @@ impl AgentManager {
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
         let (tx, rx) = mpsc::unbounded_channel();
         agent.pending.lock().await.insert(req_id.clone(), tx);
+        let cancel_handle = CliPromptCancelHandle {
+            req_id: req_id.clone(),
+            cmd_tx: agent.cmd_tx.clone(),
+        };
         agent
             .cmd_tx
             .send(ServerToAgent::CliPrompt {
@@ -123,7 +187,11 @@ impl AgentManager {
                 prompt,
             })
             .map_err(|_| anyhow!("agent writer closed"))?;
-        Ok((req_id, rx))
+        Ok(CliPromptDispatch {
+            req_id,
+            rx,
+            cancel_handle,
+        })
     }
 
     pub async fn list(&self) -> Vec<AgentSummary> {
@@ -1086,4 +1154,24 @@ pub async fn test_cli_prompt(
         error,
     })
     .into_response()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn cli_prompt_cancel_handle_sends_cancel_for_req_id() {
+        let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel();
+        let handle = CliPromptCancelHandle {
+            req_id: "req-123".to_string(),
+            cmd_tx,
+        };
+
+        assert!(handle.cancel());
+        match cmd_rx.try_recv() {
+            Ok(ServerToAgent::Cancel { task_id }) => assert_eq!(task_id, "req-123"),
+            other => panic!("expected cancel message, got {other:?}"),
+        }
+    }
 }

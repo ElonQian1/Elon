@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon-win-codex-parity-audit-20260621`
-- 基线：`origin/main` / `c5c36787`
+- 基线：`origin/main` / `f8c776a1`
 - 主工作区状态：存在未推送本地提交和未合并冲突痕迹，不在主工作区直接修改。
 
 ## 已完成
@@ -16,6 +16,8 @@
 - 已新增 `scripts/test-pc-dev-assets.js`，覆盖任务继续按钮、就绪清单和开发作业栏 Route/权限文案。
 - 已通过 `node --check`、`git diff --check`、`node scripts\test-pc-dev-assets.js` 和 `cargo check --manifest-path server\Cargo.toml --bin elon-server`。
 - Reviewer 发现 Codex resume 会丢 `project_write` sandbox；已修复 `codex_resume_args` 保留 `--sandbox workspace-write`，并补测试。
+- Explorer 标出的 P0 已处理：server 侧 PC CLI 调用现在带取消守卫，节点侧按 `req_id` 登记运行中 CLI 子进程并在收到 `Cancel` 后 kill。
+- 已通过 `cargo test --manifest-path server\Cargo.toml --bin elon-server cli_prompt_cancel_handle_sends_cancel_for_req_id` 和 `cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`。
 
 ## 本轮小目标
 
@@ -25,7 +27,7 @@
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 后续仍需处理 Explorer 标出的 P0：PC 节点上的真实 Codex/Copilot 子进程取消。
+- 继续审查 Route B 自研 runtime 与 full_access 权限语义是否还需要下一阶段补齐。
 
 ## 当前阻塞
 

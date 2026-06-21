@@ -647,6 +647,35 @@ async fn run_with_workspace_mode(
 
 // ── PC agent 委托辅助函数 ─────────────────────────────────────────────────────
 
+struct PcCliCancelOnDrop {
+    handle: Option<crate::homecli_agent::CliPromptCancelHandle>,
+}
+
+impl PcCliCancelOnDrop {
+    fn armed(handle: crate::homecli_agent::CliPromptCancelHandle) -> Self {
+        Self {
+            handle: Some(handle),
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.handle = None;
+    }
+}
+
+impl Drop for PcCliCancelOnDrop {
+    fn drop(&mut self) {
+        if let Some(handle) = self.handle.take() {
+            let sent = handle.cancel();
+            tracing::info!(
+                req_id = handle.req_id(),
+                sent,
+                "PC CLI task dropped; sent cancel to agent"
+            );
+        }
+    }
+}
+
 pub async fn run_with_pc_agent_workspace(
     agent_id: &str,
     user_id: &str,
@@ -774,7 +803,7 @@ async fn run_via_pc_agent(
     };
 
     // dispatch 时节点可能刚好掉线重连
-    let (pc_req_id, mut rx) = {
+    let (pc_req_id, mut rx, cancel_handle) = {
         let mut last_err = anyhow::anyhow!("dispatch failed");
         let mut result = Err(last_err);
         const MAX_ATTEMPTS: u32 = 25;
@@ -792,7 +821,7 @@ async fn run_via_pc_agent(
             };
             match state
                 .agent_manager
-                .dispatch_cli_prompt_with_context(
+                .dispatch_cli_prompt_with_context_control(
                     agent_id,
                     cli_name.to_string(),
                     extra_args.clone(),
@@ -802,8 +831,8 @@ async fn run_via_pc_agent(
                 )
                 .await
             {
-                Ok(r) => {
-                    result = Ok(r);
+                Ok(dispatch) => {
+                    result = Ok(dispatch.into_parts());
                     break;
                 }
                 Err(e) => {
@@ -827,6 +856,7 @@ async fn run_via_pc_agent(
         }
         result?
     };
+    let mut pc_cancel_guard = PcCliCancelOnDrop::armed(cancel_handle);
     let pc_cli_feature = if request_mode.is_plan() {
         "pc_agent_cli_plan"
     } else if cwd.is_some() {
@@ -985,6 +1015,7 @@ async fn run_via_pc_agent(
                 ..
             } => {
                 progress_handle.abort(); // 停止心跳
+                pc_cancel_guard.disarm();
                 let mut cli_usage = None;
                 let mut accounting_result = None;
                 let mut node_transaction = None;

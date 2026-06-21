@@ -35,10 +35,10 @@ use homecli_proto::{
     PROTO_VERSION,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::{mpsc, Notify, RwLock};
+use std::{collections::HashMap, path::PathBuf};
+use tokio::sync::{mpsc, watch, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
@@ -777,6 +777,7 @@ async fn run_cli_prompt(
     conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
     prompt: String,
     server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
+    mut cancel_rx: watch::Receiver<bool>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 ) {
     use tokio::io::AsyncBufReadExt;
@@ -1029,6 +1030,25 @@ async fn run_cli_prompt(
                     stderr_text.push_str(&message);
                     stderr_text.push('\n');
                     stderr_done = true;
+                }
+            },
+            changed = cancel_rx.changed() => {
+                if changed.is_ok() && *cancel_rx.borrow() {
+                    warn!("[{}] CLI 收到取消请求，强杀进程", cli_name);
+                    let _ = child.kill().await;
+                    let message = "用户已停止 PC CLI 任务".to_string();
+                    let (exit_ok, error, workspace_status) =
+                        finalize_cli_prompt_workspace(false, Some(message), conversation_workspace);
+                    let model = cli_model_from_args(cli_name, &extra_args);
+                    let _ = out_tx.send(ws_text(&cli_done_message(
+                        req_id,
+                        exit_ok,
+                        error,
+                        None,
+                        model,
+                        workspace_status,
+                    )));
+                    return;
                 }
             },
             // 超时保护：Codex 5分钟、Copilot 3分钟内必须有 stdout EOF，否则强杀
@@ -1789,6 +1809,10 @@ async fn run_session(
                             let tx_c = out_tx_r.clone();
                             let rt_c = runtime.clone();
                             tokio::spawn(async move {
+                                let req_id_for_cleanup = req_id.clone();
+                                let (cancel_tx, cancel_rx) = watch::channel(false);
+                                rt_c.register_cli_prompt_cancel(&req_id_for_cleanup, cancel_tx)
+                                    .await;
                                 let full_path = rt_c.resolve_cli(&cli).await;
                                 // 处理 --attachment URL：下载图片到本地临时文件
                                 // Copilot: --attachment <url> → 下载后 --attachment <local_path>
@@ -1811,6 +1835,7 @@ async fn run_session(
                                     match prepare_cli_prompt_cwd(cwd, project_context) {
                                         Ok(cwd) => cwd,
                                         Err(e) => {
+                                            rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
                                             let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
                                                 req_id,
                                                 exit_ok: false,
@@ -1839,10 +1864,20 @@ async fn run_session(
                                         server_url: rt_c.cloud_http_url(),
                                         user_token: rt_c.user_token().await,
                                     }),
+                                    cancel_rx,
                                     tx_c,
                                 )
                                 .await;
+                                rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
                             });
+                        }
+                        ServerToAgent::Cancel { task_id } => {
+                            let canceled = runtime.cancel_cli_prompt(&task_id).await;
+                            if canceled {
+                                info!("🛑 已请求取消 CLI prompt: {}", task_id);
+                            } else {
+                                warn!("🛑 未找到可取消的 CLI prompt: {}", task_id);
+                            }
                         }
                         ServerToAgent::Exec {
                             task_id,
@@ -2049,6 +2084,8 @@ pub(crate) struct NodeRuntime {
     tts_worker_url: RwLock<Option<String>>,
     /// 本机项目代码硬盘服务配置。
     storage_settings: RwLock<pc_storage_repo::StorageSettings>,
+    /// 正在执行的 CLI prompt 请求，用于接收云端 stop/cancel 后终止子进程。
+    active_cli_prompts: RwLock<HashMap<String, watch::Sender<bool>>>,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
 }
@@ -2072,6 +2109,7 @@ impl NodeRuntime {
             cli_paths: RwLock::new(Vec::new()),
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
+            active_cli_prompts: RwLock::new(HashMap::new()),
             wake: Notify::new(),
         }
     }
@@ -2094,6 +2132,22 @@ impl NodeRuntime {
 
     async fn set_cli_paths(&self, paths: Vec<(String, String)>) {
         *self.cli_paths.write().await = paths;
+    }
+
+    async fn register_cli_prompt_cancel(&self, req_id: &str, tx: watch::Sender<bool>) {
+        self.active_cli_prompts
+            .write()
+            .await
+            .insert(req_id.to_string(), tx);
+    }
+
+    async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
+        let tx = self.active_cli_prompts.read().await.get(req_id).cloned();
+        tx.map(|tx| tx.send(true).is_ok()).unwrap_or(false)
+    }
+
+    async fn finish_cli_prompt(&self, req_id: &str) {
+        self.active_cli_prompts.write().await.remove(req_id);
     }
 
     async fn hardware_profile(&self) -> NodeHardwareProfile {
