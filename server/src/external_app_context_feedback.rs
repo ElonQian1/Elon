@@ -25,6 +25,7 @@ pub(crate) fn spawn_generated_answer_feedback(
     external_context: Option<Value>,
     external_tool_results: Option<Value>,
     reply_text: String,
+    extra_citation_sources: Vec<Value>,
 ) {
     let Some(context) = external_context else {
         return;
@@ -43,6 +44,7 @@ pub(crate) fn spawn_generated_answer_feedback(
             &context,
             external_tool_results.as_ref(),
             &reply_text,
+            &extra_citation_sources,
         )
         .await
         {
@@ -66,6 +68,7 @@ async fn post_generated_answer_feedback(
     context: &Value,
     tool_results: Option<&Value>,
     reply_text: &str,
+    extra_citation_sources: &[Value],
 ) -> anyhow::Result<()> {
     let Some(base_url) = fb2_base_url() else {
         return Ok(());
@@ -92,6 +95,7 @@ async fn post_generated_answer_feedback(
         main_request_id,
         trigger,
         reply_text,
+        extra_citation_sources,
     ) else {
         return Ok(());
     };
@@ -326,6 +330,7 @@ fn generated_answer_feedback_payload(
     main_request_id: &str,
     trigger: &str,
     reply_text: &str,
+    extra_citation_sources: &[Value],
 ) -> Option<Value> {
     let context_audit_id = context
         .get("context_audit_id")
@@ -338,7 +343,7 @@ fn generated_answer_feedback_payload(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(main_group_id);
-    let cited_sources = mentioned_citation_sources(context, reply_text);
+    let cited_sources = feedback_citation_sources(context, reply_text, extra_citation_sources);
     let cited_source_count = cited_sources.len();
 
     let mut payload = json!({
@@ -377,6 +382,49 @@ fn mentioned_citation_sources(context: &Value, reply_text: &str) -> Vec<Value> {
         .take(MAX_CITED_SOURCES)
         .cloned()
         .collect()
+}
+
+fn feedback_citation_sources(
+    context: &Value,
+    reply_text: &str,
+    extra_citation_sources: &[Value],
+) -> Vec<Value> {
+    let mut cited_sources = mentioned_citation_sources(context, reply_text);
+    if cited_sources.len() >= MAX_CITED_SOURCES {
+        return cited_sources;
+    }
+
+    let mut seen = cited_sources
+        .iter()
+        .filter_map(citation_source_key)
+        .collect::<HashSet<_>>();
+    for source in extra_citation_sources {
+        let Some(key) = citation_source_key(source) else {
+            continue;
+        };
+        if seen.insert(key) {
+            cited_sources.push(source.clone());
+            if cited_sources.len() >= MAX_CITED_SOURCES {
+                break;
+            }
+        }
+    }
+    cited_sources
+}
+
+fn citation_source_key(source: &Value) -> Option<String> {
+    let id = source
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+    let kind = source
+        .get("kind")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("source");
+    Some(format!("{kind}:{id}"))
 }
 
 fn mentioned_opinion_memory_ids(tool_results: Option<&Value>, reply_text: &str) -> Vec<String> {
@@ -517,6 +565,7 @@ mod tests {
             "social_group_message:m1",
             "group_mention",
             "这场中央海岸 vs 奥克兰FC 风险偏高，可参考 match-1234。",
+            &[],
         )
         .expect("payload");
 
@@ -525,6 +574,39 @@ mod tests {
         assert_eq!(payload["external_user_id"], "fb2-user-1");
         assert_eq!(payload["cited_source_count"], 1);
         assert_eq!(payload["cited_sources"][0]["id"], "match-1234");
+    }
+
+    #[test]
+    fn payload_merges_extra_selected_message_source() {
+        let context = json!({
+            "app_id": "fb2",
+            "group": "official",
+            "status": "ready",
+            "source": "fb2:/api/main-project/context/pack",
+            "context_audit_id": "audit-1",
+            "citation_sources": [
+                {"kind": "match", "id": "match-1234", "label": "中央海岸 vs 奥克兰FC"}
+            ]
+        });
+
+        let payload = generated_answer_feedback_payload(
+            &context,
+            Some("fb2-user-1"),
+            "ext_fb2_official",
+            "social_group_selected_message:m1",
+            "selected_message_ai_reply",
+            "只引用了原消息，没有引用比赛来源。",
+            &[json!({
+                "kind": "selected_message",
+                "id": "gmsg-selected-1",
+                "label": "被长按的群聊消息"
+            })],
+        )
+        .expect("payload");
+
+        assert_eq!(payload["cited_source_count"], 1);
+        assert_eq!(payload["cited_sources"][0]["kind"], "selected_message");
+        assert_eq!(payload["cited_sources"][0]["id"], "gmsg-selected-1");
     }
 
     #[test]
@@ -537,7 +619,13 @@ mod tests {
 
         assert!(!is_fb2_context_pack(&context));
         assert!(generated_answer_feedback_payload(
-            &context, None, "group", "request", "trigger", "reply"
+            &context,
+            None,
+            "group",
+            "request",
+            "trigger",
+            "reply",
+            &[]
         )
         .is_none());
     }

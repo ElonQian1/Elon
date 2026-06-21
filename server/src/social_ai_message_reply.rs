@@ -39,7 +39,14 @@ pub(crate) fn spawn_friend_reply_for_message(
         user_id, friend_id, message_id
     );
     tokio::spawn(async move {
-        let result = reply_to_selected_friend_message(state, user_id, friend_id, selected).await;
+        let result = reply_to_selected_friend_message(
+            state,
+            user_id,
+            friend_id,
+            message_id.clone(),
+            selected,
+        )
+        .await;
         clear_in_flight(&key);
         if let Err(error) = result {
             warn!("friend selected-message AI reply failed: {}", error);
@@ -75,7 +82,9 @@ pub(crate) fn spawn_group_reply_for_message(
         user_id, group_id, message_id
     );
     tokio::spawn(async move {
-        let result = reply_to_selected_group_message(state, user_id, group_id, selected).await;
+        let result =
+            reply_to_selected_group_message(state, user_id, group_id, message_id.clone(), selected)
+                .await;
         clear_in_flight(&key);
         if let Err(error) = result {
             warn!("group selected-message AI reply failed: {}", error);
@@ -93,6 +102,7 @@ async fn reply_to_selected_friend_message(
     state: Arc<AppState>,
     user_id: String,
     friend_id: String,
+    selected_message_id: String,
     selected: SocialAiHistoryMessage,
 ) -> Result<()> {
     let history = state
@@ -104,6 +114,7 @@ async fn reply_to_selected_friend_message(
         "好友聊天",
         &history,
         &selected,
+        &selected_message_id,
         None,
         None,
     )
@@ -121,6 +132,7 @@ async fn reply_to_selected_group_message(
     state: Arc<AppState>,
     user_id: String,
     group_id: String,
+    selected_message_id: String,
     selected: SocialAiHistoryMessage,
 ) -> Result<()> {
     let recipient_user_ids = state.store.friend_group_member_ids(&user_id, &group_id)?;
@@ -153,6 +165,7 @@ async fn reply_to_selected_group_message(
         "群聊",
         &history,
         &selected,
+        &selected_message_id,
         external_context.as_ref(),
         external_tool_results.as_ref(),
     )
@@ -169,6 +182,7 @@ async fn reply_to_selected_group_message(
         external_context,
         external_tool_results,
         reply.clone(),
+        vec![selected_message_citation_source(&selected_message_id)],
     );
     friend_events::publish_group_message(&message, recipient_user_ids);
     Ok(())
@@ -180,6 +194,7 @@ async fn selected_reply_or_fallback(
     scene: &str,
     history: &[SocialAiHistoryMessage],
     selected: &SocialAiHistoryMessage,
+    selected_message_id: &str,
     external_context: Option<&Value>,
     external_tool_results: Option<&Value>,
 ) -> String {
@@ -189,6 +204,7 @@ async fn selected_reply_or_fallback(
         scene,
         history,
         selected,
+        selected_message_id,
         external_context,
         external_tool_results,
     )
@@ -209,6 +225,7 @@ async fn build_selected_reply(
     scene: &str,
     history: &[SocialAiHistoryMessage],
     selected: &SocialAiHistoryMessage,
+    selected_message_id: &str,
     external_context: Option<&Value>,
     external_tool_results: Option<&Value>,
 ) -> Result<String> {
@@ -233,14 +250,14 @@ async fn build_selected_reply(
             json!({
                 "role": "system",
                 "content": format!(
-                    "{}\n\n本次触发来自用户长按历史消息后点击「AI回复」，不是 @EL 文本触发。请优先根据被选择的消息作答，必要时只把最近聊天作为上下文参考。",
+                    "{}\n\n本次触发来自用户长按历史消息后点击「AI回复」，不是 @EL 文本触发。请优先根据被选择的消息作答，必要时只把最近聊天作为上下文参考。回答末尾必须用一行短句标注来源，至少包含 selected_message_id={selected_message_id}；如果使用了 fb2 外部数据，也要同时列出对应 match_id/order_id/context_audit_id 等来源。",
                     social_ai_prompt()
                 )
             }),
             json!({
                 "role": "user",
                 "content": format!(
-                    "聊天场景：{scene}\n\n最近聊天（从旧到新）：\n{}{}\n\n用户长按选择的消息：\n{}：{}\n\n请直接回复这条被选择的消息，输出要发到聊天框里的中文文本。",
+                    "聊天场景：{scene}\nselected_message_id：{selected_message_id}\n\n最近聊天（从旧到新）：\n{}{}\n\n用户长按选择的消息：\n{}：{}\n\n请直接回复这条被选择的消息，输出要发到聊天框里的中文文本。",
                     format_history(history),
                     external_context_section,
                     selected.speaker,
@@ -274,6 +291,14 @@ fn selected_message_topic_hint(selected: &SocialAiHistoryMessage) -> Option<Stri
     } else {
         Some(text.chars().take(500).collect())
     }
+}
+
+fn selected_message_citation_source(message_id: &str) -> Value {
+    json!({
+        "kind": "selected_message",
+        "id": message_id,
+        "label": "被长按的群聊消息"
+    })
 }
 
 fn mark_in_flight(key: &str) -> bool {
@@ -310,5 +335,14 @@ mod tests {
             selected_message_topic_hint(&selected).as_deref(),
             Some("帮我看今天这张票")
         );
+    }
+
+    #[test]
+    fn selected_message_source_uses_stable_shape() {
+        let source = selected_message_citation_source("gmsg-1");
+
+        assert_eq!(source["kind"], "selected_message");
+        assert_eq!(source["id"], "gmsg-1");
+        assert_eq!(source["label"], "被长按的群聊消息");
     }
 }

@@ -347,6 +347,7 @@ async fn reply_to_group(state: Arc<AppState>, user_id: String, group_id: String)
         feedback_context,
         feedback_tool_results,
         reply.clone(),
+        Vec::new(),
     );
     friend_events::publish_group_message(&message, recipient_user_ids);
     Ok(())
