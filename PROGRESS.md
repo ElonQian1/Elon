@@ -32,6 +32,7 @@
 - 已新增频道消息任务状态投影：`ProjectChannelMessage` 返回 `task_status`、`task_error`、`task_apk_url`，PC 任务卡优先使用后端任务状态判断是否仍在运行，终态任务的历史审批按钮会失效并提供继续入口。
 - 已新增 PC 开发任务现场快照 API：`/ai-tasks/:task_id/snapshot` 和 `/ai-tasks/:task_id/events` 返回持久任务信息、频道消息、事件 `rowid` 游标、`has_more` 以及 `live/detached/terminal` attach 状态，作为后续 PC node journal/attach 的服务端骨架。
 - 已修复 Route A 假 ready 抢占 Route C 的一类问题：PC 节点 profile 现在要求 CLI 版本探测成功才标记 Route A ready；服务端自动/强制 Route A 会尊重该状态，坏的本机 CLI 会让自动路线继续落到 Route B/C。
+- 已新增 Route C 云端健康预检：服务端暴露 `/api/agent/runtime/status`，PC 节点启动时用登录 token 验证服务器模型 runtime 是否真实 ready，避免“有 token 但服务器模型未配置”时误报可用。
 
 ## 验证结果
 
@@ -47,6 +48,7 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server store::tasks::tests -- --nocapture`，13 passed（新增事件游标与频道任务快照绑定）
 - 通过：`cargo test --manifest-path server\Cargo.toml project_tool_approval -- --nocapture`，8 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`，9 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`，1 passed
 - 通过：`cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`，2 passed
 - 通过：`node scripts\test-pc-dev-assets.js`
 - 通过：`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
@@ -59,10 +61,10 @@
 ## 剩余任务
 
 - 只 stage 本任务文件，commit、push。
-- 按发布脚本发布服务端；本追加阶段未改 Windows 节点包和 PC 静态资源，原则上不需要重新发布节点包。
+- 按发布脚本发布服务端；本阶段改动了 Windows 节点启动侧 Route C ready 判断，需要同步重新发布 Windows 节点包。
 - 下一阶段实现真正任务恢复：定义持久 run handle，绑定 `task_id/pc_req_id/node_id/route/cwd/codex_session_id/lease/last_event_seq/resume_strategy`。
 - 下一阶段给 PC 节点增加本地任务 registry/jsonl journal，并扩展 homecli attach 协议，避免把 `codex resume` 误认为同进程恢复。
-- 下一阶段给 Route C readiness 增加服务器模型健康预检，避免“Win 客户端有 token，但服务器模型配置不可用”时 UI 误报可开发。
+- 下一阶段把 PC 任务 snapshot/events 接入前端刷新流程，并继续推进 PC node 本地 registry/jsonl journal。
 
 ## 剩余风险
 

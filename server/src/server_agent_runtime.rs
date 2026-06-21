@@ -1,10 +1,12 @@
+// server/src/server_agent_runtime.rs
+
 use axum::{
     extract::State,
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -22,6 +24,45 @@ const MAX_TOTAL_CHARS: usize = 80_000;
 pub struct ServerAgentRuntimeRequest {
     pub messages: Vec<Value>,
     pub agent: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct ServerAgentRuntimeStatus {
+    ready: bool,
+    status: &'static str,
+    agent: Option<ServerAgentRuntimeAgentStatus>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ServerAgentRuntimeAgentStatus {
+    name: String,
+    model: String,
+    usage_mode: String,
+}
+
+pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    if auth_from_headers(&state, &headers).is_err() {
+        return json_error(StatusCode::UNAUTHORIZED, "未登录");
+    }
+
+    let agent = resolve_server_runtime_agent(&state, None)
+        .await
+        .map(|agent| {
+            let usage_mode = agent.usage_mode().to_string();
+            ServerAgentRuntimeAgentStatus {
+                name: agent.name,
+                model: agent.model,
+                usage_mode,
+            }
+        });
+    let ready = agent.is_some();
+    Json(ServerAgentRuntimeStatus {
+        ready,
+        status: if ready { "ready" } else { "unavailable" },
+        agent,
+    })
+    .into_response()
 }
 
 pub async fn chat_handler(

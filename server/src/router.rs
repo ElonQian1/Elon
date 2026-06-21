@@ -137,6 +137,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/agent/runtime/chat",
             post(server_agent_runtime::chat_handler),
         )
+        .route(
+            "/api/agent/runtime/status",
+            get(server_agent_runtime::status_handler),
+        )
         .route("/api/auth/login", post(auth_api::login))
         .route("/api/auth/register", post(auth_api::register))
         .route("/api/me", get(auth_api::me))

@@ -54,6 +54,7 @@ mod node_agent_full_access;
 mod node_agent_local_admin;
 mod node_agent_project_picker;
 mod node_agent_proxy;
+mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
 mod node_agent_server_runtime;
@@ -1610,13 +1611,14 @@ async fn run_session(
     }
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
-    let authenticated_server_runtime = creds
-        .user_token
-        .as_deref()
-        .is_some_and(|token| !token.trim().is_empty());
+    let server_runtime_ready = node_agent_route_c_status::server_runtime_ready_from_cloud(
+        &cfg.cloud_http_url,
+        creds.user_token.as_deref(),
+    )
+    .await;
     let dev_runtime = elon_pc_dev_runtime::collect_dev_runtime_profile_with_server_runtime(
         &available_clis,
-        authenticated_server_runtime,
+        server_runtime_ready,
     );
     if dev_runtime.workspace_provision_ready {
         info!(
