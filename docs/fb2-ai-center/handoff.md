@@ -6,6 +6,7 @@
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-21 质量门槛补强：主项目 `scripts/smoke-fb2-ai-center.ps1` 新增 `-CheckQuality`、`-RequireFeedbackCoverage`、`-QualitySince/-QualityUntil`、`-MaxLargeContextPackRate`、`-MaxCitationUnmatchedRate`、`-MaxMissingContextRate`、`-MaxWrongContextRate`、`-MinFeedbackCount`、`-MinMatchedCitedSourceCount`。日常无副作用 smoke 仍默认轻量；携带 `FB2_AI_CENTER_TOKEN` 后可升级验证 fb2 `/context/quality-summary` 和 `/context/feedbacks`，把 missing/wrong context、引用未命中、大包率和反馈覆盖变成自动门槛。
 - 真实群聊补充验证：账号 `123qwe` 已通过 fb2 外部应用会话绑定到主项目用户，群 `ext_fb2_official` 可发送可见 `@EL` 消息；实测 `Context Pack` 和 `match_analysis_brief` 已返回该用户本人订单，但 AI 回复曾被超时的补充 `search_user_orders` 结果干扰。
 - 主项目已修复提示和工具规划规则：Context Pack `user_orders` 与 `match_analysis_brief.data.user_orders` 都算当前用户订单来源；`search_user_orders unavailable` 只表示补充展开失败，不能否定已有本人订单事实。
 - 主项目 prompt metadata 新增 `context_fact_summary`，把比赛/本人订单/群消息数量及少量 source id 投影到 metadata，避免模型漏看长 Context Pack 中已有的订单来源。
@@ -101,6 +102,9 @@
 - 每次 fb2 或主项目 AI Center 改动后运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1`
   需要验证 live fb2 数据时先设置 `FB2_AI_CENTER_TOKEN`；需要验证平台摘要时加 `-IncludePlatformOrderSummary`；需要验证“我的票”时加 `-ExternalUserId <fb2_user_uuid>`。
+- 需要验证长期质量门槛时加：
+  `-CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339> -MaxLargeContextPackRate 0.75`
+  该检查会读取 fb2 `/context/quality-summary` 和 `/context/feedbacks`，用于发现 missing/wrong context、引用未命中和 Context Pack 大包率退化。
 - 需要验证真实群聊可见入口时，必须确认用户已授权写生产群或提供沙盒群，再运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
   没有 `-AllowVisibleMessages` 时脚本必须保持失败退出。

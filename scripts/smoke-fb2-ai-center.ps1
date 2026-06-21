@@ -11,7 +11,18 @@ param(
     [int]$RetryCount = 1,
     [switch]$IncludePlatformOrderSummary,
     [switch]$RequireFb2Live,
-    [switch]$RequireAllScenarios
+    [switch]$RequireAllScenarios,
+    [switch]$CheckQuality,
+    [switch]$RequireFeedbackCoverage,
+    [string]$QualitySince = "",
+    [string]$QualityUntil = "",
+    [double]$MaxLargeContextPackRate = 0.75,
+    [double]$MaxCitationUnmatchedRate = 0,
+    [double]$MaxMissingContextRate = 0,
+    [double]$MaxWrongContextRate = 0,
+    [int]$MinFeedbackCount = 0,
+    [int]$MinMatchedCitedSourceCount = 0,
+    [int]$QualityFeedbackSampleLimit = 5
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +51,26 @@ $Fb2Base = $Fb2Base.TrimEnd("/")
 $amp = [char]38
 $script:Failed = 0
 $script:Skipped = 0
+
+if ($RequireFeedbackCoverage) {
+    if (-not $PSBoundParameters.ContainsKey("MinFeedbackCount")) {
+        $MinFeedbackCount = 1
+    }
+    if (-not $PSBoundParameters.ContainsKey("MinMatchedCitedSourceCount")) {
+        $MinMatchedCitedSourceCount = 1
+    }
+}
+
+$qualityCheckRequested = $CheckQuality `
+    -or $RequireFeedbackCoverage `
+    -or [bool]$QualitySince `
+    -or [bool]$QualityUntil `
+    -or $PSBoundParameters.ContainsKey("MaxLargeContextPackRate") `
+    -or $PSBoundParameters.ContainsKey("MaxCitationUnmatchedRate") `
+    -or $PSBoundParameters.ContainsKey("MaxMissingContextRate") `
+    -or $PSBoundParameters.ContainsKey("MaxWrongContextRate") `
+    -or $PSBoundParameters.ContainsKey("MinFeedbackCount") `
+    -or $PSBoundParameters.ContainsKey("MinMatchedCitedSourceCount")
 
 function Write-Check {
     param(
@@ -87,6 +118,17 @@ function Assert-True {
 function Encode-QueryValue {
     param([string]$Value)
     [System.Uri]::EscapeDataString($Value)
+}
+
+function Add-QueryParam {
+    param(
+        [System.Collections.Generic.List[string]]$Params,
+        [string]$Name,
+        [string]$Value
+    )
+    if ($Value) {
+        $Params.Add("$Name=$(Encode-QueryValue $Value)") | Out-Null
+    }
 }
 
 function Invoke-Json {
@@ -179,7 +221,7 @@ try {
 }
 
 if (-not $Fb2Token) {
-    if ($RequireFb2Live -or $RequireAllScenarios) {
+    if ($RequireFb2Live -or $RequireAllScenarios -or $qualityCheckRequested) {
         Fail "fb2 live token" "FB2_AI_CENTER_TOKEN or -Fb2Token is required"
     } else {
         Skip "fb2 live data" "set FB2_AI_CENTER_TOKEN to verify Context Pack scenarios"
@@ -300,6 +342,62 @@ if (-not $Fb2Token) {
             Fail "scenario: platform order risk" "-IncludePlatformOrderSummary is required"
         } else {
             Skip "scenario: platform order risk" "pass -IncludePlatformOrderSummary to verify privileged aggregate context"
+        }
+    }
+
+    if ($qualityCheckRequested) {
+        Write-Output ""
+        Write-Output "== fb2 quality gates =="
+
+        try {
+            $qualityParams = [System.Collections.Generic.List[string]]::new()
+            Add-QueryParam -Params $qualityParams -Name "group_id" -Value $GroupId
+            Add-QueryParam -Params $qualityParams -Name "from" -Value $QualitySince
+            Add-QueryParam -Params $qualityParams -Name "to" -Value $QualityUntil
+            $qualityQuery = $qualityParams -join $amp
+            $qualityUrl = "$Fb2Base/api/main-project/context/quality-summary"
+            if ($qualityQuery) {
+                $qualityUrl = "${qualityUrl}?$qualityQuery"
+            }
+
+            $quality = Invoke-Json -Url $qualityUrl -Headers $fb2Headers
+            $metrics = $quality.data.quality_metrics
+            $feedbackSummary = $quality.data.feedback_summary
+            $auditSummary = $quality.data.audit_summary
+
+            Assert-True ($quality.success -eq $true) "quality summary"
+            Assert-True ($null -ne $metrics) "quality metrics present"
+            Assert-True ($null -ne $feedbackSummary) "quality feedback summary present"
+            Assert-True ($null -ne $auditSummary) "quality audit summary present"
+
+            if ($null -ne $metrics) {
+                Assert-True ([double]$metrics.missing_context_rate -le $MaxMissingContextRate) "quality missing_context_rate" "value=$($metrics.missing_context_rate) max=$MaxMissingContextRate"
+                Assert-True ([double]$metrics.wrong_context_rate -le $MaxWrongContextRate) "quality wrong_context_rate" "value=$($metrics.wrong_context_rate) max=$MaxWrongContextRate"
+                Assert-True ([double]$metrics.citation_unmatched_rate -le $MaxCitationUnmatchedRate) "quality citation_unmatched_rate" "value=$($metrics.citation_unmatched_rate) max=$MaxCitationUnmatchedRate"
+                Assert-True ([double]$metrics.large_context_pack_rate -le $MaxLargeContextPackRate) "quality large_context_pack_rate" "value=$($metrics.large_context_pack_rate) max=$MaxLargeContextPackRate"
+            }
+
+            if ($null -ne $feedbackSummary) {
+                Assert-True ([int64]$feedbackSummary.total_feedback -ge $MinFeedbackCount) "quality feedback count" "value=$($feedbackSummary.total_feedback) min=$MinFeedbackCount"
+                Assert-True ([int64]$feedbackSummary.matched_cited_source_count -ge $MinMatchedCitedSourceCount) "quality matched cited sources" "value=$($feedbackSummary.matched_cited_source_count) min=$MinMatchedCitedSourceCount"
+                Assert-True ([int64]$feedbackSummary.unmatched_cited_source_count -eq 0) "quality unmatched cited sources" "value=$($feedbackSummary.unmatched_cited_source_count)"
+                Assert-True ([int64]$feedbackSummary.missing_context_count -eq 0) "quality missing context count" "value=$($feedbackSummary.missing_context_count)"
+                Assert-True ([int64]$feedbackSummary.wrong_context_count -eq 0) "quality wrong context count" "value=$($feedbackSummary.wrong_context_count)"
+            }
+
+            if ($RequireFeedbackCoverage -or $MinFeedbackCount -gt 0 -or $MinMatchedCitedSourceCount -gt 0) {
+                $feedbackParams = [System.Collections.Generic.List[string]]::new()
+                Add-QueryParam -Params $feedbackParams -Name "group_id" -Value $GroupId
+                Add-QueryParam -Params $feedbackParams -Name "from" -Value $QualitySince
+                Add-QueryParam -Params $feedbackParams -Name "to" -Value $QualityUntil
+                Add-QueryParam -Params $feedbackParams -Name "limit" -Value ([string]$QualityFeedbackSampleLimit)
+                $feedbackQuery = $feedbackParams -join $amp
+                $feedbacks = Invoke-Json -Url "$Fb2Base/api/main-project/context/feedbacks?$feedbackQuery" -Headers $fb2Headers
+                Assert-True ($feedbacks.success -eq $true) "quality feedback samples"
+                Assert-True ([int]$feedbacks.data.count -gt 0) "quality feedback sample count" "count=$($feedbacks.data.count)"
+            }
+        } catch {
+            Fail "fb2 quality gates" $_.Exception.Message
         }
     }
 }

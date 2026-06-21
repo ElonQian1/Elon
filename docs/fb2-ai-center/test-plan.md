@@ -25,6 +25,8 @@
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1` 通过，确认主项目健康、版本、实时 manifest 和主项目聊天自动工具覆盖。
 - `cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 通过，确认 fb2 可引用最新 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 设置 `FB2_AI_CENTER_TOKEN` 后，上述巡检脚本能验证 fb2 live Context Pack、比赛分析、群观点和赛后复盘摘要；加 `-IncludePlatformOrderSummary` 后验证平台匿名订单摘要。
+- 设置 `FB2_AI_CENTER_TOKEN` 后，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality` 能验证 fb2 `/context/quality-summary`：`missing_context_rate`、`wrong_context_rate`、`citation_unmatched_rate` 不超过阈值，`large_context_pack_rate` 不超过预算阈值。
+- 需要验证自动反馈闭环时，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339>` 必须确认最近反馈样本存在，且 `matched_cited_source_count` 达到门槛、`unmatched_cited_source_count=0`。
 - 获得明确授权后，`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages` 能发送真实群聊 `@EL` 消息、调用 selected-message `/ai-reply`，并等到 `usr_elon_ai`/`gai_*` 回复；没有 `-AllowVisibleMessages` 时脚本必须拒绝写群。
 - 主项目工具 planner 对“今天比赛/预测/赔率/我的票”优先规划 `match_analysis_brief`，并保留 `search_matches`、`search_user_orders` 等补充工具。
 - 主项目工具 planner 对“群里大家怎么看/群友观点/讨论分歧”优先规划 `group_opinion_summary`，并保留 `search_group_opinions`、`opinion_memories` 等补充工具。
@@ -83,7 +85,7 @@
 
 ## 长期质量指标
 
-每周看一次：
+每周看一次，并优先通过 `scripts\smoke-fb2-ai-center.ps1 -CheckQuality` 自动化巡检：
 
 - Context Pack 平均耗时和 P95。
 - 空上下文比例。
