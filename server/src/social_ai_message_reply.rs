@@ -273,11 +273,12 @@ async fn build_selected_reply(
         .as_str()
         .unwrap_or("我在，但刚才没组织好回复。你可以换条消息再点一次「AI回复」。")
         .trim();
-    Ok(if reply.is_empty() {
-        "我在，但刚才没组织好回复。你可以换条消息再点一次「AI回复」。".into()
+    let reply: String = if reply.is_empty() {
+        "我在，但刚才没组织好回复。你可以换条消息再点一次「AI回复」。".to_string()
     } else {
         reply.chars().take(1400).collect()
-    })
+    };
+    Ok(ensure_selected_message_source(&reply, selected_message_id))
 }
 
 fn selected_message_topic_hint(selected: &SocialAiHistoryMessage) -> Option<String> {
@@ -299,6 +300,21 @@ fn selected_message_citation_source(message_id: &str) -> Value {
         "id": message_id,
         "label": "被长按的群聊消息"
     })
+}
+
+fn ensure_selected_message_source(reply: &str, selected_message_id: &str) -> String {
+    let reply = reply.trim();
+    let selected_message_id = selected_message_id.trim();
+    if reply.is_empty() || selected_message_id.is_empty() {
+        return reply.to_string();
+    }
+    if reply
+        .to_lowercase()
+        .contains(&selected_message_id.to_lowercase())
+    {
+        return reply.to_string();
+    }
+    format!("{reply}\n来源补充：selected_message_id {selected_message_id}")
 }
 
 fn mark_in_flight(key: &str) -> bool {
@@ -344,5 +360,24 @@ mod tests {
         assert_eq!(source["kind"], "selected_message");
         assert_eq!(source["id"], "gmsg-1");
         assert_eq!(source["label"], "被长按的群聊消息");
+    }
+
+    #[test]
+    fn selected_message_source_is_appended_when_model_omits_it() {
+        let reply =
+            ensure_selected_message_source("这句说法风险较高。\n来源：match_id EXT-1", "gmsg-1");
+
+        assert!(reply.contains("来源：match_id EXT-1"));
+        assert!(reply.contains("selected_message_id gmsg-1"));
+    }
+
+    #[test]
+    fn selected_message_source_is_not_duplicated() {
+        let reply = ensure_selected_message_source(
+            "这句说法风险较高。\n来源：selected_message_id gmsg-1",
+            "gmsg-1",
+        );
+
+        assert_eq!(reply.matches("gmsg-1").count(), 1);
     }
 }
