@@ -184,6 +184,12 @@ fn first_available_route_a_cli(allowed_clis: &[String]) -> Option<String> {
         .map(|cli| (*cli).to_string())
 }
 
+fn route_a_runtime_ready(dev_runtime: Option<&NodeDevRuntimeProfile>) -> bool {
+    dev_runtime
+        .map(|runtime| runtime.route_a_ready)
+        .unwrap_or(true)
+}
+
 fn choose_cli_for_runtime(
     allowed_clis: &[String],
     dev_runtime: Option<&NodeDevRuntimeProfile>,
@@ -193,11 +199,14 @@ fn choose_cli_for_runtime(
     if let Some(preference) = route_preference {
         return choose_forced_route(allowed_clis, dev_runtime, requested_cli, preference);
     }
-    if cli_available(allowed_clis, &requested_cli) {
+    let route_a_ready = route_a_runtime_ready(dev_runtime);
+    if route_a_ready && cli_available(allowed_clis, &requested_cli) {
         return Ok(requested_cli);
     }
-    if let Some(route_a_cli) = first_available_route_a_cli(allowed_clis) {
-        return Ok(route_a_cli);
+    if route_a_ready {
+        if let Some(route_a_cli) = first_available_route_a_cli(allowed_clis) {
+            return Ok(route_a_cli);
+        }
     }
     let Some(runtime) = dev_runtime else {
         return Ok(requested_cli);
@@ -221,6 +230,12 @@ fn choose_forced_route(
 ) -> Result<String, String> {
     match preference {
         PcRuntimeRoutePreference::RouteA => {
+            if !route_a_runtime_ready(dev_runtime) {
+                return Err(
+                    "已强制 Route A，但本机 AI CLI 版本探测未通过；请修复 CLI 登录/安装，或切回自动使用 Route C。"
+                        .to_string(),
+                );
+            }
             if cli_available(allowed_clis, &requested_cli)
                 && matches!(
                     requested_cli.as_str(),
@@ -305,6 +320,34 @@ mod tests {
     }
 
     #[test]
+    fn auto_route_skips_detected_route_a_when_profile_probe_failed() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: false,
+            server_runtime_ready: true,
+            ..Default::default()
+        };
+        let allowed = vec!["codex".to_string()];
+        assert_eq!(
+            choose_cli_for_runtime(&allowed, Some(&runtime), "codex".to_string(), None).unwrap(),
+            "server-runtime"
+        );
+    }
+
+    #[test]
+    fn auto_route_keeps_route_a_when_profile_probe_is_ready() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: true,
+            server_runtime_ready: true,
+            ..Default::default()
+        };
+        let allowed = vec!["codex".to_string()];
+        assert_eq!(
+            choose_cli_for_runtime(&allowed, Some(&runtime), "codex".to_string(), None).unwrap(),
+            "codex"
+        );
+    }
+
+    #[test]
     fn forced_route_b_skips_available_route_a() {
         let runtime = NodeDevRuntimeProfile {
             api_runtime_ready: true,
@@ -335,5 +378,23 @@ mod tests {
         .expect_err("route C should not be selected when server runtime is not ready");
         assert!(err.contains("Route C"));
         assert!(err.contains("未就绪"));
+    }
+
+    #[test]
+    fn forced_route_a_requires_successful_runtime_probe() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: false,
+            server_runtime_ready: true,
+            ..Default::default()
+        };
+        let err = choose_cli_for_runtime(
+            &["codex".to_string()],
+            Some(&runtime),
+            "codex".to_string(),
+            Some(PcRuntimeRoutePreference::RouteA),
+        )
+        .expect_err("route A should not be selected when CLI probe failed");
+        assert!(err.contains("Route A"));
+        assert!(err.contains("未通过"));
     }
 }

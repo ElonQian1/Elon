@@ -40,7 +40,7 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
     let rust_ready = rustc.available && cargo.available;
     let node_ready = node.available;
     let dev_env_ready = android_ready || rust_ready || node_ready;
-    let route_a_ready = route_a_cli_ready(allowed_clis);
+    let route_a_ready = route_a_cli_ready(allowed_clis, &[&codex, &claude, &gemini, &copilot]);
     let api_runtime_ready = api_runtime_available();
     let server_runtime_ready = authenticated_server_runtime || server_runtime_available();
     let ai_cli_ready = route_a_ready || api_runtime_ready || server_runtime_ready;
@@ -92,13 +92,16 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
     }
 }
 
-fn route_a_cli_ready(allowed_clis: &[String]) -> bool {
-    allowed_clis.iter().any(|cli| {
-        matches!(
-            cli.to_ascii_lowercase().as_str(),
-            "codex" | "copilot" | "claude" | "gemini"
-        )
-    })
+fn route_a_cli_ready(allowed_clis: &[String], toolchains: &[&DevToolchainStatus]) -> bool {
+    toolchains
+        .iter()
+        .any(|tool| tool.available && route_a_cli_allowed(allowed_clis, &tool.name))
+}
+
+fn route_a_cli_allowed(allowed_clis: &[String], cli_name: &str) -> bool {
+    allowed_clis
+        .iter()
+        .any(|cli| cli.eq_ignore_ascii_case(cli_name))
 }
 
 fn api_runtime_available() -> bool {
@@ -137,7 +140,8 @@ fn env_present(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::api_runtime_available_from_lookup;
+    use super::{api_runtime_available_from_lookup, route_a_cli_ready};
+    use homecli_proto::DevToolchainStatus;
 
     #[test]
     fn api_runtime_requires_key_and_model() {
@@ -154,6 +158,29 @@ mod tests {
             "OPENAI_MODEL" => Some("gpt-test".to_string()),
             _ => None,
         }));
+    }
+
+    #[test]
+    fn route_a_ready_requires_allowed_cli_and_successful_probe() {
+        let allowed = vec!["codex".to_string()];
+        let failed_codex = tool("codex", false);
+        let ready_claude = tool("claude", true);
+        assert!(
+            !route_a_cli_ready(&allowed, &[&failed_codex, &ready_claude]),
+            "allowed CLI path without a successful version probe should not make Route A ready"
+        );
+
+        let ready_codex = tool("codex", true);
+        assert!(route_a_cli_ready(&allowed, &[&ready_codex]));
+    }
+
+    fn tool(name: &str, available: bool) -> DevToolchainStatus {
+        DevToolchainStatus {
+            name: name.to_string(),
+            available,
+            version: None,
+            path: Some(format!("C:/tools/{name}.cmd")),
+        }
     }
 }
 

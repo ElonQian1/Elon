@@ -14,6 +14,7 @@
 6. 回归验证：跑 PC 节点目标 clippy、相关单测、全量测试和格式检查；记录全量 clippy 的仓库历史缺口。
 7. 任务恢复补强：服务重启或 PC 节点超时把 running 任务标记为 interrupted/failed 时，同步补写频道 `ai_result`，并避免活跃 runner 双终态。
 8. 任务现场快照：为 PC 开发频道任务提供只读 `snapshot/events` API，返回持久 task、频道消息、事件游标和 live/detached/terminal attach 状态，作为后续真正 attach/journal 的服务端骨架。
+9. Route C 兜底可靠性：Route A 不再只因发现 CLI 路径就抢占自动路由；新节点必须通过 CLI 版本探测才算 Route A ready，残留坏 CLI 会自动落到 Route B/C。
 
 ## 风险
 
@@ -33,6 +34,8 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server task_recovery_tests -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server store::tasks::tests -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml project_tool_approval -- --nocapture`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`
+- `cargo test --manifest-path server\pc-dev-runtime\Cargo.toml profile -- --nocapture`
 - `node scripts\test-pc-dev-assets.js`
 - `cargo test --manifest-path server\Cargo.toml --all-features`
 - `git diff --check`
