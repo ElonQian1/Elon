@@ -697,21 +697,44 @@ async fn decide_channel_ai_tool_approval_response(
             "只有 AI开发 频道可以审批项目 AI 工具调用",
         );
     }
-    let target = match project_tool_approvals::decision_target(
+    let claim = match project_tool_approvals::claim_decision_target(
         &project_id,
         &channel_id,
         &task_id,
         &approval_id,
         &decision,
     ) {
-        Ok(target) => target,
-        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        Ok(claim) => claim,
+        Err(e) => {
+            let status = match e.kind() {
+                project_tool_approvals::ToolApprovalErrorKind::BadRequest => {
+                    StatusCode::BAD_REQUEST
+                }
+                project_tool_approvals::ToolApprovalErrorKind::Conflict => StatusCode::CONFLICT,
+                project_tool_approvals::ToolApprovalErrorKind::NotFound => StatusCode::NOT_FOUND,
+            };
+            return json_error(status, e.to_string());
+        }
+    };
+    let target = match claim {
+        project_tool_approvals::ToolApprovalClaim::Dispatch(target) => target,
+        project_tool_approvals::ToolApprovalClaim::AlreadyDecided { decision } => {
+            return Json(serde_json::json!({
+                "ok": true,
+                "task_id": task_id,
+                "approval_id": approval_id,
+                "decision": decision,
+                "status": "already_decided",
+            }))
+            .into_response();
+        }
     };
     if let Err(e) = state
         .agent_manager
         .send_tool_approval_decision(&target.req_id, &approval_id, &target.decision)
         .await
     {
+        project_tool_approvals::mark_dispatch_failed(&task_id, &approval_id, &target.decision);
         return json_error(StatusCode::CONFLICT, e.to_string());
     }
     project_tool_approvals::mark_decided(&task_id, &approval_id, &target.decision);

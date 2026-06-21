@@ -96,4 +96,13 @@ mod tests {
         assert!(!state.decide("req", "tap_1_2", "approve").await);
         assert!(!state.decide("req", "tap_1_1", "maybe").await);
     }
+
+    #[tokio::test]
+    async fn duplicate_decision_is_rejected_after_first_consume() {
+        let state = ToolApprovalState::default();
+        let _waiter = state.register("req", "tap_1_1").await;
+
+        assert!(state.decide("req", "tap_1_1", "approve").await);
+        assert!(!state.decide("req", "tap_1_1", "approve").await);
+    }
 }

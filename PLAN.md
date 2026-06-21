@@ -18,6 +18,7 @@
 10. Codex Desktop 体验补齐：Route B/C 增加 `apply_patch`、diff preview、逐工具审批、超时/拒绝回传和可恢复任务。
 11. 范围读取和补丁安全：Route B/C 增加 `read_file_range`，并收紧 `apply_patch` 对 Windows `.git` 大小写变体的拒绝。
 12. `write_file` 安全审批：Route B/C 的整文件写入审批显示真实 diff，敏感/过大/二进制内容 fail-closed，批准后复查 base hash。
+13. 审批并发状态机：PC 工具审批在服务端原子认领，重复/冲突决策不会重复派发，发送失败可回滚重试。
 
 ## 风险
 
@@ -29,6 +30,7 @@
 - 本机 `/api/status` 只应向受信任云端来源或本机同源页面返回启动期随机 token；若可信 PC 网页自身出现 XSS，仍需要后续补本机确认弹窗/原生授权页进一步收紧。
 - Route A 的 `full_access` 不能只靠云端字段放大权限，后续需要本机原生确认或配对确认，避免网页/XSS 直接触发全盘级开发能力。
 - legacy relay 是兼容路径，不应承载 Route B/C 内置 runtime；若收到内置 runtime 请求必须 fail-closed，让用户升级到一龙 PC 节点客户端。
+- 目前审批状态仍是服务端内存态；本阶段先解决单进程并发竞态，后续若要支持服务重启恢复、多实例和审计追责，需要把审批记录、决策人、diff/hash 写入持久存储。
 
 ## 验证命令
 
@@ -37,6 +39,8 @@
 - `node --check server\src\assets\pc_app.js`
 - `node scripts\test-pc-dev-assets.js`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_runtime_events`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approvals`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_file_range`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_write_preview`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough`

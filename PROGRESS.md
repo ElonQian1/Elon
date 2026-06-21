@@ -3,8 +3,8 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route B/C `write_file` 审批真实 diff preview 和批准后 base hash 复查。
-- 当前分支：`codex/win-codex-parity-stage3-write-diff-20260621`，基于最新 `origin/main` 的隔离 worktree。
+- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 PC 工具审批并发状态机，避免同一审批被重复 approve/deny 派发。
+- 当前分支：`codex/win-codex-parity-stage4-approval-state-20260621`，主工作区预检确认干净且与 `origin/main` 同步后直接创建。
 
 ## 已完成
 
@@ -69,16 +69,23 @@
 - 本轮已修复 PC agent 桥接层透传白名单，`tool_approval_required/tool_approval_decision` 会进入 `project_space` 并登记审批卡，不再只透传 `tool_call/tool_result`。
 - 本轮已补 PC 资产测试 fixture，确保 `write_file` 审批卡能显示文件 chip、Diff 预览并正确 HTML escape。
 - 本轮已通过阶段性验证：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_write_preview`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_runtime_events`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough`、`node --check server\src\assets\pc_app_dev_tasks.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 本轮已启动 Explorer / Implementer / Reviewer / Tester 子代理并行审计审批链路；结论一致：P0 缺口是 `decision_target` 读 pending 后异步发送、最后才 `mark_decided`，并发双击会让服务端状态和节点实际执行不一致。
+- 本轮已把云端 PC 工具审批改成 `claim_decision_target` 原子认领：`Pending -> Dispatching -> Decided`，冲突决策返回 409，同向重复在成功派发后返回 `already_decided` 且不会再次派发。
+- 本轮已补 `mark_dispatch_failed`：PC 节点发送失败会释放 Dispatching 认领回到 Pending，用户可重试，不会卡死在处理中。
+- 本轮已让 `project_space` 使用新的 claim API，并按审批错误类型返回 400/404/409；发送失败会回滚 claim 后返回冲突错误。
+- 本轮已补 PC 节点 waiter 去重测试，确认即便重复收到同一审批决定，节点侧也只消费第一次。
+- 本轮已通过阶段性验证：`cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approvals`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_denies_write_without_executing_tool`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_rejects_stale_write_file_after_approval`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_writes_file_after_approval_when_preview_is_current`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`cargo fmt --manifest-path server\Cargo.toml --check`、`git diff --check`。
 
 ## 本轮小目标
 
-验证并发布 Route B/C 的 `write_file` 真实 diff preview、敏感/过大/二进制 fail-closed，以及批准后 base hash 复查。
+验证并发布 PC 工具审批原子认领、重复/冲突决策防重复派发、发送失败可重试。
 
 ## 待完成
 
-- 提交、推送、发布服务器和 Windows 节点包。
-- 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 下一阶段修复审批并发状态机，并评估审批状态落库/恢复。
+- 提交、推送、发布服务器。
+- 验证线上服务器版本。
+- 下一阶段评估审批 ACK/落库/恢复：服务端发送成功目前仍不等于 node-agent waiter 一定 accepted，需要协议 ACK 才能彻底确认。
+- 若后续改 PC 节点包，再发布 Windows 节点包并验证本机安装目录和本地节点状态。
 - 下一阶段补 Route A `full_access` 的本机确认页或原生确认弹窗，不能只由云端请求字段决定。
 - 下一阶段补任务恢复和更完整的工具时间线筛选。
 

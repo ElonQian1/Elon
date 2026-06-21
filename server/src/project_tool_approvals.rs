@@ -1,20 +1,61 @@
 // server/src/project_tool_approvals.rs
 
-use anyhow::{anyhow, Result};
 use serde_json::Value;
 use std::{
     collections::HashMap,
+    error::Error,
+    fmt,
     sync::{LazyLock, Mutex},
 };
 
 static TOOL_APPROVALS: LazyLock<Mutex<HashMap<String, ToolApprovalRecord>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ToolApprovalTarget {
+    pub project_id: String,
+    pub channel_id: String,
+    pub task_id: String,
     pub req_id: String,
+    pub approval_id: String,
+    pub message_id: Option<String>,
     pub decision: String,
 }
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ToolApprovalClaim {
+    Dispatch(ToolApprovalTarget),
+    AlreadyDecided { decision: String },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ToolApprovalErrorKind {
+    BadRequest,
+    Conflict,
+    NotFound,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ToolApprovalError {
+    kind: ToolApprovalErrorKind,
+    message: String,
+}
+
+impl ToolApprovalError {
+    pub(crate) fn kind(&self) -> ToolApprovalErrorKind {
+        self.kind
+    }
+}
+
+impl fmt::Display for ToolApprovalError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl Error for ToolApprovalError {}
+
+type ToolApprovalResult<T> = std::result::Result<T, ToolApprovalError>;
 
 #[derive(Clone)]
 struct ToolApprovalRecord {
@@ -23,6 +64,7 @@ struct ToolApprovalRecord {
     task_id: String,
     req_id: String,
     approval_id: String,
+    message_id: Option<String>,
     status: ApprovalStatus,
     decision: Option<String>,
 }
@@ -30,6 +72,7 @@ struct ToolApprovalRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ApprovalStatus {
     Pending,
+    Dispatching,
     Decided,
 }
 
@@ -59,58 +102,108 @@ pub(crate) fn register_required(project_id: &str, channel_id: &str, task_id: &st
         task_id: task_id.to_string(),
         req_id: req_id.to_string(),
         approval_id: approval_id.to_string(),
+        message_id: optional_trimmed_string(event, "message_id"),
         status: ApprovalStatus::Pending,
         decision: None,
     };
     if let Ok(mut approvals) = TOOL_APPROVALS.lock() {
-        approvals.insert(approval_key(task_id, approval_id), record);
+        // 事件流可能重放同一个审批卡；已有状态不能被重置成 Pending。
+        approvals
+            .entry(approval_key(task_id, approval_id))
+            .or_insert(record);
     }
 }
 
-pub(crate) fn decision_target(
+pub(crate) fn claim_decision_target(
     project_id: &str,
     channel_id: &str,
     task_id: &str,
     approval_id: &str,
     decision: &str,
-) -> Result<ToolApprovalTarget> {
+) -> ToolApprovalResult<ToolApprovalClaim> {
     let decision = normalize_decision(decision)?;
-    let approvals = TOOL_APPROVALS
+    let mut approvals = TOOL_APPROVALS
         .lock()
-        .map_err(|_| anyhow!("审批状态锁已损坏"))?;
+        .map_err(|_| approval_error(ToolApprovalErrorKind::Conflict, "审批状态锁已损坏"))?;
     let record = approvals
-        .get(&approval_key(task_id, approval_id))
-        .ok_or_else(|| anyhow!("审批请求不存在或已过期"))?;
+        .get_mut(&approval_key(task_id, approval_id))
+        .ok_or_else(|| approval_error(ToolApprovalErrorKind::NotFound, "审批请求不存在或已过期"))?;
     if record.project_id != project_id
         || record.channel_id != channel_id
         || record.task_id != task_id
         || record.approval_id != approval_id
     {
-        return Err(anyhow!("审批请求不属于当前项目频道"));
+        return Err(approval_error(
+            ToolApprovalErrorKind::BadRequest,
+            "审批请求不属于当前项目频道",
+        ));
     }
+
     match record.status {
-        ApprovalStatus::Pending => Ok(ToolApprovalTarget {
-            req_id: record.req_id.clone(),
-            decision,
-        }),
-        ApprovalStatus::Decided if record.decision.as_deref() == Some(decision.as_str()) => {
-            Ok(ToolApprovalTarget {
+        ApprovalStatus::Pending => {
+            // 关键并发点：认领和状态切换必须在同一把锁里完成，避免 approve/deny 同时派发。
+            record.status = ApprovalStatus::Dispatching;
+            record.decision = Some(decision.clone());
+            Ok(ToolApprovalClaim::Dispatch(ToolApprovalTarget {
+                project_id: record.project_id.clone(),
+                channel_id: record.channel_id.clone(),
+                task_id: record.task_id.clone(),
                 req_id: record.req_id.clone(),
+                approval_id: record.approval_id.clone(),
+                message_id: record.message_id.clone(),
                 decision,
-            })
+            }))
         }
-        ApprovalStatus::Decided => Err(anyhow!("审批请求已经被处理")),
+        ApprovalStatus::Dispatching => Err(approval_error(
+            ToolApprovalErrorKind::Conflict,
+            "审批请求正在发送，请勿重复操作",
+        )),
+        ApprovalStatus::Decided if record.decision.as_deref() == Some(decision.as_str()) => {
+            Ok(ToolApprovalClaim::AlreadyDecided { decision })
+        }
+        ApprovalStatus::Decided => Err(approval_error(
+            ToolApprovalErrorKind::Conflict,
+            "审批请求已经被处理",
+        )),
     }
 }
 
-pub(crate) fn mark_decided(task_id: &str, approval_id: &str, decision: &str) {
+pub(crate) fn mark_decided(task_id: &str, approval_id: &str, decision: &str) -> bool {
     let Ok(mut approvals) = TOOL_APPROVALS.lock() else {
-        return;
+        return false;
+    };
+    let Ok(decision) = normalize_decision(decision) else {
+        return false;
     };
     if let Some(record) = approvals.get_mut(&approval_key(task_id, approval_id)) {
-        record.status = ApprovalStatus::Decided;
-        record.decision = normalize_decision(decision).ok();
+        if record.status == ApprovalStatus::Dispatching
+            && record.decision.as_deref() == Some(decision.as_str())
+        {
+            record.status = ApprovalStatus::Decided;
+            return true;
+        }
     }
+    false
+}
+
+pub(crate) fn mark_dispatch_failed(task_id: &str, approval_id: &str, decision: &str) -> bool {
+    let Ok(mut approvals) = TOOL_APPROVALS.lock() else {
+        return false;
+    };
+    let Ok(decision) = normalize_decision(decision) else {
+        return false;
+    };
+    if let Some(record) = approvals.get_mut(&approval_key(task_id, approval_id)) {
+        if record.status == ApprovalStatus::Dispatching
+            && record.decision.as_deref() == Some(decision.as_str())
+        {
+            // 发送失败说明决定还没有交给 PC 节点，释放认领让用户可以重试。
+            record.status = ApprovalStatus::Pending;
+            record.decision = None;
+            return true;
+        }
+    }
+    false
 }
 
 pub(crate) fn clear_task(task_id: &str) {
@@ -119,12 +212,31 @@ pub(crate) fn clear_task(task_id: &str) {
     }
 }
 
-fn normalize_decision(value: &str) -> Result<String> {
+fn normalize_decision(value: &str) -> ToolApprovalResult<String> {
     match value.trim().to_ascii_lowercase().as_str() {
         "approve" | "approved" => Ok("approve".to_string()),
         "deny" | "denied" | "reject" | "rejected" => Ok("deny".to_string()),
-        _ => Err(anyhow!("decision 只能是 approve 或 deny")),
+        _ => Err(approval_error(
+            ToolApprovalErrorKind::BadRequest,
+            "decision 只能是 approve 或 deny",
+        )),
     }
+}
+
+fn approval_error(kind: ToolApprovalErrorKind, message: impl Into<String>) -> ToolApprovalError {
+    ToolApprovalError {
+        kind,
+        message: message.into(),
+    }
+}
+
+fn optional_trimmed_string(event: &Value, field: &str) -> Option<String> {
+    event
+        .get(field)
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
 }
 
 fn approval_key(task_id: &str, approval_id: &str) -> String {
@@ -133,12 +245,16 @@ fn approval_key(task_id: &str, approval_id: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{decision_target, mark_decided, register_required};
+    use super::{
+        claim_decision_target, clear_task, mark_decided, mark_dispatch_failed, register_required,
+        ToolApprovalClaim, ToolApprovalErrorKind,
+    };
     use serde_json::json;
 
     #[test]
-    fn register_and_resolve_approval_target() {
+    fn register_and_claim_dispatch_target() {
         let task_id = "task-register-and-resolve";
+        clear_task(task_id);
         register_required(
             "project",
             "channel",
@@ -146,18 +262,30 @@ mod tests {
             &json!({
                 "type": "tool_approval_required",
                 "req_id": "req",
+                "message_id": "msg-1",
                 "approval_id": "tap_1_1"
             }),
         );
 
-        let target = decision_target("project", "channel", task_id, "tap_1_1", "approve").unwrap();
+        let claim =
+            claim_decision_target("project", "channel", task_id, "tap_1_1", "approve").unwrap();
+        let ToolApprovalClaim::Dispatch(target) = claim else {
+            panic!("first approval decision must dispatch");
+        };
+        assert_eq!(target.project_id, "project");
+        assert_eq!(target.channel_id, "channel");
+        assert_eq!(target.task_id, task_id);
         assert_eq!(target.req_id, "req");
+        assert_eq!(target.approval_id, "tap_1_1");
+        assert_eq!(target.message_id.as_deref(), Some("msg-1"));
         assert_eq!(target.decision, "approve");
+        clear_task(task_id);
     }
 
     #[test]
-    fn decided_approval_rejects_conflicting_decision() {
-        let task_id = "task-conflicting-decision";
+    fn claim_prevents_conflicting_concurrent_decision() {
+        let task_id = "task-approve-then-deny-cannot-claim-again";
+        clear_task(task_id);
         register_required(
             "project",
             "channel",
@@ -168,8 +296,94 @@ mod tests {
                 "approval_id": "tap_1_1"
             }),
         );
-        mark_decided(task_id, "tap_1_1", "approve");
 
-        assert!(decision_target("project", "channel", task_id, "tap_1_1", "deny").is_err());
+        assert!(claim_decision_target("project", "channel", task_id, "tap_1_1", "approve").is_ok());
+
+        let err =
+            claim_decision_target("project", "channel", task_id, "tap_1_1", "deny").unwrap_err();
+        assert_eq!(err.kind(), ToolApprovalErrorKind::Conflict);
+        clear_task(task_id);
+    }
+
+    #[test]
+    fn duplicate_decision_is_idempotent_after_dispatch_success() {
+        let task_id = "task-duplicate-decision-does-not-return-dispatch-target";
+        clear_task(task_id);
+        register_required(
+            "project",
+            "channel",
+            task_id,
+            &json!({
+                "type": "tool_approval_required",
+                "req_id": "req",
+                "approval_id": "tap_1_1"
+            }),
+        );
+
+        assert!(
+            claim_decision_target("project", "channel", task_id, "tap_1_1", "approved").is_ok()
+        );
+        assert!(
+            claim_decision_target("project", "channel", task_id, "tap_1_1", "approve").is_err()
+        );
+        assert!(mark_decided(task_id, "tap_1_1", "approve"));
+
+        let claim =
+            claim_decision_target("project", "channel", task_id, "tap_1_1", "approve").unwrap();
+        assert_eq!(
+            claim,
+            ToolApprovalClaim::AlreadyDecided {
+                decision: "approve".to_string()
+            }
+        );
+        let err =
+            claim_decision_target("project", "channel", task_id, "tap_1_1", "deny").unwrap_err();
+        assert_eq!(err.kind(), ToolApprovalErrorKind::Conflict);
+        clear_task(task_id);
+    }
+
+    #[test]
+    fn failed_dispatch_releases_claim_for_retry() {
+        let task_id = "task-dispatch-failure-retry";
+        clear_task(task_id);
+        register_required(
+            "project",
+            "channel",
+            task_id,
+            &json!({
+                "type": "tool_approval_required",
+                "req_id": "req",
+                "approval_id": "tap_1_1"
+            }),
+        );
+
+        assert!(claim_decision_target("project", "channel", task_id, "tap_1_1", "approve").is_ok());
+        assert!(mark_dispatch_failed(task_id, "tap_1_1", "approve"));
+        assert!(claim_decision_target("project", "channel", task_id, "tap_1_1", "deny").is_ok());
+        clear_task(task_id);
+    }
+
+    #[test]
+    fn stale_dispatch_result_cannot_override_new_claim() {
+        let task_id = "task-stale-dispatch-result";
+        clear_task(task_id);
+        register_required(
+            "project",
+            "channel",
+            task_id,
+            &json!({
+                "type": "tool_approval_required",
+                "req_id": "req",
+                "approval_id": "tap_1_1"
+            }),
+        );
+
+        assert!(claim_decision_target("project", "channel", task_id, "tap_1_1", "approve").is_ok());
+        assert!(mark_dispatch_failed(task_id, "tap_1_1", "approve"));
+        assert!(claim_decision_target("project", "channel", task_id, "tap_1_1", "deny").is_ok());
+
+        assert!(!mark_decided(task_id, "tap_1_1", "approve"));
+        assert!(mark_decided(task_id, "tap_1_1", "deny"));
+        clear_task(task_id);
     }
 }
