@@ -3,8 +3,8 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route A/legacy relay 的本机 CLI 执行边界，避免云端把 PC 节点当任意远程命令通道。
-- 当前分支：`main`，提交前需要先与最新 `origin/main` 对齐。
+- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route B/C 的范围读取能力和补丁路径安全。
+- 当前分支：`codex/win-codex-parity-stage2-20260621`，基于最新 `origin/main` 的隔离 worktree。
 
 ## 已完成
 
@@ -57,18 +57,24 @@
 - 本轮已同步收紧 legacy `pc_relay_client`：复用同一套 CLI 白名单和参数/cwd 校验，明确拒绝内置 runtime，并隐藏 Windows 子进程窗口。
 - 本轮已从 PC 节点能力上报里移除 `gh`，避免前端显示一个实际会被安全层拒绝的 CLI。
 - 已通过本轮验证：`rustfmt --edition 2021 server/src/main.rs server/src/node_agent_main.rs server/src/node_agent_cli_security.rs server/src/pc_relay_client.rs server/src/ai_cli/mod.rs`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`、`cargo test --manifest-path server\Cargo.toml --bin elon-server node_agent_cli_security`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 上一阶段已发布 Route B/C `apply_patch`、diff preview 和逐工具审批，服务器版本 `v0.3.542`，节点包 SHA `563ea870`。
+- 本轮子代理审计确认：`read_file_range` 是低风险 Codex Desktop parity 增量；审批状态落库收益更高但牵涉 DB/store/API/UI，适合后续单独阶段。
+- 本轮已新增 `server/src/node_agent_file_range.rs`，Route B/C 支持 `read_file_range`，输出带行号片段并限制最多 400 行、24k 字符。
+- 本轮已把 `read_file_range` 接入 `ToolGuard` 和 runtime prompt，继续复用项目路径安全校验；非法 `start_line` / `line_count` fail-closed。
+- 本轮已修复 `tools_patch` 对 `.git` 路径的 Windows 大小写变体拒绝，`.GIT/config` 等路径现在会被显式拦截。
 
 ## 本轮小目标
 
-先发布并验证本机 CLI 执行边界硬化；下一阶段继续推进 Route B/C 的 `apply_patch`、diff preview、逐工具审批、full_access 本机确认和持久任务恢复。
+验证并发布 Route B/C 的 `read_file_range` 和 `tools_patch` `.git` 大小写安全修复。
 
 ## 待完成
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 下一阶段实现 Route B/C 的 `apply_patch` / diff preview / 逐工具审批，而不是只让模型直接调用 `write_file`。
+- 下一阶段实现 Route B/C `write_file` 的真实 diff preview。
+- 下一阶段修复审批并发状态机，并评估审批状态落库/恢复。
 - 下一阶段补 Route A `full_access` 的本机确认页或原生确认弹窗，不能只由云端请求字段决定。
-- 下一阶段补 read_file_range、任务恢复和更完整的工具时间线筛选。
+- 下一阶段补任务恢复和更完整的工具时间线筛选。
 
 ## 当前阻塞
 

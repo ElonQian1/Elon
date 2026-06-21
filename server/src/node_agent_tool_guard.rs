@@ -74,6 +74,12 @@ impl ToolGuard {
                 let path = required_str(action, "path")?;
                 self.read_file(path).await
             }
+            "read_file_range" => {
+                let path = required_str(action, "path")?;
+                let start_line = optional_positive_usize(action, "start_line")?.unwrap_or(1);
+                let line_count = optional_positive_usize(action, "line_count")?.unwrap_or(120);
+                self.read_file_range(path, start_line, line_count).await
+            }
             "write_file" => {
                 if self.read_only() {
                     bail!("write_file denied: read-only planning mode");
@@ -141,6 +147,16 @@ impl ToolGuard {
             .await
             .with_context(|| format!("read_file failed: {path}"))?;
         Ok(truncate_chars(&text, MAX_FILE_CHARS))
+    }
+
+    async fn read_file_range(
+        &self,
+        path: &str,
+        start_line: usize,
+        line_count: usize,
+    ) -> Result<String> {
+        let full = self.resolve_safe_path(path)?;
+        crate::node_agent_file_range::read_file_range(&full, path, start_line, line_count).await
     }
 
     async fn write_file(&self, path: &str, content: &str) -> Result<String> {
@@ -305,6 +321,21 @@ fn required_str<'a>(action: &'a Value, key: &str) -> Result<&'a str> {
         .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| anyhow!("{key} is required"))
+}
+
+fn optional_positive_usize(action: &Value, key: &str) -> Result<Option<usize>> {
+    let Some(value) = action.get(key) else {
+        return Ok(None);
+    };
+    let Some(value) = value.as_u64() else {
+        bail!("{key} must be a positive integer");
+    };
+    if value == 0 {
+        bail!("{key} must be >= 1");
+    }
+    usize::try_from(value)
+        .map(Some)
+        .map_err(|_| anyhow!("{key} is too large"))
 }
 
 fn normalize_path(path: PathBuf) -> Result<PathBuf> {
@@ -701,6 +732,55 @@ mod tests {
         assert!(ToolGuard::new(workspace.clone(), Some("unexpected")).read_only());
         assert!(!ToolGuard::new(workspace.clone(), Some("project_write")).read_only());
         assert!(!ToolGuard::new(workspace, Some("full_access")).read_only());
+    }
+
+    #[tokio::test]
+    async fn read_file_range_returns_numbered_slice() {
+        let temp = temp_test_dir("read_file_range_returns_numbered_slice");
+        std::fs::create_dir_all(temp.join("src")).unwrap();
+        std::fs::write(temp.join("src/main.rs"), "one\ntwo\nthree\nfour\n").unwrap();
+        let mut guard = ToolGuard::new(temp, None);
+
+        let result = guard
+            .invoke_action(&json!({
+                "tool": "read_file_range",
+                "path": "src/main.rs",
+                "start_line": 2,
+                "line_count": 2
+            }))
+            .await;
+
+        assert!(result.contains("lines 2-3 of 4"));
+        assert!(result.contains("2: two"));
+        assert!(result.contains("3: three"));
+        assert!(!result.contains("1: one"));
+    }
+
+    #[tokio::test]
+    async fn read_file_range_rejects_unsafe_or_invalid_input() {
+        let temp = temp_test_dir("read_file_range_rejects_unsafe_or_invalid_input");
+        std::fs::write(temp.join("note.txt"), "one\ntwo\n").unwrap();
+        let mut guard = ToolGuard::new(temp, None);
+
+        let zero_result = guard
+            .invoke_action(&json!({
+                "tool": "read_file_range",
+                "path": "note.txt",
+                "start_line": 0,
+                "line_count": 1
+            }))
+            .await;
+        assert!(zero_result.contains("start_line must be >= 1"));
+
+        let unsafe_result = guard
+            .invoke_action(&json!({
+                "tool": "read_file_range",
+                "path": "../outside.txt",
+                "start_line": 1,
+                "line_count": 1
+            }))
+            .await;
+        assert!(unsafe_result.contains("parent path segments are not allowed"));
     }
 
     #[tokio::test]

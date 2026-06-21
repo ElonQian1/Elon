@@ -1,3 +1,4 @@
+// server/src/tools_patch.rs
 //! Workspace-scoped patch application tool for API agents.
 
 use anyhow::{anyhow, Result};
@@ -135,7 +136,7 @@ fn validate_touched_files(project_root: &Path, files: &[String]) -> Result<()> {
         if file.contains("..") || Path::new(file).is_absolute() {
             return Err(anyhow!("补丁目标路径不安全: {}", file));
         }
-        if file == ".git" || file.starts_with(".git/") {
+        if has_git_path_component(file) {
             return Err(anyhow!("补丁不允许修改 .git 目录"));
         }
 
@@ -146,6 +147,11 @@ fn validate_touched_files(project_root: &Path, files: &[String]) -> Result<()> {
         }
     }
     Ok(())
+}
+
+fn has_git_path_component(path: &str) -> bool {
+    path.split(['/', '\\'])
+        .any(|part| part.eq_ignore_ascii_case(".git"))
 }
 
 fn resolve_existing_parent(path: &Path) -> Result<PathBuf> {
@@ -280,6 +286,23 @@ mod tests {
 
         let error = apply_patch(&workspace, patch, true).unwrap_err();
         assert!(error.to_string().contains("不安全"));
+    }
+
+    #[test]
+    fn rejects_git_directory_case_insensitively() {
+        let workspace = temp_workspace("rejects_git_directory_case_insensitively");
+        init_git(&workspace);
+
+        let patch = r#"diff --git a/.GIT/config b/.GIT/config
+--- a/.GIT/config
++++ b/.GIT/config
+@@ -1 +1 @@
+-old
++new
+"#;
+
+        let error = apply_patch(&workspace, patch, true).unwrap_err();
+        assert!(error.to_string().contains(".git"));
     }
 
     fn temp_workspace(name: &str) -> PathBuf {

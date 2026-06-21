@@ -474,6 +474,7 @@ Schema:
   "actions": [
     {"tool": "list_dir", "path": "."},
     {"tool": "read_file", "path": "README.md"},
+    {"tool": "read_file_range", "path": "src/main.rs", "start_line": 120, "line_count": 80},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
     {"tool": "apply_patch", "patch": "unified diff", "check_only": false},
     {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
@@ -483,6 +484,7 @@ Schema:
 Rules:
 - Paths must be relative to the current project workspace.
 - Prefer read-only actions first.
+- Use read_file_range instead of read_file for large files when you only need one section.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for intentional edits to existing project files.
 - Use write_file only when replacing a full file or creating a small new project file.

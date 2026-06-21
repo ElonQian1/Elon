@@ -48,6 +48,7 @@ use tracing::{info, warn};
 mod cli_usage;
 mod node_agent_admin_open;
 mod node_agent_cli_security;
+mod node_agent_file_range;
 mod node_agent_local_admin;
 mod node_agent_project_picker;
 mod node_agent_proxy;
