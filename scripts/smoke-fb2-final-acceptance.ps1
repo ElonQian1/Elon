@@ -292,6 +292,7 @@ if ($PreflightOnly) {
     Add-SwitchArg $preflightArgs "-CheckFb2ApkVersion" $true
     Add-SwitchArg $preflightArgs "-CheckLocalVoiceSdkBuild" $true
     Add-SwitchArg $preflightArgs "-RequireVoiceDeviceEvidence" $true
+    Add-SwitchArg $preflightArgs "-CheckPermissionBoundaries" $true
     Add-SwitchArg $preflightArgs "-RequireNoSkips" $true
 
     $preflightLogPath = Join-Path $summaryDir "final-acceptance-$stamp-preflight.log"

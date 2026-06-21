@@ -22,6 +22,8 @@
 - `-PreflightOnly` 已升级为进入真实群聊前的无副作用强门禁：除用户订单上下文和真机语音证据外，还会要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建和 no-skip 全部通过。
 - 已新增 `docs/fb2-ai-center/final-acceptance-matrix.md`，把终极目标拆成上下文格式、主项目能力、fb2 能力、用户场景和剩余证据缺口，作为宣布完成前的逐项审计入口。
 - 默认 smoke 已新增 live manifest 必需工具检查，覆盖 `context_pack`、`today_matches`、`match_analysis_brief`、`group_opinion_summary`、用户订单、平台摘要、feedback、quality、permission audit 和 `tool_manifest`。
+- `scripts/smoke-fb2-ai-center.ps1` 已新增 `-CheckPermissionBoundaries`，用于验证缺当前用户头、缺 platform scope、用户订单工具缺当前用户头都会 403，并读取 fb2 `/context/permission-summary` 证明被审计；`-FinalAcceptance` 和 `smoke-fb2-final-acceptance.ps1 -PreflightOnly` 会自动开启该门槛。
+- 本轮无 token 验证通过：默认 smoke 仍为 `failed=0 skipped=2`；显式 `-CheckPermissionBoundaries -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d` 会因缺 `FB2_AI_CENTER_TOKEN` 返回 `failed=1`，说明最终验收不会跳过权限负向检查。
 - 已新增 `docs/fb2-ai-center/voice-device-evidence.example.json`，要求 fb2 真机验证 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
 - `scripts/smoke-fb2-visible-chat.ps1` 已作为有副作用真实群聊 smoke，只有传 `-AllowVisibleMessages` 后才会发送 `@EL` 和 selected-message `ai-reply`。
 - 最近一次无副作用 smoke 通过，主项目线上版本返回 `0.3.579 8106b0cca6bbe95370625def93f32a2716fb56ca`，fb2 live manifest 返回 `tool_count=30`。
@@ -51,6 +53,7 @@ git diff --check
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -CheckPermissionBoundaries -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -AllowVisibleMessages
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2AiCenterToken invalid-test-token -Fb2Username 123qwe -Fb2Password 123qwe -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence.example.json
@@ -62,6 +65,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 - 缺显式 `-AllowVisibleMessages`，因此 wrapper 不会发送真实群聊消息。
 - `-PreflightOnly` 和 `-AllowVisibleMessages` 同时传会失败，避免模式歧义。
 - 缺 `FB2_AI_CENTER_TOKEN` 时在写群前失败。
+- 缺 `FB2_AI_CENTER_TOKEN` 时，显式权限负向检查也会失败，避免权限验收被 skip。
 - 使用无效 service token 时，wrapper 能解析 `123qwe` 的 fb2 用户 UUID，但订单上下文预检在写群前 401 失败。
 
 ## 下一步最小动作

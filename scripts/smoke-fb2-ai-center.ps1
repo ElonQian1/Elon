@@ -25,6 +25,7 @@ param(
     [string]$VoiceDeviceEvidencePath = "",
     [switch]$CheckQuality,
     [switch]$RequireFeedbackCoverage,
+    [switch]$CheckPermissionBoundaries,
     [string]$QualitySince = "",
     [string]$QualityUntil = "",
     [double]$MaxLargeContextPackRate = 0.75,
@@ -82,6 +83,7 @@ if ($FinalAcceptance) {
     $RequireVoiceDeviceEvidence = $true
     $CheckQuality = $true
     $RequireFeedbackCoverage = $true
+    $CheckPermissionBoundaries = $true
     $RequireNoSkips = $true
 }
 
@@ -104,6 +106,8 @@ $qualityCheckRequested = $CheckQuality `
     -or $PSBoundParameters.ContainsKey("MaxWrongContextRate") `
     -or $PSBoundParameters.ContainsKey("MinFeedbackCount") `
     -or $PSBoundParameters.ContainsKey("MinMatchedCitedSourceCount")
+
+$permissionCheckRequested = $CheckPermissionBoundaries
 
 function Write-Check {
     param(
@@ -286,6 +290,64 @@ function Invoke-Json {
             Start-Sleep -Seconds ([Math]::Min(2 * $attempt, 5))
         }
     }
+}
+
+function Invoke-HttpStatus {
+    param(
+        [string]$Url,
+        [hashtable]$Headers = @{},
+        [string]$Method = "GET",
+        [object]$Body = $null
+    )
+    $params = @{
+        Uri = $Url
+        Method = $Method
+        Headers = $Headers
+        TimeoutSec = $RequestTimeoutSec
+        SkipHttpErrorCheck = $true
+    }
+    if ($null -ne $Body) {
+        $params["ContentType"] = "application/json"
+        $params["Body"] = ($Body | ConvertTo-Json -Depth 8 -Compress)
+    }
+    Invoke-WebRequest @params
+}
+
+function Assert-StatusCode {
+    param(
+        [object]$Response,
+        [int]$Expected,
+        [string]$Name
+    )
+    $actual = [int]$Response.StatusCode
+    Assert-True ($actual -eq $Expected) $Name "status=$actual expected=$Expected"
+}
+
+function Get-NestedNumber {
+    param(
+        [object]$Value,
+        [string[]]$Paths
+    )
+    foreach ($path in $Paths) {
+        $current = $Value
+        $found = $true
+        foreach ($part in ($path -split "\.")) {
+            if ($null -eq $current) {
+                $found = $false
+                break
+            }
+            $property = $current.PSObject.Properties[$part]
+            if ($null -eq $property) {
+                $found = $false
+                break
+            }
+            $current = $property.Value
+        }
+        if ($found -and $null -ne $current -and "$current" -ne "") {
+            return [double]$current
+        }
+    }
+    return $null
 }
 
 function Fb2-Headers {
@@ -582,7 +644,7 @@ if ($RequireVoiceDeviceEvidence) {
 }
 
 if (-not $Fb2Token) {
-    if ($RequireFb2Live -or $RequireAllScenarios -or $qualityCheckRequested) {
+    if ($RequireFb2Live -or $RequireAllScenarios -or $qualityCheckRequested -or $permissionCheckRequested) {
         Fail "fb2 live token" "FB2_AI_CENTER_TOKEN or -Fb2Token is required"
     } else {
         Skip "fb2 live data" "set FB2_AI_CENTER_TOKEN to verify Context Pack scenarios"
@@ -726,6 +788,61 @@ if (-not $Fb2Token) {
             Fail "scenario: platform order risk" "-IncludePlatformOrderSummary is required"
         } else {
             Skip "scenario: platform order risk" "pass -IncludePlatformOrderSummary to verify privileged aggregate context"
+        }
+    }
+
+    if ($permissionCheckRequested) {
+        Write-Output ""
+        Write-Output "== fb2 permission boundaries =="
+
+        if (-not $ExternalUserId) {
+            Fail "permission boundaries" "-ExternalUserId is required"
+        } else {
+            $permissionSince = (Get-Date).ToUniversalTime().AddSeconds(-5).ToString("o")
+            try {
+                $topic = Encode-QueryValue "帮我分析我的票"
+                $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)external_user_id=$ExternalUserId$($amp)topic_hint=$topic$($amp)limit=3$($amp)order_limit=1"
+                $missingUserHeader = Invoke-HttpStatus -Url $url -Headers $fb2Headers
+                Assert-StatusCode $missingUserHeader 403 "permission: context pack requires current user header"
+
+                $platformWithoutScope = Invoke-HttpStatus -Url "$Fb2Base/api/main-project/context/platform-orders" -Headers $fb2Headers
+                Assert-StatusCode $platformWithoutScope 403 "permission: platform summary requires scope"
+
+                $userToolWithoutHeader = Invoke-HttpStatus -Url "$Fb2Base/api/main-project/tools/execute" -Headers $fb2Headers -Method "POST" -Body @{
+                    request_id = "main-smoke-permission-user-orders"
+                    tool_name = "search_user_orders"
+                    group_id = $GroupId
+                    external_user_id = $ExternalUserId
+                    arguments = @{
+                        external_user_id = $ExternalUserId
+                        limit = 1
+                    }
+                    reason = "main smoke permission boundary"
+                }
+                Assert-StatusCode $userToolWithoutHeader 403 "permission: user order tool requires current user header"
+
+                Start-Sleep -Seconds 1
+                $permissionParams = [System.Collections.Generic.List[string]]::new()
+                Add-QueryParam -Params $permissionParams -Name "from" -Value $permissionSince
+                Add-QueryParam -Params $permissionParams -Name "group_id" -Value $GroupId
+                $permissionQuery = $permissionParams -join $amp
+                $permissionUrl = "$Fb2Base/api/main-project/context/permission-summary"
+                if ($permissionQuery) {
+                    $permissionUrl = "${permissionUrl}?$permissionQuery"
+                }
+                $permissionSummary = Invoke-Json -Url $permissionUrl -Headers $fb2Headers
+                Assert-True ($permissionSummary.success -eq $true) "permission summary"
+
+                $permissionData = $permissionSummary.data
+                $totalBlocks = Get-NestedNumber $permissionData @("total_blocks", "summary.total_blocks", "permission_summary.total_blocks")
+                $missingUserBlocks = Get-NestedNumber $permissionData @("missing_external_user_id_count", "summary.missing_external_user_id_count", "permission_summary.missing_external_user_id_count")
+                $platformScopeBlocks = Get-NestedNumber $permissionData @("platform_scope_count", "summary.platform_scope_count", "permission_summary.platform_scope_count")
+                Assert-True ($null -ne $totalBlocks -and $totalBlocks -ge 2) "permission summary total blocks" "value=$totalBlocks"
+                Assert-True ($null -ne $missingUserBlocks -and $missingUserBlocks -ge 1) "permission summary user blocks" "value=$missingUserBlocks"
+                Assert-True ($null -ne $platformScopeBlocks -and $platformScopeBlocks -ge 1) "permission summary platform blocks" "value=$platformScopeBlocks"
+            } catch {
+                Fail "permission boundaries" $_.Exception.Message
+            }
         }
     }
 

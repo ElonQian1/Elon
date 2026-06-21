@@ -15,6 +15,7 @@
 - 2026-06-22 最终总验收开关补强：`scripts/smoke-fb2-ai-center.ps1 -FinalAcceptance` 会自动打开 live fb2 场景、完整场景、平台摘要、质量反馈、fb2 APK 发布、主项目语音 SDK 构建和 no-skip 门槛。当前环境没有 `FB2_AI_CENTER_TOKEN` 时该命令应失败，这代表终极验收条件仍未满足，而不是脚本异常。
 - 2026-06-22 最终预检门槛补强：`scripts/smoke-fb2-final-acceptance.ps1 -PreflightOnly` 现在会在不发送真实群消息的情况下，先强制跑 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 门槛；通过后才进入 `-AllowVisibleMessages` 的真实群聊验收。
 - 2026-06-22 终极目标矩阵补强：`docs/fb2-ai-center/final-acceptance-matrix.md` 记录上下文格式、主项目能力、fb2 能力、用户场景和剩余证据缺口；默认 smoke 同步检查 live manifest 必需工具，防止 fb2 端工具/接口从线上 manifest 漂移消失。
+- 2026-06-22 权限负向验收补强：`scripts/smoke-fb2-ai-center.ps1 -CheckPermissionBoundaries` 会触发缺用户头 Context Pack、缺 platform scope 平台摘要、缺用户头用户订单工具三个 403 检查，并读取 `/context/permission-summary`，证明拒绝访问已进入审计；`-FinalAcceptance` 和最终预检会自动打开。
 - 2026-06-21 SDK 构建复核通过：`cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 成功，确认主项目当前 `android/chat-voice-kit` 可产出 debug AAR，fb2 可继续引用 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
 - 真实群聊补充验证：账号 `123qwe` 已通过 fb2 外部应用会话绑定到主项目用户，群 `ext_fb2_official` 可发送可见 `@EL` 消息；实测 `Context Pack` 和 `match_analysis_brief` 已返回该用户本人订单，但 AI 回复曾被超时的补充 `search_user_orders` 结果干扰。
 - 主项目已修复提示和工具规划规则：Context Pack `user_orders` 与 `match_analysis_brief.data.user_orders` 都算当前用户订单来源；`search_user_orders unavailable` 只表示补充展开失败，不能否定已有本人订单事实。
@@ -122,6 +123,9 @@
 - 需要验证长期质量门槛时加：
   `-CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339> -MaxLargeContextPackRate 0.75`
   该检查会读取 fb2 `/context/quality-summary` 和 `/context/feedbacks`，用于发现 missing/wrong context、引用未命中和 Context Pack 大包率退化。
+- 需要验证权限负向门槛时加：
+  `-CheckPermissionBoundaries -ExternalUserId <fb2_user_uuid>`
+  该检查会读取 fb2 `/context/permission-summary`，用于证明未授权订单/平台摘要请求会被拒绝并记录审计。
 - 需要验证真实群聊可见入口时，必须确认用户已授权写生产群或提供沙盒群，再运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
   没有 `-AllowVisibleMessages` 时脚本必须保持失败退出。

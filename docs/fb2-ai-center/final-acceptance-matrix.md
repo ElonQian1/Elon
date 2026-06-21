@@ -15,7 +15,7 @@
 | `context-contract` | 默认 smoke 检查 answer policy、六类评测场景、live manifest execution policy | 已覆盖 |
 | Context Pack 拉取 | `-RequireFb2Live -RequireAllScenarios -ExternalUserId <uuid>` | 需要真实 `FB2_AI_CENTER_TOKEN` 完成最终验证 |
 | tool manifest 读取 | 默认 smoke 检查 `live_tool_manifest.status=ready`、必需 tool ids、无 missing allowed tool | 已覆盖并新增必需工具清单 |
-| 工具执行和审计 | `-RequireAllScenarios` + visible chat final acceptance 的 feedback/audit evidence | 需要最终验收绑定同一批 `QualitySince` |
+| 工具执行和审计 | `-RequireAllScenarios` + `-CheckPermissionBoundaries` + visible chat final acceptance 的 feedback/audit evidence | 需要最终验收绑定同一批 `QualitySince` |
 | answer policy | 默认 smoke 检查 `fb2.answer_policy.v1` 和 6 个 canonical eval scenarios | 已覆盖 |
 | billing policy | `chat-bootstrap.billing` 验证 ASR/TTS/context fetch 免费，AI 回复生成前扣费 | 需要 authenticated bootstrap 验证 |
 | observability | `PROGRESS.md`/`handoff.md` 记录 server version、summary JSON、log path、feedback evidence | 已有记录要求，最终验收未闭环 |
@@ -33,7 +33,7 @@
 | 反馈写入 | `record_context_feedback` | visible final acceptance 的 generated-answer feedback |
 | 反馈查询 | `list_context_feedbacks` | quality feedback samples |
 | 质量汇总 | `context_quality_summary` | `-CheckQuality` |
-| 权限审计 | `context_permission_summary`、`context_audit_summary` | 权限负向测试和审计 summary |
+| 权限审计 | `context_permission_summary`、`context_audit_summary` | `-CheckPermissionBoundaries` 会触发 403 负向请求，并读取 permission summary |
 | 工具 manifest | `tool_manifest` | 默认 smoke 和 live data smoke |
 
 ## 用户场景
@@ -51,4 +51,4 @@
 - 缺真实 `FB2_AI_CENTER_TOKEN`，不能完成 live Context Pack、平台匿名摘要、质量汇总和 feedback 样本的最终验收。
 - 缺真实 fb2 真机语音证据 JSON，不能证明小米/HyperOS 等设备上主项目 `VoiceComposerView`、系统 ASR、云端兜底和 TTS 已完整可用。
 - 缺最终 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages` summary，不能把真实群聊可见消息、AI 回复、source references 和 feedback evidence 绑定为同一批证据。
-
+- 缺带真实 token 的 `-CheckPermissionBoundaries` 当前运行结果，不能把历史权限负向验证当成本次最终完成证据。
