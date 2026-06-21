@@ -73,6 +73,34 @@ function testDevTasksContinueAction() {
   assert.strictEqual(devTasks.hasOpenTasks(messages, context), false, 'finished task should not be considered open');
 }
 
+function testDevTasksHasOpenPendingApproval() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    approveTool: async () => {},
+    draftContinuation: () => {}
+  });
+  const messages = [
+    { kind: 'ai_task', task_id: 'tsk_open_approval', content: '发起 AI 开发任务：运行测试' },
+    {
+      kind: 'ai_progress',
+      task_id: 'tsk_open_approval',
+      content: JSON.stringify({
+        type: 'tool_approval_required',
+        tool: 'run_command',
+        approval_id: 'tap_1_1',
+        status: 'pending'
+      })
+    }
+  ];
+  const context = devTasks.buildContext(messages);
+  assert.strictEqual(devTasks.hasOpenTasks(messages, context), true, 'pending approval without result should be considered open');
+}
+
 function testDevTasksToolTimeline() {
   const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
   const devTasks = sandbox.window.ElonPcDevTasks.create({
@@ -157,6 +185,45 @@ async function testDevTasksToolApprovalButtons() {
   assert.ok(html.includes('data-approval-id="tap_1_1"'), 'approval button should keep approval id');
   assert.ok(html.includes('&lt;old&gt;'), 'diff preview should be HTML escaped');
 
+  const approvedDecision = {
+    kind: 'ai_progress',
+    task_id: 'tsk_approval',
+    content: JSON.stringify({
+      type: 'tool_approval_decision',
+      tool: 'apply_patch',
+      approval_id: 'tap_1_1',
+      decision: 'approve',
+      status: 'approved'
+    })
+  };
+  const decidedContext = devTasks.buildContext([
+    { kind: 'ai_task', task_id: 'tsk_approval', content: '发起 AI 开发任务：改代码' },
+    approval,
+    approvedDecision
+  ]);
+  const decidedApprovalHtml = devTasks.renderMessage(approval, decidedContext);
+  assert.ok(decidedApprovalHtml.includes('apply_patch 已批准'), 'replayed approval card should show recovered approved state');
+  assert.ok(!decidedApprovalHtml.includes('data-dev-task-action="tool-approval"'), 'decided approval card should not expose approval buttons');
+
+  const deniedDecision = {
+    kind: 'ai_progress',
+    task_id: 'tsk_approval',
+    content: JSON.stringify({
+      type: 'tool_approval_decision',
+      tool: 'apply_patch',
+      approval_id: 'tap_1_1',
+      decision: 'deny',
+      status: 'denied'
+    })
+  };
+  const deniedApprovalHtml = devTasks.renderMessage(approval, devTasks.buildContext([
+    { kind: 'ai_task', task_id: 'tsk_approval', content: '发起 AI 开发任务：改代码' },
+    approval,
+    deniedDecision
+  ]));
+  assert.ok(deniedApprovalHtml.includes('apply_patch 已拒绝'), 'replayed approval card should show recovered denied state');
+  assert.ok(!deniedApprovalHtml.includes('data-dev-task-action="tool-approval"'), 'denied approval card should not expose approval buttons');
+
   const writeApproval = {
     kind: 'ai_progress',
     task_id: 'tsk_write_approval',
@@ -182,6 +249,44 @@ async function testDevTasksToolApprovalButtons() {
   assert.ok(writeHtml.includes('docs/note.md'), 'write_file approval should render file chip');
   assert.ok(writeHtml.includes('Diff 预览'), 'write_file approval should render diff preview');
   assert.ok(writeHtml.includes('&lt;new&gt;'), 'write_file diff preview should be HTML escaped');
+
+  const expiredDecision = {
+    kind: 'ai_progress',
+    task_id: 'tsk_write_approval',
+    content: JSON.stringify({
+      type: 'tool_approval_decision',
+      tool: 'write_file',
+      approval_id: 'tap_1_2',
+      decision: 'timeout',
+      status: 'expired'
+    })
+  };
+  const expiredHtml = devTasks.renderMessage(expiredDecision, devTasks.buildContext([
+    { kind: 'ai_task', task_id: 'tsk_write_approval', content: '发起 AI 开发任务：写文档' },
+    writeApproval,
+    expiredDecision
+  ]));
+  assert.ok(expiredHtml.includes('write_file 已过期'), 'expired approval decision should not look approved');
+  assert.ok(expiredHtml.includes('审批已过期'), 'expired approval decision should explain final state');
+
+  const canceledDecision = {
+    kind: 'ai_progress',
+    task_id: 'tsk_write_approval',
+    content: JSON.stringify({
+      type: 'tool_approval_decision',
+      tool: 'write_file',
+      approval_id: 'tap_1_2',
+      decision: 'canceled',
+      status: 'canceled'
+    })
+  };
+  const canceledHtml = devTasks.renderMessage(writeApproval, devTasks.buildContext([
+    { kind: 'ai_task', task_id: 'tsk_write_approval', content: '发起 AI 开发任务：写文档' },
+    writeApproval,
+    canceledDecision
+  ]));
+  assert.ok(canceledHtml.includes('write_file 已取消'), 'canceled decision should close replayed approval card');
+  assert.ok(!canceledHtml.includes('data-dev-task-action="tool-approval"'), 'canceled approval card should not expose approval buttons');
 
   let handler = null;
   const buttons = [{
@@ -345,6 +450,7 @@ function testLocalAdminTokenWiring() {
 
 (async () => {
   testDevTasksContinueAction();
+  testDevTasksHasOpenPendingApproval();
   testDevTasksToolTimeline();
   await testDevTasksToolApprovalButtons();
   testProjectReadinessChecklist();

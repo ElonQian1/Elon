@@ -12,6 +12,7 @@
     function buildContext(messages) {
       continuationDrafts.clear();
       const tasks = new Map();
+      const approvals = new Map();
       (messages || []).forEach((message) => {
         const kind = messageKind(message);
         const taskId = taskIdOf(message);
@@ -29,7 +30,10 @@
         }
         const task = tasks.get(taskId);
         if (kind === 'ai_task') task.request = taskRequest(messageText(message)) || task.request;
-        if (kind === 'ai_progress') task.progressCount += 1;
+        if (kind === 'ai_progress') {
+          task.progressCount += 1;
+          rememberApprovalState(approvals, taskId, parseToolEvent(messageText(message)));
+        }
         if (kind === 'ai_result') {
           const content = messageText(message);
           task.result = message;
@@ -38,7 +42,7 @@
           task.failed = !task.canceled && /失败|错误|error|failed/i.test(content);
         }
       });
-      return { tasks };
+      return { tasks, approvals };
     }
 
     function renderMessage(message, context) {
@@ -154,17 +158,16 @@
         return renderToolApproval(message, context, event);
       }
       if (event.type === 'tool_approval_decision') {
-        const decision = clean(event.decision).toLowerCase();
-        const denied = decision === 'deny' || clean(event.status).toLowerCase() === 'denied';
+        const finalState = approvalFinalState(event);
         const tool = clean(event.tool) || 'tool';
         return cardHtml({
-          tone: denied ? 'canceled' : 'done',
+          tone: finalState.tone,
           eyebrow: '工具审批',
-          title: denied ? `${tool} 已拒绝` : `${tool} 已批准`,
+          title: `${tool} ${finalState.label}`,
           body: renderToolBody(event),
           bodyIsHtml: true,
           taskId,
-          meta: denied ? '工具不会执行' : '继续执行工具',
+          meta: finalState.meta,
           actions: true,
           canCancel: !!taskId && !(task && task.result)
         });
@@ -190,17 +193,19 @@
       const task = taskId ? context.tasks.get(taskId) : null;
       const tool = clean(event.tool) || 'tool';
       const approvalId = clean(event.approval_id);
+      const recoveredState = approvalStateFor(context, taskId, approvalId);
+      const closed = recoveredState && recoveredState.status !== 'pending';
       return cardHtml({
-        tone: 'approval',
+        tone: closed ? recoveredState.tone : 'approval',
         eyebrow: '工具审批',
-        title: `确认 ${tool}`,
+        title: closed ? `${tool} ${recoveredState.label}` : `确认 ${tool}`,
         body: renderApprovalBody(event),
         bodyIsHtml: true,
         taskId,
-        meta: '批准前不会执行',
+        meta: closed ? recoveredState.meta : '批准前不会执行',
         actions: true,
         canCancel: !!taskId && !(task && task.result),
-        approval: approvalId ? { approvalId } : null
+        approval: approvalId && !closed ? { approvalId } : null
       });
     }
 
@@ -334,6 +339,49 @@
       } catch (_) {
         return null;
       }
+    }
+
+    function rememberApprovalState(approvals, taskId, event) {
+      if (!approvals || !event || !taskId) return;
+      const approvalId = clean(event.approval_id);
+      if (!approvalId) return;
+      const key = approvalKey(taskId, approvalId);
+      if (event.type === 'tool_approval_required') {
+        if (!approvals.has(key)) {
+          approvals.set(key, { status: 'pending', tool: clean(event.tool), tone: 'approval', label: '等待确认', meta: '批准前不会执行' });
+        }
+        return;
+      }
+      if (event.type === 'tool_approval_decision') {
+        approvals.set(key, approvalFinalState(event));
+      }
+    }
+
+    function approvalStateFor(context, taskId, approvalId) {
+      if (!context || !context.approvals || !taskId || !approvalId) return null;
+      return context.approvals.get(approvalKey(taskId, approvalId)) || null;
+    }
+
+    function approvalKey(taskId, approvalId) {
+      return `${clean(taskId)}:${clean(approvalId)}`;
+    }
+
+    function approvalFinalState(event) {
+      const decision = clean(event && event.decision).toLowerCase();
+      const status = clean(event && event.status).toLowerCase();
+      if (decision === 'approve' || status === 'approved') {
+        return { status: 'approved', tone: 'done', label: '已批准', meta: '继续执行工具' };
+      }
+      if (['deny', 'denied', 'reject', 'rejected'].includes(decision) || status === 'denied') {
+        return { status: 'denied', tone: 'canceled', label: '已拒绝', meta: '工具不会执行' };
+      }
+      if (decision === 'timeout' || status === 'expired') {
+        return { status: 'expired', tone: 'canceled', label: '已过期', meta: '审批已过期' };
+      }
+      if (['cancel', 'canceled', 'cancelled'].includes(decision) || ['canceled', 'cancelled'].includes(status)) {
+        return { status: 'canceled', tone: 'canceled', label: '已取消', meta: '任务已停止' };
+      }
+      return { status: 'processed', tone: 'done', label: '已处理', meta: '审批已处理' };
     }
 
     function formatToolValue(value) {

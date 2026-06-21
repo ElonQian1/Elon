@@ -1,3 +1,5 @@
+// server/src/main.rs
+
 use anyhow::Result;
 use dotenvy::dotenv;
 use std::{net::SocketAddr, sync::Arc};
@@ -129,6 +131,7 @@ mod project_storage;
 mod project_storage_git;
 mod project_store;
 mod project_task_scheduler;
+mod project_tool_approval_recovery;
 mod project_tool_approvals;
 mod project_trace_events;
 mod project_workspace_health;

@@ -3,8 +3,8 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon-stage5-approval-ack-20260621`
-- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route A `full_access` 本机门禁，避免云端字段单独触发 Codex/Copilot 沙箱绕过。
-- 当前分支：`codex/win-codex-parity-stage6-full-access-confirm-20260621`，从已发布的 `4f121db9` 继续创建。
+- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦工具审批状态恢复，避免刷新/服务内存丢失后旧审批卡 404 或重复派发。
+- 当前分支：`codex/win-codex-parity-stage7-approval-recovery-20260621`，从已发布的 `72c2e703` 继续创建。
 
 ## 已完成
 
@@ -83,15 +83,21 @@
 - 本轮已新增 `server/src/node_agent_full_access.rs`：本机持久化 `project_id + workspace_path` 完全访问授权，Route A full_access 执行前必须匹配本机授权，否则 fail-closed。
 - 本轮已在 PC 工作台注册本地项目流程里接入 `/api/full-access/grants`，用户确认完全访问后会先写入当前 PC 节点本机授权，再保存云端项目权限。
 - 本轮已通过阶段性验证：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_full_access`、`node --check server\src\assets\pc_app.js`、`node --check server\src\assets\pc_app_dev_composer.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_local_admin`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_cli_security`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`cargo fmt --manifest-path server\Cargo.toml --check`、`git diff --check`。
+- 本轮已新增 `server/src/project_tool_approval_recovery.rs`：从已持久化的 `task_events` 重放 `tool_approval_required/tool_approval_decision`，在服务端内存审批 map 丢失时恢复 pending/decided/timeout/canceled 终态。
+- 本轮已让审批 API 在 NotFound 时自动尝试恢复并重试同一决策；正常内存命中路径不增加数据库查询。
+- 本轮已让 PC 任务卡在刷新历史消息后识别同一 `task_id + approval_id` 的后续审批决定，旧审批卡显示“已批准/已拒绝/已过期/已取消”，不再渲染批准/拒绝按钮。
+- 本轮顺手修复默认项目文档 seed 列表与 `.elon/default-docs.json` manifest 不一致，补齐 AI_* 与 `.aiignore`，并更新项目文档扫描测试期望。
+- 本轮已通过阶段性验证：`node --check server\src\assets\pc_app_dev_tasks.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo test --manifest-path server\Cargo.toml tool_approval -- --nocapture`、`cargo test --manifest-path server\homecli-proto\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node project_default_docs::tests::default_docs_manifest_matches_seeded_files -- --nocapture`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node project_docs_scan::tests::project_docs_can_seed_missing_default_docs -- --nocapture`、`cargo fmt --manifest-path server\Cargo.toml --all -- --check`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
+- 本轮尝试过 `cargo test --manifest-path server\Cargo.toml` 和串行 `cargo test --manifest-path server\Cargo.toml -- --test-threads=1`；前者曾遇到 `pc_workspace_git_remote` 并发偶发失败且单跑通过，后者跑到后半段时 `%TEMP%`/C 盘空间耗尽，失败原因是“磁盘空间不足”。已清理本轮 `%TEMP%\elon-*` 临时目录约 328 个，目前 C 盘仍只剩约 200MB，不适合继续全量测试或大构建。
 
 ## 本轮小目标
 
-验证并发布 Route A 完全访问本机门禁：Codex/Copilot 只有在当前 PC 已授权该项目目录时才允许绕过沙箱。
+验证并发布审批状态恢复：服务端审批内存丢失后可从任务事件恢复，PC 历史审批卡不会重复点击。
 
 ## 待完成
 
 - 提交、推送、发布服务器和 Windows 节点包；验证 `/api/server/version`、`/api/node-agent/version`、Windows client 下载和本机 `http://127.0.0.1:7799/api/status`。
-- 下一阶段评估审批落库/恢复：目前 ACK 闭环仍是单进程内存态，服务重启或多实例审计需要持久化。
+- 下一阶段评估真正任务恢复：当前服务启动仍会把 running 任务标记为 interrupted，需要单独设计可恢复 task runner/节点重连协议。
 - 下一阶段补任务恢复和更完整的工具时间线筛选。
 
 ## 当前阻塞

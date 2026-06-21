@@ -25,7 +25,7 @@ use crate::{
     project_keys::clean_trace_id,
     project_landing,
     project_mobile::ensure_mobile_project,
-    project_tool_approvals,
+    project_tool_approval_recovery, project_tool_approvals,
     project_ws_protocol::enrich_project_ws_event,
     store::{ProjectAccess, PublicUser},
     tools,
@@ -697,7 +697,8 @@ async fn decide_channel_ai_tool_approval_response(
             "只有 AI开发 频道可以审批项目 AI 工具调用",
         );
     }
-    let claim = match project_tool_approvals::claim_decision_target(
+    let claim = match claim_channel_ai_tool_approval(
+        &state,
         &project_id,
         &channel_id,
         &task_id,
@@ -754,6 +755,40 @@ async fn decide_channel_ai_tool_approval_response(
         "status": "sent",
     }))
     .into_response()
+}
+
+fn claim_channel_ai_tool_approval(
+    state: &AppState,
+    project_id: &str,
+    channel_id: &str,
+    task_id: &str,
+    approval_id: &str,
+    decision: &str,
+) -> Result<project_tool_approvals::ToolApprovalClaim, project_tool_approvals::ToolApprovalError> {
+    match project_tool_approvals::claim_decision_target(
+        project_id,
+        channel_id,
+        task_id,
+        approval_id,
+        decision,
+    ) {
+        Err(e) if e.kind() == project_tool_approvals::ToolApprovalErrorKind::NotFound => {
+            // 服务端重启或单进程内存丢失后，用已落库的任务事件重建审批状态。
+            if let Ok(events) = state.store.list_task_events(task_id, 1000) {
+                project_tool_approval_recovery::recover_from_task_events(
+                    project_id, channel_id, task_id, &events,
+                );
+            }
+            project_tool_approvals::claim_decision_target(
+                project_id,
+                channel_id,
+                task_id,
+                approval_id,
+                decision,
+            )
+        }
+        result => result,
+    }
 }
 
 fn cancel_channel_ai_task_response(

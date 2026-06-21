@@ -27,6 +27,54 @@ const DEFAULT_PROJECT_FILES: &[DefaultProjectFile] = &[
         )),
     },
     DefaultProjectFile {
+        path: "AI_PROJECT.md",
+        title: Some("AI 项目定位"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/AI_PROJECT.md"
+        )),
+    },
+    DefaultProjectFile {
+        path: "AI_ARCHITECTURE.md",
+        title: Some("AI 架构索引"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/AI_ARCHITECTURE.md"
+        )),
+    },
+    DefaultProjectFile {
+        path: "AI_INDEX.md",
+        title: Some("AI 代码索引"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/AI_INDEX.md"
+        )),
+    },
+    DefaultProjectFile {
+        path: "AI_RULES.md",
+        title: Some("AI 规则桥接"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/AI_RULES.md"
+        )),
+    },
+    DefaultProjectFile {
+        path: "AI_TASK_TEMPLATE.md",
+        title: Some("AI 任务模板"),
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/AI_TASK_TEMPLATE.md"
+        )),
+    },
+    DefaultProjectFile {
+        path: ".aiignore",
+        title: None,
+        content: include_str!(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../default-project-docs/files/.aiignore"
+        )),
+    },
+    DefaultProjectFile {
         path: "CODEX.md",
         title: Some("Codex 桥接说明"),
         content: include_str!(concat!(

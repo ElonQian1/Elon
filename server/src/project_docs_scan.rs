@@ -483,7 +483,7 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.contains("补齐")));
-        assert_eq!(snapshot.source, "workspace");
+        assert_eq!(snapshot.source, "workspace_with_defaults");
     }
 
     #[test]

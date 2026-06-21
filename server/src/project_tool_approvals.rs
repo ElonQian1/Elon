@@ -76,9 +76,14 @@ enum ApprovalStatus {
     Decided,
 }
 
-pub(crate) fn register_required(project_id: &str, channel_id: &str, task_id: &str, event: &Value) {
+pub(crate) fn register_required(
+    project_id: &str,
+    channel_id: &str,
+    task_id: &str,
+    event: &Value,
+) -> bool {
     if event.get("type").and_then(Value::as_str) != Some("tool_approval_required") {
-        return;
+        return false;
     }
     let Some(req_id) = event
         .get("req_id")
@@ -86,7 +91,7 @@ pub(crate) fn register_required(project_id: &str, channel_id: &str, task_id: &st
         .map(str::trim)
         .filter(|value| !value.is_empty())
     else {
-        return;
+        return false;
     };
     let Some(approval_id) = event
         .get("approval_id")
@@ -94,7 +99,7 @@ pub(crate) fn register_required(project_id: &str, channel_id: &str, task_id: &st
         .map(str::trim)
         .filter(|value| !value.is_empty())
     else {
-        return;
+        return false;
     };
     let record = ToolApprovalRecord {
         project_id: project_id.to_string(),
@@ -108,10 +113,75 @@ pub(crate) fn register_required(project_id: &str, channel_id: &str, task_id: &st
     };
     if let Ok(mut approvals) = TOOL_APPROVALS.lock() {
         // 事件流可能重放同一个审批卡；已有状态不能被重置成 Pending。
-        approvals
+        let inserted = approvals
             .entry(approval_key(task_id, approval_id))
             .or_insert(record);
+        return inserted.project_id == project_id
+            && inserted.channel_id == channel_id
+            && inserted.task_id == task_id
+            && inserted.approval_id == approval_id;
     }
+    false
+}
+
+pub(crate) fn register_decision_event(
+    project_id: &str,
+    channel_id: &str,
+    task_id: &str,
+    event: &Value,
+) -> bool {
+    if event.get("type").and_then(Value::as_str) != Some("tool_approval_decision") {
+        return false;
+    }
+    let Some(approval_id) = event
+        .get("approval_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return false;
+    };
+    let Some(decision) = terminal_decision(event) else {
+        return false;
+    };
+    let req_id = event
+        .get("req_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let key = approval_key(task_id, approval_id);
+    let Ok(mut approvals) = TOOL_APPROVALS.lock() else {
+        return false;
+    };
+    if let Some(record) = approvals.get_mut(&key) {
+        if record.project_id != project_id
+            || record.channel_id != channel_id
+            || record.task_id != task_id
+            || record.approval_id != approval_id
+        {
+            return false;
+        }
+        record.status = ApprovalStatus::Decided;
+        record.decision = Some(decision);
+        return true;
+    }
+    let Some(req_id) = req_id else {
+        return false;
+    };
+    approvals.insert(
+        key,
+        ToolApprovalRecord {
+            project_id: project_id.to_string(),
+            channel_id: channel_id.to_string(),
+            task_id: task_id.to_string(),
+            req_id: req_id.to_string(),
+            approval_id: approval_id.to_string(),
+            message_id: optional_trimmed_string(event, "message_id"),
+            status: ApprovalStatus::Decided,
+            decision: Some(decision),
+        },
+    );
+    true
 }
 
 pub(crate) fn claim_decision_target(
@@ -220,6 +290,23 @@ fn normalize_decision(value: &str) -> ToolApprovalResult<String> {
             ToolApprovalErrorKind::BadRequest,
             "decision 只能是 approve 或 deny",
         )),
+    }
+}
+
+fn terminal_decision(event: &Value) -> Option<String> {
+    let raw = event
+        .get("decision")
+        .and_then(Value::as_str)
+        .or_else(|| event.get("status").and_then(Value::as_str))?
+        .trim()
+        .to_ascii_lowercase();
+    match raw.as_str() {
+        "approve" | "approved" => Some("approve".to_string()),
+        "deny" | "denied" | "reject" | "rejected" => Some("deny".to_string()),
+        // 运行时已经超时或取消时，后续点击不能重新派发；保留终态即可。
+        "timeout" | "expired" => Some("timeout".to_string()),
+        "cancel" | "canceled" | "cancelled" => Some("canceled".to_string()),
+        _ => None,
     }
 }
 
