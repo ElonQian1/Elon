@@ -1,7 +1,14 @@
 // server/src/node_agent_server_runtime.rs
 
 use crate::{
-    node_agent_runtime_events::{tool_call_chunk, tool_name, tool_result_chunk},
+    node_agent_runtime_approval::{
+        requires_tool_approval, wait_for_tool_approval, ApprovalOutcome,
+    },
+    node_agent_runtime_events::{
+        tool_approval_decision_chunk, tool_approval_id, tool_approval_required_chunk,
+        tool_call_chunk, tool_name, tool_result_chunk,
+    },
+    node_agent_tool_approval::ToolApprovalState,
     node_agent_tool_guard::{truncate_chars, ToolGuard},
 };
 use anyhow::{anyhow, bail, Context, Result};
@@ -42,6 +49,7 @@ pub(crate) async fn run_server_runtime_prompt(
     cwd: Option<&str>,
     runtime_permission: Option<&str>,
     prompt: &str,
+    approval_state: Option<ToolApprovalState>,
     cancel_rx: watch::Receiver<bool>,
     out_tx: mpsc::UnboundedSender<Message>,
 ) -> ServerRuntimeRunResult {
@@ -51,6 +59,7 @@ pub(crate) async fn run_server_runtime_prompt(
         cwd,
         runtime_permission,
         prompt,
+        approval_state,
         cancel_rx,
         out_tx,
     )
@@ -73,6 +82,7 @@ pub(crate) async fn run_api_runtime_prompt(
     cwd: Option<&str>,
     runtime_permission: Option<&str>,
     prompt: &str,
+    approval_state: Option<ToolApprovalState>,
     cancel_rx: watch::Receiver<bool>,
     out_tx: mpsc::UnboundedSender<Message>,
 ) -> ServerRuntimeRunResult {
@@ -95,6 +105,7 @@ pub(crate) async fn run_api_runtime_prompt(
         cwd,
         runtime_permission,
         prompt,
+        approval_state,
         cancel_rx,
         out_tx,
     )
@@ -145,6 +156,7 @@ async fn run_server_runtime_inner(
     cwd: Option<&str>,
     runtime_permission: Option<&str>,
     prompt: &str,
+    approval_state: Option<ToolApprovalState>,
     cancel_rx: watch::Receiver<bool>,
     out_tx: mpsc::UnboundedSender<Message>,
 ) -> Result<ServerRuntimeRunResult> {
@@ -167,6 +179,7 @@ async fn run_server_runtime_inner(
         "server-runtime",
         guard,
         prompt,
+        approval_state,
         cancel_rx,
         out_tx,
         Some("server-runtime".to_string()),
@@ -186,6 +199,7 @@ async fn run_api_runtime_inner(
     cwd: Option<&str>,
     runtime_permission: Option<&str>,
     prompt: &str,
+    approval_state: Option<ToolApprovalState>,
     cancel_rx: watch::Receiver<bool>,
     out_tx: mpsc::UnboundedSender<Message>,
 ) -> Result<ServerRuntimeRunResult> {
@@ -201,6 +215,7 @@ async fn run_api_runtime_inner(
         "api-runtime",
         guard,
         prompt,
+        approval_state,
         cancel_rx,
         out_tx,
         initial_model,
@@ -218,6 +233,7 @@ async fn run_runtime_loop<F, Fut>(
     label: &str,
     mut guard: ToolGuard,
     prompt: &str,
+    approval_state: Option<ToolApprovalState>,
     mut cancel_rx: watch::Receiver<bool>,
     out_tx: mpsc::UnboundedSender<Message>,
     initial_model: Option<String>,
@@ -292,6 +308,104 @@ where
         for (index, action) in actions.into_iter().enumerate() {
             let tool_index = index + 1;
             let tool = tool_name(&action);
+            if requires_tool_approval(&guard, &action) {
+                let approval_id = tool_approval_id(turn, tool_index);
+                let mut waiter = match approval_state.as_ref() {
+                    Some(state) => state.register(req_id, &approval_id).await,
+                    None => {
+                        let result =
+                            format!("error: {tool} approval unavailable; tool was not executed");
+                        send_chunk(
+                            &out_tx,
+                            req_id,
+                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                        );
+                        results.push(json!({
+                            "tool": tool,
+                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        }));
+                        continue;
+                    }
+                };
+                send_chunk(
+                    &out_tx,
+                    req_id,
+                    tool_approval_required_chunk(req_id, turn, tool_index, &approval_id, &action),
+                );
+                match wait_for_tool_approval(&mut waiter, &mut cancel_rx).await {
+                    ApprovalOutcome::Approved => {
+                        send_chunk(
+                            &out_tx,
+                            req_id,
+                            tool_approval_decision_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &approval_id,
+                                &tool,
+                                "approve",
+                                "approved",
+                            ),
+                        );
+                    }
+                    ApprovalOutcome::Denied(reason) => {
+                        send_chunk(
+                            &out_tx,
+                            req_id,
+                            tool_approval_decision_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &approval_id,
+                                &tool,
+                                "deny",
+                                "denied",
+                            ),
+                        );
+                        let result = format!("error: {tool} denied by user: {reason}");
+                        send_chunk(
+                            &out_tx,
+                            req_id,
+                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                        );
+                        results.push(json!({
+                            "tool": tool,
+                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        }));
+                        continue;
+                    }
+                    ApprovalOutcome::TimedOut => {
+                        send_chunk(
+                            &out_tx,
+                            req_id,
+                            tool_approval_decision_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &approval_id,
+                                &tool,
+                                "timeout",
+                                "expired",
+                            ),
+                        );
+                        let result =
+                            format!("error: {tool} approval timed out; tool was not executed");
+                        send_chunk(
+                            &out_tx,
+                            req_id,
+                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                        );
+                        results.push(json!({
+                            "tool": tool,
+                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        }));
+                        continue;
+                    }
+                    ApprovalOutcome::Canceled => {
+                        return Ok(canceled_runtime_result(label, model, &usage));
+                    }
+                }
+            }
             send_chunk(
                 &out_tx,
                 req_id,
@@ -361,6 +475,7 @@ Schema:
     {"tool": "list_dir", "path": "."},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
+    {"tool": "apply_patch", "patch": "unified diff", "check_only": false},
     {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
   ]
 }
@@ -369,7 +484,8 @@ Rules:
 - Paths must be relative to the current project workspace.
 - Prefer read-only actions first.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
-- Use write_file for intentional project files.
+- Prefer apply_patch with unified diff for intentional edits to existing project files.
+- Use write_file only when replacing a full file or creating a small new project file.
 - Use run_command only for project Git, build, format, lint, or test commands.
 - Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
 - Set done=true when no further tool action is needed.
@@ -377,7 +493,7 @@ Rules:
     .to_string();
     if read_only {
         prompt.push_str(
-            "\nCurrent mode is read-only planning. Do not request write_file or run_command.\n",
+            "\nCurrent mode is read-only planning. Do not request write_file, apply_patch, or run_command.\n",
         );
     }
     prompt
@@ -522,7 +638,19 @@ impl RuntimeUsage {
 
 #[cfg(test)]
 mod tests {
-    use super::api_runtime_config_from_lookup;
+    use super::{api_runtime_config_from_lookup, run_runtime_loop};
+    use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
+    use homecli_proto::AgentToServer;
+    use serde_json::{json, Value};
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        time::{SystemTime, UNIX_EPOCH},
+    };
+    use tokio::sync::{mpsc, watch};
+    use tokio_tungstenite::tungstenite::Message;
 
     #[test]
     fn api_runtime_config_defaults_openai_base_but_requires_model() {
@@ -558,5 +686,125 @@ mod tests {
         assert_eq!(config.api_base, "https://example.test/v1");
         assert_eq!(config.api_key, "elon-key");
         assert_eq!(config.model, "custom-model");
+    }
+
+    #[tokio::test]
+    async fn runtime_denies_write_without_executing_tool() {
+        let workspace = temp_test_dir("runtime_denies_write_without_executing_tool");
+        let target = workspace.join("blocked.txt");
+        let approval_state = ToolApprovalState::default();
+        let approval_decider = approval_state.clone();
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_for_runtime = calls.clone();
+        let req_id = "req-deny-write".to_string();
+        let runtime_req_id = req_id.clone();
+        let runtime = tokio::spawn(async move {
+            run_runtime_loop(
+                &runtime_req_id,
+                "test-runtime",
+                ToolGuard::new(workspace, Some("project_write")),
+                "write a file",
+                Some(approval_state),
+                cancel_rx,
+                out_tx,
+                Some("test-model".to_string()),
+                move |_| {
+                    let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        if call_index == 0 {
+                            Ok(chat_response(json!({
+                                "message": "need write",
+                                "done": false,
+                                "actions": [{
+                                    "tool": "write_file",
+                                    "path": "blocked.txt",
+                                    "content": "should not be written"
+                                }]
+                            })))
+                        } else {
+                            Ok(chat_response(json!({
+                                "message": "done after deny",
+                                "done": true,
+                                "actions": []
+                            })))
+                        }
+                    }
+                },
+            )
+            .await
+            .unwrap()
+        });
+
+        let approval = next_tool_event(&mut out_rx, "tool_approval_required").await;
+        assert_eq!(approval["approval_id"], "tap_1_1");
+        assert_eq!(approval["tool"], "write_file");
+        assert!(!target.exists(), "write_file must not run before approval");
+
+        assert!(approval_decider.decide(&req_id, "tap_1_1", "deny").await);
+        let denied = next_tool_event(&mut out_rx, "tool_result").await;
+        assert_eq!(denied["status"], "error");
+        assert!(denied["result"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("denied by user"));
+
+        let result = runtime.await.unwrap();
+        assert!(result.exit_ok);
+        assert!(
+            !target.exists(),
+            "denied write_file must not create the file"
+        );
+        let _ = cancel_tx.send(true);
+    }
+
+    async fn next_tool_event(
+        out_rx: &mut mpsc::UnboundedReceiver<Message>,
+        event_type: &str,
+    ) -> Value {
+        let deadline = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            while let Some(frame) = out_rx.recv().await {
+                let Message::Text(text) = frame else {
+                    continue;
+                };
+                let Ok(AgentToServer::CliChunk { text, .. }) =
+                    serde_json::from_str::<AgentToServer>(&text)
+                else {
+                    continue;
+                };
+                let Ok(value) = serde_json::from_str::<Value>(text.trim()) else {
+                    continue;
+                };
+                if value.get("type").and_then(Value::as_str) == Some(event_type) {
+                    return value;
+                }
+            }
+            panic!("event stream closed before {event_type}");
+        })
+        .await;
+        deadline.unwrap_or_else(|_| panic!("timed out waiting for {event_type}"))
+    }
+
+    fn chat_response(agent: Value) -> Value {
+        json!({
+            "model": "test-model",
+            "choices": [{
+                "message": {
+                    "content": serde_json::to_string(&agent).unwrap()
+                }
+            }]
+        })
+    }
+
+    fn temp_test_dir(name: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let path = std::env::temp_dir().join(format!("elon-{name}-{nanos}"));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).unwrap();
+        path
     }
 }

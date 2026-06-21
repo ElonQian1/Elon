@@ -2,8 +2,10 @@
 
 use crate::node_agent_tool_guard::truncate_chars;
 use serde_json::{json, Map, Value};
+use sha2::{Digest, Sha256};
 
 const MAX_EVENT_RESULT_CHARS: usize = 6_000;
+const MAX_DIFF_PREVIEW_CHARS: usize = 4_000;
 
 pub(crate) fn tool_name(action: &Value) -> String {
     action
@@ -58,6 +60,59 @@ pub(crate) fn tool_result_chunk(
     event_line(event)
 }
 
+pub(crate) fn tool_approval_id(turn: usize, index: usize) -> String {
+    format!("tap_{turn}_{index}")
+}
+
+pub(crate) fn tool_approval_required_chunk(
+    req_id: &str,
+    turn: usize,
+    index: usize,
+    approval_id: &str,
+    action: &Value,
+) -> String {
+    let tool = tool_name(action);
+    let event = json!({
+        "type": "tool_approval_required",
+        "schema": "elon.routebc.tool_approval.v1",
+        "req_id": req_id,
+        "approval_id": approval_id,
+        "tool": tool,
+        "risk": tool_risk(&tool),
+        "args": action_preview(action),
+        "diff": diff_preview(action),
+        "call_id": call_id(req_id, turn, index),
+        "turn": turn,
+        "index": index,
+        "status": "pending"
+    });
+    event_line(event)
+}
+
+pub(crate) fn tool_approval_decision_chunk(
+    req_id: &str,
+    turn: usize,
+    index: usize,
+    approval_id: &str,
+    tool: &str,
+    decision: &str,
+    status: &str,
+) -> String {
+    let event = json!({
+        "type": "tool_approval_decision",
+        "schema": "elon.routebc.tool_approval.v1",
+        "req_id": req_id,
+        "approval_id": approval_id,
+        "tool": tool,
+        "decision": decision,
+        "call_id": call_id(req_id, turn, index),
+        "turn": turn,
+        "index": index,
+        "status": status
+    });
+    event_line(event)
+}
+
 fn call_id(req_id: &str, turn: usize, index: usize) -> String {
     format!("{}:{}:{}", req_id, turn, index)
 }
@@ -91,6 +146,17 @@ fn action_preview(action: &Value) -> Value {
             }
             insert_string_field(&mut out, action, "command");
         }
+        "apply_patch" => {
+            if let Some(patch) = action.get("patch").and_then(Value::as_str) {
+                out.insert("patch_chars".to_string(), json!(patch.chars().count()));
+                out.insert("patch_sha256".to_string(), json!(sha256_hex(patch)));
+                out.insert("files".to_string(), json!(patch_touched_files(patch)));
+            }
+            if let Some(check_only) = action.get("check_only").and_then(Value::as_bool) {
+                out.insert("check_only".to_string(), json!(check_only));
+            }
+            insert_string_field(&mut out, action, "reason");
+        }
         _ => {
             for (key, value) in action.as_object().into_iter().flatten() {
                 if key == "tool" || key == "content" || out.contains_key(key) {
@@ -102,6 +168,57 @@ fn action_preview(action: &Value) -> Value {
     }
 
     Value::Object(out)
+}
+
+fn diff_preview(action: &Value) -> Value {
+    if tool_name(action) != "apply_patch" {
+        return Value::Null;
+    }
+    let Some(patch) = action.get("patch").and_then(Value::as_str) else {
+        return Value::Null;
+    };
+    let preview = truncate_chars(patch, MAX_DIFF_PREVIEW_CHARS);
+    json!({
+        "format": "unified",
+        "preview": preview,
+        "truncated": patch.chars().count() > MAX_DIFF_PREVIEW_CHARS,
+        "files": patch_touched_files(patch)
+    })
+}
+
+fn tool_risk(tool: &str) -> &'static str {
+    match tool {
+        "run_command" => "command",
+        "write_file" | "apply_patch" => "write",
+        _ => "read",
+    }
+}
+
+fn sha256_hex(text: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(text.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+fn patch_touched_files(patch: &str) -> Vec<String> {
+    let mut files = Vec::new();
+    for line in patch.lines() {
+        let Some(path) = line
+            .strip_prefix("+++ b/")
+            .or_else(|| line.strip_prefix("--- a/"))
+        else {
+            continue;
+        };
+        let path = path.trim();
+        if path == "/dev/null" || path.is_empty() || files.iter().any(|item| item == path) {
+            continue;
+        }
+        files.push(path.to_string());
+        if files.len() >= 20 {
+            break;
+        }
+    }
+    files
 }
 
 fn insert_string_field(out: &mut Map<String, Value>, action: &Value, key: &str) {
@@ -159,7 +276,7 @@ fn is_secret_key(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{tool_call_chunk, tool_result_chunk};
+    use super::{tool_approval_required_chunk, tool_call_chunk, tool_result_chunk};
     use serde_json::{json, Value};
 
     #[test]
@@ -211,5 +328,27 @@ mod tests {
         assert_eq!(event["type"], "tool_result");
         assert_eq!(event["tool"], "run_command");
         assert_eq!(event["status"], "error");
+    }
+
+    #[test]
+    fn apply_patch_preview_uses_summary_and_diff_preview() {
+        let line = tool_approval_required_chunk(
+            "req",
+            1,
+            1,
+            "tap_1_1",
+            &json!({
+                "tool": "apply_patch",
+                "patch": "diff --git a/src/main.rs b/src/main.rs\n--- a/src/main.rs\n+++ b/src/main.rs\n@@ -1 +1 @@\n-old\n+new\n",
+                "check_only": false
+            }),
+        );
+        let event: Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(event["type"], "tool_approval_required");
+        assert_eq!(event["approval_id"], "tap_1_1");
+        assert_eq!(event["args"]["files"][0], "src/main.rs");
+        assert_eq!(event["diff"]["files"][0], "src/main.rs");
+        assert!(event["args"]["patch_sha256"].as_str().unwrap().len() >= 64);
+        assert!(event["args"].get("patch").is_none());
     }
 }

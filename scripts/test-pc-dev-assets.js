@@ -119,6 +119,65 @@ function testDevTasksToolTimeline() {
   assert.ok(resultHtml.includes('exit=0'), 'tool result card should show output');
 }
 
+async function testDevTasksToolApprovalButtons() {
+  const calls = [];
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    approveTool: async (taskId, approvalId, decision) => {
+      calls.push({ taskId, approvalId, decision });
+    },
+    draftContinuation: () => {}
+  });
+
+  const approval = {
+    kind: 'ai_progress',
+    task_id: 'tsk_approval',
+    content: JSON.stringify({
+      type: 'tool_approval_required',
+      tool: 'apply_patch',
+      approval_id: 'tap_1_1',
+      status: 'pending',
+      args: { files: ['src/main.rs'], patch_chars: 42 },
+      diff: { preview: '--- a/src/main.rs\\n+++ b/src/main.rs\\n-<old>\\n+new', files: ['src/main.rs'] }
+    })
+  };
+  const context = devTasks.buildContext([
+    { kind: 'ai_task', task_id: 'tsk_approval', content: '发起 AI 开发任务：改代码' },
+    approval
+  ]);
+  const html = devTasks.renderMessage(approval, context);
+
+  assert.ok(html.includes('工具审批'), 'approval event should render as approval card');
+  assert.ok(html.includes('data-dev-task-action="tool-approval"'), 'approval card should expose approval buttons');
+  assert.ok(html.includes('data-approval-id="tap_1_1"'), 'approval button should keep approval id');
+  assert.ok(html.includes('&lt;old&gt;'), 'diff preview should be HTML escaped');
+
+  let handler = null;
+  const buttons = [{
+    dataset: { taskId: 'tsk_approval', approvalId: 'tap_1_1', decision: 'approve' },
+    disabled: false,
+    addEventListener: (_event, callback) => { handler = callback; },
+    closest: () => ({ querySelectorAll: () => buttons })
+  }];
+  devTasks.bindActions({
+    querySelectorAll(selector) {
+      return selector === '[data-dev-task-action="tool-approval"]' ? buttons : [];
+    }
+  });
+  assert.ok(handler, 'bindActions should register approval click handler');
+  await handler();
+  assert.deepStrictEqual(calls, [{
+    taskId: 'tsk_approval',
+    approvalId: 'tap_1_1',
+    decision: 'approve'
+  }]);
+}
+
 function testProjectReadinessChecklist() {
   const sandbox = loadAsset('server/src/assets/pc_app_project_readiness.js');
   const create = (state) => sandbox.window.ElonPcProjectReadiness.create({
@@ -255,11 +314,17 @@ function testLocalAdminTokenWiring() {
   assert.ok(doctor.includes('localNodeApi(path, options || {})'), 'doctor project should reuse the protected local node API');
 }
 
-testDevTasksContinueAction();
-testDevTasksToolTimeline();
-testProjectReadinessChecklist();
-testDevComposerRouteLabels();
-testDevComposerForcedRoutePreference();
-testLocalAdminTokenWiring();
+(async () => {
+  testDevTasksContinueAction();
+  testDevTasksToolTimeline();
+  await testDevTasksToolApprovalButtons();
+  testProjectReadinessChecklist();
+  testDevComposerRouteLabels();
+  testDevComposerForcedRoutePreference();
+  testLocalAdminTokenWiring();
 
-console.log('pc-dev-assets tests passed');
+  console.log('pc-dev-assets tests passed');
+})().catch((error) => {
+  console.error(error);
+  process.exit(1);
+});

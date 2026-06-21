@@ -128,6 +128,7 @@ mod project_storage;
 mod project_storage_git;
 mod project_store;
 mod project_task_scheduler;
+mod project_tool_approvals;
 mod project_trace_events;
 mod project_workspace_health;
 mod project_workspace_health_monitor;

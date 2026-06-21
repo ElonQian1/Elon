@@ -82,6 +82,17 @@ impl ToolGuard {
                 let content = required_str(action, "content")?;
                 self.write_file(path, content).await
             }
+            "apply_patch" => {
+                if self.read_only() {
+                    bail!("apply_patch denied: read-only planning mode");
+                }
+                let patch = required_str(action, "patch")?;
+                let check_only = action
+                    .get("check_only")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                self.apply_patch(patch, check_only).await
+            }
             "run_command" => {
                 if self.read_only() {
                     bail!("run_command denied: read-only planning mode");
@@ -139,6 +150,16 @@ impl ToolGuard {
         }
         tokio::fs::write(&full, content).await?;
         Ok(format!("write_file ok: {path} ({} chars)", content.len()))
+    }
+
+    async fn apply_patch(&self, patch: &str, check_only: bool) -> Result<String> {
+        let workspace = self.workspace.clone();
+        let patch = patch.to_string();
+        tokio::task::spawn_blocking(move || {
+            crate::tools_patch::apply_patch(&workspace, &patch, check_only)
+        })
+        .await
+        .map_err(|error| anyhow!("apply_patch task failed: {error}"))?
     }
 
     async fn run_command(&self, request: &RuntimeCommandRequest) -> Result<String> {
@@ -576,6 +597,7 @@ mod tests {
     use super::{
         command_allowed, normalize_path, structured_command_allowed, RuntimeToolMode, ToolGuard,
     };
+    use serde_json::json;
     use std::path::PathBuf;
 
     #[test]
@@ -679,6 +701,93 @@ mod tests {
         assert!(ToolGuard::new(workspace.clone(), Some("unexpected")).read_only());
         assert!(!ToolGuard::new(workspace.clone(), Some("project_write")).read_only());
         assert!(!ToolGuard::new(workspace, Some("full_access")).read_only());
+    }
+
+    #[tokio::test]
+    async fn apply_patch_changes_file_in_project_write_mode() {
+        let temp = temp_test_dir("apply_patch_changes_file_in_project_write_mode");
+        let file = temp.join("note.txt");
+        std::fs::write(&file, "old\n").unwrap();
+        init_git_repo(&temp);
+        let patch = "diff --git a/note.txt b/note.txt\n--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-old\n+new\n";
+        let mut guard = ToolGuard::new(temp.clone(), Some("project_write"));
+
+        let result = guard
+            .invoke_action(&json!({
+                "tool": "apply_patch",
+                "patch": patch
+            }))
+            .await;
+
+        assert!(result.contains("补丁已应用"));
+        assert_eq!(
+            std::fs::read_to_string(&file)
+                .unwrap()
+                .replace("\r\n", "\n"),
+            "new\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_patch_check_only_does_not_change_file() {
+        let temp = temp_test_dir("apply_patch_check_only_does_not_change_file");
+        let file = temp.join("note.txt");
+        std::fs::write(&file, "old\n").unwrap();
+        init_git_repo(&temp);
+        let patch = "diff --git a/note.txt b/note.txt\n--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-old\n+new\n";
+        let mut guard = ToolGuard::new(temp.clone(), Some("project_write"));
+
+        let result = guard
+            .invoke_action(&json!({
+                "tool": "apply_patch",
+                "patch": patch,
+                "check_only": true
+            }))
+            .await;
+
+        assert!(result.contains("补丁检查通过"));
+        assert_eq!(
+            std::fs::read_to_string(&file)
+                .unwrap()
+                .replace("\r\n", "\n"),
+            "old\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn apply_patch_is_denied_in_read_only_mode() {
+        let temp = temp_test_dir("apply_patch_is_denied_in_read_only_mode");
+        init_git_repo(&temp);
+        let mut guard = ToolGuard::new(temp, None);
+
+        let result = guard
+            .invoke_action(&json!({
+                "tool": "apply_patch",
+                "patch": "diff --git a/note.txt b/note.txt\n--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-old\n+new\n"
+            }))
+            .await;
+
+        assert!(result.contains("apply_patch denied"));
+    }
+
+    fn init_git_repo(path: &std::path::Path) {
+        let status = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(path)
+            .status()
+            .unwrap();
+        assert!(status.success());
+    }
+
+    fn temp_test_dir(name: &str) -> PathBuf {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let path = std::env::temp_dir().join(format!("elon-{name}-{nanos}"));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).unwrap();
+        path
     }
 
     #[test]

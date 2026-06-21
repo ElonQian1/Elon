@@ -194,6 +194,33 @@ impl AgentManager {
         })
     }
 
+    pub async fn send_tool_approval_decision(
+        &self,
+        req_id: &str,
+        approval_id: &str,
+        decision: &str,
+    ) -> Result<()> {
+        let agents = self.agents.read().await;
+        for agent in agents.values() {
+            let has_pending_req = agent.pending.lock().await.contains_key(req_id);
+            if !has_pending_req {
+                continue;
+            }
+            agent
+                .cmd_tx
+                .send(ServerToAgent::ToolApprovalDecision {
+                    req_id: req_id.to_string(),
+                    approval_id: approval_id.to_string(),
+                    decision: decision.to_string(),
+                })
+                .map_err(|_| anyhow!("agent writer closed"))?;
+            return Ok(());
+        }
+        Err(anyhow!(
+            "pending CLI request not found for tool approval: {req_id}"
+        ))
+    }
+
     pub async fn list(&self) -> Vec<AgentSummary> {
         self.agents
             .read()

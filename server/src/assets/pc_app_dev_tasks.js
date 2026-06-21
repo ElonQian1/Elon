@@ -5,6 +5,7 @@
     const markdown = deps.markdown || {};
     const refreshActiveChannel = deps.refreshActiveChannel;
     const cancelTask = deps.cancelTask;
+    const approveTool = deps.approveTool;
     const draftContinuation = deps.draftContinuation;
     const continuationDrafts = new Map();
 
@@ -80,6 +81,30 @@
           draftContinuation(draft);
         });
       });
+      root.querySelectorAll('[data-dev-task-action="tool-approval"]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const taskId = clean(button.dataset.taskId);
+          const approvalId = clean(button.dataset.approvalId);
+          const decision = clean(button.dataset.decision);
+          if (!taskId || !approvalId || !decision || typeof approveTool !== 'function') return;
+          const wrap = button.closest('.dev-task-card-actions');
+          if (wrap) {
+            wrap.querySelectorAll('button').forEach((item) => { item.disabled = true; });
+          } else {
+            button.disabled = true;
+          }
+          try {
+            await approveTool(taskId, approvalId, decision);
+          } catch (error) {
+            window.alert(error.message || error);
+            if (wrap) {
+              wrap.querySelectorAll('button').forEach((item) => { item.disabled = false; });
+            } else {
+              button.disabled = false;
+            }
+          }
+        });
+      });
     }
 
     function hasOpenTasks(messages, context) {
@@ -125,6 +150,25 @@
     function renderToolEvent(message, context, event) {
       const taskId = taskIdOf(message);
       const task = taskId ? context.tasks.get(taskId) : null;
+      if (event.type === 'tool_approval_required') {
+        return renderToolApproval(message, context, event);
+      }
+      if (event.type === 'tool_approval_decision') {
+        const decision = clean(event.decision).toLowerCase();
+        const denied = decision === 'deny' || clean(event.status).toLowerCase() === 'denied';
+        const tool = clean(event.tool) || 'tool';
+        return cardHtml({
+          tone: denied ? 'canceled' : 'done',
+          eyebrow: '工具审批',
+          title: denied ? `${tool} 已拒绝` : `${tool} 已批准`,
+          body: renderToolBody(event),
+          bodyIsHtml: true,
+          taskId,
+          meta: denied ? '工具不会执行' : '继续执行工具',
+          actions: true,
+          canCancel: !!taskId && !(task && task.result)
+        });
+      }
       const isResult = event.type === 'tool_result';
       const failed = isResult && clean(event.status).toLowerCase() === 'error';
       const tool = clean(event.tool) || 'tool';
@@ -138,6 +182,25 @@
         meta: isResult ? (failed ? '工具返回错误' : '工具已完成') : '等待工具返回',
         actions: true,
         canCancel: !!taskId && !(task && task.result)
+      });
+    }
+
+    function renderToolApproval(message, context, event) {
+      const taskId = taskIdOf(message);
+      const task = taskId ? context.tasks.get(taskId) : null;
+      const tool = clean(event.tool) || 'tool';
+      const approvalId = clean(event.approval_id);
+      return cardHtml({
+        tone: 'approval',
+        eyebrow: '工具审批',
+        title: `确认 ${tool}`,
+        body: renderApprovalBody(event),
+        bodyIsHtml: true,
+        taskId,
+        meta: '批准前不会执行',
+        actions: true,
+        canCancel: !!taskId && !(task && task.result),
+        approval: approvalId ? { approvalId } : null
       });
     }
 
@@ -172,7 +235,8 @@
       const actions = card.actions
         ? taskActionsHtml(taskId, {
           canCancel: !!card.canCancel,
-          canContinue: !!card.continueDraft
+          canContinue: !!card.continueDraft,
+          approval: card.approval
         })
         : '';
       return `<div class="message-content dev-task-wrap">
@@ -191,13 +255,22 @@
     }
 
     function taskActionsHtml(taskId, options) {
+      const approval = options.approval && taskId
+        ? approvalButtonsHtml(taskId, options.approval.approvalId)
+        : '';
       const stop = options.canCancel && taskId
         ? `<button class="danger" type="button" data-dev-task-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>`
         : '';
       const cont = options.canContinue && taskId
         ? `<button class="primary" type="button" data-dev-task-action="continue" data-task-id="${escapeHtml(taskId)}">继续</button>`
         : '';
-      return `<div class="dev-task-card-actions">${cont}${stop}<button type="button" data-dev-task-action="refresh">刷新</button></div>`;
+      return `<div class="dev-task-card-actions">${approval}${cont}${stop}<button type="button" data-dev-task-action="refresh">刷新</button></div>`;
+    }
+
+    function approvalButtonsHtml(taskId, approvalId) {
+      if (!approvalId) return '';
+      return `<button class="primary" type="button" data-dev-task-action="tool-approval" data-decision="approve" data-task-id="${escapeHtml(taskId)}" data-approval-id="${escapeHtml(approvalId)}">批准</button>
+        <button class="danger" type="button" data-dev-task-action="tool-approval" data-decision="deny" data-task-id="${escapeHtml(taskId)}" data-approval-id="${escapeHtml(approvalId)}">拒绝</button>`;
     }
 
     function renderBody(content, allowMarkdown) {
@@ -211,6 +284,12 @@
     }
 
     function renderToolBody(event) {
+      if (event.type === 'tool_approval_decision') {
+        return `<div class="dev-tool-body">
+          <span>决定</span>
+          <pre class="dev-tool-json">${escapeHtml(clean(event.decision) || clean(event.status) || '已处理')}</pre>
+        </div>`;
+      }
       if (event.type === 'tool_call') {
         return `<div class="dev-tool-body">
           <span>参数</span>
@@ -223,13 +302,33 @@
       </div>`;
     }
 
+    function renderApprovalBody(event) {
+      const diff = event.diff || {};
+      const preview = clean(diff.preview);
+      const files = Array.isArray(event.args && event.args.files)
+        ? event.args.files.map(clean).filter(Boolean)
+        : (Array.isArray(diff.files) ? diff.files.map(clean).filter(Boolean) : []);
+      const fileLine = files.length
+        ? `<div class="dev-tool-files">${files.map((file) => `<span>${escapeHtml(file)}</span>`).join('')}</div>`
+        : '';
+      const diffHtml = preview
+        ? `<div class="dev-tool-diff"><span>Diff 预览${diff.truncated ? '（已截断）' : ''}</span><pre>${escapeHtml(preview)}</pre></div>`
+        : '';
+      return `<div class="dev-tool-body">
+        <span>待审批参数</span>
+        ${fileLine}
+        <pre class="dev-tool-json">${escapeHtml(formatToolValue(event.args || {}))}</pre>
+        ${diffHtml}
+      </div>`;
+    }
+
     function parseToolEvent(content) {
       const text = clean(content);
       if (!text || text[0] !== '{') return null;
       try {
         const event = JSON.parse(text);
         const type = clean(event && event.type);
-        if (!['tool_call', 'tool_result'].includes(type)) return null;
+        if (!['tool_call', 'tool_result', 'tool_approval_required', 'tool_approval_decision'].includes(type)) return null;
         if (!clean(event.tool)) return null;
         return event;
       } catch (_) {

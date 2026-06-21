@@ -25,6 +25,7 @@ use crate::{
     project_keys::clean_trace_id,
     project_landing,
     project_mobile::ensure_mobile_project,
+    project_tool_approvals,
     project_ws_protocol::enrich_project_ws_event,
     store::{ProjectAccess, PublicUser},
     tools,
@@ -77,6 +78,11 @@ pub struct StartChannelAiTaskRequest {
     #[serde(default, alias = "runtimeRoute", alias = "pcRoute", alias = "pc_route")]
     pub runtime_route: Option<String>,
     pub trace_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ToolApprovalDecisionRequest {
+    pub decision: String,
 }
 
 #[derive(Deserialize)]
@@ -604,6 +610,121 @@ pub async fn cancel_channel_ai_task(
     cancel_channel_ai_task_response(state, user.id, project, channel_id, task_id)
 }
 
+pub async fn decide_channel_ai_tool_approval(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, channel_id, task_id, approval_id)): Path<(String, String, String, String)>,
+    Json(req): Json<ToolApprovalDecisionRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    decide_channel_ai_tool_approval_response(
+        state,
+        project,
+        channel_id,
+        task_id,
+        approval_id,
+        req.decision,
+    )
+    .await
+}
+
+pub async fn decide_user_project_channel_ai_tool_approval(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id, channel_id, task_id, approval_id)): Path<(
+        String,
+        String,
+        String,
+        String,
+        String,
+    )>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<ToolApprovalDecisionRequest>,
+) -> Response {
+    let (_user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    decide_channel_ai_tool_approval_response(
+        state,
+        project,
+        channel_id,
+        task_id,
+        approval_id,
+        req.decision,
+    )
+    .await
+}
+
+async fn decide_channel_ai_tool_approval_response(
+    state: Arc<AppState>,
+    project: ProjectAccess,
+    channel_id: String,
+    task_id: String,
+    approval_id: String,
+    decision: String,
+) -> Response {
+    if !can_start_channel_ai(&project.role) {
+        return json_error(
+            StatusCode::FORBIDDEN,
+            "当前成员角色不能审批项目 AI 工具调用",
+        );
+    }
+    let project_id = project.id.clone();
+    let channel_kind = match state
+        .store
+        .get_project_channel_kind(&project_id, &channel_id)
+    {
+        Ok(kind) => kind,
+        Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
+    };
+    if channel_kind != "ai_development" {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "只有 AI开发 频道可以审批项目 AI 工具调用",
+        );
+    }
+    let target = match project_tool_approvals::decision_target(
+        &project_id,
+        &channel_id,
+        &task_id,
+        &approval_id,
+        &decision,
+    ) {
+        Ok(target) => target,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    if let Err(e) = state
+        .agent_manager
+        .send_tool_approval_decision(&target.req_id, &approval_id, &target.decision)
+        .await
+    {
+        return json_error(StatusCode::CONFLICT, e.to_string());
+    }
+    project_tool_approvals::mark_decided(&task_id, &approval_id, &target.decision);
+    Json(serde_json::json!({
+        "ok": true,
+        "task_id": task_id,
+        "approval_id": approval_id,
+        "decision": target.decision,
+        "status": "sent",
+    }))
+    .into_response()
+}
+
 fn cancel_channel_ai_task_response(
     state: Arc<AppState>,
     _user_id: String,
@@ -952,7 +1073,26 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     None,
                                 );
                             }
-                            "tool_call" | "tool_result" => {
+                            "tool_approval_required" => {
+                                project_tool_approvals::register_required(
+                                    &task.project_id,
+                                    &task.channel_id,
+                                    &task.task_id,
+                                    &value,
+                                );
+                                if let Ok(content) = serde_json::to_string(&value) {
+                                    let _ = task.state.store.insert_project_channel_message(
+                                        &task.project_id,
+                                        &task.channel_id,
+                                        None,
+                                        "ai_progress",
+                                        &content,
+                                        Some(&task.task_id),
+                                        None,
+                                    );
+                                }
+                            }
+                            "tool_approval_decision" | "tool_call" | "tool_result" => {
                                 if let Ok(content) = serde_json::to_string(&value) {
                                     let _ = task.state.store.insert_project_channel_message(
                                         &task.project_id,
@@ -985,6 +1125,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             }
                             "done" => {
                                 remove_channel_ai_task_control(&task.task_id);
+                                project_tool_approvals::clear_task(&task.task_id);
                                 final_reply = message.if_blank("AI 开发任务已完成。").to_string();
                                 apk_url = value
                                     .get("apk_url")
@@ -1003,6 +1144,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             }
                             "error" => {
                                 remove_channel_ai_task_control(&task.task_id);
+                                project_tool_approvals::clear_task(&task.task_id);
                                 final_status = "failed".to_string();
                                 let msg = message.if_blank("AI 开发任务失败。").to_string();
                                 final_reply = msg.clone();
@@ -1024,6 +1166,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                 changed = cancel_rx.changed() => {
                     if changed.is_ok() && *cancel_rx.borrow() {
                         runner.abort();
+                        project_tool_approvals::clear_task(&task.task_id);
                         final_status = "canceled".to_string();
                         final_reply = CHANNEL_AI_CANCEL_MESSAGE.to_string();
                         error = Some(CHANNEL_AI_CANCEL_MESSAGE.to_string());
@@ -1043,6 +1186,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         }
         let _ = runner.await;
         remove_channel_ai_task_control(&task.task_id);
+        project_tool_approvals::clear_task(&task.task_id);
         if final_reply.is_empty() {
             final_reply = "AI 开发任务已结束。".to_string();
         }

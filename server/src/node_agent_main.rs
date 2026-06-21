@@ -51,8 +51,10 @@ mod node_agent_cli_security;
 mod node_agent_local_admin;
 mod node_agent_project_picker;
 mod node_agent_proxy;
+mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
 mod node_agent_server_runtime;
+mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 #[cfg(windows)]
 mod node_client_launcher;
@@ -65,6 +67,7 @@ mod project_default_docs;
 mod project_docs_scan;
 mod project_landing;
 mod project_workspace_inspect;
+mod tools_patch;
 mod windows_doctor;
 
 // ── 配置结构 ──────────────────────────────────────────────────────────────────
@@ -790,6 +793,7 @@ async fn run_cli_prompt(
     conversation_workspace: Option<pc_workspace_provisioner::ConversationWorkspaceResult>,
     prompt: String,
     server_runtime_config: Option<crate::node_agent_server_runtime::ServerRuntimeConfig>,
+    approval_state: node_agent_tool_approval::ToolApprovalState,
     mut cancel_rx: watch::Receiver<bool>,
     out_tx: tokio::sync::mpsc::UnboundedSender<Message>,
 ) {
@@ -819,6 +823,7 @@ async fn run_cli_prompt(
             cwd.as_deref(),
             runtime_permission.as_deref(),
             &prompt,
+            Some(approval_state.clone()),
             cancel_rx,
             out_tx.clone(),
         )
@@ -849,6 +854,7 @@ async fn run_cli_prompt(
                     cwd.as_deref(),
                     runtime_permission.as_deref(),
                     &prompt,
+                    Some(approval_state.clone()),
                     cancel_rx,
                     out_tx.clone(),
                 )
@@ -1934,6 +1940,7 @@ async fn run_session(
                                         server_url: rt_c.cloud_http_url(),
                                         user_token: rt_c.user_token().await,
                                     }),
+                                    rt_c.tool_approvals.clone(),
                                     cancel_rx,
                                     tx_c,
                                 )
@@ -1947,6 +1954,26 @@ async fn run_session(
                                 info!("🛑 已请求取消 CLI prompt: {}", task_id);
                             } else {
                                 warn!("🛑 未找到可取消的 CLI prompt: {}", task_id);
+                            }
+                        }
+                        ServerToAgent::ToolApprovalDecision {
+                            req_id,
+                            approval_id,
+                            decision,
+                        } => {
+                            let accepted = runtime
+                                .decide_tool_approval(&req_id, &approval_id, &decision)
+                                .await;
+                            if accepted {
+                                info!(
+                                    "✅ 已接收工具审批决定: req_id={}, approval_id={}, decision={}",
+                                    req_id, approval_id, decision
+                                );
+                            } else {
+                                warn!(
+                                    "⚠️ 工具审批决定未匹配到待审批调用: req_id={}, approval_id={}",
+                                    req_id, approval_id
+                                );
                             }
                         }
                         ServerToAgent::Exec {
@@ -2156,6 +2183,8 @@ pub(crate) struct NodeRuntime {
     storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     /// 正在执行的 CLI prompt 请求，用于接收云端 stop/cancel 后终止子进程。
     active_cli_prompts: RwLock<HashMap<String, watch::Sender<bool>>>,
+    /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
+    tool_approvals: node_agent_tool_approval::ToolApprovalState,
     /// 凭证变更（登录/登出）时唤醒 run_loop / 当前会话
     wake: Notify,
     /// 本机 7799 管理 API 的启动期随机授权 token，只通过本机 /api/status 暴露给 PC 工作台。
@@ -2182,6 +2211,7 @@ impl NodeRuntime {
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
             active_cli_prompts: RwLock::new(HashMap::new()),
+            tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             wake: Notify::new(),
             local_admin_token: node_agent_local_admin::generate_local_admin_token(),
         }
@@ -2221,6 +2251,12 @@ impl NodeRuntime {
     async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
         let tx = self.active_cli_prompts.read().await.get(req_id).cloned();
         tx.map(|tx| tx.send(true).is_ok()).unwrap_or(false)
+    }
+
+    async fn decide_tool_approval(&self, req_id: &str, approval_id: &str, decision: &str) -> bool {
+        self.tool_approvals
+            .decide(req_id, approval_id, decision)
+            .await
     }
 
     async fn finish_cli_prompt(&self, req_id: &str) {

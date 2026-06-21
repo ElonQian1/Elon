@@ -96,6 +96,7 @@
     clean, escapeHtml, markdown,
     refreshActiveChannel: refreshActiveProjectChannel,
     cancelTask: cancelProjectAiTask,
+    approveTool: approveProjectTool,
     draftContinuation: draftProjectAiContinuation
   });
 
@@ -1720,6 +1721,18 @@
     if (!cleanTaskId || state.activeKind !== 'project' || !state.activeProjectId || !state.activeChannelId) return;
     await api(`/api/projects/${encodeURIComponent(state.activeProjectId)}/channels/${encodeURIComponent(state.activeChannelId)}/ai-tasks/${encodeURIComponent(cleanTaskId)}/cancel`, {
       method: 'POST'
+    });
+    await refreshActiveProjectChannel();
+  }
+
+  async function approveProjectTool(taskId, approvalId, decision) {
+    const cleanTaskId = clean(taskId);
+    const cleanApprovalId = clean(approvalId);
+    const cleanDecision = clean(decision);
+    if (!cleanTaskId || !cleanApprovalId || !cleanDecision || state.activeKind !== 'project' || !state.activeProjectId || !state.activeChannelId) return;
+    await api(`/api/projects/${encodeURIComponent(state.activeProjectId)}/channels/${encodeURIComponent(state.activeChannelId)}/ai-tasks/${encodeURIComponent(cleanTaskId)}/tool-approvals/${encodeURIComponent(cleanApprovalId)}/decision`, {
+      method: 'POST',
+      body: JSON.stringify({ decision: cleanDecision })
     });
     await refreshActiveProjectChannel();
   }

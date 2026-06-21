@@ -1,3 +1,17 @@
+## 当前项目实现状态（2026-06-21）
+
+项目已经支持三条运行路线：
+
+- 路线 A：Win 节点套壳本机已有 Codex / Claude / Gemini / Copilot 等 CLI。
+- 路线 B：Win 节点使用用户本机配置的 OpenAI-compatible API key，模型调用走本机，文件读写和命令执行也在本机受控执行。
+- 路线 C：用户没有本机 CLI、也没有自己的 API key 时，Win 节点请求我们服务器提供模型能力，但文件读写和命令执行仍留在用户本机节点。
+
+Route B/C 的本机工具能力已经包含 `list_dir`、`read_file`、`write_file`、`apply_patch`、`run_command`。其中 `write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、绝对路径、`..`、越界路径和非 unified diff。
+
+这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、write_file 的真实 diff 预览、`read_file_range`、任务恢复、更细粒度 full_access 高危命令策略。
+
+---
+
 可以。更准确地说，你可以做一个 **Rust CLI**，让它在本机接收你的自然语言需求，然后调用远程 AI API 生成代码，最后由 CLI 把代码写成 `.ps1`、`.bat`、`.py`、`.sh`、`.rs` 等文件。
 
 重点是：**API key 只负责授权，不负责生成代码**。生成代码的是远程模型；你的 CLI 负责调用 API、解析返回结果、校验路径、写入文件。OpenAI 官方文档也建议通过 API key 或短期 token 做 Bearer 认证，并提醒 API key 是秘密，不要暴露在客户端代码里，最好从环境变量或密钥管理服务读取。([OpenAI开发者][1])

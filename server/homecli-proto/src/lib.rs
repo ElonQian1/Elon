@@ -182,6 +182,11 @@ pub enum ServerToAgent {
     Cancel {
         task_id: String,
     },
+    ToolApprovalDecision {
+        req_id: String,
+        approval_id: String,
+        decision: String,
+    },
     Ping {
         nonce: Option<String>,
     },

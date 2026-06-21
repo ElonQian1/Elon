@@ -31,6 +31,10 @@
   border-color: rgba(148, 155, 164, .52);
 }
 
+.dev-task-card.approval {
+  border-color: rgba(240, 178, 76, .58);
+}
+
 .dev-task-card-head {
   display: grid;
   gap: 4px;
@@ -82,6 +86,41 @@
   border: 1px solid rgba(255, 255, 255, .07);
   border-radius: 6px;
   background: #1f2229;
+  color: var(--text-soft);
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.dev-tool-files {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.dev-tool-files span {
+  max-width: 100%;
+  padding: 3px 7px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 6px;
+  background: #20232a;
+  color: var(--text-soft);
+  overflow-wrap: anywhere;
+}
+
+.dev-tool-diff {
+  display: grid;
+  gap: 7px;
+}
+
+.dev-tool-diff pre {
+  max-height: 280px;
+  overflow: auto;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid rgba(240, 178, 76, .22);
+  border-radius: 6px;
+  background: #1d2026;
   color: var(--text-soft);
   font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
   white-space: pre-wrap;

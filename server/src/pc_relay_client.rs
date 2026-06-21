@@ -365,6 +365,10 @@ async fn run_relay_session(
                 // TODO: 取消正在运行的 CLI 任务（当前忽略）
             }
 
+            ServerToAgent::ToolApprovalDecision { .. } => {
+                // Tool approval decisions are handled by the full node agent runtime.
+            }
+
             // LLM 流式推理请求 —— pc_relay_client 不处理此消息
             ServerToAgent::LlmStreamRequest { req_id, .. } => {
                 let err = AgentToServer::LlmStreamError {
