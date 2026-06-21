@@ -19,7 +19,7 @@
 - 第八轮“这条消息说得对吗”验证通过：先发送不带 `@EL` 的可见消息 `gmsg_7f808244d0084bf8b441fac80bf3e12a`，内容包含“西班牙让两球肯定赢盘、可以重注”，再调用长按 `AI回复` 后端入口；AI 回复 `gai_54627ba13175499ea2eef77085da3837` 基于 `EXT-2589467` 赔率和盘口事实纠正该说法，明确不承诺命中且提示重注风险；fb2 自动反馈 `062d14b9-bdba-4e43-a1f9-7bcd9c07b5b4` 返回 `trigger=selected_message_ai_reply`、`matched_cited_source_count=1`。
 - 主项目服务端已发布：`v0.3.552`，线上 `/api/server/version` 返回 `gitSha=4afafcd797e3b4e719d133e180d26318ff07321d`。
 - fb2 后端部署记录显示最新 AI Center 后端部署为 `f6374f27`，线上 `/health` 返回 healthy；后续 `06ce4333` 是 shop 前端/文档相关提交，不改变本轮 AI Center 后端能力。
-- 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据。
+- 主项目 live smoke 已通过：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -MainToken <123qwe主项目会话token> -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -IncludePlatformOrderSummary`，并携带 `FB2_AI_CENTER_TOKEN` 访问 fb2 live 数据；最新结果 `failed=0 skipped=0`，覆盖 `chat-bootstrap aiReply / voice composer / billing`。
 - 本轮 live smoke 已验证：主项目健康和版本、fb2 live tool manifest、Context Pack、比赛分析简报、群观点摘要、赛后复盘摘要、平台匿名订单摘要、统一工具执行 `group_opinion_summary`/`match_analysis_brief` 及其 visibility。
 - 本轮已获授权在真实群 `ext_fb2_official` 发送可见 `@EL` 联调消息，并验证“我的票”正例、本人订单引用、AI 回复计费、工具执行、source reference 匹配和 fb2 feedback 自动回写。
 - 测试账号 `123qwe` 对应 fb2 用户 `6fe5aa17-0403-427a-8e91-7f414beca35d`、主项目用户 `usr_13c9832b7cad4b26b50768fa961e0de4`；线上已配置大额测试余额 `balance_fen=1000000000`，无 `user_token_quota` 月限额行，`/api/me/balance` 已验证可见。
