@@ -96,14 +96,14 @@ async fn post_generated_answer_feedback(
     };
 
     let url = format!("{base_url}/api/main-project/context/feedback");
-    let response = state
-        .http_client
-        .post(&url)
-        .header(FB2_CONTEXT_HEADER, token.as_str())
-        .json(&payload)
-        .timeout(Duration::from_secs(timeout_secs()))
-        .send()
-        .await?;
+    let response = send_feedback_request(
+        state,
+        &url,
+        token.as_str(),
+        external_user_id.as_deref(),
+        &payload,
+    )
+    .await?;
 
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
@@ -271,6 +271,63 @@ async fn post_opinion_adoption_if_needed(
         );
     }
     Ok(())
+}
+
+async fn send_feedback_request(
+    state: &Arc<AppState>,
+    url: &str,
+    token: &str,
+    external_user_id: Option<&str>,
+    payload: &Value,
+) -> anyhow::Result<reqwest::Response> {
+    send_feedback_request_with_client(&state.http_client, url, token, external_user_id, payload)
+        .await
+}
+
+async fn send_feedback_request_with_client(
+    client: &reqwest::Client,
+    url: &str,
+    token: &str,
+    external_user_id: Option<&str>,
+    payload: &Value,
+) -> anyhow::Result<reqwest::Response> {
+    let timeout = Duration::from_secs(timeout_secs().max(10));
+    let mut request = client
+        .post(url)
+        .header(FB2_CONTEXT_HEADER, token)
+        .json(payload)
+        .timeout(timeout);
+    for (header, value) in fb2_request_context_headers(external_user_id, false) {
+        request = request.header(header, value);
+    }
+
+    match request.send().await {
+        Ok(response) => Ok(response),
+        Err(first_error) => {
+            warn!(
+                error = %first_error,
+                "fb2 generated-answer feedback callback initial send failed; retrying with fresh client"
+            );
+            let client = reqwest::Client::builder()
+                .pool_max_idle_per_host(0)
+                .build()?;
+            let mut retry = client
+                .post(url)
+                .header(FB2_CONTEXT_HEADER, token)
+                .json(payload)
+                .timeout(timeout);
+            for (header, value) in fb2_request_context_headers(external_user_id, false) {
+                retry = retry.header(header, value);
+            }
+            retry.send().await.map_err(|second_error| {
+                anyhow::anyhow!(
+                    "initial send failed: {}; retry send failed: {}",
+                    first_error,
+                    second_error
+                )
+            })
+        }
+    }
 }
 
 fn generated_answer_feedback_payload(
@@ -448,6 +505,7 @@ fn truncate_chars(value: &str, max_chars: usize) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[test]
     fn payload_mentions_sources_by_id_or_label() {
@@ -544,5 +602,66 @@ mod tests {
             mentioned_opinion_memory_ids(Some(&tool_results), "这里只总结群观点，不引用具体来源。");
 
         assert!(ids.is_empty());
+    }
+
+    #[tokio::test]
+    async fn feedback_request_retries_with_fresh_client_after_transport_error() {
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .expect("bind test listener");
+        let addr = listener.local_addr().expect("local addr");
+
+        let server = tokio::spawn(async move {
+            let (mut first_stream, _) = listener.accept().await.expect("first request");
+            let mut first_buffer = [0_u8; 1024];
+            let _ = first_stream.read(&mut first_buffer).await;
+            drop(first_stream);
+
+            let (mut second_stream, _) = listener.accept().await.expect("retry request");
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 1024];
+            loop {
+                let read = second_stream.read(&mut chunk).await.expect("read retry");
+                if read == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..read]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+
+            let request_text = String::from_utf8_lossy(&request);
+            let lower_request = request_text.to_ascii_lowercase();
+            assert!(request_text.starts_with("POST /feedback HTTP/1.1"));
+            assert!(lower_request.contains("x-fb2-ai-center-token: test-token"));
+            assert!(lower_request.contains("x-fb2-ai-context-user-id: fb2-user-1"));
+
+            let body = r#"{"success":true}"#;
+            let response = format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                body.len(),
+                body
+            );
+            second_stream
+                .write_all(response.as_bytes())
+                .await
+                .expect("write response");
+        });
+
+        let client = reqwest::Client::builder().build().expect("client");
+        let response = send_feedback_request_with_client(
+            &client,
+            &format!("http://{addr}/feedback"),
+            "test-token",
+            Some("fb2-user-1"),
+            &json!({"status": "ready"}),
+        )
+        .await
+        .expect("retried response");
+
+        assert!(response.status().is_success());
+        assert_eq!(response.text().await.expect("body"), r#"{"success":true}"#);
+        server.await.expect("server task");
     }
 }
