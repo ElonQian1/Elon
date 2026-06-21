@@ -17,7 +17,7 @@
 | tool manifest 读取 | 默认 smoke 检查 `live_tool_manifest.status=ready`、必需 tool ids、无 missing allowed tool | 已覆盖并新增必需工具清单 |
 | 工具执行和审计 | `-RequireAllScenarios` + `-CheckPermissionBoundaries` + visible chat final acceptance 的 feedback/audit evidence | 需要最终验收绑定同一批 `QualitySince` |
 | answer policy | 默认 smoke 检查 `fb2.answer_policy.v1` 和 6 个 canonical eval scenarios | 已覆盖 |
-| 可见群聊回答正文策略 | `smoke-fb2-visible-chat.ps1 -AllowVisibleMessages` 检查 `@EL` 和长按 `AI回复` 回复正文含来源、事实/观点/推断分层、风险边界，且拒绝“肯定赢盘/重注”类说法；最终 summary 输出 `visible_answer_policy_evidence` | 脚本门槛已补齐，仍需带真实 token 和写群授权跑最终验收 |
+| 可见群聊回答正文策略 | `smoke-fb2-visible-chat.ps1 -AllowVisibleMessages` 检查 `@EL` 和长按 `AI回复` 回复正文含来源、事实/观点/推断分层、风险边界，且拒绝“肯定赢盘/重注”类说法；最终 summary 输出 `visible_answer_policy_evidence` | 独立 visible smoke 已于 2026-06-22 03:04 通过：`@EL` 回复 `gai_4df8a06989b149ecadf780abc1b0914d`，长按 `AI回复` 回复 `gai_37f12f3fc7da4598a44f1b622955709d`。最终验收仍需带真实 token，把 feedback/quality/permission/voice 证据一起跑进 `smoke-fb2-final-acceptance.ps1` summary |
 | billing policy | `chat-bootstrap.billing` 验证 ASR/TTS/context fetch 免费，AI 回复生成前扣费 | 需要 authenticated bootstrap 验证 |
 | observability | `PROGRESS.md`/`handoff.md` 记录 server version、summary JSON、log path、feedback evidence、`preflight_evidence`、`final_acceptance_evidence` | 已有记录要求，最终验收未闭环 |
 
@@ -51,5 +51,5 @@
 
 - 缺真实 `FB2_AI_CENTER_TOKEN`，不能完成 live Context Pack、平台匿名摘要、质量汇总和 feedback 样本的最终验收。
 - 缺真实 fb2 真机语音证据 JSON，不能证明小米/HyperOS 等设备上主项目 `VoiceComposerView`、系统 ASR、云端兜底和 TTS 已完整可用。
-- 缺最终 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages` summary，不能把真实群聊可见消息、AI 回复、正文策略检查、source references、feedback evidence、`visible_answer_policy_evidence` 和 `final_acceptance_evidence` 绑定为同一批证据。
+- 已有独立真实群聊 visible smoke 通过，但仍缺最终 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages` summary，不能把真实群聊可见消息、AI 回复、正文策略检查、source references、feedback evidence、`visible_answer_policy_evidence` 和 `final_acceptance_evidence` 绑定为同一批证据。
 - 缺带真实 token 的 `-CheckPermissionBoundaries` 当前运行结果，不能把历史权限负向验证当成本次最终完成证据。

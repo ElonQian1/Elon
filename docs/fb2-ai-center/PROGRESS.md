@@ -10,6 +10,9 @@
 
 ## 已完成
 
+- 2026-06-22 03:04 复核主项目 git/线上/真机链路：主项目修复提交 `589d2bacf51cf4c679505da52d8ecfea1762420b`（`修复fb2群聊AI回答缺少分层边界`）已推入 `origin/main`，并包含在当前线上最新 `v0.3.585 / 4b0fb9dd363e3619faab7bf73c3ded680e1ad40e` 中。该修复在 fb2 外部上下文下对群聊 `@EL` 和长按 `AI回复` 回复做后处理兜底：如果模型漏掉短标签，会补齐 `数据事实：`、`AI推断：` 和 `风险边界：`，风险边界明确“不保证命中、不建议重注或梭哈”。本轮验证命令包括 `cargo test social_ai --bin elon-server`、`cargo test social_ai_message_reply --bin elon-server`、`cargo test external_app_context_answer_policy --bin elon-server`、pre-push `cargo check --workspace`、`publish-server.ps1`、`smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>` 和 `smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>`。
+- 2026-06-22 03:04 真实群聊可见 smoke 已通过，不再是“未验证”：账号 `123qwe` 通过 fb2 session bridge 解析为 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`，目标群 `ext_fb2_official`。`@EL` 可见消息 `gmsg_b2d834caf30c4265acd638cb3868bf21` 触发 AI 回复 `gai_4df8a06989b149ecadf780abc1b0914d`；selected-message seed `gmsg_a71960917eeb494f8993c4e43adb927d` 触发 AI 回复 `gai_37f12f3fc7da4598a44f1b622955709d`。脚本结果 `failed=0 skipped=0`，两条回复均通过来源标记、事实/推断分层、风险边界、禁止投注保证和反驳“肯定赢盘/重注”检查。
+- 2026-06-22 03:04 ADB 真机复核已把真实群聊 AI 结果带到用户端：设备 `Xiaomi 23116PN5BC` 上安装 fb2 `com.duoguan.football 1.1.48(96)`，`RECORD_AUDIO granted=true`，启动 `com.duoguan.football/.MainActivity` 无 `AndroidRuntime/FATAL`。进入“聊天 -> 🏆 夺冠体育官方群”后，聊天列表摘要显示 `数据事实：...`，群聊详情页可见 selected-message AI 回复正文包含 `数据事实`、`AI推断`、`风险边界`、`来源`、`context_audit_id` 和 `selected_message_id`；底部输入栏显示主项目式 `按住 说话`。本轮 logcat 只见 Google Play/系统网络超时和卫星电话能力探测噪声，未见 fb2 崩溃。
 - 2026-06-22 主项目回答策略继续收紧：`fb2.answer_policy.v1` 的 `prompt_answer_rules` 现在要求使用 `数据事实：`、`用户订单：`、`平台汇总：`、`群友观点：`、`AI推断：`、`风险边界：` 等短标签；凡涉及比赛、赔率、票据、推荐、预测或今日比赛讨论，至少要输出 `数据事实`、`AI推断` 和 `风险边界`，并明确赛果不确定、不保证命中、不建议重注或梭哈。群聊基础 prompt 和长按 `AI回复` prompt 同步采用该口径；可见群聊 smoke 也补了 negation-aware 的投注保证判定，避免把“不要重注/不宜稳赢”误判为诱导。已验证 `cargo fmt --check`、PowerShell 解析、`cargo test external_app_context_answer_policy --bin elon-server`、`cargo test social_ai --bin elon-server`、`cargo test social_ai_message_reply --bin elon-server`、`smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe`。
 - 2026-06-22 ADB 真机阶段验证已完成并记录到 `docs/fb2-ai-center/voice-device-evidence-20260622-adb.json`：设备 `Xiaomi 23116PN5BC / Android 16 / HyperOS OS3.0`，fb2 APK `com.duoguan.football 1.1.48(96)`，系统 ASR `com.xiaomi.mibrain.speech/.asr.AsrService`，录音权限和 appops 正常。实测进入 `夺冠体育官方群` 后可见主项目式 `按住 说话` 输入栏，文本/语音切换可用，按住后出现绿色录音气泡和 `取消 / AI回复 / 转文字 / 发送` 控制区，上滑取消可恢复，静音释放到 `转文字` 后 10 秒内回到 `按住 说话`，未复现永久卡在“识别中”。本轮没有人工语音样本，未证明 system ASR final、云端 ASR 成功、TTS 播放和余额为 0 时 ASR/TTS 免费，因此该 JSON 明确 `finalAcceptanceReady=false`，不能作为最终完成证据。
 - 2026-06-22 已用 `smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence-20260622-adb.json` 复核这份半成品证据：脚本正确通过 UI/录音相关项，并在 `tooShort`、`systemAsrSuccess`、`systemAsrTimeoutServerFallback`、`serverAsrSuccess`、`serverAsrFailureRecoversUi`、`ttsPlayback`、`asrTtsFreeWithZeroAiBalance` 7 项上失败，结果为 `failed=7 skipped=2`。这证明最终验收不会被 ADB 静音阶段证据误放行。
@@ -42,7 +45,7 @@
 - 未拿到 `FB2_AI_CENTER_TOKEN`，因此不能完成 fb2 live Context Pack、我的票、平台匿名摘要、质量汇总和反馈样本的最终验收。
 - `123qwe` 登录能桥接主项目，并且最终验收 wrapper 现在可从 `-Fb2Username/-Fb2Password` 自动解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`；authenticated `chat-bootstrap` 已验证通过。仍需用真实 `FB2_AI_CENTER_TOKEN` 确认该账号确实有可分析订单样本。
 - 未拿到真机语音证据 JSON；示例文件只能验证脚本分支，不能证明真实 APK 在小米/HyperOS 上不会卡住“识别中”。
-- 真实群聊可见入口还需要继续抽样 `@EL`、长按 `AI回复` 和总结帖入口，确认 AI 回答持续区分比赛事实、本人订单、平台汇总、群友观点和 AI 推断。
+- 真实群聊 `@EL` 和长按 `AI回复` 可见入口已在 2026-06-22 03:04 抽样通过；仍需把可见群聊、feedback、质量汇总、权限审计和完整语音证据放进 `scripts/smoke-fb2-final-acceptance.ps1` 同一批 summary 中，才能宣布终极完成。总结帖入口还需要单独抽样。
 - 多账号权限验收未完全完成：需要证明用户不能读取他人订单，平台摘要不泄露单个用户，未授权请求会被拒绝并审计。
 - 固定质量评测集仍需继续积累 feedback 样本，观察 `missing_context`、`wrong_context`、`citation_unmatched` 和大 Context Pack 比率。
 
@@ -53,6 +56,7 @@
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>
 pwsh -NoProfile -Command '$files = @("scripts\smoke-fb2-visible-chat.ps1", "scripts\smoke-fb2-final-acceptance.ps1"); foreach ($f in $files) { $parseErrors = $null; $tokens = $null; [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$tokens, [ref]$parseErrors) | Out-Null; if ($parseErrors.Count -gt 0) { exit 1 } }'
 git diff --check
 ```

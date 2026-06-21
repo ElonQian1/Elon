@@ -6,6 +6,9 @@
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-22 03:04 当前主项目远端和线上状态：`origin/main` 最新为 `4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，线上服务端为 `v0.3.585 / 4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，其中包含 fb2 群聊 AI 分层兜底修复 `589d2bacf51cf4c679505da52d8ecfea1762420b`。本轮工作树 `D:\rust\active-projects\elon-main-fb2-docs-20260621` 已 fast-forward 到 `origin/main` 并保持干净。
+- 2026-06-22 03:04 可见群聊 smoke 重新通过：`@EL` 消息 `gmsg_b2d834caf30c4265acd638cb3868bf21` -> AI 回复 `gai_4df8a06989b149ecadf780abc1b0914d`；selected-message seed `gmsg_a71960917eeb494f8993c4e43adb927d` -> AI 回复 `gai_37f12f3fc7da4598a44f1b622955709d`。`scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>` 返回 `failed=0 skipped=0`，并通过来源、事实/推断分层、风险边界、禁止投注保证和反驳“肯定赢盘/重注”的正文检查。
+- 2026-06-22 03:04 ADB 真机抽样：Xiaomi `23116PN5BC` 上 fb2 `1.1.48(96)` 可打开 `聊天 -> 🏆 夺冠体育官方群`，群列表摘要和群详情页都能看到主项目 AI 的 `数据事实 / AI推断 / 风险边界 / 来源 / context_audit_id` 分层回复，底部输入栏显示 `按住 说话`。logcat 未见 fb2 `AndroidRuntime/FATAL`；这证明真实群聊 AI 回复和主项目式输入栏已在当前 APK 可见，但仍不替代完整语音 ASR/TTS final acceptance。
 - 2026-06-22 主项目 answer policy/prompt 已进一步收紧：所有使用 fb2 外部上下文的群聊 AI 回复都应显式使用 `数据事实：`、`用户订单：`、`平台汇总：`、`群友观点：`、`AI推断：`、`风险边界：` 等短标签；涉及比赛、赔率、票据、推荐、预测或今日比赛讨论时，至少要输出 `数据事实`、`AI推断` 和 `风险边界`，风险边界必须说明赛果不确定、不保证命中、不建议重注或梭哈。长按 `AI回复` 对“肯定赢盘、稳赢、稳赚、包赢、重注、梭哈”等被选中消息会明确按过度确定/诱导投注处理；可见群聊 smoke 的投注保证判定也已改为识别否定/反驳语境，避免把“不要重注/不宜稳赢”误判为违规。
 - 2026-06-22 ADB 真机阶段验证：主项目会话在 `Xiaomi 23116PN5BC / Android 16 / HyperOS OS3.0` 上验证 fb2 APK `com.duoguan.football 1.1.48(96)`，系统 ASR 为 `com.xiaomi.mibrain.speech/.asr.AsrService`，录音权限和 appops 正常。已确认 `夺冠体育官方群` 页面具备主项目式 `按住 说话` 输入栏，文本/语音切换、绿色录音气泡、`取消 / AI回复 / 转文字 / 发送` 控制区、上滑取消和静音转文字后 UI 恢复均可用；证据文件为 `docs/fb2-ai-center/voice-device-evidence-20260622-adb.json`。该证据明确 `finalAcceptanceReady=false`，因为本轮未包含人工语音样本，尚未证明 system ASR final、云端 ASR 成功、TTS 播放和余额为 0 时 ASR/TTS 免费。
 - 2026-06-22 语音证据门槛复核：使用上述 JSON 运行 `scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence`，脚本正确通过 UI/录音项，并在 `tooShort`、system ASR final、云端 ASR 兜底、服务端 ASR 成功/失败恢复、TTS 播放、ASR/TTS 免费策略 7 项失败，结果 `failed=7 skipped=2`。这份 ADB 证据只能证明“主项目式语音 UI 已在 fb2 APK 出现且不会静音卡死”，不能替代最终真机语音完成证据。
@@ -136,6 +139,7 @@
 - 需要验证真实群聊可见入口时，必须确认用户已授权写生产群或提供沙盒群，再运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
   没有 `-AllowVisibleMessages` 时脚本必须保持失败退出；有授权执行时，脚本必须同时通过回复正文策略检查，不能只看 AI 回复消息 ID。
+- 如果只需要确认当前“可见群聊正文策略”是否仍健康，可用 `123qwe/123qwe` 跑上面的 visible smoke；如果要宣布最终完成，必须改用 `smoke-fb2-final-acceptance.ps1`，并同时提供 `FB2_AI_CENTER_TOKEN` 和完整 `VoiceDeviceEvidencePath`，让 feedback、quality、permission、APK、语音和真实群聊证据绑定到同一份 summary。
 - 最终总验收优先运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
