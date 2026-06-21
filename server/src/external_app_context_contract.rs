@@ -4,8 +4,7 @@ use serde_json::{json, Value};
 
 use crate::{
     external_app_context_answer_policy::default_answer_policy,
-    external_app_context_quality::context_quality,
-    external_app_usage_policy::default_usage_policy,
+    external_app_context_quality::context_quality, external_app_usage_policy::default_usage_policy,
 };
 
 pub(crate) fn fb2_pack_context(app_id: &str, external_group_id: &str, data: Value) -> Value {
