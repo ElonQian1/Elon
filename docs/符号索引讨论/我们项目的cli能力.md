@@ -6,9 +6,9 @@
 - 路线 B：Win 节点使用用户本机配置的 OpenAI-compatible API key，模型调用走本机，文件读写和命令执行也在本机受控执行。
 - 路线 C：用户没有本机 CLI、也没有自己的 API key 时，Win 节点请求我们服务器提供模型能力，但文件读写和命令执行仍留在用户本机节点。
 
-Route B/C 的本机工具能力已经包含 `list_dir`、`read_file`、`read_file_range`、`write_file`、`apply_patch`、`run_command`。其中 `write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
+Route B/C 的本机工具能力已经包含 `list_dir`、`read_file`、`read_file_range`、`write_file`、`apply_patch`、`run_command`。其中 `write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`write_file` 审批会展示整文件替换 diff，并在敏感路径、旧/新内容命中敏感字段、过大 diff、二进制内容或非 UTF-8 旧文件时 fail-closed；用户批准后还会复查旧文件 hash，防止审批后文件被外部进程改动。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
 
-这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、write_file 的真实 diff 预览、任务恢复、更细粒度 full_access 高危命令策略。
+这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、更细粒度 full_access 高危命令策略。
 
 ---
 

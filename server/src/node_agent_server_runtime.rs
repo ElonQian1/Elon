@@ -6,7 +6,7 @@ use crate::{
     },
     node_agent_runtime_events::{
         tool_approval_decision_chunk, tool_approval_id, tool_approval_required_chunk,
-        tool_call_chunk, tool_name, tool_result_chunk,
+        tool_approval_required_chunk_with_diff, tool_call_chunk, tool_name, tool_result_chunk,
     },
     node_agent_tool_approval::ToolApprovalState,
     node_agent_tool_guard::{truncate_chars, ToolGuard},
@@ -308,8 +308,27 @@ where
         for (index, action) in actions.into_iter().enumerate() {
             let tool_index = index + 1;
             let tool = tool_name(&action);
+            let mut approved_write_file_diff = None;
             if requires_tool_approval(&guard, &action) {
                 let approval_id = tool_approval_id(turn, tool_index);
+                let write_file_approval_diff = match guard.write_file_diff_preview(&action).await {
+                    Ok(diff) => diff,
+                    Err(error) => {
+                        let result = format!(
+                            "error: {tool} approval preview unavailable: {error}; tool was not executed"
+                        );
+                        send_chunk(
+                            &out_tx,
+                            req_id,
+                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                        );
+                        results.push(json!({
+                            "tool": tool,
+                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        }));
+                        continue;
+                    }
+                };
                 let mut waiter = match approval_state.as_ref() {
                     Some(state) => state.register(req_id, &approval_id).await,
                     None => {
@@ -330,10 +349,27 @@ where
                 send_chunk(
                     &out_tx,
                     req_id,
-                    tool_approval_required_chunk(req_id, turn, tool_index, &approval_id, &action),
+                    match write_file_approval_diff.as_ref() {
+                        Some(diff) => tool_approval_required_chunk_with_diff(
+                            req_id,
+                            turn,
+                            tool_index,
+                            &approval_id,
+                            &action,
+                            diff.clone(),
+                        ),
+                        None => tool_approval_required_chunk(
+                            req_id,
+                            turn,
+                            tool_index,
+                            &approval_id,
+                            &action,
+                        ),
+                    },
                 );
                 match wait_for_tool_approval(&mut waiter, &mut cancel_rx).await {
                     ApprovalOutcome::Approved => {
+                        approved_write_file_diff = write_file_approval_diff;
                         send_chunk(
                             &out_tx,
                             req_id,
@@ -404,6 +440,26 @@ where
                     ApprovalOutcome::Canceled => {
                         return Ok(canceled_runtime_result(label, model, &usage));
                     }
+                }
+            }
+            if let Some(diff) = approved_write_file_diff.as_ref() {
+                if let Err(error) = guard
+                    .verify_write_file_preview_unchanged(&action, diff)
+                    .await
+                {
+                    let result = format!(
+                        "error: {tool} approval preview is stale: {error}; tool was not executed"
+                    );
+                    send_chunk(
+                        &out_tx,
+                        req_id,
+                        tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                    );
+                    results.push(json!({
+                        "tool": tool,
+                        "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                    }));
+                    continue;
                 }
             }
             send_chunk(
@@ -742,6 +798,21 @@ mod tests {
         let approval = next_tool_event(&mut out_rx, "tool_approval_required").await;
         assert_eq!(approval["approval_id"], "tap_1_1");
         assert_eq!(approval["tool"], "write_file");
+        assert_eq!(approval["diff"]["source"], "write_file");
+        assert_eq!(approval["diff"]["kind"], "create");
+        assert_eq!(approval["diff"]["files"][0], "blocked.txt");
+        assert!(approval["diff"]["preview"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("--- /dev/null"));
+        assert!(
+            approval["diff"]["new_sha256"]
+                .as_str()
+                .unwrap_or_default()
+                .len()
+                >= 64
+        );
+        assert!(approval["diff"]["old_sha256"].is_null());
         assert!(!target.exists(), "write_file must not run before approval");
 
         assert!(approval_decider.decide(&req_id, "tap_1_1", "deny").await);
@@ -758,6 +829,149 @@ mod tests {
             !target.exists(),
             "denied write_file must not create the file"
         );
+        let _ = cancel_tx.send(true);
+    }
+
+    #[tokio::test]
+    async fn runtime_rejects_stale_write_file_after_approval() {
+        let workspace = temp_test_dir("runtime_rejects_stale_write_file_after_approval");
+        let target = workspace.join("note.txt");
+        tokio::fs::write(&target, "old\n").await.unwrap();
+        let approval_state = ToolApprovalState::default();
+        let approval_decider = approval_state.clone();
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_for_runtime = calls.clone();
+        let req_id = "req-stale-write".to_string();
+        let runtime_req_id = req_id.clone();
+        let runtime = tokio::spawn(async move {
+            run_runtime_loop(
+                &runtime_req_id,
+                "test-runtime",
+                ToolGuard::new(workspace, Some("project_write")),
+                "write a file",
+                Some(approval_state),
+                cancel_rx,
+                out_tx,
+                Some("test-model".to_string()),
+                move |_| {
+                    let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        if call_index == 0 {
+                            Ok(chat_response(json!({
+                                "message": "need write",
+                                "done": false,
+                                "actions": [{
+                                    "tool": "write_file",
+                                    "path": "note.txt",
+                                    "content": "new\n"
+                                }]
+                            })))
+                        } else {
+                            Ok(chat_response(json!({
+                                "message": "done after stale",
+                                "done": true,
+                                "actions": []
+                            })))
+                        }
+                    }
+                },
+            )
+            .await
+            .unwrap()
+        });
+
+        let approval = next_tool_event(&mut out_rx, "tool_approval_required").await;
+        assert!(approval["diff"]["preview"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("-old"));
+        tokio::fs::write(&target, "changed elsewhere\n")
+            .await
+            .unwrap();
+        assert!(approval_decider.decide(&req_id, "tap_1_1", "approve").await);
+
+        let stale = next_tool_event(&mut out_rx, "tool_result").await;
+        assert_eq!(stale["status"], "error");
+        assert!(stale["result"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("approval preview is stale"));
+        assert_eq!(
+            tokio::fs::read_to_string(&target).await.unwrap(),
+            "changed elsewhere\n"
+        );
+
+        let result = runtime.await.unwrap();
+        assert!(result.exit_ok);
+        let _ = cancel_tx.send(true);
+    }
+
+    #[tokio::test]
+    async fn runtime_writes_file_after_approval_when_preview_is_current() {
+        let workspace = temp_test_dir("runtime_writes_file_after_approval_when_preview_is_current");
+        let target = workspace.join("note.txt");
+        let approval_state = ToolApprovalState::default();
+        let approval_decider = approval_state.clone();
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_for_runtime = calls.clone();
+        let req_id = "req-approve-write".to_string();
+        let runtime_req_id = req_id.clone();
+        let runtime = tokio::spawn(async move {
+            run_runtime_loop(
+                &runtime_req_id,
+                "test-runtime",
+                ToolGuard::new(workspace, Some("project_write")),
+                "write a file",
+                Some(approval_state),
+                cancel_rx,
+                out_tx,
+                Some("test-model".to_string()),
+                move |_| {
+                    let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        if call_index == 0 {
+                            Ok(chat_response(json!({
+                                "message": "need write",
+                                "done": false,
+                                "actions": [{
+                                    "tool": "write_file",
+                                    "path": "note.txt",
+                                    "content": "approved\n"
+                                }]
+                            })))
+                        } else {
+                            Ok(chat_response(json!({
+                                "message": "done after approve",
+                                "done": true,
+                                "actions": []
+                            })))
+                        }
+                    }
+                },
+            )
+            .await
+            .unwrap()
+        });
+
+        let approval = next_tool_event(&mut out_rx, "tool_approval_required").await;
+        assert_eq!(approval["diff"]["kind"], "create");
+        assert!(approval_decider.decide(&req_id, "tap_1_1", "approve").await);
+
+        let tool_call = next_tool_event(&mut out_rx, "tool_call").await;
+        assert_eq!(tool_call["tool"], "write_file");
+        let tool_result = next_tool_event(&mut out_rx, "tool_result").await;
+        assert_eq!(tool_result["status"], "ok");
+        assert_eq!(
+            tokio::fs::read_to_string(&target).await.unwrap(),
+            "approved\n"
+        );
+
+        let result = runtime.await.unwrap();
+        assert!(result.exit_ok);
         let _ = cancel_tx.send(true);
     }
 

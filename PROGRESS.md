@@ -3,8 +3,8 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route B/C 的范围读取能力和补丁路径安全。
-- 当前分支：`codex/win-codex-parity-stage2-20260621`，基于最新 `origin/main` 的隔离 worktree。
+- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 Route B/C `write_file` 审批真实 diff preview 和批准后 base hash 复查。
+- 当前分支：`codex/win-codex-parity-stage3-write-diff-20260621`，基于最新 `origin/main` 的隔离 worktree。
 
 ## 已完成
 
@@ -62,16 +62,22 @@
 - 本轮已新增 `server/src/node_agent_file_range.rs`，Route B/C 支持 `read_file_range`，输出带行号片段并限制最多 400 行、24k 字符。
 - 本轮已把 `read_file_range` 接入 `ToolGuard` 和 runtime prompt，继续复用项目路径安全校验；非法 `start_line` / `line_count` fail-closed。
 - 本轮已修复 `tools_patch` 对 `.git` 路径的 Windows 大小写变体拒绝，`.GIT/config` 等路径现在会被显式拦截。
+- 上一阶段已发布 `read_file_range` 和 `.GIT` patch 安全修复，节点包 SHA `53ab0f68`，服务器后续运行 SHA 包含该提交。
+- 本轮只读子代理确认：前端已能渲染 `event.diff.preview`，缺口在后端没有给 `write_file` 填真实 diff；安全审计要求预览必须走 ToolGuard、敏感/过大/二进制 fail-closed，并在批准后复查旧文件 hash。
+- 本轮已新增 `server/src/node_agent_write_preview.rs`：为 `write_file` 生成 unified diff，包含 `old_sha256/new_sha256`，拒绝敏感路径、旧/新内容敏感字段、NUL/控制字符、过大内容、过大 diff 和非 UTF-8 旧文件。
+- 本轮已把 `write_file` diff preview 接入 `ToolGuard` 和 Route B/C runtime；审批通过后、真正写入前会重新读取旧文件并校验 `old_sha256`，不一致则拒绝执行。
+- 本轮已修复 PC agent 桥接层透传白名单，`tool_approval_required/tool_approval_decision` 会进入 `project_space` 并登记审批卡，不再只透传 `tool_call/tool_result`。
+- 本轮已补 PC 资产测试 fixture，确保 `write_file` 审批卡能显示文件 chip、Diff 预览并正确 HTML escape。
+- 本轮已通过阶段性验证：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_write_preview`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_runtime_events`、`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough`、`node --check server\src\assets\pc_app_dev_tasks.js`、`node --check scripts\test-pc-dev-assets.js`、`node scripts\test-pc-dev-assets.js`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`git diff --check`。
 
 ## 本轮小目标
 
-验证并发布 Route B/C 的 `read_file_range` 和 `tools_patch` `.git` 大小写安全修复。
+验证并发布 Route B/C 的 `write_file` 真实 diff preview、敏感/过大/二进制 fail-closed，以及批准后 base hash 复查。
 
 ## 待完成
 
 - 提交、推送、发布服务器和 Windows 节点包。
 - 验证线上版本、节点包版本、本机安装目录和本地节点状态。
-- 下一阶段实现 Route B/C `write_file` 的真实 diff preview。
 - 下一阶段修复审批并发状态机，并评估审批状态落库/恢复。
 - 下一阶段补 Route A `full_access` 的本机确认页或原生确认弹窗，不能只由云端请求字段决定。
 - 下一阶段补任务恢复和更完整的工具时间线筛选。

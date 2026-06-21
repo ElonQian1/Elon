@@ -247,6 +247,33 @@
     return title === '手机控制' || title === '聊天记忆';
   }
 
+  function normalizedProjectPathPart(value) {
+    const parts = clean(value)
+      .replace(/\\/g, '/')
+      .replace(/\/+$/g, '')
+      .split('/')
+      .filter(Boolean);
+    return clean(parts.pop()).toLowerCase();
+  }
+
+  function isDefaultJointProject(project) {
+    const title = titleOf(project);
+    if (title === '一龙网游加速器' || title === '多冠体育') return true;
+    const identifiers = new Set(['bb64a', 'fb2']);
+    const fields = [
+      project && project.name,
+      project && project.display_name,
+      project && project.displayName,
+      project && project.workspace_path,
+      project && project.workspacePath,
+      project && project.storage_repo_path,
+      project && project.storageRepoPath,
+      project && project.storage_worktree_path,
+      project && project.storageWorktreePath
+    ];
+    return fields.some((value) => identifiers.has(normalizedProjectPathPart(value)));
+  }
+
   function projectHue(project) {
     const seed = `${project.id || ''}:${titleOf(project)}`;
     let hash = 0;
@@ -479,7 +506,7 @@
 
   function aiSidebarProjects() {
     return state.projects
-      .filter((project) => project && project.id && !isSystemProject(project))
+      .filter((project) => project && project.id && !isSystemProject(project) && !isDefaultJointProject(project))
       .slice()
       .sort((left, right) => String(right.updated_at || right.updatedAt || '').localeCompare(String(left.updated_at || left.updatedAt || '')));
   }

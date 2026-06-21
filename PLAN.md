@@ -17,6 +17,7 @@
 9. 本机 CLI 执行边界：Route A 只允许已发现的 `codex` / `copilot` / `claude` / `gemini`，拒绝云端传来的任意可执行名、危险提权参数和裸 cwd；legacy relay 同步收紧。
 10. Codex Desktop 体验补齐：Route B/C 增加 `apply_patch`、diff preview、逐工具审批、超时/拒绝回传和可恢复任务。
 11. 范围读取和补丁安全：Route B/C 增加 `read_file_range`，并收紧 `apply_patch` 对 Windows `.git` 大小写变体的拒绝。
+12. `write_file` 安全审批：Route B/C 的整文件写入审批显示真实 diff，敏感/过大/二进制内容 fail-closed，批准后复查 base hash。
 
 ## 风险
 
@@ -37,6 +38,8 @@
 - `node scripts\test-pc-dev-assets.js`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_runtime_events`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_file_range`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_write_preview`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_guard`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server tools_patch`
