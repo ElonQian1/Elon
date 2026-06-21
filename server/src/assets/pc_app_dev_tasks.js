@@ -108,6 +108,8 @@
     function renderProgress(message, context) {
       const taskId = taskIdOf(message);
       const task = taskId ? context.tasks.get(taskId) : null;
+      const toolEvent = parseToolEvent(messageText(message));
+      if (toolEvent) return renderToolEvent(message, context, toolEvent);
       return cardHtml({
         tone: 'running',
         eyebrow: '执行进度',
@@ -115,6 +117,25 @@
         body: messageText(message),
         taskId,
         meta: '来自运行时',
+        actions: true,
+        canCancel: !!taskId && !(task && task.result)
+      });
+    }
+
+    function renderToolEvent(message, context, event) {
+      const taskId = taskIdOf(message);
+      const task = taskId ? context.tasks.get(taskId) : null;
+      const isResult = event.type === 'tool_result';
+      const failed = isResult && clean(event.status).toLowerCase() === 'error';
+      const tool = clean(event.tool) || 'tool';
+      return cardHtml({
+        tone: failed ? 'failed' : (isResult ? 'done' : 'running'),
+        eyebrow: isResult ? '工具结果' : '工具调用',
+        title: isResult ? `${tool} 执行结果` : `正在调用 ${tool}`,
+        body: renderToolBody(event),
+        bodyIsHtml: true,
+        taskId,
+        meta: isResult ? (failed ? '工具返回错误' : '工具已完成') : '等待工具返回',
         actions: true,
         canCancel: !!taskId && !(task && task.result)
       });
@@ -187,6 +208,42 @@
         });
       }
       return `<div class="dev-task-card-text">${escapeHtml(content || '')}</div>`;
+    }
+
+    function renderToolBody(event) {
+      if (event.type === 'tool_call') {
+        return `<div class="dev-tool-body">
+          <span>参数</span>
+          <pre class="dev-tool-json">${escapeHtml(formatToolValue(event.args || {}))}</pre>
+        </div>`;
+      }
+      return `<div class="dev-tool-body">
+        <span>${clean(event.status).toLowerCase() === 'error' ? '错误输出' : '输出'}</span>
+        <pre class="dev-tool-json">${escapeHtml(clean(event.result) || '完成')}</pre>
+      </div>`;
+    }
+
+    function parseToolEvent(content) {
+      const text = clean(content);
+      if (!text || text[0] !== '{') return null;
+      try {
+        const event = JSON.parse(text);
+        const type = clean(event && event.type);
+        if (!['tool_call', 'tool_result'].includes(type)) return null;
+        if (!clean(event.tool)) return null;
+        return event;
+      } catch (_) {
+        return null;
+      }
+    }
+
+    function formatToolValue(value) {
+      if (typeof value === 'string') return value;
+      try {
+        return JSON.stringify(value || {}, null, 2);
+      } catch (_) {
+        return String(value || '');
+      }
     }
 
     function statusForTask(task) {

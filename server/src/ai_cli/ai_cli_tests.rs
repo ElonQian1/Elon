@@ -260,6 +260,19 @@ fn stale_codex_session_output_triggers_fresh_retry() {
 }
 
 #[test]
+fn pc_cli_passthrough_keeps_tool_events_structured() {
+    let raw = r#"{"type":"tool_call","tool":"run_command","args":{"program":"git"}}"#;
+    let event = pc_cli_passthrough_event(raw).unwrap();
+    let value: serde_json::Value = serde_json::from_str(&event).unwrap();
+    assert_eq!(value["type"], "tool_call");
+    assert_eq!(value["tool"], "run_command");
+    assert_eq!(value["args"]["program"], "git");
+
+    assert!(pc_cli_passthrough_event("plain text").is_none());
+    assert!(pc_cli_passthrough_event(r#"{"type":"assistant_message","text":"hi"}"#).is_none());
+}
+
+#[test]
 fn tiny_chat_messages_use_fast_path() {
     assert!(is_tiny_chat_message("你好"));
     assert!(is_tiny_chat_message("你好！"));

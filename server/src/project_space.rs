@@ -25,6 +25,7 @@ use crate::{
     project_keys::clean_trace_id,
     project_landing,
     project_mobile::ensure_mobile_project,
+    project_ws_protocol::enrich_project_ws_event,
     store::{ProjectAccess, PublicUser},
     tools,
     types::AppState,
@@ -929,6 +930,10 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                 raw = rx.recv() => {
                     let Some(raw) = raw else { break };
                     if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
+                        let _ = task
+                            .state
+                            .store
+                            .record_task_event(&task.task_id, &enrich_project_ws_event(raw.clone(), &task.task_id));
                         let event_type = value.get("type").and_then(|v| v.as_str()).unwrap_or("");
                         let message = value
                             .get("message")
@@ -946,6 +951,37 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     Some(&task.task_id),
                                     None,
                                 );
+                            }
+                            "tool_call" | "tool_result" => {
+                                if let Ok(content) = serde_json::to_string(&value) {
+                                    let _ = task.state.store.insert_project_channel_message(
+                                        &task.project_id,
+                                        &task.channel_id,
+                                        None,
+                                        "ai_progress",
+                                        &content,
+                                        Some(&task.task_id),
+                                        None,
+                                    );
+                                }
+                            }
+                            "assistant_message" | "assistant_chunk" => {
+                                let text = value
+                                    .get("text")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .trim();
+                                if !text.is_empty() {
+                                    let _ = task.state.store.insert_project_channel_message(
+                                        &task.project_id,
+                                        &task.channel_id,
+                                        None,
+                                        "ai_progress",
+                                        text,
+                                        Some(&task.task_id),
+                                        None,
+                                    );
+                                }
                             }
                             "done" => {
                                 remove_channel_ai_task_control(&task.task_id);

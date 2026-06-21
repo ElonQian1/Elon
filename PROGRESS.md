@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：给 Win 本地 7799 管理 API 增加本机 admin token 和 trusted origin 校验，先堵住网页侧误触发高权限本机动作的缺口。
+- 本阶段目标：补齐 Route B/C 工具调用时间线，让 AI 开发频道能持久化并展示 `tool_call/tool_result`，同时继续收紧本机 `/api/status` 管理 token 暴露。
 - 当前分支：`main`，提交前需要先与最新 `origin/main` 对齐。
 
 ## 已完成
@@ -20,6 +20,10 @@
 - 已通过 `cargo test --manifest-path server\Cargo.toml --bin elon-server cli_prompt_cancel_handle_sends_cancel_for_req_id` 和 `cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`。
 - 已把 Route B `api-runtime` 接入 PC 节点真实执行链路：网页/PC 项目开发触发时可在无 Route A CLI 的情况下选择本机 OpenAI-compatible API runtime。
 - 已调整运行路线选择顺序：显式可用 CLI 优先，其次 Route A CLI，再 Route B API runtime，最后 Route C 服务器模型。
+- 本轮已新增 Route B/C 工具事件格式化模块，节点 runtime 执行 `list_dir/read_file/write_file/run_command` 前后会回传结构化 `tool_call/tool_result`。
+- 本轮已让 PC CLI 桥接层透传结构化工具事件，并让 AI 开发频道把工具事件写入 `task_events` 与 `ai_progress` 频道消息。
+- 本轮已让 PC 任务卡识别工具事件 JSON，渲染为工具调用/工具结果卡片，而不是裸露 JSON 文本。
+- 本轮已把 `/api/status` 改为只在受信任云端来源或本机同源浏览器上下文中返回 `local_admin_token`；普通无浏览器来源请求仍能看状态但拿不到管理 token。
 - 已给 Route C/server-runtime 和 Route B/api-runtime 共用的 runtime loop 接入取消信号，停止任务时不再只停 UI。
 - 已将 Route B readiness 与实际执行对齐：必须同时存在 API key 和 model，API base 可默认 `https://api.openai.com/v1`。
 - 已把 Route B/C 的本地工具权限改成只认可 `project_write` / `full_access` 两个已知值；未知权限默认只读。

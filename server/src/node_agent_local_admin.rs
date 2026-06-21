@@ -66,6 +66,15 @@ pub(crate) fn trusted_origin_header_values(cloud_http_url: &str) -> Vec<HeaderVa
         .collect()
 }
 
+pub(crate) fn can_expose_local_admin_token(headers: &HeaderMap, cloud_http_url: &str) -> bool {
+    if let Some(origin) = header_str(headers, ORIGIN.as_str()) {
+        return trusted_origins(cloud_http_url)
+            .iter()
+            .any(|trusted| trusted == origin);
+    }
+    matches!(header_str(headers, "sec-fetch-site"), Some("same-origin"))
+}
+
 fn verify_origin(headers: &HeaderMap, cloud_http_url: &str) -> Result<(), String> {
     let Some(origin) = header_str(headers, ORIGIN.as_str()) else {
         if header_str(headers, "sec-fetch-site").is_some_and(|site| site == "cross-site") {
@@ -87,14 +96,20 @@ fn trusted_origins(cloud_http_url: &str) -> Vec<String> {
         "http://43.139.149.158:8080".to_string(),
         "http://127.0.0.1:7799".to_string(),
         "http://localhost:7799".to_string(),
-        "http://127.0.0.1:8080".to_string(),
-        "http://localhost:8080".to_string(),
-        "http://127.0.0.1:3000".to_string(),
-        "http://localhost:3000".to_string(),
     ];
     if let Some(origin) = origin_from_url(cloud_http_url) {
         if !origins.iter().any(|item| item == &origin) {
             origins.push(origin);
+        }
+    }
+    for origin in std::env::var("ELON_NODE_EXTRA_TRUSTED_ORIGINS")
+        .unwrap_or_default()
+        .split(',')
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        if !origins.iter().any(|item| item == origin) {
+            origins.push(origin.to_string());
         }
     }
     origins
@@ -116,7 +131,9 @@ fn header_str<'a>(headers: &'a HeaderMap, name: &str) -> Option<&'a str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{verify_local_admin_request, LOCAL_ADMIN_TOKEN_HEADER};
+    use super::{
+        can_expose_local_admin_token, verify_local_admin_request, LOCAL_ADMIN_TOKEN_HEADER,
+    };
     use axum::http::{HeaderMap, HeaderName, HeaderValue};
 
     fn headers(token: Option<&str>, origin: Option<&str>) -> HeaderMap {
@@ -145,6 +162,34 @@ mod tests {
     fn accepts_token_without_browser_origin_for_native_tools() {
         let headers = headers(Some("secret"), None);
         assert!(verify_local_admin_request(&headers, "secret", "http://example.com").is_ok());
+    }
+
+    #[test]
+    fn status_token_exposure_requires_trusted_or_same_origin_browser_context() {
+        let trusted = headers(None, Some("http://43.139.149.158:8080"));
+        assert!(can_expose_local_admin_token(
+            &trusted,
+            "http://43.139.149.158:8080"
+        ));
+
+        let mut same_origin = headers(None, None);
+        same_origin.insert("sec-fetch-site", HeaderValue::from_static("same-origin"));
+        assert!(can_expose_local_admin_token(
+            &same_origin,
+            "http://43.139.149.158:8080"
+        ));
+
+        let native = headers(None, None);
+        assert!(!can_expose_local_admin_token(
+            &native,
+            "http://43.139.149.158:8080"
+        ));
+
+        let untrusted = headers(None, Some("http://localhost:3000"));
+        assert!(!can_expose_local_admin_token(
+            &untrusted,
+            "http://43.139.149.158:8080"
+        ));
     }
 
     #[test]

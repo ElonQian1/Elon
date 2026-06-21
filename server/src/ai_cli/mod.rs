@@ -19,6 +19,7 @@ pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionSc
 
 use anyhow::{anyhow, Result};
 use homecli_proto::{AgentToServer, CliProjectContext, CliWorkspaceStatus};
+use serde_json::Value;
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
@@ -934,6 +935,11 @@ async fn run_via_pc_agent(
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
+                if let Some(event) = pc_cli_passthrough_event(&text) {
+                    progress_handle.abort();
+                    let _ = tx.send(event);
+                    continue;
+                }
                 if is_codex {
                     // Codex 0.133+ 直接输出 AI 回复，逐行流式发送给 APK
                     // 过滤掉启动信息行（header 区域），只发有效回复内容
@@ -1160,6 +1166,18 @@ async fn run_via_pc_agent(
     );
     pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
+}
+
+fn pc_cli_passthrough_event(text: &str) -> Option<String> {
+    let trimmed = text.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let value = serde_json::from_str::<Value>(trimmed).ok()?;
+    match value.get("type").and_then(Value::as_str)? {
+        "tool_call" | "tool_result" | "usage" | "progress" => serde_json::to_string(&value).ok(),
+        _ => None,
+    }
 }
 
 fn pc_cli_progress_label(cli_name: &str) -> &'static str {

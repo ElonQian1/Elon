@@ -50,6 +50,7 @@ mod node_agent_admin_open;
 mod node_agent_local_admin;
 mod node_agent_project_picker;
 mod node_agent_proxy;
+mod node_agent_runtime_events;
 mod node_agent_server_runtime;
 mod node_agent_tool_guard;
 #[cfg(windows)]
@@ -2476,6 +2477,7 @@ async fn admin_tts_status() -> axum::Json<serde_json::Value> {
 
 async fn admin_status(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+    headers: axum::http::HeaderMap,
 ) -> axum::Json<serde_json::Value> {
     let live = discover_models(&rt.cfg).await;
     rt.set_models(live.clone()).await;
@@ -2484,9 +2486,8 @@ async fn admin_status(
     let hardware = rt.hardware_profile().await;
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
-    axum::Json(serde_json::json!({
+    let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
-        "local_admin_token": rt.local_admin_token(),
         "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
         "logged_in": creds.is_some(),
         "agent_id": creds.as_ref().map(|c| c.agent_id.clone()),
@@ -2504,7 +2505,16 @@ async fn admin_status(
         "hardware": hardware,
         "storage": storage,
         "models": live,
-    }))
+    });
+    if node_agent_local_admin::can_expose_local_admin_token(&headers, &rt.cloud_http_url()) {
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert(
+                "local_admin_token".to_string(),
+                serde_json::json!(rt.local_admin_token()),
+            );
+        }
+    }
+    axum::Json(payload)
 }
 
 #[derive(Deserialize)]

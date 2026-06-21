@@ -73,6 +73,52 @@ function testDevTasksContinueAction() {
   assert.strictEqual(devTasks.hasOpenTasks(messages, context), false, 'finished task should not be considered open');
 }
 
+function testDevTasksToolTimeline() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    draftContinuation: () => {}
+  });
+
+  const call = {
+    kind: 'ai_progress',
+    task_id: 'tsk_tools',
+    content: JSON.stringify({
+      type: 'tool_call',
+      tool: 'run_command',
+      status: 'running',
+      args: { program: 'git', args: ['status', '--short'] }
+    })
+  };
+  const result = {
+    kind: 'ai_progress',
+    task_id: 'tsk_tools',
+    content: JSON.stringify({
+      type: 'tool_result',
+      tool: 'run_command',
+      status: 'ok',
+      result: 'exit=0\\nstdout:\\n'
+    })
+  };
+  const context = devTasks.buildContext([
+    { kind: 'ai_task', task_id: 'tsk_tools', content: '发起 AI 开发任务：检查状态' },
+    call,
+    result
+  ]);
+  const callHtml = devTasks.renderMessage(call, context);
+  const resultHtml = devTasks.renderMessage(result, context);
+
+  assert.ok(callHtml.includes('工具调用'), 'tool call progress should render as tool card');
+  assert.ok(callHtml.includes('run_command'), 'tool call card should show tool name');
+  assert.ok(callHtml.includes('&quot;program&quot;: &quot;git&quot;'), 'tool call card should show escaped args');
+  assert.ok(resultHtml.includes('工具结果'), 'tool result progress should render as tool result card');
+  assert.ok(resultHtml.includes('exit=0'), 'tool result card should show output');
+}
+
 function testProjectReadinessChecklist() {
   const sandbox = loadAsset('server/src/assets/pc_app_project_readiness.js');
   const create = (state) => sandbox.window.ElonPcProjectReadiness.create({
@@ -210,6 +256,7 @@ function testLocalAdminTokenWiring() {
 }
 
 testDevTasksContinueAction();
+testDevTasksToolTimeline();
 testProjectReadinessChecklist();
 testDevComposerRouteLabels();
 testDevComposerForcedRoutePreference();

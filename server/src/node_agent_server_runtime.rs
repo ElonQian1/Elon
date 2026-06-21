@@ -1,6 +1,9 @@
 // server/src/node_agent_server_runtime.rs
 
-use crate::node_agent_tool_guard::{truncate_chars, ToolGuard};
+use crate::{
+    node_agent_runtime_events::{tool_call_chunk, tool_name, tool_result_chunk},
+    node_agent_tool_guard::{truncate_chars, ToolGuard},
+};
 use anyhow::{anyhow, bail, Context, Result};
 use homecli_proto::AgentToServer;
 use serde_json::{json, Value};
@@ -286,14 +289,20 @@ where
         }
 
         let mut results = Vec::new();
-        for action in actions {
-            let tool = action
-                .get("tool")
-                .and_then(Value::as_str)
-                .unwrap_or("unknown")
-                .to_string();
-            send_chunk(&out_tx, req_id, format!("[tool] {tool}\n"));
+        for (index, action) in actions.into_iter().enumerate() {
+            let tool_index = index + 1;
+            let tool = tool_name(&action);
+            send_chunk(
+                &out_tx,
+                req_id,
+                tool_call_chunk(req_id, turn, tool_index, &action),
+            );
             let result = guard.invoke_action(&action).await;
+            send_chunk(
+                &out_tx,
+                req_id,
+                tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+            );
             results.push(json!({
                 "tool": tool,
                 "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
