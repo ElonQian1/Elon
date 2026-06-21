@@ -1961,11 +1961,19 @@ async fn run_session(
                         ServerToAgent::ToolApprovalDecision {
                             req_id,
                             approval_id,
+                            dispatch_id,
                             decision,
                         } => {
                             let accepted = runtime
                                 .decide_tool_approval(&req_id, &approval_id, &decision)
                                 .await;
+                            let _ =
+                                out_tx_r.send(ws_text(&AgentToServer::ToolApprovalDecisionAck {
+                                    req_id: req_id.clone(),
+                                    approval_id: approval_id.clone(),
+                                    dispatch_id,
+                                    accepted,
+                                }));
                             if accepted {
                                 info!(
                                     "✅ 已接收工具审批决定: req_id={}, approval_id={}, decision={}",

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-pub const PROTO_VERSION: u32 = 2;
+pub const PROTO_VERSION: u32 = 3;
 
 /// PC 节点上报的单个模型能力描述
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -185,6 +185,9 @@ pub enum ServerToAgent {
     ToolApprovalDecision {
         req_id: String,
         approval_id: String,
+        /// 单次派发 ID。ACK 必须带回同一个 ID，避免迟到 ACK 误确认后续重试。
+        #[serde(default)]
+        dispatch_id: String,
         decision: String,
     },
     Ping {
@@ -382,6 +385,13 @@ pub enum AgentToServer {
         #[serde(default)]
         workspace_status: Option<CliWorkspaceStatus>,
     },
+    /// PC 节点确认 ToolApprovalDecision 是否已交给对应待审批调用。
+    ToolApprovalDecisionAck {
+        req_id: String,
+        approval_id: String,
+        dispatch_id: String,
+        accepted: bool,
+    },
     /// PC 节点上报本机支持的模型列表
     RegisterCapabilities {
         models: Vec<ModelCapability>,
@@ -520,6 +530,7 @@ impl AgentToServer {
             | Self::HttpError { .. }
             | Self::CliChunk { .. }
             | Self::CliDone { .. }
+            | Self::ToolApprovalDecisionAck { .. }
             | Self::RegisterCapabilities { .. }
             | Self::LlmStreamChunk { .. }
             | Self::LlmStreamEnd { .. }
@@ -567,5 +578,49 @@ impl AgentToServer {
     /// 流式消息需要保留在 pending map 中（还有后续），其余 req_id 消息在发送后删除。
     pub fn is_final_req_msg(&self) -> bool {
         !matches!(self, Self::CliChunk { .. } | Self::LlmStreamChunk { .. })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{AgentToServer, ServerToAgent};
+
+    #[test]
+    fn old_tool_approval_decision_without_dispatch_id_still_decodes() {
+        let json = r#"{
+            "type": "tool_approval_decision",
+            "req_id": "req",
+            "approval_id": "tap_1_1",
+            "decision": "approve"
+        }"#;
+
+        let msg: ServerToAgent = serde_json::from_str(json).expect("decode old decision message");
+        match msg {
+            ServerToAgent::ToolApprovalDecision {
+                req_id,
+                approval_id,
+                dispatch_id,
+                decision,
+            } => {
+                assert_eq!(req_id, "req");
+                assert_eq!(approval_id, "tap_1_1");
+                assert_eq!(dispatch_id, "");
+                assert_eq!(decision, "approve");
+            }
+            other => panic!("expected tool approval decision, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn tool_approval_ack_is_not_routed_as_req_stream_message() {
+        let msg = AgentToServer::ToolApprovalDecisionAck {
+            req_id: "req".to_string(),
+            approval_id: "tap_1_1".to_string(),
+            dispatch_id: "dispatch".to_string(),
+            accepted: true,
+        };
+
+        assert_eq!(msg.req_id(), None);
+        assert_eq!(msg.task_id(), None);
     }
 }

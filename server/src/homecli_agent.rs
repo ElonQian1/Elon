@@ -30,12 +30,14 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::types::AppState;
 
 // ── manager state ────────────────────────────────────────────────────────────
+
+const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
 
 /// Snapshot of one connected PC agent.
 #[derive(Clone)]
@@ -53,6 +55,8 @@ pub struct AgentEntry {
     cmd_tx: mpsc::UnboundedSender<ServerToAgent>,
     /// For each in-flight task: where to forward AgentToServer events.
     pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
+    /// One-shot ACK waiters keyed by req_id + approval_id + dispatch_id.
+    approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
 }
 
 pub struct CliPromptDispatch {
@@ -199,26 +203,55 @@ impl AgentManager {
         req_id: &str,
         approval_id: &str,
         decision: &str,
-    ) -> Result<()> {
-        let agents = self.agents.read().await;
-        for agent in agents.values() {
-            let has_pending_req = agent.pending.lock().await.contains_key(req_id);
-            if !has_pending_req {
-                continue;
+    ) -> Result<bool> {
+        let target = {
+            let agents = self.agents.read().await;
+            let mut target = None;
+            for agent in agents.values() {
+                let has_pending_req = agent.pending.lock().await.contains_key(req_id);
+                if !has_pending_req {
+                    continue;
+                }
+                target = Some((agent.cmd_tx.clone(), agent.approval_acks.clone()));
+                break;
             }
-            agent
-                .cmd_tx
-                .send(ServerToAgent::ToolApprovalDecision {
-                    req_id: req_id.to_string(),
-                    approval_id: approval_id.to_string(),
-                    decision: decision.to_string(),
-                })
-                .map_err(|_| anyhow!("agent writer closed"))?;
-            return Ok(());
+            target
+        };
+        let Some((cmd_tx, approval_acks)) = target else {
+            return Err(anyhow!(
+                "pending CLI request not found for tool approval: {req_id}"
+            ));
+        };
+
+        let dispatch_id = Uuid::new_v4().to_string();
+        let ack_key = tool_approval_ack_key(req_id, approval_id, &dispatch_id);
+        let (ack_tx, ack_rx) = oneshot::channel();
+        approval_acks.lock().await.insert(ack_key.clone(), ack_tx);
+        if cmd_tx
+            .send(ServerToAgent::ToolApprovalDecision {
+                req_id: req_id.to_string(),
+                approval_id: approval_id.to_string(),
+                dispatch_id,
+                decision: decision.to_string(),
+            })
+            .is_err()
+        {
+            approval_acks.lock().await.remove(&ack_key);
+            return Err(anyhow!("agent writer closed"));
         }
-        Err(anyhow!(
-            "pending CLI request not found for tool approval: {req_id}"
-        ))
+
+        match tokio::time::timeout(TOOL_APPROVAL_ACK_TIMEOUT, ack_rx).await {
+            Ok(Ok(accepted)) => Ok(accepted),
+            Ok(Err(_)) => Err(anyhow!(
+                "tool approval ack channel closed: req_id={req_id}, approval_id={approval_id}"
+            )),
+            Err(_) => {
+                approval_acks.lock().await.remove(&ack_key);
+                Err(anyhow!(
+                    "tool approval ack timeout: req_id={req_id}, approval_id={approval_id}"
+                ))
+            }
+        }
     }
 
     pub async fn list(&self) -> Vec<AgentSummary> {
@@ -755,6 +788,8 @@ async fn run_agent_session(
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
     let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
+        Arc::new(Mutex::new(HashMap::new()));
     let entry = AgentEntry {
         agent_id: agent_id.clone(),
         version,
@@ -770,6 +805,7 @@ async fn run_agent_session(
             .unwrap_or(0),
         cmd_tx: cmd_tx.clone(),
         pending: pending.clone(),
+        approval_acks: approval_acks.clone(),
     };
 
     // 若同一 agent_id 已有旧连接，通过旧 cmd_tx 发 Close 消息主动终止它，
@@ -795,6 +831,12 @@ async fn run_agent_session(
                     model: None,
                     workspace_status: None,
                 });
+            }
+            let mut old_acks = old_entry.approval_acks.lock().await;
+            let stale_acks: Vec<_> = old_acks.drain().collect();
+            drop(old_acks);
+            for (_, sender) in stale_acks {
+                let _ = sender.send(false);
             }
             // 发 Close 让旧连接的 writer 关闭 WebSocket
             let _ = old_entry.cmd_tx.send(ServerToAgent::Ping { nonce: None }); // flush any pending
@@ -869,12 +911,33 @@ async fn run_agent_session(
 
     // Reader: route AgentToServer events to the right pending task.
     let pending_r = pending.clone();
+    let approval_acks_r = approval_acks.clone();
     let read_result: Result<()> = async {
         while let Some(frame) = ws_rx.next().await {
             let frame = frame.map_err(|e| anyhow!("ws read: {e}"))?;
             match frame {
                 Message::Text(t) => match serde_json::from_str::<AgentToServer>(&t) {
                     Ok(msg) => {
+                        if let AgentToServer::ToolApprovalDecisionAck {
+                            req_id,
+                            approval_id,
+                            dispatch_id,
+                            accepted,
+                        } = &msg
+                        {
+                            let ack_key = tool_approval_ack_key(req_id, approval_id, dispatch_id);
+                            if let Some(tx) = approval_acks_r.lock().await.remove(&ack_key) {
+                                let _ = tx.send(*accepted);
+                            } else {
+                                tracing::warn!(
+                                    %req_id,
+                                    %approval_id,
+                                    %dispatch_id,
+                                    "unexpected tool approval ACK"
+                                );
+                            }
+                            continue;
+                        }
                         if let Some(task_id) = msg.task_id() {
                             let task_id = task_id.to_string();
                             let mut p = pending_r.lock().await;
@@ -1001,11 +1064,23 @@ async fn run_agent_session(
             });
         }
     }
+    {
+        let mut acks = approval_acks.lock().await;
+        let stale: Vec<_> = acks.drain().collect();
+        drop(acks);
+        for (_, sender) in stale {
+            let _ = sender.send(false);
+        }
+    }
 
     drop(cmd_tx);
     let _ = writer.await;
     tracing::info!(%agent_id, "agent disconnected");
     read_result
+}
+
+fn tool_approval_ack_key(req_id: &str, approval_id: &str, dispatch_id: &str) -> String {
+    format!("{req_id}:{approval_id}:{dispatch_id}")
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
@@ -1187,6 +1262,45 @@ pub async fn test_cli_prompt(
 mod tests {
     use super::*;
 
+    struct TestApprovalAgent {
+        manager: Arc<AgentManager>,
+        cmd_rx: mpsc::UnboundedReceiver<ServerToAgent>,
+        approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+    }
+
+    async fn registered_approval_agent() -> TestApprovalAgent {
+        let manager = Arc::new(AgentManager::new());
+        let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
+            Arc::new(Mutex::new(HashMap::new()));
+        let (pending_tx, _pending_rx) = mpsc::unbounded_channel();
+        pending.lock().await.insert("req".to_string(), pending_tx);
+        manager.agents.write().await.insert(
+            "agent".to_string(),
+            AgentEntry {
+                agent_id: "agent".to_string(),
+                version: "test".to_string(),
+                device_name: None,
+                hardware: None,
+                storage: None,
+                dev_runtime: None,
+                allowed_clis: Vec::new(),
+                allowed_cwds: Vec::new(),
+                connected_at: 0,
+                cmd_tx,
+                pending,
+                approval_acks: approval_acks.clone(),
+            },
+        );
+        TestApprovalAgent {
+            manager,
+            cmd_rx,
+            approval_acks,
+        }
+    }
+
     #[test]
     fn cli_prompt_cancel_handle_sends_cancel_for_req_id() {
         let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel();
@@ -1200,5 +1314,100 @@ mod tests {
             Ok(ServerToAgent::Cancel { task_id }) => assert_eq!(task_id, "req-123"),
             other => panic!("expected cancel message, got {other:?}"),
         }
+    }
+
+    #[tokio::test]
+    async fn tool_approval_decision_waits_for_matching_ack() {
+        let TestApprovalAgent {
+            manager,
+            mut cmd_rx,
+            approval_acks,
+        } = registered_approval_agent().await;
+
+        let manager_for_send = manager.clone();
+        let send_task = tokio::spawn(async move {
+            manager_for_send
+                .send_tool_approval_decision("req", "tap_1_1", "approve")
+                .await
+        });
+        let dispatch_id = match cmd_rx.recv().await {
+            Some(ServerToAgent::ToolApprovalDecision {
+                req_id,
+                approval_id,
+                dispatch_id,
+                decision,
+            }) => {
+                assert_eq!(req_id, "req");
+                assert_eq!(approval_id, "tap_1_1");
+                assert_eq!(decision, "approve");
+                dispatch_id
+            }
+            other => panic!("expected tool approval decision, got {other:?}"),
+        };
+        let ack_key = tool_approval_ack_key("req", "tap_1_1", &dispatch_id);
+        let ack_tx = approval_acks
+            .lock()
+            .await
+            .remove(&ack_key)
+            .expect("ack waiter should be registered");
+        ack_tx.send(true).expect("ack receiver should be live");
+
+        assert!(send_task.await.unwrap().unwrap());
+    }
+
+    #[tokio::test]
+    async fn stale_tool_approval_ack_does_not_complete_new_dispatch() {
+        let TestApprovalAgent {
+            manager,
+            mut cmd_rx,
+            approval_acks,
+        } = registered_approval_agent().await;
+
+        let manager_for_first = manager.clone();
+        let first_send = tokio::spawn(async move {
+            manager_for_first
+                .send_tool_approval_decision("req", "tap_1_1", "approve")
+                .await
+        });
+        let stale_dispatch_id = match cmd_rx.recv().await {
+            Some(ServerToAgent::ToolApprovalDecision { dispatch_id, .. }) => dispatch_id,
+            other => panic!("expected first tool approval decision, got {other:?}"),
+        };
+        let stale_key = tool_approval_ack_key("req", "tap_1_1", &stale_dispatch_id);
+        approval_acks
+            .lock()
+            .await
+            .remove(&stale_key)
+            .expect("first ack waiter should be registered");
+
+        let manager_for_retry = manager.clone();
+        let retry_send = tokio::spawn(async move {
+            manager_for_retry
+                .send_tool_approval_decision("req", "tap_1_1", "approve")
+                .await
+        });
+        let retry_dispatch_id = match cmd_rx.recv().await {
+            Some(ServerToAgent::ToolApprovalDecision { dispatch_id, .. }) => dispatch_id,
+            other => panic!("expected retry tool approval decision, got {other:?}"),
+        };
+        assert_ne!(stale_dispatch_id, retry_dispatch_id);
+
+        let stale_key = tool_approval_ack_key("req", "tap_1_1", &stale_dispatch_id);
+        assert!(
+            approval_acks.lock().await.remove(&stale_key).is_none(),
+            "stale ACK key must not match retry waiter"
+        );
+        let retry_key = tool_approval_ack_key("req", "tap_1_1", &retry_dispatch_id);
+        let retry_ack = approval_acks
+            .lock()
+            .await
+            .remove(&retry_key)
+            .expect("retry ack waiter should be registered");
+        retry_ack
+            .send(true)
+            .expect("retry ack receiver should be live");
+
+        assert!(retry_send.await.unwrap().unwrap());
+        assert!(first_send.await.unwrap().is_err());
     }
 }

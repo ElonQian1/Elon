@@ -19,6 +19,7 @@
 11. 范围读取和补丁安全：Route B/C 增加 `read_file_range`，并收紧 `apply_patch` 对 Windows `.git` 大小写变体的拒绝。
 12. `write_file` 安全审批：Route B/C 的整文件写入审批显示真实 diff，敏感/过大/二进制内容 fail-closed，批准后复查 base hash。
 13. 审批并发状态机：PC 工具审批在服务端原子认领，重复/冲突决策不会重复派发，发送失败可回滚重试。
+14. 审批 ACK 闭环：服务端派发审批决定后等待 PC 节点 ACK，只有对应 `dispatch_id` 被接受后才落为已决定，迟到 ACK、拒收和超时都可重试。
 
 ## 风险
 
@@ -31,6 +32,8 @@
 - Route A 的 `full_access` 不能只靠云端字段放大权限，后续需要本机原生确认或配对确认，避免网页/XSS 直接触发全盘级开发能力。
 - legacy relay 是兼容路径，不应承载 Route B/C 内置 runtime；若收到内置 runtime 请求必须 fail-closed，让用户升级到一龙 PC 节点客户端。
 - 目前审批状态仍是服务端内存态；本阶段先解决单进程并发竞态，后续若要支持服务重启恢复、多实例和审计追责，需要把审批记录、决策人、diff/hash 写入持久存储。
+- ACK 协议升级后，旧 PC 节点能收到审批决定但不会回 ACK，服务端会 fail-closed 并释放认领；因此发布服务器后必须刷新 Windows 节点包。
+- 新 PC 节点对旧服务器消息保留 `dispatch_id` 默认值兼容，避免节点包先更新时反序列化失败。
 
 ## 验证命令
 
@@ -41,6 +44,9 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_runtime_events`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approvals`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval`
+- `cargo test --manifest-path server\homecli-proto\Cargo.toml`
+- `cargo test --manifest-path server\Cargo.toml homecli_agent::tests::tool_approval_decision_waits_for_matching_ack`
+- `cargo test --manifest-path server\Cargo.toml homecli_agent::tests::stale_tool_approval_ack_does_not_complete_new_dispatch`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_file_range`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_write_preview`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough`

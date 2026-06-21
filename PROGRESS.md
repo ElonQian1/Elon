@@ -2,9 +2,9 @@
 
 ## 当前状态
 
-- 工作目录：`D:\rust\active-projects\elon cli`
-- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 PC 工具审批并发状态机，避免同一审批被重复 approve/deny 派发。
-- 当前分支：`codex/win-codex-parity-stage4-approval-state-20260621`，主工作区预检确认干净且与 `origin/main` 同步后直接创建。
+- 工作目录：`D:\rust\active-projects\elon-stage5-approval-ack-20260621`
+- 本阶段目标：继续把 Win 端开发能力逼近 Codex Desktop；本轮聚焦 PC 工具审批 ACK 闭环，避免服务端在节点未接收审批决定时误标为已批准。
+- 当前分支：`codex/win-codex-parity-stage5-approval-ack-20260621`，从 `origin/main` 独立 worktree 创建；当前需 rebase 最新主线后再提交发布。
 
 ## 已完成
 
@@ -75,17 +75,20 @@
 - 本轮已让 `project_space` 使用新的 claim API，并按审批错误类型返回 400/404/409；发送失败会回滚 claim 后返回冲突错误。
 - 本轮已补 PC 节点 waiter 去重测试，确认即便重复收到同一审批决定，节点侧也只消费第一次。
 - 本轮已通过阶段性验证：`cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approvals`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_denies_write_without_executing_tool`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_rejects_stale_write_file_after_approval`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node runtime_writes_file_after_approval_when_preview_is_current`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`cargo fmt --manifest-path server\Cargo.toml --check`、`git diff --check`。
+- 本轮已把 homecli 协议升级到 v3：`ToolApprovalDecision` 增加 `dispatch_id`，`ToolApprovalDecisionAck` 不走普通 `req_id` pending 路由，避免 ACK 被误当作任务最终消息。
+- 本轮已让服务端 `send_tool_approval_decision` 等待节点 ACK：只有匹配 `req_id + approval_id + dispatch_id` 且 `accepted=true` 时，`project_space` 才 `mark_decided`；节点拒收、断连或 ACK 超时都会 `mark_dispatch_failed` 并允许用户重试。
+- 本轮已给新节点兼容旧服务器审批消息：旧消息缺少 `dispatch_id` 时默认空字符串，避免节点包先更新导致反序列化失败。
+- 本轮已在 rebase 最新 `origin/main` 后通过验证：`cargo test --manifest-path server\homecli-proto\Cargo.toml`、`cargo test --manifest-path server\Cargo.toml homecli_agent::tests::tool_approval_decision_waits_for_matching_ack`、`cargo test --manifest-path server\Cargo.toml homecli_agent::tests::stale_tool_approval_ack_does_not_complete_new_dispatch`、`cargo test --manifest-path server\Cargo.toml --bin elon-server project_tool_approvals`、`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval`、`runtime_denies_write_without_executing_tool`、`runtime_rejects_stale_write_file_after_approval`、`runtime_writes_file_after_approval_when_preview_is_current`、`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`、`cargo fmt --manifest-path server\Cargo.toml --check`、`git diff --check`。
 
 ## 本轮小目标
 
-验证并发布 PC 工具审批原子认领、重复/冲突决策防重复派发、发送失败可重试。
+验证并发布 PC 工具审批 ACK 闭环：服务端派发审批决定后必须等 PC 节点确认 accepted，迟到 ACK 不得误确认后续重试。
 
 ## 待完成
 
-- 提交、推送、发布服务器。
-- 验证线上服务器版本。
-- 下一阶段评估审批 ACK/落库/恢复：服务端发送成功目前仍不等于 node-agent waiter 一定 accepted，需要协议 ACK 才能彻底确认。
-- 若后续改 PC 节点包，再发布 Windows 节点包并验证本机安装目录和本地节点状态。
+- 提交、推送、同步主线。
+- 发布服务器和 Windows 节点包；验证 `/api/server/version`、`/api/node-agent/version`、Windows client 下载和本机 `http://127.0.0.1:7799/api/status`。
+- 下一阶段评估审批落库/恢复：目前 ACK 闭环仍是单进程内存态，服务重启或多实例审计需要持久化。
 - 下一阶段补 Route A `full_access` 的本机确认页或原生确认弹窗，不能只由云端请求字段决定。
 - 下一阶段补任务恢复和更完整的工具时间线筛选。
 

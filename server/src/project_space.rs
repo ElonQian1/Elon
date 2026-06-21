@@ -729,17 +729,25 @@ async fn decide_channel_ai_tool_approval_response(
             .into_response();
         }
     };
-    if let Err(e) = state
+    let accepted = match state
         .agent_manager
         .send_tool_approval_decision(&target.req_id, &approval_id, &target.decision)
         .await
     {
+        Ok(accepted) => accepted,
+        Err(e) => {
+            project_tool_approvals::mark_dispatch_failed(&task_id, &approval_id, &target.decision);
+            return json_error(StatusCode::CONFLICT, e.to_string());
+        }
+    };
+    if !accepted {
         project_tool_approvals::mark_dispatch_failed(&task_id, &approval_id, &target.decision);
-        return json_error(StatusCode::CONFLICT, e.to_string());
+        return json_error(StatusCode::CONFLICT, "PC 节点未接受该工具审批决定，请重试");
     }
     project_tool_approvals::mark_decided(&task_id, &approval_id, &target.decision);
     Json(serde_json::json!({
         "ok": true,
+        "accepted": true,
         "task_id": task_id,
         "approval_id": approval_id,
         "decision": target.decision,
