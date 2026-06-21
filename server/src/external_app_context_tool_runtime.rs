@@ -266,7 +266,9 @@ async fn execute_fb2_tool(
         .header(FB2_CONTEXT_HEADER, token)
         .json(&payload)
         .timeout(Duration::from_secs(tool_execution_timeout_secs()));
-    for (header, value) in fb2_request_context_headers(external_user_id, false) {
+    for (header, value) in
+        fb2_request_context_headers(external_user_id, tool_requires_platform_scope(plan.name))
+    {
         request = request.header(header, value);
     }
 
@@ -337,6 +339,10 @@ async fn normalize_tool_response(
     normalize_parsed_tool_result(tool_name, reason, request_id, &parsed)
 }
 
+fn tool_requires_platform_scope(tool_name: &str) -> bool {
+    matches!(tool_name, "platform_orders")
+}
+
 fn unavailable_execution(
     execution_id: &str,
     app_id: &str,
@@ -374,4 +380,16 @@ fn unavailable_execution(
         "ready_count": 0,
         "audit": audit
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn platform_orders_tool_requires_platform_scope() {
+        assert!(tool_requires_platform_scope("platform_orders"));
+        assert!(!tool_requires_platform_scope("search_matches"));
+        assert!(!tool_requires_platform_scope("search_user_orders"));
+    }
 }
