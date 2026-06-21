@@ -278,7 +278,11 @@ async fn build_selected_reply(
     } else {
         reply.chars().take(1400).collect()
     };
-    Ok(ensure_selected_message_source(&reply, selected_message_id))
+    let reply = ensure_selected_message_source(&reply, selected_message_id);
+    Ok(ensure_current_context_audit_source(
+        &reply,
+        external_context,
+    ))
 }
 
 fn selected_message_topic_hint(selected: &SocialAiHistoryMessage) -> Option<String> {
@@ -315,6 +319,68 @@ fn ensure_selected_message_source(reply: &str, selected_message_id: &str) -> Str
         return reply.to_string();
     }
     format!("{reply}\n来源补充：selected_message_id {selected_message_id}")
+}
+
+fn ensure_current_context_audit_source(reply: &str, external_context: Option<&Value>) -> String {
+    let Some(context_audit_id) = external_context
+        .and_then(|context| context.get("context_audit_id"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    else {
+        return reply.to_string();
+    };
+
+    let reply = replace_context_audit_id_values(reply, context_audit_id);
+    if reply
+        .to_lowercase()
+        .contains(&context_audit_id.to_lowercase())
+    {
+        return reply;
+    }
+    format!("{reply}\n来源补充：context_audit_id {context_audit_id}")
+}
+
+fn replace_context_audit_id_values(reply: &str, current_context_audit_id: &str) -> String {
+    let marker = "context_audit_id";
+    let lower = reply.to_lowercase();
+    let mut out = String::with_capacity(reply.len() + current_context_audit_id.len());
+    let mut cursor = 0;
+
+    while let Some(relative_start) = lower[cursor..].find(marker) {
+        let marker_start = cursor + relative_start;
+        let marker_end = marker_start + marker.len();
+        out.push_str(&reply[cursor..marker_end]);
+
+        let mut separator_end = marker_end;
+        for (offset, ch) in reply[marker_end..].char_indices() {
+            if ch.is_whitespace() || matches!(ch, ':' | '：' | '=') {
+                separator_end = marker_end + offset + ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+        out.push_str(&reply[marker_end..separator_end]);
+
+        let mut token_end = separator_end;
+        for (offset, ch) in reply[separator_end..].char_indices() {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                token_end = separator_end + offset + ch.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        if token_end > separator_end {
+            out.push_str(current_context_audit_id);
+            cursor = token_end;
+        } else {
+            cursor = separator_end;
+        }
+    }
+
+    out.push_str(&reply[cursor..]);
+    out
 }
 
 fn mark_in_flight(key: &str) -> bool {
@@ -379,5 +445,29 @@ mod tests {
         );
 
         assert_eq!(reply.matches("gmsg-1").count(), 1);
+    }
+
+    #[test]
+    fn selected_message_reply_replaces_stale_context_audit_id() {
+        let context = json!({"context_audit_id": "current-audit-2"});
+        let reply = ensure_current_context_audit_source(
+            "这句说法风险较高。\n来源：match_id EXT-1，context_audit_id old-audit-1",
+            Some(&context),
+        );
+
+        assert!(reply.contains("context_audit_id current-audit-2"));
+        assert!(!reply.contains("old-audit-1"));
+    }
+
+    #[test]
+    fn selected_message_reply_appends_current_context_audit_id() {
+        let context = json!({"context_audit_id": "current-audit-2"});
+        let reply = ensure_current_context_audit_source(
+            "这句说法风险较高。\n来源：match_id EXT-1",
+            Some(&context),
+        );
+
+        assert!(reply.contains("来源：match_id EXT-1"));
+        assert!(reply.contains("context_audit_id current-audit-2"));
     }
 }
