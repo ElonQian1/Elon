@@ -310,6 +310,14 @@ function Find-EvalScenario {
     @($Scenarios | Where-Object { $_.id -eq $Id } | Select-Object -First 1)[0]
 }
 
+function Find-ProjectionPermission {
+    param(
+        [object[]]$Permissions,
+        [string]$Data
+    )
+    @($Permissions | Where-Object { $_.data -eq $Data } | Select-Object -First 1)[0]
+}
+
 function Assert-ScenarioContains {
     param(
         [object]$Scenario,
@@ -751,6 +759,10 @@ try {
     $projectionSectionIds = @($projectionSections | ForEach-Object { $_.id })
     $projectionSourceKinds = @($projectionContract.source_registry.required_kinds)
     $projectionAntiPatterns = @($projectionContract.anti_patterns)
+    $projectionRetrievalFields = @($projectionContract.retrieval_projection.recommended_fields)
+    $projectionPermissions = @($projectionContract.permission_projection)
+    $projectionQualityRoutes = @($projectionContract.quality_closure.required_feedback_routes)
+    $projectionReadiness = $projectionContract.quality_closure.minimum_non_synthetic_ready
     $evalScenarios = @($answerPolicy.eval_scenarios)
     $evalScenarioIds = @($evalScenarios | ForEach-Object { $_.id })
     Assert-True ($contract.live_tool_manifest.status -eq "ready") "live manifest ready" "tool_count=$($contract.live_tool_manifest.tool_count)"
@@ -821,6 +833,35 @@ try {
     Assert-ContainsValue $projectionSourceKinds "opinion_adoption" "domain projection source kind: opinion adoption"
     Assert-ContainsValue $projectionAntiPatterns "raw_embedding_dump" "domain projection anti-pattern: raw embedding dump"
     Assert-ContainsValue $projectionAntiPatterns "platform_order_detail_leak" "domain projection anti-pattern: platform order leak"
+    Assert-ContainsValue $projectionRetrievalFields "topic_hint" "domain projection retrieval field: topic hint"
+    Assert-ContainsValue $projectionRetrievalFields "match_reason" "domain projection retrieval field: match reason"
+    Assert-ContainsValue $projectionRetrievalFields "permission_scope" "domain projection retrieval field: permission scope"
+    Assert-ContainsValue $projectionRetrievalFields "truncated" "domain projection retrieval field: truncated"
+    Assert-ContainsValue $projectionQualityRoutes "/api/main-project/context/feedback" "domain projection quality route: feedback"
+    Assert-ContainsValue $projectionQualityRoutes "/api/main-project/context/feedback-summary" "domain projection quality route: feedback summary"
+    Assert-ContainsValue $projectionQualityRoutes "/api/main-project/context/opinion-adoption-summary" "domain projection quality route: opinion adoption summary"
+    Assert-ContainsValue $projectionQualityRoutes "/api/main-project/context/quality-summary" "domain projection quality route: quality summary"
+    Assert-True ([int]$projectionReadiness.feedback_count -ge 1) "domain projection readiness: feedback count" "feedback_count=$($projectionReadiness.feedback_count)"
+    Assert-True ([int]$projectionReadiness.opinion_adoption_count -ge 1) "domain projection readiness: opinion adoption count" "opinion_adoption_count=$($projectionReadiness.opinion_adoption_count)"
+    Assert-True ([string]$projectionReadiness.opinion_memory_ref_count -eq "present") "domain projection readiness: opinion memory refs" "opinion_memory_ref_count=$($projectionReadiness.opinion_memory_ref_count)"
+
+    $userOrderPermission = Find-ProjectionPermission $projectionPermissions "user_orders"
+    Assert-True ($null -ne $userOrderPermission) "domain projection permission: user orders present"
+    Assert-True ($userOrderPermission.scope -eq "current_user_only") "domain projection permission: user orders scope" "$($userOrderPermission.scope)"
+    Assert-ScenarioContains $userOrderPermission "required_request" @("external_user_id", "X-FB2-AI-CONTEXT-USER-ID") "domain projection permission: user orders required request"
+    Assert-ScenarioContains $userOrderPermission "forbidden" @("other_user_order_detail", "raw_user_identity") "domain projection permission: user orders forbidden"
+
+    $platformPermission = Find-ProjectionPermission $projectionPermissions "platform_order_summary"
+    Assert-True ($null -ne $platformPermission) "domain projection permission: platform summary present"
+    Assert-True ($platformPermission.scope -eq "anonymous_aggregate_only") "domain projection permission: platform summary scope" "$($platformPermission.scope)"
+    Assert-ScenarioContains $platformPermission "required_request" @("include_platform_orders=true", "X-FB2-AI-CONTEXT-SCOPE=platform_order_summary") "domain projection permission: platform summary required request"
+    Assert-ScenarioContains $platformPermission "forbidden" @("single_user_order_detail", "raw_user_identity") "domain projection permission: platform summary forbidden"
+
+    $groupOpinionPermission = Find-ProjectionPermission $projectionPermissions "group_opinions"
+    Assert-True ($null -ne $groupOpinionPermission) "domain projection permission: group opinions present"
+    Assert-True ($groupOpinionPermission.scope -eq "group_visible") "domain projection permission: group opinions scope" "$($groupOpinionPermission.scope)"
+    Assert-ScenarioContains $groupOpinionPermission "required_request" @("group_id") "domain projection permission: group opinions required request"
+    Assert-ScenarioContains $groupOpinionPermission "forbidden" @("private_message", "opinion_without_message_id") "domain projection permission: group opinions forbidden"
 } catch {
     Fail "context-contract" $_.Exception.Message
 }
