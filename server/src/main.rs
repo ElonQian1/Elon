@@ -51,6 +51,7 @@ mod external_app_context_example;
 mod external_app_context_feedback;
 mod external_app_context_gap_notice;
 mod external_app_context_health;
+mod external_app_context_index_contract;
 mod external_app_context_observability;
 mod external_app_context_pack_template;
 mod external_app_context_projection;

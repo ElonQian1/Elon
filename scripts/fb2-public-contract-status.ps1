@@ -48,6 +48,7 @@ function Get-Fb2PublicContractChecks {
     )
 
     $domain = $Contract.domain_data_blueprint_contract
+    $domainIndex = $Contract.domain_context_index_contract
     $template = $Contract.context_pack_template_contract
     $group = $Contract.group_chat_evidence_contract
     $manifest = $Contract.live_tool_manifest
@@ -58,6 +59,10 @@ function Get-Fb2PublicContractChecks {
     $domainSections = @($domain.required_context_pack_sections)
     $domainMetadata = @($domain.required_metadata)
     $domainAntiPatterns = @($domain.anti_patterns)
+    $domainIndexIds = @($domainIndex.indexes | ForEach-Object { $_.id })
+    $domainIndexInputs = @($domainIndex.required_query_inputs)
+    $domainIndexMetrics = @($domainIndex.required_metrics)
+    $domainIndexNotAllowed = @($domainIndex.index_output_boundary.not_allowed)
     $groupFields = @($group.required_group_message_fields)
     $groupFlow = @($group.required_visible_flow_evidence)
     $toolIds = @($manifest.tool_ids)
@@ -73,6 +78,18 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "domain_blueprint_no_copy" ($domain.stores_fb2_business_data_in_main_project -eq $false) "stores=$($domain.stores_fb2_business_data_in_main_project)"
         New-Fb2PublicContractCheck "domain_blueprint_rest_first" ($domain.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") ([string]$domain.first_phase_delivery)
         New-Fb2PublicContractCheck "domain_blueprint_mcp_future" ($domain.mcp_status -eq "future_wrapper_not_first_phase_fact_source") ([string]$domain.mcp_status)
+        New-Fb2PublicContractCheck "domain_index_schema" ($domainIndex.schema -eq "fb2.main_project.domain_context_index.v1") ([string]$domainIndex.schema)
+        New-Fb2PublicContractCheck "domain_index_complete" ([bool]$domainIndex.complete) "complete=$($domainIndex.complete)"
+        New-Fb2PublicContractCheck "domain_index_count" ([int]$domainIndex.index_count -eq 8) "index_count=$($domainIndex.index_count)"
+        New-Fb2PublicContractCheck "domain_index_no_copy" ($domainIndex.stores_fb2_business_data_in_main_project -eq $false) "stores=$($domainIndex.stores_fb2_business_data_in_main_project)"
+        New-Fb2PublicContractCheck "domain_index_match" (Test-Fb2ContractContains $domainIndexIds "match_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_user_ticket" (Test-Fb2ContractContains $domainIndexIds "current_user_ticket_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_platform_risk" (Test-Fb2ContractContains $domainIndexIds "platform_order_risk_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_group_opinion" (Test-Fb2ContractContains $domainIndexIds "group_opinion_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_feedback_quality" (Test-Fb2ContractContains $domainIndexIds "feedback_quality_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_topic_hint" (Test-Fb2ContractContains $domainIndexInputs "topic_hint") ($domainIndexInputs -join ",")
+        New-Fb2PublicContractCheck "domain_index_metrics_budget" (Test-Fb2ContractContains $domainIndexMetrics "budget_status") ($domainIndexMetrics -join ",")
+        New-Fb2PublicContractCheck "domain_index_no_raw_embedding_dump" (Test-Fb2ContractContains $domainIndexNotAllowed "raw_embedding_dump") ($domainIndexNotAllowed -join ",")
         New-Fb2PublicContractCheck "context_pack_template_schema" ($template.schema -eq "fb2.context_pack_template.v1") ([string]$template.schema)
         New-Fb2PublicContractCheck "context_pack_template_complete" ([bool]$template.complete) "complete=$($template.complete)"
         New-Fb2PublicContractCheck "context_pack_template_wrapper" ($template.body.wrapper -eq "fb2_context_pack") ([string]$template.body.wrapper)
@@ -136,6 +153,9 @@ function New-Fb2PublicContractStatus {
         checks = @($checks)
         contract_summary = [ordered]@{
             domain_data_blueprint_schema = [string]$Contract.domain_data_blueprint_contract.schema
+            domain_context_index_schema = [string]$Contract.domain_context_index_contract.schema
+            domain_context_index_count = [int]$Contract.domain_context_index_contract.index_count
+            domain_context_index_ids = @($Contract.domain_context_index_contract.indexes | ForEach-Object { $_.id })
             context_pack_template_schema = [string]$Contract.context_pack_template_contract.schema
             context_pack_template_wrapper = [string]$Contract.context_pack_template_contract.body.wrapper
             context_pack_template_sections = @($Contract.context_pack_template_contract.required_section_order)
@@ -178,6 +198,27 @@ function Invoke-Fb2PublicContractSelfTest {
             required_context_pack_sections = @("group_opinion_slice")
             required_metadata = @("citation_sources")
             anti_patterns = @("full_database_dump")
+        }
+        domain_context_index_contract = [pscustomobject]@{
+            schema = "fb2.main_project.domain_context_index.v1"
+            complete = $true
+            index_count = 8
+            stores_fb2_business_data_in_main_project = $false
+            indexes = @(
+                [pscustomobject]@{ id = "match_index" },
+                [pscustomobject]@{ id = "odds_snapshot_index" },
+                [pscustomobject]@{ id = "current_user_ticket_index" },
+                [pscustomobject]@{ id = "platform_order_risk_index" },
+                [pscustomobject]@{ id = "group_opinion_index" },
+                [pscustomobject]@{ id = "opinion_memory_index" },
+                [pscustomobject]@{ id = "context_audit_index" },
+                [pscustomobject]@{ id = "feedback_quality_index" }
+            )
+            required_query_inputs = @("group_id", "topic_hint", "external_user_id_when_user_orders_are_requested")
+            required_metrics = @("index_latency_ms", "budget_status")
+            index_output_boundary = [pscustomobject]@{
+                not_allowed = @("raw_embedding_dump", "full_database_dump")
+            }
         }
         context_pack_template_contract = [pscustomobject]@{
             schema = "fb2.context_pack_template.v1"

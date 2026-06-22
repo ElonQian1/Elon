@@ -4,6 +4,8 @@ fb2 用户真正需要的是“AI 能读懂 fb2 平台数据并帮助分析”�
 
 机器可读口径由 `scripts\fb2-domain-data-blueprint-status.ps1` 和主项目 `GET /api/external/apps/fb2/context-contract` 固定，状态快照字段为 `latest_domain_data_blueprint schema=fb2.main_project.domain_data_blueprint.v1`，接口字段为 `domain_data_blueprint_contract`。它把本文件路线压缩成 6 条数据 lane：比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计。若后续问“fb2 应该给主项目 AI 什么格式，是 Markdown 还是 MCP”，以该字段为准：第一阶段是 XML-wrapped Markdown Context Pack + JSON metadata + tool manifest/tools/execute，MCP 以后只能作为包装层。
 
+长期检索口径由主项目 `GET /api/external/apps/fb2/context-contract` 的 `domain_context_index_contract schema=fb2.main_project.domain_context_index.v1` 固定。它不是要求 fb2 把索引、embedding 或数据库复制给主项目，而是规定 fb2 后端内部至少按 8 类索引组织召回：`match_index`、`odds_snapshot_index`、`current_user_ticket_index`、`platform_order_risk_index`、`group_opinion_index`、`opinion_memory_index`、`context_audit_index`、`feedback_quality_index`。这些索引最终只通过 `retrieval_evidence`、`citation_sources`、`metrics` 和受控工具结果投影给主项目 AI。
+
 ## 阶段 1：Context Pack
 
 先做一个稳定的 `GET /api/main-project/context/pack`。
@@ -108,9 +110,12 @@ fb2 侧维护领域索引，减少每次全表扫描：
 
 - `match_index`：比赛、联赛、球队、开赛时间。
 - `odds_snapshot_index`：赔率快照和更新时间。
-- `order_risk_index`：用户票据结构、组合风险、命中/亏损复盘。
+- `current_user_ticket_index`：当前用户票据结构、组合风险、命中/亏损复盘。
+- `platform_order_risk_index`：平台/店铺匿名订单热度、风险偏斜和聚合趋势。
 - `group_opinion_index`：群友观点、消息 ID、支持/反对理由、比赛关联。
+- `opinion_memory_index`：被采纳观点、长期观点记忆、赛后复盘入口。
 - `context_audit_index`：每次上下文包的来源数量、字符量、耗时和裁剪状态。
+- `feedback_quality_index`：回答后的 missing/wrong context、引用命中、失败样本。
 
 AI 逐步从“读取当前上下文”升级到“基于历史观点和复盘持续改进分析”。
 

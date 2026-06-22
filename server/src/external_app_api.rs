@@ -16,6 +16,7 @@ use crate::{
     external_app_context_chat_evidence::public_group_chat_evidence_guidance,
     external_app_context_example::public_context_pack_example,
     external_app_context_health::public_context_health,
+    external_app_context_index_contract::public_context_index_guidance,
     external_app_context_observability::public_context_observability_guidance,
     external_app_context_pack_template::public_context_pack_template_guidance,
     external_app_context_projection::{
@@ -122,6 +123,12 @@ pub async fn get_external_app_context_contract(
             "schema": "external_app.domain_data_blueprint.v1",
             "complete": false,
             "lanes": []
+        })),
+        "domain_context_index_contract": public_context_index_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.domain_context_index.v1",
+            "complete": false,
+            "indexes": []
         })),
         "group_chat_evidence_contract": public_group_chat_evidence_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

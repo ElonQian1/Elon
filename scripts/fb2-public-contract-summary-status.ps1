@@ -67,6 +67,9 @@ function Get-Fb2PublicContractSummaryState {
             context_pack_template_schema = ""
             context_pack_template_wrapper = ""
             context_pack_template_sections = @()
+            domain_context_index_schema = ""
+            domain_context_index_count = 0
+            domain_context_index_ids = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -85,6 +88,9 @@ function Get-Fb2PublicContractSummaryState {
             context_pack_template_schema = ""
             context_pack_template_wrapper = ""
             context_pack_template_sections = @()
+            domain_context_index_schema = ""
+            domain_context_index_count = 0
+            domain_context_index_ids = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -97,6 +103,9 @@ function Get-Fb2PublicContractSummaryState {
     $schema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $status "schema")
     $success = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $status "success")
     $domainSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "domain_data_blueprint_schema")
+    $domainIndexSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "domain_context_index_schema")
+    $domainIndexCount = [int](Get-Fb2PublicContractSummaryProperty $summary "domain_context_index_count" 0)
+    $domainIndexIds = @((Get-Fb2PublicContractSummaryProperty $summary "domain_context_index_ids" @()))
     $templateSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_schema")
     $templateWrapper = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_wrapper")
     $templateSections = @((Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_sections" @()))
@@ -112,6 +121,13 @@ function Get-Fb2PublicContractSummaryState {
     if ($schema -ne "fb2.main_project.public_contract_status.v1") { $missing += "public_contract_status_schema" }
     if (-not $success) { $missing += "public_contract_status_success" }
     if ($domainSchema -ne "fb2.main_project.domain_data_blueprint.v1") { $missing += "domain_data_blueprint_contract" }
+    if ($domainIndexSchema -ne "fb2.main_project.domain_context_index.v1") { $missing += "domain_context_index_contract" }
+    if ($domainIndexCount -lt 8) { $missing += "domain_context_index_count" }
+    foreach ($indexId in @("match_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "feedback_quality_index")) {
+        if (-not ($domainIndexIds -contains $indexId)) {
+            $missing += "domain_context_index_$indexId"
+        }
+    }
     if ($templateSchema -ne "fb2.context_pack_template.v1") { $missing += "context_pack_template_contract" }
     if ($templateWrapper -ne "fb2_context_pack") { $missing += "context_pack_template_wrapper" }
     foreach ($section in @("user_order_slice", "group_opinion_slice", "retrieval_evidence", "quality_feedback")) {
@@ -144,6 +160,9 @@ function Get-Fb2PublicContractSummaryState {
         failed_count = [int](Get-Fb2PublicContractSummaryProperty $status "failed_count" 0)
         failed_checks = @($failedChecks)
         domain_data_blueprint_schema = $domainSchema
+        domain_context_index_schema = $domainIndexSchema
+        domain_context_index_count = $domainIndexCount
+        domain_context_index_ids = @($domainIndexIds)
         context_pack_template_schema = $templateSchema
         context_pack_template_wrapper = $templateWrapper
         context_pack_template_sections = @($templateSections)

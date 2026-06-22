@@ -467,6 +467,9 @@ function Invoke-Fb2StatusSelfTest {
             failed_checks = @()
             contract_summary = [ordered]@{
                 domain_data_blueprint_schema = "fb2.main_project.domain_data_blueprint.v1"
+                domain_context_index_schema = "fb2.main_project.domain_context_index.v1"
+                domain_context_index_count = 8
+                domain_context_index_ids = @("match_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "feedback_quality_index")
                 context_pack_template_schema = "fb2.context_pack_template.v1"
                 context_pack_template_wrapper = "fb2_context_pack"
                 context_pack_template_sections = @("usage_boundary", "match_facts", "user_order_slice", "platform_order_summary", "group_opinion_slice", "retrieval_evidence", "quality_feedback")
@@ -584,6 +587,9 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_public_contract_status.schema -ne "fb2.main_project.public_contract_status.v1") { $failed++ }
         if (-not [bool]$snapshot.latest_public_contract_status.complete) { $failed++ }
         if (-not [bool]$snapshot.latest_public_contract_status.success) { $failed++ }
+        if ($snapshot.latest_public_contract_status.domain_context_index_schema -ne "fb2.main_project.domain_context_index.v1") { $failed++ }
+        if ($snapshot.latest_public_contract_status.domain_context_index_count -lt 8) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.domain_context_index_ids) -contains "group_opinion_index")) { $failed++ }
         if ($snapshot.latest_public_contract_status.group_chat_test_method -ne "direct_api_read") { $failed++ }
         if ([bool]$snapshot.latest_public_contract_status.screenshots_accepted) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.required_group_message_fields) -contains "text_sha256")) { $failed++ }

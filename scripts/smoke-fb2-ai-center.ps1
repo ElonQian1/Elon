@@ -860,6 +860,7 @@ try {
     $contextPackTemplate = $contract.context_pack_template_contract
     $projectionContract = $contract.domain_context_projection_contract
     $domainDataBlueprint = $contract.domain_data_blueprint_contract
+    $domainContextIndex = $contract.domain_context_index_contract
     $groupChatEvidenceContract = $contract.group_chat_evidence_contract
     $toolExecutionContract = $contract.tool_execution_contract
     $toolExecutionPlan = $toolExecutionContract.main_project_execution_result.plan
@@ -876,6 +877,10 @@ try {
     $domainDataBlueprintSections = @($domainDataBlueprint.required_context_pack_sections)
     $domainDataBlueprintMetadata = @($domainDataBlueprint.required_metadata)
     $domainDataBlueprintAntiPatterns = @($domainDataBlueprint.anti_patterns)
+    $domainContextIndexIds = @($domainContextIndex.indexes | ForEach-Object { $_.id })
+    $domainContextIndexInputs = @($domainContextIndex.required_query_inputs)
+    $domainContextIndexMetrics = @($domainContextIndex.required_metrics)
+    $domainContextIndexNotAllowed = @($domainContextIndex.index_output_boundary.not_allowed)
     $groupChatEvidenceFields = @($groupChatEvidenceContract.required_group_message_fields)
     $groupChatVisibleEvidence = @($groupChatEvidenceContract.required_visible_flow_evidence)
     $toolResultEnvelopeContract = $contract.tool_result_envelope_contract
@@ -1018,6 +1023,19 @@ try {
     Assert-ContainsValue $domainDataBlueprintSections "group_opinion_slice" "domain data blueprint section: group opinion slice"
     Assert-ContainsValue $domainDataBlueprintMetadata "citation_sources" "domain data blueprint metadata: citation sources"
     Assert-ContainsValue $domainDataBlueprintAntiPatterns "full_database_dump" "domain data blueprint anti-pattern: full database dump"
+
+    Assert-True ($domainContextIndex.schema -eq "fb2.main_project.domain_context_index.v1") "domain context index schema" "$($domainContextIndex.schema)"
+    Assert-True ($domainContextIndex.complete -eq $true) "domain context index complete" "complete=$($domainContextIndex.complete)"
+    Assert-True ($domainContextIndex.stores_fb2_business_data_in_main_project -eq $false) "domain context index no main-project data copy" "stores=$($domainContextIndex.stores_fb2_business_data_in_main_project)"
+    Assert-True ([int]$domainContextIndex.index_count -eq 8) "domain context index count" "index_count=$($domainContextIndex.index_count)"
+    foreach ($indexId in @("match_index", "odds_snapshot_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "opinion_memory_index", "context_audit_index", "feedback_quality_index")) {
+        Assert-ContainsValue $domainContextIndexIds $indexId "domain context index: $indexId"
+    }
+    Assert-ContainsValue $domainContextIndexInputs "topic_hint" "domain context index input: topic hint"
+    Assert-ContainsValue $domainContextIndexInputs "external_user_id_when_user_orders_are_requested" "domain context index input: external user id"
+    Assert-ContainsValue $domainContextIndexMetrics "budget_status" "domain context index metric: budget status"
+    Assert-ContainsValue $domainContextIndexNotAllowed "raw_embedding_dump" "domain context index anti-pattern: raw embedding dump"
+    Assert-ContainsValue $domainContextIndexNotAllowed "full_database_dump" "domain context index anti-pattern: full database dump"
 
     Assert-True ($groupChatEvidenceContract.schema -eq "fb2.main_project.group_chat_evidence.v1") "group chat evidence schema" "$($groupChatEvidenceContract.schema)"
     Assert-True ($groupChatEvidenceContract.group_chat_test_method -eq "direct_api_read") "group chat evidence direct read" "$($groupChatEvidenceContract.group_chat_test_method)"

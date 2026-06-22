@@ -120,6 +120,15 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - 每条 lane 都声明 Context Pack 小节、source kinds、主工具、权限 scope、回答分层、禁止输出和未来索引。
 - 新增 fb2 业务工具时，应先归入某条 lane，或新增 lane 后同步 Context Pack section、source kind、权限和验收信号。
 
+`GET /api/external/apps/fb2/context-contract` 还会返回 `domain_context_index_contract schema=fb2.main_project.domain_context_index.v1`。它把 repo map / 符号索引讨论中的“混合检索”落到 fb2 业务数据：fb2 可以在自己后端维护索引，主项目只消费 Context Pack 投影、`citation_sources`、`retrieval_evidence`、metrics 和受控工具结果，不复制 fb2 数据库或 embedding。
+
+- 固定 8 类内部领域索引：`match_index`、`odds_snapshot_index`、`current_user_ticket_index`、`platform_order_risk_index`、`group_opinion_index`、`opinion_memory_index`、`context_audit_index`、`feedback_quality_index`。
+- 每个 index 都声明 lane、source kinds、lookup keys、required fields、permission scope、Context Pack 小节、主工具、新鲜度规则和 forbidden outputs。
+- `index_output_boundary.model_visible_output=retrieval_evidence_section_plus_citation_sources`，模型只看可引用摘要和 source id，不看原始索引或全量表。
+- `required_query_inputs` 固定 `group_id`、`topic_hint`、用户订单场景的 `external_user_id`、长按消息场景的 `selected_message_id`、平台汇总场景的 scope。
+- `required_metrics` 固定 `index_latency_ms`、`retrieved_source_count`、`source_counts`、`stale_source_count`、`permission_denied_count`、`budget_status`、`fallback_used`。
+- 禁止 `raw_embedding_dump`、`full_database_dump`、`uncited_index_hit`、其它用户订单明细和平台订单明细泄漏。
+
 `GET /api/external/apps/fb2/context-contract` 同时返回 `group_chat_evidence_contract schema=fb2.main_project.group_chat_evidence.v1`。它固定真实群聊测试不看截图，必须走接口直读：
 
 - `group_chat_test_method=direct_api_read`，`screenshots_accepted=false`。
