@@ -1,6 +1,11 @@
 // server/pc-dev-runtime/src/project_agent_runtime.rs
 
-use crate::project_scaffold::ProjectScaffoldRequest;
+use crate::{
+    project_agent_runtime_patch::{
+        agent_runtime_apply_patch_action_case, agent_runtime_apply_patch_helpers,
+    },
+    project_scaffold::ProjectScaffoldRequest,
+};
 use std::{
     fs, io,
     path::{Path, PathBuf},
@@ -69,7 +74,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `read_file_range`, `write_file`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. Each agent run has a `-MaxRunCommands` budget and truncates large command output before sending it back to the model. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget and truncates large command output before sending it back to the model. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -275,6 +280,7 @@ Schema:
     {"tool": "read_file", "path": "README.md"},
     {"tool": "read_file_range", "path": "src/main.rs", "start_line": 1, "line_count": 80},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
+    {"tool": "apply_patch", "patch": "unified diff", "check_only": false},
     {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
   ]
 }
@@ -284,7 +290,8 @@ Rules:
 - Prefer read-only actions first.
 - Use read_file_range for large files or when you only need a specific section.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
-- Use write_file only for intentional project files.
+- Prefer apply_patch with unified diff for local edits to existing project files.
+- Use write_file only for intentional new project files or full-file rewrites.
 - Use run_command only for low-risk project checks such as git status/diff/log, cargo check/test, npm test/run lint, or Gradle test/assembleDebug.
 - Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
 - There is a limited run_command budget per agent run. Choose commands carefully and stop after enough evidence.
@@ -396,7 +403,7 @@ function Confirm-AgentAction {
     Write-Host ''
     Write-Host "Agent requests $Kind`: $Target"
     $answer = Read-Host 'Type yes to allow'
-    return @('yes', 'y', '是') -contains $answer.Trim().ToLowerInvariant()
+    return @('yes', 'y') -contains $answer.Trim().ToLowerInvariant()
 }
 
 function Limit-AgentText {
@@ -416,6 +423,8 @@ function Use-AgentRunCommandBudget {
     $Script:AgentRunCommandCount += 1
     return $true
 }
+
+# __ELON_APPLY_PATCH_HELPERS__
 
 function Test-AgentCommandAllowed {
     param([Parameter(Mandatory = $true)][string]$Command)
@@ -591,6 +600,7 @@ function Invoke-AgentAction {
             Set-Content -LiteralPath $full -Value $content -Encoding UTF8
             return "write_file ok: $path"
         }
+# __ELON_APPLY_PATCH_ACTION__
         'run_command' {
             $program = [string]$Action.program
             $args = @()
@@ -715,7 +725,15 @@ switch ($Mode) {
     'server-runtime' { Invoke-ServerRuntime }
 }
 "#
-    .to_string())
+    .to_string()
+    .replace(
+        "# __ELON_APPLY_PATCH_HELPERS__",
+        agent_runtime_apply_patch_helpers(),
+    )
+    .replace(
+        "# __ELON_APPLY_PATCH_ACTION__",
+        agent_runtime_apply_patch_action_case(),
+    ))
 }
 
 #[cfg(test)]
@@ -724,6 +742,7 @@ mod tests {
     use crate::project_scaffold::ProjectScaffoldRequest;
     use std::{
         fs,
+        process::Command,
         time::{SystemTime, UNIX_EPOCH},
     };
 
@@ -759,6 +778,12 @@ mod tests {
         assert!(script.contains("'read_file_range'"));
         assert!(script.contains("start_line must be >= 1"));
         assert!(script.contains("$lineCount = 400"));
+        assert!(script.contains("'apply_patch'"));
+        assert!(script.contains("Invoke-AgentApplyPatch"));
+        assert!(script.contains("git apply"));
+        assert!(script.contains("binary patches are not supported"));
+        assert!(!script.contains("__ELON_APPLY_PATCH_HELPERS__"));
+        assert!(!script.contains("__ELON_APPLY_PATCH_ACTION__"));
         assert!(script.contains("Test-AgentCommandAllowedParts"));
         assert!(script.contains("[int]$MaxRunCommands = 8"));
         assert!(script.contains("$Script:AgentRunCommandCount"));
@@ -769,6 +794,7 @@ mod tests {
         assert!(script.contains("\"program\": \"git\""));
         assert!(script.contains("$shellMarkers"));
         assert!(script.contains("[regex]::IsMatch"));
+        assert!(!script.contains('\u{662f}'));
     }
 
     #[test]
@@ -781,9 +807,94 @@ mod tests {
         assert!(doc.contains("ELON_SERVER_TOKEN"));
         assert!(doc.contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
         assert!(doc.contains("read_file_range"));
+        assert!(doc.contains("apply_patch"));
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));
         assert!(doc.contains("-MaxRunCommands"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn generated_agent_runtime_script_parses_and_applies_patch() {
+        let root = temp_dir("generated_agent_runtime_script_parses_and_applies_patch");
+        let scripts = root.join("scripts");
+        fs::create_dir_all(&scripts).unwrap();
+        fs::write(root.join("note.txt"), "hello\n").unwrap();
+        let script_path = scripts.join("elon-agent.ps1");
+        fs::write(&script_path, agent_runtime_script().unwrap()).unwrap();
+        let validation_path = root.join("validate-agent-runtime.ps1");
+
+        let init = Command::new("git")
+            .arg("init")
+            .current_dir(&root)
+            .output()
+            .expect("git init should run");
+        assert!(
+            init.status.success(),
+            "git init failed: {}",
+            String::from_utf8_lossy(&init.stderr)
+        );
+
+        let command = r#"
+param(
+    [Parameter(Mandatory = $true)][string]$ScriptPath,
+    [Parameter(Mandatory = $true)][string]$Root
+)
+$tokens = $null
+$errors = $null
+[System.Management.Automation.Language.Parser]::ParseFile($ScriptPath, [ref]$tokens, [ref]$errors) | Out-Null
+if ($errors.Count -gt 0) {
+    $errors | ForEach-Object { Write-Error $_.Message }
+    exit 1
+}
+. $ScriptPath -Mode status -Yes | Out-Null
+$patch = @'
+diff --git a/note.txt b/note.txt
+--- a/note.txt
++++ b/note.txt
+@@ -1 +1 @@
+-hello
++hello patched
+'@
+$check = Invoke-AgentApplyPatch -Patch $patch -CheckOnly
+if ($check -notlike 'apply_patch check ok:*') {
+    Write-Error "unexpected check result: $check"
+    exit 1
+}
+$before = Get-Content -LiteralPath (Join-Path $Root 'note.txt') -Raw
+$beforeNormalized = $before.Replace("`r`n", "`n").Replace("`r", "`n")
+if ($beforeNormalized -ne "hello`n") {
+    Write-Error "check-only changed file: $before"
+    exit 1
+}
+$applied = Invoke-AgentApplyPatch -Patch $patch
+if ($applied -notlike 'apply_patch ok:*') {
+    Write-Error "unexpected apply result: $applied"
+    exit 1
+}
+$after = Get-Content -LiteralPath (Join-Path $Root 'note.txt') -Raw
+$afterNormalized = $after.Replace("`r`n", "`n").Replace("`r", "`n")
+if ($afterNormalized -ne "hello patched`n") {
+    Write-Error "patch did not apply: $after"
+    exit 1
+}
+"#;
+        fs::write(&validation_path, command).unwrap();
+        let output = Command::new("powershell")
+            .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+            .arg(&validation_path)
+            .arg(&script_path)
+            .arg(&root)
+            .output()
+            .expect("powershell should run generated runtime script");
+        assert!(
+            output.status.success(),
+            "powershell validation failed\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        );
+
+        let _ = fs::remove_dir_all(root);
     }
 
     fn request() -> ProjectScaffoldRequest<'static> {
