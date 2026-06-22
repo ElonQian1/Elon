@@ -125,34 +125,8 @@ fn env_var_configured(name: &str) -> bool {
         .unwrap_or(false)
 }
 
-#[cfg(windows)]
 fn install_summary() -> Value {
-    let install_dir = std::env::var("LOCALAPPDATA")
-        .ok()
-        .map(|value| PathBuf::from(value).join("ElonNode"));
-    match install_dir {
-        Some(install_dir) => json!({
-            "install_dir": path_to_string(&install_dir),
-            "client_exe": file_meta(&install_dir.join(crate::node_client_launcher::CLIENT_EXE_NAME)),
-            "uninstall_exe": file_meta(&install_dir.join(crate::node_client_launcher::UNINSTALL_EXE_NAME)),
-            "internal_dir": file_meta(&install_dir.join(crate::node_client_launcher::INTERNAL_DIR_NAME)),
-            "version_manifest": safe_json_file(&install_dir.join(crate::node_client_launcher::INTERNAL_DIR_NAME).join("node-agent-version.json")),
-            "running_from_install_dir": std::env::current_exe()
-                .map(|path| path.starts_with(&install_dir))
-                .unwrap_or(false),
-        }),
-        None => json!({
-            "error": "LOCALAPPDATA is not configured",
-        }),
-    }
-}
-
-#[cfg(not(windows))]
-fn install_summary() -> Value {
-    json!({
-        "supported": false,
-        "reason": "Windows client install status is only available on Windows."
-    })
+    crate::node_agent_client_install_status::status_payload()
 }
 
 fn task_journal_summary(paths: &DiagnosticPaths) -> Value {

@@ -71,42 +71,34 @@ fn status_payload() -> Value {
         "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
     });
 
-    with_windows_install_status(payload)
+    with_install_status(payload)
 }
 
-#[cfg(windows)]
-fn with_windows_install_status(mut payload: Value) -> Value {
-    if let Ok(installed) = installed_paths() {
-        if let Some(object) = payload.as_object_mut() {
-            object.insert(
-                "install_dir".to_string(),
-                json!(path_to_string(&installed.install_dir)),
-            );
-            object.insert(
-                "client_exe".to_string(),
-                json!(path_to_string(&installed.client_exe)),
-            );
-            object.insert(
-                "uninstall_exe".to_string(),
-                json!(path_to_string(&installed.uninstall_exe)),
-            );
-            object.insert(
-                "internal_dir".to_string(),
-                json!(path_to_string(&installed.internal_dir)),
-            );
-            object.insert("installed".to_string(), json!(installed.installed()));
-            object.insert(
-                "running_from_install_dir".to_string(),
-                json!(running_from_install_dir(&installed.install_dir)),
-            );
+fn with_install_status(mut payload: Value) -> Value {
+    let install = crate::node_agent_client_install_status::status_payload();
+    if let Some(object) = payload.as_object_mut() {
+        object.insert("install".to_string(), install.clone());
+        if let Some(install_object) = install.as_object() {
+            for key in [
+                "install_dir",
+                "client_exe",
+                "uninstall_exe",
+                "internal_dir",
+                "version_file",
+                "installed",
+                "running_from_install_dir",
+                "installed_git_sha",
+                "installed_package_version",
+                "layout_status",
+                "layout",
+                "version_manifest",
+            ] {
+                if let Some(value) = install_object.get(key) {
+                    object.insert(key.to_string(), value.clone());
+                }
+            }
         }
     }
-
-    payload
-}
-
-#[cfg(not(windows))]
-fn with_windows_install_status(payload: Value) -> Value {
     payload
 }
 
@@ -244,16 +236,8 @@ fn installed_paths() -> Result<InstalledPaths, String> {
     Ok(InstalledPaths {
         client_exe: install_dir.join(crate::node_client_launcher::CLIENT_EXE_NAME),
         uninstall_exe: install_dir.join(crate::node_client_launcher::UNINSTALL_EXE_NAME),
-        internal_dir: install_dir.join(crate::node_client_launcher::INTERNAL_DIR_NAME),
         install_dir,
     })
-}
-
-#[cfg(windows)]
-fn running_from_install_dir(install_dir: &Path) -> bool {
-    std::env::current_exe()
-        .map(|path| path.starts_with(install_dir))
-        .unwrap_or(false)
 }
 
 #[cfg(any(windows, test))]
@@ -299,14 +283,6 @@ struct InstalledPaths {
     install_dir: PathBuf,
     client_exe: PathBuf,
     uninstall_exe: PathBuf,
-    internal_dir: PathBuf,
-}
-
-#[cfg(windows)]
-impl InstalledPaths {
-    fn installed(&self) -> bool {
-        self.client_exe.exists() && self.uninstall_exe.exists()
-    }
 }
 
 enum ClientAction {

@@ -337,6 +337,19 @@ function cliSessionBridgeLine(bridge) {
   const tty = bridge.tty_takeover_supported ? '支持原 TTY 接管' : '不接管原 TTY';
   return modes ? `${tty} · ${modes}` : `${tty} · 使用新 CLI 子进程桥接会话`;
 }
+function shortHash(value) {
+  const text = String(value || '').trim();
+  return text.length > 12 ? text.slice(0, 8) : text;
+}
+function clientLayoutLine(status) {
+  const value = String(status || '').trim().toLowerCase();
+  if (value === 'clean') return '目录清爽';
+  if (value === 'legacy_files_present') return '发现旧脚本';
+  if (value === 'unexpected_entries') return '存在额外文件';
+  if (value === 'incomplete') return '安装不完整';
+  if (value === 'unsupported') return '非 Win 维护环境';
+  return '目录状态未知';
+}
 async function load() {
   if (window.__elonDup) return;
   const r = await localFetch('/api/status').then(r => r.json()).catch(() => null);
@@ -454,12 +467,20 @@ async function loadClientMaintenance() {
   }
   const installed = r.installed === undefined ? '未知' : (r.installed ? '已安装' : '未完整安装');
   const fromInstall = r.running_from_install_dir === undefined ? '未知' : (r.running_from_install_dir ? '是' : '否');
+  const installedSha = String(r.installed_git_sha || (r.install && r.install.installed_git_sha) || '').trim();
+  const packageVersion = String(r.installed_package_version || (r.install && r.install.installed_package_version) || '').trim();
+  const packageLine = installedSha
+    ? `包 ${esc(shortHash(installedSha))}${packageVersion ? ' / ' + esc(packageVersion) : ''}`
+    : '未读取包版本';
+  const layoutLine = clientLayoutLine(r.layout_status || (r.install && r.install.layout_status));
   summary.innerHTML = [
     `<span>平台：${esc(r.platform || '-')}</span>`,
     `<span>支持维护动作：${r.supported ? '是' : '否'}</span>`,
     `<span>安装状态：${esc(installed)}</span>`,
     `<span>当前进程来自安装目录：${esc(fromInstall)}</span>`,
     `<span>客户端版本：${esc(r.version || '-')}</span>`,
+    `<span>${packageLine}</span>`,
+    `<span>${esc(layoutLine)}</span>`,
   ].join('');
   paths.innerHTML = [
     `<span>安装目录：${pathCode(r.install_dir)}</span>`,

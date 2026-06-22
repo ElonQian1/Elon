@@ -2403,13 +2403,20 @@
       return;
     }
     const version = clean(data.version) || '--';
+    const install = data.install || {};
+    const installedSha = clean(data.installed_git_sha || install.installed_git_sha);
+    const packageVersion = clean(data.installed_package_version || install.installed_package_version);
+    const layoutStatus = clean(data.layout_status || install.layout_status);
     const installed = data.supported === false
       ? '当前平台不支持 Win 客户端维护'
       : data.installed
         ? '已安装'
         : '未检测到完整安装';
     const running = data.running_from_install_dir ? '安装目录运行中' : '外部启动或未确认';
-    els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running}`;
+    const packageLine = installedSha
+      ? `包 ${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
+      : '未读取包版本';
+    els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running} · ${packageLine} · ${clientLayoutLabel(layoutStatus)}`;
     const paths = [
       clean(data.install_dir) && `安装 ${clean(data.install_dir)}`,
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
@@ -2419,6 +2426,21 @@
     if (els.settingsCliBridgeStatus) {
       els.settingsCliBridgeStatus.textContent = cliSessionBridgeLine(data.cli_session_bridge);
     }
+  }
+
+  function shortHash(value) {
+    const text = clean(value);
+    return text.length > 12 ? text.slice(0, 8) : text;
+  }
+
+  function clientLayoutLabel(status) {
+    const value = clean(status).toLowerCase();
+    if (value === 'clean') return '目录清爽';
+    if (value === 'legacy_files_present') return '发现旧脚本';
+    if (value === 'unexpected_entries') return '存在额外文件';
+    if (value === 'incomplete') return '安装不完整';
+    if (value === 'unsupported') return '非 Win 维护环境';
+    return '目录状态未知';
   }
 
   function cliSessionBridgeLine(bridge) {
