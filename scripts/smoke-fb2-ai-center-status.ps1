@@ -9,6 +9,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "fb2-visible-readonly-validation.ps1")
+. (Join-Path $PSScriptRoot "fb2-data-only-direct-read-validation.ps1")
 
 function Get-Fb2StatusRepoRoot {
     Split-Path -Parent $PSScriptRoot
@@ -59,71 +60,6 @@ function Test-TruthyJsonValue {
     return ([string]$Value) -match "^(true|True|1)$"
 }
 
-function Test-EvidenceTextHasFingerprint {
-    param([object]$Value)
-
-    $text = [string]$Value
-    if ([string]::IsNullOrWhiteSpace($text)) {
-        return $false
-    }
-    if ($text -notmatch "\btext_len=\d+\b") {
-        return $false
-    }
-    if ($text -notmatch "\btext_sha256=[0-9a-fA-F]{8,}\b") {
-        return $false
-    }
-    return $true
-}
-
-function Get-DataOnlyDirectReadEvidenceState {
-    param([object]$Summary)
-
-    if ($null -eq $Summary) {
-        return [ordered]@{
-            complete = $false
-            mode = "missing_summary"
-            missing = @("summary")
-        }
-    }
-    if (Test-TruthyJsonValue (Get-JsonProperty $Summary "visible_direct_read_complete")) {
-        return [ordered]@{
-            complete = $true
-            mode = "current_boolean_gate"
-            missing = @()
-        }
-    }
-
-    $evidence = Get-JsonProperty $Summary "visible_direct_read_evidence"
-    if ($null -eq $evidence) {
-        return [ordered]@{
-            complete = $false
-            mode = "missing_legacy_evidence_object"
-            missing = @("visible_direct_read_evidence")
-        }
-    }
-
-    $requiredFields = @(
-        "baseline_messages",
-        "visible_mention_seed",
-        "visible_mention_reply",
-        "selected_message_seed",
-        "selected_message_reply",
-        "summary_post"
-    )
-    $missing = @()
-    foreach ($field in $requiredFields) {
-        if (-not (Test-EvidenceTextHasFingerprint (Get-JsonProperty $evidence $field))) {
-            $missing += $field
-        }
-    }
-
-    [ordered]@{
-        complete = ($missing.Count -eq 0)
-        mode = "legacy_evidence_object"
-        missing = $missing
-    }
-}
-
 function Get-GitValueOrEmpty {
     param([string[]]$GitArgs)
 
@@ -158,7 +94,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $feedbackComplete = Test-TruthyJsonValue (Get-JsonProperty $feedbackCoverage "complete")
     $visibleDirectReadComplete = Test-TruthyJsonValue (Get-JsonProperty $latestData "visible_direct_read_complete")
     $dataOnlyHasCurrentDirectReadGate = $null -ne (Get-JsonProperty $latestData "visible_direct_read_complete" $null)
-    $dataDirectReadState = Get-DataOnlyDirectReadEvidenceState $latestData
+    $dataDirectReadState = Get-Fb2DataOnlyDirectReadEvidenceState $latestData
     $dataDirectReadComplete = [bool]$dataDirectReadState.complete
     $tokenPresent = -not [string]::IsNullOrWhiteSpace($env:FB2_AI_CENTER_TOKEN)
     $voiceEvidencePath = [string]$env:FB2_VOICE_DEVICE_EVIDENCE_PATH
