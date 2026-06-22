@@ -6,6 +6,7 @@
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-22 15:55 主项目 smoke 现在不仅检查 `domain_context_projection_contract` 是否存在，也会在带 token 的完整场景中检查 fb2 实际 `context_pack` 是否符合投影契约：XML wrapper、7 个必需小节、审计 id、source registry 和场景必要 source kind。新 helper 是 `scripts\fb2-ai-center-context-projection.ps1`，离线自测已覆盖缺 wrapper、缺 `retrieval_evidence`、缺 `odds` source 等失败路径。当前仍没有 `FB2_AI_CENTER_TOKEN`，所以该 live 检查还没跑到真实 fb2 数据；下一轮拿 token 后应优先跑 `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly ...`。
 - 2026-06-22 15:35 当前线上服务已被并行 PC 提交推进到 `v0.3.611 / 8885d7e2781024d2926fd2661741a272c5b91949`，但它包含本轮 `3cf62536` 的 fb2 投影契约。已重新验证线上 `context-contract` 与非语音 smoke，`failed=0 skipped=1`；跳过项仍是缺 `FB2_AI_CENTER_TOKEN`，不是 ASR/TTS，因为本轮命令显式使用 `-SkipVoiceContractChecks`。
 - 2026-06-22 15:25 运行代码提交 `3cf62536` 已推送并发布到主项目服务端 `v0.3.610`。线上 `/health=OK`，`/api/server/version` 返回 `gitSha=3cf625361727990807e044630b3b56e8040476a7`；线上 `context-contract` 已暴露 `domain_context_projection_contract`。非语音 smoke 使用 `123qwe/123qwe` 与 `-SkipVoiceContractChecks` 通过，结果 `failed=0 skipped=1`。当前跳过项仍是缺 `FB2_AI_CENTER_TOKEN`，所以下一轮非语音优先动作是拿 service token 跑 live Context Pack、权限负向、平台匿名摘要、质量 feedback 和群观点采纳验收；ASR/TTS 按当前用户安排暂停。
 - 2026-06-22 15:10 主项目 `/api/external/apps/fb2/context-contract` 新增 `domain_context_projection_contract`，schema 为 `fb2.domain_context_projection.v1`。它把 fb2 给 AI 的数据输入固定成 RCP 风格的 XML-wrapped Markdown Context Pack：必须有比赛事实、赔率、当前用户订单、平台匿名摘要、群观点、召回理由、质量回填和 source registry；禁止原始 HTML、大 JSON、原始 embedding dump、无引用赔率/订单/群观点和平台订单明细泄漏。后续 fb2 会话应按该契约补齐或校验 `/context/pack` 输出。

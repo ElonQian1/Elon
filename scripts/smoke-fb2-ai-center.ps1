@@ -40,6 +40,7 @@ param(
     [int]$MinOpinionAdoptionCount = 1,
     [int]$QualityFeedbackSampleLimit = 5,
     [switch]$RequireNonSyntheticQualityReadiness,
+    [switch]$CheckDomainProjection,
     [switch]$SkipVoiceContractChecks,
     [switch]$RequireNoSkips
 )
@@ -105,6 +106,10 @@ if ($DataOnlyAcceptance) {
     $CheckPermissionBoundaries = $true
     $RequireNoSkips = $true
     $SkipVoiceContractChecks = $true
+}
+
+if ($RequireAllScenarios) {
+    $CheckDomainProjection = $true
 }
 
 if ($RequireFeedbackCoverage) {
@@ -432,6 +437,8 @@ function Get-MismatchedFb2UserId {
 
 $voiceEvidenceHelper = Join-Path $PSScriptRoot "fb2-ai-center-voice-evidence.ps1"
 . $voiceEvidenceHelper
+$contextProjectionHelper = Join-Path $PSScriptRoot "fb2-ai-center-context-projection.ps1"
+. $contextProjectionHelper
 
 function New-VoiceEvidenceSelfTestObject {
     param([object[]]$Artifacts)
@@ -579,6 +586,8 @@ function Invoke-AiCenterSelfTest {
         $missingSystemAsr = Copy-SelfTestObject $valid
         $missingSystemAsr.checks.systemAsrSuccess = $false
         Invoke-VoiceEvidenceSelfTestCase "rejects missing system ASR success" $missingSystemAsr $evidencePath $repoRoot $false
+
+        Invoke-Fb2ContextProjectionSelfTests
     } finally {
         $resolvedTemp = (Resolve-Path -LiteralPath $tempDir -ErrorAction SilentlyContinue)
         if ($resolvedTemp -and $resolvedTemp.Path.StartsWith($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -976,6 +985,9 @@ if (-not $Fb2Token) {
         Assert-True ([bool]$pack.data.context_audit_id) "scenario: today matches context audit" "$($pack.data.context_audit_id)"
         Assert-True ([bool]$pack.data.context_pack) "scenario: today matches context body"
         Assert-True ($null -ne $pack.data.citation_sources) "scenario: today matches citation sources field"
+        if ($CheckDomainProjection) {
+            Assert-Fb2ContextPackProjection -Data $pack.data -Scenario "today matches context pack" -ExpectedSourceKinds @("match", "odds", "context_audit")
+        }
         if ($RequireAllScenarios) {
             Assert-MinCount $pack.data.matches 1 "scenario: today matches has match data"
             Assert-MinCount $pack.data.citation_sources 1 "scenario: today matches has citation sources"
@@ -1061,6 +1073,9 @@ if (-not $Fb2Token) {
             Assert-True ($orders.success -eq $true) "scenario: my ticket context pack"
             Assert-True ([bool]$orders.data.context_audit_id) "scenario: my ticket context audit" "$($orders.data.context_audit_id)"
             Assert-True ($null -ne $orders.data.user_orders) "scenario: my ticket user_orders field"
+            if ($CheckDomainProjection) {
+                Assert-Fb2ContextPackProjection -Data $orders.data -Scenario "my ticket context pack" -ExpectedSourceKinds @("user_order", "ticket", "context_audit")
+            }
             if ($RequireAllScenarios) {
                 Assert-MinCount $orders.data.user_orders 1 "scenario: my ticket has user orders"
                 Assert-MinCount $orders.data.citation_sources 1 "scenario: my ticket has citation sources"
