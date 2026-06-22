@@ -106,8 +106,14 @@ async fn post_generated_answer_feedback(
     };
 
     let url = format!("{base_url}/api/main-project/context/feedback");
-    let response =
-        send_feedback_request(&url, token.as_str(), external_user_id.as_deref(), &payload).await?;
+    let response = send_feedback_request(
+        &url,
+        token.as_str(),
+        external_user_id.as_deref(),
+        feedback_context_needs_platform_order_scope(context),
+        &payload,
+    )
+    .await?;
 
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
@@ -279,10 +285,18 @@ async fn send_feedback_request(
     url: &str,
     token: &str,
     external_user_id: Option<&str>,
+    include_platform_order_summary: bool,
     payload: &Value,
 ) -> anyhow::Result<reqwest::Response> {
-    send_feedback_request_with_client(fb2_direct_client(), url, token, external_user_id, payload)
-        .await
+    send_feedback_request_with_client(
+        fb2_direct_client(),
+        url,
+        token,
+        external_user_id,
+        include_platform_order_summary,
+        payload,
+    )
+    .await
 }
 
 async fn send_feedback_request_with_client(
@@ -290,6 +304,7 @@ async fn send_feedback_request_with_client(
     url: &str,
     token: &str,
     external_user_id: Option<&str>,
+    include_platform_order_summary: bool,
     payload: &Value,
 ) -> anyhow::Result<reqwest::Response> {
     let timeout = Duration::from_secs(timeout_secs().max(10));
@@ -298,7 +313,9 @@ async fn send_feedback_request_with_client(
         .header(FB2_CONTEXT_HEADER, token)
         .json(payload)
         .timeout(timeout);
-    for (header, value) in fb2_request_context_headers(external_user_id, false) {
+    for (header, value) in
+        fb2_request_context_headers(external_user_id, include_platform_order_summary)
+    {
         request = request.header(header, value);
     }
 
@@ -315,7 +332,9 @@ async fn send_feedback_request_with_client(
                 .header(FB2_CONTEXT_HEADER, token)
                 .json(payload)
                 .timeout(timeout);
-            for (header, value) in fb2_request_context_headers(external_user_id, false) {
+            for (header, value) in
+                fb2_request_context_headers(external_user_id, include_platform_order_summary)
+            {
                 retry = retry.header(header, value);
             }
             retry.send().await.map_err(|second_error| {
@@ -326,6 +345,39 @@ async fn send_feedback_request_with_client(
                 )
             })
         }
+    }
+}
+
+fn feedback_context_needs_platform_order_scope(context: &Value) -> bool {
+    // fb2 会按 context_audit_id 复核最初拉取 Context Pack 时的 scope。
+    // 总结帖若引用了平台匿名订单摘要，feedback 回写也必须携带同一 scope，否则会被 403 拒绝。
+    context
+        .get("platform_order_summary")
+        .map(value_has_content)
+        .unwrap_or(false)
+        || context
+            .get("citation_sources")
+            .and_then(Value::as_array)
+            .map(|sources| {
+                sources.iter().any(|source| {
+                    source.get("kind").and_then(Value::as_str) == Some("platform_order_summary")
+                })
+            })
+            .unwrap_or(false)
+        || context
+            .get("context_pack")
+            .and_then(Value::as_str)
+            .map(|pack| pack.contains("platform_order_summary"))
+            .unwrap_or(false)
+}
+
+fn value_has_content(value: &Value) -> bool {
+    match value {
+        Value::Null => false,
+        Value::Bool(_) | Value::Number(_) => true,
+        Value::String(value) => !value.trim().is_empty(),
+        Value::Array(values) => !values.is_empty(),
+        Value::Object(values) => !values.is_empty(),
     }
 }
 
@@ -937,6 +989,28 @@ mod tests {
     }
 
     #[test]
+    fn feedback_scope_detects_platform_order_context_only() {
+        assert!(feedback_context_needs_platform_order_scope(&json!({
+            "platform_order_summary": {"visibility": "privileged_summary"}
+        })));
+        assert!(feedback_context_needs_platform_order_scope(&json!({
+            "citation_sources": [
+                {"kind": "platform_order_summary", "id": "platform_order_summary:2026-06-22"}
+            ]
+        })));
+        assert!(feedback_context_needs_platform_order_scope(&json!({
+            "context_pack": "<fb2_context_pack><platform_order_summary>匿名汇总</platform_order_summary></fb2_context_pack>"
+        })));
+        assert!(!feedback_context_needs_platform_order_scope(&json!({
+            "platform_order_summary": null,
+            "citation_sources": [
+                {"kind": "order", "id": "order-1"},
+                {"kind": "match", "id": "match-1"}
+            ]
+        })));
+    }
+
+    #[test]
     fn opinion_memory_ids_require_grounded_tool_and_reply_reference() {
         let tool_results = json!({
             "results": [
@@ -1065,6 +1139,7 @@ mod tests {
             assert!(request_text.starts_with("POST /feedback HTTP/1.1"));
             assert!(lower_request.contains("x-fb2-ai-center-token: test-token"));
             assert!(lower_request.contains("x-fb2-ai-context-user-id: fb2-user-1"));
+            assert!(lower_request.contains("x-fb2-ai-context-scope: platform_order_summary"));
 
             let body = r#"{"success":true}"#;
             let response = format!(
@@ -1084,6 +1159,7 @@ mod tests {
             &format!("http://{addr}/feedback"),
             "test-token",
             Some("fb2-user-1"),
+            true,
             &json!({"status": "ready"}),
         )
         .await
