@@ -1,7 +1,11 @@
 //! Feedback callbacks from generated main-project answers to child app context services.
 
 use serde_json::{json, Value};
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 use tracing::{info, warn};
 
 use crate::{
@@ -95,6 +99,7 @@ async fn post_generated_answer_feedback(
         main_request_id,
         trigger,
         reply_text,
+        tool_results,
         extra_citation_sources,
     ) else {
         return Ok(());
@@ -330,6 +335,7 @@ fn generated_answer_feedback_payload(
     main_request_id: &str,
     trigger: &str,
     reply_text: &str,
+    tool_results: Option<&Value>,
     extra_citation_sources: &[Value],
 ) -> Option<Value> {
     let context_audit_id = context
@@ -343,7 +349,8 @@ fn generated_answer_feedback_payload(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or(main_group_id);
-    let cited_sources = feedback_citation_sources(context, reply_text, extra_citation_sources);
+    let cited_sources =
+        feedback_citation_sources(context, reply_text, tool_results, extra_citation_sources);
     let cited_source_count = cited_sources.len();
 
     let mut payload = json!({
@@ -387,6 +394,7 @@ fn mentioned_citation_sources(context: &Value, reply_text: &str) -> Vec<Value> {
 fn feedback_citation_sources(
     context: &Value,
     reply_text: &str,
+    tool_results: Option<&Value>,
     extra_citation_sources: &[Value],
 ) -> Vec<Value> {
     let mut cited_sources = mentioned_citation_sources(context, reply_text);
@@ -398,6 +406,17 @@ fn feedback_citation_sources(
         .iter()
         .filter_map(citation_source_key)
         .collect::<HashSet<_>>();
+    for source in mentioned_tool_result_citation_sources(context, tool_results, reply_text) {
+        let Some(key) = citation_source_key(&source) else {
+            continue;
+        };
+        if seen.insert(key) {
+            cited_sources.push(source);
+            if cited_sources.len() >= MAX_CITED_SOURCES {
+                return cited_sources;
+            }
+        }
+    }
     for source in extra_citation_sources {
         let Some(key) = citation_source_key(source) else {
             continue;
@@ -410,6 +429,159 @@ fn feedback_citation_sources(
         }
     }
     cited_sources
+}
+
+fn mentioned_tool_result_citation_sources(
+    context: &Value,
+    tool_results: Option<&Value>,
+    reply_text: &str,
+) -> Vec<Value> {
+    let Some(results) = tool_results
+        .and_then(|value| value.get("results"))
+        .and_then(Value::as_array)
+    else {
+        return Vec::new();
+    };
+    let reply = reply_text.to_lowercase();
+    let context_sources = context_citation_sources_by_id(context);
+    let mut cited_sources = Vec::new();
+    let mut seen = HashSet::new();
+
+    for result in results {
+        if !tool_result_sources_are_allowed(result) {
+            continue;
+        }
+        let tool_name = result
+            .get("tool_name")
+            .and_then(Value::as_str)
+            .unwrap_or("unknown_tool");
+        for source_id in result
+            .get("source_ids")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(source_id_as_string)
+        {
+            if source_id.chars().count() < 4 || !reply.contains(&source_id.to_lowercase()) {
+                continue;
+            }
+            let mapped_sources = context_sources
+                .get(&source_id.to_lowercase())
+                .cloned()
+                .unwrap_or_else(|| vec![tool_result_citation_source(tool_name, &source_id)]);
+            for source in mapped_sources {
+                let Some(key) = citation_source_key(&source) else {
+                    continue;
+                };
+                if seen.insert(key) {
+                    cited_sources.push(source);
+                    if cited_sources.len() >= MAX_CITED_SOURCES {
+                        return cited_sources;
+                    }
+                }
+            }
+        }
+    }
+
+    cited_sources
+}
+
+fn context_citation_sources_by_id(context: &Value) -> HashMap<String, Vec<Value>> {
+    let mut out: HashMap<String, Vec<Value>> = HashMap::new();
+    for source in context
+        .get("citation_sources")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        let Some(id) = source
+            .get("id")
+            .and_then(Value::as_str)
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+        out.entry(id.to_lowercase())
+            .or_default()
+            .push(source.clone());
+    }
+    out
+}
+
+fn source_id_as_string(value: &Value) -> Option<String> {
+    match value {
+        Value::String(value) => {
+            let trimmed = value.trim();
+            if trimmed.is_empty() {
+                None
+            } else {
+                Some(trimmed.to_string())
+            }
+        }
+        Value::Number(value) => Some(value.to_string()),
+        _ => None,
+    }
+}
+
+fn tool_result_sources_are_allowed(result: &Value) -> bool {
+    if result.get("success").and_then(Value::as_bool) != Some(true) {
+        return false;
+    }
+    matches!(
+        result
+            .get("grounding")
+            .and_then(|grounding| grounding.get("status"))
+            .and_then(Value::as_str),
+        Some("grounded" | "weak")
+    )
+}
+
+fn tool_result_citation_source(tool_name: &str, source_id: &str) -> Value {
+    json!({
+        "kind": inferred_tool_source_kind(tool_name, source_id),
+        "id": source_id,
+        "label": format!("fb2 工具来源 {tool_name}")
+    })
+}
+
+fn inferred_tool_source_kind(tool_name: &str, source_id: &str) -> &'static str {
+    let id = source_id.to_lowercase();
+    if id.contains("platform_order_summary") || tool_name == "platform_orders" {
+        return "platform_order_summary";
+    }
+    if id.starts_with("order")
+        || id.contains("order")
+        || id.starts_with("ticket")
+        || matches!(tool_name, "search_user_orders" | "get_order_detail")
+    {
+        return "order";
+    }
+    if id.starts_with("gmsg")
+        || id.starts_with("msg")
+        || id.contains("message")
+        || matches!(tool_name, "search_group_opinions" | "group_opinion_summary")
+    {
+        return "group_message";
+    }
+    if id.starts_with("opinion")
+        || matches!(
+            tool_name,
+            "opinion_memories" | "list_opinion_adoptions" | "opinion_result_reviews"
+        )
+    {
+        return "group_opinion_memory";
+    }
+    if id.starts_with("match")
+        || id.starts_with("m-")
+        || matches!(
+            tool_name,
+            "search_matches" | "get_match_detail" | "match_analysis_brief"
+        )
+    {
+        return "match";
+    }
+    "tool_result"
 }
 
 fn citation_source_key(source: &Value) -> Option<String> {
@@ -565,6 +737,7 @@ mod tests {
             "social_group_message:m1",
             "group_mention",
             "这场中央海岸 vs 奥克兰FC 风险偏高，可参考 match-1234。",
+            None,
             &[],
         )
         .expect("payload");
@@ -596,6 +769,7 @@ mod tests {
             "social_group_selected_message:m1",
             "selected_message_ai_reply",
             "只引用了原消息，没有引用比赛来源。",
+            None,
             &[json!({
                 "kind": "selected_message",
                 "id": "gmsg-selected-1",
@@ -607,6 +781,93 @@ mod tests {
         assert_eq!(payload["cited_source_count"], 1);
         assert_eq!(payload["cited_sources"][0]["kind"], "selected_message");
         assert_eq!(payload["cited_sources"][0]["id"], "gmsg-selected-1");
+    }
+
+    #[test]
+    fn payload_merges_mentioned_tool_result_sources() {
+        let context = json!({
+            "app_id": "fb2",
+            "group": "official",
+            "status": "ready",
+            "source": "fb2:/api/main-project/context/pack",
+            "context_audit_id": "audit-1",
+            "citation_sources": [
+                {"kind": "match", "id": "match-tool-1", "label": "工具命中的比赛"}
+            ]
+        });
+        let tool_results = json!({
+            "results": [
+                {
+                    "tool_name": "match_analysis_brief",
+                    "success": true,
+                    "status": "ready",
+                    "grounding": {"status": "grounded"},
+                    "source_ids": ["match-tool-1", "order-tool-1"]
+                }
+            ]
+        });
+
+        let payload = generated_answer_feedback_payload(
+            &context,
+            Some("fb2-user-1"),
+            "ext_fb2_official",
+            "social_group_message:m1",
+            "group_mention",
+            "本次分析引用 match-tool-1，并补充查看 order-tool-1 的当前用户票据。",
+            Some(&tool_results),
+            &[],
+        )
+        .expect("payload");
+
+        assert_eq!(payload["cited_source_count"], 2);
+        assert_eq!(payload["cited_sources"][0]["kind"], "match");
+        assert_eq!(payload["cited_sources"][0]["id"], "match-tool-1");
+        assert_eq!(payload["cited_sources"][1]["kind"], "order");
+        assert_eq!(payload["cited_sources"][1]["id"], "order-tool-1");
+    }
+
+    #[test]
+    fn payload_ignores_unsafe_or_unmentioned_tool_sources() {
+        let context = json!({
+            "app_id": "fb2",
+            "group": "official",
+            "status": "ready",
+            "source": "fb2:/api/main-project/context/pack",
+            "context_audit_id": "audit-1",
+            "citation_sources": []
+        });
+        let tool_results = json!({
+            "results": [
+                {
+                    "tool_name": "search_user_orders",
+                    "success": true,
+                    "status": "ready",
+                    "grounding": {"status": "unsafe"},
+                    "source_ids": ["order-unsafe-1"]
+                },
+                {
+                    "tool_name": "search_matches",
+                    "success": true,
+                    "status": "ready",
+                    "grounding": {"status": "grounded"},
+                    "source_ids": ["match-unmentioned-1"]
+                }
+            ]
+        });
+
+        let payload = generated_answer_feedback_payload(
+            &context,
+            Some("fb2-user-1"),
+            "ext_fb2_official",
+            "social_group_message:m1",
+            "group_mention",
+            "这里只做概括，不引用具体工具来源。",
+            Some(&tool_results),
+            &[],
+        )
+        .expect("payload");
+
+        assert_eq!(payload["cited_source_count"], 0);
     }
 
     #[test]
@@ -625,6 +886,7 @@ mod tests {
             "request",
             "trigger",
             "reply",
+            None,
             &[]
         )
         .is_none());

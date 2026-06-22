@@ -7,6 +7,7 @@
 ## 2026-06-21 线上验证快照
 
 - 2026-06-22 11:35 主项目 readiness 运行时接入：后端新增 live `/api/main-project/context/readiness` preflight，Context Pack 和 today-matches 回退上下文都会带 `preflight_readiness`；`context_quality.warnings` 会暴露 `fb2_readiness_blocked/degraded/unavailable/not_configured`，AI 回答必须据此提示数据链路缺口；工具执行遇到 `preflight_readiness.status=blocked` 会记录 `external_app.executed_tools.v1 status=skipped` 并跳过深层 `/tools/execute`，避免在 fb2 自检失败时继续把空数据当事实。运行代码提交 `9d778940` 已发布到 `v0.3.593` 并通过 `/health`、`/api/server/version`、默认 smoke 和 authenticated bootstrap smoke；后续带真实 `FB2_AI_CENTER_TOKEN` 跑 final preflight 时要观察该字段。
+- 2026-06-22 工具来源质量闭环补强：主项目 `external_app_context_feedback` 已在 generated-answer feedback payload 中合并被 AI 回复显式提到的 grounded/weak 工具 `source_ids`。Context Pack 已有候选来源时复用原 `kind/id/label`，否则按工具名和 id 前缀生成最小来源；unsafe、失败或未提及的工具来源不会写入 feedback，避免把未用数据记成引用。
 - 2026-06-22 11:35 fb2 Explorer 只读补充：本地 `D:\rust\active-projects\fb2` 快照落后远端且脏，不应用它直接判断 live 状态。fb2 local 快照显示主项目所需 Context Pack、tool manifest、tools/execute、feedback、quality、permission、平台摘要等能力已经在代码结构里存在；关于 `/context/readiness`，应以主项目默认 smoke 对 live `/api/main-project/integration` 的发现结果为准，不能用落后本地快照覆盖线上事实。
 - 2026-06-22 09:06 当前主项目代码和线上状态：本轮 worktree 已先 fast-forward 到 `origin/main` 最新 `b80c5e95`，随后只补 `docs/fb2-ai-center/` 交接记录。fb2 总结帖相关运行代码已在提交 `1d41cb5a` 和 `225bfc6f` 中推送并发布，线上服务端为 `v0.3.588 / 225bfc6f0d9d33552f60dfd96a220753b3f7f7b6`；后续 `96bf5ce4` 是 smoke 脚本误判修正，已推送到远端但不需要服务端重新发布。
 - 2026-06-22 09:06 总结帖入口抽样通过：真实群 `ext_fb2_official` 使用 `123qwe/123qwe` 创建 summary post `gsp_46720718477f4c6e953b55d5fc309568`，最终 `status=ready`，`scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120` 返回 `failed=0 skipped=2`。脚本检查了非空 summary、source references、`数据事实 / 群友观点 / AI推断 / 风险边界`、风险提示和禁止投注保证。
@@ -105,6 +106,7 @@
 - 主项目按需执行 fb2 `platform_orders` 工具时，会同步带 `X-FB2-AI-CONTEXT-SCOPE: platform_order_summary`；线上已验证 fb2 返回 `visibility=privileged_summary`、`redaction=anonymous_aggregate_only` 和 `platform_order_summary:<date>:all` source id。
 - fb2 已提供统一工具执行入口 `POST /api/main-project/tools/execute`，线上 smoke 已验证 `search_matches` 可返回比赛来源、`search_user_orders` 缺少上下文用户头会 403、带同值头只返回本人订单、不支持工具会 400。
 - 群聊 `@EL` 和长按消息 `AI回复` 生成主项目 AI 回复后，会后台调用 fb2 `/api/main-project/context/feedback`，用 `context_audit_id`、主项目消息 ID、命中的引用来源和触发类型记录自动反馈样本；失败只写日志，不阻断聊天出消息。
+- 自动反馈的 `cited_sources` 会优先来自 fb2 Context Pack `citation_sources`；如果回答显式引用了已执行 fb2 工具返回的 grounded/weak `source_ids`，主项目也会把这些工具来源并入 feedback，方便质量汇总发现工具补充数据是否被真实回答使用。
 - 当主项目工具结果包含已 grounded 的 fb2 `opinion_memories`，且 AI 回复正文显式提到对应观点记忆 source id 或原群消息 id 时，主项目会继续调用 fb2 `record_opinion_adoption`，把这次“群观点被采纳进回答”的证据写回 fb2 质量闭环；未显式引用则不自动采纳，避免把群友观点误当事实。
 - 主项目工具契约、planner、grounding 和 prompt 已接入 fb2 的只读质量工具：`list_opinion_adoptions`、`opinion_adoption_summary`、`opinion_result_reviews`、`opinion_result_review_summary`；聊天 AI 不会自动触发 `refresh_opinion_result_reviews` 这类刷新/写入工具。
 - 主项目工具契约、planner、grounding 和 prompt 已把 fb2 聚合工具 `match_analysis_brief`、`group_opinion_summary` 纳入聊天自动执行：比赛/今日/预测/“我的票”问题优先查 `match_analysis_brief`，群友观点/大家怎么看问题优先查 `group_opinion_summary`，再按需展开细分 search/detail 工具。
