@@ -5,7 +5,7 @@
 | 要求 | 目标形态 | 当前证据 | 完成口径 |
 |---|---|---|---|
 | fb2 业务数据给主项目 AI 使用 | XML-wrapped Markdown Context Pack 作为正文，JSON metadata 和 `citation_sources` 作为机器字段 | `contracts.md` 已固定 `<fb2_context_pack>`、`context_audit_id`、`matches`、`user_orders`、`platform_order_summary`、`citation_sources` | live `/context/pack` 返回非空 `context_pack`、`context_audit_id`、业务数组和引用来源 |
-| 长期领域数据工具蓝图 | `latest_domain_data_blueprint` 固定比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计 6 条 lane | `fb2-domain-data-blueprint-status.ps1` 输出每条 lane 的 Context Pack 小节、source kinds、主工具、权限 scope、回答分层、禁止输出和未来索引 | `complete=true`、`lane_count=6`、`stores_fb2_business_data_in_main_project=false`；MCP 只作为 future wrapper |
+| 长期领域数据工具蓝图 | `latest_domain_data_blueprint` 和 `context-contract.domain_data_blueprint_contract` 固定比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计 6 条 lane | `fb2-domain-data-blueprint-status.ps1` 与 `/api/external/apps/fb2/context-contract` 输出每条 lane 的 Context Pack 小节、source kinds、主工具、权限 scope、回答分层、禁止输出和未来索引 | `complete=true`、`lane_count=6`、`stores_fb2_business_data_in_main_project=false`；MCP 只作为 future wrapper |
 | 七类用户场景有机器证据支撑 | 从 Context Pack 样本、真实群聊直读、summary-post、feedback/quality 中推导用户场景审计，覆盖今日比赛、我的票、平台订单风险、群观点、长按消息复核、总结帖、来源审计 | `latest_user_scenario_audit` 检查七类场景；`latest_context_answer_readiness` 仍保留四类核心数据问题的 source kinds 检查；只用摘要、ID、计数、hash，不保存正文 | `latest_user_scenario_audit.complete=true`、`scenario_count=7`、`complete_count=7` 后仍需 live token 刷新当前权限/质量和 full final 同批验收 |
 | 不先上完整 MCP/RAG | REST Context Pack + tool manifest + tools/execute，MCP 只作为后续包装层 | `PLAN.md`、`contracts.md`、`smoke-fb2-ai-center.ps1` | smoke 能验证 REST 契约和工具执行策略；不要求 MCP 才算完成 |
 

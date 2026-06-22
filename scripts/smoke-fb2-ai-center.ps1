@@ -859,6 +859,8 @@ try {
     $liveToolIds = @($contract.live_tool_manifest.tool_ids)
     $answerPolicy = $contract.answer_policy_contract
     $projectionContract = $contract.domain_context_projection_contract
+    $domainDataBlueprint = $contract.domain_data_blueprint_contract
+    $groupChatEvidenceContract = $contract.group_chat_evidence_contract
     $toolExecutionContract = $contract.tool_execution_contract
     $toolExecutionPlan = $toolExecutionContract.main_project_execution_result.plan
     $projectionSections = @($projectionContract.required_sections)
@@ -870,6 +872,12 @@ try {
     $projectionPermissions = @($projectionContract.permission_projection)
     $projectionQualityRoutes = @($projectionContract.quality_closure.required_feedback_routes)
     $projectionReadiness = $projectionContract.quality_closure.minimum_non_synthetic_ready
+    $domainDataBlueprintLaneIds = @($domainDataBlueprint.lanes | ForEach-Object { $_.id })
+    $domainDataBlueprintSections = @($domainDataBlueprint.required_context_pack_sections)
+    $domainDataBlueprintMetadata = @($domainDataBlueprint.required_metadata)
+    $domainDataBlueprintAntiPatterns = @($domainDataBlueprint.anti_patterns)
+    $groupChatEvidenceFields = @($groupChatEvidenceContract.required_group_message_fields)
+    $groupChatVisibleEvidence = @($groupChatEvidenceContract.required_visible_flow_evidence)
     $toolResultEnvelopeContract = $contract.tool_result_envelope_contract
     $toolResultRequiredFields = @($toolResultEnvelopeContract.normalized_envelope.required_fields)
     $toolResultBusinessSourceKinds = @($toolResultEnvelopeContract.source_registry.business_source_kinds)
@@ -969,6 +977,36 @@ try {
     Assert-True ([int]$projectionReadiness.opinion_adoption_count -ge 1) "domain projection readiness: opinion adoption count" "opinion_adoption_count=$($projectionReadiness.opinion_adoption_count)"
     Assert-True ([string]$projectionReadiness.opinion_memory_ref_count -eq "present") "domain projection readiness: opinion memory refs" "opinion_memory_ref_count=$($projectionReadiness.opinion_memory_ref_count)"
     Assert-Fb2DomainScenarioMatrixContract -ScenarioMatrix $projectionContract.domain_scenario_matrix
+
+    Assert-True ($domainDataBlueprint.schema -eq "fb2.main_project.domain_data_blueprint.v1") "domain data blueprint schema" "$($domainDataBlueprint.schema)"
+    Assert-True ($domainDataBlueprint.complete -eq $true) "domain data blueprint complete" "complete=$($domainDataBlueprint.complete)"
+    Assert-True ($domainDataBlueprint.context_format -eq "xml_wrapped_markdown_context_pack_with_json_metadata") "domain data blueprint context format" "$($domainDataBlueprint.context_format)"
+    Assert-True ($domainDataBlueprint.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") "domain data blueprint first phase" "$($domainDataBlueprint.first_phase_delivery)"
+    Assert-True ($domainDataBlueprint.mcp_status -eq "future_wrapper_not_first_phase_fact_source") "domain data blueprint mcp status" "$($domainDataBlueprint.mcp_status)"
+    Assert-True ($domainDataBlueprint.stores_fb2_business_data_in_main_project -eq $false) "domain data blueprint no main-project data copy" "stores=$($domainDataBlueprint.stores_fb2_business_data_in_main_project)"
+    Assert-True ([int]$domainDataBlueprint.lane_count -eq 6) "domain data blueprint lane count" "lane_count=$($domainDataBlueprint.lane_count)"
+    Assert-ContainsValue $domainDataBlueprintLaneIds "match_facts_and_odds" "domain data blueprint lane: match facts and odds"
+    Assert-ContainsValue $domainDataBlueprintLaneIds "current_user_tickets" "domain data blueprint lane: current user tickets"
+    Assert-ContainsValue $domainDataBlueprintLaneIds "platform_order_summary" "domain data blueprint lane: platform summary"
+    Assert-ContainsValue $domainDataBlueprintLaneIds "group_opinions" "domain data blueprint lane: group opinions"
+    Assert-ContainsValue $domainDataBlueprintLaneIds "opinion_learning_loop" "domain data blueprint lane: opinion learning"
+    Assert-ContainsValue $domainDataBlueprintLaneIds "quality_feedback_audit" "domain data blueprint lane: quality audit"
+    Assert-ContainsValue $domainDataBlueprintSections "group_opinion_slice" "domain data blueprint section: group opinion slice"
+    Assert-ContainsValue $domainDataBlueprintMetadata "citation_sources" "domain data blueprint metadata: citation sources"
+    Assert-ContainsValue $domainDataBlueprintAntiPatterns "full_database_dump" "domain data blueprint anti-pattern: full database dump"
+
+    Assert-True ($groupChatEvidenceContract.schema -eq "fb2.main_project.group_chat_evidence.v1") "group chat evidence schema" "$($groupChatEvidenceContract.schema)"
+    Assert-True ($groupChatEvidenceContract.group_chat_test_method -eq "direct_api_read") "group chat evidence direct read" "$($groupChatEvidenceContract.group_chat_test_method)"
+    Assert-True ($groupChatEvidenceContract.screenshots_accepted -eq $false) "group chat evidence rejects screenshots" "screenshots_accepted=$($groupChatEvidenceContract.screenshots_accepted)"
+    Assert-True ($groupChatEvidenceContract.write_policy.no_write_preflight -eq $true) "group chat evidence no-write preflight" "no_write_preflight=$($groupChatEvidenceContract.write_policy.no_write_preflight)"
+    Assert-True ($groupChatEvidenceContract.write_policy.visible_message_test_requires_authorization -eq $true) "group chat evidence visible write authorization" "visible_message_test_requires_authorization=$($groupChatEvidenceContract.write_policy.visible_message_test_requires_authorization)"
+    Assert-ContainsValue $groupChatEvidenceFields "message_id" "group chat evidence field: message id"
+    Assert-ContainsValue $groupChatEvidenceFields "text_len" "group chat evidence field: text length"
+    Assert-ContainsValue $groupChatEvidenceFields "text_sha256" "group chat evidence field: text sha256"
+    Assert-ContainsValue $groupChatVisibleEvidence "visible_mention_ai_reply_read" "group chat evidence: mention reply read"
+    Assert-ContainsValue $groupChatVisibleEvidence "selected_message_ai_reply_read" "group chat evidence: selected reply read"
+    Assert-ContainsValue $groupChatVisibleEvidence "summary_post_read" "group chat evidence: summary post read"
+    Assert-ContainsValue $groupChatVisibleEvidence "feedback_quality_read" "group chat evidence: feedback quality read"
 
     Assert-True ($toolResultEnvelopeContract.schema -eq "fb2.tool_result_envelope.v1") "tool result envelope schema" "$($toolResultEnvelopeContract.schema)"
     Assert-True ($toolResultEnvelopeContract.normalized_result_schema -eq "external_app.normalized_tool_result.v1") "tool result normalized schema" "$($toolResultEnvelopeContract.normalized_result_schema)"

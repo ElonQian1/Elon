@@ -32,6 +32,8 @@
 - `context-contract.answer_policy_contract.eval_scenarios` 返回六个机器可读评测场景：今日比赛、我的票、平台匿名订单摘要、群友观点、长按消息复核、来源审计。
 - `context-contract.domain_context_projection_contract.source_registry.required_kinds` 只包含业务事实来源；`feedback`、`opinion_adoption` 必须位于 `quality_history_kinds`，避免 fb2 把质量闭环记录当成比赛/订单事实。
 - `context-contract.domain_context_projection_contract.domain_scenario_matrix` 返回同六类真实用户问题的域数据矩阵，并声明每类问题需要的 Context Pack 小节、可自动工具、权限请求、source kinds、feedback 路由和验收信号。
+- `context-contract.domain_data_blueprint_contract` 返回 `fb2.main_project.domain_data_blueprint.v1`，必须包含 6 条数据 lane、第一阶段 REST Context Pack + tool manifest + tools/execute、MCP 后置、`stores_fb2_business_data_in_main_project=false`、`group_opinion_slice`、`citation_sources` 和 `full_database_dump` anti-pattern。
+- `context-contract.group_chat_evidence_contract` 返回 `fb2.main_project.group_chat_evidence.v1`，必须声明 `group_chat_test_method=direct_api_read`、`screenshots_accepted=false`，且必需群消息字段包含 `message_id`、`text_len`、`text_sha256`。
 - `context-contract.tool_result_envelope_contract` 返回 `fb2.tool_result_envelope.v1`、`external_app.normalized_tool_result.v1` 工具结果信封、`external_app.tool_result_grounding.v1` grounding 规则、business source kinds 和 quality history kinds。
 - 默认 `scripts\smoke-fb2-ai-center.ps1` 会检查 `eval_scenarios` 的场景 id、权限边界、必需来源、必需引用和禁止输出，避免评测矩阵退化成只有标题。
 - fb2 Context Pack / today-matches 响应归一化必须有服务端回归测试：HTTP 错误、非法 JSON、`success=false` 必须变成 `status=unavailable`；空 today-matches 数据必须带 `empty_matches` 质量告警；`metrics.budget_status=too_large` 必须映射为 `fb2_budget_too_large`，AI 只能说明缺口或截断风险，不能编造比赛、赔率、订单或群友观点。

@@ -13,10 +13,13 @@ use std::sync::Arc;
 
 use crate::{
     external_app_context_answer_policy::public_answer_policy_guidance,
+    external_app_context_chat_evidence::public_group_chat_evidence_guidance,
     external_app_context_example::public_context_pack_example,
     external_app_context_health::public_context_health,
     external_app_context_observability::public_context_observability_guidance,
-    external_app_context_projection::public_context_projection_guidance,
+    external_app_context_projection::{
+        public_context_projection_guidance, public_domain_data_blueprint_guidance,
+    },
     external_app_context_quality::public_context_quality_guidance,
     external_app_context_readiness::public_context_readiness_guidance,
     external_app_context_tool_execution::public_tool_execution_guidance,
@@ -105,6 +108,20 @@ pub async fn get_external_app_context_contract(
             "schema": "external_app.domain_context_projection.v1",
             "required_sections": [],
             "source_registry": {}
+        })),
+        "domain_data_blueprint_contract": public_domain_data_blueprint_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.domain_data_blueprint.v1",
+            "complete": false,
+            "lanes": []
+        })),
+        "group_chat_evidence_contract": public_group_chat_evidence_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.group_chat_evidence.v1",
+            "complete": false,
+            "group_chat_test_method": "unspecified",
+            "screenshots_accepted": false,
+            "required_group_message_fields": []
         })),
         "context_readiness_contract": public_context_readiness_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

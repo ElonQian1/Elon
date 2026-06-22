@@ -25,7 +25,7 @@
 
 ## 当前重点
 
-- 2026-06-23 当前长期数据工具路线已机器化为 `latest_domain_data_blueprint`：fb2 的比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计分别是独立 lane。每条 lane 都要能投影到 Context Pack 小节、source kinds、主工具、权限 scope、回答分层和禁止输出；主项目不复制 fb2 业务数据，MCP/RAG 只作为后续包装或内部召回增强，不能替代 REST Context Pack 的事实源和审计。
+- 2026-06-23 当前长期数据工具路线已机器化为 `latest_domain_data_blueprint` 和 `context-contract.domain_data_blueprint_contract`：fb2 的比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计分别是独立 lane。每条 lane 都要能投影到 Context Pack 小节、source kinds、主工具、权限 scope、回答分层和禁止输出；主项目不复制 fb2 业务数据，MCP/RAG 只作为后续包装或内部召回增强，不能替代 REST Context Pack 的事实源和审计。
 - 2026-06-23 当前 fb2 对话测试统一改为“接口直读”口径：状态快照的 `live_preflight_request.evidence_policy.group_chat_test_method=direct_api_read`，`screenshots_accepted=false`。只读验证必须通过 `/api/me/groups/{group_id}/messages` 或 summary-post 接口拿到消息 ID、正文长度和 `text_sha256`；截图只用于 UI 观感排查，不能证明 AI 已读群聊或已回写 feedback。
 - 2026-06-23 当前工作从“格式讨论”落到用户场景审计：`latest_user_scenario_audit` 会把 XML-wrapped Markdown Context Pack + JSON metadata + 群聊 direct-read/feedback/quality 证据，映射到七类用户真实问题。第一阶段仍明确不做完整 MCP/RAG，fb2 继续提供 REST Context Pack、tool manifest 和 tools/execute；MCP 以后只作为包装或增强层，不能替代当前事实源和审计链路。
 - 2026-06-23 在样本集格式验证之后，继续增加离线 answer readiness：状态快照会从 `latest_context_pack_sample_set` 推导 `latest_context_answer_readiness`，按“今天比赛怎么看 / 帮我分析我的票 / 平台今天订单风险怎么样 / 群里大家怎么看这场”四类问题检查必需 source kinds、回答分层和禁止输出。它不调用模型、不替代 feedback/live quality，但能证明当前样本足够支撑主项目 AI 的四类核心回答输入。

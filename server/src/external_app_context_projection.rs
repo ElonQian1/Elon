@@ -138,6 +138,126 @@ pub(crate) fn public_context_projection_guidance(app_id: &str) -> Option<Value> 
     }
 }
 
+pub(crate) fn public_domain_data_blueprint_guidance(app_id: &str) -> Option<Value> {
+    match app_id {
+        "fb2" => Some(json!({
+            "app_id": "fb2",
+            "schema": "fb2.main_project.domain_data_blueprint.v1",
+            "complete": true,
+            "context_format": "xml_wrapped_markdown_context_pack_with_json_metadata",
+            "first_phase_delivery": "rest_context_pack_plus_tool_manifest_plus_tools_execute",
+            "mcp_status": "future_wrapper_not_first_phase_fact_source",
+            "source_of_truth": "fb2_backend_live_business_data",
+            "stores_fb2_business_data_in_main_project": false,
+            "required_context_pack_sections": [
+                "usage_boundary",
+                "match_facts",
+                "user_order_slice",
+                "platform_order_summary",
+                "group_opinion_slice",
+                "retrieval_evidence",
+                "quality_feedback"
+            ],
+            "required_metadata": [
+                "context_pack_version",
+                "generated_at",
+                "context_audit_id",
+                "citation_sources",
+                "metrics",
+                "tool_contract",
+                "usage_policy",
+                "answer_policy",
+                "preflight_readiness"
+            ],
+            // 这里把 fb2 长期业务数据拆成稳定 lane；fb2 可以优化内部索引，但对主项目暴露的语义边界不能漂移。
+            "lanes": [
+                {
+                    "id": "match_facts_and_odds",
+                    "user_need": "今天比赛怎么看 / 这场赔率怎么变",
+                    "context_sections": ["match_facts", "retrieval_evidence"],
+                    "source_kinds": ["match", "odds", "context_audit"],
+                    "primary_tools": ["match_analysis_brief", "search_matches", "get_match_detail"],
+                    "permission_scope": "group_context",
+                    "answer_layers": ["match_facts", "odds_facts", "ai_inference", "risk_boundary"],
+                    "forbidden_outputs": ["fabricated_odds", "guaranteed_win"],
+                    "future_indexes": ["match_index", "odds_snapshot_index"]
+                },
+                {
+                    "id": "current_user_tickets",
+                    "user_need": "帮我分析我的票 / 我的订单风险",
+                    "context_sections": ["user_order_slice", "match_facts", "retrieval_evidence"],
+                    "source_kinds": ["user_order", "ticket", "match", "odds", "context_audit"],
+                    "primary_tools": ["match_analysis_brief", "search_user_orders", "get_order_detail"],
+                    "permission_scope": "current_user_only",
+                    "answer_layers": ["current_user_orders", "match_facts", "ai_inference", "risk_boundary"],
+                    "forbidden_outputs": ["other_user_order_detail", "guaranteed_win"],
+                    "future_indexes": ["order_risk_index", "ticket_result_review_index"]
+                },
+                {
+                    "id": "platform_order_summary",
+                    "user_need": "平台今天订单风险怎么样",
+                    "context_sections": ["platform_order_summary", "retrieval_evidence"],
+                    "source_kinds": ["platform_order_summary", "context_audit"],
+                    "primary_tools": ["platform_orders"],
+                    "permission_scope": "privileged_anonymous_summary",
+                    "answer_layers": ["platform_aggregate", "ai_inference", "risk_boundary"],
+                    "forbidden_outputs": ["single_user_order_detail", "user_identity_leak"],
+                    "future_indexes": ["platform_order_risk_index"]
+                },
+                {
+                    "id": "group_opinions",
+                    "user_need": "群里大家怎么看这场 / 总结群聊观点",
+                    "context_sections": ["group_opinion_slice", "match_facts", "retrieval_evidence"],
+                    "source_kinds": ["group_message", "opinion_memory", "match", "context_audit"],
+                    "primary_tools": ["group_opinion_summary", "search_group_opinions", "opinion_memories"],
+                    "permission_scope": "single_group_context",
+                    "answer_layers": ["group_opinion", "match_facts", "ai_inference", "risk_boundary"],
+                    "forbidden_outputs": ["group_opinion_as_fact", "fabricated_group_view"],
+                    "future_indexes": ["group_opinion_index", "opinion_memory_index"]
+                },
+                {
+                    "id": "opinion_learning_loop",
+                    "user_need": "采纳用户观点并持续复盘，让群聊分析逐步进化",
+                    "context_sections": ["quality_feedback", "group_opinion_slice"],
+                    "source_kinds": ["opinion_memory", "feedback", "opinion_adoption"],
+                    "primary_tools": ["list_opinion_adoptions", "opinion_adoption_summary", "opinion_result_reviews", "opinion_result_review_summary"],
+                    "permission_scope": "single_group_quality_history",
+                    "answer_layers": ["opinion_history", "quality_signal", "ai_inference", "risk_boundary"],
+                    "forbidden_outputs": ["quality_history_as_match_fact", "uncited_opinion_memory"],
+                    "future_indexes": ["opinion_adoption_index", "opinion_result_review_index"]
+                },
+                {
+                    "id": "quality_feedback_audit",
+                    "user_need": "回答有没有引用错来源 / 哪些失败样本需要改进",
+                    "context_sections": ["quality_feedback", "retrieval_evidence"],
+                    "source_kinds": ["context_audit", "feedback", "opinion_adoption"],
+                    "primary_tools": ["get_context_audit", "context_audit_summary", "list_context_feedbacks"],
+                    "permission_scope": "audit_metadata_only",
+                    "answer_layers": ["source_registry", "data_fact_boundary", "quality_feedback"],
+                    "forbidden_outputs": ["uncited_source", "fabricated_source"],
+                    "future_indexes": ["context_audit_index", "feedback_quality_index"]
+                }
+            ],
+            "lane_count": 6,
+            "anti_patterns": [
+                "raw_html_prompt",
+                "giant_json_prompt",
+                "full_database_dump",
+                "raw_embedding_dump",
+                "uncited_odds",
+                "uncited_order",
+                "platform_order_detail_leak"
+            ],
+            "next_evolution": [
+                "keep REST Context Pack as the AI-facing payload",
+                "add fb2-side domain indexes for faster retrieval",
+                "wrap existing REST/tool contracts with MCP later only if it preserves permissions and audit"
+            ]
+        })),
+        _ => None,
+    }
+}
+
 fn required_sections() -> Value {
     json!([
         {
@@ -559,5 +679,81 @@ mod tests {
             &audit["feedback_routes"],
             "/api/main-project/context/feedbacks"
         ));
+    }
+
+    #[test]
+    fn exposes_fb2_domain_data_blueprint_contract() {
+        let blueprint = public_domain_data_blueprint_guidance("fb2").unwrap();
+        assert_eq!(
+            blueprint["schema"],
+            "fb2.main_project.domain_data_blueprint.v1"
+        );
+        assert_eq!(
+            blueprint["context_format"],
+            "xml_wrapped_markdown_context_pack_with_json_metadata"
+        );
+        assert_eq!(
+            blueprint["first_phase_delivery"],
+            "rest_context_pack_plus_tool_manifest_plus_tools_execute"
+        );
+        assert_eq!(
+            blueprint["mcp_status"],
+            "future_wrapper_not_first_phase_fact_source"
+        );
+        assert_eq!(
+            blueprint["stores_fb2_business_data_in_main_project"],
+            json!(false)
+        );
+        assert_eq!(blueprint["lane_count"], json!(6));
+
+        let lanes = blueprint["lanes"].as_array().unwrap();
+        for id in [
+            "match_facts_and_odds",
+            "current_user_tickets",
+            "platform_order_summary",
+            "group_opinions",
+            "opinion_learning_loop",
+            "quality_feedback_audit",
+        ] {
+            assert!(lanes.iter().any(|lane| lane["id"] == id));
+        }
+
+        let ticket_lane = lanes
+            .iter()
+            .find(|lane| lane["id"] == "current_user_tickets")
+            .unwrap();
+        assert_eq!(ticket_lane["permission_scope"], "current_user_only");
+        assert!(array_contains(&ticket_lane["source_kinds"], "user_order"));
+        assert!(array_contains(
+            &ticket_lane["forbidden_outputs"],
+            "other_user_order_detail"
+        ));
+
+        let opinion_lane = lanes
+            .iter()
+            .find(|lane| lane["id"] == "opinion_learning_loop")
+            .unwrap();
+        assert!(array_contains(
+            &opinion_lane["source_kinds"],
+            "opinion_adoption"
+        ));
+        assert!(array_contains(
+            &opinion_lane["forbidden_outputs"],
+            "quality_history_as_match_fact"
+        ));
+
+        assert!(array_contains(
+            &blueprint["required_context_pack_sections"],
+            "group_opinion_slice"
+        ));
+        assert!(array_contains(
+            &blueprint["required_metadata"],
+            "citation_sources"
+        ));
+        assert!(array_contains(
+            &blueprint["anti_patterns"],
+            "full_database_dump"
+        ));
+        assert!(public_domain_data_blueprint_guidance("unknown").is_none());
     }
 }

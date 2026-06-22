@@ -104,6 +104,20 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 
 主项目 smoke 会检查这些字段，防止后续把 fb2 AI 数据输入退化成无来源的大 JSON 或临时摘要。
 
+`GET /api/external/apps/fb2/context-contract` 还会返回 `domain_data_blueprint_contract schema=fb2.main_project.domain_data_blueprint.v1`。它是长期数据工具蓝图，回答“fb2 到底给主项目 AI 什么数据、是不是先 MCP”：
+
+- 第一阶段固定为 REST Context Pack + tool manifest + `tools/execute`，MCP 以后只作为包装层。
+- 主项目不复制 fb2 业务数据，`stores_fb2_business_data_in_main_project=false`。
+- 6 条数据 lane 固定为：比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计。
+- 每条 lane 都声明 Context Pack 小节、source kinds、主工具、权限 scope、回答分层、禁止输出和未来索引。
+- 新增 fb2 业务工具时，应先归入某条 lane，或新增 lane 后同步 Context Pack section、source kind、权限和验收信号。
+
+`GET /api/external/apps/fb2/context-contract` 同时返回 `group_chat_evidence_contract schema=fb2.main_project.group_chat_evidence.v1`。它固定真实群聊测试不看截图，必须走接口直读：
+
+- `group_chat_test_method=direct_api_read`，`screenshots_accepted=false`。
+- 无写群预检读取 `/api/me/groups/{group_id}/messages`，只保存 `message_id`、`text_len`、`text_sha256` 等证据。
+- 可见 `@EL`、长按 `AI回复`、summary post、feedback/quality 都必须能被接口回读；截图只用于 UI 观感排查。
+
 `GET /api/external/apps/fb2/context-contract` 还会返回 `tool_result_envelope_contract`，这是主项目执行 fb2 工具后注入 prompt 的标准结果信封：
 
 - `schema=fb2.tool_result_envelope.v1`，`normalized_result_schema=external_app.normalized_tool_result.v1`。
