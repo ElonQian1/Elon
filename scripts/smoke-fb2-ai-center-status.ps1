@@ -59,6 +59,71 @@ function Test-TruthyJsonValue {
     return ([string]$Value) -match "^(true|True|1)$"
 }
 
+function Test-EvidenceTextHasFingerprint {
+    param([object]$Value)
+
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $false
+    }
+    if ($text -notmatch "\btext_len=\d+\b") {
+        return $false
+    }
+    if ($text -notmatch "\btext_sha256=[0-9a-fA-F]{8,}\b") {
+        return $false
+    }
+    return $true
+}
+
+function Get-DataOnlyDirectReadEvidenceState {
+    param([object]$Summary)
+
+    if ($null -eq $Summary) {
+        return [ordered]@{
+            complete = $false
+            mode = "missing_summary"
+            missing = @("summary")
+        }
+    }
+    if (Test-TruthyJsonValue (Get-JsonProperty $Summary "visible_direct_read_complete")) {
+        return [ordered]@{
+            complete = $true
+            mode = "current_boolean_gate"
+            missing = @()
+        }
+    }
+
+    $evidence = Get-JsonProperty $Summary "visible_direct_read_evidence"
+    if ($null -eq $evidence) {
+        return [ordered]@{
+            complete = $false
+            mode = "missing_legacy_evidence_object"
+            missing = @("visible_direct_read_evidence")
+        }
+    }
+
+    $requiredFields = @(
+        "baseline_messages",
+        "visible_mention_seed",
+        "visible_mention_reply",
+        "selected_message_seed",
+        "selected_message_reply",
+        "summary_post"
+    )
+    $missing = @()
+    foreach ($field in $requiredFields) {
+        if (-not (Test-EvidenceTextHasFingerprint (Get-JsonProperty $evidence $field))) {
+            $missing += $field
+        }
+    }
+
+    [ordered]@{
+        complete = ($missing.Count -eq 0)
+        mode = "legacy_evidence_object"
+        missing = $missing
+    }
+}
+
 function Get-GitValueOrEmpty {
     param([string[]]$GitArgs)
 
@@ -93,31 +158,38 @@ function Build-Fb2AiCenterStatusSnapshot {
     $feedbackComplete = Test-TruthyJsonValue (Get-JsonProperty $feedbackCoverage "complete")
     $visibleDirectReadComplete = Test-TruthyJsonValue (Get-JsonProperty $latestData "visible_direct_read_complete")
     $dataOnlyHasCurrentDirectReadGate = $null -ne (Get-JsonProperty $latestData "visible_direct_read_complete" $null)
+    $dataDirectReadState = Get-DataOnlyDirectReadEvidenceState $latestData
+    $dataDirectReadComplete = [bool]$dataDirectReadState.complete
     $tokenPresent = -not [string]::IsNullOrWhiteSpace($env:FB2_AI_CENTER_TOKEN)
     $voiceEvidencePath = [string]$env:FB2_VOICE_DEVICE_EVIDENCE_PATH
     $voiceEvidencePathPresent = -not [string]::IsNullOrWhiteSpace($voiceEvidencePath)
 
     $blockers = @()
-    if (-not $tokenPresent) {
-        $blockers += "missing_FB2_AI_CENTER_TOKEN_for_live_context_pack_permission_quality"
-    }
     if (-not $voiceEvidencePathPresent) {
         $blockers += "missing_FB2_VOICE_DEVICE_EVIDENCE_PATH_for_full_final"
     }
     if ($null -eq $latestData) {
         $blockers += "missing_data_only_acceptance_summary"
     }
-    if ($null -ne $latestData -and -not $dataOnlyHasCurrentDirectReadGate) {
+    if ($null -ne $latestData -and -not $dataDirectReadComplete) {
         $blockers += "latest_data_only_summary_predates_visible_direct_read_complete_gate"
     }
     if (-not $readOnlyComplete) {
         $blockers += "missing_or_incomplete_read_only_direct_group_read_summary"
     }
 
+    $refreshGaps = @()
+    if (-not $tokenPresent) {
+        $refreshGaps += "missing_FB2_AI_CENTER_TOKEN_for_refreshing_live_context_pack_permission_quality"
+    }
+    if ($null -ne $latestData -and -not $dataOnlyHasCurrentDirectReadGate -and $dataDirectReadComplete) {
+        $refreshGaps += "latest_data_only_summary_uses_legacy_visible_direct_read_evidence_object"
+    }
+
     $nextActions = @()
     if (-not $tokenPresent) {
         $nextActions += "set_FB2_AI_CENTER_TOKEN_or_use_controlled_wrapper_then_run_DataOnlyAcceptance_PreflightOnly"
-    } elseif ($dataSuccess -and $feedbackComplete -and ($visibleDirectReadComplete -or $readOnlyComplete)) {
+    } elseif ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete)) {
         $nextActions += "run_DataOnlyAcceptance_AllowVisibleMessages_for_non_voice_regression_if_user_allows_visible_messages"
     } else {
         $nextActions += "rerun_DataOnlyAcceptance_PreflightOnly_to_refresh_live_context_permission_quality_summary"
@@ -157,6 +229,9 @@ function Build-Fb2AiCenterStatusSnapshot {
             feedback_complete = $feedbackComplete
             visible_direct_read_complete = $visibleDirectReadComplete
             has_current_direct_read_gate = $dataOnlyHasCurrentDirectReadGate
+            direct_read_evidence_complete = $dataDirectReadComplete
+            direct_read_evidence_mode = [string]$dataDirectReadState.mode
+            direct_read_evidence_missing = @($dataDirectReadState.missing)
             summary_post_ready_for_mode = Test-TruthyJsonValue (Get-JsonProperty $latestData "summary_post_ready_for_mode")
             final_acceptance_exit_code = [string](Get-JsonProperty $latestData "final_acceptance_exit_code" "")
             visible_chat_exit_code = [string](Get-JsonProperty $latestData "visible_chat_exit_code" "")
@@ -173,11 +248,12 @@ function Build-Fb2AiCenterStatusSnapshot {
             evidence = Build-ReadOnlyDirectReadEvidence $latestReadOnly
         }
         readiness = [ordered]@{
-            non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($visibleDirectReadComplete -or $readOnlyComplete))
+            non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete))
             full_final_ready = $false
             asr_tts_status = if ($voiceEvidencePathPresent) { "voice_evidence_path_configured_but_not_verified_by_this_status_script" } else { "deferred_or_missing" }
         }
         blockers = $blockers
+        refresh_gaps = $refreshGaps
         next_actions = $nextActions
     }
 }
@@ -191,11 +267,19 @@ function Invoke-Fb2StatusSelfTest {
             mode = "visible_data_only_acceptance"
             voice_status = "deferred_by_user"
             success = $true
-            visible_direct_read_complete = $true
             summary_post_ready_for_mode = $true
             visible_chat_exit_code = 0
             final_acceptance_exit_code = 0
             feedback_coverage = [ordered]@{ complete = $true }
+            visible_direct_read_evidence = [ordered]@{
+                api = "/api/me/groups/{group_id}/messages and /api/me/groups/{group_id}/summary-posts/{post_id}"
+                baseline_messages = "group=ext_fb2_official count=80 sample_message=gai_base text_len=292 text_sha256=abcdef0123456789"
+                visible_mention_seed = "group=ext_fb2_official message=gmsg_seed text_len=83 text_sha256=abcdef0123456789"
+                visible_mention_reply = "group=ext_fb2_official message=gai_reply text_len=448 text_sha256=abcdef0123456789"
+                selected_message_seed = "group=ext_fb2_official message=gmsg_selected text_len=71 text_sha256=abcdef0123456789"
+                selected_message_reply = "group=ext_fb2_official message=gai_selected text_len=292 text_sha256=abcdef0123456789"
+                summary_post = "group=ext_fb2_official post=gsp_summary status=ready text_len=2291 text_sha256=abcdef0123456789"
+            }
             final_acceptance_evidence = [ordered]@{
                 scenario_my_ticket_orders = "count=10 min=1"
                 scenario_platform_order_summary = "count=1 min=1"
@@ -225,6 +309,10 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.latest_data_only_acceptance.success) { $failed++ }
         if (-not [bool]$snapshot.latest_read_only_direct_read.complete) { $failed++ }
         if (-not [bool]$snapshot.readiness.non_voice_historical_evidence_ready) { $failed++ }
+        if (-not [bool]$snapshot.latest_data_only_acceptance.direct_read_evidence_complete) { $failed++ }
+        if ($snapshot.latest_data_only_acceptance.direct_read_evidence_mode -ne "legacy_evidence_object") { $failed++ }
+        if (@($snapshot.blockers) -contains "latest_data_only_summary_predates_visible_direct_read_complete_gate") { $failed++ }
+        if (-not (@($snapshot.refresh_gaps) -contains "latest_data_only_summary_uses_legacy_visible_direct_read_evidence_object")) { $failed++ }
         if ($snapshot.validation_scope.group_chat_evidence -ne "api_direct_read_summary_only") { $failed++ }
         if ([bool]$snapshot.validation_scope.screenshots_accepted_for_group_chat) { $failed++ }
         if ([string]::IsNullOrWhiteSpace([string]$snapshot.repo.head)) { $failed++ }
