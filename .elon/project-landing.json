@@ -1,0 +1,101 @@
+{
+  "schema_version": "1",
+  "title": "一龙项目",
+  "tagline": "自然语言驱动的云端 APK 开发平台",
+  "summary": "一龙项目让用户在 APK 或 PC 工作台里用自然语言描述需求，由 Codex、Copilot 和 PC 节点在真实 Git 工作区完成代码修改、验证、构建、发布，并把交付结果回传到项目空间。",
+  "description": "这是 elon 平台自身项目。它同时提供移动端入口、PC 工作台、项目空间、AI CLI 调度、上下文编译、RAG 检索、发布脚本和 PC 节点运行时，让非程序员也能把想法变成可安装应用，让开发者可以把本地项目接入同一套协作与交付流程。",
+  "highlights": [
+    "APK、网页和 PC 工作台共用同一个项目空间，任务、成员、频道和交付记录集中管理",
+    "AI 代理在真实 Git 工作区改代码，按预检、提交、推送、构建、部署的链路收尾",
+    "PC 节点可以把用户自己的电脑变成安全受控的项目执行环境，支持 Codex/Copilot CLI",
+    "内置项目上下文编译、repo map、符号索引和检索能力，减少 AI 代理重复摸索代码",
+    "Android APK、后端服务和 PC 节点客户端都有版本化发布与健康检查入口"
+  ],
+  "target_users": [
+    "想用手机描述需求并生成或迭代 APK 的非程序员用户",
+    "希望把本地项目接入 AI 开发、构建和发布流程的项目 owner",
+    "愿意提供 PC 节点算力或本机 CLI 环境的开发者"
+  ],
+  "downloads": {
+    "android": {
+      "label": "一龙 APK",
+      "short": "APK",
+      "kind": "mobile_client",
+      "manifest_url": "/app/version.json",
+      "url": "/app/ElonSpeed-latest.apk",
+      "version": "1.1.549",
+      "size_bytes": "7697349",
+      "status": "available",
+      "note": "手机端主入口，用于对话、项目管理、任务进度和安装包交付"
+    },
+    "windows": {
+      "label": "Windows PC 节点客户端",
+      "short": "Win",
+      "kind": "pc_node",
+      "manifest_url": "/api/node-agent/version",
+      "url": "/api/node-agent/download/windows-client",
+      "version": "0.3.68",
+      "size_bytes": "7992239",
+      "status": "available",
+      "note": "安装后登录一次即可把本机注册为 PC 节点，承接本地项目 AI 开发任务"
+    },
+    "linux": {
+      "label": "Linux PC 节点二进制",
+      "short": "Linux",
+      "kind": "pc_node",
+      "manifest_url": "/api/node-agent/version",
+      "url": "/api/node-agent/download/linux",
+      "version": "0.3.68",
+      "size_bytes": "8842880",
+      "status": "available",
+      "note": "适合服务器或 Linux 工作站接入一龙 PC 节点网络"
+    },
+    "web": {
+      "label": "PC 工作台",
+      "short": "Web",
+      "kind": "workspace",
+      "url": "/pc",
+      "status": "external",
+      "note": "浏览器端项目空间、节点管理、模型选择和本地项目绑定入口"
+    }
+  },
+  "system_requirements": [
+    "Android 8.0+ 可安装一龙 APK",
+    "Windows 10/11 64 位可运行 PC 节点客户端",
+    "Linux x86_64 可运行 PC 节点二进制",
+    "执行 AI 开发任务的节点需要可用的 Git、Codex/Copilot CLI 或对应模型配置"
+  ],
+  "recent_updates": [
+    "补齐一龙自项目首页 manifest，让项目空间能直接展示平台介绍、能力点和下载入口",
+    "PC 节点客户端公开版本为 0.3.68，Windows 客户端包和 Linux 二进制均可下载",
+    "一龙 APK 公开版本为 1.1.549，可通过 /app/version.json 和 /app/ElonSpeed-latest.apk 获取"
+  ],
+  "privacy_notes": [
+    "AI 任务只在项目授权的工作区内执行，项目成员权限由 owner/admin 管理",
+    "API key、签名密钥和本机凭证不写入项目首页 manifest，也不会在介绍页展示",
+    "PC 节点路径与运行状态只用于受控执行和健康检查，不作为公开下载内容泄露"
+  ],
+  "resources": [
+    {
+      "label": "网页版入口",
+      "url": "/web"
+    },
+    {
+      "label": "PC 工作台",
+      "url": "/pc"
+    },
+    {
+      "label": "APK 版本 Manifest",
+      "url": "/app/version.json"
+    },
+    {
+      "label": "PC 节点版本 Manifest",
+      "url": "/api/node-agent/version"
+    },
+    {
+      "label": "GitHub 仓库",
+      "url": "https://github.com/ElonQian1/Elon"
+    }
+  ],
+  "custom_landing_url": "/web"
+}
