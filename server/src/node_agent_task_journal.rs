@@ -611,6 +611,65 @@ mod tests {
     }
 
     #[test]
+    fn stress_snapshot_handles_many_interleaved_task_events() {
+        let dir = unique_test_dir("stress-snapshot");
+        let journal = TaskJournal::new(&dir);
+        for task_index in 0..120 {
+            let req_id = format!("req-{task_index:03}");
+            journal
+                .record_started(TaskJournalStart {
+                    req_id: &req_id,
+                    cli_name: if task_index % 2 == 0 {
+                        "server-runtime"
+                    } else {
+                        "codex"
+                    },
+                    route: Some(if task_index % 2 == 0 {
+                        "route_c_server_runtime"
+                    } else {
+                        "route_a_external_cli"
+                    }),
+                    run_handle_id: Some(&req_id),
+                    cwd: Some("D:/demo"),
+                    runtime_permission: Some("project_write"),
+                })
+                .expect("start event should persist");
+            for chunk_index in 0..4 {
+                journal
+                    .record_cli_chunk(
+                        &req_id,
+                        "stdout",
+                        &format!("task {task_index} chunk {chunk_index}\n"),
+                    )
+                    .expect("chunk should persist");
+            }
+            if task_index % 3 == 0 {
+                journal
+                    .record_finished(&req_id)
+                    .expect("finish event should persist");
+            }
+        }
+
+        let snapshot = journal
+            .snapshot("req-000", 0, 3)
+            .expect("snapshot should read under pressure");
+        assert_eq!(snapshot.events.len(), 3);
+        assert!(snapshot.has_more);
+        assert!(snapshot.events.iter().all(|event| {
+            event.event.get("req_id").and_then(|value| value.as_str()) == Some("req-000")
+        }));
+
+        let latest = journal
+            .latest_records(500)
+            .expect("latest records should read under pressure");
+        assert_eq!(latest.len(), 100, "latest_records clamps public output");
+        assert!(latest
+            .iter()
+            .all(|record| record.req_id.starts_with("req-")));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
     fn records_process_pid_for_active_route_a_handle() {
         let dir = unique_test_dir("pid");
         let journal = TaskJournal::new(&dir);

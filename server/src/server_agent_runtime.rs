@@ -13,6 +13,9 @@ use std::sync::Arc;
 use crate::{
     agent_llm_call::call_chat_llm_with_options,
     project_auth::{auth_from_headers, json_error},
+    server_agent_runtime_guard::{
+        audit_summary, operational_error_summary, protection_status, ServerRuntimeProtectionStatus,
+    },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
     types::{AgentConfig, AppState},
 };
@@ -30,6 +33,7 @@ struct ServerAgentRuntimeStatus {
     status: &'static str,
     agent: Option<ServerAgentRuntimeAgentStatus>,
     limits: ServerAgentRuntimeLimits,
+    protection: ServerRuntimeProtectionStatus,
 }
 
 #[derive(Debug, Serialize)]
@@ -61,6 +65,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         status: if ready { "ready" } else { "unavailable" },
         agent,
         limits: ServerAgentRuntimeLimits::current(),
+        protection: protection_status(),
     })
     .into_response()
 }
@@ -79,11 +84,24 @@ pub async fn chat_handler(
     if let Err(message) = validate_runtime_messages(&req.messages) {
         return json_error(StatusCode::BAD_REQUEST, message);
     }
+    let audit = audit_summary(&req.messages, limits);
 
     let agent = match resolve_server_runtime_agent(&state, req.agent.as_deref()).await {
         Some(agent) => agent,
         None => return json_error(StatusCode::SERVICE_UNAVAILABLE, "服务器未配置可用 AI 代理"),
     };
+    tracing::info!(
+        target: "server_agent_runtime",
+        user_id = %user.id,
+        agent = %agent.name,
+        model = %agent.model,
+        usage_mode = %agent.usage_mode(),
+        request_fingerprint = %audit.request_fingerprint,
+        message_count = audit.message_count,
+        total_chars = audit.total_chars,
+        max_message_chars = audit.max_message_chars,
+        "pc_server_runtime request accepted"
+    );
 
     match call_chat_llm_with_options(
         &state,
@@ -97,7 +115,16 @@ pub async fn chat_handler(
     .await
     {
         Ok(response) => Json(response).into_response(),
-        Err(error) => json_error(StatusCode::BAD_GATEWAY, error),
+        Err(error) => {
+            tracing::warn!(
+                target: "server_agent_runtime",
+                user_id = %user.id,
+                request_fingerprint = %audit.request_fingerprint,
+                error = %operational_error_summary(&error.to_string()),
+                "pc_server_runtime request failed"
+            );
+            json_error(StatusCode::BAD_GATEWAY, error)
+        }
     }
 }
 
@@ -122,7 +149,8 @@ fn validate_runtime_messages(messages: &[Value]) -> Result<(), &'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::validate_runtime_messages;
+    use super::{audit_summary, protection_status, validate_runtime_messages};
+    use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
     use serde_json::json;
 
     #[test]
@@ -145,5 +173,25 @@ mod tests {
     #[test]
     fn rejects_empty_messages() {
         assert!(validate_runtime_messages(&[]).is_err());
+    }
+
+    #[test]
+    fn runtime_status_exposes_protection_contract() {
+        let protection = protection_status();
+
+        assert!(protection.input_validation.contains("total_chars"));
+        assert!(protection.billing_gate.contains("call_chat_llm"));
+        assert!(protection.request_fingerprint.contains("sha256"));
+    }
+
+    #[test]
+    fn audit_summary_keeps_prompt_text_out_of_operational_metadata() {
+        let messages = vec![json!({"role": "user", "content": "very secret prompt"})];
+        let audit = audit_summary(&messages, ServerAgentRuntimeLimits::current());
+        let text = serde_json::to_string(&audit).unwrap();
+
+        assert_eq!(audit.message_count, 1);
+        assert_eq!(audit.roles, vec!["user"]);
+        assert!(!text.contains("very secret prompt"));
     }
 }
