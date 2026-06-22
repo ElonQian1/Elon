@@ -74,6 +74,7 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
         route_a_ready,
         api_runtime_ready,
         server_runtime_ready,
+        server_runtime_status: None,
         local_tool_contract: local_tool_contract(),
         toolchains: vec![
             git,
@@ -205,13 +206,13 @@ mod tests {
     fn local_tool_contract_exposes_route_b_c_guardrails() {
         let contract = local_tool_contract();
 
-        assert!(contract
-            .routes
-            .contains(&"route_b_api_runtime".to_string()));
+        assert!(contract.routes.contains(&"route_b_api_runtime".to_string()));
         assert!(contract
             .routes
             .contains(&"route_c_server_runtime".to_string()));
-        assert!(contract.supported_tools.contains(&"apply_patch".to_string()));
+        assert!(contract
+            .supported_tools
+            .contains(&"apply_patch".to_string()));
         assert!(contract
             .supported_tools
             .contains(&"read_file_range".to_string()));

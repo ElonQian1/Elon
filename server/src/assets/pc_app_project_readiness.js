@@ -34,6 +34,7 @@
               ${readinessRow('项目目录', info.workspace)}
               ${readinessRow('执行节点', info.nodeLabel)}
               ${readinessRow('运行路线', info.routeLabel)}
+              ${info.routeCProtectionLabel ? readinessRow('Route C 保护', info.routeCProtectionLabel) : ''}
               ${readinessRow('可用 CLI', info.cliLabel)}
               ${readinessRow('本机工具', info.toolContractLabel)}
             </div>
@@ -140,6 +141,7 @@
           workspace,
           nodeLabel: '未选择 PC 节点',
           routeLabel: '先绑定本地项目',
+          routeCProtectionLabel: '',
           cliLabel: '未检查',
           toolContractLabel: '未上报',
           nextStep: nextStepForReadiness(checks)
@@ -158,6 +160,7 @@
           workspace,
           nodeLabel: shortNodeId(nodeId),
           routeLabel: '等待节点上线或授权',
+          routeCProtectionLabel: '',
           cliLabel: '未上报',
           toolContractLabel: '未上报',
           nextStep: nextStepForReadiness(checks)
@@ -177,6 +180,7 @@
         workspace,
         nodeLabel: nodeLabel(node),
         routeLabel: route.label,
+        routeCProtectionLabel: routeCProtectionLabel(node),
         cliLabel: cliLabel(node),
         toolContractLabel: localToolContractLabel(node),
         nextStep: nextStepForReadiness(checks)
@@ -193,7 +197,7 @@
       const routeA = ['codex', 'copilot', 'claude', 'gemini'].find((cli) => clis.includes(cli));
       if (routeAProbeReady(node, routeA)) return { ready: true, label: `Route A · ${routeA}` };
       if (routeFlagReady(node, 'api_runtime_ready', 'apiRuntimeReady')) return { ready: true, label: 'Route B · 本机 API runtime' };
-      if (routeFlagReady(node, 'server_runtime_ready', 'serverRuntimeReady')) return { ready: true, label: 'Route C · 服务器模型' };
+      if (routeFlagReady(node, 'server_runtime_ready', 'serverRuntimeReady')) return { ready: true, label: routeCReadyLabel(node) };
       if (routeA) return { ready: false, label: `${routeA} CLI 探测未通过` };
       return { ready: false, label: '无可用运行时' };
     }
@@ -305,6 +309,44 @@
       return (runtime.local_tool_contract || runtime.localToolContract) || {};
     }
 
+    function routeCStatus(node) {
+      const runtime = (node && (node.dev_runtime || node.devRuntime)) || {};
+      return runtime.server_runtime_status || runtime.serverRuntimeStatus || null;
+    }
+
+    function routeCReadyLabel(node) {
+      const status = routeCStatus(node) || {};
+      const agent = status.agent || {};
+      const model = clean(agent.model);
+      return model ? `Route C · 服务器模型 ${model}` : 'Route C · 服务器模型';
+    }
+
+    function routeCProtectionLabel(node) {
+      const status = routeCStatus(node);
+      if (!status) return '';
+      const stateText = clean(status.status);
+      const policy = status.policy || {};
+      if (policy.enabled === false || stateText === 'disabled') return '已关闭 · 运维开关保护';
+      if (stateText === 'missing_token') return '未登录 · 不会调用服务器模型';
+      if (stateText === 'http_error') return `云端返回 ${clean(status.httpStatus) || '错误'} · 不会启用`;
+      if (stateText === 'unavailable') return `${clean(status.reason) || '云端不可用'} · 不会启用`;
+
+      const limits = status.limits || {};
+      const admission = status.admission || {};
+      const rpm = numberField(limits, 'maxRequestsPerMinute', 'max_requests_per_minute')
+        || numberField(admission, 'maxRequestsPerMinute', 'max_requests_per_minute');
+      const perUser = numberField(limits, 'maxConcurrentPerUser', 'max_concurrent_per_user')
+        || numberField(admission, 'maxConcurrentPerUser', 'max_concurrent_per_user');
+      const global = numberField(limits, 'maxConcurrentGlobal', 'max_concurrent_global')
+        || numberField(admission, 'maxConcurrentGlobal', 'max_concurrent_global');
+      const remaining = numberField(admission, 'remainingRequestsPerMinute', 'remaining_requests_per_minute');
+      const parts = [];
+      if (rpm) parts.push(`${rpm}/分钟`);
+      if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
+      if (Number.isFinite(remaining)) parts.push(`剩余 ${remaining}`);
+      return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
+    }
+
     function localToolContractLabel(node) {
       const contract = localToolContract(node);
       const supported = arrayStrings(contract.supported_tools || contract.supportedTools);
@@ -323,6 +365,13 @@
       return Array.isArray(value)
         ? value.map((item) => clean(item)).filter(Boolean)
         : [];
+    }
+
+    function numberField(object, camelName, snakeName) {
+      if (!object || (!Object.prototype.hasOwnProperty.call(object, camelName) && !Object.prototype.hasOwnProperty.call(object, snakeName))) return null;
+      const value = object[camelName] ?? object[snakeName];
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
     }
 
     function nodeLabel(node) {

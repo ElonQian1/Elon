@@ -391,7 +391,8 @@
               ['AI Agent', node.ai_cli_ready ? '就绪' : '未就绪'],
               ['Route A 本机 CLI', routeReady(node, runtime, 'route_a_ready') ? '可用' : '未就绪'],
               ['Route B 本机 API runtime', routeReady(node, runtime, 'api_runtime_ready') ? '可用' : '未就绪'],
-              ['Route C 服务器模型', routeReady(node, runtime, 'server_runtime_ready') ? '可用' : '未就绪']
+              ['Route C 服务器模型', routeReady(node, runtime, 'server_runtime_ready') ? '可用' : '未就绪'],
+              ['Route C 保护', routeCProtectionText(runtime)]
             ])}
           </section>
           <section class="node-detail-grid compact">
@@ -495,6 +496,38 @@
 
     function routeReady(node, runtime, key) {
       return !!(node[key] || (runtime && runtime[key]));
+    }
+
+    function routeCProtectionText(runtime) {
+      const status = (runtime && (runtime.server_runtime_status || runtime.serverRuntimeStatus)) || null;
+      if (!status) return '未上报';
+      const stateText = clean(status.status);
+      const policy = status.policy || {};
+      if (policy.enabled === false || stateText === 'disabled') return '已关闭 · 运维开关保护';
+      if (stateText === 'missing_token') return '未登录 · 不会调用服务器模型';
+      if (stateText === 'http_error') return `云端返回 ${clean(status.httpStatus) || '错误'} · 不会启用`;
+      if (stateText === 'unavailable') return `${clean(status.reason) || '云端不可用'} · 不会启用`;
+      const limits = status.limits || {};
+      const admission = status.admission || {};
+      const rpm = numberField(limits, 'maxRequestsPerMinute', 'max_requests_per_minute')
+        || numberField(admission, 'maxRequestsPerMinute', 'max_requests_per_minute');
+      const perUser = numberField(limits, 'maxConcurrentPerUser', 'max_concurrent_per_user')
+        || numberField(admission, 'maxConcurrentPerUser', 'max_concurrent_per_user');
+      const global = numberField(limits, 'maxConcurrentGlobal', 'max_concurrent_global')
+        || numberField(admission, 'maxConcurrentGlobal', 'max_concurrent_global');
+      const remaining = numberField(admission, 'remainingRequestsPerMinute', 'remaining_requests_per_minute');
+      const parts = [];
+      if (rpm) parts.push(`${rpm}/分钟`);
+      if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
+      if (Number.isFinite(remaining)) parts.push(`剩余 ${remaining}`);
+      return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
+    }
+
+    function numberField(object, camelName, snakeName) {
+      if (!object || (!Object.prototype.hasOwnProperty.call(object, camelName) && !Object.prototype.hasOwnProperty.call(object, snakeName))) return null;
+      const value = object[camelName] ?? object[snakeName];
+      const number = Number(value);
+      return Number.isFinite(number) ? number : null;
     }
 
     function detailPanel(title, rows) {

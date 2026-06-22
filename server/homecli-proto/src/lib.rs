@@ -80,6 +80,10 @@ pub struct NodeDevRuntimeProfile {
     /// file and command execution local.
     #[serde(default)]
     pub server_runtime_ready: bool,
+    /// Route C cloud status summary returned by `/api/agent/runtime/status`.
+    /// This is optional so old nodes and old servers remain wire-compatible.
+    #[serde(default)]
+    pub server_runtime_status: Option<serde_json::Value>,
     /// Route B/C share this local tool contract. Model calls may happen on the
     /// PC or on the server, but file writes, patches, commands, approvals, and
     /// workspace limits are enforced by the PC node.

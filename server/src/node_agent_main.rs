@@ -1757,15 +1757,16 @@ async fn run_session(
     }
     // 将完整路径存到 runtime，供 run_cli_prompt 使用
     runtime.set_cli_paths(cli_pairs.clone()).await;
-    let server_runtime_ready = node_agent_route_c_status::server_runtime_ready_from_cloud(
+    let server_runtime_status = node_agent_route_c_status::server_runtime_status_from_cloud(
         &cfg.cloud_http_url,
         creds.user_token.as_deref(),
     )
     .await;
-    let dev_runtime = elon_pc_dev_runtime::collect_dev_runtime_profile_with_server_runtime(
+    let mut dev_runtime = elon_pc_dev_runtime::collect_dev_runtime_profile_with_server_runtime(
         &available_clis,
-        server_runtime_ready,
+        server_runtime_status.ready,
     );
+    dev_runtime.server_runtime_status = Some(server_runtime_status.status);
     if dev_runtime.workspace_provision_ready {
         info!(
             "📁 PC 开发运行时已就绪: {}",
