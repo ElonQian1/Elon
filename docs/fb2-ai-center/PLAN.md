@@ -26,7 +26,7 @@
 ## 当前重点
 
 - 截至 2026-06-22 18:38，非语音 data-only visible acceptance 已通过：`target\fb2-ai-center\data-only-acceptance-20260622T103826Z.json` 记录 `success=true`、`visible_chat_exit_code=0`、`final_acceptance_exit_code=0`、三类 `feedback_coverage=3/3`、权限负向、质量 unmatched=0 和 direct group read evidence。后续不要再把 data-only visible 当作当前阻塞。
-- 群聊对话验收不以截图为证据。每次 visible smoke 或最终验收都必须通过群聊接口直接读取 baseline messages、`@EL` AI 回复、selected-message `AI回复`、summary post、feedback 和 quality/adoption 结果，并保存对应 ID、count、matched/unmatched 统计；截图只用于人工 UI 观感，不证明链路打通。
+- 群聊对话验收不以截图为证据。每次 visible smoke 或最终验收都必须通过群聊接口直接读取 baseline messages、`@EL` seed/AI 回复、selected-message seed/`AI回复`、summary post、feedback 和 quality/adoption 结果，并保存对应 ID、count、正文 `text_len`、正文 `text_sha256`、matched/unmatched 统计；截图只用于人工 UI 观感，不证明链路打通。
 - full final acceptance 默认仍要求非合成观点采纳 `MinOpinionAdoptionCount=1`；data-only 可见窗口为了短时间真实群 smoke 已将该门槛降为 0。因此恢复 full final 前，除了真机语音证据，还要确认最近窗口或历史窗口能提供至少一条真实 non-synthetic opinion adoption。
 - 无 token 的 smoke 只能证明主项目契约和 live manifest 可读，不能证明最终完成。
 - `-FinalAcceptance` 必须同时具备主项目登录、`FB2_AI_CENTER_TOKEN`、fb2 live 数据、质量反馈样本、fb2 APK 发布检查、主项目语音 SDK 构建和 fb2 真机语音证据；只有 `-SelfTest` 例外，它只验证 wrapper 本地解析逻辑。

@@ -340,10 +340,18 @@ function Build-VisibleDirectReadEvidence {
     param([string[]]$Lines)
 
     [ordered]@{
+        api = "/api/me/groups/{group_id}/messages and /api/me/groups/{group_id}/summary-posts/{post_id}"
         baseline_messages = Find-CheckDetail $Lines "direct group message read baseline"
+        visible_mention_seed = Find-CheckDetail $Lines "visible @EL seed direct group read"
+        visible_mention_seed_text = Find-CheckDetail $Lines "visible @EL seed direct group read text present"
         visible_mention_reply = Find-CheckDetail $Lines "visible @EL direct group read"
+        visible_mention_reply_text = Find-CheckDetail $Lines "visible @EL direct group read text present"
+        selected_message_seed = Find-CheckDetail $Lines "selected-message seed direct group read"
+        selected_message_seed_text = Find-CheckDetail $Lines "selected-message seed direct group read text present"
         selected_message_reply = Find-CheckDetail $Lines "selected-message direct group read"
+        selected_message_reply_text = Find-CheckDetail $Lines "selected-message direct group read text present"
         summary_post = Find-CheckDetail $Lines "summary-post direct group read"
+        summary_post_text = Find-CheckDetail $Lines "summary-post direct group read text present"
     }
 }
 
@@ -419,10 +427,17 @@ function Invoke-FinalAcceptanceSelfTest {
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
         "OK`tselected-message AI回复 fb2 feedback`tsocial_group_selected_message:gai_selected feedback=fb_selected",
         "OK`tsummary-post fb2 feedback`tsocial_group_summary_post:gsp_summary feedback=fb_summary",
-        "OK`tdirect group message read baseline`tgroup=ext_fb2_official count=80",
-        "OK`tvisible @EL direct group read`tgroup=ext_fb2_official message=gai_visible",
-        "OK`tselected-message direct group read`tgroup=ext_fb2_official message=gai_selected",
-        "OK`tsummary-post direct group read`tgroup=ext_fb2_official post=gsp_summary status=ready",
+        "OK`tdirect group message read baseline`tgroup=ext_fb2_official count=80 sample_message=gmsg_sample text_len=32 text_sha256=aaaaaaaa",
+        "OK`tvisible @EL seed direct group read`tgroup=ext_fb2_official message=gmsg_visible_seed text_len=88 text_sha256=bbbbbbbb",
+        "OK`tvisible @EL seed direct group read text present`tgroup=ext_fb2_official message=gmsg_visible_seed text_len=88 text_sha256=bbbbbbbb",
+        "OK`tvisible @EL direct group read`tgroup=ext_fb2_official message=gai_visible text_len=120 text_sha256=cccccccc",
+        "OK`tvisible @EL direct group read text present`tgroup=ext_fb2_official message=gai_visible text_len=120 text_sha256=cccccccc",
+        "OK`tselected-message seed direct group read`tgroup=ext_fb2_official message=gmsg_selected_seed text_len=60 text_sha256=dddddddd",
+        "OK`tselected-message seed direct group read text present`tgroup=ext_fb2_official message=gmsg_selected_seed text_len=60 text_sha256=dddddddd",
+        "OK`tselected-message direct group read`tgroup=ext_fb2_official message=gai_selected text_len=140 text_sha256=eeeeeeee",
+        "OK`tselected-message direct group read text present`tgroup=ext_fb2_official message=gai_selected text_len=140 text_sha256=eeeeeeee",
+        "OK`tsummary-post direct group read`tgroup=ext_fb2_official post=gsp_summary status=ready text_len=360 text_sha256=ffffffff",
+        "OK`tsummary-post direct group read text present`tgroup=ext_fb2_official post=gsp_summary status=ready text_len=360 text_sha256=ffffffff",
         "OK`tvisible @EL reply text present`tlen=120"
     )
     $completeEvidence = @(Find-FeedbackEvidence $completeLines)
@@ -435,9 +450,16 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest ([bool]$completeCoverage["summary_post"]) "summary-post feedback covered"
     Assert-SelfTest ([int]$completeCoverage["observed_count"] -eq 3) "feedback observed count ignores unrelated OK lines" "observed=$($completeCoverage["observed_count"])"
     Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["baseline_messages"])) "direct read evidence maps baseline" ([string]$directReadEvidence["baseline_messages"])
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["visible_mention_seed"])) "direct read evidence maps visible mention seed" ([string]$directReadEvidence["visible_mention_seed"])
+    Assert-SelfTest (([string]$directReadEvidence["visible_mention_seed_text"]) -match "text_sha256=") "direct read evidence maps visible seed text hash" ([string]$directReadEvidence["visible_mention_seed_text"])
     Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["visible_mention_reply"])) "direct read evidence maps visible mention reply" ([string]$directReadEvidence["visible_mention_reply"])
+    Assert-SelfTest (([string]$directReadEvidence["visible_mention_reply_text"]) -match "text_sha256=") "direct read evidence maps visible reply text hash" ([string]$directReadEvidence["visible_mention_reply_text"])
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["selected_message_seed"])) "direct read evidence maps selected-message seed" ([string]$directReadEvidence["selected_message_seed"])
+    Assert-SelfTest (([string]$directReadEvidence["selected_message_seed_text"]) -match "text_sha256=") "direct read evidence maps selected seed text hash" ([string]$directReadEvidence["selected_message_seed_text"])
     Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["selected_message_reply"])) "direct read evidence maps selected-message reply" ([string]$directReadEvidence["selected_message_reply"])
+    Assert-SelfTest (([string]$directReadEvidence["selected_message_reply_text"]) -match "text_sha256=") "direct read evidence maps selected reply text hash" ([string]$directReadEvidence["selected_message_reply_text"])
     Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["summary_post"])) "direct read evidence maps summary post" ([string]$directReadEvidence["summary_post"])
+    Assert-SelfTest (([string]$directReadEvidence["summary_post_text"]) -match "text_sha256=") "direct read evidence maps summary post text hash" ([string]$directReadEvidence["summary_post_text"])
 
     $missingSummaryLines = @(
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",

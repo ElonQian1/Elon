@@ -206,7 +206,7 @@
 - 最终总验收优先运行，语音证据必须是 `finalAcceptanceReady=true`：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
-  先用 `-PreflightOnly` 做无副作用预检；该阶段会自动从 fb2 登录解析 `ExternalUserId`，预检该用户有订单上下文，并要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 全部通过。预检通过后再用 `-AllowVisibleMessages` 写真实群聊，把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON；其中 `visible_direct_read_evidence` 必须有 baseline、`@EL` 回复、selected-message 回复和 summary-post 的接口回读证据，`feedback_coverage.complete` 必须为 true。
+  先用 `-PreflightOnly` 做无副作用预检；该阶段会自动从 fb2 登录解析 `ExternalUserId`，预检该用户有订单上下文，并要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 全部通过。预检通过后再用 `-AllowVisibleMessages` 写真实群聊，把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON；其中 `visible_direct_read_evidence` 必须有 baseline、`@EL` seed/回复、selected-message seed/回复和 summary-post 的接口回读证据，且正文回读项必须包含 `text_len` 和 `text_sha256`，`feedback_coverage.complete` 必须为 true。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
 - 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。

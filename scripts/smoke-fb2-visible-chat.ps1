@@ -134,11 +134,15 @@ function Get-Messages {
 function Get-MessageById {
     param([string]$BearerToken, [string]$TargetGroupId, [string]$MessageId)
     $messages = Get-Messages -BearerToken $BearerToken -TargetGroupId $TargetGroupId
-    return @($messages | Where-Object { [string]$_.id -eq $MessageId } | Select-Object -First 1)
+    return ($messages | Where-Object { [string]$_.id -eq $MessageId } | Select-Object -First 1)
 }
 
 function Get-MessageText {
     param([object]$Message)
+
+    if ($null -eq $Message) {
+        return ""
+    }
 
     foreach ($field in @("content", "text", "body", "message", "message_text")) {
         $property = $Message.PSObject.Properties[$field]
@@ -155,6 +159,134 @@ function Get-MessageText {
         }
     }
     return ""
+}
+
+function Get-TextSha256 {
+    param([string]$Text)
+
+    if ([string]::IsNullOrEmpty($Text)) {
+        return ""
+    }
+
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+        $hash = $sha.ComputeHash($bytes)
+        return (-join ($hash | ForEach-Object { $_.ToString("x2") }))
+    } finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-MessageSender {
+    param([object]$Message)
+
+    if ($null -eq $Message) {
+        return ""
+    }
+
+    foreach ($field in @("sender_user_id", "sender_id", "user_id")) {
+        $property = $Message.PSObject.Properties[$field]
+        if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+            return [string]$property.Value
+        }
+    }
+    if ($Message.sender) {
+        foreach ($field in @("id", "user_id")) {
+            $property = $Message.sender.PSObject.Properties[$field]
+            if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+                return [string]$property.Value
+            }
+        }
+    }
+    return ""
+}
+
+function Format-TextFingerprint {
+    param([string]$Text)
+
+    $length = if ($null -eq $Text) { 0 } else { $Text.Length }
+    $parts = @("text_len=$length")
+    $hash = Get-TextSha256 $Text
+    if ($hash) {
+        $parts += "text_sha256=$hash"
+    }
+    return ($parts -join " ")
+}
+
+function Format-DirectMessageEvidence {
+    param([object]$Message)
+
+    if ($null -eq $Message) {
+        return "group=$GroupId message=missing text_len=0"
+    }
+
+    $parts = @(
+        "group=$GroupId",
+        "message=$([string]$Message.id)"
+    )
+    $sender = Get-MessageSender $Message
+    if ($sender) {
+        $parts += "sender=$sender"
+    }
+    if ($Message.created_at) {
+        $parts += "created_at=$([string]$Message.created_at)"
+    }
+    $parts += Format-TextFingerprint (Get-MessageText $Message)
+    return ($parts -join " ")
+}
+
+function Format-BaselineReadEvidence {
+    param([object[]]$Messages)
+
+    $items = @($Messages | Where-Object { $_ })
+    $parts = @(
+        "group=$GroupId",
+        "count=$($items.Count)"
+    )
+    $sample = @($items | Where-Object { -not [string]::IsNullOrWhiteSpace((Get-MessageText $_)) } | Select-Object -Last 1)
+    if (@($sample).Count -gt 0) {
+        $message = $sample[0]
+        $parts += "sample_message=$([string]$message.id)"
+        $sender = Get-MessageSender $message
+        if ($sender) {
+            $parts += "sample_sender=$sender"
+        }
+        $parts += Format-TextFingerprint (Get-MessageText $message)
+    }
+    return ($parts -join " ")
+}
+
+function Assert-DirectMessageRead {
+    param(
+        [object]$Message,
+        [string]$Scenario
+    )
+
+    $detail = Format-DirectMessageEvidence $Message
+    $found = (($null -ne $Message) -and [bool]$Message.id)
+    $textPresent = (-not [string]::IsNullOrWhiteSpace((Get-MessageText $Message)))
+    Assert-True $found "$Scenario direct group read found" $detail
+    Assert-True $textPresent "$Scenario direct group read text present" $detail
+    if ($found -and $textPresent) {
+        Pass "$Scenario direct group read" $detail
+    }
+}
+
+function Format-SummaryPostEvidence {
+    param([object]$Post)
+
+    if ($null -eq $Post) {
+        return "group=$GroupId post=missing status=missing text_len=0"
+    }
+
+    $parts = @(
+        "group=$GroupId",
+        "post=$([string]$Post.id)",
+        "status=$([string]$Post.status)"
+    )
+    $parts += Format-TextFingerprint ([string]$Post.summary)
+    return ($parts -join " ")
 }
 
 function Assert-TextMatchesAny {
@@ -330,6 +462,20 @@ function Invoke-VisiblePolicyCase {
 
 function Invoke-VisibleChatSelfTest {
     Write-Output "== Visible fb2 group chat smoke self-test =="
+
+    Invoke-VisiblePolicyCase -Name "direct read evidence includes text hash" -Action {
+        $message = [pscustomobject]@{
+            id = "gmsg-selftest-direct"
+            sender_user_id = "usr_elon_ai"
+            created_at = "2026-06-22T00:00:00Z"
+            content = "数据事实：这是接口回读到的群聊正文。来源：message_id=gmsg-selftest-direct"
+        }
+        $detail = Format-DirectMessageEvidence $message
+        Assert-True ($detail -match "message=gmsg-selftest-direct") "selftest direct read detail has message id" $detail
+        Assert-True ($detail -match "text_len=\d+") "selftest direct read detail has text length" $detail
+        Assert-True ($detail -match "text_sha256=[0-9a-f]{64}") "selftest direct read detail has text hash" $detail
+        Assert-DirectMessageRead -Message $message -Scenario "selftest direct message"
+    }
 
     Invoke-VisiblePolicyCase -Name "reply policy positive" -Action {
         Assert-ReplyAnswerPolicy -Scenario "selftest positive" -Reply ([pscustomobject]@{
@@ -645,7 +791,7 @@ Assert-True ($null -ne $targetGroup) "group membership" $GroupId
 
 $baselineMessages = Get-Messages -BearerToken $token -TargetGroupId $GroupId
 $baselineIds = @($baselineMessages | ForEach-Object { [string]$_.id })
-Pass "direct group message read baseline" "group=$GroupId count=$(@($baselineMessages).Count)"
+Pass "direct group message read baseline" (Format-BaselineReadEvidence $baselineMessages)
 $trace = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
 
 if ($SkipMention) {
@@ -661,6 +807,10 @@ if ($SkipMention) {
     }
     $sentId = Get-MessageId $sent
     Assert-True ([bool]$sentId) "visible @EL sent" $sentId
+    if ($sentId) {
+        $sentDirect = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $sentId
+        Assert-DirectMessageRead -Message $sentDirect -Scenario "visible @EL seed"
+    }
     if ($Fb2AiCenterToken) {
         $feedback = $null
         Wait-For-Fb2Feedback -MainRequestPrefix "social_group_message:" -ExpectedTrigger "group_mention" -FeedbackSince $mentionFeedbackSince -Scenario "visible @EL" -FeedbackOut ([ref]$feedback)
@@ -668,13 +818,13 @@ if ($SkipMention) {
             $replyId = ([string]$feedback.main_request_id).Substring("social_group_message:".Length)
             $reply = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $replyId
             Assert-True ([bool]$reply.id) "visible @EL ai reply" "$replyId"
-            Pass "visible @EL direct group read" "group=$GroupId message=$replyId"
+            Assert-DirectMessageRead -Message $reply -Scenario "visible @EL"
             Assert-ReplyAnswerPolicy -Reply $reply -Scenario "visible @EL"
         }
     } else {
         $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $sentId -KnownMessageIds $baselineIds -Scenario "@EL mention"
         Assert-True ([bool]$reply.id) "visible @EL ai reply" "$($reply.id)"
-        Pass "visible @EL direct group read" "group=$GroupId message=$($reply.id)"
+        Assert-DirectMessageRead -Message $reply -Scenario "visible @EL"
         Assert-ReplyAnswerPolicy -Reply $reply -Scenario "visible @EL"
     }
 }
@@ -695,6 +845,10 @@ if ($SkipSelectedMessage) {
     }
     $plainId = Get-MessageId $plain
     Assert-True ([bool]$plainId) "selected-message seed sent" $plainId
+    if ($plainId) {
+        $plainDirect = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $plainId
+        Assert-DirectMessageRead -Message $plainDirect -Scenario "selected-message seed"
+    }
     $knownIdsForSelected = @(Get-Messages -BearerToken $token -TargetGroupId $GroupId | ForEach-Object { [string]$_.id })
 
     $messagePath = Encode-PathSegment $plainId
@@ -707,14 +861,14 @@ if ($SkipSelectedMessage) {
             $replyId = ([string]$feedback.main_request_id).Substring("social_group_selected_message:".Length)
             $reply = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $replyId
             Assert-True ([bool]$reply.id) "selected-message ai reply" "$replyId"
-            Pass "selected-message direct group read" "group=$GroupId message=$replyId"
+            Assert-DirectMessageRead -Message $reply -Scenario "selected-message"
             Assert-ReplyAnswerPolicy -Reply $reply -Scenario "selected-message"
             Assert-SelectedMessageSafetyPolicy -Reply $reply
         }
     } else {
         $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $plainId -KnownMessageIds $knownIdsForSelected -Scenario "selected-message ai-reply"
         Assert-True ([bool]$reply.id) "selected-message ai reply" "$($reply.id)"
-        Pass "selected-message direct group read" "group=$GroupId message=$($reply.id)"
+        Assert-DirectMessageRead -Message $reply -Scenario "selected-message"
         Assert-ReplyAnswerPolicy -Reply $reply -Scenario "selected-message"
         Assert-SelectedMessageSafetyPolicy -Reply $reply
     }
@@ -746,7 +900,8 @@ if ($SkipSummaryPost) {
     if ($postId) {
         $summaryPost = Wait-For-SummaryPost -BearerToken $token -TargetGroupId $GroupId -PostId $postId
         Assert-True ([string]$summaryPost.status -eq "ready") "summary-post ready" "$($summaryPost.status)"
-        Pass "summary-post direct group read" "group=$GroupId post=$postId status=$($summaryPost.status)"
+        Assert-True (-not [string]::IsNullOrWhiteSpace([string]$summaryPost.summary)) "summary-post direct group read text present" (Format-SummaryPostEvidence $summaryPost)
+        Pass "summary-post direct group read" (Format-SummaryPostEvidence $summaryPost)
         Assert-SummaryPostPolicy -Post $summaryPost
         if ($Fb2AiCenterToken) {
             $feedback = $null
