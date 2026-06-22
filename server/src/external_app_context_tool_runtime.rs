@@ -1,3 +1,4 @@
+//! server/src/external_app_context_tool_runtime.rs
 //! Runtime execution for external app context tools.
 
 use chrono::{SecondsFormat, Utc};
@@ -57,6 +58,31 @@ pub(crate) async fn group_tool_results_for_chat(
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned);
+
+    if readiness_blocks_tool_execution(context) {
+        let execution = skipped_execution(
+            &execution_id,
+            app.id,
+            group.external_group_id,
+            &planned_tool_names,
+            plan_metadata,
+            planned_tools,
+            "fb2_readiness_blocked",
+            started_at.elapsed().as_millis(),
+        );
+        record_tool_execution(
+            state,
+            user_id,
+            group_id,
+            app.id,
+            group.external_group_id,
+            None,
+            context_audit_id.as_deref(),
+            topic_hint,
+            &execution,
+        );
+        return Some(execution);
+    }
 
     let Some(base_url) = fb2_base_url() else {
         let execution = unavailable_execution(
@@ -341,6 +367,55 @@ fn tool_requires_platform_scope(tool_name: &str) -> bool {
     matches!(tool_name, "platform_orders")
 }
 
+fn readiness_blocks_tool_execution(context: &Value) -> bool {
+    // readiness=blocked 表示 fb2 自检认为上下文链路不足；主项目跳过深层工具，避免把空数据包装成事实。
+    context
+        .get("preflight_readiness")
+        .and_then(|readiness| readiness.get("status"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        == Some("blocked")
+}
+
+fn skipped_execution(
+    execution_id: &str,
+    app_id: &str,
+    external_group_id: &str,
+    planned_tool_names: &[&str],
+    plan_metadata: Value,
+    planned_tools: Vec<PlannedTool>,
+    reason: &str,
+    duration_ms: u128,
+) -> Value {
+    let results = planned_tools
+        .into_iter()
+        .map(|tool| {
+            json!({
+                "tool_name": tool.name,
+                "request_id": Value::Null,
+                "status": "skipped",
+                "success": false,
+                "error": reason,
+                "reason": tool.reason
+            })
+        })
+        .collect::<Vec<_>>();
+    let audit = execution_audit(execution_id, planned_tool_names, &results, duration_ms);
+
+    json!({
+        "schema": "external_app.executed_tools.v1",
+        "execution_id": execution_id,
+        "app_id": app_id,
+        "status": "skipped",
+        "executed_at": Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+        "group_id": external_group_id,
+        "plan": plan_metadata,
+        "results": results,
+        "ready_count": 0,
+        "audit": audit
+    })
+}
+
 fn unavailable_execution(
     execution_id: &str,
     app_id: &str,
@@ -389,5 +464,16 @@ mod tests {
         assert!(tool_requires_platform_scope("platform_orders"));
         assert!(!tool_requires_platform_scope("search_matches"));
         assert!(!tool_requires_platform_scope("search_user_orders"));
+    }
+
+    #[test]
+    fn blocked_readiness_prevents_tool_execution() {
+        assert!(readiness_blocks_tool_execution(&json!({
+            "preflight_readiness": {"status": "blocked"}
+        })));
+        assert!(!readiness_blocks_tool_execution(&json!({
+            "preflight_readiness": {"status": "degraded"}
+        })));
+        assert!(!readiness_blocks_tool_execution(&json!({})));
     }
 }

@@ -1,3 +1,4 @@
+//! server/src/external_app_context_quality.rs
 //! Quality contract and warning generation for external app context packs.
 
 use serde_json::{json, Value};
@@ -47,6 +48,9 @@ pub(crate) fn context_quality(context: &Value, expects_context_pack: bool) -> Va
             warnings.push(warning);
         }
     }
+    if let Some(warning) = readiness_quality_warning(context) {
+        warnings.push(warning);
+    }
 
     json!({
         "warnings": warnings,
@@ -59,6 +63,34 @@ pub(crate) fn context_quality(context: &Value, expects_context_pack: bool) -> Va
 
 fn context_quality_warning_catalog() -> Value {
     json!([
+        {
+            "code": "fb2_readiness_blocked",
+            "severity": "blocking_for_fact_answer",
+            "meaning": "fb2 readiness 明确返回 blocked，当前业务上下文不足以支撑事实型回答或深度工具查询。",
+            "ai_impact": "AI 必须说明 fb2 数据暂不可用或不足，不能编造比赛、订单、赔率或群友观点。",
+            "fb2_fix": "检查 /context/readiness 中失败的 checks，并优先修复 Context Pack、订单、群观点或 source id 链路。"
+        },
+        {
+            "code": "fb2_readiness_degraded",
+            "severity": "degraded",
+            "meaning": "fb2 readiness 返回 degraded，业务上下文可用但存在缺口。",
+            "ai_impact": "AI 可以回答，但必须提示数据新鲜度、裁剪或来源缺口风险。",
+            "fb2_fix": "根据 readiness warnings 补齐缺失来源、工具声明或质量指标。"
+        },
+        {
+            "code": "fb2_readiness_unavailable",
+            "severity": "degraded",
+            "meaning": "主项目无法读取 fb2 readiness 探针。",
+            "ai_impact": "AI 仍可尝试使用已返回的 Context Pack，但不能把未验证的数据链路说成健康。",
+            "fb2_fix": "检查服务 token、/context/readiness 路由和网络超时。"
+        },
+        {
+            "code": "fb2_readiness_not_configured",
+            "severity": "degraded",
+            "meaning": "主项目未配置 fb2 readiness 所需地址或服务 token。",
+            "ai_impact": "AI 只能依赖已有上下文结果，并提示 readiness 未验证。",
+            "fb2_fix": "配置 ELON_EXTERNAL_APP_FB2_BASE_URL 和 ELON_EXTERNAL_APP_FB2_CONTEXT_TOKEN。"
+        },
         {
             "code": "missing_generated_at",
             "severity": "degraded",
@@ -123,6 +155,21 @@ fn context_quality_warning_catalog() -> Value {
             "fb2_fix": "先通过 search_matches/search_user_orders/search_group_opinions 缩小候选，再按需返回详情。"
         }
     ])
+}
+
+fn readiness_quality_warning(context: &Value) -> Option<&'static str> {
+    match context
+        .get("preflight_readiness")
+        .and_then(|readiness| readiness.get("status"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+    {
+        Some("blocked") => Some("fb2_readiness_blocked"),
+        Some("degraded") => Some("fb2_readiness_degraded"),
+        Some("unavailable") => Some("fb2_readiness_unavailable"),
+        Some("not_configured") => Some("fb2_readiness_not_configured"),
+        _ => None,
+    }
 }
 
 fn budget_status_quality_warning(context: &Value) -> Option<&'static str> {
@@ -210,5 +257,25 @@ mod tests {
 
         let warnings = quality["warnings"].as_array().unwrap();
         assert!(warnings.contains(&json!("fb2_budget_too_large")));
+    }
+
+    #[test]
+    fn quality_promotes_readiness_status_to_warning() {
+        let quality = context_quality(
+            &json!({
+                "generated_at": "2026-06-20T16:00:00+08:00",
+                "context_pack_version": "fb2-chat-pack-v1",
+                "context_pack": "<fb2_context_pack>blocked</fb2_context_pack>",
+                "matches": [{"id": "m1"}],
+                "tool_contract": {"tools": [{"name": "get_match_detail"}]},
+                "preflight_readiness": {"status": "blocked"}
+            }),
+            true,
+        );
+
+        assert!(quality["warnings"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("fb2_readiness_blocked")));
     }
 }

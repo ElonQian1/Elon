@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-22 11:35 本轮把 fb2 `/api/main-project/context/readiness` 从 smoke 验收信号推进到主项目运行时：`external_app_context_readiness` 新增 authenticated live preflight 拉取和归一化，Context Pack / today-matches 回退上下文都会注入 `preflight_readiness`；`context_quality.warnings` 会把 `blocked/degraded/unavailable/not_configured` 映射为 `fb2_readiness_*`，让 AI 回答显式提示数据链路缺口；工具执行层遇到明确 `preflight_readiness.status=blocked` 时会跳过深层 fb2 工具调用并记录 `external_app.executed_tools.v1 status=skipped`，避免在 fb2 自检认为上下文不足时继续假装可查明细。已新增单测覆盖 readiness 归一化、质量警告和 blocked 工具跳过。该改动需要后端发布后才进入线上服务。
 - 2026-06-22 09:06 补齐“总结帖/群聊总结入口”的主项目侧验收闭环：提交 `1d41cb5a` 增加 fb2 总结帖回答契约和 smoke 场景，要求输出 `数据事实`、`群友观点`、`AI推断`、`风险边界` 并保留 source references；提交 `225bfc6f` 把总结帖生成从单一默认模型改为 `social_ai` 多代理 fallback，避免默认模型额度/接口不可用时只生成兜底文案；提交 `96bf5ce4` 放宽总结帖脚本对“相关发言”原文引用的误判。上述提交均已推送到 `origin/main`，其中服务端运行代码已发布到 `v0.3.588 / 225bfc6f0d9d33552f60dfd96a220753b3f7f7b6`，`96bf5ce4` 为脚本验收修正，无需重新发布服务端。
 - 2026-06-22 09:06 总结帖真实群 smoke 已通过：命令 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120` 在真实群 `ext_fb2_official` 创建 summary post `gsp_46720718477f4c6e953b55d5fc309568`，最终 `status=ready`，脚本结果 `failed=0 skipped=2`。该总结帖回复通过非空 summary、source references、事实/观点/推断/风险分层、风险边界和禁止投注保证检查。
 - 2026-06-22 09:29 本轮把总结帖生成结果接入 fb2 自动 feedback 回写：主项目 `spawn_group_summary_generation` 现在会在 summary 更新成功后，以 `main_request_id=social_group_summary_post:<post_id>`、`trigger=group_summary_post` 调用 fb2 `/context/feedback`，让“总结今天群聊讨论”也进入质量汇总和失败样本闭环。`scripts/smoke-fb2-visible-chat.ps1` 的 summary-only 场景在提供 `FB2_AI_CENTER_TOKEN` 时会等待这条 summary-post feedback；缺 token 时仍只做可见群 summary 正文策略检查。
@@ -109,7 +110,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 1. 让 fb2 会话提供 `FB2_AI_CENTER_TOKEN` 或等价服务 token，用于主项目最终验收拉取 live Context Pack、平台匿名摘要和质量反馈。
 2. 确认 `123qwe` 或另一个 fb2 测试账号确实有可分析订单；如果不能用用户名密码解析，再手工提供有订单的测试用户 UUID。
 3. 让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-4. 主项目侧继续补强 authenticated readiness 使用：带 `FB2_AI_CENTER_TOKEN` 跑 `/context/readiness`、`/context/tool-manifest` 内容级检查，并把 readiness 状态用于 Context Pack / `tools/execute` 调用前的告警和降级判断；不要直接改 fb2 本地脏工作区。
+4. 主项目后端发布后，用线上真实 token 跑一次群聊 AI 或 final preflight，确认 `preflight_readiness.status` 能随 Context Pack 进入 prompt 质量警告，并在 fb2 返回 `blocked` 的测试场景下工具执行会记录 skipped，而不是继续调用 `/tools/execute`。
 5. 跑完整最终验收：
 
 ```powershell

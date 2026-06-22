@@ -1,3 +1,4 @@
+//! server/src/external_app_context.rs
 //! External business context pulled from child apps for chat AI.
 
 use serde_json::{json, Value};
@@ -12,6 +13,8 @@ use crate::{
         platform_order_summary_enabled, platform_order_summary_requested, timeout_secs, FB2_APP_ID,
         FB2_CONTEXT_HEADER,
     },
+    external_app_context_quality::context_quality,
+    external_app_context_readiness::live_context_readiness,
     external_app_context_response::{
         compact_error, fb2_pack_response_to_context, fb2_response_to_context,
     },
@@ -85,8 +88,12 @@ async fn fetch_fb2_business_context(
         });
     };
 
+    // readiness 是主项目调用 fb2 前的轻量预检；失败不直接中断，避免临时探针异常放大为聊天不可用。
+    let preflight_readiness = live_context_readiness(app_id).await;
+    log_readiness_preflight(app_id, external_group_id, user_id, &preflight_readiness);
+
     if context_pack_enabled() {
-        let pack = fetch_fb2_context_pack(
+        let mut pack = fetch_fb2_context_pack(
             state,
             app_id,
             user_id,
@@ -96,6 +103,7 @@ async fn fetch_fb2_business_context(
             &token,
         )
         .await;
+        annotate_context_with_readiness(&mut pack, &preflight_readiness);
         if pack["status"].as_str() == Some("ready") {
             return pack;
         }
@@ -105,7 +113,10 @@ async fn fetch_fb2_business_context(
         );
     }
 
-    fetch_fb2_match_context(app_id, external_group_id, topic_hint, &base_url, &token).await
+    let mut fallback =
+        fetch_fb2_match_context(app_id, external_group_id, topic_hint, &base_url, &token).await;
+    annotate_context_with_readiness(&mut fallback, &preflight_readiness);
+    fallback
 }
 
 async fn fetch_fb2_context_pack(
@@ -277,6 +288,37 @@ fn log_context_fetch(
     );
 }
 
+fn annotate_context_with_readiness(context: &mut Value, readiness: &Value) {
+    context["preflight_readiness"] = readiness.clone();
+    let expects_context_pack = context["source"]
+        .as_str()
+        .map(|source| source.contains("/context/pack"))
+        .unwrap_or(false);
+    if context["status"].as_str() == Some("ready") {
+        context["context_quality"] = context_quality(context, expects_context_pack);
+    }
+}
+
+fn log_readiness_preflight(
+    app_id: &str,
+    external_group_id: &str,
+    user_id: &str,
+    readiness: &Value,
+) {
+    let status = readiness["status"].as_str().unwrap_or("unknown");
+    let warning_count = readiness["warnings"].as_array().map(Vec::len).unwrap_or(0);
+    if status != "ready" {
+        warn!(
+            app_id,
+            external_group_id,
+            user_id,
+            status,
+            warning_count,
+            "external app context readiness is not ready"
+        );
+    }
+}
+
 fn context_fallback_used(context: &Value) -> bool {
     context["source"]
         .as_str()
@@ -335,5 +377,34 @@ mod tests {
             context_answer_policy_schema(&context),
             "fb2.answer_policy.v1"
         );
+    }
+
+    #[test]
+    fn readiness_annotation_updates_context_quality() {
+        let mut context = json!({
+            "app_id": "fb2",
+            "group": "official",
+            "status": "ready",
+            "source": "fb2:/api/main-project/context/pack",
+            "generated_at": "2026-06-22T11:30:00+08:00",
+            "context_pack_version": "fb2-chat-pack-v1",
+            "context_pack": "<fb2_context_pack>ok</fb2_context_pack>",
+            "matches": [{"id": "m1"}],
+            "tool_contract": {"tools": [{"name": "get_match_detail"}]},
+            "metrics": {}
+        });
+        let readiness = json!({
+            "schema": "external_app.live_context_readiness.v1",
+            "status": "blocked",
+            "warnings": ["fb2_readiness_blocked"]
+        });
+
+        annotate_context_with_readiness(&mut context, &readiness);
+
+        assert_eq!(context["preflight_readiness"]["status"], "blocked");
+        assert!(context["context_quality"]["warnings"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("fb2_readiness_blocked")));
     }
 }

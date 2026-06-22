@@ -1,6 +1,32 @@
-//! Readiness guidance for external app context packs.
+//! server/src/external_app_context_readiness.rs
+//! Readiness guidance and live preflight checks for external app context packs.
 
+use chrono::{SecondsFormat, Utc};
 use serde_json::{json, Value};
+use std::time::Duration;
+
+use crate::{
+    external_app_context_config::{
+        fb2_base_url, fb2_context_token, timeout_secs, FB2_APP_ID, FB2_CONTEXT_HEADER,
+    },
+    external_app_context_response::compact_error,
+    external_app_http_client::fb2_direct_client,
+};
+
+const FB2_CONTEXT_READINESS_PATH: &str = "/api/main-project/context/readiness";
+
+pub(crate) async fn live_context_readiness(app_id: &str) -> Value {
+    match app_id {
+        FB2_APP_ID => fetch_fb2_context_readiness().await,
+        _ => json!({
+            "app_id": app_id,
+            "schema": "external_app.live_context_readiness.v1",
+            "status": "not_configured",
+            "source": Value::Null,
+            "warnings": ["unknown_external_app_readiness"]
+        }),
+    }
+}
 
 pub(crate) fn public_context_readiness_guidance(app_id: &str) -> Option<Value> {
     match app_id {
@@ -112,6 +138,135 @@ pub(crate) fn public_context_readiness_guidance(app_id: &str) -> Option<Value> {
     }
 }
 
+async fn fetch_fb2_context_readiness() -> Value {
+    let Some(base_url) = fb2_base_url() else {
+        return readiness_status("not_configured", "missing_fb2_base_url");
+    };
+    let Some(token) = fb2_context_token() else {
+        return readiness_status("not_configured", "missing_fb2_context_token");
+    };
+
+    let url = format!("{base_url}{FB2_CONTEXT_READINESS_PATH}");
+    let response = fb2_direct_client()
+        .get(&url)
+        .header(FB2_CONTEXT_HEADER, token)
+        .timeout(Duration::from_secs(timeout_secs()))
+        .send()
+        .await;
+
+    let response = match response {
+        Ok(response) => response,
+        Err(error) => {
+            return readiness_error("unavailable", "request_failed", &error.to_string());
+        }
+    };
+    let status_code = response.status().as_u16();
+    let text = match response.text().await {
+        Ok(text) => text,
+        Err(error) => {
+            return readiness_error("unavailable", "read_failed", &error.to_string());
+        }
+    };
+    if !(200..300).contains(&status_code) {
+        return json!({
+            "app_id": FB2_APP_ID,
+            "schema": "external_app.live_context_readiness.v1",
+            "status": "unavailable",
+            "source": format!("fb2:{FB2_CONTEXT_READINESS_PATH}"),
+            "status_code": status_code,
+            "error_code": "http_error",
+            "error": compact_error(&text),
+            "secret_values_exposed": false
+        });
+    }
+
+    let parsed = match serde_json::from_str::<Value>(&text) {
+        Ok(value) => value,
+        Err(error) => {
+            return readiness_error("degraded", "json_parse_failed", &error.to_string());
+        }
+    };
+    if parsed.get("success").and_then(Value::as_bool) != Some(true) {
+        return readiness_error(
+            "degraded",
+            "fb2_readiness_failed",
+            parsed
+                .get("error")
+                .and_then(Value::as_str)
+                .unwrap_or("fb2 returned success=false"),
+        );
+    }
+
+    let data = parsed.get("data").unwrap_or(&Value::Null);
+    normalized_live_readiness(data)
+}
+
+fn normalized_live_readiness(data: &Value) -> Value {
+    let status = readiness_value(data).unwrap_or("degraded");
+    json!({
+        "app_id": FB2_APP_ID,
+        "schema": "external_app.live_context_readiness.v1",
+        "status": status,
+        "source": format!("fb2:{FB2_CONTEXT_READINESS_PATH}"),
+        "fetched_at": Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+        "context_pack_version": data.get("context_pack_version").cloned().unwrap_or(Value::Null),
+        "checks": data.get("checks").cloned().unwrap_or(Value::Null),
+        "warnings": readiness_warnings(data, status),
+        "secret_values_exposed": false
+    })
+}
+
+fn readiness_value(data: &Value) -> Option<&str> {
+    [
+        data.get("status"),
+        data.get("readiness_status"),
+        data.get("context_status"),
+        data.get("context_readiness")
+            .and_then(|value| value.get("status")),
+    ]
+    .into_iter()
+    .flatten()
+    .filter_map(Value::as_str)
+    .map(str::trim)
+    .find(|value| matches!(*value, "ready" | "degraded" | "blocked" | "unavailable"))
+}
+
+fn readiness_warnings(data: &Value, status: &str) -> Vec<Value> {
+    // fb2 readiness 是 AI 回答前的前置门禁；主项目只记录摘要，避免泄露服务令牌或业务明细。
+    let mut warnings = data
+        .get("warnings")
+        .and_then(Value::as_array)
+        .map(|values| values.iter().take(12).cloned().collect::<Vec<_>>())
+        .unwrap_or_default();
+    if status != "ready" && warnings.is_empty() {
+        warnings.push(json!(format!("fb2_readiness_{status}")));
+    }
+    warnings
+}
+
+fn readiness_status(status: &str, warning: &str) -> Value {
+    json!({
+        "app_id": FB2_APP_ID,
+        "schema": "external_app.live_context_readiness.v1",
+        "status": status,
+        "source": format!("fb2:{FB2_CONTEXT_READINESS_PATH}"),
+        "warnings": [warning],
+        "secret_values_exposed": false
+    })
+}
+
+fn readiness_error(status: &str, error_code: &str, error: &str) -> Value {
+    json!({
+        "app_id": FB2_APP_ID,
+        "schema": "external_app.live_context_readiness.v1",
+        "status": status,
+        "source": format!("fb2:{FB2_CONTEXT_READINESS_PATH}"),
+        "error_code": error_code,
+        "error": compact_error(error),
+        "secret_values_exposed": false
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,5 +290,33 @@ mod tests {
             .iter()
             .any(|check| check["name"] == "has_source_ids"));
         assert!(public_context_readiness_guidance("unknown").is_none());
+    }
+
+    #[test]
+    fn normalizes_nested_fb2_readiness_status() {
+        let readiness = normalized_live_readiness(&json!({
+            "context_pack_version": "fb2-chat-pack-v1",
+            "context_readiness": {"status": "blocked"},
+            "checks": [{"name": "has_orders", "status": "failed"}]
+        }));
+
+        assert_eq!(
+            readiness["schema"],
+            "external_app.live_context_readiness.v1"
+        );
+        assert_eq!(readiness["status"], "blocked");
+        assert_eq!(readiness["secret_values_exposed"], false);
+        assert!(readiness["warnings"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("fb2_readiness_blocked")));
+    }
+
+    #[test]
+    fn readiness_status_never_exposes_secrets() {
+        let status = readiness_status("not_configured", "missing_token");
+
+        assert_eq!(status["secret_values_exposed"], false);
+        assert!(status.get("FB2_MAIN_PROJECT_SHARED_SECRET").is_none());
     }
 }
