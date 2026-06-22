@@ -1,12 +1,17 @@
 // server/src/node_agent_client_install_status.rs
 
 use serde_json::{json, Value};
+#[cfg(any(windows, test))]
 use std::{fs, path::Path};
 
+#[cfg(any(windows, test))]
 const CLIENT_EXE_NAME: &str = "一龙PC节点.exe";
+#[cfg(any(windows, test))]
 const UNINSTALL_EXE_NAME: &str = "卸载一龙PC节点.exe";
+#[cfg(any(windows, test))]
 const INTERNAL_DIR_NAME: &str = "_internal";
 
+#[cfg(any(windows, test))]
 const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
     "安装一龙PC节点.cmd",
     "启动一龙节点.cmd",
@@ -52,6 +57,7 @@ pub(crate) fn status_payload() -> Value {
     }
 }
 
+#[cfg(any(windows, test))]
 pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Path>) -> Value {
     let client_exe = install_dir.join(CLIENT_EXE_NAME);
     let uninstall_exe = install_dir.join(UNINSTALL_EXE_NAME);
@@ -97,6 +103,7 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
     })
 }
 
+#[cfg(any(windows, test))]
 fn root_layout_status(
     install_dir: &Path,
     client_exe: &Path,
@@ -152,6 +159,7 @@ fn root_layout_status(
     })
 }
 
+#[cfg(any(windows, test))]
 fn version_manifest_summary(path: &Path) -> Value {
     let Some(value) = safe_json_file(path) else {
         return json!({
@@ -173,11 +181,13 @@ fn version_manifest_summary(path: &Path) -> Value {
     })
 }
 
+#[cfg(any(windows, test))]
 fn safe_json_file(path: &Path) -> Option<Value> {
     let text = fs::read_to_string(path).ok()?;
     serde_json::from_str(&text).ok()
 }
 
+#[cfg(any(windows, test))]
 fn file_meta(path: &Path) -> Value {
     match fs::metadata(path) {
         Ok(meta) => json!({
@@ -193,6 +203,7 @@ fn file_meta(path: &Path) -> Value {
     }
 }
 
+#[cfg(any(windows, test))]
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().to_string()
 }
