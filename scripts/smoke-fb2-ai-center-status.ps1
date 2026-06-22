@@ -165,12 +165,14 @@ function Build-Fb2AiCenterStatusSnapshot {
     $summaryDirectories = Get-Fb2StatusSummaryDirectories -PrimaryDirectory $Directory -ExtraDirectories $ExtraDirectories
 
     $latestDataFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "data-only-acceptance-*.json"
+    $latestFinalFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "final-acceptance-*.json"
     $latestReadOnlyFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "read-only-direct-read*.json"
     $latestAiCenterLogFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "*ai-center.log"
     $latestSampleRequestFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-sample-request*.json"
     $latestSampleSetFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-samples-validation*.json"
     $latestPublicContractFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "public-contract-status*.json"
     $latestData = if ($null -eq $latestDataFile) { $null } else { Read-JsonFileOrNull $latestDataFile.FullName }
+    $latestFinal = if ($null -eq $latestFinalFile) { $null } else { Read-JsonFileOrNull $latestFinalFile.FullName }
     $latestReadOnly = if ($null -eq $latestReadOnlyFile) { $null } else { Read-JsonFileOrNull $latestReadOnlyFile.FullName }
     $contextProjectionState = Get-Fb2ContextProjectionLogState -Path $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName })
     $sampleRequestState = Get-Fb2ContextSampleRequestState -Path $(if ($null -eq $latestSampleRequestFile) { "" } else { $latestSampleRequestFile.FullName })
@@ -181,6 +183,8 @@ function Build-Fb2AiCenterStatusSnapshot {
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
+    $fullFinalFeedbackCoverage = Get-JsonProperty $latestFinal "feedback_coverage"
+    $fullFinalEvidence = Get-JsonProperty $latestFinal "final_acceptance_evidence"
     $readOnlyComplete = Test-ReadOnlyDirectReadSummaryComplete $latestReadOnly
     $dataSuccess = Test-TruthyJsonValue (Get-JsonProperty $latestData "success")
     $feedbackComplete = Test-TruthyJsonValue (Get-JsonProperty $feedbackCoverage "complete")
@@ -188,6 +192,10 @@ function Build-Fb2AiCenterStatusSnapshot {
     $dataOnlyHasCurrentDirectReadGate = $null -ne (Get-JsonProperty $latestData "visible_direct_read_complete" $null)
     $dataDirectReadState = Get-Fb2DataOnlyDirectReadEvidenceState $latestData
     $dataDirectReadComplete = [bool]$dataDirectReadState.complete
+    $fullFinalSuccess = Test-TruthyJsonValue (Get-JsonProperty $latestFinal "success")
+    $fullFinalFeedbackComplete = Test-TruthyJsonValue (Get-JsonProperty $fullFinalFeedbackCoverage "complete")
+    $fullFinalDirectReadState = Get-Fb2DataOnlyDirectReadEvidenceState $latestFinal
+    $fullFinalDirectReadComplete = [bool]$fullFinalDirectReadState.complete
     $tokenPresent = -not [string]::IsNullOrWhiteSpace($env:FB2_AI_CENTER_TOKEN)
     $voiceEvidencePath = [string]$env:FB2_VOICE_DEVICE_EVIDENCE_PATH
     $voiceEvidencePathPresent = -not [string]::IsNullOrWhiteSpace($voiceEvidencePath)
@@ -336,6 +344,7 @@ function Build-Fb2AiCenterStatusSnapshot {
             exists = $null -ne $latestData
             success = $dataSuccess
             mode = [string](Get-JsonProperty $latestData "mode" "")
+            acceptance_scope = [string](Get-JsonProperty $latestData "acceptance_scope" "")
             voice_status = [string](Get-JsonProperty $latestData "voice_status" "")
             feedback_complete = $feedbackComplete
             visible_direct_read_complete = $visibleDirectReadComplete
@@ -351,6 +360,24 @@ function Build-Fb2AiCenterStatusSnapshot {
             permission_total_blocks = [string](Get-JsonProperty $finalEvidence "permission_total_blocks" "")
             quality_unmatched_cited_sources = [string](Get-JsonProperty $finalEvidence "quality_unmatched_cited_sources" "")
             quality_non_synthetic_adoption_count = [string](Get-JsonProperty $finalEvidence "quality_non_synthetic_adoption_count" "")
+        }
+        latest_final_acceptance = [ordered]@{
+            path = if ($null -eq $latestFinalFile) { "" } else { $latestFinalFile.FullName }
+            exists = $null -ne $latestFinal
+            success = $fullFinalSuccess
+            mode = [string](Get-JsonProperty $latestFinal "mode" "")
+            acceptance_scope = [string](Get-JsonProperty $latestFinal "acceptance_scope" "")
+            voice_status = [string](Get-JsonProperty $latestFinal "voice_status" "")
+            feedback_complete = $fullFinalFeedbackComplete
+            direct_read_evidence_complete = $fullFinalDirectReadComplete
+            direct_read_evidence_mode = [string]$fullFinalDirectReadState.mode
+            final_acceptance_exit_code = [string](Get-JsonProperty $latestFinal "final_acceptance_exit_code" "")
+            visible_chat_exit_code = [string](Get-JsonProperty $latestFinal "visible_chat_exit_code" "")
+            scenario_my_ticket_orders = [string](Get-JsonProperty $fullFinalEvidence "scenario_my_ticket_orders" "")
+            platform_order_summary = [string](Get-JsonProperty $fullFinalEvidence "scenario_platform_order_summary" "")
+            permission_total_blocks = [string](Get-JsonProperty $fullFinalEvidence "permission_total_blocks" "")
+            quality_unmatched_cited_sources = [string](Get-JsonProperty $fullFinalEvidence "quality_unmatched_cited_sources" "")
+            quality_non_synthetic_adoption_count = [string](Get-JsonProperty $fullFinalEvidence "quality_non_synthetic_adoption_count" "")
         }
         latest_read_only_direct_read = [ordered]@{
             path = if ($null -eq $latestReadOnlyFile) { "" } else { $latestReadOnlyFile.FullName }
