@@ -50,6 +50,7 @@ mod node_agent_active_task;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_cli_security;
+mod node_agent_client_diagnostics;
 mod node_agent_client_maintenance;
 mod node_agent_codex_session;
 mod node_agent_file_range;
@@ -2570,6 +2571,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route(
                 "/api/client-maintenance/open",
                 axum::routing::post(node_agent_client_maintenance::open_target_handler),
+            )
+            .route(
+                "/api/client-maintenance/diagnostics/export",
+                axum::routing::post(node_agent_client_diagnostics::export_handler),
             )
             .route(
                 "/api/client-maintenance/update",

@@ -1003,12 +1003,18 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('ensureProjectInfoBeforeRegister'), 'project registration should inspect local folders before submit');
   assert.ok(pcApp.includes('正在自动读取目录信息'), 'project registration should explain auto inspection progress');
   assert.ok(pcApp.includes('settings-project-meta-row'), 'project inspection metadata should render as structured rows');
+  assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
+  assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
+
+  const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
+  assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');
 
   const pcAppCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
   assert.ok(pcAppCss.includes('.settings-project-meta-row'), 'PC app CSS should style structured project inspection metadata');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
+  assert.ok(nodeAgentMain.includes('/api/client-maintenance/diagnostics/export'), 'node agent should mount diagnostics export route');
 
   const nodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_admin.html'), 'utf8');
   assert.ok(nodeAdmin.includes('X-Elon-Local-Admin-Token'), 'standalone node admin page should send local admin token header');

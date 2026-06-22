@@ -60,6 +60,7 @@
     settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
     refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'), openClientLogsBtn: $('openClientLogsBtn'),
     openClientConfigBtn: $('openClientConfigBtn'), openClientInstallBtn: $('openClientInstallBtn'),
+    exportClientDiagnosticsBtn: $('exportClientDiagnosticsBtn'),
     checkClientUpdateBtn: $('checkClientUpdateBtn'), uninstallClientBtn: $('uninstallClientBtn'),
     chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
     inspectProjectFolderBtn: $('inspectProjectFolderBtn'), registerProjectBtn: $('registerProjectBtn'),
@@ -1105,6 +1106,7 @@
     els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientLogsBtn));
     els.openClientConfigBtn.addEventListener('click', () => openClientMaintenanceTarget('config_dir', els.openClientConfigBtn));
     els.openClientInstallBtn.addEventListener('click', () => openClientMaintenanceTarget('install_dir', els.openClientInstallBtn));
+    els.exportClientDiagnosticsBtn.addEventListener('click', exportClientDiagnostics);
     els.checkClientUpdateBtn.addEventListener('click', triggerClientUpdate);
     els.uninstallClientBtn.addEventListener('click', triggerClientUninstall);
     if (els.settingsRuntimePermission) {
@@ -2413,6 +2415,18 @@
       setSettingsResult(escapeHtml(error.message || error), 'error');
     } finally {
       setSettingsBusy(els.checkClientUpdateBtn, false);
+    }
+  }
+
+  async function exportClientDiagnostics() {
+    setSettingsBusy(els.exportClientDiagnosticsBtn, true, '生成中…');
+    try {
+      const data = await localNodeApi('/api/client-maintenance/diagnostics/export', { method: 'POST' });
+      setSettingsResult(`已生成诊断信息：${escapeHtml(data.path || '')}`);
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+    } finally {
+      setSettingsBusy(els.exportClientDiagnosticsBtn, false);
     }
   }
 
