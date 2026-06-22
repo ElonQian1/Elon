@@ -161,7 +161,58 @@ async fn generate_group_summary(
     user_id: &str,
     context_pack: &str,
 ) -> anyhow::Result<(String, String)> {
-    let response = call_social_chat_llm_with_fallback_options(
+    let response =
+        match request_group_summary_completion(state, user_id, context_pack, "group_summary_post")
+            .await
+        {
+            Ok(response) => response,
+            Err(full_error) => {
+                if let Some(compact_pack) = compact_group_summary_context_pack(context_pack) {
+                    warn!(
+                    "group summary full context generation failed, retrying compact context: {}",
+                    full_error
+                );
+                    request_group_summary_completion(
+                        state,
+                        user_id,
+                        &compact_pack,
+                        "group_summary_post_compact",
+                    )
+                    .await
+                    .map_err(|compact_error| {
+                        anyhow::anyhow!(
+                            "full context failed: {}; compact context failed: {}",
+                            full_error,
+                            compact_error
+                        )
+                    })?
+                } else {
+                    return Err(full_error);
+                }
+            }
+        };
+    let summary = response["choices"][0]["message"]["content"]
+        .as_str()
+        .unwrap_or("")
+        .trim();
+    if summary.is_empty() {
+        anyhow::bail!("AI 没有返回总结内容");
+    }
+    let model = response["model"]
+        .as_str()
+        .filter(|model| !model.trim().is_empty())
+        .unwrap_or("social_ai_fallback")
+        .to_string();
+    Ok((summary.chars().take(6000).collect(), model))
+}
+
+async fn request_group_summary_completion(
+    state: &Arc<AppState>,
+    user_id: &str,
+    context_pack: &str,
+    feature: &str,
+) -> anyhow::Result<Value> {
+    call_social_chat_llm_with_fallback_options(
         state,
         &[
             json!({
@@ -177,24 +228,129 @@ async fn generate_group_summary(
             }),
         ],
         user_id,
-        "group_summary_post",
+        feature,
         0.2,
         1600,
     )
-    .await?;
-    let summary = response["choices"][0]["message"]["content"]
-        .as_str()
-        .unwrap_or("")
-        .trim();
-    if summary.is_empty() {
-        anyhow::bail!("AI 没有返回总结内容");
+    .await
+}
+
+fn compact_group_summary_context_pack(context_pack: &str) -> Option<String> {
+    const MAX_COMPACT_CHARS: usize = 18_000;
+    if context_pack.chars().count() <= MAX_COMPACT_CHARS {
+        return None;
     }
-    let model = response["model"]
-        .as_str()
-        .filter(|model| !model.trim().is_empty())
-        .unwrap_or("social_ai_fallback")
-        .to_string();
-    Ok((summary.chars().take(6000).collect(), model))
+
+    let parsed: Value = serde_json::from_str(context_pack).ok()?;
+    let selected_messages = parsed
+        .get("selected_messages")
+        .and_then(Value::as_array)
+        .map(|messages| {
+            messages
+                .iter()
+                .rev()
+                .take(24)
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .map(compact_summary_message)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let group_docs = parsed
+        .get("group_ai_docs")
+        .and_then(Value::as_array)
+        .map(|docs| {
+            docs.iter()
+                .take(8)
+                .map(compact_summary_doc)
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
+    let external_app_context = parsed
+        .get("external_app_context")
+        .map(|value| compact_json_value(value, 9000));
+
+    let compact = json!({
+        "schema": "group_summary.compact_context_pack.v1",
+        "compaction_reason": "retry_after_provider_error",
+        "original_chars": context_pack.chars().count(),
+        "group_id": parsed.get("group_id"),
+        "task": parsed.get("task"),
+        "source_window": parsed.get("source_window"),
+        "user_instructions": parsed.get("user_instructions"),
+        "requested_title": parsed.get("requested_title"),
+        "requested_topic": parsed.get("requested_topic"),
+        "source_message_count": parsed.get("source_message_count"),
+        "selected_messages": selected_messages,
+        "group_ai_docs": group_docs,
+        "external_app_context_compact": external_app_context,
+        "output_contract": parsed.get("output_contract"),
+        "must_preserve": [
+            "message_id",
+            "match_id",
+            "order_id",
+            "context_audit_id",
+            "数据事实",
+            "用户订单",
+            "平台汇总",
+            "群友观点",
+            "AI推断",
+            "风险边界"
+        ]
+    });
+
+    let compact_text = serde_json::to_string_pretty(&compact).ok()?;
+    if compact_text.chars().count() >= context_pack.chars().count() {
+        None
+    } else {
+        Some(compact_text)
+    }
+}
+
+fn compact_summary_message(message: &Value) -> Value {
+    json!({
+        "id": message.get("id"),
+        "sender_user_id": message.get("sender_user_id"),
+        "sender_name": message.get("sender_name"),
+        "created_at": message.get("created_at"),
+        "content": truncate_value_string(message.get("content"), 240),
+    })
+}
+
+fn compact_summary_doc(doc: &Value) -> Value {
+    json!({
+        "path": doc.get("path"),
+        "title": doc.get("title"),
+        "content": truncate_value_string(doc.get("content"), 600),
+    })
+}
+
+fn compact_json_value(value: &Value, max_chars: usize) -> Value {
+    let text = serde_json::to_string(value).unwrap_or_default();
+    if text.chars().count() <= max_chars {
+        value.clone()
+    } else {
+        json!({
+            "truncated": true,
+            "original_chars": text.chars().count(),
+            "excerpt": truncate_chars(&text, max_chars)
+        })
+    }
+}
+
+fn truncate_value_string(value: Option<&Value>, max_chars: usize) -> Option<String> {
+    value
+        .and_then(Value::as_str)
+        .map(|text| truncate_chars(text, max_chars))
+}
+
+fn truncate_chars(text: &str, max_chars: usize) -> String {
+    let mut out = text.chars().take(max_chars).collect::<String>();
+    if text.chars().count() > max_chars {
+        out.push_str("...");
+    }
+    out
 }
 
 fn fallback_summary(messages: &[GroupSummarySourceMessage], error: &str) -> String {
@@ -305,5 +461,56 @@ mod tests {
         );
 
         assert!(citations.is_empty());
+    }
+
+    #[test]
+    fn compact_summary_context_skips_small_context() {
+        let context = serde_json::json!({
+            "group_id": "ext_fb2_official",
+            "selected_messages": [{
+                "id": "gmsg-1",
+                "sender_name": "用户A",
+                "content": "今天比赛怎么看"
+            }]
+        })
+        .to_string();
+
+        assert!(compact_group_summary_context_pack(&context).is_none());
+    }
+
+    #[test]
+    fn compact_summary_context_preserves_source_ids_and_truncates_large_payload() {
+        let long_text = "今天比赛怎么看，赔率有什么变化。".repeat(1200);
+        let context = serde_json::json!({
+            "group_id": "ext_fb2_official",
+            "task": "summary_post",
+            "source_message_count": 40,
+            "selected_messages": [{
+                "id": "gmsg-source-1",
+                "sender_user_id": "usr-1",
+                "sender_name": "用户A",
+                "created_at": "2026-06-22T11:42:00Z",
+                "content": long_text
+            }],
+            "external_app_context": {
+                "app_id": "fb2",
+                "context_audit_id": "audit-1",
+                "payload": "赔率与订单摘要".repeat(2200)
+            },
+            "output_contract": {
+                "required_sections": ["数据事实", "AI推断", "风险边界"]
+            }
+        })
+        .to_string();
+
+        let compact = compact_group_summary_context_pack(&context).expect("compact context");
+
+        assert!(compact.len() < context.len());
+        assert!(compact.contains("group_summary.compact_context_pack.v1"));
+        assert!(compact.contains("gmsg-source-1"));
+        assert!(compact.contains("audit-1"));
+        assert!(compact.contains("message_id"));
+        assert!(compact.contains("风险边界"));
+        assert!(compact.contains("truncated"));
     }
 }
