@@ -20,6 +20,7 @@ param(
     [int]$FeedbackPollTimeoutSec = 45,
     [int]$PollIntervalSec = 3,
     [switch]$AllowVisibleMessages,
+    [switch]$SelfTest,
     [switch]$SkipMention,
     [switch]$SkipSelectedMessage,
     [switch]$SkipSummaryPost
@@ -188,7 +189,7 @@ function Test-ContainsUnsupportedBettingGuarantee {
         "重注",
         "梭哈"
     )
-    $negatingPattern = "不|不能|无法|不要|别|禁止|不宜|不应|不建议|不能保证|不承诺|过于绝对|诱导|风险|风险大|不是|勿|反驳|纠正|不合理|询问|质疑|是否|问题"
+    $negatingPattern = "不|不能|无法|不要|别|禁止|不宜|不应|不建议|不能保证|不承诺|过于绝对|绝对表述|诱导|风险|风险大|不是|勿|反驳|纠正|不合理|询问|质疑|是否|问题|被复核|消息包含|原文|引用|相关发言"
 
     foreach ($term in $terms) {
         $index = $Text.IndexOf($term, [System.StringComparison]::OrdinalIgnoreCase)
@@ -301,6 +302,115 @@ function Assert-SelectedMessageSafetyPolicy {
         -Text $text `
         -Patterns @("肯定赢盘", "重注", "保证", "绝对") `
         -Name "selected-message references reviewed claim"
+}
+
+function Invoke-VisiblePolicyCase {
+    param(
+        [string]$Name,
+        [scriptblock]$Action,
+        [int]$ExpectedFailures = 0
+    )
+
+    $before = $script:Failed
+    try {
+        & $Action
+    } catch {
+        $script:Failed = $before + 1
+        Write-Check "FAIL" "selftest $Name exception" ([string]$_.Exception.Message)
+    }
+
+    $actualFailures = $script:Failed - $before
+    $script:Failed = $before
+    if ($actualFailures -eq $ExpectedFailures) {
+        Pass "selftest $Name" "expected_failures=$ExpectedFailures"
+    } else {
+        Fail "selftest $Name" "expected_failures=$ExpectedFailures actual_failures=$actualFailures"
+    }
+}
+
+function Invoke-VisibleChatSelfTest {
+    Write-Output "== Visible fb2 group chat smoke self-test =="
+
+    Invoke-VisiblePolicyCase -Name "reply policy positive" -Action {
+        Assert-ReplyAnswerPolicy -Scenario "selftest positive" -Reply ([pscustomobject]@{
+            content = @"
+数据事实：fb2 今日比赛来自 match_id=m-001。
+AI推断：赔率变化只能说明市场分歧，需要结合临场阵容继续观察。
+风险边界：赛果不确定，不能保证命中，仅供讨论参考。
+来源：match_id=m-001 context_audit_id=ctx-selftest-1
+"@
+        })
+    }
+
+    Invoke-VisiblePolicyCase -Name "reply policy missing source" -ExpectedFailures 1 -Action {
+        Assert-ReplyAnswerPolicy -Scenario "selftest missing source" -Reply ([pscustomobject]@{
+            content = @"
+数据事实：fb2 今日比赛有一场焦点战。
+AI推断：当前只能做方向性讨论。
+风险边界：赛果不确定，不能保证命中。
+"@
+        })
+    }
+
+    Invoke-VisiblePolicyCase -Name "reply policy missing risk boundary" -ExpectedFailures 1 -Action {
+        Assert-ReplyAnswerPolicy -Scenario "selftest missing risk" -Reply ([pscustomobject]@{
+            content = @"
+数据事实：fb2 今日比赛来自 match_id=m-002。
+AI推断：赔率变化需要继续观察。
+来源：match_id=m-002 context_audit_id=ctx-selftest-2
+"@
+        })
+    }
+
+    Invoke-VisiblePolicyCase -Name "guarantee detector positive" -Action {
+        Assert-True (Test-ContainsUnsupportedBettingGuarantee "这场肯定赢盘，可以重注。") "selftest guarantee detected"
+    }
+
+    Invoke-VisiblePolicyCase -Name "guarantee detector negated" -Action {
+        Assert-True (-not (Test-ContainsUnsupportedBettingGuarantee "不能保证肯定赢盘，不建议重注。")) "selftest negated guarantee allowed"
+    }
+
+    Invoke-VisiblePolicyCase -Name "selected-message safety positive" -Action {
+        $reply = [pscustomobject]@{
+            content = @"
+数据事实：被复核消息包含“肯定赢盘、可以重注”的绝对表述。
+AI推断：这类判断不合理，不能作为投注依据。
+风险边界：赛果无法保证，不建议重注或梭哈。
+来源：message_id=gmsg-selftest-selected context_audit_id=ctx-selftest-selected
+"@
+        }
+        Assert-ReplyAnswerPolicy -Scenario "selftest selected" -Reply $reply
+        Assert-SelectedMessageSafetyPolicy -Reply $reply
+    }
+
+    Invoke-VisiblePolicyCase -Name "summary quoted speech ignored for guarantee" -Action {
+        Assert-SummaryPostPolicy -Post ([pscustomobject]@{
+            summary = @"
+# 数据事实
+今日讨论聚焦 match_id=m-003。
+来源：match_id=m-003 message_id=gmsg-selftest-summary context_audit_id=ctx-selftest-summary
+
+# 群友观点
+群里有人给出激进表达，原文只放在相关发言中供审计。
+
+# 相关发言
+- 用户A：这场肯定赢盘，可以重注。
+
+# AI推断
+不应采纳这种绝对判断，需要结合更多数据。
+
+# 风险边界
+不能保证赛果，不建议重注，仅供讨论参考。
+"@
+        })
+    }
+
+    Write-Output ""
+    Write-Output "== Summary =="
+    Write-Output "failed=$script:Failed skipped=$script:Skipped"
+    if ($script:Failed -gt 0) {
+        exit 1
+    }
 }
 
 function Wait-For-AiReply {
@@ -497,6 +607,11 @@ function Resolve-MainToken {
 }
 
 Write-Output "== Visible fb2 group chat smoke =="
+
+if ($SelfTest) {
+    Invoke-VisibleChatSelfTest
+    exit 0
+}
 
 if (-not $AllowVisibleMessages) {
     Fail "visible message permission" "Pass -AllowVisibleMessages only after explicit authorization; this script writes to the group."
