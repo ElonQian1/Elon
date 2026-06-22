@@ -150,6 +150,7 @@ pub async fn create_group_summary_post(
         topic_hint.as_deref(),
     )
     .await;
+    let feedback_external_context = external_context.clone();
     let context_pack = match serde_json::to_string_pretty(&build_context_pack(
         &group_id,
         &input,
@@ -177,6 +178,7 @@ pub async fn create_group_summary_post(
         group_id,
         detail.post.id.clone(),
         context_pack,
+        feedback_external_context,
         messages,
     );
     (
@@ -258,6 +260,7 @@ pub async fn auto_split_group_summary_posts(
             topic_hint.as_deref(),
         )
         .await;
+        let feedback_external_context = external_context.clone();
         let context_pack = match serde_json::to_string_pretty(&build_context_pack(
             &group_id,
             &input,
@@ -285,6 +288,7 @@ pub async fn auto_split_group_summary_posts(
             group_id.clone(),
             detail.post.id.clone(),
             context_pack,
+            feedback_external_context,
             topic_messages,
         );
         details.push(detail);

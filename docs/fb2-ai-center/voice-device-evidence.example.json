@@ -1,5 +1,6 @@
 {
   "schema": "fb2.voice_device_evidence.v1",
+  "finalAcceptanceReady": false,
   "recordedAt": "2026-06-22T00:00:00+08:00",
   "tester": "fb2-ai-agent",
   "device": {

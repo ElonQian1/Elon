@@ -603,6 +603,7 @@ if ($SkipSelectedMessage) {
 if ($SkipSummaryPost) {
     Skip "summary-post" "skipped by caller"
 } else {
+    $summaryFeedbackSince = (Get-Date).ToUniversalTime().AddSeconds(-5).ToString("o")
     if (-not $SummaryPostTitle) {
         $SummaryPostTitle = "可见smoke ${trace} 今日比赛总结"
     }
@@ -626,6 +627,10 @@ if ($SkipSummaryPost) {
         $summaryPost = Wait-For-SummaryPost -BearerToken $token -TargetGroupId $GroupId -PostId $postId
         Assert-True ([string]$summaryPost.status -eq "ready") "summary-post ready" "$($summaryPost.status)"
         Assert-SummaryPostPolicy -Post $summaryPost
+        if ($Fb2AiCenterToken) {
+            $feedback = $null
+            Wait-For-Fb2Feedback -MainRequestPrefix "social_group_summary_post:" -ExpectedTrigger "group_summary_post" -FeedbackSince $summaryFeedbackSince -Scenario "summary-post" -FeedbackOut ([ref]$feedback)
+        }
     }
 }
 

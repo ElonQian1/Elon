@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::{
+    external_app_context_feedback::spawn_generated_answer_feedback,
     social_ai_agents::call_social_chat_llm_with_fallback_options,
     store::{GroupAiDocument, GroupSummaryCreateInput, GroupSummarySourceMessage},
     types::AppState,
@@ -16,6 +17,7 @@ pub(crate) fn spawn_group_summary_generation(
     group_id: String,
     post_id: String,
     context_pack: String,
+    external_context: Option<Value>,
     sources: Vec<GroupSummarySourceMessage>,
 ) {
     tokio::spawn(async move {
@@ -54,6 +56,17 @@ pub(crate) fn spawn_group_summary_generation(
                 group_id, post_id, update_error
             );
         }
+        spawn_generated_answer_feedback(
+            Arc::clone(&state),
+            user_id,
+            group_id.clone(),
+            format!("social_group_summary_post:{post_id}"),
+            "group_summary_post",
+            external_context,
+            None,
+            summary,
+            Vec::new(),
+        );
     });
 }
 

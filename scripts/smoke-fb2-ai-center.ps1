@@ -610,6 +610,7 @@ if ($RequireVoiceDeviceEvidence) {
         try {
             $evidence = Get-Content -Raw -Path $VoiceDeviceEvidencePath | ConvertFrom-Json
             Assert-True ($evidence.schema -eq "fb2.voice_device_evidence.v1") "voice evidence schema" "$($evidence.schema)"
+            Assert-JsonBool $evidence "finalAcceptanceReady" "voice evidence final ready"
             Assert-NonEmptyField $evidence "recordedAt" "voice evidence recordedAt"
             Assert-NonEmptyField $evidence "tester" "voice evidence tester"
             Assert-NonEmptyField $evidence.device "manufacturer" "voice evidence device manufacturer"
