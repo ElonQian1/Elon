@@ -60,6 +60,7 @@ mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_local_admin;
 mod node_agent_project_picker;
+mod node_agent_project_profile;
 mod node_agent_proxy;
 mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
