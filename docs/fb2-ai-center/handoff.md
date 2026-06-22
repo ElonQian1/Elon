@@ -10,6 +10,8 @@
 - 2026-06-22 09:06 总结帖入口抽样通过：真实群 `ext_fb2_official` 使用 `123qwe/123qwe` 创建 summary post `gsp_46720718477f4c6e953b55d5fc309568`，最终 `status=ready`，`scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120` 返回 `failed=0 skipped=2`。脚本检查了非空 summary、source references、`数据事实 / 群友观点 / AI推断 / 风险边界`、风险提示和禁止投注保证。
 - 2026-06-22 09:29 本轮把总结帖入口补进质量闭环：主项目 summary post 生成成功后会后台调用 fb2 `/context/feedback`，`main_request_id=social_group_summary_post:<post_id>`、`trigger=group_summary_post`。`scripts\smoke-fb2-visible-chat.ps1` 的 summary-only 场景在有 `FB2_AI_CENTER_TOKEN` 时会等待 summary-post feedback；缺 token 时仍只验证可见 summary 正文策略。
 - 2026-06-22 09:29 本轮收紧真机语音证据：`scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 必须看到 `finalAcceptanceReady=true` 才能通过；`scripts\smoke-fb2-final-acceptance.ps1` summary 会输出设备、APK、按住说话、上滑取消、too short、system ASR、server ASR、TTS、ASR/TTS 免费和附件证据字段。示例 JSON 默认 `finalAcceptanceReady=false`，只能作为格式模板。
+- 2026-06-22 09:56 本轮继续收紧最终验收 summary：`scripts\smoke-fb2-final-acceptance.ps1` 输出 `feedback_coverage`，并把最终 `success` 绑定到三类自动 feedback 覆盖完整：`visible_mention`、`selected_message`、`summary_post`。以后不能只看 feedback 数组非空，要看 `feedback_coverage.complete=true`。
+- 2026-06-22 09:56 本轮继续收紧真机语音 artifact：`scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 会拒绝占位 artifact ref，要求本地 ref 解析到真实文件或远端 `http(s)://` URL，并要求至少一条 logcat 和一条截图/视频证据；最终 summary 会摘录 artifact refs 是否完整、是否有 logcat/视觉证据。
 - 2026-06-22 09:06 总结帖修复根因：旧 summary post `gsp_b4c717d3c2d947188ccc755fe4f6ff32` 进入 `ready_with_fallback`，错误为“当前 AI 模型额度已用尽或接口不可用”。这不是 fb2 用户余额不足，也不是 ASR/TTS 免费策略问题，而是总结帖链路此前只调用默认模型，没有使用 `social_ai` 多代理 fallback。现在总结帖和 `@EL`/长按 `AI回复` 使用同一类模型 fallback，`hunyuan-turbo` fallback 已在线上正常生成。
 - 2026-06-22 09:06 ADB 真机复核：设备 `e0d909c3` 在线，fb2 包 `com.duoguan.football 1.1.48(96)`，`RECORD_AUDIO granted=true`，appops 为 `foreground/allow`。启动 `com.duoguan.football/.MainActivity` 后，当前页面为 `夺冠体育官方群`，UI dump 可见 `数据事实`、`AI推断`、`风险边界`、`context_audit_id`、`按住 说话`；截图位于 `target\fb2-current-20260622.png`，UI dump 位于 `target\fb2-window-20260622.xml`。本轮 logcat 未见 fb2 `AndroidRuntime/FATAL`。
 - 2026-06-22 03:04 当前主项目远端和线上状态：`origin/main` 最新为 `4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，线上服务端为 `v0.3.585 / 4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，其中包含 fb2 群聊 AI 分层兜底修复 `589d2bacf51cf4c679505da52d8ecfea1762420b`。本轮工作树 `D:\rust\active-projects\elon-main-fb2-docs-20260621` 已 fast-forward 到 `origin/main` 并保持干净。
@@ -135,6 +137,7 @@
 - 需要把主项目本地语音 SDK 编译也纳入验收时加 `-CheckLocalVoiceSdkBuild`。
 - 最终验收或 CI 不允许跳过任何检查时加 `-RequireNoSkips`。
 - 需要验证 fb2 真机语音链路时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；正式证据必须覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
+- 真机语音证据的 `artifacts[].ref` 必须是真实可访问证据：本地路径按 evidence JSON 所在目录或仓库根目录解析，远端路径必须是 `http(s)://`；不能使用 example/placeholder/“saved file path” 文案，并且必须同时包含 logcat 和截图/视频。
 - 最终总验收直接跑 `-FinalAcceptance`，并同时提供主项目登录来源、`FB2_AI_CENTER_TOKEN` 和 `-VoiceDeviceEvidencePath`；否则必须失败，不能把 skip 当成完成。
 - 需要验证长期质量门槛时加：
   `-CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339> -MaxLargeContextPackRate 0.75`
@@ -152,7 +155,7 @@
 - 最终总验收优先运行，语音证据必须是 `finalAcceptanceReady=true`：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`
-  先用 `-PreflightOnly` 做无副作用预检；该阶段会自动从 fb2 登录解析 `ExternalUserId`，预检该用户有订单上下文，并要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 全部通过。预检通过后再用 `-AllowVisibleMessages` 写真实群聊，把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON。
+  先用 `-PreflightOnly` 做无副作用预检；该阶段会自动从 fb2 登录解析 `ExternalUserId`，预检该用户有订单上下文，并要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip 全部通过。预检通过后再用 `-AllowVisibleMessages` 写真实群聊，把真实群聊可见触发和 `-FinalAcceptance` 绑定到同一批 `QualitySince` 证据，并输出 summary JSON；其中 `feedback_coverage.complete` 必须为 true。
 - 继续完善 Context Pack prompt 投影和质量告警。
 - 增加 fb2 Context Pack 拉取失败、空数据、超预算的回归测试。
 - 观察 `auto_generated_answer_feedback` 和 `record_opinion_adoption` 样本，后续如果 AI 回答未显式引用 source id，要继续强化 prompt 或前端引用展示。

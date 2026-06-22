@@ -152,6 +152,46 @@ function Assert-True {
     }
 }
 
+function Resolve-EvidenceArtifactPath {
+    param(
+        [string]$Ref,
+        [string]$EvidenceFilePath,
+        [string]$RepoRoot
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Ref)) {
+        return ""
+    }
+    if ($Ref -match '^https?://') {
+        return $Ref
+    }
+    if ([System.IO.Path]::IsPathRooted($Ref)) {
+        return $Ref
+    }
+
+    $evidenceDir = Split-Path -Parent (Resolve-Path -LiteralPath $EvidenceFilePath).Path
+    $candidate = Join-Path $evidenceDir $Ref
+    if (Test-Path -LiteralPath $candidate) {
+        return $candidate
+    }
+
+    Join-Path $RepoRoot $Ref
+}
+
+function Test-PlaceholderArtifactRef {
+    param([string]$Ref)
+
+    if ([string]::IsNullOrWhiteSpace($Ref)) {
+        return $true
+    }
+    $lower = $Ref.ToLowerInvariant()
+    return $lower.Contains("example") `
+        -or $lower.Contains("placeholder") `
+        -or $lower.Contains("saved file path") `
+        -or $lower.Contains("screenshot/video path") `
+        -or $lower.Contains("adb logcat excerpt")
+}
+
 function Encode-QueryValue {
     param([string]$Value)
     [System.Uri]::EscapeDataString($Value)
@@ -636,8 +676,37 @@ if ($RequireVoiceDeviceEvidence) {
             Assert-JsonBool $evidence.checks "serverAsrFailureRecoversUi" "voice evidence server ASR failure recovery"
             Assert-JsonBool $evidence.checks "ttsPlayback" "voice evidence TTS playback"
             Assert-JsonBool $evidence.checks "asrTtsFreeWithZeroAiBalance" "voice evidence ASR/TTS free"
-            $artifactCount = @($evidence.artifacts | Where-Object { $_ }).Count
+            $artifactItems = @($evidence.artifacts | Where-Object { $_ })
+            $artifactCount = $artifactItems.Count
             Assert-True ($artifactCount -gt 0) "voice evidence artifacts" "count=$artifactCount"
+            $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
+            $artifactTypes = @()
+            $validArtifactRefs = 0
+            foreach ($artifact in $artifactItems) {
+                $type = ([string]$artifact.type).Trim()
+                $ref = ([string]$artifact.ref).Trim()
+                if ($type) {
+                    $artifactTypes += $type.ToLowerInvariant()
+                }
+                Assert-True (-not [string]::IsNullOrWhiteSpace($type)) "voice evidence artifact type" $type
+                Assert-True (-not (Test-PlaceholderArtifactRef $ref)) "voice evidence artifact ref" $ref
+                $resolvedRef = Resolve-EvidenceArtifactPath -Ref $ref -EvidenceFilePath $VoiceDeviceEvidencePath -RepoRoot $repoRoot
+                if ($resolvedRef -match '^https?://') {
+                    $validArtifactRefs += 1
+                    Pass "voice evidence artifact url" $resolvedRef
+                } else {
+                    $exists = [bool](Test-Path -LiteralPath $resolvedRef)
+                    Assert-True $exists "voice evidence artifact exists" $resolvedRef
+                    if ($exists) {
+                        $validArtifactRefs += 1
+                    }
+                }
+            }
+            Assert-True ($validArtifactRefs -eq $artifactCount) "voice evidence artifact refs complete" "valid=$validArtifactRefs count=$artifactCount"
+            $hasLogcat = @($artifactTypes | Where-Object { $_ -eq "logcat" -or $_ -like "*log*" }).Count -gt 0
+            $hasVisual = @($artifactTypes | Where-Object { $_ -eq "screenshot" -or $_ -eq "video" -or $_ -eq "screenshot_or_video" -or $_ -like "*screen*" -or $_ -like "*video*" }).Count -gt 0
+            Assert-True $hasLogcat "voice evidence artifact logcat" ($artifactTypes -join ",")
+            Assert-True $hasVisual "voice evidence artifact visual" ($artifactTypes -join ",")
         } catch {
             Fail "voice device evidence" $_.Exception.Message
         }

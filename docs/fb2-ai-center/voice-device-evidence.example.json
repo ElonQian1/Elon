@@ -49,5 +49,5 @@
       "note": "Shows VoiceComposerView hold-to-talk overlay, cancel zone, AI reply zone, and transcribe zone."
     }
   ],
-  "notes": "Replace this example with real fb2 APK device evidence before final acceptance."
+  "notes": "Replace this example with real fb2 APK device evidence before final acceptance. Placeholder artifact refs are intentionally invalid for smoke validation."
 }

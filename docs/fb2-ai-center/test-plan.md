@@ -36,7 +36,7 @@
 - 需要验证 authenticated `chat-bootstrap` 时，脚本支持直接传 `-MainToken`，也支持传 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN`，通过 fb2 `/api/main-project/session` 桥接主项目 token；这条路径无副作用，不会发送群消息。
 - 需要验证 fb2 用户端 APK 是否已发布到可下载版本时，加 `-CheckFb2ApkVersion`；脚本会检查 fb2 `/api/app-version` 至少达到 `1.1.48`、`update_kind=full_apk`、checksum/size 有效，并对 `apk_url` 做 HEAD 验证。
 - 需要把主项目 SDK 编译纳入同一次巡检时，加 `-CheckLocalVoiceSdkBuild`；脚本会执行 `android\gradlew.bat :chat-voice-kit:assembleDebug --quiet`。
-- 需要把 fb2 真机语音链路纳入验收时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；JSON 格式参考 `docs/fb2-ai-center/voice-device-evidence.example.json`，顶层必须是 `finalAcceptanceReady=true`，并覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
+- 需要把 fb2 真机语音链路纳入验收时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；JSON 格式参考 `docs/fb2-ai-center/voice-device-evidence.example.json`，顶层必须是 `finalAcceptanceReady=true`，并覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。`artifacts[].ref` 不能是示例/占位文案；本地 artifact 必须能按证据 JSON 所在目录或仓库根目录解析为真实文件，远端 artifact 必须是 `http(s)://` URL，并且至少有一条 logcat 和一条截图/视频证据。
 - 正式最终验收可加 `-RequireNoSkips`，确保缺少 token 或未覆盖的检查不会以 skip 形式被误判为完成。
 - 最终总验收优先使用 `-FinalAcceptance`；它会自动打开 `-RequireFb2Live`、`-RequireAllScenarios`、`-IncludePlatformOrderSummary`、`-CheckQuality`、`-RequireFeedbackCoverage`、`-CheckFb2ApkVersion`、`-CheckLocalVoiceSdkBuild`、`-RequireVoiceDeviceEvidence` 和 `-RequireNoSkips`，缺少主项目登录、`FB2_AI_CENTER_TOKEN` 或 `-VoiceDeviceEvidencePath` 时必须失败。
 - `cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 通过，确认 fb2 可引用最新 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
@@ -48,7 +48,7 @@
 - 获得明确授权后，`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages` 能发送真实群聊 `@EL` 消息、调用 selected-message `/ai-reply`，并等到 `usr_elon_ai`/`gai_*` 回复；没有 `-AllowVisibleMessages` 时脚本必须拒绝写群。
 - 可见群聊 smoke 不只检查消息 ID。`@EL` 和 selected-message 两类回复正文都必须包含来源标记、事实/观点/推断分层词、风险或不保证边界，且不得出现“肯定命中/稳赢/重注/包赢”等投注保证；selected-message 回复还必须明确反驳被测消息里的“肯定赢盘、重注”说法。
 - 只抽样总结帖入口时，可运行 `scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage`；该脚本必须检查 summary 正文策略，有 `FB2_AI_CENTER_TOKEN` 时还必须等到 `trigger=group_summary_post` 的 fb2 feedback。
-- 最终验收先跑 `scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly`，无副作用确认 `ExternalUserId`、用户订单上下文、fb2 live 数据、六类标准场景、平台匿名摘要、权限负向审计、fb2 APK 发布、主项目语音 SDK 构建、`finalAcceptanceReady=true` 的真机语音证据和 no-skip 门槛。预检 summary 必须包含 `preflight_evidence`，直接记录 APK、语音、场景和权限审计证据。预检通过后，再跑 `scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages`，它会记录 `QualitySince`，发送真实群聊 `@EL`、selected-message `AI回复` 和总结帖，最后跑 `smoke-fb2-ai-center.ps1 -FinalAcceptance` 补齐质量反馈覆盖；输出的 summary 必须显示 visible chat 和 final acceptance 两个 exit code 都为 0，并包含可见消息 ID、AI 回复 ID、summary post/feedback、子脚本日志路径、feedback evidence、`visible_answer_policy_evidence` 和 `final_acceptance_evidence`。
+- 最终验收先跑 `scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly`，无副作用确认 `ExternalUserId`、用户订单上下文、fb2 live 数据、六类标准场景、平台匿名摘要、权限负向审计、fb2 APK 发布、主项目语音 SDK 构建、`finalAcceptanceReady=true` 的真机语音证据和 no-skip 门槛。预检 summary 必须包含 `preflight_evidence`，直接记录 APK、语音、场景和权限审计证据。预检通过后，再跑 `scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages`，它会记录 `QualitySince`，发送真实群聊 `@EL`、selected-message `AI回复` 和总结帖，最后跑 `smoke-fb2-ai-center.ps1 -FinalAcceptance` 补齐质量反馈覆盖；输出的 summary 必须显示 visible chat 和 final acceptance 两个 exit code 都为 0，并包含可见消息 ID、AI 回复 ID、summary post/feedback、子脚本日志路径、feedback evidence、`feedback_coverage`、`visible_answer_policy_evidence` 和 `final_acceptance_evidence`。其中 `feedback_coverage.visible_mention`、`feedback_coverage.selected_message`、`feedback_coverage.summary_post` 必须全为 true。
 - 主项目工具 planner 对“今天比赛/预测/赔率/我的票”优先规划 `match_analysis_brief`，并保留 `search_matches`、`search_user_orders` 等补充工具。
 - 主项目工具 planner 对“群里大家怎么看/群友观点/讨论分歧”优先规划 `group_opinion_summary`，并保留 `search_group_opinions`、`opinion_memories` 等补充工具。
 - `match_analysis_brief` 归一化结果必须校验 `visibility=match_focused_brief`；`group_opinion_summary` 必须校验 `visibility=single_group_lightweight_memory`。
@@ -85,7 +85,7 @@
 10. 云端 ASR 失败，UI 恢复且不永久卡住。
 11. AI 余额为 0 时 ASR/TTS 仍可用。
 
-真机证据必须沉淀为 `fb2.voice_device_evidence.v1` JSON，顶层 `finalAcceptanceReady=true`，并至少附一条 logcat 或截图/录屏 artifact。主项目最终验收脚本只接受机器可读证据，避免用口头描述或静音半成品证据替代小米/HyperOS 等设备上的实际验证。
+真机证据必须沉淀为 `fb2.voice_device_evidence.v1` JSON，顶层 `finalAcceptanceReady=true`，并至少附一条真实可访问 logcat artifact 和一条截图/录屏 artifact。主项目最终验收脚本只接受机器可读证据，避免用口头描述、占位路径或静音半成品证据替代小米/HyperOS 等设备上的实际验证。
 
 ## AI 数据回答测试
 

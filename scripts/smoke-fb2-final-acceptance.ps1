@@ -213,6 +213,29 @@ function Find-FeedbackEvidence {
     return $items
 }
 
+function Build-FeedbackCoverage {
+    param([object[]]$FeedbackEvidence)
+
+    $items = @($FeedbackEvidence | Where-Object { $_ })
+    $mention = @($items | Where-Object { [string]$_.scenario -eq "visible @EL fb2 feedback" }).Count -gt 0
+    $selected = @($items | Where-Object { [string]$_.scenario -eq "selected-message AI回复 fb2 feedback" }).Count -gt 0
+    $summaryPost = @($items | Where-Object { [string]$_.scenario -eq "summary-post fb2 feedback" }).Count -gt 0
+    $missing = @()
+    if (-not $mention) { $missing += "visible @EL fb2 feedback" }
+    if (-not $selected) { $missing += "selected-message AI回复 fb2 feedback" }
+    if (-not $summaryPost) { $missing += "summary-post fb2 feedback" }
+
+    [ordered]@{
+        required_count = 3
+        observed_count = @($items).Count
+        visible_mention = $mention
+        selected_message = $selected
+        summary_post = $summaryPost
+        missing_required = $missing
+        complete = ($missing.Count -eq 0)
+    }
+}
+
 function Build-AiCenterEvidence {
     param([string[]]$Lines)
 
@@ -238,6 +261,9 @@ function Build-AiCenterEvidence {
         voice_evidence_tts_playback = Find-CheckDetail $Lines "voice evidence TTS playback"
         voice_evidence_asr_tts_free = Find-CheckDetail $Lines "voice evidence ASR/TTS free"
         voice_evidence_artifacts = Find-CheckDetail $Lines "voice evidence artifacts"
+        voice_evidence_artifact_refs_complete = Find-CheckDetail $Lines "voice evidence artifact refs complete"
+        voice_evidence_artifact_logcat = Find-CheckDetail $Lines "voice evidence artifact logcat"
+        voice_evidence_artifact_visual = Find-CheckDetail $Lines "voice evidence artifact visual"
         scenario_today_context_audit = Find-CheckDetail $Lines "scenario: today matches context audit"
         scenario_my_ticket_context_audit = Find-CheckDetail $Lines "scenario: my ticket context audit"
         scenario_my_ticket_orders = Find-CheckDetail $Lines "scenario: my ticket has user orders"
@@ -453,6 +479,7 @@ $centerLines = @($centerResult.output)
 
 $completedAt = (Get-Date).ToUniversalTime().ToString("o")
 $feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
+$feedbackCoverage = Build-FeedbackCoverage $feedbackEvidence
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"
     mode = "visible_final_acceptance"
@@ -479,9 +506,10 @@ $summary = [ordered]@{
     summary_post_id = Find-CheckDetail $visibleLines "summary-post created"
     summary_post_status = Find-CheckDetail $visibleLines "summary-post ready"
     feedback_evidence = $feedbackEvidence
+    feedback_coverage = $feedbackCoverage
     visible_answer_policy_evidence = Build-VisibleAnswerEvidence $visibleLines
     final_acceptance_evidence = Build-AiCenterEvidence $centerLines
-    success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0)
+    success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0 -and [bool]$feedbackCoverage["complete"])
 }
 
 $summaryJson = $summary | ConvertTo-Json -Depth 8
