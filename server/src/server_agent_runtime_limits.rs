@@ -9,6 +9,7 @@ const MAX_TOTAL_CHARS: usize = 80_000;
 const MAX_OUTPUT_TOKENS: usize = 3000;
 const MAX_REQUESTS_PER_MINUTE: usize = 12;
 const MAX_CONCURRENT_PER_USER: usize = 2;
+const MAX_CONCURRENT_GLOBAL: usize = 24;
 const TEMPERATURE: f64 = 0.2;
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -20,6 +21,7 @@ pub(crate) struct ServerAgentRuntimeLimits {
     pub max_output_tokens: usize,
     pub max_requests_per_minute: usize,
     pub max_concurrent_per_user: usize,
+    pub max_concurrent_global: usize,
     pub temperature: f64,
 }
 
@@ -32,6 +34,7 @@ impl ServerAgentRuntimeLimits {
             max_output_tokens: MAX_OUTPUT_TOKENS,
             max_requests_per_minute: MAX_REQUESTS_PER_MINUTE,
             max_concurrent_per_user: MAX_CONCURRENT_PER_USER,
+            max_concurrent_global: MAX_CONCURRENT_GLOBAL,
             temperature: TEMPERATURE,
         }
     }
@@ -89,9 +92,9 @@ mod tests {
             json!({"role": "user", "content": "Read README"}),
         ];
 
-        ServerAgentRuntimeLimits::current()
-            .validate_messages(&messages)
-            .unwrap();
+        let limits = ServerAgentRuntimeLimits::current();
+        assert!(limits.max_concurrent_global >= limits.max_concurrent_per_user);
+        limits.validate_messages(&messages).unwrap();
     }
 
     #[test]

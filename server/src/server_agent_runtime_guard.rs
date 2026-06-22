@@ -39,6 +39,9 @@ pub(crate) struct ServerRuntimeAuditSummary {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ServerRuntimeAdmissionError {
+    TooManyGlobalConcurrent {
+        max_concurrent_global: usize,
+    },
     TooManyConcurrent {
         max_concurrent_per_user: usize,
     },
@@ -57,7 +60,7 @@ pub(crate) struct ServerRuntimeAdmissionGuard {
 pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
     ServerRuntimeProtectionStatus {
         input_validation: "messages role/content/count/message_chars/total_chars",
-        admission_control: "per-user concurrency and rolling minute request limits",
+        admission_control: "global and per-user concurrency plus rolling minute request limits",
         billing_gate: "shared with call_chat_llm_with_options",
         audit:
             "logs user_id, agent, model, message counts, char totals, and request fingerprint only",
@@ -76,6 +79,12 @@ pub(crate) fn try_acquire_runtime_admission(
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let now = Instant::now();
     let window = Duration::from_secs(60);
+    if state.in_flight_global >= limits.max_concurrent_global {
+        return Err(ServerRuntimeAdmissionError::TooManyGlobalConcurrent {
+            max_concurrent_global: limits.max_concurrent_global,
+        });
+    }
+
     let entry = state.users.entry(user_id.clone()).or_default();
     entry
         .recent
@@ -105,6 +114,7 @@ pub(crate) fn try_acquire_runtime_admission(
 
     entry.in_flight += 1;
     entry.recent.push_back(now);
+    state.in_flight_global += 1;
     Ok(ServerRuntimeAdmissionGuard {
         user_id,
         released: false,
@@ -114,6 +124,11 @@ pub(crate) fn try_acquire_runtime_admission(
 impl ServerRuntimeAdmissionError {
     pub(crate) fn public_message(&self) -> String {
         match self {
+            Self::TooManyGlobalConcurrent {
+                max_concurrent_global,
+            } => format!(
+                "Route C 远程模型当前全局任务过多：平台最多同时运行 {max_concurrent_global} 个请求，请稍后重试"
+            ),
             Self::TooManyConcurrent {
                 max_concurrent_per_user,
             } => format!(
@@ -144,6 +159,7 @@ impl Drop for ServerRuntimeAdmissionGuard {
         let mut state = admission_state()
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.in_flight_global = state.in_flight_global.saturating_sub(1);
         let Some(entry) = state.users.get_mut(&self.user_id) else {
             return;
         };
@@ -162,6 +178,7 @@ impl Drop for ServerRuntimeAdmissionGuard {
 #[derive(Default)]
 struct RuntimeAdmissionState {
     users: HashMap<String, UserRuntimeAdmission>,
+    in_flight_global: usize,
 }
 
 #[derive(Default)]
@@ -276,6 +293,7 @@ mod tests {
     fn status_describes_operational_protections() {
         let status = protection_status();
         assert!(status.input_validation.contains("total_chars"));
+        assert!(status.admission_control.contains("global"));
         assert!(status.admission_control.contains("concurrency"));
         assert!(status.billing_gate.contains("call_chat_llm"));
         assert!(status.audit.contains("fingerprint"));
@@ -303,6 +321,7 @@ mod tests {
             max_output_tokens: 3000,
             max_requests_per_minute: 10,
             max_concurrent_per_user: 1,
+            max_concurrent_global: 10,
             temperature: 0.2,
         };
 
@@ -330,6 +349,7 @@ mod tests {
             max_output_tokens: 3000,
             max_requests_per_minute: 1,
             max_concurrent_per_user: 10,
+            max_concurrent_global: 10,
             temperature: 0.2,
         };
 
@@ -344,6 +364,46 @@ mod tests {
             }
         ));
         assert!(second.public_message().contains("每分钟最多 1 次"));
+    }
+
+    #[test]
+    fn admission_gate_limits_global_concurrency_across_users() {
+        let open_limits = ServerAgentRuntimeLimits {
+            max_messages: 24,
+            max_message_chars: 32_000,
+            max_total_chars: 80_000,
+            max_output_tokens: 3000,
+            max_requests_per_minute: 10,
+            max_concurrent_per_user: 10,
+            max_concurrent_global: usize::MAX,
+            temperature: 0.2,
+        };
+        let capped_limits = ServerAgentRuntimeLimits {
+            max_messages: 24,
+            max_message_chars: 32_000,
+            max_total_chars: 80_000,
+            max_output_tokens: 3000,
+            max_requests_per_minute: 10,
+            max_concurrent_per_user: 10,
+            max_concurrent_global: 1,
+            temperature: 0.2,
+        };
+
+        let first_user = unique_user("global-a");
+        let second_user = unique_user("global-b");
+        let first = try_acquire_runtime_admission(&first_user, open_limits).unwrap();
+        let second = try_acquire_runtime_admission(&second_user, capped_limits).unwrap_err();
+        assert_eq!(
+            second,
+            ServerRuntimeAdmissionError::TooManyGlobalConcurrent {
+                max_concurrent_global: 1
+            }
+        );
+        assert!(second.public_message().contains("全局任务过多"));
+
+        drop(first);
+        let after_release = try_acquire_runtime_admission(&second_user, open_limits).unwrap();
+        drop(after_release);
     }
 
     fn unique_user(label: &str) -> String {
