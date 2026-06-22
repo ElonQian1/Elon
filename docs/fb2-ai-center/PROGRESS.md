@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-22 本轮按用户最新要求确认：测试 fb2 对话不靠截图，必须直接读取群聊/summary-post 接口。最新严格 data-only visible acceptance `target\fb2-ai-center\data-only-acceptance-20260622T123604Z.json` 已证明真实群直读链路可用：`visible_chat_exit_code=0`，`@EL` 回复 `gai_9c23c6474b5a454d9b8cbbbdfdaf79de`、selected-message `AI回复` `gai_d324da35daba4302b8ca1636f24f2e8b`、summary post `gsp_4e1a6b0042da4dbfb61b62c5563ecec7` 都由接口回读，三类 feedback 覆盖 `3/3`，当前窗口引用 matched=7/unmatched=0。严格失败只剩 `quality non-synthetic adoption count value=0 min=1`，因此主项目本轮补 `social_ai` 群观点记忆 source id 兜底：回复使用群友观点且 `opinion_memories` 工具结果 grounded 时，会补 `opinion_memory_id` / `source_message_id` 来源行，帮助 `record_opinion_adoption` 落库；未 grounded 的工具结果仍不自动采纳。
 - 2026-06-22 本轮按“群聊验收必须直接读接口，不靠截图”的口径继续修复真实群聊闭环：线上可见 smoke 发现 summary-post 仍可能进入 `ready_with_fallback`，根因是默认 TokenHub 代理返回 `FREE_QUOTA_EXHAUSTED` 后回退旧 Hunyuan，大 Context Pack 总结帖偶发触发 provider 400。主项目 `group_summary_context_pack` 已新增二级 AI 重试：完整 Context Pack 失败后，把消息、source id、fb2 外部上下文和输出契约压缩成 `group_summary.compact_context_pack.v1` 再调模型，compact 也失败才进入本地提取式 fallback。已提交 `99d69f69` 并发布到主项目服务端 `v0.3.631 / 99d69f69523227abdc1643a023f42fce07d876fb`，`/health=OK`、`/api/server/version` 命中该 SHA。随后修正 `smoke-fb2-visible-chat.ps1` 对“被选择消息原文/不建议重注/避免重注/不适合重仓”等风险提示的误判，提交 `385ea682` 并推送。最终真实群聊直读 smoke 通过 `failed=0 skipped=0`：`@EL` seed `gmsg_b79416127ab64b6d8ce787da1096ee90` 触发 AI 回复 `gai_90fe6ec1096940b6826be1656da2d1a7`，selected-message seed `gmsg_13412523753f42b48a525de8ea6f6853` 触发 AI 回复 `gai_15384c147ce64f93b291cdd52c434cf8`，summary post `gsp_29ffeff9d28748b9bcb6f3814557da35` 为 `status=ready`；三类结果均由群消息/summary-post 接口回读，并记录 `text_len` 与 `text_sha256`。
 - 2026-06-22 本轮继续完善主项目侧 fb2 AI 数据契约：`/api/external/apps/fb2/context-contract` 新增 `tool_result_envelope_contract`，固定 `fb2.tool_result_envelope.v1`、`external_app.normalized_tool_result.v1`、`external_app.tool_result_grounding.v1`、工具结果必需字段、grounded/weak/unsafe/unavailable 事实可用规则、visibility/source_ids 规则和工具结果 source registry 分层。同时修正 `domain_context_projection_contract.source_registry` 口径：`required_kinds` 只保留业务事实来源，`feedback/opinion_adoption` 移到 `quality_history_kinds`，避免 fb2 把质量闭环记录误当比赛/订单事实。已提交并发布到主项目服务端 `v0.3.629 / c86ae3b660267d75d66b3c928347deeea6446cb4`；线上 `/health=OK`、`/api/server/version` 命中该 SHA，`smoke-fb2-ai-center.ps1` 通过 `failed=0 skipped=2`，跳过项仅为缺 `ELON_MAIN_TOKEN` 的 authenticated `chat-bootstrap` 和缺 `FB2_AI_CENTER_TOKEN` 的 fb2 live data 验证。
 - 2026-06-22 本轮按“测试 fb2 对话必须直接读取群聊，而不是截图”的口径继续收紧验收：`scripts\smoke-fb2-visible-chat.ps1` 现在会在发送 `@EL` seed、selected-message seed 后立即通过主项目群聊消息接口回读，并对 `@EL` AI 回复、selected-message `AI回复` 和 summary post 都记录正文 `text_len` 与 `text_sha256`。`scripts\smoke-fb2-final-acceptance.ps1` 的 `visible_direct_read_evidence` 已扩展为 baseline、`@EL` seed/回复、selected-message seed/回复、summary-post 及对应正文哈希，不再只摘录消息 ID。已验证 PowerShell parser、`smoke-fb2-visible-chat.ps1 -SelfTest`、`smoke-fb2-final-acceptance.ps1 -SelfTest` 和 `git diff --check`；本轮只改验收脚本/文档，没有改服务端运行代码，因此不需要发布服务端。
@@ -98,11 +99,11 @@
 
 ## 未完成
 
-- 2026-06-22 18:38 非语音 data-only visible acceptance 已通过，不再是当前阻塞；真实群聊三类入口、三类 feedback、权限/质量和 direct group read evidence 已绑定到同一份 summary。ASR/TTS 仍明确暂停，full final acceptance 仍未完成。
+- 2026-06-22 20:36 最新非语音 data-only visible acceptance 已证明真实群聊三类入口、三类 feedback、权限/质量和 direct group read evidence 能绑定到同一份 summary；但严格门槛下当前窗口 `opinion_adoption_count=0 min=1` 仍是本轮主项目阻塞。ASR/TTS 仍明确暂停，full final acceptance 仍未完成。
 - 当前会话可通过 fb2 服务器受控 wrapper 临时读取 service token 做 live 验证；token 不打印、不写入仓库、不写入持久环境。最终交接仍应由 fb2 会话提供等价 token 或继续使用受控 wrapper。
 - `123qwe` 登录能桥接主项目，最终验收 wrapper 可从 `-Fb2Username/-Fb2Password` 自动解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`；authenticated `chat-bootstrap` 已验证通过。带 service token 的 live data-only smoke 已确认该账号有可分析订单，`my ticket` 场景返回 `user_orders count=10`。
-- fb2 live Context Pack 域投影已在最新 data-only 验收中通过：`target\fb2-ai-center\data-only-acceptance-20260622T103826Z-ai-center.log` 显示 today pack 和 my-ticket pack 都包含 XML wrapper、`retrieval_evidence`、`quality_feedback`、source registry、`context_audit`；today pack 具备 `match/odds/context_audit` source kind，my-ticket pack 具备 `user_order/ticket/context_audit` source kind。
-- 群观点数据闭环已进入可用状态：最新 data-only 验收中 `group_opinion_summary count=1`，真实群聊 `@EL` 与 selected-message 回复均能引用来源并回写 fb2 feedback。短窗口非合成 `opinion_adoption_count=0` 当前按 data-only 可见验收阈值允许；历史 preflight 已观察到非合成 adoption=1，后续继续积累样本，不再作为当前阻塞。
+- fb2 live Context Pack 域投影已在近期 data-only 验收中通过：`target\fb2-ai-center\data-only-acceptance-20260622T103826Z-ai-center.log` 显示 today pack 和 my-ticket pack 都包含 XML wrapper、`retrieval_evidence`、`quality_feedback`、source registry、`context_audit`；today pack 具备 `match/odds/context_audit` source kind，my-ticket pack 具备 `user_order/ticket/context_audit` source kind。
+- 群观点数据闭环已进入可用状态：最新 data-only 验收中 `group_opinion_summary count=1`，真实群聊 `@EL` 与 selected-message 回复均能引用来源并回写 fb2 feedback。最终 wrapper 默认不再把 data-only 可见群聊短窗口的 `MinOpinionAdoptionCount` 自动降为 0；只有显式传 `-AllowNoNewOpinionAdoptionInShortWindow` 才允许本轮不新增观点采纳。历史 preflight 已观察到非合成 adoption=1，后续继续积累样本。
 - 当前窗口质量引用已归零：最新 data-only 验收显示 `quality_citation_unmatched_rate=0`、`quality_unmatched_cited_sources=0`、`missing_context=0`、`wrong_context=0`。历史 unmatched 债务只作为趋势观察，不再作为当前完成阻塞。
 - 已有 ADB 半成品真机语音证据 JSON，且其 artifact 文件真实存在；但它明确 `finalAcceptanceReady=false`。仍缺包含人工语音样本、system ASR final、云端 ASR 成功、server ASR 失败恢复、TTS 播放、ASR/TTS 免费策略的完整 final-ready 证据。
 - 真实群聊 `@EL`、长按 `AI回复` 和总结帖入口已经在 `scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 的同一份 summary 中通过，三类 `feedback_coverage`、质量汇总、权限审计和 direct group read evidence 已绑定。仍缺完整语音证据，因此不能宣布终极完成。
@@ -155,13 +156,13 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -D
 - 缺 `FB2_AI_CENTER_TOKEN` 时，显式权限负向检查也会失败，避免权限验收被 skip。
 - 使用无效 service token 时，wrapper 能解析 `123qwe` 的 fb2 用户 UUID，但订单上下文预检在写群前 401 失败。
 - `-DataOnlyAcceptance` 缺 `FB2_AI_CENTER_TOKEN` 时也会立即失败，但不会因为缺 `VoiceDeviceEvidencePath` 提前失败。
-- 带 service token 的最新 `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 已通过，summary 为 `target\fb2-ai-center\data-only-acceptance-20260622T103826Z.json`。后续如再跑 data-only，目标应是回归巡检，而不是当前阻塞修复。
+- 带 service token 的最新严格 `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 已证明接口直读、三类 feedback 和引用匹配通过，summary 为 `target\fb2-ai-center\data-only-acceptance-20260622T123604Z.json`；当前阻塞是本轮窗口 `opinion_adoption_count=0 min=1`，需要主项目发布观点记忆 source id 兜底后复测。
 
 ## 下一步最小动作
 
-1. 不要再把 data-only visible acceptance 当作当前阻塞；最新通过证据是 `target\fb2-ai-center\data-only-acceptance-20260622T103826Z.json`。
+1. 先提交、推送并发布主项目 `social_ai` 观点记忆 source id 兜底，然后重跑带 service token 的 `-DataOnlyAcceptance -AllowVisibleMessages -GroupId official`，要求直读、feedback 和 `MinOpinionAdoptionCount=1` 同批通过。
 2. 后续恢复语音工作时，让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-3. 恢复 full final 前，还要确认非合成观点采纳满足默认门槛 `MinOpinionAdoptionCount=1`；data-only 可见验收当前允许短窗口为 0，不能替代 full final 的观点采纳证据。
+3. 恢复 full final 前，还要确认非合成观点采纳满足默认门槛 `MinOpinionAdoptionCount=1`；data-only 可见验收默认也保持该门槛，只有显式 `-AllowNoNewOpinionAdoptionInShortWindow` 才允许短窗口为 0，且不能替代 full final 的观点采纳证据。
 4. 恢复语音后再跑完整最终验收：
 
 ```powershell

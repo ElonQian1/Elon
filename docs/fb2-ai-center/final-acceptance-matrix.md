@@ -61,6 +61,6 @@
 - 真实 `FB2_AI_CENTER_TOKEN` 已用于最新 data-only 验收，并完成 authenticated readiness/direct manifest、live Context Pack、平台匿名摘要、权限、质量汇总和三类 feedback 样本验证；token 仍不应写入仓库或文档。
 - ASR/TTS 当前按安排暂停；`-DataOnlyAcceptance` 已沉淀非语音数据闭环证据，但终极完成口径仍必须在恢复语音后补齐 `-FinalAcceptance`。
 - 缺 `finalAcceptanceReady=true` 的真实 fb2 真机语音证据 JSON，不能证明小米/HyperOS 等设备上主项目 `VoiceComposerView`、系统 ASR、云端兜底、TTS 和 ASR/TTS 免费策略已完整可用；最终证据还必须提供真实可访问的 logcat 和截图/视频 artifact。当前 ADB 半成品证据只能证明 UI/录音浮层没有静音卡死。
-- full final 默认 `MinOpinionAdoptionCount=1`，而最新 data-only visible 验收为了短窗口真实群 smoke 将该门槛降为 0；恢复 full final 前需要确认当前或可接受窗口内有至少一条真实 non-synthetic opinion adoption。
+- full final 默认 `MinOpinionAdoptionCount=1`；data-only visible 验收默认同样保持该门槛，不再自动为短窗口真实群 smoke 降为 0。只有显式传 `-AllowNoNewOpinionAdoptionInShortWindow` 时，才允许本轮不新增真实 non-synthetic opinion adoption，且该 opt-out 不能作为 full final 证据。
 - 真实群聊可见消息、AI 回复、总结帖、summary-post feedback、正文策略检查、source references、`feedback_coverage`、`visible_answer_policy_evidence` 和 `final_acceptance_evidence` 已在 data-only wrapper 同批绑定；full final 仍需把同类证据与 `finalAcceptanceReady=true` 语音证据同批绑定。
 - 带真实 token 的权限负向已在最新 data-only 验收中通过：缺当前用户头、用户头不匹配、缺平台 scope、用户订单工具缺头均返回 403，并记录 permission summary。

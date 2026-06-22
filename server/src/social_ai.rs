@@ -460,7 +460,12 @@ async fn build_reply(
             } else {
                 reply.chars().take(1400).collect()
             };
-            Ok(ensure_fb2_grounded_answer_shape(&reply, external_context))
+            let reply = ensure_fb2_grounded_answer_shape(&reply, external_context);
+            Ok(ensure_fb2_opinion_memory_source(
+                &reply,
+                external_context,
+                external_tool_results,
+            ))
         }
         Err(api_err) if state.ai_cli.enabled => {
             info!("social AI 无 API 代理，回退到本地 CLI: {}", api_err);
@@ -519,6 +524,108 @@ pub(crate) fn ensure_fb2_grounded_answer_shape(
     }
 
     sections.join("\n")
+}
+
+fn ensure_fb2_opinion_memory_source(
+    reply: &str,
+    external_context: Option<&Value>,
+    external_tool_results: Option<&Value>,
+) -> String {
+    let reply = reply.trim();
+    if reply.is_empty() || !is_fb2_external_context(external_context) {
+        return reply.to_string();
+    }
+    if !contains_any(reply, &["群友观点", "观点", "采纳", "不采纳", "建议"]) {
+        return reply.to_string();
+    }
+
+    let Some(reference) = first_grounded_opinion_memory_reference(external_tool_results) else {
+        return reply.to_string();
+    };
+    let lower_reply = reply.to_lowercase();
+    if lower_reply.contains(&reference.memory_id.to_lowercase())
+        || reference
+            .source_message_id
+            .as_ref()
+            .map(|source_message_id| lower_reply.contains(&source_message_id.to_lowercase()))
+            .unwrap_or(false)
+    {
+        return reply.to_string();
+    }
+
+    let mut source_line = format!("观点来源补充：opinion_memory_id {}", reference.memory_id);
+    if let Some(source_message_id) = reference.source_message_id {
+        source_line.push_str(&format!("，source_message_id {source_message_id}"));
+    }
+    format!("{reply}\n{source_line}")
+}
+
+struct OpinionMemoryReference {
+    memory_id: String,
+    source_message_id: Option<String>,
+}
+
+fn first_grounded_opinion_memory_reference(
+    external_tool_results: Option<&Value>,
+) -> Option<OpinionMemoryReference> {
+    let results = external_tool_results?
+        .get("results")
+        .and_then(Value::as_array)?;
+    for result in results {
+        if result.get("tool_name").and_then(Value::as_str) != Some("opinion_memories") {
+            continue;
+        }
+        if result.get("success").and_then(Value::as_bool) != Some(true) {
+            continue;
+        }
+        if result
+            .get("grounding")
+            .and_then(|grounding| grounding.get("status"))
+            .and_then(Value::as_str)
+            != Some("grounded")
+        {
+            continue;
+        }
+
+        if let Some(reference) = result
+            .get("data")
+            .and_then(|data| data.get("memories"))
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .find_map(|memory| {
+                let memory_id = clean_json_string(memory.get("id"))?;
+                Some(OpinionMemoryReference {
+                    memory_id,
+                    source_message_id: clean_json_string(memory.get("source_message_id")),
+                })
+            })
+        {
+            return Some(reference);
+        }
+
+        if let Some(memory_id) = result
+            .get("source_ids")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .find_map(|value| clean_json_string(Some(value)))
+        {
+            return Some(OpinionMemoryReference {
+                memory_id,
+                source_message_id: None,
+            });
+        }
+    }
+    None
+}
+
+fn clean_json_string(value: Option<&Value>) -> Option<String> {
+    value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| value.chars().count() >= 4)
+        .map(ToOwned::to_owned)
 }
 
 fn is_fb2_external_context(external_context: Option<&Value>) -> bool {
@@ -635,6 +742,8 @@ fn social_ai_base_prompt() -> &'static str {
 
 如果回复使用了 fb2 外部上下文里的比赛、赔率、本人订单、平台汇总或群友观点，必须在正文里写出对应来源 ID 或 label，例如 match_id、order_id、platform_order_summary:<date>:all、群消息 id、context_audit_id。没有可核对来源时，只能说信息不足，不能编造。
 
+如果采纳、引用或反驳 fb2 群友观点/历史观点记忆，且 Context Pack 或工具结果提供了 opinion_memory_id 或 source_message_id，必须在来源行写出这些 ID；这用于后续把“群观点被 AI 使用”的质量闭环写回 fb2。
+
 使用 fb2 外部上下文时，必须用短标签把「数据事实：」「用户订单：」「平台汇总：」「群友观点：」「AI推断：」「风险边界：」分开写；没有对应材料的标签可以省略，但涉及比赛、赔率、票据、推荐、预测或今日比赛讨论时，必须至少包含「数据事实：」「AI推断：」「风险边界：」。风险边界必须明确说明赛果不确定、不保证命中、不建议重注或梭哈。
 
 注意：用户的部分消息来自手机语音识别，可能含有同音字替换或音近字错误（例如"你好码"其实是"你好吗"）。请优先推断最合理的语义，忽略明显的识别错误，直接给出正确理解下的回复，无需向用户解释纠错过程。"#
@@ -714,8 +823,8 @@ fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> T) -> T {
 #[cfg(test)]
 mod tests {
     use super::{
-        contains_el_mention, ensure_fb2_grounded_answer_shape, latest_request_user_text,
-        social_ai_base_prompt,
+        contains_el_mention, ensure_fb2_grounded_answer_shape, ensure_fb2_opinion_memory_source,
+        latest_request_user_text, social_ai_base_prompt,
     };
     use crate::store::SocialAiHistoryMessage;
     use serde_json::json;
@@ -766,6 +875,8 @@ mod tests {
         assert!(prompt.contains("fb2 外部上下文"));
         assert!(prompt.contains("来源 ID"));
         assert!(prompt.contains("context_audit_id"));
+        assert!(prompt.contains("opinion_memory_id"));
+        assert!(prompt.contains("source_message_id"));
         assert!(prompt.contains("数据事实："));
         assert!(prompt.contains("AI推断："));
         assert!(prompt.contains("风险边界："));
@@ -792,5 +903,73 @@ mod tests {
         let reply = "普通朋友聊天回复";
 
         assert_eq!(ensure_fb2_grounded_answer_shape(reply, None), reply);
+    }
+
+    #[test]
+    fn fb2_opinion_memory_source_is_appended_when_reply_uses_group_opinion() {
+        let context = json!({"answer_policy": {"schema": "fb2.answer_policy.v1"}});
+        let tool_results = json!({
+            "results": [{
+                "tool_name": "opinion_memories",
+                "success": true,
+                "grounding": {"status": "grounded"},
+                "source_ids": ["opinion-memory-1"],
+                "data": {
+                    "memories": [{
+                        "id": "opinion-memory-2",
+                        "source_message_id": "gmsg-memory-2"
+                    }]
+                }
+            }]
+        });
+
+        let reply = ensure_fb2_opinion_memory_source(
+            "群友观点：我倾向采纳这个方向，但仍需看临场。",
+            Some(&context),
+            Some(&tool_results),
+        );
+
+        assert!(reply.contains("opinion_memory_id opinion-memory-2"));
+        assert!(reply.contains("source_message_id gmsg-memory-2"));
+    }
+
+    #[test]
+    fn fb2_opinion_memory_source_keeps_existing_reference() {
+        let context = json!({"app_id": "fb2"});
+        let tool_results = json!({
+            "results": [{
+                "tool_name": "opinion_memories",
+                "success": true,
+                "grounding": {"status": "grounded"},
+                "source_ids": ["opinion-memory-1"]
+            }]
+        });
+
+        let reply = ensure_fb2_opinion_memory_source(
+            "群友观点：参考 opinion-memory-1 后，我不建议重注。",
+            Some(&context),
+            Some(&tool_results),
+        );
+
+        assert_eq!(reply.matches("opinion-memory-1").count(), 1);
+    }
+
+    #[test]
+    fn fb2_opinion_memory_source_ignores_ungrounded_tool_result() {
+        let context = json!({"app_id": "fb2"});
+        let tool_results = json!({
+            "results": [{
+                "tool_name": "opinion_memories",
+                "success": true,
+                "grounding": {"status": "weak"},
+                "source_ids": ["opinion-memory-1"]
+            }]
+        });
+        let reply = "群友观点：这里只能做轻量参考。";
+
+        assert_eq!(
+            ensure_fb2_opinion_memory_source(reply, Some(&context), Some(&tool_results)),
+            reply
+        );
     }
 }

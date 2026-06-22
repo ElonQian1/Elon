@@ -28,7 +28,8 @@ param(
     [switch]$SelfTest,
     [switch]$DataOnlyAcceptance,
     [switch]$PreflightOnly,
-    [switch]$AllowVisibleMessages
+    [switch]$AllowVisibleMessages,
+    [switch]$AllowNoNewOpinionAdoptionInShortWindow
 )
 
 $ErrorActionPreference = "Stop"
@@ -48,13 +49,27 @@ if (-not $VoiceDeviceEvidencePath) { $VoiceDeviceEvidencePath = $env:FB2_VOICE_D
 $MainBase = $MainBase.TrimEnd("/")
 $Fb2Base = $Fb2Base.TrimEnd("/")
 
-if ($DataOnlyAcceptance -and $AllowVisibleMessages) {
-    if (-not $PSBoundParameters.ContainsKey("MinOpinionAdoptionCount")) {
-        # The no-side-effect data-only preflight proves historical non-synthetic
-        # adoption readiness. A short visible smoke window may legitimately
-        # produce feedback without adopting a new opinion memory.
-        $MinOpinionAdoptionCount = 0
+function Resolve-DataOnlyVisibleMinOpinionAdoptionCount {
+    param(
+        [int]$CurrentValue,
+        [bool]$WasExplicit,
+        [bool]$AllowNoNewOpinionAdoptionInShortWindow
+    )
+
+    if ($WasExplicit) {
+        return $CurrentValue
     }
+    if ($AllowNoNewOpinionAdoptionInShortWindow) {
+        return 0
+    }
+    return $CurrentValue
+}
+
+if ($DataOnlyAcceptance -and $AllowVisibleMessages) {
+    $MinOpinionAdoptionCount = Resolve-DataOnlyVisibleMinOpinionAdoptionCount `
+        -CurrentValue $MinOpinionAdoptionCount `
+        -WasExplicit $PSBoundParameters.ContainsKey("MinOpinionAdoptionCount") `
+        -AllowNoNewOpinionAdoptionInShortWindow ([bool]$AllowNoNewOpinionAdoptionInShortWindow)
     if (-not $PSBoundParameters.ContainsKey("MaxLargeContextPackRate")) {
         # Visible smokes use a small current-window denominator; 4/5 rich packs
         # should stay observable but not block chat-flow validation.
@@ -403,6 +418,9 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest (-not ($argHelperList -contains "-DisabledSwitch")) "argument helper skips disabled switch"
     Assert-SelfTest ((Resolve-VisibleMainGroupId "official") -eq "ext_fb2_official") "visible group maps fb2 local id"
     Assert-SelfTest ((Resolve-VisibleMainGroupId "ext_fb2_official") -eq "ext_fb2_official") "visible group keeps main group id"
+    Assert-SelfTest ((Resolve-DataOnlyVisibleMinOpinionAdoptionCount -CurrentValue 1 -WasExplicit $false -AllowNoNewOpinionAdoptionInShortWindow $false) -eq 1) "data-only visible keeps opinion adoption default"
+    Assert-SelfTest ((Resolve-DataOnlyVisibleMinOpinionAdoptionCount -CurrentValue 1 -WasExplicit $false -AllowNoNewOpinionAdoptionInShortWindow $true) -eq 0) "data-only visible explicit opt-out can allow no new opinion adoption"
+    Assert-SelfTest ((Resolve-DataOnlyVisibleMinOpinionAdoptionCount -CurrentValue 2 -WasExplicit $true -AllowNoNewOpinionAdoptionInShortWindow $true) -eq 2) "data-only visible explicit opinion adoption threshold wins"
 
     $childScript = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-final-wrapper-child-{0}.ps1" -f ([guid]::NewGuid().ToString("N")))
     try {
@@ -734,6 +752,7 @@ if ($PreflightOnly) {
     Add-Arg $preflightArgs "-MaxWrongContextRate" $MaxWrongContextRate
     if ($DataOnlyAcceptance) {
         Add-SwitchArg $preflightArgs "-DataOnlyAcceptance" $true
+        Add-SwitchArg $preflightArgs "-AllowHistoricalQualityDebt" $true
     } else {
         Add-Arg $preflightArgs "-VoiceDeviceEvidencePath" $VoiceDeviceEvidencePath
         Add-SwitchArg $preflightArgs "-RequireFb2Live" $true

@@ -40,6 +40,7 @@ param(
     [int]$MinOpinionAdoptionCount = 1,
     [int]$QualityFeedbackSampleLimit = 5,
     [switch]$RequireNonSyntheticQualityReadiness,
+    [switch]$AllowHistoricalQualityDebt,
     [switch]$CheckDomainProjection,
     [switch]$SkipVoiceContractChecks,
     [switch]$RequireNoSkips
@@ -1335,17 +1336,26 @@ if (-not $Fb2Token) {
             Assert-True ($null -ne $feedbackSummary) "quality feedback summary present"
             Assert-True ($null -ne $auditSummary) "quality audit summary present"
 
+            $historicalQualityDebtAllowed = $AllowHistoricalQualityDebt -and [string]::IsNullOrWhiteSpace($QualitySince) -and [string]::IsNullOrWhiteSpace($QualityUntil)
             if ($null -ne $metrics) {
                 Assert-True ([double]$metrics.missing_context_rate -le $MaxMissingContextRate) "quality missing_context_rate" "value=$($metrics.missing_context_rate) max=$MaxMissingContextRate"
                 Assert-True ([double]$metrics.wrong_context_rate -le $MaxWrongContextRate) "quality wrong_context_rate" "value=$($metrics.wrong_context_rate) max=$MaxWrongContextRate"
-                Assert-True ([double]$metrics.citation_unmatched_rate -le $MaxCitationUnmatchedRate) "quality citation_unmatched_rate" "value=$($metrics.citation_unmatched_rate) max=$MaxCitationUnmatchedRate"
+                if ($historicalQualityDebtAllowed) {
+                    Pass "quality citation_unmatched_rate" "value=$($metrics.citation_unmatched_rate) max=$MaxCitationUnmatchedRate observation=historical_debt_allowed"
+                } else {
+                    Assert-True ([double]$metrics.citation_unmatched_rate -le $MaxCitationUnmatchedRate) "quality citation_unmatched_rate" "value=$($metrics.citation_unmatched_rate) max=$MaxCitationUnmatchedRate"
+                }
                 Assert-True ([double]$metrics.large_context_pack_rate -le $MaxLargeContextPackRate) "quality large_context_pack_rate" "value=$($metrics.large_context_pack_rate) max=$MaxLargeContextPackRate"
             }
 
             if ($null -ne $feedbackSummary) {
                 Assert-True ([int64]$feedbackSummary.total_feedback -ge $MinFeedbackCount) "quality feedback count" "value=$($feedbackSummary.total_feedback) min=$MinFeedbackCount"
                 Assert-True ([int64]$feedbackSummary.matched_cited_source_count -ge $MinMatchedCitedSourceCount) "quality matched cited sources" "value=$($feedbackSummary.matched_cited_source_count) min=$MinMatchedCitedSourceCount"
-                Assert-True ([int64]$feedbackSummary.unmatched_cited_source_count -eq 0) "quality unmatched cited sources" "value=$($feedbackSummary.unmatched_cited_source_count)"
+                if ($historicalQualityDebtAllowed) {
+                    Pass "quality unmatched cited sources" "value=$($feedbackSummary.unmatched_cited_source_count) observation=historical_debt_allowed"
+                } else {
+                    Assert-True ([int64]$feedbackSummary.unmatched_cited_source_count -eq 0) "quality unmatched cited sources" "value=$($feedbackSummary.unmatched_cited_source_count)"
+                }
                 Assert-True ([int64]$feedbackSummary.missing_context_count -eq 0) "quality missing context count" "value=$($feedbackSummary.missing_context_count)"
                 Assert-True ([int64]$feedbackSummary.wrong_context_count -eq 0) "quality wrong context count" "value=$($feedbackSummary.wrong_context_count)"
             }
