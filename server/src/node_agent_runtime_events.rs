@@ -60,6 +60,26 @@ pub(crate) fn tool_result_chunk(
     event_line(event)
 }
 
+pub(crate) fn runtime_status_chunk(
+    req_id: &str,
+    turn: usize,
+    label: &str,
+    phase: &str,
+    message: &str,
+) -> String {
+    let event = json!({
+        "type": "runtime_status",
+        "schema": "elon.routebc.runtime_status.v1",
+        "req_id": req_id,
+        "runtime": label,
+        "phase": phase,
+        "message": truncate_chars(message, 1_000),
+        "turn": turn,
+        "status": phase_status(phase)
+    });
+    event_line(event)
+}
+
 pub(crate) fn tool_approval_id(turn: usize, index: usize) -> String {
     format!("tap_{turn}_{index}")
 }
@@ -133,6 +153,16 @@ pub(crate) fn tool_approval_decision_chunk(
 
 fn call_id(req_id: &str, turn: usize, index: usize) -> String {
     format!("{}:{}:{}", req_id, turn, index)
+}
+
+fn phase_status(phase: &str) -> &'static str {
+    match phase {
+        "completed" => "ok",
+        "canceled" => "canceled",
+        "failed" => "error",
+        "waiting_approval" => "pending",
+        _ => "running",
+    }
 }
 
 fn event_line(value: Value) -> String {
@@ -295,8 +325,8 @@ fn is_secret_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        tool_approval_required_chunk, tool_approval_required_chunk_with_diff, tool_call_chunk,
-        tool_result_chunk,
+        runtime_status_chunk, tool_approval_required_chunk, tool_approval_required_chunk_with_diff,
+        tool_call_chunk, tool_result_chunk,
     };
     use serde_json::{json, Value};
 
@@ -349,6 +379,20 @@ mod tests {
         assert_eq!(event["type"], "tool_result");
         assert_eq!(event["tool"], "run_command");
         assert_eq!(event["status"], "error");
+    }
+
+    #[test]
+    fn runtime_status_event_reports_phase_without_tool() {
+        let line = runtime_status_chunk("req", 2, "api-runtime", "thinking", "calling model");
+        let event: Value = serde_json::from_str(line.trim()).unwrap();
+
+        assert_eq!(event["type"], "runtime_status");
+        assert_eq!(event["schema"], "elon.routebc.runtime_status.v1");
+        assert_eq!(event["runtime"], "api-runtime");
+        assert_eq!(event["phase"], "thinking");
+        assert_eq!(event["status"], "running");
+        assert_eq!(event["turn"], 2);
+        assert!(event.get("tool").is_none());
     }
 
     #[test]

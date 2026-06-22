@@ -235,14 +235,30 @@ function testDevTasksToolTimeline() {
       result: 'exit=0\\nstdout:\\n'
     })
   };
+  const runtimeStatus = {
+    kind: 'ai_progress',
+    task_id: 'tsk_tools',
+    content: JSON.stringify({
+      type: 'runtime_status',
+      runtime: 'api-runtime',
+      phase: 'thinking',
+      message: '正在调用模型生成下一步计划',
+      turn: 1
+    })
+  };
   const context = devTasks.buildContext([
     { kind: 'ai_task', task_id: 'tsk_tools', content: '发起 AI 开发任务：检查状态' },
+    runtimeStatus,
     call,
     result
   ]);
+  const runtimeHtml = devTasks.renderMessage(runtimeStatus, context);
   const callHtml = devTasks.renderMessage(call, context);
   const resultHtml = devTasks.renderMessage(result, context);
 
+  assert.ok(runtimeHtml.includes('运行阶段'), 'runtime status progress should render as runtime card');
+  assert.ok(runtimeHtml.includes('运行时正在思考'), 'runtime status should show phase title');
+  assert.ok(runtimeHtml.includes('api-runtime'), 'runtime status should show runtime label');
   assert.ok(callHtml.includes('工具调用'), 'tool call progress should render as tool card');
   assert.ok(callHtml.includes('run_command'), 'tool call card should show tool name');
   assert.ok(callHtml.includes('&quot;program&quot;: &quot;git&quot;'), 'tool call card should show escaped args');

@@ -6,8 +6,9 @@ use crate::{
         requires_tool_approval, wait_for_tool_approval, ApprovalOutcome,
     },
     node_agent_runtime_events::{
-        tool_approval_decision_chunk, tool_approval_id, tool_approval_required_chunk,
-        tool_approval_required_chunk_with_diff, tool_call_chunk, tool_name, tool_result_chunk,
+        runtime_status_chunk, tool_approval_decision_chunk, tool_approval_id,
+        tool_approval_required_chunk, tool_approval_required_chunk_with_diff, tool_call_chunk,
+        tool_name, tool_result_chunk,
     },
     node_agent_task_journal::TaskJournal,
     node_agent_tool_approval::ToolApprovalState,
@@ -272,7 +273,13 @@ where
             &out_tx,
             task_journal.as_ref(),
             req_id,
-            format!("[{label}] turn {turn}\n"),
+            runtime_status_chunk(
+                req_id,
+                turn,
+                label,
+                "thinking",
+                "正在调用模型生成下一步计划",
+            ),
         );
         let call_messages = messages.clone();
         let response = tokio::select! {
@@ -318,6 +325,18 @@ where
             .cloned()
             .unwrap_or_default();
         if actions.is_empty() {
+            send_chunk(
+                &out_tx,
+                task_journal.as_ref(),
+                req_id,
+                runtime_status_chunk(
+                    req_id,
+                    turn,
+                    label,
+                    "completed",
+                    "没有更多工具动作，任务完成",
+                ),
+            );
             return Ok(ServerRuntimeRunResult {
                 exit_ok: true,
                 error: None,
@@ -372,6 +391,18 @@ where
                         continue;
                     }
                 };
+                send_chunk(
+                    &out_tx,
+                    task_journal.as_ref(),
+                    req_id,
+                    runtime_status_chunk(
+                        req_id,
+                        turn,
+                        label,
+                        "waiting_approval",
+                        "等待用户审批工具调用",
+                    ),
+                );
                 send_chunk(
                     &out_tx,
                     task_journal.as_ref(),
@@ -519,6 +550,12 @@ where
         }));
 
         if agent.get("done").and_then(Value::as_bool).unwrap_or(false) {
+            send_chunk(
+                &out_tx,
+                task_journal.as_ref(),
+                req_id,
+                runtime_status_chunk(req_id, turn, label, "completed", "工具结果已处理，任务完成"),
+            );
             return Ok(ServerRuntimeRunResult {
                 exit_ok: true,
                 error: None,
@@ -529,6 +566,13 @@ where
             });
         }
     }
+
+    send_chunk(
+        &out_tx,
+        task_journal.as_ref(),
+        req_id,
+        runtime_status_chunk(req_id, MAX_TURNS, label, "failed", "达到最大轮次仍未完成"),
+    );
 
     Ok(ServerRuntimeRunResult {
         exit_ok: false,
@@ -831,6 +875,48 @@ mod tests {
         assert!(message.contains("fingerprint="));
         assert!(!message.contains("sk-secret"));
         assert!(!message.contains("prompt text"));
+    }
+
+    #[tokio::test]
+    async fn runtime_loop_emits_structured_status_events() {
+        let workspace = temp_test_dir("runtime_loop_emits_structured_status_events");
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let runtime = tokio::spawn(async move {
+            run_runtime_loop(
+                RuntimeLoopOptions {
+                    req_id: "req-status",
+                    label: "test-runtime",
+                    guard: ToolGuard::new(workspace, Some("project_write")),
+                    prompt: "finish",
+                    approval_state: Some(ToolApprovalState::default()),
+                    cancel_rx,
+                    out_tx,
+                    task_journal: None,
+                    initial_model: Some("test-model".to_string()),
+                },
+                move |_| async move {
+                    Ok(chat_response(json!({
+                        "message": "done",
+                        "done": true,
+                        "actions": []
+                    })))
+                },
+            )
+            .await
+            .unwrap()
+        });
+
+        let thinking = next_tool_event(&mut out_rx, "runtime_status").await;
+        assert_eq!(thinking["phase"], "thinking");
+        assert_eq!(thinking["runtime"], "test-runtime");
+        let completed = next_tool_event(&mut out_rx, "runtime_status").await;
+        assert_eq!(completed["phase"], "completed");
+        assert_eq!(completed["status"], "ok");
+
+        let result = runtime.await.unwrap();
+        assert!(result.exit_ok);
+        let _ = cancel_tx.send(true);
     }
 
     #[tokio::test]

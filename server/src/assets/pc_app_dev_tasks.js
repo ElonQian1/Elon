@@ -210,6 +210,9 @@
     function renderToolEvent(message, context, event) {
       const taskId = taskIdOf(message);
       const task = taskId ? context.tasks.get(taskId) : null;
+      if (event.type === 'runtime_status') {
+        return renderRuntimeStatusEvent(message, context, event);
+      }
       if (event.type === 'tool_approval_required') {
         return renderToolApproval(message, context, event);
       }
@@ -239,6 +242,25 @@
         bodyIsHtml: true,
         taskId,
         meta: isResult ? (failed ? '工具返回错误' : '工具已完成') : '等待工具返回',
+        actions: true,
+        canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task)
+      });
+    }
+
+    function renderRuntimeStatusEvent(message, context, event) {
+      const taskId = taskIdOf(message);
+      const task = taskId ? context.tasks.get(taskId) : null;
+      const phase = clean(event.phase).toLowerCase();
+      const status = runtimeStatusLabel(phase);
+      const runtime = clean(event.runtime) || 'runtime';
+      const turn = Number(event.turn) > 0 ? `第 ${Number(event.turn)} 轮` : '运行阶段';
+      return cardHtml({
+        tone: status.tone,
+        eyebrow: '运行阶段',
+        title: status.title,
+        body: clean(event.message) || status.body,
+        taskId,
+        meta: `${runtime} · ${turn}`,
         actions: true,
         canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task)
       });
@@ -395,7 +417,8 @@
       try {
         const event = JSON.parse(text);
         const type = clean(event && event.type);
-        if (!['tool_call', 'tool_result', 'tool_approval_required', 'tool_approval_decision'].includes(type)) return null;
+        if (!['runtime_status', 'tool_call', 'tool_result', 'tool_approval_required', 'tool_approval_decision'].includes(type)) return null;
+        if (type === 'runtime_status') return event;
         if (!clean(event.tool)) return null;
         return event;
       } catch (_) {
@@ -453,6 +476,22 @@
       } catch (_) {
         return String(value || '');
       }
+    }
+
+    function runtimeStatusLabel(phase) {
+      if (phase === 'waiting_approval') {
+        return { tone: 'approval', title: '等待工具审批', body: '批准前不会执行工具。' };
+      }
+      if (phase === 'completed') {
+        return { tone: 'done', title: '运行时完成', body: '没有更多运行时动作。' };
+      }
+      if (phase === 'failed') {
+        return { tone: 'failed', title: '运行时受阻', body: '需要继续处理。' };
+      }
+      if (phase === 'canceled') {
+        return { tone: 'canceled', title: '运行时已停止', body: '任务已停止。' };
+      }
+      return { tone: 'running', title: '运行时正在思考', body: '正在生成下一步计划。' };
     }
 
     function statusForTask(task) {
