@@ -374,13 +374,27 @@ async fn social_ai_reply_or_fallback(
         Ok(reply) => reply,
         Err(error) => {
             warn!("{scene} AI 生成失败: {}", error);
-            if scene == DIRECT_SOCIAL_AI_SCENE {
-                "一龙AI 暂时没能连上 AI。你可以稍后再发一次，或联系管理员检查 AI 代理配置。".into()
-            } else {
-                "EL 暂时没能连上 AI。你可以稍后再 @EL 一次，或联系管理员检查 AI 代理配置。".into()
-            }
+            social_ai_fallback_message(scene, &error.to_string())
         }
     }
+}
+
+fn social_ai_fallback_message(scene: &str, error: &str) -> String {
+    if is_billing_or_quota_error(error) {
+        return error.to_string();
+    }
+    if scene == DIRECT_SOCIAL_AI_SCENE {
+        "一龙AI 暂时没能连上 AI。你可以稍后再发一次，或联系管理员检查 AI 代理配置。".into()
+    } else {
+        "EL 暂时没能连上 AI。你可以稍后再 @EL 一次，或联系管理员检查 AI 代理配置。".into()
+    }
+}
+
+fn is_billing_or_quota_error(error: &str) -> bool {
+    error.contains("余额不足")
+        || error.contains("计费系统暂时不可用")
+        || error.contains("token 用量已达上限")
+        || error.contains("用户已被封禁")
 }
 
 async fn build_reply(

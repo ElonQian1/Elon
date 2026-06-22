@@ -17,6 +17,12 @@ use crate::store::{
     TokenUsageAccountingResult, TokenUsageBillingCharge, TokenUsageRecord,
 };
 
+const NEW_USER_TRIAL_CREDIT_CONFIG_KEY: &str = "new_user_trial_credit_fen";
+const NEW_USER_TRIAL_CREDIT_ENV: &str = "NEW_USER_TRIAL_CREDIT_FEN";
+const DEFAULT_NEW_USER_TRIAL_CREDIT_FEN: i64 = 100;
+const NEW_USER_TRIAL_METHOD: &str = "new_user_trial";
+const NEW_USER_TRIAL_OPERATOR: &str = "system";
+
 // ── 模型定价表（USD / 1M tokens）─────────────────────────────────────────────
 // 返回 (input_per_m, cached_per_m, output_per_m)，单位：美元 / 百万 token
 
@@ -140,6 +146,11 @@ pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
 
     match store.billing_get_balance(user_id) {
         Ok(None) if billing_required_for_all_users(store) => {
+            if let Some(balance) = try_grant_new_user_trial_credit(store, user_id)? {
+                if balance > 0 {
+                    return Ok(());
+                }
+            }
             if let Err(e) = store.billing_ensure_balance_row(user_id) {
                 warn!("billing ensure balance row failed for {}: {}", user_id, e);
                 if billing_db_fail_open() {
@@ -151,10 +162,19 @@ pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
         }
         Ok(None) => Ok(()), // 兼容模式：未开通计费，放行
         Ok(Some(fen)) if fen > 0 => Ok(()),
-        Ok(Some(fen)) => Err(format!(
-            "余额不足（当前 {} 分），请联系管理员充值后继续使用",
-            fen
-        )),
+        Ok(Some(fen)) => {
+            let mut current_fen = fen;
+            if let Some(balance) = try_grant_new_user_trial_credit(store, user_id)? {
+                if balance > 0 {
+                    return Ok(());
+                }
+                current_fen = balance;
+            }
+            Err(format!(
+                "余额不足（当前 {} 分），请联系管理员充值后继续使用",
+                current_fen
+            ))
+        }
         Err(e) => {
             warn!("billing check_can_call db error for {}: {}", user_id, e);
             if billing_db_fail_open() {
@@ -164,6 +184,48 @@ pub fn check_can_call(store: &Store, user_id: &str) -> Result<(), String> {
             }
         }
     }
+}
+
+fn try_grant_new_user_trial_credit(store: &Store, user_id: &str) -> Result<Option<i64>, String> {
+    let amount_fen = new_user_trial_credit_fen(store);
+    if amount_fen <= 0 {
+        return Ok(None);
+    }
+    match store.billing_grant_once(
+        user_id,
+        amount_fen,
+        NEW_USER_TRIAL_METHOD,
+        NEW_USER_TRIAL_OPERATOR,
+        Some("new user trial credit"),
+    ) {
+        Ok(balance) => Ok(balance),
+        Err(e) => {
+            warn!(
+                "new user trial credit grant failed for {} ({} fen): {}",
+                user_id, amount_fen, e
+            );
+            if billing_db_fail_open() {
+                Ok(None)
+            } else {
+                Err("计费系统暂时不可用，请稍后重试".to_string())
+            }
+        }
+    }
+}
+
+fn new_user_trial_credit_fen(store: &Store) -> i64 {
+    std::env::var(NEW_USER_TRIAL_CREDIT_ENV)
+        .ok()
+        .and_then(|value| value.trim().parse::<i64>().ok())
+        .or_else(|| {
+            store
+                .billing_get_config(NEW_USER_TRIAL_CREDIT_CONFIG_KEY)
+                .ok()
+                .flatten()
+                .and_then(|value| value.trim().parse::<i64>().ok())
+        })
+        .unwrap_or(DEFAULT_NEW_USER_TRIAL_CREDIT_FEN)
+        .max(0)
 }
 
 pub fn reserve_trusted_call(
@@ -193,6 +255,23 @@ pub fn reserve_trusted_call(
         );
         if !billing_db_fail_open() {
             return Err("计费系统暂时不可用，请稍后重试".to_string());
+        }
+    }
+
+    if billing_required_for_all_users(store) {
+        let should_try_trial = match store.billing_get_balance(user_id) {
+            Ok(None) => true,
+            Ok(Some(fen)) => fen < estimated_cost_fen.max(0),
+            Err(e) => {
+                warn!(
+                    "billing balance lookup before reservation failed for {}: {}",
+                    user_id, e
+                );
+                false
+            }
+        };
+        if should_try_trial {
+            let _ = try_grant_new_user_trial_credit(store, user_id)?;
         }
     }
 
@@ -476,6 +555,117 @@ mod tests {
             Uuid::new_v4().simple()
         ));
         (Store::open(&path).expect("store should open"), path)
+    }
+
+    #[test]
+    fn strict_billing_grants_new_user_trial_credit_before_first_call() {
+        let (store, path) = temp_store();
+        store
+            .billing_set_config("new_user_trial_credit_fen", "100")
+            .unwrap();
+        let expected = new_user_trial_credit_fen(&store);
+        if expected <= 0 {
+            let _ = std::fs::remove_file(path);
+            return;
+        }
+
+        let user = store
+            .create_user(
+                &format!("trial-{}@example.com", Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        assert_eq!(store.billing_get_balance(&user.id).unwrap(), None);
+
+        check_can_call(&store, &user.id).unwrap();
+
+        assert_eq!(store.billing_get_balance(&user.id).unwrap(), Some(expected));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn new_user_trial_credit_is_only_granted_once() {
+        let (store, path) = temp_store();
+        store
+            .billing_set_config("new_user_trial_credit_fen", "100")
+            .unwrap();
+        let expected = new_user_trial_credit_fen(&store);
+        if expected <= 0 {
+            let _ = std::fs::remove_file(path);
+            return;
+        }
+
+        let user = store
+            .create_user(
+                &format!("trial-once-{}@example.com", Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        check_can_call(&store, &user.id).unwrap();
+        store
+            .billing_deduct(
+                &user.id,
+                expected,
+                None,
+                0,
+                0,
+                0,
+                73000,
+                1200,
+                BillingPriceSnapshot::legacy(),
+            )
+            .unwrap();
+        assert_eq!(store.billing_get_balance(&user.id).unwrap(), Some(0));
+
+        let err = check_can_call(&store, &user.id).unwrap_err();
+        assert!(err.contains("余额不足"));
+        assert_eq!(store.billing_get_balance(&user.id).unwrap(), Some(0));
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn reservation_grants_trial_credit_before_holding_balance() {
+        let (store, path) = temp_store();
+        store
+            .billing_set_config("new_user_trial_credit_fen", "100")
+            .unwrap();
+        let expected = new_user_trial_credit_fen(&store);
+        if expected <= 0 {
+            let _ = std::fs::remove_file(path);
+            return;
+        }
+        let reserve_fen = expected.min(10);
+        let user = store
+            .create_user(
+                &format!("trial-reserve-{}@example.com", Uuid::new_v4().simple()),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        reserve_trusted_call(
+            &store,
+            &user.id,
+            "test-reservation",
+            "chat",
+            "server_api_key",
+            Some("test-model"),
+            reserve_fen,
+        )
+        .unwrap();
+
+        assert_eq!(
+            store.billing_get_balance(&user.id).unwrap(),
+            Some(expected - reserve_fen)
+        );
+        release_trusted_call(&store, &user.id, "test-reservation", "released_no_usage");
+        let _ = std::fs::remove_file(path);
     }
 
     #[test]

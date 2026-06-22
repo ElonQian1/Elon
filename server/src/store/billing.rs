@@ -4,7 +4,7 @@
 //! 金额单位统一用"分"（i64），避免浮点误差。
 
 use anyhow::Result;
-use rusqlite::params;
+use rusqlite::{params, OptionalExtension};
 use serde::Serialize;
 
 use super::{new_id, now, BillingPriceSnapshot, Store};
@@ -208,6 +208,72 @@ impl Store {
         )?;
         tx.commit()?;
         Ok(new_balance)
+    }
+
+    /// 幂等赠送余额：同一 user_id + method + operator_id 只赠送一次。
+    pub fn billing_grant_once(
+        &self,
+        user_id: &str,
+        amount_fen: i64,
+        method: &str,
+        operator_id: &str,
+        note: Option<&str>,
+    ) -> Result<Option<i64>> {
+        if amount_fen <= 0 {
+            return Ok(None);
+        }
+
+        let conn = self.conn.lock().unwrap();
+        let tx = conn.unchecked_transaction()?;
+        let already_granted = tx
+            .query_row(
+                "SELECT 1
+                 FROM recharge_records
+                 WHERE user_id = ?1 AND method = ?2 AND operator_id = ?3
+                 LIMIT 1",
+                params![user_id, method, operator_id],
+                |_| Ok(()),
+            )
+            .optional()?
+            .is_some();
+        if already_granted {
+            tx.commit()?;
+            return Ok(None);
+        }
+
+        let ts = now();
+        tx.execute(
+            "INSERT OR IGNORE INTO user_balance (user_id, balance_fen, updated_at)
+             VALUES (?1, 0, ?2)",
+            params![user_id, ts],
+        )?;
+        tx.execute(
+            "UPDATE user_balance
+             SET balance_fen = balance_fen + ?1, updated_at = ?2
+             WHERE user_id = ?3",
+            params![amount_fen, ts, user_id],
+        )?;
+        let new_balance: i64 = tx.query_row(
+            "SELECT balance_fen FROM user_balance WHERE user_id = ?1",
+            params![user_id],
+            |r| r.get(0),
+        )?;
+        tx.execute(
+            r#"INSERT INTO recharge_records
+               (id, user_id, amount_fen, method, operator_id, note, created_at)
+               VALUES (?1,?2,?3,?4,?5,?6,?7)"#,
+            params![
+                new_id("rch"),
+                user_id,
+                amount_fen,
+                method,
+                operator_id,
+                note,
+                ts
+            ],
+        )?;
+        tx.commit()?;
+        Ok(Some(new_balance))
     }
 
     /// 分页查询用户自己的扣费明细。返回 (事件列表, 总条数)。

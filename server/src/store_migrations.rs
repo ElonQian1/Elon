@@ -88,6 +88,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (58, "项目首页 landing manifest 云端快照", migration_v58),
     (59, "项目首页上传凭证", migration_v59),
     (60, "外部应用工具执行审计", migration_v60),
+    (61, "普通新用户 AI 试用额度配置", migration_v61),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2146,6 +2147,15 @@ fn migration_v60(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_external_app_tool_exec_grounding
           ON external_app_tool_executions(app_id, status, grounded_result_count, weak_result_count, unsafe_result_count);
         "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v61(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+         VALUES ('new_user_trial_credit_fen', '100', datetime('now'))",
+        [],
     )?;
     Ok(())
 }

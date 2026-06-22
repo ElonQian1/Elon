@@ -1176,6 +1176,10 @@ function closeConvModal() {
       <input type="number" id="cfgThreshold" placeholder="1.00" min="0" step="0.01" />
     </div>
     <div class="form-group">
+      <label>新用户试用额度（元，0 表示关闭）</label>
+      <input type="number" id="cfgNewUserTrial" placeholder="1.00" min="0" step="0.01" />
+    </div>
+    <div class="form-group">
       <label>冻结预授权告警阈值（条）</label>
       <input type="number" id="cfgReservationAlert" placeholder="100" min="1" step="1" />
     </div>
@@ -2069,6 +2073,7 @@ function renderBillingConfig(cfg) {
   const rate = (rateRaw / 10000).toFixed(4);
   const markup = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
   const threshold = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
+  const newUserTrial = ((cfg.new_user_trial_credit_fen ?? 100) / 100).toFixed(2);
   const reservationAlert = cfg.billing_open_reservation_alert_threshold || 100;
   const nodeShare = ((cfg.node_provider_revenue_share_x1000 || 800) / 10).toFixed(0);
   const nodePayoutMin = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
@@ -2076,6 +2081,7 @@ function renderBillingConfig(cfg) {
     <div><span style="font-size:12px;color:var(--text-dim)">汇率 &nbsp;</span><strong>1 USD = ${rate} CNY</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">加价 &nbsp;</span><strong>×${markup}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">低余额预警 &nbsp;</span><strong>¥${threshold}</strong></div>
+    <div><span style="font-size:12px;color:var(--text-dim)">新用户试用 &nbsp;</span><strong>¥${newUserTrial}</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">冻结告警 &nbsp;</span><strong>${reservationAlert} 条</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">节点分账 &nbsp;</span><strong>${nodeShare}%</strong></div>
     <div><span style="font-size:12px;color:var(--text-dim)">最低提现 &nbsp;</span><strong>¥${nodePayoutMin}</strong></div>
@@ -2235,6 +2241,7 @@ function openConfigModal() {
     document.getElementById('cfgRate').value = ((cfg.usd_to_rmb_rate_x10000 || 73000) / 10000).toFixed(4);
     document.getElementById('cfgMarkup').value = ((cfg.markup_x1000 || 1200) / 1000).toFixed(1);
     document.getElementById('cfgThreshold').value = ((cfg.low_balance_threshold_fen || 100) / 100).toFixed(2);
+    document.getElementById('cfgNewUserTrial').value = ((cfg.new_user_trial_credit_fen ?? 100) / 100).toFixed(2);
     document.getElementById('cfgReservationAlert').value = String(cfg.billing_open_reservation_alert_threshold || 100);
     document.getElementById('cfgNodeProviderShare').value = String(Math.round((cfg.node_provider_revenue_share_x1000 || 800) / 10));
     document.getElementById('cfgNodePayoutMin').value = ((cfg.node_payout_min_fen || 100) / 100).toFixed(2);
@@ -2252,16 +2259,19 @@ async function saveConfig() {
   const rateStr = document.getElementById('cfgRate').value.trim();
   const markupStr = document.getElementById('cfgMarkup').value.trim();
   const threshStr = document.getElementById('cfgThreshold').value.trim();
+  const newUserTrialStr = document.getElementById('cfgNewUserTrial').value.trim();
   const reservationAlertStr = document.getElementById('cfgReservationAlert').value.trim();
   const nodeShareStr = document.getElementById('cfgNodeProviderShare').value.trim();
   const nodePayoutMinStr = document.getElementById('cfgNodePayoutMin').value.trim();
   if (!rateStr || isNaN(parseFloat(rateStr))) return toast('汇率格式无效', 'err');
   if (!markupStr || isNaN(parseFloat(markupStr))) return toast('加价倍数格式无效', 'err');
+  if (newUserTrialStr && (isNaN(parseFloat(newUserTrialStr)) || parseFloat(newUserTrialStr) < 0)) return toast('新用户试用额度不能小于 0', 'err');
   if (nodeShareStr && (isNaN(parseFloat(nodeShareStr)) || parseFloat(nodeShareStr) < 0 || parseFloat(nodeShareStr) > 100)) return toast('节点分账比例需为 0-100', 'err');
   if (nodePayoutMinStr && (isNaN(parseFloat(nodePayoutMinStr)) || parseFloat(nodePayoutMinStr) <= 0)) return toast('最低提现金额必须大于 0', 'err');
   const rate_x10000 = String(Math.round(parseFloat(rateStr) * 10000));
   const markup_x1000 = String(Math.round(parseFloat(markupStr) * 1000));
   const threshold_fen = String(Math.round(parseFloat(threshStr || '1') * 100));
+  const new_user_trial_fen = String(Math.max(0, Math.round(parseFloat(newUserTrialStr || '1') * 100)));
   const reservation_alert = String(Math.max(1, Math.round(parseFloat(reservationAlertStr || '100'))));
   const node_provider_share = String(Math.round(parseFloat(nodeShareStr || '80') * 10));
   const node_payout_min = String(Math.max(1, Math.round(parseFloat(nodePayoutMinStr || '1') * 100)));
@@ -2272,7 +2282,8 @@ async function saveConfig() {
     const r4 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'billing_open_reservation_alert_threshold', value: reservation_alert });
     const r5 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'node_provider_revenue_share_x1000', value: node_provider_share });
     const r6 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'node_payout_min_fen', value: node_payout_min });
-    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok || !r5.ok || !r6.ok) return toast('部分配置保存失败', 'err');
+    const r7 = await apiFetch('PUT', '/api/admin/billing/config', { key: 'new_user_trial_credit_fen', value: new_user_trial_fen });
+    if (!r1.ok || !r2.ok || !r3.ok || !r4.ok || !r5.ok || !r6.ok || !r7.ok) return toast('部分配置保存失败', 'err');
     closeConfigModal();
     toast('配置已保存', 'ok');
     loadBilling();
