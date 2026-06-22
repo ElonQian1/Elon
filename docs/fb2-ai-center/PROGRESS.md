@@ -18,6 +18,8 @@
 - 2026-06-22 09:56 本轮继续收紧真机语音证据 artifact：`scripts/smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 现在会拒绝空 ref、示例/placeholder ref；本地 artifact 必须能按证据 JSON 所在目录或仓库根目录解析为真实文件，远端 artifact 必须是 `http(s)://` URL；证据还必须至少包含一条 logcat 和一条 screenshot/video 类型附件。`scripts/smoke-fb2-final-acceptance.ps1` summary 会摘录 `voice_evidence_artifact_refs_complete`、`voice_evidence_artifact_logcat`、`voice_evidence_artifact_visual`。
 - 2026-06-22 10:30 本轮给最终总验收 wrapper 增加无副作用 `-SelfTest`：它用合成日志验证 `visible @EL`、selected-message `AI回复`、summary-post 三类 fb2 feedback 能被解析进 `feedback_coverage`，分别缺 visible/selected/summary 任一类时都会报告缺项；同时验证 visible smoke 失败、final acceptance 失败或 feedback 覆盖不完整时最终 `success` 不会误为 true，并验证 voice/quality/permission 等关键 OK 行能映射到 `final_acceptance_evidence`。该自测不需要 `FB2_AI_CENTER_TOKEN`、不访问 fb2、不发送群消息，适合在拿不到最终 token/真机证据时继续守住验收脚本本身的回归门槛。
 - 2026-06-22 10:52 本轮把主 smoke 的真机语音证据校验抽到 `scripts/fb2-ai-center-voice-evidence.ps1`，并给 `scripts/smoke-fb2-ai-center.ps1` 增加无副作用 `-SelfTest`。自测覆盖 final-ready 正例、artifact 解析变体、`finalAcceptanceReady=false`、字符串布尔值、占位 artifact、缺本地文件、缺 logcat、缺截图/视频、空 artifact、低 APK 版本和 system ASR 缺失等路径；它不需要 token、不访问 fb2、不写群，只证明语音证据门槛不会被脚本改动放松。
+- 2026-06-22 11:15 复核当前代码和线上契约状态：主项目工作树 `D:\rust\active-projects\elon-main-fb2-docs-20260621` 干净，`HEAD=origin/main=cb8f5aff`；`scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>` 通过，主项目线上版本返回 `0.3.592 37625843aa50b433d9469b8a9c175551d061075d`，live fb2 manifest 返回 `tool_count=31`，authenticated `chat-bootstrap` 继续验证 `VoiceComposerView`、本地 ASR 优先、云端兜底、ASR/TTS 免费和 AI 回复扣费门槛。当前环境没有 `FB2_AI_CENTER_TOKEN`、`FB2_VOICE_DEVICE_EVIDENCE_PATH`、`ELON_MAIN_TOKEN`、`FB2_USER_TOKEN`，因此最终验收仍不能执行。
+- 2026-06-22 11:20 子项目只读复核：`D:\rust\active-projects\fb2` 本地 `main` 落后 `origin/main` 约 59 个提交，且存在本地改动 `docs/AI_CONTEXT_24X7_OPERATIONS.md` 和未跟踪脚本 `scripts/refresh_main_project_match_context_index.ps1`，主项目会话不要在该目录直接修改或拉取覆盖。fb2 远端当前已实现 `/api/main-project/integration`、`/context/readiness`、`/context/tool-manifest`、`/context/pack`、比赛/赔率、本人订单、群观点、平台匿名摘要、feedback/quality/permission/audit、`/tools/execute` 和受控 `match-context-index/refresh`；主项目下一步应按这些 live 合同消费，不应硬编码旧接口清单或绕过 Context Pack 读取 fb2 数据库。
 - 2026-06-22 09:06 本轮修复过一个线上根因：`gsp_b4c717d3c2d947188ccc755fe4f6ff32` 曾返回 `ready_with_fallback`，错误为“当前 AI 模型额度已用尽或接口不可用”，这不是 fb2 用户余额或 ASR/TTS 计费问题，而是总结帖链路没有使用群聊 AI 的模型 fallback。修复后 `gsp_400c852f06054a9eba16c8b643a3ae73` 和 `gsp_46720718477f4c6e953b55d5fc309568` 均进入 `ready`，模型 fallback 使用 `hunyuan-turbo` 正常生成。
 - 2026-06-22 09:06 ADB 真机复核再次确认当前 fb2 APK 已具备主项目式聊天体验：设备 `e0d909c3` 上 fb2 `com.duoguan.football 1.1.48(96)`，`RECORD_AUDIO granted=true`，appops 为 `foreground/allow`；启动 `com.duoguan.football/.MainActivity` 后，`夺冠体育官方群` 页面可见主项目 AI 回复包含 `数据事实`、`AI推断`、`风险边界`、`context_audit_id`、`selected_message_id`，底部输入栏显示 `按住 说话`。截图证据保存在 `target\fb2-current-20260622.png`，UI dump 保存在 `target\fb2-window-20260622.xml`；本轮 logcat 未见 fb2 `AndroidRuntime/FATAL`。
 - 2026-06-22 03:04 复核主项目 git/线上/真机链路：主项目修复提交 `589d2bacf51cf4c679505da52d8ecfea1762420b`（`修复fb2群聊AI回答缺少分层边界`）已推入 `origin/main`，并包含在当前线上最新 `v0.3.585 / 4b0fb9dd363e3619faab7bf73c3ded680e1ad40e` 中。该修复在 fb2 外部上下文下对群聊 `@EL` 和长按 `AI回复` 回复做后处理兜底：如果模型漏掉短标签，会补齐 `数据事实：`、`AI推断：` 和 `风险边界：`，风险边界明确“不保证命中、不建议重注或梭哈”。本轮验证命令包括 `cargo test social_ai --bin elon-server`、`cargo test social_ai_message_reply --bin elon-server`、`cargo test external_app_context_answer_policy --bin elon-server`、pre-push `cargo check --workspace`、`publish-server.ps1`、`smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>` 和 `smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>`。
@@ -46,7 +48,7 @@
 - 本轮无 token 验证通过：默认 smoke 仍为 `failed=0 skipped=2`；显式 `-CheckPermissionBoundaries -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d` 会因缺 `FB2_AI_CENTER_TOKEN` 返回 `failed=1`，说明最终验收不会跳过权限负向检查。
 - 已新增 `docs/fb2-ai-center/voice-device-evidence.example.json`，要求 fb2 真机验证 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
 - `scripts/smoke-fb2-visible-chat.ps1` 已作为有副作用真实群聊 smoke，只有传 `-AllowVisibleMessages` 后才会发送 `@EL` 和 selected-message `ai-reply`。
-- 最近一次无副作用 smoke 通过，主项目线上版本返回 `0.3.579 8106b0cca6bbe95370625def93f32a2716fb56ca`，fb2 live manifest 返回 `tool_count=30`。
+- 最近一次 authenticated 无副作用 smoke 通过，主项目线上版本返回 `0.3.592 37625843aa50b433d9469b8a9c175551d061075d`，fb2 live manifest 返回 `tool_count=31`。
 - 最近一次 `-FinalAcceptance -Fb2Username 123qwe -Fb2Password 123qwe` 正确失败在缺 `FB2_AI_CENTER_TOKEN` 和缺 `-VoiceDeviceEvidencePath`，说明最终验收不会误报完成。
 - 本轮 `-PreflightOnly` 安全验证通过：缺 `FB2_AI_CENTER_TOKEN` 会立即失败；同时传 `-PreflightOnly -AllowVisibleMessages` 会立即失败；传无效 `Fb2AiCenterToken` 时能解析 `123qwe` 为 `6fe5aa17-0403-427a-8e91-7f414beca35d`，但会在写群前因订单上下文预检 401 失败。
 
@@ -58,6 +60,7 @@
 - 真实群聊 `@EL`、长按 `AI回复` 和总结帖入口都已单独抽样通过；仍需把可见群聊、summary post、三类 `feedback_coverage`、质量汇总、权限审计和完整语音证据放进 `scripts/smoke-fb2-final-acceptance.ps1` 同一批 summary 中，才能宣布终极完成。
 - 多账号权限验收未完全完成：需要证明用户不能读取他人订单，平台摘要不泄露单个用户，未授权请求会被拒绝并审计。
 - 固定质量评测集仍需继续积累 feedback 样本，观察 `missing_context`、`wrong_context`、`citation_unmatched` 和大 Context Pack 比率。
+- 主项目还没有把 fb2 `/integration` -> `/context/readiness` -> `/context/tool-manifest` 的动态发现结果沉淀成最终验收证据；目前 smoke 已验证 live manifest，但最终回答链路仍应以 readiness 和 tool policy 为准，避免后续 fb2 工具扩展后主项目停留在旧静态接口清单。
 
 ## 验证结果
 
@@ -102,7 +105,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 1. 让 fb2 会话提供 `FB2_AI_CENTER_TOKEN` 或等价服务 token，用于主项目最终验收拉取 live Context Pack、平台匿名摘要和质量反馈。
 2. 确认 `123qwe` 或另一个 fb2 测试账号确实有可分析订单；如果不能用用户名密码解析，再手工提供有订单的测试用户 UUID。
 3. 让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-4. 跑完整最终验收：
+4. 主项目侧继续补强动态发现和 readiness 使用：先读 fb2 `/integration`、`/context/readiness`、`/context/tool-manifest`，再决定 Context Pack 和 `tools/execute` 调用；不要直接改 fb2 本地脏工作区。
+5. 跑完整最终验收：
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN> -VoiceDeviceEvidencePath <real-device-evidence.json>

@@ -14,6 +14,8 @@
 - 2026-06-22 09:56 本轮继续收紧真机语音 artifact：`scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 会拒绝占位 artifact ref，要求本地 ref 解析到真实文件或远端 `http(s)://` URL，并要求至少一条 logcat 和一条截图/视频证据；最终 summary 会摘录 artifact refs 是否完整、是否有 logcat/视觉证据。
 - 2026-06-22 10:30 本轮给最终总验收 wrapper 增加 `-SelfTest` 离线自测，覆盖三类 feedback 解析、三类 feedback 分别缺失的失败路径、visible/final 子脚本 exit code、voice/quality/permission evidence 摘录和最终 `success` 的布尔门槛。该命令不需要 token、不访问 fb2、不写真实群，后续改 wrapper 前后都应先跑它。
 - 2026-06-22 10:52 本轮给主 smoke 增加 `-SelfTest` 离线自测，并把真机语音证据校验抽到 `scripts/fb2-ai-center-voice-evidence.ps1`。后续改 `-RequireVoiceDeviceEvidence` 规则前后都要跑 `scripts\smoke-fb2-ai-center.ps1 -SelfTest`，它会检查严格布尔值、APK 版本、必需 ASR/TTS/UI 字段、artifact 路径/URL、占位 ref 拒绝、logcat 和截图/视频门槛，但不替代真实 APK 的 final-ready 设备证据。
+- 2026-06-22 11:15 当前主项目状态复核：`HEAD=origin/main=cb8f5aff`，`scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>` 通过，线上版本 `0.3.592 / 37625843aa50b433d9469b8a9c175551d061075d`，live manifest `tool_count=31`。当前环境未配置 `FB2_AI_CENTER_TOKEN` 和 `FB2_VOICE_DEVICE_EVIDENCE_PATH`，所以不能进入最终 `-PreflightOnly` / `-AllowVisibleMessages` 验收。
+- 2026-06-22 11:20 fb2 子项目状态复核：本地 `D:\rust\active-projects\fb2` 落后 `origin/main` 约 59 个提交，并且有本地改动/未跟踪文件，主项目会话不要在该目录直接修改、pull 或覆盖。fb2 远端已提供 `/integration`、`/context/readiness`、`/tool-manifest`、`/context/pack`、比赛/赔率、本人订单、群观点、平台匿名摘要、feedback/quality/permission/audit、`/tools/execute` 和受控 `match-context-index/refresh`；主项目下一轮应按 live 合同动态发现和消费。
 - 2026-06-22 09:06 总结帖修复根因：旧 summary post `gsp_b4c717d3c2d947188ccc755fe4f6ff32` 进入 `ready_with_fallback`，错误为“当前 AI 模型额度已用尽或接口不可用”。这不是 fb2 用户余额不足，也不是 ASR/TTS 免费策略问题，而是总结帖链路此前只调用默认模型，没有使用 `social_ai` 多代理 fallback。现在总结帖和 `@EL`/长按 `AI回复` 使用同一类模型 fallback，`hunyuan-turbo` fallback 已在线上正常生成。
 - 2026-06-22 09:06 ADB 真机复核：设备 `e0d909c3` 在线，fb2 包 `com.duoguan.football 1.1.48(96)`，`RECORD_AUDIO granted=true`，appops 为 `foreground/allow`。启动 `com.duoguan.football/.MainActivity` 后，当前页面为 `夺冠体育官方群`，UI dump 可见 `数据事实`、`AI推断`、`风险边界`、`context_audit_id`、`按住 说话`；截图位于 `target\fb2-current-20260622.png`，UI dump 位于 `target\fb2-window-20260622.xml`。本轮 logcat 未见 fb2 `AndroidRuntime/FATAL`。
 - 2026-06-22 03:04 当前主项目远端和线上状态：`origin/main` 最新为 `4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，线上服务端为 `v0.3.585 / 4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，其中包含 fb2 群聊 AI 分层兜底修复 `589d2bacf51cf4c679505da52d8ecfea1762420b`。本轮工作树 `D:\rust\active-projects\elon-main-fb2-docs-20260621` 已 fast-forward 到 `origin/main` 并保持干净。
@@ -207,3 +209,4 @@
 - 两边不能同时改同一个文件或同一接口实现。
 - fb2 改完接口后，主项目先读最新契约和返回样例，再调整 prompt/质量告警。
 - 主项目 SDK 改完后，fb2 重新引用主项目 commit 并重打 APK。
+- 主项目不要修改 fb2 本地脏工作区；需要 fb2 改 handler、route、repository、schema 或 tool contract 时，把具体接口差距交给 fb2 会话处理。
