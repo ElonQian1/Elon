@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮继续把下一步动作从“文字描述”推进为可执行交接：`status-refresh-current.json` 新增 `next_commands`，包含刷新自身、读取 refresh JSON、无写群直读、带 token 的 `DataOnlyAcceptance -PreflightOnly`、以及需要显式授权的 visible regression 命令。命令仍使用 `<FB2_AI_CENTER_TOKEN>` / `<FB2_PASSWORD>` 占位，不保存密钥；fb2 子会话或下一轮主项目会话可以直接读取这个字段执行下一步。
 - 2026-06-23 本轮继续增强 `status-refresh-current.json` 的交接能力：新增 `owner_next_actions` 和 `blocking_state`。`owner_next_actions` 会把下一步拆成主项目、fb2 子项目和 shared 三类动作；`blocking_state` 明确 `blocked_by_external_secret`、`external_secret=FB2_AI_CENTER_TOKEN`、可继续做的无密钥回归项，以及必须等 token 才能做的 live Context Pack/订单/平台摘要/feedback 刷新。这样后续两个会话协作时，不会把“主项目还能做的脚本/契约回归”和“必须 fb2 提供 token 的 live 验证”混在一起。
 - 2026-06-23 本轮把 `scripts\fb2-ai-center-refresh-current-status.ps1` 的 stdout 摘要也落成默认 artifact：不传参数时会写出 `target\fb2-ai-center\status-refresh-current.json`，schema 为 `fb2.main_project.status_refresh.v1`，并在 `files.status_refresh` 中自引用该路径。后续交接不需要复制控制台输出，直接读取该 JSON 即可看到 public contract、七类场景、非语音完成度、full final 状态、缺 token 与下一步动作。
 - 2026-06-23 本轮给 `scripts\fb2-ai-center-refresh-current-status.ps1` 增加无网络 `-SelfTest`。自测使用临时 output dir、跳过 public contract 网络检查、禁用主工作区历史证据目录，只验证刷新总入口能稳定生成 `status-current.json`、`goal-audit-current.json`、`handoff-current.md` 和 `fb2.main_project.status_refresh.v1` 摘要。后续改这个总入口时，必须先跑自测，再跑真实刷新命令，避免状态编排脚本漂移。

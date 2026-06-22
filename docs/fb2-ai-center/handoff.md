@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮在 `status-refresh-current.json` 中新增 `next_commands`。后续会话读取该文件时，应能直接拿到 `refresh_status`、`read_status_refresh`、`no_write_direct_read`、`data_only_preflight` 和 `visible_regression_requires_authorization` 五类命令；带密钥命令只保留 `<FB2_AI_CENTER_TOKEN>` / `<FB2_PASSWORD>` 占位，不保存真实密钥。接手时优先执行 `refresh_status` 刷新本地证据，再按是否有 token 选择无写群直读或 `DataOnlyAcceptance -PreflightOnly`。
 - 2026-06-23 本轮在 `status-refresh-current.json` 中新增 `owner_next_actions` 和 `blocking_state`。当前读取该文件时，应能直接看到主项目下一步是保持契约/status 回归为绿，fb2 子项目下一步是提供 `FB2_AI_CENTER_TOKEN` 或等价 live Context Pack/权限/质量证据，shared 下一步是带 token 跑 `DataOnlyAcceptance -PreflightOnly` 后刷新状态。`blocking_state.safe_to_continue_without_secret` 列无密钥可继续事项，`requires_secret` 列必须等 token 的 live 验证事项。
 - 2026-06-23 本轮让状态刷新总入口默认保存 `target\fb2-ai-center\status-refresh-current.json`，schema 为 `fb2.main_project.status_refresh.v1`。这个文件会列出 `files.status_refresh`、`files.status`、`files.goal_audit`、`files.handoff_markdown`、`data_goal_complete`、`full_final_complete`、`token_present` 和 `next_minimum_action`；后续同步给 fb2 子会话时优先贴这个 JSON 或对应 handoff markdown，不再依赖复制终端 stdout。
 - 2026-06-23 本轮给状态刷新总入口补了无网络自测：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1 -SelfTest` 应输出 `failed=0`。它使用临时目录、跳过 public contract 网络请求、不读取主工作区历史证据，用来保护刷新总入口的编排和输出 schema；真实进度判断仍跑不带 `-SelfTest` 的刷新命令。

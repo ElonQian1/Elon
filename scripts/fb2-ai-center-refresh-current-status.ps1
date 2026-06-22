@@ -67,6 +67,40 @@ function Read-Fb2RefreshJson {
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
+function Get-Fb2RefreshProperty {
+    param(
+        [object]$Object,
+        [string]$Name,
+        [object]$Default = $null
+    )
+
+    if ($null -eq $Object) {
+        return $Default
+    }
+    if ($Object -is [System.Collections.IDictionary] -and $Object.Contains($Name)) {
+        return $Object[$Name]
+    }
+    $property = $Object.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $Default
+    }
+    return $property.Value
+}
+
+function Get-Fb2RefreshCommandValue {
+    param(
+        [object]$Primary,
+        [object]$Fallback,
+        [string]$Name
+    )
+
+    $value = [string](Get-Fb2RefreshProperty $Primary $Name "")
+    if (-not [string]::IsNullOrWhiteSpace($value)) {
+        return $value
+    }
+    return [string](Get-Fb2RefreshProperty $Fallback $Name "")
+}
+
 function New-Fb2RefreshOwnerActions {
     param(
         [object]$Status,
@@ -95,6 +129,23 @@ function New-Fb2RefreshOwnerActions {
         } else {
             "close_missing_non_voice_requirements_before_visible_or_full_final_acceptance"
         }
+    }
+}
+
+function New-Fb2RefreshNextCommands {
+    param([object]$Status)
+
+    $livePreflight = Get-Fb2RefreshProperty $Status "live_preflight_request"
+    $liveCommands = Get-Fb2RefreshProperty $livePreflight "commands"
+    $coordination = Get-Fb2RefreshProperty $Status "coordination"
+    $safeCommands = Get-Fb2RefreshProperty $coordination "safe_commands"
+
+    [ordered]@{
+        refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
+        read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
+        no_write_direct_read = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "no_write_direct_read"
+        data_only_preflight = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "data_only_preflight"
+        visible_regression_requires_authorization = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "visible_regression_requires_authorization"
     }
 }
 
@@ -156,6 +207,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.owner_next_actions.fb2_project)) "fb2 owner action"
         Assert-Fb2RefreshSelfTest ([bool]$summary.blocking_state.blocked_by_external_secret) "selftest token blocked"
         Assert-Fb2RefreshSelfTest ([string]$summary.blocking_state.external_secret -eq "FB2_AI_CENTER_TOKEN") "external secret name"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.refresh_status)) "refresh command"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight)) "data-only preflight command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
         "== SelfTest Summary =="
         "failed=0"
@@ -234,6 +287,7 @@ $goalAudit = Read-Fb2RefreshJson -Path $goalAuditPath
 $public = Read-Fb2RefreshJson -Path $publicPath
 $ownerNextActions = New-Fb2RefreshOwnerActions -Status $status -GoalAudit $goalAudit
 $blockingState = New-Fb2RefreshBlockingState -Status $status -GoalAudit $goalAudit
+$nextCommands = New-Fb2RefreshNextCommands -Status $status
 
 $refreshSummary = [pscustomobject]@{
     schema = "fb2.main_project.status_refresh.v1"
@@ -257,6 +311,7 @@ $refreshSummary = [pscustomobject]@{
     next_minimum_action = [string]$goalAudit.next_minimum_action
     owner_next_actions = $ownerNextActions
     blocking_state = $blockingState
+    next_commands = $nextCommands
     missing_non_voice_requirements = @($goalAudit.missing_non_voice_requirements)
     deferred_requirements = @($goalAudit.deferred_requirements)
 }
