@@ -32,6 +32,18 @@ struct LocalProjectInfo {
     test_command: Option<String>,
     build_command: Option<String>,
     detected_files: Vec<String>,
+    agent_runtime: AgentRuntimeFreshness,
+}
+
+#[derive(Debug, Serialize, Clone)]
+struct AgentRuntimeFreshness {
+    status: String,
+    summary: String,
+    script_path: String,
+    has_elon_agent: bool,
+    has_command_budget: bool,
+    has_output_limit: bool,
+    max_run_commands_default: Option<u32>,
 }
 
 #[derive(Debug, Serialize)]
@@ -107,6 +119,7 @@ fn local_project_info(
 
     let identity = detect_project_identity(&path, landing);
     let profile = detect_project_profile(&path);
+    let agent_runtime = inspect_agent_runtime_freshness(&path);
     let project = LocalProjectInfo {
         name: identity.name,
         workspace_path: inspect.workspace_path.clone(),
@@ -128,6 +141,7 @@ fn local_project_info(
         test_command: profile.test_command,
         build_command: profile.build_command,
         detected_files: profile.detected_files,
+        agent_runtime,
     };
     Ok((project, inspect))
 }
@@ -164,6 +178,9 @@ fn local_project_registration_readiness(
     if project.project_type.is_none() {
         warnings.push("未识别到常见项目类型，运行/测试/构建命令需要后续手动补充。".to_string());
     }
+    if project.agent_runtime.status != "current" {
+        warnings.push(project.agent_runtime.summary.clone());
+    }
     if !inspect.codex_available && !inspect.copilot_available {
         warnings.push(
             "本机未检测到 Codex/Copilot CLI，开发任务会优先走 Route B/C 模型能力。".to_string(),
@@ -195,6 +212,9 @@ fn local_project_registration_readiness(
     }
     if project.build_command.is_some() {
         autofill_fields.push("构建命令".to_string());
+    }
+    if project.agent_runtime.status == "current" {
+        autofill_fields.push("Agent Runtime".to_string());
     }
 
     let can_register = missing_fields.is_empty();
@@ -478,6 +498,64 @@ fn parse_toml_string(value: &str) -> Option<String> {
     None
 }
 
+fn inspect_agent_runtime_freshness(project_root: &Path) -> AgentRuntimeFreshness {
+    let script = project_root.join("scripts").join("elon-agent.ps1");
+    let script_path = script.to_string_lossy().to_string();
+    let Ok(text) = std::fs::read_to_string(&script) else {
+        return AgentRuntimeFreshness {
+            status: "missing".to_string(),
+            summary: "项目缺少 scripts\\elon-agent.ps1，Route B/C 自研运行时需要重新生成项目脚本。"
+                .to_string(),
+            script_path,
+            has_elon_agent: false,
+            has_command_budget: false,
+            has_output_limit: false,
+            max_run_commands_default: None,
+        };
+    };
+
+    let has_command_budget =
+        text.contains("MaxRunCommands") && text.contains("Use-AgentRunCommandBudget");
+    let has_output_limit =
+        text.contains("AgentCommandOutputMaxChars") && text.contains("Limit-AgentText");
+    let max_run_commands_default = parse_max_run_commands_default(&text);
+    if has_command_budget && has_output_limit {
+        AgentRuntimeFreshness {
+            status: "current".to_string(),
+            summary: format!(
+                "Agent Runtime 已包含命令预算和输出截断保护，默认每轮最多 {} 个 run_command。",
+                max_run_commands_default.unwrap_or(8)
+            ),
+            script_path,
+            has_elon_agent: true,
+            has_command_budget,
+            has_output_limit,
+            max_run_commands_default,
+        }
+    } else {
+        AgentRuntimeFreshness {
+            status: "stale".to_string(),
+            summary: "项目内 scripts\\elon-agent.ps1 是旧版模板，缺少 run_command 预算或输出截断保护；建议重新生成后再长期使用 Route B/C。".to_string(),
+            script_path,
+            has_elon_agent: true,
+            has_command_budget,
+            has_output_limit,
+            max_run_commands_default,
+        }
+    }
+}
+
+fn parse_max_run_commands_default(script: &str) -> Option<u32> {
+    let marker = "[int]$MaxRunCommands =";
+    let start = script.find(marker)? + marker.len();
+    let digits = script[start..]
+        .trim_start()
+        .chars()
+        .take_while(|ch| ch.is_ascii_digit())
+        .collect::<String>();
+    digits.parse().ok()
+}
+
 fn clean_project_text(value: &str, max_chars: usize) -> Option<String> {
     let value = value.trim();
     if value.is_empty() {
@@ -561,8 +639,8 @@ fn pick_folder() -> anyhow::Result<Option<String>> {
 #[cfg(test)]
 mod tests {
     use super::{
-        detect_project_identity, local_project_info, local_project_registration_readiness,
-        LocalProjectInfo,
+        detect_project_identity, inspect_agent_runtime_freshness, local_project_info,
+        local_project_registration_readiness, AgentRuntimeFreshness, LocalProjectInfo,
     };
     use homecli_proto::ProjectWorkspaceInspectStatus;
     use serde_json::json;
@@ -617,6 +695,20 @@ mod tests {
             test_command: Some("cargo test".to_string()),
             build_command: Some("cargo build".to_string()),
             detected_files: vec!["Cargo.toml".to_string()],
+            agent_runtime: current_agent_runtime(),
+        }
+    }
+
+    fn current_agent_runtime() -> AgentRuntimeFreshness {
+        AgentRuntimeFreshness {
+            status: "current".to_string(),
+            summary: "Agent Runtime 已包含命令预算和输出截断保护，默认每轮最多 8 个 run_command。"
+                .to_string(),
+            script_path: "C:\\demo\\scripts\\elon-agent.ps1".to_string(),
+            has_elon_agent: true,
+            has_command_budget: true,
+            has_output_limit: true,
+            max_run_commands_default: Some(8),
         }
     }
 
@@ -633,6 +725,9 @@ mod tests {
         assert!(readiness.warnings.is_empty());
         assert!(readiness.autofill_fields.contains(&"Git 远端".to_string()));
         assert!(readiness.autofill_fields.contains(&"构建命令".to_string()));
+        assert!(readiness
+            .autofill_fields
+            .contains(&"Agent Runtime".to_string()));
     }
 
     #[test]
@@ -646,6 +741,16 @@ mod tests {
         project.run_command = None;
         project.test_command = None;
         project.build_command = None;
+        project.agent_runtime = AgentRuntimeFreshness {
+            status: "missing".to_string(),
+            summary: "项目缺少 scripts\\elon-agent.ps1，Route B/C 自研运行时需要重新生成项目脚本。"
+                .to_string(),
+            script_path: "C:\\demo\\scripts\\elon-agent.ps1".to_string(),
+            has_elon_agent: false,
+            has_command_budget: false,
+            has_output_limit: false,
+            max_run_commands_default: None,
+        };
 
         let mut inspect = inspect_status();
         inspect.is_git_worktree = false;
@@ -666,7 +771,46 @@ mod tests {
             .warnings
             .iter()
             .any(|warning| warning.contains("Route B/C")));
+        assert!(readiness
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("elon-agent.ps1")));
         assert!(!readiness.autofill_fields.contains(&"Git 远端".to_string()));
+    }
+
+    #[test]
+    fn agent_runtime_freshness_detects_missing_stale_and_current_templates() {
+        let dir = temp_project("agent-runtime-freshness");
+
+        let missing = inspect_agent_runtime_freshness(&dir);
+        assert_eq!(missing.status, "missing");
+        assert!(!missing.has_elon_agent);
+
+        let scripts = dir.join("scripts");
+        std::fs::create_dir_all(&scripts).unwrap();
+        std::fs::write(
+            scripts.join("elon-agent.ps1"),
+            "function Invoke-AgentAction {}\n",
+        )
+        .unwrap();
+        let stale = inspect_agent_runtime_freshness(&dir);
+        assert_eq!(stale.status, "stale");
+        assert!(stale.has_elon_agent);
+        assert!(!stale.has_command_budget);
+        assert!(!stale.has_output_limit);
+
+        std::fs::write(
+            scripts.join("elon-agent.ps1"),
+            "[int]$MaxRunCommands = 8\n$AgentCommandOutputMaxChars = 12000\nfunction Use-AgentRunCommandBudget {}\nfunction Limit-AgentText {}\n",
+        )
+        .unwrap();
+        let current = inspect_agent_runtime_freshness(&dir);
+        assert_eq!(current.status, "current");
+        assert_eq!(current.max_run_commands_default, Some(8));
+        assert!(current.has_command_budget);
+        assert!(current.has_output_limit);
+
+        let _ = std::fs::remove_dir_all(dir);
     }
 
     #[test]

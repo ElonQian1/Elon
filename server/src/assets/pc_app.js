@@ -2733,6 +2733,10 @@
       clean(project.build_command) && `构建 ${clean(project.build_command)}`
     ].filter(Boolean).join(' / ');
     const detected = detectedFiles.slice(0, 4).join('、');
+    const agentRuntime = (project && project.agent_runtime) || {};
+    const agentRuntimeStatus = clean(agentRuntime.status);
+    const agentRuntimeSummary = clean(agentRuntime.summary);
+    const agentRuntimeTone = agentRuntimeStatus === 'current' ? 'ok' : (agentRuntimeSummary ? 'warning' : '');
     if (!path) {
       els.settingsProjectMeta.textContent = '尚未选择项目目录';
       return;
@@ -2746,6 +2750,7 @@
       identitySource && ['来源', identitySource],
       profile && ['类型', profile],
       commands && ['命令', commands],
+      agentRuntimeSummary && ['Agent Runtime', agentRuntimeSummary, agentRuntimeTone],
       detected && ['识别', `检测到 ${detected}`],
       autofillFields.length && ['自动', `已填写 ${autofillFields.slice(0, 8).join('、')}`],
       missingFields.length && ['缺少', missingFields.join('、'), 'error'],

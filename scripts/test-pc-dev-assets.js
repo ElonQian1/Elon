@@ -1025,6 +1025,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('registration.can_register'), 'project registration should read readiness from local inspect');
   assert.ok(pcApp.includes('autofill_fields'), 'project registration should display auto-filled fields');
   assert.ok(pcApp.includes('目录信息不足'), 'project registration should block submission when required fields are missing');
+  assert.ok(pcApp.includes('project.agent_runtime'), 'project registration should display local Agent Runtime freshness');
+  assert.ok(pcApp.includes('Agent Runtime'), 'project registration should label Agent Runtime freshness in settings');
   assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
   assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
   assert.ok(pcApp.includes('openClientTaskJournalBtn'), 'PC settings should keep task journal separate from runtime logs');
