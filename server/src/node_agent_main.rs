@@ -37,9 +37,9 @@ use homecli_proto::{
     PROTO_VERSION,
 };
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use std::{collections::HashMap, path::PathBuf};
 use tokio::sync::{mpsc, watch, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -48,6 +48,7 @@ use tracing::{info, warn};
 mod agent_runtime_error_summary;
 mod cli_usage;
 mod node_agent_active_task;
+mod node_agent_active_task_registry;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
@@ -1273,6 +1274,21 @@ async fn run_cli_prompt(run: CliPromptRun) {
     )));
 }
 
+fn duplicate_cli_prompt_done(req_id: String) -> AgentToServer {
+    AgentToServer::CliDone {
+        req_id,
+        exit_ok: false,
+        error: Some("该任务已在本机节点运行，已拒绝重复启动，避免重复 CLI 进程堆积。".to_string()),
+        prompt_tokens: None,
+        cached_input_tokens: None,
+        completion_tokens: None,
+        reasoning_tokens: None,
+        total_tokens: None,
+        model: None,
+        workspace_status: None,
+    }
+}
+
 fn send_cli_chunk(
     out_tx: &tokio::sync::mpsc::UnboundedSender<Message>,
     task_journal: &node_agent_task_journal::TaskJournal,
@@ -2017,10 +2033,17 @@ async fn run_session(
                             tokio::spawn(async move {
                                 let req_id_for_cleanup = req_id.clone();
                                 let (cancel_tx, cancel_rx) = watch::channel(false);
+                                if rt_c.cli_prompt_active(&req_id_for_cleanup).await {
+                                    warn!(
+                                        "拒绝重复启动 PC CLI prompt: {} 已经在运行",
+                                        req_id_for_cleanup
+                                    );
+                                    let _ = tx_c.send(ws_text(&duplicate_cli_prompt_done(req_id)));
+                                    return;
+                                }
                                 let resolved_cli = match rt_c.resolve_cli(&cli).await {
                                     Ok(resolved) => resolved,
                                     Err(e) => {
-                                        rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
                                         let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
                                             req_id,
                                             exit_ok: false,
@@ -2063,7 +2086,6 @@ async fn run_session(
                                     )
                                     .await
                                 {
-                                    rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
                                     let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
                                         req_id,
                                         exit_ok: false,
@@ -2082,7 +2104,6 @@ async fn run_session(
                                     match prepare_cli_prompt_cwd(cwd, project_context) {
                                         Ok(cwd) => cwd,
                                         Err(e) => {
-                                            rt_c.finish_cli_prompt(&req_id_for_cleanup).await;
                                             let _ = tx_c.send(ws_text(&AgentToServer::CliDone {
                                                 req_id,
                                                 exit_ok: false,
@@ -2098,6 +2119,22 @@ async fn run_session(
                                             return;
                                         }
                                     };
+                                let handle = node_agent_active_task::ActiveCliPromptHandle::new(
+                                    req_id_for_cleanup.clone(),
+                                    resolved_cli.name().to_string(),
+                                    node_agent_active_task::route_for_cli(resolved_cli.name()),
+                                    prepared_cwd.cwd.clone(),
+                                    runtime_permission.clone(),
+                                    cancel_tx,
+                                );
+                                if !rt_c.try_register_cli_prompt(handle).await {
+                                    warn!(
+                                        "拒绝重复启动 PC CLI prompt: {} 注册竞争失败",
+                                        req_id_for_cleanup
+                                    );
+                                    let _ = tx_c.send(ws_text(&duplicate_cli_prompt_done(req_id)));
+                                    return;
+                                }
                                 if let Err(error) = rt_c.task_journal.record_started(
                                     node_agent_task_journal::TaskJournalStart {
                                         req_id: &req_id_for_cleanup,
@@ -2112,17 +2149,6 @@ async fn run_session(
                                 ) {
                                     warn!("PC 任务 journal 写入开始事件失败: {error}");
                                 }
-                                rt_c.register_cli_prompt(
-                                    node_agent_active_task::ActiveCliPromptHandle::new(
-                                        req_id_for_cleanup.clone(),
-                                        resolved_cli.name().to_string(),
-                                        node_agent_active_task::route_for_cli(resolved_cli.name()),
-                                        prepared_cwd.cwd.clone(),
-                                        runtime_permission.clone(),
-                                        cancel_tx,
-                                    ),
-                                )
-                                .await;
                                 run_cli_prompt(CliPromptRun {
                                     req_id,
                                     bin: resolved_cli.bin().to_string(),
@@ -2395,7 +2421,7 @@ pub(crate) struct NodeRuntime {
     /// 本机项目代码硬盘服务配置。
     storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     /// 正在执行的 CLI prompt 请求，用于接收云端 stop/cancel 后终止子进程。
-    active_cli_prompts: RwLock<HashMap<String, node_agent_active_task::ActiveCliPromptHandle>>,
+    active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
     /// 本地任务 registry/jsonl，用于后续重启后恢复任务现场和 attach。
     task_journal: node_agent_task_journal::TaskJournal,
     /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
@@ -2427,7 +2453,7 @@ impl NodeRuntime {
             cli_paths: RwLock::new(Vec::new()),
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
-            active_cli_prompts: RwLock::new(HashMap::new()),
+            active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
             task_journal: node_agent_task_journal::TaskJournal::default(),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
@@ -2460,17 +2486,23 @@ impl NodeRuntime {
         *self.cli_paths.write().await = paths;
     }
 
-    async fn register_cli_prompt(&self, handle: node_agent_active_task::ActiveCliPromptHandle) {
-        self.active_cli_prompts
-            .write()
-            .await
-            .insert(handle.req_id().to_string(), handle);
+    async fn cli_prompt_active(&self, req_id: &str) -> bool {
+        self.active_cli_prompts.contains(req_id).await
+    }
+
+    async fn try_register_cli_prompt(
+        &self,
+        handle: node_agent_active_task::ActiveCliPromptHandle,
+    ) -> bool {
+        self.active_cli_prompts.try_insert(handle).await
     }
 
     async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
-        let handle = self.active_cli_prompts.read().await.get(req_id).cloned();
-        let canceled = handle
-            .map(|handle| handle.cancel_tx().send(true).is_ok())
+        let canceled = self
+            .active_cli_prompts
+            .cancel_tx(req_id)
+            .await
+            .map(|cancel_tx| cancel_tx.send(true).is_ok())
             .unwrap_or(false);
         if canceled {
             if let Err(error) = self.task_journal.record_cancel_requested(req_id) {
@@ -2485,16 +2517,13 @@ impl NodeRuntime {
         req_id: &str,
     ) -> Option<node_agent_active_task::ActiveCliPromptView> {
         let pending_approvals = self.tool_approvals.pending_for_req(req_id).await;
-        let mut prompts = self.active_cli_prompts.write().await;
-        let handle = prompts.get_mut(req_id)?;
-        handle.touch();
-        Some(handle.view(pending_approvals))
+        self.active_cli_prompts
+            .view(req_id, pending_approvals)
+            .await
     }
 
     async fn set_cli_prompt_os_pid(&self, req_id: &str, pid: Option<u32>) {
-        if let Some(handle) = self.active_cli_prompts.write().await.get_mut(req_id) {
-            handle.set_os_pid(pid);
-        }
+        self.active_cli_prompts.set_os_pid(req_id, pid).await;
     }
 
     async fn decide_tool_approval(&self, req_id: &str, approval_id: &str, decision: &str) -> bool {
@@ -2504,7 +2533,7 @@ impl NodeRuntime {
     }
 
     async fn finish_cli_prompt(&self, req_id: &str) {
-        self.active_cli_prompts.write().await.remove(req_id);
+        self.active_cli_prompts.remove(req_id).await;
     }
 
     async fn hardware_profile(&self) -> NodeHardwareProfile {
@@ -2828,7 +2857,7 @@ async fn admin_status(
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
     let full_access_grant_count = rt.full_access_grants.list().await.len();
-    let active_cli_prompt_count = rt.active_cli_prompts.read().await.len();
+    let active_cli_prompt_count = rt.active_cli_prompts.len().await;
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
