@@ -190,6 +190,39 @@ function New-Fb2GoalAuditScenarioRequirement {
         -Missing $missing
 }
 
+function Resolve-Fb2GoalAuditNextMinimumAction {
+    param(
+        [bool]$FullFinalComplete,
+        [bool]$DataGoalComplete,
+        [object]$Status,
+        [object]$GoalGapAudit
+    )
+
+    if ($FullFinalComplete) {
+        return "goal_complete"
+    }
+    if (-not $DataGoalComplete) {
+        return "fix_missing_non_voice_requirements"
+    }
+
+    $livePreflight = Get-Fb2GoalAuditProperty $Status "live_preflight_request"
+    $livePreflightMissing = @((Get-Fb2GoalAuditProperty $livePreflight "missing" @()))
+    $tokenMissing = (
+        (@($livePreflightMissing) -contains "FB2_AI_CENTER_TOKEN") `
+            -or (@((Get-Fb2GoalAuditProperty $GoalGapAudit "missing" @())) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")
+    )
+    if ($tokenMissing) {
+        return "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
+    }
+
+    $gapNext = [string](Get-Fb2GoalAuditProperty $GoalGapAudit "next_smallest_action")
+    if (-not [string]::IsNullOrWhiteSpace($gapNext)) {
+        return $gapNext
+    }
+
+    return "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+}
+
 function Read-Fb2GoalAuditStatus {
     param([string]$Path)
 
@@ -367,13 +400,11 @@ function New-Fb2GoalAuditReport {
             voice_final_evidence_path_present = $voiceEvidencePresent
             missing_same_batch_full_final = $sameBatchFullFinalMissing
         }
-        next_minimum_action = if ($fullFinalComplete) {
-            "goal_complete"
-        } elseif ($dataGoalComplete) {
-            "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
-        } else {
-            "fix_missing_non_voice_requirements"
-        }
+        next_minimum_action = Resolve-Fb2GoalAuditNextMinimumAction `
+            -FullFinalComplete $fullFinalComplete `
+            -DataGoalComplete $dataGoalComplete `
+            -Status $Status `
+            -GoalGapAudit $gap
     }
 }
 
@@ -499,8 +530,13 @@ function Invoke-Fb2GoalAuditSelfTest {
             }
         }
         goal_gap_audit = [pscustomobject]@{
-            missing = @("full_final_acceptance_same_batch_voice_and_visible_chat")
+            missing = @("FB2_AI_CENTER_TOKEN_live_permission_quality_refresh", "full_final_acceptance_same_batch_voice_and_visible_chat")
             deferred_by_user = @("ASR_TTS_final_evidence")
+            next_smallest_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
+        }
+        live_preflight_request = [pscustomobject]@{
+            missing = @("FB2_AI_CENTER_TOKEN")
+            ready_without_token = $true
         }
     }
 
@@ -509,6 +545,7 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ($report.schema -ne "fb2.main_project.goal_audit_report.v1") { $failed++ }
     if (-not [bool]$report.data_goal_complete) { $failed++ }
     if ([bool]$report.full_final_complete) { $failed++ }
+    if ($report.next_minimum_action -ne "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly") { $failed++ }
     if (-not (@($report.deferred_requirements) -contains "voice_final_evidence")) { $failed++ }
     if (@($report.missing_non_voice_requirements).Count -ne 0) { $failed++ }
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "domain_context_index_contract")) { $failed++ }
