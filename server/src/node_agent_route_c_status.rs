@@ -69,6 +69,11 @@ mod tests {
             &json!({"ready": false})
         ));
         assert!(!server_runtime_ready_from_status_value(&json!({
+            "ready": false,
+            "status": "disabled",
+            "policy": {"enabled": false}
+        })));
+        assert!(!server_runtime_ready_from_status_value(&json!({
             "status": "ready"
         })));
     }

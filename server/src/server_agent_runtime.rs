@@ -19,6 +19,7 @@ use crate::{
         ServerRuntimeProtectionStatus,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
+    server_agent_runtime_policy::ServerAgentRuntimePolicy,
     types::{AgentConfig, AppState},
 };
 
@@ -36,6 +37,7 @@ struct ServerAgentRuntimeStatus {
     agent: Option<ServerAgentRuntimeAgentStatus>,
     limits: ServerAgentRuntimeLimits,
     protection: ServerRuntimeProtectionStatus,
+    policy: ServerAgentRuntimePolicy,
     admission: ServerRuntimeAdmissionSnapshot,
 }
 
@@ -54,6 +56,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
     };
 
     let limits = ServerAgentRuntimeLimits::current();
+    let policy = ServerAgentRuntimePolicy::current();
     let agent = resolve_server_runtime_agent(&state, None)
         .await
         .map(|agent| {
@@ -64,13 +67,20 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
                 usage_mode,
             }
         });
-    let ready = agent.is_some();
+    let ready = policy.enabled && agent.is_some();
     Json(ServerAgentRuntimeStatus {
         ready,
-        status: if ready { "ready" } else { "unavailable" },
+        status: if !policy.enabled {
+            "disabled"
+        } else if ready {
+            "ready"
+        } else {
+            "unavailable"
+        },
         agent,
         limits,
         protection: protection_status(),
+        policy,
         admission: admission_snapshot(&user.id, limits),
     })
     .into_response()
@@ -85,6 +95,21 @@ pub async fn chat_handler(
         Ok(user) => user,
         Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
     };
+
+    let policy = ServerAgentRuntimePolicy::current();
+    if !policy.enabled {
+        tracing::warn!(
+            target: "server_agent_runtime",
+            user_id = %user.id,
+            source = policy.source,
+            reason = policy.reason.as_deref().unwrap_or("operator_disabled"),
+            "pc_server_runtime request rejected by runtime policy"
+        );
+        return json_error(
+            StatusCode::SERVICE_UNAVAILABLE,
+            policy.public_disabled_message(),
+        );
+    }
 
     let limits = ServerAgentRuntimeLimits::current();
     if let Err(message) = validate_runtime_messages(&req.messages) {
@@ -220,6 +245,9 @@ mod tests {
         assert!(protection.input_validation.contains("total_chars"));
         assert!(protection.input_validation.contains("message_chars"));
         assert!(protection.admission_control.contains("global"));
+        assert!(protection
+            .operational_switch
+            .contains("ELON_SERVER_AGENT_RUNTIME_ENABLED"));
         assert!(protection.billing_gate.contains("call_chat_llm"));
         assert!(protection.request_fingerprint.contains("sha256"));
     }
