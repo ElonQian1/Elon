@@ -45,6 +45,7 @@
 - 设置 `FB2_AI_CENTER_TOKEN` 后，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality` 能验证 fb2 `/context/quality-summary`：`missing_context_rate`、`wrong_context_rate`、`citation_unmatched_rate` 不超过阈值，`large_context_pack_rate` 不超过预算阈值。
 - 需要验证自动反馈闭环时，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339>` 必须确认最近反馈样本存在，且 `matched_cited_source_count` 达到门槛、`unmatched_cited_source_count=0`。
 - 需要验证权限边界时，加 `-CheckPermissionBoundaries -ExternalUserId <fb2_user_uuid>`；脚本会确认缺当前用户头的 Context Pack、缺 platform scope 的平台摘要、缺当前用户头的用户订单工具均返回 403，并读取 `/context/permission-summary` 确认审计计数。
+- 修改最终验收 wrapper 或文档映射后，先跑 `scripts\smoke-fb2-final-acceptance.ps1 -SelfTest`；该命令只验证离线合成日志的 feedback coverage、子脚本 exit code、voice/quality/permission evidence 摘录和 `success` 门槛，不需要 token，也不会发送群消息。
 - 获得明确授权后，`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages` 能发送真实群聊 `@EL` 消息、调用 selected-message `/ai-reply`，并等到 `usr_elon_ai`/`gai_*` 回复；没有 `-AllowVisibleMessages` 时脚本必须拒绝写群。
 - 可见群聊 smoke 不只检查消息 ID。`@EL` 和 selected-message 两类回复正文都必须包含来源标记、事实/观点/推断分层词、风险或不保证边界，且不得出现“肯定命中/稳赢/重注/包赢”等投注保证；selected-message 回复还必须明确反驳被测消息里的“肯定赢盘、重注”说法。
 - 只抽样总结帖入口时，可运行 `scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage`；该脚本必须检查 summary 正文策略，有 `FB2_AI_CENTER_TOKEN` 时还必须等到 `trigger=group_summary_post` 的 fb2 feedback。
@@ -165,6 +166,6 @@
 当前可见群聊脚本：
 
 - `scripts/smoke-fb2-visible-chat.ps1` 是有副作用 smoke，只能在明确授权后传 `-AllowVisibleMessages`。
-- `scripts/smoke-fb2-final-acceptance.ps1` 是最终总验收入口；无副作用阶段传 `-PreflightOnly`，可见验收阶段传 `-AllowVisibleMessages`。两种模式都必须提供 `FB2_AI_CENTER_TOKEN` 和 `finalAcceptanceReady=true` 的真机语音证据；`ExternalUserId` 可由 `-Fb2Username/-Fb2Password` 自动解析，只有无法解析时才需要手工传。
+- `scripts/smoke-fb2-final-acceptance.ps1` 是最终总验收入口；本地 wrapper 回归传 `-SelfTest`，无副作用 live 阶段传 `-PreflightOnly`，可见验收阶段传 `-AllowVisibleMessages`。除 `-SelfTest` 外，其它两种模式都必须提供 `FB2_AI_CENTER_TOKEN` 和 `finalAcceptanceReady=true` 的真机语音证据；`ExternalUserId` 可由 `-Fb2Username/-Fb2Password` 自动解析，只有无法解析时才需要手工传。
 - 脚本支持直接用 fb2 用户账号桥接主项目 session，也支持传 `ELON_MAIN_TOKEN`。
 - 验证通过不等于 APK UI 已通过；APK UI 仍需真机确认长按菜单和消息刷新显示。

@@ -26,7 +26,7 @@
 ## 当前重点
 
 - 无 token 的 smoke 只能证明主项目契约和 live manifest 可读，不能证明最终完成。
-- `-FinalAcceptance` 必须同时具备主项目登录、`FB2_AI_CENTER_TOKEN`、fb2 live 数据、质量反馈样本、fb2 APK 发布检查、主项目语音 SDK 构建和 fb2 真机语音证据。
+- `-FinalAcceptance` 必须同时具备主项目登录、`FB2_AI_CENTER_TOKEN`、fb2 live 数据、质量反馈样本、fb2 APK 发布检查、主项目语音 SDK 构建和 fb2 真机语音证据；只有 `-SelfTest` 例外，它只验证 wrapper 本地解析逻辑。
 - `scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly` 是进入真实群聊前的无副作用强门禁，必须先验证 fb2 live 数据、六类标准场景、平台匿名摘要、权限负向审计、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip。
 - `final-acceptance-matrix.md` 是终极目标完成审计入口；任何会话要宣布完成前，必须逐项对照矩阵拿到当前证据。
 - 真机语音证据必须使用 `docs/fb2-ai-center/voice-device-evidence.example.json` 同格式回传，不能只用口头描述。
@@ -42,7 +42,9 @@
 ## 验证命令
 
 ```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1
+# 预期失败：example 证据是格式模板，artifact ref 是占位，finalAcceptanceReady=false
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence.example.json
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -FinalAcceptance -Fb2Username 123qwe -Fb2Password 123qwe -Fb2Token <FB2_AI_CENTER_TOKEN> -ExternalUserId <fb2_user_uuid_with_orders> -VoiceDeviceEvidencePath <real-device-evidence.json>
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe
@@ -57,3 +59,5 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind C
 - 脚本/文档改动回滚对应 commit 即可。
 - 后端运行代码若发布后异常，按项目发布脚本回滚到上一稳定 SHA。
 - 不把 fb2 业务数据复制进主项目；出现数据错配先修 fb2 Context Pack 或 token/base_url，不让主项目编造。
+- 如果最终验收 wrapper 的 `feedback_coverage` 判断异常，先跑 `-SelfTest` 复现本地解析问题，再决定是否修改真实群聊 smoke。
+- `-SelfTest` 还会检查 voice/quality/permission 的合成 OK 行是否能进入 `final_acceptance_evidence`，如果某个子脚本 check name 改动导致 summary 字段变空，应先同步 wrapper 映射和文档。

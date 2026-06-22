@@ -23,6 +23,7 @@ param(
     [double]$MaxCitationUnmatchedRate = 0,
     [double]$MaxMissingContextRate = 0,
     [double]$MaxWrongContextRate = 0,
+    [switch]$SelfTest,
     [switch]$PreflightOnly,
     [switch]$AllowVisibleMessages
 )
@@ -301,6 +302,162 @@ function Build-VisibleAnswerEvidence {
         summary_post_risk_boundary = Find-CheckDetail $Lines "summary-post includes risk boundary"
         summary_post_no_guarantee = Find-CheckDetail $Lines "summary-post avoids betting guarantees"
     }
+}
+
+function Invoke-FinalAcceptanceSelfTest {
+    function Assert-SelfTest {
+        param(
+            [bool]$Condition,
+            [string]$Name,
+            [string]$Detail = ""
+        )
+        if ($Condition) {
+            if ($Detail) {
+                Write-Output "OK`tself-test $Name`t$Detail"
+            } else {
+                Write-Output "OK`tself-test $Name"
+            }
+        } else {
+            $script:SelfTestFailed += 1
+            if ($Detail) {
+                Write-Output "FAIL`tself-test $Name`t$Detail"
+            } else {
+                Write-Output "FAIL`tself-test $Name"
+            }
+        }
+    }
+
+    $script:SelfTestFailed = 0
+
+    $completeLines = @(
+        "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
+        "OK`tselected-message AI回复 fb2 feedback`tsocial_group_selected_message:gai_selected feedback=fb_selected",
+        "OK`tsummary-post fb2 feedback`tsocial_group_summary_post:gsp_summary feedback=fb_summary",
+        "OK`tvisible @EL reply text present`tlen=120"
+    )
+    $completeEvidence = @(Find-FeedbackEvidence $completeLines)
+    $completeCoverage = Build-FeedbackCoverage $completeEvidence
+    Assert-SelfTest ($completeEvidence.Count -eq 3) "feedback evidence parses three required entries" "count=$($completeEvidence.Count)"
+    Assert-SelfTest ([bool]$completeCoverage["complete"]) "feedback coverage complete when all entries are present"
+    Assert-SelfTest ([bool]$completeCoverage["visible_mention"]) "visible mention feedback covered"
+    Assert-SelfTest ([bool]$completeCoverage["selected_message"]) "selected-message feedback covered"
+    Assert-SelfTest ([bool]$completeCoverage["summary_post"]) "summary-post feedback covered"
+    Assert-SelfTest ([int]$completeCoverage["observed_count"] -eq 3) "feedback observed count ignores unrelated OK lines" "observed=$($completeCoverage["observed_count"])"
+
+    $missingSummaryLines = @(
+        "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
+        "OK`tselected-message AI回复 fb2 feedback`tsocial_group_selected_message:gai_selected feedback=fb_selected"
+    )
+    $missingSummaryCoverage = Build-FeedbackCoverage @(Find-FeedbackEvidence $missingSummaryLines)
+    Assert-SelfTest (-not [bool]$missingSummaryCoverage["complete"]) "feedback coverage incomplete when summary feedback is missing"
+    Assert-SelfTest (@($missingSummaryCoverage["missing_required"]) -contains "summary-post fb2 feedback") "missing summary feedback is reported" ($missingSummaryCoverage["missing_required"] -join ",")
+
+    $missingVisibleLines = @(
+        "OK`tselected-message AI回复 fb2 feedback`tsocial_group_selected_message:gai_selected feedback=fb_selected",
+        "OK`tsummary-post fb2 feedback`tsocial_group_summary_post:gsp_summary feedback=fb_summary"
+    )
+    $missingVisibleCoverage = Build-FeedbackCoverage @(Find-FeedbackEvidence $missingVisibleLines)
+    Assert-SelfTest (-not [bool]$missingVisibleCoverage["complete"]) "feedback coverage incomplete when visible feedback is missing"
+    Assert-SelfTest (@($missingVisibleCoverage["missing_required"]) -contains "visible @EL fb2 feedback") "missing visible feedback is reported" ($missingVisibleCoverage["missing_required"] -join ",")
+
+    $missingSelectedLines = @(
+        "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
+        "OK`tsummary-post fb2 feedback`tsocial_group_summary_post:gsp_summary feedback=fb_summary"
+    )
+    $missingSelectedCoverage = Build-FeedbackCoverage @(Find-FeedbackEvidence $missingSelectedLines)
+    Assert-SelfTest (-not [bool]$missingSelectedCoverage["complete"]) "feedback coverage incomplete when selected-message feedback is missing"
+    Assert-SelfTest (@($missingSelectedCoverage["missing_required"]) -contains "selected-message AI回复 fb2 feedback") "missing selected-message feedback is reported" ($missingSelectedCoverage["missing_required"] -join ",")
+
+    $noisyLines = @(
+        "FAIL`tvisible @EL fb2 feedback`tsocial_group_message:gai_bad feedback=fb_bad",
+        "OK`tvisible @EL reply text present`tlen=120",
+        "SKIP`tsummary-post fb2 feedback`tno token",
+        "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback_id=fb_visible"
+    )
+    $noisyEvidence = @(Find-FeedbackEvidence $noisyLines)
+    Assert-SelfTest ($noisyEvidence.Count -eq 0) "feedback parser ignores non-OK and non-feedback lines" "count=$($noisyEvidence.Count)"
+
+    $completeSuccess = ($true -and $true -and [bool]$completeCoverage["complete"])
+    $missingSuccess = ($true -and $true -and [bool]$missingSummaryCoverage["complete"])
+    $visibleFailedSuccess = ($false -and $true -and [bool]$completeCoverage["complete"])
+    $centerFailedSuccess = ($true -and $false -and [bool]$completeCoverage["complete"])
+    Assert-SelfTest $completeSuccess "final success allows complete feedback coverage"
+    Assert-SelfTest (-not $missingSuccess) "final success rejects missing feedback coverage"
+    Assert-SelfTest (-not $visibleFailedSuccess) "final success rejects visible smoke failure"
+    Assert-SelfTest (-not $centerFailedSuccess) "final success rejects final acceptance failure"
+
+    $centerLines = @(
+        "OK`tmain version`t0.3.592 abcdef",
+        "OK`tlive manifest ready`ttool_count=30",
+        "OK`tfb2 APK version present`t1.1.48 code=96",
+        "OK`tlocal voice SDK build`t:chat-voice-kit:assembleDebug",
+        "OK`tvoice evidence schema`tfb2.voice_device_evidence.v1",
+        "OK`tvoice evidence final ready`tfinalAcceptanceReady=True",
+        "OK`tvoice evidence device model`tXiaomi 23116PN5BC",
+        "OK`tvoice evidence APK version`t1.1.48",
+        "OK`tvoice evidence uses VoiceComposerView`tusesVoiceComposerView=True",
+        "OK`tvoice evidence hold-to-talk`tholdToTalkButton=True",
+        "OK`tvoice evidence recording overlay`trecordingOverlay=True",
+        "OK`tvoice evidence slide cancel`tslideToCancel=True",
+        "OK`tvoice evidence too short`ttooShort=True",
+        "OK`tvoice evidence system ASR success`tsystemAsrSuccess=True",
+        "OK`tvoice evidence ASR timeout fallback`tsystemAsrTimeoutServerFallback=True",
+        "OK`tvoice evidence server ASR success`tserverAsrSuccess=True",
+        "OK`tvoice evidence server ASR failure recovery`tserverAsrFailureRecoversUi=True",
+        "OK`tvoice evidence TTS playback`tttsPlayback=True",
+        "OK`tvoice evidence ASR/TTS free`tasrTtsFreeWithZeroAiBalance=True",
+        "OK`tvoice evidence artifact refs complete`tvalid=2 count=2",
+        "OK`tvoice evidence artifact logcat`tlogcat,screenshot",
+        "OK`tvoice evidence artifact visual`tlogcat,screenshot",
+        "OK`tscenario: today matches context audit`taudit_today",
+        "OK`tscenario: my ticket context audit`taudit_ticket",
+        "OK`tscenario: my ticket has user orders`tcount=1 min=1",
+        "OK`tscenario: platform order has summary data`tcount=1 min=1",
+        "OK`tpermission summary total blocks`tvalue=3",
+        "OK`tpermission summary user blocks`tvalue=2",
+        "OK`tpermission summary platform blocks`tvalue=1",
+        "OK`tquality feedback count`tvalue=3 min=3",
+        "OK`tquality matched cited sources`tvalue=3 min=3",
+        "OK`tquality unmatched cited sources`tvalue=0",
+        "OK`tquality missing context count`tvalue=0",
+        "OK`tquality wrong context count`tvalue=0"
+    )
+    $centerEvidence = Build-AiCenterEvidence $centerLines
+    foreach ($key in @(
+        "main_version",
+        "live_manifest_ready",
+        "fb2_apk_version",
+        "local_voice_sdk_build",
+        "voice_evidence_final_ready",
+        "voice_evidence_artifact_refs_complete",
+        "voice_evidence_artifact_logcat",
+        "voice_evidence_artifact_visual",
+        "scenario_today_context_audit",
+        "scenario_my_ticket_context_audit",
+        "scenario_platform_order_summary",
+        "permission_total_blocks",
+        "permission_user_blocks",
+        "permission_platform_blocks",
+        "quality_feedback_count",
+        "quality_matched_cited_sources",
+        "quality_unmatched_cited_sources",
+        "quality_missing_context_count",
+        "quality_wrong_context_count"
+    )) {
+        Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$centerEvidence[$key])) "ai-center evidence maps $key" ([string]$centerEvidence[$key])
+    }
+
+    $failed = $script:SelfTestFailed
+    Write-Output "== SelfTest Summary =="
+    Write-Output "failed=$failed"
+    if ($failed -gt 0) {
+        exit 1
+    }
+    exit 0
+}
+
+if ($SelfTest) {
+    Invoke-FinalAcceptanceSelfTest
 }
 
 if ($PreflightOnly -and $AllowVisibleMessages) {
