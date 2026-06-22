@@ -13,7 +13,7 @@ use crate::{
     project_mobile::ensure_mobile_project,
     project_storage, project_workspace_provision,
     project_ws_session::handle_project_ws,
-    store::is_system_project_source_type,
+    store::{is_system_project_source_type, ProjectDevProfile},
     types::AppState,
     user_archive_profile::build_user_archive_project_response,
 };
@@ -56,6 +56,8 @@ pub struct RegisterExternalProjectRequest {
     pub join_mode: Option<String>,
     /// 可选：PC node-agent 从项目根目录 `.elon/project-landing.json` 读取到的项目首页快照。
     pub landing: Option<serde_json::Value>,
+    /// 可选：PC node-agent 从项目根目录自动识别到的运行/测试/构建命令。
+    pub dev_profile: Option<ProjectDevProfile>,
 }
 
 #[derive(Deserialize)]
@@ -452,6 +454,32 @@ pub async fn register_external_project(
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
 
+    let dev_profile = match req.dev_profile.as_ref() {
+        Some(profile) => match state.store.upsert_project_dev_profile(
+            &user.id,
+            &create_result.project.id,
+            profile,
+        ) {
+            Ok(profile) => profile,
+            Err(error) => {
+                return json_error(StatusCode::INTERNAL_SERVER_ERROR, error.to_string());
+            }
+        },
+        None => match state
+            .store
+            .get_project_dev_profile_for_user(&user.id, &create_result.project.id)
+        {
+            Ok(profile) => profile,
+            Err(error) => {
+                tracing::warn!(
+                    project_id = %create_result.project.id,
+                    "读取项目开发命令 profile 失败: {error}"
+                );
+                None
+            }
+        },
+    };
+
     let workspace_landing = if req.landing.is_none() && node_id.is_none() {
         project_landing::load_workspace_landing(std::path::Path::new(workspace_path))
     } else {
@@ -505,6 +533,7 @@ pub async fn register_external_project(
         "is_public": effective_is_public,
         "join_mode": if effective_is_public { effective_join_mode } else { "invite" },
         "landing": landing_snapshot,
+        "dev_profile": dev_profile,
     }))
     .into_response()
 }

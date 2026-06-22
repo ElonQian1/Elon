@@ -90,6 +90,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (60, "外部应用工具执行审计", migration_v60),
     (61, "普通新用户 AI 试用额度配置", migration_v61),
     (62, "停止默认加入联合项目并清理旧成员关系", migration_v62),
+    (63, "项目开发命令自动识别元数据", migration_v63),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2164,6 +2165,26 @@ fn migration_v61(conn: &Connection) -> Result<()> {
 fn migration_v62(conn: &Connection) -> Result<()> {
     crate::store::default_joint_projects::remove_legacy_default_joint_project_memberships_conn(
         conn,
+    )?;
+    Ok(())
+}
+
+fn migration_v63(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_dev_profiles (
+          project_id          TEXT PRIMARY KEY,
+          project_type        TEXT,
+          package_manager     TEXT,
+          run_command         TEXT,
+          test_command        TEXT,
+          build_command       TEXT,
+          detected_files_json TEXT NOT NULL DEFAULT '[]',
+          source              TEXT,
+          updated_at          TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE
+        );
+        "#,
     )?;
     Ok(())
 }

@@ -39,6 +39,7 @@ mod node_payout_tests;
 mod node_payouts;
 mod pc_project_binding;
 mod project_branding;
+mod project_dev_profiles;
 mod project_execution_sessions;
 mod project_identities;
 mod project_landing_snapshots;
@@ -81,6 +82,7 @@ pub use node_compute_runs::{
 };
 pub use node_ledger::{NodeBalance, NodeCredential, NodeTransaction, SettleParams};
 pub use node_payouts::CreateNodePayout;
+pub use project_dev_profiles::ProjectDevProfile;
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
 };

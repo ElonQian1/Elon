@@ -2904,6 +2904,7 @@ struct AdminRegisterReq {
     description: Option<String>,
     repo_url: Option<String>,
     branch: Option<String>,
+    dev_profile: Option<serde_json::Value>,
 }
 
 /// 本地管理页 → 注册外部本地项目到云端。
@@ -2990,6 +2991,7 @@ async fn admin_register_project(
         "repo_url": repo_url,
         "branch": branch,
         "landing": project_landing::load_workspace_landing(pb),
+        "dev_profile": req.dev_profile,
     });
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(15))

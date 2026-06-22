@@ -2629,7 +2629,25 @@
     els.settingsProjectRepo.value = repo;
     els.settingsProjectBranch.value = branch;
     if (desc && (pathChanged || !clean(els.settingsProjectDesc.value))) els.settingsProjectDesc.value = desc;
-    state.localProjectInfo = path ? { path, name, repo, branch, canRegister, missingFields } : null;
+    const detectedFiles = Array.isArray(project.detected_files)
+      ? project.detected_files.map(clean).filter(Boolean)
+      : [];
+    const devProfile = {
+      project_type: clean(project.project_type) || null,
+      package_manager: clean(project.package_manager) || null,
+      run_command: clean(project.run_command) || null,
+      test_command: clean(project.test_command) || null,
+      build_command: clean(project.build_command) || null,
+      detected_files: detectedFiles,
+      source: 'node_agent_project_picker'
+    };
+    const hasDevProfile = Boolean(
+      devProfile.project_type || devProfile.package_manager || devProfile.run_command ||
+      devProfile.test_command || devProfile.build_command || detectedFiles.length
+    );
+    state.localProjectInfo = path
+      ? { path, name, repo, branch, canRegister, missingFields, devProfile: hasDevProfile ? devProfile : null }
+      : null;
     const git = inspect.is_git_worktree || project.is_git_worktree
       ? [branch || 'HEAD', clean(project.git_head || inspect.git_head), (project.has_uncommitted_changes || inspect.has_uncommitted_changes) ? '有未提交改动' : '干净']
         .filter(Boolean).join(' · ')
@@ -2641,9 +2659,7 @@
       clean(project.test_command) && `测试 ${clean(project.test_command)}`,
       clean(project.build_command) && `构建 ${clean(project.build_command)}`
     ].filter(Boolean).join(' / ');
-    const detected = Array.isArray(project.detected_files)
-      ? project.detected_files.map(clean).filter(Boolean).slice(0, 4).join('、')
-      : '';
+    const detected = detectedFiles.slice(0, 4).join('、');
     if (!path) {
       els.settingsProjectMeta.textContent = '尚未选择项目目录';
       return;
@@ -2826,7 +2842,8 @@
           workspace_path: path,
           description: clean(els.settingsProjectDesc.value) || null,
           repo_url: clean(els.settingsProjectRepo.value) || null,
-          branch: clean(els.settingsProjectBranch.value) || null
+          branch: clean(els.settingsProjectBranch.value) || null,
+          dev_profile: (state.localProjectInfo && state.localProjectInfo.devProfile) || null
         })
       });
       const project = (data.cloud && data.cloud.project) || {};
