@@ -80,10 +80,33 @@ pub struct NodeDevRuntimeProfile {
     /// file and command execution local.
     #[serde(default)]
     pub server_runtime_ready: bool,
+    /// Route B/C share this local tool contract. Model calls may happen on the
+    /// PC or on the server, but file writes, patches, commands, approvals, and
+    /// workspace limits are enforced by the PC node.
+    #[serde(default)]
+    pub local_tool_contract: NodeDevRuntimeToolContract,
     #[serde(default)]
     pub toolchains: Vec<DevToolchainStatus>,
     #[serde(default)]
     pub issues: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct NodeDevRuntimeToolContract {
+    #[serde(default)]
+    pub routes: Vec<String>,
+    #[serde(default)]
+    pub supported_tools: Vec<String>,
+    #[serde(default)]
+    pub approval_required_tools: Vec<String>,
+    #[serde(default)]
+    pub path_policy: Option<String>,
+    #[serde(default)]
+    pub command_policy: Option<String>,
+    #[serde(default)]
+    pub audit_policy: Option<String>,
+    #[serde(default)]
+    pub recovery_policy: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

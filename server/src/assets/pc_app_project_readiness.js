@@ -33,6 +33,7 @@
             ${readinessRow('执行节点', info.nodeLabel)}
             ${readinessRow('运行路线', info.routeLabel)}
             ${readinessRow('可用 CLI', info.cliLabel)}
+            ${readinessRow('本机工具', info.toolContractLabel)}
           </div>
           <div class="dev-readiness-next">
             <span>下一步</span>
@@ -137,6 +138,7 @@
           nodeLabel: '未选择 PC 节点',
           routeLabel: '先绑定本地项目',
           cliLabel: '未检查',
+          toolContractLabel: '未上报',
           nextStep: nextStepForReadiness(checks)
         };
       }
@@ -154,6 +156,7 @@
           nodeLabel: shortNodeId(nodeId),
           routeLabel: '等待节点上线或授权',
           cliLabel: '未上报',
+          toolContractLabel: '未上报',
           nextStep: nextStepForReadiness(checks)
         };
       }
@@ -172,6 +175,7 @@
         nodeLabel: nodeLabel(node),
         routeLabel: route.label,
         cliLabel: cliLabel(node),
+        toolContractLabel: localToolContractLabel(node),
         nextStep: nextStepForReadiness(checks)
       };
     }
@@ -286,6 +290,31 @@
     function cliLabel(node) {
       const clis = normalizedClis(node);
       return clis.length ? clis.join(' / ') : '未连接本机 CLI';
+    }
+
+    function localToolContract(node) {
+      const runtime = (node && (node.dev_runtime || node.devRuntime)) || {};
+      return (runtime.local_tool_contract || runtime.localToolContract) || {};
+    }
+
+    function localToolContractLabel(node) {
+      const contract = localToolContract(node);
+      const supported = arrayStrings(contract.supported_tools || contract.supportedTools);
+      if (!supported.length) return '未上报';
+      const core = ['read_file_range', 'apply_patch', 'run_command']
+        .filter((tool) => supported.includes(tool));
+      const approvals = arrayStrings(contract.approval_required_tools || contract.approvalRequiredTools);
+      const approvalCore = approvals.filter((tool) => ['write_file', 'apply_patch', 'run_command'].includes(tool));
+      const approvalText = approvalCore.length
+        ? `${approvalCore.join('/')} 需确认`
+        : '审批策略未上报';
+      return `${(core.length ? core : supported.slice(0, 3)).join(' / ')} · ${approvalText}`;
+    }
+
+    function arrayStrings(value) {
+      return Array.isArray(value)
+        ? value.map((item) => clean(item)).filter(Boolean)
+        : [];
     }
 
     function nodeLabel(node) {

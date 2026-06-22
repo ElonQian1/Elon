@@ -768,7 +768,19 @@ function testProjectReadinessChecklist() {
   });
 
   const readyState = {
-    nodes: [{ node_id: 'node-1', online: true, route_a_ready: true, allowed_clis: ['codex'], device_name: 'PC' }],
+    nodes: [{
+      node_id: 'node-1',
+      online: true,
+      route_a_ready: true,
+      allowed_clis: ['codex'],
+      device_name: 'PC',
+      dev_runtime: {
+        local_tool_contract: {
+          supported_tools: ['list_dir', 'read_file', 'read_file_range', 'write_file', 'apply_patch', 'run_command'],
+          approval_required_tools: ['write_file', 'apply_patch', 'run_command']
+        }
+      }
+    }],
     projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
   };
   const readyHtml = create(readyState).renderMemberPanel({
@@ -781,6 +793,10 @@ function testProjectReadinessChecklist() {
   assert.ok(readyHtml.includes('可以开发'), 'ready project should be marked developable');
   assert.ok(readyHtml.includes('AI 开发频道可用'), 'ready checklist should include development channel');
   assert.ok(readyHtml.includes('Route A · codex'), 'ready checklist should show selected route');
+  assert.ok(readyHtml.includes('read_file_range'), 'readiness should expose Route B/C file-range tool contract');
+  assert.ok(readyHtml.includes('apply_patch'), 'readiness should expose Route B/C patch tool contract');
+  assert.ok(readyHtml.includes('run_command'), 'readiness should expose Route B/C command tool contract');
+  assert.ok(readyHtml.includes('需确认'), 'readiness should expose approval-required tools');
 
   const fullAccessHtml = create(readyState).renderMemberPanel({
     id: 'p1',

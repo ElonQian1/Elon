@@ -1,5 +1,5 @@
 use crate::{command_probe, workspace_root};
-use homecli_proto::{DevToolchainStatus, NodeDevRuntimeProfile};
+use homecli_proto::{DevToolchainStatus, NodeDevRuntimeProfile, NodeDevRuntimeToolContract};
 use std::{
     path::PathBuf,
     process::{Output, Stdio},
@@ -74,6 +74,7 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
         route_a_ready,
         api_runtime_ready,
         server_runtime_ready,
+        local_tool_contract: local_tool_contract(),
         toolchains: vec![
             git,
             java,
@@ -89,6 +90,32 @@ pub fn collect_dev_runtime_profile_with_server_runtime(
             copilot,
         ],
         issues,
+    }
+}
+
+fn local_tool_contract() -> NodeDevRuntimeToolContract {
+    NodeDevRuntimeToolContract {
+        routes: vec![
+            "route_b_api_runtime".to_string(),
+            "route_c_server_runtime".to_string(),
+        ],
+        supported_tools: vec![
+            "list_dir".to_string(),
+            "read_file".to_string(),
+            "read_file_range".to_string(),
+            "write_file".to_string(),
+            "apply_patch".to_string(),
+            "run_command".to_string(),
+        ],
+        approval_required_tools: vec![
+            "write_file".to_string(),
+            "apply_patch".to_string(),
+            "run_command".to_string(),
+        ],
+        path_policy: Some("workspace_relative_no_git_no_symlink_escape".to_string()),
+        command_policy: Some("structured_project_command_allowlist".to_string()),
+        audit_policy: Some("tool_events_redact_content_and_secrets".to_string()),
+        recovery_policy: Some("task_journal_replay_without_original_tty_reattach".to_string()),
     }
 }
 
@@ -140,7 +167,7 @@ fn env_present(key: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{api_runtime_available_from_lookup, route_a_cli_ready};
+    use super::{api_runtime_available_from_lookup, local_tool_contract, route_a_cli_ready};
     use homecli_proto::DevToolchainStatus;
 
     #[test]
@@ -172,6 +199,35 @@ mod tests {
 
         let ready_codex = tool("codex", true);
         assert!(route_a_cli_ready(&allowed, &[&ready_codex]));
+    }
+
+    #[test]
+    fn local_tool_contract_exposes_route_b_c_guardrails() {
+        let contract = local_tool_contract();
+
+        assert!(contract
+            .routes
+            .contains(&"route_b_api_runtime".to_string()));
+        assert!(contract
+            .routes
+            .contains(&"route_c_server_runtime".to_string()));
+        assert!(contract.supported_tools.contains(&"apply_patch".to_string()));
+        assert!(contract
+            .supported_tools
+            .contains(&"read_file_range".to_string()));
+        assert!(contract
+            .approval_required_tools
+            .contains(&"run_command".to_string()));
+        assert!(contract
+            .path_policy
+            .as_deref()
+            .unwrap_or_default()
+            .contains("workspace_relative"));
+        assert!(contract
+            .recovery_policy
+            .as_deref()
+            .unwrap_or_default()
+            .contains("without_original_tty"));
     }
 
     fn tool(name: &str, available: bool) -> DevToolchainStatus {

@@ -257,7 +257,7 @@ where
         initial_model,
     } = options;
     let mut messages = vec![
-        json!({"role": "system", "content": system_prompt(guard.read_only())}),
+        json!({"role": "system", "content": system_prompt(label, guard.read_only())}),
         json!({"role": "user", "content": prompt}),
     ];
 
@@ -531,7 +531,7 @@ where
 
     Ok(ServerRuntimeRunResult {
         exit_ok: false,
-        error: Some(format!("server-runtime 超过 {MAX_TURNS} 轮仍未完成")),
+        error: Some(format!("{label} 超过 {MAX_TURNS} 轮仍未完成")),
         model: model.or_else(|| Some(label.to_string())),
         prompt_tokens: usage.prompt_tokens,
         completion_tokens: usage.completion_tokens,
@@ -553,8 +553,13 @@ fn resolve_workspace(cwd: Option<&str>) -> Result<PathBuf> {
     Ok(full)
 }
 
-fn system_prompt(read_only: bool) -> String {
-    let mut prompt = r#"You are the Elon Route C server runtime for a Windows PC project.
+fn system_prompt(label: &str, read_only: bool) -> String {
+    let runtime_identity = match label {
+        "api-runtime" => "Route B local API runtime",
+        "server-runtime" => "Route C server runtime",
+        _ => "local agent runtime",
+    };
+    let mut prompt = r#"You are the Elon {{runtime_identity}} for a Windows PC project.
 Return strict JSON only, without markdown fences.
 
 Schema:
@@ -582,7 +587,7 @@ Rules:
 - Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
 - Set done=true when no further tool action is needed.
 "#
-    .to_string();
+    .replace("{{runtime_identity}}", runtime_identity);
     if read_only {
         prompt.push_str(
             "\nCurrent mode is read-only planning. Do not request write_file, apply_patch, or run_command.\n",
@@ -737,7 +742,9 @@ impl RuntimeUsage {
 
 #[cfg(test)]
 mod tests {
-    use super::{api_runtime_config_from_lookup, run_runtime_loop, RuntimeLoopOptions};
+    use super::{
+        api_runtime_config_from_lookup, run_runtime_loop, system_prompt, RuntimeLoopOptions,
+    };
     use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
     use homecli_proto::AgentToServer;
     use serde_json::{json, Value};
@@ -785,6 +792,18 @@ mod tests {
         assert_eq!(config.api_base, "https://example.test/v1");
         assert_eq!(config.api_key, "elon-key");
         assert_eq!(config.model, "custom-model");
+    }
+
+    #[test]
+    fn system_prompt_matches_runtime_route_identity() {
+        let route_b = system_prompt("api-runtime", false);
+        let route_c = system_prompt("server-runtime", true);
+
+        assert!(route_b.contains("Route B local API runtime"));
+        assert!(!route_b.contains("Route C server runtime for"));
+        assert!(route_c.contains("Route C server runtime"));
+        assert!(route_c.contains("read-only planning"));
+        assert!(route_c.contains("Do not request write_file, apply_patch, or run_command"));
     }
 
     #[tokio::test]
