@@ -213,6 +213,9 @@
       if (event.type === 'runtime_status') {
         return renderRuntimeStatusEvent(message, context, event);
       }
+      if (event.type === 'runtime_summary') {
+        return renderRuntimeSummaryEvent(message, context, event);
+      }
       if (event.type === 'tool_approval_required') {
         return renderToolApproval(message, context, event);
       }
@@ -265,6 +268,32 @@
         canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task)
       });
     }
+
+    function renderRuntimeSummaryEvent(message, context, event) {
+      const taskId = taskIdOf(message);
+      const task = taskId ? context.tasks.get(taskId) : null;
+      const runtime = clean(event.runtime) || 'runtime';
+      const total = Number(event.total_tools || event.totalTools || 0) || 0;
+      const failed = Number(event.failed_tools || event.failedTools || 0) || 0;
+      const status = clean(event.status).toLowerCase();
+      const ok = failed === 0 && status !== 'error' && status !== 'failed';
+      const turn = Number(event.turn) > 0 ? `第 ${Number(event.turn)} 轮` : '运行结束';
+      const body = [
+        clean(event.message) || (ok ? '运行已完成。' : '运行结束，但存在失败工具。'),
+        `工具调用 ${total} 个，失败 ${failed} 个。`
+      ].join('\n');
+      return cardHtml({
+        tone: ok ? 'done' : 'failed',
+        eyebrow: '执行摘要',
+        title: ok ? 'Runtime 已完成' : 'Runtime 有失败工具',
+        body,
+        taskId,
+        meta: `${runtime} · ${turn}`,
+        actions: true,
+        canCancel: !!taskId && !taskIsTerminal(task) && !taskNeedsSnapshotContinue(task)
+      });
+    }
+
 
     function renderToolApproval(message, context, event) {
       const taskId = taskIdOf(message);
@@ -417,8 +446,8 @@
       try {
         const event = JSON.parse(text);
         const type = clean(event && event.type);
-        if (!['runtime_status', 'tool_call', 'tool_result', 'tool_approval_required', 'tool_approval_decision'].includes(type)) return null;
-        if (type === 'runtime_status') return event;
+        if (!['runtime_status', 'runtime_summary', 'tool_call', 'tool_result', 'tool_approval_required', 'tool_approval_decision'].includes(type)) return null;
+        if (type === 'runtime_status' || type === 'runtime_summary') return event;
         if (!clean(event.tool)) return null;
         return event;
       } catch (_) {

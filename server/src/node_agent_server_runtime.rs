@@ -6,9 +6,9 @@ use crate::{
         requires_tool_approval, wait_for_tool_approval, ApprovalOutcome,
     },
     node_agent_runtime_events::{
-        runtime_status_chunk, tool_approval_decision_chunk, tool_approval_id,
-        tool_approval_required_chunk, tool_approval_required_chunk_with_diff, tool_call_chunk,
-        tool_name, tool_result_chunk,
+        runtime_status_chunk, runtime_summary_chunk, tool_approval_decision_chunk,
+        tool_approval_id, tool_approval_required_chunk, tool_approval_required_chunk_with_diff,
+        tool_call_chunk, tool_name, tool_result_chunk,
     },
     node_agent_task_journal::TaskJournal,
     node_agent_tool_approval::ToolApprovalState,
@@ -265,6 +265,8 @@ where
 
     let mut usage = RuntimeUsage::default();
     let mut model = initial_model;
+    let mut total_tools = 0usize;
+    let mut failed_tools = 0usize;
     for turn in 1..=MAX_TURNS {
         if *cancel_rx.borrow() {
             return Ok(canceled_runtime_result(label, model, &usage));
@@ -337,6 +339,17 @@ where
                     "没有更多工具动作，任务完成",
                 ),
             );
+            send_runtime_summary(
+                &out_tx,
+                task_journal.as_ref(),
+                req_id,
+                label,
+                turn,
+                "ok",
+                total_tools,
+                failed_tools,
+                "任务完成",
+            );
             return Ok(ServerRuntimeRunResult {
                 exit_ok: true,
                 error: None,
@@ -366,10 +379,13 @@ where
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
-                        results.push(json!({
-                            "tool": tool,
-                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
-                        }));
+                        record_tool_result(
+                            &mut results,
+                            &mut total_tools,
+                            &mut failed_tools,
+                            &tool,
+                            &result,
+                        );
                         continue;
                     }
                 };
@@ -384,10 +400,13 @@ where
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
-                        results.push(json!({
-                            "tool": tool,
-                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
-                        }));
+                        record_tool_result(
+                            &mut results,
+                            &mut total_tools,
+                            &mut failed_tools,
+                            &tool,
+                            &result,
+                        );
                         continue;
                     }
                 };
@@ -465,10 +484,13 @@ where
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
-                        results.push(json!({
-                            "tool": tool,
-                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
-                        }));
+                        record_tool_result(
+                            &mut results,
+                            &mut total_tools,
+                            &mut failed_tools,
+                            &tool,
+                            &result,
+                        );
                         continue;
                     }
                     ApprovalOutcome::TimedOut => {
@@ -494,10 +516,13 @@ where
                             req_id,
                             tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                         );
-                        results.push(json!({
-                            "tool": tool,
-                            "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
-                        }));
+                        record_tool_result(
+                            &mut results,
+                            &mut total_tools,
+                            &mut failed_tools,
+                            &tool,
+                            &result,
+                        );
                         continue;
                     }
                     ApprovalOutcome::Canceled => {
@@ -519,10 +544,13 @@ where
                         req_id,
                         tool_result_chunk(req_id, turn, tool_index, &tool, &result),
                     );
-                    results.push(json!({
-                        "tool": tool,
-                        "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
-                    }));
+                    record_tool_result(
+                        &mut results,
+                        &mut total_tools,
+                        &mut failed_tools,
+                        &tool,
+                        &result,
+                    );
                     continue;
                 }
             }
@@ -539,10 +567,13 @@ where
                 req_id,
                 tool_result_chunk(req_id, turn, tool_index, &tool, &result),
             );
-            results.push(json!({
-                "tool": tool,
-                "result": truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
-            }));
+            record_tool_result(
+                &mut results,
+                &mut total_tools,
+                &mut failed_tools,
+                &tool,
+                &result,
+            );
         }
         messages.push(json!({
             "role": "user",
@@ -555,6 +586,17 @@ where
                 task_journal.as_ref(),
                 req_id,
                 runtime_status_chunk(req_id, turn, label, "completed", "工具结果已处理，任务完成"),
+            );
+            send_runtime_summary(
+                &out_tx,
+                task_journal.as_ref(),
+                req_id,
+                label,
+                turn,
+                if failed_tools == 0 { "ok" } else { "error" },
+                total_tools,
+                failed_tools,
+                "工具结果已处理，任务完成",
             );
             return Ok(ServerRuntimeRunResult {
                 exit_ok: true,
@@ -573,6 +615,17 @@ where
         req_id,
         runtime_status_chunk(req_id, MAX_TURNS, label, "failed", "达到最大轮次仍未完成"),
     );
+    send_runtime_summary(
+        &out_tx,
+        task_journal.as_ref(),
+        req_id,
+        label,
+        MAX_TURNS,
+        "error",
+        total_tools,
+        failed_tools,
+        "达到最大轮次仍未完成",
+    );
 
     Ok(ServerRuntimeRunResult {
         exit_ok: false,
@@ -582,6 +635,57 @@ where
         completion_tokens: usage.completion_tokens,
         total_tokens: usage.total_tokens,
     })
+}
+
+fn record_tool_result(
+    results: &mut Vec<Value>,
+    total_tools: &mut usize,
+    failed_tools: &mut usize,
+    tool: &str,
+    result: &str,
+) {
+    *total_tools += 1;
+    if is_tool_error(result) {
+        *failed_tools += 1;
+    }
+    results.push(json!({
+        "tool": tool,
+        "result": truncate_chars(result, MAX_TOOL_RESULT_CHARS),
+    }));
+}
+
+fn is_tool_error(result: &str) -> bool {
+    result
+        .trim_start()
+        .to_ascii_lowercase()
+        .starts_with("error:")
+}
+
+fn send_runtime_summary(
+    out_tx: &mpsc::UnboundedSender<Message>,
+    task_journal: Option<&TaskJournal>,
+    req_id: &str,
+    label: &str,
+    turn: usize,
+    status: &str,
+    total_tools: usize,
+    failed_tools: usize,
+    message: &str,
+) {
+    send_chunk(
+        out_tx,
+        task_journal,
+        req_id,
+        runtime_summary_chunk(
+            req_id,
+            label,
+            turn,
+            status,
+            total_tools,
+            failed_tools,
+            message,
+        ),
+    );
 }
 
 fn resolve_workspace(cwd: Option<&str>) -> Result<PathBuf> {

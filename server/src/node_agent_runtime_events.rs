@@ -80,6 +80,29 @@ pub(crate) fn runtime_status_chunk(
     event_line(event)
 }
 
+pub(crate) fn runtime_summary_chunk(
+    req_id: &str,
+    label: &str,
+    turn: usize,
+    status: &str,
+    total_tools: usize,
+    failed_tools: usize,
+    message: &str,
+) -> String {
+    let event = json!({
+        "type": "runtime_summary",
+        "schema": "elon.routebc.runtime_summary.v1",
+        "req_id": req_id,
+        "runtime": label,
+        "turn": turn,
+        "status": status,
+        "total_tools": total_tools,
+        "failed_tools": failed_tools,
+        "message": truncate_chars(message, 1_000),
+    });
+    event_line(event)
+}
+
 pub(crate) fn tool_approval_id(turn: usize, index: usize) -> String {
     format!("tap_{turn}_{index}")
 }
@@ -325,8 +348,8 @@ fn is_secret_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        runtime_status_chunk, tool_approval_required_chunk, tool_approval_required_chunk_with_diff,
-        tool_call_chunk, tool_result_chunk,
+        runtime_status_chunk, runtime_summary_chunk, tool_approval_required_chunk,
+        tool_approval_required_chunk_with_diff, tool_call_chunk, tool_result_chunk,
     };
     use serde_json::{json, Value};
 
@@ -379,6 +402,19 @@ mod tests {
         assert_eq!(event["type"], "tool_result");
         assert_eq!(event["tool"], "run_command");
         assert_eq!(event["status"], "error");
+    }
+
+    #[test]
+    fn runtime_summary_event_reports_tool_counts() {
+        let line = runtime_summary_chunk("req", "api-runtime", 3, "ok", 5, 1, "done");
+        let event: Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(event["type"], "runtime_summary");
+        assert_eq!(event["schema"], "elon.routebc.runtime_summary.v1");
+        assert_eq!(event["runtime"], "api-runtime");
+        assert_eq!(event["turn"], 3);
+        assert_eq!(event["status"], "ok");
+        assert_eq!(event["total_tools"], 5);
+        assert_eq!(event["failed_tools"], 1);
     }
 
     #[test]
