@@ -835,10 +835,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
     if let Err(error) =
         node_agent_cli_security::validate_cli_extra_args(cli_name, extra_args.as_slice())
     {
+        let message = error.to_string();
+        record_cli_done_outcome(&task_journal, &req_id, false, Some(&message));
         let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
             req_id,
             exit_ok: false,
-            error: Some(error.to_string()),
+            error: Some(message),
             prompt_tokens: None,
             cached_input_tokens: None,
             completion_tokens: None,
@@ -866,6 +868,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         .await;
         let (exit_ok, error, workspace_status) =
             finalize_cli_prompt_workspace(result.exit_ok, result.error, conversation_workspace);
+        record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
         let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
             req_id,
             exit_ok,
@@ -910,6 +913,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         };
         let (exit_ok, error, workspace_status) =
             finalize_cli_prompt_workspace(result.exit_ok, result.error, conversation_workspace);
+        record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
         let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
             req_id,
             exit_ok,
@@ -1037,10 +1041,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
     let mut child = match cmd.spawn() {
         Ok(c) => c,
         Err(e) => {
+            let message = format!("无法启动 {} : {}", bin, e);
+            record_cli_done_outcome(&task_journal, &req_id, false, Some(&message));
             let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
                 req_id,
                 exit_ok: false,
-                error: Some(format!("无法启动 {} : {}", bin, e)),
+                error: Some(message),
                 prompt_tokens: None,
                 cached_input_tokens: None,
                 completion_tokens: None,
@@ -1147,6 +1153,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     let (exit_ok, error, workspace_status) =
                         finalize_cli_prompt_workspace(false, Some(message), conversation_workspace);
                     let model = cli_model_from_args(cli_name, &extra_args);
+                    record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
                     let _ = out_tx.send(ws_text(&cli_done_message(
                         req_id,
                         exit_ok,
@@ -1164,11 +1171,13 @@ async fn run_cli_prompt(run: CliPromptRun) {
             )) => {
                 warn!("[{}] CLI 执行超时，强杀进程", cli_name);
                 let _ = child.kill().await;
+                let message = format!("{} 执行超时（超过{}分钟），已强制终止",
+                    cli_name, if cli_name == "codex" { 5 } else { 3 });
+                record_cli_done_outcome(&task_journal, &req_id, false, Some(&message));
                 let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
                     req_id,
                     exit_ok: false,
-                    error: Some(format!("{} 执行超时（超过{}分钟），已强制终止",
-                        cli_name, if cli_name == "codex" { 5 } else { 3 })),
+                    error: Some(message),
                     prompt_tokens: None,
                     cached_input_tokens: None,
                     completion_tokens: None,
@@ -1242,6 +1251,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
     };
     let (exit_ok, error, workspace_status) =
         finalize_cli_prompt_workspace(exit_ok, error, conversation_workspace);
+    record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
     let combined_usage_text = format!("{}\n{}", stdout_text, stderr_text);
     let usage = cli_usage::parse_cli_usage(&combined_usage_text);
     let model = usage
@@ -1270,6 +1280,38 @@ fn send_cli_chunk(
         req_id: req_id.to_string(),
         text: text.to_string(),
     }));
+}
+
+fn record_cli_done_outcome(
+    task_journal: &node_agent_task_journal::TaskJournal,
+    req_id: &str,
+    exit_ok: bool,
+    error: Option<&str>,
+) {
+    let status = if exit_ok {
+        "done"
+    } else if cli_done_error_is_canceled(error) {
+        "canceled"
+    } else {
+        "failed"
+    };
+    if let Err(journal_error) = task_journal.record_finished_with_outcome(req_id, status, error) {
+        warn!("PC 任务 journal 写入终态失败: {journal_error}");
+    }
+}
+
+fn cli_done_error_is_canceled(error: Option<&str>) -> bool {
+    let Some(error) = error.map(str::trim).filter(|value| !value.is_empty()) else {
+        return false;
+    };
+    let lower = error.to_ascii_lowercase();
+    lower.contains("cancel")
+        || lower.contains("cancelled")
+        || lower.contains("canceled")
+        || lower.contains("stopped")
+        || error.contains("取消")
+        || error.contains("停止")
+        || error.contains("终止")
 }
 
 struct PreparedCliPromptCwd {

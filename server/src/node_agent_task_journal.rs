@@ -12,6 +12,7 @@ use std::{
 };
 
 const MAX_CHUNK_CHARS: usize = 12_000;
+const MAX_ERROR_CHARS: usize = 2_000;
 
 #[derive(Clone, Debug)]
 pub(crate) struct TaskJournal {
@@ -216,18 +217,45 @@ impl TaskJournal {
     }
 
     pub(crate) fn record_finished(&self, req_id: &str) -> Result<()> {
+        self.record_finished_with_outcome(req_id, "finished", None)
+    }
+
+    pub(crate) fn record_finished_with_outcome(
+        &self,
+        req_id: &str,
+        status: &str,
+        error: Option<&str>,
+    ) -> Result<()> {
         let now = now_ms();
+        let requested_status = normalize_finish_status(status, error);
+        let mut effective_status = requested_status.to_string();
+        let mut already_terminal = false;
         let mut registry = self.load_registry()?;
         if let Some(record) = registry.get_mut(req_id) {
-            record.status = "finished".to_string();
+            if requested_status == "finished" && is_terminal_status(&record.status) {
+                effective_status = record.status.clone();
+                already_terminal = true;
+            } else {
+                record.status = requested_status.to_string();
+                effective_status = record.status.clone();
+            }
             record.updated_at_ms = now;
         }
         self.save_registry(&registry)?;
-        self.append_event(json!({
+        if already_terminal {
+            return Ok(());
+        }
+
+        let mut event = json!({
             "type": "finished",
             "req_id": req_id,
+            "status": effective_status,
             "at_ms": now
-        }))
+        });
+        if let Some(error) = normalize_finish_error(error) {
+            event["error"] = Value::String(error);
+        }
+        self.append_event(event)
     }
 
     pub(crate) fn record_cli_chunk(&self, req_id: &str, stream: &str, text: &str) -> Result<()> {
@@ -437,6 +465,53 @@ fn normalize_stream(stream: &str) -> &'static str {
     }
 }
 
+fn normalize_finish_status(status: &str, error: Option<&str>) -> &'static str {
+    match status.trim().to_ascii_lowercase().as_str() {
+        "done" | "ok" | "success" | "succeeded" => "done",
+        "failed" | "failure" | "error" | "errored" => "failed",
+        "canceled" | "cancelled" | "cancel" | "stopped" => "canceled",
+        "interrupted" => "interrupted",
+        "finished" if looks_canceled(error) => "canceled",
+        "finished" if has_error(error) => "failed",
+        "finished" => "finished",
+        _ if looks_canceled(error) => "canceled",
+        _ if has_error(error) => "failed",
+        _ => "finished",
+    }
+}
+
+fn normalize_finish_error(error: Option<&str>) -> Option<String> {
+    error
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| truncate_chars(value, MAX_ERROR_CHARS))
+}
+
+fn is_terminal_status(status: &str) -> bool {
+    matches!(
+        status.trim().to_ascii_lowercase().as_str(),
+        "finished" | "done" | "failed" | "canceled" | "cancelled" | "interrupted"
+    )
+}
+
+fn has_error(error: Option<&str>) -> bool {
+    error.map(str::trim).is_some_and(|value| !value.is_empty())
+}
+
+fn looks_canceled(error: Option<&str>) -> bool {
+    let Some(error) = error.map(str::trim).filter(|value| !value.is_empty()) else {
+        return false;
+    };
+    let lower = error.to_ascii_lowercase();
+    lower.contains("cancel")
+        || lower.contains("cancelled")
+        || lower.contains("canceled")
+        || lower.contains("stopped")
+        || error.contains("取消")
+        || error.contains("停止")
+        || error.contains("终止")
+}
+
 fn truncate_chars(text: &str, max_chars: usize) -> String {
     if text.chars().count() <= max_chars {
         return text.to_string();
@@ -494,6 +569,40 @@ mod tests {
         assert!(events.contains(r#""type":"started""#));
         assert!(events.contains(r#""type":"cancel_requested""#));
         assert!(events.contains(r#""type":"finished""#));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn preserves_explicit_terminal_outcome_from_generic_cleanup() {
+        let dir = unique_test_dir("terminal-outcome");
+        let journal = TaskJournal::new(&dir);
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-1",
+                cli_name: "server-runtime",
+                route: Some("route_b_api_runtime"),
+                run_handle_id: Some("req-1"),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("started event should persist");
+        journal
+            .record_finished_with_outcome("req-1", "canceled", Some("用户已停止 PC CLI 任务"))
+            .expect("terminal outcome should persist");
+        journal
+            .record_finished("req-1")
+            .expect("generic cleanup should not overwrite terminal status");
+
+        let registry = journal
+            .read_registry_for_test()
+            .expect("registry should read");
+        let record = registry.get("req-1").expect("record should exist");
+        assert_eq!(record.status, "canceled");
+
+        let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
+        assert_eq!(events.matches(r#""type":"finished""#).count(), 1);
+        assert!(events.contains(r#""status":"canceled""#));
+        assert!(events.contains(r#""error":"用户已停止 PC CLI 任务""#));
         let _ = fs::remove_dir_all(dir);
     }
 
