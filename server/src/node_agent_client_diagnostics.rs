@@ -62,6 +62,7 @@ fn diagnostic_payload(paths: &DiagnosticPaths) -> Value {
         "privacy": {
             "raw_prompt_exported": false,
             "raw_cli_output_exported": false,
+            "maintenance_log_contents_exported": false,
             "token_values_exported": false,
             "api_key_values_exported": false
         },
@@ -70,6 +71,8 @@ fn diagnostic_payload(paths: &DiagnosticPaths) -> Value {
             "state_file": path_to_string(&paths.state_file),
             "config_dir": path_to_string(&paths.config_dir),
             "task_journal_dir": path_to_string(&paths.task_journal_dir),
+            "logs_dir": path_to_string(&paths.logs_dir),
+            "maintenance_log_file": path_to_string(&paths.maintenance_log_file),
             "diagnostics_dir": path_to_string(&paths.diagnostics_dir)
         },
         "files": diagnostic_files(paths),
@@ -93,6 +96,8 @@ fn diagnostic_files(paths: &DiagnosticPaths) -> Value {
     json!({
         "state_file": file_meta(&paths.state_file),
         "config_dir": file_meta(&paths.config_dir),
+        "logs_dir": file_meta(&paths.logs_dir),
+        "maintenance_log": file_meta(&paths.maintenance_log_file),
         "task_journal_dir": file_meta(&paths.task_journal_dir),
         "task_registry": file_meta(&paths.task_journal_dir.join("registry.json")),
         "task_events": file_meta(&paths.task_journal_dir.join("events.jsonl")),
@@ -292,6 +297,8 @@ struct DiagnosticPaths {
     state_file: PathBuf,
     config_dir: PathBuf,
     task_journal_dir: PathBuf,
+    logs_dir: PathBuf,
+    maintenance_log_file: PathBuf,
     diagnostics_dir: PathBuf,
 }
 
@@ -307,11 +314,14 @@ impl DiagnosticPaths {
             .map(Path::to_path_buf)
             .unwrap_or_else(|| PathBuf::from("."));
         let task_journal_dir = state_file.with_file_name("task-journal");
+        let logs_dir = config_dir.join("logs");
         let diagnostics_dir = config_dir.join("diagnostics");
         Self {
             state_file,
             config_dir,
             task_journal_dir,
+            maintenance_log_file: logs_dir.join("client-maintenance.jsonl"),
+            logs_dir,
             diagnostics_dir,
         }
     }
@@ -359,7 +369,13 @@ mod tests {
         let text = serde_json::to_string(&payload).expect("payload json");
 
         assert!(payload["privacy"]["raw_cli_output_exported"] == false);
+        assert!(payload["privacy"]["maintenance_log_contents_exported"] == false);
         assert!(payload["privacy"]["api_key_values_exported"] == false);
+        assert!(payload["paths"]["logs_dir"].as_str().is_some());
+        assert!(payload["files"]["maintenance_log"]["path"]
+            .as_str()
+            .unwrap()
+            .contains("client-maintenance.jsonl"));
         assert!(text.contains("\"codex_session_present\":true"));
         assert!(!text.contains("secret-session-id"));
         assert!(!text.contains("secret output"));

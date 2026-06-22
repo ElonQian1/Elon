@@ -61,6 +61,7 @@
     settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
     settingsCliBridgeStatus: $('settingsCliBridgeStatus'),
     refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'), openClientLogsBtn: $('openClientLogsBtn'),
+    openClientTaskJournalBtn: $('openClientTaskJournalBtn'),
     openClientConfigBtn: $('openClientConfigBtn'), openClientInstallBtn: $('openClientInstallBtn'),
     exportClientDiagnosticsBtn: $('exportClientDiagnosticsBtn'),
     checkClientUpdateBtn: $('checkClientUpdateBtn'), uninstallClientBtn: $('uninstallClientBtn'),
@@ -1205,7 +1206,8 @@
     els.registerProjectBtn.addEventListener('click', registerLocalProject);
     els.settingsProjectPath.addEventListener('input', markLocalProjectPathDirty);
     els.refreshClientMaintenanceBtn.addEventListener('click', () => refreshClientMaintenance(true));
-    els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientLogsBtn));
+    els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('logs', els.openClientLogsBtn));
+    els.openClientTaskJournalBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientTaskJournalBtn));
     els.openClientConfigBtn.addEventListener('click', () => openClientMaintenanceTarget('config_dir', els.openClientConfigBtn));
     els.openClientInstallBtn.addEventListener('click', () => openClientMaintenanceTarget('install_dir', els.openClientInstallBtn));
     els.exportClientDiagnosticsBtn.addEventListener('click', exportClientDiagnostics);
@@ -2526,6 +2528,7 @@
     els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running} · ${packageLine} · ${updateLine} · ${clientLayoutLabel(layoutStatus)}`;
     const paths = [
       clean(data.install_dir) && `安装 ${clean(data.install_dir)}`,
+      clean(data.logs_dir) && `运行日志 ${clean(data.logs_dir)}`,
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
       clean(data.config_dir) && `配置 ${clean(data.config_dir)}`
     ].filter(Boolean);

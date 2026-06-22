@@ -3,7 +3,12 @@
 use axum::{http::StatusCode, Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::path::{Path, PathBuf};
+use std::{
+    fs::{self, OpenOptions},
+    io::Write,
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 #[cfg(windows)]
 use std::process::{Command, Stdio};
@@ -21,40 +26,58 @@ pub(crate) async fn open_target_handler(
     Json(req): Json<OpenTargetRequest>,
 ) -> (StatusCode, Json<Value>) {
     match open_target(&req.target) {
-        Ok(path) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "opened": path_to_string(&path),
-            })),
-        ),
-        Err(error) => error_response(StatusCode::BAD_REQUEST, error),
+        Ok(path) => {
+            record_maintenance_event("open_target", true, &req.target);
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "opened": path_to_string(&path),
+                })),
+            )
+        }
+        Err(error) => {
+            record_maintenance_event("open_target", false, &format!("{}: {}", req.target, error));
+            error_response(StatusCode::BAD_REQUEST, error)
+        }
     }
 }
 
 pub(crate) async fn update_handler() -> (StatusCode, Json<Value>) {
     match spawn_client_action(ClientAction::Update) {
-        Ok(()) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "message": "已开始后台检查更新；如有新版本，客户端会自动替换并重启。"
-            })),
-        ),
-        Err(error) => error_response(StatusCode::BAD_REQUEST, error),
+        Ok(()) => {
+            record_maintenance_event("update", true, "scheduled");
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "message": "已开始后台检查更新；如有新版本，客户端会自动替换并重启。"
+                })),
+            )
+        }
+        Err(error) => {
+            record_maintenance_event("update", false, &error);
+            error_response(StatusCode::BAD_REQUEST, error)
+        }
     }
 }
 
 pub(crate) async fn uninstall_handler() -> (StatusCode, Json<Value>) {
     match spawn_client_action(ClientAction::Uninstall) {
-        Ok(()) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "message": "已安排卸载；本机节点会退出并清理安装目录。"
-            })),
-        ),
-        Err(error) => error_response(StatusCode::BAD_REQUEST, error),
+        Ok(()) => {
+            record_maintenance_event("uninstall", true, "scheduled");
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "message": "已安排卸载；本机节点会退出并清理安装目录。"
+                })),
+            )
+        }
+        Err(error) => {
+            record_maintenance_event("uninstall", false, &error);
+            error_response(StatusCode::BAD_REQUEST, error)
+        }
     }
 }
 
@@ -68,14 +91,17 @@ fn status_payload() -> Value {
         "state_file": path_to_string(&paths.state_file),
         "config_dir": path_to_string(&paths.config_dir),
         "task_journal_dir": path_to_string(&paths.task_journal_dir),
+        "logs_dir": path_to_string(&paths.logs_dir),
+        "maintenance_log_file": path_to_string(&paths.maintenance_log_file),
         "diagnostics_dir": path_to_string(&paths.diagnostics_dir),
         "maintenance_targets": [
             { "target": "install_dir", "label": "安装目录", "purpose": "确认根目录只保留主程序、卸载程序和 _internal。" },
+            { "target": "logs", "label": "运行日志", "purpose": "查看客户端维护、更新、卸载等本机运行日志。" },
             { "target": "task_journal", "label": "任务日志", "purpose": "查看本机任务生命周期 journal，不包含 prompt 或 API key。" },
             { "target": "diagnostics_dir", "label": "诊断目录", "purpose": "保存可发给客服或开发者的脱敏诊断文件。" },
             { "target": "config_dir", "label": "配置目录", "purpose": "查看本机节点凭证和运行配置所在目录。" }
         ],
-        "client_care_summary": "普通用户日常只需要运行一龙PC节点.exe；需要移除时运行卸载一龙PC节点.exe。日志、诊断、更新和卸载都集中在本面板。",
+        "client_care_summary": "普通用户日常只需要运行一龙PC节点.exe；需要移除时运行卸载一龙PC节点.exe。运行日志、任务记录、诊断、更新和卸载都集中在本面板。",
         "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
     });
 
@@ -136,6 +162,16 @@ fn maintenance_actions(install: &Value) -> Value {
             "安装目录",
             "打开安装目录，确认用户只需要主程序、卸载程序和 _internal。",
             "install_dir",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
+            "open_client_logs",
+            "open_target",
+            "运行日志",
+            "打开客户端维护日志目录，用于排查更新、卸载、打开目录等本机维护动作。",
+            "logs",
             supported,
             "neutral",
             None,
@@ -235,7 +271,19 @@ fn open_target(raw_target: &str) -> Result<PathBuf, String> {
 fn maintenance_target(raw_target: &str) -> Result<MaintenanceTarget, String> {
     let paths = maintenance_paths();
     match raw_target.trim() {
-        "task_journal" | "logs" => Ok(MaintenanceTarget {
+        "logs" | "logs_dir" => Ok(MaintenanceTarget {
+            path: paths.logs_dir,
+            select_file: false,
+            ensure_dir: true,
+            must_exist: true,
+        }),
+        "maintenance_log" | "maintenance_log_file" => Ok(MaintenanceTarget {
+            path: paths.maintenance_log_file,
+            select_file: true,
+            ensure_dir: false,
+            must_exist: false,
+        }),
+        "task_journal" => Ok(MaintenanceTarget {
             path: paths.task_journal_dir,
             select_file: false,
             ensure_dir: true,
@@ -344,12 +392,49 @@ fn maintenance_paths() -> MaintenancePaths {
         .parent()
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
+    let logs_dir = config_dir.join("logs");
     MaintenancePaths {
         diagnostics_dir: config_dir.join("diagnostics"),
         task_journal_dir: state_file.with_file_name("task-journal"),
+        maintenance_log_file: logs_dir.join("client-maintenance.jsonl"),
+        logs_dir,
         state_file,
         config_dir,
     }
+}
+
+fn record_maintenance_event(action: &str, ok: bool, detail: &str) {
+    let paths = maintenance_paths();
+    let _ = fs::create_dir_all(&paths.logs_dir);
+    let line = json!({
+        "at_ms": now_ms(),
+        "action": action,
+        "ok": ok,
+        "detail": truncate_chars(detail, 500)
+    })
+    .to_string();
+    if let Ok(mut file) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&paths.maintenance_log_file)
+    {
+        let _ = writeln!(file, "{line}");
+    }
+}
+
+fn truncate_chars(value: &str, max_chars: usize) -> String {
+    let trimmed = value.trim();
+    if trimmed.chars().count() <= max_chars {
+        return trimmed.to_string();
+    }
+    trimmed.chars().take(max_chars).collect()
+}
+
+fn now_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default()
 }
 
 #[cfg(windows)]
@@ -393,6 +478,8 @@ struct MaintenancePaths {
     state_file: PathBuf,
     config_dir: PathBuf,
     task_journal_dir: PathBuf,
+    logs_dir: PathBuf,
+    maintenance_log_file: PathBuf,
     diagnostics_dir: PathBuf,
 }
 
@@ -417,7 +504,9 @@ enum ClientAction {
 
 #[cfg(test)]
 mod tests {
-    use super::{install_dir_from_local_app_data, maintenance_target, status_payload};
+    use super::{
+        install_dir_from_local_app_data, maintenance_target, status_payload, truncate_chars,
+    };
     use std::path::PathBuf;
 
     #[test]
@@ -434,6 +523,7 @@ mod tests {
     fn only_fixed_open_targets_are_supported() {
         assert!(maintenance_target("task_journal").is_ok());
         assert!(maintenance_target("logs").is_ok());
+        assert!(maintenance_target("maintenance_log").is_ok());
         assert!(maintenance_target("diagnostics_dir").is_ok());
         assert!(maintenance_target("config_dir").is_ok());
         assert!(maintenance_target("state_file").is_ok());
@@ -443,7 +533,14 @@ mod tests {
     #[test]
     fn status_exposes_productized_maintenance_targets() {
         let status = status_payload();
+        assert!(status["logs_dir"].as_str().is_some());
+        assert!(status["maintenance_log_file"].as_str().is_some());
         assert!(status["diagnostics_dir"].as_str().is_some());
+        assert!(status["maintenance_targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|target| target["target"].as_str() == Some("logs")));
         assert!(status["maintenance_targets"]
             .as_array()
             .unwrap()
@@ -452,7 +549,15 @@ mod tests {
         assert!(status["client_care_summary"]
             .as_str()
             .unwrap()
-            .contains("一龙PC节点.exe"));
+            .contains("运行日志"));
+        assert!(status["maintenance_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|action| {
+                action["id"].as_str() == Some("open_client_logs")
+                    && action["target"].as_str() == Some("logs")
+            }));
         assert!(status["maintenance_actions"]
             .as_array()
             .unwrap()
@@ -466,5 +571,12 @@ mod tests {
                 action["kind"].as_str() == Some("uninstall")
                     && action["confirmation"].as_str().is_some()
             }));
+    }
+
+    #[test]
+    fn maintenance_log_details_are_bounded() {
+        let long = "x".repeat(700);
+        assert_eq!(truncate_chars(&long, 500).chars().count(), 500);
+        assert_eq!(truncate_chars("  ok  ", 500), "ok");
     }
 }
