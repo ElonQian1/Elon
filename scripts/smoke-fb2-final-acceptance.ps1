@@ -56,24 +56,24 @@ function Fail-FinalAcceptance {
 
 function Add-Arg {
     param(
-        [System.Collections.Generic.List[string]]$Args,
+        [System.Collections.Generic.List[string]]$ArgumentList,
         [string]$Name,
         [object]$Value
     )
     if ($null -ne $Value -and -not [string]::IsNullOrWhiteSpace([string]$Value)) {
-        [void]$Args.Add($Name)
-        [void]$Args.Add([string]$Value)
+        [void]$ArgumentList.Add($Name)
+        [void]$ArgumentList.Add([string]$Value)
     }
 }
 
 function Add-SwitchArg {
     param(
-        [System.Collections.Generic.List[string]]$Args,
+        [System.Collections.Generic.List[string]]$ArgumentList,
         [string]$Name,
         [bool]$Enabled
     )
     if ($Enabled) {
-        [void]$Args.Add($Name)
+        [void]$ArgumentList.Add($Name)
     }
 }
 
@@ -161,14 +161,14 @@ function Test-UserOrderContextBeforeVisibleSmoke {
 function Invoke-SmokeScript {
     param(
         [string]$Name,
-        [System.Collections.Generic.List[string]]$Args,
+        [System.Collections.Generic.List[string]]$CommandArgs,
         [string]$LogPath
     )
 
     Write-Output ""
     Write-Output "== $Name =="
     $lines = [System.Collections.Generic.List[string]]::new()
-    & pwsh @Args 2>&1 | ForEach-Object {
+    & pwsh @CommandArgs 2>&1 | ForEach-Object {
         $line = [string]$_
         [void]$lines.Add($line)
         Write-Output $line
@@ -346,6 +346,35 @@ function Invoke-FinalAcceptanceSelfTest {
     }
 
     $script:SelfTestFailed = 0
+
+    $argHelperList = [System.Collections.Generic.List[string]]::new()
+    Add-Arg $argHelperList "-ExternalUserId" "fb2-user-1"
+    Add-Arg $argHelperList "-EmptyValue" ""
+    Add-SwitchArg $argHelperList "-DataOnlyAcceptance" $true
+    Add-SwitchArg $argHelperList "-DisabledSwitch" $false
+    Assert-SelfTest (($argHelperList -contains "-ExternalUserId") -and ($argHelperList -contains "fb2-user-1")) "argument helper adds named value"
+    Assert-SelfTest ($argHelperList -contains "-DataOnlyAcceptance") "argument helper adds enabled switch"
+    Assert-SelfTest (-not ($argHelperList -contains "-EmptyValue")) "argument helper skips blank value"
+    Assert-SelfTest (-not ($argHelperList -contains "-DisabledSwitch")) "argument helper skips disabled switch"
+
+    $childScript = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-final-wrapper-child-{0}.ps1" -f ([guid]::NewGuid().ToString("N")))
+    try {
+        Set-Content -Path $childScript -Value @(
+            'param([string]$Value)',
+            'Write-Output "OK`tchild smoke invoked`t$Value"'
+        ) -Encoding UTF8
+        $childArgs = [System.Collections.Generic.List[string]]::new()
+        foreach ($arg in @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $childScript, "argument-value")) {
+            [void]$childArgs.Add($arg)
+        }
+        $childResult = Invoke-SmokeScript "self-test child invocation" $childArgs ""
+        Assert-SelfTest ($childResult.exit_code -eq 0) "child smoke exits zero" "exit_code=$($childResult.exit_code)"
+        Assert-SelfTest (@($childResult.output) -contains "OK`tchild smoke invoked`targument-value") "child smoke receives arguments"
+    } finally {
+        if (Test-Path -LiteralPath $childScript) {
+            Remove-Item -LiteralPath $childScript -Force
+        }
+    }
 
     $completeLines = @(
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
