@@ -50,6 +50,7 @@ mod node_agent_active_task;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_cli_security;
+mod node_agent_client_maintenance;
 mod node_agent_codex_session;
 mod node_agent_file_range;
 mod node_agent_full_access;
@@ -2561,6 +2562,22 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/full-access/grants",
                 axum::routing::get(node_agent_full_access::list_handler)
                     .post(node_agent_full_access::grant_handler),
+            )
+            .route(
+                "/api/client-maintenance",
+                axum::routing::get(node_agent_client_maintenance::status_handler),
+            )
+            .route(
+                "/api/client-maintenance/open",
+                axum::routing::post(node_agent_client_maintenance::open_target_handler),
+            )
+            .route(
+                "/api/client-maintenance/update",
+                axum::routing::post(node_agent_client_maintenance::update_handler),
+            )
+            .route(
+                "/api/client-maintenance/uninstall",
+                axum::routing::post(node_agent_client_maintenance::uninstall_handler),
             )
             .route(
                 "/api/storage-config",

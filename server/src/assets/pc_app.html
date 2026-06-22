@@ -231,6 +231,37 @@
           <section class="settings-panel" id="settingsWorkbenchPanel" data-settings-panel="workbench">
             <h2>PC 工作台设置</h2>
             <p class="settings-panel-caption">把本机项目绑定到当前 PC 节点，注册后会出现在项目入口里。</p>
+            <div class="settings-section-title">客户端维护</div>
+            <div class="settings-info-list settings-maintenance-list">
+              <div class="settings-info-row">
+                <div>
+                  <span>本机节点客户端</span>
+                  <strong id="settingsClientStatus">尚未读取</strong>
+                </div>
+                <button class="text-button" id="refreshClientMaintenanceBtn" type="button">刷新状态</button>
+              </div>
+              <div class="settings-info-row">
+                <div>
+                  <span>日志和本地记录</span>
+                  <strong id="settingsClientPaths">任务记录、配置和安装目录会显示在这里。</strong>
+                </div>
+                <div class="settings-row-actions">
+                  <button class="text-button" id="openClientLogsBtn" type="button">打开任务记录</button>
+                  <button class="text-button" id="openClientConfigBtn" type="button">打开配置目录</button>
+                  <button class="text-button" id="openClientInstallBtn" type="button">打开安装目录</button>
+                </div>
+              </div>
+              <div class="settings-info-row">
+                <div>
+                  <span>更新和卸载</span>
+                  <strong>检查更新会使用完整客户端包；卸载会退出本机节点并清理安装目录。</strong>
+                </div>
+                <div class="settings-row-actions">
+                  <button class="text-button" id="checkClientUpdateBtn" type="button">检查更新</button>
+                  <button class="text-button danger" id="uninstallClientBtn" type="button">卸载客户端</button>
+                </div>
+              </div>
+            </div>
             <div class="settings-section-title">注册本地项目</div>
             <label class="settings-field">
               <span>项目目录</span>

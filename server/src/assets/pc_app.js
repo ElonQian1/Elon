@@ -16,7 +16,8 @@
     plaza: { loaded: false, loading: false, projects: [], query: '', filterKey: 'all', busyId: '', error: '' },
     nodeAdminUrl: safeNodeAdminUrl(),
     localAdminToken: '',
-    localAdminTokenHeader: LOCAL_ADMIN_HEADER_FALLBACK
+    localAdminTokenHeader: LOCAL_ADMIN_HEADER_FALLBACK,
+    clientMaintenance: null
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
   const PLAZA_FILTERS = [
@@ -55,6 +56,10 @@
     settingsDisplayName: $('settingsDisplayName'), settingsAccountValue: $('settingsAccountValue'), settingsUserId: $('settingsUserId'),
     settingsVerifyBtn: $('settingsVerifyBtn'), settingsEditProfileBtn: $('settingsEditProfileBtn'), settingsLoginBtn: $('settingsLoginBtn'),
     settingsSecurityBtn: $('settingsSecurityBtn'), settingsDevicesBtn: $('settingsDevicesBtn'), settingsLogoutBtn: $('settingsLogoutBtn'),
+    settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
+    refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'), openClientLogsBtn: $('openClientLogsBtn'),
+    openClientConfigBtn: $('openClientConfigBtn'), openClientInstallBtn: $('openClientInstallBtn'),
+    checkClientUpdateBtn: $('checkClientUpdateBtn'), uninstallClientBtn: $('uninstallClientBtn'),
     chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
     inspectProjectFolderBtn: $('inspectProjectFolderBtn'), registerProjectBtn: $('registerProjectBtn'),
     settingsProjectPath: $('settingsProjectPath'), settingsProjectName: $('settingsProjectName'),
@@ -1094,6 +1099,12 @@
     els.chooseProjectFolderBtn.addEventListener('click', chooseLocalProjectFolder);
     els.inspectProjectFolderBtn.addEventListener('click', inspectLocalProjectFolder);
     els.registerProjectBtn.addEventListener('click', registerLocalProject);
+    els.refreshClientMaintenanceBtn.addEventListener('click', () => refreshClientMaintenance(true));
+    els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientLogsBtn));
+    els.openClientConfigBtn.addEventListener('click', () => openClientMaintenanceTarget('config_dir', els.openClientConfigBtn));
+    els.openClientInstallBtn.addEventListener('click', () => openClientMaintenanceTarget('install_dir', els.openClientInstallBtn));
+    els.checkClientUpdateBtn.addEventListener('click', triggerClientUpdate);
+    els.uninstallClientBtn.addEventListener('click', triggerClientUninstall);
     if (els.settingsRuntimePermission) {
       els.settingsRuntimePermission.addEventListener('change', syncSettingsRuntimePermissionHint);
       syncSettingsRuntimePermissionHint();
@@ -2306,6 +2317,7 @@
     setSettingsSection(section || 'workbench');
     els.settingsBackdrop.hidden = false;
     setSettingsResult('');
+    if ((section || 'workbench') === 'workbench') refreshClientMaintenance(false);
     setTimeout(() => {
       if ((section || 'workbench') === 'workbench') els.settingsProjectPath.focus();
     }, 0);
@@ -2330,6 +2342,87 @@
     } else {
       button.disabled = false;
       button.textContent = button.dataset.label || button.textContent;
+    }
+  }
+
+  function applyClientMaintenanceStatus(data) {
+    state.clientMaintenance = data || null;
+    if (!els.settingsClientStatus || !els.settingsClientPaths) return;
+    if (!data) {
+      els.settingsClientStatus.textContent = '尚未读取';
+      els.settingsClientPaths.textContent = '任务记录、配置和安装目录会显示在这里。';
+      return;
+    }
+    const version = clean(data.version) || '--';
+    const installed = data.supported === false
+      ? '当前平台不支持 Win 客户端维护'
+      : data.installed
+        ? '已安装'
+        : '未检测到完整安装';
+    const running = data.running_from_install_dir ? '安装目录运行中' : '外部启动或未确认';
+    els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running}`;
+    const paths = [
+      clean(data.install_dir) && `安装 ${clean(data.install_dir)}`,
+      clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
+      clean(data.config_dir) && `配置 ${clean(data.config_dir)}`
+    ].filter(Boolean);
+    els.settingsClientPaths.textContent = paths.join(' · ') || '未读取到本机维护路径';
+  }
+
+  async function refreshClientMaintenance(showResult) {
+    setSettingsBusy(els.refreshClientMaintenanceBtn, true, '刷新中…');
+    try {
+      const data = await localNodeApi('/api/client-maintenance');
+      applyClientMaintenanceStatus(data);
+      if (showResult) setSettingsResult('客户端维护状态已刷新。');
+    } catch (error) {
+      applyClientMaintenanceStatus(null);
+      if (els.settingsClientStatus) els.settingsClientStatus.textContent = '无法连接本机节点';
+      if (els.settingsClientPaths) els.settingsClientPaths.textContent = clean(error.message || error);
+      if (showResult) setSettingsResult(escapeHtml(error.message || error), 'error');
+    } finally {
+      setSettingsBusy(els.refreshClientMaintenanceBtn, false);
+    }
+  }
+
+  async function openClientMaintenanceTarget(target, button) {
+    setSettingsBusy(button, true, '打开中…');
+    try {
+      const data = await localNodeApi('/api/client-maintenance/open', {
+        method: 'POST',
+        body: JSON.stringify({ target })
+      });
+      setSettingsResult(`已打开：${escapeHtml(data.opened || target)}`);
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+    } finally {
+      setSettingsBusy(button, false);
+    }
+  }
+
+  async function triggerClientUpdate() {
+    setSettingsBusy(els.checkClientUpdateBtn, true, '检查中…');
+    try {
+      const data = await localNodeApi('/api/client-maintenance/update', { method: 'POST' });
+      setSettingsResult(escapeHtml(data.message || '已开始后台检查更新。'));
+      setTimeout(() => refreshClientMaintenance(false), 2400);
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+    } finally {
+      setSettingsBusy(els.checkClientUpdateBtn, false);
+    }
+  }
+
+  async function triggerClientUninstall() {
+    const ok = window.confirm('确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。');
+    if (!ok) return;
+    setSettingsBusy(els.uninstallClientBtn, true, '卸载中…');
+    try {
+      const data = await localNodeApi('/api/client-maintenance/uninstall', { method: 'POST' });
+      setSettingsResult(escapeHtml(data.message || '已安排卸载。'));
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+      setSettingsBusy(els.uninstallClientBtn, false);
     }
   }
 

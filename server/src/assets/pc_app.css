@@ -876,6 +876,13 @@ button { cursor: pointer; }
   font-size: 13px;
 }
 .text-button:hover { color: var(--text); background: #343741; }
+.text-button.danger {
+  color: #ffdede;
+  background: rgba(223, 92, 92, .13);
+}
+.text-button.danger:hover {
+  background: rgba(223, 92, 92, .22);
+}
 
 .message-list {
   min-height: 0;
@@ -2074,6 +2081,13 @@ button { cursor: pointer; }
   color: var(--text-soft);
   font-size: 14px;
   overflow-wrap: anywhere;
+}
+.settings-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 330px;
 }
 .settings-section-title {
   margin-bottom: 10px;
