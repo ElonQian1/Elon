@@ -455,6 +455,35 @@ function Test-VisibleDirectReadEvidenceComplete {
     return $true
 }
 
+function Get-SummaryPostReadyState {
+    param([string]$Detail)
+
+    return [ordered]@{
+        detail_present = -not [string]::IsNullOrWhiteSpace($Detail)
+        model_ready = $Detail -match "\bmodel_ready=True\b"
+        fallback_used = $Detail -match "\bfallback_used=True\b"
+        fallback_allowed = $Detail -match "\ballow_fallback=True\b"
+    }
+}
+
+function Test-SummaryPostReadyForAcceptanceMode {
+    param(
+        [string]$Detail,
+        [bool]$IsDataOnlyAcceptance
+    )
+
+    $state = Get-SummaryPostReadyState $Detail
+    if (-not [bool]$state["detail_present"]) {
+        return $false
+    }
+
+    if ($IsDataOnlyAcceptance) {
+        return ([bool]$state["model_ready"] -or ([bool]$state["fallback_used"] -and [bool]$state["fallback_allowed"]))
+    }
+
+    return [bool]$state["model_ready"]
+}
+
 function Resolve-VisibleMainGroupId {
     param([string]$ContextGroupId)
 
@@ -567,6 +596,15 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest (Test-VisibleDirectReadEvidenceComplete $directReadEvidence) "direct read evidence is complete"
     $answerEvidence = Build-VisibleAnswerEvidence $completeLines
     Assert-SelfTest (([string]$answerEvidence["summary_post_model_ready"]) -match "model_ready=True") "visible answer evidence maps summary model ready" ([string]$answerEvidence["summary_post_model_ready"])
+    $readySummaryDetail = [string]$answerEvidence["summary_post_model_ready"]
+    $fallbackAllowedDetail = "status=ready_with_fallback model_ready=False fallback_used=True allow_fallback=True"
+    $fallbackNotAllowedDetail = "status=ready_with_fallback model_ready=False fallback_used=True allow_fallback=False"
+    Assert-SelfTest (Test-SummaryPostReadyForAcceptanceMode $readySummaryDetail $false) "summary ready accepted for full final" $readySummaryDetail
+    Assert-SelfTest (Test-SummaryPostReadyForAcceptanceMode $readySummaryDetail $true) "summary ready accepted for data-only" $readySummaryDetail
+    Assert-SelfTest (-not (Test-SummaryPostReadyForAcceptanceMode $fallbackAllowedDetail $false)) "summary fallback rejected for full final" $fallbackAllowedDetail
+    Assert-SelfTest (Test-SummaryPostReadyForAcceptanceMode $fallbackAllowedDetail $true) "summary fallback accepted for data-only when allowed" $fallbackAllowedDetail
+    Assert-SelfTest (-not (Test-SummaryPostReadyForAcceptanceMode $fallbackNotAllowedDetail $true)) "summary fallback rejected for data-only when not allowed" $fallbackNotAllowedDetail
+    Assert-SelfTest (-not (Test-SummaryPostReadyForAcceptanceMode "" $true)) "summary ready rejects missing detail"
 
     $missingDirectTextLines = @(
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
@@ -617,15 +655,21 @@ function Invoke-FinalAcceptanceSelfTest {
 
     $completeDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $directReadEvidence
     $missingDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $missingDirectTextEvidence
-    $completeSummaryPostReady = ([string]$answerEvidence["summary_post_model_ready"]) -match "\bmodel_ready=True\b"
+    $completeSummaryPostReady = Test-SummaryPostReadyForAcceptanceMode ([string]$answerEvidence["summary_post_model_ready"]) $false
+    $dataOnlyFallbackSummaryPostReady = Test-SummaryPostReadyForAcceptanceMode $fallbackAllowedDetail $true
+    $fullFallbackSummaryPostReady = Test-SummaryPostReadyForAcceptanceMode $fallbackAllowedDetail $false
     $missingSummaryModelReady = [string]::IsNullOrWhiteSpace([string](Build-VisibleAnswerEvidence $missingDirectTextLines)["summary_post_model_ready"])
     $completeSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete -and $completeSummaryPostReady)
+    $dataOnlyFallbackSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete -and $dataOnlyFallbackSummaryPostReady)
+    $fullFallbackSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete -and $fullFallbackSummaryPostReady)
     $missingSuccess = ($true -and $true -and [bool]$missingSummaryCoverage["complete"])
     $visibleFailedSuccess = ($false -and $true -and [bool]$completeCoverage["complete"])
     $centerFailedSuccess = ($true -and $false -and [bool]$completeCoverage["complete"])
     $directReadIncompleteSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $missingDirectReadComplete)
     $summaryModelMissingSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete -and (-not $missingSummaryModelReady))
     Assert-SelfTest $completeSuccess "final success allows complete feedback and direct read coverage"
+    Assert-SelfTest $dataOnlyFallbackSuccess "data-only success allows allowed summary fallback with complete evidence"
+    Assert-SelfTest (-not $fullFallbackSuccess) "full final success rejects summary fallback"
     Assert-SelfTest (-not $missingSuccess) "final success rejects missing feedback coverage"
     Assert-SelfTest (-not $visibleFailedSuccess) "final success rejects visible smoke failure"
     Assert-SelfTest (-not $centerFailedSuccess) "final success rejects final acceptance failure"
@@ -993,14 +1037,11 @@ $feedbackCoverage = Build-FeedbackCoverage $feedbackEvidence
 $visibleDirectReadEvidence = Build-VisibleDirectReadEvidence $visibleLines
 $visibleDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $visibleDirectReadEvidence
 $summaryPostModelReadyDetail = Find-CheckDetail $visibleLines "summary-post model ready"
-$summaryPostModelReady = $summaryPostModelReadyDetail -match "\bmodel_ready=True\b"
-$summaryPostFallbackUsed = $summaryPostModelReadyDetail -match "\bfallback_used=True\b"
-$summaryPostFallbackAllowed = $summaryPostModelReadyDetail -match "\ballow_fallback=True\b"
-$summaryPostReadyForMode = if ($DataOnlyAcceptance) {
-    -not [string]::IsNullOrWhiteSpace($summaryPostModelReadyDetail) -and ($summaryPostModelReady -or $summaryPostFallbackUsed)
-} else {
-    $summaryPostModelReady
-}
+$summaryPostReadyState = Get-SummaryPostReadyState $summaryPostModelReadyDetail
+$summaryPostModelReady = [bool]$summaryPostReadyState["model_ready"]
+$summaryPostFallbackUsed = [bool]$summaryPostReadyState["fallback_used"]
+$summaryPostFallbackAllowed = [bool]$summaryPostReadyState["fallback_allowed"]
+$summaryPostReadyForMode = Test-SummaryPostReadyForAcceptanceMode $summaryPostModelReadyDetail ([bool]$DataOnlyAcceptance)
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"
     mode = if ($DataOnlyAcceptance) { "visible_data_only_acceptance" } else { "visible_final_acceptance" }
