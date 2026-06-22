@@ -290,6 +290,28 @@ function Get-Fb2ReadinessStatus {
     @($candidates | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
 }
 
+function Test-Fb2ReadinessAllowedForMode {
+    param(
+        [string]$Status,
+        [bool]$StrictFinalAcceptance,
+        [bool]$StrictDataOnlyAcceptance
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Status)) {
+        return $false
+    }
+
+    if ($StrictFinalAcceptance) {
+        return $Status -eq "ready"
+    }
+
+    if ($StrictDataOnlyAcceptance) {
+        return @("ready", "partial") -contains $Status
+    }
+
+    return @("ready", "partial", "degraded", "blocked", "unavailable") -contains $Status
+}
+
 function Compare-VersionParts {
     param(
         [string]$Actual,
@@ -656,6 +678,10 @@ function Invoke-AiCenterSelfTest {
         }
         $readinessStatus = Get-Fb2ReadinessStatus $readinessShape
         Assert-AiCenterSelfTestCondition "reads nested fb2 readiness status" ($readinessStatus -eq "partial") "status=$readinessStatus"
+        Assert-AiCenterSelfTestCondition "final acceptance requires ready readiness" (Test-Fb2ReadinessAllowedForMode "ready" $true $false) "status=ready"
+        Assert-AiCenterSelfTestCondition "final acceptance rejects partial readiness" (-not (Test-Fb2ReadinessAllowedForMode "partial" $true $false)) "status=partial"
+        Assert-AiCenterSelfTestCondition "data-only acceptance allows partial readiness" (Test-Fb2ReadinessAllowedForMode "partial" $false $true) "status=partial"
+        Assert-AiCenterSelfTestCondition "data-only acceptance rejects degraded readiness" (-not (Test-Fb2ReadinessAllowedForMode "degraded" $false $true)) "status=degraded"
 
         $manifestShape = [pscustomobject]@{
             data = [pscustomobject]@{
@@ -1018,6 +1044,12 @@ if (-not $Fb2Token) {
         $readinessValue = Get-Fb2ReadinessStatus $readiness
         Assert-True ([bool]$readinessValue) "fb2 authenticated readiness status" "status=$readinessValue"
         Assert-ContainsValue @("ready", "partial", "degraded", "blocked", "unavailable") $readinessValue "fb2 authenticated readiness status value"
+        if ($FinalAcceptance -or $DataOnlyAcceptance) {
+            $readinessAllowed = Test-Fb2ReadinessAllowedForMode $readinessValue ([bool]$FinalAcceptance) ([bool]$DataOnlyAcceptance)
+            $readinessMode = if ($FinalAcceptance) { "final_acceptance" } else { "data_only_acceptance" }
+            $readinessReason = if ($FinalAcceptance) { "requires_ready" } else { "allows_ready_or_partial" }
+            Assert-True $readinessAllowed "fb2 authenticated readiness acceptable for acceptance" "mode=$readinessMode status=$readinessValue allowed=$readinessAllowed reason=$readinessReason"
+        }
 
         $directManifest = Invoke-Json -Url "$Fb2Base/api/main-project/context/tool-manifest" -Headers $fb2DiscoveryHeaders
         Assert-True ($directManifest.success -eq $true) "fb2 authenticated tool manifest" "success=$($directManifest.success)"

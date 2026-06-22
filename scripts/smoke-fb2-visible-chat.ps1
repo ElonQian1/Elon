@@ -23,7 +23,8 @@ param(
     [switch]$SelfTest,
     [switch]$SkipMention,
     [switch]$SkipSelectedMessage,
-    [switch]$SkipSummaryPost
+    [switch]$SkipSummaryPost,
+    [switch]$AllowSummaryFallback
 )
 
 $ErrorActionPreference = "Stop"
@@ -569,6 +570,11 @@ AI推断：被选择消息里的“肯定赢盘、重注”表述过于绝对，
         })
     }
 
+    Invoke-VisiblePolicyCase -Name "summary fallback requires explicit opt-in" -Action {
+        Assert-True (-not (@("ready") -contains "ready_with_fallback")) "selftest strict summary fallback rejected"
+        Assert-True (@("ready", "ready_with_fallback") -contains "ready_with_fallback") "selftest data-only summary fallback allowed"
+    }
+
     Write-Output ""
     Write-Output "== Summary =="
     Write-Output "failed=$script:Failed skipped=$script:Skipped"
@@ -918,7 +924,11 @@ if ($SkipSummaryPost) {
     if ($postId) {
         $summaryPost = Wait-For-SummaryPost -BearerToken $token -TargetGroupId $GroupId -PostId $postId
         $summaryStatus = [string]$summaryPost.status
-        Assert-True (@("ready", "ready_with_fallback") -contains $summaryStatus) "summary-post ready" "$summaryStatus"
+        $summaryAllowedStatuses = if ($AllowSummaryFallback) { @("ready", "ready_with_fallback") } else { @("ready") }
+        $summaryModelReady = $summaryStatus -eq "ready"
+        $summaryFallbackUsed = $summaryStatus -eq "ready_with_fallback"
+        Assert-True ($summaryAllowedStatuses -contains $summaryStatus) "summary-post ready" "$summaryStatus"
+        Pass "summary-post model ready" "status=$summaryStatus model_ready=$summaryModelReady fallback_used=$summaryFallbackUsed allow_fallback=$([bool]$AllowSummaryFallback)"
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$summaryPost.summary)) "summary-post direct group read text present" (Format-SummaryPostEvidence $summaryPost)
         Pass "summary-post direct group read" (Format-SummaryPostEvidence $summaryPost)
         Assert-SummaryPostPolicy -Post $summaryPost

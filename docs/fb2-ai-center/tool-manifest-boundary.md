@@ -109,4 +109,4 @@ feedback 回写只能采用 AI 回复正文显式提到的 `source_ids`，且工
 - live manifest 漂移检查关注 `chat_auto_executable_tool_ids` 和主项目静态 allowlist 是否对齐。
 - `/integration` 负责证明 integration-only 端点存在。
 - `-CheckQuality`、`-CheckPermissionBoundaries`、`-RequireNonSyntheticQualityReadiness` 负责证明受保护质量/权限端点可读并有审计数据。
-- 最终 summary 的 `feedback_coverage` 和 `visible_direct_read_evidence` 负责证明真实群聊回答、回读和质量写回已经进入同一批验收证据。
+- 最终 summary 的 `feedback_coverage`、`visible_direct_read_complete` 和 `visible_direct_read_evidence` 负责证明真实群聊回答、接口回读和质量写回已经进入同一批验收证据；缺少任一可见群聊正文回读的 `text_len` / `text_sha256` 时，最终 wrapper 不得返回 `success=true`。

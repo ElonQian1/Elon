@@ -284,6 +284,7 @@ function Build-AiCenterEvidence {
         fb2_tool_manifest_protected = Find-CheckDetail $Lines "fb2 tool manifest requires service token"
         fb2_authenticated_readiness = Find-CheckDetail $Lines "fb2 authenticated readiness"
         fb2_authenticated_readiness_status = Find-CheckDetail $Lines "fb2 authenticated readiness status"
+        fb2_authenticated_readiness_acceptable = Find-CheckDetail $Lines "fb2 authenticated readiness acceptable for acceptance"
         fb2_authenticated_manifest = Find-CheckDetail $Lines "fb2 authenticated tool manifest"
         fb2_authenticated_manifest_tool_ids = Find-CheckDetail $Lines "fb2 authenticated manifest tool ids"
         fb2_apk_version = Find-CheckDetail $Lines "fb2 APK version present"
@@ -348,6 +349,7 @@ function Build-VisibleAnswerEvidence {
         summary_post_fact_split = Find-CheckDetail $Lines "summary-post separates facts and inference"
         summary_post_risk_boundary = Find-CheckDetail $Lines "summary-post includes risk boundary"
         summary_post_no_guarantee = Find-CheckDetail $Lines "summary-post avoids betting guarantees"
+        summary_post_model_ready = Find-CheckDetail $Lines "summary-post model ready"
     }
 }
 
@@ -539,6 +541,7 @@ function Invoke-FinalAcceptanceSelfTest {
         "OK`tselected-message direct group read text present`tgroup=ext_fb2_official message=gai_selected text_len=140 text_sha256=eeeeeeee",
         "OK`tsummary-post direct group read`tgroup=ext_fb2_official post=gsp_summary status=ready text_len=360 text_sha256=ffffffff",
         "OK`tsummary-post direct group read text present`tgroup=ext_fb2_official post=gsp_summary status=ready text_len=360 text_sha256=ffffffff",
+        "OK`tsummary-post model ready`tstatus=ready model_ready=True fallback_used=False allow_fallback=False",
         "OK`tvisible @EL reply text present`tlen=120"
     )
     $completeEvidence = @(Find-FeedbackEvidence $completeLines)
@@ -562,6 +565,8 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["summary_post"])) "direct read evidence maps summary post" ([string]$directReadEvidence["summary_post"])
     Assert-SelfTest (([string]$directReadEvidence["summary_post_text"]) -match "text_sha256=") "direct read evidence maps summary post text hash" ([string]$directReadEvidence["summary_post_text"])
     Assert-SelfTest (Test-VisibleDirectReadEvidenceComplete $directReadEvidence) "direct read evidence is complete"
+    $answerEvidence = Build-VisibleAnswerEvidence $completeLines
+    Assert-SelfTest (([string]$answerEvidence["summary_post_model_ready"]) -match "model_ready=True") "visible answer evidence maps summary model ready" ([string]$answerEvidence["summary_post_model_ready"])
 
     $missingDirectTextLines = @(
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
@@ -612,16 +617,20 @@ function Invoke-FinalAcceptanceSelfTest {
 
     $completeDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $directReadEvidence
     $missingDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $missingDirectTextEvidence
-    $completeSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete)
+    $completeSummaryPostReady = ([string]$answerEvidence["summary_post_model_ready"]) -match "\bmodel_ready=True\b"
+    $missingSummaryModelReady = [string]::IsNullOrWhiteSpace([string](Build-VisibleAnswerEvidence $missingDirectTextLines)["summary_post_model_ready"])
+    $completeSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete -and $completeSummaryPostReady)
     $missingSuccess = ($true -and $true -and [bool]$missingSummaryCoverage["complete"])
     $visibleFailedSuccess = ($false -and $true -and [bool]$completeCoverage["complete"])
     $centerFailedSuccess = ($true -and $false -and [bool]$completeCoverage["complete"])
     $directReadIncompleteSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $missingDirectReadComplete)
+    $summaryModelMissingSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete -and (-not $missingSummaryModelReady))
     Assert-SelfTest $completeSuccess "final success allows complete feedback and direct read coverage"
     Assert-SelfTest (-not $missingSuccess) "final success rejects missing feedback coverage"
     Assert-SelfTest (-not $visibleFailedSuccess) "final success rejects visible smoke failure"
     Assert-SelfTest (-not $centerFailedSuccess) "final success rejects final acceptance failure"
     Assert-SelfTest (-not $directReadIncompleteSuccess) "final success rejects incomplete direct read evidence"
+    Assert-SelfTest (-not $summaryModelMissingSuccess) "final success rejects missing summary model-ready evidence"
 
     $centerLines = @(
         "OK`tmain version`t0.3.592 abcdef",
@@ -635,6 +644,7 @@ function Invoke-FinalAcceptanceSelfTest {
         "OK`tfb2 tool manifest requires service token`tstatus=401 expected=401",
         "OK`tfb2 authenticated readiness`tsuccess=True",
         "OK`tfb2 authenticated readiness status`tstatus=ready",
+        "OK`tfb2 authenticated readiness acceptable for acceptance`tmode=final_acceptance status=ready allowed=True reason=requires_ready",
         "OK`tfb2 authenticated tool manifest`tsuccess=True",
         "OK`tfb2 authenticated manifest tool ids`tcount=31 min=1",
         "OK`tfb2 APK version present`t1.1.48 code=96",
@@ -686,6 +696,7 @@ function Invoke-FinalAcceptanceSelfTest {
         "fb2_tool_manifest_protected",
         "fb2_authenticated_readiness",
         "fb2_authenticated_readiness_status",
+        "fb2_authenticated_readiness_acceptable",
         "fb2_authenticated_manifest",
         "fb2_authenticated_manifest_tool_ids",
         "fb2_apk_version",
@@ -932,6 +943,9 @@ Add-Arg $visibleArgs "-PollTimeoutSec" $PollTimeoutSec
 Add-Arg $visibleArgs "-FeedbackPollTimeoutSec" $FeedbackPollTimeoutSec
 Add-Arg $visibleArgs "-PollIntervalSec" $PollIntervalSec
 Add-SwitchArg $visibleArgs "-AllowVisibleMessages" $true
+if ($DataOnlyAcceptance) {
+    Add-SwitchArg $visibleArgs "-AllowSummaryFallback" $true
+}
 
 $visibleResult = Invoke-SmokeScript "visible group chat smoke" $visibleArgs $visibleLogPath
 $visibleLines = @($visibleResult.output)
@@ -978,6 +992,15 @@ $feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
 $feedbackCoverage = Build-FeedbackCoverage $feedbackEvidence
 $visibleDirectReadEvidence = Build-VisibleDirectReadEvidence $visibleLines
 $visibleDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $visibleDirectReadEvidence
+$summaryPostModelReadyDetail = Find-CheckDetail $visibleLines "summary-post model ready"
+$summaryPostModelReady = $summaryPostModelReadyDetail -match "\bmodel_ready=True\b"
+$summaryPostFallbackUsed = $summaryPostModelReadyDetail -match "\bfallback_used=True\b"
+$summaryPostFallbackAllowed = $summaryPostModelReadyDetail -match "\ballow_fallback=True\b"
+$summaryPostReadyForMode = if ($DataOnlyAcceptance) {
+    -not [string]::IsNullOrWhiteSpace($summaryPostModelReadyDetail) -and ($summaryPostModelReady -or $summaryPostFallbackUsed)
+} else {
+    $summaryPostModelReady
+}
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"
     mode = if ($DataOnlyAcceptance) { "visible_data_only_acceptance" } else { "visible_final_acceptance" }
@@ -1006,13 +1029,17 @@ $summary = [ordered]@{
     selected_message_reply_id = Find-CheckDetail $visibleLines "selected-message ai reply"
     summary_post_id = Find-CheckDetail $visibleLines "summary-post created"
     summary_post_status = Find-CheckDetail $visibleLines "summary-post ready"
+    summary_post_model_ready = $summaryPostModelReady
+    summary_post_fallback_used = $summaryPostFallbackUsed
+    summary_post_fallback_allowed = $summaryPostFallbackAllowed
+    summary_post_ready_for_mode = $summaryPostReadyForMode
     feedback_evidence = $feedbackEvidence
     feedback_coverage = $feedbackCoverage
     visible_direct_read_complete = $visibleDirectReadComplete
     visible_direct_read_evidence = $visibleDirectReadEvidence
     visible_answer_policy_evidence = Build-VisibleAnswerEvidence $visibleLines
     final_acceptance_evidence = Build-AiCenterEvidence $centerLines
-    success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0 -and [bool]$feedbackCoverage["complete"] -and $visibleDirectReadComplete)
+    success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0 -and [bool]$feedbackCoverage["complete"] -and $visibleDirectReadComplete -and $summaryPostReadyForMode)
 }
 
 $summaryJson = $summary | ConvertTo-Json -Depth 8
