@@ -4,6 +4,7 @@ param(
     [string]$OutputDir = "",
     [string[]]$EvidenceDirs = @(),
     [string]$MainWorkspaceEvidenceDir = "",
+    [string]$RefreshSummaryPath = "",
     [switch]$SkipPublicContract,
     [switch]$SelfTest
 )
@@ -93,6 +94,7 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.status)) "status file exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.goal_audit)) "goal audit file exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.handoff_markdown)) "handoff markdown exists"
+        Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.status_refresh)) "status refresh file exists"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
         "== SelfTest Summary =="
         "failed=0"
@@ -115,6 +117,16 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Resolve-Fb2RefreshPath -Path $OutputDir -Root $root
 }
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
+
+if ([string]::IsNullOrWhiteSpace($RefreshSummaryPath)) {
+    $RefreshSummaryPath = Join-Path $OutputDir "status-refresh-current.json"
+} else {
+    $RefreshSummaryPath = Resolve-Fb2RefreshPath -Path $RefreshSummaryPath -Root $root
+}
+$refreshParent = Split-Path -Parent $RefreshSummaryPath
+if (-not [string]::IsNullOrWhiteSpace($refreshParent)) {
+    New-Item -ItemType Directory -Force -Path $refreshParent | Out-Null
+}
 
 $evidence = [System.Collections.ArrayList]::new()
 $seen = @{}
@@ -160,11 +172,12 @@ $status = Read-Fb2RefreshJson -Path $statusPath
 $goalAudit = Read-Fb2RefreshJson -Path $goalAuditPath
 $public = Read-Fb2RefreshJson -Path $publicPath
 
-[pscustomobject]@{
+$refreshSummary = [pscustomobject]@{
     schema = "fb2.main_project.status_refresh.v1"
     output_dir = $OutputDir
     evidence_dirs = @($evidence)
     files = [ordered]@{
+        status_refresh = $RefreshSummaryPath
         public_contract_status = $publicPath
         status = $statusPath
         goal_audit = $goalAuditPath
@@ -181,4 +194,8 @@ $public = Read-Fb2RefreshJson -Path $publicPath
     next_minimum_action = [string]$goalAudit.next_minimum_action
     missing_non_voice_requirements = @($goalAudit.missing_non_voice_requirements)
     deferred_requirements = @($goalAudit.deferred_requirements)
-} | ConvertTo-Json -Depth 8
+}
+
+$refreshJson = $refreshSummary | ConvertTo-Json -Depth 8
+Set-Content -LiteralPath $RefreshSummaryPath -Value $refreshJson -Encoding UTF8
+$refreshJson

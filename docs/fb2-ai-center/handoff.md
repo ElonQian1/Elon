@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮让状态刷新总入口默认保存 `target\fb2-ai-center\status-refresh-current.json`，schema 为 `fb2.main_project.status_refresh.v1`。这个文件会列出 `files.status_refresh`、`files.status`、`files.goal_audit`、`files.handoff_markdown`、`data_goal_complete`、`full_final_complete`、`token_present` 和 `next_minimum_action`；后续同步给 fb2 子会话时优先贴这个 JSON 或对应 handoff markdown，不再依赖复制终端 stdout。
 - 2026-06-23 本轮给状态刷新总入口补了无网络自测：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1 -SelfTest` 应输出 `failed=0`。它使用临时目录、跳过 public contract 网络请求、不读取主工作区历史证据，用来保护刷新总入口的编排和输出 schema；真实进度判断仍跑不带 `-SelfTest` 的刷新命令。
 - 2026-06-23 本轮新增 `scripts\fb2-ai-center-refresh-current-status.ps1` 作为下一轮默认状态入口：它会刷新 public contract、status、goal audit、handoff，并默认合并当前 worktree target 与 `D:\rust\active-projects\elon cli\target\fb2-ai-center` 历史证据。输出 schema 为 `fb2.main_project.status_refresh.v1`，直接列出 `data_goal_complete`、`full_final_complete`、`next_minimum_action` 和生成文件路径。后续会话优先跑这个脚本，不要只跑单个 status 导致临时 worktree 漏读历史 data-only/visible/chat feedback 证据。
 - 2026-06-23 本轮把长期领域索引契约补进 `goal_gap_audit`：后续读取 `status-current.json` 时，`goal_gap_audit.completed` 应包含 `domain_context_index_contract`，`current_flags.domain_context_index_contract_complete=true`，`evidence_refs.domain_context_index_count=8`，并列出 8 类索引。`fb2-public-contract-summary-status.ps1` 也开始把 8 类索引全部作为硬要求；缺任意一类都不能把长期快速检索路线判定为完成。
