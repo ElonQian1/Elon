@@ -1302,12 +1302,28 @@
           <h2>我的项目</h2>
           <p>集中管理个人项目、联合项目和已加入的协作空间。</p>
         </div>
-        <button class="text-button" type="button" id="projectOpenWebBtn">打开网页版项目页</button>
+        <div class="pc-project-actions">
+          <button class="text-button" type="button" id="projectRegisterLocalBtn">注册本地项目</button>
+          <button class="text-button" type="button" id="projectOpenWebBtn">打开网页版项目页</button>
+        </div>
       </div>
-      ${projects.length ? `<div class="pc-project-grid">${projects.map(renderProjectCard).join('')}</div>` : '<div class="pc-project-empty">还没有项目<br>可以从项目广场加入，或在 PC 工作台设置里注册本地项目。</div>'}
+      ${projects.length ? `<div class="pc-project-grid">${projects.map(renderProjectCard).join('')}</div>` : `<div class="pc-project-empty">
+        <strong>还没有项目</strong>
+        <span>可以注册本机代码目录，或从项目广场加入公开项目。</span>
+        <div class="pc-project-empty-actions">
+          <button class="send-button" type="button" id="projectEmptyRegisterBtn">注册本地项目</button>
+          <button class="text-button" type="button" id="projectEmptyPlazaBtn">去项目广场</button>
+        </div>
+      </div>`}
     </section>`;
+    const registerBtn = $('projectRegisterLocalBtn');
+    if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench'));
     const webBtn = $('projectOpenWebBtn');
     if (webBtn) webBtn.addEventListener('click', () => window.open('/web', '_blank'));
+    const emptyRegisterBtn = $('projectEmptyRegisterBtn');
+    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench'));
+    const emptyPlazaBtn = $('projectEmptyPlazaBtn');
+    if (emptyPlazaBtn) emptyPlazaBtn.addEventListener('click', selectProjectPlaza);
     els.messageList.querySelectorAll('[data-open-project-id]').forEach((button) => {
       button.addEventListener('click', () => selectProject(button.dataset.openProjectId));
     });
