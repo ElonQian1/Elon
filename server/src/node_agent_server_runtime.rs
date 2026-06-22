@@ -445,7 +445,14 @@ where
                             &out_tx,
                             task_journal.as_ref(),
                             req_id,
-                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                            tool_result_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &tool,
+                                &result,
+                                Some(&action),
+                            ),
                         );
                         record_tool_result(
                             &mut results,
@@ -466,7 +473,14 @@ where
                             &out_tx,
                             task_journal.as_ref(),
                             req_id,
-                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                            tool_result_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &tool,
+                                &result,
+                                Some(&action),
+                            ),
                         );
                         record_tool_result(
                             &mut results,
@@ -527,6 +541,7 @@ where
                                 &tool,
                                 "approve",
                                 "approved",
+                                Some(&action),
                             ),
                         );
                     }
@@ -543,6 +558,7 @@ where
                                 &tool,
                                 "deny",
                                 "denied",
+                                Some(&action),
                             ),
                         );
                         let result = format!("error: {tool} denied by user: {reason}");
@@ -550,7 +566,14 @@ where
                             &out_tx,
                             task_journal.as_ref(),
                             req_id,
-                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                            tool_result_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &tool,
+                                &result,
+                                Some(&action),
+                            ),
                         );
                         record_tool_result(
                             &mut results,
@@ -574,6 +597,7 @@ where
                                 &tool,
                                 "timeout",
                                 "expired",
+                                Some(&action),
                             ),
                         );
                         let result =
@@ -582,7 +606,14 @@ where
                             &out_tx,
                             task_journal.as_ref(),
                             req_id,
-                            tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                            tool_result_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &tool,
+                                &result,
+                                Some(&action),
+                            ),
                         );
                         record_tool_result(
                             &mut results,
@@ -629,7 +660,7 @@ where
                         &out_tx,
                         task_journal.as_ref(),
                         req_id,
-                        tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                        tool_result_chunk(req_id, turn, tool_index, &tool, &result, Some(&action)),
                     );
                     record_tool_result(
                         &mut results,
@@ -652,7 +683,7 @@ where
                 &out_tx,
                 task_journal.as_ref(),
                 req_id,
-                tool_result_chunk(req_id, turn, tool_index, &tool, &result),
+                tool_result_chunk(req_id, turn, tool_index, &tool, &result, Some(&action)),
             );
             record_tool_result(
                 &mut results,

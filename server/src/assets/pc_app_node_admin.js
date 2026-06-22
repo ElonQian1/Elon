@@ -402,6 +402,7 @@
     }
 
     function clientActionButtonId(value) {
+      if (clean(value) === 'open_diagnostics_dir') return 'nodeOpenDiagnosticsDir';
       return `nodeClientAction_${clean(value).replace(/[^a-zA-Z0-9_-]/g, '_') || 'item'}`;
     }
 

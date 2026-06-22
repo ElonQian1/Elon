@@ -80,6 +80,14 @@ fn action_from_tool_call(tool_call: &Value) -> Result<Value> {
         .ok_or_else(|| anyhow!("missing function.name"))?;
     let mut args = function_arguments(function)?;
     args.insert("tool".to_string(), json!(name));
+    if let Some(tool_call_id) = tool_call
+        .get("id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        args.insert("tool_call_id".to_string(), json!(tool_call_id));
+    }
     Ok(Value::Object(args))
 }
 
@@ -247,6 +255,7 @@ mod tests {
 
         assert_eq!(agent["done"], false);
         assert_eq!(agent["actions"][0]["tool"], "read_file_range");
+        assert_eq!(agent["actions"][0]["tool_call_id"], "call_1");
         assert_eq!(agent["actions"][0]["path"], "src/main.rs");
         assert_eq!(agent["actions"][0]["start_line"], 10);
     }

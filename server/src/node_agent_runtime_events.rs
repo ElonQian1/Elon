@@ -23,7 +23,7 @@ pub(crate) fn tool_call_chunk(req_id: &str, turn: usize, index: usize, action: &
         "type": "tool_call",
         "tool": tool,
         "args": action_preview(action),
-        "call_id": call_id(req_id, turn, index),
+        "call_id": action_call_id(req_id, turn, index, Some(action)),
         "turn": turn,
         "index": index,
         "status": "running"
@@ -37,6 +37,7 @@ pub(crate) fn tool_result_chunk(
     index: usize,
     tool: &str,
     result: &str,
+    action: Option<&Value>,
 ) -> String {
     let result = truncate_chars(result, MAX_EVENT_RESULT_CHARS);
     let status = if result
@@ -52,7 +53,7 @@ pub(crate) fn tool_result_chunk(
         "type": "tool_result",
         "tool": tool,
         "result": result,
-        "call_id": call_id(req_id, turn, index),
+        "call_id": action_call_id(req_id, turn, index, action),
         "turn": turn,
         "index": index,
         "status": status
@@ -142,7 +143,7 @@ pub(crate) fn tool_approval_required_chunk_with_diff(
         "risk": tool_risk(&tool),
         "args": action_preview(action),
         "diff": diff,
-        "call_id": call_id(req_id, turn, index),
+        "call_id": action_call_id(req_id, turn, index, Some(action)),
         "turn": turn,
         "index": index,
         "status": "pending"
@@ -158,6 +159,7 @@ pub(crate) fn tool_approval_decision_chunk(
     tool: &str,
     decision: &str,
     status: &str,
+    action: Option<&Value>,
 ) -> String {
     let event = json!({
         "type": "tool_approval_decision",
@@ -166,7 +168,7 @@ pub(crate) fn tool_approval_decision_chunk(
         "approval_id": approval_id,
         "tool": tool,
         "decision": decision,
-        "call_id": call_id(req_id, turn, index),
+        "call_id": action_call_id(req_id, turn, index, action),
         "turn": turn,
         "index": index,
         "status": status
@@ -176,6 +178,20 @@ pub(crate) fn tool_approval_decision_chunk(
 
 fn call_id(req_id: &str, turn: usize, index: usize) -> String {
     format!("{}:{}:{}", req_id, turn, index)
+}
+
+fn action_call_id(req_id: &str, turn: usize, index: usize, action: Option<&Value>) -> String {
+    action
+        .and_then(|value| {
+            value
+                .get("tool_call_id")
+                .or_else(|| value.get("_tool_call_id"))
+        })
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && value.chars().count() <= 200)
+        .map(str::to_string)
+        .unwrap_or_else(|| call_id(req_id, turn, index))
 }
 
 fn phase_status(phase: &str) -> &'static str {
@@ -230,7 +246,12 @@ fn action_preview(action: &Value) -> Value {
         }
         _ => {
             for (key, value) in action.as_object().into_iter().flatten() {
-                if key == "tool" || key == "content" || out.contains_key(key) {
+                if key == "tool"
+                    || key == "content"
+                    || key == "tool_call_id"
+                    || key == "_tool_call_id"
+                    || out.contains_key(key)
+                {
                     continue;
                 }
                 out.insert(key.clone(), redact_value(key, value));
@@ -363,17 +384,19 @@ mod tests {
                 "tool": "write_file",
                 "path": "src/main.rs",
                 "content": "secret body",
-                "api_key": "should-not-render"
+                "api_key": "should-not-render",
+                "tool_call_id": "call_write_1"
             }),
         );
         let event: Value = serde_json::from_str(line.trim()).unwrap();
         assert_eq!(event["type"], "tool_call");
         assert_eq!(event["tool"], "write_file");
-        assert_eq!(event["call_id"], "req:2:3");
+        assert_eq!(event["call_id"], "call_write_1");
         assert_eq!(event["args"]["path"], "src/main.rs");
         assert_eq!(event["args"]["content_chars"], 11);
         assert!(event["args"].get("content").is_none());
         assert!(event["args"].get("api_key").is_none());
+        assert!(event["args"].get("tool_call_id").is_none());
     }
 
     #[test]
@@ -397,10 +420,18 @@ mod tests {
 
     #[test]
     fn tool_result_event_marks_guard_errors() {
-        let line = tool_result_chunk("req", 1, 2, "run_command", "error: denied");
+        let line = tool_result_chunk(
+            "req",
+            1,
+            2,
+            "run_command",
+            "error: denied",
+            Some(&json!({"tool_call_id": "call_run_1"})),
+        );
         let event: Value = serde_json::from_str(line.trim()).unwrap();
         assert_eq!(event["type"], "tool_result");
         assert_eq!(event["tool"], "run_command");
+        assert_eq!(event["call_id"], "call_run_1");
         assert_eq!(event["status"], "error");
     }
 
@@ -451,6 +482,28 @@ mod tests {
         assert_eq!(event["diff"]["files"][0], "src/main.rs");
         assert!(event["args"]["patch_sha256"].as_str().unwrap().len() >= 64);
         assert!(event["args"].get("patch").is_none());
+    }
+
+    #[test]
+    fn approval_event_keeps_provider_tool_call_id_out_of_args() {
+        let line = tool_approval_required_chunk(
+            "req",
+            1,
+            1,
+            "tap_1_1",
+            &json!({
+                "tool": "run_command",
+                "tool_call_id": "call_provider_42",
+                "program": "git",
+                "args": ["status", "--short"],
+                "reason": "inspect state"
+            }),
+        );
+        let event: Value = serde_json::from_str(line.trim()).unwrap();
+
+        assert_eq!(event["call_id"], "call_provider_42");
+        assert!(event["args"].get("tool_call_id").is_none());
+        assert_eq!(event["args"]["program"], "git");
     }
 
     #[test]
