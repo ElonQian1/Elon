@@ -110,14 +110,7 @@
                 <button class="node-mini-button" type="button" id="nodeClientRefresh">刷新</button>
               </div>
               <div class="node-kv-list dense" id="nodeClientMaintenance">${row('状态', '读取中')}</div>
-              <div class="node-admin-actions">
-                <button class="node-action" type="button" id="nodeOpenInstallDir">安装目录</button>
-                <button class="node-action" type="button" id="nodeOpenTaskJournal">任务记录</button>
-                <button class="node-action" type="button" id="nodeOpenDiagnosticsDir">诊断目录</button>
-                <button class="node-action" type="button" id="nodeExportDiagnostics">导出诊断</button>
-                <button class="node-action primary" type="button" id="nodeClientUpdate">检查更新</button>
-                <button class="node-action danger" type="button" id="nodeClientUninstall">卸载</button>
-              </div>
+              <div class="node-admin-actions" id="nodeClientActions"></div>
               <div class="node-inline-result" id="nodeClientResult"></div>
             </div>
             <div class="node-admin-panel">
@@ -154,12 +147,7 @@
       $('#nodeEnvInstall')?.addEventListener('click', installEnv);
       $('#nodeSaveOpenAiKey')?.addEventListener('click', saveOpenAiKey);
       $('#nodeClientRefresh')?.addEventListener('click', () => loadClientMaintenance(false));
-      $('#nodeOpenInstallDir')?.addEventListener('click', () => openClientTarget('install_dir', 'nodeOpenInstallDir'));
-      $('#nodeOpenTaskJournal')?.addEventListener('click', () => openClientTarget('task_journal', 'nodeOpenTaskJournal'));
-      $('#nodeOpenDiagnosticsDir')?.addEventListener('click', () => openClientTarget('diagnostics_dir', 'nodeOpenDiagnosticsDir'));
-      $('#nodeExportDiagnostics')?.addEventListener('click', exportClientDiagnostics);
-      $('#nodeClientUpdate')?.addEventListener('click', updateClient);
-      $('#nodeClientUninstall')?.addEventListener('click', uninstallClient);
+      $('#nodeClientActions')?.addEventListener('click', handleClientActionClick);
       $('#nodeTtsRefresh')?.addEventListener('click', () => loadTts(false));
       $('#nodeTtsSave')?.addEventListener('click', saveTtsConfig);
     }
@@ -300,8 +288,8 @@
       });
     }
 
-    async function exportClientDiagnostics() {
-      await withBusy('nodeExportDiagnostics', '生成中...', async () => {
+    async function exportClientDiagnostics(buttonId) {
+      await withBusy(buttonId || 'nodeExportDiagnostics', '生成中...', async () => {
         try {
           const data = await api('/api/client-maintenance/diagnostics/export', { method: 'POST' });
           setResult('nodeClientResult', `诊断信息已生成：${data.path || ''}`);
@@ -311,8 +299,8 @@
       });
     }
 
-    async function updateClient() {
-      await withBusy('nodeClientUpdate', '检查中...', async () => {
+    async function updateClient(buttonId) {
+      await withBusy(buttonId || 'nodeClientUpdate', '检查中...', async () => {
         try {
           const data = await api('/api/client-maintenance/update', { method: 'POST' });
           setResult('nodeClientResult', data.message || '已开始后台检查更新。');
@@ -323,9 +311,9 @@
       });
     }
 
-    async function uninstallClient() {
-      if (!window.confirm('确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。')) return;
-      await withBusy('nodeClientUninstall', '卸载中...', async () => {
+    async function uninstallClient(buttonId, confirmation) {
+      if (!window.confirm(confirmation || '确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。')) return;
+      await withBusy(buttonId || 'nodeClientUninstall', '卸载中...', async () => {
         try {
           const data = await api('/api/client-maintenance/uninstall', { method: 'POST' });
           setResult('nodeClientResult', data.message || '已安排卸载。');
@@ -335,11 +323,26 @@
       });
     }
 
+    function handleClientActionClick(event) {
+      const button = event.target && event.target.closest && event.target.closest('[data-client-action]');
+      if (!button || button.disabled) return;
+      const kind = clean(button.dataset.clientAction);
+      const target = clean(button.dataset.clientTarget);
+      const confirmation = clean(button.dataset.clientConfirmation);
+      const buttonId = button.id;
+      if (kind === 'open_target') return openClientTarget(target, buttonId);
+      if (kind === 'export_diagnostics') return exportClientDiagnostics(buttonId);
+      if (kind === 'update') return updateClient(buttonId);
+      if (kind === 'uninstall') return uninstallClient(buttonId, confirmation);
+      setResult('nodeClientResult', '未知客户端维护动作。', 'error');
+    }
+
     function renderClientMaintenance(data) {
       const panel = $('#nodeClientMaintenance');
       if (!panel) return;
       if (!data) {
         panel.innerHTML = row('状态', '未读取');
+        renderClientActions(null);
         return;
       }
       const install = data.install || {};
@@ -366,6 +369,39 @@
         row('任务记录', clean(data.task_journal_dir) || '未上报'),
         row('诊断目录', clean(data.diagnostics_dir) || '未上报')
       ].join('');
+      renderClientActions(data);
+    }
+
+    function renderClientActions(data) {
+      const actionsEl = $('#nodeClientActions');
+      if (!actionsEl) return;
+      const actions = clientActions(data);
+      actionsEl.innerHTML = actions.map((action) => {
+        const id = clientActionButtonId(action.id || action.kind || action.label);
+        const disabled = action.enabled === false ? ' disabled' : '';
+        const tone = clean(action.tone);
+        const className = ['node-action', tone === 'primary' ? 'primary' : '', tone === 'danger' ? 'danger' : '']
+          .filter(Boolean)
+          .join(' ');
+        return `<button class="${className}" type="button" id="${escapeHtml(id)}" data-client-action="${escapeHtml(clean(action.kind))}" data-client-target="${escapeHtml(clean(action.target))}" data-client-confirmation="${escapeHtml(clean(action.confirmation))}" title="${escapeHtml(clean(action.description))}"${disabled}>${escapeHtml(clean(action.label) || '操作')}</button>`;
+      }).join('');
+    }
+
+    function clientActions(data) {
+      const actions = data && Array.isArray(data.maintenance_actions) ? data.maintenance_actions : [];
+      if (actions.length) return actions;
+      return [
+        { id: 'open_install_dir', kind: 'open_target', target: 'install_dir', label: '安装目录', enabled: true },
+        { id: 'open_task_journal', kind: 'open_target', target: 'task_journal', label: '任务日志', enabled: true },
+        { id: 'open_diagnostics_dir', kind: 'open_target', target: 'diagnostics_dir', label: '诊断目录', enabled: true },
+        { id: 'export_diagnostics', kind: 'export_diagnostics', label: '导出诊断', enabled: true },
+        { id: 'check_update', kind: 'update', label: '检查更新', tone: 'primary', enabled: true },
+        { id: 'uninstall_client', kind: 'uninstall', label: '卸载', tone: 'danger', enabled: true }
+      ];
+    }
+
+    function clientActionButtonId(value) {
+      return `nodeClientAction_${clean(value).replace(/[^a-zA-Z0-9_-]/g, '_') || 'item'}`;
     }
 
     async function loadTts(quiet) {

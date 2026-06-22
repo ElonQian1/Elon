@@ -70,11 +70,12 @@ fn status_payload() -> Value {
         "task_journal_dir": path_to_string(&paths.task_journal_dir),
         "diagnostics_dir": path_to_string(&paths.diagnostics_dir),
         "maintenance_targets": [
-            { "target": "install_dir", "label": "安装目录" },
-            { "target": "task_journal", "label": "任务记录" },
-            { "target": "diagnostics_dir", "label": "诊断目录" },
-            { "target": "config_dir", "label": "配置目录" }
+            { "target": "install_dir", "label": "安装目录", "purpose": "确认根目录只保留主程序、卸载程序和 _internal。" },
+            { "target": "task_journal", "label": "任务日志", "purpose": "查看本机任务生命周期 journal，不包含 prompt 或 API key。" },
+            { "target": "diagnostics_dir", "label": "诊断目录", "purpose": "保存可发给客服或开发者的脱敏诊断文件。" },
+            { "target": "config_dir", "label": "配置目录", "purpose": "查看本机节点凭证和运行配置所在目录。" }
         ],
+        "client_care_summary": "普通用户日常只需要运行一龙PC节点.exe；需要移除时运行卸载一龙PC节点.exe。日志、诊断、更新和卸载都集中在本面板。",
         "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
     });
 
@@ -105,8 +106,117 @@ fn with_install_status(mut payload: Value) -> Value {
                 }
             }
         }
+        object.insert(
+            "maintenance_actions".to_string(),
+            maintenance_actions(&install),
+        );
     }
     payload
+}
+
+fn maintenance_actions(install: &Value) -> Value {
+    let supported = install
+        .get("supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(cfg!(windows));
+    let installed = install
+        .get("installed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let layout_status = install
+        .get("layout_status")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let can_use_installed_client = supported && installed;
+
+    Value::Array(vec![
+        action(
+            "open_install_dir",
+            "open_target",
+            "安装目录",
+            "打开安装目录，确认用户只需要主程序、卸载程序和 _internal。",
+            "install_dir",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
+            "open_task_journal",
+            "open_target",
+            "任务日志",
+            "打开本机任务 journal 目录，用于查看任务生命周期和恢复记录。",
+            "task_journal",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
+            "open_diagnostics_dir",
+            "open_target",
+            "诊断目录",
+            "打开脱敏诊断文件保存目录。",
+            "diagnostics_dir",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
+            "export_diagnostics",
+            "export_diagnostics",
+            "导出诊断",
+            "生成一份脱敏 JSON，包含安装、环境和任务摘要，不包含 prompt/API key。",
+            "",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
+            "check_update",
+            "update",
+            "检查更新",
+            if layout_status == "clean" {
+                "后台检查完整客户端包更新；有新版本会替换并重启。"
+            } else {
+                "后台检查更新，并尝试收敛旧脚本或额外文件造成的安装布局问题。"
+            },
+            "",
+            can_use_installed_client,
+            "primary",
+            None,
+        ),
+        action(
+            "uninstall_client",
+            "uninstall",
+            "卸载",
+            "退出本机节点、移除自启动和 URL 协议，并清理安装目录。",
+            "",
+            can_use_installed_client,
+            "danger",
+            Some("确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。"),
+        ),
+    ])
+}
+
+fn action(
+    id: &str,
+    kind: &str,
+    label: &str,
+    description: &str,
+    target: &str,
+    enabled: bool,
+    tone: &str,
+    confirmation: Option<&str>,
+) -> Value {
+    json!({
+        "id": id,
+        "kind": kind,
+        "label": label,
+        "description": description,
+        "target": target,
+        "enabled": enabled,
+        "tone": tone,
+        "confirmation": confirmation,
+    })
 }
 
 fn open_target(raw_target: &str) -> Result<PathBuf, String> {
@@ -339,5 +449,22 @@ mod tests {
             .unwrap()
             .iter()
             .any(|target| target["target"].as_str() == Some("diagnostics_dir")));
+        assert!(status["client_care_summary"]
+            .as_str()
+            .unwrap()
+            .contains("一龙PC节点.exe"));
+        assert!(status["maintenance_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|action| action["kind"].as_str() == Some("export_diagnostics")));
+        assert!(status["maintenance_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|action| {
+                action["kind"].as_str() == Some("uninstall")
+                    && action["confirmation"].as_str().is_some()
+            }));
     }
 }
