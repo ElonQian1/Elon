@@ -156,6 +156,32 @@ impl TaskJournal {
         }))
     }
 
+    pub(crate) fn clear_codex_session(&self, req_id: &str, scope_key: &str) -> Result<()> {
+        let scope_key = scope_key.trim();
+        if scope_key.is_empty() {
+            return Ok(());
+        }
+        let now = now_ms();
+        let mut registry = self.load_registry()?;
+        if let Some(record) = registry.get_mut(req_id) {
+            if record.codex_session_scope_key.as_deref() == Some(scope_key) {
+                record.codex_session_id = None;
+                record.codex_session_scope_key = None;
+                record.codex_session_updated_at_ms = None;
+                record.updated_at_ms = now;
+            }
+        }
+        self.save_registry(&registry)?;
+        self.remove_codex_session(scope_key)?;
+        self.append_event(json!({
+            "type": "codex_session_cleared",
+            "req_id": req_id,
+            "scope_key": scope_key,
+            "reason": "stale_resume",
+            "at_ms": now
+        }))
+    }
+
     pub(crate) fn record_process_started(&self, req_id: &str, pid: u32) -> Result<()> {
         let now = now_ms();
         let mut registry = self.load_registry()?;
@@ -324,6 +350,20 @@ impl TaskJournal {
             BTreeMap::new()
         };
         map.insert(scope_key.to_string(), session_id.to_string());
+        fs::write(&path, serde_json::to_string_pretty(&map)?)
+            .with_context(|| format!("写入 {:?}", path))
+    }
+
+    fn remove_codex_session(&self, scope_key: &str) -> Result<()> {
+        self.ensure_dir()?;
+        let path = self.codex_sessions_path();
+        if !path.exists() {
+            return Ok(());
+        }
+        let text = fs::read_to_string(&path).with_context(|| format!("读取 {:?}", path))?;
+        let mut map: BTreeMap<String, String> =
+            serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))?;
+        map.remove(scope_key);
         fs::write(&path, serde_json::to_string_pretty(&map)?)
             .with_context(|| format!("写入 {:?}", path))
     }
@@ -640,6 +680,46 @@ mod tests {
                     .get("session_id")
                     .and_then(|value| value.as_str())
                     == Some("session-uuid")
+        }));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn clears_stale_codex_session_for_fresh_retry() {
+        let dir = unique_test_dir("codex-session-clear");
+        let journal = TaskJournal::new(&dir);
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-1",
+                cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some("req-1"),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("start event should persist");
+        journal
+            .record_codex_session("req-1", "scope-a", "session-uuid")
+            .expect("codex session should persist");
+        journal
+            .clear_codex_session("req-1", "scope-a")
+            .expect("stale session should clear");
+
+        let snapshot = journal
+            .snapshot("req-1", 0, 20)
+            .expect("snapshot should read");
+        let record = snapshot.record.expect("record should exist");
+        assert!(record.codex_session_id.is_none());
+        assert!(record.codex_session_scope_key.is_none());
+        assert_eq!(
+            journal
+                .load_codex_session("scope-a")
+                .expect("codex session file should load"),
+            None
+        );
+        assert!(snapshot.events.iter().any(|event| {
+            event.event.get("type").and_then(|value| value.as_str())
+                == Some("codex_session_cleared")
         }));
         let _ = fs::remove_dir_all(dir);
     }

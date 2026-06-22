@@ -50,6 +50,7 @@ mod node_agent_active_task;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_cli_security;
+mod node_agent_codex_session;
 mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_local_admin;
@@ -821,8 +822,10 @@ async fn run_cli_prompt(run: CliPromptRun) {
         mut cancel_rx,
         out_tx,
     } = run;
-    let bin = bin.as_str();
-    let cli_name = cli_name.as_str();
+    let bin_owned = bin;
+    let cli_name_owned = cli_name;
+    let bin = bin_owned.as_str();
+    let cli_name = cli_name_owned.as_str();
 
     if let Err(error) =
         node_agent_cli_security::validate_cli_extra_args(cli_name, extra_args.as_slice())
@@ -930,6 +933,28 @@ async fn run_cli_prompt(run: CliPromptRun) {
     // Codex 首次: codex exec --dangerously-bypass-approvals-and-sandbox "<prompt>"
     // Codex 续接: codex exec resume <session-uuid> "<prompt>"
     let full_access = cli_prompt_full_access(runtime_permission.as_deref());
+    let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
+    let codex_scope_key = if cli_name == "codex" {
+        node_agent_cli_security::codex_session_scope_key(
+            &extra_args,
+            runtime_permission.as_deref(),
+            cwd.as_deref(),
+        )
+    } else {
+        None
+    };
+    let codex_plan = if cli_name == "codex" {
+        node_agent_codex_session::load_session_plan(
+            &task_journal,
+            &codex_sessions_file,
+            codex_scope_key.clone(),
+        )
+    } else {
+        node_agent_codex_session::CodexSessionPlan {
+            scope_key: None,
+            session_id: None,
+        }
+    };
     let mut cmd = tokio::process::Command::new(actual_bin);
     if let Some((_, args)) = batch_wrapper.as_ref() {
         cmd.args(args);
@@ -947,29 +972,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             }
         }
         cmd.arg("exec");
-        // 检查本地是否有已保存的真实 Codex session id
-        let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
-        let our_key = node_agent_cli_security::codex_session_scope_key(
-            &extra_args,
-            runtime_permission.as_deref(),
-            cwd.as_deref(),
-        );
-        let real_codex_session_id = our_key.as_ref().and_then(|key| {
-            task_journal
-                .load_codex_session(key)
-                .ok()
-                .flatten()
-                .or_else(|| {
-                    std::fs::read_to_string(&codex_sessions_file)
-                        .ok()
-                        .and_then(|s| {
-                            serde_json::from_str::<serde_json::Map<String, serde_json::Value>>(&s)
-                                .ok()
-                        })
-                        .and_then(|map| map.get(key).and_then(|v| v.as_str()).map(str::to_owned))
-                })
-        });
-        if let Some(ref real_sid) = real_codex_session_id {
+        if let Some(ref real_sid) = codex_plan.session_id {
             // 续接已有会话
             cmd.arg("resume");
             cmd.arg(real_sid);
@@ -1062,16 +1065,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
 
     // 对 Codex：从 stdout 提取真实 session id（格式: "session id: <uuid>"）
     // 并持久化到本地，以便下次用 exec resume <real_id> 续接
-    let codex_key = if cli_name == "codex" {
-        node_agent_cli_security::codex_session_scope_key(
-            &extra_args,
-            runtime_permission.as_deref(),
-            cwd.as_deref(),
-        )
-    } else {
-        None
-    };
-    let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
+    let codex_key = codex_plan.scope_key.clone();
 
     while !stdout_done || !stderr_done {
         tokio::select! {
@@ -1184,6 +1178,46 @@ async fn run_cli_prompt(run: CliPromptRun) {
     }
 
     let exit_ok = child.wait().await.map(|s| s.success()).unwrap_or(false);
+    if !exit_ok
+        && cli_name == "codex"
+        && codex_plan.is_resume()
+        && node_agent_codex_session::stale_resume_failure(&stdout_text, &stderr_text)
+    {
+        if let Some(scope_key) = codex_plan.scope_key.as_deref() {
+            node_agent_codex_session::clear_stale_session(
+                &task_journal,
+                &codex_sessions_file,
+                &req_id,
+                scope_key,
+            )
+            .await;
+        }
+        send_cli_chunk(
+            &out_tx,
+            &task_journal,
+            &req_id,
+            "stdout",
+            "codex\n已发现本机 Codex session 失效，正在清理旧 session 并自动重新开始本轮任务。\n",
+        );
+        Box::pin(run_cli_prompt(CliPromptRun {
+            req_id,
+            bin: bin_owned,
+            cli_name: cli_name_owned,
+            extra_args,
+            runtime_permission,
+            cwd,
+            conversation_workspace,
+            prompt,
+            server_runtime_config,
+            approval_state,
+            task_journal,
+            runtime,
+            cancel_rx,
+            out_tx,
+        }))
+        .await;
+        return;
+    }
     if exit_ok && cli_name == "codex" && !stdout_text.lines().any(|line| line.trim() == "codex") {
         let diagnostic = if stdout_text.trim().is_empty() {
             "Codex CLI 执行完成，但没有返回可解析输出。请查看 PC 节点日志确认是否已完成文件修改。"

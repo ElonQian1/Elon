@@ -46,6 +46,8 @@
 - 本轮全量测试暴露并修复了一个非 PC 节点的历史门禁问题：`mark_project_suggestion_updated` 复用统一频道消息 row mapper，但 SELECT 少返回 `task_status/task_error/task_apk_url` 三列，导致建议消息标记更新测试报 `Invalid column index: 15`；已补齐列和 `LEFT JOIN tasks`。
 - 本轮已补齐 PC Codex 会话续接锚点：云端 PC Codex 分发现在和 Copilot 一样下发稳定 `--session-id`，PC 节点按 `session-id + 权限 + cwd` 保存真实 Codex session，并优先从 task journal 读取后执行 `codex exec resume <session>`。
 - 本轮已把 Codex session 元数据写入本机 journal 与 resume 契约：`registry.json` 保存 `codex_session_id/scope_key/updated_at_ms`，`codex-sessions.json` 保存 scope 到真实 session 的映射，前端任务卡显示“Codex 会话可续接”。
+- 本轮已新增 Codex stale resume 自愈：如果本机 `codex exec resume <session>` 返回 session/thread/resume not found、invalid、expired 等失效信号，PC 节点会清理 task journal 与旧版 `%TEMP%\elon_codex_sessions.json` 映射，并用同一 `req_id` 自动 fresh retry。
+- 本轮已把 Codex session 读取、失效判断和清理旧缓存抽到 `node_agent_codex_session.rs`，避免继续把 Route A session 逻辑堆进 3000 行以上的 `node_agent_main.rs`。
 
 ## 验证结果
 
@@ -66,6 +68,8 @@
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，6 passed（新增本机输出、工具事件回放和 Route A pid 记录）
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_resume -- --nocapture`，4 passed（新增 Codex session resume 契约）
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，7 passed（新增 Codex session 持久化）
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`，8 passed（新增 stale Codex session 清理）
+- 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_codex_session -- --nocapture`，3 passed（新增 stale resume 检测、journal 优先读取和旧缓存清理）
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval -- --nocapture`，4 passed（新增 pending waiter 查询）
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_server_runtime -- --nocapture`，5 passed
 - 通过：`cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough -- --nocapture`，4 passed
@@ -76,7 +80,7 @@
 - 通过：`node scripts\test-pc-dev-assets.js`
 - 通过：`cargo check --manifest-path server\Cargo.toml --bin elon-server --bin elon-pc-node`
 - 通过：`cargo clippy --manifest-path server\Cargo.toml --bin elon-pc-node -- -D warnings`
-- 通过：`cargo test --manifest-path server\Cargo.toml --all-features -- --test-threads=1`，`elon-pc-node` 113 passed，`elon-server` 532 passed
+- 通过：`cargo test --manifest-path server\Cargo.toml --all-features -- --test-threads=1`，`elon-pc-node` 117 passed，`elon-server` 534 passed
 - 通过：`git diff --check`，仅有 Git 的 CRLF 工作区提示
 - 通过：`cargo fmt --manifest-path server\Cargo.toml --all --check`
 - 未通过：`cargo clippy --manifest-path server\Cargo.toml --all-targets --all-features -- -D warnings`，退出 101；剩余为服务端历史 lint（例如 `billing_pay.rs`、`agent.rs`、`store.rs`、`tools.rs`、`project_membership.rs`、`project_mobile.rs` 等），不属于本次恢复补丁。

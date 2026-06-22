@@ -23,6 +23,7 @@
 15. 本机事件回放：PC 节点把 Route A stdout/stderr 与 Route B/C 结构化工具事件写入本机 journal；PC 前端按 `pc_req_id + since` 把本机 journal 事件补进任务消息时间线，提供快照/轮询式事件回放。
 16. 同进程运行句柄显式化：PC 节点把活跃 `CliPrompt` 从裸取消 sender 升级为 live run handle，暴露 route、PID、lease、pending approvals，让前端只在本机仍有真实 waiter 时显示审批按钮。
 17. Codex 会话续接锚点：云端 PC Codex 分发下发稳定 `--session-id`，PC 节点把真实 Codex session 写入本机 journal/resume 契约，前端提示“Codex 会话可续接”。
+18. Codex stale resume 自愈：本机节点检测 `codex exec resume` 失效后清理旧 session 映射，并用同一任务自动 fresh retry，避免用户因为过期本地 session 卡死。
 
 ## 风险
 
@@ -49,6 +50,7 @@
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_agent_runtime_choice -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_route_c_status -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_journal -- --nocapture`
+- `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_codex_session -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_task_resume -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-pc-node node_agent_tool_approval -- --nocapture`
 - `cargo test --manifest-path server\Cargo.toml --bin elon-server pc_cli_passthrough -- --nocapture`
