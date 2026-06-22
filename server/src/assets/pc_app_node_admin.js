@@ -82,6 +82,7 @@
                 <button class="node-mini-button" type="button" id="nodeEnvRefresh">重新检查</button>
               </div>
               <div class="node-env-grid" id="nodeEnvGrid"><span>检查中...</span></div>
+              <div class="node-runtime-contract" id="nodeApiRuntimeContract"></div>
               <div class="node-admin-actions"><button class="node-action primary" type="button" id="nodeEnvInstall">一键安装 / 修复</button></div>
               <label class="node-form-field"><span>API Key</span><input id="nodeOpenAiKey" type="password" placeholder="sk-..." autocomplete="off" /></label>
               <label class="node-form-field"><span>Route B 模型</span><input id="nodeApiRuntimeModel" placeholder="如 gpt-5.4-mini" autocomplete="off" /></label>
@@ -480,9 +481,46 @@
         ['Claude CLI', env.claude, '可选'],
         ['Gemini CLI', env.gemini, '可选']
       ];
-      $('#nodeEnvGrid').innerHTML = items.map(([name, ok, note]) => `
+      const grid = $('#nodeEnvGrid');
+      if (grid) grid.innerHTML = items.map(([name, ok, note]) => `
         <div class="${ok ? 'ok' : 'miss'}"><strong>${escapeHtml(name)}</strong><span>${ok ? '可用' : '未就绪'} · ${escapeHtml(note)}</span></div>
       `).join('');
+      renderApiRuntimeContract(env.api_runtime_contract || env.apiRuntimeContract);
+    }
+
+    function renderApiRuntimeContract(contract) {
+      const target = $('#nodeApiRuntimeContract');
+      if (!target) return;
+      const supported = arrayStrings(contract && (contract.supported_tools || contract.supportedTools));
+      if (!supported.length) {
+        target.innerHTML = '<div class="node-contract-empty">Route B 工具契约未上报，刷新节点或更新客户端。</div>';
+        return;
+      }
+      const approvals = arrayStrings(contract.approval_required_tools || contract.approvalRequiredTools);
+      const readOnly = arrayStrings(contract.read_only_tools || contract.readOnlyTools);
+      const limitations = arrayStrings(contract.limitations);
+      const core = ['read_file_range', 'apply_patch', 'run_command'].filter((tool) => supported.includes(tool));
+      target.innerHTML = `
+        <div class="node-contract-head">
+          <strong>${escapeHtml(clean(contract.label) || 'Route B 本机 API runtime')}</strong>
+          <span>${escapeHtml(clean(contract.route) || 'route_b_api_runtime')}</span>
+        </div>
+        <div class="node-contract-tags">
+          ${supported.map((tool) => `<span>${escapeHtml(tool)}</span>`).join('')}
+        </div>
+        <div class="node-contract-lines">
+          ${contractLine('核心能力', (core.length ? core : supported.slice(0, 4)).join(' / '))}
+          ${contractLine('只读工具', readOnly.join(' / ') || '未上报')}
+          ${contractLine('需要确认', approvals.join(' / ') || '审批策略未上报')}
+          ${contractLine('命令策略', clean(contract.command_policy || contract.commandPolicy) || '未上报')}
+          ${contractLine('恢复限制', clean(contract.recovery_policy || contract.recoveryPolicy) || '未上报')}
+        </div>
+        ${limitations.length ? `<ul class="node-contract-notes">${limitations.map((note) => `<li>${escapeHtml(note)}</li>`).join('')}</ul>` : ''}
+      `;
+    }
+
+    function contractLine(label, value) {
+      return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`;
     }
 
     function modelsTable(models) {
@@ -526,6 +564,12 @@
 
     function row(label, value) {
       return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(clean(value) || '未上报')}</strong></div>`;
+    }
+
+    function arrayStrings(value) {
+      return Array.isArray(value)
+        ? value.map((item) => clean(item)).filter(Boolean)
+        : [];
     }
 
     function setResult(id, message, kind) {

@@ -6,6 +6,17 @@ use std::path::Path;
 
 const DEFAULT_OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
+const ROUTE_B_SUPPORTED_TOOLS: &[&str] = &[
+    "list_dir",
+    "read_file",
+    "read_file_range",
+    "write_file",
+    "apply_patch",
+    "run_command",
+];
+const ROUTE_B_APPROVAL_REQUIRED_TOOLS: &[&str] = &["write_file", "apply_patch", "run_command"];
+const ROUTE_B_READ_ONLY_TOOLS: &[&str] = &["list_dir", "read_file", "read_file_range"];
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct ApiRuntimeEnvStatus {
     pub key_configured: bool,
@@ -13,6 +24,22 @@ pub(crate) struct ApiRuntimeEnvStatus {
     pub model: Option<String>,
     pub api_base: String,
     pub ready: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub(crate) struct ApiRuntimeToolContract {
+    pub route: String,
+    pub label: String,
+    pub mode: String,
+    pub supported_tools: Vec<String>,
+    pub read_only_tools: Vec<String>,
+    pub approval_required_tools: Vec<String>,
+    pub path_policy: String,
+    pub command_policy: String,
+    pub approval_policy: String,
+    pub audit_policy: String,
+    pub recovery_policy: String,
+    pub limitations: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -54,6 +81,28 @@ pub(crate) fn status_from_lookup(lookup: impl Fn(&str) -> Option<String>) -> Api
         model,
         api_base: normalize_api_base(&api_base),
         ready: key_configured && model_configured,
+    }
+}
+
+pub(crate) fn tool_contract() -> ApiRuntimeToolContract {
+    ApiRuntimeToolContract {
+        route: "route_b_api_runtime".to_string(),
+        label: "Route B · 本机 API runtime".to_string(),
+        mode: "direct_provider_api".to_string(),
+        supported_tools: strings(ROUTE_B_SUPPORTED_TOOLS),
+        read_only_tools: strings(ROUTE_B_READ_ONLY_TOOLS),
+        approval_required_tools: strings(ROUTE_B_APPROVAL_REQUIRED_TOOLS),
+        path_policy: "workspace_relative_no_git_no_symlink_escape".to_string(),
+        command_policy: "structured_project_command_allowlist".to_string(),
+        approval_policy: "write_file_apply_patch_run_command_require_user_approval".to_string(),
+        audit_policy: "tool_events_redact_content_and_secrets".to_string(),
+        recovery_policy: "task_journal_replay_without_original_tty_reattach".to_string(),
+        limitations: vec![
+            "不能重新接管原 CLI TTY；任务恢复依赖 journal replay".to_string(),
+            "文件访问默认限制在项目工作区内，不允许 .git 或符号链接逃逸".to_string(),
+            "命令执行走结构化白名单，不是任意 shell".to_string(),
+            "Route B 仍不是完整 Codex Desktop 级别 IDE runtime".to_string(),
+        ],
     }
 }
 
@@ -146,6 +195,10 @@ fn first_value(lookup: &impl Fn(&str) -> Option<String>, names: &[&str]) -> Opti
             .map(|value| value.trim().to_string())
             .filter(|value| !value.is_empty())
     })
+}
+
+fn strings(values: &[&str]) -> Vec<String> {
+    values.iter().map(|value| (*value).to_string()).collect()
 }
 
 fn clean_required_env_value(label: &str, value: &str, max_len: usize) -> Result<String> {
@@ -251,5 +304,33 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         assert!(text.contains("OPENAI_MODEL=new\n"));
         assert!(text.contains("OTHER=1"));
+    }
+
+    #[test]
+    fn tool_contract_exposes_route_b_capabilities_and_guardrails() {
+        let contract = tool_contract();
+        assert_eq!(contract.route, "route_b_api_runtime");
+        assert!(contract
+            .supported_tools
+            .contains(&"read_file_range".to_string()));
+        assert!(contract
+            .supported_tools
+            .contains(&"apply_patch".to_string()));
+        assert!(contract
+            .supported_tools
+            .contains(&"run_command".to_string()));
+        assert!(contract
+            .approval_required_tools
+            .contains(&"write_file".to_string()));
+        assert!(contract
+            .approval_required_tools
+            .contains(&"apply_patch".to_string()));
+        assert_eq!(
+            contract.command_policy,
+            "structured_project_command_allowlist"
+        );
+        assert!(contract
+            .recovery_policy
+            .contains("without_original_tty_reattach"));
     }
 }

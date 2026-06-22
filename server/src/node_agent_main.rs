@@ -3202,6 +3202,7 @@ async fn admin_env_check(
 ) -> axum::Json<serde_json::Value> {
     let result = tokio::task::spawn_blocking(|| {
         let api_runtime = node_agent_api_runtime_config::status_from_env();
+        let api_runtime_contract = node_agent_api_runtime_config::tool_contract();
         serde_json::json!({
             "git":          tool_available("git"),
             "java":         tool_available("java"),
@@ -3220,6 +3221,7 @@ async fn admin_env_check(
             "api_runtime_model_configured": api_runtime.model_configured,
             "api_runtime_base": api_runtime.api_base,
             "api_runtime_ready": api_runtime.ready,
+            "api_runtime_contract": api_runtime_contract,
         })
     })
     .await
@@ -3333,6 +3335,7 @@ async fn admin_save_openai_key(
     }
 
     let status = node_agent_api_runtime_config::status_from_env();
+    let contract = node_agent_api_runtime_config::tool_contract();
     let msg = if status.ready {
         "Route B 本机 API runtime 已就绪，Codex CLI 也会继承该 API Key"
     } else {
@@ -3346,6 +3349,7 @@ async fn admin_save_openai_key(
             "api_runtime_ready": status.ready,
             "api_runtime_model": status.model,
             "api_runtime_base": status.api_base,
+            "api_runtime_contract": contract,
         })),
     )
 }
