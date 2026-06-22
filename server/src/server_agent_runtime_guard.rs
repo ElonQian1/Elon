@@ -3,6 +3,12 @@
 use serde::Serialize;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
+use std::{
+    collections::{HashMap, VecDeque},
+    fmt,
+    sync::{Mutex, OnceLock},
+    time::{Duration, Instant},
+};
 
 pub(crate) use crate::agent_runtime_error_summary::operational_error_summary;
 use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
@@ -11,6 +17,7 @@ use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ServerRuntimeProtectionStatus {
     pub input_validation: &'static str,
+    pub admission_control: &'static str,
     pub billing_gate: &'static str,
     pub audit: &'static str,
     pub request_fingerprint: &'static str,
@@ -29,15 +36,142 @@ pub(crate) struct ServerRuntimeAuditSummary {
     pub limit_max_output_tokens: usize,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum ServerRuntimeAdmissionError {
+    TooManyConcurrent {
+        max_concurrent_per_user: usize,
+    },
+    RateLimited {
+        max_requests_per_minute: usize,
+        retry_after_secs: u64,
+    },
+}
+
+#[derive(Debug)]
+pub(crate) struct ServerRuntimeAdmissionGuard {
+    user_id: String,
+    released: bool,
+}
+
 pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
     ServerRuntimeProtectionStatus {
         input_validation: "messages role/content/count/total_chars",
+        admission_control: "per-user concurrency and rolling minute request limits",
         billing_gate: "shared with call_chat_llm_with_options",
         audit:
             "logs user_id, agent, model, message counts, char totals, and request fingerprint only",
         request_fingerprint:
             "sha256 over roles, content lengths, and content hashes; prompt/error text is not logged",
     }
+}
+
+pub(crate) fn try_acquire_runtime_admission(
+    user_id: &str,
+    limits: ServerAgentRuntimeLimits,
+) -> Result<ServerRuntimeAdmissionGuard, ServerRuntimeAdmissionError> {
+    let user_id = user_id.trim().to_string();
+    let mut state = admission_state()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let now = Instant::now();
+    let window = Duration::from_secs(60);
+    let entry = state.users.entry(user_id.clone()).or_default();
+    entry
+        .recent
+        .retain(|recorded| now.duration_since(*recorded) < window);
+
+    if entry.in_flight >= limits.max_concurrent_per_user {
+        return Err(ServerRuntimeAdmissionError::TooManyConcurrent {
+            max_concurrent_per_user: limits.max_concurrent_per_user,
+        });
+    }
+    if entry.recent.len() >= limits.max_requests_per_minute {
+        let retry_after_secs = entry
+            .recent
+            .front()
+            .map(|oldest| {
+                window
+                    .saturating_sub(now.duration_since(*oldest))
+                    .as_secs()
+                    .max(1)
+            })
+            .unwrap_or(60);
+        return Err(ServerRuntimeAdmissionError::RateLimited {
+            max_requests_per_minute: limits.max_requests_per_minute,
+            retry_after_secs,
+        });
+    }
+
+    entry.in_flight += 1;
+    entry.recent.push_back(now);
+    Ok(ServerRuntimeAdmissionGuard {
+        user_id,
+        released: false,
+    })
+}
+
+impl ServerRuntimeAdmissionError {
+    pub(crate) fn public_message(&self) -> String {
+        match self {
+            Self::TooManyConcurrent {
+                max_concurrent_per_user,
+            } => format!(
+                "Route C 远程模型任务并发过高：每个用户最多同时运行 {max_concurrent_per_user} 个请求"
+            ),
+            Self::RateLimited {
+                max_requests_per_minute,
+                retry_after_secs,
+            } => format!(
+                "Route C 远程模型请求过快：每分钟最多 {max_requests_per_minute} 次，请 {retry_after_secs} 秒后重试"
+            ),
+        }
+    }
+}
+
+impl fmt::Display for ServerRuntimeAdmissionError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.public_message())
+    }
+}
+
+impl Drop for ServerRuntimeAdmissionGuard {
+    fn drop(&mut self) {
+        if self.released {
+            return;
+        }
+        self.released = true;
+        let mut state = admission_state()
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let Some(entry) = state.users.get_mut(&self.user_id) else {
+            return;
+        };
+        entry.in_flight = entry.in_flight.saturating_sub(1);
+        let now = Instant::now();
+        let window = Duration::from_secs(60);
+        entry
+            .recent
+            .retain(|recorded| now.duration_since(*recorded) < window);
+        if entry.in_flight == 0 && entry.recent.is_empty() {
+            state.users.remove(&self.user_id);
+        }
+    }
+}
+
+#[derive(Default)]
+struct RuntimeAdmissionState {
+    users: HashMap<String, UserRuntimeAdmission>,
+}
+
+#[derive(Default)]
+struct UserRuntimeAdmission {
+    in_flight: usize,
+    recent: VecDeque<Instant>,
+}
+
+fn admission_state() -> &'static Mutex<RuntimeAdmissionState> {
+    static STATE: OnceLock<Mutex<RuntimeAdmissionState>> = OnceLock::new();
+    STATE.get_or_init(|| Mutex::new(RuntimeAdmissionState::default()))
 }
 
 pub(crate) fn audit_summary(
@@ -93,9 +227,13 @@ pub(crate) fn audit_summary(
 
 #[cfg(test)]
 mod tests {
-    use super::{audit_summary, operational_error_summary, protection_status};
+    use super::{
+        audit_summary, operational_error_summary, protection_status, try_acquire_runtime_admission,
+        ServerRuntimeAdmissionError,
+    };
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
     use serde_json::json;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn audit_summary_uses_shape_not_prompt_text() {
@@ -132,6 +270,7 @@ mod tests {
     fn status_describes_operational_protections() {
         let status = protection_status();
         assert!(status.input_validation.contains("total_chars"));
+        assert!(status.admission_control.contains("concurrency"));
         assert!(status.billing_gate.contains("call_chat_llm"));
         assert!(status.audit.contains("fingerprint"));
     }
@@ -146,5 +285,64 @@ mod tests {
         assert!(summary.contains("fingerprint="));
         assert!(!summary.contains("secret-token"));
         assert!(!summary.contains("user prompt text"));
+    }
+
+    #[test]
+    fn admission_gate_limits_per_user_concurrency() {
+        let user_id = unique_user("concurrent");
+        let limits = ServerAgentRuntimeLimits {
+            max_messages: 24,
+            max_total_chars: 80_000,
+            max_output_tokens: 3000,
+            max_requests_per_minute: 10,
+            max_concurrent_per_user: 1,
+            temperature: 0.2,
+        };
+
+        let first = try_acquire_runtime_admission(&user_id, limits).unwrap();
+        let second = try_acquire_runtime_admission(&user_id, limits).unwrap_err();
+        assert_eq!(
+            second,
+            ServerRuntimeAdmissionError::TooManyConcurrent {
+                max_concurrent_per_user: 1
+            }
+        );
+
+        drop(first);
+        let after_release = try_acquire_runtime_admission(&user_id, limits).unwrap();
+        drop(after_release);
+    }
+
+    #[test]
+    fn admission_gate_limits_per_user_rate() {
+        let user_id = unique_user("rate");
+        let limits = ServerAgentRuntimeLimits {
+            max_messages: 24,
+            max_total_chars: 80_000,
+            max_output_tokens: 3000,
+            max_requests_per_minute: 1,
+            max_concurrent_per_user: 10,
+            temperature: 0.2,
+        };
+
+        let first = try_acquire_runtime_admission(&user_id, limits).unwrap();
+        drop(first);
+        let second = try_acquire_runtime_admission(&user_id, limits).unwrap_err();
+        assert!(matches!(
+            second,
+            ServerRuntimeAdmissionError::RateLimited {
+                max_requests_per_minute: 1,
+                retry_after_secs: 1..=60
+            }
+        ));
+        assert!(second.public_message().contains("每分钟最多 1 次"));
+    }
+
+    fn unique_user(label: &str) -> String {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        format!("user-{label}-{nanos}")
     }
 }

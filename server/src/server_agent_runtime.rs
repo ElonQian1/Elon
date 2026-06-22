@@ -14,7 +14,8 @@ use crate::{
     agent_llm_call::call_chat_llm_with_options,
     project_auth::{auth_from_headers, json_error},
     server_agent_runtime_guard::{
-        audit_summary, operational_error_summary, protection_status, ServerRuntimeProtectionStatus,
+        audit_summary, operational_error_summary, protection_status, try_acquire_runtime_admission,
+        ServerRuntimeProtectionStatus,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
     types::{AgentConfig, AppState},
@@ -89,6 +90,19 @@ pub async fn chat_handler(
     let agent = match resolve_server_runtime_agent(&state, req.agent.as_deref()).await {
         Some(agent) => agent,
         None => return json_error(StatusCode::SERVICE_UNAVAILABLE, "服务器未配置可用 AI 代理"),
+    };
+    let _admission = match try_acquire_runtime_admission(&user.id, limits) {
+        Ok(guard) => guard,
+        Err(error) => {
+            tracing::warn!(
+                target: "server_agent_runtime",
+                user_id = %user.id,
+                request_fingerprint = %audit.request_fingerprint,
+                admission_error = %error,
+                "pc_server_runtime request rejected by admission control"
+            );
+            return json_error(StatusCode::TOO_MANY_REQUESTS, error.public_message());
+        }
     };
     tracing::info!(
         target: "server_agent_runtime",
