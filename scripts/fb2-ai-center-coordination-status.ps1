@@ -75,6 +75,7 @@ function Get-Fb2AiCenterCoordinationStatus {
         [object]$SampleSetState,
         [object]$AnswerReadinessState,
         [object]$UserScenarioAudit,
+        [object]$DomainDataBlueprint,
         [object]$GoalGapAudit,
         [object]$LivePreflightRequest,
         [bool]$TokenPresent,
@@ -184,6 +185,16 @@ function Get-Fb2AiCenterCoordinationStatus {
             context_format = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $UserScenarioAudit "context_format")
             mcp_status = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $UserScenarioAudit "mcp_status")
             missing = @((Get-Fb2CoordinationJsonProperty $UserScenarioAudit "missing" @()))
+        }
+        domain_data_blueprint = [ordered]@{
+            schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "schema")
+            complete = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "complete")
+            context_format = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "context_format")
+            first_phase_delivery = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "first_phase_delivery")
+            mcp_status = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "mcp_status")
+            source_of_truth = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "source_of_truth")
+            lane_count = [int](Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "lane_count" 0)
+            stores_fb2_business_data_in_main_project = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $DomainDataBlueprint "stores_fb2_business_data_in_main_project")
         }
         goal_gap_audit = [ordered]@{
             schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $GoalGapAudit "schema")

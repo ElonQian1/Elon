@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-context-sample-set-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-answer-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-user-scenario-audit-status.ps1")
+. (Join-Path $PSScriptRoot "fb2-domain-data-blueprint-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-gap-audit-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-live-preflight-request-status.ps1")
@@ -102,6 +103,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $sampleRequestState = Get-Fb2ContextSampleRequestState -Path $(if ($null -eq $latestSampleRequestFile) { "" } else { $latestSampleRequestFile.FullName })
     $sampleSetState = Get-Fb2ContextSampleSetState -Path $(if ($null -eq $latestSampleSetFile) { "" } else { $latestSampleSetFile.FullName })
     $answerReadinessState = Get-Fb2ContextAnswerReadinessState -SampleSetState $sampleSetState
+    $domainDataBlueprint = Get-Fb2DomainDataBlueprintState
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
@@ -141,6 +143,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -SampleSetState $sampleSetState `
         -AnswerReadinessState $answerReadinessState `
         -UserScenarioAudit $userScenarioAudit `
+        -DomainDataBlueprint $domainDataBlueprint `
         -GoalCompletion $goalCompletion `
         -LatestDataPath $(if ($null -eq $latestDataFile) { "" } else { $latestDataFile.FullName }) `
         -LatestReadOnlyPath $(if ($null -eq $latestReadOnlyFile) { "" } else { $latestReadOnlyFile.FullName }) `
@@ -168,6 +171,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -SampleSetState $sampleSetState `
         -AnswerReadinessState $answerReadinessState `
         -UserScenarioAudit $userScenarioAudit `
+        -DomainDataBlueprint $domainDataBlueprint `
         -GoalGapAudit $goalGapAudit `
         -LivePreflightRequest $livePreflightRequest `
         -TokenPresent $tokenPresent `
@@ -281,6 +285,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         latest_context_pack_sample_set = $sampleSetState
         latest_context_answer_readiness = $answerReadinessState
         latest_user_scenario_audit = $userScenarioAudit
+        latest_domain_data_blueprint = $domainDataBlueprint
         readiness = [ordered]@{
             non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
@@ -430,6 +435,14 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_user_scenario_audit.complete_count -ne 7) { $failed++ }
         if ($snapshot.latest_user_scenario_audit.context_format -ne "xml_wrapped_markdown_context_pack_with_json_metadata") { $failed++ }
         if (-not ([string]$snapshot.latest_user_scenario_audit.mcp_status -match "rest_context_pack")) { $failed++ }
+        if ($snapshot.latest_domain_data_blueprint.schema -ne "fb2.main_project.domain_data_blueprint.v1") { $failed++ }
+        if (-not [bool]$snapshot.latest_domain_data_blueprint.complete) { $failed++ }
+        if ($snapshot.latest_domain_data_blueprint.lane_count -ne 6) { $failed++ }
+        if ($snapshot.latest_domain_data_blueprint.context_format -ne "xml_wrapped_markdown_context_pack_with_json_metadata") { $failed++ }
+        if ([bool]$snapshot.latest_domain_data_blueprint.stores_fb2_business_data_in_main_project) { $failed++ }
+        if (-not (@($snapshot.latest_domain_data_blueprint.required_context_pack_sections) -contains "group_opinion_slice")) { $failed++ }
+        if (-not (@($snapshot.latest_domain_data_blueprint.required_metadata) -contains "citation_sources")) { $failed++ }
+        if (-not (@($snapshot.latest_domain_data_blueprint.anti_patterns) -contains "full_database_dump")) { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_pack_exported_samples_validated_offline")) { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_answer_readiness_validated_offline")) { $failed++ }
         if (-not [bool]$snapshot.goal_completion.non_voice_ready) { $failed++ }
@@ -441,6 +454,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_pack_sample_set_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_answer_readiness_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "user_scenario_audit_validated")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "domain_data_blueprint_fixed")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "voice_final_evidence")) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.blocked_by_external_secret) { $failed++ }
@@ -467,6 +481,9 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.coordination.context_pack_sample_set.complete) { $failed++ }
         if (-not [bool]$snapshot.coordination.context_answer_readiness.complete) { $failed++ }
         if (-not [bool]$snapshot.coordination.user_scenario_audit.complete) { $failed++ }
+        if (-not [bool]$snapshot.coordination.domain_data_blueprint.complete) { $failed++ }
+        if ($snapshot.coordination.domain_data_blueprint.lane_count -ne 6) { $failed++ }
+        if (-not ([string]$snapshot.coordination.domain_data_blueprint.mcp_status -match "future_wrapper")) { $failed++ }
         if (-not [bool]$snapshot.coordination.live_preflight_request.ready_without_token) { $failed++ }
         if ([string]$snapshot.coordination.live_preflight_request.group_chat_test_method -ne "direct_api_read") { $failed++ }
         if ([bool]$snapshot.coordination.live_preflight_request.screenshots_accepted) { $failed++ }

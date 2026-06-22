@@ -52,6 +52,7 @@ function Get-Fb2GoalGapAuditState {
         [object]$SampleSetState,
         [object]$AnswerReadinessState,
         [object]$UserScenarioAudit,
+        [object]$DomainDataBlueprint,
         [object]$GoalCompletion,
         [string]$LatestDataPath,
         [string]$LatestReadOnlyPath,
@@ -76,6 +77,7 @@ function Get-Fb2GoalGapAuditState {
     $sampleSetComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $SampleSetState "complete")
     $answerReadinessComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $AnswerReadinessState "complete")
     $userScenarioAuditComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $UserScenarioAudit "complete")
+    $domainDataBlueprintComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $DomainDataBlueprint "complete")
     $nonVoiceReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $GoalCompletion "non_voice_ready")
     $fullFinalReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $GoalCompletion "full_final_ready")
 
@@ -85,6 +87,7 @@ function Get-Fb2GoalGapAuditState {
     if ($sampleSetComplete) { $completed += "context_pack_sample_set_validated" } else { $missing += "context_pack_sample_set_validation" }
     if ($answerReadinessComplete) { $completed += "context_answer_readiness_validated" } else { $missing += "context_answer_readiness" }
     if ($userScenarioAuditComplete) { $completed += "user_scenario_audit_validated" } else { $missing += "user_scenario_audit" }
+    if ($domainDataBlueprintComplete) { $completed += "domain_data_blueprint_fixed" } else { $missing += "domain_data_blueprint" }
     if ($latestDataSuccess -and $feedbackComplete -and $dataDirectReadComplete) {
         $completed += "live_data_only_visible_chat_feedback_historical_ready"
     } else {

@@ -2,6 +2,8 @@
 
 fb2 用户真正需要的是“AI 能读懂 fb2 平台数据并帮助分析”，不是简单联网搜索。主项目应该把 fb2 提供的数据变成可检索、可引用、可评测的上下文。
 
+机器可读口径由 `scripts\fb2-domain-data-blueprint-status.ps1` 固定，状态快照字段为 `latest_domain_data_blueprint schema=fb2.main_project.domain_data_blueprint.v1`。它把本文件路线压缩成 6 条数据 lane：比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计。若后续问“fb2 应该给主项目 AI 什么格式，是 Markdown 还是 MCP”，以该字段为准：第一阶段是 XML-wrapped Markdown Context Pack + JSON metadata + tool manifest/tools/execute，MCP 以后只能作为包装层。
+
 ## 阶段 1：Context Pack
 
 先做一个稳定的 `GET /api/main-project/context/pack`。
