@@ -21,6 +21,8 @@
   button:hover { background: #2ea043; }
   button.secondary, .button-link.secondary { background: #30363d; }
   button.secondary:hover, .button-link.secondary:hover { background: #3f4954; }
+  button.danger { background: #6e2630; }
+  button.danger:hover { background: #8b343f; }
   button:disabled { background: #30363d; cursor: not-allowed; }
   .button-link { display: inline-flex; align-items: center; justify-content: center; background: #238636; color: #fff; border: none; padding: 8px 18px; border-radius: 4px; cursor: pointer; font-size: 13px; text-decoration: none; min-height: 34px; box-sizing: border-box; }
   .button-link:hover { background: #2ea043; text-decoration: none; }
@@ -35,6 +37,8 @@
   .split-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
   .mini-panel { background: #0d1117; border: 1px solid #30363d; border-radius: 6px; padding: 12px; }
   .mini-panel strong { display: block; margin-bottom: 4px; }
+  .mini-lines { display: grid; gap: 6px; margin-top: 8px; font-size: 12px; color: #8b949e; }
+  .mini-lines code { display: inline-block; max-width: 100%; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; white-space: nowrap; }
   @media (max-width: 720px) { .split-grid { grid-template-columns: 1fr; } }
   .warn { background: #3a2e1f; border-left: 4px solid #d29922; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
   .ok-toast { background: #1f3a26; border-left: 4px solid #2ea043; padding: 10px 14px; border-radius: 4px; font-size: 13px; margin: 10px 0; }
@@ -122,6 +126,30 @@
 
   <h3>当前配置</h3>
   <div class="grid" id="cfg"></div>
+
+  <h3>客户端维护</h3>
+  <div class="card">
+    <div class="split-grid">
+      <div class="mini-panel">
+        <strong>安装状态</strong>
+        <div id="clientMaintSummary" class="mini-lines">加载中…</div>
+      </div>
+      <div class="mini-panel">
+        <strong>本机文件</strong>
+        <div id="clientMaintPaths" class="mini-lines">加载中…</div>
+      </div>
+    </div>
+    <div class="action-row">
+      <button class="secondary" type="button" onclick="openMaintenanceTarget('install_dir', this)">打开安装目录</button>
+      <button class="secondary" type="button" onclick="openMaintenanceTarget('logs', this)">打开日志目录</button>
+      <button class="secondary" type="button" onclick="openMaintenanceTarget('config_dir', this)">打开配置目录</button>
+      <button class="secondary" type="button" onclick="openMaintenanceTarget('state_file', this)">定位配置文件</button>
+      <button type="button" onclick="exportClientDiagnostics(this)">导出诊断</button>
+      <button type="button" onclick="runClientUpdate(this)">检查更新</button>
+      <button class="danger" type="button" onclick="uninstallClient(this)">卸载客户端</button>
+    </div>
+    <div id="clientMaintResult"></div>
+  </div>
 
   <h3>电脑医生</h3>
   <div class="card">
@@ -290,6 +318,15 @@ function updatePcDoctorLink(url) {
   const link = document.getElementById('pcDoctorLink');
   if (link) link.href = url;
 }
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+function pathCode(path) {
+  if (!path) return '<span>未提供</span>';
+  return `<code title="${esc(path)}">${esc(path)}</code>`;
+}
 async function load() {
   if (window.__elonDup) return;
   const r = await localFetch('/api/status').then(r => r.json()).catch(() => null);
@@ -391,6 +428,118 @@ function doLoginToken() {
 async function doLogout() {
   await localFetch('/api/logout', { method: 'POST' }).catch(() => {});
   setTimeout(load, 300);
+}
+
+// ── 客户端维护 ─────────────────────────────────────────────────────────────
+async function loadClientMaintenance() {
+  const summary = document.getElementById('clientMaintSummary');
+  const paths = document.getElementById('clientMaintPaths');
+  if (!summary || !paths) return;
+  const r = await localFetch('/api/client-maintenance').then(r => r.json()).catch(() => null);
+  if (!r || !r.ok) {
+    summary.innerHTML = '<span style="color:#f85149">维护状态读取失败</span>';
+    paths.innerHTML = '';
+    return;
+  }
+  const installed = r.installed === undefined ? '未知' : (r.installed ? '已安装' : '未完整安装');
+  const fromInstall = r.running_from_install_dir === undefined ? '未知' : (r.running_from_install_dir ? '是' : '否');
+  summary.innerHTML = [
+    `<span>平台：${esc(r.platform || '-')}</span>`,
+    `<span>支持维护动作：${r.supported ? '是' : '否'}</span>`,
+    `<span>安装状态：${esc(installed)}</span>`,
+    `<span>当前进程来自安装目录：${esc(fromInstall)}</span>`,
+    `<span>客户端版本：${esc(r.version || '-')}</span>`,
+  ].join('');
+  paths.innerHTML = [
+    `<span>安装目录：${pathCode(r.install_dir)}</span>`,
+    `<span>日志目录：${pathCode(r.task_journal_dir)}</span>`,
+    `<span>配置目录：${pathCode(r.config_dir)}</span>`,
+    `<span>配置文件：${pathCode(r.state_file)}</span>`,
+  ].join('');
+}
+
+function setBusy(btn, text) {
+  if (!btn) return () => {};
+  const prev = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = text;
+  return () => {
+    btn.disabled = false;
+    btn.textContent = prev;
+  };
+}
+
+function maintenanceOut() {
+  return document.getElementById('clientMaintResult');
+}
+
+async function openMaintenanceTarget(target, btn) {
+  const restore = setBusy(btn, '打开中…');
+  const out = maintenanceOut();
+  try {
+    const resp = await localFetch('/api/client-maintenance/open', {
+      method: 'POST',
+      body: JSON.stringify({ target }),
+    });
+    const j = await resp.json();
+    out.innerHTML = resp.ok && j.ok
+      ? `<div class="ok-toast">✅ 已打开：${pathCode(j.opened)}</div>`
+      : `<div class="err-toast">❌ ${esc(j.error || ('HTTP ' + resp.status))}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast">❌ 请求失败: ${esc(e)}</div>`;
+  } finally {
+    restore();
+  }
+}
+
+async function exportClientDiagnostics(btn) {
+  const restore = setBusy(btn, '导出中…');
+  const out = maintenanceOut();
+  try {
+    const resp = await localFetch('/api/client-maintenance/diagnostics/export', { method: 'POST' });
+    const j = await resp.json();
+    out.innerHTML = resp.ok && j.ok
+      ? `<div class="ok-toast">✅ ${esc(j.message || '已生成诊断信息')}：${pathCode(j.path)}</div>`
+      : `<div class="err-toast">❌ ${esc(j.error || ('HTTP ' + resp.status))}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast">❌ 请求失败: ${esc(e)}</div>`;
+  } finally {
+    restore();
+  }
+}
+
+async function runClientUpdate(btn) {
+  const restore = setBusy(btn, '检查中…');
+  const out = maintenanceOut();
+  try {
+    const resp = await localFetch('/api/client-maintenance/update', { method: 'POST' });
+    const j = await resp.json();
+    out.innerHTML = resp.ok && j.ok
+      ? `<div class="ok-toast">✅ ${esc(j.message || '已开始检查更新')}</div>`
+      : `<div class="err-toast">❌ ${esc(j.error || ('HTTP ' + resp.status))}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast">❌ 请求失败: ${esc(e)}</div>`;
+  } finally {
+    restore();
+    setTimeout(loadClientMaintenance, 1500);
+  }
+}
+
+async function uninstallClient(btn) {
+  if (!confirm('确认卸载一龙 PC 节点？这会停止本机节点并清理安装目录。')) return;
+  const restore = setBusy(btn, '卸载中…');
+  const out = maintenanceOut();
+  try {
+    const resp = await localFetch('/api/client-maintenance/uninstall', { method: 'POST' });
+    const j = await resp.json();
+    out.innerHTML = resp.ok && j.ok
+      ? `<div class="ok-toast">✅ ${esc(j.message || '已安排卸载')}</div>`
+      : `<div class="err-toast">❌ ${esc(j.error || ('HTTP ' + resp.status))}</div>`;
+  } catch (e) {
+    out.innerHTML = `<div class="err-toast">❌ 请求失败: ${esc(e)}</div>`;
+  } finally {
+    restore();
+  }
 }
 
 // ── 项目硬盘服务配置 ───────────────────────────────────────────────────────
@@ -534,9 +683,11 @@ async function saveApiKey() {
 }
 
 load();
+loadClientMaintenance();
 loadStorageConfig();
 loadEnvCheck();
 setInterval(load, 5000);
+setInterval(loadClientMaintenance, 15000);
 </script>
 </body>
 </html>
