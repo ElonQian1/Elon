@@ -1,10 +1,11 @@
 // server/src/node_agent_client_install_status.rs
 
 use serde_json::{json, Value};
-use std::{
-    fs,
-    path::{Path, PathBuf},
-};
+use std::{fs, path::Path};
+
+const CLIENT_EXE_NAME: &str = "一龙PC节点.exe";
+const UNINSTALL_EXE_NAME: &str = "卸载一龙PC节点.exe";
+const INTERNAL_DIR_NAME: &str = "_internal";
 
 const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
     "安装一龙PC节点.cmd",
@@ -27,7 +28,7 @@ pub(crate) fn status_payload() -> Value {
     {
         let install_dir = std::env::var("LOCALAPPDATA")
             .ok()
-            .map(|value| PathBuf::from(value).join("ElonNode"));
+            .map(|value| std::path::PathBuf::from(value).join("ElonNode"));
         match install_dir {
             Some(install_dir) => {
                 status_for_install_dir(&install_dir, std::env::current_exe().ok().as_deref())
@@ -52,9 +53,9 @@ pub(crate) fn status_payload() -> Value {
 }
 
 pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Path>) -> Value {
-    let client_exe = install_dir.join(crate::node_client_launcher::CLIENT_EXE_NAME);
-    let uninstall_exe = install_dir.join(crate::node_client_launcher::UNINSTALL_EXE_NAME);
-    let internal_dir = install_dir.join(crate::node_client_launcher::INTERNAL_DIR_NAME);
+    let client_exe = install_dir.join(CLIENT_EXE_NAME);
+    let uninstall_exe = install_dir.join(UNINSTALL_EXE_NAME);
+    let internal_dir = install_dir.join(INTERNAL_DIR_NAME);
     let version_file = internal_dir.join("node-agent-version.json");
     let layout = root_layout_status(install_dir, &client_exe, &uninstall_exe, &internal_dir);
     let manifest = version_manifest_summary(&version_file);
@@ -102,11 +103,7 @@ fn root_layout_status(
     uninstall_exe: &Path,
     internal_dir: &Path,
 ) -> Value {
-    let expected = [
-        crate::node_client_launcher::CLIENT_EXE_NAME,
-        crate::node_client_launcher::UNINSTALL_EXE_NAME,
-        crate::node_client_launcher::INTERNAL_DIR_NAME,
-    ];
+    let expected = [CLIENT_EXE_NAME, UNINSTALL_EXE_NAME, INTERNAL_DIR_NAME];
     let mut entries = Vec::new();
     let mut legacy = Vec::new();
     let mut unexpected = Vec::new();
@@ -127,12 +124,9 @@ fn root_layout_status(
     unexpected.sort();
 
     let missing = [
-        (crate::node_client_launcher::CLIENT_EXE_NAME, client_exe),
-        (
-            crate::node_client_launcher::UNINSTALL_EXE_NAME,
-            uninstall_exe,
-        ),
-        (crate::node_client_launcher::INTERNAL_DIR_NAME, internal_dir),
+        (CLIENT_EXE_NAME, client_exe),
+        (UNINSTALL_EXE_NAME, uninstall_exe),
+        (INTERNAL_DIR_NAME, internal_dir),
     ]
     .into_iter()
     .filter_map(|(name, path)| (!path.exists()).then_some(name))
@@ -205,8 +199,7 @@ fn path_to_string(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::status_for_install_dir;
-    use crate::node_client_launcher::{CLIENT_EXE_NAME, INTERNAL_DIR_NAME, UNINSTALL_EXE_NAME};
+    use super::{status_for_install_dir, CLIENT_EXE_NAME, INTERNAL_DIR_NAME, UNINSTALL_EXE_NAME};
     use serde_json::json;
     use std::{fs, path::PathBuf};
 
