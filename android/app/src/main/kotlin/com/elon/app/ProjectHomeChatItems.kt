@@ -2,7 +2,7 @@ package com.elon.app
 
 import android.content.Context
 
-internal fun AppProject.toProjectHomeFriend(context: Context): AppFriend {
+internal fun AppProject.toProjectHomeFriend(): AppFriend {
     val subtitle = projectHomeSubtitle()
     return AppFriend(
         id = projectHomeItemId(),

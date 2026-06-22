@@ -55,6 +55,10 @@ internal class MainHomeListActions(
     private val projectMemberCache = mutableMapOf<String, List<AppGroupMember>>()
     private val projectMemberRequests = mutableSetOf<String>()
 
+    init {
+        binding.ensureConversationPageScrollable()
+    }
+
     fun showFriendLocalSearch() {
         if (binding.conversationPage.visibility != View.VISIBLE || binding.chatPage.visibility == View.VISIBLE) return
         friendSearchActive = true
@@ -62,6 +66,7 @@ internal class MainHomeListActions(
         shouldFocusFriendSearch = true
         animateFriendSearchEnter = true
         renderConversationList()
+        binding.scrollConversationPageToTop()
     }
 
     fun exitFriendLocalSearch(): Boolean {
@@ -143,7 +148,7 @@ internal class MainHomeListActions(
                             openProject(item.index)
                         }
                     } else {
-                        homeRows().createFriendRow(item.project.toProjectHomeFriend(activity)) {
+                        homeRows().createFriendRow(item.project.toProjectHomeFriend()) {
                             clearFriendSearchState()
                             openProject(item.index)
                         }
