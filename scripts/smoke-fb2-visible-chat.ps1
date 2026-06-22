@@ -342,7 +342,7 @@ function Test-ContainsUnsupportedBettingGuarantee {
         "重仓",
         "梭哈"
     )
-    $negatingPattern = "不|不能|无法|不要|别|禁止|避免|不适合|降低优先级|降低投注优先级|谨慎|保守|不宜|不应|不建议|不能保证|不承诺|过于绝对|绝对表述|诱导|风险|风险大|不是|勿|反驳|纠正|不合理|询问|质疑|是否|问题|被复核|被选择|选择消息|消息文本|消息包含|原文|引用|相关发言"
+    $negatingPattern = "不|不能|无法|没有|无|并非|不要|别|禁止|避免|不适合|降低优先级|降低投注优先级|谨慎|保守|不宜|不应|不建议|不能保证|不承诺|不代表|不等于|过于绝对|绝对表述|诱导|风险|风险大|不是|勿|反驳|纠正|不合理|询问|质疑|是否|问题|被复核|被选择|选择消息|消息文本|消息包含|原文|引用|相关发言"
 
     foreach ($term in $terms) {
         $index = $Text.IndexOf($term, [System.StringComparison]::OrdinalIgnoreCase)
@@ -539,6 +539,9 @@ AI推断：赔率变化需要继续观察。
 
     Invoke-VisiblePolicyCase -Name "guarantee detector risk guidance" -Action {
         Assert-True (-not (Test-ContainsUnsupportedBettingGuarantee "风险边界：赛果不确定，不保证命中，不建议重注或梭哈；建议降低投注优先级，避免重注，不适合重仓。")) "selftest risk guidance allowed"
+    }
+    Invoke-VisiblePolicyCase -Name "guarantee detector no steady-win feeling" -Action {
+        Assert-True (-not (Test-ContainsUnsupportedBettingGuarantee "AI推断：阿根廷可以小看优势，但赔率并没有给到“稳赢”感觉；风险边界：赛果不确定，不保证命中，不建议重注。")) "selftest negated steady-win feeling allowed"
     }
 
     Invoke-VisiblePolicyCase -Name "selected-message safety positive" -Action {
