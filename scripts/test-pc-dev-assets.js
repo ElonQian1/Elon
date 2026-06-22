@@ -801,6 +801,7 @@ function testProjectReadinessChecklist() {
   };
   const readyHtml = create(readyState).renderMemberPanel({
     id: 'p1',
+    role: 'owner',
     node_id: 'node-1',
     workspace_path: 'D:/demo',
     runtime_permission: 'project_write'
@@ -816,6 +817,7 @@ function testProjectReadinessChecklist() {
 
   const fullAccessHtml = create(readyState).renderMemberPanel({
     id: 'p1',
+    role: 'owner',
     node_id: 'node-1',
     workspace_path: 'D:/demo',
     runtime_permission: 'full_access'
@@ -827,6 +829,7 @@ function testProjectReadinessChecklist() {
     projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
   }).renderMemberPanel({
     id: 'p1',
+    role: 'owner',
     node_id: 'node-1',
     workspace_path: 'D:/demo',
     runtime_permission: 'project_write'
@@ -834,7 +837,7 @@ function testProjectReadinessChecklist() {
   assert.ok(!failedRouteAHtml.includes('可以开发'), 'failed Route A probe alone should not mark project developable');
   assert.ok(failedRouteAHtml.includes('codex CLI 探测未通过'), 'readiness should explain failed Route A probe');
 
-  const blockedHtml = create({ nodes: [], projectSpace: { channels: [] } }).renderMemberPanel({ id: 'p2' });
+  const blockedHtml = create({ nodes: [], projectSpace: { channels: [] } }).renderMemberPanel({ id: 'p2', role: 'owner' });
   assert.ok(blockedHtml.includes('未绑定本机'), 'unbound project should not be marked ready');
   assert.ok(blockedHtml.includes('未绑定本机项目目录'), 'blocked checklist should explain missing workspace');
   assert.ok(blockedHtml.includes('未找到 AI 开发频道'), 'blocked checklist should explain missing dev channel');
@@ -1024,6 +1027,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('目录信息不足'), 'project registration should block submission when required fields are missing');
   assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
   assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
+  assert.ok(pcApp.includes('positionRailTooltip'), 'PC rail should position its custom hover tooltip');
+  assert.ok(pcApp.includes('aria-describedby'), 'PC rail icons should expose the shared tooltip to assistive tech');
+  assert.ok(pcApp.includes("button.removeAttribute('title')"), 'PC rail icons should avoid duplicate native tooltips');
 
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
   assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');
@@ -1032,6 +1038,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppCss.includes('.settings-project-meta-row'), 'PC app CSS should style structured project inspection metadata');
   assert.ok(pcAppCss.includes('.settings-project-meta-row.is-warning'), 'PC app CSS should style project registration warnings');
   assert.ok(pcAppCss.includes('.settings-project-meta-row.is-error'), 'PC app CSS should style blocked project registration state');
+  assert.ok(pcAppCss.includes('.rail-avatar::before'), 'PC rail should render a Discord-like active indicator');
+  assert.ok(pcAppCss.includes('.rail-avatar:focus-visible'), 'PC rail should have a keyboard focus state');
+  assert.ok(pcAppCss.includes('border-radius: inherit'), 'PC rail images should clip to the current icon shape');
+  assert.ok(pcAppCss.includes('--rail-tooltip-arrow-y'), 'PC rail tooltip arrow should track clamped tooltip position');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');

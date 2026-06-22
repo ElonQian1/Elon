@@ -1247,15 +1247,35 @@
       if (event.target.closest('#accountMenu') || event.target.closest('.user-strip')) return;
       setAccountMenu(false);
     });
+    window.addEventListener('resize', hideRailTooltip);
+    document.addEventListener('scroll', hideRailTooltip, true);
   }
 
   function attachRailTooltip(button) {
     if (!button || button.dataset.tooltipBound) return;
     button.dataset.tooltipBound = '1';
+    if (els.railTooltip) button.setAttribute('aria-describedby', 'railTooltip');
+    button.removeAttribute('title');
     button.addEventListener('mouseenter', showRailTooltip);
     button.addEventListener('focus', showRailTooltip);
     button.addEventListener('mouseleave', hideRailTooltip);
     button.addEventListener('blur', hideRailTooltip);
+  }
+
+  function positionRailTooltip(anchor) {
+    if (!els.railTooltip || !anchor) return;
+    const rect = anchor.getBoundingClientRect();
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+    const tooltipHeight = els.railTooltip.offsetHeight || 0;
+    const desiredTop = rect.top + rect.height / 2;
+    const minTop = 12 + tooltipHeight / 2;
+    const maxTop = Math.max(minTop, viewportHeight - 12 - tooltipHeight / 2);
+    const top = Math.min(Math.max(desiredTop, minTop), maxTop);
+    const arrowLimit = Math.max(0, tooltipHeight / 2 - 9);
+    const arrowOffset = Math.min(Math.max(desiredTop - top, -arrowLimit), arrowLimit);
+    els.railTooltip.style.left = `${Math.round(rect.right + 12)}px`;
+    els.railTooltip.style.top = `${Math.round(top)}px`;
+    els.railTooltip.style.setProperty('--rail-tooltip-arrow-y', `${Math.round(arrowOffset)}px`);
   }
 
   function showRailTooltip(event) {
@@ -1263,16 +1283,15 @@
     const button = event.currentTarget;
     const label = clean(button.dataset.label || button.getAttribute('aria-label'));
     if (!label) return;
-    const rect = button.getBoundingClientRect();
     els.railTooltip.textContent = label;
-    els.railTooltip.style.left = `${Math.round(rect.right + 12)}px`;
-    els.railTooltip.style.top = `${Math.round(rect.top + rect.height / 2)}px`;
     els.railTooltip.classList.add('show');
+    positionRailTooltip(button);
   }
 
   function hideRailTooltip() {
     if (!els.railTooltip) return;
     els.railTooltip.classList.remove('show');
+    els.railTooltip.style.removeProperty('--rail-tooltip-arrow-y');
   }
 
   async function loadBaseData() {

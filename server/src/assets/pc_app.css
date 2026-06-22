@@ -110,12 +110,35 @@ button { cursor: pointer; }
   transition: border-radius .14s ease, background .14s ease;
   flex: 0 0 auto;
 }
+.rail-avatar::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 4px;
+  height: 0;
+  border-radius: 0 999px 999px 0;
+  background: #f2f3f5;
+  transform: translateY(-50%);
+  transition: height .14s ease;
+}
+.rail-avatar:hover::before {
+  height: 20px;
+}
+.rail-avatar.active::before {
+  height: 36px;
+}
+.rail-avatar:focus-visible {
+  outline: 2px solid rgba(234, 242, 255, .72);
+  outline-offset: 3px;
+}
 .rail-avatar > .rail-icon {
   width: 100%;
   height: 100%;
   display: grid;
   place-items: center;
   position: relative;
+  border-radius: inherit;
   overflow: hidden;
 }
 .rail-avatar > .rail-icon img {
@@ -332,7 +355,9 @@ button { cursor: pointer; }
   z-index: 50;
   left: 0;
   top: 0;
-  max-width: 260px;
+  max-width: min(260px, calc(100vw - 96px));
+  overflow: hidden;
+  text-overflow: ellipsis;
   padding: 8px 10px;
   border-radius: 6px;
   background: #0b0c0f;
@@ -357,7 +382,7 @@ button { cursor: pointer; }
   content: "";
   position: absolute;
   left: -5px;
-  top: 50%;
+  top: calc(50% + var(--rail-tooltip-arrow-y, 0px));
   width: 10px;
   height: 10px;
   background: #0b0c0f;
