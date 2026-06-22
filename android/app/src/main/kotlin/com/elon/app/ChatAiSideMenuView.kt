@@ -28,6 +28,7 @@ internal class ChatAiSideMenuView(
     private val openConversation: (Int) -> Unit,
     private val openPersonalProject: (Int) -> Unit,
     private val openJointProject: (Int) -> Unit,
+    private val openProjectSpace: () -> Unit,
     private val copyConversationIdentity: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
     private val showCreateConversationDialog: () -> Unit,
@@ -104,6 +105,7 @@ internal class ChatAiSideMenuView(
         projectDirectoryGroup.removeAllViews()
         addPersonalProjects()
         addJointProjects()
+        addProjectSpaceEntry()
         updateChatSectionGap()
     }
 
@@ -161,6 +163,13 @@ internal class ChatAiSideMenuView(
         }
     }
 
+    private fun addProjectSpaceEntry() {
+        projectDirectoryGroup.addView(menuEntryRow("项目空间") {
+            requestClose(true)
+            postDelayed({ openProjectSpace() }, PROJECT_OPEN_DELAY_MS)
+        })
+    }
+
     private fun updateChatSectionGap() {
         val gapDp = if (!personalProjectsExpanded && !jointProjectsExpanded) {
             CHAT_SECTION_GAP_COLLAPSED_DP
@@ -195,6 +204,22 @@ internal class ChatAiSideMenuView(
                     setTextColor(Color.parseColor("#D6D6D6"))
                 }
             )
+            setOnClickListener { onClick() }
+        }
+    }
+
+    private fun menuEntryRow(title: String, onClick: () -> Unit): TextView {
+        return menuText(title).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(46)
+            ).apply {
+                topMargin = dp(2)
+            }
+            setTextColor(Color.parseColor("#D6D6D6"))
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = title
             setOnClickListener { onClick() }
         }
     }
@@ -369,7 +394,7 @@ internal class ChatAiSideMenuView(
 
     private companion object {
         const val DURATION_MS = 260L
-        const val CHAT_SECTION_GAP_COLLAPSED_DP = 196
+        const val CHAT_SECTION_GAP_COLLAPSED_DP = 148
         const val CHAT_SECTION_GAP_EXPANDED_DP = 28
         const val PROJECT_OPEN_DELAY_MS = 220L
     }

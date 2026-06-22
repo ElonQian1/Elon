@@ -69,9 +69,9 @@ internal class MainNavigationController(
     fun setupNavigation() {
         applyProjectManagementDesignMetrics()
         binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
-        binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
+        binding.tabProject.setOnClickListener { showProjectPlaza() }
         binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
-        binding.projectHomeTopTabWrap.setOnClickListener { showProjectHome(animate = false) }
+        binding.projectHomeTopTabWrap.setOnClickListener { showProjectPlaza() }
         binding.projectPlazaTopTabWrap.setOnClickListener { showProjectPlaza() }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
@@ -100,25 +100,26 @@ internal class MainNavigationController(
         binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
-    private fun showProjectTopTabs(plazaSelected: Boolean) {
+    private fun showProjectTopTabs() {
         setProjectToolbarExpanded(true)
         binding.topTitleText.visibility = View.GONE
         binding.projectTopTabs.visibility = View.VISIBLE
-        updateProjectTopTabVisual(
-            tab = binding.projectHomeTopTab,
-            indicator = binding.projectHomeTabIndicator,
-            selected = !plazaSelected
-        )
+        binding.projectTopTabs.gravity = Gravity.CENTER
+        binding.projectHomeTopTabWrap.visibility = View.GONE
+        binding.projectPlazaTopTabWrap.visibility = View.VISIBLE
+        binding.projectHomeTabIndicator.visibility = View.INVISIBLE
         updateProjectTopTabVisual(
             tab = binding.projectPlazaTopTab,
             indicator = binding.projectPlazaTabIndicator,
-            selected = plazaSelected
+            selected = true
         )
     }
 
     private fun hideProjectTopTabs() {
         setProjectToolbarExpanded(false)
         binding.projectTopTabs.visibility = View.GONE
+        binding.projectHomeTopTabWrap.visibility = View.GONE
+        binding.projectPlazaTopTabWrap.visibility = View.VISIBLE
         setProjectHomeSegmentVisible(false)
         binding.topTitleText.visibility = View.VISIBLE
     }
@@ -201,9 +202,9 @@ internal class MainNavigationController(
         }
         binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
         binding.chatPage.visibility = View.GONE
-        binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
+        binding.projectPage.visibility = View.GONE
         binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
-        binding.marketplacePage.visibility = View.GONE
+        binding.marketplacePage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
@@ -218,13 +219,14 @@ internal class MainNavigationController(
         }
         binding.topTitleText.setOnLongClickListener(null)
         if (tab == binding.tabProject) {
-            showProjectTopTabs(plazaSelected = false)
-            setProjectHomeSegmentVisible(true)
+            loadMarketplace()
+            showProjectTopTabs()
+            setProjectHomeSegmentVisible(false)
         } else {
             hideProjectTopTabs()
         }
         binding.topTitleText.text = when (tab) {
-            binding.tabProject -> "项目管理"
+            binding.tabProject -> "项目广场"
             binding.tabProfile -> "我的"
             else -> "好友"
         }
@@ -232,8 +234,7 @@ internal class MainNavigationController(
             renderConversationList()
         }
         if (tab == binding.tabProject) {
-            renderProjectList()
-            resetProjectHomeScroll()
+            loadMarketplace()
         } else if (tab == binding.tabChat) {
             refreshFriends()
             renderConversationList()
@@ -244,10 +245,10 @@ internal class MainNavigationController(
 
     private fun finishBottomTabSelection(tab: TextView) {
         binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
-        binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
+        binding.projectPage.visibility = View.GONE
         binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
         binding.chatPage.visibility = View.GONE
-        binding.marketplacePage.visibility = View.GONE
+        binding.marketplacePage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
@@ -256,7 +257,7 @@ internal class MainNavigationController(
     private fun pageForBottomTab(tab: TextView): View? {
         return when (tab) {
             binding.tabChat -> binding.conversationPage
-            binding.tabProject -> binding.projectPage
+            binding.tabProject -> binding.marketplacePage
             binding.tabProfile -> binding.profilePage
             else -> null
         }
@@ -364,7 +365,7 @@ internal class MainNavigationController(
             return
         }
         if (binding.marketplacePage.visibility == View.VISIBLE) {
-            showProjectHome(animate = true)
+            showExitConfirmation()
             return
         }
         if (binding.agentPage.root.visibility == View.VISIBLE) {
@@ -620,7 +621,8 @@ internal class MainNavigationController(
     }
 
     fun showProjectManagement(animate: Boolean = false) {
-        showProjectHome(animate = animate)
+        if (animate) closeChatSideMenu(false)
+        showProjectPlaza()
     }
 
     fun showProjectSpace(title: String, animate: Boolean = false) {
@@ -675,74 +677,8 @@ internal class MainNavigationController(
     }
 
     private fun showProjectHome(animate: Boolean = false) {
-        if (animate && binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
-            actionPopupProvider()?.dismiss()
-            closeChatSideMenu(false)
-            pageTransitionRunning = true
-            WechatPageTransition.replaceContentToRight(
-                container = binding.contentContainer,
-                page = binding.projectPage,
-                updateContent = {
-                    renderProjectList()
-                    applyProjectHomeChrome()
-                },
-                onEnd = {
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                    renderProjectList()
-                    resetProjectHomeScroll()
-                }
-            )
-        } else if (animate && binding.marketplacePage.visibility == View.VISIBLE) {
-            actionPopupProvider()?.dismiss()
-            closeChatSideMenu(false)
-            renderProjectList()
-            applyProjectHomeChrome()
-            pageTransitionRunning = true
-            WechatPageTransition.exitToRight(
-                container = binding.contentContainer,
-                outgoing = listOf(binding.marketplacePage),
-                incoming = listOf(binding.projectPage),
-                onEnd = {
-                    binding.chatPage.visibility = View.GONE
-                    binding.inputLayout.visibility = View.GONE
-                    binding.conversationPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.marketplacePage.visibility = View.GONE
-                    binding.projectPage.visibility = View.VISIBLE
-                    showMainTabs()
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                    renderProjectList()
-                    resetProjectHomeScroll()
-                }
-            )
-        } else if (animate && binding.chatPage.visibility == View.VISIBLE) {
-            actionPopupProvider()?.dismiss()
-            closeChatSideMenu(false)
-            renderProjectList()
-            applyProjectHomeChrome()
-            pageTransitionRunning = true
-            WechatPageTransition.exitToLeft(
-                container = binding.contentContainer,
-                outgoing = listOf(binding.chatPage, binding.inputLayout),
-                incoming = listOf(binding.projectPage, binding.pageTabs),
-                onEnd = {
-                    binding.chatPage.visibility = View.GONE
-                    binding.inputLayout.visibility = View.GONE
-                    binding.conversationPage.visibility = View.GONE
-                    binding.profilePage.visibility = View.GONE
-                    binding.projectPage.visibility = View.VISIBLE
-                    showMainTabs()
-                    clearPageTranslations()
-                    pageTransitionRunning = false
-                    renderProjectList()
-                    resetProjectHomeScroll()
-                }
-            )
-        } else {
-            binding.tabProject.performClick()
-        }
+        if (animate) closeChatSideMenu(false)
+        showProjectPlaza()
     }
 
     private fun showExitConfirmation() {
@@ -836,7 +772,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
-        showProjectTopTabs(plazaSelected = false)
+        showProjectTopTabs()
         setProjectHomeSegmentVisible(true)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
@@ -866,11 +802,14 @@ internal class MainNavigationController(
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
-        showProjectTopTabs(plazaSelected = true)
+        showProjectTopTabs()
         setProjectHomeSegmentVisible(false)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.VISIBLE
+        binding.addButton.setOnClickListener {
+            showHomeActionPopup(binding.addButton, binding.tabProject)
+        }
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE

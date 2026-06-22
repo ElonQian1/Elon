@@ -160,6 +160,10 @@ internal class MainHomeListActions(
                             openFriendPageProject(item.index)
                         }
                     }
+                    row.setOnLongClickListener { anchor ->
+                        showProjectActions(item.index, anchor)
+                        true
+                    }
                     binding.conversationPage.addView(row)
                 }
             }

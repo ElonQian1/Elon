@@ -277,6 +277,7 @@ internal class ChatSideMenuController(
             openConversation = openConversation,
             openPersonalProject = openPersonalProject,
             openJointProject = openJointProject,
+            openProjectSpace = openProjectManagement,
             copyConversationIdentity = copyConversationIdentity,
             isConversationWorking = isConversationWorking,
             showCreateConversationDialog = showCreateConversationDialog,
