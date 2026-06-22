@@ -221,6 +221,38 @@ impl ToolGuard {
         Ok(())
     }
 
+    pub(crate) async fn apply_patch_diff_preview(&self, action: &Value) -> Result<Option<Value>> {
+        if action.get("tool").and_then(Value::as_str) != Some("apply_patch") {
+            return Ok(None);
+        }
+        let patch = required_str(action, "patch")?.to_string();
+        let workspace = self.workspace.clone();
+        tokio::task::spawn_blocking(move || {
+            crate::tools_patch::apply_patch_diff_preview(&workspace, &patch)
+        })
+        .await
+        .map_err(|error| anyhow!("apply_patch diff preview task failed: {error}"))?
+        .map(Some)
+    }
+
+    pub(crate) async fn verify_apply_patch_preview_unchanged(
+        &self,
+        action: &Value,
+        diff: &Value,
+    ) -> Result<()> {
+        if action.get("tool").and_then(Value::as_str) != Some("apply_patch") {
+            return Ok(());
+        }
+        let patch = required_str(action, "patch")?.to_string();
+        let diff = diff.clone();
+        let workspace = self.workspace.clone();
+        tokio::task::spawn_blocking(move || {
+            crate::tools_patch::verify_apply_patch_preview_unchanged(&workspace, &patch, &diff)
+        })
+        .await
+        .map_err(|error| anyhow!("apply_patch preview verification task failed: {error}"))?
+    }
+
     async fn apply_patch(&self, patch: &str, check_only: bool) -> Result<String> {
         let workspace = self.workspace.clone();
         let patch = patch.to_string();
@@ -976,6 +1008,42 @@ mod tests {
             .verify_write_file_preview_unchanged(&delete_action, &delete_diff)
             .await;
         assert!(deleted_result
+            .unwrap_err()
+            .to_string()
+            .contains("base changed since approval preview"));
+    }
+
+    #[tokio::test]
+    async fn apply_patch_diff_preview_reports_patch_and_detects_races() {
+        let temp = temp_test_dir("apply_patch_diff_preview_reports_patch_and_detects_races");
+        let file = temp.join("note.txt");
+        std::fs::write(&file, "old\n").unwrap();
+        init_git_repo(&temp);
+        let guard = ToolGuard::new(temp.clone(), Some("project_write"));
+        let action = json!({
+            "tool": "apply_patch",
+            "patch": "diff --git a/note.txt b/note.txt\n--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-old\n+new\n"
+        });
+
+        let diff = guard
+            .apply_patch_diff_preview(&action)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(diff["source"], "apply_patch");
+        assert_eq!(diff["files"][0], "note.txt");
+        assert!(diff["preview"].as_str().unwrap().contains("-old"));
+        guard
+            .verify_apply_patch_preview_unchanged(&action, &diff)
+            .await
+            .unwrap();
+
+        std::fs::write(&file, "changed elsewhere\n").unwrap();
+        let stale_result = guard
+            .verify_apply_patch_preview_unchanged(&action, &diff)
+            .await;
+        assert!(stale_result
             .unwrap_err()
             .to_string()
             .contains("base changed since approval preview"));

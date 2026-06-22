@@ -2,11 +2,17 @@
 //! Workspace-scoped patch application tool for API agents.
 
 use anyhow::{anyhow, Result};
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::{
+    io::ErrorKind,
     path::{Path, PathBuf},
     process::Command,
     time::{SystemTime, UNIX_EPOCH},
 };
+
+const MAX_APPLY_PATCH_PREVIEW_CHARS: usize = 24_000;
+const MAX_PATCH_BASE_FILE_BYTES: u64 = 2 * 1024 * 1024;
 
 pub fn apply_patch(project_root: &Path, patch: &str, check_only: bool) -> Result<String> {
     let normalized_patch = normalize_patch(patch)?;
@@ -33,6 +39,68 @@ pub fn apply_patch(project_root: &Path, patch: &str, check_only: bool) -> Result
     ))
 }
 
+pub fn apply_patch_diff_preview(project_root: &Path, patch: &str) -> Result<Value> {
+    let normalized_patch = normalize_patch(patch)?;
+    let touched_files = touched_files(&normalized_patch)?;
+    validate_touched_files(project_root, &touched_files)?;
+    if normalized_patch.chars().count() > MAX_APPLY_PATCH_PREVIEW_CHARS {
+        return Err(anyhow!(
+            "apply_patch diff preview refused: patch is too large; split it into smaller patches"
+        ));
+    }
+    check_normalized_patch(project_root, &normalized_patch)?;
+    let base_files = base_file_fingerprints(project_root, &touched_files)?;
+
+    Ok(json!({
+        "format": "unified",
+        "source": "apply_patch",
+        "kind": "patch",
+        "preview": normalized_patch,
+        "truncated": false,
+        "files": touched_files,
+        "patch_sha256": sha256_hex(normalized_patch.as_bytes()),
+        "base_files": base_files
+    }))
+}
+
+pub fn verify_apply_patch_preview_unchanged(
+    project_root: &Path,
+    patch: &str,
+    diff: &Value,
+) -> Result<()> {
+    let normalized_patch = normalize_patch(patch)?;
+    let expected_hash = diff
+        .get("patch_sha256")
+        .and_then(Value::as_str)
+        .ok_or_else(|| anyhow!("apply_patch approval preview missing patch_sha256"))?;
+    let actual_hash = sha256_hex(normalized_patch.as_bytes());
+    if expected_hash != actual_hash {
+        return Err(anyhow!(
+            "apply_patch content changed since approval preview"
+        ));
+    }
+
+    let touched_files = touched_files(&normalized_patch)?;
+    validate_touched_files(project_root, &touched_files)?;
+    let expected_files = string_array_field(diff, "files")?;
+    if expected_files != touched_files {
+        return Err(anyhow!(
+            "apply_patch file list changed since approval preview"
+        ));
+    }
+
+    let expected_base_files = diff
+        .get("base_files")
+        .and_then(Value::as_array)
+        .ok_or_else(|| anyhow!("apply_patch approval preview missing base_files"))?;
+    let current_base_files = base_file_fingerprints(project_root, &touched_files)?;
+    if expected_base_files.as_slice() != current_base_files.as_slice() {
+        return Err(anyhow!("apply_patch base changed since approval preview"));
+    }
+
+    check_normalized_patch(project_root, &normalized_patch)
+}
+
 fn normalize_patch(patch: &str) -> Result<String> {
     let stripped = strip_fenced_diff(patch);
     let trimmed = stripped.trim();
@@ -49,6 +117,13 @@ fn normalize_patch(patch: &str) -> Result<String> {
         return Err(anyhow!("不支持二进制补丁"));
     }
     Ok(format!("{}\n", trimmed.replace("\r\n", "\n")))
+}
+
+fn check_normalized_patch(project_root: &Path, normalized_patch: &str) -> Result<()> {
+    let patch_file = temp_patch_file("agent-preview");
+    std::fs::write(&patch_file, normalized_patch)?;
+    let _cleanup = PatchFileCleanup(patch_file.clone());
+    run_git_apply(project_root, &patch_file, true)
 }
 
 fn strip_fenced_diff(value: &str) -> String {
@@ -149,6 +224,74 @@ fn validate_touched_files(project_root: &Path, files: &[String]) -> Result<()> {
     Ok(())
 }
 
+fn base_file_fingerprints(project_root: &Path, files: &[String]) -> Result<Vec<Value>> {
+    let canonical_root = project_root
+        .canonicalize()
+        .unwrap_or_else(|_| project_root.to_path_buf());
+    let mut out = Vec::with_capacity(files.len());
+    for file in files {
+        let full = canonical_root.join(file);
+        let fingerprint = match std::fs::metadata(&full) {
+            Ok(metadata) if metadata.is_file() => {
+                if metadata.len() > MAX_PATCH_BASE_FILE_BYTES {
+                    return Err(anyhow!(
+                        "apply_patch diff preview refused: base file is too large: {}",
+                        file
+                    ));
+                }
+                let bytes = std::fs::read(&full)?;
+                json!({
+                    "path": file,
+                    "exists": true,
+                    "len": bytes.len(),
+                    "sha256": sha256_hex(&bytes)
+                })
+            }
+            Ok(metadata) if metadata.is_dir() => {
+                return Err(anyhow!(
+                    "apply_patch diff preview refused: target is a directory: {}",
+                    file
+                ));
+            }
+            Ok(_) => json!({
+                "path": file,
+                "exists": true,
+                "len": 0,
+                "sha256": null
+            }),
+            Err(error) if error.kind() == ErrorKind::NotFound => json!({
+                "path": file,
+                "exists": false,
+                "len": 0,
+                "sha256": null
+            }),
+            Err(error) => {
+                return Err(anyhow!(
+                    "apply_patch diff preview failed to inspect {}: {}",
+                    file,
+                    error
+                ));
+            }
+        };
+        out.push(fingerprint);
+    }
+    Ok(out)
+}
+
+fn string_array_field(value: &Value, key: &str) -> Result<Vec<String>> {
+    value
+        .get(key)
+        .and_then(Value::as_array)
+        .ok_or_else(|| anyhow!("apply_patch approval preview missing {key}"))?
+        .iter()
+        .map(|item| {
+            item.as_str()
+                .map(str::to_string)
+                .ok_or_else(|| anyhow!("apply_patch approval preview has invalid {key}"))
+        })
+        .collect()
+}
+
 fn has_git_path_component(path: &str) -> bool {
     path.split(['/', '\\'])
         .any(|part| part.eq_ignore_ascii_case(".git"))
@@ -210,6 +353,12 @@ fn temp_patch_file(kind: &str) -> PathBuf {
     std::env::temp_dir().join(format!("elon-{kind}-{nanos}.patch"))
 }
 
+fn sha256_hex(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    hex::encode(hasher.finalize())
+}
+
 struct PatchFileCleanup(PathBuf);
 
 impl Drop for PatchFileCleanup {
@@ -269,6 +418,56 @@ mod tests {
             std::fs::read_to_string(workspace.join("README.md")).unwrap(),
             "old\n"
         );
+    }
+
+    #[test]
+    fn apply_patch_diff_preview_reports_checked_patch_and_base_hash() {
+        let workspace = temp_workspace("apply_patch_diff_preview_reports_checked_patch");
+        init_git(&workspace);
+        std::fs::write(workspace.join("README.md"), "old\n").unwrap();
+
+        let patch = r#"diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1 +1 @@
+-old
++new
+"#;
+
+        let preview = apply_patch_diff_preview(&workspace, patch).unwrap();
+
+        assert_eq!(preview["source"], "apply_patch");
+        assert_eq!(preview["kind"], "patch");
+        assert_eq!(preview["files"][0], "README.md");
+        assert_eq!(preview["base_files"][0]["path"], "README.md");
+        assert_eq!(preview["base_files"][0]["exists"], true);
+        assert!(preview["base_files"][0]["sha256"].as_str().unwrap().len() >= 64);
+        assert!(preview["patch_sha256"].as_str().unwrap().len() >= 64);
+        assert!(preview["preview"].as_str().unwrap().contains("-old"));
+        assert!(preview["preview"].as_str().unwrap().contains("+new"));
+    }
+
+    #[test]
+    fn verify_apply_patch_preview_detects_changed_base_file() {
+        let workspace = temp_workspace("verify_apply_patch_preview_detects_changed_base_file");
+        init_git(&workspace);
+        std::fs::write(workspace.join("README.md"), "old\n").unwrap();
+
+        let patch = r#"diff --git a/README.md b/README.md
+--- a/README.md
++++ b/README.md
+@@ -1 +1 @@
+-old
++new
+"#;
+
+        let preview = apply_patch_diff_preview(&workspace, patch).unwrap();
+        verify_apply_patch_preview_unchanged(&workspace, patch, &preview).unwrap();
+
+        std::fs::write(workspace.join("README.md"), "changed elsewhere\n").unwrap();
+        let error = verify_apply_patch_preview_unchanged(&workspace, patch, &preview).unwrap_err();
+
+        assert!(error.to_string().contains("base changed"));
     }
 
     #[test]

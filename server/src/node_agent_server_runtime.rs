@@ -427,10 +427,15 @@ where
         for (index, action) in actions.into_iter().enumerate() {
             let tool_index = index + 1;
             let tool = tool_name(&action);
-            let mut approved_write_file_diff = None;
+            let mut approved_approval_diff = None;
             if requires_tool_approval(&guard, &action) {
                 let approval_id = tool_approval_id(turn, tool_index);
-                let write_file_approval_diff = match guard.write_file_diff_preview(&action).await {
+                let approval_diff = match tool.as_str() {
+                    "write_file" => guard.write_file_diff_preview(&action).await,
+                    "apply_patch" => guard.apply_patch_diff_preview(&action).await,
+                    _ => Ok(None),
+                };
+                let approval_diff = match approval_diff {
                     Ok(diff) => diff,
                     Err(error) => {
                         let result = format!(
@@ -489,7 +494,7 @@ where
                     &out_tx,
                     task_journal.as_ref(),
                     req_id,
-                    match write_file_approval_diff.as_ref() {
+                    match approval_diff.as_ref() {
                         Some(diff) => tool_approval_required_chunk_with_diff(
                             req_id,
                             turn,
@@ -509,7 +514,7 @@ where
                 );
                 match wait_for_tool_approval(&mut waiter, &mut cancel_rx).await {
                     ApprovalOutcome::Approved => {
-                        approved_write_file_diff = write_file_approval_diff;
+                        approved_approval_diff = approval_diff;
                         send_chunk(
                             &out_tx,
                             task_journal.as_ref(),
@@ -602,11 +607,21 @@ where
                     }
                 }
             }
-            if let Some(diff) = approved_write_file_diff.as_ref() {
-                if let Err(error) = guard
-                    .verify_write_file_preview_unchanged(&action, diff)
-                    .await
-                {
+            if let Some(diff) = approved_approval_diff.as_ref() {
+                let preview_verification = match tool.as_str() {
+                    "write_file" => {
+                        guard
+                            .verify_write_file_preview_unchanged(&action, diff)
+                            .await
+                    }
+                    "apply_patch" => {
+                        guard
+                            .verify_apply_patch_preview_unchanged(&action, diff)
+                            .await
+                    }
+                    _ => Ok(()),
+                };
+                if let Err(error) = preview_verification {
                     let result = format!(
                         "error: {tool} approval preview is stale: {error}; tool was not executed"
                     );
@@ -1654,6 +1669,98 @@ mod tests {
         let _ = cancel_tx.send(true);
     }
 
+    #[tokio::test]
+    async fn runtime_rejects_stale_apply_patch_after_approval() {
+        let workspace = temp_test_dir("runtime_rejects_stale_apply_patch_after_approval");
+        let target = workspace.join("note.txt");
+        tokio::fs::write(&target, "old\n").await.unwrap();
+        init_git_repo(&workspace);
+        let approval_state = ToolApprovalState::default();
+        let approval_decider = approval_state.clone();
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_for_runtime = calls.clone();
+        let req_id = "req-stale-apply-patch".to_string();
+        let runtime_req_id = req_id.clone();
+        let patch = "diff --git a/note.txt b/note.txt\n--- a/note.txt\n+++ b/note.txt\n@@ -1 +1 @@\n-old\n+new\n".to_string();
+        let patch_for_runtime = patch.clone();
+        let runtime = tokio::spawn(async move {
+            run_runtime_loop(
+                RuntimeLoopOptions {
+                    req_id: &runtime_req_id,
+                    label: "test-runtime",
+                    guard: ToolGuard::new(workspace, Some("project_write")),
+                    prompt: "patch a file",
+                    approval_state: Some(approval_state),
+                    cancel_rx,
+                    out_tx,
+                    task_journal: None,
+                    initial_model: Some("test-model".to_string()),
+                },
+                move |_| {
+                    let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
+                    let patch = patch_for_runtime.clone();
+                    async move {
+                        if call_index == 0 {
+                            Ok(chat_response(json!({
+                                "message": "need patch",
+                                "done": false,
+                                "actions": [{
+                                    "tool": "apply_patch",
+                                    "patch": patch
+                                }]
+                            })))
+                        } else {
+                            Ok(chat_response(json!({
+                                "message": "done after stale",
+                                "done": true,
+                                "actions": []
+                            })))
+                        }
+                    }
+                },
+            )
+            .await
+            .unwrap()
+        });
+
+        let approval = next_tool_event(&mut out_rx, "tool_approval_required").await;
+        assert_eq!(approval["tool"], "apply_patch");
+        assert_eq!(approval["diff"]["source"], "apply_patch");
+        assert_eq!(approval["diff"]["files"][0], "note.txt");
+        assert!(approval["diff"]["preview"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("-old"));
+        assert!(
+            approval["diff"]["patch_sha256"]
+                .as_str()
+                .unwrap_or_default()
+                .len()
+                >= 64
+        );
+        tokio::fs::write(&target, "changed elsewhere\n")
+            .await
+            .unwrap();
+        assert!(approval_decider.decide(&req_id, "tap_1_1", "approve").await);
+
+        let stale = next_tool_event(&mut out_rx, "tool_result").await;
+        assert_eq!(stale["status"], "error");
+        assert!(stale["result"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("approval preview is stale"));
+        assert_eq!(
+            tokio::fs::read_to_string(&target).await.unwrap(),
+            "changed elsewhere\n"
+        );
+
+        let result = runtime.await.unwrap();
+        assert!(result.exit_ok);
+        let _ = cancel_tx.send(true);
+    }
+
     async fn next_tool_event(
         out_rx: &mut mpsc::UnboundedReceiver<Message>,
         event_type: &str,
@@ -1690,6 +1797,15 @@ mod tests {
                 }
             }]
         })
+    }
+
+    fn init_git_repo(path: &std::path::Path) {
+        let status = std::process::Command::new("git")
+            .args(["init"])
+            .current_dir(path)
+            .status()
+            .unwrap();
+        assert!(status.success());
     }
 
     fn temp_test_dir(name: &str) -> std::path::PathBuf {
