@@ -60,6 +60,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         .get("context_quality")
         .cloned()
         .unwrap_or_else(|| json!({}));
+    let gap_summary = context_gap_summary(context);
     let external_metrics = context.get("metrics").cloned().unwrap_or_else(|| json!({}));
     let context_audit_id = context
         .get("context_audit_id")
@@ -82,6 +83,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
          usage_policy={}\n\
          answer_policy={}\n\
          context_quality={}\n\
+         context_gap_summary={}\n\
          context_budget={}\n\
          external_metrics={}\n\
          context_fact_summary={}\n\
@@ -94,6 +96,7 @@ pub(crate) fn prompt_context_block(context: &Value) -> String {
         serde_json::to_string(&usage_policy).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&answer_policy).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&context_quality).unwrap_or_else(|_| "{}".into()),
+        serde_json::to_string(&gap_summary).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&budget).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&external_metrics).unwrap_or_else(|_| "{}".into()),
         serde_json::to_string(&fact_summary).unwrap_or_else(|_| "{}".into()),
@@ -182,6 +185,100 @@ fn context_fact_summary(context: &Value) -> Value {
             "none_in_context_pack"
         }
     })
+}
+
+fn context_gap_summary(context: &Value) -> Value {
+    let warnings = context_warning_codes(context);
+    let readiness_status = context
+        .get("preflight_readiness")
+        .and_then(|readiness| readiness.get("status"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("unknown");
+    let budget_status = context
+        .get("metrics")
+        .and_then(|metrics| metrics.get("budget_status"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("unknown");
+    let status = context
+        .get("status")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("unknown");
+    let blocking = status != "ready"
+        || matches!(
+            readiness_status,
+            "blocked" | "unavailable" | "not_configured"
+        )
+        || matches!(budget_status, "empty")
+        || warnings.iter().any(|warning| {
+            matches!(
+                warning.as_str(),
+                "fb2_readiness_blocked" | "fb2_budget_empty" | "missing_context_pack"
+            )
+        });
+
+    // 这个摘要专门给模型快速读取缺口：它不替代 context_quality 细节，只把会导致保守回答的信号前置。
+    json!({
+        "status": status,
+        "readiness_status": readiness_status,
+        "budget_status": budget_status,
+        "warning_codes": warnings,
+        "business_data_available": {
+            "matches": array_len(context, "matches") > 0,
+            "user_orders": array_len(context, "user_orders") > 0,
+            "group_messages": array_len(context, "group_messages") > 0,
+            "platform_order_summary": !context.get("platform_order_summary").unwrap_or(&Value::Null).is_null()
+        },
+        "truncation": {
+            "context_budget_trimmed": context
+                .get("_context_budget")
+                .and_then(|budget| budget.get("trimmed"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+            "fields": truncated_fields(context)
+        },
+        "fact_answer_allowed": !blocking,
+        "required_user_notice": if blocking {
+            "fb2_context_gap_or_unverified_data_present"
+        } else {
+            "none"
+        }
+    })
+}
+
+fn context_warning_codes(context: &Value) -> Vec<String> {
+    context
+        .get("context_quality")
+        .and_then(|quality| quality.get("warnings"))
+        .and_then(Value::as_array)
+        .map(|warnings| {
+            warnings
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::trim)
+                .filter(|warning| !warning.is_empty())
+                .take(12)
+                .map(ToOwned::to_owned)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn truncated_fields(context: &Value) -> Vec<String> {
+    [
+        ("matches_truncated", "matches"),
+        ("user_orders_truncated", "user_orders"),
+        ("group_messages_truncated", "group_messages"),
+    ]
+    .into_iter()
+    .filter(|(marker, _)| context.get(*marker).is_some())
+    .map(|(_, field)| field.to_string())
+    .collect()
 }
 
 fn preflight_readiness_summary(value: Option<&Value>) -> Value {
@@ -384,6 +481,7 @@ mod tests {
         assert!(block.contains("answer_policy="));
         assert!(block.contains("fb2.answer_policy.v1"));
         assert!(block.contains("context_quality="));
+        assert!(block.contains("context_gap_summary="));
         assert!(block.contains("external_metrics="));
         assert!(block.contains("context_fact_summary="));
         assert!(block.contains("\"user_order_count\":1"));
@@ -402,6 +500,37 @@ mod tests {
     }
 
     #[test]
+    fn prompt_gap_summary_surfaces_blocked_or_empty_context() {
+        let context = json!({
+            "source": "fb2:/api/main-project/context/pack",
+            "status": "ready",
+            "generated_at": "2026-06-22T12:00:00+08:00",
+            "context_pack": "<fb2_context_pack>没有可用比赛</fb2_context_pack>",
+            "metrics": {"budget_status": "empty"},
+            "preflight_readiness": {
+                "status": "blocked",
+                "warnings": ["fb2_readiness_blocked"]
+            },
+            "context_quality": {
+                "warnings": ["fb2_readiness_blocked", "fb2_budget_empty", "empty_matches"]
+            },
+            "matches": [],
+            "user_orders": [],
+            "group_messages": []
+        });
+
+        let block = prompt_context_block(&context);
+
+        assert!(block.contains("context_gap_summary="));
+        assert!(block.contains("\"readiness_status\":\"blocked\""));
+        assert!(block.contains("\"budget_status\":\"empty\""));
+        assert!(block.contains("\"matches\":false"));
+        assert!(block.contains("\"user_orders\":false"));
+        assert!(block.contains("\"fact_answer_allowed\":false"));
+        assert!(block.contains("fb2_context_gap_or_unverified_data_present"));
+    }
+
+    #[test]
     fn trims_large_arrays() {
         let context = json!({
             "group_messages": (0..80).map(|index| json!({"id": index, "content": "x".repeat(200)})).collect::<Vec<_>>(),
@@ -410,5 +539,35 @@ mod tests {
         let budgeted = budgeted_context(context);
         assert!(budgeted["_context_budget"]["trimmed"].as_bool().unwrap());
         assert!(budgeted["group_messages"].as_array().unwrap().len() <= 24);
+    }
+
+    #[test]
+    fn gap_summary_records_budget_truncation_fields() {
+        let context = json!({
+            "status": "ready",
+            "_context_budget": {"trimmed": true},
+            "group_messages_truncated": {"original_count": 80, "kept_count": 24},
+            "matches_truncated": {"original_count": 60, "kept_count": 24},
+            "context_quality": {"warnings": ["fb2_budget_too_large"]},
+            "matches": [{"id": "match-1"}],
+            "user_orders": [{"order_id": "order-1"}],
+            "group_messages": [{"message_id": "message-1"}],
+            "metrics": {"budget_status": "too_large"},
+            "preflight_readiness": {"status": "degraded"}
+        });
+
+        let summary = context_gap_summary(&context);
+
+        assert_eq!(summary["truncation"]["context_budget_trimmed"], true);
+        assert!(summary["truncation"]["fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("group_messages")));
+        assert!(summary["truncation"]["fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("matches")));
+        assert_eq!(summary["business_data_available"]["user_orders"], true);
+        assert_eq!(summary["fact_answer_allowed"], true);
     }
 }

@@ -1041,6 +1041,59 @@ mod tests {
     }
 
     #[test]
+    fn external_context_prompt_surfaces_quality_readiness_budget_and_tool_gap() {
+        let context = json!({
+            "app_id": "fb2",
+            "source": "fb2:/api/main-project/context/pack",
+            "status": "ready",
+            "generated_at": "2026-06-22T12:00:00+08:00",
+            "context_pack": "<fb2_context_pack>数据缺口样本</fb2_context_pack>",
+            "context_pack_version": "fb2-chat-pack-v1",
+            "context_audit_id": "audit-gap",
+            "answer_policy": {"schema": "fb2.answer_policy.v1"},
+            "metrics": {"budget_status": "empty"},
+            "_context_budget": {"trimmed": true},
+            "preflight_readiness": {
+                "status": "blocked",
+                "warnings": ["fb2_readiness_blocked"]
+            },
+            "context_quality": {
+                "warnings": ["fb2_readiness_blocked", "fb2_budget_empty", "empty_matches"],
+                "tool_readiness": {"status": "partial"}
+            },
+            "matches": [],
+            "user_orders": [],
+            "group_messages": []
+        });
+        let tool_results = json!({
+            "schema": "external_app.executed_tools.v1",
+            "app_id": "fb2",
+            "status": "skipped",
+            "executed_at": "2026-06-22T12:01:00Z",
+            "results": [{
+                "tool_name": "search_matches",
+                "status": "skipped",
+                "success": false,
+                "error": "fb2_readiness_blocked",
+                "reason": "readiness blocked"
+            }]
+        });
+
+        let block = format_external_context(Some(&context), Some(&tool_results));
+
+        assert!(block.contains("context_quality="));
+        assert!(block.contains("context_gap_summary="));
+        assert!(block.contains("\"preflight_readiness\""));
+        assert!(block.contains("context_budget="));
+        assert!(block.contains("\"trimmed\":true"));
+        assert!(block.contains("fb2_readiness_blocked"));
+        assert!(block.contains("\"fact_answer_allowed\":false"));
+        assert!(block.contains("<tool_gap_summary>"));
+        assert!(block.contains("这只是数据缺口"));
+        assert!(block.contains("不能编造成比赛、赔率、订单或群友观点事实"));
+    }
+
+    #[test]
     fn fb2_grounded_answer_shape_adds_required_labels() {
         let context = json!({"answer_policy": {"schema": "fb2.answer_policy.v1"}});
         let reply = ensure_fb2_grounded_answer_shape(

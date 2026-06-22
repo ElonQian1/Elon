@@ -265,6 +265,7 @@ GET /api/main-project/context/tool-manifest
 - 主项目会做 token budget 裁剪，不把无限大 JSON 塞进 prompt。
 - 主项目会在 prompt metadata 增加 `context_fact_summary`，保留比赛、本人订单、群消息数量、少量来源 ID 和简短本人订单样例；这用于防止模型漏看 Context Pack 已有 `user_orders`。
 - 主项目会在 `context_fact_summary.preflight_readiness` 中提前投影 fb2 readiness 的 `status` 和少量 `warnings`；如果出现 `fb2_readiness_blocked/degraded/unavailable/not_configured`，AI 必须把它当成数据链路缺口，而不是业务事实。
+- 主项目会在 prompt metadata 增加 `context_gap_summary`，把 Context Pack 的状态、readiness、budget、质量告警、业务数据是否可用和 token budget 裁剪字段压缩成模型先读的缺口摘要；当 `fact_answer_allowed=false` 时，AI 必须向用户说明数据缺口，不能编造 fb2 没有提供的比赛、赔率、订单、平台摘要或群友观点。
 - 主项目会在 executed tool JSON 前增加 `tool_fact_summary`，把 `match_analysis_brief.data.user_orders` 等当前用户订单样例提前投影，避免大赔率 JSON 被截断时丢失“我的票”结构信息。
 - 主项目会在 executed tool JSON 前增加 `tool_gap_summary`，把 `skipped/failed/unavailable` 工具结果提前投影；这些只代表数据缺口，不能编造成比赛、赔率、订单或群友观点事实。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
