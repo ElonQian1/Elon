@@ -36,6 +36,7 @@ internal class MainHomeListActions(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val showCreateProjectDialog: () -> Unit,
     private val showProjectPlaza: () -> Unit,
+    private val openFriendPageProject: (Int) -> Unit,
     private val openProject: (Int) -> Unit,
     private val openProjectConversations: (Int) -> Unit,
     private val showProjectActions: (Int, View?) -> Unit,
@@ -148,7 +149,7 @@ internal class MainHomeListActions(
                             showProjectMarker = true
                         ) {
                             clearFriendSearchState()
-                            openProject(item.index)
+                            openFriendPageProject(item.index)
                         }
                     } else {
                         homeRows().createFriendRow(
@@ -156,7 +157,7 @@ internal class MainHomeListActions(
                             showProjectMarker = true
                         ) {
                             clearFriendSearchState()
-                            openProject(item.index)
+                            openFriendPageProject(item.index)
                         }
                     }
                     binding.conversationPage.addView(row)
