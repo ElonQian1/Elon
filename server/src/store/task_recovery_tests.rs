@@ -1,6 +1,7 @@
 // server/src/store/task_recovery_tests.rs
 
 use crate::store::Store;
+use std::collections::HashSet;
 use uuid::Uuid;
 
 fn temp_store() -> Store {
@@ -197,6 +198,84 @@ fn stale_running_channel_task_can_be_excluded_from_cleanup() {
         .mark_stale_running_tasks_with_channel_results(10 * 60)
         .expect("non-excluded stale task should fail");
     assert_eq!(changed, 1);
+}
+
+#[test]
+fn stale_cleanup_bulk_pressure_keeps_terminal_results_idempotent() {
+    let store = temp_store();
+    let old_created_at = (chrono::Utc::now() - chrono::Duration::minutes(20)).to_rfc3339();
+    let mut tasks = Vec::new();
+
+    for index in 0..32 {
+        let (user_id, project_id, channel_id, task_id) =
+            temp_channel_task(&store, &format!("bulk-stale-{index}@example.com"));
+        store
+            .conn()
+            .expect("store lock should be healthy")
+            .execute(
+                "UPDATE tasks SET created_at = ?1 WHERE id = ?2",
+                rusqlite::params![old_created_at, task_id],
+            )
+            .expect("task should become stale");
+        tasks.push((user_id, project_id, channel_id, task_id));
+    }
+
+    let excluded_task_ids = tasks
+        .iter()
+        .enumerate()
+        .filter(|(index, _)| index % 7 == 0)
+        .map(|(_, (_, _, _, task_id))| task_id.clone())
+        .collect::<Vec<_>>();
+    let excluded = excluded_task_ids.iter().cloned().collect::<HashSet<_>>();
+
+    let changed = store
+        .mark_stale_running_tasks_with_channel_results_excluding(
+            10 * 60,
+            &excluded_task_ids,
+        )
+        .expect("bulk stale cleanup should succeed");
+    assert_eq!(changed, tasks.len() - excluded_task_ids.len());
+
+    for (user_id, project_id, channel_id, task_id) in &tasks {
+        let (status, error) = task_status_and_error(&store, task_id);
+        let results = result_messages_for_task(&store, user_id, project_id, channel_id, task_id);
+        if excluded.contains(task_id) {
+            assert_eq!(status, "running");
+            assert!(error.is_none());
+            assert!(results.is_empty());
+        } else {
+            assert_eq!(status, "failed");
+            assert_eq!(error.as_deref(), Some("PC节点断线或任务超时自动终止"));
+            assert_eq!(results.len(), 1);
+            assert!(results[0].contains("任务失败"));
+        }
+    }
+
+    let changed_again = store
+        .mark_stale_running_tasks_with_channel_results_excluding(
+            10 * 60,
+            &excluded_task_ids,
+        )
+        .expect("second bulk pass should be idempotent");
+    assert_eq!(changed_again, 0);
+    for (user_id, project_id, channel_id, task_id) in &tasks {
+        let results = result_messages_for_task(&store, user_id, project_id, channel_id, task_id);
+        assert_eq!(
+            results.len(),
+            if excluded.contains(task_id) { 0 } else { 1 }
+        );
+    }
+
+    let changed_without_exclusion = store
+        .mark_stale_running_tasks_with_channel_results(10 * 60)
+        .expect("excluded stale tasks should be cleanable later");
+    assert_eq!(changed_without_exclusion, excluded_task_ids.len());
+    for (user_id, project_id, channel_id, task_id) in &tasks {
+        let (status, _) = task_status_and_error(&store, task_id);
+        let results = result_messages_for_task(&store, user_id, project_id, channel_id, task_id);
+        assert_eq!(status, "failed");
+        assert_eq!(results.len(), 1);
+    }
 }
 
 #[test]
