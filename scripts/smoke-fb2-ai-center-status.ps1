@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-visible-readonly-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-data-only-direct-read-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-projection-log-validation.ps1")
+. (Join-Path $PSScriptRoot "fb2-context-sample-request-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-ai-center-coordination-status.ps1")
 
@@ -88,9 +89,11 @@ function Build-Fb2AiCenterStatusSnapshot {
     $latestDataFile = Get-LatestFileByPattern -Directory $Directory -Pattern "data-only-acceptance-*.json"
     $latestReadOnlyFile = Get-LatestFileByPattern -Directory $Directory -Pattern "read-only-direct-read*.json"
     $latestAiCenterLogFile = Get-LatestFileByPattern -Directory $Directory -Pattern "*ai-center.log"
+    $latestSampleRequestFile = Get-LatestFileByPattern -Directory $Directory -Pattern "context-pack-sample-request*.json"
     $latestData = if ($null -eq $latestDataFile) { $null } else { Read-JsonFileOrNull $latestDataFile.FullName }
     $latestReadOnly = if ($null -eq $latestReadOnlyFile) { $null } else { Read-JsonFileOrNull $latestReadOnlyFile.FullName }
     $contextProjectionState = Get-Fb2ContextProjectionLogState -Path $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName })
+    $sampleRequestState = Get-Fb2ContextSampleRequestState -Path $(if ($null -eq $latestSampleRequestFile) { "" } else { $latestSampleRequestFile.FullName })
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
@@ -123,6 +126,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -LatestDataPath $(if ($null -eq $latestDataFile) { "" } else { $latestDataFile.FullName }) `
         -LatestReadOnlyPath $(if ($null -eq $latestReadOnlyFile) { "" } else { $latestReadOnlyFile.FullName }) `
         -LatestAiCenterLogPath $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName }) `
+        -SampleRequestState $sampleRequestState `
         -TokenPresent $tokenPresent `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent
 
@@ -142,10 +146,16 @@ function Build-Fb2AiCenterStatusSnapshot {
     if (-not [bool]$contextProjectionState.complete) {
         $blockers += "missing_or_incomplete_context_projection_log_evidence"
     }
+    if (-not $tokenPresent -and -not [bool]$sampleRequestState.complete) {
+        $blockers += "missing_or_incomplete_context_pack_sample_request_for_tokenless_handoff"
+    }
 
     $refreshGaps = @()
     if (-not $tokenPresent) {
         $refreshGaps += "missing_FB2_AI_CENTER_TOKEN_for_refreshing_live_context_pack_permission_quality"
+        if ([bool]$sampleRequestState.complete) {
+            $refreshGaps += "context_pack_sample_request_ready_for_fb2_export"
+        }
     }
     if ($null -ne $latestData -and -not $dataOnlyHasCurrentDirectReadGate -and $dataDirectReadComplete) {
         $refreshGaps += "latest_data_only_summary_uses_legacy_visible_direct_read_evidence_object"
@@ -153,7 +163,11 @@ function Build-Fb2AiCenterStatusSnapshot {
 
     $nextActions = @()
     if (-not $tokenPresent) {
-        $nextActions += "set_FB2_AI_CENTER_TOKEN_or_use_controlled_wrapper_then_run_DataOnlyAcceptance_PreflightOnly"
+        if ([bool]$sampleRequestState.complete) {
+            $nextActions += "send_context_pack_sample_request_to_fb2_or_wait_for_exported_samples"
+        } else {
+            $nextActions += "generate_context_pack_sample_request_or_set_FB2_AI_CENTER_TOKEN"
+        }
     } elseif ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete)) {
         $nextActions += "run_DataOnlyAcceptance_AllowVisibleMessages_for_non_voice_regression_if_user_allows_visible_messages"
     } else {
@@ -213,6 +227,7 @@ function Build-Fb2AiCenterStatusSnapshot {
             evidence = Build-ReadOnlyDirectReadEvidence $latestReadOnly
         }
         latest_ai_center_context_projection = $contextProjectionState
+        latest_context_pack_sample_request = $sampleRequestState
         readiness = [ordered]@{
             non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
@@ -272,6 +287,16 @@ function Invoke-Fb2StatusSelfTest {
         }
         $data | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "data-only-acceptance-test.json") -Encoding UTF8
         $readOnly | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "read-only-direct-read-test.json") -Encoding UTF8
+        [ordered]@{
+            schema = "fb2.main_project.context_pack_sample_request.v1"
+            scenarios = @(
+                [ordered]@{ id = "today_matches_context_pack"; save_as = "target/fb2-ai-center/samples/today_matches_context_pack.json"; expected_source_kinds = @("match", "odds", "context_audit"); validate_command = "validate today" },
+                [ordered]@{ id = "my_ticket_context_pack"; save_as = "target/fb2-ai-center/samples/my_ticket_context_pack.json"; expected_source_kinds = @("user_order", "ticket", "context_audit"); validate_command = "validate ticket" },
+                [ordered]@{ id = "platform_order_context_pack"; save_as = "target/fb2-ai-center/samples/platform_order_context_pack.json"; expected_source_kinds = @("platform_order_summary", "context_audit"); validate_command = "validate platform" },
+                [ordered]@{ id = "group_opinion_context_pack"; save_as = "target/fb2-ai-center/samples/group_opinion_context_pack.json"; expected_source_kinds = @("group_message", "opinion_memory", "context_audit"); validate_command = "validate opinion" }
+            )
+            redaction_rules = @("Do not include service tokens.")
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "context-pack-sample-request-test.json") -Encoding UTF8
         @(
             "OK`tcontext projection body: today matches context pack",
             "OK`tcontext projection wrapper open: today matches context pack",
@@ -322,6 +347,9 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.latest_ai_center_context_projection.complete) { $failed++ }
         if (-not [bool]$snapshot.latest_ai_center_context_projection.today_matches_context_pack.complete) { $failed++ }
         if (-not [bool]$snapshot.latest_ai_center_context_projection.my_ticket_context_pack.complete) { $failed++ }
+        if (-not [bool]$snapshot.latest_context_pack_sample_request.complete) { $failed++ }
+        if ($snapshot.latest_context_pack_sample_request.scenario_count -ne 4) { $failed++ }
+        if (-not (@($snapshot.refresh_gaps) -contains "context_pack_sample_request_ready_for_fb2_export")) { $failed++ }
         if (-not [bool]$snapshot.goal_completion.non_voice_ready) { $failed++ }
         if ([bool]$snapshot.goal_completion.full_final_ready) { $failed++ }
         if ($snapshot.goal_completion.stage -ne "non_voice_data_chat_permission_quality_ready_voice_deferred") { $failed++ }

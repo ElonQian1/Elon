@@ -71,6 +71,7 @@ function Get-Fb2AiCenterCoordinationStatus {
         [string]$LatestDataPath,
         [string]$LatestReadOnlyPath,
         [string]$LatestAiCenterLogPath,
+        [object]$SampleRequestState,
         [bool]$TokenPresent,
         [bool]$VoiceEvidencePathPresent
     )
@@ -139,6 +140,15 @@ function Get-Fb2AiCenterCoordinationStatus {
             summary_post = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $visibleEvidence "summary_post")
         }
         context_projection = Get-Fb2CoordinationContextProjectionStatus $ContextProjectionState
+        context_pack_sample_request = [ordered]@{
+            path = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $SampleRequestState "path")
+            exists = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $SampleRequestState "exists")
+            complete = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $SampleRequestState "complete")
+            schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $SampleRequestState "schema")
+            scenario_count = [int](Get-Fb2CoordinationJsonProperty $SampleRequestState "scenario_count" 0)
+            scenario_ids = @((Get-Fb2CoordinationJsonProperty $SampleRequestState "scenario_ids" @()))
+            missing = @((Get-Fb2CoordinationJsonProperty $SampleRequestState "missing" @()))
+        }
         direct_read_policy = [ordered]@{
             group_messages_api = "/api/me/groups/{group_id}/messages"
             summary_posts_api = "/api/me/groups/{group_id}/summary-posts/{post_id}"
@@ -149,17 +159,22 @@ function Get-Fb2AiCenterCoordinationStatus {
         }
         safe_commands = [ordered]@{
             no_write_direct_read = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>'
+            generate_context_pack_sample_request = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -PrintExportRequest -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -OutputPath target\fb2-ai-center\context-pack-sample-request-current.json'
             data_only_preflight = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>'
             visible_regression_requires_authorization = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>'
         }
         next_action_by_owner = [ordered]@{
             main_project = if ($nonVoiceReady) {
                 "keep contracts/status wrappers current; do not reopen ASR/TTS until requested"
+            } elseif (-not $TokenPresent -and (Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $SampleRequestState "complete"))) {
+                "wait for fb2 exported Context Pack samples, then validate them offline with validate-fb2-context-pack.ps1"
             } else {
                 "refresh data-only preflight with service token and inspect failing contract evidence"
             }
             fb2_project = if ($nonVoiceReady) {
                 "treat non-voice data/chat/feedback as passed; continue using direct APIs for regressions"
+            } elseif (-not $TokenPresent -and (Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $SampleRequestState "complete"))) {
+                "export live Context Pack samples listed in context_pack_sample_request and return validation results"
             } else {
                 "provide current service token/live endpoint evidence and fix any failing context endpoint"
             }

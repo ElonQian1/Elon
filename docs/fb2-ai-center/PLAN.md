@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 `status-current.json` 现在会直接暴露 `latest_context_pack_sample_request`，避免后续只看到“缺 FB2_AI_CENTER_TOKEN”而不知道已有替代交接路径。当前缺 token 时的最小动作应是：确认样本请求 `complete=true`，等待 fb2 子会话按四类场景导出样本；如果补齐 token，则直接跑 live `-DataOnlyAcceptance -PreflightOnly`。
 - 2026-06-23 当前 live refresh 仍受 `FB2_AI_CENTER_TOKEN` 限制，本轮把“让 fb2 子会话导出样本”落成可执行交接：`scripts\validate-fb2-context-pack.ps1 -PrintExportRequest` 会生成 `fb2.main_project.context_pack_sample_request.v1`，要求 fb2 按四类场景导出完整 `/api/main-project/context/pack` 响应，再由主项目离线跑同一脚本验证。下一步最小动作是让 fb2 子会话按这份 JSON 回传样本，或在当前环境补 service token 后直接跑 live `-DataOnlyAcceptance -PreflightOnly`。
 - 2026-06-23 本轮继续把“fb2 对话验证必须直接读取群聊，不用截图”做成可复用证据：`ReadOnlyDirectRead` summary 新增最近 20 条消息的 `recent_messages` 索引，只保留 ID、类型、发送方、时间、正文长度和 sha256，不保存正文也不写群。后续排查“AI 有没有在群聊真实回答/能不能读到历史对话”时，先看这个 summary，再进入有授权的 `-AllowVisibleMessages`。
 - 2026-06-23 当前缺 `FB2_AI_CENTER_TOKEN` 时，主项目不能直接刷新 live Context Pack/权限/质量 preflight；为了让 fb2 子项目仍能推进数据格式闭环，新增离线样本验证路径：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -InputPath <context-pack-response.json> -Scenario today_matches_context_pack`。该脚本只验证本地样本的 XML-wrapped Markdown、小节、审计 ID 和 source kinds，不替代带 token 的 live `-DataOnlyAcceptance -PreflightOnly`。
