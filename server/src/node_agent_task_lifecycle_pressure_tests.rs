@@ -2,7 +2,7 @@ use crate::{
     node_agent_task_journal::{TaskJournal, TaskJournalRecord, TaskJournalStart},
     node_agent_task_resume::{task_attach_state, task_resume_contract},
 };
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc, thread};
 
 #[test]
@@ -467,6 +467,110 @@ fn stress_restart_resume_contract_never_claims_lost_control_handles() {
             assert_eq!(resume_json["codex_session"], Value::Null);
         }
     }
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
+fn stress_oversized_tool_events_remain_structured_and_bounded() {
+    let dir = unique_test_dir("oversized-tool-event-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = TaskJournal::new(&dir);
+    let routes = [
+        ("codex", "route_a_external_cli"),
+        ("api-runtime", "route_b_api_runtime"),
+        ("server-runtime", "route_c_server_runtime"),
+    ];
+    let long_result = "r".repeat(18_000);
+    let long_error = "e".repeat(5_000);
+
+    for task_index in 0..90 {
+        let (cli_name, route) = routes[task_index % routes.len()];
+        let req_id = format!("req-oversized-tool-{task_index:03}");
+        journal
+            .record_started(TaskJournalStart {
+                req_id: &req_id,
+                cli_name,
+                route: Some(route),
+                run_handle_id: Some(&req_id),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("oversized tool task should start");
+
+        let tool_event = serde_json::to_string(&json!({
+            "type": "tool_result",
+            "tool": "run_command",
+            "status": "ok",
+            "result": long_result,
+        }))
+        .expect("tool event should serialize");
+        assert!(
+            tool_event.chars().count() > 12_000,
+            "pressure fixture must exceed the journal text bound"
+        );
+        journal
+            .record_cli_chunk(&req_id, "runtime", &tool_event)
+            .expect("oversized tool event should persist");
+        journal
+            .record_finished_with_outcome(&req_id, "failed", Some(&long_error))
+            .expect("oversized terminal error should persist");
+    }
+
+    let registry = read_registry(&dir);
+    assert_eq!(registry.len(), 90);
+    assert_eq!(count_status(&registry, "failed"), 90);
+
+    let sample = journal
+        .snapshot("req-oversized-tool-089", 0, 20)
+        .expect("oversized tool snapshot should read");
+    let tool_event = sample
+        .events
+        .iter()
+        .find(|event| event.event.get("type").and_then(Value::as_str) == Some("tool_event"))
+        .expect("oversized structured tool event should not degrade to cli_chunk");
+    assert_eq!(tool_event.event["event"]["type"], "tool_result");
+    assert_eq!(tool_event.event["event"]["tool"], "run_command");
+    assert!(tool_event.event["event"]["result"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("本机 journal 输出已截断"));
+    assert!(tool_event.event["text"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("本机 journal 输出已截断"));
+    assert!(
+        tool_event.event["text"]
+            .as_str()
+            .unwrap_or_default()
+            .chars()
+            .count()
+            < 12_100,
+        "saved raw tool text should stay bounded for replay"
+    );
+
+    let finished = sample
+        .events
+        .iter()
+        .find(|event| event.event.get("type").and_then(Value::as_str) == Some("finished"))
+        .expect("terminal event should be replayable");
+    assert!(finished.event["error"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("本机 journal 输出已截断"));
+    assert!(
+        finished.event["error"]
+            .as_str()
+            .unwrap_or_default()
+            .chars()
+            .count()
+            < 2_100,
+        "terminal errors should stay bounded for the task journal UI"
+    );
+
+    let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
+    assert_eq!(events.matches(r#""type":"tool_event""#).count(), 90);
+    assert_eq!(events.matches(r#""type":"cli_chunk""#).count(), 0);
 
     let _ = fs::remove_dir_all(dir);
 }

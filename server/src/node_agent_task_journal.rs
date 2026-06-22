@@ -11,10 +11,12 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::node_agent_task_journal_lock::with_task_journal_io_lock;
-
-const MAX_CHUNK_CHARS: usize = 12_000;
-const MAX_ERROR_CHARS: usize = 2_000;
+use crate::{
+    node_agent_task_journal_events::{
+        cli_chunk_event, is_terminal_status, normalize_finish_error, normalize_finish_status,
+    },
+    node_agent_task_journal_lock::with_task_journal_io_lock,
+};
 
 #[derive(Clone, Debug)]
 pub(crate) struct TaskJournal {
@@ -291,22 +293,9 @@ impl TaskJournal {
     }
 
     pub(crate) fn record_cli_chunk(&self, req_id: &str, stream: &str, text: &str) -> Result<()> {
-        with_task_journal_io_lock(|| {
-            let text = truncate_chars(text, MAX_CHUNK_CHARS);
-            if text.trim().is_empty() {
-                return Ok(());
-            }
-            let now = now_ms();
-            if let Some(event) = parse_runtime_event(req_id, stream, &text, now) {
-                return self.append_event(event);
-            }
-            self.append_event(json!({
-                "type": "cli_chunk",
-                "req_id": req_id,
-                "stream": normalize_stream(stream),
-                "text": text,
-                "at_ms": now
-            }))
+        with_task_journal_io_lock(|| match cli_chunk_event(req_id, stream, text, now_ms()) {
+            Some(event) => self.append_event(event),
+            None => Ok(()),
         })
     }
 
@@ -479,89 +468,6 @@ fn event_belongs_to_task(event: &Value, task_id: &str) -> bool {
         .get("req_id")
         .and_then(|value| value.as_str())
         .is_some_and(|req_id| req_id == task_id)
-}
-
-fn parse_runtime_event(req_id: &str, stream: &str, text: &str, at_ms: u128) -> Option<Value> {
-    let parsed: Value = serde_json::from_str(text.trim()).ok()?;
-    let event_type = parsed.get("type").and_then(Value::as_str)?;
-    if !matches!(
-        event_type,
-        "tool_call" | "tool_result" | "tool_approval_required" | "tool_approval_decision"
-    ) {
-        return None;
-    }
-    Some(json!({
-        "type": "tool_event",
-        "req_id": req_id,
-        "stream": normalize_stream(stream),
-        "event": parsed,
-        "text": text,
-        "at_ms": at_ms
-    }))
-}
-
-fn normalize_stream(stream: &str) -> &'static str {
-    match stream.trim().to_ascii_lowercase().as_str() {
-        "stderr" => "stderr",
-        "runtime" => "runtime",
-        _ => "stdout",
-    }
-}
-
-fn normalize_finish_status(status: &str, error: Option<&str>) -> &'static str {
-    match status.trim().to_ascii_lowercase().as_str() {
-        "done" | "ok" | "success" | "succeeded" => "done",
-        "failed" | "failure" | "error" | "errored" => "failed",
-        "canceled" | "cancelled" | "cancel" | "stopped" => "canceled",
-        "interrupted" => "interrupted",
-        "finished" if looks_canceled(error) => "canceled",
-        "finished" if has_error(error) => "failed",
-        "finished" => "finished",
-        _ if looks_canceled(error) => "canceled",
-        _ if has_error(error) => "failed",
-        _ => "finished",
-    }
-}
-
-fn normalize_finish_error(error: Option<&str>) -> Option<String> {
-    error
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| truncate_chars(value, MAX_ERROR_CHARS))
-}
-
-fn is_terminal_status(status: &str) -> bool {
-    matches!(
-        status.trim().to_ascii_lowercase().as_str(),
-        "finished" | "done" | "failed" | "canceled" | "cancelled" | "interrupted"
-    )
-}
-
-fn has_error(error: Option<&str>) -> bool {
-    error.map(str::trim).is_some_and(|value| !value.is_empty())
-}
-
-fn looks_canceled(error: Option<&str>) -> bool {
-    let Some(error) = error.map(str::trim).filter(|value| !value.is_empty()) else {
-        return false;
-    };
-    let lower = error.to_ascii_lowercase();
-    lower.contains("cancel")
-        || lower.contains("cancelled")
-        || lower.contains("canceled")
-        || lower.contains("stopped")
-        || error.contains("取消")
-        || error.contains("停止")
-        || error.contains("终止")
-}
-
-fn truncate_chars(text: &str, max_chars: usize) -> String {
-    if text.chars().count() <= max_chars {
-        return text.to_string();
-    }
-    let mut out: String = text.chars().take(max_chars).collect();
-    out.push_str("\n...（本机 journal 输出已截断）");
-    out
 }
 
 fn now_ms() -> u128 {
