@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 当前交接入口进一步收敛为 `status-refresh-current.json` + `handoff-prompt-current.md`。前者保存机器字段和完成矩阵，后者把 owner 下一步、阻塞项、可执行命令和接手规则整理成可复制提示，并把 token/password 参数占位。后续会话先跑 `scripts\fb2-ai-center-refresh-current-status.ps1`，再按 prompt 决定是做无密钥回归，还是拿 `FB2_AI_CENTER_TOKEN` 跑 live data-only preflight。
 - 2026-06-23 当前长期数据工具路线已机器化为 `latest_domain_data_blueprint` 和 `context-contract.domain_data_blueprint_contract`：fb2 的比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计分别是独立 lane。每条 lane 都要能投影到 Context Pack 小节、source kinds、主工具、权限 scope、回答分层和禁止输出；主项目不复制 fb2 业务数据，MCP/RAG 只作为后续包装或内部召回增强，不能替代 REST Context Pack 的事实源和审计。
 - 2026-06-23 新增无密钥公开契约巡检路径：`scripts\fb2-public-contract-status.ps1` 只读主项目 `/health`、`/api/server/version` 和 `/api/external/apps/fb2/context-contract`，用于回答“主项目代码和线上公开契约现在是什么状态”。它会检查领域数据蓝图、群聊直读契约和 live manifest，但明确不验证 fb2 live Context Pack、订单、权限或质量闭环。
 - 2026-06-23 新增一页式 handoff 报告：`scripts\fb2-ai-center-handoff-report.ps1` 从 `status-current.json` 生成 JSON/Markdown，给主项目会话和 fb2 子会话同步当前完成项、缺口、直读证据策略和安全命令。该报告只按当前本地 summary 说话，不从历史文档推断完成，适合判断“现在做到哪里、下一步要干嘛”。

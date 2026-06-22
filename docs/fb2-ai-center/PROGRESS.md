@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮新增 `scripts\fb2-ai-center-handoff-prompt.ps1`，并把它接入 `scripts\fb2-ai-center-refresh-current-status.ps1`。刷新后会生成 `target\fb2-ai-center\handoff-prompt-current.md`，把 `owner_next_actions`、`blocking_state`、`next_commands`、`completion_matrix` 和接手规则整理成可复制给下一轮主项目或 fb2 子会话的提示；脚本会把 `FB2_AI_CENTER_TOKEN`、`-Fb2AiCenterToken`、`-Fb2Token`、`-Fb2Password` 参数替换成占位，避免交接文件保存真实密钥。
 - 2026-06-23 本轮继续把“最终目标到底完成到哪一步”变成机器可读交接：`status-refresh-current.json` 新增 `completion_matrix schema=fb2.main_project.completion_matrix.v1`。该矩阵直接从 `goal-audit-current.json` 的 requirements 派生，逐项列出 group、owner、status、complete、deferred、evidence、missing，并汇总 totals/gates；后续会话不需要在长文档里手工判断“今日比赛/我的票/平台摘要/群观点/权限/反馈/群聊直读/语音暂停”分别是什么状态。
 - 2026-06-23 本轮在提交 `e136a251` 后按新 `next_commands.no_write_direct_read` 口径复跑真实群聊 API 直读：`scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password 123qwe -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json` 返回 `failed=0 skipped=0`。当前账号仍能读取群 `ext_fb2_official`，`message_count=80`，最近消息索引 20 条，样本消息 `gai_06537010425c467595cee04c585b2edf` 的 `text_len=292`、`text_sha256=b6f9bceebb28841a1380c002b3103e3d4264c8f1b4577a0af2855f537061fc1a`，且 `writes=false`。这继续证明 fb2 对话验收走 API 直读，不靠截图；没有发送 `@EL`、没有长按 AI 回复、没有创建 summary post。
 - 2026-06-23 本轮继续把下一步动作从“文字描述”推进为可执行交接：`status-refresh-current.json` 新增 `next_commands`，包含刷新自身、读取 refresh JSON、无写群直读、带 token 的 `DataOnlyAcceptance -PreflightOnly`、以及需要显式授权的 visible regression 命令。命令仍使用 `<FB2_AI_CENTER_TOKEN>` / `<FB2_PASSWORD>` 占位，不保存密钥；fb2 子会话或下一轮主项目会话可以直接读取这个字段执行下一步。

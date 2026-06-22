@@ -5,6 +5,7 @@ param(
     [string[]]$EvidenceDirs = @(),
     [string]$MainWorkspaceEvidenceDir = "",
     [string]$RefreshSummaryPath = "",
+    [string]$HandoffPromptPath = "",
     [switch]$SkipPublicContract,
     [switch]$SelfTest
 )
@@ -286,6 +287,7 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.goal_audit)) "goal audit file exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.handoff_markdown)) "handoff markdown exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.status_refresh)) "status refresh file exists"
+        Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.handoff_prompt)) "handoff prompt file exists"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.owner_next_actions.main_project)) "main owner action"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.owner_next_actions.fb2_project)) "fb2 owner action"
         Assert-Fb2RefreshSelfTest ([bool]$summary.blocking_state.blocked_by_external_secret) "selftest token blocked"
@@ -325,6 +327,15 @@ if ([string]::IsNullOrWhiteSpace($RefreshSummaryPath)) {
 $refreshParent = Split-Path -Parent $RefreshSummaryPath
 if (-not [string]::IsNullOrWhiteSpace($refreshParent)) {
     New-Item -ItemType Directory -Force -Path $refreshParent | Out-Null
+}
+if ([string]::IsNullOrWhiteSpace($HandoffPromptPath)) {
+    $HandoffPromptPath = Join-Path $OutputDir "handoff-prompt-current.md"
+} else {
+    $HandoffPromptPath = Resolve-Fb2RefreshPath -Path $HandoffPromptPath -Root $root
+}
+$handoffPromptParent = Split-Path -Parent $HandoffPromptPath
+if (-not [string]::IsNullOrWhiteSpace($handoffPromptParent)) {
+    New-Item -ItemType Directory -Force -Path $handoffPromptParent | Out-Null
 }
 
 $evidence = [System.Collections.ArrayList]::new()
@@ -387,6 +398,7 @@ $refreshSummary = [pscustomobject]@{
         goal_audit_markdown = $goalAuditMarkdownPath
         handoff = $handoffPath
         handoff_markdown = $handoffMarkdownPath
+        handoff_prompt = $HandoffPromptPath
     }
     public_contract_ready = [bool]($public -and $public.success)
     user_scenario_audit_ready = [bool]$status.latest_user_scenario_audit.complete
@@ -405,4 +417,7 @@ $refreshSummary = [pscustomobject]@{
 
 $refreshJson = $refreshSummary | ConvertTo-Json -Depth 8
 Set-Content -LiteralPath $RefreshSummaryPath -Value $refreshJson -Encoding UTF8
+& (Join-Path $PSScriptRoot "fb2-ai-center-handoff-prompt.ps1") `
+    -RefreshPath $RefreshSummaryPath `
+    -OutputPath $HandoffPromptPath | Out-Null
 $refreshJson
