@@ -859,6 +859,8 @@ try {
     $liveToolIds = @($contract.live_tool_manifest.tool_ids)
     $answerPolicy = $contract.answer_policy_contract
     $projectionContract = $contract.domain_context_projection_contract
+    $toolExecutionContract = $contract.tool_execution_contract
+    $toolExecutionPlan = $toolExecutionContract.main_project_execution_result.plan
     $projectionSections = @($projectionContract.required_sections)
     $projectionSectionIds = @($projectionSections | ForEach-Object { $_.id })
     $projectionSourceKinds = @($projectionContract.source_registry.required_kinds)
@@ -884,6 +886,15 @@ try {
     Assert-True (@($policy.main_project_allowed_missing_tool_ids).Count -eq 0) "no allowed tool missing in live fb2 manifest"
     foreach ($toolId in $requiredFb2ToolIds) {
         Assert-ContainsValue $liveToolIds $toolId "live manifest required tool: $toolId"
+    }
+    Assert-True ($toolExecutionContract.schema -eq "fb2.tool_execution.v1") "tool execution contract schema" "$($toolExecutionContract.schema)"
+    Assert-True ($toolExecutionContract.main_project_execution_result.schema -eq "external_app.executed_tools.v1") "tool execution result schema" "$($toolExecutionContract.main_project_execution_result.schema)"
+    Assert-True ($toolExecutionPlan.schema -eq "external_app.tool_plan.v1") "tool execution plan schema" "$($toolExecutionPlan.schema)"
+    Assert-True ($toolExecutionPlan.strategy -eq "deterministic_fb2_chat_v1") "tool execution plan strategy" "$($toolExecutionPlan.strategy)"
+    $domainScenarioSelectionContract = [string]$toolExecutionPlan.domain_scenario_selection
+    Assert-True ($domainScenarioSelectionContract.Contains("fb2.domain_scenario_selection.v1")) "tool execution plan domain scenario selection" $domainScenarioSelectionContract
+    foreach ($fieldName in @("primary_tools", "required_citations", "permission_scope", "forbidden_outputs")) {
+        Assert-True ($domainScenarioSelectionContract.Contains($fieldName)) "tool execution plan domain scenario selection field: $fieldName" $domainScenarioSelectionContract
     }
     Assert-True ($answerPolicy.schema -eq "fb2.answer_policy.v1") "answer policy schema"
     Assert-True (@($answerPolicy.canonical_eval_questions).Count -ge 6) "answer policy canonical eval questions" "count=$(@($answerPolicy.canonical_eval_questions).Count)"
