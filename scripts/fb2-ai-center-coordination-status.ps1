@@ -74,6 +74,7 @@ function Get-Fb2AiCenterCoordinationStatus {
         [object]$SampleRequestState,
         [object]$SampleSetState,
         [object]$AnswerReadinessState,
+        [object]$UserScenarioAudit,
         [object]$GoalGapAudit,
         [bool]$TokenPresent,
         [bool]$VoiceEvidencePathPresent
@@ -172,6 +173,16 @@ function Get-Fb2AiCenterCoordinationStatus {
             failed_count = [int](Get-Fb2CoordinationJsonProperty $AnswerReadinessState "failed_count" 0)
             missing = @((Get-Fb2CoordinationJsonProperty $AnswerReadinessState "missing" @()))
             note = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $AnswerReadinessState "note")
+        }
+        user_scenario_audit = [ordered]@{
+            schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $UserScenarioAudit "schema")
+            complete = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $UserScenarioAudit "complete")
+            scenario_count = [int](Get-Fb2CoordinationJsonProperty $UserScenarioAudit "scenario_count" 0)
+            complete_count = [int](Get-Fb2CoordinationJsonProperty $UserScenarioAudit "complete_count" 0)
+            failed_count = [int](Get-Fb2CoordinationJsonProperty $UserScenarioAudit "failed_count" 0)
+            context_format = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $UserScenarioAudit "context_format")
+            mcp_status = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $UserScenarioAudit "mcp_status")
+            missing = @((Get-Fb2CoordinationJsonProperty $UserScenarioAudit "missing" @()))
         }
         goal_gap_audit = [ordered]@{
             schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $GoalGapAudit "schema")

@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 当前工作从“格式讨论”落到用户场景审计：`latest_user_scenario_audit` 会把 XML-wrapped Markdown Context Pack + JSON metadata + 群聊 direct-read/feedback/quality 证据，映射到七类用户真实问题。第一阶段仍明确不做完整 MCP/RAG，fb2 继续提供 REST Context Pack、tool manifest 和 tools/execute；MCP 以后只作为包装或增强层，不能替代当前事实源和审计链路。
 - 2026-06-23 在样本集格式验证之后，继续增加离线 answer readiness：状态快照会从 `latest_context_pack_sample_set` 推导 `latest_context_answer_readiness`，按“今天比赛怎么看 / 帮我分析我的票 / 平台今天订单风险怎么样 / 群里大家怎么看这场”四类问题检查必需 source kinds、回答分层和禁止输出。它不调用模型、不替代 feedback/live quality，但能证明当前样本足够支撑主项目 AI 的四类核心回答输入。
 - 2026-06-23 继续把 fb2 子会话导出的四类 live Context Pack 样本纳入主项目状态机：`validate-fb2-context-pack.ps1 -ValidateSampleSet` 会一次性验证 `today_matches_context_pack`、`my_ticket_context_pack`、`platform_order_context_pack`、`group_opinion_context_pack` 四个样本，并生成 `context-pack-samples-validation-current.json`。状态快照会输出 `latest_context_pack_sample_set`；缺 token 但样本集完整时，下一步从“等待 fb2 导出样本”切到“补 `FB2_AI_CENTER_TOKEN` 刷新 live 权限/质量 preflight”。
 - 2026-06-23 `status-current.json` 现在会直接暴露 `latest_context_pack_sample_request`，避免后续只看到“缺 FB2_AI_CENTER_TOKEN”而不知道已有替代交接路径。当前缺 token 时的最小动作应是：确认样本请求 `complete=true`，等待 fb2 子会话按四类场景导出样本；如果补齐 token，则直接跑 live `-DataOnlyAcceptance -PreflightOnly`。

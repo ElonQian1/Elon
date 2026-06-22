@@ -14,6 +14,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-context-sample-request-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-sample-set-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-answer-readiness-status.ps1")
+. (Join-Path $PSScriptRoot "fb2-user-scenario-audit-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-gap-audit-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-ai-center-coordination-status.ps1")
@@ -121,6 +122,14 @@ function Build-Fb2AiCenterStatusSnapshot {
         -ContextProjectionComplete ([bool]$contextProjectionState.complete) `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent `
         -FinalEvidence $finalEvidence
+    $userScenarioAudit = Get-Fb2UserScenarioAuditState `
+        -LatestData $latestData `
+        -LatestReadOnly $latestReadOnly `
+        -FinalEvidence $finalEvidence `
+        -FeedbackCoverage $feedbackCoverage `
+        -DataDirectReadState $dataDirectReadState `
+        -ContextProjectionState $contextProjectionState `
+        -AnswerReadinessState $answerReadinessState
     $goalGapAudit = Get-Fb2GoalGapAuditState `
         -LatestData $latestData `
         -LatestReadOnly $latestReadOnly `
@@ -130,6 +139,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -SampleRequestState $sampleRequestState `
         -SampleSetState $sampleSetState `
         -AnswerReadinessState $answerReadinessState `
+        -UserScenarioAudit $userScenarioAudit `
         -GoalCompletion $goalCompletion `
         -LatestDataPath $(if ($null -eq $latestDataFile) { "" } else { $latestDataFile.FullName }) `
         -LatestReadOnlyPath $(if ($null -eq $latestReadOnlyFile) { "" } else { $latestReadOnlyFile.FullName }) `
@@ -150,6 +160,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -SampleRequestState $sampleRequestState `
         -SampleSetState $sampleSetState `
         -AnswerReadinessState $answerReadinessState `
+        -UserScenarioAudit $userScenarioAudit `
         -GoalGapAudit $goalGapAudit `
         -TokenPresent $tokenPresent `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent
@@ -261,6 +272,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         latest_context_pack_sample_request = $sampleRequestState
         latest_context_pack_sample_set = $sampleSetState
         latest_context_answer_readiness = $answerReadinessState
+        latest_user_scenario_audit = $userScenarioAudit
         readiness = [ordered]@{
             non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
@@ -403,6 +415,12 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_context_pack_sample_set.passed_count -ne 4) { $failed++ }
         if (-not [bool]$snapshot.latest_context_answer_readiness.complete) { $failed++ }
         if ($snapshot.latest_context_answer_readiness.passed_count -ne 4) { $failed++ }
+        if ($snapshot.latest_user_scenario_audit.schema -ne "fb2.main_project.user_scenario_audit.v1") { $failed++ }
+        if (-not [bool]$snapshot.latest_user_scenario_audit.complete) { $failed++ }
+        if ($snapshot.latest_user_scenario_audit.scenario_count -ne 7) { $failed++ }
+        if ($snapshot.latest_user_scenario_audit.complete_count -ne 7) { $failed++ }
+        if ($snapshot.latest_user_scenario_audit.context_format -ne "xml_wrapped_markdown_context_pack_with_json_metadata") { $failed++ }
+        if (-not ([string]$snapshot.latest_user_scenario_audit.mcp_status -match "rest_context_pack")) { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_pack_exported_samples_validated_offline")) { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_answer_readiness_validated_offline")) { $failed++ }
         if (-not [bool]$snapshot.goal_completion.non_voice_ready) { $failed++ }
@@ -413,6 +431,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "direct_group_chat_read")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_pack_sample_set_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_answer_readiness_validated")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "user_scenario_audit_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "voice_final_evidence")) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.blocked_by_external_secret) { $failed++ }
@@ -427,6 +446,7 @@ function Invoke-Fb2StatusSelfTest {
         if ([bool]$snapshot.coordination.direct_read_policy.writes_group_messages_in_status) { $failed++ }
         if (-not [bool]$snapshot.coordination.context_pack_sample_set.complete) { $failed++ }
         if (-not [bool]$snapshot.coordination.context_answer_readiness.complete) { $failed++ }
+        if (-not [bool]$snapshot.coordination.user_scenario_audit.complete) { $failed++ }
         if ([string]$snapshot.coordination.current_evidence.visible_group_id -ne "ext_fb2_official") { $failed++ }
         if ([string]$snapshot.coordination.current_evidence.visible_mention_reply_id -ne "") { $failed++ }
         if (-not ([string]$snapshot.coordination.safe_commands.visible_regression_requires_authorization -match "-AllowVisibleMessages")) { $failed++ }
