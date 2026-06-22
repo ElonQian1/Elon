@@ -104,6 +104,7 @@ internal class MainNavigationController(
         setProjectToolbarExpanded(true)
         binding.topTitleText.visibility = View.GONE
         binding.projectTopTabs.visibility = View.VISIBLE
+        binding.projectTopTabs.setPadding(0, 0, 0, 0)
         binding.projectTopTabs.gravity = Gravity.CENTER
         binding.projectHomeTopTabWrap.visibility = View.GONE
         binding.projectPlazaTopTabWrap.visibility = View.VISIBLE
@@ -111,7 +112,8 @@ internal class MainNavigationController(
         updateProjectTopTabVisual(
             tab = binding.projectPlazaTopTab,
             indicator = binding.projectPlazaTabIndicator,
-            selected = true
+            selected = true,
+            showIndicator = false
         )
     }
 
@@ -135,10 +137,15 @@ internal class MainNavigationController(
         if (visible) binding.projectSegmentBar.bringToFront()
     }
 
-    private fun updateProjectTopTabVisual(tab: TextView, indicator: View, selected: Boolean) {
+    private fun updateProjectTopTabVisual(
+        tab: TextView,
+        indicator: View,
+        selected: Boolean,
+        showIndicator: Boolean = selected
+    ) {
         tab.setTextColor(activity.getColor(R.color.elon_text_primary))
         tab.setTypeface(tab.typeface, if (selected) Typeface.BOLD else Typeface.BOLD)
-        indicator.visibility = if (selected) View.VISIBLE else View.INVISIBLE
+        indicator.visibility = if (showIndicator) View.VISIBLE else View.INVISIBLE
     }
 
     private fun showProjectSpaceBottomMenu() {
