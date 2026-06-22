@@ -2,6 +2,7 @@
 
 param(
     [string]$SummaryDir = "",
+    [string[]]$EvidenceDirs = @(),
     [string]$OutputPath = "",
     [switch]$SelfTest
 )
@@ -40,6 +41,72 @@ function Get-LatestFileByPattern {
         return $null
     }
     return $files[0]
+}
+
+function Split-Fb2StatusDirectoryList {
+    param([string]$Value)
+
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        return @()
+    }
+    $separator = [System.IO.Path]::PathSeparator
+    @($Value -split [regex]::Escape([string]$separator) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+}
+
+function Get-Fb2StatusSummaryDirectories {
+    param(
+        [string]$PrimaryDirectory,
+        [string[]]$ExtraDirectories
+    )
+
+    $root = Get-Fb2StatusRepoRoot
+    if ([string]::IsNullOrWhiteSpace($PrimaryDirectory)) {
+        $PrimaryDirectory = Join-Path $root "target\fb2-ai-center"
+    }
+
+    $candidates = @()
+    $candidates += $PrimaryDirectory
+    $candidates += @($ExtraDirectories)
+    $candidates += Split-Fb2StatusDirectoryList -Value $env:FB2_AI_CENTER_SUMMARY_DIR
+    $candidates += Split-Fb2StatusDirectoryList -Value $env:FB2_AI_CENTER_SUMMARY_DIRS
+
+    $seen = @{}
+    $result = @()
+    foreach ($candidate in $candidates) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) {
+            continue
+        }
+        $path = [string]$candidate
+        if (-not [System.IO.Path]::IsPathRooted($path)) {
+            $path = Join-Path $root $path
+        }
+        $key = $path.ToLowerInvariant()
+        if (-not $seen.ContainsKey($key)) {
+            $seen[$key] = $true
+            $result += $path
+        }
+    }
+    return @($result)
+}
+
+function Get-LatestFileByPatternAcrossDirectories {
+    param(
+        [string[]]$Directories,
+        [string]$Pattern
+    )
+
+    $files = @()
+    foreach ($directory in @($Directories)) {
+        if ([string]::IsNullOrWhiteSpace($directory) -or -not (Test-Path -LiteralPath $directory)) {
+            continue
+        }
+        $files += @(Get-ChildItem -LiteralPath $directory -Filter $Pattern -File -ErrorAction SilentlyContinue)
+    }
+    $ordered = @($files | Sort-Object LastWriteTimeUtc -Descending)
+    if ($ordered.Count -eq 0) {
+        return $null
+    }
+    return $ordered[0]
 }
 
 function Get-JsonProperty {
@@ -86,19 +153,23 @@ function Get-GitValueOrEmpty {
 }
 
 function Build-Fb2AiCenterStatusSnapshot {
-    param([string]$Directory)
+    param(
+        [string]$Directory,
+        [string[]]$ExtraDirectories = @()
+    )
 
     $root = Get-Fb2StatusRepoRoot
     if ([string]::IsNullOrWhiteSpace($Directory)) {
         $Directory = Join-Path $root "target\fb2-ai-center"
     }
+    $summaryDirectories = Get-Fb2StatusSummaryDirectories -PrimaryDirectory $Directory -ExtraDirectories $ExtraDirectories
 
-    $latestDataFile = Get-LatestFileByPattern -Directory $Directory -Pattern "data-only-acceptance-*.json"
-    $latestReadOnlyFile = Get-LatestFileByPattern -Directory $Directory -Pattern "read-only-direct-read*.json"
-    $latestAiCenterLogFile = Get-LatestFileByPattern -Directory $Directory -Pattern "*ai-center.log"
-    $latestSampleRequestFile = Get-LatestFileByPattern -Directory $Directory -Pattern "context-pack-sample-request*.json"
-    $latestSampleSetFile = Get-LatestFileByPattern -Directory $Directory -Pattern "context-pack-samples-validation*.json"
-    $latestPublicContractFile = Get-LatestFileByPattern -Directory $Directory -Pattern "public-contract-status*.json"
+    $latestDataFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "data-only-acceptance-*.json"
+    $latestReadOnlyFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "read-only-direct-read*.json"
+    $latestAiCenterLogFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "*ai-center.log"
+    $latestSampleRequestFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-sample-request*.json"
+    $latestSampleSetFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-samples-validation*.json"
+    $latestPublicContractFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "public-contract-status*.json"
     $latestData = if ($null -eq $latestDataFile) { $null } else { Read-JsonFileOrNull $latestDataFile.FullName }
     $latestReadOnly = if ($null -eq $latestReadOnlyFile) { $null } else { Read-JsonFileOrNull $latestReadOnlyFile.FullName }
     $contextProjectionState = Get-Fb2ContextProjectionLogState -Path $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName })
@@ -241,6 +312,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         schema = "fb2.main_project.status_snapshot.v1"
         generated_at = (Get-Date).ToUniversalTime().ToString("o")
         summary_dir = $Directory
+        summary_dirs = @($summaryDirectories)
         repo = [ordered]@{
             branch = Get-GitValueOrEmpty -GitArgs @("-C", $root, "branch", "--show-current")
             head = Get-GitValueOrEmpty -GitArgs @("-C", $root, "rev-parse", "--short=8", "HEAD")
@@ -554,7 +626,7 @@ if ($SelfTest) {
     exit 0
 }
 
-$snapshot = Build-Fb2AiCenterStatusSnapshot -Directory $SummaryDir
+$snapshot = Build-Fb2AiCenterStatusSnapshot -Directory $SummaryDir -ExtraDirectories $EvidenceDirs
 $json = $snapshot | ConvertTo-Json -Depth 10
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {
     $dir = Split-Path -Parent $OutputPath

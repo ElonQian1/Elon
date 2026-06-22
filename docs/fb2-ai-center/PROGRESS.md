@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮修正状态快照在临时 worktree 中误报缺 live 验收证据的问题：`scripts\smoke-fb2-ai-center-status.ps1` 新增 `-EvidenceDirs` 参数，并支持环境变量 `FB2_AI_CENTER_SUMMARY_DIR` / `FB2_AI_CENTER_SUMMARY_DIRS`。状态脚本会在当前 worktree target 和额外证据目录之间选取最新 data-only summary、read-only direct-read、ai-center log、样本集和公开契约 summary；`fb2-ai-center-handoff-report.ps1` 也会输出 `source_summary_dirs` 和带额外证据目录的刷新命令。这样从临时 worktree 继续工作时，不会因为看不到 `D:\rust\active-projects\elon cli\target\fb2-ai-center` 里的已通过 data-only visible acceptance 而误判“仍缺订单/平台汇总/群聊反馈”。
 - 2026-06-23 本轮修正主项目 smoke 的 live manifest 必需工具口径：`context_feedback_summary` 不再被当作 fb2 manifest 必须暴露的 tool id；质量反馈闭环以 `record_context_feedback`、`list_context_feedbacks`、`context_audit_summary` 及受保护质量/反馈 HTTP 端点验收，避免把 integration-only 能力误判为聊天工具缺失。
 - 2026-06-23 本轮把 fb2 AI-facing Markdown 模板下沉到主项目公开契约：`GET /api/external/apps/fb2/context-contract` 新增 `context_pack_template_contract schema=fb2.context_pack_template.v1`。该字段固定 `<fb2_context_pack>` XML wrapper、7 个 Markdown 小节顺序、必需 JSON metadata、业务 source kinds、质量历史 source kinds、空数据处理规则、MCP 后置口径和投注/隐私边界；`scripts\smoke-fb2-ai-center.ps1` 与 `scripts\fb2-public-contract-status.ps1` 已同步检查，避免 fb2 后续只给临时 Markdown、大 JSON 或没有 source id 的摘要。
 - 2026-06-23 本轮新增 `server/src/external_app_context_gap_notice.rs`，并接入群聊/好友 `social_ai` 生成后链路。fb2 Context Pack 或 readiness 出现 `blocked/degraded/unavailable/partial`、`metrics.budget_status=empty/too_large`、`missing_context_pack` 或 token budget 截断时，即使模型回复没有主动说明，服务端也会在最终聊天回复追加 `数据缺口：...不能把缺失数据编造成比赛、赔率、订单或群友观点事实。` 该保护只作用于 fb2 外部上下文，不改变普通聊天回复，也不保存 fb2 业务数据。

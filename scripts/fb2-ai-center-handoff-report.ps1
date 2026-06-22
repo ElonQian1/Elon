@@ -81,6 +81,7 @@ function New-Fb2HandoffReport {
     $coordination = Get-Fb2HandoffProperty $Status "coordination"
     $coordinationNext = Get-Fb2HandoffProperty $coordination "next_action_by_owner"
     $commands = Get-Fb2HandoffProperty $livePreflight "commands"
+    $summaryDirs = @((Get-Fb2HandoffProperty $Status "summary_dirs" @()))
 
     $publicComplete = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $public "complete")
     $directReadComplete = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $readOnly "complete")
@@ -123,6 +124,7 @@ function New-Fb2HandoffReport {
         generated_at = (Get-Date).ToUniversalTime().ToString("o")
         source_status_path = $SourcePath
         source_status_generated_at = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $Status "generated_at")
+        source_summary_dirs = @($summaryDirs)
         stage = $stage
         verdict = [ordered]@{
             public_contract_ready = $publicComplete
@@ -185,6 +187,7 @@ function New-Fb2HandoffReport {
         safe_commands = [ordered]@{
             refresh_public_contract = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-public-contract-status.ps1 -OutputPath target\fb2-ai-center\public-contract-status-current.json'
             refresh_status = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center-status.ps1 -OutputPath target\fb2-ai-center\status-current.json'
+            refresh_status_with_extra_evidence = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center-status.ps1 -EvidenceDirs "D:\rust\active-projects\elon cli\target\fb2-ai-center" -OutputPath target\fb2-ai-center\status-current.json'
             no_write_direct_read = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $commands "no_write_direct_read")
             data_only_preflight = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $commands "data_only_preflight")
             visible_regression_requires_authorization = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $commands "visible_regression_requires_authorization")
@@ -203,6 +206,9 @@ function ConvertTo-Fb2HandoffMarkdown {
     [void]$lines.Add("- generated_at: $($Report.generated_at)")
     [void]$lines.Add("- stage: $($Report.stage)")
     [void]$lines.Add("- source_status: $($Report.source_status_path)")
+    if (@($Report.source_summary_dirs).Count -gt 0) {
+        [void]$lines.Add("- source_summary_dirs: $((@($Report.source_summary_dirs) -join " | "))")
+    }
     [void]$lines.Add("")
     [void]$lines.Add("## Verdict")
     [void]$lines.Add("")
@@ -252,6 +258,7 @@ function ConvertTo-Fb2HandoffMarkdown {
     foreach ($name in @(
         "refresh_public_contract",
         "refresh_status",
+        "refresh_status_with_extra_evidence",
         "no_write_direct_read",
         "data_only_preflight",
         "visible_regression_requires_authorization",
