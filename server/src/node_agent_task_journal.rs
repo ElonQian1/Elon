@@ -269,30 +269,18 @@ impl TaskJournal {
         let registry = self.load_registry()?;
         let record = registry.get(task_id).cloned();
         let event_limit = limit.clamp(1, 200);
-        let mut events = Vec::new();
-        let mut last_event_seq = 0usize;
-        let mut has_more = false;
 
         // Journal 只保存本机进程状态，不写入 prompt/API key；读取时仍按 req_id 过滤，避免
-        // 前端把其他任务的本机路径混进当前任务卡片。
-        for (seq, event) in self.read_events()?.into_iter() {
-            last_event_seq = last_event_seq.max(seq);
-            if seq <= since || !event_belongs_to_task(&event, task_id) {
-                continue;
-            }
-            if events.len() >= event_limit {
-                has_more = true;
-                continue;
-            }
-            events.push(TaskJournalEventView { seq, event });
-        }
+        // 前端把其他任务的本机路径混进当前任务卡片。压力场景下按行流式扫描，避免把整个
+        // events.jsonl 收集到内存后再过滤。
+        let event_scan = self.scan_task_events(task_id, since, event_limit)?;
 
         Ok(TaskJournalSnapshot {
             task_id: task_id.to_string(),
             record,
-            events,
-            last_event_seq,
-            has_more,
+            events: event_scan.events,
+            last_event_seq: event_scan.last_event_seq,
+            has_more: event_scan.has_more,
         })
     }
 
@@ -368,30 +356,51 @@ impl TaskJournal {
             .with_context(|| format!("写入 {:?}", path))
     }
 
-    fn read_events(&self) -> Result<Vec<(usize, serde_json::Value)>> {
+    fn scan_task_events(
+        &self,
+        task_id: &str,
+        since: usize,
+        event_limit: usize,
+    ) -> Result<TaskJournalEventScan> {
         let path = self.events_path();
         if !path.exists() {
-            return Ok(Vec::new());
+            return Ok(TaskJournalEventScan::default());
         }
         let file = File::open(&path).with_context(|| format!("打开 {:?}", path))?;
         let reader = BufReader::new(file);
-        let mut events = Vec::new();
+        let mut scan = TaskJournalEventScan::default();
         for (index, line) in reader.lines().enumerate() {
+            let seq = index + 1;
+            scan.last_event_seq = scan.last_event_seq.max(seq);
             let line = line.with_context(|| format!("读取 {:?}", path))?;
             if line.trim().is_empty() {
                 continue;
             }
             let event = serde_json::from_str(&line)
                 .with_context(|| format!("解析 {:?} 第 {} 行", path, index + 1))?;
-            events.push((index + 1, event));
+            if seq <= since || !event_belongs_to_task(&event, task_id) {
+                continue;
+            }
+            if scan.events.len() >= event_limit {
+                scan.has_more = true;
+                continue;
+            }
+            scan.events.push(TaskJournalEventView { seq, event });
         }
-        Ok(events)
+        Ok(scan)
     }
 
     #[cfg(test)]
     fn read_registry_for_test(&self) -> Result<BTreeMap<String, TaskJournalRecord>> {
         self.load_registry()
     }
+}
+
+#[derive(Default)]
+struct TaskJournalEventScan {
+    events: Vec<TaskJournalEventView>,
+    last_event_seq: usize,
+    has_more: bool,
 }
 
 fn event_belongs_to_task(event: &Value, task_id: &str) -> bool {
@@ -666,6 +675,60 @@ mod tests {
         assert!(latest
             .iter()
             .all(|record| record.req_id.starts_with("req-")));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn stress_snapshot_streams_large_interleaved_journal() {
+        let dir = unique_test_dir("stress-streaming-snapshot");
+        let journal = TaskJournal::new(&dir);
+        for task_index in 0..400 {
+            let req_id = format!("req-{task_index:03}");
+            journal
+                .record_started(TaskJournalStart {
+                    req_id: &req_id,
+                    cli_name: "server-runtime",
+                    route: Some("route_c_server_runtime"),
+                    run_handle_id: Some(&req_id),
+                    cwd: Some("D:/demo"),
+                    runtime_permission: Some("project_write"),
+                })
+                .expect("start event should persist");
+            for chunk_index in 0..8 {
+                journal
+                    .record_cli_chunk(
+                        &req_id,
+                        "runtime",
+                        &format!("task {task_index} chunk {chunk_index}\n"),
+                    )
+                    .expect("chunk should persist");
+            }
+            if task_index % 5 == 0 {
+                journal
+                    .record_finished(&req_id)
+                    .expect("finish event should persist");
+            }
+        }
+
+        let snapshot = journal
+            .snapshot("req-399", 0, 4)
+            .expect("snapshot should stream large journal");
+        assert_eq!(snapshot.events.len(), 4);
+        assert!(snapshot.has_more);
+        assert!(snapshot.last_event_seq > 3_000);
+        assert!(snapshot.events.iter().all(|event| {
+            event.event.get("req_id").and_then(|value| value.as_str()) == Some("req-399")
+        }));
+
+        let cursor = snapshot.events.last().map(|event| event.seq).unwrap_or(0);
+        let next = journal
+            .snapshot("req-399", cursor, 20)
+            .expect("cursor snapshot should continue target task only");
+        assert!(next.events.iter().all(|event| {
+            event.event.get("req_id").and_then(|value| value.as_str()) == Some("req-399")
+        }));
+        assert!(next.events.len() >= 5);
+
         let _ = fs::remove_dir_all(dir);
     }
 
