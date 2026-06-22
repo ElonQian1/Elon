@@ -5,8 +5,7 @@ use std::sync::Arc;
 use tracing::{info, warn};
 
 use crate::{
-    agent_llm_call::call_chat_llm_with_options,
-    social_ai::resolve_social_agent,
+    social_ai_agents::call_social_chat_llm_with_fallback_options,
     store::{GroupAiDocument, GroupSummaryCreateInput, GroupSummarySourceMessage},
     types::AppState,
 };
@@ -138,10 +137,8 @@ async fn generate_group_summary(
     user_id: &str,
     context_pack: &str,
 ) -> anyhow::Result<(String, String)> {
-    let agent = resolve_social_agent(state).await?;
-    let response = call_chat_llm_with_options(
+    let response = call_social_chat_llm_with_fallback_options(
         state,
-        &agent,
         &[
             json!({
                 "role": "system",
@@ -168,7 +165,12 @@ async fn generate_group_summary(
     if summary.is_empty() {
         anyhow::bail!("AI 没有返回总结内容");
     }
-    Ok((summary.chars().take(6000).collect(), agent.model))
+    let model = response["model"]
+        .as_str()
+        .filter(|model| !model.trim().is_empty())
+        .unwrap_or("social_ai_fallback")
+        .to_string();
+    Ok((summary.chars().take(6000).collect(), model))
 }
 
 fn fallback_summary(messages: &[GroupSummarySourceMessage], error: &str) -> String {

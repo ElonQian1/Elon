@@ -9,7 +9,7 @@ use std::sync::Arc;
 use tracing::warn;
 
 use crate::{
-    agent_llm_call::call_chat_llm,
+    agent_llm_call::call_chat_llm_with_options,
     types::{AgentConfig, AgentsConfig, AppState},
 };
 
@@ -27,6 +27,17 @@ pub(crate) async fn call_social_chat_llm_with_fallback(
     user_id: &str,
     feature: &str,
 ) -> Result<Value> {
+    call_social_chat_llm_with_fallback_options(state, messages, user_id, feature, 0.8, 700).await
+}
+
+pub(crate) async fn call_social_chat_llm_with_fallback_options(
+    state: &Arc<AppState>,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+    temperature: f64,
+    max_tokens: usize,
+) -> Result<Value> {
     let agents = social_agents_in_fallback_order(state).await;
     if agents.is_empty() {
         return Err(anyhow!("未配置可用 AI 代理，请先在后台配置 API 代理"));
@@ -34,7 +45,17 @@ pub(crate) async fn call_social_chat_llm_with_fallback(
 
     let mut last_retryable_error = None;
     for (index, agent) in agents.iter().enumerate() {
-        match call_chat_llm(state, agent, messages, user_id, feature).await {
+        match call_chat_llm_with_options(
+            state,
+            agent,
+            messages,
+            user_id,
+            feature,
+            temperature,
+            max_tokens,
+        )
+        .await
+        {
             Ok(response) => return Ok(response),
             Err(error) => {
                 let message = error.to_string();

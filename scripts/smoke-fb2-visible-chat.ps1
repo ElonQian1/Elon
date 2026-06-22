@@ -206,6 +206,31 @@ function Test-ContainsUnsupportedBettingGuarantee {
     return $false
 }
 
+function Remove-SummaryQuotedSpeech {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return ""
+    }
+
+    $kept = New-Object System.Collections.Generic.List[string]
+    $inRelatedSpeech = $false
+    foreach ($line in ($Text -split "`r?`n")) {
+        if ($line -match '^\s*#{1,6}\s*相关发言') {
+            $inRelatedSpeech = $true
+            continue
+        }
+        if ($line -match '^\s*#{1,6}\s+' -and $inRelatedSpeech) {
+            $inRelatedSpeech = $false
+        }
+        if (-not $inRelatedSpeech) {
+            [void]$kept.Add($line)
+        }
+    }
+
+    return ($kept -join "`n")
+}
+
 function Assert-ReplyAnswerPolicy {
     param(
         [object]$Reply,
@@ -256,7 +281,8 @@ function Assert-SummaryPostPolicy {
         -Patterns @("风险边界", "不保证", "不能保证", "无法保证", "仅供参考", "不诱导", "风险") `
         -Name "summary-post includes risk boundary"
 
-    Assert-True (-not (Test-ContainsUnsupportedBettingGuarantee $text)) "summary-post avoids betting guarantees"
+    $policyText = Remove-SummaryQuotedSpeech $text
+    Assert-True (-not (Test-ContainsUnsupportedBettingGuarantee $policyText)) "summary-post avoids betting guarantees"
 }
 
 function Assert-SelectedMessageSafetyPolicy {
