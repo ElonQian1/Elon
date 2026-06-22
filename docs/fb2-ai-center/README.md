@@ -41,6 +41,13 @@
 - `final-acceptance-matrix.md`：终极目标逐项验收矩阵，明确每个接口、场景、权限和质量项需要什么证据。
 - `handoff.md`：7*24 协作交接记录模板和当前状态。
 
+真机语音证据先用 `scripts/collect-fb2-voice-device-evidence.ps1` 采集，再用 smoke 脚本验收。采集器会保存 screenshot、UI dump、logcat、包版本、权限、系统 ASR 服务和 `fb2.voice_device_evidence.v1` JSON；默认 `finalAcceptanceReady=false`，只适合定位和半成品证据。只有测试者已经用人工语音样本确认 system ASR final、云端 ASR fallback、server ASR 失败恢复、TTS 播放和 ASR/TTS 零余额免费，并为每个 `Observed*` 开关保留对应 artifact 时，才允许传 `-MarkFinalReady`。
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\collect-fb2-voice-device-evidence.ps1 -DeviceSerial <adb_serial> -CaptureHoldGesture -OutputDir target\fb2-voice-device-evidence\<run_id>
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath target\fb2-voice-device-evidence\<run_id>\voice-device-evidence.json
+```
+
 常规巡检先跑无副作用脚本 `scripts/smoke-fb2-ai-center.ps1`。修改主 smoke 的语音证据门槛后先跑 `scripts/smoke-fb2-ai-center.ps1 -SelfTest`，它不需要 token、不会访问 fb2、不会发送群消息，会用离线合成证据验证 `finalAcceptanceReady`、APK 版本、严格布尔字段、artifact 路径/URL、占位 ref 拒绝、logcat 和截图/视频证据门槛。最终验收 wrapper 的本地逻辑先跑 `scripts/smoke-fb2-final-acceptance.ps1 -SelfTest`，它同样不需要 token，会验证三类 feedback coverage、子脚本 exit code、voice/quality/permission evidence 摘录和最终 success 条件不会退化。只有拿到明确授权后，才运行有副作用脚本 `scripts/smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`，它会向真实群聊发送可见消息。
 
 最终验收使用 `scripts/smoke-fb2-final-acceptance.ps1`。先用 `-PreflightOnly` 做无副作用预检：解析 `ExternalUserId`、确认该用户有订单上下文，并在不发送群消息的前提下强制验证 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建、`finalAcceptanceReady=true` 的真机语音证据和 no-skip 门槛。真机语音证据的 artifact 不能是占位 ref；本地文件必须存在，远端证据必须是 URL，且至少包含 logcat 和截图/视频。预检通过后，再用 `-AllowVisibleMessages` 把真实群聊可见触发、总结帖、summary-post feedback 和 `smoke-fb2-ai-center.ps1 -FinalAcceptance` 绑定到同一批证据，并输出机器可读 summary；summary 会记录子脚本日志路径、`@EL` 消息 ID、AI 回复 ID、长按 `AI回复` 消息 ID、回复正文策略证据 `visible_answer_policy_evidence`、feedback evidence 和 `feedback_coverage`。最终 `success` 必须证明 `visible_mention`、`selected_message`、`summary_post` 三类 feedback 都覆盖。传 `-Fb2Username/-Fb2Password` 时会自动解析 `ExternalUserId`；缺 `FB2_AI_CENTER_TOKEN`、无法解析或手工提供有订单的 `ExternalUserId`、final-ready 真机语音证据或显式写群授权时必须失败。
