@@ -67,6 +67,8 @@ mod node_agent_runtime_events;
 mod node_agent_server_runtime;
 mod node_agent_task_journal;
 mod node_agent_task_journal_api;
+#[cfg(test)]
+mod node_agent_task_lifecycle_pressure_tests;
 mod node_agent_task_resume;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
