@@ -488,3 +488,16 @@ pub async fn pc_app_doctor_js() -> impl IntoResponse {
         PC_APP_DOCTOR_JS,
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::PC_APP_TASK_SNAPSHOTS_JS;
+
+    #[test]
+    fn pc_task_snapshot_asset_keeps_local_journal_pagination_contract() {
+        assert!(PC_APP_TASK_SNAPSHOTS_JS.contains("local_journal_has_more"));
+        assert!(PC_APP_TASK_SNAPSHOTS_JS.contains("shouldContinuePolling(snapshot)"));
+        assert!(PC_APP_TASK_SNAPSHOTS_JS
+            .contains("localJournalSeq(snapshot) > localJournalSeq(previous)"));
+    }
+}

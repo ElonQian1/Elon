@@ -58,19 +58,23 @@
       snapshots.set(taskId, snapshot);
       const nextSeq = lastSeqOf(snapshot);
       if (nextSeq > since) cursors.set(key, nextSeq);
+      const shouldContinue = shouldContinuePolling(snapshot);
+      const nextDelay = localJournalHasMore(snapshot) ? 900 : 4500;
       if (shouldRenderSnapshot(previous, snapshot, since)) {
         const messages = Array.isArray(snapshot.messages) ? snapshot.messages : [];
         if (messages.length && typeof deps.renderMessages === 'function') {
+          if (shouldContinue && stillViewing(projectId, channelId)) scheduleTask(projectId, channelId, taskId, nextDelay);
           deps.renderMessages(messages, 'project');
           return;
         }
         if (typeof deps.refreshActiveChannel === 'function') {
+          if (shouldContinue && stillViewing(projectId, channelId)) scheduleTask(projectId, channelId, taskId, nextDelay);
           await deps.refreshActiveChannel();
           return;
         }
       }
-      if (!taskIsTerminal(snapshot.task) && stillViewing(projectId, channelId)) {
-        scheduleTask(projectId, channelId, taskId, 4500);
+      if (shouldContinue && stillViewing(projectId, channelId)) {
+        scheduleTask(projectId, channelId, taskId, nextDelay);
       }
     }
 
@@ -84,7 +88,9 @@
         pc_req_id: clean(data.pc_req_id || data.pcReqId),
         attach: data.attach || null,
         resume: data.resume || null,
-        local_journal: null
+        local_journal: null,
+        local_journal_seq: 0,
+        local_journal_has_more: false
       };
     }
 
@@ -98,6 +104,8 @@
         const journal = normalizeLocalJournal(data);
         if (!journal) return;
         snapshot.local_journal = journal;
+        snapshot.local_journal_seq = journal.last_event_seq;
+        snapshot.local_journal_has_more = !!journal.has_more;
         snapshot.attach = mergeAttach(snapshot, journal);
         snapshot.resume = mergeResume(snapshot, journal);
         appendLocalJournalMessages(snapshot, journal, taskId);
@@ -185,6 +193,7 @@
     function shouldRenderSnapshot(previous, snapshot, since) {
       if (!previous) return true;
       if (lastSeqOf(snapshot) > since) return true;
+      if (localJournalSeq(snapshot) > localJournalSeq(previous)) return true;
       if (taskStatus(previous.task) !== taskStatus(snapshot.task)) return true;
       return attachStatus(previous.attach) !== attachStatus(snapshot.attach)
         || resumeStatus(previous.resume) !== resumeStatus(snapshot.resume);
@@ -193,6 +202,19 @@
     function lastSeqOf(snapshot) {
       const seq = Number(snapshot && (snapshot.last_event_seq || snapshot.lastEventSeq || 0));
       return Number.isFinite(seq) ? seq : 0;
+    }
+
+    function localJournalSeq(snapshot) {
+      const seq = Number(snapshot && (snapshot.local_journal_seq || snapshot.localJournalSeq || 0));
+      return Number.isFinite(seq) ? seq : 0;
+    }
+
+    function localJournalHasMore(snapshot) {
+      return !!(snapshot && (snapshot.local_journal_has_more || snapshot.localJournalHasMore));
+    }
+
+    function shouldContinuePolling(snapshot) {
+      return !taskIsTerminal(snapshot.task) || localJournalHasMore(snapshot);
     }
 
     function taskStatus(task) {
