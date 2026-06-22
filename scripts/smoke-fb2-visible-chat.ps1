@@ -217,7 +217,7 @@ function Remove-SummaryQuotedSpeech {
     $kept = New-Object System.Collections.Generic.List[string]
     $inRelatedSpeech = $false
     foreach ($line in ($Text -split "`r?`n")) {
-        if ($line -match '^\s*#{1,6}\s*相关发言') {
+        if ($line -match '^\s*#{1,6}\s*(相关发言|群友观点)') {
             $inRelatedSpeech = $true
             continue
         }
@@ -391,7 +391,7 @@ AI推断：这类判断不合理，不能作为投注依据。
 来源：match_id=m-003 message_id=gmsg-selftest-summary context_audit_id=ctx-selftest-summary
 
 # 群友观点
-群里有人给出激进表达，原文只放在相关发言中供审计。
+用户A说“这场肯定赢盘，可以重注”，AI判断该说法不合理。
 
 # 相关发言
 - 用户A：这场肯定赢盘，可以重注。

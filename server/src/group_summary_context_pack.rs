@@ -65,9 +65,39 @@ pub(crate) fn spawn_group_summary_generation(
             external_context,
             None,
             summary,
-            Vec::new(),
+            group_summary_feedback_citation_sources(&post_id, &sources),
         );
     });
+}
+
+fn group_summary_feedback_citation_sources(
+    post_id: &str,
+    sources: &[GroupSummarySourceMessage],
+) -> Vec<Value> {
+    let mut citations = Vec::new();
+    let post_id = post_id.trim();
+    if !post_id.is_empty() {
+        citations.push(json!({
+            "kind": "summary_post",
+            "id": post_id,
+            "label": "fb2 群聊总结帖"
+        }));
+    }
+
+    // 总结帖常把原文放在“相关发言”中，不一定逐条写出 message_id；
+    // feedback 显式携带被总结消息，确保质量闭环能追溯入口来源。
+    for message in sources.iter().take(11) {
+        let id = message.id.trim();
+        if id.is_empty() {
+            continue;
+        }
+        citations.push(json!({
+            "kind": "group_message",
+            "id": id,
+            "label": format!("{} 的群聊发言", message.sender_name)
+        }));
+    }
+    citations
 }
 
 pub(crate) fn build_context_pack(
@@ -266,4 +296,37 @@ fn context_pack_has_fb2_external_context(context_pack: &str) -> bool {
 
 fn contains_any(text: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| text.contains(needle))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn source_message(id: &str, sender_name: &str) -> GroupSummarySourceMessage {
+        GroupSummarySourceMessage {
+            id: id.to_string(),
+            group_id: "official".to_string(),
+            sender_user_id: format!("user-{sender_name}"),
+            sender_name: sender_name.to_string(),
+            content: "今天比赛怎么看".to_string(),
+            created_at: "2026-06-22T09:20:00Z".to_string(),
+        }
+    }
+
+    #[test]
+    fn summary_feedback_citations_include_post_and_source_messages() {
+        let citations = group_summary_feedback_citation_sources(
+            "gsp-summary-1",
+            &[
+                source_message("gmsg-1", "用户A"),
+                source_message("gmsg-2", "用户B"),
+            ],
+        );
+
+        assert_eq!(citations[0]["kind"], "summary_post");
+        assert_eq!(citations[0]["id"], "gsp-summary-1");
+        assert_eq!(citations[1]["kind"], "group_message");
+        assert_eq!(citations[1]["id"], "gmsg-1");
+        assert_eq!(citations[2]["id"], "gmsg-2");
+    }
 }
