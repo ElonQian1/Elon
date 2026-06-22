@@ -399,7 +399,7 @@ impl TaskJournal {
         let mut scan = TaskJournalEventScan::default();
         for (index, line) in reader.lines().enumerate() {
             let seq = index + 1;
-            scan.last_event_seq = scan.last_event_seq.max(seq);
+            scan.scanned_last_seq = scan.scanned_last_seq.max(seq);
             let line = line.with_context(|| format!("读取 {:?}", path))?;
             if line.trim().is_empty() {
                 continue;
@@ -413,7 +413,11 @@ impl TaskJournal {
                 scan.has_more = true;
                 continue;
             }
+            scan.last_event_seq = seq;
             scan.events.push(TaskJournalEventView { seq, event });
+        }
+        if scan.last_event_seq == 0 && scan.scanned_last_seq > since {
+            scan.last_event_seq = scan.scanned_last_seq;
         }
         Ok(scan)
     }
@@ -428,6 +432,7 @@ impl TaskJournal {
 struct TaskJournalEventScan {
     events: Vec<TaskJournalEventView>,
     last_event_seq: usize,
+    scanned_last_seq: usize,
     has_more: bool,
 }
 
@@ -773,6 +778,18 @@ mod tests {
             .expect("snapshot should read under pressure");
         assert_eq!(snapshot.events.len(), 3);
         assert!(snapshot.has_more);
+        assert_eq!(
+            snapshot.last_event_seq,
+            snapshot.events.last().expect("page should have events").seq,
+            "paginated snapshot cursor should stay at the returned page tail"
+        );
+        let next = journal
+            .snapshot("req-000", snapshot.last_event_seq, 20)
+            .expect("next snapshot should continue target task");
+        assert!(next.events.len() >= 3);
+        assert!(next.events.iter().all(|event| {
+            event.event.get("req_id").and_then(|value| value.as_str()) == Some("req-000")
+        }));
         assert!(snapshot.events.iter().all(|event| {
             event.event.get("req_id").and_then(|value| value.as_str()) == Some("req-000")
         }));
@@ -824,19 +841,23 @@ mod tests {
             .expect("snapshot should stream large journal");
         assert_eq!(snapshot.events.len(), 4);
         assert!(snapshot.has_more);
-        assert!(snapshot.last_event_seq > 3_000);
+        assert_eq!(
+            snapshot.last_event_seq,
+            snapshot.events.last().expect("page should have events").seq,
+            "limited page cursor should not jump to the global journal tail"
+        );
         assert!(snapshot.events.iter().all(|event| {
             event.event.get("req_id").and_then(|value| value.as_str()) == Some("req-399")
         }));
 
-        let cursor = snapshot.events.last().map(|event| event.seq).unwrap_or(0);
         let next = journal
-            .snapshot("req-399", cursor, 20)
+            .snapshot("req-399", snapshot.last_event_seq, 20)
             .expect("cursor snapshot should continue target task only");
         assert!(next.events.iter().all(|event| {
             event.event.get("req_id").and_then(|value| value.as_str()) == Some("req-399")
         }));
-        assert!(next.events.len() >= 5);
+        assert_eq!(next.events.len(), 5);
+        assert!(!next.has_more);
 
         let _ = fs::remove_dir_all(dir);
     }

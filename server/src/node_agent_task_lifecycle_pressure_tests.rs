@@ -113,6 +113,87 @@ fn stress_terminal_outcomes_across_all_pc_task_routes() {
     let _ = fs::remove_dir_all(dir);
 }
 
+#[test]
+fn stress_local_journal_cursor_replays_long_interleaved_task_without_skipping() {
+    let dir = unique_test_dir("cursor-replay-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = TaskJournal::new(&dir);
+    let target_req = "req-route-c-long";
+    journal
+        .record_started(TaskJournalStart {
+            req_id: target_req,
+            cli_name: "server-runtime",
+            route: Some("route_c_server_runtime"),
+            run_handle_id: Some(target_req),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("project_write"),
+        })
+        .expect("target task should start");
+
+    for index in 0..240 {
+        let other_req = format!("req-other-{index:03}");
+        journal
+            .record_started(TaskJournalStart {
+                req_id: &other_req,
+                cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some(&other_req),
+                cwd: Some("D:/other"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("other task should start under pressure");
+        journal
+            .record_cli_chunk(target_req, "runtime", &format!("target chunk {index}\n"))
+            .expect("target chunk should persist under pressure");
+        journal
+            .record_cli_chunk(&other_req, "stdout", &format!("other chunk {index}\n"))
+            .expect("other chunk should persist under pressure");
+        if index % 3 == 0 {
+            journal
+                .record_finished(&other_req)
+                .expect("other task finish should persist under pressure");
+        }
+    }
+    journal
+        .record_finished_with_outcome(target_req, "done", None)
+        .expect("target task finish should persist");
+
+    let mut since = 0;
+    let mut total_target_events = 0;
+    let mut pages = 0;
+    loop {
+        let snapshot = journal
+            .snapshot(target_req, since, 50)
+            .expect("target snapshot page should read");
+        pages += 1;
+        assert!(
+            snapshot.last_event_seq >= since,
+            "cursor should not move backwards"
+        );
+        assert!(snapshot.events.iter().all(|event| {
+            event.event.get("req_id").and_then(Value::as_str) == Some(target_req)
+        }));
+        total_target_events += snapshot.events.len();
+        if !snapshot.has_more {
+            break;
+        }
+        assert!(
+            snapshot.last_event_seq > since,
+            "a page with more target events must advance only to the returned page tail"
+        );
+        since = snapshot.last_event_seq;
+        assert!(pages < 20, "cursor replay should finish in bounded pages");
+    }
+
+    assert_eq!(
+        total_target_events, 242,
+        "started + 240 chunks + finished should all be replayed"
+    );
+    assert!(pages >= 5, "pressure case should require real pagination");
+
+    let _ = fs::remove_dir_all(dir);
+}
+
 fn read_registry(dir: &std::path::Path) -> BTreeMap<String, TaskJournalRecord> {
     let text = fs::read_to_string(dir.join("registry.json")).expect("registry should read");
     serde_json::from_str(&text).expect("registry should parse")
