@@ -149,6 +149,89 @@ function New-Fb2RefreshNextCommands {
     }
 }
 
+function Get-Fb2RefreshRequirementGroup {
+    param([string]$Id)
+
+    switch -Regex ($Id) {
+        "^(context_pack_contract|main_project_contract_smoke|domain_context_index_contract)$" { return "main_project_contract" }
+        "^(today_matches_analysis|my_ticket_analysis|platform_order_risk|group_opinion_summary|selected_message_review|group_discussion_summary_post|source_reference_audit)$" { return "user_scenarios" }
+        "^(permission_safety|feedback_quality_loop)$" { return "permission_and_quality" }
+        "^direct_group_chat_read$" { return "group_chat_direct_read" }
+        "^voice_final_evidence$" { return "voice_deferred_by_user" }
+        default { return "other" }
+    }
+}
+
+function Get-Fb2RefreshRequirementOwner {
+    param([string]$Group)
+
+    switch ($Group) {
+        "main_project_contract" { return "main_project" }
+        "user_scenarios" { return "shared" }
+        "permission_and_quality" { return "shared" }
+        "group_chat_direct_read" { return "shared" }
+        "voice_deferred_by_user" { return "paused_by_user" }
+        default { return "shared" }
+    }
+}
+
+function New-Fb2RefreshCompletionMatrix {
+    param(
+        [object]$Status,
+        [object]$GoalAudit
+    )
+
+    $requirements = @($GoalAudit.requirements)
+    $items = @(
+        foreach ($requirement in $requirements) {
+            $id = [string]$requirement.id
+            $group = Get-Fb2RefreshRequirementGroup -Id $id
+            [ordered]@{
+                id = $id
+                group = $group
+                owner = Get-Fb2RefreshRequirementOwner -Group $group
+                title = [string]$requirement.title
+                status = [string]$requirement.status
+                complete = [bool]$requirement.complete
+                deferred = [bool]$requirement.deferred
+                evidence = [string]$requirement.evidence
+                missing = [string]$requirement.missing
+            }
+        }
+    )
+
+    $completeCount = @($items | Where-Object { [bool]$_.complete }).Count
+    $deferredCount = @($items | Where-Object { [bool]$_.deferred }).Count
+    $incompleteCount = @($items | Where-Object { -not [bool]$_.complete -and -not [bool]$_.deferred }).Count
+    $tokenPresent = [bool]$Status.environment.fb2_ai_center_token_present
+
+    [ordered]@{
+        schema = "fb2.main_project.completion_matrix.v1"
+        totals = [ordered]@{
+            total = @($items).Count
+            complete = $completeCount
+            deferred = $deferredCount
+            incomplete = $incompleteCount
+        }
+        gates = [ordered]@{
+            data_goal_complete = [bool]$GoalAudit.data_goal_complete
+            full_final_complete = [bool]$GoalAudit.full_final_complete
+            token_present = $tokenPresent
+            voice_deferred_by_user = @($GoalAudit.deferred_requirements) -contains "voice_final_evidence"
+            next_minimum_action = [string]$GoalAudit.next_minimum_action
+        }
+        groups = [ordered]@{
+            main_project_contract = @($items | Where-Object { $_.group -eq "main_project_contract" }).Count
+            user_scenarios = @($items | Where-Object { $_.group -eq "user_scenarios" }).Count
+            permission_and_quality = @($items | Where-Object { $_.group -eq "permission_and_quality" }).Count
+            group_chat_direct_read = @($items | Where-Object { $_.group -eq "group_chat_direct_read" }).Count
+            voice_deferred_by_user = @($items | Where-Object { $_.group -eq "voice_deferred_by_user" }).Count
+            other = @($items | Where-Object { $_.group -eq "other" }).Count
+        }
+        requirements = $items
+    }
+}
+
 function New-Fb2RefreshBlockingState {
     param(
         [object]$Status,
@@ -209,6 +292,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest ([string]$summary.blocking_state.external_secret -eq "FB2_AI_CENTER_TOKEN") "external secret name"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.refresh_status)) "refresh command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight)) "data-only preflight command"
+        Assert-Fb2RefreshSelfTest ([string]$summary.completion_matrix.schema -eq "fb2.main_project.completion_matrix.v1") "completion matrix schema"
+        Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
         "== SelfTest Summary =="
         "failed=0"
@@ -288,6 +373,7 @@ $public = Read-Fb2RefreshJson -Path $publicPath
 $ownerNextActions = New-Fb2RefreshOwnerActions -Status $status -GoalAudit $goalAudit
 $blockingState = New-Fb2RefreshBlockingState -Status $status -GoalAudit $goalAudit
 $nextCommands = New-Fb2RefreshNextCommands -Status $status
+$completionMatrix = New-Fb2RefreshCompletionMatrix -Status $status -GoalAudit $goalAudit
 
 $refreshSummary = [pscustomobject]@{
     schema = "fb2.main_project.status_refresh.v1"
@@ -312,6 +398,7 @@ $refreshSummary = [pscustomobject]@{
     owner_next_actions = $ownerNextActions
     blocking_state = $blockingState
     next_commands = $nextCommands
+    completion_matrix = $completionMatrix
     missing_non_voice_requirements = @($goalAudit.missing_non_voice_requirements)
     deferred_requirements = @($goalAudit.deferred_requirements)
 }
