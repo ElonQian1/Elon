@@ -89,6 +89,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (59, "项目首页上传凭证", migration_v59),
     (60, "外部应用工具执行审计", migration_v60),
     (61, "普通新用户 AI 试用额度配置", migration_v61),
+    (62, "停止默认加入联合项目并清理旧成员关系", migration_v62),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2160,6 +2161,13 @@ fn migration_v61(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_v62(conn: &Connection) -> Result<()> {
+    crate::store::default_joint_projects::remove_legacy_default_joint_project_memberships_conn(
+        conn,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2317,6 +2325,95 @@ mod tests {
         assert_eq!(identity.0, "node:node-a");
         assert_eq!(identity.1, "workspace_path");
         assert_eq!(identity.2, "d:/rust/active-projects/江西吉安商会");
+    }
+
+    #[test]
+    fn migration_v62_removes_legacy_default_joint_memberships() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v19(&conn).expect("join request table should exist");
+        migration_v48(&conn).expect("storage columns should exist");
+        migration_v49(&conn).expect("storage worktree column should exist");
+        migration_v50(&conn).expect("display name column should exist");
+
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_owner", "18800000000", "owner"],
+        )
+        .expect("owner should insert");
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_member", "18800000001", "member"],
+        )
+        .expect("member should insert");
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_admin", "18800000002", "admin"],
+        )
+        .expect("admin should insert");
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES (?1, ?2, NULL, 'hash', ?3, 'user', 'active', 'now', 'now')",
+            params!["usr_approved", "18800000003", "approved"],
+        )
+        .expect("approved should insert");
+
+        insert_project(&conn, "prj_bb64a", "bb64a", "usr_owner");
+        insert_project(&conn, "prj_regular", "普通联合项目", "usr_owner");
+        insert_member(&conn, "prj_bb64a", "usr_owner", "owner");
+        insert_member(&conn, "prj_bb64a", "usr_member", "member");
+        insert_member(&conn, "prj_bb64a", "usr_admin", "admin");
+        insert_member(&conn, "prj_bb64a", "usr_approved", "member");
+        insert_member(&conn, "prj_regular", "usr_member", "member");
+        conn.execute(
+            "INSERT INTO project_join_requests (
+                id, project_id, user_id, message, status, reviewed_by,
+                reviewed_at, created_at, updated_at
+             )
+             VALUES ('req_approved', 'prj_bb64a', 'usr_approved', 'ok', 'approved',
+                     'usr_owner', 'now', 'now', 'now')",
+            [],
+        )
+        .expect("approved request should insert");
+
+        migration_v62(&conn).expect("cleanup migration should apply");
+
+        let default_member_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_members WHERE project_id = 'prj_bb64a' AND user_id = 'usr_member'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("default member count should load");
+        let admin_role: String = conn
+            .query_row(
+                "SELECT role FROM project_members WHERE project_id = 'prj_bb64a' AND user_id = 'usr_admin'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("admin role should load");
+        let approved_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_members WHERE project_id = 'prj_bb64a' AND user_id = 'usr_approved'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("approved count should load");
+        let regular_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_members WHERE project_id = 'prj_regular' AND user_id = 'usr_member'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("regular count should load");
+
+        assert_eq!(default_member_count, 0);
+        assert_eq!(admin_role, "admin");
+        assert_eq!(approved_count, 1);
+        assert_eq!(regular_count, 1);
     }
 
     fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {

@@ -99,8 +99,6 @@ impl Store {
         tx.commit()?;
         drop(conn);
 
-        self.ensure_default_joint_project_memberships_for_project(project_id)?;
-
         let conn = self.conn()?;
         conn.query_row(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,

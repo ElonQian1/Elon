@@ -57,7 +57,6 @@ impl Store {
             status: "active".into(),
             avatar_data_url: None,
         };
-        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
         Ok(user)
     }
 
@@ -97,7 +96,6 @@ impl Store {
             status: row.6,
             avatar_data_url: None,
         };
-        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
         Ok(user)
     }
 
@@ -165,7 +163,6 @@ impl Store {
             .optional()?
             .ok_or_else(|| anyhow!("登录已过期，请重新登录"))?
         };
-        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
         Ok(user)
     }
 

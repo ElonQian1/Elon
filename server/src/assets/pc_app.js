@@ -1199,7 +1199,7 @@
     setAuthClaimBanner(false);
     const [me, projects, friends, groups, nodes] = await Promise.allSettled([
       api('/api/me'),
-      api('/api/me/projects?include_system=true'),
+      api('/api/me/projects'),
       api('/api/me/friends'),
       api('/api/me/groups'),
       api('/api/me/nodes')

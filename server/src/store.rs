@@ -475,9 +475,6 @@ impl Store {
                 &now,
             )?;
             tx.commit()?;
-            default_joint_projects::ensure_default_joint_project_memberships_for_project_conn(
-                &conn, &id, &now,
-            )?;
             Ok::<(), anyhow::Error>(())
         };
         if let Err(err) = create_result {
@@ -596,7 +593,6 @@ impl Store {
             },
         )?;
         drop(conn);
-        self.ensure_default_joint_project_memberships_for_user(&user.id)?;
         Ok(user)
     }
 
@@ -1068,9 +1064,6 @@ fn update_external_project_binding(
     )?;
     tx.commit()?;
 
-    default_joint_projects::ensure_default_joint_project_memberships_for_project_conn(
-        conn, project_id, now,
-    )?;
     find_project_by_id_for_user(conn, user_id, project_id)?
         .ok_or_else(|| anyhow!("项目绑定后无法读取"))
 }
