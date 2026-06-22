@@ -76,6 +76,8 @@ GET /api/external/apps/fb2/context-contract
 
 主项目实际拉取 fb2 上下文后，会把 `answer_policy_contract.prompt_answer_rules` 投影成 prompt 里的 `<answer_rules>`，也会给归一化结果补 `answer_policy` 并放进 prompt metadata。fb2 不返回 `answer_policy` 时，主项目使用默认策略，但 fb2 的 Context Pack 和工具结果必须能支撑这些回答边界。
 
+运行时回答 prompt 还会注入 `<fb2_domain_scenario_guidance schema="fb2.domain_scenario_prompt.v1">`。该块由主项目根据 `topic_hint`、工具计划和 Context Pack 数据识别六类场景，并从 `domain_context_projection_contract.domain_scenario_matrix` 的同一源头读取 `required_citations` 和 `forbidden_outputs`。fb2 后续新增工具或字段时，应先更新矩阵，再让主项目 prompt/planner 复用同一源头，避免 contract 与模型实际提示漂移。
+
 ## AI 数据接入格式原则 v1
 
 fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pack，而不是把数据库、原始网页或索引结果直接交给模型：

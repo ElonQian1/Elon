@@ -606,13 +606,17 @@ pub(crate) fn format_external_context(
         .unwrap_or_default();
     let tool_block =
         crate::external_app_context_tool_prompt::prompt_executed_tools_block(external_tool_results);
+    let scenario_block =
+        crate::external_app_context_scenario_prompt::prompt_domain_scenario_guidance(
+            external_context,
+            external_tool_results,
+        );
 
-    match (context_block.is_empty(), tool_block.is_empty()) {
-        (true, true) => String::new(),
-        (false, true) => context_block,
-        (true, false) => tool_block,
-        (false, false) => format!("{context_block}\n\n{tool_block}"),
-    }
+    [context_block, scenario_block, tool_block]
+        .into_iter()
+        .filter(|block| !block.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n\n")
 }
 
 pub(crate) fn ensure_fb2_grounded_answer_shape(
@@ -946,7 +950,8 @@ fn with_in_flight<T>(operation: impl FnOnce(&mut HashSet<String>) -> T) -> T {
 mod tests {
     use super::{
         contains_el_mention, ensure_fb2_grounded_answer_shape, ensure_fb2_opinion_memory_source,
-        latest_request_user_text, social_ai_base_prompt, social_ai_fallback_message,
+        format_external_context, latest_request_user_text, social_ai_base_prompt,
+        social_ai_fallback_message,
     };
     use crate::store::SocialAiHistoryMessage;
     use serde_json::json;
@@ -1003,6 +1008,36 @@ mod tests {
         assert!(prompt.contains("AI推断："));
         assert!(prompt.contains("风险边界："));
         assert!(prompt.contains("不保证命中"));
+    }
+
+    #[test]
+    fn external_context_prompt_includes_fb2_domain_scenario_guidance() {
+        let context = json!({
+            "app_id": "fb2",
+            "source": "fb2",
+            "status": "ready",
+            "context_audit_id": "audit-social-1",
+            "answer_policy": {"schema": "fb2.answer_policy.v1"},
+            "context_pack": "<fb2_context_pack>比赛和订单摘要</fb2_context_pack>"
+        });
+        let tools = json!({
+            "app_id": "fb2",
+            "plan": {
+                "topic_hint": "今天比赛怎么看，顺便帮我分析我的票",
+                "planned_tools": [
+                    {"name": "match_analysis_brief"},
+                    {"name": "search_user_orders"}
+                ]
+            },
+            "results": []
+        });
+
+        let block = format_external_context(Some(&context), Some(&tools));
+
+        assert!(block.contains("fb2.domain_scenario_prompt.v1"));
+        assert!(block.contains("scenario=today_matches_analysis"));
+        assert!(block.contains("scenario=my_ticket_analysis"));
+        assert!(block.contains("order_id/ticket_id/match_id"));
     }
 
     #[test]

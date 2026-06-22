@@ -54,6 +54,7 @@ mod external_app_context_projection;
 mod external_app_context_quality;
 mod external_app_context_readiness;
 mod external_app_context_response;
+mod external_app_context_scenario_prompt;
 mod external_app_context_tool_audit;
 mod external_app_context_tool_execution;
 mod external_app_context_tool_planner;

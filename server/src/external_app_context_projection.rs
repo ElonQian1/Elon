@@ -35,7 +35,7 @@ pub(crate) fn public_context_projection_guidance(app_id: &str) -> Option<Value> 
                 "retrieval_evidence": "每条比赛、订单、群观点为什么被召回",
                 "tests": "quality-summary、feedback-summary、permission-summary 和 data-only acceptance"
             },
-            "domain_scenario_matrix": domain_scenario_matrix(),
+            "domain_scenario_matrix": fb2_domain_scenario_matrix(),
             "required_sections": required_sections(),
             "source_registry": {
                 "required_field": "citation_sources",
@@ -197,7 +197,7 @@ fn required_sections() -> Value {
     ])
 }
 
-fn domain_scenario_matrix() -> Value {
+pub(crate) fn fb2_domain_scenario_matrix() -> Value {
     json!([
         {
             "id": "today_matches_analysis",
