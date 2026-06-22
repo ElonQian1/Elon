@@ -20,6 +20,12 @@ pub(crate) fn update_client_if_needed(install_dir: &Path) -> Result<bool> {
     match try_update_client_if_needed(install_dir) {
         Ok(scheduled_restart) => Ok(scheduled_restart),
         Err(error) => {
+            super::log_file::record_event(
+                install_dir,
+                "auto_update_failed",
+                false,
+                &format!("{error:#}"),
+            );
             eprintln!("自动更新检查失败，继续使用本地版本: {error:#}");
             Ok(false)
         }
@@ -64,6 +70,12 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     match try_update_from_client_package(install_dir, &package_url, &remote_text) {
         Ok(updated) => return Ok(updated),
         Err(error) => {
+            super::log_file::record_event(
+                install_dir,
+                "client_package_update_failed",
+                false,
+                &format!("{error:#}"),
+            );
             eprintln!("完整客户端包更新失败，回退到单 exe 更新: {error:#}");
         }
     }

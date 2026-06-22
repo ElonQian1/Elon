@@ -73,6 +73,8 @@ fn diagnostic_payload(paths: &DiagnosticPaths) -> Value {
             "task_journal_dir": path_to_string(&paths.task_journal_dir),
             "logs_dir": path_to_string(&paths.logs_dir),
             "maintenance_log_file": path_to_string(&paths.maintenance_log_file),
+            "launcher_logs_dir": optional_path_to_value(paths.launcher_logs_dir.as_deref()),
+            "launcher_log_file": optional_path_to_value(paths.launcher_log_file.as_deref()),
             "diagnostics_dir": path_to_string(&paths.diagnostics_dir)
         },
         "files": diagnostic_files(paths),
@@ -98,6 +100,8 @@ fn diagnostic_files(paths: &DiagnosticPaths) -> Value {
         "config_dir": file_meta(&paths.config_dir),
         "logs_dir": file_meta(&paths.logs_dir),
         "maintenance_log": file_meta(&paths.maintenance_log_file),
+        "launcher_logs_dir": optional_file_meta(paths.launcher_logs_dir.as_deref()),
+        "launcher_log": optional_file_meta(paths.launcher_log_file.as_deref()),
         "task_journal_dir": file_meta(&paths.task_journal_dir),
         "task_registry": file_meta(&paths.task_journal_dir.join("registry.json")),
         "task_events": file_meta(&paths.task_journal_dir.join("events.jsonl")),
@@ -237,6 +241,15 @@ fn file_meta(path: &Path) -> Value {
     }
 }
 
+fn optional_file_meta(path: Option<&Path>) -> Value {
+    path.map(file_meta).unwrap_or_else(|| {
+        json!({
+            "exists": false,
+            "reason": "launcher_log_path_unavailable",
+        })
+    })
+}
+
 fn value_u128(value: Option<&Value>) -> u128 {
     value
         .and_then(Value::as_u64)
@@ -256,6 +269,12 @@ fn system_time_ms(time: SystemTime) -> Option<u128> {
 
 fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().to_string()
+}
+
+fn optional_path_to_value(path: Option<&Path>) -> Value {
+    path.map(path_to_string)
+        .map(Value::String)
+        .unwrap_or(Value::Null)
 }
 
 fn open_export_path(path: &Path) -> Result<bool, String> {
@@ -299,6 +318,8 @@ struct DiagnosticPaths {
     task_journal_dir: PathBuf,
     logs_dir: PathBuf,
     maintenance_log_file: PathBuf,
+    launcher_logs_dir: Option<PathBuf>,
+    launcher_log_file: Option<PathBuf>,
     diagnostics_dir: PathBuf,
 }
 
@@ -316,15 +337,34 @@ impl DiagnosticPaths {
         let task_journal_dir = state_file.with_file_name("task-journal");
         let logs_dir = config_dir.join("logs");
         let diagnostics_dir = config_dir.join("diagnostics");
+        let launcher_logs_dir = launcher_logs_dir();
+        let launcher_log_file = launcher_logs_dir
+            .as_ref()
+            .map(|dir| dir.join("client-launcher.jsonl"));
         Self {
             state_file,
             config_dir,
             task_journal_dir,
+            launcher_logs_dir,
+            launcher_log_file,
             maintenance_log_file: logs_dir.join("client-maintenance.jsonl"),
             logs_dir,
             diagnostics_dir,
         }
     }
+}
+
+fn launcher_logs_dir() -> Option<PathBuf> {
+    std::env::var("LOCALAPPDATA")
+        .ok()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .map(|value| {
+            PathBuf::from(value)
+                .join("ElonNode")
+                .join("_internal")
+                .join("logs")
+        })
 }
 
 #[cfg(test)]
@@ -372,10 +412,21 @@ mod tests {
         assert!(payload["privacy"]["maintenance_log_contents_exported"] == false);
         assert!(payload["privacy"]["api_key_values_exported"] == false);
         assert!(payload["paths"]["logs_dir"].as_str().is_some());
+        assert!(payload
+            .get("paths")
+            .unwrap()
+            .get("launcher_logs_dir")
+            .is_some());
+        assert!(payload
+            .get("paths")
+            .unwrap()
+            .get("launcher_log_file")
+            .is_some());
         assert!(payload["files"]["maintenance_log"]["path"]
             .as_str()
             .unwrap()
             .contains("client-maintenance.jsonl"));
+        assert!(payload["files"].get("launcher_log").is_some());
         assert!(text.contains("\"codex_session_present\":true"));
         assert!(!text.contains("secret-session-id"));
         assert!(!text.contains("secret output"));

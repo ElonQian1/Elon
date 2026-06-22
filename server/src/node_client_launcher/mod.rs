@@ -3,6 +3,7 @@
 mod command;
 mod env_file;
 mod installer;
+pub(crate) mod log_file;
 mod paths;
 mod process;
 mod updater;
@@ -21,6 +22,7 @@ pub(crate) const AGENT_RUNTIME_ARG: &str = "--agent-runtime";
 pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";
 pub(crate) const DEFAULT_ADMIN_PORT: u16 = 7799;
 
+#[derive(Clone, Copy)]
 enum ClientCommand {
     Start,
     Install,
@@ -30,6 +32,36 @@ enum ClientCommand {
 
 pub(crate) fn run() -> Result<()> {
     let command = ClientCommand::from_env();
+    let install_dir = paths::install_dir().ok();
+    if let Some(install_dir) = install_dir.as_deref() {
+        log_file::record_event(
+            install_dir,
+            "launcher_command_started",
+            true,
+            command.as_str(),
+        );
+    }
+    let result = run_command(command);
+    if let Some(install_dir) = install_dir.as_deref() {
+        match &result {
+            Ok(()) => log_file::record_event(
+                install_dir,
+                "launcher_command_finished",
+                true,
+                command.as_str(),
+            ),
+            Err(error) => log_file::record_event(
+                install_dir,
+                "launcher_command_finished",
+                false,
+                &format!("{}: {error:#}", command.as_str()),
+            ),
+        }
+    }
+    result
+}
+
+fn run_command(command: ClientCommand) -> Result<()> {
     match command {
         ClientCommand::Start => {
             let install_dir = installer::ensure_installed()?;
@@ -67,6 +99,15 @@ impl ClientCommand {
             return Self::Update;
         }
         Self::Start
+    }
+
+    fn as_str(self) -> &'static str {
+        match self {
+            Self::Start => "start",
+            Self::Install => "install",
+            Self::Uninstall => "uninstall",
+            Self::Update => "update",
+        }
     }
 }
 

@@ -34,6 +34,7 @@
 
 - 顶层只保留两个用户可识别入口：「一龙PC节点.exe」和「卸载一龙PC节点.exe」。
 - _internal 目录只放配置示例、版本信息和说明，不再放可运行的内部 agent exe。
+- 启动、安装、更新、卸载入口日志在 %LOCALAPPDATA%\ElonNode\_internal\logs\client-launcher.jsonl；PC 工作台设置里可打开「启动器日志」。
 
 高级配置：
 

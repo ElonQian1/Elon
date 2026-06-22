@@ -389,6 +389,7 @@
         row('更新', updateLine),
         row('目录结构', clientLayoutLabel(data.layout_status || install.layout_status)),
         row('运行日志', clean(data.logs_dir) || '未上报'),
+        row('启动器日志', clean(data.launcher_logs_dir) || '未上报'),
         row('任务记录', clean(data.task_journal_dir) || '未上报'),
         row('诊断目录', clean(data.diagnostics_dir) || '未上报')
       ].join('');
@@ -416,6 +417,7 @@
       return [
         { id: 'open_install_dir', kind: 'open_target', target: 'install_dir', label: '安装目录', enabled: true },
         { id: 'open_client_logs', kind: 'open_target', target: 'logs', label: '运行日志', enabled: true },
+        { id: 'open_launcher_logs', kind: 'open_target', target: 'launcher_logs', label: '启动器日志', enabled: true },
         { id: 'open_task_journal', kind: 'open_target', target: 'task_journal', label: '任务日志', enabled: true },
         { id: 'open_diagnostics_dir', kind: 'open_target', target: 'diagnostics_dir', label: '诊断目录', enabled: true },
         { id: 'export_diagnostics', kind: 'export_diagnostics', label: '导出诊断', enabled: true },

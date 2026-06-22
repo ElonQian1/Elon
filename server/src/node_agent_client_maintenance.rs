@@ -93,10 +93,13 @@ fn status_payload() -> Value {
         "task_journal_dir": path_to_string(&paths.task_journal_dir),
         "logs_dir": path_to_string(&paths.logs_dir),
         "maintenance_log_file": path_to_string(&paths.maintenance_log_file),
+        "launcher_logs_dir": optional_path_to_value(paths.launcher_logs_dir.as_deref()),
+        "launcher_log_file": optional_path_to_value(paths.launcher_log_file.as_deref()),
         "diagnostics_dir": path_to_string(&paths.diagnostics_dir),
         "maintenance_targets": [
             { "target": "install_dir", "label": "安装目录", "purpose": "确认根目录只保留主程序、卸载程序和 _internal。" },
             { "target": "logs", "label": "运行日志", "purpose": "查看客户端维护、更新、卸载等本机运行日志。" },
+            { "target": "launcher_logs", "label": "启动器日志", "purpose": "查看双击启动、安装、自动更新和卸载入口日志。" },
             { "target": "task_journal", "label": "任务日志", "purpose": "查看本机任务生命周期 journal，不包含 prompt 或 API key。" },
             { "target": "diagnostics_dir", "label": "诊断目录", "purpose": "保存可发给客服或开发者的脱敏诊断文件。" },
             { "target": "config_dir", "label": "配置目录", "purpose": "查看本机节点凭证和运行配置所在目录。" }
@@ -182,6 +185,16 @@ fn maintenance_actions(install: &Value) -> Value {
             "任务日志",
             "打开本机任务 journal 目录，用于查看任务生命周期和恢复记录。",
             "task_journal",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
+            "open_launcher_logs",
+            "open_target",
+            "启动器日志",
+            "打开双击启动、安装、自动更新和卸载入口日志目录。",
+            "launcher_logs",
             supported,
             "neutral",
             None,
@@ -283,6 +296,28 @@ fn maintenance_target(raw_target: &str) -> Result<MaintenanceTarget, String> {
             ensure_dir: false,
             must_exist: false,
         }),
+        "launcher_logs" | "launcher_logs_dir" => {
+            let path = paths
+                .launcher_logs_dir
+                .ok_or_else(|| "无法定位客户端启动器日志目录。".to_string())?;
+            Ok(MaintenanceTarget {
+                path,
+                select_file: false,
+                ensure_dir: true,
+                must_exist: true,
+            })
+        }
+        "launcher_log" | "launcher_log_file" => {
+            let path = paths
+                .launcher_log_file
+                .ok_or_else(|| "无法定位客户端启动器日志文件。".to_string())?;
+            Ok(MaintenanceTarget {
+                path,
+                select_file: true,
+                ensure_dir: false,
+                must_exist: false,
+            })
+        }
         "task_journal" => Ok(MaintenanceTarget {
             path: paths.task_journal_dir,
             select_file: false,
@@ -396,6 +431,8 @@ fn maintenance_paths() -> MaintenancePaths {
     MaintenancePaths {
         diagnostics_dir: config_dir.join("diagnostics"),
         task_journal_dir: state_file.with_file_name("task-journal"),
+        launcher_logs_dir: launcher_logs_dir(),
+        launcher_log_file: launcher_log_file(),
         maintenance_log_file: logs_dir.join("client-maintenance.jsonl"),
         logs_dir,
         state_file,
@@ -470,8 +507,23 @@ fn path_to_string(path: &Path) -> String {
     path.to_string_lossy().to_string()
 }
 
+fn optional_path_to_value(path: Option<&Path>) -> Value {
+    path.map(path_to_string)
+        .map(Value::String)
+        .unwrap_or(Value::Null)
+}
+
 fn error_response(status: StatusCode, error: String) -> (StatusCode, Json<Value>) {
     (status, Json(json!({ "ok": false, "error": error })))
+}
+
+fn launcher_logs_dir() -> Option<PathBuf> {
+    install_dir_from_local_app_data(std::env::var("LOCALAPPDATA").ok().as_deref())
+        .map(|install_dir| install_dir.join("_internal").join("logs"))
+}
+
+fn launcher_log_file() -> Option<PathBuf> {
+    launcher_logs_dir().map(|dir| dir.join("client-launcher.jsonl"))
 }
 
 struct MaintenancePaths {
@@ -480,6 +532,8 @@ struct MaintenancePaths {
     task_journal_dir: PathBuf,
     logs_dir: PathBuf,
     maintenance_log_file: PathBuf,
+    launcher_logs_dir: Option<PathBuf>,
+    launcher_log_file: Option<PathBuf>,
     diagnostics_dir: PathBuf,
 }
 
@@ -524,6 +578,7 @@ mod tests {
         assert!(maintenance_target("task_journal").is_ok());
         assert!(maintenance_target("logs").is_ok());
         assert!(maintenance_target("maintenance_log").is_ok());
+        assert!(maintenance_target("launcher_logs").is_ok());
         assert!(maintenance_target("diagnostics_dir").is_ok());
         assert!(maintenance_target("config_dir").is_ok());
         assert!(maintenance_target("state_file").is_ok());
@@ -535,12 +590,19 @@ mod tests {
         let status = status_payload();
         assert!(status["logs_dir"].as_str().is_some());
         assert!(status["maintenance_log_file"].as_str().is_some());
+        assert!(status.get("launcher_logs_dir").is_some());
+        assert!(status.get("launcher_log_file").is_some());
         assert!(status["diagnostics_dir"].as_str().is_some());
         assert!(status["maintenance_targets"]
             .as_array()
             .unwrap()
             .iter()
             .any(|target| target["target"].as_str() == Some("logs")));
+        assert!(status["maintenance_targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|target| target["target"].as_str() == Some("launcher_logs")));
         assert!(status["maintenance_targets"]
             .as_array()
             .unwrap()
@@ -557,6 +619,14 @@ mod tests {
             .any(|action| {
                 action["id"].as_str() == Some("open_client_logs")
                     && action["target"].as_str() == Some("logs")
+            }));
+        assert!(status["maintenance_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|action| {
+                action["id"].as_str() == Some("open_launcher_logs")
+                    && action["target"].as_str() == Some("launcher_logs")
             }));
         assert!(status["maintenance_actions"]
             .as_array()

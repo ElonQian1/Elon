@@ -142,6 +142,7 @@
     <div class="action-row">
       <button class="secondary" type="button" onclick="openMaintenanceTarget('install_dir', this)">打开安装目录</button>
       <button class="secondary" type="button" onclick="openMaintenanceTarget('logs', this)">打开运行日志</button>
+      <button class="secondary" type="button" onclick="openMaintenanceTarget('launcher_logs', this)">打开启动器日志</button>
       <button class="secondary" type="button" onclick="openMaintenanceTarget('task_journal', this)">打开任务记录</button>
       <button class="secondary" type="button" onclick="openMaintenanceTarget('diagnostics_dir', this)">打开诊断目录</button>
       <button class="secondary" type="button" onclick="openMaintenanceTarget('config_dir', this)">打开配置目录</button>
@@ -487,6 +488,7 @@ async function loadClientMaintenance() {
   paths.innerHTML = [
     `<span>安装目录：${pathCode(r.install_dir)}</span>`,
     `<span>运行日志：${pathCode(r.logs_dir)}</span>`,
+    `<span>启动器日志：${pathCode(r.launcher_logs_dir)}</span>`,
     `<span>任务记录：${pathCode(r.task_journal_dir)}</span>`,
     `<span>配置目录：${pathCode(r.config_dir)}</span>`,
     `<span>配置文件：${pathCode(r.state_file)}</span>`,

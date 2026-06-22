@@ -61,6 +61,7 @@
     settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
     settingsCliBridgeStatus: $('settingsCliBridgeStatus'),
     refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'), openClientLogsBtn: $('openClientLogsBtn'),
+    openClientLauncherLogsBtn: $('openClientLauncherLogsBtn'),
     openClientTaskJournalBtn: $('openClientTaskJournalBtn'),
     openClientConfigBtn: $('openClientConfigBtn'), openClientInstallBtn: $('openClientInstallBtn'),
     exportClientDiagnosticsBtn: $('exportClientDiagnosticsBtn'),
@@ -1207,6 +1208,7 @@
     els.settingsProjectPath.addEventListener('input', markLocalProjectPathDirty);
     els.refreshClientMaintenanceBtn.addEventListener('click', () => refreshClientMaintenance(true));
     els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('logs', els.openClientLogsBtn));
+    els.openClientLauncherLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('launcher_logs', els.openClientLauncherLogsBtn));
     els.openClientTaskJournalBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientTaskJournalBtn));
     els.openClientConfigBtn.addEventListener('click', () => openClientMaintenanceTarget('config_dir', els.openClientConfigBtn));
     els.openClientInstallBtn.addEventListener('click', () => openClientMaintenanceTarget('install_dir', els.openClientInstallBtn));
@@ -2529,6 +2531,7 @@
     const paths = [
       clean(data.install_dir) && `安装 ${clean(data.install_dir)}`,
       clean(data.logs_dir) && `运行日志 ${clean(data.logs_dir)}`,
+      clean(data.launcher_logs_dir) && `启动器日志 ${clean(data.launcher_logs_dir)}`,
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
       clean(data.config_dir) && `配置 ${clean(data.config_dir)}`
     ].filter(Boolean);

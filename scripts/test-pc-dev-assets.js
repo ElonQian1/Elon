@@ -1028,9 +1028,12 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
   assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
   assert.ok(pcApp.includes('openClientTaskJournalBtn'), 'PC settings should keep task journal separate from runtime logs');
+  assert.ok(pcApp.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs separately');
   assert.ok(pcApp.includes("openClientMaintenanceTarget('logs'"), 'PC settings should open the runtime logs target');
+  assert.ok(pcApp.includes("openClientMaintenanceTarget('launcher_logs'"), 'PC settings should open launcher logs target');
   assert.ok(pcApp.includes("openClientMaintenanceTarget('task_journal'"), 'PC settings should still open task journal explicitly');
   assert.ok(pcApp.includes('logs_dir'), 'PC settings should display the client runtime logs directory');
+  assert.ok(pcApp.includes('launcher_logs_dir'), 'PC settings should display the client launcher logs directory');
   assert.ok(pcApp.includes('clientPackageLatest'), 'PC settings should keep latest Windows client package metadata');
   assert.ok(pcApp.includes('客户端已是最新'), 'PC settings should compare installed and latest client package versions');
   assert.ok(pcApp.includes('positionRailTooltip'), 'PC rail should position its custom hover tooltip');
@@ -1046,7 +1049,9 @@ function testLocalAdminTokenWiring() {
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
   assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');
   assert.ok(pcAppHtml.includes('openClientTaskJournalBtn'), 'PC settings should expose task journal as its own button');
+  assert.ok(pcAppHtml.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs as its own button');
   assert.ok(pcAppHtml.includes('打开运行日志'), 'PC settings should expose runtime logs as a user-facing action');
+  assert.ok(pcAppHtml.includes('打开启动器日志'), 'PC settings should expose launcher logs as a user-facing action');
 
   const pcAppCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
   assert.ok(pcAppCss.includes('.settings-project-meta-row'), 'PC app CSS should style structured project inspection metadata');
@@ -1067,7 +1072,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAdmin.includes('apiModelInput'), 'standalone node admin page should expose Route B model input');
   assert.ok(nodeAdmin.includes('api_base: apiBase || null'), 'standalone node admin page should save Route B API base');
   assert.ok(nodeAdmin.includes('logs_dir'), 'standalone node admin page should display runtime logs directory');
+  assert.ok(nodeAdmin.includes('launcher_logs_dir'), 'standalone node admin page should display launcher logs directory');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('logs'"), 'standalone node admin page should open runtime logs');
+  assert.ok(nodeAdmin.includes("openMaintenanceTarget('launcher_logs'"), 'standalone node admin page should open launcher logs');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('task_journal'"), 'standalone node admin page should keep task journal separate');
   assert.ok(nodeAdmin.includes('diagnostics_dir'), 'standalone node admin page should expose diagnostics directory target');
 
@@ -1079,6 +1086,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nativeNodeAdmin.includes('diagnostics_dir'), 'PC node panel should open diagnostics directory target');
   assert.ok(nativeNodeAdmin.includes('logs_dir'), 'PC node panel should display runtime logs directory');
   assert.ok(nativeNodeAdmin.includes('open_client_logs'), 'PC node panel should expose runtime logs action');
+  assert.ok(nativeNodeAdmin.includes('launcher_logs_dir'), 'PC node panel should display launcher logs directory');
+  assert.ok(nativeNodeAdmin.includes('open_launcher_logs'), 'PC node panel should expose launcher logs action');
   assert.ok(nativeNodeAdmin.includes('loadLatestClientPackageVersion'), 'PC node panel should fetch latest client package metadata');
   assert.ok(nativeNodeAdmin.includes('clientUpdateLine'), 'PC node panel should compare installed and latest client versions');
 
