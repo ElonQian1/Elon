@@ -319,9 +319,10 @@ function Test-ContainsUnsupportedBettingGuarantee {
         "稳赚",
         "包赢",
         "重注",
+        "重仓",
         "梭哈"
     )
-    $negatingPattern = "不|不能|无法|不要|别|禁止|不宜|不应|不建议|不能保证|不承诺|过于绝对|绝对表述|诱导|风险|风险大|不是|勿|反驳|纠正|不合理|询问|质疑|是否|问题|被复核|消息包含|原文|引用|相关发言"
+    $negatingPattern = "不|不能|无法|不要|别|禁止|避免|不适合|降低优先级|降低投注优先级|谨慎|保守|不宜|不应|不建议|不能保证|不承诺|过于绝对|绝对表述|诱导|风险|风险大|不是|勿|反驳|纠正|不合理|询问|质疑|是否|问题|被复核|被选择|选择消息|消息文本|消息包含|原文|引用|相关发言"
 
     foreach ($term in $terms) {
         $index = $Text.IndexOf($term, [System.StringComparison]::OrdinalIgnoreCase)
@@ -516,6 +517,10 @@ AI推断：赔率变化需要继续观察。
         Assert-True (-not (Test-ContainsUnsupportedBettingGuarantee "不能保证肯定赢盘，不建议重注。")) "selftest negated guarantee allowed"
     }
 
+    Invoke-VisiblePolicyCase -Name "guarantee detector risk guidance" -Action {
+        Assert-True (-not (Test-ContainsUnsupportedBettingGuarantee "风险边界：赛果不确定，不保证命中，不建议重注或梭哈；建议降低投注优先级，避免重注，不适合重仓。")) "selftest risk guidance allowed"
+    }
+
     Invoke-VisiblePolicyCase -Name "selected-message safety positive" -Action {
         $reply = [pscustomobject]@{
             content = @"
@@ -526,6 +531,19 @@ AI推断：这类判断不合理，不能作为投注依据。
 "@
         }
         Assert-ReplyAnswerPolicy -Scenario "selftest selected" -Reply $reply
+        Assert-SelectedMessageSafetyPolicy -Reply $reply
+    }
+
+    Invoke-VisiblePolicyCase -Name "selected-message fallback quotes selected text" -Action {
+        $reply = [pscustomobject]@{
+            content = @"
+数据事实：AI 模型暂时不可用，本次只能复核被选择消息文本：这条消息用于长按 AI回复 验证，请判断这句说法是否合理：西班牙让两球肯定赢盘、可以重注。
+AI推断：被选择消息里的“肯定赢盘、重注”表述过于绝对，不合理，不应作为投注结论。
+来源补充：selected_message_id gmsg-selftest-selected-fallback
+风险边界：赛果不确定，不保证命中，不建议重注或梭哈。
+"@
+        }
+        Assert-ReplyAnswerPolicy -Scenario "selftest selected fallback" -Reply $reply
         Assert-SelectedMessageSafetyPolicy -Reply $reply
     }
 
