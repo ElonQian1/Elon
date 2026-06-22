@@ -14,7 +14,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import java.text.DateFormat
 import java.util.Date
@@ -63,7 +62,7 @@ internal class MainHomeRows(
             setOnClickListener { onClick() }
         }
 
-        row.addView(createFriendAvatar(friend))
+        row.addView(createFriendAvatar(friend, showProjectMarker))
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -71,7 +70,7 @@ internal class MainHomeRows(
             }
             orientation = LinearLayout.VERTICAL
         }
-        middle.addView(createHomeChatTitle(friend.name, showProjectMarker))
+        middle.addView(createHomeChatTitle(friend.name))
         middle.addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -128,7 +127,7 @@ internal class MainHomeRows(
             setOnClickListener { onClick() }
         }
 
-        row.addView(createGroupAvatar(group))
+        row.addView(createGroupAvatar(group, showProjectMarker))
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -136,7 +135,7 @@ internal class MainHomeRows(
             }
             orientation = LinearLayout.VERTICAL
         }
-        middle.addView(createHomeChatTitle(group.name, showProjectMarker))
+        middle.addView(createHomeChatTitle(group.name))
         middle.addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -172,14 +171,10 @@ internal class MainHomeRows(
         return row
     }
 
-    private fun createHomeChatTitle(title: String, showProjectMarker: Boolean): TextView {
+    private fun createHomeChatTitle(title: String): TextView {
         return TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
-                if (showProjectMarker) {
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                } else {
-                    LinearLayout.LayoutParams.MATCH_PARENT
-                },
+                LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
             ellipsize = TextUtils.TruncateAt.END
@@ -188,19 +183,6 @@ internal class MainHomeRows(
             text = title
             setTextColor(Color.parseColor("#D6D6D6"))
             textSize = 16f
-            if (showProjectMarker) {
-                maxWidth = (activity.resources.displayMetrics.widthPixels - dp(170)).coerceAtLeast(dp(120))
-                compoundDrawablePadding = dp(6)
-                setCompoundDrawablesRelative(null, null, createProjectTitleMarker(), null)
-            }
-        }
-    }
-
-    private fun createProjectTitleMarker(): Drawable? {
-        return ContextCompat.getDrawable(activity, R.drawable.ic_side_menu_files)?.mutate()?.apply {
-            val iconSize = dp(17)
-            setTint(Color.parseColor("#D9D9D9"))
-            setBounds(0, 0, iconSize, iconSize)
         }
     }
 
@@ -530,7 +512,7 @@ internal class MainHomeRows(
         }
     }
 
-    private fun createFriendAvatar(friend: AppFriend): View {
+    private fun createFriendAvatar(friend: AppFriend, showProjectMarker: Boolean = false): View {
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
@@ -545,26 +527,15 @@ internal class MainHomeRows(
             if (friend.unreadCount > 0) {
                 addView(createUnreadBadge(friend.unreadCount))
             }
-            // 在线绿点（右下角，10dp，与未读红点不重叠）
-            if (friend.isOnline) {
-                addView(android.view.View(activity).apply {
-                    val dotSize = dp(10)
-                    layoutParams = FrameLayout.LayoutParams(dotSize, dotSize).apply {
-                        gravity = Gravity.BOTTOM or Gravity.END
-                        bottomMargin = -dp(1)
-                        rightMargin = -dp(1)
-                    }
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(Color.parseColor("#58BE6A"))
-                        setStroke(dp(2), Color.parseColor("#222222"))
-                    }
-                })
+            if (showProjectMarker) {
+                addView(createAvatarCornerDot("#F2C94C"))
+            } else if (friend.isOnline) {
+                addView(createAvatarCornerDot("#58BE6A"))
             }
         }
     }
 
-    private fun createGroupAvatar(group: AppGroup): View {
+    private fun createGroupAvatar(group: AppGroup, showProjectMarker: Boolean = false): View {
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
@@ -578,6 +549,25 @@ internal class MainHomeRows(
             )
             if (group.unreadCount > 0) {
                 addView(createUnreadBadge(group.unreadCount))
+            }
+            if (showProjectMarker) {
+                addView(createAvatarCornerDot("#F2C94C"))
+            }
+        }
+    }
+
+    private fun createAvatarCornerDot(colorHex: String): View {
+        return View(activity).apply {
+            val dotSize = dp(10)
+            layoutParams = FrameLayout.LayoutParams(dotSize, dotSize).apply {
+                gravity = Gravity.BOTTOM or Gravity.END
+                bottomMargin = -dp(1)
+                rightMargin = -dp(1)
+            }
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(Color.parseColor(colorHex))
+                setStroke(dp(2), Color.parseColor("#222222"))
             }
         }
     }
