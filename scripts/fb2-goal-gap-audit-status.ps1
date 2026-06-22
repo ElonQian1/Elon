@@ -53,6 +53,7 @@ function Get-Fb2GoalGapAuditState {
         [object]$AnswerReadinessState,
         [object]$UserScenarioAudit,
         [object]$DomainDataBlueprint,
+        [object]$ContractSmokeSummary,
         [object]$GoalCompletion,
         [string]$LatestDataPath,
         [string]$LatestReadOnlyPath,
@@ -78,6 +79,19 @@ function Get-Fb2GoalGapAuditState {
     $answerReadinessComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $AnswerReadinessState "complete")
     $userScenarioAuditComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $UserScenarioAudit "complete")
     $domainDataBlueprintComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $DomainDataBlueprint "complete")
+    $contractSmokeGates = Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "gates"
+    # 这里只判断主项目无写群契约是否健康；缺 service token 的 fb2 live 数据仍由 live_preflight_request 单独跟踪。
+    $contractSmokeComplete = (
+        (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "complete")) `
+            -and (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "success")) `
+            -and ([int](Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "failed_count" 0) -eq 0) `
+            -and (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $contractSmokeGates "chat_bootstrap_ready")) `
+            -and (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $contractSmokeGates "ai_billing_policy_ready")) `
+            -and (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $contractSmokeGates "live_manifest_ready")) `
+            -and (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $contractSmokeGates "domain_contract_ready")) `
+            -and (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $contractSmokeGates "dynamic_discovery_ready")) `
+            -and (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $contractSmokeGates "protected_service_token_boundary_ready"))
+    )
     $nonVoiceReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $GoalCompletion "non_voice_ready")
     $fullFinalReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $GoalCompletion "full_final_ready")
 
@@ -88,6 +102,7 @@ function Get-Fb2GoalGapAuditState {
     if ($answerReadinessComplete) { $completed += "context_answer_readiness_validated" } else { $missing += "context_answer_readiness" }
     if ($userScenarioAuditComplete) { $completed += "user_scenario_audit_validated" } else { $missing += "user_scenario_audit" }
     if ($domainDataBlueprintComplete) { $completed += "domain_data_blueprint_fixed" } else { $missing += "domain_data_blueprint" }
+    if ($contractSmokeComplete) { $completed += "main_project_contract_smoke" } else { $missing += "main_project_contract_smoke" }
     if ($latestDataSuccess -and $feedbackComplete -and $dataDirectReadComplete) {
         $completed += "live_data_only_visible_chat_feedback_historical_ready"
     } else {
@@ -151,6 +166,7 @@ function Get-Fb2GoalGapAuditState {
             sample_request_complete = $sampleRequestComplete
             sample_set_complete = $sampleSetComplete
             answer_readiness_complete = $answerReadinessComplete
+            main_project_contract_smoke_complete = $contractSmokeComplete
             non_voice_ready = $nonVoiceReady
             full_final_ready = $fullFinalReady
         }
@@ -166,6 +182,9 @@ function Get-Fb2GoalGapAuditState {
             sample_set_source_kinds = @((Get-Fb2GoalGapAuditProperty $SampleSetState "source_kinds" @()))
             answer_readiness_passed_count = [int](Get-Fb2GoalGapAuditProperty $AnswerReadinessState "passed_count" 0)
             user_scenario_complete_count = [int](Get-Fb2GoalGapAuditProperty $UserScenarioAudit "complete_count" 0)
+            contract_smoke_summary_path = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "path")
+            contract_smoke_check_count = [int](Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "check_count" 0)
+            contract_smoke_live_data_status = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $contractSmokeGates "fb2_live_data_status")
             goal_completion_stage = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $GoalCompletion "stage")
         }
     }
