@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-22 15:10 本轮把 repo map/RCP 讨论落成 fb2 域数据机器契约：主项目新增 `domain_context_projection_contract`，公开 `fb2.domain_context_projection.v1`，固定 XML-wrapped Markdown `fb2_context_pack`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`、source registry、召回理由、权限投影、质量闭环和反模式。`scripts\smoke-fb2-ai-center.ps1` 已检查该契约，防止 fb2 AI 输入退化为原始 HTML、大 JSON、embedding dump 或无来源摘要。
 - 2026-06-22 14:40 根据当前安排暂停 ASR/TTS 继续处理后，本轮新增非语音独立验收路径：`scripts\smoke-fb2-ai-center.ps1 -DataOnlyAcceptance` 会强制检查 live fb2 数据、六类场景、平台匿名摘要、APK、权限负向审计、质量反馈、非合成 feedback 和群观点采纳，同时用 `-SkipVoiceContractChecks` 明确跳过 chat-bootstrap 的 ASR/TTS/VoiceComposer 断言；`scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance` 可用于无副作用预检或真实群聊可见验收，不再要求 `VoiceDeviceEvidencePath`，summary 写入 `voice_status=deferred_by_user`。该模式只证明比赛/订单/平台摘要/群观点 AI 数据闭环，不替代最终语音验收。
 - 2026-06-22 14:25 本轮继续处理非语音 AI 数据质量契约：主项目 `context_observability_contract` 新增 `non_synthetic_feedback_count`、`opinion_adoption_count`、`opinion_memory_ref_count` 三个推荐指标，并加入 recommended log fields；这让 `/api/external/apps/fb2/context-contract` 也能公开真实反馈、群观点采纳和观点记忆引用的长期观测口径，不只依赖 smoke 脚本。
 - 2026-06-22 14:10 本轮把 fb2 新增的非合成质量 readiness 纳入主项目侧验收：`scripts\smoke-fb2-ai-center.ps1` 新增 `-RequireNonSyntheticQualityReadiness`、`-MinNonSyntheticFeedbackCount`、`-MinOpinionAdoptionCount`，会用 `exclude_synthetic=true` 同时读取 fb2 `feedback-summary`、`quality-summary`、`opinion-adoption-summary`，确认真实反馈计数、quality/feedback 计数一致、群观点采纳和 memory refs 可观测；`-FinalAcceptance` 自动启用。`scripts\smoke-fb2-final-acceptance.ps1` 已透传阈值并把非合成反馈/采纳/记忆引用写入 summary evidence。当前仍缺真实 `FB2_AI_CENTER_TOKEN` 和 final-ready 语音证据，不能完成最终验收。
@@ -91,6 +92,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe -SkipVoiceContractChecks
+cargo test --manifest-path server\Cargo.toml external_app_context_projection -- --nocapture
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120

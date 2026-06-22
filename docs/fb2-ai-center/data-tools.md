@@ -17,6 +17,20 @@ fb2 用户真正需要的是“AI 能读懂 fb2 平台数据并帮助分析”�
 - `tool_contract`
 - `metrics`
 
+Context Pack 不是普通 Markdown 摘要，而是 fb2 域数据投影。主项目 `/api/external/apps/fb2/context-contract` 的 `domain_context_projection_contract` 会固定这些必需小节：
+
+| 小节 | 作用 | 必需来源 |
+|---|---|---|
+| `usage_boundary` | 告诉 AI 只能做比赛讨论/订单剖析参考，不承诺命中 | 使用边界 |
+| `match_facts` | 今日/近期比赛、赔率、更新时间 | `match_id`、`odds_updated_at` |
+| `user_order_slice` | 当前用户自己的票据和组合风险 | `order_id`、`ticket_id`、current-user 权限 |
+| `platform_order_summary` | 平台/店铺匿名聚合，不泄露个人 | `platform_order_summary` |
+| `group_opinion_slice` | 群友观点、分歧、长期观点记忆 | `message_id`、`opinion_memory_id` |
+| `retrieval_evidence` | 说明为什么这些数据被召回，以及缺口 | `context_audit_id`、reason、freshness |
+| `quality_feedback` | 回答后如何回填来源、采纳观点和错误上下文 | `main_request_id`、`context_audit_id` |
+
+fb2 可以在内部使用数据库索引、缓存、向量库、MCP 或领域召回器，但给主项目 AI 的最终结果必须是这个可引用、可审计、可裁剪的投影，不直接暴露原始索引或 embedding。
+
 主项目会传 `topic_hint`，fb2 应优先根据它召回：
 
 - “今天比赛/今晚比赛”：按日期和开赛时间召回比赛。

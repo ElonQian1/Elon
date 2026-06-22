@@ -86,6 +86,18 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - 禁止把原始 HTML、巨大 JSON、全量数据库记录、全量 embedding、未裁剪订单明细或其它用户私密数据直接放进 prompt。
 - MCP/RAG 不是当前完成条件；后续 MCP 只能包装现有 REST Context Pack、tool manifest 和 `POST /tools/execute`，不能绕过 fb2 权限和审计另建事实源。
 
+`GET /api/external/apps/fb2/context-contract` 还会返回 `domain_context_projection_contract`，这是 fb2 域数据版 RCP（Refactor/Task Context Pack）规范，用来把 repo map/符号索引讨论中的原则落到比赛和订单业务：
+
+- `format.wrapper=fb2_context_pack`，正文必须是 XML-wrapped Markdown。
+- `required_sections` 固定 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`。
+- `source_registry.required_kinds` 固定 `match`、`odds`、`user_order`、`ticket`、`group_message`、`opinion_memory`、`platform_order_summary`、`context_audit`、`feedback`、`opinion_adoption`。
+- `retrieval_projection` 要求 fb2 返回召回理由、命中词、新鲜度、权限范围和是否截断，而不只是返回一堆数据。
+- `permission_projection` 固定用户订单、平台匿名摘要和群观点的权限头与禁止泄漏项。
+- `quality_closure` 固定 feedback、feedback-summary、opinion-adoption-summary、quality-summary 的闭环口径。
+- `anti_patterns` 明确禁止 `raw_html_prompt`、`giant_json_prompt`、`full_database_dump`、`raw_embedding_dump`、`uncited_odds`、`uncited_order`、`platform_order_detail_leak` 等输入形态。
+
+主项目 smoke 会检查这些字段，防止后续把 fb2 AI 数据输入退化成无来源的大 JSON 或临时摘要。
+
 ## fb2 对主项目输出
 
 ### 1. Context Pack

@@ -737,6 +737,11 @@ try {
     $policy = $contract.live_tool_manifest.main_project_tool_execution_policy
     $liveToolIds = @($contract.live_tool_manifest.tool_ids)
     $answerPolicy = $contract.answer_policy_contract
+    $projectionContract = $contract.domain_context_projection_contract
+    $projectionSections = @($projectionContract.required_sections)
+    $projectionSectionIds = @($projectionSections | ForEach-Object { $_.id })
+    $projectionSourceKinds = @($projectionContract.source_registry.required_kinds)
+    $projectionAntiPatterns = @($projectionContract.anti_patterns)
     $evalScenarios = @($answerPolicy.eval_scenarios)
     $evalScenarioIds = @($evalScenarios | ForEach-Object { $_.id })
     Assert-True ($contract.live_tool_manifest.status -eq "ready") "live manifest ready" "tool_count=$($contract.live_tool_manifest.tool_count)"
@@ -788,6 +793,25 @@ try {
     Assert-ScenarioContains $auditScenario "required_source_kinds" @("citation_sources") "eval scenario source audit source kinds"
     Assert-ScenarioContains $auditScenario "required_citations" @("context_audit_id") "eval scenario source audit citations"
     Assert-ScenarioContains $auditScenario "forbidden_outputs" @("uncited_claim", "invented_source_id") "eval scenario source audit forbidden outputs"
+
+    Assert-True ($projectionContract.schema -eq "fb2.domain_context_projection.v1") "domain projection schema" "$($projectionContract.schema)"
+    Assert-True ($projectionContract.format.wrapper -eq "fb2_context_pack") "domain projection wrapper" "$($projectionContract.format.wrapper)"
+    Assert-ContainsValue $projectionSectionIds "match_facts" "domain projection section: match facts"
+    Assert-ContainsValue $projectionSectionIds "user_order_slice" "domain projection section: user orders"
+    Assert-ContainsValue $projectionSectionIds "platform_order_summary" "domain projection section: platform summary"
+    Assert-ContainsValue $projectionSectionIds "group_opinion_slice" "domain projection section: group opinions"
+    Assert-ContainsValue $projectionSectionIds "retrieval_evidence" "domain projection section: retrieval evidence"
+    Assert-ContainsValue $projectionSectionIds "quality_feedback" "domain projection section: quality feedback"
+    Assert-ContainsValue $projectionSourceKinds "match" "domain projection source kind: match"
+    Assert-ContainsValue $projectionSourceKinds "odds" "domain projection source kind: odds"
+    Assert-ContainsValue $projectionSourceKinds "user_order" "domain projection source kind: user order"
+    Assert-ContainsValue $projectionSourceKinds "group_message" "domain projection source kind: group message"
+    Assert-ContainsValue $projectionSourceKinds "opinion_memory" "domain projection source kind: opinion memory"
+    Assert-ContainsValue $projectionSourceKinds "platform_order_summary" "domain projection source kind: platform summary"
+    Assert-ContainsValue $projectionSourceKinds "feedback" "domain projection source kind: feedback"
+    Assert-ContainsValue $projectionSourceKinds "opinion_adoption" "domain projection source kind: opinion adoption"
+    Assert-ContainsValue $projectionAntiPatterns "raw_embedding_dump" "domain projection anti-pattern: raw embedding dump"
+    Assert-ContainsValue $projectionAntiPatterns "platform_order_detail_leak" "domain projection anti-pattern: platform order leak"
 } catch {
     Fail "context-contract" $_.Exception.Message
 }
