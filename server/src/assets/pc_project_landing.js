@@ -416,6 +416,44 @@
         .filter(Boolean);
     }
 
+    function workbenchActionsHtml(downloads) {
+      const devChannel = channelByKind('ai_development');
+      const docsChannel = channelByKind('docs');
+      const discussionChannel = channelByKind('discussion') || channelByKind('requirements') || channelByKind('suggestions');
+      const actions = [
+        devChannel ? workbenchChannelAction('AI 开发', '继续开发', devChannel, 'dev') : null,
+        docsChannel ? workbenchChannelAction('项目文档', '查看文档', docsChannel, 'docs') : null,
+        discussionChannel ? workbenchChannelAction('协作讨论', '打开频道', discussionChannel, 'chat') : null,
+        downloads.some((item) => ACTIVE_STATUSES.has(item.status) && item.url)
+          ? {
+            label: '下载交付',
+            sub: '可用客户端',
+            glyph: '↓',
+            tone: 'download',
+            attrs: 'data-scroll-downloads="1"'
+          }
+          : null
+      ].filter(Boolean).slice(0, 4);
+      if (!actions.length) return '';
+      return `<section class="project-landing-workbench" aria-label="项目快捷入口">
+        ${actions.map((action) => `<button class="project-landing-workbench-action tone-${escapeHtml(action.tone)}" type="button" ${action.attrs}>
+          <span>${escapeHtml(action.glyph)}</span>
+          <strong>${escapeHtml(action.label)}</strong>
+          <small>${escapeHtml(action.sub)}</small>
+        </button>`).join('')}
+      </section>`;
+    }
+
+    function workbenchChannelAction(label, sub, channel, tone) {
+      return {
+        label,
+        sub: sub || channelName(channel),
+        glyph: channelGlyph(channel),
+        tone,
+        attrs: `data-workbench-channel-id="${escapeHtml(channel.id)}"`
+      };
+    }
+
     function iconHtml(project) {
       const icon = iconUrlOf(project);
       const name = titleOf(project);
@@ -668,6 +706,7 @@
           </div>
         </header>
         <div class="project-landing-summary">${escapeHtml(description)}</div>
+        ${workbenchActionsHtml(downloads)}
         <div class="project-landing-download-groups">${downloadGroupsHtml(downloads)}</div>
         ${features.length ? `<div class="project-landing-section">
           <h2>项目亮点</h2>
@@ -696,6 +735,15 @@
       });
       els.messageList.querySelectorAll('.project-landing-channel[data-channel-id]').forEach((button) => {
         button.addEventListener('click', () => selectProjectChannel(button.dataset.channelId));
+      });
+      els.messageList.querySelectorAll('[data-workbench-channel-id]').forEach((button) => {
+        button.addEventListener('click', () => selectProjectChannel(button.dataset.workbenchChannelId));
+      });
+      els.messageList.querySelectorAll('[data-scroll-downloads]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const target = els.messageList.querySelector('.project-landing-download-groups');
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
       });
       els.messageList.querySelectorAll('[data-resource-url]').forEach((button) => {
         button.addEventListener('click', () => {
