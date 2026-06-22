@@ -31,7 +31,7 @@
 - 2026-06-22 15:10 本轮把 repo map/RCP 讨论落成 fb2 域数据机器契约：主项目新增 `domain_context_projection_contract`，公开 `fb2.domain_context_projection.v1`，固定 XML-wrapped Markdown `fb2_context_pack`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`、source registry、召回理由、权限投影、质量闭环和反模式。`scripts\smoke-fb2-ai-center.ps1` 已检查该契约，防止 fb2 AI 输入退化为原始 HTML、大 JSON、embedding dump 或无来源摘要。
 - 2026-06-22 14:40 根据当前安排暂停 ASR/TTS 继续处理后，本轮新增非语音独立验收路径：`scripts\smoke-fb2-ai-center.ps1 -DataOnlyAcceptance` 会强制检查 live fb2 数据、六类场景、平台匿名摘要、APK、权限负向审计、质量反馈、非合成 feedback 和群观点采纳，同时用 `-SkipVoiceContractChecks` 明确跳过 chat-bootstrap 的 ASR/TTS/VoiceComposer 断言；`scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance` 可用于无副作用预检或真实群聊可见验收，不再要求 `VoiceDeviceEvidencePath`，summary 写入 `voice_status=deferred_by_user`。该模式只证明比赛/订单/平台摘要/群观点 AI 数据闭环，不替代最终语音验收。
 - 2026-06-22 14:25 本轮继续处理非语音 AI 数据质量契约：主项目 `context_observability_contract` 新增 `non_synthetic_feedback_count`、`opinion_adoption_count`、`opinion_memory_ref_count` 三个推荐指标，并加入 recommended log fields；这让 `/api/external/apps/fb2/context-contract` 也能公开真实反馈、群观点采纳和观点记忆引用的长期观测口径，不只依赖 smoke 脚本。
-- 2026-06-22 14:10 本轮把 fb2 新增的非合成质量 readiness 纳入主项目侧验收：`scripts\smoke-fb2-ai-center.ps1` 新增 `-RequireNonSyntheticQualityReadiness`、`-MinNonSyntheticFeedbackCount`、`-MinOpinionAdoptionCount`，会用 `exclude_synthetic=true` 同时读取 fb2 `feedback-summary`、`quality-summary`、`opinion-adoption-summary`，确认真实反馈计数、quality/feedback 计数一致、群观点采纳和 memory refs 可观测；`-FinalAcceptance` 自动启用。`scripts\smoke-fb2-final-acceptance.ps1` 已透传阈值并把非合成反馈/采纳/记忆引用写入 summary evidence。当前仍缺真实 `FB2_AI_CENTER_TOKEN` 和 final-ready 语音证据，不能完成最终验收。
+- 2026-06-22 14:10 本轮把 fb2 新增的非合成质量 readiness 纳入主项目侧验收：`scripts\smoke-fb2-ai-center.ps1` 新增 `-RequireNonSyntheticQualityReadiness`、`-MinNonSyntheticFeedbackCount`、`-MinOpinionAdoptionCount`，会用 `exclude_synthetic=true` 同时读取 fb2 `feedback-summary`、`quality-summary`、`opinion-adoption-summary`，确认真实反馈计数、quality/feedback 计数一致、群观点采纳和 memory refs 可观测；`-FinalAcceptance` 自动启用。`scripts\smoke-fb2-final-acceptance.ps1` 已透传阈值并把非合成反馈/采纳/记忆引用写入 summary evidence。当时仍缺真实 `FB2_AI_CENTER_TOKEN` 和 final-ready 语音证据，不能完成最终验收。
 - 2026-06-22 13:40 本轮在远端推进后重新 fast-forward 到 `origin/main=82e042227074939b01fcbe5c32319277ea425f37`；线上 `/api/server/version` 返回 `v0.3.605 / 82e042227074939b01fcbe5c32319277ea425f37`。`smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>` 通过，authenticated `chat-bootstrap` 和 live manifest 继续健康，仅因缺 `FB2_AI_CENTER_TOKEN` 跳过 live fb2 data。用采集器重新生成的 ADB 半成品证据已记录 `mainProjectCommit=82e04222`，`smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 仍按预期失败在 `finalAcceptanceReady=false` 和缺失 ASR/TTS/免费策略 checks 上。
 - 2026-06-22 13:35 本轮新增主项目侧 ADB 真机语音证据采集器：`scripts\collect-fb2-voice-device-evidence.ps1` 可保存 screenshot、UI dump、logcat、包版本、权限、系统 ASR 服务，并生成 `fb2.voice_device_evidence.v1` JSON。脚本默认 `finalAcceptanceReady=false`，不会把半成品证据当作最终完成；只有测试者已经用人工语音样本确认所有 UI/ASR/TTS/免费策略检查项，并为每个 `Observed*` 开关保留对应 artifact 时，才允许传 `-MarkFinalReady`。本轮用 `e0d909c3` 跑 `-CaptureHoldGesture` 成功生成 `target\fb2-voice-device-evidence\latest-adb-check\voice-device-evidence.json` 和 7 个 artifact；随后 `smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 按预期失败在 `finalAcceptanceReady=false` 和 10 个缺失 checks 上，证明采集器不会误放行最终验收。
 - 2026-06-22 13:20 本轮复核当前主项目代码、线上契约和真机状态：主项目工作树干净，`HEAD=origin/main=ffa817befdbb046c69615574711a1cea70fd7b69`；线上 `/api/server/version` 返回 `v0.3.604 / ffa817befdbb046c69615574711a1cea70fd7b69`。`scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>` 通过，fb2 session bridge 解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`，authenticated `chat-bootstrap` 继续验证 `VoiceComposerView`、`VoiceComposerBootstrap`、`ChatVoiceEventSink`、系统 ASR 本地优先、云端 ASR 兜底、ASR/TTS 免费、AI 回复扣费和 live manifest `tool_count=34`。当前仍未配置 `FB2_AI_CENTER_TOKEN`，因此 live Context Pack、平台摘要、质量汇总和权限最终验收仍按预期跳过。
@@ -96,11 +96,11 @@
 - 2026-06-22 18:38 非语音 data-only visible acceptance 已通过，不再是当前阻塞；真实群聊三类入口、三类 feedback、权限/质量和 direct group read evidence 已绑定到同一份 summary。ASR/TTS 仍明确暂停，full final acceptance 仍未完成。
 - 当前会话可通过 fb2 服务器受控 wrapper 临时读取 service token 做 live 验证；token 不打印、不写入仓库、不写入持久环境。最终交接仍应由 fb2 会话提供等价 token 或继续使用受控 wrapper。
 - `123qwe` 登录能桥接主项目，最终验收 wrapper 可从 `-Fb2Username/-Fb2Password` 自动解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`；authenticated `chat-bootstrap` 已验证通过。带 service token 的 live data-only smoke 已确认该账号有可分析订单，`my ticket` 场景返回 `user_orders count=10`。
-- fb2 live Context Pack 仍未达到主项目域投影契约：正文缺 `retrieval_evidence` / `quality_feedback` 小节；today pack 的 source kinds 只有 `group_message` 和 `match`，缺 `odds/context_audit`；ticket pack 的 source kinds 只有 `group_message/match/order`，缺 `user_order/ticket/context_audit`。这需要 fb2 会话补 `/api/main-project/context/pack` 的输出格式和 citation source kind。
-- 群观点质量闭环仍未完成：`group_opinion_summary` 当前 `opinion_summary count=0`，非合成 `opinion_adoption_count=0` / `memory_ref_count=0`，还不能证明 AI 在真实回答中采纳并回写群友观点。
-- 质量引用仍有真实历史债务：live `quality-summary` 显示 `citation_unmatched_rate=0.1`、`unmatched_cited_source_count=6`，不能把“引用来源完全匹配”当作已完成。
+- fb2 live Context Pack 域投影已在最新 data-only 验收中通过：`target\fb2-ai-center\data-only-acceptance-20260622T103826Z-ai-center.log` 显示 today pack 和 my-ticket pack 都包含 XML wrapper、`retrieval_evidence`、`quality_feedback`、source registry、`context_audit`；today pack 具备 `match/odds/context_audit` source kind，my-ticket pack 具备 `user_order/ticket/context_audit` source kind。
+- 群观点数据闭环已进入可用状态：最新 data-only 验收中 `group_opinion_summary count=1`，真实群聊 `@EL` 与 selected-message 回复均能引用来源并回写 fb2 feedback。短窗口非合成 `opinion_adoption_count=0` 当前按 data-only 可见验收阈值允许；历史 preflight 已观察到非合成 adoption=1，后续继续积累样本，不再作为当前阻塞。
+- 当前窗口质量引用已归零：最新 data-only 验收显示 `quality_citation_unmatched_rate=0`、`quality_unmatched_cited_sources=0`、`missing_context=0`、`wrong_context=0`。历史 unmatched 债务只作为趋势观察，不再作为当前完成阻塞。
 - 已有 ADB 半成品真机语音证据 JSON，且其 artifact 文件真实存在；但它明确 `finalAcceptanceReady=false`。仍缺包含人工语音样本、system ASR final、云端 ASR 成功、server ASR 失败恢复、TTS 播放、ASR/TTS 免费策略的完整 final-ready 证据。
-- 真实群聊 `@EL`、长按 `AI回复` 和总结帖入口都已单独抽样通过；仍需把可见群聊、summary post、三类 `feedback_coverage`、质量汇总、权限审计和完整语音证据放进 `scripts/smoke-fb2-final-acceptance.ps1` 同一批 summary 中，才能宣布终极完成。
+- 真实群聊 `@EL`、长按 `AI回复` 和总结帖入口已经在 `scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 的同一份 summary 中通过，三类 `feedback_coverage`、质量汇总、权限审计和 direct group read evidence 已绑定。仍缺完整语音证据，因此不能宣布终极完成。
 - 当前账号权限负向验收已通过本轮 data-only smoke：缺当前用户头、用户头不匹配、平台摘要缺 scope、用户订单工具缺用户头均 403，并在 permission-summary 中记录 total=4/user=3/platform=1。多账号扩展抽样仍可继续，但当前核心权限门槛已不再是脚本阻塞。
 - 固定质量评测集仍需继续积累 feedback 样本，观察 `missing_context`、`wrong_context`、`citation_unmatched` 和大 Context Pack 比率。
 - 动态发现默认检查已补齐；本轮 authenticated `/context/readiness` 和 `/context/tool-manifest` 内容级检查已 live 跑通，readiness 当前为 `partial`，direct manifest 与主项目 live contract 已对齐。
@@ -150,13 +150,14 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -D
 - 缺 `FB2_AI_CENTER_TOKEN` 时，显式权限负向检查也会失败，避免权限验收被 skip。
 - 使用无效 service token 时，wrapper 能解析 `123qwe` 的 fb2 用户 UUID，但订单上下文预检在写群前 401 失败。
 - `-DataOnlyAcceptance` 缺 `FB2_AI_CENTER_TOKEN` 时也会立即失败，但不会因为缺 `VoiceDeviceEvidencePath` 提前失败。
-- 带 service token 的 `smoke-fb2-ai-center.ps1 -DataOnlyAcceptance` 当前仍失败在 fb2 真实数据/质量缺口：Context Pack 缺 `retrieval_evidence` / `quality_feedback` 和必要 source kind，群观点摘要为空，引用未命中率不为 0，非合成观点采纳为 0。
+- 带 service token 的最新 `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 已通过，summary 为 `target\fb2-ai-center\data-only-acceptance-20260622T103826Z.json`。后续如再跑 data-only，目标应是回归巡检，而不是当前阻塞修复。
 
 ## 下一步最小动作
 
 1. 不要再把 data-only visible acceptance 当作当前阻塞；最新通过证据是 `target\fb2-ai-center\data-only-acceptance-20260622T103826Z.json`。
 2. 后续恢复语音工作时，让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-3. 恢复语音后再跑完整最终验收：
+3. 恢复 full final 前，还要确认非合成观点采纳满足默认门槛 `MinOpinionAdoptionCount=1`；data-only 可见验收当前允许短窗口为 0，不能替代 full final 的观点采纳证据。
+4. 恢复语音后再跑完整最终验收：
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN> -VoiceDeviceEvidencePath <real-device-evidence.json>

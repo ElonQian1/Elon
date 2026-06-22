@@ -178,6 +178,7 @@
   有明确写群授权后再跑：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token>`
   这两条不会要求 `VoiceDeviceEvidencePath`，但必须有 fb2 service token 和有订单用户上下文；通过只表示数据/权限/质量/可见群聊闭环通过，不代表 ASR/TTS 完成。
+- full final 不使用 data-only 的短窗口放宽门槛；恢复语音最终验收前，除了 `finalAcceptanceReady=true` 真机语音证据，还要确认真实 non-synthetic opinion adoption 至少 1 条，避免默认 `MinOpinionAdoptionCount=1` 卡住。
 - 最终验收或 CI 不允许跳过任何检查时加 `-RequireNoSkips`。
 - 需要验证 fb2 真机语音链路时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；正式证据必须覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
 - 真机语音证据的 `artifacts[].ref` 必须是真实可访问证据：本地路径按 evidence JSON 所在目录或仓库根目录解析，远端路径必须是 `http(s)://`；不能使用 example/placeholder/“saved file path” 文案，并且必须同时包含 logcat 和截图/视频。
@@ -190,7 +191,7 @@
   该检查会读取 fb2 `/context/permission-summary`，用于证明未授权订单/平台摘要请求会被拒绝并记录审计。
 - 需要验证真实群聊可见入口时，必须确认用户已授权写生产群或提供沙盒群，再运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
-  没有 `-AllowVisibleMessages` 时脚本必须保持失败退出；有授权执行时，脚本必须同时通过回复正文策略检查，不能只看 AI 回复消息 ID。
+  没有 `-AllowVisibleMessages` 时脚本必须保持失败退出；有授权执行时，脚本必须通过主项目群聊接口回读 baseline、`@EL` 回复、selected-message `AI回复` 和 summary post，并同时通过回复正文策略检查，不能只看截图或 AI 回复消息 ID。
 - 如果只想抽样总结帖入口，可跳过 `@EL` 和 selected-message：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120`
   该命令会创建真实 summary post，并检查 summary 是否具备 source references、事实/观点/推断/风险分层和禁止投注保证；如果同时提供 `FB2_AI_CENTER_TOKEN`，脚本还会等待 `trigger=group_summary_post` 的 fb2 feedback 回写。
