@@ -231,26 +231,62 @@ function Get-ObjectPropertyNames {
     @($Value.PSObject.Properties | ForEach-Object { $_.Name })
 }
 
+function Get-Fb2ToolIdVariants {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return @()
+    }
+
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return @()
+    }
+
+    $variants = @($text)
+    if ($text.StartsWith("fb2.", [System.StringComparison]::OrdinalIgnoreCase)) {
+        $variants += $text.Substring(4)
+    }
+    @($variants)
+}
+
 function Get-Fb2ManifestToolIds {
     param([object]$Manifest)
 
     $ids = @()
-    $ids += @($Manifest.data.tool_ids)
-    $ids += @($Manifest.data.tool_contract.tool_ids)
+    foreach ($id in @($Manifest.data.tool_ids)) {
+        $ids += Get-Fb2ToolIdVariants $id
+    }
+    foreach ($id in @($Manifest.data.tool_contract.tool_ids)) {
+        $ids += Get-Fb2ToolIdVariants $id
+    }
     foreach ($endpoint in @($Manifest.data.tool_contract.endpoints)) {
         if ($endpoint -is [string]) {
-            $ids += $endpoint
+            $ids += Get-Fb2ToolIdVariants $endpoint
             continue
         }
-        foreach ($field in @("id", "tool_id", "name", "key")) {
+        foreach ($field in @("id", "tool_id", "name", "key", "execute_tool_name")) {
             $property = $endpoint.PSObject.Properties[$field]
             if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
-                $ids += [string]$property.Value
-                break
+                $ids += Get-Fb2ToolIdVariants $property.Value
             }
         }
     }
     @($ids | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+}
+
+function Get-Fb2ReadinessStatus {
+    param([object]$Readiness)
+
+    $candidates = @(
+        $Readiness.data.status,
+        $Readiness.data.readiness.status,
+        $Readiness.data.readiness_status,
+        $Readiness.data.context_status,
+        $Readiness.data.context_readiness.status
+    )
+
+    @($candidates | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1)
 }
 
 function Compare-VersionParts {
@@ -522,6 +558,21 @@ function Invoke-VoiceEvidenceSelfTestCase {
     }
 }
 
+function Assert-AiCenterSelfTestCondition {
+    param(
+        [string]$Name,
+        [bool]$Condition,
+        [string]$Details = ""
+    )
+
+    if ($Condition) {
+        Write-Output "OK`tself-test $Name`t$Details"
+    } else {
+        $script:SelfTestFailed += 1
+        Write-Output "FAIL`tself-test $Name`t$Details"
+    }
+}
+
 function Invoke-AiCenterSelfTest {
     $script:SelfTestFailed = 0
     $tempRoot = [System.IO.Path]::GetTempPath()
@@ -594,6 +645,32 @@ function Invoke-AiCenterSelfTest {
         $missingSystemAsr = Copy-SelfTestObject $valid
         $missingSystemAsr.checks.systemAsrSuccess = $false
         Invoke-VoiceEvidenceSelfTestCase "rejects missing system ASR success" $missingSystemAsr $evidencePath $repoRoot $false
+
+        $readinessShape = [pscustomobject]@{
+            data = [pscustomobject]@{
+                readiness = [pscustomobject]@{
+                    status = "partial"
+                }
+            }
+        }
+        $readinessStatus = Get-Fb2ReadinessStatus $readinessShape
+        Assert-AiCenterSelfTestCondition "reads nested fb2 readiness status" ($readinessStatus -eq "partial") "status=$readinessStatus"
+
+        $manifestShape = [pscustomobject]@{
+            data = [pscustomobject]@{
+                tool_ids = @("fb2.context_pack")
+                tool_contract = [pscustomobject]@{
+                    tool_ids = @("fb2.today_matches")
+                    endpoints = @(
+                        [pscustomobject]@{ id = "fb2.group_opinion_summary"; execute_tool_name = "fb2.group_opinion_summary" },
+                        [pscustomobject]@{ id = "fb2.context_quality_summary"; path = "/api/main-project/context/quality-summary" },
+                        "fb2.tool_manifest"
+                    )
+                }
+            }
+        }
+        $manifestIds = Get-Fb2ManifestToolIds $manifestShape
+        Assert-AiCenterSelfTestCondition "normalizes fb2-prefixed manifest IDs" (($manifestIds -contains "context_pack") -and ($manifestIds -contains "today_matches") -and ($manifestIds -contains "group_opinion_summary") -and ($manifestIds -contains "tool_manifest")) "ids=$($manifestIds -join ',')"
 
         Invoke-Fb2ContextProjectionSelfTests
     } finally {
@@ -911,14 +988,9 @@ if (-not $Fb2Token) {
         $fb2DiscoveryHeaders = Fb2-Headers
         $readiness = Invoke-Json -Url "$Fb2Base/api/main-project/context/readiness" -Headers $fb2DiscoveryHeaders
         Assert-True ($readiness.success -eq $true) "fb2 authenticated readiness" "success=$($readiness.success)"
-        $readinessValue = @(
-            $readiness.data.status,
-            $readiness.data.readiness_status,
-            $readiness.data.context_status,
-            $readiness.data.context_readiness.status
-        ) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1
+        $readinessValue = Get-Fb2ReadinessStatus $readiness
         Assert-True ([bool]$readinessValue) "fb2 authenticated readiness status" "status=$readinessValue"
-        Assert-ContainsValue @("ready", "degraded", "blocked", "unavailable") $readinessValue "fb2 authenticated readiness status value"
+        Assert-ContainsValue @("ready", "partial", "degraded", "blocked", "unavailable") $readinessValue "fb2 authenticated readiness status value"
 
         $directManifest = Invoke-Json -Url "$Fb2Base/api/main-project/context/tool-manifest" -Headers $fb2DiscoveryHeaders
         Assert-True ($directManifest.success -eq $true) "fb2 authenticated tool manifest" "success=$($directManifest.success)"
@@ -1191,7 +1263,6 @@ if (-not $Fb2Token) {
                 Start-Sleep -Seconds 1
                 $permissionParams = [System.Collections.Generic.List[string]]::new()
                 Add-QueryParam -Params $permissionParams -Name "from" -Value $permissionSince
-                Add-QueryParam -Params $permissionParams -Name "group_id" -Value $GroupId
                 $permissionQuery = $permissionParams -join $amp
                 $permissionUrl = "$Fb2Base/api/main-project/context/permission-summary"
                 if ($permissionQuery) {
@@ -1274,9 +1345,10 @@ if (-not $Fb2Token) {
                 Add-QueryParam -Params $nonSyntheticParams -Name "to" -Value $QualityUntil
                 $nonSyntheticQuery = $nonSyntheticParams -join $amp
 
-                $nonSyntheticQuality = Invoke-Json -Url "$Fb2Base/api/main-project/context/quality-summary?$nonSyntheticQuery" -Headers $fb2Headers
-                $nonSyntheticFeedback = Invoke-Json -Url "$Fb2Base/api/main-project/context/feedback-summary?$nonSyntheticQuery" -Headers $fb2Headers
-                $nonSyntheticAdoption = Invoke-Json -Url "$Fb2Base/api/main-project/context/opinion-adoption-summary?$nonSyntheticQuery" -Headers $fb2Headers
+                $nonSyntheticHeaders = if ($ExternalUserId) { Fb2-Headers -UserId $ExternalUserId } else { $fb2Headers }
+                $nonSyntheticQuality = Invoke-Json -Url "$Fb2Base/api/main-project/context/quality-summary?$nonSyntheticQuery" -Headers $nonSyntheticHeaders
+                $nonSyntheticFeedback = Invoke-Json -Url "$Fb2Base/api/main-project/context/feedback-summary?$nonSyntheticQuery" -Headers $nonSyntheticHeaders
+                $nonSyntheticAdoption = Invoke-Json -Url "$Fb2Base/api/main-project/context/opinion-adoption-summary?$nonSyntheticQuery" -Headers $nonSyntheticHeaders
 
                 Assert-True ($nonSyntheticQuality.success -eq $true) "quality non-synthetic summary"
                 Assert-True ($nonSyntheticFeedback.success -eq $true) "quality non-synthetic feedback summary"

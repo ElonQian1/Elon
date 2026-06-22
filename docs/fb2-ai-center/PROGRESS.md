@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-22 本轮继续推进非语音 data-only 验收，修复主项目 `scripts\smoke-fb2-ai-center.ps1` 对 fb2 当前返回结构的误判：`/context/readiness` 的总状态来自 `data.readiness.status=partial`，direct `/context/tool-manifest` 的 endpoint id 使用 `fb2.*` 前缀，而主项目 contract 使用裸 tool id；脚本现已归一化两者并在 `-SelfTest` 中覆盖。带线上 service token 重新运行 `-DataOnlyAcceptance -Fb2Username 123qwe -Fb2Password <redacted> -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -GroupId official` 后，authenticated readiness/manifest、APK、本人订单、平台匿名摘要和权限负向审计均通过；权限 summary 也改为按本轮 `from` 窗口查询，避免平台 scope 拒绝因无 `group_id` 被过滤；非合成 quality/adoption 查询在带 `external_user_id` 时会同步发送 `X-FB2-AI-CONTEXT-USER-ID`。当前 live data-only 失败缩小为 13 个真实数据/质量缺口：fb2 Context Pack 正文缺 `retrieval_evidence` / `quality_feedback` 小节，today pack 的 source kinds 只有 `group_message=1;match=10`、缺 `odds/context_audit`，ticket pack 的 source kinds 只有 `group_message=1;match=10;order=10`、缺 `user_order/ticket/context_audit`，群观点摘要为空，quality `citation_unmatched_rate=0.1` 且 unmatched cited sources=6，非合成观点采纳仍为 0。ASR/TTS 仍按用户要求暂停。
 - 2026-06-22 本轮用 fb2 受控 wrapper 从服务器环境临时读取 service token（不打印 token、不写环境持久化）后，先跑通 fb2 只读 live Context Pack smoke：`run_main_project_ai_context_live_replay.ps1 -RunContextPackSmoke -RunPlatformPositiveSmoke -RunProtectedUserOrderSmoke -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -ContextUserId 6fe5aa17-0403-427a-8e91-7f414beca35d` 通过，证明 fb2 线上可读取今日比赛上下文、平台匿名摘要和 123qwe 本人订单范围。随后尝试主项目 `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly`，发现 wrapper 的 `Invoke-SmokeScript` / `Add-Arg` / `Add-SwitchArg` 使用 `$Args` 与 PowerShell 自动变量冲突，导致子脚本空跑或关键参数未传入。本轮已修复为显式 `CommandArgs` / `ArgumentList`，并在 `-SelfTest` 中增加真实子 PowerShell 调用和参数 helper 回归测试。修复后 data-only preflight 能真实执行并产出 live evidence：本人订单 `count=10`、平台摘要 `count=1`、APK `1.1.48`、Context Pack audit id 均进入 summary；当前失败已转为真实数据/契约缺口：authenticated manifest 字段解析不匹配、Context Pack 缺 `retrieval_evidence` / `quality_feedback` 小节与部分 source kind、群观点摘要为空、权限平台拦截计数不足、非合成观点采纳仍为 0。ASR/TTS 仍按当前用户安排暂停。
 - 2026-06-22 本轮继续按 ASR/TTS 暂停边界推进非语音验收质量：`scripts\smoke-fb2-final-acceptance.ps1 -SelfTest` 新增 data-only summary 自测，明确 `-DataOnlyAcceptance` 的 `voice_status=deferred_by_user`、`acceptance_scope=data_permission_quality_visible_chat_without_voice`，并验证该模式不会误要求 `local_voice_sdk_build` 或 `voice_evidence_final_ready`，但仍必须保留用户订单、权限审计、非合成质量和群观点采纳 evidence。这样后续在缺语音最终证据时可以继续推进非语音 live 验收，同时不会把 data-only 误判为终极完成。
 - 2026-06-22 `a3de7e2e` 已推送并发布到主项目服务端 `v0.3.613`。独立验证 `/health=OK`，`/api/server/version` 返回 `gitSha=a3de7e2e2d2c3d61cded7436eced813d25753dad`。部署后重新运行 `pwsh -File scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted> -SkipVoiceContractChecks` 通过，结果 `failed=0 skipped=1`；新增的权限投影、质量闭环、召回字段和分层回答规则断言均命中。唯一跳过项仍是缺 `FB2_AI_CENTER_TOKEN`，不是 ASR/TTS，本轮语音链路按用户要求继续暂停。
@@ -83,13 +84,16 @@
 
 ## 未完成
 
-- 未拿到 `FB2_AI_CENTER_TOKEN`，因此不能完成 fb2 live Context Pack、我的票、平台匿名摘要、质量汇总和反馈样本的最终验收。
-- `123qwe` 登录能桥接主项目，并且最终验收 wrapper 现在可从 `-Fb2Username/-Fb2Password` 自动解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`；authenticated `chat-bootstrap` 已验证通过。仍需用真实 `FB2_AI_CENTER_TOKEN` 确认该账号确实有可分析订单样本。
+- 当前会话可通过 fb2 服务器受控 wrapper 临时读取 service token 做 live 验证；token 不打印、不写入仓库、不写入持久环境。最终交接仍应由 fb2 会话提供等价 token 或继续使用受控 wrapper。
+- `123qwe` 登录能桥接主项目，最终验收 wrapper 可从 `-Fb2Username/-Fb2Password` 自动解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`；authenticated `chat-bootstrap` 已验证通过。带 service token 的 live data-only smoke 已确认该账号有可分析订单，`my ticket` 场景返回 `user_orders count=10`。
+- fb2 live Context Pack 仍未达到主项目域投影契约：正文缺 `retrieval_evidence` / `quality_feedback` 小节；today pack 的 source kinds 只有 `group_message` 和 `match`，缺 `odds/context_audit`；ticket pack 的 source kinds 只有 `group_message/match/order`，缺 `user_order/ticket/context_audit`。这需要 fb2 会话补 `/api/main-project/context/pack` 的输出格式和 citation source kind。
+- 群观点质量闭环仍未完成：`group_opinion_summary` 当前 `opinion_summary count=0`，非合成 `opinion_adoption_count=0` / `memory_ref_count=0`，还不能证明 AI 在真实回答中采纳并回写群友观点。
+- 质量引用仍有真实历史债务：live `quality-summary` 显示 `citation_unmatched_rate=0.1`、`unmatched_cited_source_count=6`，不能把“引用来源完全匹配”当作已完成。
 - 已有 ADB 半成品真机语音证据 JSON，且其 artifact 文件真实存在；但它明确 `finalAcceptanceReady=false`。仍缺包含人工语音样本、system ASR final、云端 ASR 成功、server ASR 失败恢复、TTS 播放、ASR/TTS 免费策略的完整 final-ready 证据。
 - 真实群聊 `@EL`、长按 `AI回复` 和总结帖入口都已单独抽样通过；仍需把可见群聊、summary post、三类 `feedback_coverage`、质量汇总、权限审计和完整语音证据放进 `scripts/smoke-fb2-final-acceptance.ps1` 同一批 summary 中，才能宣布终极完成。
-- 多账号权限验收未完全完成：需要证明用户不能读取他人订单，平台摘要不泄露单个用户，未授权请求会被拒绝并审计。
+- 当前账号权限负向验收已通过本轮 data-only smoke：缺当前用户头、用户头不匹配、平台摘要缺 scope、用户订单工具缺用户头均 403，并在 permission-summary 中记录 total=4/user=3/platform=1。多账号扩展抽样仍可继续，但当前核心权限门槛已不再是脚本阻塞。
 - 固定质量评测集仍需继续积累 feedback 样本，观察 `missing_context`、`wrong_context`、`citation_unmatched` 和大 Context Pack 比率。
-- 动态发现默认检查已补齐；但当前环境仍没有 `FB2_AI_CENTER_TOKEN`，所以 authenticated `/context/readiness` 和 `/context/tool-manifest` 的内容级检查还没有在本轮 live 跑通，最终验收时必须带 token 复核。
+- 动态发现默认检查已补齐；本轮 authenticated `/context/readiness` 和 `/context/tool-manifest` 内容级检查已 live 跑通，readiness 当前为 `partial`，direct manifest 与主项目 live contract 已对齐。
 
 ## 验证结果
 
@@ -125,6 +129,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2AiCenterToken invalid-test-token -Fb2Username 123qwe -Fb2Password 123qwe -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence.example.json
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages -Fb2AiCenterToken invalid-test-token -Fb2Username 123qwe -Fb2Password 123qwe -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence.example.json
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -DataOnlyAcceptance -Fb2Username 123qwe -Fb2Password <redacted> -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -GroupId official -RequestTimeoutSec 60
 ```
 
 失败原因：
@@ -135,14 +140,15 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 - 缺 `FB2_AI_CENTER_TOKEN` 时，显式权限负向检查也会失败，避免权限验收被 skip。
 - 使用无效 service token 时，wrapper 能解析 `123qwe` 的 fb2 用户 UUID，但订单上下文预检在写群前 401 失败。
 - `-DataOnlyAcceptance` 缺 `FB2_AI_CENTER_TOKEN` 时也会立即失败，但不会因为缺 `VoiceDeviceEvidencePath` 提前失败。
+- 带 service token 的 `smoke-fb2-ai-center.ps1 -DataOnlyAcceptance` 当前仍失败在 fb2 真实数据/质量缺口：Context Pack 缺 `retrieval_evidence` / `quality_feedback` 和必要 source kind，群观点摘要为空，引用未命中率不为 0，非合成观点采纳为 0。
 
 ## 下一步最小动作
 
-1. 让 fb2 会话提供 `FB2_AI_CENTER_TOKEN` 或等价服务 token，用于主项目最终验收拉取 live Context Pack、平台匿名摘要和质量反馈。
-2. 确认 `123qwe` 或另一个 fb2 测试账号确实有可分析订单；如果不能用用户名密码解析，再手工提供有订单的测试用户 UUID。
-3. 当前 ASR/TTS 暂缓，先用 `-DataOnlyAcceptance` 跑非语音预检；拿到明确可见群授权后再跑 `-DataOnlyAcceptance -AllowVisibleMessages`，把 `@EL`、长按 `AI回复`、总结帖、feedback coverage、质量和权限证据绑到同一份 summary。
+1. 把本轮 13 个 live data-only 失败项交给 fb2 会话：补 Context Pack 的 `retrieval_evidence` / `quality_feedback` 小节，补 `odds/context_audit/user_order/ticket` source kind，修复 `group_opinion_summary` 空结果，推动真实观点采纳写回，并清理 `unmatched_cited_source_count=6`。
+2. fb2 修完后，主项目继续用受控 wrapper 或 fb2 提供的 service token 跑 `-DataOnlyAcceptance`；目标是非语音数据/权限/质量 `failed=0 skipped=0`。
+3. 当前 ASR/TTS 暂缓；非语音 data-only 通过后，再在已有生产群授权下跑 `-DataOnlyAcceptance -AllowVisibleMessages`，把 `@EL`、长按 `AI回复`、总结帖、feedback coverage、质量和权限证据绑到同一份 summary。
 4. 后续恢复语音工作时，让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-5. 用线上真实 token 跑一次群聊 AI 或 data-only/final preflight，确认 `preflight_readiness.status`、`context_fact_summary.preflight_readiness` 和 `<tool_gap_summary>` 能随 Context Pack / 工具结果进入真实 prompt；fb2 返回 `blocked` 的测试场景下工具执行应记录 skipped，而不是继续调用 `/tools/execute`。
+5. 用线上真实 token 跑一次群聊 AI 或 data-only/final preflight，继续确认 `preflight_readiness.status`、`context_fact_summary.preflight_readiness` 和 `<tool_gap_summary>` 能随 Context Pack / 工具结果进入真实 prompt；fb2 返回 `blocked` 的测试场景下工具执行应记录 skipped，而不是继续调用 `/tools/execute`。
 6. 恢复语音后再跑完整最终验收：
 
 ```powershell
