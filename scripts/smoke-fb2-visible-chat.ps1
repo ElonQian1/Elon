@@ -20,6 +20,7 @@ param(
     [int]$FeedbackPollTimeoutSec = 45,
     [int]$PollIntervalSec = 3,
     [switch]$AllowVisibleMessages,
+    [switch]$ReadOnlyDirectRead,
     [switch]$SelfTest,
     [switch]$SkipMention,
     [switch]$SkipSelectedMessage,
@@ -83,6 +84,21 @@ function Assert-True {
 function Encode-PathSegment {
     param([string]$Value)
     [System.Uri]::EscapeDataString($Value)
+}
+
+function Get-VisibleChatRunModeError {
+    param(
+        [bool]$AllowWrites,
+        [bool]$ReadOnly
+    )
+
+    if ($AllowWrites -and $ReadOnly) {
+        return "Use either -AllowVisibleMessages for write smoke or -ReadOnlyDirectRead for no-write preflight, not both."
+    }
+    if (-not $AllowWrites -and -not $ReadOnly) {
+        return "Pass -ReadOnlyDirectRead for no-write API read preflight, or -AllowVisibleMessages only after explicit authorization; write smoke sends messages to the group."
+    }
+    return ""
 }
 
 function Invoke-Json {
@@ -575,6 +591,13 @@ AI推断：被选择消息里的“肯定赢盘、重注”表述过于绝对，
         Assert-True (@("ready", "ready_with_fallback") -contains "ready_with_fallback") "selftest data-only summary fallback allowed"
     }
 
+    Invoke-VisiblePolicyCase -Name "read-only direct read permission gate" -Action {
+        Assert-True ((Get-VisibleChatRunModeError $false $false) -match "ReadOnlyDirectRead") "selftest no mode rejected"
+        Assert-True ([string]::IsNullOrWhiteSpace((Get-VisibleChatRunModeError $true $false))) "selftest write mode allowed"
+        Assert-True ([string]::IsNullOrWhiteSpace((Get-VisibleChatRunModeError $false $true))) "selftest read-only mode allowed"
+        Assert-True ((Get-VisibleChatRunModeError $true $true) -match "not both") "selftest write plus read-only rejected"
+    }
+
     Write-Output ""
     Write-Output "== Summary =="
     Write-Output "failed=$script:Failed skipped=$script:Skipped"
@@ -783,8 +806,9 @@ if ($SelfTest) {
     exit 0
 }
 
-if (-not $AllowVisibleMessages) {
-    Fail "visible message permission" "Pass -AllowVisibleMessages only after explicit authorization; this script writes to the group."
+$runModeError = Get-VisibleChatRunModeError ([bool]$AllowVisibleMessages) ([bool]$ReadOnlyDirectRead)
+if (-not [string]::IsNullOrWhiteSpace($runModeError)) {
+    Fail "visible message permission" $runModeError
     Write-Output ""
     Write-Output "== Summary =="
     Write-Output "failed=$script:Failed skipped=$script:Skipped"
@@ -815,7 +839,20 @@ Assert-True ($null -ne $targetGroup) "group membership" $GroupId
 
 $baselineMessages = Get-Messages -BearerToken $token -TargetGroupId $GroupId
 $baselineIds = @($baselineMessages | ForEach-Object { [string]$_.id })
-Pass "direct group message read baseline" (Format-BaselineReadEvidence $baselineMessages)
+$baselineReadEvidence = Format-BaselineReadEvidence $baselineMessages
+Pass "direct group message read baseline" $baselineReadEvidence
+if ($ReadOnlyDirectRead) {
+    Assert-True (@($baselineMessages).Count -gt 0) "read-only direct group read count" "count=$(@($baselineMessages).Count)"
+    Assert-True ($baselineReadEvidence -match "\btext_len=\d+\b" -and $baselineReadEvidence -match "\btext_sha256=[0-9a-fA-F]{8,}\b") "read-only direct group read text fingerprint" $baselineReadEvidence
+    Pass "read-only direct group read complete" "group=$GroupId writes=false"
+    Write-Output ""
+    Write-Output "== Summary =="
+    Write-Output "failed=$script:Failed skipped=$script:Skipped"
+    if ($script:Failed -gt 0) {
+        exit 1
+    }
+    exit 0
+}
 $trace = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
 
 if ($SkipMention) {
