@@ -169,7 +169,8 @@ async fn post_opinion_adoption_if_needed(
     base_url: &str,
     token: &str,
 ) -> anyhow::Result<()> {
-    let opinion_memory_ids = mentioned_opinion_memory_ids(tool_results, reply_text);
+    let opinion_memory_ids =
+        mentioned_opinion_memory_ids(feedback_payload, tool_results, reply_text);
     if opinion_memory_ids.is_empty() {
         return Ok(());
     }
@@ -599,16 +600,30 @@ fn citation_source_key(source: &Value) -> Option<String> {
     Some(format!("{kind}:{id}"))
 }
 
-fn mentioned_opinion_memory_ids(tool_results: Option<&Value>, reply_text: &str) -> Vec<String> {
+fn mentioned_opinion_memory_ids(
+    feedback_payload: &Value,
+    tool_results: Option<&Value>,
+    reply_text: &str,
+) -> Vec<String> {
+    let reply = reply_text.to_lowercase();
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+
+    for source in feedback_payload
+        .get("cited_sources")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        push_mentioned_opinion_memory_source(&mut out, &mut seen, source, &reply);
+    }
+
     let Some(results) = tool_results
         .and_then(|value| value.get("results"))
         .and_then(Value::as_array)
     else {
-        return Vec::new();
+        return out;
     };
-    let reply = reply_text.to_lowercase();
-    let mut seen = HashSet::new();
-    let mut out = Vec::new();
 
     for result in results {
         if result.get("tool_name").and_then(Value::as_str) != Some("opinion_memories") {
@@ -659,6 +674,35 @@ fn mentioned_opinion_memory_ids(tool_results: Option<&Value>, reply_text: &str) 
         }
     }
     out
+}
+
+fn push_mentioned_opinion_memory_source(
+    out: &mut Vec<String>,
+    seen: &mut HashSet<String>,
+    source: &Value,
+    lower_reply: &str,
+) {
+    let kind = source
+        .get("kind")
+        .and_then(Value::as_str)
+        .map(|value| value.trim().to_ascii_lowercase())
+        .unwrap_or_default();
+    if !matches!(kind.as_str(), "opinion_memory" | "group_opinion_memory") {
+        return;
+    }
+    let Some(memory_id) = source.get("id").and_then(Value::as_str) else {
+        return;
+    };
+    push_mentioned_opinion_memory_id(out, seen, memory_id, memory_id, lower_reply);
+    if let Some(label) = source.get("label").and_then(Value::as_str) {
+        push_mentioned_opinion_memory_id(out, seen, memory_id, label, lower_reply);
+    }
+    if let Some(message_id) = source.get("message_id").and_then(Value::as_str) {
+        push_mentioned_opinion_memory_id(out, seen, memory_id, message_id, lower_reply);
+    }
+    if let Some(source_message_id) = source.get("source_message_id").and_then(Value::as_str) {
+        push_mentioned_opinion_memory_id(out, seen, memory_id, source_message_id, lower_reply);
+    }
 }
 
 fn push_mentioned_opinion_memory_id(
@@ -918,6 +962,7 @@ mod tests {
         });
 
         let ids = mentioned_opinion_memory_ids(
+            &json!({"cited_sources": []}),
             Some(&tool_results),
             "AI 采纳了 opinion-memory-1，也参考了 group-msg-9999 的历史观点。",
         );
@@ -937,8 +982,53 @@ mod tests {
             }]
         });
 
-        let ids =
-            mentioned_opinion_memory_ids(Some(&tool_results), "这里只总结群观点，不引用具体来源。");
+        let ids = mentioned_opinion_memory_ids(
+            &json!({"cited_sources": []}),
+            Some(&tool_results),
+            "这里只总结群观点，不引用具体来源。",
+        );
+
+        assert!(ids.is_empty());
+    }
+
+    #[test]
+    fn opinion_memory_ids_include_context_citation_sources() {
+        let feedback_payload = json!({
+            "cited_sources": [
+                {
+                    "kind": "opinion_memory",
+                    "id": "opinion-memory-context-1",
+                    "label": "群友A赛前观点",
+                    "source_message_id": "group-msg-context-1"
+                },
+                {
+                    "kind": "match",
+                    "id": "match-1",
+                    "label": "比赛事实"
+                }
+            ]
+        });
+
+        let ids = mentioned_opinion_memory_ids(
+            &feedback_payload,
+            None,
+            "本次回答采纳了 group-msg-context-1 的群友观点，并结合 match-1。",
+        );
+
+        assert_eq!(ids, vec!["opinion-memory-context-1"]);
+    }
+
+    #[test]
+    fn opinion_memory_ids_ignore_unmentioned_context_sources() {
+        let feedback_payload = json!({
+            "cited_sources": [{
+                "kind": "group_opinion_memory",
+                "id": "opinion-memory-context-1",
+                "label": "群友A赛前观点"
+            }]
+        });
+
+        let ids = mentioned_opinion_memory_ids(&feedback_payload, None, "这里只做普通回答。");
 
         assert!(ids.is_empty());
     }
