@@ -957,6 +957,7 @@ try {
     Assert-True ([int]$projectionReadiness.feedback_count -ge 1) "domain projection readiness: feedback count" "feedback_count=$($projectionReadiness.feedback_count)"
     Assert-True ([int]$projectionReadiness.opinion_adoption_count -ge 1) "domain projection readiness: opinion adoption count" "opinion_adoption_count=$($projectionReadiness.opinion_adoption_count)"
     Assert-True ([string]$projectionReadiness.opinion_memory_ref_count -eq "present") "domain projection readiness: opinion memory refs" "opinion_memory_ref_count=$($projectionReadiness.opinion_memory_ref_count)"
+    Assert-Fb2DomainScenarioMatrixContract -ScenarioMatrix $projectionContract.domain_scenario_matrix
 
     Assert-True ($toolResultEnvelopeContract.schema -eq "fb2.tool_result_envelope.v1") "tool result envelope schema" "$($toolResultEnvelopeContract.schema)"
     Assert-True ($toolResultEnvelopeContract.normalized_result_schema -eq "external_app.normalized_tool_result.v1") "tool result normalized schema" "$($toolResultEnvelopeContract.normalized_result_schema)"

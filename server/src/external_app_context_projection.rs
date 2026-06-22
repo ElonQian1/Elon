@@ -35,6 +35,7 @@ pub(crate) fn public_context_projection_guidance(app_id: &str) -> Option<Value> 
                 "retrieval_evidence": "每条比赛、订单、群观点为什么被召回",
                 "tests": "quality-summary、feedback-summary、permission-summary 和 data-only acceptance"
             },
+            "domain_scenario_matrix": domain_scenario_matrix(),
             "required_sections": required_sections(),
             "source_registry": {
                 "required_field": "citation_sources",
@@ -196,6 +197,129 @@ fn required_sections() -> Value {
     ])
 }
 
+fn domain_scenario_matrix() -> Value {
+    json!([
+        {
+            "id": "today_matches_analysis",
+            "user_question": "今天比赛怎么看？",
+            "entrypoints": ["group_mention_at_el", "summary_post", "chat_bootstrap_ai_reply"],
+            "context_pack_sections": ["match_facts", "retrieval_evidence", "quality_feedback"],
+            "primary_tools": ["match_analysis_brief", "search_matches"],
+            "required_source_kinds": ["match", "odds", "context_audit"],
+            "required_citations": ["match_id", "context_audit_id"],
+            "permission_scope": "group_visible",
+            "required_request": ["group_id", "topic_hint"],
+            "feedback_routes": ["/api/main-project/context/feedback", "/api/main-project/context/quality-summary"],
+            "acceptance_signals": [
+                "reply_has_data_facts",
+                "reply_has_ai_inference",
+                "reply_has_risk_boundary",
+                "matched_cited_sources"
+            ],
+            "forbidden_outputs": ["guaranteed_win", "fabricated_odds", "betting_inducement"]
+        },
+        {
+            "id": "my_ticket_analysis",
+            "user_question": "帮我分析我的票。",
+            "entrypoints": ["group_mention_at_el", "chat_bootstrap_ai_reply"],
+            "context_pack_sections": ["match_facts", "user_order_slice", "retrieval_evidence", "quality_feedback"],
+            "primary_tools": ["match_analysis_brief", "search_user_orders"],
+            "required_source_kinds": ["user_order", "ticket", "match", "context_audit"],
+            "required_citations": ["order_id", "ticket_id", "match_id", "context_audit_id"],
+            "permission_scope": "current_user_only",
+            "required_request": ["external_user_id", "X-FB2-AI-CONTEXT-USER-ID", "topic_hint"],
+            "feedback_routes": ["/api/main-project/context/feedback", "/api/main-project/context/quality-summary"],
+            "acceptance_signals": [
+                "reply_has_user_orders",
+                "only_current_user_orders",
+                "matched_cited_sources",
+                "permission_summary_records_wrong_user_blocks"
+            ],
+            "forbidden_outputs": ["other_user_order_detail", "guaranteed_win"]
+        },
+        {
+            "id": "platform_order_risk",
+            "user_question": "平台今天订单风险怎么样？",
+            "entrypoints": ["privileged_group_mention_at_el", "operations_summary", "summary_post"],
+            "context_pack_sections": ["platform_order_summary", "match_facts", "retrieval_evidence", "quality_feedback"],
+            "primary_tools": ["platform_orders", "match_analysis_brief"],
+            "required_source_kinds": ["platform_order_summary", "match", "context_audit"],
+            "required_citations": ["platform_order_summary", "context_audit_id"],
+            "permission_scope": "anonymous_aggregate_only",
+            "required_request": ["include_platform_orders=true", "X-FB2-AI-CONTEXT-SCOPE=platform_order_summary"],
+            "feedback_routes": ["/api/main-project/context/feedback", "/api/main-project/context/quality-summary"],
+            "acceptance_signals": [
+                "reply_has_platform_summary",
+                "no_single_user_order_detail",
+                "matched_cited_sources",
+                "permission_summary_records_platform_scope_blocks"
+            ],
+            "forbidden_outputs": ["single_user_order_detail", "user_identity_leak"]
+        },
+        {
+            "id": "group_opinion_summary",
+            "user_question": "群里大家怎么看这场？",
+            "entrypoints": ["group_mention_at_el", "summary_post"],
+            "context_pack_sections": ["group_opinion_slice", "match_facts", "retrieval_evidence", "quality_feedback"],
+            "primary_tools": ["group_opinion_summary", "opinion_memories"],
+            "required_source_kinds": ["group_message", "opinion_memory", "match", "context_audit"],
+            "required_citations": ["message_id", "opinion_memory_id", "context_audit_id"],
+            "permission_scope": "group_visible",
+            "required_request": ["group_id", "topic_hint"],
+            "feedback_routes": [
+                "/api/main-project/context/feedback",
+                "/api/main-project/context/opinion-adoption-summary",
+                "/api/main-project/context/quality-summary"
+            ],
+            "acceptance_signals": [
+                "reply_has_group_opinions",
+                "opinion_adoption_count_non_synthetic",
+                "matched_cited_sources",
+                "memory_refs_present"
+            ],
+            "forbidden_outputs": ["group_opinion_as_fact", "fabricated_group_view"]
+        },
+        {
+            "id": "selected_message_review",
+            "user_question": "这条消息说得对吗？",
+            "entrypoints": ["selected_message_ai_reply"],
+            "context_pack_sections": ["match_facts", "group_opinion_slice", "retrieval_evidence", "quality_feedback"],
+            "primary_tools": ["match_analysis_brief", "opinion_result_review_summary"],
+            "required_source_kinds": ["match", "group_message", "context_audit"],
+            "trigger_source_ids": ["selected_message_id"],
+            "required_citations": ["selected_message_id", "match_id", "context_audit_id"],
+            "permission_scope": "group_visible",
+            "required_request": ["group_id", "topic_hint", "selected_message_id"],
+            "feedback_routes": ["/api/main-project/context/feedback", "/api/main-project/context/quality-summary"],
+            "acceptance_signals": [
+                "reply_references_selected_message",
+                "reply_rejects_guarantee_claims",
+                "reply_has_risk_boundary",
+                "matched_cited_sources"
+            ],
+            "forbidden_outputs": ["unsupported_claim_verdict", "guaranteed_win"]
+        },
+        {
+            "id": "source_reference_audit",
+            "user_question": "你刚才依据了哪些比赛、订单和群消息？",
+            "entrypoints": ["group_followup", "chat_bootstrap_ai_reply"],
+            "context_pack_sections": ["retrieval_evidence", "quality_feedback", "match_facts", "user_order_slice", "group_opinion_slice"],
+            "primary_tools": ["context_feedback_summary", "context_audit_summary"],
+            "required_source_kinds": ["context_audit"],
+            "required_citations": ["context_audit_id"],
+            "permission_scope": "same_as_original_request",
+            "required_request": ["context_audit_id_or_previous_main_request_id"],
+            "feedback_routes": ["/api/main-project/context/feedbacks", "/api/main-project/context/quality-summary"],
+            "acceptance_signals": [
+                "reply_lists_sources",
+                "does_not_invent_source_id",
+                "matched_cited_sources"
+            ],
+            "forbidden_outputs": ["uncited_claim", "invented_source_id"]
+        }
+    ])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -345,5 +469,95 @@ mod tests {
         ] {
             assert!(grounding_rule.contains(phrase));
         }
+    }
+
+    fn scenario<'a>(matrix: &'a [Value], id: &str) -> &'a Value {
+        matrix
+            .iter()
+            .find(|scenario| scenario["id"] == id)
+            .unwrap_or_else(|| panic!("missing domain scenario {id}"))
+    }
+
+    #[test]
+    fn fb2_domain_projection_declares_scenario_matrix() {
+        let contract = public_context_projection_guidance("fb2").unwrap();
+        let matrix = contract["domain_scenario_matrix"].as_array().unwrap();
+        assert_eq!(matrix.len(), 6);
+
+        let today = scenario(matrix, "today_matches_analysis");
+        assert!(array_contains(
+            &today["context_pack_sections"],
+            "match_facts"
+        ));
+        assert!(array_contains(
+            &today["primary_tools"],
+            "match_analysis_brief"
+        ));
+        assert!(array_contains(&today["required_source_kinds"], "odds"));
+        assert!(array_contains(
+            &today["forbidden_outputs"],
+            "fabricated_odds"
+        ));
+
+        let ticket = scenario(matrix, "my_ticket_analysis");
+        assert_eq!(ticket["permission_scope"], "current_user_only");
+        assert!(array_contains(
+            &ticket["context_pack_sections"],
+            "user_order_slice"
+        ));
+        assert!(array_contains(
+            &ticket["required_request"],
+            "X-FB2-AI-CONTEXT-USER-ID"
+        ));
+        assert!(array_contains(&ticket["required_citations"], "ticket_id"));
+        assert!(array_contains(
+            &ticket["acceptance_signals"],
+            "only_current_user_orders"
+        ));
+
+        let platform = scenario(matrix, "platform_order_risk");
+        assert_eq!(platform["permission_scope"], "anonymous_aggregate_only");
+        assert!(array_contains(
+            &platform["required_request"],
+            "X-FB2-AI-CONTEXT-SCOPE=platform_order_summary"
+        ));
+        assert!(array_contains(
+            &platform["forbidden_outputs"],
+            "single_user_order_detail"
+        ));
+
+        let opinions = scenario(matrix, "group_opinion_summary");
+        assert!(array_contains(
+            &opinions["context_pack_sections"],
+            "group_opinion_slice"
+        ));
+        assert!(array_contains(
+            &opinions["feedback_routes"],
+            "/api/main-project/context/opinion-adoption-summary"
+        ));
+        assert!(array_contains(
+            &opinions["acceptance_signals"],
+            "memory_refs_present"
+        ));
+
+        let selected = scenario(matrix, "selected_message_review");
+        assert!(array_contains(
+            &selected["trigger_source_ids"],
+            "selected_message_id"
+        ));
+        assert!(array_contains(
+            &selected["acceptance_signals"],
+            "reply_rejects_guarantee_claims"
+        ));
+
+        let audit = scenario(matrix, "source_reference_audit");
+        assert!(array_contains(
+            &audit["context_pack_sections"],
+            "quality_feedback"
+        ));
+        assert!(array_contains(
+            &audit["feedback_routes"],
+            "/api/main-project/context/feedbacks"
+        ));
     }
 }

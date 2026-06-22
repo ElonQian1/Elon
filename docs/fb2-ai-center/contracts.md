@@ -92,6 +92,7 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - `required_sections` 固定 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`。
 - `source_registry.required_kinds` 固定业务事实来源：`context_audit`、`match`、`odds`、`user_order`、`ticket`、`group_message`、`opinion_memory`、`platform_order_summary`。
 - `source_registry.quality_history_kinds` 固定质量历史来源：`feedback`、`opinion_adoption`，默认 `default_chat_fact=false`；只有显式标注 `scope=quality_history` 时，才可以作为“历史质量反馈/观点采纳记录”引用，不能冒充比赛、赔率、订单或群友观点事实。
+- `domain_scenario_matrix` 把六类真实用户问题映射到必须召回的 Context Pack 小节、主项目可自动工具、权限请求、source kinds、feedback 路由和可验收信号：今日比赛、我的票、平台订单风险、群观点、长按消息复核、来源审计。
 - `retrieval_projection` 要求 fb2 返回召回理由、命中词、新鲜度、权限范围和是否截断，而不只是返回一堆数据。
 - `permission_projection` 固定用户订单、平台匿名摘要和群观点的权限头与禁止泄漏项。
 - `quality_closure` 固定 feedback、feedback-summary、opinion-adoption-summary、quality-summary 的闭环口径。

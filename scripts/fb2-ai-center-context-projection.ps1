@@ -84,6 +84,35 @@ function Assert-Fb2ContextPackProjection {
     }
 }
 
+function Assert-Fb2DomainScenarioMatrixContract {
+    param([object[]]$ScenarioMatrix)
+
+    $scenarios = @($ScenarioMatrix)
+    $scenarioIds = @($scenarios | ForEach-Object { $_.id })
+    Assert-True (($scenarioIds -contains "today_matches_analysis") -and ($scenarioIds -contains "my_ticket_analysis")) "domain projection scenario matrix: core scenarios"
+    Assert-True (($scenarioIds -contains "platform_order_risk") -and ($scenarioIds -contains "group_opinion_summary")) "domain projection scenario matrix: aggregate scenarios"
+    Assert-True (($scenarioIds -contains "selected_message_review") -and ($scenarioIds -contains "source_reference_audit")) "domain projection scenario matrix: audit scenarios"
+
+    $ticketScenario = Find-EvalScenario $scenarios "my_ticket_analysis"
+    Assert-ScenarioContains $ticketScenario "context_pack_sections" @("match_facts", "user_order_slice", "retrieval_evidence") "domain projection scenario my ticket sections"
+    Assert-ScenarioContains $ticketScenario "required_request" @("external_user_id", "X-FB2-AI-CONTEXT-USER-ID") "domain projection scenario my ticket request"
+    Assert-ScenarioContains $ticketScenario "required_source_kinds" @("user_order", "ticket", "match") "domain projection scenario my ticket source kinds"
+    Assert-ScenarioContains $ticketScenario "acceptance_signals" @("only_current_user_orders", "matched_cited_sources") "domain projection scenario my ticket acceptance"
+
+    $platformScenario = Find-EvalScenario $scenarios "platform_order_risk"
+    Assert-ScenarioContains $platformScenario "required_request" @("include_platform_orders=true", "X-FB2-AI-CONTEXT-SCOPE=platform_order_summary") "domain projection scenario platform request"
+    Assert-ScenarioContains $platformScenario "forbidden_outputs" @("single_user_order_detail", "user_identity_leak") "domain projection scenario platform forbidden"
+
+    $opinionScenario = Find-EvalScenario $scenarios "group_opinion_summary"
+    Assert-ScenarioContains $opinionScenario "context_pack_sections" @("group_opinion_slice", "quality_feedback") "domain projection scenario opinion sections"
+    Assert-ScenarioContains $opinionScenario "feedback_routes" @("/api/main-project/context/opinion-adoption-summary") "domain projection scenario opinion feedback route"
+    Assert-ScenarioContains $opinionScenario "acceptance_signals" @("opinion_adoption_count_non_synthetic", "memory_refs_present") "domain projection scenario opinion acceptance"
+
+    $selectedScenario = Find-EvalScenario $scenarios "selected_message_review"
+    Assert-ScenarioContains $selectedScenario "trigger_source_ids" @("selected_message_id") "domain projection scenario selected trigger source"
+    Assert-ScenarioContains $selectedScenario "acceptance_signals" @("reply_rejects_guarantee_claims", "reply_has_risk_boundary") "domain projection scenario selected acceptance"
+}
+
 function New-Fb2ContextProjectionSelfTestData {
     [pscustomobject]@{
         context_audit_id = "audit-self-test"
@@ -118,6 +147,48 @@ function New-Fb2ContextProjectionSelfTestData {
     }
 }
 
+function New-Fb2DomainScenarioMatrixSelfTestData {
+    @(
+        [pscustomobject]@{
+            id = "today_matches_analysis"
+            context_pack_sections = @("match_facts", "retrieval_evidence", "quality_feedback")
+            primary_tools = @("match_analysis_brief")
+            required_source_kinds = @("match", "odds", "context_audit")
+            required_request = @("group_id", "topic_hint")
+            acceptance_signals = @("reply_has_data_facts", "matched_cited_sources")
+            forbidden_outputs = @("fabricated_odds")
+        },
+        [pscustomobject]@{
+            id = "my_ticket_analysis"
+            context_pack_sections = @("match_facts", "user_order_slice", "retrieval_evidence")
+            required_request = @("external_user_id", "X-FB2-AI-CONTEXT-USER-ID")
+            required_source_kinds = @("user_order", "ticket", "match")
+            acceptance_signals = @("only_current_user_orders", "matched_cited_sources")
+        },
+        [pscustomobject]@{
+            id = "platform_order_risk"
+            required_request = @("include_platform_orders=true", "X-FB2-AI-CONTEXT-SCOPE=platform_order_summary")
+            forbidden_outputs = @("single_user_order_detail", "user_identity_leak")
+        },
+        [pscustomobject]@{
+            id = "group_opinion_summary"
+            context_pack_sections = @("group_opinion_slice", "quality_feedback")
+            feedback_routes = @("/api/main-project/context/opinion-adoption-summary")
+            acceptance_signals = @("opinion_adoption_count_non_synthetic", "memory_refs_present")
+        },
+        [pscustomobject]@{
+            id = "selected_message_review"
+            trigger_source_ids = @("selected_message_id")
+            acceptance_signals = @("reply_rejects_guarantee_claims", "reply_has_risk_boundary")
+        },
+        [pscustomobject]@{
+            id = "source_reference_audit"
+            context_pack_sections = @("retrieval_evidence", "quality_feedback")
+            feedback_routes = @("/api/main-project/context/feedbacks")
+        }
+    )
+}
+
 function Invoke-ContextProjectionSelfTestCase {
     param(
         [string]$Name,
@@ -139,6 +210,26 @@ function Invoke-ContextProjectionSelfTestCase {
     }
 }
 
+function Invoke-DomainScenarioMatrixSelfTestCase {
+    param(
+        [string]$Name,
+        [object[]]$ScenarioMatrix,
+        [bool]$ShouldPass
+    )
+
+    $before = $script:Failed
+    Assert-Fb2DomainScenarioMatrixContract -ScenarioMatrix $ScenarioMatrix
+    $caseFailures = $script:Failed - $before
+    $script:Failed = $before
+    $passedExpectation = if ($ShouldPass) { $caseFailures -eq 0 } else { $caseFailures -gt 0 }
+    if ($passedExpectation) {
+        Write-Output "OK`tself-test domain scenario matrix $Name`tcase_failures=$caseFailures"
+    } else {
+        $script:SelfTestFailed += 1
+        Write-Output "FAIL`tself-test domain scenario matrix $Name`tcase_failures=$caseFailures shouldPass=$ShouldPass"
+    }
+}
+
 function Invoke-Fb2ContextProjectionSelfTests {
     $valid = New-Fb2ContextProjectionSelfTestData
     Invoke-ContextProjectionSelfTestCase "valid domain pack" $valid @("match", "odds", "user_order", "context_audit") $true
@@ -154,4 +245,17 @@ function Invoke-Fb2ContextProjectionSelfTests {
     $missingSourceKind = Copy-SelfTestObject $valid
     $missingSourceKind.citation_sources = @($missingSourceKind.citation_sources | Where-Object { $_.kind -ne "odds" })
     Invoke-ContextProjectionSelfTestCase "rejects missing odds source" $missingSourceKind @("match", "odds") $false
+
+    $validMatrix = New-Fb2DomainScenarioMatrixSelfTestData
+    Invoke-DomainScenarioMatrixSelfTestCase "valid matrix" $validMatrix $true
+
+    $missingTicketPermission = @($validMatrix | ForEach-Object { Copy-SelfTestObject $_ })
+    $ticketScenario = Find-EvalScenario $missingTicketPermission "my_ticket_analysis"
+    $ticketScenario.required_request = @("external_user_id")
+    Invoke-DomainScenarioMatrixSelfTestCase "rejects missing ticket user header" $missingTicketPermission $false
+
+    $missingOpinionAdoption = @($validMatrix | ForEach-Object { Copy-SelfTestObject $_ })
+    $opinionScenario = Find-EvalScenario $missingOpinionAdoption "group_opinion_summary"
+    $opinionScenario.feedback_routes = @("/api/main-project/context/feedback")
+    Invoke-DomainScenarioMatrixSelfTestCase "rejects missing opinion adoption route" $missingOpinionAdoption $false
 }
