@@ -73,6 +73,7 @@ function Get-Fb2AiCenterCoordinationStatus {
         [string]$LatestAiCenterLogPath,
         [object]$SampleRequestState,
         [object]$SampleSetState,
+        [object]$AnswerReadinessState,
         [bool]$TokenPresent,
         [bool]$VoiceEvidencePathPresent
     )
@@ -161,6 +162,15 @@ function Get-Fb2AiCenterCoordinationStatus {
             scenario_ids = @((Get-Fb2CoordinationJsonProperty $SampleSetState "scenario_ids" @()))
             source_kinds = @((Get-Fb2CoordinationJsonProperty $SampleSetState "source_kinds" @()))
             missing = @((Get-Fb2CoordinationJsonProperty $SampleSetState "missing" @()))
+        }
+        context_answer_readiness = [ordered]@{
+            schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $AnswerReadinessState "schema")
+            complete = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $AnswerReadinessState "complete")
+            scenario_count = [int](Get-Fb2CoordinationJsonProperty $AnswerReadinessState "scenario_count" 0)
+            passed_count = [int](Get-Fb2CoordinationJsonProperty $AnswerReadinessState "passed_count" 0)
+            failed_count = [int](Get-Fb2CoordinationJsonProperty $AnswerReadinessState "failed_count" 0)
+            missing = @((Get-Fb2CoordinationJsonProperty $AnswerReadinessState "missing" @()))
+            note = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $AnswerReadinessState "note")
         }
         direct_read_policy = [ordered]@{
             group_messages_api = "/api/me/groups/{group_id}/messages"

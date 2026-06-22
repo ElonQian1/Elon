@@ -5,6 +5,7 @@
 | 要求 | 目标形态 | 当前证据 | 完成口径 |
 |---|---|---|---|
 | fb2 业务数据给主项目 AI 使用 | XML-wrapped Markdown Context Pack 作为正文，JSON metadata 和 `citation_sources` 作为机器字段 | `contracts.md` 已固定 `<fb2_context_pack>`、`context_audit_id`、`matches`、`user_orders`、`platform_order_summary`、`citation_sources` | live `/context/pack` 返回非空 `context_pack`、`context_audit_id`、业务数组和引用来源 |
+| 四类核心问题有足够来源支撑回答 | 从 Context Pack 样本集推导 answer readiness，覆盖今日比赛、我的票、平台订单风险、群观点 | `latest_context_answer_readiness` 会检查四类样本的必需 source kinds、回答分层和禁止输出；只用摘要，不保存正文 | `complete=true`、`passed_count=4` 后仍需 live token 验证模型回复、feedback 和 quality summary |
 | 不先上完整 MCP/RAG | REST Context Pack + tool manifest + tools/execute，MCP 只作为后续包装层 | `PLAN.md`、`contracts.md`、`smoke-fb2-ai-center.ps1` | smoke 能验证 REST 契约和工具执行策略；不要求 MCP 才算完成 |
 
 ## 主项目必须提供

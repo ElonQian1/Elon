@@ -59,6 +59,7 @@ function Get-Fb2ContextSampleSetState {
     $scenarioIds = @()
     $auditIds = @()
     $sourceKinds = @()
+    $scenarioStates = @()
     foreach ($scenario in @($summary.scenarios)) {
         $id = [string](Get-Fb2ContextSampleSetProperty $scenario "scenario" "")
         if (-not [string]::IsNullOrWhiteSpace($id)) {
@@ -68,7 +69,17 @@ function Get-Fb2ContextSampleSetState {
         if (-not [string]::IsNullOrWhiteSpace($auditId)) {
             $auditIds += $auditId
         }
-        $sourceKinds += @((Get-Fb2ContextSampleSetProperty $scenario "source_kinds" @()) | ForEach-Object { [string]$_ })
+        $scenarioSourceKinds = @((Get-Fb2ContextSampleSetProperty $scenario "source_kinds" @()) | ForEach-Object { [string]$_ })
+        $sourceKinds += $scenarioSourceKinds
+        $scenarioStates += [ordered]@{
+            scenario = $id
+            passed = [bool](Get-Fb2ContextSampleSetProperty $scenario "passed" $false)
+            context_audit_id = $auditId
+            citation_source_count = [int](Get-Fb2ContextSampleSetProperty $scenario "citation_source_count" 0)
+            source_kinds = @($scenarioSourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+            context_pack_chars = [int](Get-Fb2ContextSampleSetProperty $scenario "context_pack_chars" 0)
+            context_pack_sha256 = [string](Get-Fb2ContextSampleSetProperty $scenario "context_pack_sha256" "")
+        }
     }
 
     $expectedIds = @(
@@ -99,6 +110,7 @@ function Get-Fb2ContextSampleSetState {
         scenario_ids = @($scenarioIds)
         audit_ids = @($auditIds | Select-Object -Unique)
         source_kinds = @($sourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        scenarios = @($scenarioStates)
         missing = @($missing)
         secret_like_scenarios = @((Get-Fb2ContextSampleSetProperty $summary "secret_like_scenarios" @()))
     }

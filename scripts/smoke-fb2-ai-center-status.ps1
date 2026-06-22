@@ -13,6 +13,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-context-projection-log-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-sample-request-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-sample-set-status.ps1")
+. (Join-Path $PSScriptRoot "fb2-context-answer-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-ai-center-coordination-status.ps1")
 
@@ -97,6 +98,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $contextProjectionState = Get-Fb2ContextProjectionLogState -Path $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName })
     $sampleRequestState = Get-Fb2ContextSampleRequestState -Path $(if ($null -eq $latestSampleRequestFile) { "" } else { $latestSampleRequestFile.FullName })
     $sampleSetState = Get-Fb2ContextSampleSetState -Path $(if ($null -eq $latestSampleSetFile) { "" } else { $latestSampleSetFile.FullName })
+    $answerReadinessState = Get-Fb2ContextAnswerReadinessState -SampleSetState $sampleSetState
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
@@ -131,6 +133,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -LatestAiCenterLogPath $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName }) `
         -SampleRequestState $sampleRequestState `
         -SampleSetState $sampleSetState `
+        -AnswerReadinessState $answerReadinessState `
         -TokenPresent $tokenPresent `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent
 
@@ -159,6 +162,9 @@ function Build-Fb2AiCenterStatusSnapshot {
         $refreshGaps += "missing_FB2_AI_CENTER_TOKEN_for_refreshing_live_context_pack_permission_quality"
         if ([bool]$sampleSetState.complete) {
             $refreshGaps += "context_pack_exported_samples_validated_offline"
+            if ([bool]$answerReadinessState.complete) {
+                $refreshGaps += "context_answer_readiness_validated_offline"
+            }
         } elseif ([bool]$sampleRequestState.complete) {
             $refreshGaps += "context_pack_sample_request_ready_for_fb2_export"
         }
@@ -237,6 +243,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         latest_ai_center_context_projection = $contextProjectionState
         latest_context_pack_sample_request = $sampleRequestState
         latest_context_pack_sample_set = $sampleSetState
+        latest_context_answer_readiness = $answerReadinessState
         readiness = [ordered]@{
             non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
@@ -376,7 +383,10 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_context_pack_sample_request.scenario_count -ne 4) { $failed++ }
         if (-not [bool]$snapshot.latest_context_pack_sample_set.complete) { $failed++ }
         if ($snapshot.latest_context_pack_sample_set.passed_count -ne 4) { $failed++ }
+        if (-not [bool]$snapshot.latest_context_answer_readiness.complete) { $failed++ }
+        if ($snapshot.latest_context_answer_readiness.passed_count -ne 4) { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_pack_exported_samples_validated_offline")) { $failed++ }
+        if (-not (@($snapshot.refresh_gaps) -contains "context_answer_readiness_validated_offline")) { $failed++ }
         if (-not [bool]$snapshot.goal_completion.non_voice_ready) { $failed++ }
         if ([bool]$snapshot.goal_completion.full_final_ready) { $failed++ }
         if ($snapshot.goal_completion.stage -ne "non_voice_data_chat_permission_quality_ready_voice_deferred") { $failed++ }
@@ -387,6 +397,7 @@ function Invoke-Fb2StatusSelfTest {
         if ([bool]$snapshot.coordination.direct_read_policy.screenshots_accepted) { $failed++ }
         if ([bool]$snapshot.coordination.direct_read_policy.writes_group_messages_in_status) { $failed++ }
         if (-not [bool]$snapshot.coordination.context_pack_sample_set.complete) { $failed++ }
+        if (-not [bool]$snapshot.coordination.context_answer_readiness.complete) { $failed++ }
         if ([string]$snapshot.coordination.current_evidence.visible_group_id -ne "ext_fb2_official") { $failed++ }
         if ([string]$snapshot.coordination.current_evidence.visible_mention_reply_id -ne "") { $failed++ }
         if (-not ([string]$snapshot.coordination.safe_commands.visible_regression_requires_authorization -match "-AllowVisibleMessages")) { $failed++ }
