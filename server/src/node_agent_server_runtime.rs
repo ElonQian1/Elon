@@ -1,6 +1,7 @@
 // server/src/node_agent_server_runtime.rs
 
 use crate::{
+    agent_runtime_error_summary::operational_error_summary,
     node_agent_runtime_approval::{
         requires_tool_approval, wait_for_tool_approval, ApprovalOutcome,
     },
@@ -615,7 +616,10 @@ async fn call_server_runtime(
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
     if !status.is_success() {
-        bail!("服务器 AI runtime 返回 {status}: {body}");
+        bail!(
+            "{}",
+            runtime_http_error_message("服务器 AI runtime", status, &body)
+        );
     }
     serde_json::from_str(&body).context("服务器 AI runtime 响应不是 JSON")
 }
@@ -639,9 +643,16 @@ async fn call_api_runtime(
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
     if !status.is_success() {
-        bail!("本机 API runtime 返回 {status}: {body}");
+        bail!(
+            "{}",
+            runtime_http_error_message("本机 API runtime", status, &body)
+        );
     }
     serde_json::from_str(&body).context("本机 API runtime 响应不是 JSON")
+}
+
+fn runtime_http_error_message(label: &str, status: reqwest::StatusCode, body: &str) -> String {
+    format!("{label} 返回 {status}: {}", operational_error_summary(body))
 }
 
 fn first_value(lookup: &impl Fn(&str) -> Option<String>, names: &[&str]) -> Option<String> {
@@ -743,7 +754,8 @@ impl RuntimeUsage {
 #[cfg(test)]
 mod tests {
     use super::{
-        api_runtime_config_from_lookup, run_runtime_loop, system_prompt, RuntimeLoopOptions,
+        api_runtime_config_from_lookup, run_runtime_loop, runtime_http_error_message,
+        system_prompt, RuntimeLoopOptions,
     };
     use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
     use homecli_proto::AgentToServer;
@@ -804,6 +816,21 @@ mod tests {
         assert!(route_c.contains("Route C server runtime"));
         assert!(route_c.contains("read-only planning"));
         assert!(route_c.contains("Do not request write_file, apply_patch, or run_command"));
+    }
+
+    #[test]
+    fn runtime_http_error_message_redacts_provider_body() {
+        let message = runtime_http_error_message(
+            "本机 API runtime",
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            "429 rate limit: sk-secret and prompt text",
+        );
+
+        assert!(message.contains("429"));
+        assert!(message.contains("rate_limit"));
+        assert!(message.contains("fingerprint="));
+        assert!(!message.contains("sk-secret"));
+        assert!(!message.contains("prompt text"));
     }
 
     #[tokio::test]

@@ -45,6 +45,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
 
+mod agent_runtime_error_summary;
 mod cli_usage;
 mod node_agent_active_task;
 mod node_agent_admin_open;

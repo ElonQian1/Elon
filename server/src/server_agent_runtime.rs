@@ -116,14 +116,15 @@ pub async fn chat_handler(
     {
         Ok(response) => Json(response).into_response(),
         Err(error) => {
+            let summary = operational_error_summary(&error.to_string());
             tracing::warn!(
                 target: "server_agent_runtime",
                 user_id = %user.id,
                 request_fingerprint = %audit.request_fingerprint,
-                error = %operational_error_summary(&error.to_string()),
+                error = %summary,
                 "pc_server_runtime request failed"
             );
-            json_error(StatusCode::BAD_GATEWAY, error)
+            json_error(StatusCode::BAD_GATEWAY, provider_error_message(&summary))
         }
     }
 }
@@ -147,9 +148,16 @@ fn validate_runtime_messages(messages: &[Value]) -> Result<(), &'static str> {
     ServerAgentRuntimeLimits::current().validate_messages(messages)
 }
 
+fn provider_error_message(summary: &str) -> String {
+    format!("AI runtime provider failed: {summary}")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{audit_summary, protection_status, validate_runtime_messages};
+    use super::{
+        audit_summary, operational_error_summary, protection_status, provider_error_message,
+        validate_runtime_messages,
+    };
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
     use serde_json::json;
 
@@ -193,5 +201,16 @@ mod tests {
         assert_eq!(audit.message_count, 1);
         assert_eq!(audit.roles, vec!["user"]);
         assert!(!text.contains("very secret prompt"));
+    }
+
+    #[test]
+    fn provider_error_response_uses_summary_not_raw_body() {
+        let raw = "429 rate limit: sk-secret and user prompt text";
+        let message = provider_error_message(&operational_error_summary(raw));
+
+        assert!(message.contains("rate_limit"));
+        assert!(message.contains("fingerprint="));
+        assert!(!message.contains("sk-secret"));
+        assert!(!message.contains("user prompt text"));
     }
 }

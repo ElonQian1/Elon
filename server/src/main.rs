@@ -17,6 +17,7 @@ mod agent_intent;
 mod agent_llm_call;
 mod agent_prompts;
 mod agent_routing;
+mod agent_runtime_error_summary;
 mod agent_tool_calls;
 mod ai_cli;
 mod api;
