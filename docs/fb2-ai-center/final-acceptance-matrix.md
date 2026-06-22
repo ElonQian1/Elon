@@ -14,6 +14,7 @@
 | `chat-bootstrap` | `smoke-fb2-ai-center.ps1 -MainToken` 或 `-Fb2Username/-Fb2Password` 检查默认群、语音 composer、AI 回复、计费策略 | 最新 data-only summary 已用 `123qwe/123qwe` 通过 fb2 session bridge 验证 authenticated bootstrap、AI 回复入口和 billing；full final 仍需语音证据 |
 | `context-contract` | 默认 smoke 检查 answer policy、六类评测场景、live manifest execution policy | 已覆盖 |
 | fb2 场景矩阵进入运行时 prompt | Rust 单测验证 `format_external_context()` 输出 `<fb2_domain_scenario_guidance schema="fb2.domain_scenario_prompt.v1">`，且从同一 `fb2_domain_scenario_matrix()` 读取 required citations / forbidden outputs | 本轮已补运行时 prompt guidance，覆盖 @EL 和长按 `AI回复` 共用链路；发布后需 live 验证服务端 SHA |
+| fb2 场景矩阵进入工具计划审计 | Rust 单测验证 `external_app.tool_plan.v1` metadata 带 `domain_scenario_selection schema=fb2.domain_scenario_selection.v1`，并记录 `permission_scope`、`primary_tools`、`required_citations`、`forbidden_outputs` | 本轮已补 planner metadata，覆盖“我的票”、平台匿名订单风险和群观点等自动工具计划；发布后需 live 验证服务端 SHA |
 | Context Pack 拉取 | `-RequireFb2Live -RequireAllScenarios -ExternalUserId <uuid>` | 已在 `data-only-acceptance-20260622T133357Z` 用 service token 验证：today pack、my-ticket pack、平台摘要、群观点和 citation sources 均通过 |
 | tool manifest 读取 | 默认 smoke 检查 `live_tool_manifest.status=ready`、必需 tool ids、无 missing allowed tool | 已覆盖并新增必需工具清单 |
 | fb2 dynamic discovery | 默认 smoke 直连 fb2 `/integration`，检查路由就绪、token header、关键端点和官方群映射；无 token 时 readiness/tool-manifest 必须 401；带 token 时验证 authenticated readiness 和 direct manifest tool id | 最新 data-only summary 已验证 `/integration`、authenticated readiness、direct manifest tool ids 与主项目 contract 对齐 |

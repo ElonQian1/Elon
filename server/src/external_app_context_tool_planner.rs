@@ -2,8 +2,11 @@
 
 use serde_json::{json, Value};
 
-use crate::external_app_context_config::{
-    infer_lottery_type, platform_order_summary_enabled, platform_order_summary_requested,
+use crate::{
+    external_app_context_config::{
+        infer_lottery_type, platform_order_summary_enabled, platform_order_summary_requested,
+    },
+    external_app_context_scenario_prompt::fb2_domain_scenario_selection,
 };
 
 const PLANNER_SCHEMA: &str = "external_app.tool_plan.v1";
@@ -24,6 +27,7 @@ pub(crate) struct Fb2ToolPlan {
     topic_hint: String,
     pub(crate) tools: Vec<PlannedTool>,
     skipped_reasons: Vec<&'static str>,
+    domain_scenario_selection: Value,
 }
 
 impl Fb2ToolPlan {
@@ -46,6 +50,7 @@ impl Fb2ToolPlan {
             "topic_hint": self.topic_hint,
             "planned_count": self.tools.len(),
             "planned_tools": self.tools.iter().map(PlannedTool::to_metadata).collect::<Vec<_>>(),
+            "domain_scenario_selection": self.domain_scenario_selection,
             "skipped_reasons": self.skipped_reasons
         })
     }
@@ -416,10 +421,15 @@ fn plan_fb2_tools_with_platform_scope(
     if plans.is_empty() {
         skipped_reasons.push("no_fb2_tool_trigger_matched");
     }
+    let tool_names = plans.iter().map(|tool| tool.name).collect::<Vec<_>>();
+    let domain_scenario_selection =
+        fb2_domain_scenario_selection(Some(context), Some(query), &tool_names);
+
     Fb2ToolPlan {
         topic_hint: query.to_string(),
         tools: plans,
         skipped_reasons,
+        domain_scenario_selection,
     }
 }
 
@@ -582,6 +592,20 @@ mod tests {
             plan.to_metadata()["planned_tools"][0]["trigger"].as_str(),
             Some("match_analysis_brief_needed")
         );
+        assert_plan_scenario(
+            &plan,
+            "my_ticket_analysis",
+            "current_user_only",
+            "order_id",
+            "guaranteed_win",
+        );
+        assert_plan_scenario(
+            &plan,
+            "group_opinion_summary",
+            "group_visible",
+            "message_id",
+            "fabricated_group_view",
+        );
     }
 
     #[test]
@@ -611,6 +635,13 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("current_user_orders_already_in_context_pack")));
+        assert_plan_scenario(
+            &plan,
+            "my_ticket_analysis",
+            "current_user_only",
+            "ticket_id",
+            "other_user_order_detail",
+        );
     }
 
     #[test]
@@ -666,6 +697,13 @@ mod tests {
         assert_eq!(
             platform_tool["trigger"].as_str(),
             Some("platform_order_summary_needed")
+        );
+        assert_plan_scenario(
+            &enabled,
+            "platform_order_risk",
+            "anonymous_aggregate_only",
+            "platform_order_summary",
+            "user_identity_leak",
         );
     }
 
@@ -800,5 +838,34 @@ mod tests {
             tool.arguments.get("query").is_none(),
             "opinion_memories must default to recent group memories instead of over-filtering by the raw user query"
         );
+    }
+
+    fn assert_plan_scenario(
+        plan: &Fb2ToolPlan,
+        scenario_id: &str,
+        permission_scope: &str,
+        required_citation: &str,
+        forbidden_output: &str,
+    ) {
+        let metadata = plan.to_metadata();
+        let scenarios = metadata["domain_scenario_selection"]["selected_scenarios"]
+            .as_array()
+            .expect("selected scenarios");
+        let scenario = scenarios
+            .iter()
+            .find(|scenario| scenario["id"].as_str() == Some(scenario_id))
+            .unwrap_or_else(|| panic!("missing scenario {scenario_id}: {scenarios:?}"));
+        assert_eq!(
+            scenario["permission_scope"].as_str(),
+            Some(permission_scope)
+        );
+        assert!(scenario["required_citations"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(required_citation)));
+        assert!(scenario["forbidden_outputs"]
+            .as_array()
+            .unwrap()
+            .contains(&json!(forbidden_output)));
     }
 }

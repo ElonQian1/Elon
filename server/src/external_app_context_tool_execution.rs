@@ -71,6 +71,7 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
                     "schema": "external_app.tool_plan.v1",
                     "strategy": "deterministic_fb2_chat_v1",
                     "planned_tools": "array with tool name, trigger, confidence and evidence",
+                    "domain_scenario_selection": "fb2.domain_scenario_selection.v1; selected fb2 user scenarios with primary_tools, required_citations, permission_scope and forbidden_outputs",
                     "skipped_reasons": "why main project did not plan a tool when applicable"
                 },
                 "results": {

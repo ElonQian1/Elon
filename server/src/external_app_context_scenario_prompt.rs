@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use serde_json::Value;
+use serde_json::{json, Value};
 
 use crate::external_app_context_projection::fb2_domain_scenario_matrix;
 
@@ -15,21 +15,15 @@ pub(crate) fn prompt_domain_scenario_guidance(
         return String::new();
     }
 
-    let mut scenarios = BTreeSet::new();
     let topic_hint = topic_hint(execution);
     let tool_names = tool_names(execution);
-    infer_scenarios_from_tools(&mut scenarios, &tool_names);
-    infer_scenarios_from_topic(&mut scenarios, topic_hint.as_deref());
-    infer_scenarios_from_context(&mut scenarios, context);
-
-    if scenarios.is_empty() {
-        scenarios.insert("source_reference_audit");
-    }
-
-    let scenario_matrix = fb2_domain_scenario_matrix();
-    let scenario_lines = scenarios
-        .iter()
-        .filter_map(|id| scenario_prompt_line(id, &scenario_matrix))
+    let selection = fb2_domain_scenario_selection(context, topic_hint.as_deref(), &tool_names);
+    let scenario_lines = selection
+        .get("selected_scenarios")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(scenario_prompt_line)
         .collect::<Vec<_>>();
     if scenario_lines.is_empty() {
         return String::new();
@@ -61,6 +55,33 @@ pub(crate) fn prompt_domain_scenario_guidance(
          </fb2_domain_scenario_guidance>",
         scenario_lines.join("\n")
     )
+}
+
+pub(crate) fn fb2_domain_scenario_selection(
+    context: Option<&Value>,
+    topic_hint: Option<&str>,
+    tool_names: &[&str],
+) -> Value {
+    let mut scenario_ids = BTreeSet::new();
+    infer_scenarios_from_tools(&mut scenario_ids, tool_names);
+    infer_scenarios_from_topic(&mut scenario_ids, topic_hint);
+    infer_scenarios_from_context(&mut scenario_ids, context);
+
+    if scenario_ids.is_empty() {
+        scenario_ids.insert("source_reference_audit");
+    }
+
+    let scenario_matrix = fb2_domain_scenario_matrix();
+    let selected_scenarios = scenario_ids
+        .iter()
+        .filter_map(|id| scenario_metadata(id, &scenario_matrix))
+        .collect::<Vec<_>>();
+
+    json!({
+        "schema": "fb2.domain_scenario_selection.v1",
+        "selected_count": selected_scenarios.len(),
+        "selected_scenarios": selected_scenarios
+    })
 }
 
 fn is_fb2_context(context: Option<&Value>, execution: Option<&Value>) -> bool {
@@ -237,8 +258,30 @@ fn contains_any(text: &str, needles: &[&str]) -> bool {
     })
 }
 
-fn scenario_prompt_line(id: &str, matrix: &Value) -> Option<String> {
+fn scenario_metadata(id: &str, matrix: &Value) -> Option<Value> {
     let scenario = matrix.as_array()?.iter().find(|item| item["id"] == id)?;
+    let guidance = scenario_guidance(id)?;
+    Some(json!({
+        "id": id,
+        "permission_scope": scenario["permission_scope"],
+        "primary_tools": scenario["primary_tools"],
+        "required_citations": scenario["required_citations"],
+        "forbidden_outputs": scenario["forbidden_outputs"],
+        "guidance": guidance
+    }))
+}
+
+fn scenario_prompt_line(scenario: &Value) -> Option<String> {
+    let id = scenario.get("id").and_then(Value::as_str)?;
+    Some(format!(
+        "- scenario={id}：{} required_citations={} forbidden_outputs={}",
+        scenario.get("guidance").and_then(Value::as_str)?,
+        compact_json_array(&scenario["required_citations"]),
+        compact_json_array(&scenario["forbidden_outputs"])
+    ))
+}
+
+fn scenario_guidance(id: &str) -> Option<&'static str> {
     let guidance = match id {
         "today_matches_analysis" => "使用 match_analysis_brief/search_matches 和 match/odds 来源回答“今天比赛怎么看”；不得编造赔率或承诺命中。",
         "my_ticket_analysis" => "只使用 current_user_only 的 user_order/ticket 来源分析“我的票”；缺订单就说明当前上下文没有本人票据。",
@@ -248,11 +291,7 @@ fn scenario_prompt_line(id: &str, matrix: &Value) -> Option<String> {
         "source_reference_audit" => "回答“依据了哪些来源”时只列当前 Context Pack、工具结果和 feedback 中真实存在的来源 ID；没有的来源明确说没有，不得补造。",
         _ => return None,
     };
-    Some(format!(
-        "- scenario={id}：{guidance} required_citations={} forbidden_outputs={}",
-        compact_json_array(&scenario["required_citations"]),
-        compact_json_array(&scenario["forbidden_outputs"])
-    ))
+    Some(guidance)
 }
 
 fn compact_json_array(value: &Value) -> String {
@@ -302,6 +341,41 @@ mod tests {
         assert!(block.contains("scenario=group_opinion_summary"));
         assert!(block.contains("current_user_only"));
         assert!(block.contains("order_id/ticket_id/match_id"));
+    }
+
+    #[test]
+    fn returns_machine_readable_selection_for_planner_metadata() {
+        let context = json!({
+            "app_id": "fb2",
+            "user_orders": [{"order_id": "order-1"}],
+            "matches": [{"match_id": "match-1"}]
+        });
+        let selection = fb2_domain_scenario_selection(
+            Some(&context),
+            Some("帮我分析我的票"),
+            &["match_analysis_brief"],
+        );
+
+        assert_eq!(
+            selection["schema"].as_str(),
+            Some("fb2.domain_scenario_selection.v1")
+        );
+        let selected = selection["selected_scenarios"].as_array().unwrap();
+        assert!(selected
+            .iter()
+            .any(|scenario| scenario["id"] == "my_ticket_analysis"));
+        let ticket = selected
+            .iter()
+            .find(|scenario| scenario["id"] == "my_ticket_analysis")
+            .unwrap();
+        assert_eq!(
+            ticket["permission_scope"].as_str(),
+            Some("current_user_only")
+        );
+        assert!(ticket["required_citations"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("order_id")));
     }
 
     #[test]

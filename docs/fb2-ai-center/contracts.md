@@ -78,6 +78,8 @@ GET /api/external/apps/fb2/context-contract
 
 运行时回答 prompt 还会注入 `<fb2_domain_scenario_guidance schema="fb2.domain_scenario_prompt.v1">`。该块由主项目根据 `topic_hint`、工具计划和 Context Pack 数据识别六类场景，并从 `domain_context_projection_contract.domain_scenario_matrix` 的同一源头读取 `required_citations` 和 `forbidden_outputs`。fb2 后续新增工具或字段时，应先更新矩阵，再让主项目 prompt/planner 复用同一源头，避免 contract 与模型实际提示漂移。
 
+工具规划和执行审计 metadata 同步包含 `domain_scenario_selection schema=fb2.domain_scenario_selection.v1`。它不是给模型看的正文，而是机器可读计划字段：每个选中场景都带 `permission_scope`、`primary_tools`、`required_citations` 和 `forbidden_outputs`。后续排查“AI 为什么查了这些 fb2 工具 / 为什么不能回答平台订单明细 / 为什么必须引用 order_id 或 message_id”时，应优先看 executed tools 里的 plan metadata，而不是只看最终自然语言回复。
+
 ## AI 数据接入格式原则 v1
 
 fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pack，而不是把数据库、原始网页或索引结果直接交给模型：
@@ -111,6 +113,8 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - 工具结果 source registry 同样区分 `business_source_kinds` 和 `quality_history_kinds`。回答和 feedback 回写只能引用 AI 回复正文显式提到的 `source_ids`，不得把未提到、失败或权限不匹配的工具结果写成事实来源。
 
 工具发现、质量端点和反馈写回的边界见 `tool-manifest-boundary.md`。简要口径是：`chat_auto_executable_tool_ids` 才代表主项目聊天 AI 可自动调用的工具；`context_quality_summary`、`context_permission_summary` 等质量/权限能力可以是 integration-only 受保护 HTTP 端点，不要求作为聊天自动 tool id；`feedback`、`opinion_adoption` 默认是质量闭环路线，不要求每次 Context Pack 都作为业务事实 source kind 输出。
+
+主项目返回的 tool execution contract 中，`main_project_execution_result.plan.domain_scenario_selection` 固定为上述机器可读场景选择结果。fb2 不需要复制主项目 planner 逻辑，但新增业务工具时要确保 manifest、Context Pack section 和 `domain_scenario_matrix` 能让主项目 planner 选出正确场景。
 
 ## fb2 对主项目输出
 
