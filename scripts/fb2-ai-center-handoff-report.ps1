@@ -71,6 +71,8 @@ function New-Fb2HandoffReport {
 
     $validation = Get-Fb2HandoffProperty $Status "validation_scope"
     $public = Get-Fb2HandoffProperty $Status "latest_public_contract_status"
+    $contractSmoke = Get-Fb2HandoffProperty $Status "latest_contract_smoke_summary"
+    $contractSmokeGates = Get-Fb2HandoffProperty $contractSmoke "gates"
     $readOnly = Get-Fb2HandoffProperty $Status "latest_read_only_direct_read"
     $readOnlyEvidence = Get-Fb2HandoffProperty $readOnly "evidence"
     $answerReadiness = Get-Fb2HandoffProperty $Status "latest_context_answer_readiness"
@@ -84,6 +86,7 @@ function New-Fb2HandoffReport {
     $summaryDirs = @((Get-Fb2HandoffProperty $Status "summary_dirs" @()))
 
     $publicComplete = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $public "complete")
+    $contractSmokeComplete = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $contractSmoke "complete")
     $directReadComplete = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $readOnly "complete")
     $answerReady = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $answerReadiness "complete")
     $scenarioComplete = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $scenarioAudit "complete")
@@ -128,6 +131,7 @@ function New-Fb2HandoffReport {
         stage = $stage
         verdict = [ordered]@{
             public_contract_ready = $publicComplete
+            contract_smoke_ready = $contractSmokeComplete
             group_chat_direct_read_ready = $directReadComplete
             context_answer_readiness_ready = $answerReady
             user_scenario_audit_ready = $scenarioComplete
@@ -149,6 +153,19 @@ function New-Fb2HandoffReport {
             server_git_sha = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $public "server_git_sha")
             live_tool_count = [int](Get-Fb2HandoffProperty $public "live_tool_count" 0)
             limitations = @((Get-Fb2HandoffProperty $public "limitations" @()))
+        }
+        contract_smoke = [ordered]@{
+            complete = $contractSmokeComplete
+            path = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $contractSmoke "path")
+            failed_count = [int](Get-Fb2HandoffProperty $contractSmoke "failed_count" 0)
+            skipped_count = [int](Get-Fb2HandoffProperty $contractSmoke "skipped_count" 0)
+            check_count = [int](Get-Fb2HandoffProperty $contractSmoke "check_count" 0)
+            chat_bootstrap_ready = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $contractSmokeGates "chat_bootstrap_ready")
+            ai_billing_policy_ready = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $contractSmokeGates "ai_billing_policy_ready")
+            live_manifest_ready = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $contractSmokeGates "live_manifest_ready")
+            protected_service_token_boundary_ready = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $contractSmokeGates "protected_service_token_boundary_ready")
+            fb2_live_data_status = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $contractSmokeGates "fb2_live_data_status")
+            missing = @((Get-Fb2HandoffProperty $contractSmoke "missing" @()))
         }
         group_chat_direct_read = [ordered]@{
             complete = $directReadComplete
@@ -216,6 +233,7 @@ function ConvertTo-Fb2HandoffMarkdown {
     [void]$lines.Add("|---|---|")
     foreach ($name in @(
         "public_contract_ready",
+        "contract_smoke_ready",
         "group_chat_direct_read_ready",
         "context_answer_readiness_ready",
         "user_scenario_audit_ready",
@@ -237,6 +255,7 @@ function ConvertTo-Fb2HandoffMarkdown {
     [void]$lines.Add("## Current Evidence")
     [void]$lines.Add("")
     [void]$lines.Add("- public_contract: complete=$($Report.public_contract.complete), server=$($Report.public_contract.server_version), sha=$($Report.public_contract.server_git_sha), live_tool_count=$($Report.public_contract.live_tool_count)")
+    [void]$lines.Add("- contract_smoke: complete=$($Report.contract_smoke.complete), failed=$($Report.contract_smoke.failed_count), skipped=$($Report.contract_smoke.skipped_count), checks=$($Report.contract_smoke.check_count), chat_bootstrap=$($Report.contract_smoke.chat_bootstrap_ready), ai_billing=$($Report.contract_smoke.ai_billing_policy_ready), live_data=$($Report.contract_smoke.fb2_live_data_status)")
     [void]$lines.Add("- direct_group_read: complete=$($Report.group_chat_direct_read.complete), group=$($Report.group_chat_direct_read.group_id), count=$($Report.group_chat_direct_read.message_count), sample=$($Report.group_chat_direct_read.sample_message_id), sha=$($Report.group_chat_direct_read.sample_text_sha256), writes=$($Report.group_chat_direct_read.writes)")
     [void]$lines.Add("- answer_readiness: complete=$($Report.answer_readiness.complete), passed=$($Report.answer_readiness.passed_count)/$($Report.answer_readiness.scenario_count)")
     [void]$lines.Add("- user_scenario_audit: complete=$($Report.user_scenario_audit.complete), complete_count=$($Report.user_scenario_audit.complete_count)/$($Report.user_scenario_audit.scenario_count), missing=$(@($Report.user_scenario_audit.missing) -join ', ')")
@@ -288,6 +307,21 @@ function Invoke-Fb2HandoffSelfTest {
             server_git_sha = "abc123"
             live_tool_count = 34
             limitations = @("does_not_verify_fb2_live_context_pack_or_orders")
+        }
+        latest_contract_smoke_summary = [pscustomobject]@{
+            complete = $true
+            path = "contract-smoke-summary.json"
+            failed_count = 0
+            skipped_count = 1
+            check_count = 12
+            gates = [pscustomobject]@{
+                chat_bootstrap_ready = $true
+                ai_billing_policy_ready = $true
+                live_manifest_ready = $true
+                protected_service_token_boundary_ready = $true
+                fb2_live_data_status = "skipped_missing_FB2_AI_CENTER_TOKEN"
+            }
+            missing = @()
         }
         latest_read_only_direct_read = [pscustomobject]@{
             complete = $true
@@ -343,6 +377,9 @@ function Invoke-Fb2HandoffSelfTest {
     if ($report.schema -ne "fb2.main_project.handoff_report.v1") { $failed++ }
     if ($report.stage -ne "contract_direct_read_and_offline_context_ready_needs_live_refresh") { $failed++ }
     if (-not [bool]$report.verdict.public_contract_ready) { $failed++ }
+    if (-not [bool]$report.verdict.contract_smoke_ready) { $failed++ }
+    if (-not [bool]$report.contract_smoke.chat_bootstrap_ready) { $failed++ }
+    if ([string]$report.contract_smoke.fb2_live_data_status -ne "skipped_missing_FB2_AI_CENTER_TOKEN") { $failed++ }
     if (-not [bool]$report.verdict.group_chat_direct_read_ready) { $failed++ }
     if ([bool]$report.verdict.user_scenario_audit_ready) { $failed++ }
     if ([bool]$report.evidence_policy.screenshots_accepted) { $failed++ }

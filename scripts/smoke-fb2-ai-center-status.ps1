@@ -22,6 +22,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-live-preflight-request-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-ai-center-coordination-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-public-contract-summary-status.ps1")
+. (Join-Path $PSScriptRoot "fb2-ai-center-contract-smoke-summary.ps1")
 
 function Get-Fb2StatusRepoRoot {
     Split-Path -Parent $PSScriptRoot
@@ -171,6 +172,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $latestSampleRequestFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-sample-request*.json"
     $latestSampleSetFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-samples-validation*.json"
     $latestPublicContractFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "public-contract-status*.json"
+    $latestContractSmokeFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "contract-smoke-summary*.json"
     $latestData = if ($null -eq $latestDataFile) { $null } else { Read-JsonFileOrNull $latestDataFile.FullName }
     $latestFinal = if ($null -eq $latestFinalFile) { $null } else { Read-JsonFileOrNull $latestFinalFile.FullName }
     $latestReadOnly = if ($null -eq $latestReadOnlyFile) { $null } else { Read-JsonFileOrNull $latestReadOnlyFile.FullName }
@@ -180,6 +182,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $answerReadinessState = Get-Fb2ContextAnswerReadinessState -SampleSetState $sampleSetState
     $domainDataBlueprint = Get-Fb2DomainDataBlueprintState
     $publicContractStatus = Get-Fb2PublicContractSummaryState -Path $(if ($null -eq $latestPublicContractFile) { "" } else { $latestPublicContractFile.FullName })
+    $contractSmokeSummary = Get-Fb2ContractSmokeSummaryState -Path $(if ($null -eq $latestContractSmokeFile) { "" } else { $latestContractSmokeFile.FullName })
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
@@ -297,6 +300,9 @@ function Build-Fb2AiCenterStatusSnapshot {
     if (-not [bool]$publicContractStatus.complete) {
         $refreshGaps += "missing_or_incomplete_public_contract_status_summary"
     }
+    if (-not [bool]$contractSmokeSummary.complete) {
+        $refreshGaps += "missing_or_incomplete_contract_smoke_summary"
+    }
 
     $nextActions = @()
     if (-not $tokenPresent) {
@@ -392,6 +398,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         latest_user_scenario_audit = $userScenarioAudit
         latest_domain_data_blueprint = $domainDataBlueprint
         latest_public_contract_status = $publicContractStatus
+        latest_contract_smoke_summary = $contractSmokeSummary
         readiness = [ordered]@{
             non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
@@ -488,6 +495,36 @@ function Invoke-Fb2StatusSelfTest {
                 "does_not_replace_DataOnlyAcceptance_or_FinalAcceptance"
             )
         } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "public-contract-status-test.json") -Encoding UTF8
+        [ordered]@{
+            schema = "fb2.main_project.contract_smoke_summary.v1"
+            generated_at = "2026-01-01T00:00:00Z"
+            main_base = "http://example.invalid"
+            fb2_base = "http://fb2.example.invalid"
+            group_id = "official"
+            external_user_id = "6fe5aa17-0403-427a-8e91-7f414beca35d"
+            fb2_ai_center_token_present = $false
+            require_fb2_live = $false
+            require_no_skips = $false
+            skip_voice_contract_checks = $false
+            success = $true
+            complete = $true
+            failed_count = 0
+            skipped_count = 1
+            check_count = 12
+            gates = [ordered]@{
+                chat_bootstrap_ready = $true
+                voice_contract_ready = $true
+                ai_billing_policy_ready = $true
+                live_manifest_ready = $true
+                domain_contract_ready = $true
+                dynamic_discovery_ready = $true
+                protected_service_token_boundary_ready = $true
+                fb2_live_data_status = "skipped_missing_FB2_AI_CENTER_TOKEN"
+            }
+            failed_checks = @()
+            skipped_checks = @([ordered]@{ name = "fb2 live data"; detail = "set FB2_AI_CENTER_TOKEN to verify Context Pack scenarios" })
+            missing = @()
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "contract-smoke-summary-test.json") -Encoding UTF8
         [ordered]@{
             schema = "fb2.main_project.context_pack_sample_request.v1"
             scenarios = @(
@@ -595,6 +632,14 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.latest_public_contract_status.required_group_message_fields) -contains "text_sha256")) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.limitations) -contains "does_not_verify_fb2_live_context_pack_or_orders")) { $failed++ }
         if (@($snapshot.refresh_gaps) -contains "missing_or_incomplete_public_contract_status_summary") { $failed++ }
+        if ($snapshot.latest_contract_smoke_summary.schema -ne "fb2.main_project.contract_smoke_summary.v1") { $failed++ }
+        if (-not [bool]$snapshot.latest_contract_smoke_summary.complete) { $failed++ }
+        if (-not [bool]$snapshot.latest_contract_smoke_summary.success) { $failed++ }
+        if (-not [bool]$snapshot.latest_contract_smoke_summary.gates.chat_bootstrap_ready) { $failed++ }
+        if (-not [bool]$snapshot.latest_contract_smoke_summary.gates.ai_billing_policy_ready) { $failed++ }
+        if (-not [bool]$snapshot.latest_contract_smoke_summary.gates.protected_service_token_boundary_ready) { $failed++ }
+        if ([string]$snapshot.latest_contract_smoke_summary.gates.fb2_live_data_status -ne "skipped_missing_FB2_AI_CENTER_TOKEN") { $failed++ }
+        if (@($snapshot.refresh_gaps) -contains "missing_or_incomplete_contract_smoke_summary") { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_pack_exported_samples_validated_offline")) { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_answer_readiness_validated_offline")) { $failed++ }
         if (-not [bool]$snapshot.goal_completion.non_voice_ready) { $failed++ }

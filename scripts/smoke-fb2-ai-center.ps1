@@ -43,10 +43,13 @@ param(
     [switch]$AllowHistoricalQualityDebt,
     [switch]$CheckDomainProjection,
     [switch]$SkipVoiceContractChecks,
-    [switch]$RequireNoSkips
+    [switch]$RequireNoSkips,
+    [string]$SummaryPath = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+. (Join-Path $PSScriptRoot "fb2-ai-center-contract-smoke-summary.ps1")
 
 if (-not $MainBase) {
     $MainBase = $env:ELON_MAIN_BASE
@@ -81,6 +84,7 @@ $Fb2Base = $Fb2Base.TrimEnd("/")
 $amp = [char]38
 $script:Failed = 0
 $script:Skipped = 0
+$script:Fb2ContractSmokeChecks = [System.Collections.Generic.List[object]]::new()
 
 if ($FinalAcceptance) {
     $IncludePlatformOrderSummary = $true
@@ -144,6 +148,11 @@ function Write-Check {
         [string]$Name,
         [string]$Detail = ""
     )
+    [void]$script:Fb2ContractSmokeChecks.Add([ordered]@{
+        status = $Status
+        name = $Name
+        detail = $Detail
+    })
     if ($Detail) {
         Write-Output "$Status`t$Name`t$Detail"
     } else {
@@ -1536,10 +1545,27 @@ if (-not $Fb2Token) {
 Write-Output ""
 Write-Output "== Summary =="
 Write-Output "failed=$script:Failed skipped=$script:Skipped"
+$exitFailureCount = [int]$script:Failed
 if ($RequireNoSkips -and $script:Skipped -gt 0) {
     Write-Check "FAIL" "no skipped checks" "skipped=$script:Skipped"
-    exit 1
+    $exitFailureCount += 1
 }
-if ($script:Failed -gt 0) {
+if (-not [string]::IsNullOrWhiteSpace($SummaryPath)) {
+    $summary = New-Fb2ContractSmokeSummary `
+        -Checks $script:Fb2ContractSmokeChecks `
+        -FailedCount $exitFailureCount `
+        -SkippedCount ([int]$script:Skipped) `
+        -MainBase $MainBase `
+        -Fb2Base $Fb2Base `
+        -GroupId $GroupId `
+        -ExternalUserId $ExternalUserId `
+        -Fb2TokenPresent (-not [string]::IsNullOrWhiteSpace($Fb2Token)) `
+        -RequireFb2Live ([bool]$RequireFb2Live) `
+        -RequireNoSkips ([bool]$RequireNoSkips) `
+        -SkipVoiceContractChecks ([bool]$SkipVoiceContractChecks)
+    Write-Fb2ContractSmokeSummary -Summary $summary -OutputPath $SummaryPath
+    Write-Output "OK`tcontract smoke summary`tpath=$SummaryPath complete=$($summary.complete)"
+}
+if ($exitFailureCount -gt 0) {
     exit 1
 }
