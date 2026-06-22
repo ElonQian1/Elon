@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮修正主项目 smoke 的 live manifest 必需工具口径：`context_feedback_summary` 不再被当作 fb2 manifest 必须暴露的 tool id；质量反馈闭环以 `record_context_feedback`、`list_context_feedbacks`、`context_audit_summary` 及受保护质量/反馈 HTTP 端点验收，避免把 integration-only 能力误判为聊天工具缺失。
 - 2026-06-23 本轮把 fb2 AI-facing Markdown 模板下沉到主项目公开契约：`GET /api/external/apps/fb2/context-contract` 新增 `context_pack_template_contract schema=fb2.context_pack_template.v1`。该字段固定 `<fb2_context_pack>` XML wrapper、7 个 Markdown 小节顺序、必需 JSON metadata、业务 source kinds、质量历史 source kinds、空数据处理规则、MCP 后置口径和投注/隐私边界；`scripts\smoke-fb2-ai-center.ps1` 与 `scripts\fb2-public-contract-status.ps1` 已同步检查，避免 fb2 后续只给临时 Markdown、大 JSON 或没有 source id 的摘要。
 - 2026-06-23 本轮新增 `server/src/external_app_context_gap_notice.rs`，并接入群聊/好友 `social_ai` 生成后链路。fb2 Context Pack 或 readiness 出现 `blocked/degraded/unavailable/partial`、`metrics.budget_status=empty/too_large`、`missing_context_pack` 或 token budget 截断时，即使模型回复没有主动说明，服务端也会在最终聊天回复追加 `数据缺口：...不能把缺失数据编造成比赛、赔率、订单或群友观点事实。` 该保护只作用于 fb2 外部上下文，不改变普通聊天回复，也不保存 fb2 业务数据。
 - 2026-06-23 本轮新增 `scripts\fb2-ai-center-handoff-report.ps1`，用于把 `status-current.json` 压缩成 `fb2.main_project.handoff_report.v1` JSON 和 Markdown。它汇总公开契约、群聊直读、四类 Context Pack answer readiness、七类用户场景审计、缺口、owner 下一步和安全命令；如果当前 worktree 没有 data-only summary/log，它会如实显示 selected-message、summary-post 和 source-audit 场景缺当前证据，避免后续从历史文档误判为当前状态已完整。该脚本不访问网络、不写群、不保存消息正文。

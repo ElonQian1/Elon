@@ -847,7 +847,6 @@ $requiredFb2ToolIds = @(
     "platform_orders",
     "record_context_feedback",
     "list_context_feedbacks",
-    "context_feedback_summary",
     "context_audit_summary",
     "tool_manifest"
 )
