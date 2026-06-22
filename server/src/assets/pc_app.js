@@ -2350,7 +2350,19 @@
       ? [branch || 'HEAD', clean(project.git_head || inspect.git_head), (project.has_uncommitted_changes || inspect.has_uncommitted_changes) ? '有未提交改动' : '干净']
         .filter(Boolean).join(' · ')
       : '未检测到 Git 工作区';
-    els.settingsProjectMeta.textContent = path ? `${path} · ${git}` : '尚未选择项目目录';
+    const profile = [clean(project.project_type), clean(project.package_manager)]
+      .filter(Boolean).join(' · ');
+    const commands = [
+      clean(project.run_command) && `运行 ${clean(project.run_command)}`,
+      clean(project.test_command) && `测试 ${clean(project.test_command)}`,
+      clean(project.build_command) && `构建 ${clean(project.build_command)}`
+    ].filter(Boolean).join(' / ');
+    const detected = Array.isArray(project.detected_files)
+      ? project.detected_files.map(clean).filter(Boolean).slice(0, 4).join('、')
+      : '';
+    els.settingsProjectMeta.textContent = path
+      ? [path, git, profile, commands, detected ? `检测到 ${detected}` : ''].filter(Boolean).join(' · ')
+      : '尚未选择项目目录';
   }
 
   function normalizeRuntimePermission(value) {
