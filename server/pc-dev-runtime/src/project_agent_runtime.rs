@@ -69,7 +69,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. Each agent run has a `-MaxRunCommands` budget and truncates large command output before sending it back to the model. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `read_file_range`, `write_file`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. Each agent run has a `-MaxRunCommands` budget and truncates large command output before sending it back to the model. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -273,6 +273,7 @@ Schema:
   "actions": [
     {"tool": "list_dir", "path": "."},
     {"tool": "read_file", "path": "README.md"},
+    {"tool": "read_file_range", "path": "src/main.rs", "start_line": 1, "line_count": 80},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
     {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
   ]
@@ -281,6 +282,7 @@ Schema:
 Rules:
 - Use paths relative to the project root.
 - Prefer read-only actions first.
+- Use read_file_range for large files or when you only need a specific section.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Use write_file only for intentional project files.
 - Use run_command only for low-risk project checks such as git status/diff/log, cargo check/test, npm test/run lint, or Gradle test/assembleDebug.
@@ -543,6 +545,36 @@ function Invoke-AgentAction {
             }
             return $text
         }
+        'read_file_range' {
+            $path = [string]$Action.path
+            $startLine = [int]$Action.start_line
+            $lineCount = [int]$Action.line_count
+            if ($startLine -lt 1) {
+                return "read_file_range error: start_line must be >= 1"
+            }
+            if ($lineCount -lt 1) {
+                return "read_file_range error: line_count must be >= 1"
+            }
+            if ($lineCount -gt 400) {
+                $lineCount = 400
+            }
+            $full = Resolve-SafePath $path
+            if (-not (Test-Path -LiteralPath $full -PathType Leaf)) {
+                return "read_file_range error: file not found: $path"
+            }
+            $endLine = $startLine + $lineCount - 1
+            $lines = @(Get-Content -LiteralPath $full -TotalCount $endLine)
+            $selected = @($lines | Select-Object -Skip ($startLine - 1) -First $lineCount)
+            if ($selected.Count -eq 0) {
+                return "read_file_range empty: $path has no lines at or after $startLine"
+            }
+            $lineNo = $startLine
+            $numbered = foreach ($line in $selected) {
+                "{0}: {1}" -f $lineNo, $line
+                $lineNo += 1
+            }
+            return ($numbered -join "`n")
+        }
         'write_file' {
             $path = [string]$Action.path
             $content = [string]$Action.content
@@ -724,6 +756,9 @@ mod tests {
         assert!(script.contains("Resolve-SafePath"));
         assert!(script.contains("Parent path segments are not allowed"));
         assert!(script.contains("ReparsePoint"));
+        assert!(script.contains("'read_file_range'"));
+        assert!(script.contains("start_line must be >= 1"));
+        assert!(script.contains("$lineCount = 400"));
         assert!(script.contains("Test-AgentCommandAllowedParts"));
         assert!(script.contains("[int]$MaxRunCommands = 8"));
         assert!(script.contains("$Script:AgentRunCommandCount"));
@@ -745,6 +780,7 @@ mod tests {
         assert!(doc.contains("ELON_AGENT_API_KEY"));
         assert!(doc.contains("ELON_SERVER_TOKEN"));
         assert!(doc.contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
+        assert!(doc.contains("read_file_range"));
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));
         assert!(doc.contains("-MaxRunCommands"));
