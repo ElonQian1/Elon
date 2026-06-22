@@ -44,8 +44,8 @@
 - 已新增 `scripts/smoke-fb2-final-acceptance.ps1`，支持 `-PreflightOnly` 无副作用预检，也会在写群前解析 `ExternalUserId` 并预检用户订单上下文，再把真实群聊可见触发和 `-FinalAcceptance` 绑定为同一批 `QualitySince` 证据，并输出机器可读 summary、子脚本日志路径、可见消息 ID、AI 回复 ID 和 feedback evidence。
 - `-PreflightOnly` 已升级为进入真实群聊前的无副作用强门禁：除用户订单上下文和真机语音证据外，还会要求 fb2 live 数据、六类标准场景、平台匿名摘要、fb2 APK 发布、主项目语音 SDK 构建和 no-skip 全部通过。
 - 已新增 `docs/fb2-ai-center/final-acceptance-matrix.md`，把终极目标拆成上下文格式、主项目能力、fb2 能力、用户场景和剩余证据缺口，作为宣布完成前的逐项审计入口。
-- 默认 smoke 已新增 live manifest 必需工具检查，覆盖 `context_pack`、`today_matches`、`match_analysis_brief`、`group_opinion_summary`、用户订单、平台摘要、feedback、quality、permission audit 和 `tool_manifest`。
-- `scripts/smoke-fb2-ai-center.ps1` 已新增 `-CheckPermissionBoundaries`，用于验证缺当前用户头、缺 platform scope、用户订单工具缺当前用户头都会 403，并读取 fb2 `/context/permission-summary` 证明被审计；`-FinalAcceptance` 和 `smoke-fb2-final-acceptance.ps1 -PreflightOnly` 会自动开启该门槛。
+- 默认 smoke 已新增 live manifest 必需工具检查，覆盖 `context_pack`、`today_matches`、`match_analysis_brief`、`group_opinion_summary`、用户订单、平台摘要、feedback、context audit 和 `tool_manifest`；`context_quality_summary` / `context_permission_summary` 作为受保护 HTTP 端点由 `/integration`、`-CheckQuality` 和 `-CheckPermissionBoundaries` 验证，不再要求必须出现在聊天工具 manifest id 中。
+- `scripts/smoke-fb2-ai-center.ps1` 已新增 `-CheckPermissionBoundaries`，用于验证缺当前用户头、`external_user_id` 与 `X-FB2-AI-CONTEXT-USER-ID` 不一致、缺 platform scope、用户订单工具缺当前用户头都会 403，并读取 fb2 `/context/permission-summary` 证明被审计；`-FinalAcceptance` 和 `smoke-fb2-final-acceptance.ps1 -PreflightOnly` 会自动开启该门槛。
 - `scripts/smoke-fb2-final-acceptance.ps1` 的 summary 已新增 `preflight_evidence` / `final_acceptance_evidence`，直接摘录 APK、语音、场景、权限和质量关键 OK 行，减少最终验收时人工翻日志的空间。
 - 本轮 summary 证据补强验证通过：`smoke-fb2-final-acceptance.ps1` 解析通过；默认无副作用 smoke 仍为 `failed=0 skipped=2`；缺 `FB2_AI_CENTER_TOKEN` 时 `-PreflightOnly` 仍立即失败，不会写真实群。
 - 本轮无 token 验证通过：默认 smoke 仍为 `failed=0 skipped=2`；显式 `-CheckPermissionBoundaries -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d` 会因缺 `FB2_AI_CENTER_TOKEN` 返回 `failed=1`，说明最终验收不会跳过权限负向检查。
@@ -58,6 +58,8 @@
 - 同轮 logcat 证明 `com.duoguan.football` 触发 `MediaRecorder/AudioRecord`，小米 `AsrService` 返回 `error code: 7 / empty_asr` 后 `ASR_END`，UI 正常回收；但日志没有观察到主项目 `/api/voice/asr` 云端兜底请求，因此这仍是半成品语音证据，不能用于最终 `finalAcceptanceReady=true`。
 - 本轮补齐主项目动态发现验收：默认 `scripts/smoke-fb2-ai-center.ps1` 会直接读取 fb2 `/api/main-project/integration`，确认 `routing_mode=main_project_ready`、`service_token_header=X-FB2-AI-CENTER-TOKEN`、`official` 群映射和 Context Pack/readiness/tool manifest/订单/平台摘要/质量/权限端点存在；无 service token 时还会确认 `/context/readiness` 和 `/context/tool-manifest` 返回 401，证明受保护 discovery 没有裸露。
 - `scripts/smoke-fb2-final-acceptance.ps1` 的 `preflight_evidence` / `final_acceptance_evidence` 已新增 dynamic discovery 摘录字段，最终 summary 会记录 integration、受保护 discovery、以及有 token 时的 authenticated readiness/manifest 证据。
+- 2026-06-22 本轮继续收紧用户订单权限负向验收：`scripts/smoke-fb2-ai-center.ps1 -CheckPermissionBoundaries` 现在不仅验证缺 `X-FB2-AI-CONTEXT-USER-ID` 会 403，还会用同一 `external_user_id` 搭配一个不同的 `X-FB2-AI-CONTEXT-USER-ID` 验证 Context Pack 必须返回 403；permission summary 门槛同步提高到 `total_blocks>=4`、用户范围拦截 `missing_external_user_id_count>=3`、平台范围拦截 `platform_scope_count>=1`，避免“只能看自己的订单”只测缺头不测错头。
+- 2026-06-22 本轮修正 live manifest 漂移误判：fb2 线上 manifest 当前提供 `context_feedback_summary`、`context_audit_summary` 和受保护 `/context/quality-summary`、`/context/permission-summary` 集成端点，但不再把 `context_quality_summary` / `context_permission_summary` 暴露为 tool id；主项目 smoke 已改为分别校验 manifest 工具能力和 `/integration` 端点能力，避免把“端点存在但不是聊天工具”误判为 manifest 缺失。
 
 ## 未完成
 

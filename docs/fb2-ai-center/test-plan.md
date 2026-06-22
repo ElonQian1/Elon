@@ -47,7 +47,7 @@
 - 完整场景验收必须加 `-RequireAllScenarios`；此时脚本不仅要求参数存在，还会要求 Context Pack 有 `context_audit_id`、比赛/订单等数据数量达到门槛，并且关键场景有 `citation_sources`。
 - 设置 `FB2_AI_CENTER_TOKEN` 后，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality` 能验证 fb2 `/context/quality-summary`：`missing_context_rate`、`wrong_context_rate`、`citation_unmatched_rate` 不超过阈值，`large_context_pack_rate` 不超过预算阈值。
 - 需要验证自动反馈闭环时，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339>` 必须确认最近反馈样本存在，且 `matched_cited_source_count` 达到门槛、`unmatched_cited_source_count=0`。
-- 需要验证权限边界时，加 `-CheckPermissionBoundaries -ExternalUserId <fb2_user_uuid>`；脚本会确认缺当前用户头的 Context Pack、缺 platform scope 的平台摘要、缺当前用户头的用户订单工具均返回 403，并读取 `/context/permission-summary` 确认审计计数。
+- 需要验证权限边界时，加 `-CheckPermissionBoundaries -ExternalUserId <fb2_user_uuid>`；脚本会确认缺当前用户头的 Context Pack、`external_user_id` 与 `X-FB2-AI-CONTEXT-USER-ID` 不一致的 Context Pack、缺 platform scope 的平台摘要、缺当前用户头的用户订单工具均返回 403，并读取 `/context/permission-summary` 确认审计计数。
 - 修改最终验收 wrapper 或文档映射后，先跑 `scripts\smoke-fb2-final-acceptance.ps1 -SelfTest`；该命令只验证离线合成日志的 feedback coverage、子脚本 exit code、voice/quality/permission evidence 摘录和 `success` 门槛，不需要 token，也不会发送群消息。
 - 获得明确授权后，`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages` 能发送真实群聊 `@EL` 消息、调用 selected-message `/ai-reply`，并等到 `usr_elon_ai`/`gai_*` 回复；没有 `-AllowVisibleMessages` 时脚本必须拒绝写群。
 - 可见群聊 smoke 不只检查消息 ID。`@EL` 和 selected-message 两类回复正文都必须包含来源标记、事实/观点/推断分层词、风险或不保证边界，且不得出现“肯定命中/稳赢/重注/包赢”等投注保证；selected-message 回复还必须明确反驳被测消息里的“肯定赢盘、重注”说法。

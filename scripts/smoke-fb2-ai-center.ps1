@@ -399,6 +399,15 @@ function Fb2-Headers {
     $headers
 }
 
+function Get-MismatchedFb2UserId {
+    param([string]$UserId)
+    $candidate = "00000000-0000-0000-0000-000000000001"
+    if ($UserId -eq $candidate) {
+        return "00000000-0000-0000-0000-000000000002"
+    }
+    $candidate
+}
+
 $voiceEvidenceHelper = Join-Path $PSScriptRoot "fb2-ai-center-voice-evidence.ps1"
 . $voiceEvidenceHelper
 
@@ -691,8 +700,7 @@ $requiredFb2ToolIds = @(
     "platform_orders",
     "record_context_feedback",
     "list_context_feedbacks",
-    "context_quality_summary",
-    "context_permission_summary",
+    "context_feedback_summary",
     "context_audit_summary",
     "tool_manifest"
 )
@@ -1053,6 +1061,11 @@ if (-not $Fb2Token) {
                 $missingUserHeader = Invoke-HttpStatus -Url $url -Headers $fb2Headers
                 Assert-StatusCode $missingUserHeader 403 "permission: context pack requires current user header"
 
+                $mismatchedUserId = Get-MismatchedFb2UserId $ExternalUserId
+                $mismatchedUserHeaders = Fb2-Headers -UserId $mismatchedUserId
+                $mismatchedUserHeader = Invoke-HttpStatus -Url $url -Headers $mismatchedUserHeaders
+                Assert-StatusCode $mismatchedUserHeader 403 "permission: context pack rejects mismatched current user header"
+
                 $platformWithoutScope = Invoke-HttpStatus -Url "$Fb2Base/api/main-project/context/platform-orders" -Headers $fb2Headers
                 Assert-StatusCode $platformWithoutScope 403 "permission: platform summary requires scope"
 
@@ -1085,8 +1098,8 @@ if (-not $Fb2Token) {
                 $totalBlocks = Get-NestedNumber $permissionData @("total_blocks", "summary.total_blocks", "permission_summary.total_blocks")
                 $missingUserBlocks = Get-NestedNumber $permissionData @("missing_external_user_id_count", "summary.missing_external_user_id_count", "permission_summary.missing_external_user_id_count")
                 $platformScopeBlocks = Get-NestedNumber $permissionData @("platform_scope_count", "summary.platform_scope_count", "permission_summary.platform_scope_count")
-                Assert-True ($null -ne $totalBlocks -and $totalBlocks -ge 2) "permission summary total blocks" "value=$totalBlocks"
-                Assert-True ($null -ne $missingUserBlocks -and $missingUserBlocks -ge 1) "permission summary user blocks" "value=$missingUserBlocks"
+                Assert-True ($null -ne $totalBlocks -and $totalBlocks -ge 4) "permission summary total blocks" "value=$totalBlocks"
+                Assert-True ($null -ne $missingUserBlocks -and $missingUserBlocks -ge 3) "permission summary user blocks" "value=$missingUserBlocks"
                 Assert-True ($null -ne $platformScopeBlocks -and $platformScopeBlocks -ge 1) "permission summary platform blocks" "value=$platformScopeBlocks"
             } catch {
                 Fail "permission boundaries" $_.Exception.Message

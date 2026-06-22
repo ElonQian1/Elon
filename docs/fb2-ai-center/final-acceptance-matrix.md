@@ -38,8 +38,8 @@
 | 平台匿名摘要 | `platform_orders` | `scenario: platform order risk`，必须带 platform scope |
 | 反馈写入 | `record_context_feedback` | visible final acceptance 的 generated-answer feedback |
 | 反馈查询 | `list_context_feedbacks` | quality feedback samples |
-| 质量汇总 | `context_quality_summary` | `-CheckQuality` |
-| 权限审计 | `context_permission_summary`、`context_audit_summary` | `-CheckPermissionBoundaries` 会触发 403 负向请求，并读取 permission summary |
+| 质量汇总 | `/context/quality-summary` 集成端点、`context_feedback_summary`、`context_audit_summary` | `-CheckQuality` |
+| 权限审计 | `/context/permission-summary` 集成端点、`context_audit_summary` | `-CheckPermissionBoundaries` 会触发缺用户头、用户头不匹配、缺平台 scope、用户订单工具缺头等 403 负向请求，并读取 permission summary |
 | 工具 manifest | `tool_manifest` | 默认 smoke 和 live data smoke |
 
 ## 用户场景
