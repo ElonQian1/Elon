@@ -14,6 +14,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import java.text.DateFormat
 import java.util.Date
@@ -41,7 +42,11 @@ internal class MainHomeRows(
         }
     }
 
-    fun createFriendRow(friend: AppFriend, onClick: () -> Unit): View {
+    fun createFriendRow(
+        friend: AppFriend,
+        showProjectMarker: Boolean = false,
+        onClick: () -> Unit
+    ): View {
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -66,18 +71,7 @@ internal class MainHomeRows(
             }
             orientation = LinearLayout.VERTICAL
         }
-        middle.addView(TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            maxLines = 1
-            text = friend.name
-            setTextColor(Color.parseColor("#D6D6D6"))
-            textSize = 16f
-        })
+        middle.addView(createHomeChatTitle(friend.name, showProjectMarker))
         middle.addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -113,7 +107,11 @@ internal class MainHomeRows(
         return row
     }
 
-    fun createGroupRow(group: AppGroup, onClick: () -> Unit): View {
+    fun createGroupRow(
+        group: AppGroup,
+        showProjectMarker: Boolean = false,
+        onClick: () -> Unit
+    ): View {
         val row = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -138,18 +136,7 @@ internal class MainHomeRows(
             }
             orientation = LinearLayout.VERTICAL
         }
-        middle.addView(TextView(activity).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            ellipsize = TextUtils.TruncateAt.END
-            includeFontPadding = false
-            maxLines = 1
-            text = group.name
-            setTextColor(Color.parseColor("#D6D6D6"))
-            textSize = 16f
-        })
+        middle.addView(createHomeChatTitle(group.name, showProjectMarker))
         middle.addView(TextView(activity).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -183,6 +170,38 @@ internal class MainHomeRows(
             })
         }
         return row
+    }
+
+    private fun createHomeChatTitle(title: String, showProjectMarker: Boolean): TextView {
+        return TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                if (showProjectMarker) {
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                } else {
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                },
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+            ellipsize = TextUtils.TruncateAt.END
+            includeFontPadding = false
+            maxLines = 1
+            text = title
+            setTextColor(Color.parseColor("#D6D6D6"))
+            textSize = 16f
+            if (showProjectMarker) {
+                maxWidth = (activity.resources.displayMetrics.widthPixels - dp(170)).coerceAtLeast(dp(120))
+                compoundDrawablePadding = dp(6)
+                setCompoundDrawablesRelative(null, null, createProjectTitleMarker(), null)
+            }
+        }
+    }
+
+    private fun createProjectTitleMarker(): Drawable? {
+        return ContextCompat.getDrawable(activity, R.drawable.ic_side_menu_files)?.mutate()?.apply {
+            val iconSize = dp(17)
+            setTint(Color.parseColor("#D9D9D9"))
+            setBounds(0, 0, iconSize, iconSize)
+        }
     }
 
     fun createFriendPlaceholder(loggedIn: Boolean, onClick: () -> Unit): View {

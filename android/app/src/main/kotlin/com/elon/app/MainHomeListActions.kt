@@ -143,12 +143,18 @@ internal class MainHomeListActions(
                 )
                 is HomeChatItem.ProjectItem -> {
                     val row = if (item.project.isJointDevelopmentProject()) {
-                        homeRows().createGroupRow(item.project.toProjectHomeGroup(activity, item.members)) {
+                        homeRows().createGroupRow(
+                            item.project.toProjectHomeGroup(activity, item.members),
+                            showProjectMarker = true
+                        ) {
                             clearFriendSearchState()
                             openProject(item.index)
                         }
                     } else {
-                        homeRows().createFriendRow(item.project.toProjectHomeFriend()) {
+                        homeRows().createFriendRow(
+                            item.project.toProjectHomeFriend(),
+                            showProjectMarker = true
+                        ) {
                             clearFriendSearchState()
                             openProject(item.index)
                         }
