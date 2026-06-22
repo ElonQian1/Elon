@@ -6,6 +6,7 @@
     } = deps;
 
     function renderMemberPanel(project) {
+      if (!canUseDeveloperReadiness(project)) return '';
       const info = buildReadiness(project);
       const permission = runtimePermission(project);
       const permissionTone = permission === 'full_access' ? 'warn' : 'ok';
@@ -20,42 +21,44 @@
         : '';
 
       return `
-        <section class="dev-readiness ${escapeHtml(info.tone)}" data-dev-readiness-project="${escapeHtml(project.id || '')}">
-          <div class="dev-readiness-head">
+        <details class="dev-readiness ${escapeHtml(info.tone)}" data-dev-readiness-project="${escapeHtml(project.id || '')}">
+          <summary class="dev-readiness-summary">
             <div>
-              <span>开发就绪</span>
+              <span>开发者设置</span>
               <strong>${escapeHtml(info.title)}</strong>
             </div>
             <em>${escapeHtml(info.badge)}</em>
+          </summary>
+          <div class="dev-readiness-body">
+            <div class="dev-readiness-grid">
+              ${readinessRow('项目目录', info.workspace)}
+              ${readinessRow('执行节点', info.nodeLabel)}
+              ${readinessRow('运行路线', info.routeLabel)}
+              ${readinessRow('可用 CLI', info.cliLabel)}
+              ${readinessRow('本机工具', info.toolContractLabel)}
+            </div>
+            <div class="dev-readiness-next">
+              <span>下一步</span>
+              <strong>${escapeHtml(info.nextStep)}</strong>
+            </div>
+            <div class="dev-readiness-checks">
+              ${readinessChecksHtml(info.checks)}
+            </div>
+            <label class="dev-readiness-permission ${permissionTone}">
+              <span>AI 权限</span>
+              <select data-dev-readiness-permission="${escapeHtml(project.id || '')}">
+                <option value="project_write" ${permission === 'project_write' ? 'selected' : ''}>仅项目内写入</option>
+                <option value="full_access" ${permission === 'full_access' ? 'selected' : ''}>完全访问</option>
+              </select>
+            </label>
+            <div class="dev-readiness-actions">
+              ${devAction}
+              ${nodeAction}
+              ${settingsAction}
+              <button class="dev-readiness-action" type="button" data-dev-readiness-action="refresh" data-project-id="${escapeHtml(project.id || '')}">刷新</button>
+            </div>
           </div>
-          <div class="dev-readiness-grid">
-            ${readinessRow('项目目录', info.workspace)}
-            ${readinessRow('执行节点', info.nodeLabel)}
-            ${readinessRow('运行路线', info.routeLabel)}
-            ${readinessRow('可用 CLI', info.cliLabel)}
-            ${readinessRow('本机工具', info.toolContractLabel)}
-          </div>
-          <div class="dev-readiness-next">
-            <span>下一步</span>
-            <strong>${escapeHtml(info.nextStep)}</strong>
-          </div>
-          <div class="dev-readiness-checks">
-            ${readinessChecksHtml(info.checks)}
-          </div>
-          <label class="dev-readiness-permission ${permissionTone}">
-            <span>AI 权限</span>
-            <select data-dev-readiness-permission="${escapeHtml(project.id || '')}">
-              <option value="project_write" ${permission === 'project_write' ? 'selected' : ''}>仅项目内写入</option>
-              <option value="full_access" ${permission === 'full_access' ? 'selected' : ''}>完全访问</option>
-            </select>
-          </label>
-          <div class="dev-readiness-actions">
-            ${devAction}
-            ${nodeAction}
-            ${settingsAction}
-            <button class="dev-readiness-action" type="button" data-dev-readiness-action="refresh" data-project-id="${escapeHtml(project.id || '')}">刷新</button>
-          </div>
-        </section>`;
+        </details>`;
     }
 
     function bindMemberPanel(project) {
@@ -178,6 +181,11 @@
         toolContractLabel: localToolContractLabel(node),
         nextStep: nextStepForReadiness(checks)
       };
+    }
+
+    function canUseDeveloperReadiness(project) {
+      const role = clean(project && (project.role || project.member_role || project.memberRole)).toLowerCase();
+      return ['owner', 'admin', 'editor', 'developer', 'maintainer'].includes(role);
     }
 
     function routeInfo(node) {

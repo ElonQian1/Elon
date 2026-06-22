@@ -91,6 +91,28 @@
   margin-top: 16px;
 }
 
+.project-landing-download-empty {
+  min-height: 96px;
+  display: grid;
+  align-content: center;
+  gap: 6px;
+  padding: 18px;
+  border: 1px dashed #3a3e48;
+  border-radius: 8px;
+  background: #202126;
+  color: #9ea5b3;
+}
+
+.project-landing-download-empty strong {
+  color: #f0f3f7;
+  font-size: 15px;
+}
+
+.project-landing-download-empty span {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .project-landing-download-group h2 {
   margin: 0 0 8px;
   color: #f0f3f7;
@@ -330,9 +352,7 @@
   display: flex;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #343740;
+  margin-top: 0;
 }
 
 .project-landing-channels,

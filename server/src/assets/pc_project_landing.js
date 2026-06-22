@@ -372,17 +372,7 @@
           });
       }
 
-      return PLATFORM_ORDER.map((platform) => ({
-        platform,
-        label: PLATFORM_META[platform].label,
-        short: PLATFORM_META[platform].short,
-        url: '',
-        manifestUrl: '',
-        version: '',
-        size: '',
-        status: 'planned',
-        note: platform === 'android' ? '暂无 APK' : '等待项目配置'
-      }));
+      return [];
     }
 
     function descriptionOf(project, landing) {
@@ -405,8 +395,7 @@
       const values = raw.map((item) => typeof item === 'string' ? clean(item) : valueOf(item.title, item.text, item.label))
         .filter(Boolean)
         .slice(0, 4);
-      if (values.length) return values;
-      return ['统一展示项目简介', '集中管理下载入口', '保留公告、文档和 AI 开发频道'];
+      return values;
     }
 
     function targetUsersOf(project, landing) {
@@ -422,7 +411,7 @@
     }
 
     function quickChannels() {
-      return ['announcements', 'docs', 'ai_development', 'builds', 'issues']
+      return ['announcements', 'docs', 'discussion', 'issues', 'requirements', 'suggestions']
         .map((kind) => channelByKind(kind))
         .filter(Boolean);
     }
@@ -489,6 +478,12 @@
     }
 
     function downloadGroupsHtml(downloads) {
+      if (!downloads.length) {
+        return `<section class="project-landing-download-empty">
+          <strong>暂无可下载客户端</strong>
+          <span>项目负责人发布安装包后，这里会显示下载入口。</span>
+        </section>`;
+      }
       return downloadGroups(downloads).map((group) => `<section class="project-landing-download-group group-${escapeHtml(group.key)}">
         <h2>${escapeHtml(group.label)}</h2>
         <div class="project-landing-downloads">${group.items.map(downloadCardHtml).join('')}</div>
@@ -674,15 +669,18 @@
         </header>
         <div class="project-landing-summary">${escapeHtml(description)}</div>
         <div class="project-landing-download-groups">${downloadGroupsHtml(downloads)}</div>
-        <div class="project-landing-section">
-          <h2>核心信息</h2>
+        ${features.length ? `<div class="project-landing-section">
+          <h2>项目亮点</h2>
           <div class="project-landing-feature-grid">${features.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>
-        </div>
+        </div>` : ''}
         ${targets.length ? `<div class="project-landing-section"><h2>适用人群</h2><div class="project-landing-tag-list">${targets.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></div>` : ''}
-        <div class="project-landing-footer">
-          <div class="project-landing-channels">${channels.map(quickChannelHtml).join('')}</div>
-          <div class="project-landing-resources">${resourceButtons}</div>
-        </div>
+        ${(channels.length || resourceButtons) ? `<div class="project-landing-section project-landing-actions-section">
+          <h2>常用入口</h2>
+          <div class="project-landing-footer">
+            <div class="project-landing-channels">${channels.map(quickChannelHtml).join('')}</div>
+            <div class="project-landing-resources">${resourceButtons}</div>
+          </div>
+        </div>` : ''}
       </section>`;
 
       bindActions();

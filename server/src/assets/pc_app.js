@@ -954,33 +954,78 @@
 
   function renderProjectChannels(query) {
     const channels = ((state.projectSpace && state.projectSpace.channels) || [])
-      .filter((channel) => channelName(channel).toLowerCase().includes(query));
+      .filter((channel) => projectChannelSearchText(channel).includes(query));
     const homeVisible = !query || '首页开始介绍下载overviewhome'.includes(query);
-    els.channelList.innerHTML = [
-      '<div class="channel-section">频道</div>',
-      homeVisible ? channelButton({
+    const homeButton = homeVisible ? channelButton({
         id: 'project-home',
         kind: 'project-home',
         glyph: '首',
         title: '首页',
         sub: '项目介绍与下载',
         active: !state.activeChannelId
-      }) : '',
-      channels.map((channel) => channelButton({
-        id: channel.id,
-        kind: 'project-channel',
-        glyph: channelGlyph(channel),
-        title: channelName(channel),
-        sub: channel.kind || channel.channel_kind || '频道',
-        active: channel.id === state.activeChannelId
-      })).join('') || '<div class="empty-state">暂无频道</div>'
-    ].join('');
+      }) : '';
+    if (query) {
+      els.channelList.innerHTML = [
+        '<div class="channel-section">搜索结果</div>',
+        homeButton,
+        channels.map(projectChannelButton).join('') || '<div class="empty-state">暂无频道</div>'
+      ].join('');
+    } else {
+      const grouped = groupedProjectChannels(channels);
+      els.channelList.innerHTML = [
+        '<div class="channel-section">常用</div>',
+        homeButton,
+        grouped.primary.map(projectChannelButton).join('') || '<div class="empty-state">暂无常用频道</div>',
+        grouped.feedback.length ? '<div class="channel-section">反馈</div>' : '',
+        grouped.feedback.map(projectChannelButton).join(''),
+        grouped.dev.length ? '<div class="channel-section">开发工具</div>' : '',
+        grouped.dev.map(projectChannelButton).join(''),
+        grouped.other.length ? '<div class="channel-section">其他</div>' : '',
+        grouped.other.map(projectChannelButton).join('')
+      ].join('');
+    }
     els.channelList.querySelectorAll('[data-channel-id]').forEach((btn) => {
       btn.addEventListener('click', () => selectProjectChannel(btn.dataset.channelId));
     });
     els.channelList.querySelectorAll('[data-project-home]').forEach((btn) => {
       btn.addEventListener('click', selectProjectLanding);
     });
+  }
+
+  function groupedProjectChannels(channels) {
+    const grouped = { primary: [], feedback: [], dev: [], other: [] };
+    (channels || []).forEach((channel) => {
+      grouped[projectChannelGroup(channel)].push(channel);
+    });
+    return grouped;
+  }
+
+  function projectChannelButton(channel) {
+    return channelButton({
+      id: channel.id,
+      kind: 'project-channel',
+      glyph: channelGlyph(channel),
+      title: channelTitle(channel),
+      sub: channelSubtitle(channel),
+      active: channel.id === state.activeChannelId
+    });
+  }
+
+  function projectChannelSearchText(channel) {
+    return [
+      channelTitle(channel),
+      channelSubtitle(channel),
+      channelKind(channel),
+      clean(channel && channel.id)
+    ].join(' ').toLowerCase();
+  }
+
+  function projectChannelGroup(channel) {
+    const kind = channelKind(channel);
+    if (['announcements', 'docs', 'discussion'].includes(kind)) return 'primary';
+    if (['requirements', 'suggestions', 'issues'].includes(kind)) return 'feedback';
+    if (['ai_development', 'builds'].includes(kind)) return 'dev';
+    return 'other';
   }
 
   function cachedProjectConversation(projectId, conversationId) {
@@ -1010,8 +1055,42 @@
     return clean(channel.name || channel.title || channel.display_name || channel.id) || '频道';
   }
 
+  function channelKind(channel) {
+    return clean(channel && (channel.kind || channel.channel_kind)).toLowerCase();
+  }
+
+  function channelTitle(channel) {
+    const name = channelName(channel);
+    const kind = channelKind(channel);
+    const fallback = {
+      announcements: '公告',
+      docs: '文档',
+      discussion: '讨论',
+      requirements: '需求',
+      suggestions: '意见',
+      issues: '问题反馈',
+      ai_development: 'AI开发',
+      builds: '构建发布'
+    };
+    return (name === kind || name === clean(channel && channel.id)) ? (fallback[kind] || name) : name;
+  }
+
+  function channelSubtitle(channel) {
+    const label = {
+      announcements: '项目公告',
+      docs: '资料文档',
+      discussion: '成员讨论',
+      requirements: '功能需求',
+      suggestions: '意见建议',
+      issues: '问题反馈',
+      ai_development: 'AI 开发任务',
+      builds: '构建与发布'
+    };
+    return label[channelKind(channel)] || '项目频道';
+  }
+
   function channelGlyph(channel) {
-    const kind = clean(channel.kind || channel.channel_kind).toLowerCase();
+    const kind = channelKind(channel);
     if (kind === 'ai_development') return 'AI';
     if (kind === 'announcements') return '!';
     if (kind === 'docs') return '文';
@@ -1959,9 +2038,9 @@
     state.activeConversationId = '';
     state.activeMemberUserId = '';
     renderChannels();
-    setHeader(channelGlyph(channel), channelName(channel), channel.kind || channel.channel_kind || '项目频道');
+    setHeader(channelGlyph(channel), channelTitle(channel), channelSubtitle(channel));
     const canWrite = state.activeChannelKind !== 'docs';
-    setComposer(canWrite, canWrite ? `在 #${channelName(channel)} 发送消息` : '文档频道只读', state.activeChannelKind === 'ai_development');
+    setComposer(canWrite, canWrite ? `在 #${channelTitle(channel)} 发送消息` : '文档频道只读', state.activeChannelKind === 'ai_development');
     setNodeMode(false);
     els.messageList.innerHTML = '<div class="empty-state">加载频道消息中…</div>';
     try {

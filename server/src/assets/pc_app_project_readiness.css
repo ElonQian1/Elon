@@ -1,6 +1,5 @@
 .dev-readiness {
   margin: 0 0 12px;
-  padding: 12px;
   border: 1px solid #31343c;
   border-radius: 8px;
   background: #24262d;
@@ -19,15 +18,42 @@
   border-color: rgba(116, 122, 138, .45);
 }
 
-.dev-readiness-head {
+.dev-readiness-summary {
   display: flex;
   align-items: start;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
+  min-height: 58px;
+  padding: 12px;
+  cursor: pointer;
+  list-style: none;
 }
 
-.dev-readiness-head span,
+.dev-readiness-summary::-webkit-details-marker {
+  display: none;
+}
+
+.dev-readiness-summary::after {
+  content: "展开";
+  align-self: center;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.dev-readiness[open] .dev-readiness-summary {
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.dev-readiness[open] .dev-readiness-summary::after {
+  content: "收起";
+}
+
+.dev-readiness-body {
+  padding: 12px;
+}
+
+.dev-readiness-summary span,
 .dev-readiness-grid span,
 .dev-readiness-permission span {
   display: block;
@@ -36,15 +62,16 @@
   font-weight: 800;
 }
 
-.dev-readiness-head strong {
+.dev-readiness-summary strong {
   display: block;
   margin-top: 2px;
   font-size: 14px;
   color: var(--text);
 }
 
-.dev-readiness-head em {
+.dev-readiness-summary em {
   min-width: 48px;
+  margin-right: 4px;
   padding: 4px 7px;
   border-radius: 999px;
   background: #30333b;
@@ -55,12 +82,12 @@
   text-align: center;
 }
 
-.dev-readiness.ready .dev-readiness-head em {
+.dev-readiness.ready .dev-readiness-summary em {
   background: rgba(35, 165, 90, .16);
   color: #6ee7a7;
 }
 
-.dev-readiness.warning .dev-readiness-head em {
+.dev-readiness.warning .dev-readiness-summary em {
   background: rgba(242, 185, 68, .16);
   color: #f6cf78;
 }
