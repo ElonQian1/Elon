@@ -50,7 +50,7 @@
                   <h3>注册本地项目</h3>
                 </div>
               </div>
-              <p class="node-admin-copy">从这里打开 PC 工作台的原生注册弹窗，选择本机文件夹后自动读取 Git 远端和分支。</p>
+              <p class="node-admin-copy">从这里选择本机项目文件夹，工作台会自动读取 Git 远端、分支和项目命令，并在信息完整时直接注册。</p>
               <div class="node-admin-actions">
                 <button class="node-action primary" type="button" id="nodeOpenProjectSettings">选择文件夹并注册</button>
               </div>
@@ -140,7 +140,7 @@
       $('#nodeNativeLogout')?.addEventListener('click', logoutLocalNode);
       $('#nodeNativeAdvanced')?.addEventListener('click', () => window.open(state.nodeAdminUrl, '_blank', 'noopener'));
       $('#nodeOpenProjectSettings')?.addEventListener('click', () => {
-        if (typeof deps.openSettings === 'function') deps.openSettings();
+        if (typeof deps.openSettings === 'function') deps.openSettings('workbench', { autoPickAndRegister: true });
       });
       $('#nodeStorageRefresh')?.addEventListener('click', () => loadStorageConfig(false));
       $('#nodeStorageSave')?.addEventListener('click', saveStorageConfig);

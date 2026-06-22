@@ -2456,15 +2456,22 @@
     }
   }
 
-  function openSettings(section) {
+  function openSettings(section, options) {
+    const targetSection = section || 'workbench';
+    const autoPickAndRegister = !!(options && options.autoPickAndRegister);
     setAccountMenu(false);
     renderUser();
-    setSettingsSection(section || 'workbench');
+    setSettingsSection(targetSection);
     els.settingsBackdrop.hidden = false;
     setSettingsResult('');
-    if ((section || 'workbench') === 'workbench') refreshClientMaintenance(false);
+    if (targetSection === 'workbench') refreshClientMaintenance(false);
     setTimeout(() => {
-      if ((section || 'workbench') === 'workbench') els.settingsProjectPath.focus();
+      if (targetSection !== 'workbench') return;
+      if (autoPickAndRegister) {
+        chooseLocalProjectFolder({ autoRegister: true });
+        return;
+      }
+      els.settingsProjectPath.focus();
     }, 0);
   }
 
@@ -2771,7 +2778,8 @@
     });
   }
 
-  async function chooseLocalProjectFolder() {
+  async function chooseLocalProjectFolder(options) {
+    const autoRegister = !!(options && options.autoRegister);
     setSettingsResult('正在打开本机文件夹选择器…');
     setSettingsBusy(els.chooseProjectFolderBtn, true, '选择中…');
     try {
@@ -2781,6 +2789,12 @@
         return;
       }
       applyLocalProjectInfo(data);
+      const registration = (data && data.registration) || {};
+      if (autoRegister && registration.can_register !== false) {
+        setSettingsResult(projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支，正在注册…'));
+        await registerLocalProject({ fromAutoPick: true });
+        return;
+      }
       setSettingsResult(projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支。'));
     } catch (error) {
       setSettingsResult(escapeHtml(error.message || error), 'error');
