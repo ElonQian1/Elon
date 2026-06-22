@@ -341,6 +341,7 @@
         return;
       }
       const install = data.install || {};
+      const product = data.product_status || install.product_status || {};
       const installedSha = clean(data.installed_git_sha || install.installed_git_sha);
       const packageVersion = clean(data.installed_package_version || install.installed_package_version);
       const installState = data.supported === false
@@ -352,7 +353,10 @@
       const packageLine = installedSha
         ? `${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
         : '未读取';
+      const entryLine = clean(product.primary_entry_name) || '一龙PC节点.exe';
       panel.innerHTML = [
+        row('健康', clean(product.summary) || '未读取'),
+        row('入口', entryLine),
         row('运行版本', clean(data.version) || '未知'),
         row('安装状态', `${installState} · ${running}`),
         row('安装包', packageLine),

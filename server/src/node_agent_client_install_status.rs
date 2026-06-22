@@ -4,11 +4,8 @@ use serde_json::{json, Value};
 #[cfg(any(windows, test))]
 use std::{fs, path::Path};
 
-#[cfg(any(windows, test))]
 const CLIENT_EXE_NAME: &str = "一龙PC节点.exe";
-#[cfg(any(windows, test))]
 const UNINSTALL_EXE_NAME: &str = "卸载一龙PC节点.exe";
-#[cfg(any(windows, test))]
 const INTERNAL_DIR_NAME: &str = "_internal";
 
 #[cfg(any(windows, test))]
@@ -42,6 +39,7 @@ pub(crate) fn status_payload() -> Value {
                 "supported": true,
                 "installed": false,
                 "layout_status": "unknown",
+                "product_status": unsupported_product_status("LOCALAPPDATA is not configured"),
                 "error": "LOCALAPPDATA is not configured",
             }),
         }
@@ -52,6 +50,13 @@ pub(crate) fn status_payload() -> Value {
             "supported": false,
             "installed": false,
             "layout_status": "unsupported",
+            "product_status": {
+                "status": "unsupported",
+                "summary": "当前平台不是 Windows，无法检查一龙 PC 节点客户端安装布局。",
+                "primary_entry_name": CLIENT_EXE_NAME,
+                "uninstall_entry_name": UNINSTALL_EXE_NAME,
+                "root_layout_expectation": root_layout_expectation(),
+            },
             "reason": "Windows client install status is only available on Windows."
         })
     }
@@ -79,6 +84,11 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
+    let product_status = product_status(
+        installed,
+        running_from_install_dir,
+        layout["status"].as_str().unwrap_or("unknown"),
+    );
 
     json!({
         "supported": true,
@@ -94,6 +104,7 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
         "version_manifest": manifest,
         "layout_status": layout["status"].clone(),
         "layout": layout,
+        "product_status": product_status,
         "files": {
             "client_exe": file_meta(&client_exe),
             "uninstall_exe": file_meta(&uninstall_exe),
@@ -101,6 +112,54 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
             "version_file": file_meta(&version_file),
         }
     })
+}
+
+#[cfg(any(windows, test))]
+fn product_status(installed: bool, running_from_install_dir: bool, layout_status: &str) -> Value {
+    let (status, summary) = if !installed {
+        (
+            "needs_repair",
+            format!("安装不完整；请重新运行 {CLIENT_EXE_NAME}，客户端会自动修复安装目录。"),
+        )
+    } else if layout_status == "clean" && running_from_install_dir {
+        (
+            "ready",
+            format!("正常；日常只运行 {CLIENT_EXE_NAME}，卸载只运行 {UNINSTALL_EXE_NAME}。"),
+        )
+    } else if layout_status == "clean" {
+        (
+            "ready_external_launch",
+            format!("安装目录正常；日常入口是 {CLIENT_EXE_NAME}，当前进程不是从安装目录启动。"),
+        )
+    } else {
+        (
+            "cleanup_recommended",
+            format!("客户端可用，但安装目录仍有旧文件或额外文件；重新运行 {CLIENT_EXE_NAME} 会自动收敛布局。"),
+        )
+    };
+
+    json!({
+        "status": status,
+        "summary": summary,
+        "primary_entry_name": CLIENT_EXE_NAME,
+        "uninstall_entry_name": UNINSTALL_EXE_NAME,
+        "root_layout_expectation": root_layout_expectation(),
+    })
+}
+
+#[cfg(windows)]
+fn unsupported_product_status(reason: &str) -> Value {
+    json!({
+        "status": "needs_repair",
+        "summary": format!("无法确认安装目录：{reason}。请重新运行 {CLIENT_EXE_NAME} 修复。"),
+        "primary_entry_name": CLIENT_EXE_NAME,
+        "uninstall_entry_name": UNINSTALL_EXE_NAME,
+        "root_layout_expectation": root_layout_expectation(),
+    })
+}
+
+fn root_layout_expectation() -> String {
+    format!("{CLIENT_EXE_NAME}、{UNINSTALL_EXE_NAME}、{INTERNAL_DIR_NAME}")
 }
 
 #[cfg(any(windows, test))]
@@ -237,6 +296,36 @@ mod tests {
         assert_eq!(status["layout_status"], "clean");
         assert_eq!(status["installed_git_sha"], "abc123");
         assert_eq!(status["running_from_install_dir"], true);
+        assert_eq!(status["product_status"]["status"], "ready");
+        assert!(status["product_status"]["summary"]
+            .as_str()
+            .unwrap()
+            .contains(CLIENT_EXE_NAME));
+        assert_eq!(
+            status["product_status"]["primary_entry_name"],
+            CLIENT_EXE_NAME
+        );
+
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn complete_layout_with_legacy_files_is_actionable_not_confusing() {
+        let dir = unique_test_dir("complete-legacy");
+        let internal = dir.join(INTERNAL_DIR_NAME);
+        fs::create_dir_all(&internal).unwrap();
+        fs::write(dir.join(CLIENT_EXE_NAME), "client").unwrap();
+        fs::write(dir.join(UNINSTALL_EXE_NAME), "uninstall").unwrap();
+        fs::write(dir.join("启动一龙节点.cmd"), "legacy").unwrap();
+
+        let status = status_for_install_dir(&dir, Some(&dir.join(CLIENT_EXE_NAME)));
+        assert_eq!(status["installed"], true);
+        assert_eq!(status["layout_status"], "legacy_files_present");
+        assert_eq!(status["product_status"]["status"], "cleanup_recommended");
+        assert!(status["product_status"]["summary"]
+            .as_str()
+            .unwrap()
+            .contains("重新运行"));
 
         let _ = fs::remove_dir_all(dir);
     }
@@ -261,6 +350,7 @@ mod tests {
             .unwrap()
             .iter()
             .any(|item| item.as_str() == Some(UNINSTALL_EXE_NAME)));
+        assert_eq!(status["product_status"]["status"], "needs_repair");
 
         let _ = fs::remove_dir_all(dir);
     }
