@@ -18,6 +18,7 @@
     localAdminToken: '',
     localAdminTokenHeader: LOCAL_ADMIN_HEADER_FALLBACK,
     clientMaintenance: null,
+    clientPackageLatest: null,
     localProjectInfo: null
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
@@ -2521,7 +2522,8 @@
     const packageLine = installedSha
       ? `包 ${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
       : '未读取包版本';
-    els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running} · ${packageLine} · ${clientLayoutLabel(layoutStatus)}`;
+    const updateLine = clientUpdateLine(data, state.clientPackageLatest);
+    els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running} · ${packageLine} · ${updateLine} · ${clientLayoutLabel(layoutStatus)}`;
     const paths = [
       clean(data.install_dir) && `安装 ${clean(data.install_dir)}`,
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
@@ -2533,9 +2535,47 @@
     }
   }
 
+  async function refreshLatestClientPackageVersion() {
+    try {
+      const resp = await fetch('/api/node-agent/version', { cache: 'no-store' });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      state.clientPackageLatest = await resp.json();
+    } catch (error) {
+      state.clientPackageLatest = { error: clean(error && (error.message || error)) || 'version_unavailable' };
+    }
+    if (state.clientMaintenance) applyClientMaintenanceStatus(state.clientMaintenance);
+  }
+
+  function clientUpdateLine(local, latest) {
+    const install = (local && local.install) || {};
+    const installedSha = clean(local && (local.installed_git_sha || install.installed_git_sha));
+    const remoteSha = clean(latest && (latest.gitSha || latest.git_sha));
+    const remoteVersion = clean(latest && latest.version);
+    const remoteSize = formatBytes(latest && (latest.windowsClientFileSize || latest.fileSize));
+    const latestLabel = [
+      remoteVersion ? `v${remoteVersion}` : '',
+      remoteSize,
+      remoteSha ? shortHash(remoteSha) : ''
+    ].filter(Boolean).join(' · ');
+    if (latest && latest.error) return '无法读取线上版本';
+    if (!remoteSha) return '正在读取线上版本';
+    if (!installedSha) return `可检查更新 · 最新 ${latestLabel}`;
+    if (installedSha === remoteSha) return `客户端已是最新 · ${latestLabel}`;
+    return `可更新 · 当前 ${shortHash(installedSha)} · 最新 ${latestLabel}`;
+  }
+
   function shortHash(value) {
     const text = clean(value);
     return text.length > 12 ? text.slice(0, 8) : text;
+  }
+
+  function formatBytes(value) {
+    const bytes = Number(value || 0);
+    if (!bytes) return '';
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / 1024 / 1024 / 1024).toFixed(1)} GB`;
+    if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+    if (bytes >= 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${bytes} B`;
   }
 
   function clientLayoutLabel(status) {
@@ -2564,6 +2604,7 @@
     try {
       const data = await localNodeApi('/api/client-maintenance');
       applyClientMaintenanceStatus(data);
+      refreshLatestClientPackageVersion();
       if (showResult) setSettingsResult('客户端维护状态已刷新。');
     } catch (error) {
       applyClientMaintenanceStatus(null);

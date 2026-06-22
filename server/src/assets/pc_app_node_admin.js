@@ -2,6 +2,8 @@
   function createNativeNodeAdmin(deps) {
     const { state, $, clean, escapeHtml, localNodeApi, ensureLocalNodeLogin } = deps;
     let root = null;
+    let clientMaintenanceData = null;
+    let latestClientPackage = null;
 
     function render(surface, status) {
       root = surface;
@@ -9,6 +11,7 @@
       bind();
       loadStorageConfig(true);
       loadEnvCheck(true);
+      loadLatestClientPackageVersion(true);
       loadClientMaintenance(true);
       loadTts(true);
     }
@@ -266,12 +269,28 @@
     async function loadClientMaintenance(quiet) {
       try {
         const data = await api('/api/client-maintenance');
+        clientMaintenanceData = data;
         renderClientMaintenance(data);
+        loadLatestClientPackageVersion(true);
         if (!quiet) setResult('nodeClientResult', '客户端维护状态已刷新。');
       } catch (error) {
         const panel = $('#nodeClientMaintenance');
         if (panel) panel.innerHTML = row('状态', '无法读取本机维护状态');
         setResult('nodeClientResult', error.message || error, 'error');
+      }
+    }
+
+    async function loadLatestClientPackageVersion(quiet) {
+      try {
+        const resp = await fetch('/api/node-agent/version', { cache: 'no-store' });
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        latestClientPackage = await resp.json();
+      } catch (error) {
+        latestClientPackage = { error: clean(error && (error.message || error)) || 'version_unavailable' };
+      }
+      if (clientMaintenanceData) renderClientMaintenance(clientMaintenanceData);
+      if (!quiet && latestClientPackage && latestClientPackage.error) {
+        setResult('nodeClientResult', '无法读取线上客户端版本，仍可使用本地更新按钮。', 'error');
       }
     }
 
@@ -360,12 +379,14 @@
         ? `${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
         : '未读取';
       const entryLine = clean(product.primary_entry_name) || '一龙PC节点.exe';
+      const updateLine = clientUpdateLine(data, latestClientPackage);
       panel.innerHTML = [
         row('健康', clean(product.summary) || '未读取'),
         row('入口', entryLine),
         row('运行版本', clean(data.version) || '未知'),
         row('安装状态', `${installState} · ${running}`),
         row('安装包', packageLine),
+        row('更新', updateLine),
         row('目录结构', clientLayoutLabel(data.layout_status || install.layout_status)),
         row('任务记录', clean(data.task_journal_dir) || '未上报'),
         row('诊断目录', clean(data.diagnostics_dir) || '未上报')
@@ -534,6 +555,23 @@
     function shortHash(value) {
       const text = clean(value);
       return text.length > 12 ? text.slice(0, 8) : text;
+    }
+
+    function clientUpdateLine(local, latest) {
+      const installedSha = clean(local && (local.installed_git_sha || local.install && local.install.installed_git_sha));
+      const remoteSha = clean(latest && (latest.gitSha || latest.git_sha));
+      const remoteVersion = clean(latest && latest.version);
+      const remoteSize = formatBytes(latest && (latest.windowsClientFileSize || latest.fileSize));
+      const latestLabel = [
+        remoteVersion ? `v${remoteVersion}` : '',
+        remoteSize,
+        remoteSha ? shortHash(remoteSha) : ''
+      ].filter(Boolean).join(' · ');
+      if (latest && latest.error) return '无法读取线上版本';
+      if (!remoteSha) return '正在读取线上版本';
+      if (!installedSha) return `可检查更新 · 最新 ${latestLabel}`;
+      if (installedSha === remoteSha) return `客户端已是最新 · ${latestLabel}`;
+      return `可更新 · 当前 ${shortHash(installedSha)} · 最新 ${latestLabel}`;
     }
 
     function clientLayoutLabel(status) {

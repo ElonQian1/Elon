@@ -1027,6 +1027,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('目录信息不足'), 'project registration should block submission when required fields are missing');
   assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
   assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
+  assert.ok(pcApp.includes('clientPackageLatest'), 'PC settings should keep latest Windows client package metadata');
+  assert.ok(pcApp.includes('客户端已是最新'), 'PC settings should compare installed and latest client package versions');
   assert.ok(pcApp.includes('positionRailTooltip'), 'PC rail should position its custom hover tooltip');
   assert.ok(pcApp.includes('aria-describedby'), 'PC rail icons should expose the shared tooltip to assistive tech');
   assert.ok(pcApp.includes("button.removeAttribute('title')"), 'PC rail icons should avoid duplicate native tooltips');
@@ -1060,6 +1062,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nativeNodeAdmin.includes('api_base: apiBase || null'), 'PC node panel should persist Route B API base');
   assert.ok(nativeNodeAdmin.includes('nodeOpenDiagnosticsDir'), 'PC node panel should expose diagnostics directory entry');
   assert.ok(nativeNodeAdmin.includes('diagnostics_dir'), 'PC node panel should open diagnostics directory target');
+  assert.ok(nativeNodeAdmin.includes('loadLatestClientPackageVersion'), 'PC node panel should fetch latest client package metadata');
+  assert.ok(nativeNodeAdmin.includes('clientUpdateLine'), 'PC node panel should compare installed and latest client versions');
 
   const doctor = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_doctor.js'), 'utf8');
   assert.ok(doctor.includes('localNodeApi(path, options || {})'), 'doctor project should reuse the protected local node API');
