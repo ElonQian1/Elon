@@ -32,6 +32,7 @@ pub(crate) struct ServerRuntimeAuditSummary {
     pub max_message_chars: usize,
     pub roles: Vec<String>,
     pub limit_max_messages: usize,
+    pub limit_max_message_chars: usize,
     pub limit_max_total_chars: usize,
     pub limit_max_output_tokens: usize,
 }
@@ -55,7 +56,7 @@ pub(crate) struct ServerRuntimeAdmissionGuard {
 
 pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
     ServerRuntimeProtectionStatus {
-        input_validation: "messages role/content/count/total_chars",
+        input_validation: "messages role/content/count/message_chars/total_chars",
         admission_control: "per-user concurrency and rolling minute request limits",
         billing_gate: "shared with call_chat_llm_with_options",
         audit:
@@ -220,6 +221,7 @@ pub(crate) fn audit_summary(
         max_message_chars,
         roles,
         limit_max_messages: limits.max_messages,
+        limit_max_message_chars: limits.max_message_chars,
         limit_max_total_chars: limits.max_total_chars,
         limit_max_output_tokens: limits.max_output_tokens,
     }
@@ -246,6 +248,10 @@ mod tests {
 
         assert_eq!(left_summary.message_count, 1);
         assert_eq!(left_summary.total_chars, "secret prompt A".chars().count());
+        assert_eq!(
+            left_summary.limit_max_message_chars,
+            limits.max_message_chars
+        );
         assert_eq!(left_summary.roles, vec!["user"]);
         assert_ne!(
             left_summary.request_fingerprint,
@@ -292,6 +298,7 @@ mod tests {
         let user_id = unique_user("concurrent");
         let limits = ServerAgentRuntimeLimits {
             max_messages: 24,
+            max_message_chars: 32_000,
             max_total_chars: 80_000,
             max_output_tokens: 3000,
             max_requests_per_minute: 10,
@@ -318,6 +325,7 @@ mod tests {
         let user_id = unique_user("rate");
         let limits = ServerAgentRuntimeLimits {
             max_messages: 24,
+            max_message_chars: 32_000,
             max_total_chars: 80_000,
             max_output_tokens: 3000,
             max_requests_per_minute: 1,

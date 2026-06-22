@@ -4,6 +4,7 @@ use serde::Serialize;
 use serde_json::Value;
 
 const MAX_MESSAGES: usize = 24;
+const MAX_MESSAGE_CHARS: usize = 32_000;
 const MAX_TOTAL_CHARS: usize = 80_000;
 const MAX_OUTPUT_TOKENS: usize = 3000;
 const MAX_REQUESTS_PER_MINUTE: usize = 12;
@@ -14,6 +15,7 @@ const TEMPERATURE: f64 = 0.2;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ServerAgentRuntimeLimits {
     pub max_messages: usize,
+    pub max_message_chars: usize,
     pub max_total_chars: usize,
     pub max_output_tokens: usize,
     pub max_requests_per_minute: usize,
@@ -25,6 +27,7 @@ impl ServerAgentRuntimeLimits {
     pub(crate) const fn current() -> Self {
         Self {
             max_messages: MAX_MESSAGES,
+            max_message_chars: MAX_MESSAGE_CHARS,
             max_total_chars: MAX_TOTAL_CHARS,
             max_output_tokens: MAX_OUTPUT_TOKENS,
             max_requests_per_minute: MAX_REQUESTS_PER_MINUTE,
@@ -60,7 +63,11 @@ impl ServerAgentRuntimeLimits {
             if content.trim().is_empty() {
                 return Err("message.content 不能为空");
             }
-            total_chars += content.chars().count();
+            let content_chars = content.chars().count();
+            if content_chars > self.max_message_chars {
+                return Err("message.content 过长");
+            }
+            total_chars += content_chars;
             if total_chars > self.max_total_chars {
                 return Err("messages 内容过长");
             }
@@ -116,5 +123,11 @@ mod tests {
             "content": "x".repeat(limits.max_total_chars + 1)
         })];
         assert!(limits.validate_messages(&too_long).is_err());
+
+        let too_long_single_message = vec![json!({
+            "role": "user",
+            "content": "x".repeat(limits.max_message_chars + 1)
+        })];
+        assert!(limits.validate_messages(&too_long_single_message).is_err());
     }
 }

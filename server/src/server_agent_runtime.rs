@@ -202,6 +202,7 @@ mod tests {
         let protection = protection_status();
 
         assert!(protection.input_validation.contains("total_chars"));
+        assert!(protection.input_validation.contains("message_chars"));
         assert!(protection.billing_gate.contains("call_chat_llm"));
         assert!(protection.request_fingerprint.contains("sha256"));
     }
