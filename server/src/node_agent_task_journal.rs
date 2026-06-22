@@ -431,8 +431,18 @@ impl TaskJournal {
             if line.trim().is_empty() {
                 continue;
             }
-            let event = serde_json::from_str(&line)
-                .with_context(|| format!("解析 {:?} 第 {} 行", path, index + 1))?;
+            let event = match serde_json::from_str(&line) {
+                Ok(event) => event,
+                Err(error) => {
+                    tracing::warn!(
+                        path = %path.display(),
+                        seq,
+                        error = %error,
+                        "skipping corrupt task journal event line"
+                    );
+                    continue;
+                }
+            };
             if seq <= since || !event_belongs_to_task(&event, task_id) {
                 continue;
             }

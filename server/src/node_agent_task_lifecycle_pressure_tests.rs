@@ -3,7 +3,14 @@ use crate::{
     node_agent_task_resume::{task_attach_state, task_resume_contract},
 };
 use serde_json::{json, Value};
-use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc, thread};
+use std::{
+    collections::BTreeMap,
+    fs::{self, OpenOptions},
+    io::Write,
+    path::PathBuf,
+    sync::Arc,
+    thread,
+};
 
 #[test]
 fn stress_terminal_outcomes_across_all_pc_task_routes() {
@@ -575,9 +582,75 @@ fn stress_oversized_tool_events_remain_structured_and_bounded() {
     let _ = fs::remove_dir_all(dir);
 }
 
+#[test]
+fn stress_corrupt_journal_lines_do_not_block_resume_replay() {
+    let dir = unique_test_dir("corrupt-journal-replay-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = TaskJournal::new(&dir);
+    let target_req = "req-route-c-corrupt-replay";
+    journal
+        .record_started(TaskJournalStart {
+            req_id: target_req,
+            cli_name: "server-runtime",
+            route: Some("route_c_server_runtime"),
+            run_handle_id: Some(target_req),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("project_write"),
+        })
+        .expect("target task should start before corrupt journal pressure");
+
+    for index in 0..48 {
+        append_corrupt_event_line(&dir, index);
+        journal
+            .record_cli_chunk(target_req, "runtime", &format!("target chunk {index}\n"))
+            .expect("valid target event should persist after corrupt line");
+    }
+    append_corrupt_event_line(&dir, 999);
+    journal
+        .record_finished_with_outcome(target_req, "done", None)
+        .expect("target task should finish after corrupt journal pressure");
+
+    let snapshot = journal
+        .snapshot(target_req, 0, 200)
+        .expect("snapshot should skip corrupt journal lines");
+    assert_eq!(
+        snapshot.events.len(),
+        50,
+        "started + 48 chunks + finished should all replay despite corrupt lines"
+    );
+    assert!(!snapshot.has_more);
+    assert!(snapshot.last_event_seq > snapshot.events.len());
+    assert!(snapshot
+        .events
+        .iter()
+        .all(|event| { event.event.get("req_id").and_then(Value::as_str) == Some(target_req) }));
+    assert_eq!(
+        snapshot
+            .record
+            .as_ref()
+            .map(|record| record.status.as_str()),
+        Some("done")
+    );
+
+    let _ = fs::remove_dir_all(dir);
+}
+
 fn read_registry(dir: &std::path::Path) -> BTreeMap<String, TaskJournalRecord> {
     let text = fs::read_to_string(dir.join("registry.json")).expect("registry should read");
     serde_json::from_str(&text).expect("registry should parse")
+}
+
+fn append_corrupt_event_line(dir: &std::path::Path, index: usize) {
+    let mut file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("events.jsonl"))
+        .expect("events file should open for corrupt fixture");
+    writeln!(
+        file,
+        "{{\"type\":\"cli_chunk\",\"req_id\":\"broken-{index}\""
+    )
+    .expect("corrupt fixture line should write");
 }
 
 fn count_records(
