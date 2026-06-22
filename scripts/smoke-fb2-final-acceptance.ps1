@@ -322,6 +322,18 @@ function Build-VisibleAnswerEvidence {
     }
 }
 
+function Resolve-VisibleMainGroupId {
+    param([string]$ContextGroupId)
+
+    if ([string]::IsNullOrWhiteSpace($ContextGroupId)) {
+        return $ContextGroupId
+    }
+    if ($ContextGroupId.StartsWith("ext_fb2_", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return $ContextGroupId
+    }
+    return "ext_fb2_$ContextGroupId"
+}
+
 function Invoke-FinalAcceptanceSelfTest {
     function Assert-SelfTest {
         param(
@@ -356,6 +368,8 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest ($argHelperList -contains "-DataOnlyAcceptance") "argument helper adds enabled switch"
     Assert-SelfTest (-not ($argHelperList -contains "-EmptyValue")) "argument helper skips blank value"
     Assert-SelfTest (-not ($argHelperList -contains "-DisabledSwitch")) "argument helper skips disabled switch"
+    Assert-SelfTest ((Resolve-VisibleMainGroupId "official") -eq "ext_fb2_official") "visible group maps fb2 local id"
+    Assert-SelfTest ((Resolve-VisibleMainGroupId "ext_fb2_official") -eq "ext_fb2_official") "visible group keeps main group id"
 
     $childScript = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-final-wrapper-child-{0}.ps1" -f ([guid]::NewGuid().ToString("N")))
     try {
@@ -627,6 +641,7 @@ New-Item -ItemType Directory -Force -Path $summaryDir | Out-Null
 $logPrefix = if ($DataOnlyAcceptance) { "data-only-acceptance" } else { "final-acceptance" }
 $visibleLogPath = Join-Path $summaryDir "$logPrefix-$stamp-visible-chat.log"
 $centerLogPath = Join-Path $summaryDir "$logPrefix-$stamp-ai-center.log"
+$visibleMainGroupId = Resolve-VisibleMainGroupId $GroupId
 
 $mainHead = ""
 try { $mainHead = (& git -C $root rev-parse HEAD).Trim() } catch { $mainHead = "" }
@@ -693,6 +708,7 @@ if ($PreflightOnly) {
         main_base = $MainBase
         fb2_base = $Fb2Base
         group_id = $GroupId
+        visible_group_id = $visibleMainGroupId
         external_user_id = $ExternalUserId
         voice_device_evidence_path = $VoiceDeviceEvidencePath
         main_project_head = $mainHead
@@ -733,7 +749,7 @@ Add-Arg $visibleArgs "-Fb2AiCenterToken" $Fb2AiCenterToken
 Add-Arg $visibleArgs "-Fb2UserId" $ExternalUserId
 Add-Arg $visibleArgs "-Fb2Username" $Fb2Username
 Add-Arg $visibleArgs "-Fb2Password" $Fb2Password
-Add-Arg $visibleArgs "-GroupId" $GroupId
+Add-Arg $visibleArgs "-GroupId" $visibleMainGroupId
 Add-Arg $visibleArgs "-RequestTimeoutSec" $RequestTimeoutSec
 Add-Arg $visibleArgs "-PollTimeoutSec" $PollTimeoutSec
 Add-Arg $visibleArgs "-FeedbackPollTimeoutSec" $FeedbackPollTimeoutSec
@@ -794,6 +810,7 @@ $summary = [ordered]@{
     main_base = $MainBase
     fb2_base = $Fb2Base
     group_id = $GroupId
+    visible_group_id = $visibleMainGroupId
     external_user_id = $ExternalUserId
     voice_device_evidence_path = $VoiceDeviceEvidencePath
     main_project_head = $mainHead
