@@ -6,6 +6,7 @@
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-22 15:25 运行代码提交 `3cf62536` 已推送并发布到主项目服务端 `v0.3.610`。线上 `/health=OK`，`/api/server/version` 返回 `gitSha=3cf625361727990807e044630b3b56e8040476a7`；线上 `context-contract` 已暴露 `domain_context_projection_contract`。非语音 smoke 使用 `123qwe/123qwe` 与 `-SkipVoiceContractChecks` 通过，结果 `failed=0 skipped=1`。当前跳过项仍是缺 `FB2_AI_CENTER_TOKEN`，所以下一轮非语音优先动作是拿 service token 跑 live Context Pack、权限负向、平台匿名摘要、质量 feedback 和群观点采纳验收；ASR/TTS 按当前用户安排暂停。
 - 2026-06-22 15:10 主项目 `/api/external/apps/fb2/context-contract` 新增 `domain_context_projection_contract`，schema 为 `fb2.domain_context_projection.v1`。它把 fb2 给 AI 的数据输入固定成 RCP 风格的 XML-wrapped Markdown Context Pack：必须有比赛事实、赔率、当前用户订单、平台匿名摘要、群观点、召回理由、质量回填和 source registry；禁止原始 HTML、大 JSON、原始 embedding dump、无引用赔率/订单/群观点和平台订单明细泄漏。后续 fb2 会话应按该契约补齐或校验 `/context/pack` 输出。
 - 2026-06-22 14:40 当前按用户安排暂停 ASR/TTS 继续处理，主项目本轮新增非语音独立验收路径：`scripts\smoke-fb2-ai-center.ps1 -DataOnlyAcceptance` 会强制验证 live fb2 数据、六类场景、平台匿名摘要、APK、权限负向审计、质量反馈、非合成 feedback、群观点采纳和 no-skip，同时跳过 chat-bootstrap 语音/ASR/TTS 断言；`scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance` 支持 `-PreflightOnly` 和 `-AllowVisibleMessages`，不要求 `VoiceDeviceEvidencePath`，summary 会写 `voice_status=deferred_by_user`。这只用于继续推进比赛/订单/群观点/平台摘要 AI 数据闭环，不能宣布最终 ASR/TTS 或终极目标完成。
 - 2026-06-22 14:25 主项目 `/api/external/apps/fb2/context-contract` 的 `context_observability_contract` 已加入三项非语音长期质量指标：`non_synthetic_feedback_count`、`opinion_adoption_count`、`opinion_memory_ref_count`。这些字段和 smoke 的 `-RequireNonSyntheticQualityReadiness` 对齐，用于证明真实反馈、群观点采纳和观点记忆引用进入闭环。
