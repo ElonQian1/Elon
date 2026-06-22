@@ -35,8 +35,18 @@ internal class ChatAiSideMenuView(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) : FrameLayout(context) {
+    private val menuContent = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(dp(32), dp(92), dp(18), dp(18))
+    }
     private val projectDirectoryGroup = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
+    }
+    private val chatSectionGap = View(context).apply {
+        layoutParams = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(CHAT_SECTION_GAP_COLLAPSED_DP)
+        )
     }
     private val conversationDirectoryGroup = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
@@ -48,8 +58,7 @@ internal class ChatAiSideMenuView(
     init {
         clipChildren = false
         clipToPadding = false
-        buildProjectDirectory()
-        buildConversationDirectory()
+        buildMenuContent()
     }
 
     fun render() {
@@ -62,37 +71,40 @@ internal class ChatAiSideMenuView(
         directoryRowAnimators.clear()
     }
 
-    private fun buildProjectDirectory() {
-        val projectScroll = ScrollView(context).apply {
+    private fun buildMenuContent() {
+        val menuScroll = ScrollView(context).apply {
             overScrollMode = View.OVER_SCROLL_NEVER
             isVerticalScrollBarEnabled = false
             isFillViewport = false
         }
-        projectScroll.addView(
-            projectDirectoryGroup,
+        menuScroll.addView(
+            menuContent,
             ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT
             )
         )
         addView(
-            projectScroll,
+            menuScroll,
             LayoutParams(
                 LayoutParams.MATCH_PARENT,
-                dp(PROJECT_DIRECTORY_HEIGHT_DP)
+                LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                leftMargin = dp(32)
-                rightMargin = dp(18)
-                topMargin = dp(92)
+                bottomMargin = dp(78)
             }
         )
+        menuContent.addView(projectDirectoryGroup)
+        menuContent.addView(chatSectionGap)
+        menuContent.addView(conversationDirectoryGroup)
+        conversationDirectoryGroup.addView(conversationHeaderRow())
     }
 
     private fun updateProjectSections() {
         projectDirectoryGroup.removeAllViews()
         addPersonalProjects()
         addJointProjects()
+        updateChatSectionGap()
     }
 
     private fun addPersonalProjects() {
@@ -149,6 +161,17 @@ internal class ChatAiSideMenuView(
         }
     }
 
+    private fun updateChatSectionGap() {
+        val gapDp = if (!personalProjectsExpanded && !jointProjectsExpanded) {
+            CHAT_SECTION_GAP_COLLAPSED_DP
+        } else {
+            CHAT_SECTION_GAP_EXPANDED_DP
+        }
+        val params = chatSectionGap.layoutParams as LinearLayout.LayoutParams
+        params.height = dp(gapDp)
+        chatSectionGap.layoutParams = params
+    }
+
     private fun sectionHeader(
         title: String,
         expanded: Boolean,
@@ -191,34 +214,6 @@ internal class ChatAiSideMenuView(
             }
             setOnClickListener { onClick() }
         }
-    }
-
-    private fun buildConversationDirectory() {
-        val chatScroll = ScrollView(context).apply {
-            overScrollMode = View.OVER_SCROLL_NEVER
-            isFillViewport = false
-        }
-        chatScroll.addView(
-            conversationDirectoryGroup,
-            ViewGroup.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        )
-        addView(
-            chatScroll,
-            LayoutParams(
-                LayoutParams.MATCH_PARENT,
-                LayoutParams.MATCH_PARENT
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-                leftMargin = dp(32)
-                rightMargin = dp(18)
-                topMargin = dp(388)
-                bottomMargin = dp(78)
-            }
-        )
-        conversationDirectoryGroup.addView(conversationHeaderRow())
     }
 
     private fun updateConversationSummaries() {
@@ -374,7 +369,8 @@ internal class ChatAiSideMenuView(
 
     private companion object {
         const val DURATION_MS = 260L
-        const val PROJECT_DIRECTORY_HEIGHT_DP = 278
+        const val CHAT_SECTION_GAP_COLLAPSED_DP = 196
+        const val CHAT_SECTION_GAP_EXPANDED_DP = 28
         const val PROJECT_OPEN_DELAY_MS = 220L
     }
 }
