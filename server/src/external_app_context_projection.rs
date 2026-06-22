@@ -184,6 +184,17 @@ fn required_sections() -> Value {
 mod tests {
     use super::*;
 
+    fn array_contains(value: &Value, expected: &str) -> bool {
+        value.as_array().unwrap().contains(&json!(expected))
+    }
+
+    fn permission_for<'a>(permissions: &'a [Value], data: &str) -> &'a Value {
+        permissions
+            .iter()
+            .find(|permission| permission["data"] == data)
+            .unwrap_or_else(|| panic!("missing permission projection for {data}"))
+    }
+
     #[test]
     fn exposes_fb2_domain_context_projection_contract() {
         let contract = public_context_projection_guidance("fb2").unwrap();
@@ -220,5 +231,92 @@ mod tests {
             .unwrap()
             .contains(&json!("raw_embedding_dump")));
         assert!(public_context_projection_guidance("unknown").is_none());
+    }
+
+    #[test]
+    fn fb2_domain_projection_declares_permissions_quality_and_grounding() {
+        let contract = public_context_projection_guidance("fb2").unwrap();
+
+        let retrieval_fields = &contract["retrieval_projection"]["recommended_fields"];
+        for field in [
+            "topic_hint",
+            "match_reason",
+            "permission_scope",
+            "truncated",
+        ] {
+            assert!(array_contains(retrieval_fields, field));
+        }
+
+        let permissions = contract["permission_projection"].as_array().unwrap();
+        let user_orders = permission_for(permissions, "user_orders");
+        assert_eq!(user_orders["scope"], "current_user_only");
+        assert!(array_contains(
+            &user_orders["required_request"],
+            "external_user_id"
+        ));
+        assert!(array_contains(
+            &user_orders["required_request"],
+            "X-FB2-AI-CONTEXT-USER-ID"
+        ));
+        assert!(array_contains(
+            &user_orders["forbidden"],
+            "other_user_order_detail"
+        ));
+
+        let platform_summary = permission_for(permissions, "platform_order_summary");
+        assert_eq!(platform_summary["scope"], "anonymous_aggregate_only");
+        assert!(array_contains(
+            &platform_summary["required_request"],
+            "include_platform_orders=true"
+        ));
+        assert!(array_contains(
+            &platform_summary["required_request"],
+            "X-FB2-AI-CONTEXT-SCOPE=platform_order_summary"
+        ));
+        assert!(array_contains(
+            &platform_summary["forbidden"],
+            "single_user_order_detail"
+        ));
+
+        let group_opinions = permission_for(permissions, "group_opinions");
+        assert_eq!(group_opinions["scope"], "group_visible");
+        assert!(array_contains(
+            &group_opinions["required_request"],
+            "group_id"
+        ));
+        assert!(array_contains(
+            &group_opinions["forbidden"],
+            "private_message"
+        ));
+        assert!(array_contains(
+            &group_opinions["forbidden"],
+            "opinion_without_message_id"
+        ));
+
+        let quality_routes = &contract["quality_closure"]["required_feedback_routes"];
+        for route in [
+            "/api/main-project/context/feedback",
+            "/api/main-project/context/feedback-summary",
+            "/api/main-project/context/opinion-adoption-summary",
+            "/api/main-project/context/quality-summary",
+        ] {
+            assert!(array_contains(quality_routes, route));
+        }
+        let readiness = &contract["quality_closure"]["minimum_non_synthetic_ready"];
+        assert_eq!(readiness["feedback_count"], json!(1));
+        assert_eq!(readiness["opinion_adoption_count"], json!(1));
+        assert_eq!(readiness["opinion_memory_ref_count"], "present");
+
+        let grounding_rule = contract["answer_grounding_rule"].as_str().unwrap();
+        for phrase in [
+            "数据事实",
+            "用户订单",
+            "平台汇总",
+            "群友观点",
+            "AI推断",
+            "风险边界",
+        ] {
+            assert!(grounding_rule.contains(phrase));
+        }
     }
 }
