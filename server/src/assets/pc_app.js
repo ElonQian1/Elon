@@ -217,17 +217,38 @@
   }
 
   function iconUrlOf(project) {
-    return clean(project.icon_data_url || project.iconDataUrl || project.icon_url || project.iconUrl || project.logo || project.avatar);
+    return clean(project.icon_data_url || project.iconDataUrl ||
+      project.project_icon_data_url || project.projectIconDataUrl ||
+      project.icon_url || project.iconUrl ||
+      project.logo_url || project.logoUrl ||
+      project.icon || project.logo || project.avatar);
   }
 
   function avatarUrlOf(entity) {
     if (!entity) return '';
     return clean(entity.avatar_data_url || entity.avatarDataUrl ||
       entity.sender_avatar_data_url || entity.senderAvatarDataUrl ||
+      entity.sender_avatar_url || entity.senderAvatarUrl ||
+      entity.user_avatar || entity.userAvatar ||
+      entity.user_avatar_url || entity.userAvatarUrl ||
+      entity.member_avatar_url || entity.memberAvatarUrl ||
+      entity.profile_avatar_url || entity.profileAvatarUrl ||
       entity.avatar_url || entity.avatarUrl ||
       entity.icon_data_url || entity.iconDataUrl ||
+      entity.logo_url || entity.logoUrl ||
+      entity.photo_url || entity.photoUrl ||
+      entity.head_img_url || entity.headImgUrl ||
+      entity.portrait_url || entity.portraitUrl ||
       entity.image_url || entity.imageUrl ||
       entity.avatar);
+  }
+
+  function entityPresenceClass(entity) {
+    if (!entity) return '';
+    const status = clean(entity.presence || entity.online_status || entity.onlineStatus || entity.status).toLowerCase();
+    if (entity.is_online === true || entity.isOnline === true || status === 'online' || status === 'active') return 'online';
+    if (entity.is_online === false || entity.isOnline === false || status === 'offline' || status === 'inactive') return 'offline';
+    return '';
   }
 
   function avatarContents(url, label, fallback) {
@@ -1935,12 +1956,17 @@
   }
 
   function renderMembers(title, members, options) {
-    els.memberPanelTitle.textContent = title;
+    const memberCount = Array.isArray(members) ? members.length : 0;
+    els.memberPanelTitle.textContent = memberCount ? `${title} (${memberCount})` : title;
     const prefix = options && options.prefixHtml ? options.prefixHtml : '';
     const rows = (members || []).map((member) => {
       const name = clean(member.name || member.nickname || member.account || member.user_account || member.phone || member.email) || '成员';
       const sub = clean(member.sub || member.role || member.status || member.id) || '';
-      return `<div class="member-row">${avatarElement('div', 'member-avatar', avatarUrlOf(member), name, '员')}<div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(sub)}</span></div></div>`;
+      const presence = entityPresenceClass(member);
+      return `<div class="member-row ${presence ? `is-${escapeHtml(presence)}` : ''}" title="${escapeHtml(name)}">
+        ${avatarElement('div', `member-avatar ${presence}`, avatarUrlOf(member), name, '员')}
+        <div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(sub)}</span></div>
+      </div>`;
     }).join('') || '<div class="empty-state">暂无成员</div>';
     els.memberList.innerHTML = prefix + rows;
   }

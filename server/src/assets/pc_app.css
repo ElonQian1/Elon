@@ -1586,6 +1586,26 @@ button { cursor: pointer; }
   font-weight: 800;
   color: white;
 }
+.member-avatar.online::after,
+.member-avatar.offline::after {
+  content: "";
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 11px;
+  height: 11px;
+  border: 3px solid #202126;
+  border-radius: 50%;
+}
+.member-avatar.online::after {
+  background: var(--green);
+}
+.member-avatar.offline::after {
+  background: #545862;
+}
+.member-row.is-online strong {
+  color: var(--text);
+}
 .member-row strong {
   display: block;
   font-size: 13px;
