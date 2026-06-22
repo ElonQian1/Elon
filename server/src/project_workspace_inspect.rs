@@ -18,7 +18,7 @@ pub fn inspect_project_workspace(workspace_path: &str) -> Result<ProjectWorkspac
         false
     };
     let git_branch = if git_inside {
-        git_output(&path, &["rev-parse", "--abbrev-ref", "HEAD"])
+        detect_git_branch(&path)
     } else {
         None
     };
@@ -28,7 +28,7 @@ pub fn inspect_project_workspace(workspace_path: &str) -> Result<ProjectWorkspac
         None
     };
     let git_remote_origin = if git_inside {
-        git_output(&path, &["remote", "get-url", "origin"])
+        detect_git_remote(&path)
     } else {
         None
     };
@@ -65,6 +65,43 @@ fn git_output(cwd: &Path, args: &[&str]) -> Option<String> {
     }
     let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
     (!text.is_empty()).then_some(text)
+}
+
+fn detect_git_branch(cwd: &Path) -> Option<String> {
+    clean_git_branch(git_output(cwd, &["rev-parse", "--abbrev-ref", "HEAD"]))
+        .or_else(|| branch_containing_head(cwd))
+}
+
+fn clean_git_branch(value: Option<String>) -> Option<String> {
+    value
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty() && value != "HEAD")
+}
+
+fn branch_containing_head(cwd: &Path) -> Option<String> {
+    let output = git_output(
+        cwd,
+        &["branch", "--format=%(refname:short)", "--contains", "HEAD"],
+    )?;
+    output
+        .lines()
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && *value != "HEAD")
+        .find(|value| !value.starts_with('('))
+        .map(ToOwned::to_owned)
+}
+
+fn detect_git_remote(cwd: &Path) -> Option<String> {
+    git_output(cwd, &["remote", "get-url", "origin"]).or_else(|| first_git_remote_url(cwd))
+}
+
+fn first_git_remote_url(cwd: &Path) -> Option<String> {
+    let remotes = git_output(cwd, &["remote"])?;
+    remotes
+        .lines()
+        .map(str::trim)
+        .filter(|remote| !remote.is_empty())
+        .find_map(|remote| git_output(cwd, &["remote", "get-url", remote]))
 }
 
 fn command_available(name: &str) -> bool {
@@ -133,6 +170,7 @@ fn disk_free_bytes(path: &Path) -> Option<u64> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -170,5 +208,90 @@ mod tests {
         assert!(status.is_dir);
         assert!(!status.is_git_worktree);
         assert_eq!(status.uncommitted_count, None);
+    }
+
+    #[test]
+    fn inspect_git_workspace_uses_first_remote_when_origin_is_absent() {
+        let Some(dir) = temp_git_repo("first-remote") else {
+            return;
+        };
+        run_git(
+            &dir,
+            &["remote", "add", "upstream", "https://example.com/demo.git"],
+        );
+
+        let status = inspect_project_workspace(dir.to_string_lossy().as_ref()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(
+            status.git_remote_origin.as_deref(),
+            Some("https://example.com/demo.git")
+        );
+    }
+
+    #[test]
+    fn inspect_detached_head_uses_containing_branch_name() {
+        let Some(dir) = temp_git_repo("detached-head") else {
+            return;
+        };
+        run_git(&dir, &["checkout", "--detach", "HEAD"]);
+
+        let status = inspect_project_workspace(dir.to_string_lossy().as_ref()).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(status.git_branch.as_deref(), Some("main"));
+    }
+
+    fn temp_git_repo(label: &str) -> Option<PathBuf> {
+        if !git_available() {
+            return None;
+        }
+        let dir = std::env::temp_dir().join(format!(
+            "elon-git-workspace-{label}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        if !run_git_status(&dir, &["init", "-b", "main"]) {
+            if !run_git_status(&dir, &["init"]) {
+                let _ = std::fs::remove_dir_all(&dir);
+                return None;
+            }
+            run_git(&dir, &["checkout", "-B", "main"]);
+        }
+        run_git(&dir, &["config", "user.email", "test@example.com"]);
+        run_git(&dir, &["config", "user.name", "Elon Test"]);
+        std::fs::write(dir.join("README.md"), "# Demo\n").unwrap();
+        run_git(&dir, &["add", "README.md"]);
+        run_git(&dir, &["commit", "-m", "init"]);
+        Some(dir)
+    }
+
+    fn git_available() -> bool {
+        Command::new("git")
+            .arg("--version")
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
+    }
+
+    fn run_git(cwd: &Path, args: &[&str]) {
+        assert!(
+            run_git_status(cwd, args),
+            "git command failed: git {}",
+            args.join(" ")
+        );
+    }
+
+    fn run_git_status(cwd: &Path, args: &[&str]) -> bool {
+        Command::new("git")
+            .current_dir(cwd)
+            .args(args)
+            .status()
+            .map(|status| status.success())
+            .unwrap_or(false)
     }
 }

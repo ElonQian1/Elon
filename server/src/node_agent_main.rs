@@ -3023,11 +3023,23 @@ async fn admin_register_project(
             axum::Json(serde_json::json!({ "ok": false, "error": "workspace_path 必须是目录" })),
         );
     }
+    let inspect = project_workspace_inspect::inspect_project_workspace(path).ok();
     let repo_url = clean_optional_admin_field(req.repo_url.as_deref())
+        .or_else(|| {
+            inspect
+                .as_ref()
+                .and_then(|status| status.git_remote_origin.clone())
+        })
         .or_else(|| git_value_at(pb, &["remote", "get-url", "origin"]));
-    let branch = clean_optional_admin_field(req.branch.as_deref()).or_else(|| {
-        git_value_at(pb, &["rev-parse", "--abbrev-ref", "HEAD"]).filter(|value| value != "HEAD")
-    });
+    let branch = clean_optional_admin_field(req.branch.as_deref())
+        .or_else(|| {
+            inspect
+                .as_ref()
+                .and_then(|status| status.git_branch.clone())
+        })
+        .or_else(|| {
+            git_value_at(pb, &["rev-parse", "--abbrev-ref", "HEAD"]).filter(|value| value != "HEAD")
+        });
 
     // 2) 必须已登录（有凭证 + token）才能调用云端
     let creds = match rt.creds().await {
