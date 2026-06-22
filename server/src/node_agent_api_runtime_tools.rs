@@ -17,21 +17,11 @@ pub(crate) fn agent_response_from_tool_calls(response: &Value) -> Result<Option<
     else {
         return Ok(None);
     };
-    let Some(tool_calls) = message.get("tool_calls").and_then(Value::as_array) else {
-        return Ok(None);
-    };
-    if tool_calls.is_empty() {
+    let actions = tool_call_actions(message)?;
+    if actions.is_empty() {
         return Ok(None);
     }
 
-    let mut actions = Vec::with_capacity(tool_calls.len());
-    for (index, tool_call) in tool_calls.iter().enumerate() {
-        actions.push(
-            action_from_tool_call(tool_call).with_context(|| {
-                format!("本机 API runtime tool_calls[{index}] 不是有效工具调用")
-            })?,
-        );
-    }
     let message = message
         .get("content")
         .and_then(Value::as_str)
@@ -88,6 +78,44 @@ fn action_from_tool_call(tool_call: &Value) -> Result<Value> {
     {
         args.insert("tool_call_id".to_string(), json!(tool_call_id));
     }
+    Ok(Value::Object(args))
+}
+
+fn tool_call_actions(message: &Value) -> Result<Vec<Value>> {
+    if let Some(tool_calls) = message.get("tool_calls").and_then(Value::as_array) {
+        let mut actions = Vec::with_capacity(tool_calls.len());
+        for (index, tool_call) in tool_calls.iter().enumerate() {
+            actions.push(action_from_tool_call(tool_call).with_context(|| {
+                format!("本机 API runtime tool_calls[{index}] 不是有效工具调用")
+            })?);
+        }
+        if !actions.is_empty() {
+            return Ok(actions);
+        }
+    }
+
+    if let Some(function_call) = message
+        .get("function_call")
+        .filter(|value| value.is_object())
+    {
+        return action_from_legacy_function_call(function_call)
+            .map(|action| vec![action])
+            .context("本机 API runtime function_call 不是有效工具调用");
+    }
+
+    Ok(Vec::new())
+}
+
+fn action_from_legacy_function_call(function_call: &Value) -> Result<Value> {
+    let name = function_call
+        .get("name")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| anyhow!("missing function_call.name"))?;
+    let mut args = function_arguments(function_call)?;
+    args.insert("tool".to_string(), json!(name));
+    args.insert("tool_call_id".to_string(), json!("legacy_function_call"));
     Ok(Value::Object(args))
 }
 
@@ -261,6 +289,63 @@ mod tests {
     }
 
     #[test]
+    fn legacy_function_call_is_converted_to_existing_action_schema() {
+        let response = json!({
+            "choices": [{
+                "message": {
+                    "content": null,
+                    "function_call": {
+                        "name": "read_file",
+                        "arguments": "{\"path\":\"README.md\"}"
+                    }
+                }
+            }]
+        });
+
+        let content = agent_response_from_tool_calls(&response)
+            .unwrap()
+            .expect("legacy function call should be converted");
+        let agent: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        assert_eq!(agent["done"], false);
+        assert_eq!(agent["actions"][0]["tool"], "read_file");
+        assert_eq!(agent["actions"][0]["tool_call_id"], "legacy_function_call");
+        assert_eq!(agent["actions"][0]["path"], "README.md");
+    }
+
+    #[test]
+    fn modern_tool_calls_take_precedence_over_legacy_function_call() {
+        let response = json!({
+            "choices": [{
+                "message": {
+                    "tool_calls": [{
+                        "id": "call_1",
+                        "type": "function",
+                        "function": {
+                            "name": "list_dir",
+                            "arguments": {"path":"src"}
+                        }
+                    }],
+                    "function_call": {
+                        "name": "read_file",
+                        "arguments": "{\"path\":\"README.md\"}"
+                    }
+                }
+            }]
+        });
+
+        let content = agent_response_from_tool_calls(&response)
+            .unwrap()
+            .expect("tool calls should be converted");
+        let agent: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        assert_eq!(agent["actions"].as_array().unwrap().len(), 1);
+        assert_eq!(agent["actions"][0]["tool"], "list_dir");
+        assert_eq!(agent["actions"][0]["tool_call_id"], "call_1");
+        assert_eq!(agent["actions"][0]["path"], "src");
+    }
+
+    #[test]
     fn invalid_tool_call_arguments_fail_fast() {
         let response = json!({
             "choices": [{
@@ -271,6 +356,23 @@ mod tests {
                             "arguments": "not json"
                         }
                     }]
+                }
+            }]
+        });
+
+        let error = agent_response_from_tool_calls(&response).unwrap_err();
+        assert!(format!("{error:#}").contains("function.arguments is not JSON"));
+    }
+
+    #[test]
+    fn invalid_legacy_function_call_arguments_fail_fast() {
+        let response = json!({
+            "choices": [{
+                "message": {
+                    "function_call": {
+                        "name": "read_file",
+                        "arguments": "not json"
+                    }
                 }
             }]
         });
