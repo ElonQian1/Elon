@@ -17,35 +17,43 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import android.widget.Toast
 import kotlin.math.sin
 
 internal class ChatAiSideMenuView(
     context: Context,
     private val conversations: () -> List<AppConversation>,
     private val activeConversationIndex: () -> Int,
+    private val projects: () -> List<AppProject>,
+    private val activeProjectIndex: () -> Int,
     private val openConversation: (Int) -> Unit,
+    private val openPersonalProject: (Int) -> Unit,
+    private val openJointProject: (Int) -> Unit,
     private val copyConversationIdentity: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
-    private val openProjectManagement: () -> Unit,
     private val showCreateConversationDialog: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) : FrameLayout(context) {
+    private val projectDirectoryGroup = LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+    }
     private val conversationDirectoryGroup = LinearLayout(context).apply {
         orientation = LinearLayout.VERTICAL
     }
     private val directoryRowAnimators = mutableMapOf<View, ValueAnimator>()
+    private var personalProjectsExpanded = false
+    private var jointProjectsExpanded = false
 
     init {
         clipChildren = false
         clipToPadding = false
-        buildTopMenu()
+        buildProjectDirectory()
         buildConversationDirectory()
     }
 
     fun render() {
+        updateProjectSections()
         updateConversationSummaries()
     }
 
@@ -54,37 +62,135 @@ internal class ChatAiSideMenuView(
         directoryRowAnimators.clear()
     }
 
-    private fun buildTopMenu() {
-        val topMenu = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
+    private fun buildProjectDirectory() {
+        val projectScroll = ScrollView(context).apply {
+            overScrollMode = View.OVER_SCROLL_NEVER
+            isVerticalScrollBarEnabled = false
+            isFillViewport = false
         }
+        projectScroll.addView(
+            projectDirectoryGroup,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            )
+        )
         addView(
-            topMenu,
+            projectScroll,
             LayoutParams(
-                LayoutParams.WRAP_CONTENT,
-                LayoutParams.WRAP_CONTENT
+                LayoutParams.MATCH_PARENT,
+                dp(PROJECT_DIRECTORY_HEIGHT_DP)
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
                 leftMargin = dp(32)
-                topMargin = dp(106)
+                rightMargin = dp(18)
+                topMargin = dp(92)
             }
         )
-        topMenu.addView(
-            menuRow("项目", R.drawable.ic_side_menu_project) {
-                requestClose(true)
-                postDelayed({ openProjectManagement() }, DURATION_MS)
+    }
+
+    private fun updateProjectSections() {
+        projectDirectoryGroup.removeAllViews()
+        addPersonalProjects()
+        addJointProjects()
+    }
+
+    private fun addPersonalProjects() {
+        projectDirectoryGroup.addView(sectionHeader("个人项目", personalProjectsExpanded) {
+            personalProjectsExpanded = !personalProjectsExpanded
+            updateProjectSections()
+        })
+        if (!personalProjectsExpanded) return
+
+        val personalProjects = projects()
+            .mapIndexed { index, project -> index to project }
+            .filter { (_, project) -> !project.isJointDevelopmentProject() }
+            .sortedWith(
+                compareByDescending<Pair<Int, AppProject>> { it.second.isSystemArchiveProject() }
+                    .thenByDescending { it.second.updatedAt }
+            )
+        if (personalProjects.isEmpty()) {
+            projectDirectoryGroup.addView(emptyRow("暂无个人项目"))
+        } else {
+            personalProjects.forEach { (index, project) ->
+                projectDirectoryGroup.addView(
+                    projectNameRow(project, active = index == activeProjectIndex()) {
+                        requestClose(true)
+                        postDelayed({ openPersonalProject(index) }, PROJECT_OPEN_DELAY_MS)
+                    }
+                )
             }
-        )
-        topMenu.addView(
-            menuRow("文件库", R.drawable.ic_side_menu_files) {
-                Toast.makeText(context, "文件库功能准备中", Toast.LENGTH_SHORT).show()
+        }
+        projectDirectoryGroup.addView(space(34))
+    }
+
+    private fun addJointProjects() {
+        projectDirectoryGroup.addView(sectionHeader("联合项目", jointProjectsExpanded) {
+            jointProjectsExpanded = !jointProjectsExpanded
+            updateProjectSections()
+        })
+        if (!jointProjectsExpanded) return
+
+        val jointProjects = projects()
+            .mapIndexed { index, project -> index to project }
+            .filter { (_, project) -> project.isJointDevelopmentProject() }
+            .sortedByDescending { it.second.updatedAt }
+        if (jointProjects.isEmpty()) {
+            projectDirectoryGroup.addView(emptyRow("暂无联合项目"))
+            return
+        }
+        jointProjects.forEach { (index, project) ->
+            projectDirectoryGroup.addView(
+                projectNameRow(project, active = index == activeProjectIndex()) {
+                    requestClose(true)
+                    postDelayed({ openJointProject(index) }, PROJECT_OPEN_DELAY_MS)
+                }
+            )
+        }
+    }
+
+    private fun sectionHeader(
+        title: String,
+        expanded: Boolean,
+        onClick: () -> Unit
+    ): LinearLayout {
+        return LinearLayout(context).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(46)
+            ).apply {
+                topMargin = dp(2)
             }
-        )
-        topMenu.addView(
-            menuRow("设备", R.drawable.ic_side_menu_device) {
-                Toast.makeText(context, "设备功能准备中", Toast.LENGTH_SHORT).show()
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = if (expanded) "收起$title" else "展开$title"
+            addView(
+                menuText(title).apply {
+                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    setTextColor(Color.parseColor("#D6D6D6"))
+                }
+            )
+            setOnClickListener { onClick() }
+        }
+    }
+
+    private fun projectNameRow(project: AppProject, active: Boolean, onClick: () -> Unit): TextView {
+        return menuText(project.title).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
+            setPadding(dp(10), 0, dp(10), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            setTextColor(Color.parseColor(if (active) "#D6D6D6" else "#A8A8A8"))
+            if (active) {
+                background = GradientDrawable().apply {
+                    cornerRadius = dp(8).toFloat()
+                    setColor(Color.parseColor("#222222"))
+                }
             }
-        )
+            setOnClickListener { onClick() }
+        }
     }
 
     private fun buildConversationDirectory() {
@@ -212,36 +318,8 @@ internal class ChatAiSideMenuView(
         }
     }
 
-    private fun menuRow(title: String, iconRes: Int, action: () -> Unit): LinearLayout {
-        return LinearLayout(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(228), dp(46))
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            isClickable = true
-            foreground = selectableForeground()
-            setPadding(0, 0, dp(8), 0)
-
-            addView(
-                ImageView(context).apply {
-                    setImageResource(iconRes)
-                    imageTintList = ColorStateList.valueOf(Color.parseColor("#A8A8A8"))
-                    scaleType = ImageView.ScaleType.CENTER
-                },
-                LinearLayout.LayoutParams(dp(26), dp(26))
-            )
-            addView(
-                menuText(title).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
-                    setPadding(dp(16), 0, 0, 0)
-                }
-            )
-            setOnClickListener { action() }
-        }
-    }
-
     private fun menuText(title: String): TextView {
         return TextView(context).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(190), dp(42))
             gravity = Gravity.CENTER_VERTICAL or Gravity.START
             includeFontPadding = false
             maxLines = 1
@@ -249,6 +327,20 @@ internal class ChatAiSideMenuView(
             text = title
             setTextColor(Color.parseColor("#A8A8A8"))
             textSize = 17.5f
+        }
+    }
+
+    private fun emptyRow(text: String): TextView {
+        return menuText(text).apply {
+            setTextColor(Color.parseColor("#777777"))
+            textSize = 14f
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(34))
+        }
+    }
+
+    private fun space(heightDp: Int): View {
+        return View(context).apply {
+            layoutParams = LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(heightDp))
         }
     }
 
@@ -282,5 +374,7 @@ internal class ChatAiSideMenuView(
 
     private companion object {
         const val DURATION_MS = 260L
+        const val PROJECT_DIRECTORY_HEIGHT_DP = 278
+        const val PROJECT_OPEN_DELAY_MS = 220L
     }
 }
