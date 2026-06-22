@@ -12,6 +12,7 @@ param(
     [string]$ExternalUserId = "",
     [int]$RequestTimeoutSec = 45,
     [int]$RetryCount = 1,
+    [switch]$SelfTest,
     [switch]$FinalAcceptance,
     [switch]$IncludePlatformOrderSummary,
     [switch]$RequireFb2Live,
@@ -152,46 +153,6 @@ function Assert-True {
     }
 }
 
-function Resolve-EvidenceArtifactPath {
-    param(
-        [string]$Ref,
-        [string]$EvidenceFilePath,
-        [string]$RepoRoot
-    )
-
-    if ([string]::IsNullOrWhiteSpace($Ref)) {
-        return ""
-    }
-    if ($Ref -match '^https?://') {
-        return $Ref
-    }
-    if ([System.IO.Path]::IsPathRooted($Ref)) {
-        return $Ref
-    }
-
-    $evidenceDir = Split-Path -Parent (Resolve-Path -LiteralPath $EvidenceFilePath).Path
-    $candidate = Join-Path $evidenceDir $Ref
-    if (Test-Path -LiteralPath $candidate) {
-        return $candidate
-    }
-
-    Join-Path $RepoRoot $Ref
-}
-
-function Test-PlaceholderArtifactRef {
-    param([string]$Ref)
-
-    if ([string]::IsNullOrWhiteSpace($Ref)) {
-        return $true
-    }
-    $lower = $Ref.ToLowerInvariant()
-    return $lower.Contains("example") `
-        -or $lower.Contains("placeholder") `
-        -or $lower.Contains("saved file path") `
-        -or $lower.Contains("screenshot/video path") `
-        -or $lower.Contains("adb logcat excerpt")
-}
-
 function Encode-QueryValue {
     param([string]$Value)
     [System.Uri]::EscapeDataString($Value)
@@ -269,7 +230,10 @@ function Assert-JsonBool {
         [string]$Field,
         [string]$Name
     )
-    Assert-True ($Value.$Field -eq $true) $Name "$Field=$($Value.$Field)"
+    $property = if ($null -ne $Value) { $Value.PSObject.Properties[$Field] } else { $null }
+    $actual = if ($null -ne $property) { $property.Value } else { $null }
+    $isStrictTrue = ($null -ne $property) -and ($actual -is [bool]) -and ($actual -eq $true)
+    Assert-True $isStrictTrue $Name "$Field=$actual"
 }
 
 function Assert-NonEmptyField {
@@ -403,6 +367,174 @@ function Fb2-Headers {
         $headers["X-FB2-AI-CONTEXT-SCOPE"] = "platform_order_summary"
     }
     $headers
+}
+
+$voiceEvidenceHelper = Join-Path $PSScriptRoot "fb2-ai-center-voice-evidence.ps1"
+. $voiceEvidenceHelper
+
+function New-VoiceEvidenceSelfTestObject {
+    param([object[]]$Artifacts)
+
+    [pscustomobject]@{
+        schema = "fb2.voice_device_evidence.v1"
+        finalAcceptanceReady = $true
+        recordedAt = "2026-06-22T10:00:00+08:00"
+        tester = "smoke-self-test"
+        device = [pscustomobject]@{
+            manufacturer = "Xiaomi"
+            model = "23116PN5BC"
+            osVersion = "HyperOS OS3.0"
+            androidApi = 35
+            speechRecognizerService = "com.xiaomi.mibrain.speech/.asr.AsrService"
+        }
+        apk = [pscustomobject]@{
+            packageName = "com.duoguan.football"
+            versionName = "1.1.48"
+            versionCode = 96
+        }
+        sdk = [pscustomobject]@{
+            mainProjectCommit = "selftest"
+            voiceKit = "android/chat-voice-kit"
+            bootstrapApi = "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)"
+        }
+        checks = [pscustomobject]@{
+            usesVoiceComposerView = $true
+            textVoiceToggle = $true
+            holdToTalkButton = $true
+            recordingOverlay = $true
+            slideToCancel = $true
+            zoneSend = $true
+            zoneAiReply = $true
+            zoneTranscribe = $true
+            tooShort = $true
+            systemAsrSuccess = $true
+            systemAsrTimeoutServerFallback = $true
+            serverAsrSuccess = $true
+            serverAsrFailureRecoversUi = $true
+            ttsPlayback = $true
+            asrTtsFreeWithZeroAiBalance = $true
+        }
+        artifacts = @($Artifacts)
+    }
+}
+
+function Copy-SelfTestObject {
+    param([object]$Value)
+    $Value | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+}
+
+function Invoke-VoiceEvidenceSelfTestCase {
+    param(
+        [string]$Name,
+        [object]$Evidence,
+        [string]$EvidenceFilePath,
+        [string]$RepoRoot,
+        [bool]$ShouldPass
+    )
+
+    Set-Content -Path $EvidenceFilePath -Value ($Evidence | ConvertTo-Json -Depth 12) -Encoding UTF8
+    $before = $script:Failed
+    Assert-Fb2VoiceDeviceEvidence -Evidence $Evidence -EvidenceFilePath $EvidenceFilePath -RepoRoot $RepoRoot -MinFb2ApkVersion $MinFb2ApkVersion
+    $caseFailures = $script:Failed - $before
+    $script:Failed = $before
+    $passedExpectation = if ($ShouldPass) { $caseFailures -eq 0 } else { $caseFailures -gt 0 }
+    if ($passedExpectation) {
+        Write-Output "OK`tself-test voice evidence $Name`tcase_failures=$caseFailures"
+    } else {
+        $script:SelfTestFailed += 1
+        Write-Output "FAIL`tself-test voice evidence $Name`tcase_failures=$caseFailures shouldPass=$ShouldPass"
+    }
+}
+
+function Invoke-AiCenterSelfTest {
+    $script:SelfTestFailed = 0
+    $tempRoot = [System.IO.Path]::GetTempPath()
+    $tempDir = Join-Path $tempRoot ("fb2-ai-center-voice-evidence-selftest-" + [guid]::NewGuid().ToString("N"))
+    New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
+    try {
+        $logRef = "voice-logcat.txt"
+        $screenRef = "voice-screen.png"
+        Set-Content -Path (Join-Path $tempDir $logRef) -Value "SpeechRecognizer fallback self-test" -Encoding UTF8
+        Set-Content -Path (Join-Path $tempDir $screenRef) -Value "fake screenshot bytes" -Encoding UTF8
+        $evidencePath = Join-Path $tempDir "voice-evidence.json"
+        $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
+        $baseArtifacts = @(
+            [pscustomobject]@{ type = "logcat"; ref = $logRef; note = "self-test logcat" },
+            [pscustomobject]@{ type = "screenshot"; ref = $screenRef; note = "self-test screenshot" }
+        )
+
+        $valid = New-VoiceEvidenceSelfTestObject -Artifacts $baseArtifacts
+        Invoke-VoiceEvidenceSelfTestCase "valid final-ready evidence" $valid $evidencePath $repoRoot $true
+
+        $resolutionVariants = New-VoiceEvidenceSelfTestObject -Artifacts @(
+            [pscustomobject]@{ type = "logcat"; ref = (Join-Path $tempDir $logRef); note = "absolute local logcat" },
+            [pscustomobject]@{ type = "screenshot"; ref = $screenRef; note = "same-dir relative screenshot" },
+            [pscustomobject]@{ type = "diagnostic_log"; ref = "docs/fb2-ai-center/README.md"; note = "repo-root relative diagnostic log" },
+            [pscustomobject]@{ type = "video"; ref = "https://fb2.invalid/fb2-voice-evidence.mp4"; note = "remote URL accepted without fetch" }
+        )
+        Invoke-VoiceEvidenceSelfTestCase "accepts artifact resolution variants" $resolutionVariants $evidencePath $repoRoot $true
+
+        $notReady = Copy-SelfTestObject $valid
+        $notReady.finalAcceptanceReady = $false
+        Invoke-VoiceEvidenceSelfTestCase "rejects finalAcceptanceReady false" $notReady $evidencePath $repoRoot $false
+
+        $stringReady = Copy-SelfTestObject $valid
+        $stringReady.finalAcceptanceReady = "true"
+        Invoke-VoiceEvidenceSelfTestCase "rejects string finalAcceptanceReady" $stringReady $evidencePath $repoRoot $false
+
+        $placeholder = Copy-SelfTestObject $valid
+        $placeholder.artifacts[0].ref = "placeholder logcat path"
+        Invoke-VoiceEvidenceSelfTestCase "rejects placeholder artifact ref" $placeholder $evidencePath $repoRoot $false
+
+        $missingFile = Copy-SelfTestObject $valid
+        $missingFile.artifacts[0].ref = "missing-logcat.txt"
+        Invoke-VoiceEvidenceSelfTestCase "rejects missing local artifact" $missingFile $evidencePath $repoRoot $false
+
+        $missingVisual = New-VoiceEvidenceSelfTestObject -Artifacts @([pscustomobject]@{ type = "logcat"; ref = $logRef; note = "self-test logcat" })
+        Invoke-VoiceEvidenceSelfTestCase "rejects missing visual artifact" $missingVisual $evidencePath $repoRoot $false
+
+        $missingLogcat = New-VoiceEvidenceSelfTestObject -Artifacts @([pscustomobject]@{ type = "screenshot"; ref = $screenRef; note = "self-test screenshot" })
+        Invoke-VoiceEvidenceSelfTestCase "rejects missing logcat artifact" $missingLogcat $evidencePath $repoRoot $false
+
+        $emptyArtifacts = New-VoiceEvidenceSelfTestObject -Artifacts @()
+        Invoke-VoiceEvidenceSelfTestCase "rejects empty artifact list" $emptyArtifacts $evidencePath $repoRoot $false
+
+        $blankArtifactType = New-VoiceEvidenceSelfTestObject -Artifacts @(
+            [pscustomobject]@{ type = ""; ref = $logRef; note = "blank type" },
+            [pscustomobject]@{ type = "screenshot"; ref = $screenRef; note = "self-test screenshot" }
+        )
+        Invoke-VoiceEvidenceSelfTestCase "rejects blank artifact type" $blankArtifactType $evidencePath $repoRoot $false
+
+        $blankArtifactRef = New-VoiceEvidenceSelfTestObject -Artifacts @(
+            [pscustomobject]@{ type = "logcat"; ref = ""; note = "blank ref" },
+            [pscustomobject]@{ type = "screenshot"; ref = $screenRef; note = "self-test screenshot" }
+        )
+        Invoke-VoiceEvidenceSelfTestCase "rejects blank artifact ref" $blankArtifactRef $evidencePath $repoRoot $false
+
+        $lowApk = Copy-SelfTestObject $valid
+        $lowApk.apk.versionName = "1.1.47"
+        Invoke-VoiceEvidenceSelfTestCase "rejects low APK version" $lowApk $evidencePath $repoRoot $false
+
+        $missingSystemAsr = Copy-SelfTestObject $valid
+        $missingSystemAsr.checks.systemAsrSuccess = $false
+        Invoke-VoiceEvidenceSelfTestCase "rejects missing system ASR success" $missingSystemAsr $evidencePath $repoRoot $false
+    } finally {
+        $resolvedTemp = (Resolve-Path -LiteralPath $tempDir -ErrorAction SilentlyContinue)
+        if ($resolvedTemp -and $resolvedTemp.Path.StartsWith($tempRoot, [System.StringComparison]::OrdinalIgnoreCase)) {
+            Remove-Item -LiteralPath $resolvedTemp.Path -Recurse -Force
+        }
+    }
+
+    Write-Output "== SelfTest Summary =="
+    Write-Output "failed=$script:SelfTestFailed"
+    if ($script:SelfTestFailed -gt 0) {
+        exit 1
+    }
+    exit 0
+}
+
+if ($SelfTest) {
+    Invoke-AiCenterSelfTest
 }
 
 function Resolve-MainTokenFromFb2 {
@@ -649,64 +781,8 @@ if ($RequireVoiceDeviceEvidence) {
     } else {
         try {
             $evidence = Get-Content -Raw -Path $VoiceDeviceEvidencePath | ConvertFrom-Json
-            Assert-True ($evidence.schema -eq "fb2.voice_device_evidence.v1") "voice evidence schema" "$($evidence.schema)"
-            Assert-JsonBool $evidence "finalAcceptanceReady" "voice evidence final ready"
-            Assert-NonEmptyField $evidence "recordedAt" "voice evidence recordedAt"
-            Assert-NonEmptyField $evidence "tester" "voice evidence tester"
-            Assert-NonEmptyField $evidence.device "manufacturer" "voice evidence device manufacturer"
-            Assert-NonEmptyField $evidence.device "model" "voice evidence device model"
-            Assert-NonEmptyField $evidence.device "osVersion" "voice evidence OS"
-            Assert-NonEmptyField $evidence.device "speechRecognizerService" "voice evidence recognizer"
-            Assert-NonEmptyField $evidence.apk "versionName" "voice evidence APK versionName"
-            Assert-True ((Compare-VersionParts ([string]$evidence.apk.versionName) $MinFb2ApkVersion) -ge 0) "voice evidence APK version" "version=$($evidence.apk.versionName) min=$MinFb2ApkVersion"
-            Assert-NonEmptyField $evidence.apk "versionCode" "voice evidence APK versionCode"
-            Assert-NonEmptyField $evidence.sdk "mainProjectCommit" "voice evidence main project commit"
-            Assert-JsonBool $evidence.checks "usesVoiceComposerView" "voice evidence uses VoiceComposerView"
-            Assert-JsonBool $evidence.checks "textVoiceToggle" "voice evidence text/voice toggle"
-            Assert-JsonBool $evidence.checks "holdToTalkButton" "voice evidence hold-to-talk"
-            Assert-JsonBool $evidence.checks "recordingOverlay" "voice evidence recording overlay"
-            Assert-JsonBool $evidence.checks "slideToCancel" "voice evidence slide cancel"
-            Assert-JsonBool $evidence.checks "zoneSend" "voice evidence send zone"
-            Assert-JsonBool $evidence.checks "zoneAiReply" "voice evidence AI reply zone"
-            Assert-JsonBool $evidence.checks "zoneTranscribe" "voice evidence transcribe zone"
-            Assert-JsonBool $evidence.checks "tooShort" "voice evidence too short"
-            Assert-JsonBool $evidence.checks "systemAsrSuccess" "voice evidence system ASR success"
-            Assert-JsonBool $evidence.checks "systemAsrTimeoutServerFallback" "voice evidence ASR timeout fallback"
-            Assert-JsonBool $evidence.checks "serverAsrSuccess" "voice evidence server ASR success"
-            Assert-JsonBool $evidence.checks "serverAsrFailureRecoversUi" "voice evidence server ASR failure recovery"
-            Assert-JsonBool $evidence.checks "ttsPlayback" "voice evidence TTS playback"
-            Assert-JsonBool $evidence.checks "asrTtsFreeWithZeroAiBalance" "voice evidence ASR/TTS free"
-            $artifactItems = @($evidence.artifacts | Where-Object { $_ })
-            $artifactCount = $artifactItems.Count
-            Assert-True ($artifactCount -gt 0) "voice evidence artifacts" "count=$artifactCount"
             $repoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot "..")).Path
-            $artifactTypes = @()
-            $validArtifactRefs = 0
-            foreach ($artifact in $artifactItems) {
-                $type = ([string]$artifact.type).Trim()
-                $ref = ([string]$artifact.ref).Trim()
-                if ($type) {
-                    $artifactTypes += $type.ToLowerInvariant()
-                }
-                Assert-True (-not [string]::IsNullOrWhiteSpace($type)) "voice evidence artifact type" $type
-                Assert-True (-not (Test-PlaceholderArtifactRef $ref)) "voice evidence artifact ref" $ref
-                $resolvedRef = Resolve-EvidenceArtifactPath -Ref $ref -EvidenceFilePath $VoiceDeviceEvidencePath -RepoRoot $repoRoot
-                if ($resolvedRef -match '^https?://') {
-                    $validArtifactRefs += 1
-                    Pass "voice evidence artifact url" $resolvedRef
-                } else {
-                    $exists = [bool](Test-Path -LiteralPath $resolvedRef)
-                    Assert-True $exists "voice evidence artifact exists" $resolvedRef
-                    if ($exists) {
-                        $validArtifactRefs += 1
-                    }
-                }
-            }
-            Assert-True ($validArtifactRefs -eq $artifactCount) "voice evidence artifact refs complete" "valid=$validArtifactRefs count=$artifactCount"
-            $hasLogcat = @($artifactTypes | Where-Object { $_ -eq "logcat" -or $_ -like "*log*" }).Count -gt 0
-            $hasVisual = @($artifactTypes | Where-Object { $_ -eq "screenshot" -or $_ -eq "video" -or $_ -eq "screenshot_or_video" -or $_ -like "*screen*" -or $_ -like "*video*" }).Count -gt 0
-            Assert-True $hasLogcat "voice evidence artifact logcat" ($artifactTypes -join ",")
-            Assert-True $hasVisual "voice evidence artifact visual" ($artifactTypes -join ",")
+            Assert-Fb2VoiceDeviceEvidence -Evidence $evidence -EvidenceFilePath $VoiceDeviceEvidencePath -RepoRoot $repoRoot -MinFb2ApkVersion $MinFb2ApkVersion
         } catch {
             Fail "voice device evidence" $_.Exception.Message
         }

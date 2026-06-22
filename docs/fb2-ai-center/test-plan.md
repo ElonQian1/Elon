@@ -36,7 +36,8 @@
 - 需要验证 authenticated `chat-bootstrap` 时，脚本支持直接传 `-MainToken`，也支持传 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN`，通过 fb2 `/api/main-project/session` 桥接主项目 token；这条路径无副作用，不会发送群消息。
 - 需要验证 fb2 用户端 APK 是否已发布到可下载版本时，加 `-CheckFb2ApkVersion`；脚本会检查 fb2 `/api/app-version` 至少达到 `1.1.48`、`update_kind=full_apk`、checksum/size 有效，并对 `apk_url` 做 HEAD 验证。
 - 需要把主项目 SDK 编译纳入同一次巡检时，加 `-CheckLocalVoiceSdkBuild`；脚本会执行 `android\gradlew.bat :chat-voice-kit:assembleDebug --quiet`。
-- 需要把 fb2 真机语音链路纳入验收时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；JSON 格式参考 `docs/fb2-ai-center/voice-device-evidence.example.json`，顶层必须是 `finalAcceptanceReady=true`，并覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。`artifacts[].ref` 不能是示例/占位文案；本地 artifact 必须能按证据 JSON 所在目录或仓库根目录解析为真实文件，远端 artifact 必须是 `http(s)://` URL，并且至少有一条 logcat 和一条截图/视频证据。
+- 需要把 fb2 真机语音链路纳入验收时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；JSON 格式参考 `docs/fb2-ai-center/voice-device-evidence.example.json`，顶层必须是严格布尔值 `finalAcceptanceReady=true`，并覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。`artifacts[].ref` 不能是示例/占位文案；本地 artifact 必须能按证据 JSON 所在目录或仓库根目录解析为真实文件，远端 artifact 必须是 `http(s)://` URL，并且至少有一条 logcat 和一条截图/视频证据。
+- 修改 `scripts/smoke-fb2-ai-center.ps1` 的语音证据规则后，先跑 `scripts\smoke-fb2-ai-center.ps1 -SelfTest`；该命令用离线合成 JSON 覆盖 final-ready 正例、artifact 解析变体、`finalAcceptanceReady=false`、字符串布尔值、占位 ref、缺本地文件、缺 logcat、缺截图/视频、空 artifact、低 APK 版本和缺系统 ASR 成功等失败路径。它只验证验收脚本本身，不替代真实 fb2 APK 的 `finalAcceptanceReady=true` 证据。
 - 正式最终验收可加 `-RequireNoSkips`，确保缺少 token 或未覆盖的检查不会以 skip 形式被误判为完成。
 - 最终总验收优先使用 `-FinalAcceptance`；它会自动打开 `-RequireFb2Live`、`-RequireAllScenarios`、`-IncludePlatformOrderSummary`、`-CheckQuality`、`-RequireFeedbackCoverage`、`-CheckFb2ApkVersion`、`-CheckLocalVoiceSdkBuild`、`-RequireVoiceDeviceEvidence` 和 `-RequireNoSkips`，缺少主项目登录、`FB2_AI_CENTER_TOKEN` 或 `-VoiceDeviceEvidencePath` 时必须失败。
 - `cd android && .\gradlew.bat :chat-voice-kit:assembleDebug` 通过，确认 fb2 可引用最新 `VoiceComposerBootstrap` 和 `VoiceComposerView`。
@@ -86,7 +87,7 @@
 10. 云端 ASR 失败，UI 恢复且不永久卡住。
 11. AI 余额为 0 时 ASR/TTS 仍可用。
 
-真机证据必须沉淀为 `fb2.voice_device_evidence.v1` JSON，顶层 `finalAcceptanceReady=true`，并至少附一条真实可访问 logcat artifact 和一条截图/录屏 artifact。主项目最终验收脚本只接受机器可读证据，避免用口头描述、占位路径或静音半成品证据替代小米/HyperOS 等设备上的实际验证。
+真机证据必须沉淀为 `fb2.voice_device_evidence.v1` JSON，顶层 `finalAcceptanceReady=true` 必须是 JSON 布尔值，不接受字符串 `"true"`，并至少附一条真实可访问 logcat artifact 和一条截图/录屏 artifact。主项目最终验收脚本只接受机器可读证据，避免用口头描述、占位路径或静音半成品证据替代小米/HyperOS 等设备上的实际验证。
 
 ## AI 数据回答测试
 

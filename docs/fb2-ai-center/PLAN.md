@@ -42,6 +42,7 @@
 ## 验证命令
 
 ```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1
 # 预期失败：example 证据是格式模板，artifact ref 是占位，finalAcceptanceReady=false
