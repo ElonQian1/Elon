@@ -17,7 +17,8 @@
     nodeAdminUrl: safeNodeAdminUrl(),
     localAdminToken: '',
     localAdminTokenHeader: LOCAL_ADMIN_HEADER_FALLBACK,
-    clientMaintenance: null
+    clientMaintenance: null,
+    localProjectInfo: null
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
   const PLAZA_FILTERS = [
@@ -1099,6 +1100,7 @@
     els.chooseProjectFolderBtn.addEventListener('click', chooseLocalProjectFolder);
     els.inspectProjectFolderBtn.addEventListener('click', inspectLocalProjectFolder);
     els.registerProjectBtn.addEventListener('click', registerLocalProject);
+    els.settingsProjectPath.addEventListener('input', markLocalProjectPathDirty);
     els.refreshClientMaintenanceBtn.addEventListener('click', () => refreshClientMaintenance(true));
     els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientLogsBtn));
     els.openClientConfigBtn.addEventListener('click', () => openClientMaintenanceTarget('config_dir', els.openClientConfigBtn));
@@ -2336,12 +2338,13 @@
   function setSettingsBusy(button, busy, label) {
     if (!button) return;
     if (busy) {
-      button.dataset.label = button.textContent;
+      if (!button.disabled) button.dataset.label = button.textContent;
       button.disabled = true;
       button.textContent = label || '处理中…';
     } else {
       button.disabled = false;
       button.textContent = button.dataset.label || button.textContent;
+      delete button.dataset.label;
     }
   }
 
@@ -2439,6 +2442,7 @@
     els.settingsProjectRepo.value = repo;
     els.settingsProjectBranch.value = branch;
     if (desc && !clean(els.settingsProjectDesc.value)) els.settingsProjectDesc.value = desc;
+    state.localProjectInfo = path ? { path, name, repo, branch } : null;
     const git = inspect.is_git_worktree || project.is_git_worktree
       ? [branch || 'HEAD', clean(project.git_head || inspect.git_head), (project.has_uncommitted_changes || inspect.has_uncommitted_changes) ? '有未提交改动' : '干净']
         .filter(Boolean).join(' · ')
@@ -2453,9 +2457,48 @@
     const detected = Array.isArray(project.detected_files)
       ? project.detected_files.map(clean).filter(Boolean).slice(0, 4).join('、')
       : '';
+    if (!path) {
+      els.settingsProjectMeta.textContent = '尚未选择项目目录';
+      return;
+    }
+    const rows = [
+      ['目录', path],
+      ['Git', git],
+      profile && ['类型', profile],
+      commands && ['命令', commands],
+      detected && ['识别', `检测到 ${detected}`]
+    ].filter(Boolean);
+    els.settingsProjectMeta.innerHTML = rows.map(([label, value]) => (
+      `<div class="settings-project-meta-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
+    )).join('');
+  }
+
+  function markLocalProjectPathDirty() {
+    const path = clean(els.settingsProjectPath.value);
+    state.localProjectInfo = null;
     els.settingsProjectMeta.textContent = path
-      ? [path, git, profile, commands, detected ? `检测到 ${detected}` : ''].filter(Boolean).join(' · ')
+      ? '注册前会自动读取目录、Git 远端、当前分支和项目命令。'
       : '尚未选择项目目录';
+  }
+
+  function projectInfoMatchesPath(path) {
+    return clean(state.localProjectInfo && state.localProjectInfo.path) === clean(path);
+  }
+
+  async function inspectProjectPath(path) {
+    const data = await localNodeApi('/api/project-folder/inspect', {
+      method: 'POST',
+      body: JSON.stringify({ workspace_path: path })
+    });
+    applyLocalProjectInfo(data);
+    return data;
+  }
+
+  async function ensureProjectInfoBeforeRegister(path) {
+    if (projectInfoMatchesPath(path) && clean(els.settingsProjectName.value)) return;
+    setSettingsResult('正在自动读取目录信息…');
+    await inspectProjectPath(path);
+    setSettingsResult('已自动读取目录、Git 远端、当前分支和项目命令，继续注册。');
   }
 
   function normalizeRuntimePermission(value) {
@@ -2520,11 +2563,7 @@
     }
     setSettingsBusy(els.inspectProjectFolderBtn, true, '读取中…');
     try {
-      const data = await localNodeApi('/api/project-folder/inspect', {
-        method: 'POST',
-        body: JSON.stringify({ workspace_path: path })
-      });
-      applyLocalProjectInfo(data);
+      await inspectProjectPath(path);
       setSettingsResult('已读取项目目录、Git 远端和当前分支。');
     } catch (error) {
       setSettingsResult(escapeHtml(error.message || error), 'error');
@@ -2544,10 +2583,23 @@
   }
 
   async function registerLocalProject() {
-    const name = clean(els.settingsProjectName.value);
     const path = clean(els.settingsProjectPath.value);
-    if (!name || !path) {
-      setSettingsResult('请选择项目目录，确认项目名称已自动填写。', 'error');
+    if (!path) {
+      setSettingsResult('请选择项目目录。', 'error');
+      return;
+    }
+    setSettingsBusy(els.registerProjectBtn, true, '自动读取…');
+    try {
+      await ensureProjectInfoBeforeRegister(path);
+    } catch (error) {
+      setSettingsResult(escapeHtml(error.message || error), 'error');
+      setSettingsBusy(els.registerProjectBtn, false);
+      return;
+    }
+    const name = clean(els.settingsProjectName.value);
+    if (!name) {
+      setSettingsResult('目录已读取，但没有识别到项目名称，请手动填写。', 'error');
+      setSettingsBusy(els.registerProjectBtn, false);
       return;
     }
     const runtimeMode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
@@ -2555,6 +2607,7 @@
       const ok = window.confirm(`确认给项目「${name}」开启本机完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；这次确认会写入当前 PC 节点的本机授权记录。`);
       if (!ok) {
         setSettingsResult('已取消完全访问授权，项目尚未注册。');
+        setSettingsBusy(els.registerProjectBtn, false);
         return;
       }
     }

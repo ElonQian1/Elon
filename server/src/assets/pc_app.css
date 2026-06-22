@@ -2140,6 +2140,24 @@ button { cursor: pointer; }
   line-height: 1.6;
   margin-bottom: 12px;
 }
+.settings-project-meta-row {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 4px 0;
+}
+.settings-project-meta-row span {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+.settings-project-meta-row strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 .settings-actions {
   display: flex;
   flex-wrap: wrap;

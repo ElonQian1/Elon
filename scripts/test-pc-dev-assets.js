@@ -982,6 +982,12 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('/api/full-access/grants'), 'PC app should write local full-access grants');
   assert.ok(pcApp.includes('localNodeApi, clean'), 'PC app should pass protected local node API into task snapshots');
   assert.ok(pcApp.includes('confirm_full_access: true'), 'full-access grant request should include explicit confirmation');
+  assert.ok(pcApp.includes('ensureProjectInfoBeforeRegister'), 'project registration should inspect local folders before submit');
+  assert.ok(pcApp.includes('正在自动读取目录信息'), 'project registration should explain auto inspection progress');
+  assert.ok(pcApp.includes('settings-project-meta-row'), 'project inspection metadata should render as structured rows');
+
+  const pcAppCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
+  assert.ok(pcAppCss.includes('.settings-project-meta-row'), 'PC app CSS should style structured project inspection metadata');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
