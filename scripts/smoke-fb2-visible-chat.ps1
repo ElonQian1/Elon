@@ -645,6 +645,7 @@ Assert-True ($null -ne $targetGroup) "group membership" $GroupId
 
 $baselineMessages = Get-Messages -BearerToken $token -TargetGroupId $GroupId
 $baselineIds = @($baselineMessages | ForEach-Object { [string]$_.id })
+Pass "direct group message read baseline" "group=$GroupId count=$(@($baselineMessages).Count)"
 $trace = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
 
 if ($SkipMention) {
@@ -667,11 +668,13 @@ if ($SkipMention) {
             $replyId = ([string]$feedback.main_request_id).Substring("social_group_message:".Length)
             $reply = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $replyId
             Assert-True ([bool]$reply.id) "visible @EL ai reply" "$replyId"
+            Pass "visible @EL direct group read" "group=$GroupId message=$replyId"
             Assert-ReplyAnswerPolicy -Reply $reply -Scenario "visible @EL"
         }
     } else {
         $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $sentId -KnownMessageIds $baselineIds -Scenario "@EL mention"
         Assert-True ([bool]$reply.id) "visible @EL ai reply" "$($reply.id)"
+        Pass "visible @EL direct group read" "group=$GroupId message=$($reply.id)"
         Assert-ReplyAnswerPolicy -Reply $reply -Scenario "visible @EL"
     }
 }
@@ -704,12 +707,14 @@ if ($SkipSelectedMessage) {
             $replyId = ([string]$feedback.main_request_id).Substring("social_group_selected_message:".Length)
             $reply = Get-MessageById -BearerToken $token -TargetGroupId $GroupId -MessageId $replyId
             Assert-True ([bool]$reply.id) "selected-message ai reply" "$replyId"
+            Pass "selected-message direct group read" "group=$GroupId message=$replyId"
             Assert-ReplyAnswerPolicy -Reply $reply -Scenario "selected-message"
             Assert-SelectedMessageSafetyPolicy -Reply $reply
         }
     } else {
         $reply = Wait-For-AiReply -BearerToken $token -TargetGroupId $GroupId -AfterMessageId $plainId -KnownMessageIds $knownIdsForSelected -Scenario "selected-message ai-reply"
         Assert-True ([bool]$reply.id) "selected-message ai reply" "$($reply.id)"
+        Pass "selected-message direct group read" "group=$GroupId message=$($reply.id)"
         Assert-ReplyAnswerPolicy -Reply $reply -Scenario "selected-message"
         Assert-SelectedMessageSafetyPolicy -Reply $reply
     }
@@ -741,6 +746,7 @@ if ($SkipSummaryPost) {
     if ($postId) {
         $summaryPost = Wait-For-SummaryPost -BearerToken $token -TargetGroupId $GroupId -PostId $postId
         Assert-True ([string]$summaryPost.status -eq "ready") "summary-post ready" "$($summaryPost.status)"
+        Pass "summary-post direct group read" "group=$GroupId post=$postId status=$($summaryPost.status)"
         Assert-SummaryPostPolicy -Post $summaryPost
         if ($Fb2AiCenterToken) {
             $feedback = $null

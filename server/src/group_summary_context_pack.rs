@@ -71,33 +71,14 @@ pub(crate) fn spawn_group_summary_generation(
 }
 
 fn group_summary_feedback_citation_sources(
-    post_id: &str,
-    sources: &[GroupSummarySourceMessage],
+    _post_id: &str,
+    _sources: &[GroupSummarySourceMessage],
 ) -> Vec<Value> {
-    let mut citations = Vec::new();
-    let post_id = post_id.trim();
-    if !post_id.is_empty() {
-        citations.push(json!({
-            "kind": "summary_post",
-            "id": post_id,
-            "label": "fb2 群聊总结帖"
-        }));
-    }
-
-    // 总结帖常把原文放在“相关发言”中，不一定逐条写出 message_id；
-    // feedback 显式携带被总结消息，确保质量闭环能追溯入口来源。
-    for message in sources.iter().take(11) {
-        let id = message.id.trim();
-        if id.is_empty() {
-            continue;
-        }
-        citations.push(json!({
-            "kind": "group_message",
-            "id": id,
-            "label": format!("{} 的群聊发言", message.sender_name)
-        }));
-    }
-    citations
+    // Summary post identity is already carried by main_request_id. Do not add
+    // main-project local gmsg_* rows as fb2 cited_sources: fb2 matches feedback
+    // citations against its Context Pack audit registry, so arbitrary visible
+    // chat IDs pollute quality metrics as unmatched sources.
+    Vec::new()
 }
 
 pub(crate) fn build_context_pack(
@@ -314,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn summary_feedback_citations_include_post_and_source_messages() {
+    fn summary_feedback_extra_citations_exclude_main_group_messages() {
         let citations = group_summary_feedback_citation_sources(
             "gsp-summary-1",
             &[
@@ -323,10 +304,6 @@ mod tests {
             ],
         );
 
-        assert_eq!(citations[0]["kind"], "summary_post");
-        assert_eq!(citations[0]["id"], "gsp-summary-1");
-        assert_eq!(citations[1]["kind"], "group_message");
-        assert_eq!(citations[1]["id"], "gmsg-1");
-        assert_eq!(citations[2]["id"], "gmsg-2");
+        assert!(citations.is_empty());
     }
 }
