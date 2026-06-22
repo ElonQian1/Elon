@@ -34,7 +34,11 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
         profile.project_type = Some("Node.js".to_string());
         profile.package_manager = Some(node_package_manager(path));
         profile.detected_files.push("package.json".to_string());
-        if path.join("pnpm-lock.yaml").exists() {
+        if path.join("bun.lockb").exists() {
+            profile.detected_files.push("bun.lockb".to_string());
+        } else if path.join("bun.lock").exists() {
+            profile.detected_files.push("bun.lock".to_string());
+        } else if path.join("pnpm-lock.yaml").exists() {
             profile.detected_files.push("pnpm-lock.yaml".to_string());
         } else if path.join("yarn.lock").exists() {
             profile.detected_files.push("yarn.lock".to_string());
@@ -61,6 +65,10 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
         return profile;
     }
 
+    if let Some(dotnet) = dotnet_project_profile(path) {
+        return dotnet;
+    }
+
     if let Some(python) = python_project_profile(path) {
         return python;
     }
@@ -69,7 +77,9 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
 }
 
 fn node_package_manager(path: &Path) -> String {
-    if path.join("pnpm-lock.yaml").exists() {
+    if path.join("bun.lockb").exists() || path.join("bun.lock").exists() {
+        "bun".to_string()
+    } else if path.join("pnpm-lock.yaml").exists() {
         "pnpm".to_string()
     } else if path.join("yarn.lock").exists() {
         "yarn".to_string()
@@ -104,6 +114,7 @@ fn first_script_command(
         .map(|name| match manager {
             "yarn" => format!("yarn {name}"),
             "pnpm" => format!("pnpm {name}"),
+            "bun" => format!("bun run {name}"),
             _ => format!("npm run {name}"),
         })
 }
@@ -116,6 +127,47 @@ fn gradle_command(path: &Path, task: &str) -> String {
     } else {
         format!("gradle {task}")
     }
+}
+
+fn dotnet_project_profile(path: &Path) -> Option<ProjectProfile> {
+    let mut detected_files = directory_files_with_extensions(path, &["sln", "csproj"]);
+    if detected_files.is_empty() {
+        return None;
+    }
+    detected_files.sort();
+    let has_project = detected_files.iter().any(|file| file.ends_with(".csproj"));
+    Some(ProjectProfile {
+        project_type: Some(".NET".to_string()),
+        package_manager: Some("dotnet".to_string()),
+        run_command: has_project.then(|| "dotnet run".to_string()),
+        test_command: Some("dotnet test".to_string()),
+        build_command: Some("dotnet build".to_string()),
+        detected_files: detected_files.into_iter().take(8).collect(),
+    })
+}
+
+fn directory_files_with_extensions(path: &Path, extensions: &[&str]) -> Vec<String> {
+    let Ok(entries) = std::fs::read_dir(path) else {
+        return Vec::new();
+    };
+    entries
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let file_type = entry.file_type().ok()?;
+            if !file_type.is_file() {
+                return None;
+            }
+            let file_name = entry.file_name().to_string_lossy().to_string();
+            let extension = Path::new(&file_name)
+                .extension()
+                .and_then(|value| value.to_str())
+                .map(str::to_ascii_lowercase)?;
+            extensions
+                .iter()
+                .any(|candidate| extension == *candidate)
+                .then_some(file_name)
+        })
+        .collect()
 }
 
 fn python_project_profile(path: &Path) -> Option<ProjectProfile> {
@@ -256,6 +308,27 @@ mod tests {
     }
 
     #[test]
+    fn detects_bun_package_manager_and_scripts() {
+        let dir = temp_project("node-bun");
+        std::fs::write(dir.join("bun.lockb"), "").unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"scripts":{"dev":"vite --host","test":"bun test","build":"vite build"}}"#,
+        )
+        .unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Node.js"));
+        assert_eq!(profile.package_manager.as_deref(), Some("bun"));
+        assert_eq!(profile.run_command.as_deref(), Some("bun run dev"));
+        assert_eq!(profile.test_command.as_deref(), Some("bun run test"));
+        assert_eq!(profile.build_command.as_deref(), Some("bun run build"));
+        assert!(profile.detected_files.contains(&"bun.lockb".to_string()));
+    }
+
+    #[test]
     fn detects_gradle_projects() {
         let dir = temp_project("gradle");
         std::fs::write(dir.join("build.gradle.kts"), "plugins {}\n").unwrap();
@@ -269,6 +342,41 @@ mod tests {
             .as_deref()
             .unwrap_or_default()
             .contains("build"));
+    }
+
+    #[test]
+    fn detects_dotnet_solution_and_project_commands() {
+        let dir = temp_project("dotnet");
+        std::fs::write(dir.join("Demo.sln"), "").unwrap();
+        std::fs::write(dir.join("Demo.Web.csproj"), "<Project />\n").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some(".NET"));
+        assert_eq!(profile.package_manager.as_deref(), Some("dotnet"));
+        assert_eq!(profile.run_command.as_deref(), Some("dotnet run"));
+        assert_eq!(profile.test_command.as_deref(), Some("dotnet test"));
+        assert_eq!(profile.build_command.as_deref(), Some("dotnet build"));
+        assert!(profile.detected_files.contains(&"Demo.sln".to_string()));
+        assert!(profile
+            .detected_files
+            .contains(&"Demo.Web.csproj".to_string()));
+    }
+
+    #[test]
+    fn detects_dotnet_solution_without_run_command() {
+        let dir = temp_project("dotnet-solution-only");
+        std::fs::write(dir.join("Demo.sln"), "").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some(".NET"));
+        assert_eq!(profile.package_manager.as_deref(), Some("dotnet"));
+        assert!(profile.run_command.is_none());
+        assert_eq!(profile.test_command.as_deref(), Some("dotnet test"));
+        assert_eq!(profile.build_command.as_deref(), Some("dotnet build"));
     }
 
     #[test]
