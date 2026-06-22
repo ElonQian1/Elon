@@ -741,13 +741,56 @@ fn parse_agent_response(content: &str) -> Result<Value> {
     if let Ok(value) = serde_json::from_str(trimmed) {
         return Ok(value);
     }
-    let start = trimmed
-        .find('{')
-        .ok_or_else(|| anyhow!("server-runtime 返回内容不是 JSON"))?;
-    let end = trimmed
-        .rfind('}')
-        .ok_or_else(|| anyhow!("server-runtime 返回内容不是 JSON"))?;
-    serde_json::from_str(&trimmed[start..=end]).context("server-runtime JSON 解析失败")
+    if let Some(value) = parse_first_json_object(trimmed) {
+        return Ok(value);
+    }
+    bail!("server-runtime 返回内容不是 JSON")
+}
+
+fn parse_first_json_object(content: &str) -> Option<Value> {
+    for (start, ch) in content.char_indices() {
+        if ch != '{' {
+            continue;
+        }
+        let Some(end) = matching_json_object_end(&content[start..]) else {
+            continue;
+        };
+        let candidate = &content[start..start + end];
+        if let Ok(value) = serde_json::from_str(candidate) {
+            return Some(value);
+        }
+    }
+    None
+}
+
+fn matching_json_object_end(content: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    let mut in_string = false;
+    let mut escaped = false;
+    for (offset, ch) in content.char_indices() {
+        if in_string {
+            if escaped {
+                escaped = false;
+            } else if ch == '\\' {
+                escaped = true;
+            } else if ch == '"' {
+                in_string = false;
+            }
+            continue;
+        }
+        match ch {
+            '"' => in_string = true,
+            '{' => depth = depth.saturating_add(1),
+            '}' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return Some(offset + ch.len_utf8());
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn send_chunk(
@@ -798,8 +841,8 @@ impl RuntimeUsage {
 #[cfg(test)]
 mod tests {
     use super::{
-        api_runtime_config_from_lookup, run_runtime_loop, runtime_http_error_message,
-        system_prompt, RuntimeLoopOptions,
+        api_runtime_config_from_lookup, parse_agent_response, run_runtime_loop,
+        runtime_http_error_message, system_prompt, RuntimeLoopOptions,
     };
     use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
     use homecli_proto::AgentToServer;
@@ -875,6 +918,43 @@ mod tests {
         assert!(message.contains("fingerprint="));
         assert!(!message.contains("sk-secret"));
         assert!(!message.contains("prompt text"));
+    }
+
+    #[test]
+    fn parse_agent_response_accepts_markdown_fenced_json() {
+        let parsed = parse_agent_response(
+            r#"```json
+{"message":"ok","done":true,"actions":[]}
+```"#,
+        )
+        .expect("fenced json should parse");
+
+        assert_eq!(parsed["message"], "ok");
+        assert_eq!(parsed["done"], true);
+    }
+
+    #[test]
+    fn parse_agent_response_skips_non_json_braces_before_payload() {
+        let parsed = parse_agent_response(
+            r#"先说明：{这不是 JSON}
+{"message":"继续","done":false,"actions":[{"tool":"list_dir","path":"."}]}
+后续文字"#,
+        )
+        .expect("first valid json object should parse");
+
+        assert_eq!(parsed["message"], "继续");
+        assert_eq!(parsed["actions"][0]["tool"], "list_dir");
+    }
+
+    #[test]
+    fn parse_agent_response_ignores_braces_inside_json_strings() {
+        let parsed = parse_agent_response(
+            r#"prefix {"message":"literal { brace } text","done":true,"actions":[]} suffix"#,
+        )
+        .expect("json string braces should not break scanning");
+
+        assert_eq!(parsed["message"], "literal { brace } text");
+        assert_eq!(parsed["done"], true);
     }
 
     #[tokio::test]
