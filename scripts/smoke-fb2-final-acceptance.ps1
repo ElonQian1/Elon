@@ -26,6 +26,7 @@ param(
     [double]$MaxMissingContextRate = 0,
     [double]$MaxWrongContextRate = 0,
     [switch]$SelfTest,
+    [switch]$DataOnlyAcceptance,
     [switch]$PreflightOnly,
     [switch]$AllowVisibleMessages
 )
@@ -258,6 +259,7 @@ function Build-AiCenterEvidence {
         fb2_authenticated_manifest_tool_ids = Find-CheckDetail $Lines "fb2 authenticated manifest tool ids"
         fb2_apk_version = Find-CheckDetail $Lines "fb2 APK version present"
         fb2_apk_download_head = Find-CheckDetail $Lines "fb2 APK download head"
+        data_only_scope = Find-CheckDetail $Lines "data-only acceptance excludes voice contract"
         local_voice_sdk_build = Find-CheckDetail $Lines "local voice SDK build"
         voice_evidence_schema = Find-CheckDetail $Lines "voice evidence schema"
         voice_evidence_final_ready = Find-CheckDetail $Lines "voice evidence final ready"
@@ -513,10 +515,14 @@ if (-not $PreflightOnly -and -not $AllowVisibleMessages) {
 if (-not $Fb2AiCenterToken) {
     Fail-FinalAcceptance "FB2_AI_CENTER_TOKEN or -Fb2AiCenterToken is required."
 }
-if (-not $VoiceDeviceEvidencePath) {
-    Fail-FinalAcceptance "FB2_VOICE_DEVICE_EVIDENCE_PATH or -VoiceDeviceEvidencePath is required."
-}
-if (-not (Test-Path $VoiceDeviceEvidencePath)) {
+if (-not $DataOnlyAcceptance) {
+    if (-not $VoiceDeviceEvidencePath) {
+        Fail-FinalAcceptance "FB2_VOICE_DEVICE_EVIDENCE_PATH or -VoiceDeviceEvidencePath is required."
+    }
+    if (-not (Test-Path $VoiceDeviceEvidencePath)) {
+        Fail-FinalAcceptance "Voice device evidence file not found: $VoiceDeviceEvidencePath"
+    }
+} elseif ($VoiceDeviceEvidencePath -and -not (Test-Path $VoiceDeviceEvidencePath)) {
     Fail-FinalAcceptance "Voice device evidence file not found: $VoiceDeviceEvidencePath"
 }
 if (-not $MainToken -and -not $Fb2UserToken -and (-not $Fb2Username -or -not $Fb2Password)) {
@@ -541,7 +547,8 @@ $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
 
 if (-not $SummaryPath) {
     $summaryDir = Join-Path $root "target\fb2-ai-center"
-    $SummaryPath = Join-Path $summaryDir "final-acceptance-$stamp.json"
+    $summaryPrefix = if ($DataOnlyAcceptance) { "data-only-acceptance" } else { "final-acceptance" }
+    $SummaryPath = Join-Path $summaryDir "$summaryPrefix-$stamp.json"
 } else {
     $summaryDir = Split-Path -Parent $SummaryPath
     if (-not $summaryDir) {
@@ -549,8 +556,9 @@ if (-not $SummaryPath) {
     }
 }
 New-Item -ItemType Directory -Force -Path $summaryDir | Out-Null
-$visibleLogPath = Join-Path $summaryDir "final-acceptance-$stamp-visible-chat.log"
-$centerLogPath = Join-Path $summaryDir "final-acceptance-$stamp-ai-center.log"
+$logPrefix = if ($DataOnlyAcceptance) { "data-only-acceptance" } else { "final-acceptance" }
+$visibleLogPath = Join-Path $summaryDir "$logPrefix-$stamp-visible-chat.log"
+$centerLogPath = Join-Path $summaryDir "$logPrefix-$stamp-ai-center.log"
 
 $mainHead = ""
 try { $mainHead = (& git -C $root rev-parse HEAD).Trim() } catch { $mainHead = "" }
@@ -576,22 +584,41 @@ if ($PreflightOnly) {
     Add-Arg $preflightArgs "-GroupId" $GroupId
     Add-Arg $preflightArgs "-ExternalUserId" $ExternalUserId
     Add-Arg $preflightArgs "-RequestTimeoutSec" $RequestTimeoutSec
-    Add-Arg $preflightArgs "-VoiceDeviceEvidencePath" $VoiceDeviceEvidencePath
-    Add-SwitchArg $preflightArgs "-RequireFb2Live" $true
-    Add-SwitchArg $preflightArgs "-RequireAllScenarios" $true
-    Add-SwitchArg $preflightArgs "-IncludePlatformOrderSummary" $true
-    Add-SwitchArg $preflightArgs "-CheckFb2ApkVersion" $true
-    Add-SwitchArg $preflightArgs "-CheckLocalVoiceSdkBuild" $true
-    Add-SwitchArg $preflightArgs "-RequireVoiceDeviceEvidence" $true
-    Add-SwitchArg $preflightArgs "-CheckPermissionBoundaries" $true
-    Add-SwitchArg $preflightArgs "-RequireNoSkips" $true
+    Add-Arg $preflightArgs "-MinFeedbackCount" $MinFeedbackCount
+    Add-Arg $preflightArgs "-MinMatchedCitedSourceCount" $MinMatchedCitedSourceCount
+    Add-Arg $preflightArgs "-MinNonSyntheticFeedbackCount" $MinNonSyntheticFeedbackCount
+    Add-Arg $preflightArgs "-MinOpinionAdoptionCount" $MinOpinionAdoptionCount
+    Add-Arg $preflightArgs "-QualityFeedbackSampleLimit" $QualityFeedbackSampleLimit
+    Add-Arg $preflightArgs "-MaxLargeContextPackRate" $MaxLargeContextPackRate
+    Add-Arg $preflightArgs "-MaxCitationUnmatchedRate" $MaxCitationUnmatchedRate
+    Add-Arg $preflightArgs "-MaxMissingContextRate" $MaxMissingContextRate
+    Add-Arg $preflightArgs "-MaxWrongContextRate" $MaxWrongContextRate
+    if ($DataOnlyAcceptance) {
+        Add-SwitchArg $preflightArgs "-DataOnlyAcceptance" $true
+    } else {
+        Add-Arg $preflightArgs "-VoiceDeviceEvidencePath" $VoiceDeviceEvidencePath
+        Add-SwitchArg $preflightArgs "-RequireFb2Live" $true
+        Add-SwitchArg $preflightArgs "-RequireAllScenarios" $true
+        Add-SwitchArg $preflightArgs "-IncludePlatformOrderSummary" $true
+        Add-SwitchArg $preflightArgs "-CheckFb2ApkVersion" $true
+        Add-SwitchArg $preflightArgs "-CheckLocalVoiceSdkBuild" $true
+        Add-SwitchArg $preflightArgs "-RequireVoiceDeviceEvidence" $true
+        Add-SwitchArg $preflightArgs "-CheckQuality" $true
+        Add-SwitchArg $preflightArgs "-RequireFeedbackCoverage" $true
+        Add-SwitchArg $preflightArgs "-RequireNonSyntheticQualityReadiness" $true
+        Add-SwitchArg $preflightArgs "-CheckPermissionBoundaries" $true
+        Add-SwitchArg $preflightArgs "-RequireNoSkips" $true
+    }
 
-    $preflightLogPath = Join-Path $summaryDir "final-acceptance-$stamp-preflight.log"
-    $preflightResult = Invoke-SmokeScript "final preflight without visible messages" $preflightArgs $preflightLogPath
+    $preflightLogPath = Join-Path $summaryDir "$logPrefix-$stamp-preflight.log"
+    $preflightName = if ($DataOnlyAcceptance) { "data-only preflight without visible messages" } else { "final preflight without visible messages" }
+    $preflightResult = Invoke-SmokeScript $preflightName $preflightArgs $preflightLogPath
     $completedAt = (Get-Date).ToUniversalTime().ToString("o")
     $summary = [ordered]@{
         schema = "fb2.main_project.final_acceptance.v1"
-        mode = "preflight_only"
+        mode = if ($DataOnlyAcceptance) { "data_only_preflight" } else { "preflight_only" }
+        acceptance_scope = if ($DataOnlyAcceptance) { "data_permission_quality_visible_chat_without_voice" } else { "full_final_acceptance" }
+        voice_status = if ($DataOnlyAcceptance) { "deferred_by_user" } else { "required" }
         started_at = $startedAt
         completed_at = $completedAt
         quality_since = $qualitySince
@@ -675,9 +702,14 @@ Add-Arg $centerArgs "-MaxLargeContextPackRate" $MaxLargeContextPackRate
 Add-Arg $centerArgs "-MaxCitationUnmatchedRate" $MaxCitationUnmatchedRate
 Add-Arg $centerArgs "-MaxMissingContextRate" $MaxMissingContextRate
 Add-Arg $centerArgs "-MaxWrongContextRate" $MaxWrongContextRate
-Add-SwitchArg $centerArgs "-FinalAcceptance" $true
+if ($DataOnlyAcceptance) {
+    Add-SwitchArg $centerArgs "-DataOnlyAcceptance" $true
+} else {
+    Add-SwitchArg $centerArgs "-FinalAcceptance" $true
+}
 
-$centerResult = Invoke-SmokeScript "final no-skip acceptance" $centerArgs $centerLogPath
+$centerName = if ($DataOnlyAcceptance) { "data-only no-skip acceptance" } else { "final no-skip acceptance" }
+$centerResult = Invoke-SmokeScript $centerName $centerArgs $centerLogPath
 $centerLines = @($centerResult.output)
 
 $completedAt = (Get-Date).ToUniversalTime().ToString("o")
@@ -685,7 +717,9 @@ $feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
 $feedbackCoverage = Build-FeedbackCoverage $feedbackEvidence
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"
-    mode = "visible_final_acceptance"
+    mode = if ($DataOnlyAcceptance) { "visible_data_only_acceptance" } else { "visible_final_acceptance" }
+    acceptance_scope = if ($DataOnlyAcceptance) { "data_permission_quality_visible_chat_without_voice" } else { "full_final_acceptance" }
+    voice_status = if ($DataOnlyAcceptance) { "deferred_by_user" } else { "required" }
     started_at = $startedAt
     completed_at = $completedAt
     quality_since = $qualitySince

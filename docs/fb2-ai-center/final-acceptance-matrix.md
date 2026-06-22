@@ -19,6 +19,7 @@
 | readiness 运行时使用 | 主项目拉 Context Pack 前读取 fb2 `/context/readiness`，把结果写入 `preflight_readiness`，并把非 ready 状态提升为 `context_quality.warnings` 和 `context_fact_summary.preflight_readiness`；`blocked` 时工具执行记录 skipped，prompt 里要出现 `<tool_gap_summary>` 数据缺口 | 运行代码提交 `9d778940` 已推送并发布；本轮已补 prompt 可见性单测，仍需带真实 token 做 Context Pack 内容级 live 复核 |
 | 工具执行和审计 | `-RequireAllScenarios` + `-CheckPermissionBoundaries` + visible chat final acceptance 的 feedback/audit evidence 和 `feedback_coverage` | 需要最终验收绑定同一批 `QualitySince`，且 `visible_mention`、`selected_message`、`summary_post` 三类 feedback 覆盖完整 |
 | answer policy | 默认 smoke 检查 `fb2.answer_policy.v1` 和 6 个 canonical eval scenarios | 已覆盖 |
+| 非语音 data-only 验收 | `smoke-fb2-ai-center.ps1 -DataOnlyAcceptance` 或最终 wrapper `-DataOnlyAcceptance` | 当前 ASR/TTS 暂缓时使用；验证 live 数据、六类场景、平台匿名摘要、APK、权限、质量、非合成 feedback 和群观点采纳，summary 标记 `voice_status=deferred_by_user`。该项不能替代最终语音验收 |
 | 真机语音证据采集 | `collect-fb2-voice-device-evidence.ps1 -CaptureHoldGesture` 生成 `fb2.voice_device_evidence.v1` JSON 和 screenshot/UI dump/logcat artifact，再由 `smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 验证 | 已新增采集器；默认输出 `finalAcceptanceReady=false`，只作为证据采集路径。最终完成仍必须人工确认所有 UI/ASR/TTS/免费策略 checks 并用长期 artifact 支撑 |
 | 语音证据脚本离线回归 | `smoke-fb2-ai-center.ps1 -SelfTest` 检查 final-ready 正例、严格布尔字段、artifact 解析/占位拒绝、logcat/视觉证据、低 APK 和 ASR/TTS 必需项失败路径 | 已补本地自测；它只证明主 smoke 的语音证据门槛不会退化，不替代真实 fb2 APK 的 `finalAcceptanceReady=true` 真机证据 |
 | 最终验收 wrapper 离线回归 | `smoke-fb2-final-acceptance.ps1 -SelfTest` 检查三类 feedback coverage、子脚本 exit code、voice/quality/permission evidence 摘录和 summary success 门槛 | 已补本地自测；它只证明 wrapper 逻辑未退化，不替代 live token、真实群聊或真机语音最终证据 |
@@ -58,6 +59,7 @@
 ## 还不能宣布完成的证据缺口
 
 - 缺真实 `FB2_AI_CENTER_TOKEN`，不能完成 authenticated readiness/direct manifest、live Context Pack、平台匿名摘要、质量汇总和 feedback 样本的最终验收。
+- ASR/TTS 当前按安排暂停；`-DataOnlyAcceptance` 可以继续推进并沉淀非语音数据闭环证据，但终极完成口径仍必须在恢复语音后补齐 `-FinalAcceptance`。
 - 缺 `finalAcceptanceReady=true` 的真实 fb2 真机语音证据 JSON，不能证明小米/HyperOS 等设备上主项目 `VoiceComposerView`、系统 ASR、云端兜底、TTS 和 ASR/TTS 免费策略已完整可用；最终证据还必须提供真实可访问的 logcat 和截图/视频 artifact。当前 ADB 半成品证据只能证明 UI/录音浮层没有静音卡死。
 - 已有独立真实群聊 visible smoke 和 summary post smoke 通过，但仍缺最终 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages` summary，不能把真实群聊可见消息、AI 回复、总结帖、summary-post feedback、正文策略检查、source references、`feedback_coverage`、`visible_answer_policy_evidence` 和 `final_acceptance_evidence` 绑定为同一批证据。
 - 缺带真实 token 的 `-CheckPermissionBoundaries` 当前运行结果，不能把历史权限负向验证当成本次最终完成证据。

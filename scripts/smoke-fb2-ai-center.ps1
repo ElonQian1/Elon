@@ -14,6 +14,7 @@ param(
     [int]$RetryCount = 1,
     [switch]$SelfTest,
     [switch]$FinalAcceptance,
+    [switch]$DataOnlyAcceptance,
     [switch]$IncludePlatformOrderSummary,
     [switch]$RequireFb2Live,
     [switch]$RequireAllScenarios,
@@ -39,6 +40,7 @@ param(
     [int]$MinOpinionAdoptionCount = 1,
     [int]$QualityFeedbackSampleLimit = 5,
     [switch]$RequireNonSyntheticQualityReadiness,
+    [switch]$SkipVoiceContractChecks,
     [switch]$RequireNoSkips
 )
 
@@ -90,6 +92,19 @@ if ($FinalAcceptance) {
     $RequireNonSyntheticQualityReadiness = $true
     $CheckPermissionBoundaries = $true
     $RequireNoSkips = $true
+}
+
+if ($DataOnlyAcceptance) {
+    $IncludePlatformOrderSummary = $true
+    $RequireFb2Live = $true
+    $RequireAllScenarios = $true
+    $CheckFb2ApkVersion = $true
+    $CheckQuality = $true
+    $RequireFeedbackCoverage = $true
+    $RequireNonSyntheticQualityReadiness = $true
+    $CheckPermissionBoundaries = $true
+    $RequireNoSkips = $true
+    $SkipVoiceContractChecks = $true
 }
 
 if ($RequireFeedbackCoverage) {
@@ -657,38 +672,42 @@ if ($MainToken) {
         $mainHeaders = @{ "Authorization" = "Bearer $($MainToken.Trim())" }
         $bootstrap = Invoke-Json -Url "$MainBase/api/external/apps/fb2/chat-bootstrap" -Headers $mainHeaders
         Assert-True ($bootstrap.aiReply.schema -eq "external_app.ai_reply.v1") "chat-bootstrap aiReply"
-        Assert-True ([bool]$bootstrap.voice.composer) "chat-bootstrap voice composer"
         Assert-True ([bool]$bootstrap.billing) "chat-bootstrap billing"
-        Assert-True ($bootstrap.voice.androidSdk.module -eq "android/chat-voice-kit") "chat-bootstrap voice sdk module" "$($bootstrap.voice.androidSdk.module)"
-        Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "VoiceComposerView" "chat-bootstrap voice sdk exposes VoiceComposerView"
-        Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "VoiceComposerBootstrap" "chat-bootstrap voice sdk exposes VoiceComposerBootstrap"
-        Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "ChatVoiceEventSink" "chat-bootstrap voice sdk exposes events"
-        Assert-True ($bootstrap.voice.composer.requiredForMainProjectLikeExperience -eq $true) "chat-bootstrap requires voice composer"
-        Assert-True ($bootstrap.voice.composer.recommendedConfigApi -eq "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)") "chat-bootstrap recommended voice config" "$($bootstrap.voice.composer.recommendedConfigApi)"
-        Assert-True ($bootstrap.voice.composer.defaultConfig.recordingOverlayEnabled -eq $true) "chat-bootstrap recording overlay enabled"
-        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.serverFallbackEnabled -eq $true) "chat-bootstrap server ASR fallback enabled"
-        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.serverConfigRequired -eq $true) "chat-bootstrap server ASR config required"
-        Assert-True ([int]$bootstrap.voice.composer.defaultConfig.asr.localResultTimeoutMs -gt 0) "chat-bootstrap local ASR result timeout" "$($bootstrap.voice.composer.defaultConfig.asr.localResultTimeoutMs)ms"
-        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.localEngineFallbackEnabled -eq $true) "chat-bootstrap local engine fallback enabled"
-        Assert-True ($bootstrap.voice.composer.defaultConfig.asr.prewarmLocalEngine -eq $true) "chat-bootstrap local ASR prewarm enabled"
-        Assert-ContainsValue $bootstrap.voice.composer.states "SERVER_PROCESSING" "chat-bootstrap exposes server processing state"
-        Assert-ContainsValue $bootstrap.voice.composer.zones "AI_REPLY" "chat-bootstrap exposes AI reply zone"
-        Assert-ContainsValue $bootstrap.voice.composer.callbacks "onVoiceServerFallbackStarted" "chat-bootstrap exposes fallback callback"
-        Assert-True ($bootstrap.voice.asr.localFirst -eq $true) "chat-bootstrap ASR local first"
-        Assert-True ($bootstrap.voice.asr.serverFallback -eq $true) "chat-bootstrap ASR server fallback"
-        Assert-True ($bootstrap.voice.asr.uploadEndpoint -eq "/api/voice/asr") "chat-bootstrap ASR endpoint" "$($bootstrap.voice.asr.uploadEndpoint)"
-        Assert-True ($bootstrap.voice.asr.billing -eq "free_auth_and_limits_only") "chat-bootstrap ASR free billing"
-        Assert-True ($bootstrap.voice.tts.billing -eq "free_auth_and_limits_only") "chat-bootstrap TTS free billing"
-        Assert-True ($bootstrap.experience.usagePolicy.asr -eq "free") "chat-bootstrap experience ASR free"
-        Assert-True ($bootstrap.experience.usagePolicy.tts -eq "free") "chat-bootstrap experience TTS free"
         Assert-True ($bootstrap.experience.usagePolicy.aiReplyGeneration -eq "billable") "chat-bootstrap experience AI billable"
-        Assert-True ($bootstrap.experience.controls.fullWidthHoldToTalkButton -eq $true) "chat-bootstrap hold-to-talk full-width"
-        Assert-True ($bootstrap.billing.gates.beforeAsr -eq "never_check_ai_balance") "chat-bootstrap before ASR gate"
-        Assert-True ($bootstrap.billing.gates.beforeTts -eq "never_check_ai_balance") "chat-bootstrap before TTS gate"
         Assert-True ($bootstrap.billing.gates.beforeAiReplyGeneration -eq "check_balance_or_trial_credit") "chat-bootstrap before AI reply gate"
-        Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "asr" "chat-bootstrap AI reply keeps ASR free"
-        Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "tts" "chat-bootstrap AI reply keeps TTS free"
         Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "external_context_fetch" "chat-bootstrap AI reply keeps context fetch free"
+        if ($SkipVoiceContractChecks) {
+            Pass "data-only acceptance excludes voice contract" "ASR/TTS deferred by current task scope"
+        } else {
+            Assert-True ([bool]$bootstrap.voice.composer) "chat-bootstrap voice composer"
+            Assert-True ($bootstrap.voice.androidSdk.module -eq "android/chat-voice-kit") "chat-bootstrap voice sdk module" "$($bootstrap.voice.androidSdk.module)"
+            Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "VoiceComposerView" "chat-bootstrap voice sdk exposes VoiceComposerView"
+            Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "VoiceComposerBootstrap" "chat-bootstrap voice sdk exposes VoiceComposerBootstrap"
+            Assert-ContainsValue $bootstrap.voice.androidSdk.publicComponents "ChatVoiceEventSink" "chat-bootstrap voice sdk exposes events"
+            Assert-True ($bootstrap.voice.composer.requiredForMainProjectLikeExperience -eq $true) "chat-bootstrap requires voice composer"
+            Assert-True ($bootstrap.voice.composer.recommendedConfigApi -eq "VoiceComposerBootstrap.applyFb2GroupChatConfig(...)") "chat-bootstrap recommended voice config" "$($bootstrap.voice.composer.recommendedConfigApi)"
+            Assert-True ($bootstrap.voice.composer.defaultConfig.recordingOverlayEnabled -eq $true) "chat-bootstrap recording overlay enabled"
+            Assert-True ($bootstrap.voice.composer.defaultConfig.asr.serverFallbackEnabled -eq $true) "chat-bootstrap server ASR fallback enabled"
+            Assert-True ($bootstrap.voice.composer.defaultConfig.asr.serverConfigRequired -eq $true) "chat-bootstrap server ASR config required"
+            Assert-True ([int]$bootstrap.voice.composer.defaultConfig.asr.localResultTimeoutMs -gt 0) "chat-bootstrap local ASR result timeout" "$($bootstrap.voice.composer.defaultConfig.asr.localResultTimeoutMs)ms"
+            Assert-True ($bootstrap.voice.composer.defaultConfig.asr.localEngineFallbackEnabled -eq $true) "chat-bootstrap local engine fallback enabled"
+            Assert-True ($bootstrap.voice.composer.defaultConfig.asr.prewarmLocalEngine -eq $true) "chat-bootstrap local ASR prewarm enabled"
+            Assert-ContainsValue $bootstrap.voice.composer.states "SERVER_PROCESSING" "chat-bootstrap exposes server processing state"
+            Assert-ContainsValue $bootstrap.voice.composer.zones "AI_REPLY" "chat-bootstrap exposes AI reply zone"
+            Assert-ContainsValue $bootstrap.voice.composer.callbacks "onVoiceServerFallbackStarted" "chat-bootstrap exposes fallback callback"
+            Assert-True ($bootstrap.voice.asr.localFirst -eq $true) "chat-bootstrap ASR local first"
+            Assert-True ($bootstrap.voice.asr.serverFallback -eq $true) "chat-bootstrap ASR server fallback"
+            Assert-True ($bootstrap.voice.asr.uploadEndpoint -eq "/api/voice/asr") "chat-bootstrap ASR endpoint" "$($bootstrap.voice.asr.uploadEndpoint)"
+            Assert-True ($bootstrap.voice.asr.billing -eq "free_auth_and_limits_only") "chat-bootstrap ASR free billing"
+            Assert-True ($bootstrap.voice.tts.billing -eq "free_auth_and_limits_only") "chat-bootstrap TTS free billing"
+            Assert-True ($bootstrap.experience.usagePolicy.asr -eq "free") "chat-bootstrap experience ASR free"
+            Assert-True ($bootstrap.experience.usagePolicy.tts -eq "free") "chat-bootstrap experience TTS free"
+            Assert-True ($bootstrap.experience.controls.fullWidthHoldToTalkButton -eq $true) "chat-bootstrap hold-to-talk full-width"
+            Assert-True ($bootstrap.billing.gates.beforeAsr -eq "never_check_ai_balance") "chat-bootstrap before ASR gate"
+            Assert-True ($bootstrap.billing.gates.beforeTts -eq "never_check_ai_balance") "chat-bootstrap before TTS gate"
+            Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "asr" "chat-bootstrap AI reply keeps ASR free"
+            Assert-ContainsValue $bootstrap.aiReply.freePreparationSteps "tts" "chat-bootstrap AI reply keeps TTS free"
+        }
     } catch {
         Fail "chat-bootstrap" $_.Exception.Message
     }

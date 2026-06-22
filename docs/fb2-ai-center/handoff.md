@@ -6,6 +6,7 @@
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-22 14:40 当前按用户安排暂停 ASR/TTS 继续处理，主项目本轮新增非语音独立验收路径：`scripts\smoke-fb2-ai-center.ps1 -DataOnlyAcceptance` 会强制验证 live fb2 数据、六类场景、平台匿名摘要、APK、权限负向审计、质量反馈、非合成 feedback、群观点采纳和 no-skip，同时跳过 chat-bootstrap 语音/ASR/TTS 断言；`scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance` 支持 `-PreflightOnly` 和 `-AllowVisibleMessages`，不要求 `VoiceDeviceEvidencePath`，summary 会写 `voice_status=deferred_by_user`。这只用于继续推进比赛/订单/群观点/平台摘要 AI 数据闭环，不能宣布最终 ASR/TTS 或终极目标完成。
 - 2026-06-22 14:25 主项目 `/api/external/apps/fb2/context-contract` 的 `context_observability_contract` 已加入三项非语音长期质量指标：`non_synthetic_feedback_count`、`opinion_adoption_count`、`opinion_memory_ref_count`。这些字段和 smoke 的 `-RequireNonSyntheticQualityReadiness` 对齐，用于证明真实反馈、群观点采纳和观点记忆引用进入闭环。
 - 2026-06-22 14:10 主项目侧新增非合成质量 readiness 验收门槛：`smoke-fb2-ai-center.ps1 -RequireNonSyntheticQualityReadiness` 会对 fb2 `feedback-summary`、`quality-summary`、`opinion-adoption-summary` 使用同一组 `group_id/external_user_id/from/to/exclude_synthetic=true` 查询，并要求非合成反馈和群观点采纳达到阈值；`-FinalAcceptance` 自动启用。最终 wrapper 已把 `MinNonSyntheticFeedbackCount`、`MinOpinionAdoptionCount` 透传到中心 smoke，并在 summary evidence 中记录 `quality_non_synthetic_feedback_count`、`quality_non_synthetic_adoption_count`、`quality_non_synthetic_memory_refs`。下一轮仍需拿到 `FB2_AI_CENTER_TOKEN` 与 `finalAcceptanceReady=true` 真机语音证据，才能跑完整最终验收。
 - 2026-06-22 13:40 当前最新主项目状态已随远端快进到 `origin/main=82e042227074939b01fcbe5c32319277ea425f37`，线上 `/api/server/version` 为 `v0.3.605 / 82e042227074939b01fcbe5c32319277ea425f37`。`smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>` 通过，authenticated `chat-bootstrap` 和 live manifest 继续健康，仅因缺 `FB2_AI_CENTER_TOKEN` 跳过 live fb2 data。本轮重新跑采集器后，半成品 ADB 证据 JSON 记录 `mainProjectCommit=82e04222`；`smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence` 仍正确拒绝该证据作为最终完成。
@@ -153,6 +154,11 @@
 - 需要验证 authenticated `chat-bootstrap` 的语音 SDK 契约时，传 `-MainToken <token>`，或传 `-Fb2Username/-Fb2Password` 让脚本通过 fb2 session bridge 自动获取主项目 token；这条 smoke 不会写真实群聊。
 - 需要验证 fb2 用户端 APK 发布状态时加 `-CheckFb2ApkVersion`；默认最低版本为 `1.1.48`，可用 `-MinFb2ApkVersion` 临时提高门槛。
 - 需要把主项目本地语音 SDK 编译也纳入验收时加 `-CheckLocalVoiceSdkBuild`。
+- 当前 ASR/TTS 暂缓期间，非语音数据闭环优先跑：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token>`
+  有明确写群授权后再跑：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token>`
+  这两条不会要求 `VoiceDeviceEvidencePath`，但必须有 fb2 service token 和有订单用户上下文；通过只表示数据/权限/质量/可见群聊闭环通过，不代表 ASR/TTS 完成。
 - 最终验收或 CI 不允许跳过任何检查时加 `-RequireNoSkips`。
 - 需要验证 fb2 真机语音链路时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；正式证据必须覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。
 - 真机语音证据的 `artifacts[].ref` 必须是真实可访问证据：本地路径按 evidence JSON 所在目录或仓库根目录解析，远端路径必须是 `http(s)://`；不能使用 example/placeholder/“saved file path” 文案，并且必须同时包含 logcat 和截图/视频。
