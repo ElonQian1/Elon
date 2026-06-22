@@ -52,6 +52,8 @@ internal class MainHomeListActions(
     private var plazaBannerProjects: List<StoreProject> = emptyList()
     private var plazaBannerLoading = false
     private var plazaBannerLoaded = false
+    private val projectMemberCache = mutableMapOf<String, List<AppGroupMember>>()
+    private val projectMemberRequests = mutableSetOf<String>()
 
     fun showFriendLocalSearch() {
         if (binding.conversationPage.visibility != View.VISIBLE || binding.chatPage.visibility == View.VISIBLE) return
@@ -134,6 +136,20 @@ internal class MainHomeListActions(
                         openGroup(item.group)
                     }
                 )
+                is HomeChatItem.ProjectItem -> {
+                    val row = if (item.project.isJointDevelopmentProject()) {
+                        homeRows().createGroupRow(item.project.toProjectHomeGroup(activity, item.members)) {
+                            clearFriendSearchState()
+                            openProject(item.index)
+                        }
+                    } else {
+                        homeRows().createFriendRow(item.project.toProjectHomeFriend(activity)) {
+                            clearFriendSearchState()
+                            openProject(item.index)
+                        }
+                    }
+                    binding.conversationPage.addView(row)
+                }
             }
         }
     }
@@ -172,6 +188,10 @@ internal class MainHomeListActions(
                     "${item.group.memberCount} 位成员",
                     item.group.members.joinToString(" ") { member -> member.displayName }
                 )
+                is HomeChatItem.ProjectItem -> matchesQuery(
+                    query,
+                    *item.project.projectHomeSearchValues(item.members).toTypedArray()
+                )
             }
         }
     }
@@ -205,7 +225,7 @@ internal class MainHomeListActions(
             setText(friendSearchQuery)
             setSingleLine(true)
             textSize = 15f
-            hint = "搜索好友、群聊、最近消息"
+            hint = "搜索好友、群聊、项目"
             setTextColor(Color.parseColor("#D6D6D6"))
             setHintTextColor(Color.parseColor("#777777"))
             background = null
@@ -288,9 +308,9 @@ internal class MainHomeListActions(
             setTextColor(Color.parseColor("#777777"))
             textSize = 14f
             text = if (friendSearchQuery.isBlank()) {
-                "输入关键词搜索本地好友内容"
+                "输入关键词搜索好友、群聊或项目"
             } else {
-                "没有匹配的好友或群聊"
+                "没有匹配的好友、群聊或项目"
             }
         }
     }
@@ -315,7 +335,18 @@ internal class MainHomeListActions(
                 sortTime = group.lastMessageAt ?: group.createdAt ?: 0L
             )
         }
-        return (groupItems + friendItems)
+        val projectItems = projects().mapIndexed { index, project ->
+            if (project.isJointDevelopmentProject()) {
+                ensureProjectMembersLoaded(project)
+            }
+            HomeChatItem.ProjectItem(
+                index = index,
+                project = project,
+                members = projectMemberCache[projectMemberCacheKey(project)],
+                sortTime = project.updatedAt
+            )
+        }
+        return (groupItems + friendItems + projectItems)
             .sortedWith(
                 compareByDescending<HomeChatItem> { pinnedHomeChatPriority(it) }
                     .thenByDescending { it.sortTime }
@@ -323,6 +354,7 @@ internal class MainHomeListActions(
                         when (item) {
                             is HomeChatItem.FriendItem -> item.friend.name
                             is HomeChatItem.GroupItem -> item.group.name
+                            is HomeChatItem.ProjectItem -> item.project.title
                         }
                     }
             )
@@ -332,12 +364,45 @@ internal class MainHomeListActions(
         return when (item) {
             is HomeChatItem.FriendItem -> if (item.friend.id == SOCIAL_AI_USER_ID) 1 else 0
             is HomeChatItem.GroupItem -> 0
+            is HomeChatItem.ProjectItem -> 0
         }
+    }
+
+    private fun ensureProjectMembersLoaded(project: AppProject) {
+        if (!AuthManager.isLoggedIn(activity)) return
+        val projectId = project.projectSpaceId().trim().takeIf { it.isNotBlank() } ?: return
+        if (!projectMemberRequests.add(projectId)) return
+        thread(name = "project-home-members-${projectId.hashCode()}") {
+            val result = runCatching {
+                fetchProjectSpace(
+                    http = http,
+                    serverUrl = serverUrl(),
+                    context = activity,
+                    projectId = projectId
+                ).members.toProjectHomeGroupMembers()
+            }
+            activity.runOnUiThread {
+                projectMemberCache[projectId] = result.getOrDefault(emptyList())
+                if (binding.conversationPage.visibility == View.VISIBLE && binding.chatPage.visibility != View.VISIBLE) {
+                    renderConversationList()
+                }
+            }
+        }
+    }
+
+    private fun projectMemberCacheKey(project: AppProject): String {
+        return project.projectSpaceId().trim().takeIf { it.isNotBlank() } ?: project.id
     }
 
     private sealed class HomeChatItem(open val sortTime: Long) {
         data class FriendItem(val friend: AppFriend, override val sortTime: Long) : HomeChatItem(sortTime)
         data class GroupItem(val group: AppGroup, override val sortTime: Long) : HomeChatItem(sortTime)
+        data class ProjectItem(
+            val index: Int,
+            val project: AppProject,
+            val members: List<AppGroupMember>?,
+            override val sortTime: Long
+        ) : HomeChatItem(sortTime)
     }
 
     fun renderProjectList() {
