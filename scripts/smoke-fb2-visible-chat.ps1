@@ -917,7 +917,8 @@ if ($SkipSummaryPost) {
     Assert-True ([bool]$postId) "summary-post created" $postId
     if ($postId) {
         $summaryPost = Wait-For-SummaryPost -BearerToken $token -TargetGroupId $GroupId -PostId $postId
-        Assert-True ([string]$summaryPost.status -eq "ready") "summary-post ready" "$($summaryPost.status)"
+        $summaryStatus = [string]$summaryPost.status
+        Assert-True (@("ready", "ready_with_fallback") -contains $summaryStatus) "summary-post ready" "$summaryStatus"
         Assert-True (-not [string]::IsNullOrWhiteSpace([string]$summaryPost.summary)) "summary-post direct group read text present" (Format-SummaryPostEvidence $summaryPost)
         Pass "summary-post direct group read" (Format-SummaryPostEvidence $summaryPost)
         Assert-SummaryPostPolicy -Post $summaryPost

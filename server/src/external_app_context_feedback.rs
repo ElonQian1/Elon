@@ -504,10 +504,6 @@ fn mentioned_tool_result_citation_sources(
         if !tool_result_sources_are_allowed(result) {
             continue;
         }
-        let tool_name = result
-            .get("tool_name")
-            .and_then(Value::as_str)
-            .unwrap_or("unknown_tool");
         for source_id in result
             .get("source_ids")
             .and_then(Value::as_array)
@@ -518,10 +514,10 @@ fn mentioned_tool_result_citation_sources(
             if source_id.chars().count() < 4 || !reply.contains(&source_id.to_lowercase()) {
                 continue;
             }
-            let mapped_sources = context_sources
-                .get(&source_id.to_lowercase())
-                .cloned()
-                .unwrap_or_else(|| vec![tool_result_citation_source(tool_name, &source_id)]);
+            let Some(mapped_sources) = context_sources.get(&source_id.to_lowercase()).cloned()
+            else {
+                continue;
+            };
             for source in mapped_sources {
                 let Some(key) = citation_source_key(&source) else {
                     continue;
@@ -588,53 +584,6 @@ fn tool_result_sources_are_allowed(result: &Value) -> bool {
             .and_then(Value::as_str),
         Some("grounded" | "weak")
     )
-}
-
-fn tool_result_citation_source(tool_name: &str, source_id: &str) -> Value {
-    json!({
-        "kind": inferred_tool_source_kind(tool_name, source_id),
-        "id": source_id,
-        "label": format!("fb2 工具来源 {tool_name}")
-    })
-}
-
-fn inferred_tool_source_kind(tool_name: &str, source_id: &str) -> &'static str {
-    let id = source_id.to_lowercase();
-    if id.contains("platform_order_summary") || tool_name == "platform_orders" {
-        return "platform_order_summary";
-    }
-    if id.starts_with("order")
-        || id.contains("order")
-        || id.starts_with("ticket")
-        || matches!(tool_name, "search_user_orders" | "get_order_detail")
-    {
-        return "order";
-    }
-    if id.starts_with("gmsg")
-        || id.starts_with("msg")
-        || id.contains("message")
-        || matches!(tool_name, "search_group_opinions" | "group_opinion_summary")
-    {
-        return "group_message";
-    }
-    if id.starts_with("opinion")
-        || matches!(
-            tool_name,
-            "opinion_memories" | "list_opinion_adoptions" | "opinion_result_reviews"
-        )
-    {
-        return "group_opinion_memory";
-    }
-    if id.starts_with("match")
-        || id.starts_with("m-")
-        || matches!(
-            tool_name,
-            "search_matches" | "get_match_detail" | "match_analysis_brief"
-        )
-    {
-        return "match";
-    }
-    "tool_result"
 }
 
 fn citation_source_key(source: &Value) -> Option<String> {
@@ -880,7 +829,7 @@ mod tests {
     }
 
     #[test]
-    fn payload_merges_mentioned_tool_result_sources() {
+    fn payload_reports_tool_sources_only_when_present_in_context_audit() {
         let context = json!({
             "app_id": "fb2",
             "group": "official",
@@ -915,11 +864,9 @@ mod tests {
         )
         .expect("payload");
 
-        assert_eq!(payload["cited_source_count"], 2);
+        assert_eq!(payload["cited_source_count"], 1);
         assert_eq!(payload["cited_sources"][0]["kind"], "match");
         assert_eq!(payload["cited_sources"][0]["id"], "match-tool-1");
-        assert_eq!(payload["cited_sources"][1]["kind"], "order");
-        assert_eq!(payload["cited_sources"][1]["id"], "order-tool-1");
     }
 
     #[test]
