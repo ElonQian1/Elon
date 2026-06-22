@@ -162,7 +162,7 @@
 - `chat-bootstrap` 鉴权正例：需要主项目用户 token。
 - “帮我分析我的票”正例：需要明确授权的 fb2 测试用户 UUID，并且该用户确实有可分析订单。
 - 真实群聊 `@EL`、长按消息 `AI回复`、总结帖入口：需要沙盒群，或用户明确允许在生产群产生可见 AI 消息。
-- 真机语音链路：需要 fb2 引用 `android/chat-voice-kit` 后重打 APK，并用 `docs/fb2-ai-center/voice-device-evidence.example.json` 同格式回传 `finalAcceptanceReady=true` 的小米/HyperOS 系统 ASR 超时兜底、录音浮层、直接发语音、转文字、AI 回复区、TTS 和 ASR/TTS 免费证据。
+- 真机语音链路：fb2 `1.1.48(96)` 在小米/HyperOS 上已经通过 ADB 抽样确认文本/语音切换、`按住 说话`、上滑取消、直接发 3 秒语音消息和系统 ASR `empty_asr` 后 UI 回收；仍需要按 `docs/fb2-ai-center/voice-device-evidence.example.json` 同格式回传 `finalAcceptanceReady=true` 的人工语音样本、系统 ASR final、云端 ASR 兜底、server ASR 失败恢复、AI 回复区、TTS 和 ASR/TTS 免费证据。
 
 当前可见群聊脚本：
 

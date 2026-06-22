@@ -1,0 +1,260 @@
+06-22 11:00:02.797 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:02.797 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:02.837 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:02.837 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:02.877 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:02.877 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:02.917 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:02.917 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:02.957 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:02.957 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:02.997 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:02.997 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.032 I/MIUIInput( 2457): [MotionEvent] publisher action=0x1, deviceId=-1, 1022114294, channel 'b7dd365 com.duoguan.football/com.duoguan.football.MainActivity'
+06-22 11:00:03.033 I/MIUIInput(14710): [MotionEvent] ViewRootImpl windowName 'com.duoguan.football/com.duoguan.football.MainActivity', { action=ACTION_UP, id[0]=0, pointerCount=1, eventTime=1022114294, downTime=1022111289, phoneEventTime=1782097203031 } moveCount:175
+06-22 11:00:03.035 D/MediaRecorder(14710): stop+ 0xb400006ec2ade610
+06-22 11:00:03.035 D/StagefrightRecorder( 2918): stop+
+06-22 11:00:03.035 I/AudioRecord( 2918): stop mSessionID=78985, mPortID=15557, mActice: 1 packageName: com.duoguan.football
+06-22 11:00:03.035 D/AudioRecord( 2918): stop(15557): mActive:1
+06-22 11:00:03.038 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.038 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.049 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 2 isneedblemic 0
+06-22 11:00:03.049 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 2 isneedblemic 0
+06-22 11:00:03.049 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-landscape
+06-22 11:00:03.049 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-portrait
+06-22 11:00:03.049 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-inverted-landscape
+06-22 11:00:03.049 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-inverted-portrait
+06-22 11:00:03.049 E/PAL: StreamCompress( 1692): stop: 406: device 27 name PAL_DEVICE_IN_HANDSET_MIC, going to stop
+06-22 11:00:03.049 D/PAL: Device( 1692): stop_l: 917: Enter. deviceCount 2 deviceStartStopCount 2 for device id 27 (PAL_DEVICE_IN_HANDSET_MIC)
+06-22 11:00:03.055 D/kv_xml_parser( 1692): metadata_print:    key[DeviceTX] value[Handset_Mic]
+06-22 11:00:03.060 I/PAL: StreamCompress( 1692): close: 277: device 27 (PAL_DEVICE_IN_HANDSET_MIC), going to close
+06-22 11:00:03.060 I/PAL: Device( 1692): close: 728: Enter. deviceCount 2 for device id 27 (PAL_DEVICE_IN_HANDSET_MIC)
+06-22 11:00:03.060 I/PAL: Device( 1692): close: 773: Exit. deviceCount 1 for device id 27 (PAL_DEVICE_IN_HANDSET_MIC), exit status 0
+06-22 11:00:03.061 D/PAL: Device( 1692): removeStreamDeviceAttr: 1284: dev: 27 attr removed are: priority: 0x3, stream type: 3, ch: 2, sr: 48000, bit_width: 16, fmt: 1, sndDev: handset-dmic-endfire, custom_key:
+06-22 11:00:03.061 D/PAL: ResourceManager( 1692): restoreDevice: 15850: current device: 27 running at, ch 2, sr 48000, bit_width 16, fmt 1, sndDev handset-dmic-endfire
+06-22 11:00:03.061 D/PAL: ResourceManager( 1692): getSharedBEActiveStreamDevs: 7800: got dev 27 (PAL_DEVICE_IN_HANDSET_MIC) active streams on dev is 1
+06-22 11:00:03.061 D/PAL: ResourceManager( 1692): getSharedBEActiveStreamDevs: 7800: got dev 28 (PAL_DEVICE_IN_SPEAKER_MIC) active streams on dev is 0
+06-22 11:00:03.061 D/PAL: ResourceManager( 1692): updateSndName: 9620: Updated snd device to handset-dmic-endfire for device PAL_DEVICE_IN_HANDSET_MIC
+06-22 11:00:03.065 D/AudioServiceStubImpl( 2457): startCameraRecordService
+06-22 11:00:03.067 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 2 isneedblemic 0
+06-22 11:00:03.068 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 2 isneedblemic 0
+06-22 11:00:03.068 D/LeAudioService(13929): Recording mode changed: true -> true
+06-22 11:00:03.070 I/AHAL: AudioStream( 1692): RouteStream: 6140: Enter: InPrimary usecase(22: audio-record-compress)
+06-22 11:00:03.075 D/AudioFlingerImpl( 1979): meetingpowerpolicy mVoipTxAppCount 0 mTargetRecordMode 1 mSupportMeetingPower 0 mIsSpeakerMic 1
+06-22 11:00:03.076 D/AudioFlingerImpl( 1979): checkForGameParameter_l() set events appname=-com.duoguan.football
+06-22 11:00:03.077 D/AHAL: AudioStream( 1692): astream_in_set_parameters: 2067: Enter: appname=-com.duoguan.football
+06-22 11:00:03.077 D/AHAL: AudioStreamCustom( 1692): SetParameters: 1085: Enter: kvpairs is appname=-com.duoguan.football
+06-22 11:00:03.077 D/AHAL: AudioStream( 1692): SetParameters: 6597: enter: kvpairs: appname=-com.duoguan.football
+06-22 11:00:03.079 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.079 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.080 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.082 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.083 D/MiSound.MQSUtils( 2457): report record event.{"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.duoguan.football", "record_source":"MIC", "record_encoding":"10", "record_channel_num":"1", "record_sample_rate":"44100", "record_time_during":"3"},"dgt":"null","audio_ext":"null"}
+06-22 11:00:03.084 D/LeAudioService(13929): Recording mode changed: true -> true
+06-22 11:00:03.087 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.089 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.090 V/xlog_client( 2457):  xlog_send_java  JNI test, msg is {"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.duoguan.football", "record_source":"MIC", "record_encoding":"10", "record_channel_num":"1", "record_sample_rate":"44100", "record_time_during":"3"},"dgt":"null","audio_ext":"null"}
+06-22 11:00:03.091 E/xlog_client( 2457): xlog_send_java:fail to  send msg {"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.duoguan.football", "record_source":"MIC", "record_encoding":"10", "record_channel_num":"1", "record_sample_rate":"44100", "record_time_during":"3"},"dgt":"null","audio_ext":"null"}
+06-22 11:00:03.094 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.095 D/MPEG4Writer( 2918): Top 5 write durations(microseconds): #1:54 #2:55 #3:58 #4:107 #5:192
+06-22 11:00:03.095 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.096 D/StagefrightRecorder( 2918): stop-
+06-22 11:00:03.096 D/MediaRecorder(14710): stop- 0xb400006ec2ade610
+06-22 11:00:03.096 D/MediaRecorder(14710): release+ 0xb400006ec2ade610
+06-22 11:00:03.096 D/StagefrightRecorder( 2918): Destructor+
+06-22 11:00:03.096 D/StagefrightRecorder( 2918): stop+
+06-22 11:00:03.096 W/StagefrightRecorder( 2918): stop while neither recording nor paused
+06-22 11:00:03.096 D/StagefrightRecorder( 2918): stop-
+06-22 11:00:03.096 D/StagefrightRecorder( 2918): Destructor-
+06-22 11:00:03.096 I/AudioRecord( 2918): stop mSessionID=78985, mPortID=15557, mActice: 0 packageName: com.duoguan.football
+06-22 11:00:03.096 D/AudioRecord( 2918): stop(15557): mActive:0
+06-22 11:00:03.099 D/AudioRecordStub( 2918): ~AudioRecordStub() destroy
+06-22 11:00:03.100 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.100 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.100 D/MediaRecorder(14710): release- 0xb400006ec2ade610
+06-22 11:00:03.100 D/MediaRecorder(14710): destructor+ 0xb400006ec2ade610
+06-22 11:00:03.100 D/MediaRecorder(14710): destructor- 0xb400006ec2ade610
+06-22 11:00:03.107 W/MediaRecorder(14710): mediarecorder went away with unhandled events
+06-22 11:00:03.108 I/AsrService(25775): onStopListening: mUseLocal=false
+06-22 11:00:03.119 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.119 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.120 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.120 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.121 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.121 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.121 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:03.122 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.123 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.126 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:03.156 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.156 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.196 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.196 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.238 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.238 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.276 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.277 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.316 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.316 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.356 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.357 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.402 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.402 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.438 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.438 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.478 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.478 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.518 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.518 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.558 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.559 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.597 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.597 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.637 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.637 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.678 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.678 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.717 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.717 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.757 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.758 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.798 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.799 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.838 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.838 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.879 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.879 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.918 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.919 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.959 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:03.959 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:03.999 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.000 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.039 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.039 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.080 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.080 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.119 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.119 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.158 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.159 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.200 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.200 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.237 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.237 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.279 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.279 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.318 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.318 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.358 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.358 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = true
+06-22 11:00:04.397 I/AsrService(25775): handleMsg: ERROR_OCCUR callback isNull? false
+06-22 11:00:04.397 D/AsrService(25775):  error code: 7
+06-22 11:00:04.397 I/AudioRecordTask(25775): stop record audio
+06-22 11:00:04.399 I/AudioRecordTask(25775): currentIsSpeak=false
+06-22 11:00:04.399 I/AudioRecordTask(25775): recordingToBuffer: true mUseManualVad=true currentIsSpeak = false formerhasSpeak = false mVadEnded = false isRecordStart = false
+06-22 11:00:04.399 I/AudioRecordTask(25775): stop record audio
+06-22 11:00:04.401 I/AivsSDK-[AIVS 5382-OkHttp http://27.44.124.198:8080] LiteCryptWsClient(25775): processText:SpeechRecognizer.RecognizeResult,a0a5f56b34c456f8ea1f58d6a965076
+06-22 11:00:04.401 I/AivsSDK-[AIVS 2453-DownloadThread] InstructionManager(25775): handleInstruction:SpeechRecognizer.RecognizeResult,a0a5f56b34c456f8ea1f58d6a965076
+06-22 11:00:04.401 I/EngineCapabilityUtils(25775): process FullName=SpeechRecognizer.RecognizeResult dialogId=a0a5f56b34c456f8ea1f58d6a965076
+06-22 11:00:04.402 I/AsrService(25775): handleMsg: ASR_DATA results= EventId=a0a5f56b34c456f8ea1f58d6a965076
+06-22 11:00:04.402 W/AsrService(25775): onCallbackResults: param error
+06-22 11:00:04.405 I/AivsSDK-[AIVS 2453-DownloadThread] InstructionManager(25775): handleInstruction: {"header":{"name":"Abort","namespace":"System","dialog_id":"a0a5f56b34c456f8ea1f58d6a965076","id":"27e974fb5c3042b2803bbd36b50e16ae"},"payload":{"reason":"empty_asr"}}
+06-22 11:00:04.406 I/AudioRecord(25775): stop mSessionID=78993, mPortID=15560, mActice: 1 packageName: com.xiaomi.mibrain.speech
+06-22 11:00:04.407 D/AudioRecord(25775): stop(15560): mActive:1
+06-22 11:00:04.410 I/AsrService(25775): handleMsg: ASR_END
+06-22 11:00:04.410 I/AudioRecordTask(25775): stop record audio
+06-22 11:00:04.411 W/MIUISafety-Monitor(31337): sync com.duoguan.football,userId:0,op:27,active:false,isNote:false,isTerminal:false,notify:true
+06-22 11:00:04.418 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 1 isneedblemic 0
+06-22 11:00:04.418 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 1 isneedblemic 0
+06-22 11:00:04.420 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = record-customized
+06-22 11:00:04.420 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = main-mic
+06-22 11:00:04.420 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = top-mic
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = back-mic
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = aux-mic
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = default-mic
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = va-mic-enroll
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = va-mic-asr
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-landscape
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-portrait
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-inverted-landscape
+06-22 11:00:04.421 D/PAL: ResourceManager( 1692): getECEnableSetting: 4417: existing custom config key = unprocessed-hdr-mic-inverted-portrait
+06-22 11:00:04.421 I/vendor.qti.hardware.servicetrackeraidl-service( 1813): unbindService is called for service : com.xiaomi.mibrain.speech/.asr.AsrService and for client system
+06-22 11:00:04.422 D/PAL: Device( 1692): stop_l: 917: Enter. deviceCount 1 deviceStartStopCount 1 for device id 27 (PAL_DEVICE_IN_HANDSET_MIC)
+06-22 11:00:04.429 D/kv_xml_parser( 1692): metadata_print:    key[StreamTX] value[PCM_Record]
+06-22 11:00:04.430 D/kv_xml_parser( 1692): metadata_print:    key[DeviceTX] value[Handset_Mic]
+06-22 11:00:04.444 I/PAL: Device( 1692): close: 728: Enter. deviceCount 1 for device id 27 (PAL_DEVICE_IN_HANDSET_MIC)
+06-22 11:00:04.444 D/PAL: Device( 1692): close: 733: Disabling device 27 with snd dev handset-dmic-endfire
+06-22 11:00:04.446 I/PAL: Device( 1692): close: 773: Exit. deviceCount 0 for device id 27 (PAL_DEVICE_IN_HANDSET_MIC), exit status 0
+06-22 11:00:04.446 I/PAL: StreamSoundTrigger( 1692): GetCurrentCaptureProfile: 1864: cap_prof DUAL_MIC_16KHZ_16BIT_CUSTOM_NS_RAW: dev_id=0x1a, chs=2, sr=16000, snd_name=va-mic-dmic-lpi, ec_ref=1
+06-22 11:00:04.446 I/PAL: Device( 1692): setDeviceAttributes: 479: DeviceAttributes for Device Id 40 (PAL_DEVICE_IN_HANDSET_VA_MIC) updated
+06-22 11:00:04.447 D/PAL: Stream( 1692): getStreamType: 528: streamType - 17 (PAL_STREAM_VOICE_UI)
+06-22 11:00:04.447 D/PAL: VoiceUIPlatformInfo( 1692): GetVUIFirstStageConfig: 267: search module for model type 102
+06-22 11:00:04.447 D/PAL: VoiceUIPlatformInfo( 1692): GetVUIFirstStageConfig: 267: search module for model type 102
+06-22 11:00:04.447 D/PAL: ResourceManager( 1692): getPALDeviceName: 8906: id 40 (PAL_DEVICE_IN_HANDSET_VA_MIC)
+06-22 11:00:04.447 I/PAL: Device( 1692): open: 564: Enter. deviceCount 0 for device id 40 (PAL_DEVICE_IN_HANDSET_VA_MIC)
+06-22 11:00:04.447 D/PAL: Device( 1692): open: 617: Update sndName va-mic-dmic-lpi, currently va-mic
+06-22 11:00:04.447 D/PAL: Device( 1692): open: 662: audio_route 0xb40000700b0c53d0K SND device name va-mic-dmic-lpi
+06-22 11:00:04.447 D/audio_route( 1692): Apply path: va-mic-dmic-lpi
+06-22 11:00:04.494 I/PAL: Device( 1692): open: 703: Exit. deviceCount 1 for device id 40 (PAL_DEVICE_IN_HANDSET_VA_MIC), exit status: 0
+06-22 11:00:04.494 D/PAL: Stream( 1692): getStreamType: 528: streamType - 17 (PAL_STREAM_VOICE_UI)
+06-22 11:00:04.495 D/PAL: VoiceUIPlatformInfo( 1692): GetVUIFirstStageConfig: 267: search module for model type 102
+06-22 11:00:04.495 D/PAL: VoiceUIPlatformInfo( 1692): GetVUIFirstStageConfig: 267: search module for model type 102
+06-22 11:00:04.495 I/PAL: StreamSoundTrigger( 1692): ProcessEvent: 2310: Start device 40-PAL_DEVICE_IN_HANDSET_VA_MIC
+06-22 11:00:04.495 D/PAL: Device( 1692): start_l: 816: Enter. deviceCount 1 deviceStartStopCount 0 for device id 40 (PAL_DEVICE_IN_HANDSET_VA_MIC)
+06-22 11:00:04.501 D/PAL: Stream( 1692): getStreamType: 528: streamType - 17 (PAL_STREAM_VOICE_UI)
+06-22 11:00:04.501 D/PAL: VoiceUIPlatformInfo( 1692): GetVUIFirstStageConfig: 267: search module for model type 102
+06-22 11:00:04.501 D/PAL: VoiceUIPlatformInfo( 1692): GetVUIFirstStageConfig: 267: search module for model type 102
+06-22 11:00:04.512 D/PAL: Device( 1692): removeStreamDeviceAttr: 1284: dev: 27 attr removed are: priority: 0x3, stream type: 2, ch: 2, sr: 48000, bit_width: 16, fmt: 1, sndDev: handset-dmic-endfire, custom_key:
+06-22 11:00:04.512 D/PAL: ResourceManager( 1692): restoreDevice: 15850: current device: 27 running at, ch 2, sr 48000, bit_width 16, fmt 1, sndDev handset-dmic-endfire
+06-22 11:00:04.512 D/PAL: ResourceManager( 1692): getSharedBEActiveStreamDevs: 7800: got dev 27 (PAL_DEVICE_IN_HANDSET_MIC) active streams on dev is 0
+06-22 11:00:04.512 D/PAL: ResourceManager( 1692): getSharedBEActiveStreamDevs: 7800: got dev 28 (PAL_DEVICE_IN_SPEAKER_MIC) active streams on dev is 0
+06-22 11:00:04.516 E/AppOps  ( 2457): Operation not started: uid=10271 pkg=com.xiaomi.mibrain.speech(null) op=RECORD_AUDIO
+06-22 11:00:04.519 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 1 isneedblemic 0
+06-22 11:00:04.519 D/AHAL: AudioDeviceCustom( 1692): CheckInputDevice: 1678: stream_in_list_.size() 1 isneedblemic 0
+06-22 11:00:04.520 I/AHAL: AudioStream( 1692): RouteStream: 6140: Enter: InPrimary usecase(21: audio-record)
+06-22 11:00:04.524 D/APM_AudioPolicyManager( 1979): stopInput: setCaptureState false for sva/voicetrigger
+06-22 11:00:04.526 D/AudioFlingerImpl( 1979): meetingpowerpolicy mVoipTxAppCount 0 mTargetRecordMode 1 mSupportMeetingPower 0 mIsSpeakerMic 1
+06-22 11:00:04.530 I/AudioRecord(25775): stop mSessionID=78993, mPortID=15560, mActice: 0 packageName: com.xiaomi.mibrain.speech
+06-22 11:00:04.530 D/AudioRecord(25775): stop(15560): mActive:0
+06-22 11:00:04.531 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.532 D/MiSound.MQSUtils( 2457): report record event.{"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.xiaomi.mibrain.speech", "record_source":"MIC", "record_encoding":"2", "record_channel_num":"1", "record_sample_rate":"16000", "record_time_during":"4"},"dgt":"null","audio_ext":"null"}
+06-22 11:00:04.532 D/AudioRecordStub(25775): ~AudioRecordStub() destroy
+06-22 11:00:04.532 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:04.532 I/AudioRecordTask(25775): recorder release
+06-22 11:00:04.536 D/LeAudioService(13929): Recording mode changed: true -> false
+06-22 11:00:04.536 V/xlog_client( 2457):  xlog_send_java  JNI test, msg is {"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.xiaomi.mibrain.speech", "record_source":"MIC", "record_encoding":"2", "record_channel_num":"1", "record_sample_rate":"16000", "record_time_during":"4"},"dgt":"null","audio_ext":"null"}
+06-22 11:00:04.536 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.537 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:04.538 E/xlog_client( 2457): xlog_send_java:fail to  send msg {"name":"recording_parameters","audio_event":{"device_name":"mic", "packg_name":"com.xiaomi.mibrain.speech", "record_source":"MIC", "record_encoding":"2", "record_channel_num":"1", "record_sample_rate":"16000", "record_time_during":"4"},"dgt":"null","audio_ext":"null"}
+06-22 11:00:04.542 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:04.542 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.543 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.544 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:04.554 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.556 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:04.556 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.557 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:04.559 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.559 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:04.565 D/NativePermissionController( 1979): checkPermission: missing 13 for 10125
+06-22 11:00:04.566 D/NativePermissionController( 1979): checkPermission: missing 13 for 10572
+06-22 11:00:08.416 I/ChatVoiceEngineSelector(14710): 候选引擎(1): 系统语音引擎(系统默认)(com.xiaomi.mibrain.speech)
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerNames:(no_layer_names), blurRadius:0, scale:(1.000000,1.000000), blends:(no_color_mode)
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:com.duoguan.football/com.duoguan.football.MainActivity#200331
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:StatusBar1#119436
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:Miui Bottom Caption of Task=1226#200322
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:GestureStubHome#76
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:GestureStubLeft#73
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:GestureStubRight#77
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:RoundCornerTop#119411
+06-22 11:00:09.343 I/SurfaceFlinger( 2016): SF-MICapture: mode:0, layerName:RoundCornerBottom#119412
+06-22 11:00:09.683 I/adbd    (29541): in ShellService: uiautomator dump /sdcard/window_fb2_after_voice_cancel.xml
+06-22 11:00:09.731 D/AlarmManager( 2457): mPendingIntent -> PendingIntent{971b07f: PendingIntentRecord{a69084c android broadcastIntent}}
+06-22 11:00:09.732 I/vendor.xiaomi.hardware.micharge-service( 1850): ReadFilePathValue path = /sys/class/power_supply/battery/temp value = 353
+06-22 11:00:09.733 E/IMiCharge( 2457): MiCharge method 9 val = 353
+06-22 11:00:09.734 I/vendor.xiaomi.hardware.micharge-service( 1850): ReadFilePathValue path = /sys/class/power_supply/battery/charge_control_limit value = 7
+06-22 11:00:09.734 E/IMiCharge( 2457): MiCharge method 10 val = 7
+06-22 11:00:10.001 I/AconfigPackage(18933): android.permission.flags is mapped to system
+06-22 11:00:10.001 I/AconfigPackage(18933): android.service.voice.flags is mapped to system
+06-22 11:00:10.003 I/AconfigPackage(18933): com.android.permission.flags is mapped to com.android.permission

@@ -51,6 +51,8 @@
 - 最近一次 authenticated 无副作用 smoke 通过，主项目线上版本返回 `0.3.592 37625843aa50b433d9469b8a9c175551d061075d`，fb2 live manifest 返回 `tool_count=31`。
 - 最近一次 `-FinalAcceptance -Fb2Username 123qwe -Fb2Password 123qwe` 正确失败在缺 `FB2_AI_CENTER_TOKEN` 和缺 `-VoiceDeviceEvidencePath`，说明最终验收不会误报完成。
 - 本轮 `-PreflightOnly` 安全验证通过：缺 `FB2_AI_CENTER_TOKEN` 会立即失败；同时传 `-PreflightOnly -AllowVisibleMessages` 会立即失败；传无效 `Fb2AiCenterToken` 时能解析 `123qwe` 为 `6fe5aa17-0403-427a-8e91-7f414beca35d`，但会在写群前因订单上下文预检 401 失败。
+- 2026-06-22 11:00 ADB 复测已完成：设备 `e0d909c3`，fb2 `com.duoguan.football` `1.1.48(96)`，小米语音服务 `com.xiaomi.mibrain.speech/.asr.AsrService`。真机确认群聊页已有 `按住 说话`、文本/语音切换、录音发送和上滑取消；释放路径新增 3 秒语音消息后回到 idle，没有卡在“识别中...”。
+- 同轮 logcat 证明 `com.duoguan.football` 触发 `MediaRecorder/AudioRecord`，小米 `AsrService` 返回 `error code: 7 / empty_asr` 后 `ASR_END`，UI 正常回收；但日志没有观察到主项目 `/api/voice/asr` 云端兜底请求，因此这仍是半成品语音证据，不能用于最终 `finalAcceptanceReady=true`。
 
 ## 未完成
 

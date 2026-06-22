@@ -124,6 +124,7 @@
 - 用更多账号继续抽样主项目真实群聊入口触发 `@EL` 和长按消息 `AI回复`；当前账号 `123qwe` 已验证 AI 回答能显式区分比赛事实、本人订单、群观点和 AI 推断。
 - 用已完赛比赛样本验证 `opinion_result_review_summary` 和 `opinion_result_reviews` 在主项目真实群聊回答中只被描述为历史复盘/样本统计，不被写成未来命中承诺。
 - fb2 `1.1.48` 已接入主项目群聊可见回复刷新和长按 `AI回复` 客户端入口；仍需在小米/HyperOS 真机上验证系统 ASR 超时后云端兜底、录音浮层、直接发语音、转文字和 APK UI 长按菜单。
+- 2026-06-22 11:00 主项目 ADB 复测：同一台小米/HyperOS 真机上，fb2 `1.1.48(96)` 的群聊输入栏可在文本/语音之间切换；`按住 说话` 上滑取消会触发录音链路并回到 idle；长按释放会生成 3 秒语音消息并回到 idle。logcat 看到 `com.duoguan.football` 的 `MediaRecorder/AudioRecord` 和小米 `AsrService error code: 7 / empty_asr`，但没有看到 `/api/voice/asr` 云端兜底请求。该证据只能证明录音和系统 ASR 错误回收，不证明最终 ASR fallback。
 - 主项目最终验收脚本已把 fb2 真机语音证据纳入 `-FinalAcceptance`，证据格式见 `docs/fb2-ai-center/voice-device-evidence.example.json`；没有 `-VoiceDeviceEvidencePath` 时最终验收必须失败。
 - 主项目和 fb2 建立固定 AI 数据回答评测集。
 - 后续把 fb2 工具执行从当前的 Context Pack + 轻量工具调用继续升级为更细粒度的可评测工具链。

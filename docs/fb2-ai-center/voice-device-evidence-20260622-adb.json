@@ -1,7 +1,7 @@
 {
   "schema": "fb2.voice_device_evidence.v1",
   "finalAcceptanceReady": false,
-  "recordedAt": "2026-06-22T01:47:15+08:00",
+  "recordedAt": "2026-06-22T11:01:30+08:00",
   "tester": "codex-main-project-adb",
   "device": {
     "manufacturer": "Xiaomi",
@@ -60,6 +60,10 @@
     "Holding the talk button shows the green recording bubble and the three-zone control surface: 取消 / AI回复 / 转文字 plus center 发送.",
     "Sliding to cancel dismisses the overlay and returns the composer to '按住 说话'.",
     "Releasing over 转文字 after a silent hold returns to '按住 说话' within 10 seconds; no permanent '识别中' state was observed in this ADB run.",
+    "The 11:00 ADB slide-to-cancel run triggered com.duoguan.football MediaRecorder/AudioRecord and Xiaomi AsrService, then returned to idle without a stuck processing state.",
+    "The 11:00 ADB release run created a visible 3-second voice message and returned to the idle '按住 说话' composer.",
+    "The 11:00 release log shows Xiaomi AsrService error code 7 / empty_asr and ASR_END after silent input; the UI recovered.",
+    "No /api/voice/asr or server fallback request was observed in this release log, so this evidence still does not prove cloud ASR fallback.",
     "Logcat records com.duoguan.football microphone AudioRecord activity and Xiaomi system speech service activity, but this run did not include human speech and did not prove a successful final ASR transcript."
   ],
   "artifacts": [
@@ -97,6 +101,26 @@
       "type": "logcat",
       "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-transcribe-logcat.txt",
       "note": "Shows silent ASR/transcribe attempt and UI recovery window."
+    },
+    {
+      "type": "screenshot",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-cancel-after-1100.png",
+      "note": "11:00 ADB slide-to-cancel run recovered to the idle hold-to-talk composer."
+    },
+    {
+      "type": "logcat",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-cancel-logcat-1100.txt",
+      "note": "11:00 slide-to-cancel log shows com.duoguan.football recording activity and Xiaomi AsrService empty_asr recovery."
+    },
+    {
+      "type": "screenshot",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-release-after.png",
+      "note": "11:00 ADB release run created a 3-second voice message and returned to idle."
+    },
+    {
+      "type": "logcat",
+      "ref": "docs/fb2-ai-center/adb-evidence/2026-06-22/fb2-voice-release-logcat.txt",
+      "note": "11:00 release log shows MediaRecorder/AudioRecord for fb2, Xiaomi AsrService error code 7 / empty_asr, and no observed /api/voice/asr fallback."
     }
   ],
   "remainingForFinalAcceptance": [
