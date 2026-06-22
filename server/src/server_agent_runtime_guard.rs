@@ -37,6 +37,21 @@ pub(crate) struct ServerRuntimeAuditSummary {
     pub limit_max_output_tokens: usize,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ServerRuntimeAdmissionSnapshot {
+    pub in_flight_global: usize,
+    pub max_concurrent_global: usize,
+    pub remaining_concurrent_global: usize,
+    pub in_flight_for_user: usize,
+    pub max_concurrent_per_user: usize,
+    pub remaining_concurrent_for_user: usize,
+    pub recent_requests_per_minute: usize,
+    pub max_requests_per_minute: usize,
+    pub remaining_requests_per_minute: usize,
+    pub rate_limit_retry_after_secs: Option<u64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ServerRuntimeAdmissionError {
     TooManyGlobalConcurrent {
@@ -122,6 +137,15 @@ pub(crate) fn try_acquire_runtime_admission(
 }
 
 impl ServerRuntimeAdmissionError {
+    pub(crate) fn retry_after_secs(&self) -> u64 {
+        match self {
+            Self::RateLimited {
+                retry_after_secs, ..
+            } => *retry_after_secs,
+            Self::TooManyGlobalConcurrent { .. } | Self::TooManyConcurrent { .. } => 1,
+        }
+    }
+
     pub(crate) fn public_message(&self) -> String {
         match self {
             Self::TooManyGlobalConcurrent {
@@ -172,6 +196,63 @@ impl Drop for ServerRuntimeAdmissionGuard {
         if entry.in_flight == 0 && entry.recent.is_empty() {
             state.users.remove(&self.user_id);
         }
+    }
+}
+
+pub(crate) fn admission_snapshot(
+    user_id: &str,
+    limits: ServerAgentRuntimeLimits,
+) -> ServerRuntimeAdmissionSnapshot {
+    let user_id = user_id.trim();
+    let mut state = admission_state()
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    let now = Instant::now();
+    let window = Duration::from_secs(60);
+
+    let mut should_remove_user = false;
+    let (in_flight_for_user, recent_requests_per_minute, rate_limit_retry_after_secs) =
+        if let Some(entry) = state.users.get_mut(user_id) {
+            entry
+                .recent
+                .retain(|recorded| now.duration_since(*recorded) < window);
+            should_remove_user = entry.in_flight == 0 && entry.recent.is_empty();
+            let retry_after = if entry.recent.len() >= limits.max_requests_per_minute {
+                entry.recent.front().map(|oldest| {
+                    window
+                        .saturating_sub(now.duration_since(*oldest))
+                        .as_secs()
+                        .max(1)
+                })
+            } else {
+                None
+            };
+            (entry.in_flight, entry.recent.len(), retry_after)
+        } else {
+            (0, 0, None)
+        };
+    if should_remove_user {
+        state.users.remove(user_id);
+    }
+
+    let in_flight_global = state.in_flight_global;
+    ServerRuntimeAdmissionSnapshot {
+        in_flight_global,
+        max_concurrent_global: limits.max_concurrent_global,
+        remaining_concurrent_global: limits
+            .max_concurrent_global
+            .saturating_sub(in_flight_global),
+        in_flight_for_user,
+        max_concurrent_per_user: limits.max_concurrent_per_user,
+        remaining_concurrent_for_user: limits
+            .max_concurrent_per_user
+            .saturating_sub(in_flight_for_user),
+        recent_requests_per_minute,
+        max_requests_per_minute: limits.max_requests_per_minute,
+        remaining_requests_per_minute: limits
+            .max_requests_per_minute
+            .saturating_sub(recent_requests_per_minute),
+        rate_limit_retry_after_secs,
     }
 }
 
@@ -247,8 +328,8 @@ pub(crate) fn audit_summary(
 #[cfg(test)]
 mod tests {
     use super::{
-        audit_summary, operational_error_summary, protection_status, try_acquire_runtime_admission,
-        ServerRuntimeAdmissionError,
+        admission_snapshot, audit_summary, operational_error_summary, protection_status,
+        try_acquire_runtime_admission, ServerRuntimeAdmissionError,
     };
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
     use serde_json::json;
@@ -404,6 +485,48 @@ mod tests {
         drop(first);
         let after_release = try_acquire_runtime_admission(&second_user, open_limits).unwrap();
         drop(after_release);
+    }
+
+    #[test]
+    fn admission_snapshot_reports_current_user_capacity() {
+        let user_id = unique_user("snapshot");
+        let limits = ServerAgentRuntimeLimits {
+            max_messages: 24,
+            max_message_chars: 32_000,
+            max_total_chars: 80_000,
+            max_output_tokens: 3000,
+            max_requests_per_minute: 1,
+            max_concurrent_per_user: 1,
+            max_concurrent_global: 10,
+            temperature: 0.2,
+        };
+
+        let guard = try_acquire_runtime_admission(&user_id, limits).unwrap();
+        let snapshot = admission_snapshot(&user_id, limits);
+        assert_eq!(snapshot.in_flight_for_user, 1);
+        assert_eq!(snapshot.remaining_concurrent_for_user, 0);
+        assert_eq!(snapshot.recent_requests_per_minute, 1);
+        assert_eq!(snapshot.remaining_requests_per_minute, 0);
+        assert!(matches!(snapshot.rate_limit_retry_after_secs, Some(1..=60)));
+        assert!(!serde_json::to_string(&snapshot).unwrap().contains(&user_id));
+
+        drop(guard);
+        let released = admission_snapshot(&user_id, limits);
+        assert_eq!(released.in_flight_for_user, 0);
+    }
+
+    #[test]
+    fn admission_error_exposes_retry_after_for_clients() {
+        let rate_limited = ServerRuntimeAdmissionError::RateLimited {
+            max_requests_per_minute: 1,
+            retry_after_secs: 17,
+        };
+        assert_eq!(rate_limited.retry_after_secs(), 17);
+
+        let concurrent = ServerRuntimeAdmissionError::TooManyConcurrent {
+            max_concurrent_per_user: 1,
+        };
+        assert_eq!(concurrent.retry_after_secs(), 1);
     }
 
     fn unique_user(label: &str) -> String {

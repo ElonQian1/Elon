@@ -2,7 +2,7 @@
 
 use axum::{
     extract::State,
-    http::{HeaderMap, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
@@ -14,7 +14,8 @@ use crate::{
     agent_llm_call::call_chat_llm_with_json_response_mode,
     project_auth::{auth_from_headers, json_error},
     server_agent_runtime_guard::{
-        audit_summary, operational_error_summary, protection_status, try_acquire_runtime_admission,
+        admission_snapshot, audit_summary, operational_error_summary, protection_status,
+        try_acquire_runtime_admission, ServerRuntimeAdmissionError, ServerRuntimeAdmissionSnapshot,
         ServerRuntimeProtectionStatus,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
@@ -35,6 +36,7 @@ struct ServerAgentRuntimeStatus {
     agent: Option<ServerAgentRuntimeAgentStatus>,
     limits: ServerAgentRuntimeLimits,
     protection: ServerRuntimeProtectionStatus,
+    admission: ServerRuntimeAdmissionSnapshot,
 }
 
 #[derive(Debug, Serialize)]
@@ -46,10 +48,12 @@ struct ServerAgentRuntimeAgentStatus {
 }
 
 pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
-    if auth_from_headers(&state, &headers).is_err() {
-        return json_error(StatusCode::UNAUTHORIZED, "未登录");
-    }
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
+    };
 
+    let limits = ServerAgentRuntimeLimits::current();
     let agent = resolve_server_runtime_agent(&state, None)
         .await
         .map(|agent| {
@@ -65,8 +69,9 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         ready,
         status: if ready { "ready" } else { "unavailable" },
         agent,
-        limits: ServerAgentRuntimeLimits::current(),
+        limits,
         protection: protection_status(),
+        admission: admission_snapshot(&user.id, limits),
     })
     .into_response()
 }
@@ -101,7 +106,7 @@ pub async fn chat_handler(
                 admission_error = %error,
                 "pc_server_runtime request rejected by admission control"
             );
-            return json_error(StatusCode::TOO_MANY_REQUESTS, error.public_message());
+            return admission_error_response(error);
         }
     };
     tracing::info!(
@@ -166,13 +171,24 @@ fn provider_error_message(summary: &str) -> String {
     format!("AI runtime provider failed: {summary}")
 }
 
+fn admission_error_response(error: ServerRuntimeAdmissionError) -> Response {
+    let retry_after = error.retry_after_secs().to_string();
+    let mut response = json_error(StatusCode::TOO_MANY_REQUESTS, error.public_message());
+    if let Ok(value) = HeaderValue::from_str(&retry_after) {
+        response.headers_mut().insert(header::RETRY_AFTER, value);
+    }
+    response
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        audit_summary, operational_error_summary, protection_status, provider_error_message,
-        validate_runtime_messages,
+        admission_error_response, audit_summary, operational_error_summary, protection_status,
+        provider_error_message, validate_runtime_messages,
     };
+    use crate::server_agent_runtime_guard::ServerRuntimeAdmissionError;
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
+    use axum::http::header;
     use serde_json::json;
 
     #[test]
@@ -228,5 +244,16 @@ mod tests {
         assert!(message.contains("fingerprint="));
         assert!(!message.contains("sk-secret"));
         assert!(!message.contains("user prompt text"));
+    }
+
+    #[test]
+    fn admission_error_response_sets_retry_after_header() {
+        let response = admission_error_response(ServerRuntimeAdmissionError::RateLimited {
+            max_requests_per_minute: 1,
+            retry_after_secs: 23,
+        });
+
+        assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "23");
     }
 }
