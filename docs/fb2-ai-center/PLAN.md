@@ -25,7 +25,7 @@
 
 ## 当前重点
 
-- 截至 2026-06-22 20:36，最新非语音 data-only visible acceptance 已证明真实群聊接口直读链路可用，但严格观点采纳门槛仍未通过：`target\fb2-ai-center\data-only-acceptance-20260622T123604Z.json` 记录 `visible_chat_exit_code=0`、三类 `feedback_coverage=3/3`、`@EL` 回复 `gai_9c23c6474b5a454d9b8cbbbdfdaf79de`、selected-message `AI回复` `gai_d324da35daba4302b8ca1636f24f2e8b`、summary post `gsp_4e1a6b0042da4dbfb61b62c5563ecec7`，且均来自接口回读，不是截图。失败只剩当前窗口 `opinion_adoption_count=0 min=1`；主项目本轮要补齐群观点记忆 source id 输出，再发布复测。
+- 截至 2026-06-22 21:10，最新非语音 data-only visible acceptance 已证明真实群聊接口直读链路可用，但严格观点采纳门槛仍未通过：`target\fb2-ai-center\data-only-acceptance-20260622T125844Z.json` 记录 `visible_chat_exit_code=0`、三类 `feedback_coverage=3/3`、`@EL` 回复 `gai_042e366935dc4d1e89ca184868096a9a`、selected-message `AI回复` `gai_5dce905396f14982b6c49e993dcbb60d`、summary post `gsp_fc6c29f4d8934073954e07b222b0e16c`，且均来自接口回读，不是截图。失败只剩当前窗口 `opinion_adoption_count=0 min=1`。根因已定位为主项目 planner 给 `opinion_memories` 传入整句 `query` 后，fb2 当前持久观点记忆被过度过滤；主项目已改为优先规划 `opinion_memories`，并按本群最近持久观点记忆读取 `{include_expired=false, limit=12}`，不再传原始 query。下一步发布主项目服务端并重跑严格 data-only visible acceptance。
 - 群聊对话验收不以截图为证据。每次 visible smoke 或最终验收都必须通过群聊接口直接读取 baseline messages、`@EL` seed/AI 回复、selected-message seed/`AI回复`、summary post、feedback 和 quality/adoption 结果，并保存对应 ID、count、正文 `text_len`、正文 `text_sha256`、matched/unmatched 统计；截图只用于人工 UI 观感，不证明链路打通。
 - full final acceptance 默认仍要求非合成观点采纳 `MinOpinionAdoptionCount=1`；data-only 可见窗口默认也保持该门槛。只有显式传 `-AllowNoNewOpinionAdoptionInShortWindow` 才允许短时间真实群 smoke 不新增 adoption，该 opt-out 不能作为 full final 的观点采纳证据。
 - 无 token 的 smoke 只能证明主项目契约和 live manifest 可读，不能证明最终完成。
@@ -55,7 +55,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence.example.json
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>
-# 最新严格直读样本：target\fb2-ai-center\data-only-acceptance-20260622T123604Z.json，直读和 feedback 通过，观点采纳待本轮修复后复测
+# 最新严格直读样本：target\fb2-ai-center\data-only-acceptance-20260622T125844Z.json，直读和 feedback 通过，观点采纳待 planner 修复发布后复测
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -FinalAcceptance -Fb2Username 123qwe -Fb2Password 123qwe -Fb2Token <FB2_AI_CENTER_TOKEN> -ExternalUserId <fb2_user_uuid_with_orders> -VoiceDeviceEvidencePath <real-device-evidence.json>
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN> -VoiceDeviceEvidencePath <real-device-evidence.json>

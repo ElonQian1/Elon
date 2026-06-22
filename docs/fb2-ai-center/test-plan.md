@@ -64,7 +64,7 @@
 - 真实群聊 summary 还必须包含 `visible_direct_read_evidence`，机器可读地摘录 baseline 群消息读取、`@EL` seed/回复回读、selected-message seed/回复回读和 summary-post 回读；每条可见对话正文必须有 `text_len` 和 `text_sha256`，避免后续用截图、人工翻日志或只有消息 ID 的记录代替接口证据。
 - 主项目自动 feedback 不只回填 Context Pack 里的 `citation_sources`。当 AI 回复正文显式提到已执行工具返回的 `source_ids`，且该工具结果为 `success=true`、`grounding.status=grounded/weak` 时，也必须把工具来源写入 fb2 `/context/feedback.cited_sources`；`unsafe`、失败或未被回复提到的工具来源不能回写。
 - 主项目工具 planner 对“今天比赛/预测/赔率/我的票”优先规划 `match_analysis_brief`，并保留 `search_matches`、`search_user_orders` 等补充工具。
-- 主项目工具 planner 对“群里大家怎么看/群友观点/讨论分歧”优先规划 `group_opinion_summary`，并保留 `search_group_opinions`、`opinion_memories` 等补充工具。
+- 主项目工具 planner 对“群里大家怎么看/群友观点/讨论分歧/采纳建议”必须把 `group_opinion_summary` 和 `opinion_memories` 放进前 5 个自动工具；`opinion_memories` 默认按本群最近持久观点记忆读取 `{include_expired=false, limit=12}`，不得把整句用户问题作为 `query` 过度过滤。`search_group_opinions` 作为当前群聊观点来源补充工具保留。
 - `match_analysis_brief` 归一化结果必须校验 `visibility=match_focused_brief`；`group_opinion_summary` 必须校验 `visibility=single_group_lightweight_memory`。
 - 群聊 AI prompt 包含 `<answer_rules>`，并由 `answer_policy_contract.prompt_answer_rules` 生成。
 - 群聊 AI prompt metadata 包含 `answer_policy`。

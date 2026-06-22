@@ -78,6 +78,7 @@ fn plan_fb2_tools_with_platform_scope(
     let mut skipped_reasons = Vec::new();
     let mut match_analysis_brief_planned = false;
     let mut group_opinion_summary_planned = false;
+    let mut opinion_memories_planned = false;
 
     if let Some(evidence) = match_evidence(context, query) {
         let mut brief_arguments = json!({
@@ -185,6 +186,18 @@ fn plan_fb2_tools_with_platform_scope(
         group_opinion_summary_planned = true;
 
         plans.push(PlannedTool {
+            name: "opinion_memories",
+            reason:
+                "用户要求参考群友观点、建议或采纳结论，需要优先读取 fb2 本群最近的持久观点记忆。",
+            arguments: opinion_memory_arguments(),
+            requires_external_user: false,
+            trigger: "group_opinion_memory_needed",
+            confidence: confidence_for(&evidence),
+            evidence: evidence.clone(),
+        });
+        opinion_memories_planned = true;
+
+        plans.push(PlannedTool {
             name: "search_group_opinions",
             reason: "用户要求总结群友观点、讨论分歧或采纳建议，需要检索群聊观点来源。",
             arguments: json!({
@@ -219,18 +232,17 @@ fn plan_fb2_tools_with_platform_scope(
                 evidence: evidence.clone(),
             });
         }
-        plans.push(PlannedTool {
-            name: "opinion_memories",
-            reason: "用户要求参考群友历史观点、建议或长期记忆，需要检索 fb2 群观点记忆索引。",
-            arguments: json!({
-                "query": query,
-                "include_expired": false
-            }),
-            requires_external_user: false,
-            trigger: "group_opinion_memory_needed",
-            confidence: confidence_for(&evidence),
-            evidence,
-        });
+        if !opinion_memories_planned {
+            plans.push(PlannedTool {
+                name: "opinion_memories",
+                reason: "用户要求参考群友历史观点、建议或长期记忆，需要检索 fb2 群观点记忆索引。",
+                arguments: opinion_memory_arguments(),
+                requires_external_user: false,
+                trigger: "group_opinion_memory_needed",
+                confidence: confidence_for(&evidence),
+                evidence,
+            });
+        }
     }
 
     if let Some(evidence) = keyword_evidence(
@@ -449,6 +461,13 @@ fn match_evidence(context: &Value, query: &str) -> Option<Vec<String>> {
     }
 }
 
+fn opinion_memory_arguments() -> Value {
+    json!({
+        "include_expired": false,
+        "limit": 12
+    })
+}
+
 fn audit_evidence(context: &Value) -> Option<Vec<String>> {
     let mut evidence = Vec::new();
     for warning in [
@@ -554,10 +573,11 @@ mod tests {
                 "search_matches",
                 "search_user_orders",
                 "group_opinion_summary",
-                "search_group_opinions",
+                "opinion_memories",
             ]
         );
         assert!(plan.tools[2].requires_external_user);
+        assert_recent_group_opinion_memory_arguments(&plan);
         assert_eq!(
             plan.to_metadata()["planned_tools"][0]["trigger"].as_str(),
             Some("match_analysis_brief_needed")
@@ -582,10 +602,11 @@ mod tests {
                 "match_analysis_brief",
                 "search_matches",
                 "group_opinion_summary",
-                "search_group_opinions",
                 "opinion_memories",
+                "search_group_opinions",
             ]
         );
+        assert_recent_group_opinion_memory_arguments(&plan);
         assert!(plan.to_metadata()["skipped_reasons"]
             .as_array()
             .unwrap()
@@ -682,6 +703,7 @@ mod tests {
 
         assert!(plan.tool_names().contains(&"search_group_opinions"));
         assert!(plan.tool_names().contains(&"opinion_memories"));
+        assert_recent_group_opinion_memory_arguments(&plan);
         let metadata = plan.to_metadata();
         assert!(metadata["planned_tools"]
             .as_array()
@@ -764,5 +786,19 @@ mod tests {
             .as_array()
             .unwrap()
             .contains(&json!("no_fb2_tool_trigger_matched")));
+    }
+
+    fn assert_recent_group_opinion_memory_arguments(plan: &Fb2ToolPlan) {
+        let tool = plan
+            .tools
+            .iter()
+            .find(|tool| tool.name == "opinion_memories")
+            .expect("opinion_memories should be planned");
+        assert_eq!(tool.arguments["include_expired"].as_bool(), Some(false));
+        assert_eq!(tool.arguments["limit"].as_u64(), Some(12));
+        assert!(
+            tool.arguments.get("query").is_none(),
+            "opinion_memories must default to recent group memories instead of over-filtering by the raw user query"
+        );
     }
 }
