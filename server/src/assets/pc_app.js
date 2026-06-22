@@ -5,6 +5,14 @@
   const TOKEN_KEYS = kit.TOKEN_KEYS || ['lodex_token', 'elon_token'];
   const SOCIAL_AI_USER_ID = 'usr_elon_ai';
   const LOCAL_ADMIN_HEADER_FALLBACK = 'X-Elon-Local-Admin-Token';
+  const CLIENT_PROTOCOL_TARGETS = {
+    logs: 'elon-node://logs',
+    launcher_logs: 'elon-node://launcher-logs',
+    task_journal: 'elon-node://task-journal',
+    config_dir: 'elon-node://config',
+    install_dir: 'elon-node://install-dir',
+    diagnostics_dir: 'elon-node://diagnostics'
+  };
   const $ = (id) => document.getElementById(id);
   const state = {
     token: readToken(), user: null, projects: [], friends: [], groups: [], nodes: [],
@@ -2631,9 +2639,32 @@
       });
       setSettingsResult(`已打开：${escapeHtml(data.opened || target)}`);
     } catch (error) {
-      setSettingsResult(escapeHtml(error.message || error), 'error');
+      const protocolUrl = clientProtocolUrlForTarget(target);
+      if (protocolUrl) {
+        launchClientProtocol(protocolUrl);
+        setSettingsResult(`本机节点暂时不可达，已请求 Win 端打开：${escapeHtml(target)}`);
+      } else {
+        setSettingsResult(escapeHtml(error.message || error), 'error');
+      }
     } finally {
       setSettingsBusy(button, false);
+    }
+  }
+
+  function clientProtocolUrlForTarget(target) {
+    return CLIENT_PROTOCOL_TARGETS[String(target || '').trim()] || '';
+  }
+
+  function launchClientProtocol(url) {
+    try {
+      const frame = document.createElement('iframe');
+      frame.style.display = 'none';
+      frame.setAttribute('aria-hidden', 'true');
+      frame.src = url;
+      document.body.appendChild(frame);
+      window.setTimeout(() => frame.remove(), 2000);
+    } catch (_) {
+      window.open(url, '_blank', 'noopener');
     }
   }
 

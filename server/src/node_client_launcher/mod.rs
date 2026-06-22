@@ -4,6 +4,7 @@ mod command;
 mod env_file;
 mod installer;
 pub(crate) mod log_file;
+mod maintenance_protocol;
 mod paths;
 mod process;
 mod updater;
@@ -28,6 +29,7 @@ enum ClientCommand {
     Install,
     Uninstall,
     Update,
+    OpenMaintenance(maintenance_protocol::MaintenanceProtocolTarget),
 }
 
 pub(crate) fn run() -> Result<()> {
@@ -82,6 +84,10 @@ fn run_command(command: ClientCommand) -> Result<()> {
             let install_dir = paths::install_dir()?;
             let _ = updater::update_client_if_needed(&install_dir)?;
         }
+        ClientCommand::OpenMaintenance(target) => {
+            let install_dir = paths::install_dir()?;
+            maintenance_protocol::open_target(target, &install_dir)?;
+        }
     }
     Ok(())
 }
@@ -98,6 +104,12 @@ impl ClientCommand {
         if args.iter().any(|arg| arg == "--update") {
             return Self::Update;
         }
+        if let Some(target) = maintenance_protocol::target_from_args(&args) {
+            return Self::OpenMaintenance(target);
+        }
+        if maintenance_protocol::protocol_start_requested(&args) {
+            return Self::Start;
+        }
         Self::Start
     }
 
@@ -107,6 +119,7 @@ impl ClientCommand {
             Self::Install => "install",
             Self::Uninstall => "uninstall",
             Self::Update => "update",
+            Self::OpenMaintenance(target) => target.action_name(),
         }
     }
 }
