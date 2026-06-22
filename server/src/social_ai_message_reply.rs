@@ -213,8 +213,7 @@ async fn selected_reply_or_fallback(
         Ok(reply) => reply,
         Err(error) => {
             warn!("{scene} selected-message AI generation failed: {}", error);
-            "EL 暂时没能连上 AI。你可以稍后再点一次「AI回复」，或联系管理员检查 AI 代理配置。"
-                .into()
+            selected_message_generation_fallback(selected, selected_message_id, external_context)
         }
     }
 }
@@ -278,12 +277,13 @@ async fn build_selected_reply(
     } else {
         reply.chars().take(1400).collect()
     };
-    let reply = ensure_selected_message_source(&reply, selected_message_id);
-    let reply = ensure_current_context_audit_source(&reply, external_context);
-    Ok(crate::social_ai::ensure_fb2_grounded_answer_shape(
+    let reply = ensure_selected_message_reply_shape(
         &reply,
+        selected_message_id,
+        selected_content,
         external_context,
-    ))
+    );
+    Ok(reply)
 }
 
 fn selected_message_topic_hint(selected: &SocialAiHistoryMessage) -> Option<String> {
@@ -384,6 +384,101 @@ fn replace_context_audit_id_values(reply: &str, current_context_audit_id: &str) 
     out
 }
 
+fn selected_message_generation_fallback(
+    selected: &SocialAiHistoryMessage,
+    selected_message_id: &str,
+    external_context: Option<&Value>,
+) -> String {
+    let selected_excerpt = truncate_chars(selected.content.trim(), 120);
+    let review_terms = selected_message_review_terms(&selected.content);
+    let reply = if review_terms.is_empty() {
+        format!(
+            "数据事实：AI 模型暂时不可用，本次只能复核被选择消息文本：{selected_excerpt}\n\
+             AI推断：这条消息需要谨慎看待，等待模型恢复后可再次点击「AI回复」获取更完整分析。"
+        )
+    } else {
+        format!(
+            "数据事实：AI 模型暂时不可用，本次只能复核被选择消息文本：{selected_excerpt}\n\
+             AI推断：被选择消息里的“{}”表述过于绝对，不合理，不应作为投注结论。",
+            review_terms.join("、")
+        )
+    };
+    ensure_selected_message_reply_shape(
+        &reply,
+        selected_message_id,
+        &selected.content,
+        external_context,
+    )
+}
+
+fn ensure_selected_message_reply_shape(
+    reply: &str,
+    selected_message_id: &str,
+    selected_content: &str,
+    external_context: Option<&Value>,
+) -> String {
+    let mut reply = reply.trim().to_string();
+    if reply.is_empty() {
+        reply = "AI推断：这条消息需要谨慎看待。".to_string();
+    }
+
+    reply = ensure_selected_message_source(&reply, selected_message_id);
+    reply = ensure_current_context_audit_source(&reply, external_context);
+    reply = crate::social_ai::ensure_fb2_grounded_answer_shape(&reply, external_context);
+
+    let review_terms = selected_message_review_terms(selected_content);
+    if !review_terms.is_empty() {
+        let terms = review_terms.join("、");
+        if review_terms.iter().any(|term| !reply.contains(term)) {
+            reply.push_str(&format!(
+                "\n原文复核：已针对被选择消息中的“{terms}”说法作风险判断。"
+            ));
+        }
+        if !contains_any(&reply, &["不合理", "不应", "过于绝对"]) {
+            reply.push_str(&format!(
+                "\nAI推断：被选择消息里的“{terms}”表述过于绝对，不合理，不应作为投注结论。"
+            ));
+        }
+    }
+
+    if (!review_terms.is_empty() || external_context.is_some())
+        && !contains_any(
+            &reply,
+            &[
+                "风险边界",
+                "不保证",
+                "不能保证",
+                "无法保证",
+                "仅供参考",
+                "有风险",
+                "风险",
+            ],
+        )
+    {
+        reply.push_str("\n风险边界：赛果不确定，不保证命中，不建议重注或梭哈。");
+    }
+
+    reply
+}
+
+fn selected_message_review_terms(selected_content: &str) -> Vec<&'static str> {
+    let mut terms = Vec::new();
+    for term in ["肯定赢盘", "稳赢", "稳赚", "包赢", "保证", "重注", "梭哈"] {
+        if selected_content.contains(term) {
+            terms.push(term);
+        }
+    }
+    terms
+}
+
+fn contains_any(text: &str, needles: &[&str]) -> bool {
+    needles.iter().any(|needle| text.contains(needle))
+}
+
+fn truncate_chars(text: &str, max_chars: usize) -> String {
+    text.chars().take(max_chars).collect()
+}
+
 fn mark_in_flight(key: &str) -> bool {
     with_in_flight(|items| items.insert(key.to_string()))
 }
@@ -470,5 +565,55 @@ mod tests {
 
         assert!(reply.contains("来源：match_id EXT-1"));
         assert!(reply.contains("context_audit_id current-audit-2"));
+    }
+
+    #[test]
+    fn selected_message_reply_shape_adds_review_policy() {
+        let context = json!({
+            "app_id": "fb2",
+            "answer_policy": {"schema": "fb2.answer_policy.v1"},
+            "context_audit_id": "audit-selected-1"
+        });
+        let reply = ensure_selected_message_reply_shape(
+            "这句说法需要谨慎。",
+            "gmsg-selected-1",
+            "西班牙让两球肯定赢盘、可以重注。",
+            Some(&context),
+        );
+
+        assert!(reply.contains("数据事实："));
+        assert!(reply.contains("AI推断："));
+        assert!(reply.contains("风险边界："));
+        assert!(reply.contains("selected_message_id gmsg-selected-1"));
+        assert!(reply.contains("context_audit_id audit-selected-1"));
+        assert!(reply.contains("肯定赢盘"));
+        assert!(reply.contains("重注"));
+        assert!(reply.contains("过于绝对") || reply.contains("不合理"));
+    }
+
+    #[test]
+    fn selected_message_error_fallback_is_policy_shaped() {
+        let selected = SocialAiHistoryMessage {
+            speaker: "用户A".into(),
+            content: "西班牙让两球肯定赢盘、可以重注。".into(),
+            from_request_user: false,
+        };
+        let context = json!({
+            "app_id": "fb2",
+            "answer_policy": {"schema": "fb2.answer_policy.v1"},
+            "context_audit_id": "audit-selected-2"
+        });
+
+        let reply =
+            selected_message_generation_fallback(&selected, "gmsg-selected-2", Some(&context));
+
+        assert!(reply.contains("数据事实："));
+        assert!(reply.contains("AI推断："));
+        assert!(reply.contains("风险边界："));
+        assert!(reply.contains("selected_message_id gmsg-selected-2"));
+        assert!(reply.contains("context_audit_id audit-selected-2"));
+        assert!(reply.contains("肯定赢盘"));
+        assert!(reply.contains("重注"));
+        assert!(reply.contains("不合理"));
     }
 }

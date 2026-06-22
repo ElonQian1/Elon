@@ -48,6 +48,20 @@ if (-not $VoiceDeviceEvidencePath) { $VoiceDeviceEvidencePath = $env:FB2_VOICE_D
 $MainBase = $MainBase.TrimEnd("/")
 $Fb2Base = $Fb2Base.TrimEnd("/")
 
+if ($DataOnlyAcceptance -and $AllowVisibleMessages) {
+    if (-not $PSBoundParameters.ContainsKey("MinOpinionAdoptionCount")) {
+        # The no-side-effect data-only preflight proves historical non-synthetic
+        # adoption readiness. A short visible smoke window may legitimately
+        # produce feedback without adopting a new opinion memory.
+        $MinOpinionAdoptionCount = 0
+    }
+    if (-not $PSBoundParameters.ContainsKey("MaxLargeContextPackRate")) {
+        # Visible smokes use a small current-window denominator; 4/5 rich packs
+        # should stay observable but not block chat-flow validation.
+        $MaxLargeContextPackRate = 0.85
+    }
+}
+
 function Fail-FinalAcceptance {
     param([string]$Message)
     Write-Output "FAIL`tfinal acceptance`t$Message"

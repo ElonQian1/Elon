@@ -653,7 +653,7 @@ if ($SkipMention) {
 } else {
     $mentionFeedbackSince = (Get-Date).ToUniversalTime().AddSeconds(-5).ToString("o")
     if (-not $MentionText) {
-        $MentionText = "@EL 可见smoke ${trace}: 请用 fb2 数据简短说明今天比赛怎么看，并引用来源。"
+        $MentionText = "@EL 可见smoke ${trace}: 请结合 fb2 比赛、我的票和群友观点说明今天比赛怎么看；如果采纳或不采纳群友观点，请写明原因并引用来源。"
     }
     $groupPath = Encode-PathSegment $GroupId
     $sent = Invoke-Json -Url "$MainBase/api/me/groups/$groupPath/messages" -Headers $headers -Method "POST" -Body @{
