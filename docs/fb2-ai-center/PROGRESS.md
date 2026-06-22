@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮继续增强 `status-refresh-current.json` 的交接能力：新增 `owner_next_actions` 和 `blocking_state`。`owner_next_actions` 会把下一步拆成主项目、fb2 子项目和 shared 三类动作；`blocking_state` 明确 `blocked_by_external_secret`、`external_secret=FB2_AI_CENTER_TOKEN`、可继续做的无密钥回归项，以及必须等 token 才能做的 live Context Pack/订单/平台摘要/feedback 刷新。这样后续两个会话协作时，不会把“主项目还能做的脚本/契约回归”和“必须 fb2 提供 token 的 live 验证”混在一起。
 - 2026-06-23 本轮把 `scripts\fb2-ai-center-refresh-current-status.ps1` 的 stdout 摘要也落成默认 artifact：不传参数时会写出 `target\fb2-ai-center\status-refresh-current.json`，schema 为 `fb2.main_project.status_refresh.v1`，并在 `files.status_refresh` 中自引用该路径。后续交接不需要复制控制台输出，直接读取该 JSON 即可看到 public contract、七类场景、非语音完成度、full final 状态、缺 token 与下一步动作。
 - 2026-06-23 本轮给 `scripts\fb2-ai-center-refresh-current-status.ps1` 增加无网络 `-SelfTest`。自测使用临时 output dir、跳过 public contract 网络检查、禁用主工作区历史证据目录，只验证刷新总入口能稳定生成 `status-current.json`、`goal-audit-current.json`、`handoff-current.md` 和 `fb2.main_project.status_refresh.v1` 摘要。后续改这个总入口时，必须先跑自测，再跑真实刷新命令，避免状态编排脚本漂移。
 - 2026-06-23 本轮新增 `scripts\fb2-ai-center-refresh-current-status.ps1`，把 public contract、status、goal audit、handoff 四步刷新收成一个无写群入口。它默认合并当前 worktree `target\fb2-ai-center` 和主工作区 `D:\rust\active-projects\elon cli\target\fb2-ai-center` 的历史证据，输出 `fb2.main_project.status_refresh.v1`，直接给出 `user_scenario_audit_ready`、`non_voice_historical_evidence_ready`、`data_goal_complete`、`full_final_complete` 和 `next_minimum_action`。这样后续从隔离 worktree 继续时，不会因为漏传 `-EvidenceDirs` 把已通过的七类场景、Context Pack 投影、群聊直读和 feedback 历史证据误判为缺代码。

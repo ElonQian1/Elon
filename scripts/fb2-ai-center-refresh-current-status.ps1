@@ -67,6 +67,63 @@ function Read-Fb2RefreshJson {
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
+function New-Fb2RefreshOwnerActions {
+    param(
+        [object]$Status,
+        [object]$GoalAudit
+    )
+
+    $tokenPresent = [bool]$Status.environment.fb2_ai_center_token_present
+    $dataGoalComplete = [bool]$GoalAudit.data_goal_complete
+    $fullFinalComplete = [bool]$GoalAudit.full_final_complete
+
+    [ordered]@{
+        main_project = if ($dataGoalComplete -and -not $tokenPresent) {
+            "keep_contract_and_status_regressions_green_until_FB2_AI_CENTER_TOKEN_is_available"
+        } else {
+            "refresh_status_goal_audit_and_handoff_after_each_contract_or_smoke_change"
+        }
+        fb2_project = if (-not $tokenPresent) {
+            "provide_FB2_AI_CENTER_TOKEN_or_export_equivalent_live_Context_Pack_permission_quality_evidence"
+        } else {
+            "keep_live_context_pack_orders_platform_summary_group_opinion_and_feedback_endpoints_current"
+        }
+        shared = if ($fullFinalComplete) {
+            "final_acceptance_complete"
+        } elseif ($dataGoalComplete) {
+            "run_DataOnlyAcceptance_PreflightOnly_with_token_then_refresh_status_refresh_current_json"
+        } else {
+            "close_missing_non_voice_requirements_before_visible_or_full_final_acceptance"
+        }
+    }
+}
+
+function New-Fb2RefreshBlockingState {
+    param(
+        [object]$Status,
+        [object]$GoalAudit
+    )
+
+    [ordered]@{
+        blocked_by_external_secret = -not [bool]$Status.environment.fb2_ai_center_token_present
+        external_secret = "FB2_AI_CENTER_TOKEN"
+        deferred_by_user = @($Status.goal_gap_audit.deferred_by_user)
+        safe_to_continue_without_secret = @(
+            "public_contract_regression",
+            "status_refresh_selftest",
+            "offline_context_pack_sample_validation",
+            "handoff_documentation"
+        )
+        requires_secret = @(
+            "live_context_pack_permission_quality_refresh",
+            "current_user_order_live_verification",
+            "platform_order_summary_live_verification",
+            "feedback_quality_live_refresh"
+        )
+        next_minimum_action = [string]$GoalAudit.next_minimum_action
+    }
+}
+
 function Assert-Fb2RefreshSelfTest {
     param(
         [bool]$Condition,
@@ -95,6 +152,10 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.goal_audit)) "goal audit file exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.handoff_markdown)) "handoff markdown exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.status_refresh)) "status refresh file exists"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.owner_next_actions.main_project)) "main owner action"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.owner_next_actions.fb2_project)) "fb2 owner action"
+        Assert-Fb2RefreshSelfTest ([bool]$summary.blocking_state.blocked_by_external_secret) "selftest token blocked"
+        Assert-Fb2RefreshSelfTest ([string]$summary.blocking_state.external_secret -eq "FB2_AI_CENTER_TOKEN") "external secret name"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
         "== SelfTest Summary =="
         "failed=0"
@@ -171,6 +232,8 @@ if (-not $SkipPublicContract) {
 $status = Read-Fb2RefreshJson -Path $statusPath
 $goalAudit = Read-Fb2RefreshJson -Path $goalAuditPath
 $public = Read-Fb2RefreshJson -Path $publicPath
+$ownerNextActions = New-Fb2RefreshOwnerActions -Status $status -GoalAudit $goalAudit
+$blockingState = New-Fb2RefreshBlockingState -Status $status -GoalAudit $goalAudit
 
 $refreshSummary = [pscustomobject]@{
     schema = "fb2.main_project.status_refresh.v1"
@@ -192,6 +255,8 @@ $refreshSummary = [pscustomobject]@{
     full_final_complete = [bool]$goalAudit.full_final_complete
     token_present = [bool]$status.environment.fb2_ai_center_token_present
     next_minimum_action = [string]$goalAudit.next_minimum_action
+    owner_next_actions = $ownerNextActions
+    blocking_state = $blockingState
     missing_non_voice_requirements = @($goalAudit.missing_non_voice_requirements)
     deferred_requirements = @($goalAudit.deferred_requirements)
 }
