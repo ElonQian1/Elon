@@ -12,6 +12,8 @@ struct VersionInfo {
     git_sha: String,
     #[serde(default, rename = "downloadUrl")]
     download_url: String,
+    #[serde(default, rename = "windowsClientDownloadUrl")]
+    windows_client_download_url: String,
 }
 
 pub(crate) fn update_client_if_needed(install_dir: &Path) -> Result<bool> {
@@ -49,6 +51,21 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     let local_sha = read_local_git_sha(&version_file).unwrap_or_default();
     if local_sha == remote.git_sha {
         return Ok(false);
+    }
+
+    let package_url = if remote.windows_client_download_url.trim().is_empty() {
+        format!(
+            "{}/api/node-agent/download/windows-client",
+            base_url.trim_end_matches('/')
+        )
+    } else {
+        remote.windows_client_download_url.clone()
+    };
+    match try_update_from_client_package(install_dir, &package_url, &remote_text) {
+        Ok(updated) => return Ok(updated),
+        Err(error) => {
+            eprintln!("完整客户端包更新失败，回退到单 exe 更新: {error:#}");
+        }
     }
 
     let download_url = if remote.download_url.trim().is_empty() {
@@ -100,6 +117,146 @@ fn auto_update_disabled(env_values: &std::collections::HashMap<String, String>) 
             )
         })
         .unwrap_or(false)
+}
+
+fn try_update_from_client_package(
+    install_dir: &Path,
+    package_url: &str,
+    remote_text: &str,
+) -> Result<bool> {
+    let internal_dir = paths::internal_dir(install_dir);
+    std::fs::create_dir_all(&internal_dir)
+        .with_context(|| format!("无法创建内部目录 {}", internal_dir.display()))?;
+    let tmp_zip = internal_dir.join("elon-node-agent-windows.zip.new");
+    let tmp_version = internal_dir.join("node-agent-version.json.new");
+    let version_file = paths::version_file(install_dir);
+    let bytes = reqwest::blocking::get(package_url)
+        .with_context(|| format!("无法下载 {package_url}"))?
+        .error_for_status()
+        .with_context(|| format!("下载接口返回错误 {package_url}"))?
+        .bytes()
+        .context("无法读取完整客户端包内容")?;
+    if bytes.len() < 1024 * 1024 {
+        anyhow::bail!("下载的完整客户端包过小，疑似异常响应");
+    }
+    std::fs::write(&tmp_zip, &bytes).with_context(|| format!("无法写入 {}", tmp_zip.display()))?;
+    std::fs::write(&tmp_version, remote_text)
+        .with_context(|| format!("无法写入 {}", tmp_version.display()))?;
+
+    process::stop_agent();
+    let client = paths::client_exe(install_dir);
+    if running_from_path(&client) {
+        schedule_self_replace_package(&tmp_zip, install_dir, &tmp_version, &version_file)?;
+        Ok(true)
+    } else {
+        replace_client_package(&tmp_zip, install_dir, &tmp_version, &version_file)?;
+        Ok(false)
+    }
+}
+
+fn replace_client_package(
+    tmp_zip: &Path,
+    install_dir: &Path,
+    tmp_version: &Path,
+    version_file: &Path,
+) -> Result<()> {
+    #[cfg(windows)]
+    {
+        let script = package_replace_script(None, tmp_zip, install_dir, tmp_version, version_file);
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        let status =
+            launcher_command::status_hidden(&mut cmd).context("无法执行完整客户端包更新")?;
+        if !status.success() {
+            anyhow::bail!("完整客户端包更新脚本失败");
+        }
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (tmp_zip, install_dir, tmp_version, version_file);
+        anyhow::bail!("完整客户端包更新只支持 Windows")
+    }
+}
+
+fn schedule_self_replace_package(
+    tmp_zip: &Path,
+    install_dir: &Path,
+    tmp_version: &Path,
+    version_file: &Path,
+) -> Result<()> {
+    #[cfg(windows)]
+    {
+        let script = package_replace_script(
+            Some(std::process::id()),
+            tmp_zip,
+            install_dir,
+            tmp_version,
+            version_file,
+        );
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        launcher_command::spawn_hidden(&mut cmd).context("无法安排完整客户端包自更新")?;
+        Ok(())
+    }
+    #[cfg(not(windows))]
+    {
+        replace_client_package(tmp_zip, install_dir, tmp_version, version_file)
+    }
+}
+
+#[cfg(windows)]
+fn package_replace_script(
+    pid_to_wait: Option<u32>,
+    tmp_zip: &Path,
+    install_dir: &Path,
+    tmp_version: &Path,
+    version_file: &Path,
+) -> String {
+    let wait = pid_to_wait
+        .map(|pid| format!("Wait-Process -Id {pid} -ErrorAction SilentlyContinue\n"))
+        .unwrap_or_default();
+    let restart = pid_to_wait
+        .map(|_| {
+            "$client = Join-Path $installDir '一龙PC节点.exe'\nStart-Process -FilePath $client -WindowStyle Hidden\n"
+                .to_string()
+        })
+        .unwrap_or_default();
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+{wait}$zip = '{tmp_zip}'
+$installDir = '{install_dir}'
+$tmpVersion = '{tmp_version}'
+$versionFile = '{version_file}'
+$extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+try {{
+  Expand-Archive -LiteralPath $zip -DestinationPath $extractDir -Force
+  $packageClient = Join-Path $extractDir '一龙PC节点.exe'
+  $packageUninstall = Join-Path $extractDir '卸载一龙PC节点.exe'
+  $packageInternal = Join-Path $extractDir '_internal'
+  if (!(Test-Path -LiteralPath $packageClient)) {{ throw '完整客户端包缺少主程序' }}
+  if (!(Test-Path -LiteralPath $packageUninstall)) {{ throw '完整客户端包缺少卸载程序' }}
+  New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+  $targetInternal = Join-Path $installDir '_internal'
+  New-Item -ItemType Directory -Force -Path $targetInternal | Out-Null
+  Copy-Item -LiteralPath $packageClient -Destination (Join-Path $installDir '一龙PC节点.exe') -Force
+  Copy-Item -LiteralPath $packageUninstall -Destination (Join-Path $installDir '卸载一龙PC节点.exe') -Force
+  if (Test-Path -LiteralPath $packageInternal) {{
+    Copy-Item -Path (Join-Path $packageInternal '*') -Destination $targetInternal -Recurse -Force
+  }}
+  Move-Item -LiteralPath $tmpVersion -Destination $versionFile -Force
+}} finally {{
+  Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+}}
+{restart}"#,
+        wait = wait,
+        tmp_zip = launcher_command::ps_single_quote(&tmp_zip.to_string_lossy()),
+        install_dir = launcher_command::ps_single_quote(&install_dir.to_string_lossy()),
+        tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy()),
+        version_file = launcher_command::ps_single_quote(&version_file.to_string_lossy()),
+        restart = restart
+    )
 }
 
 fn replace_client_files(
@@ -220,5 +377,25 @@ mod tests {
             script.find("Move-Item -LiteralPath $tmpExe").unwrap()
                 < script.find("Start-Process -FilePath $client").unwrap()
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn package_replace_script_updates_full_client_layout() {
+        use std::path::Path;
+
+        let script = super::package_replace_script(
+            Some(1234),
+            Path::new(r"C:\ElonNode\_internal\elon-node-agent-windows.zip.new"),
+            Path::new(r"C:\ElonNode"),
+            Path::new(r"C:\ElonNode\_internal\node-agent-version.json.new"),
+            Path::new(r"C:\ElonNode\_internal\node-agent-version.json"),
+        );
+
+        assert!(script.contains("Wait-Process -Id 1234"));
+        assert!(script.contains("Expand-Archive -LiteralPath $zip"));
+        assert!(script.contains("Copy-Item -Path (Join-Path $packageInternal '*')"));
+        assert!(script.contains("Move-Item -LiteralPath $tmpVersion"));
+        assert!(script.contains("Start-Process -FilePath $client -WindowStyle Hidden"));
     }
 }
