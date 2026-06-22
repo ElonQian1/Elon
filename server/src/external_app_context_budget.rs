@@ -1,3 +1,4 @@
+//! server/src/external_app_context_budget.rs
 //! Budgeting and prompt projection for external app context packs.
 
 use serde_json::{json, Value};
@@ -162,6 +163,7 @@ fn context_fact_summary(context: &Value) -> Value {
         "match_count": array_len(context, "matches"),
         "user_order_count": array_len(context, "user_orders"),
         "group_message_count": array_len(context, "group_messages"),
+        "preflight_readiness": preflight_readiness_summary(context.get("preflight_readiness")),
         "source_id_samples": {
             "match_ids": id_samples(context.get("matches"), &["id", "match_id"], 5),
             "order_ids": id_samples(context.get("user_orders"), &["order_id", "id", "ticket_id"], 5),
@@ -179,6 +181,28 @@ fn context_fact_summary(context: &Value) -> Value {
         } else {
             "none_in_context_pack"
         }
+    })
+}
+
+fn preflight_readiness_summary(value: Option<&Value>) -> Value {
+    let Some(readiness) = value else {
+        return json!({
+            "status": "unknown",
+            "warnings": []
+        });
+    };
+    json!({
+        "status": first_prompt_value(readiness, &["status"]),
+        "warnings": readiness
+            .get("warnings")
+            .and_then(Value::as_array)
+            .map(|warnings| warnings
+                .iter()
+                .filter_map(|warning| warning.as_str().map(str::trim))
+                .filter(|warning| !warning.is_empty())
+                .take(5)
+                .collect::<Vec<_>>())
+            .unwrap_or_default()
     })
 }
 
@@ -333,6 +357,10 @@ mod tests {
             "answer_policy": {"schema": "fb2.answer_policy.v1"},
             "context_audit_id": "audit-1",
             "metrics": {"budget_status": "ok"},
+            "preflight_readiness": {
+                "status": "degraded",
+                "warnings": ["fb2_readiness_degraded"]
+            },
             "matches": [{"id": "match-1"}],
             "citation_sources": [
                 {"kind": "match", "id": "match-1", "label": "比赛 match-1"},
@@ -359,6 +387,9 @@ mod tests {
         assert!(block.contains("external_metrics="));
         assert!(block.contains("context_fact_summary="));
         assert!(block.contains("\"user_order_count\":1"));
+        assert!(block.contains("\"preflight_readiness\""));
+        assert!(block.contains("\"status\":\"degraded\""));
+        assert!(block.contains("fb2_readiness_degraded"));
         assert!(block.contains("platform_order_summary:2026-06-21:all"));
         assert!(block.contains("\"kind\":\"platform_order_summary\""));
         assert!(block.contains("order-1"));

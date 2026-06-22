@@ -6,7 +6,7 @@
 
 - 主项目是 AI Center，负责账号互通、默认群聊、聊天协议、语音 SDK、AI 生成、计费和上下文注入。
 - fb2 是业务数据提供方，负责比赛、赔率、订单、群友观点、平台汇总和审计指标。
-- 第一阶段不做 MCP。先用 HTTP Context Pack，把 fb2 业务上下文转成模型友好的 Markdown/XML，再由主项目注入群聊 AI。
+- 第一阶段不做完整 MCP/RAG。先用 HTTP Context Pack，把 fb2 业务上下文转成模型友好的 Markdown/XML，再由主项目注入群聊 AI；后续 MCP 只能作为现有 REST Context Pack、tool manifest 和 tools/execute 的适配包装层，不能另立事实源。
 - ASR、TTS、Context Pack 拉取免费；只有 AI 生成回复内容消耗 token/额度。
 - fb2 不应该复制主项目内部聊天页代码。Android 原生侧优先接 `android/chat-voice-kit`，H5/WebView 侧按 `ChatVoiceInteractionContract` 还原。
 

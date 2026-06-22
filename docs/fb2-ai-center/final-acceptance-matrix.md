@@ -16,7 +16,7 @@
 | Context Pack 拉取 | `-RequireFb2Live -RequireAllScenarios -ExternalUserId <uuid>` | 需要真实 `FB2_AI_CENTER_TOKEN` 完成最终验证 |
 | tool manifest 读取 | 默认 smoke 检查 `live_tool_manifest.status=ready`、必需 tool ids、无 missing allowed tool | 已覆盖并新增必需工具清单 |
 | fb2 dynamic discovery | 默认 smoke 直连 fb2 `/integration`，检查路由就绪、token header、关键端点和官方群映射；无 token 时 readiness/tool-manifest 必须 401；带 token 时验证 authenticated readiness 和 direct manifest tool id | 默认无 token discovery 已覆盖；authenticated 内容级检查仍需在最终验收中带 `FB2_AI_CENTER_TOKEN` 复核 |
-| readiness 运行时使用 | 主项目拉 Context Pack 前读取 fb2 `/context/readiness`，把结果写入 `preflight_readiness`，并把非 ready 状态提升为 `context_quality.warnings`；`blocked` 时工具执行记录 skipped | 运行代码提交 `9d778940` 已推送并发布，线上版本先验证到 `v0.3.593 / 9d778940...`；仍需带真实 token 做 Context Pack 内容级 live 复核 |
+| readiness 运行时使用 | 主项目拉 Context Pack 前读取 fb2 `/context/readiness`，把结果写入 `preflight_readiness`，并把非 ready 状态提升为 `context_quality.warnings` 和 `context_fact_summary.preflight_readiness`；`blocked` 时工具执行记录 skipped，prompt 里要出现 `<tool_gap_summary>` 数据缺口 | 运行代码提交 `9d778940` 已推送并发布；本轮已补 prompt 可见性单测，仍需带真实 token 做 Context Pack 内容级 live 复核 |
 | 工具执行和审计 | `-RequireAllScenarios` + `-CheckPermissionBoundaries` + visible chat final acceptance 的 feedback/audit evidence 和 `feedback_coverage` | 需要最终验收绑定同一批 `QualitySince`，且 `visible_mention`、`selected_message`、`summary_post` 三类 feedback 覆盖完整 |
 | answer policy | 默认 smoke 检查 `fb2.answer_policy.v1` 和 6 个 canonical eval scenarios | 已覆盖 |
 | 语音证据脚本离线回归 | `smoke-fb2-ai-center.ps1 -SelfTest` 检查 final-ready 正例、严格布尔字段、artifact 解析/占位拒绝、logcat/视觉证据、低 APK 和 ASR/TTS 必需项失败路径 | 已补本地自测；它只证明主 smoke 的语音证据门槛不会退化，不替代真实 fb2 APK 的 `finalAcceptanceReady=true` 真机证据 |

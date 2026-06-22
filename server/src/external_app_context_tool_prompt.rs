@@ -1,3 +1,4 @@
+//! server/src/external_app_context_tool_prompt.rs
 //! Prompt projection for executed external app tools.
 
 use serde_json::Value;
@@ -29,11 +30,13 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
         body.push_str("\n... [external app tool results truncated]");
     }
     let fact_summary = prompt_tool_fact_summary(execution);
+    let gap_summary = prompt_tool_gap_summary(execution);
 
     format!(
         "按需执行的外部项目工具：\n\
          <executed_external_app_tools app_id=\"{app_id}\" status=\"{status}\" executed_at=\"{executed_at}\">\n\
          {fact_summary}\
+         {gap_summary}\
          {body}\n\
          <tool_result_rules>\n\
          - 只有 status=ready、success=true 且 grounding.status=grounded 的单项结果可以作为强事实引用。\n\
@@ -54,6 +57,58 @@ pub(crate) fn prompt_executed_tools_block(execution: Option<&Value>) -> String {
          </tool_result_rules>\n\
          </executed_external_app_tools>"
     )
+}
+
+fn prompt_tool_gap_summary(execution: &Value) -> String {
+    let lines = execution
+        .get("results")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|result| {
+            matches!(
+                result.get("status").and_then(Value::as_str),
+                Some("skipped" | "failed" | "unavailable")
+            )
+        })
+        .filter_map(tool_gap_summary_for_result)
+        .take(8)
+        .collect::<Vec<_>>();
+
+    if lines.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "<tool_gap_summary>\n{}\n</tool_gap_summary>\n",
+            lines.join("\n")
+        )
+    }
+}
+
+fn tool_gap_summary_for_result(result: &Value) -> Option<String> {
+    let tool_name = result
+        .get("tool_name")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown_tool");
+    let status = result
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let reason = first_value_as_string(
+        result,
+        &[
+            "reason",
+            "error_code",
+            "error",
+            "message",
+            "skipped_reason",
+            "fallback_reason",
+        ],
+    )
+    .unwrap_or_else(|| "unspecified".to_string());
+    Some(format!(
+        "- {tool_name}: status={status}, reason={reason}. 这只是数据缺口，不是比赛、赔率、订单或群友观点事实。"
+    ))
 }
 
 fn prompt_tool_fact_summary(execution: &Value) -> String {
@@ -239,5 +294,30 @@ mod tests {
         assert!(block.contains("order_id=order-1"));
         assert!(block.contains("first_slip=主队 vs 客队 主胜 odds=1.96"));
         assert!(block.contains("可用于“我的票”分析"));
+    }
+
+    #[test]
+    fn rendered_tool_block_surfaces_skipped_readiness_gap_before_body() {
+        let block = prompt_executed_tools_block(Some(&json!({
+            "schema": "external_app.executed_tools.v1",
+            "app_id": "fb2",
+            "status": "skipped",
+            "executed_at": "2026-06-22T00:00:00Z",
+            "results": [{
+                "tool_name": "match_analysis_brief",
+                "status": "skipped",
+                "reason": "fb2_readiness_blocked"
+            }]
+        })));
+
+        let summary_index = block.find("<tool_gap_summary>").unwrap();
+        let body_index = block
+            .find("\"schema\": \"external_app.executed_tools.v1\"")
+            .unwrap();
+        assert!(summary_index < body_index);
+        assert!(block.contains("status=skipped"));
+        assert!(block.contains("fb2_readiness_blocked"));
+        assert!(block.contains("这只是数据缺口"));
+        assert!(block.contains("不能编造成比赛、赔率、订单或群友观点事实"));
     }
 }

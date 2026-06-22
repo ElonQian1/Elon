@@ -76,6 +76,16 @@ GET /api/external/apps/fb2/context-contract
 
 主项目实际拉取 fb2 上下文后，会把 `answer_policy_contract.prompt_answer_rules` 投影成 prompt 里的 `<answer_rules>`，也会给归一化结果补 `answer_policy` 并放进 prompt metadata。fb2 不返回 `answer_policy` 时，主项目使用默认策略，但 fb2 的 Context Pack 和工具结果必须能支撑这些回答边界。
 
+## AI 数据接入格式原则 v1
+
+fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pack，而不是把数据库、原始网页或索引结果直接交给模型：
+
+- `context_pack` 是唯一主正文，格式为 XML-wrapped Markdown，例如 `<fb2_context_pack>...</fb2_context_pack>`。
+- JSON 只承载紧凑机器元数据：`context_pack_version`、`generated_at`、`context_audit_id`、`metrics`、`citation_sources`、`tool_contract`、`usage_policy`、`answer_policy`、`preflight_readiness`。
+- `citation_sources[]` 是回答引用和 feedback 回写的来源索引；比赛、赔率、订单、群观点、平台摘要都必须尽量提供可引用 ID。
+- 禁止把原始 HTML、巨大 JSON、全量数据库记录、全量 embedding、未裁剪订单明细或其它用户私密数据直接放进 prompt。
+- MCP/RAG 不是当前完成条件；后续 MCP 只能包装现有 REST Context Pack、tool manifest 和 `POST /tools/execute`，不能绕过 fb2 权限和审计另建事实源。
+
 ## fb2 对主项目输出
 
 ### 1. Context Pack
@@ -224,7 +234,9 @@ GET /api/main-project/context/tool-manifest
 - 主项目拉 `/context/pack` 时会按 fb2 契约附加用户身份头和平台 scope 头；这些头只用于权限裁剪，不改变数据归属。
 - 主项目会做 token budget 裁剪，不把无限大 JSON 塞进 prompt。
 - 主项目会在 prompt metadata 增加 `context_fact_summary`，保留比赛、本人订单、群消息数量、少量来源 ID 和简短本人订单样例；这用于防止模型漏看 Context Pack 已有 `user_orders`。
+- 主项目会在 `context_fact_summary.preflight_readiness` 中提前投影 fb2 readiness 的 `status` 和少量 `warnings`；如果出现 `fb2_readiness_blocked/degraded/unavailable/not_configured`，AI 必须把它当成数据链路缺口，而不是业务事实。
 - 主项目会在 executed tool JSON 前增加 `tool_fact_summary`，把 `match_analysis_brief.data.user_orders` 等当前用户订单样例提前投影，避免大赔率 JSON 被截断时丢失“我的票”结构信息。
+- 主项目会在 executed tool JSON 前增加 `tool_gap_summary`，把 `skipped/failed/unavailable` 工具结果提前投影；这些只代表数据缺口，不能编造成比赛、赔率、订单或群友观点事实。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
 - 主项目日志只记录 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
 - AI 回答必须区分事实、群友观点和推断；上下文不足时要明确说明。

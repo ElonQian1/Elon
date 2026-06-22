@@ -10,6 +10,8 @@
 
 ## 已完成
 
+- 2026-06-22 本轮继续补强主项目 AI prompt 投影：`external_app_context_budget` 的 `context_fact_summary` 现在显式包含 `preflight_readiness.status` 和少量 `warnings`，让 `fb2_readiness_blocked/degraded/unavailable/not_configured` 不只藏在大 JSON 里；`external_app_context_tool_prompt` 新增 `<tool_gap_summary>`，把 `skipped/failed/unavailable` 工具结果提前投影，并明确这些只是数据缺口，不能被 AI 编造成比赛、赔率、订单或群友观点事实。已新增单测覆盖 readiness 摘要进入 prompt、skipped readiness gap 在工具 JSON 之前出现、以及工具缺口不能作为事实使用。
+- 2026-06-22 本轮把 AI 数据接入格式原则集中写入 `contracts.md`：fb2 给主项目 AI 的唯一主正文是 XML-wrapped Markdown Context Pack；JSON 只承载 compact metadata、citation sources、tool contract、usage/answer policy 和 readiness；禁止把原始 HTML、巨大 JSON、全量数据库、embedding 或未裁剪订单明细直接塞进 prompt；MCP/RAG 只能作为现有 REST Context Pack、tool manifest、tools/execute 的后续包装层，不能另立事实源。`data-tools.md` 同步补充按需工具选择规则，避免 manifest-only 工具被误当作聊天 AI 自动执行能力。
 - 2026-06-22 11:35 本轮把 fb2 `/api/main-project/context/readiness` 从 smoke 验收信号推进到主项目运行时：`external_app_context_readiness` 新增 authenticated live preflight 拉取和归一化，Context Pack / today-matches 回退上下文都会注入 `preflight_readiness`；`context_quality.warnings` 会把 `blocked/degraded/unavailable/not_configured` 映射为 `fb2_readiness_*`，让 AI 回答显式提示数据链路缺口；工具执行层遇到明确 `preflight_readiness.status=blocked` 时会跳过深层 fb2 工具调用并记录 `external_app.executed_tools.v1 status=skipped`，避免在 fb2 自检认为上下文不足时继续假装可查明细。已新增单测覆盖 readiness 归一化、质量警告和 blocked 工具跳过。运行代码提交 `9d778940` 已推送并发布，线上先验证到 `v0.3.593 / 9d778940452dc2ceed615e4f4b1ac0a78908ec73`，`/health=OK`，默认 smoke 和 `123qwe/123qwe` authenticated bootstrap smoke 均通过。
 - 2026-06-22 09:06 补齐“总结帖/群聊总结入口”的主项目侧验收闭环：提交 `1d41cb5a` 增加 fb2 总结帖回答契约和 smoke 场景，要求输出 `数据事实`、`群友观点`、`AI推断`、`风险边界` 并保留 source references；提交 `225bfc6f` 把总结帖生成从单一默认模型改为 `social_ai` 多代理 fallback，避免默认模型额度/接口不可用时只生成兜底文案；提交 `96bf5ce4` 放宽总结帖脚本对“相关发言”原文引用的误判。上述提交均已推送到 `origin/main`，其中服务端运行代码已发布到 `v0.3.588 / 225bfc6f0d9d33552f60dfd96a220753b3f7f7b6`，`96bf5ce4` 为脚本验收修正，无需重新发布服务端。
 - 2026-06-22 09:06 总结帖真实群 smoke 已通过：命令 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120` 在真实群 `ext_fb2_official` 创建 summary post `gsp_46720718477f4c6e953b55d5fc309568`，最终 `status=ready`，脚本结果 `failed=0 skipped=2`。该总结帖回复通过非空 summary、source references、事实/观点/推断/风险分层、风险边界和禁止投注保证检查。
@@ -79,6 +81,8 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120
 cargo test --manifest-path server\Cargo.toml summary_policy_shape --bin elon-server
 cargo test --manifest-path server\Cargo.toml social_ai_agents --bin elon-server
+cargo test --manifest-path server\Cargo.toml external_app_context_budget --bin elon-server
+cargo test --manifest-path server\Cargo.toml external_app_context_tool_prompt --bin elon-server
 scripts\publish-server.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath docs\fb2-ai-center\voice-device-evidence-20260622-adb.json
 pwsh -NoProfile -Command '$files = @("scripts\smoke-fb2-visible-chat.ps1", "scripts\smoke-fb2-final-acceptance.ps1"); foreach ($f in $files) { $parseErrors = $null; $tokens = $null; [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$tokens, [ref]$parseErrors) | Out-Null; if ($parseErrors.Count -gt 0) { exit 1 } }'
@@ -110,7 +114,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 1. 让 fb2 会话提供 `FB2_AI_CENTER_TOKEN` 或等价服务 token，用于主项目最终验收拉取 live Context Pack、平台匿名摘要和质量反馈。
 2. 确认 `123qwe` 或另一个 fb2 测试账号确实有可分析订单；如果不能用用户名密码解析，再手工提供有订单的测试用户 UUID。
 3. 让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-4. 用线上真实 token 跑一次群聊 AI 或 final preflight，确认 `preflight_readiness.status` 能随 Context Pack 进入 prompt 质量警告，并在 fb2 返回 `blocked` 的测试场景下工具执行会记录 skipped，而不是继续调用 `/tools/execute`。
+4. 用线上真实 token 跑一次群聊 AI 或 final preflight，确认 `preflight_readiness.status`、`context_fact_summary.preflight_readiness` 和 `<tool_gap_summary>` 能随 Context Pack / 工具结果进入真实 prompt；fb2 返回 `blocked` 的测试场景下工具执行应记录 skipped，而不是继续调用 `/tools/execute`。
 5. 跑完整最终验收：
 
 ```powershell

@@ -65,6 +65,17 @@ fb2 在 Context Pack 里声明可用工具，主项目先把它们投影给模�
 - `group_opinion_summary`：群友观点、大家怎么看、讨论分歧问题的首选聚合工具。
 - `search_matches` / `search_user_orders` / `search_group_opinions` / `opinion_memories` 等细分工具仍作为可追溯展开或补充来源。
 
+按需工具选择规则：
+
+| 用户意图 | 首选路径 | 权限和回答要求 |
+|---|---|---|
+| 默认业务问答 | 先用 `/context/pack` | Context Pack 已有事实优先，缺口再查工具。 |
+| 今日比赛、赔率、预测、某场分析 | `match_analysis_brief` | 必须区分比赛事实、赔率事实和 AI 推断，不承诺命中。 |
+| 我的票、我的订单、帮我分析我的票 | `match_analysis_brief`，必要时补 `search_user_orders` | 必须有 `external_user_id` 和同值 `X-FB2-AI-CONTEXT-USER-ID`；只能使用当前用户订单。 |
+| 群里大家怎么看、观点分歧 | `group_opinion_summary` | 只标为群友观点，不得当成比赛事实。 |
+| 平台今天订单风险、平台汇总 | `platform_orders` | 必须显式 platform scope，只返回匿名聚合，不泄露单个用户。 |
+| manifest-only 工具 | 不自动执行 | 只作为能力发现、回调端点或后续接入候选。 |
+
 执行前置条件：
 
 - 工具 schema 稳定。
