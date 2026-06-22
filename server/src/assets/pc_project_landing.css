@@ -85,6 +85,86 @@
   line-height: 1.68;
 }
 
+.project-landing-workbench {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.project-landing-workbench-action {
+  min-height: 78px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  grid-template-rows: 1fr auto;
+  gap: 4px 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid #353945;
+  border-radius: 8px;
+  background: #22242b;
+  color: #dbe1eb;
+  text-align: left;
+}
+
+.project-landing-workbench-action:hover {
+  border-color: #4d5667;
+  background: #282b34;
+}
+
+.project-landing-workbench-action span {
+  grid-row: 1 / 3;
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: #323947;
+  color: #edf2fb;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.project-landing-workbench-action.tone-dev span {
+  background: #244a3a;
+  color: #dff7e8;
+}
+
+.project-landing-workbench-action.tone-docs span {
+  background: #30415f;
+  color: #dce9ff;
+}
+
+.project-landing-workbench-action.tone-chat span {
+  background: #4a3d61;
+  color: #f1e5ff;
+}
+
+.project-landing-workbench-action.tone-download span {
+  background: #59471f;
+  color: #ffe4a9;
+}
+
+.project-landing-workbench-action strong,
+.project-landing-workbench-action small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.project-landing-workbench-action strong {
+  color: #f3f6fa;
+  font-size: 14px;
+  line-height: 1.2;
+}
+
+.project-landing-workbench-action small {
+  color: #9ea7b5;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
 .project-landing-download-groups {
   display: grid;
   gap: 16px;
@@ -411,6 +491,10 @@
 }
 
 @media (max-width: 940px) {
+  .project-landing-workbench {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .project-landing-downloads {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -439,6 +523,10 @@
   }
 
   .project-landing-downloads {
+    grid-template-columns: 1fr;
+  }
+
+  .project-landing-workbench {
     grid-template-columns: 1fr;
   }
 
