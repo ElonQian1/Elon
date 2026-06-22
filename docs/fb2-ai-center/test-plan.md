@@ -31,6 +31,7 @@
 - `context-contract.answer_policy_contract` 返回引用规则和固定评测问题。
 - `context-contract.answer_policy_contract.eval_scenarios` 返回六个机器可读评测场景：今日比赛、我的票、平台匿名订单摘要、群友观点、长按消息复核、来源审计。
 - 默认 `scripts\smoke-fb2-ai-center.ps1` 会检查 `eval_scenarios` 的场景 id、权限边界、必需来源、必需引用和禁止输出，避免评测矩阵退化成只有标题。
+- fb2 Context Pack / today-matches 响应归一化必须有服务端回归测试：HTTP 错误、非法 JSON、`success=false` 必须变成 `status=unavailable`；空 today-matches 数据必须带 `empty_matches` 质量告警；`metrics.budget_status=too_large` 必须映射为 `fb2_budget_too_large`，AI 只能说明缺口或截断风险，不能编造比赛、赔率、订单或群友观点。
 - `context-contract.context_readiness_contract` 返回 required fields、prompt metadata 和 blocked/degraded/ready 判定标准。
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1` 通过，确认主项目健康、版本、实时 manifest 和主项目聊天自动工具覆盖。
 - 默认 smoke 还必须直连 fb2 `/api/main-project/integration`，确认 `routing_mode=main_project_ready`、`service_token_header=X-FB2-AI-CENTER-TOKEN`、`official` 群映射，以及 `context_readiness`、`context_pack`、`tool_manifest`、`match_analysis_brief`、`group_opinion_summary`、用户订单、平台匿名摘要、质量和权限端点存在。
