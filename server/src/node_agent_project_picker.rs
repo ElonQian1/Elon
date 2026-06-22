@@ -253,6 +253,9 @@ fn detect_project_identity(path: &Path, landing: Option<&Value>) -> ProjectIdent
     ) {
         return identity;
     }
+    if let Some(identity) = identity_from_readme(&fallback_name, path) {
+        return identity;
+    }
     ProjectIdentity {
         description: Some(default_project_description(&fallback_name)),
         name: fallback_name,
@@ -302,6 +305,55 @@ fn identity_from_toml_manifest(
     )
 }
 
+fn identity_from_readme(fallback_name: &str, path: &Path) -> Option<ProjectIdentity> {
+    let (readme_path, source) = ["README.md", "README.MD", "Readme.md", "README"]
+        .into_iter()
+        .map(|file| (path.join(file), file))
+        .find(|(candidate, _)| candidate.is_file())?;
+    let text = std::fs::read_to_string(readme_path).ok()?;
+    let mut title = None;
+    let mut description_lines = Vec::new();
+    let mut in_code_fence = false;
+    let mut seen_heading = false;
+
+    for raw_line in text.lines().take(120) {
+        let line = raw_line.trim();
+        if line.starts_with("```") || line.starts_with("~~~") {
+            in_code_fence = !in_code_fence;
+            continue;
+        }
+        if in_code_fence || line.is_empty() {
+            if !description_lines.is_empty() {
+                break;
+            }
+            continue;
+        }
+        if line.starts_with("<!--") || line.starts_with("[!") || line.starts_with("![") {
+            continue;
+        }
+        if title.is_none() {
+            if let Some(heading) = markdown_heading_text(line) {
+                title = Some(heading);
+                seen_heading = true;
+                continue;
+            }
+        } else if markdown_heading_text(line).is_some() {
+            if !description_lines.is_empty() {
+                break;
+            }
+            continue;
+        }
+        if seen_heading || title.is_none() {
+            if let Some(text) = clean_readme_line(line) {
+                description_lines.push(text);
+            }
+        }
+    }
+
+    let description = clean_project_text(&description_lines.join(" "), 240);
+    identity_from_parts(fallback_name, title, description, source)
+}
+
 fn identity_from_parts(
     fallback_name: &str,
     name: Option<String>,
@@ -318,6 +370,52 @@ fn identity_from_parts(
         description,
         source: Some(source.to_string()),
     })
+}
+
+fn markdown_heading_text(line: &str) -> Option<String> {
+    let text = line.strip_prefix('#')?;
+    if !text.starts_with('#') && !text.starts_with(' ') {
+        return None;
+    }
+    let text = line.trim_start_matches('#').trim();
+    clean_project_text(&strip_markdown_inline(text), 120)
+}
+
+fn clean_readme_line(line: &str) -> Option<String> {
+    if line.starts_with('#') || line.starts_with('|') || line.starts_with('>') {
+        return None;
+    }
+    let text = strip_markdown_inline(line);
+    clean_project_text(&text, 240)
+}
+
+fn strip_markdown_inline(value: &str) -> String {
+    let mut output = String::new();
+    let mut chars = value.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            '`' | '*' | '_' => {}
+            '[' => {
+                let mut label = String::new();
+                for next in chars.by_ref() {
+                    if next == ']' {
+                        break;
+                    }
+                    label.push(next);
+                }
+                if chars.peek() == Some(&'(') {
+                    for next in chars.by_ref() {
+                        if next == ')' {
+                            break;
+                        }
+                    }
+                }
+                output.push_str(&label);
+            }
+            _ => output.push(ch),
+        }
+    }
+    output.trim().to_string()
 }
 
 fn first_json_string(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<String> {
@@ -623,6 +721,44 @@ mod tests {
         assert_eq!(identity.name, "repair-agent");
         assert_eq!(identity.description.as_deref(), Some("Windows 维修代理"));
         assert_eq!(identity.source.as_deref(), Some("Cargo.toml"));
+    }
+
+    #[test]
+    fn detects_project_identity_from_readme_heading_and_intro() {
+        let dir = temp_project("identity-readme");
+        std::fs::write(
+            dir.join("README.md"),
+            "# 网络诊断助手\n\n![badge](https://example.com/badge.svg)\n\n帮助用户自动检查代理、DNS 和网卡配置。\n第二句会合并进项目描述。\n\n## 安装\n",
+        )
+        .unwrap();
+
+        let identity = detect_project_identity(&dir, None);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "网络诊断助手");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("帮助用户自动检查代理、DNS 和网卡配置。 第二句会合并进项目描述。")
+        );
+        assert_eq!(identity.source.as_deref(), Some("README.md"));
+    }
+
+    #[test]
+    fn structured_manifest_identity_takes_precedence_over_readme() {
+        let dir = temp_project("identity-priority");
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"name":"package-name","description":"manifest desc"}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("README.md"), "# README 名称\n\nREADME 描述").unwrap();
+
+        let identity = detect_project_identity(&dir, None);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "package-name");
+        assert_eq!(identity.description.as_deref(), Some("manifest desc"));
+        assert_eq!(identity.source.as_deref(), Some("package.json"));
     }
 
     #[test]
