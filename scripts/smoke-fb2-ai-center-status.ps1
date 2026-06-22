@@ -20,6 +20,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-goal-gap-audit-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-live-preflight-request-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-ai-center-coordination-status.ps1")
+. (Join-Path $PSScriptRoot "fb2-public-contract-summary-status.ps1")
 
 function Get-Fb2StatusRepoRoot {
     Split-Path -Parent $PSScriptRoot
@@ -97,6 +98,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $latestAiCenterLogFile = Get-LatestFileByPattern -Directory $Directory -Pattern "*ai-center.log"
     $latestSampleRequestFile = Get-LatestFileByPattern -Directory $Directory -Pattern "context-pack-sample-request*.json"
     $latestSampleSetFile = Get-LatestFileByPattern -Directory $Directory -Pattern "context-pack-samples-validation*.json"
+    $latestPublicContractFile = Get-LatestFileByPattern -Directory $Directory -Pattern "public-contract-status*.json"
     $latestData = if ($null -eq $latestDataFile) { $null } else { Read-JsonFileOrNull $latestDataFile.FullName }
     $latestReadOnly = if ($null -eq $latestReadOnlyFile) { $null } else { Read-JsonFileOrNull $latestReadOnlyFile.FullName }
     $contextProjectionState = Get-Fb2ContextProjectionLogState -Path $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName })
@@ -104,6 +106,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $sampleSetState = Get-Fb2ContextSampleSetState -Path $(if ($null -eq $latestSampleSetFile) { "" } else { $latestSampleSetFile.FullName })
     $answerReadinessState = Get-Fb2ContextAnswerReadinessState -SampleSetState $sampleSetState
     $domainDataBlueprint = Get-Fb2DomainDataBlueprintState
+    $publicContractStatus = Get-Fb2PublicContractSummaryState -Path $(if ($null -eq $latestPublicContractFile) { "" } else { $latestPublicContractFile.FullName })
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
@@ -212,6 +215,9 @@ function Build-Fb2AiCenterStatusSnapshot {
     if ($null -ne $latestData -and -not $dataOnlyHasCurrentDirectReadGate -and $dataDirectReadComplete) {
         $refreshGaps += "latest_data_only_summary_uses_legacy_visible_direct_read_evidence_object"
     }
+    if (-not [bool]$publicContractStatus.complete) {
+        $refreshGaps += "missing_or_incomplete_public_contract_status_summary"
+    }
 
     $nextActions = @()
     if (-not $tokenPresent) {
@@ -286,6 +292,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         latest_context_answer_readiness = $answerReadinessState
         latest_user_scenario_audit = $userScenarioAudit
         latest_domain_data_blueprint = $domainDataBlueprint
+        latest_public_contract_status = $publicContractStatus
         readiness = [ordered]@{
             non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
@@ -347,6 +354,35 @@ function Invoke-Fb2StatusSelfTest {
         }
         $data | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "data-only-acceptance-test.json") -Encoding UTF8
         $readOnly | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "read-only-direct-read-test.json") -Encoding UTF8
+        [ordered]@{
+            schema = "fb2.main_project.public_contract_status.v1"
+            main_base = "http://example.invalid"
+            server = [ordered]@{
+                health = "OK"
+                versionName = "selftest"
+                gitSha = "abc123"
+            }
+            success = $true
+            passed_count = 28
+            failed_count = 0
+            failed_checks = @()
+            contract_summary = [ordered]@{
+                domain_data_blueprint_schema = "fb2.main_project.domain_data_blueprint.v1"
+                domain_lane_count = 6
+                stores_fb2_business_data_in_main_project = $false
+                group_chat_evidence_schema = "fb2.main_project.group_chat_evidence.v1"
+                group_chat_test_method = "direct_api_read"
+                screenshots_accepted = $false
+                required_group_message_fields = @("message_id", "type", "sender_id", "created_at", "text_len", "text_sha256")
+                live_tool_count = 3
+            }
+            limitations = @(
+                "public_contract_only_no_fb2_service_token_required",
+                "does_not_verify_fb2_live_context_pack_or_orders",
+                "does_not_write_or_read_visible_group_flow_beyond_public_contract",
+                "does_not_replace_DataOnlyAcceptance_or_FinalAcceptance"
+            )
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "public-contract-status-test.json") -Encoding UTF8
         [ordered]@{
             schema = "fb2.main_project.context_pack_sample_request.v1"
             scenarios = @(
@@ -443,6 +479,14 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.latest_domain_data_blueprint.required_context_pack_sections) -contains "group_opinion_slice")) { $failed++ }
         if (-not (@($snapshot.latest_domain_data_blueprint.required_metadata) -contains "citation_sources")) { $failed++ }
         if (-not (@($snapshot.latest_domain_data_blueprint.anti_patterns) -contains "full_database_dump")) { $failed++ }
+        if ($snapshot.latest_public_contract_status.schema -ne "fb2.main_project.public_contract_status.v1") { $failed++ }
+        if (-not [bool]$snapshot.latest_public_contract_status.complete) { $failed++ }
+        if (-not [bool]$snapshot.latest_public_contract_status.success) { $failed++ }
+        if ($snapshot.latest_public_contract_status.group_chat_test_method -ne "direct_api_read") { $failed++ }
+        if ([bool]$snapshot.latest_public_contract_status.screenshots_accepted) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.required_group_message_fields) -contains "text_sha256")) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.limitations) -contains "does_not_verify_fb2_live_context_pack_or_orders")) { $failed++ }
+        if (@($snapshot.refresh_gaps) -contains "missing_or_incomplete_public_contract_status_summary") { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_pack_exported_samples_validated_offline")) { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "context_answer_readiness_validated_offline")) { $failed++ }
         if (-not [bool]$snapshot.goal_completion.non_voice_ready) { $failed++ }
