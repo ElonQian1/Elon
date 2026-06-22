@@ -31,6 +31,64 @@ function Resolve-ReadOnlySummaryPath {
     return (Join-Path $summaryDir "read-only-direct-read-$stamp.json")
 }
 
+function Get-ReadOnlyMessageKind {
+    param([object]$Message)
+
+    if ($null -eq $Message) {
+        return "unknown"
+    }
+
+    $id = [string]$Message.id
+    if ($id.StartsWith("gai_", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "ai_reply"
+    }
+    if ($id.StartsWith("gmsg_", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "group_message"
+    }
+    if ($id.StartsWith("gsp_", [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "summary_post"
+    }
+
+    return "unknown"
+}
+
+function New-ReadOnlyMessageFingerprint {
+    param(
+        [object]$Message,
+        [int]$Index
+    )
+
+    $text = Get-MessageText $Message
+    [ordered]@{
+        index = $Index
+        message_id = if ($null -eq $Message) { "" } else { [string]$Message.id }
+        kind = Get-ReadOnlyMessageKind $Message
+        sender = Get-MessageSender $Message
+        created_at = if ($null -eq $Message -or -not $Message.created_at) { "" } else { [string]$Message.created_at }
+        text_len = $text.Length
+        text_sha256 = Get-TextSha256 $text
+    }
+}
+
+function New-ReadOnlyRecentMessageIndex {
+    param(
+        [object[]]$Messages,
+        [int]$MaxMessages = 20
+    )
+
+    $items = @($Messages | Where-Object { $_ })
+    if ($items.Count -eq 0) {
+        return @()
+    }
+
+    $window = @($items | Select-Object -Last $MaxMessages)
+    $result = New-Object System.Collections.Generic.List[object]
+    for ($i = 0; $i -lt $window.Count; $i++) {
+        [void]$result.Add((New-ReadOnlyMessageFingerprint -Message $window[$i] -Index $i))
+    }
+    return @($result.ToArray())
+}
+
 function Write-ReadOnlyDirectReadSummary {
     param(
         [string]$OutputPath,
@@ -48,6 +106,9 @@ function Write-ReadOnlyDirectReadSummary {
     )
 
     $sampleText = if ($null -eq $SampleMessage) { "" } else { Get-MessageText $SampleMessage }
+    $recentMessages = @(New-ReadOnlyRecentMessageIndex -Messages $Messages -MaxMessages 20)
+    $recentAiMessages = @($recentMessages | Where-Object { [string]$_["kind"] -eq "ai_reply" })
+    $latestAiMessage = @($recentAiMessages | Select-Object -Last 1)
     $summary = [ordered]@{
         schema = "fb2.main_project.visible_chat_readonly.v1"
         mode = "read_only_direct_read"
@@ -68,6 +129,11 @@ function Write-ReadOnlyDirectReadSummary {
         direct_read_evidence = $ReadEvidence
         direct_read_complete = (@($Messages).Count -gt 0 -and $TextFingerprintComplete)
         api = "/api/me/groups/{group_id}/messages"
+        recent_message_limit = 20
+        recent_message_count = $recentMessages.Count
+        recent_ai_message_count = $recentAiMessages.Count
+        latest_ai_message_id = if ($latestAiMessage.Count -eq 0) { "" } else { [string]$latestAiMessage[0]["message_id"] }
+        recent_messages = @($recentMessages)
     }
 
     $summaryJson = $summary | ConvertTo-Json -Depth 8

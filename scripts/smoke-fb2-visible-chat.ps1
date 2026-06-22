@@ -608,10 +608,10 @@ AI推断：被选择消息里的“肯定赢盘、重注”表述过于绝对，
         $tmpSummary = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-readonly-summary-" + [System.Guid]::NewGuid().ToString("N") + ".json")
         try {
             $message = [pscustomobject]@{
-                id = "gmsg-readonly-summary"
+                id = "gai_readonly_summary"
                 sender_user_id = "usr_elon_ai"
                 created_at = "2026-06-22T00:00:00Z"
-                content = "数据事实：read-only summary selftest。来源：message_id=gmsg-readonly-summary。风险边界：仅用于脚本回归。"
+                content = "数据事实：read-only summary selftest。来源：message_id=gai_readonly_summary。风险边界：仅用于脚本回归。"
             }
             $detail = Format-BaselineReadEvidence @($message)
             $summary = Write-ReadOnlyDirectReadSummary `
@@ -629,9 +629,15 @@ AI推断：被选择消息里的“肯定赢盘、重注”表述过于绝对，
                 -Fb2UserId "selftest-user"
             Assert-True (Test-Path -LiteralPath $tmpSummary) "selftest read-only summary file written" $tmpSummary
             Assert-True ([bool]$summary["direct_read_complete"]) "selftest read-only summary complete"
-            Assert-True ([string]$summary["sample_message_id"] -eq "gmsg-readonly-summary") "selftest read-only summary sample id" ([string]$summary["sample_message_id"])
+            Assert-True ([string]$summary["sample_message_id"] -eq "gai_readonly_summary") "selftest read-only summary sample id" ([string]$summary["sample_message_id"])
             Assert-True ([int]$summary["sample_text_len"] -gt 0) "selftest read-only summary text len" ([string]$summary["sample_text_len"])
             Assert-True (([string]$summary["sample_text_sha256"]) -match "^[0-9a-f]{64}$") "selftest read-only summary text hash" ([string]$summary["sample_text_sha256"])
+            Assert-True ([int]$summary["recent_message_count"] -eq 1) "selftest read-only recent message count" ([string]$summary["recent_message_count"])
+            Assert-True ([int]$summary["recent_ai_message_count"] -eq 1) "selftest read-only recent ai count" ([string]$summary["recent_ai_message_count"])
+            Assert-True ([string]$summary["latest_ai_message_id"] -eq "gai_readonly_summary") "selftest read-only latest ai id" ([string]$summary["latest_ai_message_id"])
+            $recentMessages = @($summary["recent_messages"])
+            Assert-True ($recentMessages.Count -eq 1) "selftest read-only recent index count" "count=$($recentMessages.Count)"
+            Assert-True ([string]$recentMessages[0]["text_sha256"] -eq [string]$summary["sample_text_sha256"]) "selftest read-only recent hash matches sample"
         } finally {
             if (Test-Path -LiteralPath $tmpSummary) {
                 Remove-Item -LiteralPath $tmpSummary -Force

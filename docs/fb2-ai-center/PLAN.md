@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 本轮继续把“fb2 对话验证必须直接读取群聊，不用截图”做成可复用证据：`ReadOnlyDirectRead` summary 新增最近 20 条消息的 `recent_messages` 索引，只保留 ID、类型、发送方、时间、正文长度和 sha256，不保存正文也不写群。后续排查“AI 有没有在群聊真实回答/能不能读到历史对话”时，先看这个 summary，再进入有授权的 `-AllowVisibleMessages`。
 - 2026-06-23 当前缺 `FB2_AI_CENTER_TOKEN` 时，主项目不能直接刷新 live Context Pack/权限/质量 preflight；为了让 fb2 子项目仍能推进数据格式闭环，新增离线样本验证路径：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -InputPath <context-pack-response.json> -Scenario today_matches_context_pack`。该脚本只验证本地样本的 XML-wrapped Markdown、小节、审计 ID 和 source kinds，不替代带 token 的 live `-DataOnlyAcceptance -PreflightOnly`。
 - 2026-06-23 本轮把生成后来源校验纳入主项目 feedback 闭环：AI 回复中出现的比赛、赔率、订单、票据、群消息、观点记忆、平台摘要和 audit 类 source id，必须能匹配本轮 Context Pack、选中消息额外来源、当前 `context_audit_id` 或 grounded/weak 成功工具结果。未匹配来源会把 feedback 标记为 `wrong_context=true` 并写入 `note`，由 fb2 质量汇总暴露；这项不替代群聊直读验收，后续可见群聊仍必须通过接口读取消息、summary post、feedback 和质量统计。
 - 2026-06-22 本轮把状态快照从“只认新布尔字段”改为“布尔字段或完整接口回读证据均可证明历史 data-only 直读”。`scripts\smoke-fb2-ai-center-status.ps1` 现在会检查旧 summary 的 `visible_direct_read_evidence` 是否同时包含 baseline、`@EL` seed/回复、selected-message seed/回复、summary-post 六类接口回读，并要求每项有 `text_len` 和 `text_sha256`。当前 `target\fb2-ai-center\status-current.json` 显示 `direct_read_evidence_complete=true`、`direct_read_evidence_mode=legacy_evidence_object`、`non_voice_historical_evidence_ready=true`；缺 `FB2_AI_CENTER_TOKEN` 和旧 summary 未带新布尔字段只作为 `refresh_gaps`，不再当作非语音已通过闭环的 blocker。
