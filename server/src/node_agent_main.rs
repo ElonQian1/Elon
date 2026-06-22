@@ -51,6 +51,7 @@ mod node_agent_active_task;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_cli_security;
+mod node_agent_cli_session_bridge;
 mod node_agent_client_diagnostics;
 mod node_agent_client_maintenance;
 mod node_agent_codex_session;
@@ -2802,6 +2803,7 @@ async fn admin_status(
         "hardware": hardware,
         "storage": storage,
         "full_access_grant_count": full_access_grant_count,
+        "cli_session_bridge": node_agent_cli_session_bridge::status_payload(),
         "models": live,
     });
     if node_agent_local_admin::can_expose_local_admin_token(&headers, &rt.cloud_http_url()) {

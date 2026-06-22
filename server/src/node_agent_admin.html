@@ -327,6 +327,16 @@ function pathCode(path) {
   if (!path) return '<span>未提供</span>';
   return `<code title="${esc(path)}">${esc(path)}</code>`;
 }
+function cliSessionBridgeLine(bridge) {
+  const summary = String((bridge && bridge.summary) || '').trim();
+  if (summary) return summary;
+  if (!bridge) return '本机节点未返回 CLI 会话桥接状态';
+  const modes = Array.isArray(bridge.continuity_modes)
+    ? bridge.continuity_modes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 3).join(' / ')
+    : '';
+  const tty = bridge.tty_takeover_supported ? '支持原 TTY 接管' : '不接管原 TTY';
+  return modes ? `${tty} · ${modes}` : `${tty} · 使用新 CLI 子进程桥接会话`;
+}
 async function load() {
   if (window.__elonDup) return;
   const r = await localFetch('/api/status').then(r => r.json()).catch(() => null);
@@ -359,6 +369,7 @@ async function load() {
     ['Ollama', r.ollama_url],
     ['LM Studio', r.lm_studio_url || '(未配置)'],
     ['自定义 LLM', r.custom_url || '(未配置)'],
+    ['CLI 会话桥接', cliSessionBridgeLine(r.cli_session_bridge)],
     ['默认价格', r.price_per_1k + ' credits/1k tokens']
   ];
   for (const [k, v] of rows) {

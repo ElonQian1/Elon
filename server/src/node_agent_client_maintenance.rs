@@ -68,6 +68,7 @@ fn status_payload() -> Value {
         "state_file": path_to_string(&paths.state_file),
         "config_dir": path_to_string(&paths.config_dir),
         "task_journal_dir": path_to_string(&paths.task_journal_dir),
+        "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
     });
 
     with_windows_install_status(payload)

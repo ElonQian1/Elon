@@ -58,6 +58,7 @@
     settingsVerifyBtn: $('settingsVerifyBtn'), settingsEditProfileBtn: $('settingsEditProfileBtn'), settingsLoginBtn: $('settingsLoginBtn'),
     settingsSecurityBtn: $('settingsSecurityBtn'), settingsDevicesBtn: $('settingsDevicesBtn'), settingsLogoutBtn: $('settingsLogoutBtn'),
     settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
+    settingsCliBridgeStatus: $('settingsCliBridgeStatus'),
     refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'), openClientLogsBtn: $('openClientLogsBtn'),
     openClientConfigBtn: $('openClientConfigBtn'), openClientInstallBtn: $('openClientInstallBtn'),
     exportClientDiagnosticsBtn: $('exportClientDiagnosticsBtn'),
@@ -2382,6 +2383,7 @@
     if (!data) {
       els.settingsClientStatus.textContent = '尚未读取';
       els.settingsClientPaths.textContent = '任务记录、配置和安装目录会显示在这里。';
+      if (els.settingsCliBridgeStatus) els.settingsCliBridgeStatus.textContent = '读取本机节点后显示会话连续性能力。';
       return;
     }
     const version = clean(data.version) || '--';
@@ -2398,6 +2400,20 @@
       clean(data.config_dir) && `配置 ${clean(data.config_dir)}`
     ].filter(Boolean);
     els.settingsClientPaths.textContent = paths.join(' · ') || '未读取到本机维护路径';
+    if (els.settingsCliBridgeStatus) {
+      els.settingsCliBridgeStatus.textContent = cliSessionBridgeLine(data.cli_session_bridge);
+    }
+  }
+
+  function cliSessionBridgeLine(bridge) {
+    const summary = clean(bridge && bridge.summary);
+    if (summary) return summary;
+    if (!bridge) return '本机节点未返回 CLI 会话桥接状态。';
+    const modes = Array.isArray(bridge.continuity_modes)
+      ? bridge.continuity_modes.map(clean).filter(Boolean).slice(0, 3).join(' / ')
+      : '';
+    const tty = bridge.tty_takeover_supported ? '支持原 TTY 接管' : '不接管原 TTY';
+    return modes ? `${tty} · ${modes}` : `${tty} · 使用新 CLI 子进程桥接会话`;
   }
 
   async function refreshClientMaintenance(showResult) {
