@@ -370,6 +370,89 @@ function Build-VisibleDirectReadEvidence {
     }
 }
 
+function Test-VisibleDirectReadEvidenceComplete {
+    param([System.Collections.IDictionary]$Evidence)
+
+    if ($null -eq $Evidence) {
+        return $false
+    }
+
+    $requiredKeys = @(
+        "baseline_messages",
+        "visible_mention_seed",
+        "visible_mention_seed_text",
+        "visible_mention_reply",
+        "visible_mention_reply_text",
+        "selected_message_seed",
+        "selected_message_seed_text",
+        "selected_message_reply",
+        "selected_message_reply_text",
+        "summary_post",
+        "summary_post_text"
+    )
+    foreach ($key in $requiredKeys) {
+        if (-not $Evidence.Contains($key)) {
+            return $false
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$Evidence[$key])) {
+            return $false
+        }
+    }
+
+    $textEvidenceKeys = @(
+        "baseline_messages",
+        "visible_mention_seed",
+        "visible_mention_seed_text",
+        "visible_mention_reply",
+        "visible_mention_reply_text",
+        "selected_message_seed",
+        "selected_message_seed_text",
+        "selected_message_reply",
+        "selected_message_reply_text",
+        "summary_post",
+        "summary_post_text"
+    )
+    foreach ($key in $textEvidenceKeys) {
+        $value = [string]$Evidence[$key]
+        if ($value -notmatch "\btext_len=\d+\b") {
+            return $false
+        }
+        if ($value -notmatch "\btext_sha256=[0-9a-fA-F]{8,}\b") {
+            return $false
+        }
+    }
+
+    if (([string]$Evidence["baseline_messages"]) -notmatch "\bcount=\d+\b") {
+        return $false
+    }
+    if (([string]$Evidence["baseline_messages"]) -notmatch "\bsample_message=\S+") {
+        return $false
+    }
+
+    foreach ($key in @(
+        "visible_mention_seed",
+        "visible_mention_seed_text",
+        "visible_mention_reply",
+        "visible_mention_reply_text",
+        "selected_message_seed",
+        "selected_message_seed_text",
+        "selected_message_reply",
+        "selected_message_reply_text"
+    )) {
+        if (([string]$Evidence[$key]) -notmatch "\bmessage=\S+") {
+            return $false
+        }
+    }
+
+    foreach ($key in @("summary_post", "summary_post_text")) {
+        if (([string]$Evidence[$key]) -notmatch "\bpost=\S+") {
+            return $false
+        }
+    }
+
+    return $true
+}
+
 function Resolve-VisibleMainGroupId {
     param([string]$ContextGroupId)
 
@@ -478,6 +561,21 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest (([string]$directReadEvidence["selected_message_reply_text"]) -match "text_sha256=") "direct read evidence maps selected reply text hash" ([string]$directReadEvidence["selected_message_reply_text"])
     Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["summary_post"])) "direct read evidence maps summary post" ([string]$directReadEvidence["summary_post"])
     Assert-SelfTest (([string]$directReadEvidence["summary_post_text"]) -match "text_sha256=") "direct read evidence maps summary post text hash" ([string]$directReadEvidence["summary_post_text"])
+    Assert-SelfTest (Test-VisibleDirectReadEvidenceComplete $directReadEvidence) "direct read evidence is complete"
+
+    $missingDirectTextLines = @(
+        "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
+        "OK`tselected-message AI回复 fb2 feedback`tsocial_group_selected_message:gai_selected feedback=fb_selected",
+        "OK`tsummary-post fb2 feedback`tsocial_group_summary_post:gsp_summary feedback=fb_summary",
+        "OK`tdirect group message read baseline`tgroup=ext_fb2_official count=80 sample_message=gmsg_sample text_len=32 text_sha256=aaaaaaaa",
+        "OK`tvisible @EL seed direct group read`tgroup=ext_fb2_official message=gmsg_visible_seed text_len=88 text_sha256=bbbbbbbb",
+        "OK`tvisible @EL direct group read`tgroup=ext_fb2_official message=gai_visible text_len=120 text_sha256=cccccccc",
+        "OK`tselected-message seed direct group read`tgroup=ext_fb2_official message=gmsg_selected_seed text_len=60 text_sha256=dddddddd",
+        "OK`tselected-message direct group read`tgroup=ext_fb2_official message=gai_selected text_len=140 text_sha256=eeeeeeee",
+        "OK`tsummary-post direct group read`tgroup=ext_fb2_official post=gsp_summary status=ready text_len=360 text_sha256=ffffffff"
+    )
+    $missingDirectTextEvidence = Build-VisibleDirectReadEvidence $missingDirectTextLines
+    Assert-SelfTest (-not (Test-VisibleDirectReadEvidenceComplete $missingDirectTextEvidence)) "direct read evidence rejects missing text hashes"
 
     $missingSummaryLines = @(
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
@@ -512,14 +610,18 @@ function Invoke-FinalAcceptanceSelfTest {
     $noisyEvidence = @(Find-FeedbackEvidence $noisyLines)
     Assert-SelfTest ($noisyEvidence.Count -eq 0) "feedback parser ignores non-OK and non-feedback lines" "count=$($noisyEvidence.Count)"
 
-    $completeSuccess = ($true -and $true -and [bool]$completeCoverage["complete"])
+    $completeDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $directReadEvidence
+    $missingDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $missingDirectTextEvidence
+    $completeSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $completeDirectReadComplete)
     $missingSuccess = ($true -and $true -and [bool]$missingSummaryCoverage["complete"])
     $visibleFailedSuccess = ($false -and $true -and [bool]$completeCoverage["complete"])
     $centerFailedSuccess = ($true -and $false -and [bool]$completeCoverage["complete"])
-    Assert-SelfTest $completeSuccess "final success allows complete feedback coverage"
+    $directReadIncompleteSuccess = ($true -and $true -and [bool]$completeCoverage["complete"] -and $missingDirectReadComplete)
+    Assert-SelfTest $completeSuccess "final success allows complete feedback and direct read coverage"
     Assert-SelfTest (-not $missingSuccess) "final success rejects missing feedback coverage"
     Assert-SelfTest (-not $visibleFailedSuccess) "final success rejects visible smoke failure"
     Assert-SelfTest (-not $centerFailedSuccess) "final success rejects final acceptance failure"
+    Assert-SelfTest (-not $directReadIncompleteSuccess) "final success rejects incomplete direct read evidence"
 
     $centerLines = @(
         "OK`tmain version`t0.3.592 abcdef",
@@ -874,6 +976,8 @@ $centerLines = @($centerResult.output)
 $completedAt = (Get-Date).ToUniversalTime().ToString("o")
 $feedbackEvidence = @(Find-FeedbackEvidence $visibleLines)
 $feedbackCoverage = Build-FeedbackCoverage $feedbackEvidence
+$visibleDirectReadEvidence = Build-VisibleDirectReadEvidence $visibleLines
+$visibleDirectReadComplete = Test-VisibleDirectReadEvidenceComplete $visibleDirectReadEvidence
 $summary = [ordered]@{
     schema = "fb2.main_project.final_acceptance.v1"
     mode = if ($DataOnlyAcceptance) { "visible_data_only_acceptance" } else { "visible_final_acceptance" }
@@ -904,10 +1008,11 @@ $summary = [ordered]@{
     summary_post_status = Find-CheckDetail $visibleLines "summary-post ready"
     feedback_evidence = $feedbackEvidence
     feedback_coverage = $feedbackCoverage
-    visible_direct_read_evidence = Build-VisibleDirectReadEvidence $visibleLines
+    visible_direct_read_complete = $visibleDirectReadComplete
+    visible_direct_read_evidence = $visibleDirectReadEvidence
     visible_answer_policy_evidence = Build-VisibleAnswerEvidence $visibleLines
     final_acceptance_evidence = Build-AiCenterEvidence $centerLines
-    success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0 -and [bool]$feedbackCoverage["complete"])
+    success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0 -and [bool]$feedbackCoverage["complete"] -and $visibleDirectReadComplete)
 }
 
 $summaryJson = $summary | ConvertTo-Json -Depth 8

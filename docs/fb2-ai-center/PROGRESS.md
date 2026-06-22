@@ -101,10 +101,10 @@
 
 ## 未完成
 
-- 2026-06-22 21:10 最新非语音 data-only visible acceptance 已证明真实群聊三类入口、三类 feedback、权限/质量和 direct group read evidence 能绑定到同一份 summary；但严格门槛下当前窗口 `opinion_adoption_count=0 min=1` 仍需发布 planner 修复后复测。ASR/TTS 仍明确暂停，full final acceptance 仍未完成。
+- 2026-06-22 21:34 最新非语音 data-only visible acceptance 已通过，真实群聊三类入口、三类 feedback、权限/质量、direct group read evidence 和 `opinion_adoption_count=1` 已绑定到同一份 summary：`target\fb2-ai-center\data-only-acceptance-20260622T133357Z.json`。ASR/TTS 仍明确暂停，full final acceptance 仍未完成。
 - 当前会话可通过 fb2 服务器受控 wrapper 临时读取 service token 做 live 验证；token 不打印、不写入仓库、不写入持久环境。最终交接仍应由 fb2 会话提供等价 token 或继续使用受控 wrapper。
 - `123qwe` 登录能桥接主项目，最终验收 wrapper 可从 `-Fb2Username/-Fb2Password` 自动解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`；authenticated `chat-bootstrap` 已验证通过。带 service token 的 live data-only smoke 已确认该账号有可分析订单，`my ticket` 场景返回 `user_orders count=10`。
-- fb2 live Context Pack 域投影已在近期 data-only 验收中通过：`target\fb2-ai-center\data-only-acceptance-20260622T103826Z-ai-center.log` 显示 today pack 和 my-ticket pack 都包含 XML wrapper、`retrieval_evidence`、`quality_feedback`、source registry、`context_audit`；today pack 具备 `match/odds/context_audit` source kind，my-ticket pack 具备 `user_order/ticket/context_audit` source kind。
+- fb2 live Context Pack 域投影已在近期 data-only 验收中通过：最新 `target\fb2-ai-center\data-only-acceptance-20260622T133357Z-ai-center.log` 显示 today pack 和 my-ticket pack 都包含 XML wrapper、`retrieval_evidence`、`quality_feedback`、source registry、`context_audit`；today pack 具备 `match/odds/context_audit` source kind，my-ticket pack 具备 `user_order/ticket/context_audit` source kind。
 - 群观点数据闭环已进入可用状态：最新 data-only 验收中 `group_opinion_summary count=1`，真实群聊 `@EL` 与 selected-message 回复均能引用来源并回写 fb2 feedback。最终 wrapper 默认不再把 data-only 可见群聊短窗口的 `MinOpinionAdoptionCount` 自动降为 0；只有显式传 `-AllowNoNewOpinionAdoptionInShortWindow` 才允许本轮不新增观点采纳。历史 preflight 已观察到非合成 adoption=1，后续继续积累样本。
 - 当前窗口质量引用已归零：最新 data-only 验收显示 `quality_citation_unmatched_rate=0`、`quality_unmatched_cited_sources=0`、`missing_context=0`、`wrong_context=0`。历史 unmatched 债务只作为趋势观察，不再作为当前完成阻塞。
 - 已有 ADB 半成品真机语音证据 JSON，且其 artifact 文件真实存在；但它明确 `finalAcceptanceReady=false`。仍缺包含人工语音样本、system ASR final、云端 ASR 成功、server ASR 失败恢复、TTS 播放、ASR/TTS 免费策略的完整 final-ready 证据。
@@ -158,14 +158,13 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -D
 - 缺 `FB2_AI_CENTER_TOKEN` 时，显式权限负向检查也会失败，避免权限验收被 skip。
 - 使用无效 service token 时，wrapper 能解析 `123qwe` 的 fb2 用户 UUID，但订单上下文预检在写群前 401 失败。
 - `-DataOnlyAcceptance` 缺 `FB2_AI_CENTER_TOKEN` 时也会立即失败，但不会因为缺 `VoiceDeviceEvidencePath` 提前失败。
-- 带 service token 的最新严格 `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 已证明接口直读、三类 feedback 和引用匹配通过，summary 为 `target\fb2-ai-center\data-only-acceptance-20260622T123604Z.json`；当前阻塞是本轮窗口 `opinion_adoption_count=0 min=1`，需要主项目发布观点记忆 source id 兜底后复测。
+- 带 service token 的最新严格 `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 已证明接口直读、三类 feedback、引用匹配和非合成观点采纳同批通过，summary 为 `target\fb2-ai-center\data-only-acceptance-20260622T133357Z.json`；当前非语音阻塞已清掉，剩余是 ASR/TTS final-ready 证据。
 
 ## 下一步最小动作
 
-1. 先提交、推送并发布主项目 `social_ai` 观点记忆 source id 兜底，然后重跑带 service token 的 `-DataOnlyAcceptance -AllowVisibleMessages -GroupId official`，要求直读、feedback 和 `MinOpinionAdoptionCount=1` 同批通过。
-2. 后续恢复语音工作时，让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-3. 恢复 full final 前，还要确认非合成观点采纳满足默认门槛 `MinOpinionAdoptionCount=1`；data-only 可见验收默认也保持该门槛，只有显式 `-AllowNoNewOpinionAdoptionInShortWindow` 才允许短窗口为 0，且不能替代 full final 的观点采纳证据。
-4. 恢复语音后再跑完整最终验收：
+1. 后续恢复语音工作时，让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
+2. 恢复 full final 前，可先重跑一次带 service token 的 `-DataOnlyAcceptance -AllowVisibleMessages -GroupId official` 做非语音回归；默认仍要求 `MinOpinionAdoptionCount=1`，不能用短窗口 opt-out 替代 full final 证据。
+3. 恢复语音后再跑完整最终验收：
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN> -VoiceDeviceEvidencePath <real-device-evidence.json>
