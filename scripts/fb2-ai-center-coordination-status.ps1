@@ -74,6 +74,7 @@ function Get-Fb2AiCenterCoordinationStatus {
         [object]$SampleRequestState,
         [object]$SampleSetState,
         [object]$AnswerReadinessState,
+        [object]$GoalGapAudit,
         [bool]$TokenPresent,
         [bool]$VoiceEvidencePathPresent
     )
@@ -171,6 +172,14 @@ function Get-Fb2AiCenterCoordinationStatus {
             failed_count = [int](Get-Fb2CoordinationJsonProperty $AnswerReadinessState "failed_count" 0)
             missing = @((Get-Fb2CoordinationJsonProperty $AnswerReadinessState "missing" @()))
             note = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $AnswerReadinessState "note")
+        }
+        goal_gap_audit = [ordered]@{
+            schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $GoalGapAudit "schema")
+            completed = @((Get-Fb2CoordinationJsonProperty $GoalGapAudit "completed" @()))
+            missing = @((Get-Fb2CoordinationJsonProperty $GoalGapAudit "missing" @()))
+            blocked_by_external_secret = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $GoalGapAudit "blocked_by_external_secret")
+            deferred_by_user = @((Get-Fb2CoordinationJsonProperty $GoalGapAudit "deferred_by_user" @()))
+            next_smallest_action = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $GoalGapAudit "next_smallest_action")
         }
         direct_read_policy = [ordered]@{
             group_messages_api = "/api/me/groups/{group_id}/messages"

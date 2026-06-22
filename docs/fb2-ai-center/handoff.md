@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮新增 `goal_gap_audit schema=fb2.main_project.goal_gap_audit.v1`，作为终极目标差距的机器可读总控字段。它由 `scripts\fb2-goal-gap-audit-status.ps1` 从 data-only summary、no-write 群聊直读 summary、Context Pack 样本集、answer readiness 和 goal completion 中汇总，只保存路径、计数、source kinds、消息正文长度和 sha256，不保存订单或群聊正文。当前对 fb2 对话的测试口径固定为 `direct_read_policy.screenshots_accepted=false`：状态验收只认 `/api/me/groups/{group_id}/messages` 和 summary-post 的接口回读证据；截图只能辅助 UI 排查，不能证明 AI 已读群聊、已引用来源或已回写 feedback。`goal_gap_audit.next_smallest_action` 会在缺 token 时提示先设置 `FB2_AI_CENTER_TOKEN` 跑 data-only preflight；ASR/TTS 仍在 `deferred_by_user` 中，不作为本阶段继续处理项。
 - 2026-06-23 本轮在样本集验证之后新增离线 answer readiness 状态：`scripts\fb2-context-answer-readiness-status.ps1` 会从 `latest_context_pack_sample_set` 推导 `latest_context_answer_readiness`，按四类核心问题检查回答所需 source kinds、回答分层和禁止输出：今日比赛、我的票、平台订单风险、群观点。通过只代表“样本可支撑主项目 AI 输入”，不代表模型已经 live 回复；最终仍需 `FB2_AI_CENTER_TOKEN` 刷新权限/质量/feedback。当前 status 通过时应看到 `context_answer_readiness_validated_offline`，下一步是补 token 跑 live data-only preflight。
 - 2026-06-23 本轮继续接住 fb2 子会话导出的四类 Context Pack 样本：`scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir <samples-dir> -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json` 会批量验证 `today_matches_context_pack`、`my_ticket_context_pack`、`platform_order_context_pack`、`group_opinion_context_pack`，并生成 `fb2.main_project.context_pack_sample_set_validation.v1`。summary 只存 audit id、source kinds、citation source count、context pack sha256/长度，避免把订单或群聊正文带进主项目状态。`scripts\smoke-fb2-ai-center-status.ps1` 现在输出 `latest_context_pack_sample_set`，coordination 也会显示样本集是否通过；样本集通过后，缺口从“等待 fb2 导出样本”变为“补 `FB2_AI_CENTER_TOKEN` 刷新 live 权限/质量 preflight”。
 - 2026-06-23 本轮继续把样本交接纳入状态机：新增 `scripts\fb2-context-sample-request-status.ps1`，`scripts\smoke-fb2-ai-center-status.ps1` 会读取最新 `context-pack-sample-request*.json` 并输出 `latest_context_pack_sample_request`。当 `FB2_AI_CENTER_TOKEN` 缺失但样本请求完整时，`refresh_gaps` 会出现 `context_pack_sample_request_ready_for_fb2_export`，`next_actions` 会切到 `send_context_pack_sample_request_to_fb2_or_wait_for_exported_samples`；coordination 中 `context_pack_sample_request` 会列出路径、schema、场景数和场景 id，fb2 子会话应按这里导出 live Context Pack 样本。
@@ -206,6 +207,9 @@
   有明确写群授权后再跑：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token>`
   这两条不会要求 `VoiceDeviceEvidencePath`，但必须有 fb2 service token 和有订单用户上下文；通过只表示数据/权限/质量/可见群聊闭环通过，不代表 ASR/TTS 完成。
+- 每轮交接前建议先生成状态快照：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center-status.ps1 -OutputPath target\fb2-ai-center\status-current.json`
+  然后读取 `goal_gap_audit.completed/missing/deferred_by_user/next_smallest_action`。如果 `completed` 已包含 `direct_group_chat_read`，说明当前证据来自群聊 API 直读或已绑定的 direct-read summary；如果只看到截图、录屏或消息 ID，而没有 `text_len/text_sha256`，不能算群聊对话验收通过。
 - full final 不使用 data-only 的短窗口放宽门槛；最新 data-only 已确认真实 non-synthetic opinion adoption 至少 1 条。恢复语音最终验收前仍建议同批复跑一次，避免用历史样本替代当前 `QualitySince` 证据。
 - 最终验收或 CI 不允许跳过任何检查时加 `-RequireNoSkips`。
 - 需要验证 fb2 真机语音链路时，加 `-RequireVoiceDeviceEvidence -VoiceDeviceEvidencePath <json>`；正式证据必须覆盖 `VoiceComposerView`、按住说话、上滑取消、三段底部操作区、系统 ASR、云端 ASR 兜底、TTS 和 ASR/TTS 免费策略。

@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮把“不要用截图测试 fb2 对话，要直接读取群聊功能”提升为终极目标差距审计：新增 `scripts\fb2-goal-gap-audit-status.ps1`，`scripts\smoke-fb2-ai-center-status.ps1` 现在输出 `goal_gap_audit schema=fb2.main_project.goal_gap_audit.v1`。它只汇总本地 summary、路径、source kinds、计数、消息正文长度和 sha256，不保存订单或群聊正文；`direct_read_policy.screenshots_accepted=false`、`write_required_for_status=false`，并把 `direct_group_chat_read`、Context Pack 样本集、answer readiness、非语音历史证据列为已完成项，把缺 `FB2_AI_CENTER_TOKEN` 的 live 权限/质量刷新、ASR/TTS final evidence 和 full final 同批验收列为剩余缺口。
 - 2026-06-23 本轮继续把四类样本从“Context Pack 格式/来源种类通过”推进到“核心回答输入覆盖通过”：新增 `scripts\fb2-context-answer-readiness-status.ps1`，`smoke-fb2-ai-center-status.ps1` 会输出 `latest_context_answer_readiness schema=fb2.main_project.context_answer_readiness.v1`。它按四类真实问题检查样本是否具备必需 source kinds、answer layers 和 forbidden outputs：today matches、my ticket、platform order risk、group opinion。该检查只使用样本摘要，不调用模型、不读取 token、不保存正文；通过后 `refresh_gaps` 会增加 `context_answer_readiness_validated_offline`，下一步仍是补 `FB2_AI_CENTER_TOKEN` 刷新 live 权限/质量/feedback。
 - 2026-06-23 本轮把 fb2 子会话导出的四类 Context Pack 样本从“人工同步结果”推进成主项目可复验 artifact：`scripts\validate-fb2-context-pack.ps1` 新增 `-ValidateSampleSet -SamplesDir <dir> -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json`，会逐个验证 today matches、my ticket、platform order、group opinion 样本，并只把 audit id、source kinds、citation source 数量、context pack sha256/长度写入摘要，不输出订单或群消息正文。新增 `scripts\fb2-context-sample-set-status.ps1`，`status-current.json` 现在输出 `latest_context_pack_sample_set`，coordination 也会携带样本集通过状态和安全验证命令。
 - 2026-06-23 本轮把 Context Pack 样本导出请求纳入 `scripts\smoke-fb2-ai-center-status.ps1` 状态快照：新增 `scripts\fb2-context-sample-request-status.ps1`，会读取 `target\fb2-ai-center\context-pack-sample-request-current.json` 等请求文件，校验 schema、四个场景、保存路径、source kinds、校验命令和 secret-like 文本。`status-current.json` 现在输出 `latest_context_pack_sample_request`，并在缺 `FB2_AI_CENTER_TOKEN` 但样本请求完整时把 `next_actions` 改成 `send_context_pack_sample_request_to_fb2_or_wait_for_exported_samples`，coordination 里也会给 fb2 子会话明确“按 context_pack_sample_request 导出 live 样本”。
@@ -190,9 +191,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -D
 
 ## 下一步最小动作
 
-1. 后续恢复语音工作时，让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-2. 恢复 full final 前，可先重跑一次带 service token 的 `-DataOnlyAcceptance -AllowVisibleMessages -GroupId official` 做非语音回归；默认仍要求 `MinOpinionAdoptionCount=1`，不能用短窗口 opt-out 替代 full final 证据。
-3. 恢复语音后再跑完整最终验收：
+1. 每轮开始先跑 `scripts\smoke-fb2-ai-center-status.ps1 -OutputPath target\fb2-ai-center\status-current.json`，看 `goal_gap_audit`。其中 `completed` 证明已由 API 直读或样本摘要覆盖，`missing` 才是下一轮应处理的真实缺口；截图不作为群聊对话验收证据。
+2. 后续恢复语音工作时，让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
+3. 恢复 full final 前，可先重跑一次带 service token 的 `-DataOnlyAcceptance -AllowVisibleMessages -GroupId official` 做非语音回归；默认仍要求 `MinOpinionAdoptionCount=1`，不能用短窗口 opt-out 替代 full final 证据。
+4. 恢复语音后再跑完整最终验收：
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN> -VoiceDeviceEvidencePath <real-device-evidence.json>

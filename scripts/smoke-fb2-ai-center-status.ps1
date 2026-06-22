@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-context-sample-set-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-answer-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-readiness-status.ps1")
+. (Join-Path $PSScriptRoot "fb2-goal-gap-audit-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-ai-center-coordination-status.ps1")
 
 function Get-Fb2StatusRepoRoot {
@@ -120,6 +121,21 @@ function Build-Fb2AiCenterStatusSnapshot {
         -ContextProjectionComplete ([bool]$contextProjectionState.complete) `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent `
         -FinalEvidence $finalEvidence
+    $goalGapAudit = Get-Fb2GoalGapAuditState `
+        -LatestData $latestData `
+        -LatestReadOnly $latestReadOnly `
+        -FeedbackCoverage $feedbackCoverage `
+        -DataDirectReadState $dataDirectReadState `
+        -ContextProjectionState $contextProjectionState `
+        -SampleRequestState $sampleRequestState `
+        -SampleSetState $sampleSetState `
+        -AnswerReadinessState $answerReadinessState `
+        -GoalCompletion $goalCompletion `
+        -LatestDataPath $(if ($null -eq $latestDataFile) { "" } else { $latestDataFile.FullName }) `
+        -LatestReadOnlyPath $(if ($null -eq $latestReadOnlyFile) { "" } else { $latestReadOnlyFile.FullName }) `
+        -LatestAiCenterLogPath $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName }) `
+        -TokenPresent $tokenPresent `
+        -VoiceEvidencePathPresent $voiceEvidencePathPresent
     $coordination = Get-Fb2AiCenterCoordinationStatus `
         -LatestData $latestData `
         -LatestReadOnly $latestReadOnly `
@@ -134,6 +150,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -SampleRequestState $sampleRequestState `
         -SampleSetState $sampleSetState `
         -AnswerReadinessState $answerReadinessState `
+        -GoalGapAudit $goalGapAudit `
         -TokenPresent $tokenPresent `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent
 
@@ -250,6 +267,7 @@ function Build-Fb2AiCenterStatusSnapshot {
             asr_tts_status = if ($voiceEvidencePathPresent) { "voice_evidence_path_configured_but_not_verified_by_this_status_script" } else { "deferred_or_missing" }
         }
         goal_completion = $goalCompletion
+        goal_gap_audit = $goalGapAudit
         coordination = $coordination
         blockers = $blockers
         refresh_gaps = $refreshGaps
@@ -391,6 +409,17 @@ function Invoke-Fb2StatusSelfTest {
         if ([bool]$snapshot.goal_completion.full_final_ready) { $failed++ }
         if ($snapshot.goal_completion.stage -ne "non_voice_data_chat_permission_quality_ready_voice_deferred") { $failed++ }
         if (-not (@($snapshot.goal_completion.missing_items) -contains "voice_final_evidence_path_present")) { $failed++ }
+        if ($snapshot.goal_gap_audit.schema -ne "fb2.main_project.goal_gap_audit.v1") { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "direct_group_chat_read")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_pack_sample_set_validated")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_answer_readiness_validated")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.missing) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.missing) -contains "voice_final_evidence")) { $failed++ }
+        if (-not [bool]$snapshot.goal_gap_audit.blocked_by_external_secret) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.deferred_by_user) -contains "ASR_TTS_final_evidence")) { $failed++ }
+        if ([bool]$snapshot.goal_gap_audit.direct_read_policy.screenshots_accepted) { $failed++ }
+        if ($snapshot.goal_gap_audit.next_smallest_action -ne "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly") { $failed++ }
+        if (-not [bool]$snapshot.goal_gap_audit.current_flags.direct_group_chat_read_complete) { $failed++ }
         if ($snapshot.coordination.schema -ne "fb2.main_project.coordination.v1") { $failed++ }
         if ($snapshot.coordination.summary -ne "non_voice_ready_voice_deferred") { $failed++ }
         if (-not [bool]$snapshot.coordination.acceptance_scope.non_voice_ready) { $failed++ }
