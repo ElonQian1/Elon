@@ -123,7 +123,16 @@ function Get-Fb2PublicContractSummaryState {
     if ($domainSchema -ne "fb2.main_project.domain_data_blueprint.v1") { $missing += "domain_data_blueprint_contract" }
     if ($domainIndexSchema -ne "fb2.main_project.domain_context_index.v1") { $missing += "domain_context_index_contract" }
     if ($domainIndexCount -lt 8) { $missing += "domain_context_index_count" }
-    foreach ($indexId in @("match_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "feedback_quality_index")) {
+    foreach ($indexId in @(
+            "match_index",
+            "odds_snapshot_index",
+            "current_user_ticket_index",
+            "platform_order_risk_index",
+            "group_opinion_index",
+            "opinion_memory_index",
+            "context_audit_index",
+            "feedback_quality_index"
+        )) {
         if (-not ($domainIndexIds -contains $indexId)) {
             $missing += "domain_context_index_$indexId"
         }

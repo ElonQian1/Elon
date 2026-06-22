@@ -229,6 +229,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -AnswerReadinessState $answerReadinessState `
         -UserScenarioAudit $userScenarioAudit `
         -DomainDataBlueprint $domainDataBlueprint `
+        -PublicContractStatus $publicContractStatus `
         -ContractSmokeSummary $contractSmokeSummary `
         -GoalCompletion $goalCompletion `
         -LatestDataPath $(if ($null -eq $latestDataFile) { "" } else { $latestDataFile.FullName }) `
@@ -477,7 +478,16 @@ function Invoke-Fb2StatusSelfTest {
                 domain_data_blueprint_schema = "fb2.main_project.domain_data_blueprint.v1"
                 domain_context_index_schema = "fb2.main_project.domain_context_index.v1"
                 domain_context_index_count = 8
-                domain_context_index_ids = @("match_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "feedback_quality_index")
+                domain_context_index_ids = @(
+                    "match_index",
+                    "odds_snapshot_index",
+                    "current_user_ticket_index",
+                    "platform_order_risk_index",
+                    "group_opinion_index",
+                    "opinion_memory_index",
+                    "context_audit_index",
+                    "feedback_quality_index"
+                )
                 context_pack_template_schema = "fb2.context_pack_template.v1"
                 context_pack_template_wrapper = "fb2_context_pack"
                 context_pack_template_sections = @("usage_boundary", "match_facts", "user_order_slice", "platform_order_summary", "group_opinion_slice", "retrieval_evidence", "quality_feedback")
@@ -653,6 +663,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_answer_readiness_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "user_scenario_audit_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "domain_data_blueprint_fixed")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "domain_context_index_contract")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "main_project_contract_smoke")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "voice_final_evidence")) { $failed++ }
@@ -661,7 +672,10 @@ function Invoke-Fb2StatusSelfTest {
         if ([bool]$snapshot.goal_gap_audit.direct_read_policy.screenshots_accepted) { $failed++ }
         if ($snapshot.goal_gap_audit.next_smallest_action -ne "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly") { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.direct_group_chat_read_complete) { $failed++ }
+        if (-not [bool]$snapshot.goal_gap_audit.current_flags.domain_context_index_contract_complete) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.main_project_contract_smoke_complete) { $failed++ }
+        if ($snapshot.goal_gap_audit.evidence_refs.domain_context_index_count -ne 8) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.evidence_refs.domain_context_index_ids) -contains "odds_snapshot_index")) { $failed++ }
         if ($snapshot.goal_gap_audit.evidence_refs.contract_smoke_check_count -ne 12) { $failed++ }
         if ([string]$snapshot.goal_gap_audit.evidence_refs.contract_smoke_live_data_status -ne "skipped_missing_FB2_AI_CENTER_TOKEN") { $failed++ }
         if ($snapshot.live_preflight_request.schema -ne "fb2.main_project.live_preflight_request.v1") { $failed++ }

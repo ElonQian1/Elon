@@ -53,6 +53,7 @@ function Get-Fb2GoalGapAuditState {
         [object]$AnswerReadinessState,
         [object]$UserScenarioAudit,
         [object]$DomainDataBlueprint,
+        [object]$PublicContractStatus,
         [object]$ContractSmokeSummary,
         [object]$GoalCompletion,
         [string]$LatestDataPath,
@@ -79,6 +80,29 @@ function Get-Fb2GoalGapAuditState {
     $answerReadinessComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $AnswerReadinessState "complete")
     $userScenarioAuditComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $UserScenarioAudit "complete")
     $domainDataBlueprintComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $DomainDataBlueprint "complete")
+    $requiredDomainIndexes = @(
+        "match_index",
+        "odds_snapshot_index",
+        "current_user_ticket_index",
+        "platform_order_risk_index",
+        "group_opinion_index",
+        "opinion_memory_index",
+        "context_audit_index",
+        "feedback_quality_index"
+    )
+    $domainIndexSchema = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $PublicContractStatus "domain_context_index_schema")
+    $domainIndexCount = [int](Get-Fb2GoalGapAuditProperty $PublicContractStatus "domain_context_index_count" 0)
+    $domainIndexIds = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "domain_context_index_ids" @()))
+    $domainIndexMissingIds = @($requiredDomainIndexes | Where-Object { -not (@($domainIndexIds) -contains $_) })
+    $publicContractMissing = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "missing" @()))
+    # 领域索引是 fb2 长期快速检索的公开契约；它只约束 fb2 内部索引和 Context Pack 投影，不让主项目复制业务数据。
+    $domainContextIndexComplete = (
+        (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $PublicContractStatus "complete")) `
+            -and $domainIndexSchema -eq "fb2.main_project.domain_context_index.v1" `
+            -and $domainIndexCount -ge 8 `
+            -and @($domainIndexMissingIds).Count -eq 0 `
+            -and -not (@($publicContractMissing) | Where-Object { ([string]$_).StartsWith("domain_context_index") })
+    )
     $contractSmokeGates = Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "gates"
     # 这里只判断主项目无写群契约是否健康；缺 service token 的 fb2 live 数据仍由 live_preflight_request 单独跟踪。
     $contractSmokeComplete = (
@@ -102,6 +126,7 @@ function Get-Fb2GoalGapAuditState {
     if ($answerReadinessComplete) { $completed += "context_answer_readiness_validated" } else { $missing += "context_answer_readiness" }
     if ($userScenarioAuditComplete) { $completed += "user_scenario_audit_validated" } else { $missing += "user_scenario_audit" }
     if ($domainDataBlueprintComplete) { $completed += "domain_data_blueprint_fixed" } else { $missing += "domain_data_blueprint" }
+    if ($domainContextIndexComplete) { $completed += "domain_context_index_contract" } else { $missing += "domain_context_index_contract" }
     if ($contractSmokeComplete) { $completed += "main_project_contract_smoke" } else { $missing += "main_project_contract_smoke" }
     if ($latestDataSuccess -and $feedbackComplete -and $dataDirectReadComplete) {
         $completed += "live_data_only_visible_chat_feedback_historical_ready"
@@ -166,6 +191,7 @@ function Get-Fb2GoalGapAuditState {
             sample_request_complete = $sampleRequestComplete
             sample_set_complete = $sampleSetComplete
             answer_readiness_complete = $answerReadinessComplete
+            domain_context_index_contract_complete = $domainContextIndexComplete
             main_project_contract_smoke_complete = $contractSmokeComplete
             non_voice_ready = $nonVoiceReady
             full_final_ready = $fullFinalReady
@@ -182,6 +208,9 @@ function Get-Fb2GoalGapAuditState {
             sample_set_source_kinds = @((Get-Fb2GoalGapAuditProperty $SampleSetState "source_kinds" @()))
             answer_readiness_passed_count = [int](Get-Fb2GoalGapAuditProperty $AnswerReadinessState "passed_count" 0)
             user_scenario_complete_count = [int](Get-Fb2GoalGapAuditProperty $UserScenarioAudit "complete_count" 0)
+            domain_context_index_schema = $domainIndexSchema
+            domain_context_index_count = $domainIndexCount
+            domain_context_index_ids = @($domainIndexIds)
             contract_smoke_summary_path = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "path")
             contract_smoke_check_count = [int](Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "check_count" 0)
             contract_smoke_live_data_status = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $contractSmokeGates "fb2_live_data_status")
