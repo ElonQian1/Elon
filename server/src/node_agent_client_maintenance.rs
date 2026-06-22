@@ -518,8 +518,15 @@ fn error_response(status: StatusCode, error: String) -> (StatusCode, Json<Value>
 }
 
 fn launcher_logs_dir() -> Option<PathBuf> {
-    install_dir_from_local_app_data(std::env::var("LOCALAPPDATA").ok().as_deref())
-        .map(|install_dir| install_dir.join("_internal").join("logs"))
+    #[cfg(windows)]
+    {
+        install_dir_from_local_app_data(std::env::var("LOCALAPPDATA").ok().as_deref())
+            .map(|install_dir| install_dir.join("_internal").join("logs"))
+    }
+    #[cfg(not(windows))]
+    {
+        None
+    }
 }
 
 fn launcher_log_file() -> Option<PathBuf> {
