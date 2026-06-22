@@ -2447,11 +2447,14 @@
     const project = (payload && payload.project) || {};
     const inspect = (payload && payload.inspect) || {};
     const registration = (payload && payload.registration) || {};
+    const previousPath = clean(state.localProjectInfo && state.localProjectInfo.path);
     const path = clean(project.workspace_path || inspect.workspace_path);
+    const pathChanged = path && path !== previousPath;
     const name = clean(project.name);
     const repo = clean(project.repo_url || inspect.git_remote_origin);
     const branch = clean(project.branch || inspect.git_branch);
     const desc = clean(project.description);
+    const identitySource = clean(project.identity_source);
     const canRegister = registration.can_register !== false;
     const missingFields = Array.isArray(registration.missing_fields)
       ? registration.missing_fields.map(clean).filter(Boolean)
@@ -2466,7 +2469,7 @@
     if (name) els.settingsProjectName.value = name;
     els.settingsProjectRepo.value = repo;
     els.settingsProjectBranch.value = branch;
-    if (desc && !clean(els.settingsProjectDesc.value)) els.settingsProjectDesc.value = desc;
+    if (desc && (pathChanged || !clean(els.settingsProjectDesc.value))) els.settingsProjectDesc.value = desc;
     state.localProjectInfo = path ? { path, name, repo, branch, canRegister, missingFields } : null;
     const git = inspect.is_git_worktree || project.is_git_worktree
       ? [branch || 'HEAD', clean(project.git_head || inspect.git_head), (project.has_uncommitted_changes || inspect.has_uncommitted_changes) ? '有未提交改动' : '干净']
@@ -2492,6 +2495,7 @@
       ['目录', path],
       ['状态', summary, statusTone],
       ['Git', git],
+      identitySource && ['来源', identitySource],
       profile && ['类型', profile],
       commands && ['命令', commands],
       detected && ['识别', `检测到 ${detected}`],

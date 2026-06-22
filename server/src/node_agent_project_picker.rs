@@ -2,7 +2,7 @@
 
 use axum::{http::StatusCode, Json};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
 use crate::{project_landing, project_workspace_inspect};
@@ -17,6 +17,7 @@ struct LocalProjectInfo {
     name: String,
     workspace_path: String,
     description: Option<String>,
+    identity_source: Option<String>,
     repo_url: Option<String>,
     branch: Option<String>,
     git_head: Option<String>,
@@ -67,7 +68,8 @@ fn project_info_response(workspace_path: &str) -> (StatusCode, Json<serde_json::
         return json_error(StatusCode::BAD_REQUEST, "workspace_path 不能为空");
     }
 
-    match local_project_info(workspace_path) {
+    let landing = project_landing::load_workspace_landing(Path::new(workspace_path));
+    match local_project_info(workspace_path, landing.as_ref()) {
         Ok((project, inspect)) => {
             let registration = local_project_registration_readiness(&project, &inspect);
             (
@@ -77,7 +79,7 @@ fn project_info_response(workspace_path: &str) -> (StatusCode, Json<serde_json::
                     "project": project,
                     "inspect": inspect,
                     "registration": registration,
-                    "landing": project_landing::load_workspace_landing(Path::new(workspace_path)),
+                    "landing": landing,
                 })),
             )
         }
@@ -87,6 +89,7 @@ fn project_info_response(workspace_path: &str) -> (StatusCode, Json<serde_json::
 
 fn local_project_info(
     workspace_path: &str,
+    landing: Option<&Value>,
 ) -> anyhow::Result<(
     LocalProjectInfo,
     homecli_proto::ProjectWorkspaceInspectStatus,
@@ -100,13 +103,13 @@ fn local_project_info(
         anyhow::bail!("workspace_path 必须指向一个目录");
     }
 
-    let name = project_name(&path);
+    let identity = detect_project_identity(&path, landing);
     let profile = detect_project_profile(&path);
-    let description = Some(format!("绑定到本 PC 节点的本地项目: {name}"));
     let project = LocalProjectInfo {
-        name,
+        name: identity.name,
         workspace_path: inspect.workspace_path.clone(),
-        description,
+        description: identity.description,
+        identity_source: identity.source,
         repo_url: inspect.git_remote_origin.clone(),
         branch: inspect
             .git_branch
@@ -225,6 +228,176 @@ struct ProjectProfile {
     test_command: Option<String>,
     build_command: Option<String>,
     detected_files: Vec<String>,
+}
+
+#[derive(Debug)]
+struct ProjectIdentity {
+    name: String,
+    description: Option<String>,
+    source: Option<String>,
+}
+
+fn detect_project_identity(path: &Path, landing: Option<&Value>) -> ProjectIdentity {
+    let fallback_name = project_name(path);
+    if let Some(identity) = identity_from_landing(&fallback_name, landing) {
+        return identity;
+    }
+    if let Some(identity) = identity_from_package_json(&fallback_name, &path.join("package.json")) {
+        return identity;
+    }
+    if let Some(identity) = identity_from_toml_manifest(
+        &fallback_name,
+        &path.join("Cargo.toml"),
+        "package",
+        "Cargo.toml",
+    ) {
+        return identity;
+    }
+    if let Some(identity) = identity_from_toml_manifest(
+        &fallback_name,
+        &path.join("pyproject.toml"),
+        "project",
+        "pyproject.toml",
+    ) {
+        return identity;
+    }
+    ProjectIdentity {
+        description: Some(default_project_description(&fallback_name)),
+        name: fallback_name,
+        source: Some("目录名".to_string()),
+    }
+}
+
+fn identity_from_landing(fallback_name: &str, landing: Option<&Value>) -> Option<ProjectIdentity> {
+    let object = landing?.as_object()?;
+    let name = first_json_string(object, &["title"]);
+    let description = first_json_string(object, &["tagline", "summary", "description"]);
+    identity_from_parts(
+        fallback_name,
+        name,
+        description,
+        ".elon/project-landing.json",
+    )
+}
+
+fn identity_from_package_json(fallback_name: &str, package_json: &Path) -> Option<ProjectIdentity> {
+    let object = std::fs::read_to_string(package_json)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .and_then(|value| value.as_object().cloned())?;
+    identity_from_parts(
+        fallback_name,
+        first_json_string(&object, &["displayName", "display_name", "name"]),
+        first_json_string(&object, &["description"]),
+        "package.json",
+    )
+}
+
+fn identity_from_toml_manifest(
+    fallback_name: &str,
+    manifest_path: &Path,
+    section: &str,
+    source: &str,
+) -> Option<ProjectIdentity> {
+    if !manifest_path.is_file() {
+        return None;
+    }
+    identity_from_parts(
+        fallback_name,
+        toml_section_string(manifest_path, section, "name"),
+        toml_section_string(manifest_path, section, "description"),
+        source,
+    )
+}
+
+fn identity_from_parts(
+    fallback_name: &str,
+    name: Option<String>,
+    description: Option<String>,
+    source: &str,
+) -> Option<ProjectIdentity> {
+    if name.is_none() && description.is_none() {
+        return None;
+    }
+    let name = name.unwrap_or_else(|| fallback_name.to_string());
+    let description = description.or_else(|| Some(default_project_description(&name)));
+    Some(ProjectIdentity {
+        name,
+        description,
+        source: Some(source.to_string()),
+    })
+}
+
+fn first_json_string(object: &serde_json::Map<String, Value>, keys: &[&str]) -> Option<String> {
+    keys.iter()
+        .find_map(|key| object.get(*key).and_then(|value| value.as_str()))
+        .and_then(|value| clean_project_text(value, 240))
+}
+
+fn toml_section_string(path: &Path, section: &str, key: &str) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let mut in_section = false;
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            in_section = line.trim_start_matches('[').trim_end_matches(']').trim() == section;
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        let Some((left, right)) = line.split_once('=') else {
+            continue;
+        };
+        if left.trim() == key {
+            return parse_toml_string(right.trim())
+                .and_then(|value| clean_project_text(&value, 240));
+        }
+    }
+    None
+}
+
+fn parse_toml_string(value: &str) -> Option<String> {
+    let value = value.trim();
+    if let Some(rest) = value.strip_prefix('"') {
+        let mut escaped = false;
+        let mut output = String::new();
+        for ch in rest.chars() {
+            if escaped {
+                output.push(ch);
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == '"' {
+                return Some(output);
+            }
+            output.push(ch);
+        }
+        return None;
+    }
+    if let Some(rest) = value.strip_prefix('\'') {
+        return rest.split_once('\'').map(|(text, _)| text.to_string());
+    }
+    None
+}
+
+fn clean_project_text(value: &str, max_chars: usize) -> Option<String> {
+    let value = value.trim();
+    if value.is_empty() {
+        return None;
+    }
+    Some(value.chars().take(max_chars).collect())
+}
+
+fn default_project_description(name: &str) -> String {
+    format!("绑定到本 PC 节点的本地项目: {name}")
 }
 
 fn detect_project_profile(path: &Path) -> ProjectProfile {
@@ -408,8 +581,12 @@ fn pick_folder() -> anyhow::Result<Option<String>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{detect_project_profile, local_project_registration_readiness, LocalProjectInfo};
+    use super::{
+        detect_project_identity, detect_project_profile, local_project_info,
+        local_project_registration_readiness, LocalProjectInfo,
+    };
     use homecli_proto::ProjectWorkspaceInspectStatus;
+    use serde_json::json;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -448,6 +625,7 @@ mod tests {
             name: "demo".to_string(),
             workspace_path: "C:\\demo".to_string(),
             description: Some("绑定到本 PC 节点的本地项目: demo".to_string()),
+            identity_source: Some("目录名".to_string()),
             repo_url: Some("https://example.com/demo.git".to_string()),
             branch: Some("main".to_string()),
             git_head: Some("abc1234".to_string()),
@@ -510,6 +688,83 @@ mod tests {
             .iter()
             .any(|warning| warning.contains("Route B/C")));
         assert!(!readiness.autofill_fields.contains(&"Git 远端".to_string()));
+    }
+
+    #[test]
+    fn detects_project_identity_from_landing_manifest() {
+        let landing = json!({
+            "title": "智能客服工作台",
+            "tagline": "给运营团队使用的客服项目"
+        });
+
+        let identity = detect_project_identity(PathBuf::from("C:\\demo").as_path(), Some(&landing));
+
+        assert_eq!(identity.name, "智能客服工作台");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("给运营团队使用的客服项目")
+        );
+        assert_eq!(
+            identity.source.as_deref(),
+            Some(".elon/project-landing.json")
+        );
+    }
+
+    #[test]
+    fn detects_project_identity_from_package_json() {
+        let dir = temp_project("identity-node");
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"name":"agent-desk","description":"本地 AI 工作台"}"#,
+        )
+        .unwrap();
+
+        let identity = detect_project_identity(&dir, None);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "agent-desk");
+        assert_eq!(identity.description.as_deref(), Some("本地 AI 工作台"));
+        assert_eq!(identity.source.as_deref(), Some("package.json"));
+    }
+
+    #[test]
+    fn detects_project_identity_from_cargo_manifest() {
+        let dir = temp_project("identity-rust");
+        std::fs::write(
+            dir.join("Cargo.toml"),
+            "[package]\nname = \"repair-agent\"\ndescription = 'Windows 维修代理'\n",
+        )
+        .unwrap();
+
+        let identity = detect_project_identity(&dir, None);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "repair-agent");
+        assert_eq!(identity.description.as_deref(), Some("Windows 维修代理"));
+        assert_eq!(identity.source.as_deref(), Some("Cargo.toml"));
+    }
+
+    #[test]
+    fn local_project_info_uses_landing_identity() {
+        let dir = temp_project("landing-info");
+        std::fs::create_dir_all(dir.join(".elon")).unwrap();
+        std::fs::write(
+            dir.join(".elon").join("project-landing.json"),
+            r#"{"title":"项目元信息名称","summary":"项目元信息描述"}"#,
+        )
+        .unwrap();
+        let landing = crate::project_landing::load_workspace_landing(&dir);
+
+        let (project, _) = local_project_info(dir.to_string_lossy().as_ref(), landing.as_ref())
+            .expect("local project should inspect");
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(project.name, "项目元信息名称");
+        assert_eq!(project.description.as_deref(), Some("项目元信息描述"));
+        assert_eq!(
+            project.identity_source.as_deref(),
+            Some(".elon/project-landing.json")
+        );
     }
 
     #[test]
