@@ -103,43 +103,86 @@ pub(crate) async fn call_chat_llm_with_options(
     temperature: f64,
     max_tokens: usize,
 ) -> Result<Value> {
+    call_chat_llm_with_response_format(
+        state,
+        agent,
+        messages,
+        user_id,
+        feature,
+        temperature,
+        max_tokens,
+        false,
+    )
+    .await
+}
+
+/// 调用 LLM API（普通对话），要求 OpenAI 兼容模型尽量返回 JSON 对象。
+///
+/// 部分 OpenAI-compatible 网关不支持 `response_format`，遇到兼容性错误时会自动降级
+/// 为普通对话请求；认证、额度、限流等真实错误不会被重试掩盖。
+pub(crate) async fn call_chat_llm_with_json_response_mode(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+    temperature: f64,
+    max_tokens: usize,
+) -> Result<Value> {
+    call_chat_llm_with_response_format(
+        state,
+        agent,
+        messages,
+        user_id,
+        feature,
+        temperature,
+        max_tokens,
+        true,
+    )
+    .await
+}
+
+async fn call_chat_llm_with_response_format(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    messages: &[Value],
+    user_id: &str,
+    feature: &str,
+    temperature: f64,
+    max_tokens: usize,
+    json_response_mode: bool,
+) -> Result<Value> {
     ensure_api_call_allowed(state, agent, user_id)?;
     let url = format!("{}/chat/completions", agent.api_base);
-
-    let body = json!({
-        "model": agent.model,
-        "messages": messages,
-        "stream": false,
-        "temperature": temperature,
-        "max_tokens": max_tokens,
-    });
-
-    let is_copilot_direct = agent.api_base.contains("githubcopilot.com");
-    let integration_id =
-        std::env::var("COPILOT_INTEGRATION_ID").unwrap_or_else(|_| "vscode-chat".into());
-
-    let mut req = state
-        .http_client
-        .post(&url)
-        .bearer_auth(&agent.api_key)
-        .json(&body);
-    if is_copilot_direct {
-        req = req
-            .header("editor-version", "vscode/1.99.0")
-            .header("editor-plugin-version", "copilot-chat/0.26.0")
-            .header("Copilot-Integration-Id", integration_id);
-    }
-    let resp = req.send().await.map_err(|e| {
-        if e.is_timeout() {
-            anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
-        } else {
-            anyhow::anyhow!("AI 请求失败: {}", e)
-        }
-    })?;
+    let body = chat_completion_body(agent, messages, temperature, max_tokens, json_response_mode);
+    let resp = send_chat_completion_request(state, agent, &url, &body).await?;
 
     if !resp.status().is_success() {
         let status = resp.status();
         let text = resp.text().await?;
+        if json_response_mode && should_retry_without_json_response_mode(status, &text) {
+            let fallback_body =
+                chat_completion_body(agent, messages, temperature, max_tokens, false);
+            let fallback = send_chat_completion_request(state, agent, &url, &fallback_body).await?;
+            if !fallback.status().is_success() {
+                let fallback_status = fallback.status();
+                let fallback_text = fallback.text().await?;
+                return Err(anyhow::anyhow!(
+                    "{}",
+                    friendly_ai_api_error(fallback_status, &fallback_text)
+                ));
+            }
+            let response: Value = fallback.json().await?;
+            crate::token_usage_api::record_api_usage(
+                &state.store,
+                &response,
+                user_id,
+                feature,
+                &agent.model,
+                agent.usage_mode(),
+            );
+            return Ok(response);
+        }
         return Err(anyhow::anyhow!("{}", friendly_ai_api_error(status, &text)));
     }
 
@@ -153,6 +196,129 @@ pub(crate) async fn call_chat_llm_with_options(
         agent.usage_mode(),
     );
     Ok(response)
+}
+
+fn chat_completion_body(
+    agent: &AgentConfig,
+    messages: &[Value],
+    temperature: f64,
+    max_tokens: usize,
+    json_response_mode: bool,
+) -> Value {
+    let mut body = json!({
+        "model": agent.model,
+        "messages": messages,
+        "stream": false,
+        "temperature": temperature,
+        "max_tokens": max_tokens,
+    });
+    if json_response_mode {
+        body["response_format"] = json!({ "type": "json_object" });
+    }
+    body
+}
+
+async fn send_chat_completion_request(
+    state: &Arc<AppState>,
+    agent: &AgentConfig,
+    url: &str,
+    body: &Value,
+) -> Result<reqwest::Response> {
+    let is_copilot_direct = agent.api_base.contains("githubcopilot.com");
+    let integration_id =
+        std::env::var("COPILOT_INTEGRATION_ID").unwrap_or_else(|_| "vscode-chat".into());
+
+    let mut req = state
+        .http_client
+        .post(url)
+        .bearer_auth(&agent.api_key)
+        .json(body);
+    if is_copilot_direct {
+        req = req
+            .header("editor-version", "vscode/1.99.0")
+            .header("editor-plugin-version", "copilot-chat/0.26.0")
+            .header("Copilot-Integration-Id", integration_id);
+    }
+
+    req.send().await.map_err(|e| {
+        if e.is_timeout() {
+            anyhow::anyhow!("AI 请求超时，请检查代理地址、密钥或稍后重试")
+        } else {
+            anyhow::anyhow!("AI 请求失败: {}", e)
+        }
+    })
+}
+
+fn should_retry_without_json_response_mode(status: reqwest::StatusCode, body: &str) -> bool {
+    if !matches!(
+        status,
+        reqwest::StatusCode::BAD_REQUEST
+            | reqwest::StatusCode::UNPROCESSABLE_ENTITY
+            | reqwest::StatusCode::NOT_IMPLEMENTED
+    ) {
+        return false;
+    }
+    let lower = body.to_ascii_lowercase();
+    lower.contains("response_format")
+        || lower.contains("json_object")
+        || lower.contains("json mode")
+        || lower.contains("unsupported parameter")
+        || lower.contains("unknown parameter")
+        || lower.contains("unrecognized request argument")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{chat_completion_body, should_retry_without_json_response_mode};
+    use crate::types::AgentConfig;
+    use serde_json::json;
+
+    #[test]
+    fn chat_completion_body_can_request_json_object_response() {
+        let agent = test_agent();
+        let messages = vec![json!({"role": "user", "content": "Return JSON"})];
+
+        let body = chat_completion_body(&agent, &messages, 0.2, 3000, true);
+        assert_eq!(body["model"], "gpt-test");
+        assert_eq!(body["temperature"], 0.2);
+        assert_eq!(body["max_tokens"], 3000);
+        assert_eq!(body["response_format"]["type"], "json_object");
+        assert_eq!(body["messages"][0]["content"], "Return JSON");
+
+        let fallback = chat_completion_body(&agent, &messages, 0.2, 3000, false);
+        assert!(fallback.get("response_format").is_none());
+    }
+
+    #[test]
+    fn json_response_fallback_only_handles_compatibility_errors() {
+        assert!(should_retry_without_json_response_mode(
+            reqwest::StatusCode::BAD_REQUEST,
+            "Unrecognized request argument supplied: response_format"
+        ));
+        assert!(should_retry_without_json_response_mode(
+            reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+            "json_object is not supported"
+        ));
+        assert!(!should_retry_without_json_response_mode(
+            reqwest::StatusCode::UNAUTHORIZED,
+            "invalid api key"
+        ));
+        assert!(!should_retry_without_json_response_mode(
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            "rate limit"
+        ));
+    }
+
+    fn test_agent() -> AgentConfig {
+        AgentConfig {
+            name: "test".to_string(),
+            api_base: "https://example.test/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-test".to_string(),
+            embedding_model: None,
+            usage_mode: None,
+        }
+    }
 }
 
 fn ensure_api_call_allowed(

@@ -11,7 +11,7 @@ use serde_json::Value;
 use std::sync::Arc;
 
 use crate::{
-    agent_llm_call::call_chat_llm_with_options,
+    agent_llm_call::call_chat_llm_with_json_response_mode,
     project_auth::{auth_from_headers, json_error},
     server_agent_runtime_guard::{
         audit_summary, operational_error_summary, protection_status, try_acquire_runtime_admission,
@@ -117,7 +117,7 @@ pub async fn chat_handler(
         "pc_server_runtime request accepted"
     );
 
-    match call_chat_llm_with_options(
+    match call_chat_llm_with_json_response_mode(
         &state,
         &agent,
         &req.messages,
