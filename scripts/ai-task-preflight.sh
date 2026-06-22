@@ -75,6 +75,7 @@ if [[ "$always_create_worktree" -eq 1 || "$dirty" -eq 1 || "$behind" -gt 0 ]]; t
   needs_worktree=1
 fi
 
+created_worktree=0
 if [[ "$create_worktree" -eq 1 && "$needs_worktree" -eq 1 ]]; then
   if [[ "$has_origin" -ne 1 ]]; then
     echo "Cannot create isolated worktree: origin remote is missing" >&2
@@ -95,6 +96,7 @@ if [[ "$create_worktree" -eq 1 && "$needs_worktree" -eq 1 ]]; then
   echo "WORKTREE_BRANCH=$new_branch"
   echo "WORKTREE_PATH=$worktree_path"
   echo "NEXT=cd \"$worktree_path\""
+  created_worktree=1
 elif [[ "$needs_worktree" -eq 1 ]]; then
   echo "WORKTREE_CREATED=false"
   echo "NEXT=Run bash scripts/ai-task-preflight.sh --create-worktree before editing."
@@ -104,7 +106,9 @@ else
 fi
 
 # 自动清理已合并、工作树干净的孤儿 task worktree。要禁用：--skip-auto-cleanup
-if [[ "$skip_auto_cleanup" -ne 1 && -x "$repo_root/scripts/cleanup-task-worktrees.sh" ]]; then
+if [[ "$created_worktree" -eq 1 && "$skip_auto_cleanup" -ne 1 ]]; then
+  echo "AUTO_CLEANUP=skipped_after_worktree_create"
+elif [[ "$skip_auto_cleanup" -ne 1 && -x "$repo_root/scripts/cleanup-task-worktrees.sh" ]]; then
   cleanup_out="$(bash "$repo_root/scripts/cleanup-task-worktrees.sh" --apply 2>&1 || true)"
   removed_line="$(printf '%s\n' "$cleanup_out" | grep -E '^完成：清理' | tail -n 1 || true)"
   if [[ -n "$removed_line" ]]; then

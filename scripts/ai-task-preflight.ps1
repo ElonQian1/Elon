@@ -59,6 +59,7 @@ if ($isDirty) {
 }
 
 $needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0)
+$createdWorktree = $false
 if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     if (-not $hasOrigin) {
         throw "Cannot create isolated worktree: origin remote is missing"
@@ -84,6 +85,7 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     Write-Host "WORKTREE_BRANCH=$newBranch"
     Write-Host "WORKTREE_PATH=$worktreePath"
     Write-Host "NEXT=cd `"$worktreePath`""
+    $createdWorktree = $true
 } elseif ($needsWorktree) {
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Run powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree before editing."
@@ -97,7 +99,9 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
 # 仅删除满足"已合并到 origin/main + 无未提交内容 + 不是当前 worktree"的，
 # 有未提交改动的会被自动保留。要禁用：-SkipAutoCleanup
 # ─────────────────────────────────────────────────────────────
-if (-not $SkipAutoCleanup) {
+if ($createdWorktree -and -not $SkipAutoCleanup) {
+    Write-Host "AUTO_CLEANUP=skipped_after_worktree_create"
+} elseif (-not $SkipAutoCleanup) {
     $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
     if (Test-Path -LiteralPath $cleanupScript) {
         try {

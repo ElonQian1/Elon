@@ -328,6 +328,80 @@ fn stress_concurrent_task_journal_writes_keep_registry_and_events_consistent() {
     let _ = fs::remove_dir_all(dir);
 }
 
+#[test]
+fn stress_restart_resume_contract_never_claims_lost_control_handles() {
+    let dir = unique_test_dir("restart-resume-contract-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = TaskJournal::new(&dir);
+    let routes = [
+        ("codex", "route_a_external_cli"),
+        ("api-runtime", "route_b_api_runtime"),
+        ("server-runtime", "route_c_server_runtime"),
+    ];
+
+    for task_index in 0..270 {
+        let (cli_name, route) = routes[task_index % routes.len()];
+        let req_id = format!("req-restart-{task_index:03}");
+        journal
+            .record_started(TaskJournalStart {
+                req_id: &req_id,
+                cli_name,
+                route: Some(route),
+                run_handle_id: Some(&req_id),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("restart pressure task should start");
+        journal
+            .record_process_started(&req_id, 10_000 + task_index as u32)
+            .expect("process pid should persist before restart");
+        if cli_name == "codex" {
+            let scope_key = format!("scope-{task_index:03}");
+            let session_id = format!("session-{task_index:03}");
+            journal
+                .record_codex_session(&req_id, &scope_key, &session_id)
+                .expect("codex session should persist before restart");
+        }
+        if task_index % 5 == 0 {
+            journal
+                .record_cancel_requested(&req_id)
+                .expect("cancel request should persist before restart");
+        }
+    }
+
+    let registry = read_registry(&dir);
+    assert_eq!(registry.len(), 270);
+    for record in registry.values() {
+        let attach = task_attach_state(Some(record), None);
+        let resume = task_resume_contract(&attach);
+        let resume_json =
+            serde_json::to_value(resume).expect("restart resume contract should serialize");
+
+        assert_eq!(resume_json["status"], "detached");
+        assert_eq!(resume_json["strategy"]["kind"], "snapshot_continue");
+        assert_eq!(resume_json["next_action"], "continue_from_snapshot");
+        assert_eq!(resume_json["can_reconnect"], false);
+        assert_eq!(resume_json["can_cancel"], false);
+        assert_eq!(resume_json["can_stream_live_output"], false);
+        assert_eq!(resume_json["can_approve_tools"], false);
+        assert_eq!(resume_json["can_replay_journal_events"], true);
+        assert_eq!(resume_json["run_handle"], Value::Null);
+        assert_eq!(resume_json["strategy"]["requires_new_task"], true);
+
+        if record.cli_name == "codex" {
+            assert_eq!(resume_json["can_resume_codex_session"], true);
+            assert!(resume_json["codex_session"]["id"]
+                .as_str()
+                .is_some_and(|value| value.starts_with("session-")));
+        } else {
+            assert_eq!(resume_json["can_resume_codex_session"], false);
+            assert_eq!(resume_json["codex_session"], Value::Null);
+        }
+    }
+
+    let _ = fs::remove_dir_all(dir);
+}
+
 fn read_registry(dir: &std::path::Path) -> BTreeMap<String, TaskJournalRecord> {
     let text = fs::read_to_string(dir.join("registry.json")).expect("registry should read");
     serde_json::from_str(&text).expect("registry should parse")
