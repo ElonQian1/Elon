@@ -3,10 +3,10 @@
 use axum::{http::StatusCode, Json};
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{
-    path::{Path, PathBuf},
-    process::{Command, Stdio},
-};
+use std::path::{Path, PathBuf};
+
+#[cfg(windows)]
+use std::process::{Command, Stdio};
 
 #[derive(Deserialize)]
 pub(crate) struct OpenTargetRequest {
@@ -60,7 +60,7 @@ pub(crate) async fn uninstall_handler() -> (StatusCode, Json<Value>) {
 
 fn status_payload() -> Value {
     let paths = maintenance_paths();
-    let mut payload = json!({
+    let payload = json!({
         "ok": true,
         "platform": std::env::consts::OS,
         "supported": cfg!(windows),
@@ -70,7 +70,11 @@ fn status_payload() -> Value {
         "task_journal_dir": path_to_string(&paths.task_journal_dir),
     });
 
-    #[cfg(windows)]
+    with_windows_install_status(payload)
+}
+
+#[cfg(windows)]
+fn with_windows_install_status(mut payload: Value) -> Value {
     if let Ok(installed) = installed_paths() {
         if let Some(object) = payload.as_object_mut() {
             object.insert(
@@ -97,6 +101,11 @@ fn status_payload() -> Value {
         }
     }
 
+    payload
+}
+
+#[cfg(not(windows))]
+fn with_windows_install_status(payload: Value) -> Value {
     payload
 }
 
@@ -246,6 +255,7 @@ fn running_from_install_dir(install_dir: &Path) -> bool {
         .unwrap_or(false)
 }
 
+#[cfg(any(windows, test))]
 fn install_dir_from_local_app_data(local_app_data: Option<&str>) -> Option<PathBuf> {
     local_app_data
         .map(str::trim)
