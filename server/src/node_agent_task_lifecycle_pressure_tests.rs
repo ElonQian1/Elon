@@ -114,6 +114,75 @@ fn stress_terminal_outcomes_across_all_pc_task_routes() {
 }
 
 #[test]
+fn stress_late_cancel_requests_never_reopen_terminal_tasks() {
+    let dir = unique_test_dir("late-cancel-after-terminal-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = TaskJournal::new(&dir);
+    let terminal_outcomes = [
+        ("done", None, "done"),
+        ("failed", Some("provider unavailable"), "failed"),
+        ("canceled", Some("用户已停止 PC CLI 任务"), "canceled"),
+    ];
+
+    for task_index in 0..300 {
+        let (finish_status, error, expected_status) =
+            terminal_outcomes[task_index % terminal_outcomes.len()];
+        let req_id = format!("req-late-cancel-{task_index:03}");
+        journal
+            .record_started(TaskJournalStart {
+                req_id: &req_id,
+                cli_name: "server-runtime",
+                route: Some("route_c_server_runtime"),
+                run_handle_id: Some(&req_id),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("task start should persist before late cancel pressure");
+        journal
+            .record_finished_with_outcome(&req_id, finish_status, error)
+            .expect("terminal outcome should persist before late cancel pressure");
+        journal
+            .record_cancel_requested(&req_id)
+            .expect("late cancel request should remain auditable");
+
+        let registry = read_registry(&dir);
+        let record = registry
+            .get(&req_id)
+            .expect("terminal record should stay in registry");
+        assert_eq!(
+            record.status, expected_status,
+            "late cancel must not reopen terminal task {req_id}"
+        );
+        assert!(
+            record.cancel_requested_at_ms.is_none(),
+            "late cancel after terminal should not look like an active cancel request"
+        );
+    }
+
+    let registry = read_registry(&dir);
+    assert_eq!(registry.len(), 300);
+    assert_eq!(count_status(&registry, "done"), 100);
+    assert_eq!(count_status(&registry, "failed"), 100);
+    assert_eq!(count_status(&registry, "canceled"), 100);
+    assert_eq!(count_status(&registry, "cancel_requested"), 0);
+
+    let sample = journal
+        .snapshot("req-late-cancel-002", 0, 20)
+        .expect("late cancel sample snapshot should read");
+    assert_eq!(
+        sample.record.as_ref().map(|record| record.status.as_str()),
+        Some("canceled")
+    );
+    assert!(sample.events.iter().any(|event| {
+        event.event.get("type").and_then(Value::as_str) == Some("cancel_requested")
+            && event.event.get("ignored").and_then(Value::as_bool) == Some(true)
+            && event.event.get("reason").and_then(Value::as_str) == Some("task_already_terminal")
+    }));
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
 fn stress_local_journal_cursor_replays_long_interleaved_task_without_skipping() {
     let dir = unique_test_dir("cursor-replay-pressure");
     let _ = fs::remove_dir_all(&dir);

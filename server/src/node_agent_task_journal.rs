@@ -216,17 +216,33 @@ impl TaskJournal {
         with_task_journal_io_lock(|| {
             let now = now_ms();
             let mut registry = self.load_registry()?;
+            let mut current_status = None;
+            let mut ignored = false;
             if let Some(record) = registry.get_mut(req_id) {
-                record.status = "cancel_requested".to_string();
-                record.updated_at_ms = now;
-                record.cancel_requested_at_ms = Some(now);
+                if is_terminal_status(&record.status) {
+                    ignored = true;
+                    current_status = Some(record.status.clone());
+                } else {
+                    record.status = "cancel_requested".to_string();
+                    record.updated_at_ms = now;
+                    record.cancel_requested_at_ms = Some(now);
+                    current_status = Some(record.status.clone());
+                }
             }
             self.save_registry(&registry)?;
-            self.append_event(json!({
+            let mut event = json!({
                 "type": "cancel_requested",
                 "req_id": req_id,
                 "at_ms": now
-            }))
+            });
+            if let Some(status) = current_status {
+                event["status"] = Value::String(status);
+            }
+            if ignored {
+                event["ignored"] = Value::Bool(true);
+                event["reason"] = Value::String("task_already_terminal".to_string());
+            }
+            self.append_event(event)
         })
     }
 
