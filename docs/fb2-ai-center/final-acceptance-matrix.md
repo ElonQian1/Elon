@@ -15,6 +15,7 @@
 | `context-contract` | 默认 smoke 检查 answer policy、六类评测场景、live manifest execution policy | 已覆盖 |
 | Context Pack 拉取 | `-RequireFb2Live -RequireAllScenarios -ExternalUserId <uuid>` | 需要真实 `FB2_AI_CENTER_TOKEN` 完成最终验证 |
 | tool manifest 读取 | 默认 smoke 检查 `live_tool_manifest.status=ready`、必需 tool ids、无 missing allowed tool | 已覆盖并新增必需工具清单 |
+| fb2 dynamic discovery | 默认 smoke 直连 fb2 `/integration`，检查路由就绪、token header、关键端点和官方群映射；无 token 时 readiness/tool-manifest 必须 401；带 token 时验证 authenticated readiness 和 direct manifest tool id | 默认无 token discovery 已覆盖；authenticated 内容级检查仍需在最终验收中带 `FB2_AI_CENTER_TOKEN` 复核 |
 | 工具执行和审计 | `-RequireAllScenarios` + `-CheckPermissionBoundaries` + visible chat final acceptance 的 feedback/audit evidence 和 `feedback_coverage` | 需要最终验收绑定同一批 `QualitySince`，且 `visible_mention`、`selected_message`、`summary_post` 三类 feedback 覆盖完整 |
 | answer policy | 默认 smoke 检查 `fb2.answer_policy.v1` 和 6 个 canonical eval scenarios | 已覆盖 |
 | 语音证据脚本离线回归 | `smoke-fb2-ai-center.ps1 -SelfTest` 检查 final-ready 正例、严格布尔字段、artifact 解析/占位拒绝、logcat/视觉证据、低 APK 和 ASR/TTS 必需项失败路径 | 已补本地自测；它只证明主 smoke 的语音证据门槛不会退化，不替代真实 fb2 APK 的 `finalAcceptanceReady=true` 真机证据 |
@@ -53,7 +54,7 @@
 
 ## 还不能宣布完成的证据缺口
 
-- 缺真实 `FB2_AI_CENTER_TOKEN`，不能完成 live Context Pack、平台匿名摘要、质量汇总和 feedback 样本的最终验收。
+- 缺真实 `FB2_AI_CENTER_TOKEN`，不能完成 authenticated readiness/direct manifest、live Context Pack、平台匿名摘要、质量汇总和 feedback 样本的最终验收。
 - 缺 `finalAcceptanceReady=true` 的真实 fb2 真机语音证据 JSON，不能证明小米/HyperOS 等设备上主项目 `VoiceComposerView`、系统 ASR、云端兜底、TTS 和 ASR/TTS 免费策略已完整可用；最终证据还必须提供真实可访问的 logcat 和截图/视频 artifact。当前 ADB 半成品证据只能证明 UI/录音浮层没有静音卡死。
 - 已有独立真实群聊 visible smoke 和 summary post smoke 通过，但仍缺最终 `scripts/smoke-fb2-final-acceptance.ps1 -AllowVisibleMessages` summary，不能把真实群聊可见消息、AI 回复、总结帖、summary-post feedback、正文策略检查、source references、`feedback_coverage`、`visible_answer_policy_evidence` 和 `final_acceptance_evidence` 绑定为同一批证据。
 - 缺带真实 token 的 `-CheckPermissionBoundaries` 当前运行结果，不能把历史权限负向验证当成本次最终完成证据。

@@ -53,6 +53,8 @@
 - 本轮 `-PreflightOnly` 安全验证通过：缺 `FB2_AI_CENTER_TOKEN` 会立即失败；同时传 `-PreflightOnly -AllowVisibleMessages` 会立即失败；传无效 `Fb2AiCenterToken` 时能解析 `123qwe` 为 `6fe5aa17-0403-427a-8e91-7f414beca35d`，但会在写群前因订单上下文预检 401 失败。
 - 2026-06-22 11:00 ADB 复测已完成：设备 `e0d909c3`，fb2 `com.duoguan.football` `1.1.48(96)`，小米语音服务 `com.xiaomi.mibrain.speech/.asr.AsrService`。真机确认群聊页已有 `按住 说话`、文本/语音切换、录音发送和上滑取消；释放路径新增 3 秒语音消息后回到 idle，没有卡在“识别中...”。
 - 同轮 logcat 证明 `com.duoguan.football` 触发 `MediaRecorder/AudioRecord`，小米 `AsrService` 返回 `error code: 7 / empty_asr` 后 `ASR_END`，UI 正常回收；但日志没有观察到主项目 `/api/voice/asr` 云端兜底请求，因此这仍是半成品语音证据，不能用于最终 `finalAcceptanceReady=true`。
+- 本轮补齐主项目动态发现验收：默认 `scripts/smoke-fb2-ai-center.ps1` 会直接读取 fb2 `/api/main-project/integration`，确认 `routing_mode=main_project_ready`、`service_token_header=X-FB2-AI-CENTER-TOKEN`、`official` 群映射和 Context Pack/readiness/tool manifest/订单/平台摘要/质量/权限端点存在；无 service token 时还会确认 `/context/readiness` 和 `/context/tool-manifest` 返回 401，证明受保护 discovery 没有裸露。
+- `scripts/smoke-fb2-final-acceptance.ps1` 的 `preflight_evidence` / `final_acceptance_evidence` 已新增 dynamic discovery 摘录字段，最终 summary 会记录 integration、受保护 discovery、以及有 token 时的 authenticated readiness/manifest 证据。
 
 ## 未完成
 
@@ -62,7 +64,7 @@
 - 真实群聊 `@EL`、长按 `AI回复` 和总结帖入口都已单独抽样通过；仍需把可见群聊、summary post、三类 `feedback_coverage`、质量汇总、权限审计和完整语音证据放进 `scripts/smoke-fb2-final-acceptance.ps1` 同一批 summary 中，才能宣布终极完成。
 - 多账号权限验收未完全完成：需要证明用户不能读取他人订单，平台摘要不泄露单个用户，未授权请求会被拒绝并审计。
 - 固定质量评测集仍需继续积累 feedback 样本，观察 `missing_context`、`wrong_context`、`citation_unmatched` 和大 Context Pack 比率。
-- 主项目还没有把 fb2 `/integration` -> `/context/readiness` -> `/context/tool-manifest` 的动态发现结果沉淀成最终验收证据；目前 smoke 已验证 live manifest，但最终回答链路仍应以 readiness 和 tool policy 为准，避免后续 fb2 工具扩展后主项目停留在旧静态接口清单。
+- 动态发现默认检查已补齐；但当前环境仍没有 `FB2_AI_CENTER_TOKEN`，所以 authenticated `/context/readiness` 和 `/context/tool-manifest` 的内容级检查还没有在本轮 live 跑通，最终验收时必须带 token 复核。
 
 ## 验证结果
 
@@ -107,7 +109,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 1. 让 fb2 会话提供 `FB2_AI_CENTER_TOKEN` 或等价服务 token，用于主项目最终验收拉取 live Context Pack、平台匿名摘要和质量反馈。
 2. 确认 `123qwe` 或另一个 fb2 测试账号确实有可分析订单；如果不能用用户名密码解析，再手工提供有订单的测试用户 UUID。
 3. 让 fb2 会话按 `docs/fb2-ai-center/voice-device-evidence.example.json` 回传 `finalAcceptanceReady=true` 的完整真机证据；半成品 ADB 静音证据只能用于定位，不能用于最终验收。
-4. 主项目侧继续补强动态发现和 readiness 使用：先读 fb2 `/integration`、`/context/readiness`、`/context/tool-manifest`，再决定 Context Pack 和 `tools/execute` 调用；不要直接改 fb2 本地脏工作区。
+4. 主项目侧继续补强 authenticated readiness 使用：带 `FB2_AI_CENTER_TOKEN` 跑 `/context/readiness`、`/context/tool-manifest` 内容级检查，并把 readiness 状态用于 Context Pack / `tools/execute` 调用前的告警和降级判断；不要直接改 fb2 本地脏工作区。
 5. 跑完整最终验收：
 
 ```powershell

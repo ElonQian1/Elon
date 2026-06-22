@@ -243,6 +243,17 @@ function Build-AiCenterEvidence {
     [ordered]@{
         main_version = Find-CheckDetail $Lines "main version"
         live_manifest_ready = Find-CheckDetail $Lines "live manifest ready"
+        fb2_integration_discovery = Find-CheckDetail $Lines "fb2 integration discovery"
+        fb2_integration_routing_mode = Find-CheckDetail $Lines "fb2 integration routing mode"
+        fb2_integration_context_pack = Find-CheckDetail $Lines "fb2 integration endpoint: context_pack"
+        fb2_integration_tool_manifest = Find-CheckDetail $Lines "fb2 integration endpoint: tool_manifest"
+        fb2_integration_group_mapping = Find-CheckDetail $Lines "fb2 integration group mapping"
+        fb2_readiness_protected = Find-CheckDetail $Lines "fb2 readiness requires service token"
+        fb2_tool_manifest_protected = Find-CheckDetail $Lines "fb2 tool manifest requires service token"
+        fb2_authenticated_readiness = Find-CheckDetail $Lines "fb2 authenticated readiness"
+        fb2_authenticated_readiness_status = Find-CheckDetail $Lines "fb2 authenticated readiness status"
+        fb2_authenticated_manifest = Find-CheckDetail $Lines "fb2 authenticated tool manifest"
+        fb2_authenticated_manifest_tool_ids = Find-CheckDetail $Lines "fb2 authenticated manifest tool ids"
         fb2_apk_version = Find-CheckDetail $Lines "fb2 APK version present"
         fb2_apk_download_head = Find-CheckDetail $Lines "fb2 APK download head"
         local_voice_sdk_build = Find-CheckDetail $Lines "local voice SDK build"
@@ -389,6 +400,17 @@ function Invoke-FinalAcceptanceSelfTest {
     $centerLines = @(
         "OK`tmain version`t0.3.592 abcdef",
         "OK`tlive manifest ready`ttool_count=30",
+        "OK`tfb2 integration discovery`tproject_id=fb2",
+        "OK`tfb2 integration routing mode`trouting_mode=main_project_ready",
+        "OK`tfb2 integration endpoint: context_pack`tcontext_pack",
+        "OK`tfb2 integration endpoint: tool_manifest`ttool_manifest",
+        "OK`tfb2 integration group mapping`tofficial",
+        "OK`tfb2 readiness requires service token`tstatus=401 expected=401",
+        "OK`tfb2 tool manifest requires service token`tstatus=401 expected=401",
+        "OK`tfb2 authenticated readiness`tsuccess=True",
+        "OK`tfb2 authenticated readiness status`tstatus=ready",
+        "OK`tfb2 authenticated tool manifest`tsuccess=True",
+        "OK`tfb2 authenticated manifest tool ids`tcount=31 min=1",
         "OK`tfb2 APK version present`t1.1.48 code=96",
         "OK`tlocal voice SDK build`t:chat-voice-kit:assembleDebug",
         "OK`tvoice evidence schema`tfb2.voice_device_evidence.v1",
@@ -426,6 +448,17 @@ function Invoke-FinalAcceptanceSelfTest {
     foreach ($key in @(
         "main_version",
         "live_manifest_ready",
+        "fb2_integration_discovery",
+        "fb2_integration_routing_mode",
+        "fb2_integration_context_pack",
+        "fb2_integration_tool_manifest",
+        "fb2_integration_group_mapping",
+        "fb2_readiness_protected",
+        "fb2_tool_manifest_protected",
+        "fb2_authenticated_readiness",
+        "fb2_authenticated_readiness_status",
+        "fb2_authenticated_manifest",
+        "fb2_authenticated_manifest_tool_ids",
         "fb2_apk_version",
         "local_voice_sdk_build",
         "voice_evidence_final_ready",

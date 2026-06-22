@@ -196,6 +196,36 @@ function Assert-ContainsValue {
     Assert-True (@($Value) -contains $Expected) $Name $Expected
 }
 
+function Get-ObjectPropertyNames {
+    param([object]$Value)
+    if ($null -eq $Value) {
+        return @()
+    }
+    @($Value.PSObject.Properties | ForEach-Object { $_.Name })
+}
+
+function Get-Fb2ManifestToolIds {
+    param([object]$Manifest)
+
+    $ids = @()
+    $ids += @($Manifest.data.tool_ids)
+    $ids += @($Manifest.data.tool_contract.tool_ids)
+    foreach ($endpoint in @($Manifest.data.tool_contract.endpoints)) {
+        if ($endpoint -is [string]) {
+            $ids += $endpoint
+            continue
+        }
+        foreach ($field in @("id", "tool_id", "name", "key")) {
+            $property = $endpoint.PSObject.Properties[$field]
+            if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+                $ids += [string]$property.Value
+                break
+            }
+        }
+    }
+    @($ids | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+}
+
 function Compare-VersionParts {
     param(
         [string]$Actual,
@@ -650,6 +680,24 @@ if ($MainToken) {
     Skip "chat-bootstrap" "set ELON_MAIN_TOKEN or -MainToken to verify authenticated bootstrap"
 }
 
+$requiredFb2ToolIds = @(
+    "context_pack",
+    "today_matches",
+    "match_analysis_brief",
+    "group_opinion_summary",
+    "search_matches",
+    "search_user_orders",
+    "user_orders",
+    "platform_orders",
+    "record_context_feedback",
+    "list_context_feedbacks",
+    "context_quality_summary",
+    "context_permission_summary",
+    "context_audit_summary",
+    "tool_manifest"
+)
+$liveToolIds = @()
+
 try {
     $contract = Invoke-Json "$MainBase/api/external/apps/fb2/context-contract"
     $policy = $contract.live_tool_manifest.main_project_tool_execution_policy
@@ -663,22 +711,7 @@ try {
     Assert-True (($policy.chat_auto_executable_tool_ids -contains "match_analysis_brief") -and ($policy.chat_auto_executable_tool_ids -contains "group_opinion_summary")) "auto executable aggregate tools"
     Assert-True ($policy.manifest_only_tool_ids -contains "record_context_feedback") "callback tool is not chat-auto-executable"
     Assert-True (@($policy.main_project_allowed_missing_tool_ids).Count -eq 0) "no allowed tool missing in live fb2 manifest"
-    foreach ($toolId in @(
-        "context_pack",
-        "today_matches",
-        "match_analysis_brief",
-        "group_opinion_summary",
-        "search_matches",
-        "search_user_orders",
-        "user_orders",
-        "platform_orders",
-        "record_context_feedback",
-        "list_context_feedbacks",
-        "context_quality_summary",
-        "context_permission_summary",
-        "context_audit_summary",
-        "tool_manifest"
-    )) {
+    foreach ($toolId in $requiredFb2ToolIds) {
         Assert-ContainsValue $liveToolIds $toolId "live manifest required tool: $toolId"
     }
     Assert-True ($answerPolicy.schema -eq "fb2.answer_policy.v1") "answer policy schema"
@@ -723,6 +756,75 @@ try {
     Assert-ScenarioContains $auditScenario "forbidden_outputs" @("uncited_claim", "invented_source_id") "eval scenario source audit forbidden outputs"
 } catch {
     Fail "context-contract" $_.Exception.Message
+}
+
+Write-Output ""
+Write-Output "== fb2 dynamic discovery =="
+try {
+    $integration = Invoke-Json "$Fb2Base/api/main-project/integration"
+    $integrationData = $integration.data
+    Assert-True ($integration.success -eq $true) "fb2 integration discovery" "project_id=$($integrationData.project_id)"
+    Assert-True ($integrationData.configured -eq $true) "fb2 integration configured" "configured=$($integrationData.configured)"
+    Assert-True ($integrationData.routing_mode -eq "main_project_ready") "fb2 integration routing mode" "routing_mode=$($integrationData.routing_mode)"
+    Assert-True ($integrationData.service_token_header -eq "X-FB2-AI-CENTER-TOKEN") "fb2 integration token header" "$($integrationData.service_token_header)"
+
+    $integrationEndpointNames = Get-ObjectPropertyNames $integrationData.fb2_context_endpoints
+    foreach ($endpointName in @(
+        "context_readiness",
+        "context_pack",
+        "tool_manifest",
+        "match_analysis_brief",
+        "group_opinion_summary",
+        "user_orders",
+        "platform_orders",
+        "context_quality_summary",
+        "context_permission_summary"
+    )) {
+        Assert-ContainsValue $integrationEndpointNames $endpointName "fb2 integration endpoint: $endpointName"
+    }
+
+    $groupIds = @($integrationData.group_mappings | ForEach-Object { $_.local_group_id })
+    Assert-ContainsValue $groupIds $GroupId "fb2 integration group mapping"
+} catch {
+    Fail "fb2 integration discovery" $_.Exception.Message
+}
+
+if (-not $Fb2Token) {
+    try {
+        $readinessStatus = Invoke-HttpStatus -Url "$Fb2Base/api/main-project/context/readiness"
+        Assert-StatusCode $readinessStatus 401 "fb2 readiness requires service token"
+        $manifestStatus = Invoke-HttpStatus -Url "$Fb2Base/api/main-project/context/tool-manifest"
+        Assert-StatusCode $manifestStatus 401 "fb2 tool manifest requires service token"
+    } catch {
+        Fail "fb2 protected dynamic discovery" $_.Exception.Message
+    }
+} else {
+    try {
+        $fb2DiscoveryHeaders = Fb2-Headers
+        $readiness = Invoke-Json -Url "$Fb2Base/api/main-project/context/readiness" -Headers $fb2DiscoveryHeaders
+        Assert-True ($readiness.success -eq $true) "fb2 authenticated readiness" "success=$($readiness.success)"
+        $readinessValue = @(
+            $readiness.data.status,
+            $readiness.data.readiness_status,
+            $readiness.data.context_status,
+            $readiness.data.context_readiness.status
+        ) | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -First 1
+        Assert-True ([bool]$readinessValue) "fb2 authenticated readiness status" "status=$readinessValue"
+        Assert-ContainsValue @("ready", "degraded", "blocked", "unavailable") $readinessValue "fb2 authenticated readiness status value"
+
+        $directManifest = Invoke-Json -Url "$Fb2Base/api/main-project/context/tool-manifest" -Headers $fb2DiscoveryHeaders
+        Assert-True ($directManifest.success -eq $true) "fb2 authenticated tool manifest" "success=$($directManifest.success)"
+        $directToolIds = Get-Fb2ManifestToolIds $directManifest
+        Assert-MinCount $directToolIds 1 "fb2 authenticated manifest tool ids"
+        foreach ($toolId in $requiredFb2ToolIds) {
+            Assert-ContainsValue $directToolIds $toolId "fb2 authenticated manifest required tool: $toolId"
+        }
+        foreach ($toolId in $liveToolIds) {
+            Assert-ContainsValue $directToolIds $toolId "fb2 direct manifest matches main contract: $toolId"
+        }
+    } catch {
+        Fail "fb2 authenticated dynamic discovery" $_.Exception.Message
+    }
 }
 
 if ($CheckFb2ApkVersion) {

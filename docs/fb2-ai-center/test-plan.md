@@ -33,6 +33,8 @@
 - 默认 `scripts\smoke-fb2-ai-center.ps1` 会检查 `eval_scenarios` 的场景 id、权限边界、必需来源、必需引用和禁止输出，避免评测矩阵退化成只有标题。
 - `context-contract.context_readiness_contract` 返回 required fields、prompt metadata 和 blocked/degraded/ready 判定标准。
 - `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1` 通过，确认主项目健康、版本、实时 manifest 和主项目聊天自动工具覆盖。
+- 默认 smoke 还必须直连 fb2 `/api/main-project/integration`，确认 `routing_mode=main_project_ready`、`service_token_header=X-FB2-AI-CENTER-TOKEN`、`official` 群映射，以及 `context_readiness`、`context_pack`、`tool_manifest`、`match_analysis_brief`、`group_opinion_summary`、用户订单、平台匿名摘要、质量和权限端点存在。
+- 没有 `FB2_AI_CENTER_TOKEN` 时，默认 smoke 必须确认 fb2 `/context/readiness` 和 `/context/tool-manifest` 返回 401；带 token 的最终验收必须进一步验证 authenticated readiness 状态和 direct tool manifest 的必需 tool id，并与主项目 `context-contract.live_tool_manifest.tool_ids` 对齐。
 - 需要验证 authenticated `chat-bootstrap` 时，脚本支持直接传 `-MainToken`，也支持传 `-Fb2Username/-Fb2Password` 或 `FB2_USER_TOKEN`，通过 fb2 `/api/main-project/session` 桥接主项目 token；这条路径无副作用，不会发送群消息。
 - 需要验证 fb2 用户端 APK 是否已发布到可下载版本时，加 `-CheckFb2ApkVersion`；脚本会检查 fb2 `/api/app-version` 至少达到 `1.1.48`、`update_kind=full_apk`、checksum/size 有效，并对 `apk_url` 做 HEAD 验证。
 - 需要把主项目 SDK 编译纳入同一次巡检时，加 `-CheckLocalVoiceSdkBuild`；脚本会执行 `android\gradlew.bat :chat-voice-kit:assembleDebug --quiet`。
