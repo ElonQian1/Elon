@@ -36,6 +36,7 @@
 - `contracts.md`：主项目和 fb2 之间的 HTTP、上下文、工具和 SDK 契约。
 - `roadmap.md`：P0 到 P3 的执行顺序和验收目标。
 - `data-tools.md`：fb2 应该提供哪些业务数据能力，以及从 Context Pack 走向 MCP/tools 的路径。
+- `tool-manifest-boundary.md`：固定 live tool manifest、聊天自动工具、manifest-only 能力、integration-only 质量/权限端点和 source registry 的边界。
 - `voice-sdk.md`：fb2 复用主项目 ASR/TTS 和微信式语音输入栏的落地标准。
 - `billing-policy.md`：免费通道和扣费通道的固定口径。
 - `test-plan.md`：端到端验收和长期评测清单。
@@ -46,7 +47,7 @@
 
 当前 ASR/TTS 链路按业务安排暂缓，不作为本阶段继续推进项。非语音数据闭环使用独立 `-DataOnlyAcceptance`：它验证主项目健康、authenticated `chat-bootstrap` 的 AI 回复/计费/context fetch、live manifest、fb2 live Context Pack 六类场景、平台匿名摘要、APK 版本、权限负向审计、质量反馈、非合成 feedback 和群观点采纳；它不会要求主项目语音 SDK 构建或 `finalAcceptanceReady=true` 真机语音证据。这个模式只用于推进比赛/订单/平台摘要/群观点 AI 数据能力，不能替代最终 ASR/TTS 验收，也不能宣布终极目标完成。
 
-真实群聊验收必须以接口直读为准：`smoke-fb2-visible-chat.ps1` 和最终 wrapper 要读取群聊 baseline、`@EL` 回复、selected-message `AI回复`、summary post 和 feedback/quality 结果，并把消息 ID、记录数、匹配/未匹配统计写入日志和 summary。截图只能辅助排查 UI，不得作为“AI 已在群聊回答、引用和反馈已闭环”的证明。
+真实群聊验收必须以接口直读为准：`smoke-fb2-visible-chat.ps1` 和最终 wrapper 要读取群聊 baseline、`@EL` 回复、selected-message `AI回复`、summary post 和 feedback/quality 结果，并把消息 ID、记录数、匹配/未匹配统计写入日志和 summary。最终 wrapper 的 summary 必须包含 `visible_direct_read_evidence`，记录 baseline 群消息读取、`@EL` 回复回读、selected-message 回复回读和 summary-post 回读。截图只能辅助排查 UI，不得作为“AI 已在群聊回答、引用和反馈已闭环”的证明。
 
 ```powershell
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>

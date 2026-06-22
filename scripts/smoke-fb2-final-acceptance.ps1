@@ -336,6 +336,17 @@ function Build-VisibleAnswerEvidence {
     }
 }
 
+function Build-VisibleDirectReadEvidence {
+    param([string[]]$Lines)
+
+    [ordered]@{
+        baseline_messages = Find-CheckDetail $Lines "direct group message read baseline"
+        visible_mention_reply = Find-CheckDetail $Lines "visible @EL direct group read"
+        selected_message_reply = Find-CheckDetail $Lines "selected-message direct group read"
+        summary_post = Find-CheckDetail $Lines "summary-post direct group read"
+    }
+}
+
 function Resolve-VisibleMainGroupId {
     param([string]$ContextGroupId)
 
@@ -408,16 +419,25 @@ function Invoke-FinalAcceptanceSelfTest {
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
         "OK`tselected-message AI回复 fb2 feedback`tsocial_group_selected_message:gai_selected feedback=fb_selected",
         "OK`tsummary-post fb2 feedback`tsocial_group_summary_post:gsp_summary feedback=fb_summary",
+        "OK`tdirect group message read baseline`tgroup=ext_fb2_official count=80",
+        "OK`tvisible @EL direct group read`tgroup=ext_fb2_official message=gai_visible",
+        "OK`tselected-message direct group read`tgroup=ext_fb2_official message=gai_selected",
+        "OK`tsummary-post direct group read`tgroup=ext_fb2_official post=gsp_summary status=ready",
         "OK`tvisible @EL reply text present`tlen=120"
     )
     $completeEvidence = @(Find-FeedbackEvidence $completeLines)
     $completeCoverage = Build-FeedbackCoverage $completeEvidence
+    $directReadEvidence = Build-VisibleDirectReadEvidence $completeLines
     Assert-SelfTest ($completeEvidence.Count -eq 3) "feedback evidence parses three required entries" "count=$($completeEvidence.Count)"
     Assert-SelfTest ([bool]$completeCoverage["complete"]) "feedback coverage complete when all entries are present"
     Assert-SelfTest ([bool]$completeCoverage["visible_mention"]) "visible mention feedback covered"
     Assert-SelfTest ([bool]$completeCoverage["selected_message"]) "selected-message feedback covered"
     Assert-SelfTest ([bool]$completeCoverage["summary_post"]) "summary-post feedback covered"
     Assert-SelfTest ([int]$completeCoverage["observed_count"] -eq 3) "feedback observed count ignores unrelated OK lines" "observed=$($completeCoverage["observed_count"])"
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["baseline_messages"])) "direct read evidence maps baseline" ([string]$directReadEvidence["baseline_messages"])
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["visible_mention_reply"])) "direct read evidence maps visible mention reply" ([string]$directReadEvidence["visible_mention_reply"])
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["selected_message_reply"])) "direct read evidence maps selected-message reply" ([string]$directReadEvidence["selected_message_reply"])
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$directReadEvidence["summary_post"])) "direct read evidence maps summary post" ([string]$directReadEvidence["summary_post"])
 
     $missingSummaryLines = @(
         "OK`tvisible @EL fb2 feedback`tsocial_group_message:gai_visible feedback=fb_visible",
@@ -843,6 +863,7 @@ $summary = [ordered]@{
     summary_post_status = Find-CheckDetail $visibleLines "summary-post ready"
     feedback_evidence = $feedbackEvidence
     feedback_coverage = $feedbackCoverage
+    visible_direct_read_evidence = Build-VisibleDirectReadEvidence $visibleLines
     visible_answer_policy_evidence = Build-VisibleAnswerEvidence $visibleLines
     final_acceptance_evidence = Build-AiCenterEvidence $centerLines
     success = ($visibleResult.exit_code -eq 0 -and $centerResult.exit_code -eq 0 -and [bool]$feedbackCoverage["complete"])

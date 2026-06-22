@@ -98,6 +98,8 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 
 主项目 smoke 会检查这些字段，防止后续把 fb2 AI 数据输入退化成无来源的大 JSON 或临时摘要。
 
+工具发现、质量端点和反馈写回的边界见 `tool-manifest-boundary.md`。简要口径是：`chat_auto_executable_tool_ids` 才代表主项目聊天 AI 可自动调用的工具；`context_quality_summary`、`context_permission_summary` 等质量/权限能力可以是 integration-only 受保护 HTTP 端点，不要求作为聊天自动 tool id；`feedback`、`opinion_adoption` 默认是质量闭环路线，不要求每次 Context Pack 都作为业务事实 source kind 输出。
+
 ## fb2 对主项目输出
 
 ### 1. Context Pack
