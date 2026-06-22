@@ -1,3 +1,4 @@
+//! server/src/external_app_context_observability.rs
 //! Public observability contract for external app business context.
 
 use serde_json::{json, Value};
@@ -84,6 +85,27 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                     "owner": "main_project",
                     "meaning": "主项目记录每次 fb2 工具执行的 grounded/weak/unsafe 结果数量、source_id 覆盖和耗时。",
                     "target": "grounded_result_count 应逐步提高，unsafe_result_count 应保持为 0。"
+                },
+                {
+                    "name": "non_synthetic_feedback_count",
+                    "type": "integer",
+                    "owner": "fb2",
+                    "meaning": "fb2 /context/feedback-summary?exclude_synthetic=true 返回的真实用户/真实流程反馈数量。",
+                    "target": "最终验收至少应大于 0，长期按群和用户维度持续增长。"
+                },
+                {
+                    "name": "opinion_adoption_count",
+                    "type": "integer",
+                    "owner": "fb2",
+                    "meaning": "fb2 /context/opinion-adoption-summary 返回的群观点被 AI 明确采纳进回答的次数。",
+                    "target": "最终验收至少应大于 0，且采纳必须能回溯到 message_id 或 opinion_memory source id。"
+                },
+                {
+                    "name": "opinion_memory_ref_count",
+                    "type": "integer",
+                    "owner": "fb2",
+                    "meaning": "群观点采纳记录中可追溯的观点记忆引用数量。",
+                    "target": "应和 AI 回复中的来源引用共同增长，避免只记录空泛采纳。"
                 }
             ],
             "recommended_log_fields": [
@@ -106,7 +128,10 @@ pub(crate) fn public_context_observability_guidance(app_id: &str) -> Option<Valu
                 "tool_execution_id",
                 "grounded_result_count",
                 "weak_result_count",
-                "unsafe_result_count"
+                "unsafe_result_count",
+                "non_synthetic_feedback_count",
+                "opinion_adoption_count",
+                "opinion_memory_ref_count"
             ],
             "main_project_persistence": {
                 "table": "external_app_tool_executions",
@@ -155,6 +180,20 @@ mod tests {
             .unwrap()
             .iter()
             .any(|metric| metric["name"] == "external_tool_grounding"));
+        assert!(guidance["recommended_metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|metric| metric["name"] == "non_synthetic_feedback_count"));
+        assert!(guidance["recommended_metrics"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|metric| metric["name"] == "opinion_adoption_count"));
+        assert!(guidance["recommended_log_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("opinion_memory_ref_count")));
         assert!(guidance["recommended_metrics"]
             .as_array()
             .unwrap()
