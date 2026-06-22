@@ -104,6 +104,14 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 
 主项目 smoke 会检查这些字段，防止后续把 fb2 AI 数据输入退化成无来源的大 JSON 或临时摘要。
 
+`GET /api/external/apps/fb2/context-contract` 还会返回 `context_pack_template_contract schema=fb2.context_pack_template.v1`。它是 fb2 后端最直接的实现模板：
+
+- 正文格式必须是 `<fb2_context_pack>...</fb2_context_pack>` 包裹的 Markdown。
+- Markdown 小节顺序固定为 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`。
+- 每个小节都声明 `required_when`、`required_source_kinds` 和 `empty_rule`，空数据时要说明缺口，不能省略后让模型猜。
+- `citation_source_shape.business_source_kinds` 只包含业务事实来源；`feedback`、`opinion_adoption` 位于 `quality_history_kinds`，默认不能当比赛或订单事实。
+- `minimal_markdown_template` 可直接给 fb2 子会话作为生成样板；后续 MCP 只能包装这套 REST Context Pack，不替代它。
+
 `GET /api/external/apps/fb2/context-contract` 还会返回 `domain_data_blueprint_contract schema=fb2.main_project.domain_data_blueprint.v1`。它是长期数据工具蓝图，回答“fb2 到底给主项目 AI 什么数据、是不是先 MCP”：
 
 - 第一阶段固定为 REST Context Pack + tool manifest + `tools/execute`，MCP 以后只作为包装层。

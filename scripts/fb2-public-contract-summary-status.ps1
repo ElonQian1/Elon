@@ -64,6 +64,9 @@ function Get-Fb2PublicContractSummaryState {
             complete = $false
             schema = ""
             success = $false
+            context_pack_template_schema = ""
+            context_pack_template_wrapper = ""
+            context_pack_template_sections = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -79,6 +82,9 @@ function Get-Fb2PublicContractSummaryState {
             complete = $false
             schema = ""
             success = $false
+            context_pack_template_schema = ""
+            context_pack_template_wrapper = ""
+            context_pack_template_sections = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -91,6 +97,9 @@ function Get-Fb2PublicContractSummaryState {
     $schema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $status "schema")
     $success = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $status "success")
     $domainSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "domain_data_blueprint_schema")
+    $templateSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_schema")
+    $templateWrapper = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_wrapper")
+    $templateSections = @((Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_sections" @()))
     $groupSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "group_chat_evidence_schema")
     $groupMethod = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "group_chat_test_method")
     $screenshotsRaw = Get-Fb2PublicContractSummaryProperty $summary "screenshots_accepted" $null
@@ -103,6 +112,13 @@ function Get-Fb2PublicContractSummaryState {
     if ($schema -ne "fb2.main_project.public_contract_status.v1") { $missing += "public_contract_status_schema" }
     if (-not $success) { $missing += "public_contract_status_success" }
     if ($domainSchema -ne "fb2.main_project.domain_data_blueprint.v1") { $missing += "domain_data_blueprint_contract" }
+    if ($templateSchema -ne "fb2.context_pack_template.v1") { $missing += "context_pack_template_contract" }
+    if ($templateWrapper -ne "fb2_context_pack") { $missing += "context_pack_template_wrapper" }
+    foreach ($section in @("user_order_slice", "group_opinion_slice", "retrieval_evidence", "quality_feedback")) {
+        if (-not ($templateSections -contains $section)) {
+            $missing += "context_pack_template_section_$section"
+        }
+    }
     if ($groupSchema -ne "fb2.main_project.group_chat_evidence.v1") { $missing += "group_chat_evidence_contract" }
     if ($groupMethod -ne "direct_api_read") { $missing += "group_chat_direct_api_read_contract" }
     if ($null -eq $screenshotsRaw -or $screenshotsAccepted) { $missing += "group_chat_rejects_screenshots_contract" }
@@ -128,6 +144,9 @@ function Get-Fb2PublicContractSummaryState {
         failed_count = [int](Get-Fb2PublicContractSummaryProperty $status "failed_count" 0)
         failed_checks = @($failedChecks)
         domain_data_blueprint_schema = $domainSchema
+        context_pack_template_schema = $templateSchema
+        context_pack_template_wrapper = $templateWrapper
+        context_pack_template_sections = @($templateSections)
         domain_lane_count = [int](Get-Fb2PublicContractSummaryProperty $summary "domain_lane_count" 0)
         stores_fb2_business_data_in_main_project = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $summary "stores_fb2_business_data_in_main_project")
         group_chat_evidence_schema = $groupSchema

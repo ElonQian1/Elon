@@ -858,6 +858,7 @@ try {
     $policy = $contract.live_tool_manifest.main_project_tool_execution_policy
     $liveToolIds = @($contract.live_tool_manifest.tool_ids)
     $answerPolicy = $contract.answer_policy_contract
+    $contextPackTemplate = $contract.context_pack_template_contract
     $projectionContract = $contract.domain_context_projection_contract
     $domainDataBlueprint = $contract.domain_data_blueprint_contract
     $groupChatEvidenceContract = $contract.group_chat_evidence_contract
@@ -886,6 +887,10 @@ try {
     $toolResultGroundingFields = @($toolResultEnvelopeContract.grounding.required_fields)
     $evalScenarios = @($answerPolicy.eval_scenarios)
     $evalScenarioIds = @($evalScenarios | ForEach-Object { $_.id })
+    $templateSections = @($contextPackTemplate.required_section_order)
+    $templateMetadata = @($contextPackTemplate.required_metadata)
+    $templateBusinessKinds = @($contextPackTemplate.citation_source_shape.business_source_kinds)
+    $templateQualityKinds = @($contextPackTemplate.citation_source_shape.quality_history_kinds | ForEach-Object { $_.kind })
     Assert-True ($contract.live_tool_manifest.status -eq "ready") "live manifest ready" "tool_count=$($contract.live_tool_manifest.tool_count)"
     Assert-True ($policy.schema -eq "external_app.live_tool_execution_policy.v1") "live manifest execution policy"
     Assert-True (($policy.chat_auto_executable_tool_ids -contains "search_matches") -and ($policy.chat_auto_executable_tool_ids -contains "search_group_opinions")) "auto executable core tools"
@@ -909,6 +914,26 @@ try {
     Assert-True (($evalScenarioIds -contains "today_matches_analysis") -and ($evalScenarioIds -contains "my_ticket_analysis")) "answer policy core eval scenarios"
     Assert-True (($evalScenarioIds -contains "platform_order_risk") -and ($evalScenarioIds -contains "group_opinion_summary")) "answer policy aggregate eval scenarios"
     Assert-True (($evalScenarioIds -contains "selected_message_review") -and ($evalScenarioIds -contains "source_reference_audit")) "answer policy audit eval scenarios"
+
+    Assert-True ($contextPackTemplate.schema -eq "fb2.context_pack_template.v1") "context pack template schema" "$($contextPackTemplate.schema)"
+    Assert-True ($contextPackTemplate.complete -eq $true) "context pack template complete" "complete=$($contextPackTemplate.complete)"
+    Assert-True ($contextPackTemplate.body.wrapper -eq "fb2_context_pack") "context pack template wrapper" "$($contextPackTemplate.body.wrapper)"
+    Assert-True ($contextPackTemplate.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") "context pack template first phase" "$($contextPackTemplate.first_phase_delivery)"
+    Assert-True ($contextPackTemplate.mcp_status -eq "future_wrapper_not_first_phase_fact_source") "context pack template mcp status" "$($contextPackTemplate.mcp_status)"
+    foreach ($sectionId in @("usage_boundary", "match_facts", "user_order_slice", "platform_order_summary", "group_opinion_slice", "retrieval_evidence", "quality_feedback")) {
+        Assert-ContainsValue $templateSections $sectionId "context pack template section: $sectionId"
+    }
+    foreach ($metadataName in @("context_pack_version", "generated_at", "context_audit_id", "citation_sources", "metrics", "preflight_readiness")) {
+        Assert-ContainsValue $templateMetadata $metadataName "context pack template metadata: $metadataName"
+    }
+    foreach ($sourceKind in @("match", "odds", "user_order", "ticket", "group_message", "opinion_memory", "platform_order_summary")) {
+        Assert-ContainsValue $templateBusinessKinds $sourceKind "context pack template source kind: $sourceKind"
+    }
+    Assert-True (-not ($templateBusinessKinds -contains "feedback")) "context pack template business sources exclude feedback"
+    Assert-ContainsValue $templateQualityKinds "feedback" "context pack template quality history kind: feedback"
+    Assert-ContainsValue $templateQualityKinds "opinion_adoption" "context pack template quality history kind: opinion adoption"
+    Assert-ContainsValue @($contextPackTemplate.body.not_allowed) "full_database_dump" "context pack template anti-pattern: full database dump"
+    Assert-ContainsValue @($contextPackTemplate.answer_boundaries) "不得承诺投注命中，不得建议重注或梭哈。" "context pack template betting boundary"
 
     $todayScenario = Find-EvalScenario $evalScenarios "today_matches_analysis"
     Assert-ScenarioContains $todayScenario "required_source_kinds" @("match", "odds") "eval scenario today source kinds"

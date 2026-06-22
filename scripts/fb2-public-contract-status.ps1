@@ -48,8 +48,12 @@ function Get-Fb2PublicContractChecks {
     )
 
     $domain = $Contract.domain_data_blueprint_contract
+    $template = $Contract.context_pack_template_contract
     $group = $Contract.group_chat_evidence_contract
     $manifest = $Contract.live_tool_manifest
+    $templateSections = @($template.required_section_order)
+    $templateMetadata = @($template.required_metadata)
+    $templateSourceKinds = @($template.citation_source_shape.business_source_kinds)
     $domainLaneIds = @($domain.lanes | ForEach-Object { $_.id })
     $domainSections = @($domain.required_context_pack_sections)
     $domainMetadata = @($domain.required_metadata)
@@ -69,6 +73,19 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "domain_blueprint_no_copy" ($domain.stores_fb2_business_data_in_main_project -eq $false) "stores=$($domain.stores_fb2_business_data_in_main_project)"
         New-Fb2PublicContractCheck "domain_blueprint_rest_first" ($domain.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") ([string]$domain.first_phase_delivery)
         New-Fb2PublicContractCheck "domain_blueprint_mcp_future" ($domain.mcp_status -eq "future_wrapper_not_first_phase_fact_source") ([string]$domain.mcp_status)
+        New-Fb2PublicContractCheck "context_pack_template_schema" ($template.schema -eq "fb2.context_pack_template.v1") ([string]$template.schema)
+        New-Fb2PublicContractCheck "context_pack_template_complete" ([bool]$template.complete) "complete=$($template.complete)"
+        New-Fb2PublicContractCheck "context_pack_template_wrapper" ($template.body.wrapper -eq "fb2_context_pack") ([string]$template.body.wrapper)
+        New-Fb2PublicContractCheck "context_pack_template_rest_first" ($template.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") ([string]$template.first_phase_delivery)
+        New-Fb2PublicContractCheck "context_pack_template_mcp_future" ($template.mcp_status -eq "future_wrapper_not_first_phase_fact_source") ([string]$template.mcp_status)
+        New-Fb2PublicContractCheck "context_pack_template_user_order_section" (Test-Fb2ContractContains $templateSections "user_order_slice") ($templateSections -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_group_opinion_section" (Test-Fb2ContractContains $templateSections "group_opinion_slice") ($templateSections -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_retrieval_evidence_section" (Test-Fb2ContractContains $templateSections "retrieval_evidence") ($templateSections -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_citation_metadata" (Test-Fb2ContractContains $templateMetadata "citation_sources") ($templateMetadata -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_preflight_metadata" (Test-Fb2ContractContains $templateMetadata "preflight_readiness") ($templateMetadata -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_order_source_kind" (Test-Fb2ContractContains $templateSourceKinds "user_order") ($templateSourceKinds -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_opinion_source_kind" (Test-Fb2ContractContains $templateSourceKinds "opinion_memory") ($templateSourceKinds -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_business_sources_exclude_feedback" (-not (Test-Fb2ContractContains $templateSourceKinds "feedback")) ($templateSourceKinds -join ",")
         New-Fb2PublicContractCheck "domain_lane_current_user_tickets" (Test-Fb2ContractContains $domainLaneIds "current_user_tickets") ($domainLaneIds -join ",")
         New-Fb2PublicContractCheck "domain_lane_group_opinions" (Test-Fb2ContractContains $domainLaneIds "group_opinions") ($domainLaneIds -join ",")
         New-Fb2PublicContractCheck "domain_lane_quality_feedback_audit" (Test-Fb2ContractContains $domainLaneIds "quality_feedback_audit") ($domainLaneIds -join ",")
@@ -119,6 +136,9 @@ function New-Fb2PublicContractStatus {
         checks = @($checks)
         contract_summary = [ordered]@{
             domain_data_blueprint_schema = [string]$Contract.domain_data_blueprint_contract.schema
+            context_pack_template_schema = [string]$Contract.context_pack_template_contract.schema
+            context_pack_template_wrapper = [string]$Contract.context_pack_template_contract.body.wrapper
+            context_pack_template_sections = @($Contract.context_pack_template_contract.required_section_order)
             domain_lane_count = [int]$Contract.domain_data_blueprint_contract.lane_count
             stores_fb2_business_data_in_main_project = [bool]$Contract.domain_data_blueprint_contract.stores_fb2_business_data_in_main_project
             group_chat_evidence_schema = [string]$Contract.group_chat_evidence_contract.schema
@@ -158,6 +178,28 @@ function Invoke-Fb2PublicContractSelfTest {
             required_context_pack_sections = @("group_opinion_slice")
             required_metadata = @("citation_sources")
             anti_patterns = @("full_database_dump")
+        }
+        context_pack_template_contract = [pscustomobject]@{
+            schema = "fb2.context_pack_template.v1"
+            complete = $true
+            first_phase_delivery = "rest_context_pack_plus_tool_manifest_plus_tools_execute"
+            mcp_status = "future_wrapper_not_first_phase_fact_source"
+            body = [pscustomobject]@{
+                wrapper = "fb2_context_pack"
+            }
+            required_section_order = @(
+                "usage_boundary",
+                "match_facts",
+                "user_order_slice",
+                "platform_order_summary",
+                "group_opinion_slice",
+                "retrieval_evidence",
+                "quality_feedback"
+            )
+            required_metadata = @("context_pack_version", "generated_at", "context_audit_id", "citation_sources", "preflight_readiness")
+            citation_source_shape = [pscustomobject]@{
+                business_source_kinds = @("context_audit", "match", "odds", "user_order", "ticket", "group_message", "opinion_memory", "platform_order_summary")
+            }
         }
         group_chat_evidence_contract = [pscustomobject]@{
             schema = "fb2.main_project.group_chat_evidence.v1"

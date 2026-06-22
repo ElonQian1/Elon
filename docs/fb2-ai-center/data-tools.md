@@ -21,6 +21,8 @@ fb2 用户真正需要的是“AI 能读懂 fb2 平台数据并帮助分析”�
 
 Context Pack 不是普通 Markdown 摘要，而是 fb2 域数据投影。主项目 `/api/external/apps/fb2/context-contract` 的 `domain_context_projection_contract` 会固定这些必需小节：
 
+更具体的可执行模板由同一接口的 `context_pack_template_contract schema=fb2.context_pack_template.v1` 输出。fb2 后端和子会话应优先按这个字段生成 `<fb2_context_pack>`，而不是从文档中复制临时 Markdown；主项目 smoke 和公开契约巡检会检查该字段。
+
 | 小节 | 作用 | 必需来源 |
 |---|---|---|
 | `usage_boundary` | 告诉 AI 只能做比赛讨论/订单剖析参考，不承诺命中 | 使用边界 |

@@ -28,6 +28,7 @@
 - `chat-bootstrap.billing.gates.beforeTts=never_check_ai_balance`。
 - `chat-bootstrap.billing.gates.beforeAiReplyGeneration=check_balance_or_trial_credit`。
 - `GET /api/external/apps/fb2/context-contract` 返回 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
+- `context-contract.context_pack_template_contract` 返回 `fb2.context_pack_template.v1`，必须声明 `<fb2_context_pack>` wrapper、7 个必需 Markdown 小节、`citation_sources` / `preflight_readiness` 等必需 metadata、业务 source kinds 不含 `feedback`，并明确 MCP 是后续包装层。
 - `context-contract.answer_policy_contract` 返回引用规则和固定评测问题。
 - `context-contract.answer_policy_contract.eval_scenarios` 返回六个机器可读评测场景：今日比赛、我的票、平台匿名订单摘要、群友观点、长按消息复核、来源审计。
 - `context-contract.domain_context_projection_contract.source_registry.required_kinds` 只包含业务事实来源；`feedback`、`opinion_adoption` 必须位于 `quality_history_kinds`，避免 fb2 把质量闭环记录当成比赛/订单事实。

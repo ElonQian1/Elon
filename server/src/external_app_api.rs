@@ -17,6 +17,7 @@ use crate::{
     external_app_context_example::public_context_pack_example,
     external_app_context_health::public_context_health,
     external_app_context_observability::public_context_observability_guidance,
+    external_app_context_pack_template::public_context_pack_template_guidance,
     external_app_context_projection::{
         public_context_projection_guidance, public_domain_data_blueprint_guidance,
     },
@@ -102,6 +103,13 @@ pub async fn get_external_app_context_contract(
             "app_id": app.id,
             "schema": "external_app.context_quality.v1",
             "warning_catalog": []
+        })),
+        "context_pack_template_contract": public_context_pack_template_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.context_pack_template.v1",
+            "complete": false,
+            "required_section_order": [],
+            "required_metadata": []
         })),
         "domain_context_projection_contract": public_context_projection_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

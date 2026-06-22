@@ -363,11 +363,14 @@ function Invoke-Fb2StatusSelfTest {
                 gitSha = "abc123"
             }
             success = $true
-            passed_count = 28
+            passed_count = 41
             failed_count = 0
             failed_checks = @()
             contract_summary = [ordered]@{
                 domain_data_blueprint_schema = "fb2.main_project.domain_data_blueprint.v1"
+                context_pack_template_schema = "fb2.context_pack_template.v1"
+                context_pack_template_wrapper = "fb2_context_pack"
+                context_pack_template_sections = @("usage_boundary", "match_facts", "user_order_slice", "platform_order_summary", "group_opinion_slice", "retrieval_evidence", "quality_feedback")
                 domain_lane_count = 6
                 stores_fb2_business_data_in_main_project = $false
                 group_chat_evidence_schema = "fb2.main_project.group_chat_evidence.v1"

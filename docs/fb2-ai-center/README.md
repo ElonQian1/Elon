@@ -17,6 +17,7 @@
 - fb2 聊天/语音启动协议：`GET /api/external/apps/fb2/chat-bootstrap`
 - fb2 上下文契约：`GET /api/external/apps/fb2/context-contract`
 - fb2 业务上下文拉取：`server/src/external_app_context.rs`
+- fb2 Context Pack 模板契约：`server/src/external_app_context_pack_template.rs`
 - Context Pack 预算和 prompt 投影：`server/src/external_app_context_budget.rs`
 - fb2 缺口提示硬保护：`server/src/external_app_context_gap_notice.rs`
 - 推荐工具契约：`server/src/external_app_context_tools.rs`
@@ -49,6 +50,8 @@
 当前 ASR/TTS 链路按业务安排暂缓，不作为本阶段继续推进项。非语音数据闭环使用独立 `-DataOnlyAcceptance`：它验证主项目健康、authenticated `chat-bootstrap` 的 AI 回复/计费/context fetch、live manifest、fb2 live Context Pack 六类场景、平台匿名摘要、APK 版本、权限负向审计、质量反馈、非合成 feedback 和群观点采纳；它不会要求主项目语音 SDK 构建或 `finalAcceptanceReady=true` 真机语音证据。这个模式只用于推进比赛/订单/平台摘要/群观点 AI 数据能力，不能替代最终 ASR/TTS 验收，也不能宣布终极目标完成。
 
 没有 `FB2_AI_CENTER_TOKEN` 时，主项目会话不能直接读取 fb2 live Context Pack，但可以生成一份给 fb2 子会话执行的样本导出请求：`pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -PrintExportRequest -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -OutputPath target\fb2-ai-center\context-pack-sample-request-current.json`。该 JSON 会列出今日比赛、我的票、平台匿名摘要、群友观点四类 `/api/main-project/context/pack` 请求模板、期望 source kinds、保存路径和离线校验命令；它不包含 token，不写群，也不保存消息正文。
+
+fb2 子项目实现 `/api/main-project/context/pack` 时，优先读取主项目 `context-contract.context_pack_template_contract`。它是机器可读的 Markdown/XML 模板：正文必须是 `<fb2_context_pack>` 包裹的 Markdown，固定包含 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback` 七个小节；JSON metadata 必须包含 `context_audit_id`、`citation_sources`、`metrics`、`tool_contract`、`answer_policy` 和 `preflight_readiness` 等字段。MCP 可以以后包装这套 REST 契约，但不能绕过这份模板直接另建事实源。
 
 真实群聊验收必须以接口直读为准：`smoke-fb2-visible-chat.ps1` 和最终 wrapper 要读取群聊 baseline、`@EL` seed/回复、selected-message seed/`AI回复`、summary post 和 feedback/quality 结果，并把消息 ID、记录数、正文长度、正文 sha256、匹配/未匹配统计写入日志和 summary。最终 wrapper 的 summary 必须包含 `visible_direct_read_complete=true` 和 `visible_direct_read_evidence`，记录 baseline 群消息读取、`@EL` seed/回复回读、selected-message seed/回复回读和 summary-post 回读；缺任一接口回读正文证据时，最终 `success` 必须为 false。截图只能辅助排查 UI，不得作为“AI 已在群聊回答、引用和反馈已闭环”的证明。
 
