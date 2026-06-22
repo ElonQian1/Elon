@@ -9,6 +9,7 @@
       bind();
       loadStorageConfig(true);
       loadEnvCheck(true);
+      loadClientMaintenance(true);
       loadTts(true);
     }
 
@@ -103,6 +104,24 @@
             <div class="node-admin-panel">
               <div class="node-panel-head">
                 <div>
+                  <span class="node-admin-eyebrow">客户端</span>
+                  <h3>更新、日志和卸载</h3>
+                </div>
+                <button class="node-mini-button" type="button" id="nodeClientRefresh">刷新</button>
+              </div>
+              <div class="node-kv-list dense" id="nodeClientMaintenance">${row('状态', '读取中')}</div>
+              <div class="node-admin-actions">
+                <button class="node-action" type="button" id="nodeOpenInstallDir">安装目录</button>
+                <button class="node-action" type="button" id="nodeOpenTaskJournal">任务记录</button>
+                <button class="node-action" type="button" id="nodeExportDiagnostics">导出诊断</button>
+                <button class="node-action primary" type="button" id="nodeClientUpdate">检查更新</button>
+                <button class="node-action danger" type="button" id="nodeClientUninstall">卸载</button>
+              </div>
+              <div class="node-inline-result" id="nodeClientResult"></div>
+            </div>
+            <div class="node-admin-panel">
+              <div class="node-panel-head">
+                <div>
                   <span class="node-admin-eyebrow">TTS</span>
                   <h3>本机语音 Worker</h3>
                 </div>
@@ -133,6 +152,12 @@
       $('#nodeEnvRefresh')?.addEventListener('click', () => loadEnvCheck(false));
       $('#nodeEnvInstall')?.addEventListener('click', installEnv);
       $('#nodeSaveOpenAiKey')?.addEventListener('click', saveOpenAiKey);
+      $('#nodeClientRefresh')?.addEventListener('click', () => loadClientMaintenance(false));
+      $('#nodeOpenInstallDir')?.addEventListener('click', () => openClientTarget('install_dir', 'nodeOpenInstallDir'));
+      $('#nodeOpenTaskJournal')?.addEventListener('click', () => openClientTarget('task_journal', 'nodeOpenTaskJournal'));
+      $('#nodeExportDiagnostics')?.addEventListener('click', exportClientDiagnostics);
+      $('#nodeClientUpdate')?.addEventListener('click', updateClient);
+      $('#nodeClientUninstall')?.addEventListener('click', uninstallClient);
       $('#nodeTtsRefresh')?.addEventListener('click', () => loadTts(false));
       $('#nodeTtsSave')?.addEventListener('click', saveTtsConfig);
     }
@@ -247,6 +272,95 @@
       });
     }
 
+    async function loadClientMaintenance(quiet) {
+      try {
+        const data = await api('/api/client-maintenance');
+        renderClientMaintenance(data);
+        if (!quiet) setResult('nodeClientResult', '客户端维护状态已刷新。');
+      } catch (error) {
+        const panel = $('#nodeClientMaintenance');
+        if (panel) panel.innerHTML = row('状态', '无法读取本机维护状态');
+        setResult('nodeClientResult', error.message || error, 'error');
+      }
+    }
+
+    async function openClientTarget(target, buttonId) {
+      await withBusy(buttonId, '打开中...', async () => {
+        try {
+          const data = await api('/api/client-maintenance/open', {
+            method: 'POST',
+            body: JSON.stringify({ target })
+          });
+          setResult('nodeClientResult', `已打开：${data.opened || target}`);
+        } catch (error) {
+          setResult('nodeClientResult', error.message || error, 'error');
+        }
+      });
+    }
+
+    async function exportClientDiagnostics() {
+      await withBusy('nodeExportDiagnostics', '生成中...', async () => {
+        try {
+          const data = await api('/api/client-maintenance/diagnostics/export', { method: 'POST' });
+          setResult('nodeClientResult', `诊断信息已生成：${data.path || ''}`);
+        } catch (error) {
+          setResult('nodeClientResult', error.message || error, 'error');
+        }
+      });
+    }
+
+    async function updateClient() {
+      await withBusy('nodeClientUpdate', '检查中...', async () => {
+        try {
+          const data = await api('/api/client-maintenance/update', { method: 'POST' });
+          setResult('nodeClientResult', data.message || '已开始后台检查更新。');
+          window.setTimeout(() => loadClientMaintenance(true), 2400);
+        } catch (error) {
+          setResult('nodeClientResult', error.message || error, 'error');
+        }
+      });
+    }
+
+    async function uninstallClient() {
+      if (!window.confirm('确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。')) return;
+      await withBusy('nodeClientUninstall', '卸载中...', async () => {
+        try {
+          const data = await api('/api/client-maintenance/uninstall', { method: 'POST' });
+          setResult('nodeClientResult', data.message || '已安排卸载。');
+        } catch (error) {
+          setResult('nodeClientResult', error.message || error, 'error');
+        }
+      });
+    }
+
+    function renderClientMaintenance(data) {
+      const panel = $('#nodeClientMaintenance');
+      if (!panel) return;
+      if (!data) {
+        panel.innerHTML = row('状态', '未读取');
+        return;
+      }
+      const install = data.install || {};
+      const installedSha = clean(data.installed_git_sha || install.installed_git_sha);
+      const packageVersion = clean(data.installed_package_version || install.installed_package_version);
+      const installState = data.supported === false
+        ? '当前平台不支持维护'
+        : data.installed
+          ? '已安装'
+          : '未检测到完整安装';
+      const running = data.running_from_install_dir ? '安装目录运行中' : '外部启动或未确认';
+      const packageLine = installedSha
+        ? `${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
+        : '未读取';
+      panel.innerHTML = [
+        row('运行版本', clean(data.version) || '未知'),
+        row('安装状态', `${installState} · ${running}`),
+        row('安装包', packageLine),
+        row('目录结构', clientLayoutLabel(data.layout_status || install.layout_status)),
+        row('任务记录', clean(data.task_journal_dir) || '未上报')
+      ].join('');
+    }
+
     async function loadTts(quiet) {
       try {
         const [status, config] = await Promise.all([api('/api/tts-status'), api('/api/tts-relay-config')]);
@@ -333,6 +447,21 @@
       return `<div class="node-model-list">${models.map((model) => `
         <div><strong>${escapeHtml(clean(model.model_id || model.display_name) || '模型')}</strong><span>${escapeHtml(clean(model.provider) || 'local')} · ${escapeHtml(clean(model.price_per_1k_credits || model.price_per_1k) || '0')} credits/1k</span></div>
       `).join('')}</div>`;
+    }
+
+    function shortHash(value) {
+      const text = clean(value);
+      return text.length > 12 ? text.slice(0, 8) : text;
+    }
+
+    function clientLayoutLabel(status) {
+      const value = clean(status).toLowerCase();
+      if (value === 'clean') return '目录清爽';
+      if (value === 'legacy_files_present') return '发现旧脚本';
+      if (value === 'unexpected_entries') return '存在额外文件';
+      if (value === 'incomplete') return '安装不完整';
+      if (value === 'unsupported') return '非 Win 维护环境';
+      return '目录状态未知';
     }
 
     function hardwareLine(hardware) {
