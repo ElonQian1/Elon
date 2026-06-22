@@ -1033,6 +1033,12 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('aria-describedby'), 'PC rail icons should expose the shared tooltip to assistive tech');
   assert.ok(pcApp.includes("button.removeAttribute('title')"), 'PC rail icons should avoid duplicate native tooltips');
 
+  const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
+  assert.ok(pcAppNode.includes('admissionAvailability'), 'PC node page should read Route C admission availability');
+  assert.ok(pcAppNode.includes('admission_availability'), 'PC node page should keep snake_case admission compatibility');
+  assert.ok(pcAppNode.includes('routeCLimitedReasonText'), 'PC node page should explain Route C limited reasons');
+  assert.ok(pcAppNode.includes('秒后重试'), 'PC node page should show Route C retry-after hints');
+
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
   assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');
 

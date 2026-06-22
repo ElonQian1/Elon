@@ -14,9 +14,9 @@ use crate::{
     agent_llm_call::call_chat_llm_with_json_response_mode,
     project_auth::{auth_from_headers, json_error},
     server_agent_runtime_guard::{
-        admission_snapshot, audit_summary, operational_error_summary, protection_status,
-        try_acquire_runtime_admission, ServerRuntimeAdmissionError, ServerRuntimeAdmissionSnapshot,
-        ServerRuntimeProtectionStatus,
+        admission_availability, admission_snapshot, audit_summary, operational_error_summary,
+        protection_status, try_acquire_runtime_admission, ServerRuntimeAdmissionAvailability,
+        ServerRuntimeAdmissionError, ServerRuntimeAdmissionSnapshot, ServerRuntimeProtectionStatus,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
     server_agent_runtime_policy::ServerAgentRuntimePolicy,
@@ -39,6 +39,8 @@ struct ServerAgentRuntimeStatus {
     protection: ServerRuntimeProtectionStatus,
     policy: ServerAgentRuntimePolicy,
     admission: ServerRuntimeAdmissionSnapshot,
+    #[serde(rename = "admissionAvailability")]
+    admission_availability: ServerRuntimeAdmissionAvailability,
 }
 
 #[derive(Debug, Serialize)]
@@ -67,21 +69,26 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
                 usage_mode,
             }
         });
-    let ready = policy.enabled && agent.is_some();
+    let admission = admission_snapshot(&user.id, limits);
+    let admission_availability = admission_availability(&admission);
+    let ready = policy.enabled && agent.is_some() && admission_availability.ready;
     Json(ServerAgentRuntimeStatus {
         ready,
         status: if !policy.enabled {
             "disabled"
-        } else if ready {
-            "ready"
-        } else {
+        } else if agent.is_none() {
             "unavailable"
+        } else if !admission_availability.ready {
+            "limited"
+        } else {
+            "ready"
         },
         agent,
         limits,
         protection: protection_status(),
         policy,
-        admission: admission_snapshot(&user.id, limits),
+        admission,
+        admission_availability,
     })
     .into_response()
 }

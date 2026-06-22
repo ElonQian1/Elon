@@ -507,6 +507,14 @@
       if (stateText === 'missing_token') return '未登录 · 不会调用服务器模型';
       if (stateText === 'http_error') return `云端返回 ${clean(status.httpStatus) || '错误'} · 不会启用`;
       if (stateText === 'unavailable') return `${clean(status.reason) || '云端不可用'} · 不会启用`;
+      const availability = status.admissionAvailability || status.admission_availability || {};
+      if (stateText === 'limited' || availability.ready === false) {
+        const retryAfter = numberField(availability, 'retryAfterSecs', 'retry_after_secs');
+        const message = clean(availability.publicMessage || availability.public_message)
+          || routeCLimitedReasonText(clean(availability.reason))
+          || '当前容量已满';
+        return retryAfter ? `已保护 · ${message} · ${retryAfter} 秒后重试` : `已保护 · ${message}`;
+      }
       const limits = status.limits || {};
       const admission = status.admission || {};
       const rpm = numberField(limits, 'maxRequestsPerMinute', 'max_requests_per_minute')
@@ -521,6 +529,13 @@
       if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
       if (Number.isFinite(remaining)) parts.push(`剩余 ${remaining}`);
       return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
+    }
+
+    function routeCLimitedReasonText(reason) {
+      if (reason === 'global_concurrency_limited') return '平台并发已满';
+      if (reason === 'user_concurrency_limited') return '当前用户并发已满';
+      if (reason === 'rate_limited') return '请求频率已达上限';
+      return '';
     }
 
     function numberField(object, camelName, snakeName) {

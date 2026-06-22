@@ -89,6 +89,11 @@ fn normalize_status_value(value: &Value) -> Value {
         "protection": value.get("protection").cloned().unwrap_or(Value::Null),
         "policy": value.get("policy").cloned().unwrap_or(Value::Null),
         "admission": value.get("admission").cloned().unwrap_or(Value::Null),
+        "admissionAvailability": value
+            .get("admissionAvailability")
+            .or_else(|| value.get("admission_availability"))
+            .cloned()
+            .unwrap_or(Value::Null),
     })
 }
 
@@ -138,13 +143,34 @@ mod tests {
             "protection": {"admissionControl": "global and per-user concurrency"},
             "policy": {"enabled": true},
             "admission": {"remainingRequestsPerMinute": 11},
+            "admissionAvailability": {"ready": true},
             "ignored": "not forwarded"
         }));
 
         assert!(server_runtime_ready_from_status_value(&status));
         assert_eq!(status["limits"]["maxRequestsPerMinute"], 12);
         assert_eq!(status["admission"]["remainingRequestsPerMinute"], 11);
+        assert_eq!(status["admissionAvailability"]["ready"], true);
         assert!(status.get("ignored").is_none());
+    }
+
+    #[test]
+    fn normalizes_snake_case_admission_availability_for_older_servers() {
+        let status = normalize_status_value(&json!({
+            "ready": false,
+            "status": "limited",
+            "admission_availability": {
+                "ready": false,
+                "reason": "rate_limited",
+                "publicMessage": "当前用户 Route C 远程模型请求频率已达上限",
+                "retryAfterSecs": 17
+            }
+        }));
+
+        assert!(!server_runtime_ready_from_status_value(&status));
+        assert_eq!(status["status"], "limited");
+        assert_eq!(status["admissionAvailability"]["reason"], "rate_limited");
+        assert_eq!(status["admissionAvailability"]["retryAfterSecs"], 17);
     }
 
     #[test]

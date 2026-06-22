@@ -53,6 +53,18 @@ pub(crate) struct ServerRuntimeAdmissionSnapshot {
     pub rate_limit_retry_after_secs: Option<u64>,
 }
 
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ServerRuntimeAdmissionAvailability {
+    pub ready: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reason: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub public_message: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub retry_after_secs: Option<u64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ServerRuntimeAdmissionError {
     TooManyGlobalConcurrent {
@@ -258,6 +270,41 @@ pub(crate) fn admission_snapshot(
     }
 }
 
+pub(crate) fn admission_availability(
+    snapshot: &ServerRuntimeAdmissionSnapshot,
+) -> ServerRuntimeAdmissionAvailability {
+    if snapshot.remaining_concurrent_global == 0 {
+        return ServerRuntimeAdmissionAvailability {
+            ready: false,
+            reason: Some("global_concurrency_limited"),
+            public_message: Some("Route C 远程模型全局并发已满"),
+            retry_after_secs: Some(1),
+        };
+    }
+    if snapshot.remaining_concurrent_for_user == 0 {
+        return ServerRuntimeAdmissionAvailability {
+            ready: false,
+            reason: Some("user_concurrency_limited"),
+            public_message: Some("当前用户 Route C 远程模型并发已满"),
+            retry_after_secs: Some(1),
+        };
+    }
+    if snapshot.remaining_requests_per_minute == 0 {
+        return ServerRuntimeAdmissionAvailability {
+            ready: false,
+            reason: Some("rate_limited"),
+            public_message: Some("当前用户 Route C 远程模型请求频率已达上限"),
+            retry_after_secs: snapshot.rate_limit_retry_after_secs,
+        };
+    }
+    ServerRuntimeAdmissionAvailability {
+        ready: true,
+        reason: None,
+        public_message: None,
+        retry_after_secs: None,
+    }
+}
+
 #[derive(Default)]
 struct RuntimeAdmissionState {
     users: HashMap<String, UserRuntimeAdmission>,
@@ -330,8 +377,9 @@ pub(crate) fn audit_summary(
 #[cfg(test)]
 mod tests {
     use super::{
-        admission_snapshot, audit_summary, operational_error_summary, protection_status,
-        try_acquire_runtime_admission, ServerRuntimeAdmissionError,
+        admission_availability, admission_snapshot, audit_summary, operational_error_summary,
+        protection_status, try_acquire_runtime_admission, ServerRuntimeAdmissionError,
+        ServerRuntimeAdmissionSnapshot,
     };
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
     use serde_json::json;
@@ -518,6 +566,43 @@ mod tests {
         drop(guard);
         let released = admission_snapshot(&user_id, limits);
         assert_eq!(released.in_flight_for_user, 0);
+    }
+
+    #[test]
+    fn admission_availability_reports_capacity_reason() {
+        let mut snapshot = ServerRuntimeAdmissionSnapshot {
+            in_flight_global: 0,
+            max_concurrent_global: 24,
+            remaining_concurrent_global: 24,
+            in_flight_for_user: 0,
+            max_concurrent_per_user: 2,
+            remaining_concurrent_for_user: 2,
+            recent_requests_per_minute: 0,
+            max_requests_per_minute: 12,
+            remaining_requests_per_minute: 12,
+            rate_limit_retry_after_secs: None,
+        };
+
+        assert!(admission_availability(&snapshot).ready);
+
+        snapshot.remaining_concurrent_global = 0;
+        let global = admission_availability(&snapshot);
+        assert!(!global.ready);
+        assert_eq!(global.reason, Some("global_concurrency_limited"));
+
+        snapshot.remaining_concurrent_global = 1;
+        snapshot.remaining_concurrent_for_user = 0;
+        let user = admission_availability(&snapshot);
+        assert!(!user.ready);
+        assert_eq!(user.reason, Some("user_concurrency_limited"));
+
+        snapshot.remaining_concurrent_for_user = 1;
+        snapshot.remaining_requests_per_minute = 0;
+        snapshot.rate_limit_retry_after_secs = Some(17);
+        let rate = admission_availability(&snapshot);
+        assert!(!rate.ready);
+        assert_eq!(rate.reason, Some("rate_limited"));
+        assert_eq!(rate.retry_after_secs, Some(17));
     }
 
     #[test]
