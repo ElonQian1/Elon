@@ -2,10 +2,11 @@
 
 ## 当前快照
 
-日期：2026-06-22
+日期：2026-06-23
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮把 handoff 中上一条“后续应做 post-generation source/gap validator”推进成主项目运行代码：`external_app_context_source_validation` 会在 generated-answer feedback 写回前校验 AI 回复正文里出现的 source-like id。只有本轮 Context Pack `citation_sources`、选中消息额外来源、`context_audit_id`、以及 grounded/weak 且成功的工具结果来源能通过；未匹配的 `match/order/ticket/gmsg/gai/gsp/opinion/memory/platform_order_summary/audit/UUID` 类 token 会让 feedback payload 的 `wrong_context=true`，并在 `note` 里保留 `source_validation=...` 供 fb2 `/context/quality-summary` 和失败样本排查。真实群聊验证继续走 `/api/me/groups/{group_id}/messages`、summary-post、feedback/quality summary 的接口直读证据，截图仍只能辅助 UI。
 - 2026-06-23 本轮补齐主项目 prompt 层的 fb2 上下文缺口摘要：`external_app_context_budget::prompt_context_block()` 现在输出 `context_gap_summary`，把 Context Pack 状态、readiness、budget、质量告警、业务数据是否可用和裁剪字段压成模型先读的 JSON。`fb2_readiness_blocked`、`fb2_budget_empty`、`missing_context_pack` 等信号会让 `fact_answer_allowed=false`，AI 只能说明缺口，不能把缺口写成比赛、赔率、本人订单或群友观点事实。已加 blocked/empty/truncated 的 Rust 测试，以及 `social_ai::format_external_context()` 的组合测试。后续如继续强化，应做 post-generation source/gap validator：回答里出现的比赛、赔率、订单、群观点 source id 必须能在本轮 Context Pack 或已 grounded 工具结果里匹配。真实群聊验证继续走 `/api/me/groups/{group_id}/messages`、summary-post、feedback/quality summary 的接口直读证据，截图仍只能辅助 UI。
 - 2026-06-23 本轮继续把当前状态做成机器可读目标摘要：`scripts\smoke-fb2-ai-center-status.ps1` 新增 `goal_completion schema=fb2.main_project.goal_completion.v1`，从最新 data-only summary、只读群聊 summary 和 ai-center log 汇总终极目标进度。当前应显示 `non_voice_ready=true`、`full_final_ready=false`、`stage=non_voice_data_chat_permission_quality_ready_voice_deferred`，ready 项包括 Context Pack 投影、本人订单、平台摘要、群聊接口直读、三类 AI feedback、权限/质量闭环；missing 项只应剩 `voice_final_evidence_path_present`。后续会话先跑 `scripts\smoke-fb2-ai-center-status.ps1 -OutputPath target\fb2-ai-center\status-current.json` 判断当前差距，不要再靠截图或人工口头状态判断。
 - 2026-06-23 本轮在同一个状态快照里新增 `coordination schema=fb2.main_project.coordination.v1`，作为主项目会话和 fb2 子会话的交接 payload。它会给出 owner split、禁止复制数据/禁止截图验收/禁止无授权写群、当前 `data-only`/只读群聊/ai-center log 路径、`official -> ext_fb2_official`、`@EL` 回复 ID、selected-message `AI回复` ID、summary-post ID、feedback 覆盖、Context Pack 投影状态和安全命令。fb2 子会话后续如果问“现在要配合什么”，先看 `coordination.next_action_by_owner.fb2_project`；当前应是“非语音数据/聊天/反馈已通过，继续用 direct APIs 做回归；ASR/TTS final evidence 暂不处理”。

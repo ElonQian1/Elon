@@ -13,6 +13,7 @@ use crate::{
         fb2_base_url, fb2_context_token, fb2_request_context_headers, timeout_secs, FB2_APP_ID,
         FB2_CONTEXT_HEADER,
     },
+    external_app_context_source_validation::validate_reply_sources,
     external_app_http_client::{build_fb2_direct_client, fb2_direct_client},
     types::AppState,
 };
@@ -133,6 +134,7 @@ async fn post_generated_answer_feedback(
             trigger,
             context_audit_id = payload["context_audit_id"].as_str().unwrap_or("unknown"),
             cited_source_count = payload["cited_source_count"].as_u64().unwrap_or(0),
+            wrong_context = payload["wrong_context"].as_bool().unwrap_or(false),
             "fb2 generated-answer feedback callback recorded"
         );
     } else {
@@ -405,6 +407,13 @@ fn generated_answer_feedback_payload(
     let cited_sources =
         feedback_citation_sources(context, reply_text, tool_results, extra_citation_sources);
     let cited_source_count = cited_sources.len();
+    let source_validation = validate_reply_sources(
+        context,
+        tool_results,
+        reply_text,
+        &cited_sources,
+        extra_citation_sources,
+    );
 
     let mut payload = json!({
         "context_audit_id": context_audit_id,
@@ -413,11 +422,12 @@ fn generated_answer_feedback_payload(
         "cited_source_count": cited_source_count,
         "cited_sources": cited_sources,
         "missing_context": false,
-        "wrong_context": false,
+        "wrong_context": source_validation.has_unmatched_sources(),
         "note": truncate_chars(
             &format!(
-                "auto_generated_answer_feedback; trigger={trigger}; cited_sources={}",
-                cited_source_count
+                "auto_generated_answer_feedback; trigger={trigger}; cited_sources={}; {}",
+                cited_source_count,
+                source_validation.note_fragment()
             ),
             FEEDBACK_NOTE_MAX_CHARS
         )
@@ -911,6 +921,79 @@ mod tests {
         .expect("payload");
 
         assert_eq!(payload["cited_source_count"], 0);
+    }
+
+    #[test]
+    fn payload_marks_wrong_context_when_reply_mentions_unmatched_source_id() {
+        let context = json!({
+            "app_id": "fb2",
+            "group": "official",
+            "status": "ready",
+            "source": "fb2:/api/main-project/context/pack",
+            "context_audit_id": "audit-1",
+            "citation_sources": [
+                {"kind": "match", "id": "match-1234", "label": "工具命中的比赛"}
+            ]
+        });
+
+        let payload = generated_answer_feedback_payload(
+            &context,
+            Some("fb2-user-1"),
+            "ext_fb2_official",
+            "social_group_message:m1",
+            "group_mention",
+            "数据事实引用 match-1234，但也写出了不存在的 order-404。",
+            None,
+            &[],
+        )
+        .expect("payload");
+
+        assert_eq!(payload["cited_source_count"], 1);
+        assert_eq!(payload["wrong_context"], true);
+        assert!(payload["note"]
+            .as_str()
+            .unwrap()
+            .contains("source_validation=unmatched"));
+    }
+
+    #[test]
+    fn payload_allows_grounded_tool_source_without_feedback_citation_pollution() {
+        let context = json!({
+            "app_id": "fb2",
+            "group": "official",
+            "status": "ready",
+            "source": "fb2:/api/main-project/context/pack",
+            "context_audit_id": "audit-1",
+            "citation_sources": []
+        });
+        let tool_results = json!({
+            "results": [{
+                "tool_name": "match_analysis_brief",
+                "success": true,
+                "status": "ready",
+                "grounding": {"status": "grounded"},
+                "source_ids": ["order-tool-1"]
+            }]
+        });
+
+        let payload = generated_answer_feedback_payload(
+            &context,
+            Some("fb2-user-1"),
+            "ext_fb2_official",
+            "social_group_message:m1",
+            "group_mention",
+            "用户订单：引用 order-tool-1 作为当前用户票据来源。",
+            Some(&tool_results),
+            &[],
+        )
+        .expect("payload");
+
+        assert_eq!(payload["cited_source_count"], 0);
+        assert_eq!(payload["wrong_context"], false);
+        assert!(payload["note"]
+            .as_str()
+            .unwrap()
+            .contains("source_validation=ok"));
     }
 
     #[test]

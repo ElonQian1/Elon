@@ -268,6 +268,7 @@ GET /api/main-project/context/tool-manifest
 - 主项目会在 prompt metadata 增加 `context_gap_summary`，把 Context Pack 的状态、readiness、budget、质量告警、业务数据是否可用和 token budget 裁剪字段压缩成模型先读的缺口摘要；当 `fact_answer_allowed=false` 时，AI 必须向用户说明数据缺口，不能编造 fb2 没有提供的比赛、赔率、订单、平台摘要或群友观点。
 - 主项目会在 executed tool JSON 前增加 `tool_fact_summary`，把 `match_analysis_brief.data.user_orders` 等当前用户订单样例提前投影，避免大赔率 JSON 被截断时丢失“我的票”结构信息。
 - 主项目会在 executed tool JSON 前增加 `tool_gap_summary`，把 `skipped/failed/unavailable` 工具结果提前投影；这些只代表数据缺口，不能编造成比赛、赔率、订单或群友观点事实。
+- 主项目会在 AI 回复生成后做来源 ID 校验：回复正文里出现的比赛、赔率、订单、票据、群消息、观点记忆、平台摘要和 audit 类 source id，必须能匹配本轮 `citation_sources`、选中消息额外来源、当前 `context_audit_id`，或 `success=true` 且 `grounding.status=grounded/weak` 的工具结果。未匹配来源会在 `/context/feedback` payload 中标记 `wrong_context=true`，并写入 `note` 的 `source_validation=...`；主项目不新增 fb2 未声明的顶层字段。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
 - 主项目日志只记录 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
 - AI 回答必须区分事实、群友观点和推断；上下文不足时要明确说明。
