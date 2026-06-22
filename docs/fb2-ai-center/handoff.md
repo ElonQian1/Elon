@@ -6,6 +6,7 @@
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-22 本轮新增 final wrapper 的 data-only 离线守门：`smoke-fb2-final-acceptance.ps1 -SelfTest` 会检查 `-DataOnlyAcceptance` 摘要必须标记 `voice_status=deferred_by_user`，且 evidence 中不要求 `local_voice_sdk_build` / `voice_evidence_final_ready`，但仍要求本人订单、权限审计、非合成质量和群观点采纳字段可被映射。后续 ASR/TTS 暂停期间，允许继续用 data-only 方式推进比赛/订单/平台摘要/群观点 live 验收；不要把它写成 full final acceptance。
 - 2026-06-22 最新主项目服务端已发布 `v0.3.613 / a3de7e2e2d2c3d61cded7436eced813d25753dad`，包含 `6209f4b8` 的群观点采纳写回运行时代码，以及本轮 `domain_context_projection_contract` 的 smoke/源码验收。已验证 `/health=OK`、`/api/server/version`，并在部署后跑通 `smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted> -SkipVoiceContractChecks`，结果 `failed=0 skipped=1`。剩余跳过仍是缺 `FB2_AI_CENTER_TOKEN`，所以 live Context Pack、本人订单、平台匿名摘要、真实 feedback/quality/opinion-adoption 还不能做最终数据验收。
 - 2026-06-22 当前按用户要求暂停 ASR/TTS 深挖，继续收口 fb2 非语音 AI 数据闭环。主项目已同步远端 `6209f4b8`，其中 generated-answer feedback 会从 Context Pack `cited_sources` 识别被回答显式引用的 `opinion_memory/group_opinion_memory` 并触发 fb2 观点采纳写回。本轮 `scripts\smoke-fb2-ai-center.ps1` 已把该长期闭环约束纳入主项目契约验收：`domain_context_projection_contract` 必须公开召回字段、三类权限投影、质量回写路由和非合成 readiness 门槛；否则 context-contract smoke 会失败。下一轮仍优先拿 `FB2_AI_CENTER_TOKEN` 跑 live Context Pack、本人订单、平台匿名摘要、群观点、feedback/quality/opinion-adoption 验收；语音链路留到后续专门处理。
 - 2026-06-22 服务端单测也已保护同一份 fb2 域投影契约：`external_app_context_projection` 会检查权限投影、质量闭环、召回字段，以及回答必须区分 `数据事实/用户订单/平台汇总/群友观点/AI推断/风险边界`。后续改 `context-contract` 时不要只更新 JSON 文案，必须同步更新 smoke 与 Rust 单测。

@@ -493,6 +493,45 @@ function Invoke-FinalAcceptanceSelfTest {
         Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$centerEvidence[$key])) "ai-center evidence maps $key" ([string]$centerEvidence[$key])
     }
 
+    $dataOnlyCenterLines = @(
+        "OK`tmain version`t0.3.613 a3de7e2e",
+        "OK`tlive manifest ready`ttool_count=34",
+        "OK`tdata-only acceptance excludes voice contract`tASR/TTS deferred by current task scope",
+        "OK`tscenario: today matches context audit`taudit_today",
+        "OK`tscenario: my ticket context audit`taudit_ticket",
+        "OK`tscenario: my ticket has user orders`tcount=1 min=1",
+        "OK`tscenario: platform order has summary data`tcount=1 min=1",
+        "OK`tpermission summary total blocks`tvalue=4",
+        "OK`tpermission summary user blocks`tvalue=3",
+        "OK`tpermission summary platform blocks`tvalue=1",
+        "OK`tquality feedback count`tvalue=3 min=3",
+        "OK`tquality matched cited sources`tvalue=3 min=3",
+        "OK`tquality unmatched cited sources`tvalue=0",
+        "OK`tquality missing context count`tvalue=0",
+        "OK`tquality wrong context count`tvalue=0",
+        "OK`tquality non-synthetic feedback count`tvalue=2 min=1",
+        "OK`tquality non-synthetic adoption count`tvalue=1 min=1",
+        "OK`tquality non-synthetic memory refs`tvalue=3"
+    )
+    $dataOnlyEvidence = Build-AiCenterEvidence $dataOnlyCenterLines
+    $dataOnlySummary = [ordered]@{
+        schema = "fb2.main_project.final_acceptance.v1"
+        mode = "data_only_preflight"
+        acceptance_scope = "data_permission_quality_visible_chat_without_voice"
+        voice_status = "deferred_by_user"
+        voice_device_evidence_path = ""
+        preflight_evidence = $dataOnlyEvidence
+        success = $true
+    }
+    Assert-SelfTest ($dataOnlySummary["voice_status"] -eq "deferred_by_user") "data-only summary defers voice"
+    Assert-SelfTest ($dataOnlySummary["acceptance_scope"] -eq "data_permission_quality_visible_chat_without_voice") "data-only summary scope excludes voice"
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$dataOnlyEvidence["data_only_scope"])) "data-only evidence maps deferred voice scope" ([string]$dataOnlyEvidence["data_only_scope"])
+    Assert-SelfTest ([string]::IsNullOrWhiteSpace([string]$dataOnlyEvidence["local_voice_sdk_build"])) "data-only evidence does not require local voice SDK"
+    Assert-SelfTest ([string]::IsNullOrWhiteSpace([string]$dataOnlyEvidence["voice_evidence_final_ready"])) "data-only evidence does not require final-ready voice evidence"
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$dataOnlyEvidence["scenario_my_ticket_orders"])) "data-only evidence still requires user orders" ([string]$dataOnlyEvidence["scenario_my_ticket_orders"])
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$dataOnlyEvidence["permission_total_blocks"])) "data-only evidence still requires permission audit" ([string]$dataOnlyEvidence["permission_total_blocks"])
+    Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$dataOnlyEvidence["quality_non_synthetic_adoption_count"])) "data-only evidence still requires opinion adoption quality" ([string]$dataOnlyEvidence["quality_non_synthetic_adoption_count"])
+
     $failed = $script:SelfTestFailed
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"

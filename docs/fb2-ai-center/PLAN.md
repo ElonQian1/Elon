@@ -32,6 +32,7 @@
 - `final-acceptance-matrix.md` 是终极目标完成审计入口；任何会话要宣布完成前，必须逐项对照矩阵拿到当前证据。
 - 真机语音证据必须使用 `docs/fb2-ai-center/voice-device-evidence.example.json` 同格式回传，不能只用口头描述。
 - 最终总验收使用 `scripts\smoke-fb2-final-acceptance.ps1`，把真实群聊可见触发和 `-FinalAcceptance` 绑定成同一批证据，避免拿历史反馈或旧群聊记录凑数。
+- `scripts\smoke-fb2-final-acceptance.ps1 -SelfTest` 现在同时覆盖 full final 和 data-only 两种摘要语义：data-only 必须写 `voice_status=deferred_by_user`，不能误要求本地语音 SDK 或 final-ready 语音证据，但仍必须保留用户订单、权限审计、质量 feedback 和群观点采纳 evidence。
 
 ## 风险
 
