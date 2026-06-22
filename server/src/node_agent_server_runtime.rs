@@ -15,6 +15,7 @@ use crate::{
     node_agent_tool_guard::{truncate_chars, ToolGuard},
 };
 use anyhow::{anyhow, bail, Context, Result};
+use futures::StreamExt;
 use homecli_proto::AgentToServer;
 use serde_json::{json, Value};
 use std::{collections::VecDeque, future::Future, path::PathBuf, time::Duration};
@@ -23,6 +24,7 @@ use tokio_tungstenite::tungstenite::Message;
 
 const MAX_TURNS: usize = 8;
 const MAX_TOOL_RESULT_CHARS: usize = 24_000;
+const MAX_RUNTIME_HTTP_BODY_BYTES: usize = 1024 * 1024;
 
 #[derive(Clone)]
 pub(crate) struct ServerRuntimeConfig {
@@ -938,7 +940,7 @@ async fn call_server_runtime(
         .send()
         .await?;
     let status = response.status();
-    let body = response.text().await.unwrap_or_default();
+    let body = limited_runtime_response_text(response, "服务器 AI runtime").await?;
     if !status.is_success() {
         bail!(
             "{}",
@@ -966,7 +968,7 @@ async fn call_api_runtime(
         let response =
             send_api_runtime_request(client, &url, config, messages, json_mode, tools_mode).await?;
         let status = response.status();
-        let body = response.text().await.unwrap_or_default();
+        let body = limited_runtime_response_text(response, "本机 API runtime").await?;
         if status.is_success() {
             return serde_json::from_str(&body).context("本机 API runtime 响应不是 JSON");
         }
@@ -1053,6 +1055,39 @@ fn api_runtime_should_retry_without_json_mode(status: reqwest::StatusCode, body:
 
 fn runtime_http_error_message(label: &str, status: reqwest::StatusCode, body: &str) -> String {
     format!("{label} 返回 {status}: {}", operational_error_summary(body))
+}
+
+async fn limited_runtime_response_text(response: reqwest::Response, label: &str) -> Result<String> {
+    if let Some(content_length) = response.content_length() {
+        ensure_runtime_response_size(label, content_length as usize)?;
+    }
+
+    let mut body = Vec::new();
+    let mut stream = response.bytes_stream();
+    while let Some(chunk) = stream.next().await {
+        let chunk = chunk.with_context(|| format!("读取 {label} 响应失败"))?;
+        ensure_runtime_response_size(label, body.len().saturating_add(chunk.len()))?;
+        body.extend_from_slice(&chunk);
+    }
+
+    String::from_utf8(body).with_context(|| format!("{label} 响应不是 UTF-8"))
+}
+
+fn ensure_runtime_response_size(label: &str, observed_bytes: usize) -> Result<()> {
+    if observed_bytes > MAX_RUNTIME_HTTP_BODY_BYTES {
+        bail!(
+            "{}",
+            runtime_response_too_large_message(label, observed_bytes)
+        );
+    }
+    Ok(())
+}
+
+fn runtime_response_too_large_message(label: &str, observed_bytes: usize) -> String {
+    format!(
+        "{label} 响应过大：{} 字节，超过客户端安全上限 {} 字节，已中止读取",
+        observed_bytes, MAX_RUNTIME_HTTP_BODY_BYTES
+    )
 }
 
 fn first_value(lookup: &impl Fn(&str) -> Option<String>, names: &[&str]) -> Option<String> {
@@ -1203,8 +1238,10 @@ impl RuntimeUsage {
 mod tests {
     use super::{
         api_runtime_chat_payload, api_runtime_config_from_lookup,
-        api_runtime_should_retry_without_json_mode, parse_agent_response, run_runtime_loop,
-        runtime_http_error_message, system_prompt, ApiRuntimeConfig, RuntimeLoopOptions,
+        api_runtime_should_retry_without_json_mode, ensure_runtime_response_size,
+        parse_agent_response, run_runtime_loop, runtime_http_error_message,
+        runtime_response_too_large_message, system_prompt, ApiRuntimeConfig, RuntimeLoopOptions,
+        MAX_RUNTIME_HTTP_BODY_BYTES,
     };
     use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
     use anyhow::anyhow;
@@ -1325,6 +1362,35 @@ mod tests {
         assert!(message.contains("429"));
         assert!(message.contains("rate_limit"));
         assert!(message.contains("fingerprint="));
+        assert!(!message.contains("sk-secret"));
+        assert!(!message.contains("prompt text"));
+    }
+
+    #[test]
+    fn runtime_response_size_limit_allows_boundary() {
+        ensure_runtime_response_size("服务器 AI runtime", MAX_RUNTIME_HTTP_BODY_BYTES)
+            .expect("exact limit should be accepted");
+    }
+
+    #[test]
+    fn runtime_response_size_limit_rejects_oversized_body() {
+        let error =
+            ensure_runtime_response_size("服务器 AI runtime", MAX_RUNTIME_HTTP_BODY_BYTES + 1)
+                .unwrap_err();
+        let message = error.to_string();
+
+        assert!(message.contains("服务器 AI runtime 响应过大"));
+        assert!(message.contains("已中止读取"));
+        assert!(message.contains(&(MAX_RUNTIME_HTTP_BODY_BYTES + 1).to_string()));
+    }
+
+    #[test]
+    fn runtime_response_too_large_message_does_not_include_body() {
+        let message =
+            runtime_response_too_large_message("本机 API runtime", MAX_RUNTIME_HTTP_BODY_BYTES + 9);
+
+        assert!(message.contains("本机 API runtime 响应过大"));
+        assert!(message.contains("1048585"));
         assert!(!message.contains("sk-secret"));
         assert!(!message.contains("prompt text"));
     }
