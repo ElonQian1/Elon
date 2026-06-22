@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮新增 `server/src/external_app_context_gap_notice.rs`，并接入群聊/好友 `social_ai` 生成后链路。fb2 Context Pack 或 readiness 出现 `blocked/degraded/unavailable/partial`、`metrics.budget_status=empty/too_large`、`missing_context_pack` 或 token budget 截断时，即使模型回复没有主动说明，服务端也会在最终聊天回复追加 `数据缺口：...不能把缺失数据编造成比赛、赔率、订单或群友观点事实。` 该保护只作用于 fb2 外部上下文，不改变普通聊天回复，也不保存 fb2 业务数据。
 - 2026-06-23 本轮新增 `scripts\fb2-ai-center-handoff-report.ps1`，用于把 `status-current.json` 压缩成 `fb2.main_project.handoff_report.v1` JSON 和 Markdown。它汇总公开契约、群聊直读、四类 Context Pack answer readiness、七类用户场景审计、缺口、owner 下一步和安全命令；如果当前 worktree 没有 data-only summary/log，它会如实显示 selected-message、summary-post 和 source-audit 场景缺当前证据，避免后续从历史文档误判为当前状态已完整。该脚本不访问网络、不写群、不保存消息正文。
 - 2026-06-23 本轮把无密钥公开契约巡检接入总状态快照：新增 `scripts\fb2-public-contract-summary-status.ps1`，`scripts\smoke-fb2-ai-center-status.ps1` 会读取最新 `public-contract-status*.json` 并输出 `latest_public_contract_status`。该字段把线上主项目版本 SHA、`domain_data_blueprint_contract`、`group_chat_evidence_contract`、live tool count、limitations 和群聊必需字段汇总到同一份状态里；群聊测试口径仍是 `direct_api_read`、`screenshots_accepted=false`、`message_id/text_len/text_sha256`，截图不能替代该 summary 或群聊 API 直读证据。
 - 2026-06-23 本轮新增 `scripts\fb2-public-contract-status.ps1`，作为无密钥线上公开契约巡检。它读取主项目 `/health`、`/api/server/version`、`/api/external/apps/fb2/context-contract`，检查 `domain_data_blueprint_contract`、`group_chat_evidence_contract` 和 live manifest，并输出 `fb2.main_project.public_contract_status.v1`。该脚本用于回答“主项目公开契约/代码线上是什么状态”，但 limitations 明确不替代 fb2 live Context Pack、订单、权限、质量或最终验收。

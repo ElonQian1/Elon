@@ -18,6 +18,7 @@
 - fb2 上下文契约：`GET /api/external/apps/fb2/context-contract`
 - fb2 业务上下文拉取：`server/src/external_app_context.rs`
 - Context Pack 预算和 prompt 投影：`server/src/external_app_context_budget.rs`
+- fb2 缺口提示硬保护：`server/src/external_app_context_gap_notice.rs`
 - 推荐工具契约：`server/src/external_app_context_tools.rs`
 - 语音 SDK：`android/chat-voice-kit`
 - 已有说明文档：`docs/fb2-business-context-pack.md`、`docs/fb2-chat-voice-kit-integration.md`
@@ -52,6 +53,8 @@
 真实群聊验收必须以接口直读为准：`smoke-fb2-visible-chat.ps1` 和最终 wrapper 要读取群聊 baseline、`@EL` seed/回复、selected-message seed/`AI回复`、summary post 和 feedback/quality 结果，并把消息 ID、记录数、正文长度、正文 sha256、匹配/未匹配统计写入日志和 summary。最终 wrapper 的 summary 必须包含 `visible_direct_read_complete=true` 和 `visible_direct_read_evidence`，记录 baseline 群消息读取、`@EL` seed/回复回读、selected-message seed/回复回读和 summary-post 回读；缺任一接口回读正文证据时，最终 `success` 必须为 false。截图只能辅助排查 UI，不得作为“AI 已在群聊回答、引用和反馈已闭环”的证明。
 
 只需要确认当前账号能通过主项目群聊 API 直接读到 fb2 群消息时，先跑无写入预检：`scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password 123qwe`。它只做 session bridge、群成员检查和 baseline 消息读取，输出 `text_len`、`text_sha256` 和 `writes=false`，并写出 `fb2.main_project.visible_chat_readonly.v1` summary JSON；summary 会带最近 20 条消息的 `recent_messages` 索引，只保存消息 ID、类型、发送方、时间、正文长度和 sha256，不保存正文。该模式不会发送 `@EL`、不会触发 selected-message `AI回复`、不会创建总结帖。
+
+fb2 回答的防编造保护分两层：prompt 内的 `context_gap_summary` 会提示模型哪些数据缺失；生成后还会经过 `external_app_context_gap_notice`。只要 fb2 外部上下文报告 readiness 阻断/降级、Context Pack 为空/过大/被截断或缺少可引用 Context Pack，最终聊天回复必须追加 `数据缺口` 行，明确不能把缺失数据编造成比赛、赔率、订单或群友观点事实。
 
 readiness 和总结帖状态也要分层：full final 必须要求 fb2 authenticated readiness 为 `ready`，并要求 summary post 为模型生成 `ready`；data-only 当前允许 readiness `partial` 和 summary `ready_with_fallback`，但 summary 必须显式写出 `summary_post_fallback_used`、`summary_post_ready_for_mode` 和 readiness 允许原因。`degraded`、`blocked`、`unavailable` 不能通过 data-only 或 full final。
 

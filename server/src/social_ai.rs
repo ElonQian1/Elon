@@ -583,6 +583,10 @@ async fn build_reply(
                 reply.chars().take(1400).collect()
             };
             let reply = ensure_fb2_grounded_answer_shape(&reply, external_context);
+            let reply = crate::external_app_context_gap_notice::ensure_fb2_context_gap_notice(
+                &reply,
+                external_context,
+            );
             Ok(ensure_fb2_opinion_memory_source(
                 &reply,
                 external_context,
