@@ -113,6 +113,7 @@
               <div class="node-admin-actions">
                 <button class="node-action" type="button" id="nodeOpenInstallDir">安装目录</button>
                 <button class="node-action" type="button" id="nodeOpenTaskJournal">任务记录</button>
+                <button class="node-action" type="button" id="nodeOpenDiagnosticsDir">诊断目录</button>
                 <button class="node-action" type="button" id="nodeExportDiagnostics">导出诊断</button>
                 <button class="node-action primary" type="button" id="nodeClientUpdate">检查更新</button>
                 <button class="node-action danger" type="button" id="nodeClientUninstall">卸载</button>
@@ -155,6 +156,7 @@
       $('#nodeClientRefresh')?.addEventListener('click', () => loadClientMaintenance(false));
       $('#nodeOpenInstallDir')?.addEventListener('click', () => openClientTarget('install_dir', 'nodeOpenInstallDir'));
       $('#nodeOpenTaskJournal')?.addEventListener('click', () => openClientTarget('task_journal', 'nodeOpenTaskJournal'));
+      $('#nodeOpenDiagnosticsDir')?.addEventListener('click', () => openClientTarget('diagnostics_dir', 'nodeOpenDiagnosticsDir'));
       $('#nodeExportDiagnostics')?.addEventListener('click', exportClientDiagnostics);
       $('#nodeClientUpdate')?.addEventListener('click', updateClient);
       $('#nodeClientUninstall')?.addEventListener('click', uninstallClient);
@@ -361,7 +363,8 @@
         row('安装状态', `${installState} · ${running}`),
         row('安装包', packageLine),
         row('目录结构', clientLayoutLabel(data.layout_status || install.layout_status)),
-        row('任务记录', clean(data.task_journal_dir) || '未上报')
+        row('任务记录', clean(data.task_journal_dir) || '未上报'),
+        row('诊断目录', clean(data.diagnostics_dir) || '未上报')
       ].join('');
     }
 

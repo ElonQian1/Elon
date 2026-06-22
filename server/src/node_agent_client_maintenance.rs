@@ -68,6 +68,13 @@ fn status_payload() -> Value {
         "state_file": path_to_string(&paths.state_file),
         "config_dir": path_to_string(&paths.config_dir),
         "task_journal_dir": path_to_string(&paths.task_journal_dir),
+        "diagnostics_dir": path_to_string(&paths.diagnostics_dir),
+        "maintenance_targets": [
+            { "target": "install_dir", "label": "安装目录" },
+            { "target": "task_journal", "label": "任务记录" },
+            { "target": "diagnostics_dir", "label": "诊断目录" },
+            { "target": "config_dir", "label": "配置目录" }
+        ],
         "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
     });
 
@@ -126,6 +133,12 @@ fn maintenance_target(raw_target: &str) -> Result<MaintenanceTarget, String> {
         }),
         "config_dir" => Ok(MaintenanceTarget {
             path: paths.config_dir,
+            select_file: false,
+            ensure_dir: true,
+            must_exist: true,
+        }),
+        "diagnostics" | "diagnostics_dir" => Ok(MaintenanceTarget {
+            path: paths.diagnostics_dir,
             select_file: false,
             ensure_dir: true,
             must_exist: true,
@@ -222,6 +235,7 @@ fn maintenance_paths() -> MaintenancePaths {
         .map(Path::to_path_buf)
         .unwrap_or_else(|| PathBuf::from("."));
     MaintenancePaths {
+        diagnostics_dir: config_dir.join("diagnostics"),
         task_journal_dir: state_file.with_file_name("task-journal"),
         state_file,
         config_dir,
@@ -269,6 +283,7 @@ struct MaintenancePaths {
     state_file: PathBuf,
     config_dir: PathBuf,
     task_journal_dir: PathBuf,
+    diagnostics_dir: PathBuf,
 }
 
 struct MaintenanceTarget {
@@ -292,7 +307,7 @@ enum ClientAction {
 
 #[cfg(test)]
 mod tests {
-    use super::{install_dir_from_local_app_data, maintenance_target};
+    use super::{install_dir_from_local_app_data, maintenance_target, status_payload};
     use std::path::PathBuf;
 
     #[test]
@@ -309,8 +324,20 @@ mod tests {
     fn only_fixed_open_targets_are_supported() {
         assert!(maintenance_target("task_journal").is_ok());
         assert!(maintenance_target("logs").is_ok());
+        assert!(maintenance_target("diagnostics_dir").is_ok());
         assert!(maintenance_target("config_dir").is_ok());
         assert!(maintenance_target("state_file").is_ok());
         assert!(maintenance_target(r"C:\Windows").is_err());
+    }
+
+    #[test]
+    fn status_exposes_productized_maintenance_targets() {
+        let status = status_payload();
+        assert!(status["diagnostics_dir"].as_str().is_some());
+        assert!(status["maintenance_targets"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|target| target["target"].as_str() == Some("diagnostics_dir")));
     }
 }
