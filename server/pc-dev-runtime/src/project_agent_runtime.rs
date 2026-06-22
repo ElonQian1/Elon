@@ -69,7 +69,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `write_file`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes and commands without applying them. Each agent run has a `-MaxRunCommands` budget and truncates large command output before sending it back to the model. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -104,6 +104,7 @@ fn agent_runtime_script() -> io::Result<String> {
     [string]$ServerToken = '',
     [string]$ServerAgent = '',
     [int]$MaxTurns = 6,
+    [int]$MaxRunCommands = 8,
     [switch]$DryRun,
     [switch]$Yes
 )
@@ -112,6 +113,11 @@ $ErrorActionPreference = 'Stop'
 
 $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 Set-Location $ProjectRoot
+
+if ($MaxRunCommands -lt 1) { $MaxRunCommands = 1 }
+if ($MaxRunCommands -gt 20) { $MaxRunCommands = 20 }
+$Script:AgentRunCommandCount = 0
+$AgentCommandOutputMaxChars = 12000
 
 function Test-Tool {
     param([Parameter(Mandatory = $true)][string]$Name)
@@ -278,6 +284,7 @@ Rules:
 - Use write_file only for intentional project files.
 - Use run_command only for low-risk project checks such as git status/diff/log, cargo check/test, npm test/run lint, or Gradle test/assembleDebug.
 - Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
+- There is a limited run_command budget per agent run. Choose commands carefully and stop after enough evidence.
 - Set done=true when no further tool action is needed.
 '@
 }
@@ -387,6 +394,24 @@ function Confirm-AgentAction {
     Write-Host "Agent requests $Kind`: $Target"
     $answer = Read-Host 'Type yes to allow'
     return @('yes', 'y', '是') -contains $answer.Trim().ToLowerInvariant()
+}
+
+function Limit-AgentText {
+    param(
+        [AllowNull()][string]$Text,
+        [Parameter(Mandatory = $true)][int]$MaxChars
+    )
+    if ($null -eq $Text) { return '' }
+    if ($Text.Length -le $MaxChars) { return $Text }
+    return $Text.Substring(0, $MaxChars) + "`n[truncated after $MaxChars chars]"
+}
+
+function Use-AgentRunCommandBudget {
+    if ($Script:AgentRunCommandCount -ge $MaxRunCommands) {
+        return $false
+    }
+    $Script:AgentRunCommandCount += 1
+    return $true
 }
 
 function Test-AgentCommandAllowed {
@@ -550,6 +575,9 @@ function Invoke-AgentAction {
                 if (-not (Confirm-AgentAction 'run_command' "$program $($args -join ' ')")) {
                     return "run_command denied by user: $program $($args -join ' ')"
                 }
+                if (-not (Use-AgentRunCommandBudget)) {
+                    return "run_command denied: command budget exhausted ($MaxRunCommands per agent run)"
+                }
                 $output = & $program @args 2>&1 | Out-String
             } else {
                 $command = [string]$Action.command
@@ -563,8 +591,12 @@ function Invoke-AgentAction {
                 if (-not (Confirm-AgentAction 'run_command' $command)) {
                     return "run_command denied by user: $command"
                 }
+                if (-not (Use-AgentRunCommandBudget)) {
+                    return "run_command denied: command budget exhausted ($MaxRunCommands per agent run)"
+                }
                 $output = powershell -NoProfile -ExecutionPolicy Bypass -Command $command 2>&1 | Out-String
             }
+            $output = Limit-AgentText $output $AgentCommandOutputMaxChars
             if ($LASTEXITCODE -ne 0) {
                 return "run_command exit=$LASTEXITCODE`n$output"
             }
@@ -692,6 +724,12 @@ mod tests {
         assert!(script.contains("Parent path segments are not allowed"));
         assert!(script.contains("ReparsePoint"));
         assert!(script.contains("Test-AgentCommandAllowedParts"));
+        assert!(script.contains("[int]$MaxRunCommands = 8"));
+        assert!(script.contains("$Script:AgentRunCommandCount"));
+        assert!(script.contains("Use-AgentRunCommandBudget"));
+        assert!(script.contains("command budget exhausted"));
+        assert!(script.contains("$AgentCommandOutputMaxChars = 12000"));
+        assert!(script.contains("Limit-AgentText $output $AgentCommandOutputMaxChars"));
         assert!(script.contains("\"program\": \"git\""));
         assert!(script.contains("$shellMarkers"));
         assert!(script.contains("[regex]::IsMatch"));
@@ -707,6 +745,7 @@ mod tests {
         assert!(doc.contains("ELON_SERVER_TOKEN"));
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));
+        assert!(doc.contains("-MaxRunCommands"));
     }
 
     fn request() -> ProjectScaffoldRequest<'static> {

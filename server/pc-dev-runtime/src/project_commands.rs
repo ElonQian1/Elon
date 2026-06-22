@@ -48,6 +48,8 @@ fn local_cli_script() -> io::Result<String> {
 
     [string]$ServerAgent = '',
 
+    [int]$MaxRunCommands = 8,
+
     [switch]$DryRun,
 
     [switch]$Yes
@@ -131,6 +133,7 @@ function Invoke-Agent {
     if ($ServerUrl.Trim()) { $agentArgs += @('-ServerUrl', $ServerUrl) }
     if ($ServerToken.Trim()) { $agentArgs += @('-ServerToken', $ServerToken) }
     if ($ServerAgent.Trim()) { $agentArgs += @('-ServerAgent', $ServerAgent) }
+    $agentArgs += @('-MaxRunCommands', [string]$MaxRunCommands)
     if ($DryRun) { $agentArgs += '-DryRun' }
     if ($Yes) { $agentArgs += '-Yes' }
     & $script @agentArgs
@@ -226,6 +229,8 @@ mod tests {
         assert!(script.contains("AgentMode"));
         assert!(script.contains("server-runtime"));
         assert!(script.contains("ServerToken"));
+        assert!(script.contains("[int]$MaxRunCommands = 8"));
+        assert!(script.contains("'-MaxRunCommands', [string]$MaxRunCommands"));
         assert!(script.contains("assembleDebug"));
         assert!(script.contains("cargo"));
         assert!(script.contains("npm"));
