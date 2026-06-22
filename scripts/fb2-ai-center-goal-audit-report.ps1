@@ -61,6 +61,15 @@ function Test-Fb2GoalAuditZeroText {
     return $text -match "\b(value|count)=0\b|^0$"
 }
 
+function Test-Fb2GoalAuditContains {
+    param(
+        [object]$Values,
+        [string]$Expected
+    )
+
+    return (@($Values) -contains $Expected)
+}
+
 function Find-Fb2GoalAuditScenario {
     param(
         [object]$UserScenarioAudit,
@@ -212,6 +221,29 @@ function New-Fb2GoalAuditReport {
 
     $publicComplete = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $public "complete")
     $templateReady = ([string](Get-Fb2GoalAuditProperty $public "context_pack_template_schema") -eq "fb2.context_pack_template.v1")
+    $domainIndexSchema = [string](Get-Fb2GoalAuditProperty $public "domain_context_index_schema")
+    $domainIndexCount = [int](Get-Fb2GoalAuditProperty $public "domain_context_index_count" 0)
+    $domainIndexIds = @((Get-Fb2GoalAuditProperty $public "domain_context_index_ids" @()))
+    $domainIndexMissing = @((Get-Fb2GoalAuditProperty $public "missing" @()))
+    $requiredDomainIndexes = @(
+        "match_index",
+        "odds_snapshot_index",
+        "current_user_ticket_index",
+        "platform_order_risk_index",
+        "group_opinion_index",
+        "opinion_memory_index",
+        "context_audit_index",
+        "feedback_quality_index"
+    )
+    $missingDomainIndexes = @($requiredDomainIndexes | Where-Object { -not (Test-Fb2GoalAuditContains $domainIndexIds $_) })
+    # 领域索引契约是“fb2 数据如何长期高效服务主项目 AI”的机器边界；缺它时不能只靠 Context Pack 样本宣称数据目标完整。
+    $domainIndexReady = (
+        $publicComplete `
+            -and $domainIndexSchema -eq "fb2.main_project.domain_context_index.v1" `
+            -and $domainIndexCount -ge 8 `
+            -and @($missingDomainIndexes).Count -eq 0 `
+            -and @($domainIndexMissing).Count -eq 0
+    )
     $sampleSetComplete = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $sampleSet "complete")
     $answerReady = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $answerReadiness "complete")
     $contextContractComplete = ($publicComplete -and $templateReady -and $sampleSetComplete -and $answerReady)
@@ -251,6 +283,13 @@ function New-Fb2GoalAuditReport {
         -Title "fb2 uses XML-wrapped Markdown Context Pack plus JSON metadata, not raw DB/MCP-first" `
         -Complete $contextContractComplete `
         -Evidence "public_contract=$publicComplete template=$($public.context_pack_template_schema) sample_set=$sampleSetComplete answer_readiness=$answerReady"
+
+    $items += New-Fb2GoalAuditRequirement `
+        -Id "domain_context_index_contract" `
+        -Title "fb2 exposes the long-term domain index contract for matches, odds, tickets, platform risk, group opinions and feedback quality" `
+        -Complete $domainIndexReady `
+        -Evidence "schema=$domainIndexSchema count=$domainIndexCount indexes=$(@($domainIndexIds) -join ',')" `
+        -Missing ($missingDomainIndexes -join ",")
 
     $items += New-Fb2GoalAuditScenarioRequirement -UserScenarioAudit $scenarioAudit -ScenarioId "today_matches_analysis" -Title "用户问今天比赛怎么看时可读取比赛事实和赔率"
     $items += New-Fb2GoalAuditScenarioRequirement -UserScenarioAudit $scenarioAudit -ScenarioId "my_ticket_analysis" -Title "用户问帮我分析我的票时只读取本人订单/票据"
@@ -413,6 +452,19 @@ function Invoke-Fb2GoalAuditSelfTest {
         latest_public_contract_status = [pscustomobject]@{
             complete = $true
             context_pack_template_schema = "fb2.context_pack_template.v1"
+            domain_context_index_schema = "fb2.main_project.domain_context_index.v1"
+            domain_context_index_count = 8
+            domain_context_index_ids = @(
+                "match_index",
+                "odds_snapshot_index",
+                "current_user_ticket_index",
+                "platform_order_risk_index",
+                "group_opinion_index",
+                "opinion_memory_index",
+                "context_audit_index",
+                "feedback_quality_index"
+            )
+            missing = @()
         }
         latest_context_pack_sample_set = [pscustomobject]@{ complete = $true }
         latest_context_answer_readiness = [pscustomobject]@{ complete = $true }
@@ -459,12 +511,19 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ([bool]$report.full_final_complete) { $failed++ }
     if (-not (@($report.deferred_requirements) -contains "voice_final_evidence")) { $failed++ }
     if (@($report.missing_non_voice_requirements).Count -ne 0) { $failed++ }
+    if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "domain_context_index_contract")) { $failed++ }
 
     $badScenario = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $badScenario.latest_user_scenario_audit.scenarios[1].complete = $false
     $badReport = New-Fb2GoalAuditReport -Status $badScenario -SourcePath "selftest-bad.json"
     if ([bool]$badReport.data_goal_complete) { $failed++ }
     if (-not (@($badReport.missing_non_voice_requirements) -contains "my_ticket_analysis")) { $failed++ }
+
+    $badDomainIndex = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $badDomainIndex.latest_public_contract_status.domain_context_index_ids = @("match_index")
+    $badDomainIndexReport = New-Fb2GoalAuditReport -Status $badDomainIndex -SourcePath "selftest-bad-domain-index.json"
+    if ([bool]$badDomainIndexReport.data_goal_complete) { $failed++ }
+    if (-not (@($badDomainIndexReport.missing_non_voice_requirements) -contains "domain_context_index_contract")) { $failed++ }
 
     $voiceOnly = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $voiceOnly.goal_completion.requirements.voice_final_evidence_path_present = $true
