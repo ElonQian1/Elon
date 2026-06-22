@@ -10,6 +10,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "fb2-visible-readonly-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-data-only-direct-read-validation.ps1")
+. (Join-Path $PSScriptRoot "fb2-context-projection-log-validation.ps1")
 
 function Get-Fb2StatusRepoRoot {
     Split-Path -Parent $PSScriptRoot
@@ -84,8 +85,10 @@ function Build-Fb2AiCenterStatusSnapshot {
 
     $latestDataFile = Get-LatestFileByPattern -Directory $Directory -Pattern "data-only-acceptance-*.json"
     $latestReadOnlyFile = Get-LatestFileByPattern -Directory $Directory -Pattern "read-only-direct-read*.json"
+    $latestAiCenterLogFile = Get-LatestFileByPattern -Directory $Directory -Pattern "*ai-center.log"
     $latestData = if ($null -eq $latestDataFile) { $null } else { Read-JsonFileOrNull $latestDataFile.FullName }
     $latestReadOnly = if ($null -eq $latestReadOnlyFile) { $null } else { Read-JsonFileOrNull $latestReadOnlyFile.FullName }
+    $contextProjectionState = Get-Fb2ContextProjectionLogState -Path $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName })
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
@@ -112,6 +115,9 @@ function Build-Fb2AiCenterStatusSnapshot {
     }
     if (-not $readOnlyComplete) {
         $blockers += "missing_or_incomplete_read_only_direct_group_read_summary"
+    }
+    if (-not [bool]$contextProjectionState.complete) {
+        $blockers += "missing_or_incomplete_context_projection_log_evidence"
     }
 
     $refreshGaps = @()
@@ -183,8 +189,9 @@ function Build-Fb2AiCenterStatusSnapshot {
             complete = $readOnlyComplete
             evidence = Build-ReadOnlyDirectReadEvidence $latestReadOnly
         }
+        latest_ai_center_context_projection = $contextProjectionState
         readiness = [ordered]@{
-            non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete))
+            non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
             asr_tts_status = if ($voiceEvidencePathPresent) { "voice_evidence_path_configured_but_not_verified_by_this_status_script" } else { "deferred_or_missing" }
         }
@@ -240,6 +247,42 @@ function Invoke-Fb2StatusSelfTest {
         }
         $data | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "data-only-acceptance-test.json") -Encoding UTF8
         $readOnly | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "read-only-direct-read-test.json") -Encoding UTF8
+        @(
+            "OK`tcontext projection body: today matches context pack",
+            "OK`tcontext projection wrapper open: today matches context pack",
+            "OK`tcontext projection wrapper close: today matches context pack",
+            "OK`tcontext projection audit id: today matches context pack`taudit-today",
+            "OK`tcontext projection source registry: today matches context pack",
+            "OK`tcontext projection section: today matches context pack/usage_boundary`tusage_boundary",
+            "OK`tcontext projection section: today matches context pack/match_facts`tmatch_facts",
+            "OK`tcontext projection section: today matches context pack/user_order_slice`tuser_order_slice",
+            "OK`tcontext projection section: today matches context pack/platform_order_summary`tplatform_order_summary",
+            "OK`tcontext projection section: today matches context pack/group_opinion_slice`tgroup_opinion_slice",
+            "OK`tcontext projection section: today matches context pack/retrieval_evidence`tretrieval_evidence",
+            "OK`tcontext projection section: today matches context pack/quality_feedback`tquality_feedback",
+            "OK`tcontext projection source kind: today matches context pack/match`tmatch",
+            "OK`tcontext projection source kind: today matches context pack/odds`todds",
+            "OK`tcontext projection source kind: today matches context pack/context_audit`tcontext_audit",
+            "OK`tcontext projection body: my ticket context pack",
+            "OK`tcontext projection wrapper open: my ticket context pack",
+            "OK`tcontext projection wrapper close: my ticket context pack",
+            "OK`tcontext projection audit id: my ticket context pack`taudit-ticket",
+            "OK`tcontext projection source registry: my ticket context pack",
+            "OK`tcontext projection section: my ticket context pack/usage_boundary`tusage_boundary",
+            "OK`tcontext projection section: my ticket context pack/match_facts`tmatch_facts",
+            "OK`tcontext projection section: my ticket context pack/user_order_slice`tuser_order_slice",
+            "OK`tcontext projection section: my ticket context pack/platform_order_summary`tplatform_order_summary",
+            "OK`tcontext projection section: my ticket context pack/group_opinion_slice`tgroup_opinion_slice",
+            "OK`tcontext projection section: my ticket context pack/retrieval_evidence`tretrieval_evidence",
+            "OK`tcontext projection section: my ticket context pack/quality_feedback`tquality_feedback",
+            "OK`tcontext projection source kind: my ticket context pack/user_order`tuser_order",
+            "OK`tcontext projection source kind: my ticket context pack/ticket`tticket",
+            "OK`tcontext projection source kind: my ticket context pack/context_audit`tcontext_audit",
+            "OK`tscenario: group opinions has summary data`tcount=1 min=1",
+            "OK`tscenario: platform order has summary data`tcount=1 min=1",
+            "OK`tquality unmatched cited sources`tvalue=0",
+            "OK`tquality non-synthetic adoption count`tvalue=1 min=1"
+        ) | Set-Content -Path (Join-Path $tmp "data-only-acceptance-test-ai-center.log") -Encoding UTF8
         $snapshot = Build-Fb2AiCenterStatusSnapshot -Directory $tmp
         $failed = 0
         if (-not [bool]$snapshot.latest_data_only_acceptance.success) { $failed++ }
@@ -251,6 +294,9 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.refresh_gaps) -contains "latest_data_only_summary_uses_legacy_visible_direct_read_evidence_object")) { $failed++ }
         if ($snapshot.validation_scope.group_chat_evidence -ne "api_direct_read_summary_only") { $failed++ }
         if ([bool]$snapshot.validation_scope.screenshots_accepted_for_group_chat) { $failed++ }
+        if (-not [bool]$snapshot.latest_ai_center_context_projection.complete) { $failed++ }
+        if (-not [bool]$snapshot.latest_ai_center_context_projection.today_matches_context_pack.complete) { $failed++ }
+        if (-not [bool]$snapshot.latest_ai_center_context_projection.my_ticket_context_pack.complete) { $failed++ }
         if ([string]::IsNullOrWhiteSpace([string]$snapshot.repo.head)) { $failed++ }
         Write-Output "== SelfTest Summary =="
         Write-Output "failed=$failed"
