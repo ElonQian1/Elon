@@ -2158,6 +2158,15 @@ button { cursor: pointer; }
   font-weight: 600;
   overflow-wrap: anywhere;
 }
+.settings-project-meta-row.is-ok strong {
+  color: #dff6e8;
+}
+.settings-project-meta-row.is-warning strong {
+  color: #ffe0a6;
+}
+.settings-project-meta-row.is-error strong {
+  color: #ffdede;
+}
 .settings-actions {
   display: flex;
   flex-wrap: wrap;

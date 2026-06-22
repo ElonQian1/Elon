@@ -1003,6 +1003,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('ensureProjectInfoBeforeRegister'), 'project registration should inspect local folders before submit');
   assert.ok(pcApp.includes('正在自动读取目录信息'), 'project registration should explain auto inspection progress');
   assert.ok(pcApp.includes('settings-project-meta-row'), 'project inspection metadata should render as structured rows');
+  assert.ok(pcApp.includes('registration.can_register'), 'project registration should read readiness from local inspect');
+  assert.ok(pcApp.includes('autofill_fields'), 'project registration should display auto-filled fields');
+  assert.ok(pcApp.includes('目录信息不足'), 'project registration should block submission when required fields are missing');
   assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
   assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
 
@@ -1011,6 +1014,8 @@ function testLocalAdminTokenWiring() {
 
   const pcAppCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
   assert.ok(pcAppCss.includes('.settings-project-meta-row'), 'PC app CSS should style structured project inspection metadata');
+  assert.ok(pcAppCss.includes('.settings-project-meta-row.is-warning'), 'PC app CSS should style project registration warnings');
+  assert.ok(pcAppCss.includes('.settings-project-meta-row.is-error'), 'PC app CSS should style blocked project registration state');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');

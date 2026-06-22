@@ -2446,17 +2446,28 @@
   function applyLocalProjectInfo(payload) {
     const project = (payload && payload.project) || {};
     const inspect = (payload && payload.inspect) || {};
+    const registration = (payload && payload.registration) || {};
     const path = clean(project.workspace_path || inspect.workspace_path);
     const name = clean(project.name);
     const repo = clean(project.repo_url || inspect.git_remote_origin);
     const branch = clean(project.branch || inspect.git_branch);
     const desc = clean(project.description);
+    const canRegister = registration.can_register !== false;
+    const missingFields = Array.isArray(registration.missing_fields)
+      ? registration.missing_fields.map(clean).filter(Boolean)
+      : [];
+    const warnings = Array.isArray(registration.warnings)
+      ? registration.warnings.map(clean).filter(Boolean)
+      : [];
+    const autofillFields = Array.isArray(registration.autofill_fields)
+      ? registration.autofill_fields.map(clean).filter(Boolean)
+      : [];
     if (path) els.settingsProjectPath.value = path;
     if (name) els.settingsProjectName.value = name;
     els.settingsProjectRepo.value = repo;
     els.settingsProjectBranch.value = branch;
     if (desc && !clean(els.settingsProjectDesc.value)) els.settingsProjectDesc.value = desc;
-    state.localProjectInfo = path ? { path, name, repo, branch } : null;
+    state.localProjectInfo = path ? { path, name, repo, branch, canRegister, missingFields } : null;
     const git = inspect.is_git_worktree || project.is_git_worktree
       ? [branch || 'HEAD', clean(project.git_head || inspect.git_head), (project.has_uncommitted_changes || inspect.has_uncommitted_changes) ? '有未提交改动' : '干净']
         .filter(Boolean).join(' · ')
@@ -2475,15 +2486,21 @@
       els.settingsProjectMeta.textContent = '尚未选择项目目录';
       return;
     }
+    const summary = clean(registration.summary) || (canRegister ? '已读取目录信息，可以注册。' : '目录信息不足，暂不能注册。');
+    const statusTone = !canRegister ? 'error' : warnings.length ? 'warning' : 'ok';
     const rows = [
       ['目录', path],
+      ['状态', summary, statusTone],
       ['Git', git],
       profile && ['类型', profile],
       commands && ['命令', commands],
-      detected && ['识别', `检测到 ${detected}`]
+      detected && ['识别', `检测到 ${detected}`],
+      autofillFields.length && ['自动', `已填写 ${autofillFields.slice(0, 8).join('、')}`],
+      missingFields.length && ['缺少', missingFields.join('、'), 'error'],
+      warnings.length && ['提醒', warnings.slice(0, 3).join('；'), 'warning']
     ].filter(Boolean);
-    els.settingsProjectMeta.innerHTML = rows.map(([label, value]) => (
-      `<div class="settings-project-meta-row"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
+    els.settingsProjectMeta.innerHTML = rows.map(([label, value, tone]) => (
+      `<div class="settings-project-meta-row ${tone ? `is-${escapeHtml(tone)}` : ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
     )).join('');
   }
 
@@ -2509,10 +2526,15 @@
   }
 
   async function ensureProjectInfoBeforeRegister(path) {
-    if (projectInfoMatchesPath(path) && clean(els.settingsProjectName.value)) return;
+    if (projectInfoMatchesPath(path) && clean(els.settingsProjectName.value) && state.localProjectInfo.canRegister !== false) return;
     setSettingsResult('正在自动读取目录信息…');
     await inspectProjectPath(path);
     setSettingsResult('已自动读取目录、Git 远端、当前分支和项目命令，继续注册。');
+  }
+
+  function projectRegistrationSummary(data, fallback) {
+    const registration = (data && data.registration) || {};
+    return clean(registration.summary) || fallback;
   }
 
   function normalizeRuntimePermission(value) {
@@ -2561,7 +2583,7 @@
         return;
       }
       applyLocalProjectInfo(data);
-      setSettingsResult('已读取项目目录、Git 远端和当前分支。');
+      setSettingsResult(projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支。'));
     } catch (error) {
       setSettingsResult(escapeHtml(error.message || error), 'error');
     } finally {
@@ -2577,8 +2599,8 @@
     }
     setSettingsBusy(els.inspectProjectFolderBtn, true, '读取中…');
     try {
-      await inspectProjectPath(path);
-      setSettingsResult('已读取项目目录、Git 远端和当前分支。');
+      const data = await inspectProjectPath(path);
+      setSettingsResult(projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支。'));
     } catch (error) {
       setSettingsResult(escapeHtml(error.message || error), 'error');
     } finally {
@@ -2613,6 +2635,12 @@
     const name = clean(els.settingsProjectName.value);
     if (!name) {
       setSettingsResult('目录已读取，但没有识别到项目名称，请手动填写。', 'error');
+      setSettingsBusy(els.registerProjectBtn, false);
+      return;
+    }
+    if (state.localProjectInfo && state.localProjectInfo.canRegister === false) {
+      const missing = (state.localProjectInfo.missingFields || []).join('、') || '必要信息';
+      setSettingsResult(`目录信息不足，缺少：${escapeHtml(missing)}。`, 'error');
       setSettingsBusy(els.registerProjectBtn, false);
       return;
     }

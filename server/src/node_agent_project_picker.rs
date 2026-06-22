@@ -31,6 +31,16 @@ struct LocalProjectInfo {
     detected_files: Vec<String>,
 }
 
+#[derive(Debug, Serialize)]
+struct LocalProjectRegistrationReadiness {
+    can_register: bool,
+    status: String,
+    summary: String,
+    missing_fields: Vec<String>,
+    warnings: Vec<String>,
+    autofill_fields: Vec<String>,
+}
+
 pub(crate) async fn pick_local_project_folder() -> (StatusCode, Json<serde_json::Value>) {
     match pick_folder() {
         Ok(Some(path)) => project_info_response(&path),
@@ -58,15 +68,19 @@ fn project_info_response(workspace_path: &str) -> (StatusCode, Json<serde_json::
     }
 
     match local_project_info(workspace_path) {
-        Ok((project, inspect)) => (
-            StatusCode::OK,
-            Json(json!({
-                "ok": true,
-                "project": project,
-                "inspect": inspect,
-                "landing": project_landing::load_workspace_landing(Path::new(workspace_path)),
-            })),
-        ),
+        Ok((project, inspect)) => {
+            let registration = local_project_registration_readiness(&project, &inspect);
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "project": project,
+                    "inspect": inspect,
+                    "registration": registration,
+                    "landing": project_landing::load_workspace_landing(Path::new(workspace_path)),
+                })),
+            )
+        }
         Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
     }
 }
@@ -111,6 +125,96 @@ fn local_project_info(
         detected_files: profile.detected_files,
     };
     Ok((project, inspect))
+}
+
+fn local_project_registration_readiness(
+    project: &LocalProjectInfo,
+    inspect: &homecli_proto::ProjectWorkspaceInspectStatus,
+) -> LocalProjectRegistrationReadiness {
+    let mut missing_fields = Vec::new();
+    if project.workspace_path.trim().is_empty() {
+        missing_fields.push("项目目录".to_string());
+    }
+    if project.name.trim().is_empty() {
+        missing_fields.push("项目名称".to_string());
+    }
+
+    let mut warnings = Vec::new();
+    if !inspect.is_git_worktree {
+        warnings.push("未检测到 Git 工作区，后续 AI 无法基于远端仓库判断同步状态。".to_string());
+    }
+    if inspect.is_git_worktree && project.repo_url.is_none() {
+        warnings.push("未检测到 Git origin，注册后需要手动确认代码来源。".to_string());
+    }
+    if inspect.is_git_worktree && project.branch.is_none() {
+        warnings
+            .push("当前处于 detached HEAD 或未识别到分支，注册后会使用 HEAD 状态。".to_string());
+    }
+    if inspect.has_uncommitted_changes {
+        warnings.push(format!(
+            "目录内有 {} 个未提交改动，AI 开始开发前会看到脏工作区。",
+            inspect.uncommitted_count.unwrap_or(0)
+        ));
+    }
+    if project.project_type.is_none() {
+        warnings.push("未识别到常见项目类型，运行/测试/构建命令需要后续手动补充。".to_string());
+    }
+    if !inspect.codex_available && !inspect.copilot_available {
+        warnings.push(
+            "本机未检测到 Codex/Copilot CLI，开发任务会优先走 Route B/C 模型能力。".to_string(),
+        );
+    }
+
+    let mut autofill_fields = vec![
+        "项目目录".to_string(),
+        "项目名称".to_string(),
+        "项目描述".to_string(),
+    ];
+    if project.repo_url.is_some() {
+        autofill_fields.push("Git 远端".to_string());
+    }
+    if project.branch.is_some() {
+        autofill_fields.push("Git 分支".to_string());
+    }
+    if project.project_type.is_some() {
+        autofill_fields.push("项目类型".to_string());
+    }
+    if project.package_manager.is_some() {
+        autofill_fields.push("包管理器".to_string());
+    }
+    if project.run_command.is_some() {
+        autofill_fields.push("运行命令".to_string());
+    }
+    if project.test_command.is_some() {
+        autofill_fields.push("测试命令".to_string());
+    }
+    if project.build_command.is_some() {
+        autofill_fields.push("构建命令".to_string());
+    }
+
+    let can_register = missing_fields.is_empty();
+    let status = if !can_register {
+        "blocked"
+    } else if warnings.is_empty() {
+        "ready"
+    } else {
+        "needs_review"
+    }
+    .to_string();
+    let summary = match status.as_str() {
+        "ready" => "已自动识别关键字段，可以直接注册到云端。".to_string(),
+        "needs_review" => "已自动识别关键字段，但建议确认提示项后再注册。".to_string(),
+        _ => format!("还缺少 {}，暂不能注册。", missing_fields.join("、")),
+    };
+
+    LocalProjectRegistrationReadiness {
+        can_register,
+        status,
+        summary,
+        missing_fields,
+        warnings,
+        autofill_fields,
+    }
 }
 
 #[derive(Debug, Default)]
@@ -304,7 +408,8 @@ fn pick_folder() -> anyhow::Result<Option<String>> {
 
 #[cfg(test)]
 mod tests {
-    use super::detect_project_profile;
+    use super::{detect_project_profile, local_project_registration_readiness, LocalProjectInfo};
+    use homecli_proto::ProjectWorkspaceInspectStatus;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -319,6 +424,92 @@ mod tests {
         ));
         std::fs::create_dir_all(&dir).unwrap();
         dir
+    }
+
+    fn inspect_status() -> ProjectWorkspaceInspectStatus {
+        ProjectWorkspaceInspectStatus {
+            workspace_path: "C:\\demo".to_string(),
+            path_exists: true,
+            is_dir: true,
+            is_git_worktree: true,
+            git_branch: Some("main".to_string()),
+            git_head: Some("abc1234".to_string()),
+            git_remote_origin: Some("https://example.com/demo.git".to_string()),
+            has_uncommitted_changes: false,
+            uncommitted_count: Some(0),
+            disk_free_bytes: Some(1024 * 1024 * 1024),
+            codex_available: true,
+            copilot_available: false,
+        }
+    }
+
+    fn local_project() -> LocalProjectInfo {
+        LocalProjectInfo {
+            name: "demo".to_string(),
+            workspace_path: "C:\\demo".to_string(),
+            description: Some("绑定到本 PC 节点的本地项目: demo".to_string()),
+            repo_url: Some("https://example.com/demo.git".to_string()),
+            branch: Some("main".to_string()),
+            git_head: Some("abc1234".to_string()),
+            is_git_worktree: true,
+            has_uncommitted_changes: false,
+            uncommitted_count: Some(0),
+            project_type: Some("Rust".to_string()),
+            package_manager: Some("Cargo".to_string()),
+            run_command: Some("cargo run".to_string()),
+            test_command: Some("cargo test".to_string()),
+            build_command: Some("cargo build".to_string()),
+            detected_files: vec!["Cargo.toml".to_string()],
+        }
+    }
+
+    #[test]
+    fn registration_readiness_reports_ready_project_autofill() {
+        let project = local_project();
+        let inspect = inspect_status();
+
+        let readiness = local_project_registration_readiness(&project, &inspect);
+
+        assert!(readiness.can_register);
+        assert_eq!(readiness.status, "ready");
+        assert!(readiness.missing_fields.is_empty());
+        assert!(readiness.warnings.is_empty());
+        assert!(readiness.autofill_fields.contains(&"Git 远端".to_string()));
+        assert!(readiness.autofill_fields.contains(&"构建命令".to_string()));
+    }
+
+    #[test]
+    fn registration_readiness_warns_about_gitless_unknown_project() {
+        let mut project = local_project();
+        project.repo_url = None;
+        project.branch = None;
+        project.is_git_worktree = false;
+        project.project_type = None;
+        project.package_manager = None;
+        project.run_command = None;
+        project.test_command = None;
+        project.build_command = None;
+
+        let mut inspect = inspect_status();
+        inspect.is_git_worktree = false;
+        inspect.git_remote_origin = None;
+        inspect.git_branch = None;
+        inspect.codex_available = false;
+        inspect.copilot_available = false;
+
+        let readiness = local_project_registration_readiness(&project, &inspect);
+
+        assert!(readiness.can_register);
+        assert_eq!(readiness.status, "needs_review");
+        assert!(readiness
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("未检测到 Git 工作区")));
+        assert!(readiness
+            .warnings
+            .iter()
+            .any(|warning| warning.contains("Route B/C")));
+        assert!(!readiness.autofill_fields.contains(&"Git 远端".to_string()));
     }
 
     #[test]
