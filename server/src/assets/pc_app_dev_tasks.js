@@ -58,6 +58,7 @@
         apkUrl: '',
         attach: null,
         resume: null,
+        pcReqId: '',
         lastEventSeq: 0
       };
     }
@@ -80,6 +81,8 @@
         if (attach) task.attach = attach;
         const resume = snapshot && snapshot.resume ? snapshot.resume : null;
         if (resume) task.resume = resume;
+        const pcReqId = clean(snapshot && (snapshot.pc_req_id || snapshot.pcReqId));
+        if (pcReqId) task.pcReqId = pcReqId;
         const seq = Number(snapshot && (snapshot.last_event_seq || snapshot.lastEventSeq || 0));
         if (Number.isFinite(seq) && seq > 0) task.lastEventSeq = seq;
       });
@@ -182,7 +185,7 @@
         actions: true,
         canCancel: !!taskId && !taskIsTerminal(task) && !snapshotContinue,
         continueDraft: (taskIsTerminal(task) || snapshotContinue) && !(task && task.result)
-          ? continuationDraft(request, task && (task.error || task.status), taskIsCanceled(task), taskIsFailed(task), task && task.resume)
+          ? continuationDraft(task, request, task && (task.error || task.status), taskIsCanceled(task), taskIsFailed(task))
           : null
       });
     }
@@ -283,7 +286,7 @@
         taskId,
         meta: canceled ? '已中断运行' : (failed ? '需要继续处理' : '可以检查变更'),
         actions: true,
-        continueDraft: continuationDraft(task && task.request, content, canceled, failed, task && task.resume)
+        continueDraft: continuationDraft(task, task && task.request, content, canceled, failed)
       });
     }
 
@@ -558,21 +561,37 @@
       return clean(content).replace(/^发起\s*AI\s*开发任务[:：]\s*/i, '');
     }
 
-    function continuationDraft(request, result, canceled, failed, resume) {
+    function continuationDraft(task, request, result, canceled, failed) {
       const original = compactForDraft(request || '', 1200);
       const lastResult = compactForDraft(result || '', 1600);
+      const resume = task && task.resume ? task.resume : null;
       const resumeLine = resumeDraftLine(resume);
+      const contextLines = continuationContextLines(task);
       const statusLine = canceled
         ? '上次任务被我停止了。'
         : (failed ? '上次任务失败了。' : '上次任务已完成，我要继续迭代。');
       return [
         '继续处理这个 AI 开发任务。',
         statusLine,
+        contextLines.length ? `续接上下文：\n${contextLines.join('\n')}` : '',
         resumeLine ? `恢复方式：${resumeLine}` : '',
         original ? `原始需求：\n${original}` : '',
         lastResult ? `上次结果：\n${lastResult}` : '',
         '请先检查当前项目工作区状态，保护已有改动，再继续完成剩余开发或下一步迭代。'
       ].filter(Boolean).join('\n\n');
+    }
+
+    function continuationContextLines(task) {
+      const taskId = clean(task && task.taskId);
+      const pcReqId = clean(task && (task.pcReqId || task.pc_req_id));
+      const resume = task && task.resume ? task.resume : null;
+      const lines = [];
+      if (taskId) lines.push(`云端任务 ID：${taskId}`);
+      if (pcReqId) lines.push(`本机请求 ID：${pcReqId}`);
+      if (resume && resume.can_resume_codex_session === true) {
+        lines.push('本机 Codex session 已记录，节点会优先自动续接；不要让用户手动粘贴 session id。');
+      }
+      return lines;
     }
 
     function taskNeedsSnapshotContinue(task) {

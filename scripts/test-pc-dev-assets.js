@@ -51,13 +51,14 @@ function escapeHtml(value) {
 
 function testDevTasksContinueAction() {
   const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  let drafted = '';
   const devTasks = sandbox.window.ElonPcDevTasks.create({
     clean,
     escapeHtml,
     markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
     refreshActiveChannel: () => {},
     cancelTask: () => {},
-    draftContinuation: () => {}
+    draftContinuation: (draft) => { drafted = draft; }
   });
 
   const messages = [
@@ -65,12 +66,41 @@ function testDevTasksContinueAction() {
     { kind: 'ai_progress', task_id: 'tsk_1234567890', content: '正在检查项目' },
     { kind: 'ai_result', task_id: 'tsk_1234567890', content: '任务失败：测试未通过' }
   ];
-  const context = devTasks.buildContext(messages);
+  const snapshots = new Map([[
+    'tsk_1234567890',
+    {
+      task: { id: 'tsk_1234567890', status: 'failed' },
+      pc_req_id: 'req-local-1',
+      resume: {
+        can_resume_codex_session: true,
+        codex_session: { id: 'session-uuid', scope_key: 'scope-a' }
+      }
+    }
+  ]]);
+  const context = devTasks.buildContext(messages, { snapshots });
   const html = devTasks.renderMessage(messages[2], context);
 
   assert.ok(html.includes('data-dev-task-action="continue"'), 'result card should expose continue action');
   assert.ok(html.includes('data-dev-task-action="refresh"'), 'result card should keep refresh action');
   assert.strictEqual(devTasks.hasOpenTasks(messages, context), false, 'finished task should not be considered open');
+
+  let handler = null;
+  const buttons = [{
+    dataset: { taskId: 'tsk_1234567890' },
+    addEventListener: (_event, callback) => { handler = callback; }
+  }];
+  devTasks.bindActions({
+    querySelectorAll(selector) {
+      return selector === '[data-dev-task-action="continue"]' ? buttons : [];
+    }
+  });
+  assert.ok(handler, 'bindActions should register continuation click handler');
+  handler();
+
+  assert.ok(drafted.includes('云端任务 ID：tsk_1234567890'), 'continuation draft should include cloud task id');
+  assert.ok(drafted.includes('本机请求 ID：req-local-1'), 'continuation draft should include local pc req id');
+  assert.ok(drafted.includes('本机 Codex session 已记录'), 'continuation draft should explain automatic codex resume');
+  assert.ok(!drafted.includes('session-uuid'), 'continuation draft should not leak raw codex session id');
 }
 
 function testDevTasksHasOpenPendingApproval() {
