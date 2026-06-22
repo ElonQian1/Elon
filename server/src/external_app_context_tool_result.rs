@@ -19,6 +19,7 @@ pub(crate) fn normalize_parsed_tool_result(
     let grounding = tool_result_grounding(tool_name, success, &source_ids, visibility.as_deref());
 
     json!({
+        "schema": "external_app.normalized_tool_result.v1",
         "tool_name": tool_name,
         "request_id": parsed.get("request_id").cloned().unwrap_or_else(|| json!(request_id)),
         "status": if success { "ready" } else { "failed" },
@@ -156,6 +157,7 @@ mod tests {
         );
 
         assert_eq!(result["grounding"]["status"], "grounded");
+        assert_eq!(result["schema"], "external_app.normalized_tool_result.v1");
         assert_eq!(result["grounding"]["source_id_count"], 1);
         assert_eq!(result["grounding"]["facts_allowed"], true);
     }

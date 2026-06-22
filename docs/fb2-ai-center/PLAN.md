@@ -31,6 +31,7 @@
 - 无 token 的 smoke 只能证明主项目契约和 live manifest 可读，不能证明最终完成。
 - `-FinalAcceptance` 必须同时具备主项目登录、`FB2_AI_CENTER_TOKEN`、fb2 live 数据、质量反馈样本、fb2 APK 发布检查、主项目语音 SDK 构建和 fb2 真机语音证据；只有 `-SelfTest` 例外，它只验证 wrapper 本地解析逻辑。
 - 当前 ASR/TTS 暂缓期间，非语音闭环使用 `-DataOnlyAcceptance`，它不要求主项目语音 SDK 构建或真机语音证据，只验证比赛/订单/平台摘要/群观点、权限、质量、feedback 和真实群聊可见入口。该模式不能替代 `-FinalAcceptance`，也不能宣布终极目标完成。
+- 当前主项目契约继续向“fb2 业务数据服务 AI”收口：`source_registry.required_kinds` 只代表比赛、赔率、本人订单、票据、群消息、观点记忆、平台匿名摘要和上下文审计等业务事实；`feedback/opinion_adoption` 是 `quality_history_kinds`。工具执行结果必须走 `tool_result_envelope_contract`，由 `source_ids + visibility + grounding` 决定是否可作为事实。
 - `scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly` 是进入真实群聊前的无副作用强门禁，必须先验证 fb2 live 数据、六类标准场景、平台匿名摘要、权限负向审计、fb2 APK 发布、主项目语音 SDK 构建、真机语音证据和 no-skip。
 - `final-acceptance-matrix.md` 是终极目标完成审计入口；任何会话要宣布完成前，必须逐项对照矩阵拿到当前证据。
 - 真机语音证据必须使用 `docs/fb2-ai-center/voice-device-evidence.example.json` 同格式回传，不能只用口头描述。

@@ -20,6 +20,7 @@ use crate::{
     external_app_context_quality::public_context_quality_guidance,
     external_app_context_readiness::public_context_readiness_guidance,
     external_app_context_tool_execution::public_tool_execution_guidance,
+    external_app_context_tool_result_contract::public_tool_result_envelope_guidance,
     external_app_context_tools::public_tool_contract_guidance,
     external_app_registry::{
         external_app_by_id, group_seeds, public_external_app_config, service_token_env_names,
@@ -138,6 +139,12 @@ pub async fn get_external_app_context_contract(
             "schema": "external_app.tool_execution.v1",
             "execution_status": "not_configured",
             "allowed_tools": []
+        })),
+        "tool_result_envelope_contract": public_tool_result_envelope_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.tool_result_envelope.v1",
+            "normalized_envelope": {},
+            "grounding": {}
         })),
         "tool_quality_report_contract": public_tool_quality_report_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

@@ -92,6 +92,18 @@ fb2 当前可以把 answer policy 放在 `tool_contract.answer_policy` 下；只
 
 如果后续 fb2 想把历史 feedback 或观点采纳样本作为模型可引用事实使用，应单独给出 `kind=feedback` 或 `kind=opinion_adoption` 的 source registry 条目，并标明 `scope=quality_history`，避免把质量指标误当比赛事实。
 
+## 工具结果信封
+
+主项目执行 fb2 工具后，不把原始工具响应直接塞进 prompt，而是先归一化为 `external_app.normalized_tool_result.v1`。`/api/external/apps/fb2/context-contract` 的 `tool_result_envelope_contract` 固定该信封：
+
+- `schema=fb2.tool_result_envelope.v1`
+- 必需字段：`schema`、`tool_name`、`request_id`、`status`、`success`、`data`、`error`、`generated_at`、`source_ids`、`visibility`、`metrics`、`grounding`、`reason`
+- `grounding.status=grounded/weak` 时可作为事实，其中 `weak` 必须说明证据缺口
+- `grounding.status=unsafe/unavailable` 时不能作为事实
+- `source_registry.business_source_kinds` 只包含业务事实来源；`quality_history_kinds` 只表示历史反馈/采纳记录
+
+feedback 回写只能采用 AI 回复正文显式提到的 `source_ids`，且工具结果必须 `success=true`、`grounding.status=grounded/weak`。未被回答提到、权限 visibility 不匹配或工具失败的 source id 不能写回 fb2 cited sources。
+
 ## 主项目验收口径
 
 - live manifest 漂移检查关注 `chat_auto_executable_tool_ids` 和主项目静态 allowlist 是否对齐。

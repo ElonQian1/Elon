@@ -59,6 +59,7 @@ mod external_app_context_tool_execution;
 mod external_app_context_tool_planner;
 mod external_app_context_tool_prompt;
 mod external_app_context_tool_result;
+mod external_app_context_tool_result_contract;
 mod external_app_context_tool_runtime;
 mod external_app_context_tools;
 mod external_app_http_client;

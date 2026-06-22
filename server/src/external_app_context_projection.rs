@@ -39,24 +39,40 @@ pub(crate) fn public_context_projection_guidance(app_id: &str) -> Option<Value> 
             "source_registry": {
                 "required_field": "citation_sources",
                 "required_kinds": [
+                    "context_audit",
                     "match",
                     "odds",
                     "user_order",
                     "ticket",
                     "group_message",
                     "opinion_memory",
-                    "platform_order_summary",
-                    "context_audit",
-                    "feedback",
-                    "opinion_adoption"
+                    "platform_order_summary"
+                ],
+                "quality_history_kinds": [
+                    {
+                        "kind": "feedback",
+                        "scope": "quality_history",
+                        "default_chat_fact": false
+                    },
+                    {
+                        "kind": "opinion_adoption",
+                        "scope": "quality_history",
+                        "default_chat_fact": false
+                    }
                 ],
                 "minimum_shape": {
-                    "kind": "match | odds | user_order | ticket | group_message | opinion_memory | platform_order_summary | context_audit | feedback | opinion_adoption",
+                    "kind": "context_audit | match | odds | user_order | ticket | group_message | opinion_memory | platform_order_summary",
                     "id": "stable source id",
                     "label": "short human-readable label",
                     "updated_at": "optional ISO-8601 freshness timestamp"
                 },
-                "rule": "AI 回答中出现的关键判断必须能追到 citation_sources 或 executed tool source_ids；没有来源时只能说明缺口。"
+                "quality_history_shape": {
+                    "kind": "feedback | opinion_adoption",
+                    "scope": "quality_history",
+                    "default_chat_fact": false,
+                    "id": "feedback/adoption source id when explicitly used as quality history"
+                },
+                "rule": "AI 回答中出现的业务事实必须能追到 citation_sources 或 executed tool source_ids；feedback/opinion_adoption 默认只属于质量闭环，除非显式标注 scope=quality_history，否则不能当比赛、赔率、订单或群观点事实。"
             },
             "retrieval_projection": {
                 "recommended_fields": [
@@ -218,13 +234,24 @@ mod tests {
         let source_kinds = contract["source_registry"]["required_kinds"]
             .as_array()
             .unwrap();
+        assert!(source_kinds.contains(&json!("context_audit")));
         assert!(source_kinds.contains(&json!("match")));
         assert!(source_kinds.contains(&json!("odds")));
         assert!(source_kinds.contains(&json!("user_order")));
         assert!(source_kinds.contains(&json!("group_message")));
         assert!(source_kinds.contains(&json!("platform_order_summary")));
-        assert!(source_kinds.contains(&json!("feedback")));
-        assert!(source_kinds.contains(&json!("opinion_adoption")));
+        assert!(!source_kinds.contains(&json!("feedback")));
+        assert!(!source_kinds.contains(&json!("opinion_adoption")));
+
+        let quality_kinds = contract["source_registry"]["quality_history_kinds"]
+            .as_array()
+            .unwrap();
+        assert!(quality_kinds
+            .iter()
+            .any(|kind| { kind["kind"] == "feedback" && kind["scope"] == "quality_history" }));
+        assert!(quality_kinds.iter().any(|kind| {
+            kind["kind"] == "opinion_adoption" && kind["default_chat_fact"] == false
+        }));
 
         assert!(contract["anti_patterns"]
             .as_array()

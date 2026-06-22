@@ -835,11 +835,18 @@ try {
     $projectionSections = @($projectionContract.required_sections)
     $projectionSectionIds = @($projectionSections | ForEach-Object { $_.id })
     $projectionSourceKinds = @($projectionContract.source_registry.required_kinds)
+    $projectionQualityHistoryKinds = @($projectionContract.source_registry.quality_history_kinds | ForEach-Object { $_.kind })
     $projectionAntiPatterns = @($projectionContract.anti_patterns)
     $projectionRetrievalFields = @($projectionContract.retrieval_projection.recommended_fields)
     $projectionPermissions = @($projectionContract.permission_projection)
     $projectionQualityRoutes = @($projectionContract.quality_closure.required_feedback_routes)
     $projectionReadiness = $projectionContract.quality_closure.minimum_non_synthetic_ready
+    $toolResultEnvelopeContract = $contract.tool_result_envelope_contract
+    $toolResultRequiredFields = @($toolResultEnvelopeContract.normalized_envelope.required_fields)
+    $toolResultBusinessSourceKinds = @($toolResultEnvelopeContract.source_registry.business_source_kinds)
+    $toolResultQualityHistoryKinds = @($toolResultEnvelopeContract.source_registry.quality_history_kinds | ForEach-Object { $_.kind })
+    $toolResultGroundingStatuses = @($toolResultEnvelopeContract.grounding.statuses | ForEach-Object { $_.status })
+    $toolResultGroundingFields = @($toolResultEnvelopeContract.grounding.required_fields)
     $evalScenarios = @($answerPolicy.eval_scenarios)
     $evalScenarioIds = @($evalScenarios | ForEach-Object { $_.id })
     Assert-True ($contract.live_tool_manifest.status -eq "ready") "live manifest ready" "tool_count=$($contract.live_tool_manifest.tool_count)"
@@ -906,8 +913,10 @@ try {
     Assert-ContainsValue $projectionSourceKinds "group_message" "domain projection source kind: group message"
     Assert-ContainsValue $projectionSourceKinds "opinion_memory" "domain projection source kind: opinion memory"
     Assert-ContainsValue $projectionSourceKinds "platform_order_summary" "domain projection source kind: platform summary"
-    Assert-ContainsValue $projectionSourceKinds "feedback" "domain projection source kind: feedback"
-    Assert-ContainsValue $projectionSourceKinds "opinion_adoption" "domain projection source kind: opinion adoption"
+    Assert-True (-not ($projectionSourceKinds -contains "feedback")) "domain projection business sources exclude feedback"
+    Assert-True (-not ($projectionSourceKinds -contains "opinion_adoption")) "domain projection business sources exclude opinion adoption"
+    Assert-ContainsValue $projectionQualityHistoryKinds "feedback" "domain projection quality history kind: feedback"
+    Assert-ContainsValue $projectionQualityHistoryKinds "opinion_adoption" "domain projection quality history kind: opinion adoption"
     Assert-ContainsValue $projectionAntiPatterns "raw_embedding_dump" "domain projection anti-pattern: raw embedding dump"
     Assert-ContainsValue $projectionAntiPatterns "platform_order_detail_leak" "domain projection anti-pattern: platform order leak"
     Assert-ContainsValue $projectionRetrievalFields "topic_hint" "domain projection retrieval field: topic hint"
@@ -921,6 +930,23 @@ try {
     Assert-True ([int]$projectionReadiness.feedback_count -ge 1) "domain projection readiness: feedback count" "feedback_count=$($projectionReadiness.feedback_count)"
     Assert-True ([int]$projectionReadiness.opinion_adoption_count -ge 1) "domain projection readiness: opinion adoption count" "opinion_adoption_count=$($projectionReadiness.opinion_adoption_count)"
     Assert-True ([string]$projectionReadiness.opinion_memory_ref_count -eq "present") "domain projection readiness: opinion memory refs" "opinion_memory_ref_count=$($projectionReadiness.opinion_memory_ref_count)"
+
+    Assert-True ($toolResultEnvelopeContract.schema -eq "fb2.tool_result_envelope.v1") "tool result envelope schema" "$($toolResultEnvelopeContract.schema)"
+    Assert-True ($toolResultEnvelopeContract.normalized_result_schema -eq "external_app.normalized_tool_result.v1") "tool result normalized schema" "$($toolResultEnvelopeContract.normalized_result_schema)"
+    Assert-ContainsValue $toolResultRequiredFields "source_ids" "tool result required field: source ids"
+    Assert-ContainsValue $toolResultRequiredFields "visibility" "tool result required field: visibility"
+    Assert-ContainsValue $toolResultRequiredFields "grounding" "tool result required field: grounding"
+    Assert-ContainsValue $toolResultGroundingFields "facts_allowed" "tool result grounding field: facts allowed"
+    Assert-ContainsValue $toolResultGroundingStatuses "grounded" "tool result grounding status: grounded"
+    Assert-ContainsValue $toolResultGroundingStatuses "weak" "tool result grounding status: weak"
+    Assert-ContainsValue $toolResultGroundingStatuses "unsafe" "tool result grounding status: unsafe"
+    Assert-ContainsValue $toolResultGroundingStatuses "unavailable" "tool result grounding status: unavailable"
+    Assert-ContainsValue $toolResultBusinessSourceKinds "match" "tool result business source kind: match"
+    Assert-ContainsValue $toolResultBusinessSourceKinds "user_order" "tool result business source kind: user order"
+    Assert-ContainsValue $toolResultBusinessSourceKinds "platform_order_summary" "tool result business source kind: platform summary"
+    Assert-True (-not ($toolResultBusinessSourceKinds -contains "feedback")) "tool result business sources exclude feedback"
+    Assert-ContainsValue $toolResultQualityHistoryKinds "feedback" "tool result quality history kind: feedback"
+    Assert-ContainsValue $toolResultQualityHistoryKinds "opinion_adoption" "tool result quality history kind: opinion adoption"
 
     $userOrderPermission = Find-ProjectionPermission $projectionPermissions "user_orders"
     Assert-True ($null -ne $userOrderPermission) "domain projection permission: user orders present"

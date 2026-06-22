@@ -90,13 +90,22 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 
 - `format.wrapper=fb2_context_pack`，正文必须是 XML-wrapped Markdown。
 - `required_sections` 固定 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`。
-- `source_registry.required_kinds` 固定 `match`、`odds`、`user_order`、`ticket`、`group_message`、`opinion_memory`、`platform_order_summary`、`context_audit`、`feedback`、`opinion_adoption`。
+- `source_registry.required_kinds` 固定业务事实来源：`context_audit`、`match`、`odds`、`user_order`、`ticket`、`group_message`、`opinion_memory`、`platform_order_summary`。
+- `source_registry.quality_history_kinds` 固定质量历史来源：`feedback`、`opinion_adoption`，默认 `default_chat_fact=false`；只有显式标注 `scope=quality_history` 时，才可以作为“历史质量反馈/观点采纳记录”引用，不能冒充比赛、赔率、订单或群友观点事实。
 - `retrieval_projection` 要求 fb2 返回召回理由、命中词、新鲜度、权限范围和是否截断，而不只是返回一堆数据。
 - `permission_projection` 固定用户订单、平台匿名摘要和群观点的权限头与禁止泄漏项。
 - `quality_closure` 固定 feedback、feedback-summary、opinion-adoption-summary、quality-summary 的闭环口径。
 - `anti_patterns` 明确禁止 `raw_html_prompt`、`giant_json_prompt`、`full_database_dump`、`raw_embedding_dump`、`uncited_odds`、`uncited_order`、`platform_order_detail_leak` 等输入形态。
 
 主项目 smoke 会检查这些字段，防止后续把 fb2 AI 数据输入退化成无来源的大 JSON 或临时摘要。
+
+`GET /api/external/apps/fb2/context-contract` 还会返回 `tool_result_envelope_contract`，这是主项目执行 fb2 工具后注入 prompt 的标准结果信封：
+
+- `schema=fb2.tool_result_envelope.v1`，`normalized_result_schema=external_app.normalized_tool_result.v1`。
+- 必需字段包括 `schema`、`tool_name`、`request_id`、`status`、`success`、`data`、`error`、`generated_at`、`source_ids`、`visibility`、`metrics`、`grounding`、`reason`。
+- `grounding.schema=external_app.tool_result_grounding.v1`，状态固定为 `grounded`、`weak`、`unsafe`、`unavailable`。
+- 只有 `success=true` 且 `grounding.status=grounded/weak` 的工具结果可以作为事实；`weak` 必须说明证据缺口，`unsafe/unavailable` 只能说明不可用。
+- 工具结果 source registry 同样区分 `business_source_kinds` 和 `quality_history_kinds`。回答和 feedback 回写只能引用 AI 回复正文显式提到的 `source_ids`，不得把未提到、失败或权限不匹配的工具结果写成事实来源。
 
 工具发现、质量端点和反馈写回的边界见 `tool-manifest-boundary.md`。简要口径是：`chat_auto_executable_tool_ids` 才代表主项目聊天 AI 可自动调用的工具；`context_quality_summary`、`context_permission_summary` 等质量/权限能力可以是 integration-only 受保护 HTTP 端点，不要求作为聊天自动 tool id；`feedback`、`opinion_adoption` 默认是质量闭环路线，不要求每次 Context Pack 都作为业务事实 source kind 输出。
 
