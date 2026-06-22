@@ -907,18 +907,21 @@ async fn call_api_runtime(
     messages: &[Value],
 ) -> Result<Value> {
     let url = format!("{}/chat/completions", config.api_base.trim_end_matches('/'));
-    let response = client
-        .post(url)
-        .bearer_auth(&config.api_key)
-        .json(&json!({
-            "model": config.model,
-            "messages": messages,
-            "temperature": 0.2
-        }))
-        .send()
-        .await?;
+    let response = send_api_runtime_request(client, &url, config, messages, true).await?;
     let status = response.status();
     let body = response.text().await.unwrap_or_default();
+    if !status.is_success() && api_runtime_should_retry_without_json_mode(status, &body) {
+        let fallback = send_api_runtime_request(client, &url, config, messages, false).await?;
+        let fallback_status = fallback.status();
+        let fallback_body = fallback.text().await.unwrap_or_default();
+        if !fallback_status.is_success() {
+            bail!(
+                "{}",
+                runtime_http_error_message("本机 API runtime", fallback_status, &fallback_body)
+            );
+        }
+        return serde_json::from_str(&fallback_body).context("本机 API runtime 响应不是 JSON");
+    }
     if !status.is_success() {
         bail!(
             "{}",
@@ -926,6 +929,56 @@ async fn call_api_runtime(
         );
     }
     serde_json::from_str(&body).context("本机 API runtime 响应不是 JSON")
+}
+
+async fn send_api_runtime_request(
+    client: &reqwest::Client,
+    url: &str,
+    config: &ApiRuntimeConfig,
+    messages: &[Value],
+    json_mode: bool,
+) -> Result<reqwest::Response> {
+    client
+        .post(url)
+        .bearer_auth(&config.api_key)
+        .json(&api_runtime_chat_payload(config, messages, json_mode))
+        .send()
+        .await
+        .context("本机 API runtime 请求失败")
+}
+
+fn api_runtime_chat_payload(
+    config: &ApiRuntimeConfig,
+    messages: &[Value],
+    json_mode: bool,
+) -> Value {
+    let mut payload = json!({
+        "model": config.model,
+        "messages": messages,
+        "temperature": 0.2
+    });
+    if json_mode {
+        payload["response_format"] = json!({ "type": "json_object" });
+    }
+    payload
+}
+
+fn api_runtime_should_retry_without_json_mode(status: reqwest::StatusCode, body: &str) -> bool {
+    if !matches!(
+        status,
+        reqwest::StatusCode::BAD_REQUEST
+            | reqwest::StatusCode::UNPROCESSABLE_ENTITY
+            | reqwest::StatusCode::NOT_IMPLEMENTED
+    ) {
+        return false;
+    }
+    let lower = body.to_ascii_lowercase();
+    lower.contains("response_format")
+        || lower.contains("json_object")
+        || lower.contains("json mode")
+        || lower.contains("unsupported parameter")
+        || lower.contains("unknown parameter")
+        || lower.contains("unrecognized request argument")
 }
 
 fn runtime_http_error_message(label: &str, status: reqwest::StatusCode, body: &str) -> String {
@@ -1074,8 +1127,9 @@ impl RuntimeUsage {
 #[cfg(test)]
 mod tests {
     use super::{
-        api_runtime_config_from_lookup, parse_agent_response, run_runtime_loop,
-        runtime_http_error_message, system_prompt, RuntimeLoopOptions,
+        api_runtime_chat_payload, api_runtime_config_from_lookup,
+        api_runtime_should_retry_without_json_mode, parse_agent_response, run_runtime_loop,
+        runtime_http_error_message, system_prompt, ApiRuntimeConfig, RuntimeLoopOptions,
     };
     use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
     use anyhow::anyhow;
@@ -1125,6 +1179,45 @@ mod tests {
         assert_eq!(config.api_base, "https://example.test/v1");
         assert_eq!(config.api_key, "elon-key");
         assert_eq!(config.model, "custom-model");
+    }
+
+    #[test]
+    fn api_runtime_payload_uses_json_mode_by_default() {
+        let config = ApiRuntimeConfig {
+            api_base: "https://example.test/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "gpt-test".to_string(),
+        };
+        let messages = vec![json!({"role": "user", "content": "Return JSON"})];
+
+        let payload = api_runtime_chat_payload(&config, &messages, true);
+        assert_eq!(payload["model"], "gpt-test");
+        assert_eq!(payload["temperature"], 0.2);
+        assert_eq!(payload["response_format"]["type"], "json_object");
+        assert_eq!(payload["messages"][0]["content"], "Return JSON");
+
+        let fallback = api_runtime_chat_payload(&config, &messages, false);
+        assert!(fallback.get("response_format").is_none());
+    }
+
+    #[test]
+    fn api_runtime_json_mode_retry_is_limited_to_compatibility_errors() {
+        assert!(api_runtime_should_retry_without_json_mode(
+            reqwest::StatusCode::BAD_REQUEST,
+            "Unrecognized request argument supplied: response_format"
+        ));
+        assert!(api_runtime_should_retry_without_json_mode(
+            reqwest::StatusCode::UNPROCESSABLE_ENTITY,
+            "json_object is not supported by this model"
+        ));
+        assert!(!api_runtime_should_retry_without_json_mode(
+            reqwest::StatusCode::UNAUTHORIZED,
+            "invalid api key"
+        ));
+        assert!(!api_runtime_should_retry_without_json_mode(
+            reqwest::StatusCode::TOO_MANY_REQUESTS,
+            "rate limit"
+        ));
     }
 
     #[test]
