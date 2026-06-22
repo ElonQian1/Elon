@@ -34,6 +34,8 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "fb2-visible-readonly-validation.ps1")
+
 if (-not $MainBase) { $MainBase = $env:ELON_MAIN_BASE }
 if (-not $MainBase) { $MainBase = "http://43.139.149.158:8080" }
 if (-not $MainToken) { $MainToken = $env:ELON_MAIN_TOKEN }
@@ -450,84 +452,6 @@ function Test-VisibleDirectReadEvidenceComplete {
         if (([string]$Evidence[$key]) -notmatch "\bpost=\S+") {
             return $false
         }
-    }
-
-    return $true
-}
-
-function Read-JsonFileOrNull {
-    param([string]$Path)
-
-    if ([string]::IsNullOrWhiteSpace($Path)) {
-        return $null
-    }
-    if (-not (Test-Path -LiteralPath $Path)) {
-        return $null
-    }
-
-    try {
-        Get-Content -Raw -LiteralPath $Path | ConvertFrom-Json
-    } catch {
-        $null
-    }
-}
-
-function Build-ReadOnlyDirectReadEvidence {
-    param([object]$Summary)
-
-    [ordered]@{
-        schema = [string]$Summary.schema
-        api = [string]$Summary.api
-        group_id = [string]$Summary.group_id
-        writes = [bool]$Summary.writes
-        direct_read_complete = [bool]$Summary.direct_read_complete
-        message_count = [int]$Summary.message_count
-        sample_message_id = [string]$Summary.sample_message_id
-        sample_sender = [string]$Summary.sample_sender
-        sample_text_len = [int]$Summary.sample_text_len
-        sample_text_sha256 = [string]$Summary.sample_text_sha256
-        direct_read_evidence = [string]$Summary.direct_read_evidence
-    }
-}
-
-function Test-ReadOnlyDirectReadSummaryComplete {
-    param([object]$Summary)
-
-    if ($null -eq $Summary) {
-        return $false
-    }
-    if ([string]$Summary.schema -ne "fb2.main_project.visible_chat_readonly.v1") {
-        return $false
-    }
-    if ([string]$Summary.mode -ne "read_only_direct_read") {
-        return $false
-    }
-    if ([bool]$Summary.writes) {
-        return $false
-    }
-    if (-not [bool]$Summary.direct_read_complete) {
-        return $false
-    }
-    if ([int]$Summary.message_count -lt 1) {
-        return $false
-    }
-    foreach ($field in @("group_id", "sample_message_id", "sample_sender", "direct_read_evidence", "api")) {
-        if ([string]::IsNullOrWhiteSpace([string]$Summary.$field)) {
-            return $false
-        }
-    }
-    if ([int]$Summary.sample_text_len -lt 1) {
-        return $false
-    }
-    if ([string]$Summary.sample_text_sha256 -notmatch "^[0-9a-fA-F]{8,}$") {
-        return $false
-    }
-    $evidence = [string]$Summary.direct_read_evidence
-    if ($evidence -notmatch "\btext_len=\d+\b") {
-        return $false
-    }
-    if ($evidence -notmatch "\btext_sha256=[0-9a-fA-F]{8,}\b") {
-        return $false
     }
 
     return $true
