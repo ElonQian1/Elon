@@ -5,6 +5,8 @@ param(
     [string]$Scenario = "custom",
     [string[]]$ExpectedSourceKinds = @(),
     [switch]$PrintExportRequest,
+    [switch]$ValidateSampleSet,
+    [string]$SamplesDir = "",
     [string]$OutputPath = "",
     [string]$GroupId = "official",
     [string]$ExternalUserId = "",
@@ -86,6 +88,15 @@ function Get-DefaultExpectedSourceKinds {
     }
 }
 
+function Get-Fb2ContextPackSampleSetSpecs {
+    @(
+        [ordered]@{ id = "today_matches_context_pack"; expected_source_kinds = @("match", "odds", "context_audit") },
+        [ordered]@{ id = "my_ticket_context_pack"; expected_source_kinds = @("user_order", "ticket", "context_audit") },
+        [ordered]@{ id = "platform_order_context_pack"; expected_source_kinds = @("platform_order_summary", "context_audit") },
+        [ordered]@{ id = "group_opinion_context_pack"; expected_source_kinds = @("group_message", "opinion_memory", "context_audit") }
+    )
+}
+
 function Normalize-Fb2ContextPackInput {
     param([object]$Payload)
 
@@ -99,6 +110,79 @@ function Normalize-Fb2ContextPackInput {
         return $Payload
     }
     return $Payload
+}
+
+function Get-Fb2ContextPackTextSha256 {
+    param([string]$Text)
+
+    if ([string]::IsNullOrWhiteSpace($Text)) {
+        return ""
+    }
+
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes($Text)
+    $hash = [System.Security.Cryptography.SHA256]::HashData($bytes)
+    return (($hash | ForEach-Object { $_.ToString("x2") }) -join "")
+}
+
+function Test-Fb2ContextPackSampleSecretLikeText {
+    param([string]$Raw)
+
+    if ([string]::IsNullOrWhiteSpace($Raw)) {
+        return $false
+    }
+    return $Raw -match "(Bearer\s+[A-Za-z0-9._-]+|sk-[A-Za-z0-9]|FB2_AI_CENTER_TOKEN\s*=)"
+}
+
+function Get-Fb2ContextPackSampleInfo {
+    param(
+        [string]$Path,
+        [string]$ScenarioName
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) {
+        return [ordered]@{
+            scenario = $ScenarioName
+            path = [string]$Path
+            exists = $false
+            context_audit_id = ""
+            citation_source_count = 0
+            source_kinds = @()
+            context_pack_chars = 0
+            context_pack_sha256 = ""
+            contains_secret_like_text = $false
+        }
+    }
+
+    $raw = Get-Content -Raw -LiteralPath $Path
+    try {
+        $payload = $raw | ConvertFrom-Json
+        $data = Normalize-Fb2ContextPackInput $payload
+    } catch {
+        return [ordered]@{
+            scenario = $ScenarioName
+            path = [string]$Path
+            exists = $true
+            context_audit_id = ""
+            citation_source_count = 0
+            source_kinds = @()
+            context_pack_chars = 0
+            context_pack_sha256 = ""
+            contains_secret_like_text = Test-Fb2ContextPackSampleSecretLikeText $raw
+        }
+    }
+
+    $contextPack = Get-Fb2ContextProjectionText -Data $data
+    [ordered]@{
+        scenario = $ScenarioName
+        path = [string]$Path
+        exists = $true
+        context_audit_id = [string]$data.context_audit_id
+        citation_source_count = @($data.citation_sources | Where-Object { $_ }).Count
+        source_kinds = @(Get-Fb2CitationSourceKinds -Data $data)
+        context_pack_chars = $contextPack.Length
+        context_pack_sha256 = Get-Fb2ContextPackTextSha256 $contextPack
+        contains_secret_like_text = Test-Fb2ContextPackSampleSecretLikeText $raw
+    }
 }
 
 function New-Fb2ContextPackSampleScenario {
@@ -246,6 +330,80 @@ function Invoke-Fb2ContextPackFileValidation {
     Assert-Fb2ContextPackProjection -Data $data -Scenario $ScenarioName -ExpectedSourceKinds $ExpectedKinds
 }
 
+function Invoke-Fb2ContextPackSampleSetValidation {
+    param(
+        [string]$Directory,
+        [string]$SummaryPath
+    )
+
+    $root = Split-Path -Parent $PSScriptRoot
+    if ([string]::IsNullOrWhiteSpace($Directory)) {
+        $Directory = Join-Path $root "target\fb2-ai-center\samples"
+    }
+
+    $results = @()
+    $missing = @()
+    $secretLike = @()
+    $startedFailures = $script:Failed
+
+    foreach ($spec in Get-Fb2ContextPackSampleSetSpecs) {
+        $id = [string]$spec["id"]
+        $expectedKinds = @($spec["expected_source_kinds"])
+        $path = Join-Path $Directory "$id.json"
+        $before = $script:Failed
+        Invoke-Fb2ContextPackFileValidation -Path $path -ScenarioName $id -ExpectedKinds $expectedKinds
+        $caseFailures = $script:Failed - $before
+        $info = Get-Fb2ContextPackSampleInfo -Path $path -ScenarioName $id
+        if (-not [bool]$info["exists"]) {
+            $missing += $id
+        }
+        if ([bool]$info["contains_secret_like_text"]) {
+            $secretLike += $id
+            Write-CheckFail "sample set secret-like text: $id" "sample may contain token-like text"
+            $caseFailures += 1
+        }
+
+        $results += [ordered]@{
+            scenario = $id
+            path = [string]$path
+            passed = ($caseFailures -eq 0)
+            failure_count = $caseFailures
+            expected_source_kinds = @($expectedKinds)
+            context_audit_id = [string]$info["context_audit_id"]
+            citation_source_count = [int]$info["citation_source_count"]
+            source_kinds = @($info["source_kinds"])
+            context_pack_chars = [int]$info["context_pack_chars"]
+            context_pack_sha256 = [string]$info["context_pack_sha256"]
+            contains_secret_like_text = [bool]$info["contains_secret_like_text"]
+        }
+    }
+
+    $sampleSetFailures = $script:Failed - $startedFailures
+    $summary = [ordered]@{
+        schema = "fb2.main_project.context_pack_sample_set_validation.v1"
+        generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        samples_dir = [string]$Directory
+        complete = ($sampleSetFailures -eq 0 -and $missing.Count -eq 0 -and $secretLike.Count -eq 0)
+        scenario_count = @($results).Count
+        passed_count = @($results | Where-Object { [bool]$_["passed"] }).Count
+        failed_count = @($results | Where-Object { -not [bool]$_["passed"] }).Count
+        missing = @($missing)
+        secret_like_scenarios = @($secretLike)
+        scenarios = @($results)
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($SummaryPath)) {
+        $dir = Split-Path -Parent $SummaryPath
+        if ($dir -and -not (Test-Path -LiteralPath $dir)) {
+            New-Item -ItemType Directory -Path $dir -Force | Out-Null
+        }
+        $summary | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $SummaryPath -Encoding UTF8
+        Write-CheckOk "sample set validation summary written" $SummaryPath
+    }
+
+    Write-Output "OK`tcontext pack sample set scenarios`tcount=$(@($results).Count) passed=$($summary.passed_count) failed=$($summary.failed_count)"
+}
+
 function Invoke-Fb2ContextPackValidatorSelfTest {
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-context-pack-validator-{0}" -f ([guid]::NewGuid().ToString("N")))
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
@@ -291,6 +449,26 @@ function Invoke-Fb2ContextPackValidatorSelfTest {
         }
         $requestJson = $request | ConvertTo-Json -Depth 12
         Assert-True ($requestJson -notmatch "123qwe|Bearer\s+\S+") "self-test export request does not leak secrets"
+
+        $sampleDir = Join-Path $tmp "samples"
+        New-Item -ItemType Directory -Path $sampleDir -Force | Out-Null
+        foreach ($spec in Get-Fb2ContextPackSampleSetSpecs) {
+            $sample = [ordered]@{
+                success = $true
+                data = New-Fb2ContextProjectionSelfTestData
+            }
+            $sample.data.context_audit_id = "audit-$($spec["id"])"
+            $samplePath = Join-Path $sampleDir "$($spec["id"]).json"
+            $sample | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $samplePath -Encoding UTF8
+        }
+        $sampleSummaryPath = Join-Path $tmp "context-pack-samples-validation-selftest.json"
+        $beforeSampleSet = $script:Failed
+        Invoke-Fb2ContextPackSampleSetValidation -Directory $sampleDir -SummaryPath $sampleSummaryPath
+        $sampleSetFailures = $script:Failed - $beforeSampleSet
+        $sampleSetSummary = Get-Content -Raw -LiteralPath $sampleSummaryPath | ConvertFrom-Json
+        Assert-True ($sampleSetFailures -eq 0) "self-test sample set validation has no case failures" "case_failures=$sampleSetFailures"
+        Assert-True ([bool]$sampleSetSummary.complete) "self-test sample set summary complete" "complete=$($sampleSetSummary.complete)"
+        Assert-True ($sampleSetSummary.scenario_count -eq 4) "self-test sample set scenario count" "count=$($sampleSetSummary.scenario_count)"
     } finally {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -307,6 +485,8 @@ if ($SelfTest) {
         }
         exit 0
     }
+} elseif ($ValidateSampleSet) {
+    Invoke-Fb2ContextPackSampleSetValidation -Directory $SamplesDir -SummaryPath $OutputPath
 } else {
     Invoke-Fb2ContextPackFileValidation -Path $InputPath -ScenarioName $Scenario -ExpectedKinds $ExpectedSourceKinds
 }
