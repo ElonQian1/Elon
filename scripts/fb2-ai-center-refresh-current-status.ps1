@@ -4,7 +4,8 @@ param(
     [string]$OutputDir = "",
     [string[]]$EvidenceDirs = @(),
     [string]$MainWorkspaceEvidenceDir = "",
-    [switch]$SkipPublicContract
+    [switch]$SkipPublicContract,
+    [switch]$SelfTest
 )
 
 $ErrorActionPreference = "Stop"
@@ -63,6 +64,48 @@ function Read-Fb2RefreshJson {
         return $null
     }
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+}
+
+function Assert-Fb2RefreshSelfTest {
+    param(
+        [bool]$Condition,
+        [string]$Message
+    )
+
+    if (-not $Condition) {
+        throw "SelfTest failed: $Message"
+    }
+}
+
+function Invoke-Fb2RefreshSelfTest {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-ai-center-refresh-selftest-" + [guid]::NewGuid().ToString("N"))
+    $output = Join-Path $tempRoot "out"
+    $missingEvidence = Join-Path $tempRoot "missing-evidence"
+    try {
+        New-Item -ItemType Directory -Force -Path $output | Out-Null
+        # 自测必须无网络、无 token、无主工作区依赖；这里只验证编排脚本能生成稳定机器摘要。
+        $raw = & $PSCommandPath -OutputDir $output -MainWorkspaceEvidenceDir $missingEvidence -SkipPublicContract
+        $summary = $raw | ConvertFrom-Json
+        Assert-Fb2RefreshSelfTest ($summary.schema -eq "fb2.main_project.status_refresh.v1") "schema"
+        Assert-Fb2RefreshSelfTest ([string]$summary.output_dir -eq $output) "output_dir"
+        Assert-Fb2RefreshSelfTest (@($summary.evidence_dirs).Count -eq 1) "isolated evidence dirs"
+        Assert-Fb2RefreshSelfTest (-not [bool]$summary.public_contract_ready) "public contract skipped"
+        Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.status)) "status file exists"
+        Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.goal_audit)) "goal audit file exists"
+        Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.handoff_markdown)) "handoff markdown exists"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
+        "== SelfTest Summary =="
+        "failed=0"
+    } finally {
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force
+        }
+    }
+}
+
+if ($SelfTest) {
+    Invoke-Fb2RefreshSelfTest
+    exit 0
 }
 
 $root = Get-Fb2RefreshRepoRoot
