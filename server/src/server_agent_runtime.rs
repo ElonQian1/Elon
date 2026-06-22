@@ -19,8 +19,8 @@ use crate::{
         ServerRuntimeAdmissionError, ServerRuntimeAdmissionSnapshot, ServerRuntimeProtectionStatus,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
-    server_agent_runtime_policy::ServerAgentRuntimePolicy,
-    types::{AgentConfig, AppState},
+    server_agent_runtime_policy::{ServerAgentRuntimeAgentPolicy, ServerAgentRuntimePolicy},
+    types::{AgentConfig, AgentsConfig, AppState},
 };
 
 #[derive(Debug, Deserialize)]
@@ -59,8 +59,10 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
 
     let limits = ServerAgentRuntimeLimits::current();
     let policy = ServerAgentRuntimePolicy::current();
-    let agent = resolve_server_runtime_agent(&state, None)
+    let agent_policy = ServerAgentRuntimeAgentPolicy::current();
+    let agent = resolve_server_runtime_agent(&state, None, &agent_policy)
         .await
+        .ok()
         .map(|agent| {
             let usage_mode = agent.usage_mode().to_string();
             ServerAgentRuntimeAgentStatus {
@@ -124,10 +126,26 @@ pub async fn chat_handler(
     }
     let audit = audit_summary(&req.messages, limits);
 
-    let agent = match resolve_server_runtime_agent(&state, req.agent.as_deref()).await {
-        Some(agent) => agent,
-        None => return json_error(StatusCode::SERVICE_UNAVAILABLE, "服务器未配置可用 AI 代理"),
-    };
+    let agent_policy = ServerAgentRuntimeAgentPolicy::current();
+    let agent =
+        match resolve_server_runtime_agent(&state, req.agent.as_deref(), &agent_policy).await {
+            Ok(agent) => agent,
+            Err(ServerRuntimeAgentResolveError::NotAllowed) => {
+                tracing::warn!(
+                    target: "server_agent_runtime",
+                    user_id = %user.id,
+                    requested_agent = req.agent.as_deref().unwrap_or(""),
+                    policy_mode = agent_policy.mode,
+                    policy_source = agent_policy.source,
+                    request_fingerprint = %audit.request_fingerprint,
+                    "pc_server_runtime request rejected by agent selection policy"
+                );
+                return json_error(StatusCode::FORBIDDEN, agent_policy.public_denied_message());
+            }
+            Err(ServerRuntimeAgentResolveError::Unavailable) => {
+                return json_error(StatusCode::SERVICE_UNAVAILABLE, "服务器未配置可用 AI 代理");
+            }
+        };
     let _admission = match try_acquire_runtime_admission(&user.id, limits) {
         Ok(guard) => guard,
         Err(error) => {
@@ -183,16 +201,40 @@ pub async fn chat_handler(
 async fn resolve_server_runtime_agent(
     state: &Arc<AppState>,
     requested_agent: Option<&str>,
-) -> Option<AgentConfig> {
+    agent_policy: &ServerAgentRuntimeAgentPolicy,
+) -> Result<AgentConfig, ServerRuntimeAgentResolveError> {
     let agent_name = requested_agent
         .map(str::trim)
         .filter(|value| !value.is_empty());
-    state
-        .agents_config
-        .read()
-        .await
-        .get_agent(agent_name)
+    let agents = state.agents_config.read().await;
+    if !agent_policy.allows_requested_agent(agent_name, &agents.default_agent) {
+        return Err(ServerRuntimeAgentResolveError::NotAllowed);
+    }
+    if let Some(agent_name) = agent_name {
+        return named_agent_config(&agents, agent_name)
+            .cloned()
+            .ok_or(ServerRuntimeAgentResolveError::Unavailable);
+    }
+    agents
+        .get_agent(None)
         .cloned()
+        .ok_or(ServerRuntimeAgentResolveError::Unavailable)
+}
+
+fn named_agent_config<'a>(agents: &'a AgentsConfig, agent_name: &str) -> Option<&'a AgentConfig> {
+    agents.agents.get(agent_name).or_else(|| {
+        agents
+            .agents
+            .iter()
+            .find(|(key, _)| key.eq_ignore_ascii_case(agent_name))
+            .map(|(_, agent)| agent)
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ServerRuntimeAgentResolveError {
+    NotAllowed,
+    Unavailable,
 }
 
 fn validate_runtime_messages(messages: &[Value]) -> Result<(), &'static str> {
@@ -215,13 +257,15 @@ fn admission_error_response(error: ServerRuntimeAdmissionError) -> Response {
 #[cfg(test)]
 mod tests {
     use super::{
-        admission_error_response, audit_summary, operational_error_summary, protection_status,
-        provider_error_message, validate_runtime_messages,
+        admission_error_response, audit_summary, named_agent_config, operational_error_summary,
+        protection_status, provider_error_message, validate_runtime_messages,
     };
     use crate::server_agent_runtime_guard::ServerRuntimeAdmissionError;
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
+    use crate::types::{AgentConfig, AgentsConfig};
     use axum::http::header;
     use serde_json::json;
+    use std::collections::HashMap;
 
     #[test]
     fn accepts_normal_runtime_messages() {
@@ -251,6 +295,7 @@ mod tests {
 
         assert!(protection.input_validation.contains("total_chars"));
         assert!(protection.input_validation.contains("message_chars"));
+        assert!(protection.agent_selection.contains("default server agent"));
         assert!(protection.admission_control.contains("global"));
         assert!(protection
             .operational_switch
@@ -290,5 +335,33 @@ mod tests {
 
         assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "23");
+    }
+
+    #[test]
+    fn named_agent_lookup_accepts_exact_or_case_insensitive_match() {
+        let agents = AgentsConfig {
+            default_agent: "main".to_string(),
+            agents: HashMap::from([(
+                "route-c-fast".to_string(),
+                AgentConfig {
+                    name: "route-c-fast".to_string(),
+                    api_base: "https://api.example.com/v1".to_string(),
+                    api_key: "sk-test".to_string(),
+                    model: "fast-model".to_string(),
+                    embedding_model: None,
+                    usage_mode: Some("server_api_key".to_string()),
+                },
+            )]),
+        };
+
+        assert_eq!(
+            named_agent_config(&agents, "route-c-fast").map(|agent| agent.model.as_str()),
+            Some("fast-model")
+        );
+        assert_eq!(
+            named_agent_config(&agents, "ROUTE-C-FAST").map(|agent| agent.model.as_str()),
+            Some("fast-model")
+        );
+        assert!(named_agent_config(&agents, "expensive").is_none());
     }
 }

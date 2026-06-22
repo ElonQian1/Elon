@@ -17,6 +17,7 @@ use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ServerRuntimeProtectionStatus {
     pub input_validation: &'static str,
+    pub agent_selection: &'static str,
     pub admission_control: &'static str,
     pub operational_switch: &'static str,
     pub billing_gate: &'static str,
@@ -88,6 +89,8 @@ pub(crate) struct ServerRuntimeAdmissionGuard {
 pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
     ServerRuntimeProtectionStatus {
         input_validation: "messages role/content/count/message_chars/total_chars",
+        agent_selection:
+            "default server agent only unless ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS explicitly allows more",
         admission_control: "global and per-user concurrency plus rolling minute request limits",
         operational_switch: "ELON_SERVER_AGENT_RUNTIME_ENABLED can disable Route C without redeploy",
         billing_gate: "shared with call_chat_llm_with_options",
@@ -424,6 +427,9 @@ mod tests {
     fn status_describes_operational_protections() {
         let status = protection_status();
         assert!(status.input_validation.contains("total_chars"));
+        assert!(status
+            .agent_selection
+            .contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
         assert!(status.admission_control.contains("global"));
         assert!(status.admission_control.contains("concurrency"));
         assert!(status

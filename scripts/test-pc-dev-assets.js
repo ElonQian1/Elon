@@ -815,6 +815,35 @@ function testProjectReadinessChecklist() {
   assert.ok(readyHtml.includes('run_command'), 'readiness should expose Route B/C command tool contract');
   assert.ok(readyHtml.includes('需确认'), 'readiness should expose approval-required tools');
 
+  const routeCHtml = create({
+    nodes: [{
+      node_id: 'node-c',
+      online: true,
+      server_runtime_ready: true,
+      allowed_clis: [],
+      dev_runtime: {
+        server_runtime_ready: true,
+        server_runtime_status: {
+          status: 'ready',
+          agent: { model: 'route-c-model' },
+          limits: { maxRequestsPerMinute: 12, maxConcurrentPerUser: 2, maxConcurrentGlobal: 24 },
+          admission: { remainingRequestsPerMinute: 11 },
+          protection: { agentSelection: 'default server agent only' },
+          policy: { enabled: true }
+        }
+      }
+    }],
+    projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
+  }).renderMemberPanel({
+    id: 'p-route-c',
+    role: 'owner',
+    node_id: 'node-c',
+    workspace_path: 'D:/demo',
+    runtime_permission: 'project_write'
+  });
+  assert.ok(routeCHtml.includes('Route C · 服务器模型 route-c-model'), 'readiness should show Route C model route');
+  assert.ok(routeCHtml.includes('agent 受控'), 'readiness should show Route C agent selection protection');
+
   const fullAccessHtml = create(readyState).renderMemberPanel({
     id: 'p1',
     role: 'owner',
@@ -1045,6 +1074,8 @@ function testLocalAdminTokenWiring() {
   const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
   assert.ok(pcAppNode.includes('admissionAvailability'), 'PC node page should read Route C admission availability');
   assert.ok(pcAppNode.includes('admission_availability'), 'PC node page should keep snake_case admission compatibility');
+  assert.ok(pcAppNode.includes('agentSelection'), 'PC node page should display Route C agent selection protection');
+  assert.ok(pcAppNode.includes('agent_selection'), 'PC node page should keep snake_case agent selection compatibility');
   assert.ok(pcAppNode.includes('routeCLimitedReasonText'), 'PC node page should explain Route C limited reasons');
   assert.ok(pcAppNode.includes('秒后重试'), 'PC node page should show Route C retry-after hints');
 

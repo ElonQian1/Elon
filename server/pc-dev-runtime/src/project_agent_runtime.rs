@@ -86,6 +86,7 @@ scripts\elon.ps1 agent -AgentMode server-runtime -Prompt "Create a docs note" -D
 
 Route C does not expose the server API key to this PC. The server only returns structured local actions; this PC runtime still applies the same workspace path, dry-run, command policy, and confirmation checks as Route B.
 When the Windows client is installed and logged in, Route C can reuse the local node login token automatically. Manual `ELON_SERVER_TOKEN` is only needed for advanced or portable setups.
+`ELON_SERVER_AGENT` is optional and is honored only when the Elon server operator explicitly allows that agent through `ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS`; otherwise Route C uses the server default agent.
 "#,
         req.project_id, req.template, req.user_id
     ))
@@ -743,6 +744,7 @@ mod tests {
         assert!(doc.contains("Route C"));
         assert!(doc.contains("ELON_AGENT_API_KEY"));
         assert!(doc.contains("ELON_SERVER_TOKEN"));
+        assert!(doc.contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));
         assert!(doc.contains("-MaxRunCommands"));

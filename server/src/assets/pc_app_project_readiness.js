@@ -333,6 +333,8 @@
 
       const limits = status.limits || {};
       const admission = status.admission || {};
+      const protection = status.protection || {};
+      const agentSelection = clean(protection.agentSelection || protection.agent_selection);
       const rpm = numberField(limits, 'maxRequestsPerMinute', 'max_requests_per_minute')
         || numberField(admission, 'maxRequestsPerMinute', 'max_requests_per_minute');
       const perUser = numberField(limits, 'maxConcurrentPerUser', 'max_concurrent_per_user')
@@ -341,6 +343,7 @@
         || numberField(admission, 'maxConcurrentGlobal', 'max_concurrent_global');
       const remaining = numberField(admission, 'remainingRequestsPerMinute', 'remaining_requests_per_minute');
       const parts = [];
+      if (agentSelection) parts.push('agent 受控');
       if (rpm) parts.push(`${rpm}/分钟`);
       if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
       if (Number.isFinite(remaining)) parts.push(`剩余 ${remaining}`);
