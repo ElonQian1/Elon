@@ -17,7 +17,7 @@ use crate::{
 use anyhow::{anyhow, bail, Context, Result};
 use homecli_proto::AgentToServer;
 use serde_json::{json, Value};
-use std::{future::Future, path::PathBuf, time::Duration};
+use std::{collections::VecDeque, future::Future, path::PathBuf, time::Duration};
 use tokio::sync::{mpsc, watch};
 use tokio_tungstenite::tungstenite::Message;
 
@@ -878,6 +878,7 @@ Rules:
 - Use write_file only when replacing a full file or creating a small new project file.
 - Use run_command only for project Git, build, format, lint, or test commands.
 - Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
+- If your API supports native tool/function calls, use those tool calls for actions. Otherwise return the actions array in JSON.
 - Set done=true when no further tool action is needed.
 "#
     .replace("{{runtime_identity}}", runtime_identity);
@@ -922,28 +923,44 @@ async fn call_api_runtime(
     messages: &[Value],
 ) -> Result<Value> {
     let url = format!("{}/chat/completions", config.api_base.trim_end_matches('/'));
-    let response = send_api_runtime_request(client, &url, config, messages, true).await?;
-    let status = response.status();
-    let body = response.text().await.unwrap_or_default();
-    if !status.is_success() && api_runtime_should_retry_without_json_mode(status, &body) {
-        let fallback = send_api_runtime_request(client, &url, config, messages, false).await?;
-        let fallback_status = fallback.status();
-        let fallback_body = fallback.text().await.unwrap_or_default();
-        if !fallback_status.is_success() {
-            bail!(
-                "{}",
-                runtime_http_error_message("本机 API runtime", fallback_status, &fallback_body)
-            );
+    let mut attempts = VecDeque::from([(true, true)]);
+    let mut attempted = Vec::<(bool, bool)>::new();
+    let mut last_error = None;
+
+    while let Some((json_mode, tools_mode)) = attempts.pop_front() {
+        if attempted.contains(&(json_mode, tools_mode)) {
+            continue;
         }
-        return serde_json::from_str(&fallback_body).context("本机 API runtime 响应不是 JSON");
+        attempted.push((json_mode, tools_mode));
+        let response =
+            send_api_runtime_request(client, &url, config, messages, json_mode, tools_mode).await?;
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        if status.is_success() {
+            return serde_json::from_str(&body).context("本机 API runtime 响应不是 JSON");
+        }
+
+        let retry_without_json =
+            json_mode && api_runtime_should_retry_without_json_mode(status, &body);
+        let retry_without_tools = tools_mode
+            && crate::node_agent_api_runtime_tools::should_retry_without_tools(status, &body);
+        if retry_without_json {
+            attempts.push_back((false, tools_mode));
+        }
+        if retry_without_tools {
+            attempts.push_back((json_mode, false));
+        }
+        if retry_without_json || retry_without_tools {
+            attempts.push_back((false, false));
+        }
+        last_error = Some((status, body));
     }
-    if !status.is_success() {
-        bail!(
-            "{}",
-            runtime_http_error_message("本机 API runtime", status, &body)
-        );
-    }
-    serde_json::from_str(&body).context("本机 API runtime 响应不是 JSON")
+
+    let (status, body) = last_error.ok_or_else(|| anyhow!("本机 API runtime 没有执行任何请求"))?;
+    bail!(
+        "{}",
+        runtime_http_error_message("本机 API runtime", status, &body)
+    );
 }
 
 async fn send_api_runtime_request(
@@ -952,11 +969,14 @@ async fn send_api_runtime_request(
     config: &ApiRuntimeConfig,
     messages: &[Value],
     json_mode: bool,
+    tools_mode: bool,
 ) -> Result<reqwest::Response> {
     client
         .post(url)
         .bearer_auth(&config.api_key)
-        .json(&api_runtime_chat_payload(config, messages, json_mode))
+        .json(&api_runtime_chat_payload(
+            config, messages, json_mode, tools_mode,
+        ))
         .send()
         .await
         .context("本机 API runtime 请求失败")
@@ -966,6 +986,7 @@ fn api_runtime_chat_payload(
     config: &ApiRuntimeConfig,
     messages: &[Value],
     json_mode: bool,
+    tools_mode: bool,
 ) -> Value {
     let mut payload = json!({
         "model": config.model,
@@ -974,6 +995,9 @@ fn api_runtime_chat_payload(
     });
     if json_mode {
         payload["response_format"] = json!({ "type": "json_object" });
+    }
+    if tools_mode {
+        crate::node_agent_api_runtime_tools::add_tools_to_payload(&mut payload);
     }
     payload
 }
@@ -1024,6 +1048,11 @@ fn canceled_runtime_result(
 }
 
 fn extract_assistant_content(response: &Value) -> Result<String> {
+    if let Some(content) =
+        crate::node_agent_api_runtime_tools::agent_response_from_tool_calls(response)?
+    {
+        return Ok(content);
+    }
     if let Some(content) = response
         .get("choices")
         .and_then(Value::as_array)
@@ -1197,7 +1226,7 @@ mod tests {
     }
 
     #[test]
-    fn api_runtime_payload_uses_json_mode_by_default() {
+    fn api_runtime_payload_uses_json_mode_and_tools_by_default() {
         let config = ApiRuntimeConfig {
             api_base: "https://example.test/v1".to_string(),
             api_key: "sk-test".to_string(),
@@ -1205,14 +1234,21 @@ mod tests {
         };
         let messages = vec![json!({"role": "user", "content": "Return JSON"})];
 
-        let payload = api_runtime_chat_payload(&config, &messages, true);
+        let payload = api_runtime_chat_payload(&config, &messages, true, true);
         assert_eq!(payload["model"], "gpt-test");
         assert_eq!(payload["temperature"], 0.2);
         assert_eq!(payload["response_format"]["type"], "json_object");
+        assert_eq!(payload["tool_choice"], "auto");
+        assert!(payload["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["function"]["name"] == "run_command"));
         assert_eq!(payload["messages"][0]["content"], "Return JSON");
 
-        let fallback = api_runtime_chat_payload(&config, &messages, false);
+        let fallback = api_runtime_chat_payload(&config, &messages, false, false);
         assert!(fallback.get("response_format").is_none());
+        assert!(fallback.get("tools").is_none());
     }
 
     #[test]
@@ -1338,6 +1374,62 @@ mod tests {
 
         let result = runtime.await.unwrap();
         assert!(result.exit_ok);
+        let _ = cancel_tx.send(true);
+    }
+
+    #[tokio::test]
+    async fn runtime_loop_executes_openai_tool_calls() {
+        let workspace = temp_test_dir("runtime_loop_executes_openai_tool_calls");
+        std::fs::write(workspace.join("README.md"), "hello\n").unwrap();
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_for_runtime = calls.clone();
+
+        let runtime = tokio::spawn(async move {
+            run_runtime_loop(
+                RuntimeLoopOptions {
+                    req_id: "req-tool-calls",
+                    label: "api-runtime",
+                    guard: ToolGuard::new(workspace, Some("project_write")),
+                    prompt: "inspect files",
+                    approval_state: Some(ToolApprovalState::default()),
+                    cancel_rx,
+                    out_tx,
+                    task_journal: None,
+                    initial_model: Some("gpt-test".to_string()),
+                },
+                move |_| {
+                    let call_index = calls_for_runtime.fetch_add(1, Ordering::SeqCst);
+                    async move {
+                        if call_index == 0 {
+                            Ok(chat_tool_call_response("list_dir", json!({ "path": "." })))
+                        } else {
+                            Ok(chat_response(json!({
+                                "message": "done after list",
+                                "done": true,
+                                "actions": []
+                            })))
+                        }
+                    }
+                },
+            )
+            .await
+            .unwrap()
+        });
+
+        let tool_call = next_tool_event(&mut out_rx, "tool_call").await;
+        assert_eq!(tool_call["tool"], "list_dir");
+        let tool_result = next_tool_event(&mut out_rx, "tool_result").await;
+        assert_eq!(tool_result["status"], "ok");
+        assert!(tool_result["result"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("README.md"));
+
+        let result = runtime.await.unwrap();
+        assert!(result.exit_ok);
+        assert_eq!(calls.load(Ordering::SeqCst), 2);
         let _ = cancel_tx.send(true);
     }
 
@@ -1794,6 +1886,25 @@ mod tests {
             "choices": [{
                 "message": {
                     "content": serde_json::to_string(&agent).unwrap()
+                }
+            }]
+        })
+    }
+
+    fn chat_tool_call_response(name: &str, arguments: Value) -> Value {
+        json!({
+            "model": "test-model",
+            "choices": [{
+                "message": {
+                    "content": null,
+                    "tool_calls": [{
+                        "id": "call_test",
+                        "type": "function",
+                        "function": {
+                            "name": name,
+                            "arguments": serde_json::to_string(&arguments).unwrap()
+                        }
+                    }]
                 }
             }]
         })
