@@ -374,6 +374,43 @@ mod tests {
     }
 
     #[test]
+    fn cancel_requested_without_live_handle_cannot_be_canceled_again() {
+        let canceling = record("cancel_requested");
+        let attach = task_attach_state(Some(&canceling), None);
+        let resume = task_resume_contract(&attach);
+
+        assert_eq!(attach.status, "detached");
+        assert!(!resume.can_reconnect);
+        assert!(!resume.can_cancel);
+        assert!(!resume.can_approve_tools);
+        assert_eq!(resume.next_action, "continue_from_snapshot");
+        assert!(resume
+            .limitations
+            .iter()
+            .any(|item| item.contains("节点重启后不能重新绑定原进程控制句柄")));
+    }
+
+    #[test]
+    fn live_codex_task_exposes_control_and_session_continuity() {
+        let running = codex_record("running");
+        let attach = task_attach_state(Some(&running), Some(active_handle()));
+        let resume = task_resume_contract(&attach);
+
+        assert_eq!(resume.status, "live");
+        assert!(resume.can_reconnect);
+        assert!(resume.can_cancel);
+        assert!(resume.can_resume_codex_session);
+        assert_eq!(resume.next_action, "wait_or_cancel");
+        assert_eq!(
+            resume
+                .codex_session
+                .as_ref()
+                .map(|session| session.id.as_str()),
+            Some("session-uuid")
+        );
+    }
+
+    #[test]
     fn codex_session_is_exposed_for_snapshot_continue() {
         let running = codex_record("running");
         let resume = task_resume_contract(&task_attach_state(Some(&running), None));

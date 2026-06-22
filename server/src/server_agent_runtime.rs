@@ -13,11 +13,9 @@ use std::sync::Arc;
 use crate::{
     agent_llm_call::call_chat_llm_with_options,
     project_auth::{auth_from_headers, json_error},
+    server_agent_runtime_limits::ServerAgentRuntimeLimits,
     types::{AgentConfig, AppState},
 };
-
-const MAX_MESSAGES: usize = 24;
-const MAX_TOTAL_CHARS: usize = 80_000;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -31,6 +29,7 @@ struct ServerAgentRuntimeStatus {
     ready: bool,
     status: &'static str,
     agent: Option<ServerAgentRuntimeAgentStatus>,
+    limits: ServerAgentRuntimeLimits,
 }
 
 #[derive(Debug, Serialize)]
@@ -61,6 +60,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         ready,
         status: if ready { "ready" } else { "unavailable" },
         agent,
+        limits: ServerAgentRuntimeLimits::current(),
     })
     .into_response()
 }
@@ -75,6 +75,7 @@ pub async fn chat_handler(
         Err(_) => return json_error(StatusCode::UNAUTHORIZED, "未登录"),
     };
 
+    let limits = ServerAgentRuntimeLimits::current();
     if let Err(message) = validate_runtime_messages(&req.messages) {
         return json_error(StatusCode::BAD_REQUEST, message);
     }
@@ -90,8 +91,8 @@ pub async fn chat_handler(
         &req.messages,
         &user.id,
         "pc_server_runtime",
-        0.2,
-        3000,
+        limits.temperature,
+        limits.max_output_tokens,
     )
     .await
     {
@@ -116,39 +117,7 @@ async fn resolve_server_runtime_agent(
 }
 
 fn validate_runtime_messages(messages: &[Value]) -> Result<(), &'static str> {
-    if messages.is_empty() {
-        return Err("messages 不能为空");
-    }
-    if messages.len() > MAX_MESSAGES {
-        return Err("messages 过多");
-    }
-
-    let mut total_chars = 0usize;
-    for message in messages {
-        let Some(object) = message.as_object() else {
-            return Err("message 必须是对象");
-        };
-        let role = object
-            .get("role")
-            .and_then(Value::as_str)
-            .ok_or("message.role 不能为空")?;
-        if !matches!(role, "system" | "user" | "assistant") {
-            return Err("message.role 只允许 system/user/assistant");
-        }
-        let content = object
-            .get("content")
-            .and_then(Value::as_str)
-            .ok_or("message.content 不能为空")?;
-        if content.trim().is_empty() {
-            return Err("message.content 不能为空");
-        }
-        total_chars += content.chars().count();
-        if total_chars > MAX_TOTAL_CHARS {
-            return Err("messages 内容过长");
-        }
-    }
-
-    Ok(())
+    ServerAgentRuntimeLimits::current().validate_messages(messages)
 }
 
 #[cfg(test)]
