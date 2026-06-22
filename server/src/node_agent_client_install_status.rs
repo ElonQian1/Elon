@@ -84,11 +84,7 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
-    let product_status = product_status(
-        installed,
-        running_from_install_dir,
-        layout["status"].as_str().unwrap_or("unknown"),
-    );
+    let product_status = product_status(installed, running_from_install_dir, &layout);
 
     json!({
         "supported": true,
@@ -115,7 +111,11 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
 }
 
 #[cfg(any(windows, test))]
-fn product_status(installed: bool, running_from_install_dir: bool, layout_status: &str) -> Value {
+fn product_status(installed: bool, running_from_install_dir: bool, layout: &Value) -> Value {
+    let layout_status = layout["status"].as_str().unwrap_or("unknown");
+    let missing_entry_count = array_len(layout.get("missing_entries"));
+    let legacy_file_count = array_len(layout.get("legacy_top_level_files"));
+    let unexpected_entry_count = array_len(layout.get("unexpected_top_level_entries"));
     let (status, summary) = if !installed {
         (
             "needs_repair",
@@ -138,13 +138,35 @@ fn product_status(installed: bool, running_from_install_dir: bool, layout_status
         )
     };
 
+    let mut recommended_actions = Vec::new();
+    if !installed {
+        recommended_actions.push(format!("重新运行 {CLIENT_EXE_NAME} 修复安装。"));
+    } else if layout_status != "clean" {
+        recommended_actions.push(format!("重新运行 {CLIENT_EXE_NAME} 收敛安装目录。"));
+    }
+    if installed && !running_from_install_dir {
+        recommended_actions.push(format!("以后从安装目录运行 {CLIENT_EXE_NAME}。"));
+    }
+    if recommended_actions.is_empty() {
+        recommended_actions.push("无需处理；保持只运行主程序和卸载程序。".to_string());
+    }
+
     json!({
         "status": status,
         "summary": summary,
         "primary_entry_name": CLIENT_EXE_NAME,
         "uninstall_entry_name": UNINSTALL_EXE_NAME,
         "root_layout_expectation": root_layout_expectation(),
+        "missing_entry_count": missing_entry_count,
+        "legacy_file_count": legacy_file_count,
+        "unexpected_entry_count": unexpected_entry_count,
+        "recommended_actions": recommended_actions,
     })
+}
+
+#[cfg(any(windows, test))]
+fn array_len(value: Option<&Value>) -> usize {
+    value.and_then(Value::as_array).map(Vec::len).unwrap_or(0)
 }
 
 #[cfg(windows)]
@@ -297,6 +319,9 @@ mod tests {
         assert_eq!(status["installed_git_sha"], "abc123");
         assert_eq!(status["running_from_install_dir"], true);
         assert_eq!(status["product_status"]["status"], "ready");
+        assert_eq!(status["product_status"]["missing_entry_count"], 0);
+        assert_eq!(status["product_status"]["legacy_file_count"], 0);
+        assert_eq!(status["product_status"]["unexpected_entry_count"], 0);
         assert!(status["product_status"]["summary"]
             .as_str()
             .unwrap()
@@ -322,6 +347,12 @@ mod tests {
         assert_eq!(status["installed"], true);
         assert_eq!(status["layout_status"], "legacy_files_present");
         assert_eq!(status["product_status"]["status"], "cleanup_recommended");
+        assert_eq!(status["product_status"]["legacy_file_count"], 1);
+        assert!(status["product_status"]["recommended_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item.as_str().unwrap_or_default().contains("收敛安装目录")));
         assert!(status["product_status"]["summary"]
             .as_str()
             .unwrap()
@@ -351,6 +382,7 @@ mod tests {
             .iter()
             .any(|item| item.as_str() == Some(UNINSTALL_EXE_NAME)));
         assert_eq!(status["product_status"]["status"], "needs_repair");
+        assert_eq!(status["product_status"]["missing_entry_count"], 2);
 
         let _ = fs::remove_dir_all(dir);
     }

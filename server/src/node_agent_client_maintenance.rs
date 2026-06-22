@@ -128,6 +128,7 @@ fn with_install_status(mut payload: Value) -> Value {
                 "installed_package_version",
                 "layout_status",
                 "layout",
+                "product_status",
                 "version_manifest",
             ] {
                 if let Some(value) = install_object.get(key) {
@@ -648,6 +649,11 @@ mod tests {
                 action["kind"].as_str() == Some("uninstall")
                     && action["confirmation"].as_str().is_some()
             }));
+        assert!(status["product_status"]["summary"].as_str().is_some());
+        assert_eq!(
+            status["product_status"]["primary_entry_name"].as_str(),
+            Some(crate::node_client_launcher::CLIENT_EXE_NAME)
+        );
     }
 
     #[test]
