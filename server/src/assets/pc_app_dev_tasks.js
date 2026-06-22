@@ -276,16 +276,17 @@
       const total = Number(event.total_tools || event.totalTools || 0) || 0;
       const failed = Number(event.failed_tools || event.failedTools || 0) || 0;
       const status = clean(event.status).toLowerCase();
-      const ok = failed === 0 && status !== 'error' && status !== 'failed';
+      const canceled = ['canceled', 'cancelled', 'stopped'].includes(status);
+      const ok = failed === 0 && !canceled && !['error', 'failed'].includes(status);
       const turn = Number(event.turn) > 0 ? `第 ${Number(event.turn)} 轮` : '运行结束';
       const body = [
-        clean(event.message) || (ok ? '运行已完成。' : '运行结束，但存在失败工具。'),
+        clean(event.message) || (canceled ? '运行已停止。' : (ok ? '运行已完成。' : '运行结束，但存在失败工具。')),
         `工具调用 ${total} 个，失败 ${failed} 个。`
       ].join('\n');
       return cardHtml({
-        tone: ok ? 'done' : 'failed',
+        tone: canceled ? 'canceled' : (ok ? 'done' : 'failed'),
         eyebrow: '执行摘要',
-        title: ok ? 'Runtime 已完成' : 'Runtime 有失败工具',
+        title: canceled ? 'Runtime 已停止' : (ok ? 'Runtime 已完成' : 'Runtime 有失败工具'),
         body,
         taskId,
         meta: `${runtime} · ${turn}`,

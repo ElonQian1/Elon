@@ -269,6 +269,15 @@ where
     let mut failed_tools = 0usize;
     for turn in 1..=MAX_TURNS {
         if *cancel_rx.borrow() {
+            send_runtime_canceled(
+                &out_tx,
+                task_journal.as_ref(),
+                req_id,
+                label,
+                turn,
+                total_tools,
+                failed_tools,
+            );
             return Ok(canceled_runtime_result(label, model, &usage));
         }
         send_chunk(
@@ -284,17 +293,41 @@ where
             ),
         );
         let call_messages = messages.clone();
-        let response = tokio::select! {
+        let response_result = tokio::select! {
             result = call_chat(call_messages.clone()) => {
-                result.with_context(|| format!("调用 {label} 失败"))?
+                result
             }
             changed = cancel_rx.changed() => {
                 if changed.is_ok() && *cancel_rx.borrow() {
+                    send_runtime_canceled(
+                        &out_tx,
+                        task_journal.as_ref(),
+                        req_id,
+                        label,
+                        turn,
+                        total_tools,
+                        failed_tools,
+                    );
                     return Ok(canceled_runtime_result(label, model, &usage));
                 }
-                call_chat(call_messages)
-                    .await
-                    .with_context(|| format!("调用 {label} 失败"))?
+                call_chat(call_messages).await
+            }
+        };
+        let response = match response_result.with_context(|| format!("调用 {label} 失败")) {
+            Ok(response) => response,
+            Err(error) => {
+                let error_message = format!("{error:#}");
+                send_runtime_failure(
+                    &out_tx,
+                    task_journal.as_ref(),
+                    req_id,
+                    label,
+                    turn,
+                    total_tools,
+                    failed_tools,
+                    &error_message,
+                );
+                return Err(error);
             }
         };
         usage.merge(&response);
@@ -305,9 +338,39 @@ where
         {
             model = Some(value.to_string());
         }
-        let content = extract_assistant_content(&response)?;
+        let content = match extract_assistant_content(&response) {
+            Ok(content) => content,
+            Err(error) => {
+                send_runtime_failure(
+                    &out_tx,
+                    task_journal.as_ref(),
+                    req_id,
+                    label,
+                    turn,
+                    total_tools,
+                    failed_tools,
+                    &error.to_string(),
+                );
+                return Err(error);
+            }
+        };
         messages.push(json!({"role": "assistant", "content": content}));
-        let agent = parse_agent_response(&content)?;
+        let agent = match parse_agent_response(&content) {
+            Ok(agent) => agent,
+            Err(error) => {
+                send_runtime_failure(
+                    &out_tx,
+                    task_journal.as_ref(),
+                    req_id,
+                    label,
+                    turn,
+                    total_tools,
+                    failed_tools,
+                    &error.to_string(),
+                );
+                return Err(error);
+            }
+        };
         if let Some(message) = agent
             .get("message")
             .and_then(Value::as_str)
@@ -526,6 +589,15 @@ where
                         continue;
                     }
                     ApprovalOutcome::Canceled => {
+                        send_runtime_canceled(
+                            &out_tx,
+                            task_journal.as_ref(),
+                            req_id,
+                            label,
+                            turn,
+                            total_tools,
+                            failed_tools,
+                        );
                         return Ok(canceled_runtime_result(label, model, &usage));
                     }
                 }
@@ -685,6 +757,63 @@ fn send_runtime_summary(
             failed_tools,
             message,
         ),
+    );
+}
+
+fn send_runtime_canceled(
+    out_tx: &mpsc::UnboundedSender<Message>,
+    task_journal: Option<&TaskJournal>,
+    req_id: &str,
+    label: &str,
+    turn: usize,
+    total_tools: usize,
+    failed_tools: usize,
+) {
+    send_chunk(
+        out_tx,
+        task_journal,
+        req_id,
+        runtime_status_chunk(req_id, turn, label, "canceled", "用户已停止运行时任务"),
+    );
+    send_runtime_summary(
+        out_tx,
+        task_journal,
+        req_id,
+        label,
+        turn,
+        "canceled",
+        total_tools,
+        failed_tools,
+        "用户已停止运行时任务",
+    );
+}
+
+fn send_runtime_failure(
+    out_tx: &mpsc::UnboundedSender<Message>,
+    task_journal: Option<&TaskJournal>,
+    req_id: &str,
+    label: &str,
+    turn: usize,
+    total_tools: usize,
+    failed_tools: usize,
+    message: &str,
+) {
+    send_chunk(
+        out_tx,
+        task_journal,
+        req_id,
+        runtime_status_chunk(req_id, turn, label, "failed", message),
+    );
+    send_runtime_summary(
+        out_tx,
+        task_journal,
+        req_id,
+        label,
+        turn,
+        "error",
+        total_tools,
+        failed_tools,
+        message,
     );
 }
 
@@ -949,6 +1078,7 @@ mod tests {
         runtime_http_error_message, system_prompt, RuntimeLoopOptions,
     };
     use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
+    use anyhow::anyhow;
     use homecli_proto::AgentToServer;
     use serde_json::{json, Value};
     use std::{
@@ -1101,6 +1231,96 @@ mod tests {
         let result = runtime.await.unwrap();
         assert!(result.exit_ok);
         let _ = cancel_tx.send(true);
+    }
+
+    #[tokio::test]
+    async fn runtime_loop_emits_canceled_summary_when_stopped_before_turn() {
+        let workspace =
+            temp_test_dir("runtime_loop_emits_canceled_summary_when_stopped_before_turn");
+        let (_cancel_tx, cancel_rx) = watch::channel(true);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let calls = Arc::new(AtomicUsize::new(0));
+        let calls_for_runtime = calls.clone();
+
+        let result = run_runtime_loop(
+            RuntimeLoopOptions {
+                req_id: "req-canceled",
+                label: "test-runtime",
+                guard: ToolGuard::new(workspace, Some("project_write")),
+                prompt: "finish",
+                approval_state: Some(ToolApprovalState::default()),
+                cancel_rx,
+                out_tx,
+                task_journal: None,
+                initial_model: Some("test-model".to_string()),
+            },
+            move |_| {
+                calls_for_runtime.fetch_add(1, Ordering::SeqCst);
+                async move {
+                    Ok(chat_response(json!({
+                        "message": "should not run",
+                        "done": true,
+                        "actions": []
+                    })))
+                }
+            },
+        )
+        .await
+        .unwrap();
+
+        let canceled = next_tool_event(&mut out_rx, "runtime_status").await;
+        assert_eq!(canceled["phase"], "canceled");
+        assert_eq!(canceled["status"], "canceled");
+        let summary = next_tool_event(&mut out_rx, "runtime_summary").await;
+        assert_eq!(summary["status"], "canceled");
+        assert_eq!(summary["total_tools"], 0);
+        assert!(!result.exit_ok);
+        assert_eq!(calls.load(Ordering::SeqCst), 0);
+    }
+
+    #[tokio::test]
+    async fn runtime_loop_emits_failure_summary_on_model_error() {
+        let workspace = temp_test_dir("runtime_loop_emits_failure_summary_on_model_error");
+        let (_cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+
+        let error = match run_runtime_loop(
+            RuntimeLoopOptions {
+                req_id: "req-model-error",
+                label: "test-runtime",
+                guard: ToolGuard::new(workspace, Some("project_write")),
+                prompt: "finish",
+                approval_state: Some(ToolApprovalState::default()),
+                cancel_rx,
+                out_tx,
+                task_journal: None,
+                initial_model: Some("test-model".to_string()),
+            },
+            move |_| async move { Err(anyhow!("provider unavailable")) },
+        )
+        .await
+        {
+            Ok(_) => panic!("runtime should fail when model call fails"),
+            Err(error) => error,
+        };
+
+        let thinking = next_tool_event(&mut out_rx, "runtime_status").await;
+        assert_eq!(thinking["phase"], "thinking");
+        let failed = next_tool_event(&mut out_rx, "runtime_status").await;
+        assert_eq!(failed["phase"], "failed");
+        assert_eq!(failed["status"], "error");
+        assert!(failed["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("调用 test-runtime 失败"));
+        assert!(failed["message"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("provider unavailable"));
+        let summary = next_tool_event(&mut out_rx, "runtime_summary").await;
+        assert_eq!(summary["status"], "error");
+        assert_eq!(summary["failed_tools"], 0);
+        assert!(format!("{error:#}").contains("provider unavailable"));
     }
 
     #[tokio::test]
