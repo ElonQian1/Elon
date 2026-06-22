@@ -179,10 +179,10 @@
     function routeInfo(node) {
       const clis = normalizedClis(node);
       const routeA = ['codex', 'copilot', 'claude', 'gemini'].find((cli) => clis.includes(cli));
-      if (node.route_a_ready && routeA) return { ready: true, label: `Route A · ${routeA}` };
-      if (node.api_runtime_ready) return { ready: true, label: 'Route B · 本机 API runtime' };
-      if (node.server_runtime_ready) return { ready: true, label: 'Route C · 服务器模型' };
-      if (routeA) return { ready: !!node.online, label: `本机 CLI · ${routeA}` };
+      if (routeAProbeReady(node, routeA)) return { ready: true, label: `Route A · ${routeA}` };
+      if (routeFlagReady(node, 'api_runtime_ready', 'apiRuntimeReady')) return { ready: true, label: 'Route B · 本机 API runtime' };
+      if (routeFlagReady(node, 'server_runtime_ready', 'serverRuntimeReady')) return { ready: true, label: 'Route C · 服务器模型' };
+      if (routeA) return { ready: false, label: `${routeA} CLI 探测未通过` };
       return { ready: false, label: '无可用运行时' };
     }
 
@@ -259,6 +259,28 @@
 
     function normalizedClis(node) {
       return (node && node.allowed_clis || []).map((item) => clean(item).toLowerCase()).filter(Boolean);
+    }
+
+    function routeAProbeReady(node, routeA) {
+      if (!routeA) return false;
+      if (hasRouteFlag(node, 'route_a_ready', 'routeAReady')) {
+        return routeFlagReady(node, 'route_a_ready', 'routeAReady');
+      }
+      return true;
+    }
+
+    function routeFlagReady(node, snakeName, camelName) {
+      if (!node) return false;
+      if (Object.prototype.hasOwnProperty.call(node, snakeName)) return node[snakeName] === true;
+      if (Object.prototype.hasOwnProperty.call(node, camelName)) return node[camelName] === true;
+      return false;
+    }
+
+    function hasRouteFlag(node, snakeName, camelName) {
+      return !!node && (
+        Object.prototype.hasOwnProperty.call(node, snakeName)
+        || Object.prototype.hasOwnProperty.call(node, camelName)
+      );
     }
 
     function cliLabel(node) {

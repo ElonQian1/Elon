@@ -788,6 +788,18 @@ function testProjectReadinessChecklist() {
   });
   assert.ok(fullAccessHtml.includes('B/C 保留白名单'), 'full access copy should explain Route B/C boundaries');
 
+  const failedRouteAHtml = create({
+    nodes: [{ node_id: 'node-1', online: true, route_a_ready: false, allowed_clis: ['codex'] }],
+    projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
+  }).renderMemberPanel({
+    id: 'p1',
+    node_id: 'node-1',
+    workspace_path: 'D:/demo',
+    runtime_permission: 'project_write'
+  });
+  assert.ok(!failedRouteAHtml.includes('可以开发'), 'failed Route A probe alone should not mark project developable');
+  assert.ok(failedRouteAHtml.includes('codex CLI 探测未通过'), 'readiness should explain failed Route A probe');
+
   const blockedHtml = create({ nodes: [], projectSpace: { channels: [] } }).renderMemberPanel({ id: 'p2' });
   assert.ok(blockedHtml.includes('未绑定本机'), 'unbound project should not be marked ready');
   assert.ok(blockedHtml.includes('未绑定本机项目目录'), 'blocked checklist should explain missing workspace');
@@ -831,6 +843,47 @@ function testDevComposerRouteLabels() {
   assert.ok(inserted.innerHTML.includes('Route B · 本机 API runtime'), 'composer should show API runtime route');
   assert.ok(inserted.innerHTML.includes('data-dev-composer-route="route_b"'), 'composer should expose Route B selector');
   assert.strictEqual(composer.selectedRouteForRequest(), '', 'auto route should not be sent to backend');
+}
+
+function testDevComposerSkipsFailedRouteAProbe() {
+  let inserted = null;
+  const fakeParent = {
+    insertBefore(element) {
+      inserted = element;
+    }
+  };
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_composer.js', {
+    document: {
+      createElement: () => ({ hidden: true, className: '', innerHTML: '', querySelectorAll: () => [] })
+    }
+  });
+  const state = {
+    activeKind: 'project',
+    activeChannelKind: 'ai_development',
+    activeProjectId: 'p1',
+    projects: [{ id: 'p1', node_id: 'node-1', workspace_path: 'D:/demo', runtime_permission: 'project_write' }],
+    nodes: [{
+      node_id: 'node-1',
+      online: true,
+      route_a_ready: false,
+      server_runtime_ready: true,
+      allowed_clis: ['codex']
+    }]
+  };
+  const composer = sandbox.window.ElonPcDevComposer.create({
+    state,
+    els: { composer: { parentElement: fakeParent } },
+    clean,
+    escapeHtml,
+    openSettings: () => {},
+    selectNode: () => {},
+    openModelPicker: () => {}
+  });
+
+  composer.render();
+  assert.ok(inserted.innerHTML.includes('Route C · 服务器模型'), 'auto route should skip failed Route A and show Route C');
+  assert.ok(inserted.innerHTML.includes('codex CLI 登录/版本探测未通过'), 'Route A button should explain failed probe');
+  assert.strictEqual(composer.selectedRouteForRequest(), '', 'auto fallback should remain an automatic backend choice');
 }
 
 function testDevComposerForcedRoutePreference() {
@@ -921,6 +974,7 @@ function testLocalAdminTokenWiring() {
   await testTaskSnapshotsReplaysLocalJournalMessages();
   testProjectReadinessChecklist();
   testDevComposerRouteLabels();
+  testDevComposerSkipsFailedRouteAProbe();
   testDevComposerForcedRoutePreference();
   testLocalAdminTokenWiring();
 

@@ -119,10 +119,13 @@
       }
       const clis = normalizedClis(node);
       const routeA = ['codex', 'copilot', 'claude', 'gemini'].find((cli) => clis.includes(cli));
-      const routeAReady = !!routeA;
-      const routeBReady = !!node.api_runtime_ready;
-      const routeCReady = !!node.server_runtime_ready;
-      const auto = autoRouteLabel(routeA, routeBReady, routeCReady);
+      const routeAReady = routeAProbeReady(node, routeA);
+      const routeBReady = routeFlagReady(node, 'api_runtime_ready', 'apiRuntimeReady');
+      const routeCReady = routeFlagReady(node, 'server_runtime_ready', 'serverRuntimeReady');
+      const auto = autoRouteLabel(routeAReady ? routeA : '', routeBReady, routeCReady);
+      const routeAUnavailable = routeA
+        ? `Route A 未就绪：${routeA} CLI 登录/版本探测未通过`
+        : 'Route A 未就绪：未检测到 Codex/Copilot/Claude/Gemini CLI';
       const options = [
         {
           value: 'auto',
@@ -134,7 +137,7 @@
           value: 'route_a',
           label: 'A',
           enabled: routeAReady,
-          title: routeAReady ? `Route A · ${routeA}` : 'Route A 未就绪：未检测到 Codex/Copilot/Claude/Gemini CLI'
+          title: routeAReady ? `Route A · ${routeA}` : routeAUnavailable
         },
         {
           value: 'route_b',
@@ -186,6 +189,28 @@
       if (routeBReady) return { ready: true, label: 'Route B · 本机 API runtime' };
       if (routeCReady) return { ready: true, label: 'Route C · 服务器模型' };
       return { ready: false, label: '运行时未就绪' };
+    }
+
+    function routeAProbeReady(node, routeA) {
+      if (!routeA) return false;
+      if (hasRouteFlag(node, 'route_a_ready', 'routeAReady')) {
+        return routeFlagReady(node, 'route_a_ready', 'routeAReady');
+      }
+      return true;
+    }
+
+    function routeFlagReady(node, snakeName, camelName) {
+      if (!node) return false;
+      if (Object.prototype.hasOwnProperty.call(node, snakeName)) return node[snakeName] === true;
+      if (Object.prototype.hasOwnProperty.call(node, camelName)) return node[camelName] === true;
+      return false;
+    }
+
+    function hasRouteFlag(node, snakeName, camelName) {
+      return !!node && (
+        Object.prototype.hasOwnProperty.call(node, snakeName)
+        || Object.prototype.hasOwnProperty.call(node, camelName)
+      );
     }
 
     function activeProject() {
