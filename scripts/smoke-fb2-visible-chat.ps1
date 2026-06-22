@@ -188,7 +188,7 @@ function Test-ContainsUnsupportedBettingGuarantee {
         "重注",
         "梭哈"
     )
-    $negatingPattern = "不|不能|无法|不要|别|禁止|不宜|不应|不建议|不能保证|不承诺|过于绝对|诱导|风险|不是|勿|反驳|纠正|不合理"
+    $negatingPattern = "不|不能|无法|不要|别|禁止|不宜|不应|不建议|不能保证|不承诺|过于绝对|诱导|风险|风险大|不是|勿|反驳|纠正|不合理|询问|质疑|是否|问题"
 
     foreach ($term in $terms) {
         $index = $Text.IndexOf($term, [System.StringComparison]::OrdinalIgnoreCase)
