@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-visible-readonly-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-data-only-direct-read-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-projection-log-validation.ps1")
+. (Join-Path $PSScriptRoot "fb2-goal-readiness-status.ps1")
 
 function Get-Fb2StatusRepoRoot {
     Split-Path -Parent $PSScriptRoot
@@ -102,6 +103,14 @@ function Build-Fb2AiCenterStatusSnapshot {
     $tokenPresent = -not [string]::IsNullOrWhiteSpace($env:FB2_AI_CENTER_TOKEN)
     $voiceEvidencePath = [string]$env:FB2_VOICE_DEVICE_EVIDENCE_PATH
     $voiceEvidencePathPresent = -not [string]::IsNullOrWhiteSpace($voiceEvidencePath)
+    $goalCompletion = Get-Fb2GoalCompletionState `
+        -DataSuccess $dataSuccess `
+        -FeedbackComplete $feedbackComplete `
+        -DataDirectReadComplete $dataDirectReadComplete `
+        -ReadOnlyDirectReadComplete $readOnlyComplete `
+        -ContextProjectionComplete ([bool]$contextProjectionState.complete) `
+        -VoiceEvidencePathPresent $voiceEvidencePathPresent `
+        -FinalEvidence $finalEvidence
 
     $blockers = @()
     if (-not $voiceEvidencePathPresent) {
@@ -195,6 +204,7 @@ function Build-Fb2AiCenterStatusSnapshot {
             full_final_ready = $false
             asr_tts_status = if ($voiceEvidencePathPresent) { "voice_evidence_path_configured_but_not_verified_by_this_status_script" } else { "deferred_or_missing" }
         }
+        goal_completion = $goalCompletion
         blockers = $blockers
         refresh_gaps = $refreshGaps
         next_actions = $nextActions
@@ -297,6 +307,10 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.latest_ai_center_context_projection.complete) { $failed++ }
         if (-not [bool]$snapshot.latest_ai_center_context_projection.today_matches_context_pack.complete) { $failed++ }
         if (-not [bool]$snapshot.latest_ai_center_context_projection.my_ticket_context_pack.complete) { $failed++ }
+        if (-not [bool]$snapshot.goal_completion.non_voice_ready) { $failed++ }
+        if ([bool]$snapshot.goal_completion.full_final_ready) { $failed++ }
+        if ($snapshot.goal_completion.stage -ne "non_voice_data_chat_permission_quality_ready_voice_deferred") { $failed++ }
+        if (-not (@($snapshot.goal_completion.missing_items) -contains "voice_final_evidence_path_present")) { $failed++ }
         if ([string]::IsNullOrWhiteSpace([string]$snapshot.repo.head)) { $failed++ }
         Write-Output "== SelfTest Summary =="
         Write-Output "failed=$failed"
