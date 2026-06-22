@@ -621,6 +621,7 @@ function testDevTasksUsesLocalJournalAttachLabel() {
   assert.ok(html.includes('本机现场可连接'), 'task card should label local journal live attach state');
   assert.ok(html.includes('本机事件可回放'), 'task card should expose local journal replay');
   assert.ok(html.includes('Codex 会话可续接'), 'task card should expose codex session resume capability');
+  assert.ok(html.includes('原 CLI 终端不可重接'), 'task card should explain original CLI terminal cannot be reattached');
 }
 
 function testDevTasksUsesResumeContractForSnapshotContinue() {
@@ -672,6 +673,7 @@ function testDevTasksUsesResumeContractForSnapshotContinue() {
   assert.strictEqual(devTasks.openTaskIds(messages, context).length, 0, 'detached resume contract should remove task from open IDs');
   assert.ok(taskHtml.includes('需要基于快照继续'), 'detached task should not look normally running');
   assert.ok(taskHtml.includes('基于快照继续'), 'detached task should expose snapshot continuation mode');
+  assert.ok(taskHtml.includes('原 CLI 终端不可重接'), 'detached task should explain CLI terminal reattach limitation');
   assert.ok(taskHtml.includes('data-dev-task-action="continue"'), 'detached task should offer continue action');
   assert.ok(!taskHtml.includes('data-dev-task-action="cancel"'), 'detached task should not offer stop action');
   assert.ok(!approvalHtml.includes('data-decision="approve"'), 'detached task should close stale approval buttons');
