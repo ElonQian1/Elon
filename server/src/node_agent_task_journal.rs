@@ -11,6 +11,8 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use crate::node_agent_task_journal_lock::with_task_journal_io_lock;
+
 const MAX_CHUNK_CHARS: usize = 12_000;
 const MAX_ERROR_CHARS: usize = 2_000;
 
@@ -80,51 +82,55 @@ impl TaskJournal {
     }
 
     pub(crate) fn record_started(&self, start: TaskJournalStart<'_>) -> Result<()> {
-        let now = now_ms();
-        let mut registry = self.load_registry()?;
-        let record = TaskJournalRecord {
-            req_id: start.req_id.to_string(),
-            cli_name: start.cli_name.to_string(),
-            route: start.route.map(str::to_string),
-            run_handle_id: start.run_handle_id.map(str::to_string),
-            cwd: start.cwd.map(str::to_string),
-            runtime_permission: start.runtime_permission.map(str::to_string),
-            os_pid: None,
-            process_started_at_ms: None,
-            codex_session_id: None,
-            codex_session_scope_key: None,
-            codex_session_updated_at_ms: None,
-            status: "running".to_string(),
-            started_at_ms: now,
-            updated_at_ms: now,
-            cancel_requested_at_ms: None,
-        };
-        registry.insert(start.req_id.to_string(), record);
-        self.save_registry(&registry)?;
-        self.append_event(json!({
-            "type": "started",
-            "req_id": start.req_id,
-            "cli": start.cli_name,
-            "route": start.route,
-            "run_handle_id": start.run_handle_id,
-            "cwd": start.cwd,
-            "runtime_permission": start.runtime_permission,
-            "at_ms": now
-        }))
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            let record = TaskJournalRecord {
+                req_id: start.req_id.to_string(),
+                cli_name: start.cli_name.to_string(),
+                route: start.route.map(str::to_string),
+                run_handle_id: start.run_handle_id.map(str::to_string),
+                cwd: start.cwd.map(str::to_string),
+                runtime_permission: start.runtime_permission.map(str::to_string),
+                os_pid: None,
+                process_started_at_ms: None,
+                codex_session_id: None,
+                codex_session_scope_key: None,
+                codex_session_updated_at_ms: None,
+                status: "running".to_string(),
+                started_at_ms: now,
+                updated_at_ms: now,
+                cancel_requested_at_ms: None,
+            };
+            registry.insert(start.req_id.to_string(), record);
+            self.save_registry(&registry)?;
+            self.append_event(json!({
+                "type": "started",
+                "req_id": start.req_id,
+                "cli": start.cli_name,
+                "route": start.route,
+                "run_handle_id": start.run_handle_id,
+                "cwd": start.cwd,
+                "runtime_permission": start.runtime_permission,
+                "at_ms": now
+            }))
+        })
     }
 
     pub(crate) fn load_codex_session(&self, scope_key: &str) -> Result<Option<String>> {
-        let path = self.codex_sessions_path();
-        if !path.exists() {
-            return Ok(None);
-        }
-        let text = fs::read_to_string(&path).with_context(|| format!("读取 {:?}", path))?;
-        let map: BTreeMap<String, String> =
-            serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))?;
-        Ok(map
-            .get(scope_key)
-            .map(|value| value.trim().to_string())
-            .filter(|value| !value.is_empty()))
+        with_task_journal_io_lock(|| {
+            let path = self.codex_sessions_path();
+            if !path.exists() {
+                return Ok(None);
+            }
+            let text = fs::read_to_string(&path).with_context(|| format!("读取 {:?}", path))?;
+            let map: BTreeMap<String, String> =
+                serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))?;
+            Ok(map
+                .get(scope_key)
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()))
+        })
     }
 
     pub(crate) fn record_codex_session(
@@ -133,87 +139,95 @@ impl TaskJournal {
         scope_key: &str,
         session_id: &str,
     ) -> Result<()> {
-        let scope_key = scope_key.trim();
-        let session_id = session_id.trim();
-        if scope_key.is_empty() || session_id.is_empty() {
-            return Ok(());
-        }
-        let now = now_ms();
-        let mut registry = self.load_registry()?;
-        if let Some(record) = registry.get_mut(req_id) {
-            record.codex_session_id = Some(session_id.to_string());
-            record.codex_session_scope_key = Some(scope_key.to_string());
-            record.codex_session_updated_at_ms = Some(now);
-            record.updated_at_ms = now;
-        }
-        self.save_registry(&registry)?;
-        self.save_codex_session(scope_key, session_id)?;
-        self.append_event(json!({
-            "type": "codex_session",
-            "req_id": req_id,
-            "scope_key": scope_key,
-            "session_id": session_id,
-            "at_ms": now
-        }))
+        with_task_journal_io_lock(|| {
+            let scope_key = scope_key.trim();
+            let session_id = session_id.trim();
+            if scope_key.is_empty() || session_id.is_empty() {
+                return Ok(());
+            }
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                record.codex_session_id = Some(session_id.to_string());
+                record.codex_session_scope_key = Some(scope_key.to_string());
+                record.codex_session_updated_at_ms = Some(now);
+                record.updated_at_ms = now;
+            }
+            self.save_registry(&registry)?;
+            self.save_codex_session(scope_key, session_id)?;
+            self.append_event(json!({
+                "type": "codex_session",
+                "req_id": req_id,
+                "scope_key": scope_key,
+                "session_id": session_id,
+                "at_ms": now
+            }))
+        })
     }
 
     pub(crate) fn clear_codex_session(&self, req_id: &str, scope_key: &str) -> Result<()> {
-        let scope_key = scope_key.trim();
-        if scope_key.is_empty() {
-            return Ok(());
-        }
-        let now = now_ms();
-        let mut registry = self.load_registry()?;
-        if let Some(record) = registry.get_mut(req_id) {
-            if record.codex_session_scope_key.as_deref() == Some(scope_key) {
-                record.codex_session_id = None;
-                record.codex_session_scope_key = None;
-                record.codex_session_updated_at_ms = None;
-                record.updated_at_ms = now;
+        with_task_journal_io_lock(|| {
+            let scope_key = scope_key.trim();
+            if scope_key.is_empty() {
+                return Ok(());
             }
-        }
-        self.save_registry(&registry)?;
-        self.remove_codex_session(scope_key)?;
-        self.append_event(json!({
-            "type": "codex_session_cleared",
-            "req_id": req_id,
-            "scope_key": scope_key,
-            "reason": "stale_resume",
-            "at_ms": now
-        }))
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                if record.codex_session_scope_key.as_deref() == Some(scope_key) {
+                    record.codex_session_id = None;
+                    record.codex_session_scope_key = None;
+                    record.codex_session_updated_at_ms = None;
+                    record.updated_at_ms = now;
+                }
+            }
+            self.save_registry(&registry)?;
+            self.remove_codex_session(scope_key)?;
+            self.append_event(json!({
+                "type": "codex_session_cleared",
+                "req_id": req_id,
+                "scope_key": scope_key,
+                "reason": "stale_resume",
+                "at_ms": now
+            }))
+        })
     }
 
     pub(crate) fn record_process_started(&self, req_id: &str, pid: u32) -> Result<()> {
-        let now = now_ms();
-        let mut registry = self.load_registry()?;
-        if let Some(record) = registry.get_mut(req_id) {
-            record.os_pid = Some(pid);
-            record.process_started_at_ms = Some(now);
-            record.updated_at_ms = now;
-        }
-        self.save_registry(&registry)?;
-        self.append_event(json!({
-            "type": "process_started",
-            "req_id": req_id,
-            "pid": pid,
-            "at_ms": now
-        }))
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                record.os_pid = Some(pid);
+                record.process_started_at_ms = Some(now);
+                record.updated_at_ms = now;
+            }
+            self.save_registry(&registry)?;
+            self.append_event(json!({
+                "type": "process_started",
+                "req_id": req_id,
+                "pid": pid,
+                "at_ms": now
+            }))
+        })
     }
 
     pub(crate) fn record_cancel_requested(&self, req_id: &str) -> Result<()> {
-        let now = now_ms();
-        let mut registry = self.load_registry()?;
-        if let Some(record) = registry.get_mut(req_id) {
-            record.status = "cancel_requested".to_string();
-            record.updated_at_ms = now;
-            record.cancel_requested_at_ms = Some(now);
-        }
-        self.save_registry(&registry)?;
-        self.append_event(json!({
-            "type": "cancel_requested",
-            "req_id": req_id,
-            "at_ms": now
-        }))
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                record.status = "cancel_requested".to_string();
+                record.updated_at_ms = now;
+                record.cancel_requested_at_ms = Some(now);
+            }
+            self.save_registry(&registry)?;
+            self.append_event(json!({
+                "type": "cancel_requested",
+                "req_id": req_id,
+                "at_ms": now
+            }))
+        })
     }
 
     pub(crate) fn record_finished(&self, req_id: &str) -> Result<()> {
@@ -226,66 +240,72 @@ impl TaskJournal {
         status: &str,
         error: Option<&str>,
     ) -> Result<()> {
-        let now = now_ms();
-        let requested_status = normalize_finish_status(status, error);
-        let mut effective_status = requested_status.to_string();
-        let mut already_terminal = false;
-        let mut registry = self.load_registry()?;
-        if let Some(record) = registry.get_mut(req_id) {
-            if requested_status == "finished" && is_terminal_status(&record.status) {
-                effective_status = record.status.clone();
-                already_terminal = true;
-            } else {
-                record.status = requested_status.to_string();
-                effective_status = record.status.clone();
+        with_task_journal_io_lock(|| {
+            let now = now_ms();
+            let requested_status = normalize_finish_status(status, error);
+            let mut effective_status = requested_status.to_string();
+            let mut already_terminal = false;
+            let mut registry = self.load_registry()?;
+            if let Some(record) = registry.get_mut(req_id) {
+                if requested_status == "finished" && is_terminal_status(&record.status) {
+                    effective_status = record.status.clone();
+                    already_terminal = true;
+                } else {
+                    record.status = requested_status.to_string();
+                    effective_status = record.status.clone();
+                }
+                record.updated_at_ms = now;
             }
-            record.updated_at_ms = now;
-        }
-        self.save_registry(&registry)?;
-        if already_terminal {
-            return Ok(());
-        }
+            self.save_registry(&registry)?;
+            if already_terminal {
+                return Ok(());
+            }
 
-        let mut event = json!({
-            "type": "finished",
-            "req_id": req_id,
-            "status": effective_status,
-            "at_ms": now
-        });
-        if let Some(error) = normalize_finish_error(error) {
-            event["error"] = Value::String(error);
-        }
-        self.append_event(event)
+            let mut event = json!({
+                "type": "finished",
+                "req_id": req_id,
+                "status": effective_status,
+                "at_ms": now
+            });
+            if let Some(error) = normalize_finish_error(error) {
+                event["error"] = Value::String(error);
+            }
+            self.append_event(event)
+        })
     }
 
     pub(crate) fn record_cli_chunk(&self, req_id: &str, stream: &str, text: &str) -> Result<()> {
-        let text = truncate_chars(text, MAX_CHUNK_CHARS);
-        if text.trim().is_empty() {
-            return Ok(());
-        }
-        let now = now_ms();
-        if let Some(event) = parse_runtime_event(req_id, stream, &text, now) {
-            return self.append_event(event);
-        }
-        self.append_event(json!({
-            "type": "cli_chunk",
-            "req_id": req_id,
-            "stream": normalize_stream(stream),
-            "text": text,
-            "at_ms": now
-        }))
+        with_task_journal_io_lock(|| {
+            let text = truncate_chars(text, MAX_CHUNK_CHARS);
+            if text.trim().is_empty() {
+                return Ok(());
+            }
+            let now = now_ms();
+            if let Some(event) = parse_runtime_event(req_id, stream, &text, now) {
+                return self.append_event(event);
+            }
+            self.append_event(json!({
+                "type": "cli_chunk",
+                "req_id": req_id,
+                "stream": normalize_stream(stream),
+                "text": text,
+                "at_ms": now
+            }))
+        })
     }
 
     pub(crate) fn latest_records(&self, limit: usize) -> Result<Vec<TaskJournalRecord>> {
-        let mut records: Vec<_> = self.load_registry()?.into_values().collect();
-        records.sort_by(|left, right| {
-            right
-                .updated_at_ms
-                .cmp(&left.updated_at_ms)
-                .then_with(|| right.started_at_ms.cmp(&left.started_at_ms))
-        });
-        records.truncate(limit.min(100));
-        Ok(records)
+        with_task_journal_io_lock(|| {
+            let mut records: Vec<_> = self.load_registry()?.into_values().collect();
+            records.sort_by(|left, right| {
+                right
+                    .updated_at_ms
+                    .cmp(&left.updated_at_ms)
+                    .then_with(|| right.started_at_ms.cmp(&left.started_at_ms))
+            });
+            records.truncate(limit.min(100));
+            Ok(records)
+        })
     }
 
     pub(crate) fn snapshot(
@@ -294,21 +314,23 @@ impl TaskJournal {
         since: usize,
         limit: usize,
     ) -> Result<TaskJournalSnapshot> {
-        let registry = self.load_registry()?;
-        let record = registry.get(task_id).cloned();
-        let event_limit = limit.clamp(1, 200);
+        with_task_journal_io_lock(|| {
+            let registry = self.load_registry()?;
+            let record = registry.get(task_id).cloned();
+            let event_limit = limit.clamp(1, 200);
 
-        // Journal 只保存本机进程状态，不写入 prompt/API key；读取时仍按 req_id 过滤，避免
-        // 前端把其他任务的本机路径混进当前任务卡片。压力场景下按行流式扫描，避免把整个
-        // events.jsonl 收集到内存后再过滤。
-        let event_scan = self.scan_task_events(task_id, since, event_limit)?;
+            // Journal 只保存本机进程状态，不写入 prompt/API key；读取时仍按 req_id 过滤，避免
+            // 前端把其他任务的本机路径混进当前任务卡片。压力场景下按行流式扫描，避免把整个
+            // events.jsonl 收集到内存后再过滤。
+            let event_scan = self.scan_task_events(task_id, since, event_limit)?;
 
-        Ok(TaskJournalSnapshot {
-            task_id: task_id.to_string(),
-            record,
-            events: event_scan.events,
-            last_event_seq: event_scan.last_event_seq,
-            has_more: event_scan.has_more,
+            Ok(TaskJournalSnapshot {
+                task_id: task_id.to_string(),
+                record,
+                events: event_scan.events,
+                last_event_seq: event_scan.last_event_seq,
+                has_more: event_scan.has_more,
+            })
         })
     }
 
@@ -424,7 +446,7 @@ impl TaskJournal {
 
     #[cfg(test)]
     fn read_registry_for_test(&self) -> Result<BTreeMap<String, TaskJournalRecord>> {
-        self.load_registry()
+        with_task_journal_io_lock(|| self.load_registry())
     }
 }
 

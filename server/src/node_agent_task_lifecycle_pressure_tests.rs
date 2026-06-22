@@ -3,7 +3,7 @@ use crate::{
     node_agent_task_resume::{task_attach_state, task_resume_contract},
 };
 use serde_json::Value;
-use std::{collections::BTreeMap, fs, path::PathBuf};
+use std::{collections::BTreeMap, fs, path::PathBuf, sync::Arc, thread};
 
 #[test]
 fn stress_terminal_outcomes_across_all_pc_task_routes() {
@@ -194,6 +194,140 @@ fn stress_local_journal_cursor_replays_long_interleaved_task_without_skipping() 
     let _ = fs::remove_dir_all(dir);
 }
 
+#[test]
+fn stress_concurrent_task_journal_writes_keep_registry_and_events_consistent() {
+    let dir = unique_test_dir("concurrent-writes-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = Arc::new(TaskJournal::new(&dir));
+    let workers = 16;
+    let tasks_per_worker = 24;
+    let chunks_per_task = 3;
+
+    let handles = (0..workers)
+        .map(|worker| {
+            let journal = Arc::clone(&journal);
+            thread::spawn(move || {
+                for task in 0..tasks_per_worker {
+                    let req_id = format!("req-w{worker:02}-t{task:02}");
+                    let route = match worker % 3 {
+                        0 => "route_a_external_cli",
+                        1 => "route_b_api_runtime",
+                        _ => "route_c_server_runtime",
+                    };
+                    let cli_name = match worker % 3 {
+                        0 => "codex",
+                        1 => "api-runtime",
+                        _ => "server-runtime",
+                    };
+                    journal
+                        .record_started(TaskJournalStart {
+                            req_id: &req_id,
+                            cli_name,
+                            route: Some(route),
+                            run_handle_id: Some(&req_id),
+                            cwd: Some("D:/demo"),
+                            runtime_permission: Some("project_write"),
+                        })
+                        .expect("concurrent task start should persist");
+                    for chunk in 0..chunks_per_task {
+                        journal
+                            .record_cli_chunk(
+                                &req_id,
+                                "runtime",
+                                &format!("worker {worker} task {task} chunk {chunk}\n"),
+                            )
+                            .expect("concurrent task chunk should persist");
+                    }
+                    if task % 4 == 0 {
+                        journal
+                            .record_cancel_requested(&req_id)
+                            .expect("concurrent cancel should persist");
+                        journal
+                            .record_finished_with_outcome(
+                                &req_id,
+                                "canceled",
+                                Some("用户已停止 PC CLI 任务"),
+                            )
+                            .expect("concurrent canceled finish should persist");
+                    } else if task % 4 == 1 {
+                        journal
+                            .record_finished_with_outcome(
+                                &req_id,
+                                "failed",
+                                Some("provider unavailable"),
+                            )
+                            .expect("concurrent failed finish should persist");
+                    } else {
+                        journal
+                            .record_finished_with_outcome(&req_id, "done", None)
+                            .expect("concurrent done finish should persist");
+                    }
+                    journal
+                        .record_finished(&req_id)
+                        .expect("generic cleanup should stay idempotent under concurrency");
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    for handle in handles {
+        handle.join().expect("pressure worker should not panic");
+    }
+
+    let expected_tasks = workers * tasks_per_worker;
+    let registry = read_registry(&dir);
+    assert_eq!(
+        registry.len(),
+        expected_tasks,
+        "concurrent read/modify/write must not lose registry records"
+    );
+    assert_eq!(count_status(&registry, "canceled"), workers * 6);
+    assert_eq!(count_status(&registry, "failed"), workers * 6);
+    assert_eq!(count_status(&registry, "done"), workers * 12);
+
+    let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
+    assert_eq!(
+        events.matches(r#""type":"started""#).count(),
+        expected_tasks
+    );
+    assert_eq!(
+        events.matches(r#""type":"cli_chunk""#).count(),
+        expected_tasks * chunks_per_task
+    );
+    assert_eq!(
+        events.matches(r#""type":"cancel_requested""#).count(),
+        workers * 6
+    );
+    assert_eq!(
+        events.matches(r#""type":"finished""#).count(),
+        expected_tasks
+    );
+
+    let sample = journal
+        .snapshot("req-w15-t23", 0, 20)
+        .expect("concurrent sample snapshot should read");
+    assert_eq!(
+        sample.record.as_ref().map(|record| record.status.as_str()),
+        Some("done")
+    );
+    assert_eq!(
+        sample.events.len(),
+        5,
+        "started + 3 chunks + finished should be replayable for the sampled task"
+    );
+    assert!(sample
+        .events
+        .iter()
+        .all(|event| { event.event.get("req_id").and_then(Value::as_str) == Some("req-w15-t23") }));
+
+    let latest = journal
+        .latest_records(500)
+        .expect("latest records should read after concurrent pressure");
+    assert_eq!(latest.len(), 100, "latest_records must keep public clamp");
+
+    let _ = fs::remove_dir_all(dir);
+}
+
 fn read_registry(dir: &std::path::Path) -> BTreeMap<String, TaskJournalRecord> {
     let text = fs::read_to_string(dir.join("registry.json")).expect("registry should read");
     serde_json::from_str(&text).expect("registry should parse")
@@ -207,6 +341,13 @@ fn count_records(
     registry
         .values()
         .filter(|record| record.route.as_deref() == Some(route) && record.status == status)
+        .count()
+}
+
+fn count_status(registry: &BTreeMap<String, TaskJournalRecord>, status: &str) -> usize {
+    registry
+        .values()
+        .filter(|record| record.status == status)
         .count()
 }
 
