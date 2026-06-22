@@ -17,6 +17,7 @@ $ErrorActionPreference = "Stop"
 . (Join-Path $PSScriptRoot "fb2-user-scenario-audit-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-readiness-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-goal-gap-audit-status.ps1")
+. (Join-Path $PSScriptRoot "fb2-live-preflight-request-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-ai-center-coordination-status.ps1")
 
 function Get-Fb2StatusRepoRoot {
@@ -146,6 +147,12 @@ function Build-Fb2AiCenterStatusSnapshot {
         -LatestAiCenterLogPath $(if ($null -eq $latestAiCenterLogFile) { "" } else { $latestAiCenterLogFile.FullName }) `
         -TokenPresent $tokenPresent `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent
+    $livePreflightRequest = Get-Fb2LivePreflightRequestState `
+        -GoalGapAudit $goalGapAudit `
+        -UserScenarioAudit $userScenarioAudit `
+        -LatestReadOnly $latestReadOnly `
+        -SampleSetState $sampleSetState `
+        -TokenPresent $tokenPresent
     $coordination = Get-Fb2AiCenterCoordinationStatus `
         -LatestData $latestData `
         -LatestReadOnly $latestReadOnly `
@@ -162,6 +169,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -AnswerReadinessState $answerReadinessState `
         -UserScenarioAudit $userScenarioAudit `
         -GoalGapAudit $goalGapAudit `
+        -LivePreflightRequest $livePreflightRequest `
         -TokenPresent $tokenPresent `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent
 
@@ -280,6 +288,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         }
         goal_completion = $goalCompletion
         goal_gap_audit = $goalGapAudit
+        live_preflight_request = $livePreflightRequest
         coordination = $coordination
         blockers = $blockers
         refresh_gaps = $refreshGaps
@@ -439,6 +448,17 @@ function Invoke-Fb2StatusSelfTest {
         if ([bool]$snapshot.goal_gap_audit.direct_read_policy.screenshots_accepted) { $failed++ }
         if ($snapshot.goal_gap_audit.next_smallest_action -ne "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly") { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.direct_group_chat_read_complete) { $failed++ }
+        if ($snapshot.live_preflight_request.schema -ne "fb2.main_project.live_preflight_request.v1") { $failed++ }
+        if (-not [bool]$snapshot.live_preflight_request.ready_without_token) { $failed++ }
+        if (-not [bool]$snapshot.live_preflight_request.blocked_by_external_secret) { $failed++ }
+        if ([bool]$snapshot.live_preflight_request.writes_visible_group_messages) { $failed++ }
+        if (-not (@($snapshot.live_preflight_request.missing) -contains "FB2_AI_CENTER_TOKEN")) { $failed++ }
+        if (-not ([string]$snapshot.live_preflight_request.commands.data_only_preflight -match "DataOnlyAcceptance")) { $failed++ }
+        if (-not ([string]$snapshot.live_preflight_request.commands.visible_regression_requires_authorization -match "AllowVisibleMessages")) { $failed++ }
+        if ([string]$snapshot.live_preflight_request.target_user.external_user_id -ne "6fe5aa17-0403-427a-8e91-7f414beca35d") { $failed++ }
+        if ([string]$snapshot.live_preflight_request.evidence_policy.group_chat_test_method -ne "direct_api_read") { $failed++ }
+        if ([bool]$snapshot.live_preflight_request.evidence_policy.screenshots_accepted) { $failed++ }
+        if (-not (@($snapshot.live_preflight_request.evidence_policy.required_group_message_fields) -contains "text_sha256")) { $failed++ }
         if ($snapshot.coordination.schema -ne "fb2.main_project.coordination.v1") { $failed++ }
         if ($snapshot.coordination.summary -ne "non_voice_ready_voice_deferred") { $failed++ }
         if (-not [bool]$snapshot.coordination.acceptance_scope.non_voice_ready) { $failed++ }
@@ -447,6 +467,9 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.coordination.context_pack_sample_set.complete) { $failed++ }
         if (-not [bool]$snapshot.coordination.context_answer_readiness.complete) { $failed++ }
         if (-not [bool]$snapshot.coordination.user_scenario_audit.complete) { $failed++ }
+        if (-not [bool]$snapshot.coordination.live_preflight_request.ready_without_token) { $failed++ }
+        if ([string]$snapshot.coordination.live_preflight_request.group_chat_test_method -ne "direct_api_read") { $failed++ }
+        if ([bool]$snapshot.coordination.live_preflight_request.screenshots_accepted) { $failed++ }
         if ([string]$snapshot.coordination.current_evidence.visible_group_id -ne "ext_fb2_official") { $failed++ }
         if ([string]$snapshot.coordination.current_evidence.visible_mention_reply_id -ne "") { $failed++ }
         if (-not ([string]$snapshot.coordination.safe_commands.visible_regression_requires_authorization -match "-AllowVisibleMessages")) { $failed++ }

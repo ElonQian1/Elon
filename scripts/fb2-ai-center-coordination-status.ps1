@@ -76,6 +76,7 @@ function Get-Fb2AiCenterCoordinationStatus {
         [object]$AnswerReadinessState,
         [object]$UserScenarioAudit,
         [object]$GoalGapAudit,
+        [object]$LivePreflightRequest,
         [bool]$TokenPresent,
         [bool]$VoiceEvidencePathPresent
     )
@@ -191,6 +192,16 @@ function Get-Fb2AiCenterCoordinationStatus {
             blocked_by_external_secret = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $GoalGapAudit "blocked_by_external_secret")
             deferred_by_user = @((Get-Fb2CoordinationJsonProperty $GoalGapAudit "deferred_by_user" @()))
             next_smallest_action = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $GoalGapAudit "next_smallest_action")
+        }
+        live_preflight_request = [ordered]@{
+            schema = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty $LivePreflightRequest "schema")
+            ready_without_token = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $LivePreflightRequest "ready_without_token")
+            blocked_by_external_secret = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $LivePreflightRequest "blocked_by_external_secret")
+            no_write_mode = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty $LivePreflightRequest "no_write_mode")
+            missing = @((Get-Fb2CoordinationJsonProperty $LivePreflightRequest "missing" @()))
+            data_only_preflight_command = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty (Get-Fb2CoordinationJsonProperty $LivePreflightRequest "commands") "data_only_preflight")
+            group_chat_test_method = ConvertTo-Fb2CoordinationText (Get-Fb2CoordinationJsonProperty (Get-Fb2CoordinationJsonProperty $LivePreflightRequest "evidence_policy") "group_chat_test_method")
+            screenshots_accepted = Test-Fb2CoordinationTruthyJsonValue (Get-Fb2CoordinationJsonProperty (Get-Fb2CoordinationJsonProperty $LivePreflightRequest "evidence_policy") "screenshots_accepted")
         }
         direct_read_policy = [ordered]@{
             group_messages_api = "/api/me/groups/{group_id}/messages"

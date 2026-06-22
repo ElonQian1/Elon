@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 当前 fb2 对话测试统一改为“接口直读”口径：状态快照的 `live_preflight_request.evidence_policy.group_chat_test_method=direct_api_read`，`screenshots_accepted=false`。只读验证必须通过 `/api/me/groups/{group_id}/messages` 或 summary-post 接口拿到消息 ID、正文长度和 `text_sha256`；截图只用于 UI 观感排查，不能证明 AI 已读群聊或已回写 feedback。
 - 2026-06-23 当前工作从“格式讨论”落到用户场景审计：`latest_user_scenario_audit` 会把 XML-wrapped Markdown Context Pack + JSON metadata + 群聊 direct-read/feedback/quality 证据，映射到七类用户真实问题。第一阶段仍明确不做完整 MCP/RAG，fb2 继续提供 REST Context Pack、tool manifest 和 tools/execute；MCP 以后只作为包装或增强层，不能替代当前事实源和审计链路。
 - 2026-06-23 在样本集格式验证之后，继续增加离线 answer readiness：状态快照会从 `latest_context_pack_sample_set` 推导 `latest_context_answer_readiness`，按“今天比赛怎么看 / 帮我分析我的票 / 平台今天订单风险怎么样 / 群里大家怎么看这场”四类问题检查必需 source kinds、回答分层和禁止输出。它不调用模型、不替代 feedback/live quality，但能证明当前样本足够支撑主项目 AI 的四类核心回答输入。
 - 2026-06-23 继续把 fb2 子会话导出的四类 live Context Pack 样本纳入主项目状态机：`validate-fb2-context-pack.ps1 -ValidateSampleSet` 会一次性验证 `today_matches_context_pack`、`my_ticket_context_pack`、`platform_order_context_pack`、`group_opinion_context_pack` 四个样本，并生成 `context-pack-samples-validation-current.json`。状态快照会输出 `latest_context_pack_sample_set`；缺 token 但样本集完整时，下一步从“等待 fb2 导出样本”切到“补 `FB2_AI_CENTER_TOKEN` 刷新 live 权限/质量 preflight”。
