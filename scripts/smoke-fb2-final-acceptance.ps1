@@ -18,6 +18,8 @@ param(
     [int]$PollIntervalSec = 3,
     [int]$MinFeedbackCount = 2,
     [int]$MinMatchedCitedSourceCount = 2,
+    [int]$MinNonSyntheticFeedbackCount = 1,
+    [int]$MinOpinionAdoptionCount = 1,
     [int]$QualityFeedbackSampleLimit = 10,
     [double]$MaxLargeContextPackRate = 0.75,
     [double]$MaxCitationUnmatchedRate = 0,
@@ -288,6 +290,9 @@ function Build-AiCenterEvidence {
         quality_unmatched_cited_sources = Find-CheckDetail $Lines "quality unmatched cited sources"
         quality_missing_context_count = Find-CheckDetail $Lines "quality missing context count"
         quality_wrong_context_count = Find-CheckDetail $Lines "quality wrong context count"
+        quality_non_synthetic_feedback_count = Find-CheckDetail $Lines "quality non-synthetic feedback count"
+        quality_non_synthetic_adoption_count = Find-CheckDetail $Lines "quality non-synthetic adoption count"
+        quality_non_synthetic_memory_refs = Find-CheckDetail $Lines "quality non-synthetic memory refs"
     }
 }
 
@@ -442,7 +447,10 @@ function Invoke-FinalAcceptanceSelfTest {
         "OK`tquality matched cited sources`tvalue=3 min=3",
         "OK`tquality unmatched cited sources`tvalue=0",
         "OK`tquality missing context count`tvalue=0",
-        "OK`tquality wrong context count`tvalue=0"
+        "OK`tquality wrong context count`tvalue=0",
+        "OK`tquality non-synthetic feedback count`tvalue=2 min=1",
+        "OK`tquality non-synthetic adoption count`tvalue=1 min=1",
+        "OK`tquality non-synthetic memory refs`tvalue=3"
     )
     $centerEvidence = Build-AiCenterEvidence $centerLines
     foreach ($key in @(
@@ -475,7 +483,10 @@ function Invoke-FinalAcceptanceSelfTest {
         "quality_matched_cited_sources",
         "quality_unmatched_cited_sources",
         "quality_missing_context_count",
-        "quality_wrong_context_count"
+        "quality_wrong_context_count",
+        "quality_non_synthetic_feedback_count",
+        "quality_non_synthetic_adoption_count",
+        "quality_non_synthetic_memory_refs"
     )) {
         Assert-SelfTest (-not [string]::IsNullOrWhiteSpace([string]$centerEvidence[$key])) "ai-center evidence maps $key" ([string]$centerEvidence[$key])
     }
@@ -657,6 +668,8 @@ Add-Arg $centerArgs "-VoiceDeviceEvidencePath" $VoiceDeviceEvidencePath
 Add-Arg $centerArgs "-QualitySince" $qualitySince
 Add-Arg $centerArgs "-MinFeedbackCount" $MinFeedbackCount
 Add-Arg $centerArgs "-MinMatchedCitedSourceCount" $MinMatchedCitedSourceCount
+Add-Arg $centerArgs "-MinNonSyntheticFeedbackCount" $MinNonSyntheticFeedbackCount
+Add-Arg $centerArgs "-MinOpinionAdoptionCount" $MinOpinionAdoptionCount
 Add-Arg $centerArgs "-QualityFeedbackSampleLimit" $QualityFeedbackSampleLimit
 Add-Arg $centerArgs "-MaxLargeContextPackRate" $MaxLargeContextPackRate
 Add-Arg $centerArgs "-MaxCitationUnmatchedRate" $MaxCitationUnmatchedRate

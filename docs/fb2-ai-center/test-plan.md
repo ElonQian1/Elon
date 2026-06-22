@@ -50,6 +50,7 @@
 - 完整场景验收必须加 `-RequireAllScenarios`；此时脚本不仅要求参数存在，还会要求 Context Pack 有 `context_audit_id`、比赛/订单等数据数量达到门槛，并且关键场景有 `citation_sources`。
 - 设置 `FB2_AI_CENTER_TOKEN` 后，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality` 能验证 fb2 `/context/quality-summary`：`missing_context_rate`、`wrong_context_rate`、`citation_unmatched_rate` 不超过阈值，`large_context_pack_rate` 不超过预算阈值。
 - 需要验证自动反馈闭环时，`scripts\smoke-fb2-ai-center.ps1 -CheckQuality -RequireFeedbackCoverage -QualitySince <RFC3339>` 必须确认最近反馈样本存在，且 `matched_cited_source_count` 达到门槛、`unmatched_cited_source_count=0`。
+- `scripts\smoke-fb2-ai-center.ps1 -RequireNonSyntheticQualityReadiness` 会用 `exclude_synthetic=true` 同时读取 fb2 `/context/feedback-summary`、`/context/quality-summary` 和 `/context/opinion-adoption-summary`，确认非合成反馈样本存在、`quality-summary` 与 `feedback-summary` 计数一致，并且群观点采纳数达到门槛。`-FinalAcceptance` 会自动启用该检查；默认阈值为 `MinNonSyntheticFeedbackCount=1`、`MinOpinionAdoptionCount=1`，可按验收窗口调整。
 - 需要验证权限边界时，加 `-CheckPermissionBoundaries -ExternalUserId <fb2_user_uuid>`；脚本会确认缺当前用户头的 Context Pack、`external_user_id` 与 `X-FB2-AI-CONTEXT-USER-ID` 不一致的 Context Pack、缺 platform scope 的平台摘要、缺当前用户头的用户订单工具均返回 403，并读取 `/context/permission-summary` 确认审计计数。
 - 修改最终验收 wrapper 或文档映射后，先跑 `scripts\smoke-fb2-final-acceptance.ps1 -SelfTest`；该命令只验证离线合成日志的 feedback coverage、子脚本 exit code、voice/quality/permission evidence 摘录和 `success` 门槛，不需要 token，也不会发送群消息。
 - 修改真实群聊可见回答策略或投注保证检测后，先跑 `scripts\smoke-fb2-visible-chat.ps1 -SelfTest`；该命令只用合成回复验证来源引用、事实/推断/风险分层、缺来源/缺风险失败、投注保证拦截、否定式表达放行，以及 selected-message/summary 引用原文时不被误判为 AI 诱导，不需要 token，也不会发送群消息。

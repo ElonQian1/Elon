@@ -40,6 +40,7 @@
 | 反馈写入 | `record_context_feedback` | visible final acceptance 的 generated-answer feedback |
 | 反馈查询 | `list_context_feedbacks` | quality feedback samples |
 | 质量汇总 | `/context/quality-summary` 集成端点、`context_feedback_summary`、`context_audit_summary` | `-CheckQuality` |
+| 非合成质量 readiness | `/context/feedback-summary?exclude_synthetic=true`、`/context/quality-summary?exclude_synthetic=true`、`/context/opinion-adoption-summary?exclude_synthetic=true` | `-RequireNonSyntheticQualityReadiness`；`-FinalAcceptance` 自动启用，默认要求非合成反馈 >= 1、群观点采纳 >= 1 |
 | 权限审计 | `/context/permission-summary` 集成端点、`context_audit_summary` | `-CheckPermissionBoundaries` 会触发缺用户头、用户头不匹配、缺平台 scope、用户订单工具缺头等 403 负向请求，并读取 permission summary |
 | 工具 manifest | `tool_manifest` | 默认 smoke 和 live data smoke |
 

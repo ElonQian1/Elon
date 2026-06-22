@@ -35,7 +35,10 @@ param(
     [double]$MaxWrongContextRate = 0,
     [int]$MinFeedbackCount = 0,
     [int]$MinMatchedCitedSourceCount = 0,
+    [int]$MinNonSyntheticFeedbackCount = 1,
+    [int]$MinOpinionAdoptionCount = 1,
     [int]$QualityFeedbackSampleLimit = 5,
+    [switch]$RequireNonSyntheticQualityReadiness,
     [switch]$RequireNoSkips
 )
 
@@ -84,6 +87,7 @@ if ($FinalAcceptance) {
     $RequireVoiceDeviceEvidence = $true
     $CheckQuality = $true
     $RequireFeedbackCoverage = $true
+    $RequireNonSyntheticQualityReadiness = $true
     $CheckPermissionBoundaries = $true
     $RequireNoSkips = $true
 }
@@ -106,7 +110,10 @@ $qualityCheckRequested = $CheckQuality `
     -or $PSBoundParameters.ContainsKey("MaxMissingContextRate") `
     -or $PSBoundParameters.ContainsKey("MaxWrongContextRate") `
     -or $PSBoundParameters.ContainsKey("MinFeedbackCount") `
-    -or $PSBoundParameters.ContainsKey("MinMatchedCitedSourceCount")
+    -or $PSBoundParameters.ContainsKey("MinMatchedCitedSourceCount") `
+    -or $PSBoundParameters.ContainsKey("MinNonSyntheticFeedbackCount") `
+    -or $PSBoundParameters.ContainsKey("MinOpinionAdoptionCount") `
+    -or $RequireNonSyntheticQualityReadiness
 
 $permissionCheckRequested = $CheckPermissionBoundaries
 
@@ -1157,6 +1164,37 @@ if (-not $Fb2Token) {
                 $feedbacks = Invoke-Json -Url "$Fb2Base/api/main-project/context/feedbacks?$feedbackQuery" -Headers $fb2Headers
                 Assert-True ($feedbacks.success -eq $true) "quality feedback samples"
                 Assert-True ([int]$feedbacks.data.count -gt 0) "quality feedback sample count" "count=$($feedbacks.data.count)"
+            }
+
+            if ($RequireNonSyntheticQualityReadiness) {
+                $nonSyntheticParams = [System.Collections.Generic.List[string]]::new()
+                Add-QueryParam -Params $nonSyntheticParams -Name "group_id" -Value $GroupId
+                Add-QueryParam -Params $nonSyntheticParams -Name "external_user_id" -Value $ExternalUserId
+                Add-QueryParam -Params $nonSyntheticParams -Name "exclude_synthetic" -Value "true"
+                Add-QueryParam -Params $nonSyntheticParams -Name "from" -Value $QualitySince
+                Add-QueryParam -Params $nonSyntheticParams -Name "to" -Value $QualityUntil
+                $nonSyntheticQuery = $nonSyntheticParams -join $amp
+
+                $nonSyntheticQuality = Invoke-Json -Url "$Fb2Base/api/main-project/context/quality-summary?$nonSyntheticQuery" -Headers $fb2Headers
+                $nonSyntheticFeedback = Invoke-Json -Url "$Fb2Base/api/main-project/context/feedback-summary?$nonSyntheticQuery" -Headers $fb2Headers
+                $nonSyntheticAdoption = Invoke-Json -Url "$Fb2Base/api/main-project/context/opinion-adoption-summary?$nonSyntheticQuery" -Headers $fb2Headers
+
+                Assert-True ($nonSyntheticQuality.success -eq $true) "quality non-synthetic summary"
+                Assert-True ($nonSyntheticFeedback.success -eq $true) "quality non-synthetic feedback summary"
+                Assert-True ($nonSyntheticAdoption.success -eq $true) "quality non-synthetic adoption summary"
+
+                $nonSyntheticFeedbackCount = Get-NestedNumber $nonSyntheticFeedback.data @("summary.total_feedback", "feedback_summary.total_feedback", "total_feedback")
+                $nonSyntheticQualityFeedbackCount = Get-NestedNumber $nonSyntheticQuality.data @("feedback_summary.total_feedback", "summary.total_feedback", "total_feedback")
+                $nonSyntheticAdoptionCount = Get-NestedNumber $nonSyntheticAdoption.data @("summary.total_adoptions", "opinion_adoption_summary.total_adoptions", "total_adoptions")
+                $nonSyntheticMemoryRefs = Get-NestedNumber $nonSyntheticAdoption.data @("summary.total_memory_refs", "opinion_adoption_summary.total_memory_refs", "total_memory_refs")
+
+                Assert-True ($null -ne $nonSyntheticFeedbackCount) "quality non-synthetic feedback metric" "value=$nonSyntheticFeedbackCount"
+                Assert-True ($null -ne $nonSyntheticQualityFeedbackCount) "quality non-synthetic feedback alignment metric" "value=$nonSyntheticQualityFeedbackCount"
+                Assert-True ($null -ne $nonSyntheticAdoptionCount) "quality non-synthetic adoption metric" "value=$nonSyntheticAdoptionCount"
+                Assert-True ($nonSyntheticQualityFeedbackCount -eq $nonSyntheticFeedbackCount) "quality non-synthetic summary alignment" "quality=$nonSyntheticQualityFeedbackCount feedback=$nonSyntheticFeedbackCount"
+                Assert-True ($nonSyntheticFeedbackCount -ge $MinNonSyntheticFeedbackCount) "quality non-synthetic feedback count" "value=$nonSyntheticFeedbackCount min=$MinNonSyntheticFeedbackCount"
+                Assert-True ($nonSyntheticAdoptionCount -ge $MinOpinionAdoptionCount) "quality non-synthetic adoption count" "value=$nonSyntheticAdoptionCount min=$MinOpinionAdoptionCount"
+                Assert-True ($null -ne $nonSyntheticMemoryRefs) "quality non-synthetic memory refs" "value=$nonSyntheticMemoryRefs"
             }
         } catch {
             Fail "fb2 quality gates" $_.Exception.Message
