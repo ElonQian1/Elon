@@ -1,4 +1,6 @@
 use crate::{
+    node_agent_active_task::ActiveCliPromptHandle,
+    node_agent_active_task_registry::ActiveCliPromptRegistry,
     node_agent_task_journal::{TaskJournal, TaskJournalRecord, TaskJournalStart},
     node_agent_task_resume::{task_attach_state, task_resume_contract},
 };
@@ -8,9 +10,13 @@ use std::{
     fs::{self, OpenOptions},
     io::Write,
     path::PathBuf,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
     thread,
 };
+use tokio::sync::watch;
 
 #[test]
 fn stress_terminal_outcomes_across_all_pc_task_routes() {
@@ -635,6 +641,111 @@ fn stress_corrupt_journal_lines_do_not_block_resume_replay() {
     let _ = fs::remove_dir_all(dir);
 }
 
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stress_active_registry_rejects_duplicate_handles_and_cleans_up() {
+    let registry = Arc::new(ActiveCliPromptRegistry::new());
+    let task_count = 96;
+    let duplicate_attempts_per_task = 12;
+    let mut cancel_receivers = Vec::new();
+
+    for task_index in 0..task_count {
+        let req_id = format!("req-active-{task_index:03}");
+        let (handle, cancel_rx) = active_handle_with_rx(&req_id, "route_a_external_cli");
+        assert!(
+            registry.try_insert(handle).await,
+            "initial active handle should be inserted"
+        );
+        cancel_receivers.push((req_id, cancel_rx));
+    }
+
+    let mut duplicate_workers = Vec::new();
+    for attempt in 0..duplicate_attempts_per_task {
+        for task_index in 0..task_count {
+            let registry = Arc::clone(&registry);
+            duplicate_workers.push(tokio::spawn(async move {
+                let req_id = format!("req-active-{task_index:03}");
+                let route = match attempt % 3 {
+                    0 => "route_a_external_cli",
+                    1 => "route_b_api_runtime",
+                    _ => "route_c_server_runtime",
+                };
+                let (handle, _duplicate_cancel_rx) = active_handle_with_rx(&req_id, route);
+                assert!(
+                    !registry.try_insert(handle).await,
+                    "duplicate active handle must not replace {req_id}"
+                );
+                let view = registry
+                    .view(&req_id, Vec::new())
+                    .await
+                    .expect("original active handle should remain visible");
+                assert_eq!(
+                    view.route, "route_a_external_cli",
+                    "duplicate route must not replace original handle"
+                );
+            }));
+        }
+    }
+
+    for worker in duplicate_workers {
+        worker
+            .await
+            .expect("duplicate active registry worker should not panic");
+    }
+    assert_eq!(registry.len().await, task_count);
+
+    for task_index in 0..task_count {
+        let req_id = format!("req-active-{task_index:03}");
+        registry
+            .set_os_pid(&req_id, Some(20_000 + task_index as u32))
+            .await;
+        let cancel_tx = registry
+            .cancel_tx(&req_id)
+            .await
+            .expect("live handle should expose cancel sender");
+        assert!(
+            cancel_tx.send(true).is_ok(),
+            "cancel should reach the original active handle"
+        );
+        let view = registry
+            .view(&req_id, Vec::new())
+            .await
+            .expect("active handle should remain visible until removed");
+        assert_eq!(view.os_pid, Some(20_000 + task_index as u32));
+    }
+
+    for (_req_id, mut cancel_rx) in cancel_receivers {
+        assert!(
+            cancel_rx.changed().await.is_ok(),
+            "original cancel receiver should observe cancellation"
+        );
+        assert!(*cancel_rx.borrow());
+    }
+
+    let removed_count = Arc::new(AtomicUsize::new(0));
+    let mut remove_workers = Vec::new();
+    for _attempt in 0..2 {
+        for task_index in 0..task_count {
+            let registry = Arc::clone(&registry);
+            let removed_count = Arc::clone(&removed_count);
+            remove_workers.push(tokio::spawn(async move {
+                let req_id = format!("req-active-{task_index:03}");
+                if registry.remove(&req_id).await {
+                    removed_count.fetch_add(1, Ordering::SeqCst);
+                }
+            }));
+        }
+    }
+
+    for worker in remove_workers {
+        worker
+            .await
+            .expect("active registry remove worker should not panic");
+    }
+    assert_eq!(removed_count.load(Ordering::SeqCst), task_count);
+    assert_eq!(registry.len().await, 0);
+    assert!(registry.cancel_tx("req-active-000").await.is_none());
+}
+
 fn read_registry(dir: &std::path::Path) -> BTreeMap<String, TaskJournalRecord> {
     let text = fs::read_to_string(dir.join("registry.json")).expect("registry should read");
     serde_json::from_str(&text).expect("registry should parse")
@@ -676,4 +787,22 @@ fn unique_test_dir(suffix: &str) -> PathBuf {
         "elon-task-lifecycle-pressure-{}-{suffix}",
         std::process::id()
     ))
+}
+
+fn active_handle_with_rx(
+    req_id: &str,
+    route: &str,
+) -> (ActiveCliPromptHandle, watch::Receiver<bool>) {
+    let (cancel_tx, cancel_rx) = watch::channel(false);
+    (
+        ActiveCliPromptHandle::new(
+            req_id.to_string(),
+            "codex".to_string(),
+            route.to_string(),
+            Some("D:/demo".to_string()),
+            Some("project_write".to_string()),
+            cancel_tx,
+        ),
+        cancel_rx,
+    )
 }
