@@ -248,6 +248,8 @@ function New-Fb2GoalAuditReport {
     $scenarioAudit = Get-Fb2GoalAuditProperty $Status "latest_user_scenario_audit"
     $answerReadiness = Get-Fb2GoalAuditProperty $Status "latest_context_answer_readiness"
     $sampleSet = Get-Fb2GoalAuditProperty $Status "latest_context_pack_sample_set"
+    $contractSmoke = Get-Fb2GoalAuditProperty $Status "latest_contract_smoke_summary"
+    $contractSmokeGates = Get-Fb2GoalAuditProperty $contractSmoke "gates"
     $gap = Get-Fb2GoalAuditProperty $Status "goal_gap_audit"
     $deferred = @((Get-Fb2GoalAuditProperty $gap "deferred_by_user" @()))
     $gapMissing = @((Get-Fb2GoalAuditProperty $gap "missing" @()))
@@ -280,6 +282,34 @@ function New-Fb2GoalAuditReport {
     $sampleSetComplete = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $sampleSet "complete")
     $answerReady = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $answerReadiness "complete")
     $contextContractComplete = ($publicComplete -and $templateReady -and $sampleSetComplete -and $answerReady)
+    # 这个门槛只证明主项目侧无写群契约仍可用；fb2 受保护 live 数据仍由 token preflight 单独证明。
+    $contractSmokeComplete = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmoke "complete")
+    $contractSmokeFailedCount = [int](Get-Fb2GoalAuditProperty $contractSmoke "failed_count" 0)
+    $contractSmokeReady = (
+        $contractSmokeComplete `
+            -and $contractSmokeFailedCount -eq 0 `
+            -and (Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmokeGates "chat_bootstrap_ready")) `
+            -and (Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmokeGates "ai_billing_policy_ready")) `
+            -and (Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmokeGates "live_manifest_ready")) `
+            -and (Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmokeGates "domain_contract_ready")) `
+            -and (Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmokeGates "dynamic_discovery_ready")) `
+            -and (Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmokeGates "protected_service_token_boundary_ready"))
+    )
+    $contractSmokeMissing = @()
+    if (-not $contractSmokeComplete) { $contractSmokeMissing += "contract_smoke_summary" }
+    if ($contractSmokeFailedCount -ne 0) { $contractSmokeMissing += "failed_checks" }
+    foreach ($gateName in @(
+            "chat_bootstrap_ready",
+            "ai_billing_policy_ready",
+            "live_manifest_ready",
+            "domain_contract_ready",
+            "dynamic_discovery_ready",
+            "protected_service_token_boundary_ready"
+        )) {
+        if (-not (Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $contractSmokeGates $gateName))) {
+            $contractSmokeMissing += $gateName
+        }
+    }
 
     $permissionBlocks = Get-Fb2GoalAuditProperty $data "permission_total_blocks"
     $qualityUnmatched = Get-Fb2GoalAuditProperty $data "quality_unmatched_cited_sources"
@@ -316,6 +346,13 @@ function New-Fb2GoalAuditReport {
         -Title "fb2 uses XML-wrapped Markdown Context Pack plus JSON metadata, not raw DB/MCP-first" `
         -Complete $contextContractComplete `
         -Evidence "public_contract=$publicComplete template=$($public.context_pack_template_schema) sample_set=$sampleSetComplete answer_readiness=$answerReady"
+
+    $items += New-Fb2GoalAuditRequirement `
+        -Id "main_project_contract_smoke" `
+        -Title "主项目默认 smoke 证明 chat-bootstrap、AI计费、live manifest、动态发现和 service-token 边界仍可用" `
+        -Complete $contractSmokeReady `
+        -Evidence "complete=$contractSmokeComplete failed=$contractSmokeFailedCount checks=$($contractSmoke.check_count) live_data=$($contractSmokeGates.fb2_live_data_status)" `
+        -Missing (@($contractSmokeMissing | Select-Object -Unique) -join ",")
 
     $items += New-Fb2GoalAuditRequirement `
         -Id "domain_context_index_contract" `
@@ -385,6 +422,9 @@ function New-Fb2GoalAuditReport {
             permission_total_blocks = [string]$permissionBlocks
             quality_unmatched_cited_sources = [string]$qualityUnmatched
             direct_read_evidence_complete = $directReadComplete
+            contract_smoke_summary = [string](Get-Fb2GoalAuditProperty $contractSmoke "path")
+            contract_smoke_check_count = [string](Get-Fb2GoalAuditProperty $contractSmoke "check_count")
+            contract_smoke_live_data_status = [string](Get-Fb2GoalAuditProperty $contractSmokeGates "fb2_live_data_status")
         }
         full_final_completion_evidence = [ordered]@{
             path = [string](Get-Fb2GoalAuditProperty $fullSource "path")
@@ -499,6 +539,24 @@ function Invoke-Fb2GoalAuditSelfTest {
         }
         latest_context_pack_sample_set = [pscustomobject]@{ complete = $true }
         latest_context_answer_readiness = [pscustomobject]@{ complete = $true }
+        latest_contract_smoke_summary = [pscustomobject]@{
+            complete = $true
+            path = "contract-smoke-summary.json"
+            failed_count = 0
+            skipped_count = 1
+            check_count = 255
+            gates = [pscustomobject]@{
+                chat_bootstrap_ready = $true
+                voice_contract_ready = $true
+                ai_billing_policy_ready = $true
+                live_manifest_ready = $true
+                domain_contract_ready = $true
+                dynamic_discovery_ready = $true
+                protected_service_token_boundary_ready = $true
+                fb2_live_data_status = "skipped_missing_FB2_AI_CENTER_TOKEN"
+            }
+            missing = @()
+        }
         latest_user_scenario_audit = [pscustomobject]@{ scenarios = $scenarios }
         latest_read_only_direct_read = [pscustomobject]@{ path = "read-only.json" }
         latest_data_only_acceptance = [pscustomobject]@{
@@ -548,6 +606,8 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ($report.next_minimum_action -ne "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly") { $failed++ }
     if (-not (@($report.deferred_requirements) -contains "voice_final_evidence")) { $failed++ }
     if (@($report.missing_non_voice_requirements).Count -ne 0) { $failed++ }
+    if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "main_project_contract_smoke")) { $failed++ }
+    if (-not (Test-Fb2GoalAuditTextPresent (Get-Fb2GoalAuditProperty $report.evidence_summary "contract_smoke_summary"))) { $failed++ }
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "domain_context_index_contract")) { $failed++ }
 
     $badScenario = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
@@ -561,6 +621,12 @@ function Invoke-Fb2GoalAuditSelfTest {
     $badDomainIndexReport = New-Fb2GoalAuditReport -Status $badDomainIndex -SourcePath "selftest-bad-domain-index.json"
     if ([bool]$badDomainIndexReport.data_goal_complete) { $failed++ }
     if (-not (@($badDomainIndexReport.missing_non_voice_requirements) -contains "domain_context_index_contract")) { $failed++ }
+
+    $badContractSmoke = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $badContractSmoke.latest_contract_smoke_summary.gates.chat_bootstrap_ready = $false
+    $badContractSmokeReport = New-Fb2GoalAuditReport -Status $badContractSmoke -SourcePath "selftest-bad-contract-smoke.json"
+    if ([bool]$badContractSmokeReport.data_goal_complete) { $failed++ }
+    if (-not (@($badContractSmokeReport.missing_non_voice_requirements) -contains "main_project_contract_smoke")) { $failed++ }
 
     $voiceOnly = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $voiceOnly.goal_completion.requirements.voice_final_evidence_path_present = $true
