@@ -886,6 +886,48 @@ function testDevComposerSkipsFailedRouteAProbe() {
   assert.strictEqual(composer.selectedRouteForRequest(), '', 'auto fallback should remain an automatic backend choice');
 }
 
+function testDevComposerFallsBackFromUnavailableStoredRoute() {
+  let inserted = null;
+  const fakeParent = {
+    insertBefore(element) {
+      inserted = element;
+    }
+  };
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_composer.js', {
+    localStorage: createMemoryStorage({ elon_pc_dev_runtime_route: 'route_a' }),
+    document: {
+      createElement: () => ({ hidden: true, className: '', innerHTML: '', querySelectorAll: () => [] })
+    }
+  });
+  const state = {
+    activeKind: 'project',
+    activeChannelKind: 'ai_development',
+    activeProjectId: 'p1',
+    projects: [{ id: 'p1', node_id: 'node-1', workspace_path: 'D:/demo', runtime_permission: 'project_write' }],
+    nodes: [{
+      node_id: 'node-1',
+      online: true,
+      route_a_ready: false,
+      server_runtime_ready: true,
+      allowed_clis: ['codex']
+    }]
+  };
+  const composer = sandbox.window.ElonPcDevComposer.create({
+    state,
+    els: { composer: { parentElement: fakeParent } },
+    clean,
+    escapeHtml,
+    openSettings: () => {},
+    selectNode: () => {},
+    openModelPicker: () => {}
+  });
+
+  composer.render();
+  assert.ok(inserted.innerHTML.includes('已跳过失效偏好'), 'composer should explain stored route fallback');
+  assert.ok(inserted.innerHTML.includes('aria-pressed="true"'), 'composer should keep a visible active route');
+  assert.strictEqual(composer.selectedRouteForRequest(), '', 'unavailable stored route must not be forced to backend');
+}
+
 function testDevComposerForcedRoutePreference() {
   let inserted = null;
   const fakeParent = {
@@ -975,6 +1017,7 @@ function testLocalAdminTokenWiring() {
   testProjectReadinessChecklist();
   testDevComposerRouteLabels();
   testDevComposerSkipsFailedRouteAProbe();
+  testDevComposerFallsBackFromUnavailableStoredRoute();
   testDevComposerForcedRoutePreference();
   testLocalAdminTokenWiring();
 

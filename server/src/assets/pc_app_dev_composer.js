@@ -58,7 +58,9 @@
     }
 
     function selectedRouteForRequest() {
-      return routePreference === 'auto' ? '' : routePreference;
+      const project = activeProject();
+      if (!project) return '';
+      return buildInfo(project).requestRoute;
     }
 
     function ensureBar() {
@@ -103,6 +105,7 @@
         tone: route.ready ? (permission === 'full_access' ? 'full-access' : 'ready') : 'warning',
         routeLabel: route.label,
         routeOptions: route.options,
+        requestRoute: route.requestRoute,
         permissionLabel: permission === 'full_access' ? '完全访问（本机确认）' : '仅项目内写入',
         workspace: clean(project.workspace_path || project.workspacePath) || '未绑定本机目录',
         settingsLabel: permission === 'full_access' ? '权限' : '设置'
@@ -160,13 +163,20 @@
         route_c: routeCReady ? 'Route C · 服务器模型' : 'Route C 未就绪'
       };
       const ready = route === 'auto' ? auto.ready : !!selected.enabled;
-      return routeSummary(route, labelByRoute[route] || auto.label, ready, options);
+      const effectiveRoute = ready ? route : (auto.ready ? 'auto' : route);
+      const effectiveLabel = effectiveRoute === route
+        ? (labelByRoute[route] || auto.label)
+        : `${auto.label}（已跳过失效偏好）`;
+      const effectiveReady = effectiveRoute === 'auto' ? auto.ready : ready;
+      const requestRoute = effectiveRoute === 'auto' ? '' : effectiveRoute;
+      return routeSummary(effectiveRoute, effectiveLabel, effectiveReady, options, requestRoute);
     }
 
-    function routeSummary(route, label, ready, options) {
+    function routeSummary(route, label, ready, options, requestRoute) {
       return {
         ready,
         label,
+        requestRoute: requestRoute || '',
         options: options.map((option) => ({
           ...option,
           active: option.value === route
