@@ -2,10 +2,14 @@
 
 ## 当前快照
 
-日期：2026-06-21
+日期：2026-06-22
 
 ## 2026-06-21 线上验证快照
 
+- 2026-06-22 09:06 当前主项目代码和线上状态：本轮 worktree 已先 fast-forward 到 `origin/main` 最新 `b80c5e95`，随后只补 `docs/fb2-ai-center/` 交接记录。fb2 总结帖相关运行代码已在提交 `1d41cb5a` 和 `225bfc6f` 中推送并发布，线上服务端为 `v0.3.588 / 225bfc6f0d9d33552f60dfd96a220753b3f7f7b6`；后续 `96bf5ce4` 是 smoke 脚本误判修正，已推送到远端但不需要服务端重新发布。
+- 2026-06-22 09:06 总结帖入口抽样通过：真实群 `ext_fb2_official` 使用 `123qwe/123qwe` 创建 summary post `gsp_46720718477f4c6e953b55d5fc309568`，最终 `status=ready`，`scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120` 返回 `failed=0 skipped=2`。脚本检查了非空 summary、source references、`数据事实 / 群友观点 / AI推断 / 风险边界`、风险提示和禁止投注保证。
+- 2026-06-22 09:06 总结帖修复根因：旧 summary post `gsp_b4c717d3c2d947188ccc755fe4f6ff32` 进入 `ready_with_fallback`，错误为“当前 AI 模型额度已用尽或接口不可用”。这不是 fb2 用户余额不足，也不是 ASR/TTS 免费策略问题，而是总结帖链路此前只调用默认模型，没有使用 `social_ai` 多代理 fallback。现在总结帖和 `@EL`/长按 `AI回复` 使用同一类模型 fallback，`hunyuan-turbo` fallback 已在线上正常生成。
+- 2026-06-22 09:06 ADB 真机复核：设备 `e0d909c3` 在线，fb2 包 `com.duoguan.football 1.1.48(96)`，`RECORD_AUDIO granted=true`，appops 为 `foreground/allow`。启动 `com.duoguan.football/.MainActivity` 后，当前页面为 `夺冠体育官方群`，UI dump 可见 `数据事实`、`AI推断`、`风险边界`、`context_audit_id`、`按住 说话`；截图位于 `target\fb2-current-20260622.png`，UI dump 位于 `target\fb2-window-20260622.xml`。本轮 logcat 未见 fb2 `AndroidRuntime/FATAL`。
 - 2026-06-22 03:04 当前主项目远端和线上状态：`origin/main` 最新为 `4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，线上服务端为 `v0.3.585 / 4b0fb9dd363e3619faab7bf73c3ded680e1ad40e`，其中包含 fb2 群聊 AI 分层兜底修复 `589d2bacf51cf4c679505da52d8ecfea1762420b`。本轮工作树 `D:\rust\active-projects\elon-main-fb2-docs-20260621` 已 fast-forward 到 `origin/main` 并保持干净。
 - 2026-06-22 03:04 可见群聊 smoke 重新通过：`@EL` 消息 `gmsg_b2d834caf30c4265acd638cb3868bf21` -> AI 回复 `gai_4df8a06989b149ecadf780abc1b0914d`；selected-message seed `gmsg_a71960917eeb494f8993c4e43adb927d` -> AI 回复 `gai_37f12f3fc7da4598a44f1b622955709d`。`scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>` 返回 `failed=0 skipped=0`，并通过来源、事实/推断分层、风险边界、禁止投注保证和反驳“肯定赢盘/重注”的正文检查。
 - 2026-06-22 03:04 ADB 真机抽样：Xiaomi `23116PN5BC` 上 fb2 `1.1.48(96)` 可打开 `聊天 -> 🏆 夺冠体育官方群`，群列表摘要和群详情页都能看到主项目 AI 的 `数据事实 / AI推断 / 风险边界 / 来源 / context_audit_id` 分层回复，底部输入栏显示 `按住 说话`。logcat 未见 fb2 `AndroidRuntime/FATAL`；这证明真实群聊 AI 回复和主项目式输入栏已在当前 APK 可见，但仍不替代完整语音 ASR/TTS final acceptance。
@@ -139,6 +143,9 @@
 - 需要验证真实群聊可见入口时，必须确认用户已授权写生产群或提供沙盒群，再运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages`
   没有 `-AllowVisibleMessages` 时脚本必须保持失败退出；有授权执行时，脚本必须同时通过回复正文策略检查，不能只看 AI 回复消息 ID。
+- 如果只想抽样总结帖入口，可跳过 `@EL` 和 selected-message：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120`
+  该命令会创建真实 summary post，并检查 summary 是否具备 source references、事实/观点/推断/风险分层和禁止投注保证。
 - 如果只需要确认当前“可见群聊正文策略”是否仍健康，可用 `123qwe/123qwe` 跑上面的 visible smoke；如果要宣布最终完成，必须改用 `smoke-fb2-final-acceptance.ps1`，并同时提供 `FB2_AI_CENTER_TOKEN` 和完整 `VoiceDeviceEvidencePath`，让 feedback、quality、permission、APK、语音和真实群聊证据绑定到同一份 summary。
 - 最终总验收优先运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <token> -VoiceDeviceEvidencePath <json>`

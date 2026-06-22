@@ -10,6 +10,10 @@
 
 ## 已完成
 
+- 2026-06-22 09:06 补齐“总结帖/群聊总结入口”的主项目侧验收闭环：提交 `1d41cb5a` 增加 fb2 总结帖回答契约和 smoke 场景，要求输出 `数据事实`、`群友观点`、`AI推断`、`风险边界` 并保留 source references；提交 `225bfc6f` 把总结帖生成从单一默认模型改为 `social_ai` 多代理 fallback，避免默认模型额度/接口不可用时只生成兜底文案；提交 `96bf5ce4` 放宽总结帖脚本对“相关发言”原文引用的误判。上述提交均已推送到 `origin/main`，其中服务端运行代码已发布到 `v0.3.588 / 225bfc6f0d9d33552f60dfd96a220753b3f7f7b6`，`96bf5ce4` 为脚本验收修正，无需重新发布服务端。
+- 2026-06-22 09:06 总结帖真实群 smoke 已通过：命令 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120` 在真实群 `ext_fb2_official` 创建 summary post `gsp_46720718477f4c6e953b55d5fc309568`，最终 `status=ready`，脚本结果 `failed=0 skipped=2`。该总结帖回复通过非空 summary、source references、事实/观点/推断/风险分层、风险边界和禁止投注保证检查。
+- 2026-06-22 09:06 本轮修复过一个线上根因：`gsp_b4c717d3c2d947188ccc755fe4f6ff32` 曾返回 `ready_with_fallback`，错误为“当前 AI 模型额度已用尽或接口不可用”，这不是 fb2 用户余额或 ASR/TTS 计费问题，而是总结帖链路没有使用群聊 AI 的模型 fallback。修复后 `gsp_400c852f06054a9eba16c8b643a3ae73` 和 `gsp_46720718477f4c6e953b55d5fc309568` 均进入 `ready`，模型 fallback 使用 `hunyuan-turbo` 正常生成。
+- 2026-06-22 09:06 ADB 真机复核再次确认当前 fb2 APK 已具备主项目式聊天体验：设备 `e0d909c3` 上 fb2 `com.duoguan.football 1.1.48(96)`，`RECORD_AUDIO granted=true`，appops 为 `foreground/allow`；启动 `com.duoguan.football/.MainActivity` 后，`夺冠体育官方群` 页面可见主项目 AI 回复包含 `数据事实`、`AI推断`、`风险边界`、`context_audit_id`、`selected_message_id`，底部输入栏显示 `按住 说话`。截图证据保存在 `target\fb2-current-20260622.png`，UI dump 保存在 `target\fb2-window-20260622.xml`；本轮 logcat 未见 fb2 `AndroidRuntime/FATAL`。
 - 2026-06-22 03:04 复核主项目 git/线上/真机链路：主项目修复提交 `589d2bacf51cf4c679505da52d8ecfea1762420b`（`修复fb2群聊AI回答缺少分层边界`）已推入 `origin/main`，并包含在当前线上最新 `v0.3.585 / 4b0fb9dd363e3619faab7bf73c3ded680e1ad40e` 中。该修复在 fb2 外部上下文下对群聊 `@EL` 和长按 `AI回复` 回复做后处理兜底：如果模型漏掉短标签，会补齐 `数据事实：`、`AI推断：` 和 `风险边界：`，风险边界明确“不保证命中、不建议重注或梭哈”。本轮验证命令包括 `cargo test social_ai --bin elon-server`、`cargo test social_ai_message_reply --bin elon-server`、`cargo test external_app_context_answer_policy --bin elon-server`、pre-push `cargo check --workspace`、`publish-server.ps1`、`smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>` 和 `smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password <redacted>`。
 - 2026-06-22 03:04 真实群聊可见 smoke 已通过，不再是“未验证”：账号 `123qwe` 通过 fb2 session bridge 解析为 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`，目标群 `ext_fb2_official`。`@EL` 可见消息 `gmsg_b2d834caf30c4265acd638cb3868bf21` 触发 AI 回复 `gai_4df8a06989b149ecadf780abc1b0914d`；selected-message seed `gmsg_a71960917eeb494f8993c4e43adb927d` 触发 AI 回复 `gai_37f12f3fc7da4598a44f1b622955709d`。脚本结果 `failed=0 skipped=0`，两条回复均通过来源标记、事实/推断分层、风险边界、禁止投注保证和反驳“肯定赢盘/重注”检查。
 - 2026-06-22 03:04 ADB 真机复核已把真实群聊 AI 结果带到用户端：设备 `Xiaomi 23116PN5BC` 上安装 fb2 `com.duoguan.football 1.1.48(96)`，`RECORD_AUDIO granted=true`，启动 `com.duoguan.football/.MainActivity` 无 `AndroidRuntime/FATAL`。进入“聊天 -> 🏆 夺冠体育官方群”后，聊天列表摘要显示 `数据事实：...`，群聊详情页可见 selected-message AI 回复正文包含 `数据事实`、`AI推断`、`风险边界`、`来源`、`context_audit_id` 和 `selected_message_id`；底部输入栏显示主项目式 `按住 说话`。本轮 logcat 只见 Google Play/系统网络超时和卫星电话能力探测噪声，未见 fb2 崩溃。
@@ -45,7 +49,7 @@
 - 未拿到 `FB2_AI_CENTER_TOKEN`，因此不能完成 fb2 live Context Pack、我的票、平台匿名摘要、质量汇总和反馈样本的最终验收。
 - `123qwe` 登录能桥接主项目，并且最终验收 wrapper 现在可从 `-Fb2Username/-Fb2Password` 自动解析 `ExternalUserId=6fe5aa17-0403-427a-8e91-7f414beca35d`；authenticated `chat-bootstrap` 已验证通过。仍需用真实 `FB2_AI_CENTER_TOKEN` 确认该账号确实有可分析订单样本。
 - 未拿到真机语音证据 JSON；示例文件只能验证脚本分支，不能证明真实 APK 在小米/HyperOS 上不会卡住“识别中”。
-- 真实群聊 `@EL` 和长按 `AI回复` 可见入口已在 2026-06-22 03:04 抽样通过；仍需把可见群聊、feedback、质量汇总、权限审计和完整语音证据放进 `scripts/smoke-fb2-final-acceptance.ps1` 同一批 summary 中，才能宣布终极完成。总结帖入口还需要单独抽样。
+- 真实群聊 `@EL`、长按 `AI回复` 和总结帖入口都已单独抽样通过；仍需把可见群聊、summary post、feedback、质量汇总、权限审计和完整语音证据放进 `scripts/smoke-fb2-final-acceptance.ps1` 同一批 summary 中，才能宣布终极完成。
 - 多账号权限验收未完全完成：需要证明用户不能读取他人订单，平台摘要不泄露单个用户，未授权请求会被拒绝并审计。
 - 固定质量评测集仍需继续积累 feedback 样本，观察 `missing_context`、`wrong_context`、`citation_unmatched` 和大 Context Pack 比率。
 
@@ -57,6 +61,10 @@
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <redacted>
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -SkipMention -SkipSelectedMessage -Fb2Username 123qwe -Fb2Password <redacted> -PollTimeoutSec 120
+cargo test --manifest-path server\Cargo.toml summary_policy_shape --bin elon-server
+cargo test --manifest-path server\Cargo.toml social_ai_agents --bin elon-server
+scripts\publish-server.ps1
 pwsh -NoProfile -Command '$files = @("scripts\smoke-fb2-visible-chat.ps1", "scripts\smoke-fb2-final-acceptance.ps1"); foreach ($f in $files) { $parseErrors = $null; $tokens = $null; [System.Management.Automation.Language.Parser]::ParseFile($f, [ref]$tokens, [ref]$parseErrors) | Out-Null; if ($parseErrors.Count -gt 0) { exit 1 } }'
 git diff --check
 ```
