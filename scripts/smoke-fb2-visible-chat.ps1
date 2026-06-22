@@ -47,6 +47,8 @@ $Fb2Base = $Fb2Base.TrimEnd("/")
 $script:Failed = 0
 $script:Skipped = 0
 
+. (Join-Path $PSScriptRoot "fb2-visible-readonly-summary.ps1")
+
 function Write-Check {
     param([string]$Status, [string]$Name, [string]$Detail = "")
     if ($Detail) {
@@ -273,74 +275,6 @@ function Format-BaselineReadEvidence {
         $parts += Format-TextFingerprint (Get-MessageText $message)
     }
     return ($parts -join " ")
-}
-
-function Get-BaselineSampleMessage {
-    param([object[]]$Messages)
-
-    $sample = @(@($Messages | Where-Object { -not [string]::IsNullOrWhiteSpace((Get-MessageText $_)) } | Select-Object -Last 1))
-    if ($sample.Count -eq 0) {
-        return $null
-    }
-    return $sample[0]
-}
-
-function Resolve-ReadOnlySummaryPath {
-    param([string]$RequestedPath)
-
-    if (-not [string]::IsNullOrWhiteSpace($RequestedPath)) {
-        $summaryDir = Split-Path -Parent $RequestedPath
-        if ($summaryDir -and -not (Test-Path -LiteralPath $summaryDir)) {
-            New-Item -ItemType Directory -Path $summaryDir -Force | Out-Null
-        }
-        return $RequestedPath
-    }
-
-    $root = Split-Path -Parent $PSScriptRoot
-    $summaryDir = Join-Path $root "target\fb2-ai-center"
-    New-Item -ItemType Directory -Path $summaryDir -Force | Out-Null
-    $stamp = (Get-Date).ToUniversalTime().ToString("yyyyMMddTHHmmssZ")
-    return (Join-Path $summaryDir "read-only-direct-read-$stamp.json")
-}
-
-function Write-ReadOnlyDirectReadSummary {
-    param(
-        [string]$OutputPath,
-        [object[]]$Messages,
-        [object]$SampleMessage,
-        [object]$ResolvedToken,
-        [string]$ReadEvidence,
-        [bool]$TextFingerprintComplete,
-        [string]$StartedAt,
-        [string]$CompletedAt
-    )
-
-    $sampleText = if ($null -eq $SampleMessage) { "" } else { Get-MessageText $SampleMessage }
-    $summary = [ordered]@{
-        schema = "fb2.main_project.visible_chat_readonly.v1"
-        mode = "read_only_direct_read"
-        writes = $false
-        started_at = $StartedAt
-        completed_at = $CompletedAt
-        main_base = $MainBase
-        fb2_base = $Fb2Base
-        group_id = $GroupId
-        token_source = [string]$ResolvedToken.Source
-        fb2_user_id = [string]$Fb2UserId
-        message_count = @($Messages).Count
-        sample_message_id = if ($null -eq $SampleMessage) { "" } else { [string]$SampleMessage.id }
-        sample_sender = Get-MessageSender $SampleMessage
-        sample_created_at = if ($null -eq $SampleMessage -or -not $SampleMessage.created_at) { "" } else { [string]$SampleMessage.created_at }
-        sample_text_len = $sampleText.Length
-        sample_text_sha256 = Get-TextSha256 $sampleText
-        direct_read_evidence = $ReadEvidence
-        direct_read_complete = (@($Messages).Count -gt 0 -and $TextFingerprintComplete)
-        api = "/api/me/groups/{group_id}/messages"
-    }
-
-    $summaryJson = $summary | ConvertTo-Json -Depth 8
-    Set-Content -Path $OutputPath -Value $summaryJson -Encoding UTF8
-    return $summary
 }
 
 function Assert-DirectMessageRead {
@@ -685,7 +619,11 @@ AI推断：被选择消息里的“肯定赢盘、重注”表述过于绝对，
                 -ReadEvidence $detail `
                 -TextFingerprintComplete $true `
                 -StartedAt "2026-06-22T00:00:00Z" `
-                -CompletedAt "2026-06-22T00:00:01Z"
+                -CompletedAt "2026-06-22T00:00:01Z" `
+                -MainBase "selftest-main" `
+                -Fb2Base "selftest-fb2" `
+                -GroupId "selftest-group" `
+                -Fb2UserId "selftest-user"
             Assert-True (Test-Path -LiteralPath $tmpSummary) "selftest read-only summary file written" $tmpSummary
             Assert-True ([bool]$summary["direct_read_complete"]) "selftest read-only summary complete"
             Assert-True ([string]$summary["sample_message_id"] -eq "gmsg-readonly-summary") "selftest read-only summary sample id" ([string]$summary["sample_message_id"])
@@ -947,7 +885,7 @@ if ($ReadOnlyDirectRead) {
     Assert-True (@($baselineMessages).Count -gt 0) "read-only direct group read count" "count=$(@($baselineMessages).Count)"
     Assert-True $readOnlyTextFingerprintComplete "read-only direct group read text fingerprint" $baselineReadEvidence
     Pass "read-only direct group read complete" "group=$GroupId writes=false"
-    $readOnlySummaryPath = Resolve-ReadOnlySummaryPath $SummaryPath
+    $readOnlySummaryPath = Resolve-ReadOnlySummaryPath -RequestedPath $SummaryPath -ScriptRoot $PSScriptRoot
     $readOnlySummary = Write-ReadOnlyDirectReadSummary `
         -OutputPath $readOnlySummaryPath `
         -Messages $baselineMessages `
@@ -956,7 +894,11 @@ if ($ReadOnlyDirectRead) {
         -ReadEvidence $baselineReadEvidence `
         -TextFingerprintComplete $readOnlyTextFingerprintComplete `
         -StartedAt $startedAt `
-        -CompletedAt ((Get-Date).ToUniversalTime().ToString("o"))
+        -CompletedAt ((Get-Date).ToUniversalTime().ToString("o")) `
+        -MainBase $MainBase `
+        -Fb2Base $Fb2Base `
+        -GroupId $GroupId `
+        -Fb2UserId $Fb2UserId
     Pass "read-only direct group read summary" "path=$readOnlySummaryPath direct_read_complete=$($readOnlySummary["direct_read_complete"])"
     Write-Output ""
     Write-Output "== Summary =="
