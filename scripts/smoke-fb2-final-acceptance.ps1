@@ -455,6 +455,84 @@ function Test-VisibleDirectReadEvidenceComplete {
     return $true
 }
 
+function Read-JsonFileOrNull {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return $null
+    }
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    try {
+        Get-Content -Raw -LiteralPath $Path | ConvertFrom-Json
+    } catch {
+        $null
+    }
+}
+
+function Build-ReadOnlyDirectReadEvidence {
+    param([object]$Summary)
+
+    [ordered]@{
+        schema = [string]$Summary.schema
+        api = [string]$Summary.api
+        group_id = [string]$Summary.group_id
+        writes = [bool]$Summary.writes
+        direct_read_complete = [bool]$Summary.direct_read_complete
+        message_count = [int]$Summary.message_count
+        sample_message_id = [string]$Summary.sample_message_id
+        sample_sender = [string]$Summary.sample_sender
+        sample_text_len = [int]$Summary.sample_text_len
+        sample_text_sha256 = [string]$Summary.sample_text_sha256
+        direct_read_evidence = [string]$Summary.direct_read_evidence
+    }
+}
+
+function Test-ReadOnlyDirectReadSummaryComplete {
+    param([object]$Summary)
+
+    if ($null -eq $Summary) {
+        return $false
+    }
+    if ([string]$Summary.schema -ne "fb2.main_project.visible_chat_readonly.v1") {
+        return $false
+    }
+    if ([string]$Summary.mode -ne "read_only_direct_read") {
+        return $false
+    }
+    if ([bool]$Summary.writes) {
+        return $false
+    }
+    if (-not [bool]$Summary.direct_read_complete) {
+        return $false
+    }
+    if ([int]$Summary.message_count -lt 1) {
+        return $false
+    }
+    foreach ($field in @("group_id", "sample_message_id", "sample_sender", "direct_read_evidence", "api")) {
+        if ([string]::IsNullOrWhiteSpace([string]$Summary.$field)) {
+            return $false
+        }
+    }
+    if ([int]$Summary.sample_text_len -lt 1) {
+        return $false
+    }
+    if ([string]$Summary.sample_text_sha256 -notmatch "^[0-9a-fA-F]{8,}$") {
+        return $false
+    }
+    $evidence = [string]$Summary.direct_read_evidence
+    if ($evidence -notmatch "\btext_len=\d+\b") {
+        return $false
+    }
+    if ($evidence -notmatch "\btext_sha256=[0-9a-fA-F]{8,}\b") {
+        return $false
+    }
+
+    return $true
+}
+
 function Get-SummaryPostReadyState {
     param([string]$Detail)
 
@@ -535,6 +613,30 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest ((Resolve-DataOnlyVisibleMinOpinionAdoptionCount -CurrentValue 1 -WasExplicit $false -AllowNoNewOpinionAdoptionInShortWindow $false) -eq 1) "data-only visible keeps opinion adoption default"
     Assert-SelfTest ((Resolve-DataOnlyVisibleMinOpinionAdoptionCount -CurrentValue 1 -WasExplicit $false -AllowNoNewOpinionAdoptionInShortWindow $true) -eq 0) "data-only visible explicit opt-out can allow no new opinion adoption"
     Assert-SelfTest ((Resolve-DataOnlyVisibleMinOpinionAdoptionCount -CurrentValue 2 -WasExplicit $true -AllowNoNewOpinionAdoptionInShortWindow $true) -eq 2) "data-only visible explicit opinion adoption threshold wins"
+
+    $readOnlySummaryOk = [pscustomobject][ordered]@{
+        schema = "fb2.main_project.visible_chat_readonly.v1"
+        mode = "read_only_direct_read"
+        writes = $false
+        group_id = "ext_fb2_official"
+        direct_read_complete = $true
+        message_count = 80
+        sample_message_id = "gai_sample"
+        sample_sender = "usr_elon_ai"
+        sample_text_len = 292
+        sample_text_sha256 = "abcdef0123456789"
+        direct_read_evidence = "group=ext_fb2_official count=80 sample_message=gai_sample text_len=292 text_sha256=abcdef0123456789"
+        api = "/api/me/groups/{group_id}/messages"
+    }
+    $readOnlyEvidence = Build-ReadOnlyDirectReadEvidence $readOnlySummaryOk
+    Assert-SelfTest (Test-ReadOnlyDirectReadSummaryComplete $readOnlySummaryOk) "read-only direct-read summary is complete"
+    Assert-SelfTest (([string]$readOnlyEvidence["sample_text_sha256"]) -eq "abcdef0123456789") "read-only direct-read evidence maps hash" ([string]$readOnlyEvidence["sample_text_sha256"])
+    $readOnlySummaryWithWrite = $readOnlySummaryOk.PSObject.Copy()
+    $readOnlySummaryWithWrite.writes = $true
+    Assert-SelfTest (-not (Test-ReadOnlyDirectReadSummaryComplete $readOnlySummaryWithWrite)) "read-only direct-read rejects write evidence"
+    $readOnlySummaryMissingHash = $readOnlySummaryOk.PSObject.Copy()
+    $readOnlySummaryMissingHash.sample_text_sha256 = ""
+    Assert-SelfTest (-not (Test-ReadOnlyDirectReadSummaryComplete $readOnlySummaryMissingHash)) "read-only direct-read rejects missing text hash"
 
     $childScript = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-final-wrapper-child-{0}.ps1" -f ([guid]::NewGuid().ToString("N")))
     try {
@@ -928,6 +1030,31 @@ if ($PreflightOnly) {
     $preflightLogPath = Join-Path $summaryDir "$logPrefix-$stamp-preflight.log"
     $preflightName = if ($DataOnlyAcceptance) { "data-only preflight without visible messages" } else { "final preflight without visible messages" }
     $preflightResult = Invoke-SmokeScript $preflightName $preflightArgs $preflightLogPath
+
+    $readOnlyArgs = [System.Collections.Generic.List[string]]::new()
+    [void]$readOnlyArgs.Add("-NoProfile")
+    [void]$readOnlyArgs.Add("-ExecutionPolicy")
+    [void]$readOnlyArgs.Add("Bypass")
+    [void]$readOnlyArgs.Add("-File")
+    [void]$readOnlyArgs.Add($visibleScript)
+    Add-Arg $readOnlyArgs "-MainBase" $MainBase
+    Add-Arg $readOnlyArgs "-MainToken" $MainToken
+    Add-Arg $readOnlyArgs "-Fb2Base" $Fb2Base
+    Add-Arg $readOnlyArgs "-Fb2Token" $Fb2UserToken
+    Add-Arg $readOnlyArgs "-Fb2AiCenterToken" $Fb2AiCenterToken
+    Add-Arg $readOnlyArgs "-Fb2UserId" $ExternalUserId
+    Add-Arg $readOnlyArgs "-Fb2Username" $Fb2Username
+    Add-Arg $readOnlyArgs "-Fb2Password" $Fb2Password
+    Add-Arg $readOnlyArgs "-GroupId" $visibleMainGroupId
+    Add-Arg $readOnlyArgs "-RequestTimeoutSec" $RequestTimeoutSec
+    Add-SwitchArg $readOnlyArgs "-ReadOnlyDirectRead" $true
+    $readOnlyLogPath = Join-Path $summaryDir "$logPrefix-$stamp-readonly-visible-chat.log"
+    $readOnlySummaryPath = Join-Path $summaryDir "$logPrefix-$stamp-readonly-visible-chat.json"
+    Add-Arg $readOnlyArgs "-SummaryPath" $readOnlySummaryPath
+    $readOnlyResult = Invoke-SmokeScript "preflight read-only direct group read" $readOnlyArgs $readOnlyLogPath
+    $readOnlySummary = Read-JsonFileOrNull $readOnlySummaryPath
+    $readOnlyDirectReadComplete = Test-ReadOnlyDirectReadSummaryComplete $readOnlySummary
+
     $completedAt = (Get-Date).ToUniversalTime().ToString("o")
     $summary = [ordered]@{
         schema = "fb2.main_project.final_acceptance.v1"
@@ -950,7 +1077,12 @@ if ($PreflightOnly) {
         preflight_exit_code = $preflightResult.exit_code
         preflight_log_path = $preflightResult.log_path
         preflight_evidence = Build-AiCenterEvidence $preflightResult.output
-        success = ($preflightResult.exit_code -eq 0)
+        read_only_direct_read_exit_code = $readOnlyResult.exit_code
+        read_only_direct_read_log_path = $readOnlyResult.log_path
+        read_only_direct_read_summary_path = $readOnlySummaryPath
+        read_only_direct_read_complete = $readOnlyDirectReadComplete
+        read_only_direct_read_evidence = Build-ReadOnlyDirectReadEvidence $readOnlySummary
+        success = ($preflightResult.exit_code -eq 0 -and $readOnlyResult.exit_code -eq 0 -and $readOnlyDirectReadComplete)
     }
 
     $summaryJson = $summary | ConvertTo-Json -Depth 8
