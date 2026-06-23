@@ -345,7 +345,16 @@ fn is_source_like_token(token: &str) -> bool {
 fn is_field_name(value: &str) -> bool {
     matches!(
         value,
-        "match_id" | "order_id" | "ticket_id" | "message_id" | "source_id" | "context_audit_id"
+        "match_id"
+            | "order_id"
+            | "ticket_id"
+            | "message_id"
+            | "source_id"
+            | "context_audit_id"
+            | "memory_id"
+            | "memory_ids"
+            | "opinion_memory_id"
+            | "opinion_memory_ids"
     )
 }
 
@@ -449,7 +458,7 @@ mod tests {
         let validation = validate_reply_sources(
             &context,
             None,
-            "2026-06-23 的 match_id 字段缺失，所以这里只能说明数据不足。",
+            "2026-06-23 的 match_id 与 opinion_memory_id 字段缺失，所以这里只能说明数据不足。",
             &[],
             &[],
         );

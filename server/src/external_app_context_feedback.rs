@@ -464,7 +464,7 @@ fn feedback_citation_sources(
     context: &Value,
     reply_text: &str,
     tool_results: Option<&Value>,
-    extra_citation_sources: &[Value],
+    _extra_citation_sources: &[Value],
 ) -> Vec<Value> {
     let mut cited_sources = mentioned_citation_sources(context, reply_text);
     if cited_sources.len() >= MAX_CITED_SOURCES {
@@ -483,17 +483,6 @@ fn feedback_citation_sources(
             cited_sources.push(source);
             if cited_sources.len() >= MAX_CITED_SOURCES {
                 return cited_sources;
-            }
-        }
-    }
-    for source in extra_citation_sources {
-        let Some(key) = citation_source_key(source) else {
-            continue;
-        };
-        if seen.insert(key) {
-            cited_sources.push(source.clone());
-            if cited_sources.len() >= MAX_CITED_SOURCES {
-                break;
             }
         }
     }
@@ -811,7 +800,8 @@ mod tests {
     }
 
     #[test]
-    fn payload_merges_extra_selected_message_source() {
+    fn payload_uses_extra_selected_message_for_answer_validation_without_feedback_citation_pollution(
+    ) {
         let context = json!({
             "app_id": "fb2",
             "group": "official",
@@ -829,7 +819,7 @@ mod tests {
             "ext_fb2_official",
             "social_group_selected_message:m1",
             "selected_message_ai_reply",
-            "只引用了原消息，没有引用比赛来源。",
+            "只引用了原消息 gmsg-selected-1，没有引用比赛来源。",
             None,
             &[json!({
                 "kind": "selected_message",
@@ -839,9 +829,13 @@ mod tests {
         )
         .expect("payload");
 
-        assert_eq!(payload["cited_source_count"], 1);
-        assert_eq!(payload["cited_sources"][0]["kind"], "selected_message");
-        assert_eq!(payload["cited_sources"][0]["id"], "gmsg-selected-1");
+        assert_eq!(payload["cited_source_count"], 0);
+        assert_eq!(payload["wrong_context"], false);
+        assert_eq!(payload["answer_source_validation"]["status"], "ok");
+        assert_eq!(
+            payload["answer_source_validation"]["matched_source_ids"][0],
+            "gmsg-selected-1"
+        );
     }
 
     #[test]

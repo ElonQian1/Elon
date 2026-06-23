@@ -752,6 +752,9 @@ function Wait-For-Fb2Feedback {
     $localGroupId = Get-Fb2LocalGroupId $GroupId
     $deadline = (Get-Date).AddSeconds($FeedbackPollTimeoutSec)
     $headers = @{ "X-FB2-AI-CENTER-TOKEN" = $Fb2AiCenterToken.Trim() }
+    if (-not [string]::IsNullOrWhiteSpace($Fb2UserId)) {
+        $headers["X-FB2-AI-CONTEXT-USER-ID"] = $Fb2UserId.Trim()
+    }
 
     while ((Get-Date) -lt $deadline) {
         $query = @(
