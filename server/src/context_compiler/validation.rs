@@ -30,7 +30,7 @@ pub(crate) fn build_validation_plan(
         relevant_files.iter().any(|file| file.path.ends_with(".rs")) || rust_project.is_some();
     if touches_rust {
         commands.push(ValidationCommand {
-            command: "rustfmt <changed-rs-files>".to_string(),
+            command: "rustfmt --edition 2021 <changed-rs-files>".to_string(),
             reason: "Rust 改动只格式化本次变更文件，避免污染历史格式。".to_string(),
             required: true,
         });

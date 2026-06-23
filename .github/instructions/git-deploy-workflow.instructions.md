@@ -222,14 +222,14 @@ git worktree remove ..\Elon-session-$id --force
 # ✅ 一条命令格式化所有本次改动的 .rs 文件（修改 + 新增全覆盖）
 $rs = @(git diff --name-only) + @(git ls-files --others --exclude-standard) |
   Where-Object { $_ -match '\.rs$' }
-if ($rs) { rustfmt $rs }
+if ($rs) { rustfmt --edition 2021 $rs }
 ```
 
 **禁止**：
 - `cargo fmt`（无参数）：会扫描整个 crate 数百个历史文件，产生大量无关 diff，污染 PR 历史
 - 修改其他 AI 负责的 `.rs` 文件的格式
 
-> `rustfmt <files>` 只格式化指定文件，几百毫秒完成，不触发重编译。
+> `rustfmt --edition 2021 <files>` 只格式化指定文件，几百毫秒完成，不触发重编译。仓库根目录也有 `rustfmt.toml` 固化 edition，显式参数用于避免 AI 或脚本在其他工作目录直接调用 rustfmt 时回退到旧默认 edition。
 
 ---
 

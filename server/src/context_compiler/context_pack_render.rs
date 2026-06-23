@@ -287,7 +287,7 @@ pub(crate) fn render_output_contract(out: &mut String) {
     out.push_str("- 优先编辑 relevant_files 中 role=edit-target 的片段；没有源码片段的文件先读取真实文件。\n");
     out.push_str("- 涉及 Rust public API、trait impl、enum match、unsafe/await/Send/Sync/Drop 时同步检查调用方和测试。\n");
     out.push_str("- 如果上下文不足，先列 missing_context，不要猜测未提供源码的行为。\n");
-    out.push_str("- 修改 Rust 代码后优先对本次改动的 .rs 文件运行 rustfmt。\n");
+    out.push_str("- 修改 Rust 代码后优先对本次改动的 .rs 文件运行 rustfmt --edition 2021。\n");
     out.push_str("- 后端行为变化至少运行相关 cargo test 或 cargo check。\n");
     out.push_str("- Android/APK 变化先完成代码同步；只有用户明确要求发布时才运行发布脚本。\n");
     out.push_str("</output_contract>\n\n");
