@@ -127,6 +127,72 @@ fn stress_terminal_outcomes_across_all_pc_task_routes() {
 }
 
 #[test]
+fn stress_workspace_latest_records_filter_before_global_clamp() {
+    let dir = unique_test_dir("workspace-filter-before-clamp");
+    let _ = fs::remove_dir_all(&dir);
+    let journal_dir = dir.join("journal");
+    let target_workspace = dir.join("target-workspace");
+    let target_project = target_workspace.join("project");
+    let other_project = dir.join("other-workspace").join("project");
+    fs::create_dir_all(&target_project).expect("target project dir should create");
+    fs::create_dir_all(&other_project).expect("other project dir should create");
+
+    let mut registry = BTreeMap::new();
+    for index in 0..12 {
+        let req_id = format!("req-target-old-{index:03}");
+        registry.insert(
+            req_id.clone(),
+            journal_record_for_workspace(&req_id, &target_project, 1_000 + index as u128),
+        );
+    }
+    for index in 0..180 {
+        let req_id = format!("req-other-new-{index:03}");
+        registry.insert(
+            req_id.clone(),
+            journal_record_for_workspace(&req_id, &other_project, 10_000 + index as u128),
+        );
+    }
+    fs::create_dir_all(&journal_dir).expect("journal dir should create");
+    fs::write(
+        journal_dir.join("registry.json"),
+        serde_json::to_string_pretty(&registry).expect("registry should serialize"),
+    )
+    .expect("registry should write");
+
+    let journal = TaskJournal::new(&journal_dir);
+    let global_latest = journal
+        .latest_records(100)
+        .expect("global latest records should read");
+    assert_eq!(global_latest.len(), 100);
+    assert!(
+        global_latest
+            .iter()
+            .all(|record| record.req_id.starts_with("req-other-new-")),
+        "fixture should prove global latest output is saturated by other workspaces"
+    );
+
+    let workspace_latest = journal
+        .latest_records_for_workspace(&target_workspace, 6)
+        .expect("workspace latest records should read before global clamp");
+    assert_eq!(
+        workspace_latest
+            .iter()
+            .map(|record| record.req_id.as_str())
+            .collect::<Vec<_>>(),
+        vec![
+            "req-target-old-011",
+            "req-target-old-010",
+            "req-target-old-009",
+            "req-target-old-008",
+            "req-target-old-007",
+            "req-target-old-006",
+        ]
+    );
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[test]
 fn stress_late_cancel_requests_never_reopen_terminal_tasks() {
     let dir = unique_test_dir("late-cancel-after-terminal-pressure");
     let _ = fs::remove_dir_all(&dir);
@@ -805,4 +871,28 @@ fn active_handle_with_rx(
         ),
         cancel_rx,
     )
+}
+
+fn journal_record_for_workspace(
+    req_id: &str,
+    cwd: &std::path::Path,
+    updated_at_ms: u128,
+) -> TaskJournalRecord {
+    TaskJournalRecord {
+        req_id: req_id.to_string(),
+        cli_name: "server-runtime".to_string(),
+        route: Some("route_c_server_runtime".to_string()),
+        run_handle_id: Some(req_id.to_string()),
+        cwd: Some(cwd.to_string_lossy().to_string()),
+        runtime_permission: Some("project_write".to_string()),
+        os_pid: None,
+        process_started_at_ms: None,
+        codex_session_id: None,
+        codex_session_scope_key: None,
+        codex_session_updated_at_ms: None,
+        status: "canceled".to_string(),
+        started_at_ms: updated_at_ms.saturating_sub(5),
+        updated_at_ms,
+        cancel_requested_at_ms: Some(updated_at_ms.saturating_sub(1)),
+    }
 }

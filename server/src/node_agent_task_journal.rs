@@ -7,7 +7,7 @@ use std::{
     collections::BTreeMap,
     fs::{self, File, OpenOptions},
     io::{BufRead, BufReader, Write},
-    path::PathBuf,
+    path::{Path, PathBuf},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -16,6 +16,7 @@ use crate::{
         cli_chunk_event, is_terminal_status, normalize_finish_error, normalize_finish_status,
     },
     node_agent_task_journal_lock::with_task_journal_io_lock,
+    node_agent_workspace_match::{canonical_or_original, record_cwd_matches_workspace},
 };
 
 #[derive(Clone, Debug)]
@@ -300,8 +301,31 @@ impl TaskJournal {
     }
 
     pub(crate) fn latest_records(&self, limit: usize) -> Result<Vec<TaskJournalRecord>> {
+        self.latest_records_matching(limit, |_| true)
+    }
+
+    pub(crate) fn latest_records_for_workspace(
+        &self,
+        workspace: &Path,
+        limit: usize,
+    ) -> Result<Vec<TaskJournalRecord>> {
+        let workspace = canonical_or_original(workspace);
+        self.latest_records_matching(limit, |record| {
+            record_cwd_matches_workspace(record.cwd.as_deref(), &workspace)
+        })
+    }
+
+    fn latest_records_matching(
+        &self,
+        limit: usize,
+        mut matches_record: impl FnMut(&TaskJournalRecord) -> bool,
+    ) -> Result<Vec<TaskJournalRecord>> {
         with_task_journal_io_lock(|| {
-            let mut records: Vec<_> = self.load_registry()?.into_values().collect();
+            let mut records: Vec<_> = self
+                .load_registry()?
+                .into_values()
+                .filter(|record| matches_record(record))
+                .collect();
             records.sort_by(|left, right| {
                 right
                     .updated_at_ms

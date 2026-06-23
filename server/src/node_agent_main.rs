@@ -79,6 +79,7 @@ mod node_agent_task_lifecycle_pressure_tests;
 mod node_agent_task_resume;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
+mod node_agent_workspace_match;
 mod node_agent_write_preview;
 #[cfg(windows)]
 mod node_client_launcher;
@@ -2530,15 +2531,15 @@ impl NodeRuntime {
         &self,
         workspace: &Path,
     ) -> Vec<node_agent_active_task::ActiveCliPromptView> {
-        let workspace = canonical_or_original(workspace);
+        let workspace = node_agent_workspace_match::canonical_or_original(workspace);
         self.active_cli_prompts
             .views_without_approvals()
             .await
             .into_iter()
             .filter(|view| {
-                view.cwd
-                    .as_deref()
-                    .is_some_and(|cwd| cli_prompt_cwd_matches_workspace(cwd, &workspace))
+                view.cwd.as_deref().is_some_and(|cwd| {
+                    node_agent_workspace_match::cwd_matches_workspace(cwd, &workspace)
+                })
             })
             .collect()
     }
@@ -2548,18 +2549,8 @@ impl NodeRuntime {
         workspace: &Path,
         limit: usize,
     ) -> anyhow::Result<Vec<node_agent_task_journal::TaskJournalRecord>> {
-        let workspace = canonical_or_original(workspace);
-        Ok(self
-            .task_journal
-            .latest_records(limit)?
-            .into_iter()
-            .filter(|record| {
-                record
-                    .cwd
-                    .as_deref()
-                    .is_some_and(|cwd| cli_prompt_cwd_matches_workspace(cwd, &workspace))
-            })
-            .collect())
+        self.task_journal
+            .latest_records_for_workspace(workspace, limit)
     }
 
     async fn set_cli_prompt_os_pid(&self, req_id: &str, pid: Option<u32>) {
@@ -2619,18 +2610,6 @@ impl NodeRuntime {
     async fn set_models(&self, models: Vec<ModelCapability>) {
         self.status.write().await.models_cached = models;
     }
-}
-
-fn cli_prompt_cwd_matches_workspace(cwd: &str, workspace: &Path) -> bool {
-    let cwd = cwd.trim();
-    if cwd.is_empty() {
-        return false;
-    }
-    canonical_or_original(Path::new(cwd)).starts_with(workspace)
-}
-
-fn canonical_or_original(path: &Path) -> PathBuf {
-    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {

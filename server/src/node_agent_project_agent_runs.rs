@@ -27,6 +27,8 @@ const DEFAULT_RUNS: usize = 20;
 const MAX_EVENTS_PER_RUN: usize = 200;
 const DEFAULT_EVENTS_PER_RUN: usize = 20;
 const MAX_EVENT_LINES_SCANNED: usize = 2_000;
+const RECENT_TASK_CANDIDATE_LIMIT: usize = 100;
+const RECENT_TASKS_LIMIT: usize = 6;
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct ProjectAgentRunsReq {
@@ -112,20 +114,22 @@ pub(crate) async fn list_handler(
             let active_views = runtime
                 .active_cli_prompt_views_for_workspace(&workspace)
                 .await;
-            let active_task_ids: BTreeSet<String> =
-                active_views.iter().map(|view| view.req_id.clone()).collect();
+            let active_task_ids: BTreeSet<String> = active_views
+                .iter()
+                .map(|view| view.req_id.clone())
+                .collect();
             response.active_controls = active_views
                 .into_iter()
                 .map(ProjectAgentRunControl::from)
                 .collect();
-            response.recent_tasks = runtime
-                .task_journal_records_for_workspace(&workspace, 100)
+            let journal_records = runtime
+                .task_journal_records_for_workspace(&workspace, RECENT_TASK_CANDIDATE_LIMIT)
                 .unwrap_or_default()
                 .into_iter()
-                .filter(|record| !active_task_ids.contains(&record.req_id))
-                .take(6)
-                .map(project_task_resume_view)
+                .take(RECENT_TASK_CANDIDATE_LIMIT)
                 .collect();
+            response.recent_tasks =
+                recent_task_resume_views(journal_records, &active_task_ids, RECENT_TASKS_LIMIT);
             (StatusCode::OK, Json(json!(response))).into_response()
         }
         Err(error) => (
@@ -170,6 +174,21 @@ fn list_project_agent_runs(req: &ProjectAgentRunsReq) -> Result<ProjectAgentRuns
         recent_tasks: Vec::new(),
         runs,
     })
+}
+
+fn recent_task_resume_views(
+    records: Vec<TaskJournalRecord>,
+    active_task_ids: &BTreeSet<String>,
+    limit: usize,
+) -> Vec<ProjectAgentRunTaskResume> {
+    let mut seen = BTreeSet::new();
+    records
+        .into_iter()
+        .filter(|record| !active_task_ids.contains(&record.req_id))
+        .filter(|record| seen.insert(record.req_id.clone()))
+        .take(limit)
+        .map(project_task_resume_view)
+        .collect()
 }
 
 impl From<ActiveCliPromptView> for ProjectAgentRunControl {
@@ -517,11 +536,62 @@ mod tests {
         assert!(!serialized.contains("sk-live-secret"));
     }
 
+    #[test]
+    fn recent_task_resume_views_filter_active_ids_dedupe_and_cap() {
+        let records = vec![
+            task_record("req-live", 900),
+            task_record("req-9", 899),
+            task_record("req-8", 898),
+            task_record("req-8", 897),
+            task_record("req-7", 896),
+            task_record("req-6", 895),
+            task_record("req-5", 894),
+            task_record("req-4", 893),
+            task_record("req-3", 892),
+        ];
+        let active = BTreeSet::from(["req-live".to_string()]);
+
+        let views = recent_task_resume_views(records, &active, 6);
+
+        assert_eq!(views.len(), 6);
+        assert_eq!(
+            views
+                .iter()
+                .map(|view| view.task_id.as_str())
+                .collect::<Vec<_>>(),
+            vec!["req-9", "req-8", "req-7", "req-6", "req-5", "req-4"]
+        );
+        assert!(views.iter().all(|view| {
+            let resume = serde_json::to_value(&view.resume).expect("resume should serialize");
+            resume["next_action"] == "continue_from_snapshot" && resume["can_cancel"] == false
+        }));
+    }
+
     fn temp_dir(label: &str) -> PathBuf {
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
         std::env::temp_dir().join(format!("elon-{label}-{}-{nanos}", std::process::id()))
+    }
+
+    fn task_record(req_id: &str, updated_at_ms: u128) -> TaskJournalRecord {
+        TaskJournalRecord {
+            req_id: req_id.to_string(),
+            cli_name: "server-runtime".to_string(),
+            route: Some("route_c_server_runtime".to_string()),
+            run_handle_id: Some(req_id.to_string()),
+            cwd: Some("D:/demo".to_string()),
+            runtime_permission: Some("project_write".to_string()),
+            os_pid: None,
+            process_started_at_ms: None,
+            codex_session_id: None,
+            codex_session_scope_key: None,
+            codex_session_updated_at_ms: None,
+            status: "canceled".to_string(),
+            started_at_ms: updated_at_ms.saturating_sub(10),
+            updated_at_ms,
+            cancel_requested_at_ms: Some(updated_at_ms.saturating_sub(1)),
+        }
     }
 }
