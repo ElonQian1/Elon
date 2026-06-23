@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 当前状态门禁新增“可见回答策略证据”检查：`validate-fb2-ai-center-current-state.ps1` 会自动对最新 data-only/final acceptance summary 跑 `validate-fb2-visible-answer-policy.ps1`，并输出 `visible-answer-policy-validation-current.json`。这项确保真实群聊 `@EL`、长按 `AI回复` 和总结帖的回答证据包含来源、事实/推断分层、风险边界和反投注保证，不再只靠 status 字段间接推断。
 - 2026-06-23 当前状态门禁已新增“主项目服务端部署状态”检查：`scripts\validate-fb2-main-server-deploy-status.ps1` 会读取主项目 `/health`、`/api/server/version`，并用 `git merge-base --is-ancestor` 验证线上服务端 SHA 是否包含最新 `server` runtime commit。当前线上返回 `versionName=0.3.681`、`gitSha=8e31ab0a98319dea8d46fcbbf31a2d2c85fde60b`，最新 server runtime commit 为 `c5a432423a423ab1722ff39a387ef1870c548363`，`deployed_contains_latest_runtime_sha=true`。这允许后续文档/验收记录提交晚于服务端发布，同时仍能拦住真正的 server 代码未发布。
 - 2026-06-23 当前终局差距按机器矩阵判断：`completion_matrix.total=14`、`complete=13`、`deferred=1`、`incomplete=0`；非语音数据目标 `data_goal_complete=true`，完整终局 `full_final_complete=false`。唯一 deferred 是用户明确暂停的 `voice_final_evidence`；另一个不能替代的外部前置条件是 `FB2_AI_CENTER_TOKEN`，用于刷新受保护 live Context Pack、本人订单、平台摘要、权限和 feedback/quality。ASR/TTS 当前继续暂停，不纳入本轮推进。
 - 2026-06-23 发布后抽样验证已刷新：`contract-smoke-after-deploy-current.json` 证明 `123qwe/123qwe` 的 authenticated `chat-bootstrap`、live manifest、answer policy、domain blueprint 和 dynamic discovery 仍通过，`failed=0`、`skipped=1`；`read-only-direct-read-after-deploy-current.json` 证明官方群 `ext_fb2_official` 可直接 API 只读，`message_count=80`、`writes=false`。这两项是无副作用健康抽样，不能替代带 `FB2_AI_CENTER_TOKEN` 的本人订单、平台摘要、feedback/quality live 验证。

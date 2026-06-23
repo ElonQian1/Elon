@@ -209,6 +209,23 @@ function New-Fb2CurrentStateValidation {
             -Arguments @("-SummaryPath", $latestReadOnlyPath, "-OutputPath", (Join-Path $targetDir "visible-readonly-summary-validation-current.json")) `
             -ExpectedOutputPath (Join-Path $targetDir "visible-readonly-summary-validation-current.json")))
     }
+    $latestDataOnly = Get-Fb2CurrentProperty $statusForOptionalSteps "latest_data_only_acceptance"
+    $latestDataOnlyPath = [string](Get-Fb2CurrentProperty $latestDataOnly "path" "")
+    $visibleAnswerPolicyValidationPath = Join-Path $targetDir "visible-answer-policy-validation-current.json"
+    if (-not [string]::IsNullOrWhiteSpace($latestDataOnlyPath) -and (Test-Path -LiteralPath $latestDataOnlyPath)) {
+        [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+            -Name "validate_visible_answer_policy" `
+            -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-visible-answer-policy.ps1") `
+            -Arguments @("-SummaryPath", $latestDataOnlyPath, "-OutputPath", $visibleAnswerPolicyValidationPath) `
+            -ExpectedOutputPath $visibleAnswerPolicyValidationPath))
+    } else {
+        [void]$steps.Add((New-Fb2CurrentInlineStep `
+            -Name "validate_visible_answer_policy" `
+            -Success $false `
+            -OutputPath "" `
+            -JsonSuccess $false `
+            -Details "missing_latest_data_only_acceptance_summary"))
+    }
 
     [void]$steps.Add((Invoke-Fb2CurrentPwsh `
         -Name "validate_evidence_freshness" `
@@ -237,6 +254,7 @@ function New-Fb2CurrentStateValidation {
     $completion = Get-Fb2CurrentProperty $refresh "completion_matrix"
     $gates = Get-Fb2CurrentProperty $completion "gates"
     $exportedSampleValidation = Get-Fb2CurrentProperty $refresh "exported_context_pack_sample_set_validation"
+    $visibleAnswerPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $visibleAnswerPolicyValidationPath
     $result = [ordered]@{
         schema = "fb2.main_project.current_state_validation.v1"
         generated_at_utc = ([datetime]::UtcNow).ToString("o")
@@ -253,6 +271,7 @@ function New-Fb2CurrentStateValidation {
         next_minimum_action = [string](Get-Fb2CurrentProperty $refresh "next_minimum_action" "")
         blocked_by_external_secret = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
         exported_context_pack_sample_set_validation = $exportedSampleValidation
+        visible_answer_policy_validation = $visibleAnswerPolicyValidation
         safe_to_continue_without_secret = @((Get-Fb2CurrentProperty $blocking "safe_to_continue_without_secret" @()))
         requires_secret = @((Get-Fb2CurrentProperty $blocking "requires_secret" @()))
         note = "This gate refreshes and validates current machine evidence only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN."
@@ -277,6 +296,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "refresh_status"; script = "fb2-ai-center-refresh-current-status.ps1" },
         [ordered]@{ name = "server_deploy_status"; script = "validate-fb2-main-server-deploy-status.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
+        [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },
