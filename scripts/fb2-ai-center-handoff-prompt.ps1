@@ -122,6 +122,8 @@ function New-Fb2HandoffPrompt {
     $requirements = @(Get-Fb2PromptProperty $matrix "requirements" @())
     $exportedSamples = Get-Fb2PromptProperty $Refresh "exported_context_pack_sample_set_validation"
     $exportedSampleScenarios = @(Get-Fb2PromptProperty $exportedSamples "scenarios" @())
+    $serverDeploy = Get-Fb2PromptProperty $Refresh "server_deploy_status"
+    $server = Get-Fb2PromptProperty $serverDeploy "server"
     $lines = [System.Collections.ArrayList]::new()
 
     Add-Fb2PromptLine -Lines $lines -Text "# fb2 AI Center 下一轮执行提示"
@@ -138,6 +140,16 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- voice_deferred_by_user: `{0}`' -f [bool]$gates.voice_deferred_by_user)
     Add-Fb2PromptLine -Lines $lines -Text ('- next_minimum_action: `{0}`' -f [string]$gates.next_minimum_action)
     Add-Fb2PromptLine -Lines $lines -Text ('- totals: complete `{0}` / deferred `{1}` / incomplete `{2}` / total `{3}`' -f [int]$totals.complete, [int]$totals.deferred, [int]$totals.incomplete, [int]$totals.total)
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 线上主项目"
+    Add-Fb2PromptLine -Lines $lines -Text ('- main_base: `{0}`' -f [string](Get-Fb2PromptProperty $serverDeploy 'main_base' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- health: `{0}`' -f [string](Get-Fb2PromptProperty $server 'health' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- versionName: `{0}`' -f [string](Get-Fb2PromptProperty $server 'versionName' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- deployed_git_sha: `{0}`' -f [string](Get-Fb2PromptProperty $server 'gitSha' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- latest_runtime_sha: `{0}`' -f [string](Get-Fb2PromptProperty $serverDeploy 'latest_runtime_sha' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- deployed_contains_latest_runtime_sha: `{0}`' -f [bool](Get-Fb2PromptProperty $serverDeploy 'deployed_contains_latest_runtime_sha' $false))
+    Add-Fb2PromptLine -Lines $lines -Text ('- server_deploy_ready: `{0}`' -f [bool](Get-Fb2PromptProperty $Refresh 'server_deploy_ready' $false))
+    Add-Fb2PromptLine -Lines $lines -Text ('- note: `{0}`' -f (Format-Fb2PromptCell (Get-Fb2PromptProperty $serverDeploy 'note' '') 220))
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## Owner 下一步"
     Add-Fb2PromptLine -Lines $lines -Text ('- main_project: `{0}`' -f [string]$ownerActions.main_project)
@@ -246,6 +258,19 @@ function Invoke-Fb2PromptSelfTest {
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
         $fixture = [pscustomobject]@{
             schema = "fb2.main_project.status_refresh.v1"
+            server_deploy_ready = $true
+            server_deploy_status = [ordered]@{
+                schema = "fb2.main_project.server_deploy_status.v1"
+                main_base = "http://43.139.149.158:8080"
+                server = [ordered]@{
+                    health = "OK"
+                    versionName = "0.3.755"
+                    gitSha = "1c14bde6cd12e7af87ec7feb2cb7dc412138c2c5"
+                }
+                latest_runtime_sha = "12368e2ba39b6ed8071a5e43b4c4e56091a0c18c"
+                deployed_contains_latest_runtime_sha = $true
+                note = "This verifies the deployed main-project server contains the latest runtime commit."
+            }
             owner_next_actions = [ordered]@{
                 main_project = "keep_contract_and_status_regressions_green_until_FB2_AI_CENTER_TOKEN_is_available"
                 fb2_project = "provide_FB2_AI_CENTER_TOKEN_or_export_equivalent_live_Context_Pack_permission_quality_evidence"

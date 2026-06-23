@@ -2,6 +2,7 @@
 
 param(
     [string]$StatusPath = "",
+    [string]$RefreshPath = "",
     [string]$OutputPath = "",
     [string]$MarkdownPath = "",
     [switch]$SelfTest
@@ -66,7 +67,8 @@ function Read-Fb2HandoffJson {
 function New-Fb2HandoffReport {
     param(
         [object]$Status,
-        [string]$SourcePath
+        [string]$SourcePath,
+        [object]$Refresh = $null
     )
 
     $validation = Get-Fb2HandoffProperty $Status "validation_scope"
@@ -82,6 +84,8 @@ function New-Fb2HandoffReport {
     $livePreflight = Get-Fb2HandoffProperty $Status "live_preflight_request"
     $coordination = Get-Fb2HandoffProperty $Status "coordination"
     $coordinationNext = Get-Fb2HandoffProperty $coordination "next_action_by_owner"
+    $refreshNext = Get-Fb2HandoffProperty $Refresh "owner_next_actions"
+    $refreshBlocking = Get-Fb2HandoffProperty $Refresh "blocking_state"
     $commands = Get-Fb2HandoffProperty $livePreflight "commands"
     $summaryDirs = @((Get-Fb2HandoffProperty $Status "summary_dirs" @()))
 
@@ -105,9 +109,18 @@ function New-Fb2HandoffReport {
         "needs_more_evidence"
     }
 
-    $mainNext = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $coordinationNext "main_project")
-    $fb2Next = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $coordinationNext "fb2_project")
-    $sharedNext = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $coordinationNext "shared")
+    $mainNext = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $refreshNext "main_project")
+    $fb2Next = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $refreshNext "fb2_project")
+    $sharedNext = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $refreshNext "shared")
+    if ([string]::IsNullOrWhiteSpace($mainNext)) {
+        $mainNext = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $coordinationNext "main_project")
+    }
+    if ([string]::IsNullOrWhiteSpace($fb2Next)) {
+        $fb2Next = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $coordinationNext "fb2_project")
+    }
+    if ([string]::IsNullOrWhiteSpace($sharedNext)) {
+        $sharedNext = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $coordinationNext "shared")
+    }
     if ([string]::IsNullOrWhiteSpace($mainNext)) {
         $mainNext = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $goalGap "next_smallest_action")
     }
@@ -120,6 +133,25 @@ function New-Fb2HandoffReport {
     }
     if ([string]::IsNullOrWhiteSpace($sharedNext)) {
         $sharedNext = if ($voiceEvidencePresent) { "run full final acceptance" } else { "ASR/TTS final evidence remains deferred" }
+    }
+
+    $protectedLivePreflightSatisfied = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $refreshBlocking "protected_live_preflight_satisfied")
+    $blockedByExternalSecret = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $goalGap "blocked_by_external_secret")
+    $nextMinimumAction = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $goalGap "next_smallest_action")
+    $deferredByUser = @((Get-Fb2HandoffProperty $goalGap "deferred_by_user" @()))
+    if ($null -ne $refreshBlocking) {
+        $blockedByExternalSecret = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $refreshBlocking "blocked_by_external_secret")
+        $nextMinimumAction = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $refreshBlocking "next_minimum_action")
+        $refreshDeferred = @((Get-Fb2HandoffProperty $refreshBlocking "deferred_by_user" @()))
+        if (@($refreshDeferred).Count -gt 0) {
+            $deferredByUser = @($refreshDeferred)
+        }
+    }
+    $missing = @((Get-Fb2HandoffProperty $goalGap "missing" @()))
+    $refreshGaps = @((Get-Fb2HandoffProperty $Status "refresh_gaps" @()))
+    if ($protectedLivePreflightSatisfied -or -not $blockedByExternalSecret) {
+        $missing = @($missing | Where-Object { [string]$_ -ne "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh" })
+        $refreshGaps = @($refreshGaps | Where-Object { [string]$_ -ne "missing_FB2_AI_CENTER_TOKEN_for_refreshing_live_context_pack_permission_quality" })
     }
 
     [ordered]@{
@@ -191,10 +223,12 @@ function New-Fb2HandoffReport {
             missing = @((Get-Fb2HandoffProperty $scenarioAudit "missing" @()))
         }
         blockers = [ordered]@{
-            missing = @((Get-Fb2HandoffProperty $goalGap "missing" @()))
-            refresh_gaps = @((Get-Fb2HandoffProperty $Status "refresh_gaps" @()))
-            deferred_by_user = @((Get-Fb2HandoffProperty $goalGap "deferred_by_user" @()))
-            blocked_by_external_secret = Test-Fb2HandoffTruthy (Get-Fb2HandoffProperty $goalGap "blocked_by_external_secret")
+            missing = @($missing)
+            refresh_gaps = @($refreshGaps)
+            deferred_by_user = @($deferredByUser)
+            blocked_by_external_secret = [bool]$blockedByExternalSecret
+            protected_live_preflight_satisfied = [bool]$protectedLivePreflightSatisfied
+            next_minimum_action = $nextMinimumAction
         }
         next_action_by_owner = [ordered]@{
             main_project = $mainNext
@@ -208,7 +242,7 @@ function New-Fb2HandoffReport {
             no_write_direct_read = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $commands "no_write_direct_read")
             data_only_preflight = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $commands "data_only_preflight")
             visible_regression_requires_authorization = ConvertTo-Fb2HandoffText (Get-Fb2HandoffProperty $commands "visible_regression_requires_authorization")
-            generate_handoff_report = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-handoff-report.ps1 -StatusPath target\fb2-ai-center\status-current.json -OutputPath target\fb2-ai-center\handoff-current.json -MarkdownPath target\fb2-ai-center\handoff-current.md'
+            generate_handoff_report = 'pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-handoff-report.ps1 -StatusPath target\fb2-ai-center\status-current.json -RefreshPath target\fb2-ai-center\status-refresh-current.json -OutputPath target\fb2-ai-center\handoff-current.json -MarkdownPath target\fb2-ai-center\handoff-current.md'
         }
     }
 }
@@ -262,6 +296,9 @@ function ConvertTo-Fb2HandoffMarkdown {
     [void]$lines.Add("")
     [void]$lines.Add("## Blockers")
     [void]$lines.Add("")
+    [void]$lines.Add("- blocked_by_external_secret: $($Report.blockers.blocked_by_external_secret)")
+    [void]$lines.Add("- protected_live_preflight_satisfied: $($Report.blockers.protected_live_preflight_satisfied)")
+    [void]$lines.Add("- next_minimum_action: $($Report.blockers.next_minimum_action)")
     [void]$lines.Add("- missing: $(@($Report.blockers.missing) -join ', ')")
     [void]$lines.Add("- refresh_gaps: $(@($Report.blockers.refresh_gaps) -join ', ')")
     [void]$lines.Add("- deferred_by_user: $(@($Report.blockers.deferred_by_user) -join ', ')")
@@ -373,6 +410,20 @@ function Invoke-Fb2HandoffSelfTest {
 
     $report = New-Fb2HandoffReport -Status $status -SourcePath "selftest-status.json"
     $md = ConvertTo-Fb2HandoffMarkdown -Report $report
+    $refresh = [pscustomobject]@{
+        owner_next_actions = [pscustomobject]@{
+            main_project = "keep_non_voice_regression_green"
+            fb2_project = "keep_live_context_pack_current"
+            shared = "resume_voice_only_when_user_unpauses"
+        }
+        blocking_state = [pscustomobject]@{
+            blocked_by_external_secret = $false
+            protected_live_preflight_satisfied = $true
+            deferred_by_user = @("ASR_TTS_final_evidence")
+            next_minimum_action = "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+        }
+    }
+    $overlayReport = New-Fb2HandoffReport -Status $status -SourcePath "selftest-status.json" -Refresh $refresh
     $failed = 0
     if ($report.schema -ne "fb2.main_project.handoff_report.v1") { $failed++ }
     if ($report.stage -ne "contract_direct_read_and_offline_context_ready_needs_live_refresh") { $failed++ }
@@ -386,6 +437,11 @@ function Invoke-Fb2HandoffSelfTest {
     if (-not (@($report.evidence_policy.required_group_message_fields) -contains "text_sha256")) { $failed++ }
     if (-not ([string]$md -match "direct_api_read")) { $failed++ }
     if (-not ([string]$md -match "selected_message_review")) { $failed++ }
+    if ([bool]$overlayReport.blockers.blocked_by_external_secret) { $failed++ }
+    if (-not [bool]$overlayReport.blockers.protected_live_preflight_satisfied) { $failed++ }
+    if (@($overlayReport.blockers.missing) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh") { $failed++ }
+    if (@($overlayReport.blockers.refresh_gaps) -contains "missing_FB2_AI_CENTER_TOKEN_for_refreshing_live_context_pack_permission_quality") { $failed++ }
+    if ([string]$overlayReport.next_action_by_owner.main_project -ne "keep_non_voice_regression_green") { $failed++ }
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"
     if ($failed -gt 0) {
@@ -404,7 +460,8 @@ if ([string]::IsNullOrWhiteSpace($StatusPath)) {
 }
 
 $status = Read-Fb2HandoffJson -Path $StatusPath
-$report = New-Fb2HandoffReport -Status $status -SourcePath $StatusPath
+$refresh = if ([string]::IsNullOrWhiteSpace($RefreshPath)) { $null } else { Read-Fb2HandoffJson -Path $RefreshPath }
+$report = New-Fb2HandoffReport -Status $status -SourcePath $StatusPath -Refresh $refresh
 $json = $report | ConvertTo-Json -Depth 10
 
 if (-not [string]::IsNullOrWhiteSpace($OutputPath)) {

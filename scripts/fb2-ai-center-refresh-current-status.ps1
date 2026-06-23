@@ -1125,4 +1125,9 @@ Set-Content -LiteralPath $RefreshSummaryPath -Value $refreshJson -Encoding UTF8
 & (Join-Path $PSScriptRoot "fb2-ai-center-handoff-prompt.ps1") `
     -RefreshPath $RefreshSummaryPath `
     -OutputPath $HandoffPromptPath | Out-Null
+& (Join-Path $PSScriptRoot "fb2-ai-center-handoff-report.ps1") `
+    -StatusPath $statusPath `
+    -RefreshPath $RefreshSummaryPath `
+    -OutputPath $handoffPath `
+    -MarkdownPath $handoffMarkdownPath | Out-Null
 $refreshJson

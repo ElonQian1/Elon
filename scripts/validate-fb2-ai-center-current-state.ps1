@@ -195,6 +195,41 @@ function Test-Fb2CurrentAnswerSourceValidationState {
     )
 }
 
+function Test-Fb2CurrentHandoffBlockingState {
+    param(
+        [object]$Refresh,
+        [object]$HandoffReport
+    )
+
+    if ($null -eq $Refresh -or $null -eq $HandoffReport) {
+        return $false
+    }
+    $protected = [bool](Get-Fb2CurrentProperty $Refresh "protected_live_preflight_satisfied" $false)
+    $blocking = Get-Fb2CurrentProperty $Refresh "blocking_state"
+    $expectedBlocked = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
+    $reportBlockers = Get-Fb2CurrentProperty $HandoffReport "blockers"
+    if ($null -eq $reportBlockers) {
+        return $false
+    }
+    if ([bool](Get-Fb2CurrentProperty $reportBlockers "blocked_by_external_secret" $true) -ne $expectedBlocked) {
+        return $false
+    }
+    if ([bool](Get-Fb2CurrentProperty $reportBlockers "protected_live_preflight_satisfied" $false) -ne $protected) {
+        return $false
+    }
+    if ($protected) {
+        $missing = @((Get-Fb2CurrentProperty $reportBlockers "missing" @()))
+        $refreshGaps = @((Get-Fb2CurrentProperty $reportBlockers "refresh_gaps" @()))
+        if (@($missing | Where-Object { [string]$_ -eq "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh" }).Count -gt 0) {
+            return $false
+        }
+        if (@($refreshGaps | Where-Object { [string]$_ -eq "missing_FB2_AI_CENTER_TOKEN_for_refreshing_live_context_pack_permission_quality" }).Count -gt 0) {
+            return $false
+        }
+    }
+    return $true
+}
+
 function New-Fb2CurrentStateValidation {
     param(
         [string]$RefreshPath,
@@ -384,6 +419,14 @@ function New-Fb2CurrentStateValidation {
         -Success (Test-Fb2CurrentAnswerSourceValidationState -State $answerSourceValidationState) `
         -JsonSuccess (Get-Fb2CurrentProperty $answerSourceValidationState "ready" $null) `
         -Details ($answerSourceValidationState | ConvertTo-Json -Depth 4)))
+    $handoffPath = [string](Get-Fb2CurrentProperty (Get-Fb2CurrentProperty $refresh "files") "handoff" "")
+    $handoffReport = Read-Fb2CurrentJsonOrNull -Path $handoffPath
+    [void]$steps.Add((New-Fb2CurrentInlineStep `
+        -Name "validate_handoff_report_blocking_state" `
+        -Success (Test-Fb2CurrentHandoffBlockingState -Refresh $refresh -HandoffReport $handoffReport) `
+        -OutputPath $handoffPath `
+        -JsonSuccess (Get-Fb2CurrentProperty (Get-Fb2CurrentProperty $handoffReport "blockers") "blocked_by_external_secret" $null) `
+        -Details ($handoffReport | ConvertTo-Json -Depth 5)))
     $failedSteps = @($steps | Where-Object { -not [bool]$_.success -or -not [bool]$_.output_secret_safe })
     $blocking = Get-Fb2CurrentProperty $refresh "blocking_state"
     $completion = Get-Fb2CurrentProperty $refresh "completion_matrix"
@@ -553,6 +596,34 @@ function Invoke-Fb2CurrentStateSelfTest {
         $badAnswerSourceValidation = $goodAnswerSourceValidation | ConvertTo-Json -Depth 4 | ConvertFrom-Json
         $badAnswerSourceValidation.tool_sources_check = $false
         if (Test-Fb2CurrentAnswerSourceValidationState -State $badAnswerSourceValidation) {
+            $failed++
+        }
+        $refreshWithProtectedBridge = [pscustomobject]@{
+            protected_live_preflight_satisfied = $true
+            blocking_state = [pscustomobject]@{
+                blocked_by_external_secret = $false
+            }
+        }
+        $goodHandoff = [pscustomobject]@{
+            blockers = [pscustomobject]@{
+                blocked_by_external_secret = $false
+                protected_live_preflight_satisfied = $true
+                missing = @("voice_final_evidence")
+                refresh_gaps = @()
+            }
+        }
+        if (-not (Test-Fb2CurrentHandoffBlockingState -Refresh $refreshWithProtectedBridge -HandoffReport $goodHandoff)) {
+            $failed++
+        }
+        $badHandoff = [pscustomobject]@{
+            blockers = [pscustomobject]@{
+                blocked_by_external_secret = $true
+                protected_live_preflight_satisfied = $true
+                missing = @("FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")
+                refresh_gaps = @("missing_FB2_AI_CENTER_TOKEN_for_refreshing_live_context_pack_permission_quality")
+            }
+        }
+        if (Test-Fb2CurrentHandoffBlockingState -Refresh $refreshWithProtectedBridge -HandoffReport $badHandoff) {
             $failed++
         }
 

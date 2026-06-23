@@ -89,6 +89,7 @@ function New-Fb2PromptValidation {
         )) {
         Add-Fb2PromptValidationCheck $checks "section $section" ($Content.Contains($section))
     }
+    Add-Fb2PromptValidationCheck $checks "section ## 线上主项目" ($Content.Contains("## 线上主项目"))
 
     foreach ($field in @(
             "data_goal_complete",
@@ -101,6 +102,24 @@ function New-Fb2PromptValidation {
         )) {
         Add-Fb2PromptValidationCheck $checks "gate $field" ($Content -match [regex]::Escape($field))
     }
+
+    foreach ($field in @(
+            "main_base",
+            "health",
+            "versionName",
+            "deployed_git_sha",
+            "latest_runtime_sha",
+            "deployed_contains_latest_runtime_sha",
+            "server_deploy_ready"
+        )) {
+        Add-Fb2PromptValidationCheck $checks "server deploy field $field" ($Content -match [regex]::Escape($field))
+    }
+    Add-Fb2PromptValidationCheck $checks "server deploy health ok visible" ($Content -match 'health:\s+`OK`')
+    Add-Fb2PromptValidationCheck $checks "server deploy version visible" ($Content -match 'versionName:\s+`[^`]+`')
+    Add-Fb2PromptValidationCheck $checks "server deploy sha visible" ($Content -match 'deployed_git_sha:\s+`[0-9a-f]{7,40}`')
+    Add-Fb2PromptValidationCheck $checks "latest runtime sha visible" ($Content -match 'latest_runtime_sha:\s+`[0-9a-f]{7,40}`')
+    Add-Fb2PromptValidationCheck $checks "server deploy contains latest runtime visible" ($Content -match 'deployed_contains_latest_runtime_sha:\s+`True`')
+    Add-Fb2PromptValidationCheck $checks "server deploy ready visible" ($Content -match 'server_deploy_ready:\s+`True`')
 
     $requiredCommands = @(
         "refresh_status",
@@ -217,6 +236,16 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - voice_deferred_by_user: `True`
 - next_minimum_action: `set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly`
 - totals: complete `13` / deferred `1` / incomplete `0` / total `14`
+
+## 线上主项目
+- main_base: `http://43.139.149.158:8080`
+- health: `OK`
+- versionName: `0.3.755`
+- deployed_git_sha: `1c14bde6cd12e7af87ec7feb2cb7dc412138c2c5`
+- latest_runtime_sha: `12368e2ba39b6ed8071a5e43b4c4e56091a0c18c`
+- deployed_contains_latest_runtime_sha: `True`
+- server_deploy_ready: `True`
+- note: `This verifies the deployed main-project server contains the latest runtime commit.`
 
 ## Owner 下一步
 - main_project: `keep_contract_and_status_regressions_green_until_FB2_AI_CENTER_TOKEN_is_available`
