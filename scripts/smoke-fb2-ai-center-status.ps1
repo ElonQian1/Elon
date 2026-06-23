@@ -111,6 +111,27 @@ function Get-LatestFileByPatternAcrossDirectories {
     return $ordered[0]
 }
 
+function Get-LatestFb2ContextSampleSetValidationFile {
+    param([string[]]$Directories)
+
+    $patterns = @(
+        "context-pack-samples-validation*.json",
+        "fb2-repo-context-pack-samples-validation*.json"
+    )
+    $files = @()
+    foreach ($pattern in $patterns) {
+        $file = Get-LatestFileByPatternAcrossDirectories -Directories $Directories -Pattern $pattern
+        if ($null -ne $file) {
+            $files += $file
+        }
+    }
+    $ordered = @($files | Sort-Object LastWriteTimeUtc -Descending)
+    if ($ordered.Count -eq 0) {
+        return $null
+    }
+    return $ordered[0]
+}
+
 function Get-JsonProperty {
     param(
         [object]$Object,
@@ -171,7 +192,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $latestReadOnlyFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "read-only-direct-read*.json"
     $latestAiCenterLogFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "*ai-center.log"
     $latestSampleRequestFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-sample-request*.json"
-    $latestSampleSetFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-samples-validation*.json"
+    $latestSampleSetFile = Get-LatestFb2ContextSampleSetValidationFile -Directories $summaryDirectories
     $latestPublicContractFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "public-contract-status*.json"
     $latestContractSmokeFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "contract-smoke-summary*.json"
     $latestData = if ($null -eq $latestDataFile) { $null } else { Read-JsonFileOrNull $latestDataFile.FullName }
@@ -581,6 +602,7 @@ function Invoke-Fb2StatusSelfTest {
             )
             redaction_rules = @("Do not include service tokens.")
         } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "context-pack-sample-request-test.json") -Encoding UTF8
+        $legacySampleSetPath = Join-Path $tmp "context-pack-samples-validation-test.json"
         [ordered]@{
             schema = "fb2.main_project.context_pack_sample_set_validation.v1"
             samples_dir = (Join-Path $tmp "samples")
@@ -596,7 +618,24 @@ function Invoke-Fb2StatusSelfTest {
                 [ordered]@{ scenario = "platform_order_context_pack"; passed = $true; context_audit_id = "audit-platform"; citation_source_count = 23; source_kinds = @("platform_order_summary", "context_audit"); context_pack_sha256 = "ghi" },
                 [ordered]@{ scenario = "group_opinion_context_pack"; passed = $true; context_audit_id = "audit-opinion"; citation_source_count = 23; source_kinds = @("group_message", "opinion_memory", "context_audit"); context_pack_sha256 = "jkl" }
             )
-        } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "context-pack-samples-validation-test.json") -Encoding UTF8
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path $legacySampleSetPath -Encoding UTF8
+        (Get-Item -LiteralPath $legacySampleSetPath).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(-5)
+        [ordered]@{
+            schema = "fb2.main_project.context_pack_sample_set_validation.v1"
+            samples_dir = (Join-Path $tmp "samples")
+            complete = $true
+            scenario_count = 4
+            passed_count = 4
+            failed_count = 0
+            missing = @()
+            secret_like_scenarios = @()
+            scenarios = @(
+                [ordered]@{ scenario = "today_matches_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-today"; citation_source_count = 23; source_kinds = @("match", "odds", "context_audit", "group_message"); context_pack_sha256 = "fb2abc" },
+                [ordered]@{ scenario = "my_ticket_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-ticket"; citation_source_count = 43; source_kinds = @("match", "odds", "user_order", "ticket", "context_audit", "group_message"); context_pack_sha256 = "fb2def" },
+                [ordered]@{ scenario = "platform_order_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-platform"; citation_source_count = 24; source_kinds = @("platform_order_summary", "context_audit", "match", "odds"); context_pack_sha256 = "fb2ghi" },
+                [ordered]@{ scenario = "group_opinion_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-opinion"; citation_source_count = 24; source_kinds = @("group_message", "opinion_memory", "context_audit", "match", "odds"); context_pack_sha256 = "fb2jkl" }
+            )
+        } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "fb2-repo-context-pack-samples-validation-current.json") -Encoding UTF8
         @(
             "OK`tcontext projection body: today matches context pack",
             "OK`tcontext projection wrapper open: today matches context pack",
@@ -655,8 +694,12 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_context_pack_sample_request.scenario_count -ne 4) { $failed++ }
         if (-not [bool]$snapshot.latest_context_pack_sample_set.complete) { $failed++ }
         if ($snapshot.latest_context_pack_sample_set.passed_count -ne 4) { $failed++ }
+        if ($snapshot.latest_context_pack_sample_set.path -notmatch "fb2-repo-context-pack-samples-validation") { $failed++ }
+        if (@($snapshot.latest_context_pack_sample_set.audit_ids) -notcontains "audit-fb2repo-today") { $failed++ }
         if (-not [bool]$snapshot.latest_context_answer_readiness.complete) { $failed++ }
         if ($snapshot.latest_context_answer_readiness.passed_count -ne 4) { $failed++ }
+        $todayReadiness = @($snapshot.latest_context_answer_readiness.scenarios | Where-Object { $_.id -eq "today_matches_analysis" })[0]
+        if ($todayReadiness.context_audit_id -ne "audit-fb2repo-today") { $failed++ }
         if ($snapshot.latest_user_scenario_audit.schema -ne "fb2.main_project.user_scenario_audit.v1") { $failed++ }
         if (-not [bool]$snapshot.latest_user_scenario_audit.complete) { $failed++ }
         if ($snapshot.latest_user_scenario_audit.scenario_count -ne 7) { $failed++ }
