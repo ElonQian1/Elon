@@ -390,6 +390,13 @@ function New-Fb2CurrentStateValidation {
         -Arguments @("-OutputPath", $contextProjectionLayerDocValidationPath) `
         -ExpectedOutputPath $contextProjectionLayerDocValidationPath))
 
+    $runtimeRoutingValidationPath = Join-Path $targetDir "runtime-routing-validation-current.json"
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_runtime_routing" `
+        -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-main-runtime-routing.ps1") `
+        -Arguments @("-OutputPath", $runtimeRoutingValidationPath) `
+        -ExpectedOutputPath $runtimeRoutingValidationPath))
+
     $userScenarioValidationPath = Join-Path $targetDir "user-scenario-audit-validation-current.json"
     if (-not [string]::IsNullOrWhiteSpace($statusPathForOptionalSteps) -and (Test-Path -LiteralPath $statusPathForOptionalSteps)) {
         [void]$steps.Add((Invoke-Fb2CurrentPwsh `
@@ -470,6 +477,7 @@ function New-Fb2CurrentStateValidation {
     $livePreflightRequestValidation = Read-Fb2CurrentJsonOrNull -Path $livePreflightValidationPath
     $tokenlessContinuationValidation = Read-Fb2CurrentJsonOrNull -Path $tokenlessContinuationValidationPath
     $contextProjectionLogValidation = Read-Fb2CurrentJsonOrNull -Path $contextProjectionValidationPath
+    $runtimeRoutingValidation = Read-Fb2CurrentJsonOrNull -Path $runtimeRoutingValidationPath
     $userScenarioAuditValidation = Read-Fb2CurrentJsonOrNull -Path $userScenarioValidationPath
     $directNetworkPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $directNetworkPolicyValidationPath
     $protectedLivePreflightSatisfied = [bool](Get-Fb2CurrentProperty $refresh "protected_live_preflight_satisfied" $false)
@@ -504,6 +512,7 @@ function New-Fb2CurrentStateValidation {
         live_preflight_request_validation = $livePreflightRequestValidation
         tokenless_continuation_validation = $tokenlessContinuationValidation
         context_projection_log_validation = $contextProjectionLogValidation
+        runtime_routing_validation = $runtimeRoutingValidation
         user_scenario_audit_validation = $userScenarioAuditValidation
         safe_to_continue_without_secret = @((Get-Fb2CurrentProperty $blocking "safe_to_continue_without_secret" @()))
         requires_secret = @((Get-Fb2CurrentProperty $blocking "requires_secret" @()))
@@ -537,6 +546,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "live_preflight_request"; script = "validate-fb2-live-preflight-request.ps1" },
         [ordered]@{ name = "context_projection_log"; script = "validate-fb2-context-projection-log.ps1" },
         [ordered]@{ name = "context_projection_layer_doc"; script = "validate-fb2-context-projection-layer-doc.ps1" },
+        [ordered]@{ name = "runtime_routing"; script = "validate-fb2-main-runtime-routing.ps1" },
         [ordered]@{ name = "user_scenario_audit"; script = "validate-fb2-user-scenario-audit.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "evidence_privacy"; script = "validate-fb2-evidence-privacy.ps1" },

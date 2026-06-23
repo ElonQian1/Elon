@@ -105,6 +105,7 @@
 - `match_analysis_brief` 归一化结果必须校验 `visibility=match_focused_brief`；`group_opinion_summary` 必须校验 `visibility=single_group_lightweight_memory`。
 - 群聊 AI prompt 包含 `<answer_rules>`，并由 `answer_policy_contract.prompt_answer_rules` 生成。
 - 群聊 AI prompt metadata 包含 `answer_policy`。
+- 运行时路由必须通过 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-main-runtime-routing.ps1`。该门禁证明 `@EL`、长按 `AI回复`、群聊总结帖入口都把用户问题、选中消息或总结主题整理成 `topic_hint`，并继续传给 fb2 Context Pack、today-matches fallback、工具 planner、工具执行审计和日志观测字段。
 - 群聊 AI 拉取 fb2 Context Pack 时，query 包含最后一次有效用户问题的 `topic_hint`。
 - 长按群消息 `AI回复` 拉取 fb2 Context Pack 时，query 包含被选中消息的 `topic_hint`。
 - 群聊总结帖拉取 fb2 Context Pack 时，query 包含由 `topic/title/instructions` 合成的 `topic_hint`。
