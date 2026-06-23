@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮继续加固 `validate-fb2-ai-center-current-state.ps1`：每个子步骤只要声明了 expected output，就必须实际写出文件且能解析为 JSON；validator 类输出还要 `success=true`。自测新增“子脚本 exit 0 但不写产物”和“写出非 JSON 产物”两个负例，避免后续把空产物、坏 JSON 或被中断的门禁误判为当前状态通过。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-current-state.ps1`，作为无密钥当前状态总门禁：默认先刷新 `status-refresh-current.json`，再运行 evidence freshness、gap action board、completion matrix、handoff prompt 四个 validator，输出 `current-state-validation-current.json`，集中暴露 `data_goal_complete`、`full_final_complete`、`token_present`、`blocked_by_external_secret` 和 `next_minimum_action`。`next_commands`、handoff prompt 和现有 validator 已新增 `validate_current_state`，后续会话可以一条命令确认主项目状态没有把历史证据、截图或 data-only 结果误当终极完成。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-evidence-freshness.ps1`，把 `status-refresh-current.json.evidence_freshness` 做成独立机器门禁。该脚本检查 schema、generated_at 是否过期、artifact 数量是否一致、`status_refresh` / `handoff_prompt` 等核心 artifact 是否来自当前 output dir、token/data/full-final 标志是否与 refresh 顶层一致，并在有 fb2-repo Context Pack 样本验证文件时要求 freshness artifact 路径与 `files.exported_context_pack_sample_set_validation` 一致。`next_commands`、handoff prompt 和现有 validator 已新增 `validate_evidence_freshness`，避免历史证据被误当成当前 live 证据。
 - 2026-06-23 本轮继续加固 `owner_next_actions` 协作分工：`validate-fb2-ai-center-gap-action-board.ps1` 现在会检查主项目动作必须围绕 contract/status 回归直到 `FB2_AI_CENTER_TOKEN` 可用，fb2 子项目动作必须明确提供 `FB2_AI_CENTER_TOKEN` 或等价 live Context Pack/权限/质量证据，shared 动作必须指向带 token 的 `DataOnlyAcceptance_PreflightOnly` 后刷新 status。自测新增“fb2_project=continue later”这类含糊交接必须失败的负例。

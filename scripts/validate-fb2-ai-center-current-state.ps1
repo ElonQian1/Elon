@@ -93,15 +93,18 @@ function Invoke-Fb2CurrentPwsh {
     $command = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $ScriptPath) + @($Arguments)
     $output = & pwsh @command 2>&1
     $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    $outputExists = [string]::IsNullOrWhiteSpace($ExpectedOutputPath) -or (Test-Path -LiteralPath $ExpectedOutputPath)
     $result = Read-Fb2CurrentJsonOrNull -Path $ExpectedOutputPath
+    $outputParseable = [string]::IsNullOrWhiteSpace($ExpectedOutputPath) -or ($null -ne $result)
     $jsonSuccess = if ($null -eq $result) { $null } else { Get-Fb2CurrentProperty $result "success" $null }
-    $success = ($exitCode -eq 0) -and ($null -eq $jsonSuccess -or [bool]$jsonSuccess)
+    $success = ($exitCode -eq 0) -and $outputExists -and $outputParseable -and ($null -eq $jsonSuccess -or [bool]$jsonSuccess)
     [ordered]@{
         name = $Name
         exit_code = $exitCode
         success = [bool]$success
         output_path = $ExpectedOutputPath
-        output_exists = (-not [string]::IsNullOrWhiteSpace($ExpectedOutputPath) -and (Test-Path -LiteralPath $ExpectedOutputPath))
+        output_exists = [bool]$outputExists
+        output_parseable = [bool]$outputParseable
         json_success = $jsonSuccess
         output_secret_safe = Test-Fb2CurrentSecretSafe -Text (@($output) -join "`n")
     }
@@ -198,6 +201,7 @@ function New-Fb2CurrentStateValidation {
 }
 
 function Invoke-Fb2CurrentStateSelfTest {
+    $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-current-state-selftest-" + [guid]::NewGuid().ToString("N"))
     $steps = @(
         [ordered]@{ name = "refresh_status"; script = "fb2-ai-center-refresh-current-status.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
@@ -205,19 +209,48 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },
         [ordered]@{ name = "handoff_prompt"; script = "validate-fb2-ai-center-handoff-prompt.ps1" }
     )
-    $failed = 0
-    foreach ($step in $steps) {
-        $scriptPath = Join-Path $PSScriptRoot ([string]$step.script)
-        $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $scriptPath -SelfTest 2>&1
-        $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
-        if ($exitCode -ne 0 -or -not (Test-Fb2CurrentSecretSafe -Text (@($output) -join "`n"))) {
+    try {
+        New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
+        $failed = 0
+        foreach ($step in $steps) {
+            $scriptPath = Join-Path $PSScriptRoot ([string]$step.script)
+            $output = & pwsh -NoProfile -ExecutionPolicy Bypass -File $scriptPath -SelfTest 2>&1
+            $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+            if ($exitCode -ne 0 -or -not (Test-Fb2CurrentSecretSafe -Text (@($output) -join "`n"))) {
+                $failed++
+            }
+        }
+
+        $noOutputScript = Join-Path $tempRoot "no-output.ps1"
+        Set-Content -LiteralPath $noOutputScript -Value "exit 0" -Encoding UTF8
+        $missingOutput = Invoke-Fb2CurrentPwsh `
+            -Name "missing_output_fixture" `
+            -ScriptPath $noOutputScript `
+            -ExpectedOutputPath (Join-Path $tempRoot "missing-output.json")
+        if ([bool]$missingOutput.success -or [bool]$missingOutput.output_exists -or [bool]$missingOutput.output_parseable) {
             $failed++
         }
-    }
-    Write-Output "== SelfTest Summary =="
-    Write-Output "failed=$failed"
-    if ($failed -gt 0) {
-        exit 1
+
+        $invalidOutputScript = Join-Path $tempRoot "invalid-output.ps1"
+        $invalidOutputPath = Join-Path $tempRoot "invalid-output.json"
+        Set-Content -LiteralPath $invalidOutputScript -Value "Set-Content -LiteralPath '$invalidOutputPath' -Value 'not-json' -Encoding UTF8; exit 0" -Encoding UTF8
+        $invalidOutput = Invoke-Fb2CurrentPwsh `
+            -Name "invalid_output_fixture" `
+            -ScriptPath $invalidOutputScript `
+            -ExpectedOutputPath $invalidOutputPath
+        if ([bool]$invalidOutput.success -or -not [bool]$invalidOutput.output_exists -or [bool]$invalidOutput.output_parseable) {
+            $failed++
+        }
+
+        Write-Output "== SelfTest Summary =="
+        Write-Output "failed=$failed"
+        if ($failed -gt 0) {
+            exit 1
+        }
+    } finally {
+        if (Test-Path -LiteralPath $tempRoot) {
+            Remove-Item -LiteralPath $tempRoot -Recurse -Force
+        }
     }
 }
 

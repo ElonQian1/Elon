@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮加固 `validate-fb2-ai-center-current-state.ps1` 的 step 判定：子脚本 exit code 为 0 但没有写 expected output、或 expected output 不是可解析 JSON，都会让总门禁失败。接手会话如果看到 `current-state-validation-current.json.steps[*].success=true`，现在可以同时依赖 `output_exists=true`、`output_parseable=true` 和 validator `json_success=true`，而不是只信子进程退出码。
 - 2026-06-23 本轮新增 `validate-fb2-ai-center-current-state.ps1`，用于接手会话的一键无密钥门禁：它刷新当前 status，再依次跑 evidence freshness、gap action board、completion matrix、handoff prompt validator，输出 `current-state-validation-current.json`。后续要回答“现在做到哪里、下一步干嘛”时，先运行 `validate_current_state`；若结果仍是 `data_goal_complete=true / full_final_complete=false / token_present=false`，下一步仍是补 `FB2_AI_CENTER_TOKEN` 跑 no-write `DataOnlyAcceptance -PreflightOnly`，ASR/TTS 继续按用户要求暂停。
 - 2026-06-23 本轮新增 `validate-fb2-ai-center-evidence-freshness.ps1`，用于独立校验 `status-refresh-current.json.evidence_freshness`：核心 artifact 必须来自当前 output dir，`generated_at_utc` 不能过期，顶层 token/data/full-final 标志要和 freshness 摘要一致，fb2-repo 样本验证 artifact 要和 `files.exported_context_pack_sample_set_validation` 对齐。接手会话在刷新 status 后应和 gap/completion/handoff validator 一起运行 `validate_evidence_freshness`，防止把历史 artifact 当作刚完成的 protected live 验证。
 - 2026-06-23 本轮把 `owner_next_actions` 也纳入 validator：主项目动作必须是保持 contract/status 回归直到 token 可用，fb2 子项目动作必须明确提供 `FB2_AI_CENTER_TOKEN` 或等价 live Context Pack/权限/质量证据，shared 动作必须是带 token 跑 `DataOnlyAcceptance_PreflightOnly` 后刷新 status。这样后续两个会话不会把“主项目还能做什么”和“必须 fb2 提供 token/live 证据”的边界写成模糊交接。
