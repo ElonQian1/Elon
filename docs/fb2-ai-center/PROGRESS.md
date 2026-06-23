@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮给 `status-refresh-current.json` 新增 `gap_action_board schema=fb2.main_project.gap_action_board.v1`，并同步展示到 `handoff-prompt-current.md`。它把剩余缺口从字符串变成可执行动作：`FB2_AI_CENTER_TOKEN_live_permission_quality_refresh` 指向带 token 的无写群 `DataOnlyAcceptance -PreflightOnly`；`full_final_acceptance_same_batch_voice_and_visible_chat` 标记需要同批 full final 与显式授权的可见群聊回归；`voice_final_evidence` 标记为用户暂停。每项都带 owner、所需证据、命令、是否可无密钥执行、是否会写群。
 - 2026-06-23 本轮给 `status-refresh-current.json` 新增 `evidence_freshness schema=fb2.main_project.evidence_freshness.v1`，并同步展示到 `handoff-prompt-current.md`。它只描述本地 artifact 新鲜度：各 summary/prompt 文件是否存在、来自 `current_output_dir` 还是历史证据目录、`last_write_utc` 和 `age_minutes`；不会把历史 evidence 伪装成刚刚完成的受保护 live 验证。该字段继续明确 protected live fb2 数据仍需要 `FB2_AI_CENTER_TOKEN`。
 - 2026-06-23 本轮新增 `scripts\fb2-ai-center-handoff-prompt.ps1`，并把它接入 `scripts\fb2-ai-center-refresh-current-status.ps1`。刷新后会生成 `target\fb2-ai-center\handoff-prompt-current.md`，把 `owner_next_actions`、`blocking_state`、`next_commands`、`completion_matrix` 和接手规则整理成可复制给下一轮主项目或 fb2 子会话的提示；脚本会把 `FB2_AI_CENTER_TOKEN`、`-Fb2AiCenterToken`、`-Fb2Token`、`-Fb2Password` 参数替换成占位，避免交接文件保存真实密钥。
 - 2026-06-23 本轮继续把“最终目标到底完成到哪一步”变成机器可读交接：`status-refresh-current.json` 新增 `completion_matrix schema=fb2.main_project.completion_matrix.v1`。该矩阵直接从 `goal-audit-current.json` 的 requirements 派生，逐项列出 group、owner、status、complete、deferred、evidence、missing，并汇总 totals/gates；后续会话不需要在长文档里手工判断“今日比赛/我的票/平台摘要/群观点/权限/反馈/群聊直读/语音暂停”分别是什么状态。

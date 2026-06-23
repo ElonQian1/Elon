@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮新增 `gap_action_board schema=fb2.main_project.gap_action_board.v1`。接手会话不再只看 `missing` 字符串，而是逐项看到 owner、所需证据、命令、是否可无密钥执行和是否需要真实群写入：缺 `FB2_AI_CENTER_TOKEN` 的 live 权限/质量刷新走无写群 `DataOnlyAcceptance -PreflightOnly`；same-batch full final 需要语音证据和可见群聊授权；`voice_final_evidence` 继续是用户暂停项。
 - 2026-06-23 本轮在 `status-refresh-current.json` 和 `handoff-prompt-current.md` 中增加 `evidence_freshness schema=fb2.main_project.evidence_freshness.v1`。接手会话可以直接看每个 artifact 的 `source_scope`、`last_write_utc` 和 `age_minutes`，区分当前刷新生成的 summary 与历史证据目录；这只是本地 artifact 新鲜度，不代表受保护 fb2 live Context Pack/订单/质量已经重新验证。缺 `FB2_AI_CENTER_TOKEN` 时仍只能做无密钥回归。
 - 2026-06-23 本轮新增 `target\fb2-ai-center\handoff-prompt-current.md` 作为可复制交接提示，由 `scripts\fb2-ai-center-handoff-prompt.ps1` 从 `status-refresh-current.json` 生成，并由刷新总入口自动调用。它会汇总当前 gates、owner 下一步、无写群/带 token/需授权命令、阻塞项、完成矩阵和接手规则；其中 `FB2_AI_CENTER_TOKEN`、`-Fb2AiCenterToken`、`-Fb2Token`、`-Fb2Password` 都会被替换成占位。后续同步给 fb2 子会话时优先贴这个 prompt，再附 `status-refresh-current.json`。
 - 2026-06-23 本轮给 `status-refresh-current.json` 增加 `completion_matrix schema=fb2.main_project.completion_matrix.v1`。它从 `goal-audit-current.json` 的 requirements 派生，逐项记录 group、owner、status、complete、deferred、evidence 和 missing，并汇总 totals/gates。接手会话判断终极目标差距时，优先看这个矩阵：非语音场景和安全反馈是否完整看 `data_goal_complete` / requirements，完整最终验收仍看 `full_final_complete`，ASR/TTS 暂停项仍是 `voice_final_evidence`。

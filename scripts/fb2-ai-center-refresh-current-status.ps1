@@ -345,6 +345,147 @@ function New-Fb2RefreshEvidenceFreshness {
     }
 }
 
+function New-Fb2RefreshGapAction {
+    param(
+        [string]$Id,
+        [string]$Status,
+        [string]$Owner,
+        [string]$EvidenceNeeded,
+        [string]$Command,
+        [string]$Notes,
+        [bool]$CanRunWithoutSecret,
+        [bool]$RequiresVisibleGroupWrite,
+        [bool]$DeferredByUser
+    )
+
+    [ordered]@{
+        id = $Id
+        status = $Status
+        owner = $Owner
+        evidence_needed = $EvidenceNeeded
+        command = $Command
+        notes = $Notes
+        can_run_without_secret = $CanRunWithoutSecret
+        requires_visible_group_write = $RequiresVisibleGroupWrite
+        deferred_by_user = $DeferredByUser
+    }
+}
+
+function New-Fb2RefreshGapActionBoard {
+    param(
+        [object]$Status,
+        [object]$GoalAudit,
+        [object]$BlockingState,
+        [object]$NextCommands,
+        [object]$CompletionMatrix
+    )
+
+    $missing = @($Status.goal_gap_audit.missing) + @($GoalAudit.missing_non_voice_requirements)
+    $missing = @($missing | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    $deferred = @($GoalAudit.deferred_requirements) + @($Status.goal_gap_audit.deferred_by_user)
+    $deferred = @($deferred | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+
+    $actions = [System.Collections.ArrayList]::new()
+    foreach ($id in $missing) {
+        $text = [string]$id
+        if ($text -eq "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh") {
+            [void]$actions.Add((New-Fb2RefreshGapAction `
+                -Id $text `
+                -Status "blocked_by_external_secret" `
+                -Owner "fb2_project_and_shared" `
+                -EvidenceNeeded "FB2_AI_CENTER_TOKEN or equivalent exported live Context Pack / permission / quality evidence" `
+                -Command ([string]$NextCommands.data_only_preflight) `
+                -Notes "Run no-write DataOnlyAcceptance preflight after the service token is available; do not treat historical artifacts as a fresh live refresh." `
+                -CanRunWithoutSecret $false `
+                -RequiresVisibleGroupWrite $false `
+                -DeferredByUser $false))
+            continue
+        }
+        if ($text -eq "full_final_acceptance_same_batch_voice_and_visible_chat") {
+            [void]$actions.Add((New-Fb2RefreshGapAction `
+                -Id $text `
+                -Status "waiting_on_voice_and_authorized_visible_regression" `
+                -Owner "shared" `
+                -EvidenceNeeded "same-batch full final summary with voice_status=required, visible direct-read evidence, feedback coverage and voice final evidence" `
+                -Command ([string]$NextCommands.visible_regression_requires_authorization) `
+                -Notes "Visible group writes require explicit authorization; this cannot be completed while ASR/TTS final evidence is paused." `
+                -CanRunWithoutSecret $false `
+                -RequiresVisibleGroupWrite $true `
+                -DeferredByUser $false))
+            continue
+        }
+        if ($text -eq "voice_final_evidence" -or $text -eq "ASR_TTS_final_evidence") {
+            [void]$actions.Add((New-Fb2RefreshGapAction `
+                -Id $text `
+                -Status "deferred_by_user" `
+                -Owner "paused_by_user" `
+                -EvidenceNeeded "real device ASR/TTS final-ready evidence JSON and matching final acceptance run" `
+                -Command "" `
+                -Notes "ASR/TTS work is intentionally paused by user; keep this visible but do not resume voice work in the current non-voice phase." `
+                -CanRunWithoutSecret $false `
+                -RequiresVisibleGroupWrite $false `
+                -DeferredByUser $true))
+            continue
+        }
+
+        $requirement = @($CompletionMatrix.requirements | Where-Object { [string]$_.id -eq $text } | Select-Object -First 1)
+        $owner = if (@($requirement).Count -gt 0 -and -not [string]::IsNullOrWhiteSpace([string]$requirement[0].owner)) {
+            [string]$requirement[0].owner
+        } else {
+            "shared"
+        }
+        [void]$actions.Add((New-Fb2RefreshGapAction `
+            -Id $text `
+            -Status "missing" `
+            -Owner $owner `
+            -EvidenceNeeded "fresh passing evidence for requirement $text" `
+            -Command ([string]$NextCommands.refresh_status) `
+            -Notes "Refresh status after the owning side updates its contract, Context Pack output, tool manifest or validation evidence." `
+            -CanRunWithoutSecret $true `
+            -RequiresVisibleGroupWrite $false `
+            -DeferredByUser $false))
+    }
+
+    foreach ($id in $deferred) {
+        $text = [string]$id
+        if (@($actions | Where-Object { [string]$_.id -eq $text }).Count -gt 0) {
+            continue
+        }
+        if ($text -eq "voice_final_evidence") {
+            [void]$actions.Add((New-Fb2RefreshGapAction `
+                -Id $text `
+                -Status "deferred_by_user" `
+                -Owner "paused_by_user" `
+                -EvidenceNeeded "real device ASR/TTS final-ready evidence JSON and matching final acceptance run" `
+                -Command "" `
+                -Notes "ASR/TTS work is intentionally paused by user; do not use data-only acceptance to mark full final complete." `
+                -CanRunWithoutSecret $false `
+                -RequiresVisibleGroupWrite $false `
+                -DeferredByUser $true))
+            continue
+        }
+        [void]$actions.Add((New-Fb2RefreshGapAction `
+            -Id $text `
+            -Status "deferred" `
+            -Owner "shared" `
+            -EvidenceNeeded "fresh evidence for deferred requirement $text" `
+            -Command "" `
+            -Notes "Deferred requirement; keep it visible in handoff until explicitly resumed or completed." `
+            -CanRunWithoutSecret $false `
+            -RequiresVisibleGroupWrite $false `
+            -DeferredByUser $true))
+    }
+
+    [ordered]@{
+        schema = "fb2.main_project.gap_action_board.v1"
+        next_minimum_action = [string]$GoalAudit.next_minimum_action
+        blocked_by_external_secret = [bool]$BlockingState.blocked_by_external_secret
+        external_secret = [string]$BlockingState.external_secret
+        action_count = @($actions).Count
+        actions = @($actions)
+    }
+}
+
 function New-Fb2RefreshBlockingState {
     param(
         [object]$Status,
@@ -410,6 +551,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
         Assert-Fb2RefreshSelfTest ([string]$summary.evidence_freshness.schema -eq "fb2.main_project.evidence_freshness.v1") "evidence freshness schema"
         Assert-Fb2RefreshSelfTest (@($summary.evidence_freshness.artifacts).Count -gt 0) "evidence freshness artifacts"
+        Assert-Fb2RefreshSelfTest ([string]$summary.gap_action_board.schema -eq "fb2.main_project.gap_action_board.v1") "gap action board schema"
+        Assert-Fb2RefreshSelfTest (@($summary.gap_action_board.actions).Count -gt 0) "gap action board actions"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
         "== SelfTest Summary =="
         "failed=0"
@@ -499,6 +642,12 @@ $ownerNextActions = New-Fb2RefreshOwnerActions -Status $status -GoalAudit $goalA
 $blockingState = New-Fb2RefreshBlockingState -Status $status -GoalAudit $goalAudit
 $nextCommands = New-Fb2RefreshNextCommands -Status $status
 $completionMatrix = New-Fb2RefreshCompletionMatrix -Status $status -GoalAudit $goalAudit
+$gapActionBoard = New-Fb2RefreshGapActionBoard `
+    -Status $status `
+    -GoalAudit $goalAudit `
+    -BlockingState $blockingState `
+    -NextCommands $nextCommands `
+    -CompletionMatrix $completionMatrix
 $files = [ordered]@{
     status_refresh = $RefreshSummaryPath
     public_contract_status = $publicPath
@@ -532,6 +681,7 @@ $refreshSummary = [pscustomobject]@{
     blocking_state = $blockingState
     next_commands = $nextCommands
     completion_matrix = $completionMatrix
+    gap_action_board = $gapActionBoard
     evidence_freshness = $evidenceFreshness
     missing_non_voice_requirements = @($goalAudit.missing_non_voice_requirements)
     deferred_requirements = @($goalAudit.deferred_requirements)

@@ -117,6 +117,8 @@ function New-Fb2HandoffPrompt {
     $ownerActions = Get-Fb2PromptProperty $Refresh "owner_next_actions"
     $freshness = Get-Fb2PromptProperty $Refresh "evidence_freshness"
     $freshnessArtifacts = @(Get-Fb2PromptProperty $freshness "artifacts" @())
+    $gapBoard = Get-Fb2PromptProperty $Refresh "gap_action_board"
+    $gapActions = @(Get-Fb2PromptProperty $gapBoard "actions" @())
     $requirements = @(Get-Fb2PromptProperty $matrix "requirements" @())
     $lines = [System.Collections.ArrayList]::new()
 
@@ -151,6 +153,19 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine $lines "- blocked_by_external_secret: `$([bool]$blocking.blocked_by_external_secret)`"
     Add-Fb2PromptLine $lines "- safe_to_continue_without_secret: `$(@($blocking.safe_to_continue_without_secret) -join ', ')`"
     Add-Fb2PromptLine $lines "- requires_secret: `$(@($blocking.requires_secret) -join ', ')`"
+    Add-Fb2PromptLine $lines ""
+    Add-Fb2PromptLine $lines "## 缺口行动板"
+    Add-Fb2PromptLine $lines "- gap_schema: `$([string](Get-Fb2PromptProperty $gapBoard 'schema' ''))`"
+    Add-Fb2PromptLine $lines "- action_count: `$([int](Get-Fb2PromptProperty $gapBoard 'action_count' 0))`"
+    foreach ($action in $gapActions) {
+        $actionId = Format-Fb2PromptCell $action.id 120
+        $actionStatus = Format-Fb2PromptCell $action.status 100
+        $actionOwner = Format-Fb2PromptCell $action.owner 80
+        $actionEvidence = Format-Fb2PromptCell $action.evidence_needed 220
+        $actionCommand = Format-Fb2PromptCell $action.command 220
+        $actionNotes = Format-Fb2PromptCell $action.notes 220
+        Add-Fb2PromptLine -Lines $lines -Text ("- gap {0}: status={1}; owner={2}; evidence={3}; command={4}; notes={5}" -f $actionId, $actionStatus, $actionOwner, $actionEvidence, $actionCommand, $actionNotes)
+    }
     Add-Fb2PromptLine $lines ""
     Add-Fb2PromptLine $lines "## 证据新鲜度"
     Add-Fb2PromptLine $lines "- freshness_schema: `$([string](Get-Fb2PromptProperty $freshness 'schema' ''))`"
@@ -255,6 +270,28 @@ function Invoke-Fb2PromptSelfTest {
                     [ordered]@{ name = "goal_audit"; source_scope = "current_output_dir"; age_minutes = 0; path = "target\fb2-ai-center\goal-audit-current.json" }
                 )
             }
+            gap_action_board = [ordered]@{
+                schema = "fb2.main_project.gap_action_board.v1"
+                action_count = 2
+                actions = @(
+                    [ordered]@{
+                        id = "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh"
+                        status = "blocked_by_external_secret"
+                        owner = "fb2_project_and_shared"
+                        evidence_needed = "FB2_AI_CENTER_TOKEN or equivalent exported live Context Pack / permission / quality evidence"
+                        command = '$env:FB2_AI_CENTER_TOKEN="secret-real-value"; pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Token secret-real-value'
+                        notes = "Run no-write DataOnlyAcceptance preflight after token is available."
+                    },
+                    [ordered]@{
+                        id = "voice_final_evidence"
+                        status = "deferred_by_user"
+                        owner = "paused_by_user"
+                        evidence_needed = "real device ASR/TTS evidence"
+                        command = ""
+                        notes = "ASR/TTS is paused."
+                    }
+                )
+            }
         }
         $fixture | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $refreshPath -Encoding UTF8
         & $PSCommandPath -RefreshPath $refreshPath -OutputPath $promptPath | Out-Null
@@ -264,6 +301,8 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "today_matches_analysis") "matrix item"
         Assert-Fb2PromptSelfTest ($content -match "证据新鲜度") "freshness section"
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.evidence_freshness.v1") "freshness schema"
+        Assert-Fb2PromptSelfTest ($content -match "缺口行动板") "gap action section"
+        Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.gap_action_board.v1") "gap action schema"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_AI_CENTER_TOKEN>") "token placeholder"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_PASSWORD>") "password placeholder"
         Assert-Fb2PromptSelfTest ($content -notmatch "secret-real-value") "token redacted"
