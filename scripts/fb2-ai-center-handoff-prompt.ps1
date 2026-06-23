@@ -122,41 +122,41 @@ function New-Fb2HandoffPrompt {
     $requirements = @(Get-Fb2PromptProperty $matrix "requirements" @())
     $lines = [System.Collections.ArrayList]::new()
 
-    Add-Fb2PromptLine $lines "# fb2 AI Center 下一轮执行提示"
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "来源 refresh summary: `$SourcePath`"
-    Add-Fb2PromptLine $lines "schema: `$([string]$Refresh.schema)` / matrix: `$([string]$matrix.schema)`"
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## 当前闸门"
-    Add-Fb2PromptLine $lines "- data_goal_complete: `$([bool]$gates.data_goal_complete)`"
-    Add-Fb2PromptLine $lines "- full_final_complete: `$([bool]$gates.full_final_complete)`"
-    Add-Fb2PromptLine $lines "- token_present: `$([bool]$gates.token_present)`"
-    Add-Fb2PromptLine $lines "- voice_deferred_by_user: `$([bool]$gates.voice_deferred_by_user)`"
-    Add-Fb2PromptLine $lines "- next_minimum_action: `$([string]$gates.next_minimum_action)`"
-    Add-Fb2PromptLine $lines "- totals: complete `$([int]$totals.complete)` / deferred `$([int]$totals.deferred)` / incomplete `$([int]$totals.incomplete)` / total `$([int]$totals.total)`"
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## Owner 下一步"
-    Add-Fb2PromptLine $lines "- main_project: `$([string]$ownerActions.main_project)`"
-    Add-Fb2PromptLine $lines "- fb2_project: `$([string]$ownerActions.fb2_project)`"
-    Add-Fb2PromptLine $lines "- shared: `$([string]$ownerActions.shared)`"
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## 可执行命令"
-    foreach ($name in @("refresh_status", "read_status_refresh", "validate_gap_action_board", "validate_visible_answer_policy", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
+    Add-Fb2PromptLine -Lines $lines -Text "# fb2 AI Center 下一轮执行提示"
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text ('来源 refresh summary: `{0}`' -f $SourcePath)
+    Add-Fb2PromptLine -Lines $lines -Text ('schema: `{0}` / matrix: `{1}`' -f [string]$Refresh.schema, [string]$matrix.schema)
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 当前闸门"
+    Add-Fb2PromptLine -Lines $lines -Text ('- data_goal_complete: `{0}`' -f [bool]$gates.data_goal_complete)
+    Add-Fb2PromptLine -Lines $lines -Text ('- full_final_complete: `{0}`' -f [bool]$gates.full_final_complete)
+    Add-Fb2PromptLine -Lines $lines -Text ('- token_present: `{0}`' -f [bool]$gates.token_present)
+    Add-Fb2PromptLine -Lines $lines -Text ('- voice_deferred_by_user: `{0}`' -f [bool]$gates.voice_deferred_by_user)
+    Add-Fb2PromptLine -Lines $lines -Text ('- next_minimum_action: `{0}`' -f [string]$gates.next_minimum_action)
+    Add-Fb2PromptLine -Lines $lines -Text ('- totals: complete `{0}` / deferred `{1}` / incomplete `{2}` / total `{3}`' -f [int]$totals.complete, [int]$totals.deferred, [int]$totals.incomplete, [int]$totals.total)
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## Owner 下一步"
+    Add-Fb2PromptLine -Lines $lines -Text ('- main_project: `{0}`' -f [string]$ownerActions.main_project)
+    Add-Fb2PromptLine -Lines $lines -Text ('- fb2_project: `{0}`' -f [string]$ownerActions.fb2_project)
+    Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 可执行命令"
+    foreach ($name in @("refresh_status", "read_status_refresh", "validate_gap_action_board", "validate_completion_matrix", "validate_visible_answer_policy", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
         $value = Protect-Fb2PromptSecret -Text ([string](Get-Fb2PromptProperty $commands $name ""))
         if (-not [string]::IsNullOrWhiteSpace($value)) {
-            Add-Fb2PromptLine $lines "- `${name}`: ``$value``"
+            Add-Fb2PromptLine -Lines $lines -Text ('- `{0}`: `{1}`' -f $name, $value)
         }
     }
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## 阻塞与边界"
-    Add-Fb2PromptLine $lines "- external_secret: `$([string]$blocking.external_secret)`"
-    Add-Fb2PromptLine $lines "- blocked_by_external_secret: `$([bool]$blocking.blocked_by_external_secret)`"
-    Add-Fb2PromptLine $lines "- safe_to_continue_without_secret: `$(@($blocking.safe_to_continue_without_secret) -join ', ')`"
-    Add-Fb2PromptLine $lines "- requires_secret: `$(@($blocking.requires_secret) -join ', ')`"
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## 缺口行动板"
-    Add-Fb2PromptLine $lines "- gap_schema: `$([string](Get-Fb2PromptProperty $gapBoard 'schema' ''))`"
-    Add-Fb2PromptLine $lines "- action_count: `$([int](Get-Fb2PromptProperty $gapBoard 'action_count' 0))`"
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 阻塞与边界"
+    Add-Fb2PromptLine -Lines $lines -Text ('- external_secret: `{0}`' -f [string]$blocking.external_secret)
+    Add-Fb2PromptLine -Lines $lines -Text ('- blocked_by_external_secret: `{0}`' -f [bool]$blocking.blocked_by_external_secret)
+    Add-Fb2PromptLine -Lines $lines -Text ('- safe_to_continue_without_secret: `{0}`' -f (@($blocking.safe_to_continue_without_secret) -join ', '))
+    Add-Fb2PromptLine -Lines $lines -Text ('- requires_secret: `{0}`' -f (@($blocking.requires_secret) -join ', '))
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 缺口行动板"
+    Add-Fb2PromptLine -Lines $lines -Text ('- gap_schema: `{0}`' -f [string](Get-Fb2PromptProperty $gapBoard 'schema' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- action_count: `{0}`' -f [int](Get-Fb2PromptProperty $gapBoard 'action_count' 0))
     foreach ($action in $gapActions) {
         $actionId = Format-Fb2PromptCell $action.id 120
         $actionStatus = Format-Fb2PromptCell $action.status 100
@@ -166,13 +166,13 @@ function New-Fb2HandoffPrompt {
         $actionNotes = Format-Fb2PromptCell $action.notes 220
         Add-Fb2PromptLine -Lines $lines -Text ("- gap {0}: status={1}; owner={2}; evidence={3}; command={4}; notes={5}" -f $actionId, $actionStatus, $actionOwner, $actionEvidence, $actionCommand, $actionNotes)
     }
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## 证据新鲜度"
-    Add-Fb2PromptLine $lines "- freshness_schema: `$([string](Get-Fb2PromptProperty $freshness 'schema' ''))`"
-    Add-Fb2PromptLine $lines "- generated_at_utc: `$([string](Get-Fb2PromptProperty $freshness 'generated_at_utc' ''))`"
-    Add-Fb2PromptLine $lines "- note: `$([string](Get-Fb2PromptProperty $freshness 'note' ''))`"
-    Add-Fb2PromptLine $lines "- current_output_artifact_count: `$([int](Get-Fb2PromptProperty $freshness 'current_output_artifact_count' 0))`"
-    Add-Fb2PromptLine $lines "- history_artifact_count: `$([int](Get-Fb2PromptProperty $freshness 'history_artifact_count' 0))`"
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 证据新鲜度"
+    Add-Fb2PromptLine -Lines $lines -Text ('- freshness_schema: `{0}`' -f [string](Get-Fb2PromptProperty $freshness 'schema' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- generated_at_utc: `{0}`' -f [string](Get-Fb2PromptProperty $freshness 'generated_at_utc' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- note: `{0}`' -f [string](Get-Fb2PromptProperty $freshness 'note' ''))
+    Add-Fb2PromptLine -Lines $lines -Text ('- current_output_artifact_count: `{0}`' -f [int](Get-Fb2PromptProperty $freshness 'current_output_artifact_count' 0))
+    Add-Fb2PromptLine -Lines $lines -Text ('- history_artifact_count: `{0}`' -f [int](Get-Fb2PromptProperty $freshness 'history_artifact_count' 0))
     $pipe = [char]124
     Add-Fb2PromptLine -Lines $lines -Text ('{0} artifact {0} source {0} age_minutes {0} path {0}' -f $pipe)
     Add-Fb2PromptLine -Lines $lines -Text ('{0}---{0}---{0}---:{0}---{0}' -f $pipe)
@@ -183,8 +183,8 @@ function New-Fb2HandoffPrompt {
         $path = Format-Fb2PromptCell $artifact.path 180
         Add-Fb2PromptLine -Lines $lines -Text ('{0} {1} {0} {2} {0} {3} {0} {4} {0}' -f $pipe, $name, $source, $age, $path)
     }
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## 完成矩阵"
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 完成矩阵"
     Add-Fb2PromptLine -Lines $lines -Text ('{0} group {0} owner {0} id {0} status {0} evidence {0} missing {0}' -f $pipe)
     Add-Fb2PromptLine -Lines $lines -Text ('{0}---{0}---{0}---{0}---{0}---{0}---{0}' -f $pipe)
     foreach ($requirement in $requirements) {
@@ -196,13 +196,13 @@ function New-Fb2HandoffPrompt {
         $missing = Format-Fb2PromptCell $requirement.missing 160
         Add-Fb2PromptLine -Lines $lines -Text ('{0} {1} {0} {2} {0} {3} {0} {4} {0} {5} {0} {6} {0}' -f $pipe, $group, $owner, $id, $status, $evidence, $missing)
     }
-    Add-Fb2PromptLine $lines ""
-    Add-Fb2PromptLine $lines "## 接手规则"
-    Add-Fb2PromptLine $lines "- 先运行 `refresh_status`，再读取 `status-refresh-current.json`。"
-    Add-Fb2PromptLine $lines "- 没有 `FB2_AI_CENTER_TOKEN` 时，只做公开契约、离线样本、无写群直读和文档/脚本回归。"
-    Add-Fb2PromptLine $lines "- 有 token 后，先跑 `data_only_preflight`，刷新 live Context Pack、本人订单、平台摘要、权限和质量证据。"
-    Add-Fb2PromptLine $lines "- 真实群聊可见写入必须另有明确授权；截图不能替代 API 直读 summary。"
-    Add-Fb2PromptLine $lines "- ASR/TTS final evidence 仍按用户要求暂停，不能把 `full_final_complete=false` 改成完成。"
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 接手规则"
+    Add-Fb2PromptLine -Lines $lines -Text '- 先运行 `refresh_status`，再读取 `status-refresh-current.json`。'
+    Add-Fb2PromptLine -Lines $lines -Text '- 没有 `FB2_AI_CENTER_TOKEN` 时，只做公开契约、离线样本、无写群直读和文档/脚本回归。'
+    Add-Fb2PromptLine -Lines $lines -Text '- 有 token 后，先跑 `data_only_preflight`，刷新 live Context Pack、本人订单、平台摘要、权限和质量证据。'
+    Add-Fb2PromptLine -Lines $lines -Text '- 真实群聊可见写入必须另有明确授权；截图不能替代 API 直读 summary。'
+    Add-Fb2PromptLine -Lines $lines -Text '- ASR/TTS final evidence 仍按用户要求暂停，不能把 `full_final_complete=false` 改成完成。'
 
     return (($lines -join [Environment]::NewLine) + [Environment]::NewLine)
 }
@@ -241,6 +241,7 @@ function Invoke-Fb2PromptSelfTest {
                 refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
                 read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
                 validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
+                validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
                 validate_visible_answer_policy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>"
                 no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Password secret-real-password"
                 data_only_preflight = '$env:FB2_AI_CENTER_TOKEN="secret-real-value"; pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Token secret-real-value'
@@ -305,6 +306,7 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.evidence_freshness.v1") "freshness schema"
         Assert-Fb2PromptSelfTest ($content -match "缺口行动板") "gap action section"
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.gap_action_board.v1") "gap action schema"
+        Assert-Fb2PromptSelfTest ($content -match "validate_completion_matrix") "completion matrix validation command"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_AI_CENTER_TOKEN>") "token placeholder"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_PASSWORD>") "password placeholder"
         Assert-Fb2PromptSelfTest ($content -notmatch "secret-real-value") "token redacted"

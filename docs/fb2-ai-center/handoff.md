@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮新增 completion matrix 独立验收：`scripts\validate-fb2-ai-center-completion-matrix.ps1` 会读取 `status-refresh-current.json.completion_matrix`，逐项验证 14 个 requirement、分组/owner、totals/groups、`data_goal_complete`、`full_final_complete`、语音 deferred 和 secret redaction。`status-refresh-current.json.next_commands.validate_completion_matrix` 与 `handoff-prompt-current.md` 已同步输出该命令；接手会话应在修改 goal audit、completion matrix 或 refresh 编排后运行它，避免把旧证据或 data-only 证据误判成 full final。
 - 2026-06-23 本轮补齐公开契约 domain index 回归：`fb2-public-contract-status.ps1` 现在对 8 类 index 全部做单项检查，新增覆盖 `odds_snapshot_index`、`opinion_memory_index`、`context_audit_index`，并用 selftest 证明 `index_count=8` 但缺真实 index 时会失败。线上公开契约当前 `passed_count=56`、`failed_count=0`，`domain_context_index_ids` 包含比赛、赔率、当前用户票据、平台风险、群观点、观点记忆、上下文审计和反馈质量。该项只证明主项目公开契约没有漂移，不证明 fb2 protected live 数据已经刷新。
 - 2026-06-23 本轮修复 `status-refresh-current.json` 的 artifact 新鲜度显示：`status_refresh` 和 `handoff_prompt` 在脚本末尾生成，现已按 current-run generated 记录，正式刷新输出里二者均为 `exists=true`、`source_scope=current_output_dir`、`age_minutes=0.0`。接手会话可继续用 `evidence_freshness` 区分当前输出和历史证据，但不能把该字段当作 protected fb2 live 数据已刷新；缺 `FB2_AI_CENTER_TOKEN` 的结论不变。
 - 2026-06-23 08:54 当前主项目侧本轮收尾：上一轮代码已通过 `CodePushed` 门禁，`HEAD=origin/main=dd8e4dda`，worktree 干净。重新刷新 `status-refresh-current.json` 后仍显示非语音数据/聊天/权限/反馈闭环完成，`full_final_complete=false`；缺口仍是 `FB2_AI_CENTER_TOKEN` 的受保护 live preflight 刷新，以及用户已暂停的 ASR/TTS final-ready 真机证据。本轮另按 direct API read 口径只读 `ext_fb2_official`：`message_count=80`、样本 `gai_06537010425c467595cee04c585b2edf`、`text_len=292`、`text_sha256=b6f9bceebb28841a1380c002b3103e3d4264c8f1b4577a0af2855f537061fc1a`、`writes=false`。本次没有写真实群、没有截图验收、没有处理 ASR/TTS。
@@ -244,6 +245,9 @@
 - 每轮交接前建议先生成状态快照：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center-status.ps1 -OutputPath target\fb2-ai-center\status-current.json`
   然后读取 `goal_gap_audit.completed/missing/deferred_by_user/next_smallest_action`。如果 `completed` 已包含 `direct_group_chat_read`，说明当前证据来自群聊 API 直读或已绑定的 direct-read summary；如果只看到截图、录屏或消息 ID，而没有 `text_len/text_sha256`，不能算群聊对话验收通过。
+- 修改 `completion_matrix`、`goal-audit` 或状态刷新编排后运行：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1`
+  这会证明 14 项终极目标 requirement 没有丢项、分组/owner/totals 与明细一致、语音暂停时 `full_final_complete` 不会误报，并且矩阵证据不泄露 token/password。
 - 同一份状态里还要看 `latest_user_scenario_audit`：`complete=true` 表示七类用户场景都有对应证据；如果缺 `selected_message_review`、`group_discussion_summary_post` 或 `source_reference_audit`，不要只用四类 Context Pack 样本宣布“fb2 用户问题都能回答”。
 - 同一份状态里还要看 `latest_domain_data_blueprint`：`complete=true`、`lane_count=6` 表示长期数据工具路线已固定。后续新增 fb2 业务工具时，先把它归入对应 lane 或新增 lane，再更新 Context Pack section、source kind、权限 scope 和验收信号。
 - 同一份状态里还要看 `live_preflight_request`：它是给拿到 service token 后执行的最小命令清单。没有 token 时不要用截图、旧 summary 或离线样本替代 live 权限/质量刷新。
