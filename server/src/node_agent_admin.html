@@ -139,19 +139,7 @@
         <div id="clientMaintPaths" class="mini-lines">加载中…</div>
       </div>
     </div>
-    <div class="action-row">
-      <button class="secondary" type="button" onclick="openMaintenanceTarget('install_dir', this)">打开安装目录</button>
-      <button class="secondary" type="button" onclick="openMaintenanceTarget('logs', this)">打开运行日志</button>
-      <button class="secondary" type="button" onclick="openMaintenanceTarget('launcher_logs', this)">打开启动器日志</button>
-      <button class="secondary" type="button" onclick="openMaintenanceTarget('task_journal', this)">打开任务记录</button>
-      <button class="secondary" type="button" onclick="openMaintenanceTarget('diagnostics_dir', this)">打开诊断目录</button>
-      <button class="secondary" type="button" onclick="openMaintenanceTarget('config_dir', this)">打开配置目录</button>
-      <button class="secondary" type="button" onclick="openMaintenanceTarget('state_file', this)">定位配置文件</button>
-      <button type="button" onclick="exportClientDiagnostics(this)">导出诊断</button>
-      <button type="button" onclick="repairClient(this)">修复客户端入口</button>
-      <button type="button" onclick="runClientUpdate(this)">检查更新</button>
-      <button class="danger" type="button" onclick="uninstallClient(this)">卸载客户端</button>
-    </div>
+    <div class="action-row" id="clientMaintActions">加载维护动作…</div>
     <div id="clientMaintResult"></div>
   </div>
 
@@ -467,6 +455,7 @@ async function loadClientMaintenance() {
   if (!r || !r.ok) {
     summary.innerHTML = '<span style="color:#f85149">维护状态读取失败</span>';
     paths.innerHTML = '';
+    renderClientMaintenanceActions([]);
     return;
   }
   const installed = r.installed === undefined ? '未知' : (r.installed ? '已安装' : '未完整安装');
@@ -500,6 +489,46 @@ async function loadClientMaintenance() {
     `<span>配置目录：${pathCode(r.config_dir)}</span>`,
     `<span>配置文件：${pathCode(r.state_file)}</span>`,
   ].join('');
+  renderClientMaintenanceActions(r.maintenance_actions);
+}
+
+function renderClientMaintenanceActions(actions) {
+  const root = document.getElementById('clientMaintActions');
+  if (!root) return;
+  root.innerHTML = '';
+  const items = Array.isArray(actions) ? actions : [];
+  if (!items.length) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'secondary';
+    btn.disabled = true;
+    btn.textContent = '维护动作未上报';
+    root.appendChild(btn);
+    return;
+  }
+  for (const action of items) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = String(action.label || action.id || '维护动作');
+    btn.title = String(action.description || '');
+    if (action.tone === 'danger') btn.className = 'danger';
+    else if (action.tone !== 'primary') btn.className = 'secondary';
+    btn.disabled = action.enabled === false;
+    btn.addEventListener('click', () => runMaintenanceAction(action, btn));
+    root.appendChild(btn);
+  }
+}
+
+async function runMaintenanceAction(action, btn) {
+  const kind = String(action && action.kind || '').trim();
+  const target = String(action && action.target || '').trim();
+  if (kind === 'open_target') return openMaintenanceTarget(target, btn);
+  if (kind === 'export_diagnostics') return exportClientDiagnostics(btn);
+  if (kind === 'repair') return repairClient(btn);
+  if (kind === 'update') return runClientUpdate(btn);
+  if (kind === 'uninstall') return uninstallClient(btn, action.confirmation);
+  const out = maintenanceOut();
+  if (out) out.innerHTML = `<div class="err-toast">❌ 不支持的维护动作：${esc(kind || 'unknown')}</div>`;
 }
 
 function clientStartMenuLine(product, startMenu) {
@@ -620,8 +649,9 @@ async function repairClient(btn) {
   }
 }
 
-async function uninstallClient(btn) {
-  if (!confirm('确认卸载一龙 PC 节点？这会停止本机节点并清理安装目录。')) return;
+async function uninstallClient(btn, confirmationText) {
+  const message = String(confirmationText || '确认卸载一龙 PC 节点？这会停止本机节点并清理安装目录。');
+  if (message && !confirm(message)) return;
   const restore = setBusy(btn, '卸载中…');
   const out = maintenanceOut();
   try {

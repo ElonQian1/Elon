@@ -245,6 +245,26 @@ fn maintenance_actions(install: &Value) -> Value {
             None,
         ),
         action(
+            "open_config_dir",
+            "open_target",
+            "配置目录",
+            "打开本机节点凭证和运行配置所在目录。",
+            "config_dir",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
+            "open_state_file",
+            "open_target",
+            "配置文件",
+            "定位本机节点状态配置文件。",
+            "state_file",
+            supported,
+            "neutral",
+            None,
+        ),
+        action(
             "export_diagnostics",
             "export_diagnostics",
             "导出诊断",
@@ -735,6 +755,22 @@ mod tests {
             .unwrap()
             .iter()
             .any(|action| {
+                action["id"].as_str() == Some("open_config_dir")
+                    && action["target"].as_str() == Some("config_dir")
+            }));
+        assert!(status["maintenance_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|action| {
+                action["id"].as_str() == Some("open_state_file")
+                    && action["target"].as_str() == Some("state_file")
+            }));
+        assert!(status["maintenance_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|action| {
                 action["id"].as_str() == Some("repair_client")
                     && action["kind"].as_str() == Some("repair")
             }));
@@ -756,6 +792,65 @@ mod tests {
             status["product_status"]["primary_entry_name"].as_str(),
             Some(crate::node_client_launcher::CLIENT_EXE_NAME)
         );
+    }
+
+    #[test]
+    fn maintenance_actions_are_ui_renderable_contracts() {
+        let status = status_payload();
+        let actions = status["maintenance_actions"]
+            .as_array()
+            .expect("maintenance actions should be an array");
+        assert!(actions.len() >= 9);
+
+        for action in actions {
+            let kind = action["kind"]
+                .as_str()
+                .expect("maintenance action kind should be string");
+            assert!(
+                !action["id"].as_str().unwrap_or_default().trim().is_empty(),
+                "maintenance action id should be renderable"
+            );
+            assert!(
+                !action["label"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .trim()
+                    .is_empty(),
+                "maintenance action label should be renderable"
+            );
+            assert!(
+                !action["description"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .trim()
+                    .is_empty(),
+                "maintenance action description should be renderable"
+            );
+            assert!(action["enabled"].as_bool().is_some());
+            assert!(matches!(
+                action["tone"].as_str(),
+                Some("primary" | "neutral" | "danger")
+            ));
+            if kind == "open_target" {
+                assert!(
+                    !action["target"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .trim()
+                        .is_empty(),
+                    "open_target action should include a maintenance target"
+                );
+            }
+            if kind == "uninstall" {
+                assert!(
+                    action["confirmation"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .contains("卸载"),
+                    "uninstall action should carry its confirmation copy"
+                );
+            }
+        }
     }
 
     #[test]

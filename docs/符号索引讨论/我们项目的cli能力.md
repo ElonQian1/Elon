@@ -1063,6 +1063,7 @@ Route B/C 本机工具白名单
 Route B/C 工具调用时间线
 Route C 平台日预算 + 用户日预算 + 重复请求防抖 + agent 选择保护 + server_api_key-only 硬门槛
 Win 客户端维护面板展示安装状态、开始菜单健康、日志入口、修复客户端入口、更新/卸载动作和下一步建议
+客户端维护按钮已经改成后端 `maintenance_actions` 契约驱动；页面按 `kind/target/enabled/tone/confirmation` 渲染日志、诊断、配置、修复、更新和卸载动作，避免前端硬编码按钮和后端能力漂移
 本机 7799 管理 API token 保护
 Route A CLI 名称、路径、参数、cwd fail-closed 校验
 legacy relay 同步拒绝任意 CLI 和内置 runtime
