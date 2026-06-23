@@ -141,7 +141,7 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 可执行命令"
-    foreach ($name in @("refresh_status", "read_status_refresh", "generate_context_pack_sample_request", "validate_context_pack_sample_set", "validate_exported_context_pack_sample_set", "validate_current_state", "validate_read_only_direct_read", "validate_gap_action_board", "validate_evidence_freshness", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
+    foreach ($name in @("refresh_status", "read_status_refresh", "generate_context_pack_sample_request", "validate_context_pack_sample_set", "validate_exported_context_pack_sample_set", "validate_current_state", "validate_server_deploy_status", "validate_read_only_direct_read", "validate_gap_action_board", "validate_evidence_freshness", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
         $value = Protect-Fb2PromptSecret -Text ([string](Get-Fb2PromptProperty $commands $name ""))
         if (-not [string]::IsNullOrWhiteSpace($value)) {
             Add-Fb2PromptLine -Lines $lines -Text ('- `{0}`: `{1}`' -f $name, $value)
@@ -244,6 +244,7 @@ function Invoke-Fb2PromptSelfTest {
                 validate_context_pack_sample_set = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json"
                 validate_exported_context_pack_sample_set = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir <fb2_repo>\target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\fb2-repo-context-pack-samples-validation-current.json"
                 validate_current_state = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1"
+                validate_server_deploy_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-main-server-deploy-status.ps1"
                 validate_read_only_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json"
                 validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
                 validate_evidence_freshness = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1"
@@ -317,6 +318,7 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "validate_context_pack_sample_set") "context pack sample set validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_exported_context_pack_sample_set") "exported context pack sample set validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_current_state") "current state validation command"
+        Assert-Fb2PromptSelfTest ($content -match "validate_server_deploy_status") "server deploy status validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_read_only_direct_read") "read-only direct read validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_evidence_freshness") "evidence freshness validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_completion_matrix") "completion matrix validation command"

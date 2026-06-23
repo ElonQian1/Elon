@@ -141,6 +141,12 @@ function New-Fb2CurrentStateValidation {
             -ExpectedOutputPath $RefreshPath))
     }
 
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_server_deploy_status" `
+        -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-main-server-deploy-status.ps1") `
+        -Arguments @("-OutputPath", (Join-Path $targetDir "server-deploy-status-current.json")) `
+        -ExpectedOutputPath (Join-Path $targetDir "server-deploy-status-current.json")))
+
     $refreshForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
     $filesForOptionalSteps = Get-Fb2CurrentProperty $refreshForOptionalSteps "files"
     $statusPathForOptionalSteps = [string](Get-Fb2CurrentProperty $filesForOptionalSteps "status" "")
@@ -218,6 +224,7 @@ function Invoke-Fb2CurrentStateSelfTest {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-current-state-selftest-" + [guid]::NewGuid().ToString("N"))
     $steps = @(
         [ordered]@{ name = "refresh_status"; script = "fb2-ai-center-refresh-current-status.ps1" },
+        [ordered]@{ name = "server_deploy_status"; script = "validate-fb2-main-server-deploy-status.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },

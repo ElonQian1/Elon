@@ -160,6 +160,7 @@ function New-Fb2RefreshNextCommands {
         validate_context_pack_sample_set = $sampleSetCommand
         validate_exported_context_pack_sample_set = $exportedSampleSetCommand
         validate_current_state = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1"
+        validate_server_deploy_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-main-server-deploy-status.ps1"
         validate_read_only_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json"
         validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
         validate_evidence_freshness = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1"
@@ -340,6 +341,7 @@ function New-Fb2RefreshEvidenceFreshness {
     }
     $artifactNames = @(
         "public_contract_status",
+        "server_deploy_status",
         "status",
         "goal_audit",
         "goal_audit_markdown",
@@ -584,6 +586,7 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_context_pack_sample_set)) "context pack sample set validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_exported_context_pack_sample_set)) "exported context pack sample set validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_current_state)) "current state validation command"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_server_deploy_status)) "server deploy status validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_read_only_direct_read)) "read-only direct read validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_gap_action_board)) "gap action validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_evidence_freshness)) "evidence freshness validation command"
@@ -661,6 +664,7 @@ if ([string]::IsNullOrWhiteSpace($MainWorkspaceEvidenceDir)) {
 Add-Fb2RefreshDirectory -Target $evidence -Seen $seen -Directory $MainWorkspaceEvidenceDir -Root $root -RequireExists
 
 $publicPath = Join-Path $OutputDir "public-contract-status-current.json"
+$serverDeployStatusPath = Join-Path $OutputDir "server-deploy-status-current.json"
 $statusPath = Join-Path $OutputDir "status-current.json"
 $goalAuditPath = Join-Path $OutputDir "goal-audit-current.json"
 $goalAuditMarkdownPath = Join-Path $OutputDir "goal-audit-current.md"
@@ -669,6 +673,7 @@ $handoffMarkdownPath = Join-Path $OutputDir "handoff-current.md"
 
 if (-not $SkipPublicContract) {
     & (Join-Path $PSScriptRoot "fb2-public-contract-status.ps1") -OutputPath $publicPath | Out-Null
+    & (Join-Path $PSScriptRoot "validate-fb2-main-server-deploy-status.ps1") -OutputPath $serverDeployStatusPath | Out-Null
 }
 
 & (Join-Path $PSScriptRoot "smoke-fb2-ai-center-status.ps1") `
@@ -689,6 +694,7 @@ if (-not $SkipPublicContract) {
 $status = Read-Fb2RefreshJson -Path $statusPath
 $goalAudit = Read-Fb2RefreshJson -Path $goalAuditPath
 $public = Read-Fb2RefreshJson -Path $publicPath
+$serverDeployStatus = Read-Fb2RefreshJson -Path $serverDeployStatusPath
 $ownerNextActions = New-Fb2RefreshOwnerActions -Status $status -GoalAudit $goalAudit
 $blockingState = New-Fb2RefreshBlockingState -Status $status -GoalAudit $goalAudit
 $nextCommands = New-Fb2RefreshNextCommands -Status $status
@@ -702,6 +708,7 @@ $gapActionBoard = New-Fb2RefreshGapActionBoard `
 $files = [ordered]@{
     status_refresh = $RefreshSummaryPath
     public_contract_status = $publicPath
+    server_deploy_status = $serverDeployStatusPath
     status = $statusPath
     goal_audit = $goalAuditPath
     goal_audit_markdown = $goalAuditMarkdownPath
@@ -723,6 +730,8 @@ $refreshSummary = [pscustomobject]@{
     evidence_dirs = @($evidence)
     files = $files
     public_contract_ready = [bool]($public -and $public.success)
+    server_deploy_ready = [bool]($serverDeployStatus -and $serverDeployStatus.success)
+    server_deploy_status = $serverDeployStatus
     user_scenario_audit_ready = [bool]$status.latest_user_scenario_audit.complete
     non_voice_historical_evidence_ready = [bool]$status.readiness.non_voice_historical_evidence_ready
     data_goal_complete = [bool]$goalAudit.data_goal_complete
