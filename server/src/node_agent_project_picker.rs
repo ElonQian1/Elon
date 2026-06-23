@@ -6,6 +6,7 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
 use crate::{
+    node_agent_project_manifest_identity::detect_manifest_project_identity,
     node_agent_project_profile::detect_project_profile, project_landing, project_workspace_inspect,
 };
 
@@ -260,6 +261,13 @@ fn detect_project_identity(
     }
     if let Some(identity) = identity_from_package_json(&fallback_name, &path.join("package.json")) {
         return identity;
+    }
+    if let Some(identity) = detect_manifest_project_identity(&fallback_name, path) {
+        return ProjectIdentity {
+            name: identity.name,
+            description: identity.description,
+            source: Some(identity.source),
+        };
     }
     if let Some(identity) = identity_from_toml_manifest(
         &fallback_name,
