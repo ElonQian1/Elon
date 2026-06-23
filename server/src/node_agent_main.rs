@@ -54,6 +54,7 @@ mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_cli_security;
 mod node_agent_cli_session_bridge;
+mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
 mod node_agent_client_maintenance;

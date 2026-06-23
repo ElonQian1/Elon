@@ -63,6 +63,7 @@ fn diagnostic_payload(paths: &DiagnosticPaths) -> Value {
             "raw_prompt_exported": false,
             "raw_cli_output_exported": false,
             "maintenance_log_contents_exported": false,
+            "maintenance_log_details_exported": false,
             "token_values_exported": false,
             "api_key_values_exported": false
         },
@@ -78,6 +79,10 @@ fn diagnostic_payload(paths: &DiagnosticPaths) -> Value {
             "diagnostics_dir": path_to_string(&paths.diagnostics_dir)
         },
         "files": diagnostic_files(paths),
+        "logs": crate::node_agent_client_diagnostic_logs::diagnostic_log_summary(
+            &paths.maintenance_log_file,
+            paths.launcher_log_file.as_deref(),
+        ),
         "env": redacted_env_summary(),
         "install": install_summary(),
         "tasks": task_journal_summary(paths),
@@ -404,12 +409,20 @@ mod tests {
             "{\"type\":\"started\",\"req_id\":\"req-1\"}\n{\"type\":\"cli_chunk\",\"text\":\"secret output\"}\n",
         )
         .expect("events");
+        let logs_dir = dir.join("logs");
+        fs::create_dir_all(&logs_dir).expect("logs dir");
+        fs::write(
+            logs_dir.join("client-maintenance.jsonl"),
+            "{\"at_ms\":3,\"action\":\"open_target\",\"ok\":false,\"detail\":\"secret maintenance detail\"}\n",
+        )
+        .expect("maintenance log");
         let paths = DiagnosticPaths::from_state_file(state_file);
         let payload = diagnostic_payload(&paths);
         let text = serde_json::to_string(&payload).expect("payload json");
 
         assert!(payload["privacy"]["raw_cli_output_exported"] == false);
         assert!(payload["privacy"]["maintenance_log_contents_exported"] == false);
+        assert!(payload["privacy"]["maintenance_log_details_exported"] == false);
         assert!(payload["privacy"]["api_key_values_exported"] == false);
         assert!(payload["paths"]["logs_dir"].as_str().is_some());
         assert!(payload
@@ -430,6 +443,12 @@ mod tests {
         assert!(text.contains("\"codex_session_present\":true"));
         assert!(!text.contains("secret-session-id"));
         assert!(!text.contains("secret output"));
+        assert!(!text.contains("secret maintenance detail"));
+        assert_eq!(payload["logs"]["maintenance"]["line_count"], 1);
+        assert_eq!(
+            payload["logs"]["maintenance"]["actions"]["open_target"]["failed"],
+            1
+        );
         assert_eq!(payload["tasks"]["events"]["line_count"], 2);
         assert_eq!(payload["tasks"]["events"]["types"]["started"], 1);
         assert_eq!(payload["tasks"]["events"]["types"]["cli_chunk"], 1);
