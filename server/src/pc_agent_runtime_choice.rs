@@ -1,6 +1,7 @@
 // server/src/pc_agent_runtime_choice.rs
 
 use homecli_proto::NodeDevRuntimeProfile;
+use serde_json::Value;
 use std::sync::Arc;
 
 use crate::types::{AiCliOption, AppState};
@@ -216,7 +217,7 @@ fn choose_cli_for_runtime(
     if runtime.api_runtime_ready {
         return Ok("api-runtime".to_string());
     }
-    if runtime.server_runtime_ready {
+    if route_c_runtime_ready(Some(runtime)) {
         return Ok("server-runtime".to_string());
     }
     Ok(requested_cli)
@@ -256,22 +257,87 @@ fn choose_forced_route(
             }
         }
         PcRuntimeRoutePreference::RouteC => {
-            if dev_runtime.is_some_and(|runtime| runtime.server_runtime_ready) {
+            if route_c_runtime_ready(dev_runtime) {
                 Ok("server-runtime".to_string())
             } else {
-                Err("已强制 Route C，但服务器模型 Runtime 未就绪；请确认 Win 客户端已登录并连接云端，或切回自动。".to_string())
+                Err("已强制 Route C，但服务器模型 Runtime 未就绪或被限流/预算保护挡住；请确认 Win 客户端已登录、云端 Route C 可接单，或切回自动。".to_string())
             }
         }
     }
+}
+
+fn route_c_runtime_ready(dev_runtime: Option<&NodeDevRuntimeProfile>) -> bool {
+    let Some(runtime) = dev_runtime else {
+        return false;
+    };
+    if !runtime.server_runtime_ready {
+        return false;
+    }
+    runtime
+        .server_runtime_status
+        .as_ref()
+        .map(route_c_status_allows_selection)
+        .unwrap_or(true)
+}
+
+fn route_c_status_allows_selection(status: &Value) -> bool {
+    if status.get("ready").and_then(Value::as_bool) == Some(false) {
+        return false;
+    }
+    if let Some(status) = status.get("status").and_then(Value::as_str) {
+        if matches!(
+            status,
+            "disabled"
+                | "missing_agent"
+                | "admission_limited"
+                | "budget_exhausted"
+                | "user_budget_exhausted"
+                | "limited"
+                | "unavailable"
+                | "http_error"
+        ) {
+            return false;
+        }
+    }
+    if nested_bool(status, &["admissionAvailability", "ready"]) == Some(false)
+        || nested_bool(status, &["admission_availability", "ready"]) == Some(false)
+    {
+        return false;
+    }
+    if nested_bool(status, &["budget", "ready"]) == Some(false) {
+        return false;
+    }
+    if let Some(budget_status) = status
+        .get("budget")
+        .and_then(|budget| budget.get("status"))
+        .and_then(Value::as_str)
+    {
+        if matches!(
+            budget_status,
+            "exhausted" | "user_exhausted" | "unavailable"
+        ) {
+            return false;
+        }
+    }
+    true
+}
+
+fn nested_bool(value: &Value, path: &[&str]) -> Option<bool> {
+    let mut current = value;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current.as_bool()
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         choose_cli_for_runtime, cli_name_from_parts, first_available_route_a_cli,
-        PcRuntimeRoutePreference,
+        route_c_runtime_ready, PcRuntimeRoutePreference,
     };
     use homecli_proto::NodeDevRuntimeProfile;
+    use serde_json::json;
 
     #[test]
     fn cli_name_detects_known_providers() {
@@ -316,6 +382,68 @@ mod tests {
         assert_eq!(
             choose_cli_for_runtime(&[], Some(&runtime), "codex".to_string(), None).unwrap(),
             "server-runtime"
+        );
+    }
+
+    #[test]
+    fn route_c_status_gate_preserves_old_nodes_without_cloud_detail() {
+        let runtime = NodeDevRuntimeProfile {
+            server_runtime_ready: true,
+            server_runtime_status: None,
+            ..Default::default()
+        };
+
+        assert!(route_c_runtime_ready(Some(&runtime)));
+        assert_eq!(
+            choose_cli_for_runtime(&[], Some(&runtime), "codex".to_string(), None).unwrap(),
+            "server-runtime"
+        );
+    }
+
+    #[test]
+    fn auto_route_skips_route_c_when_admission_is_limited() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: false,
+            server_runtime_ready: true,
+            server_runtime_status: Some(json!({
+                "ready": true,
+                "status": "ready",
+                "admissionAvailability": {
+                    "ready": false,
+                    "reason": "rate_limited",
+                    "retryAfterSecs": 17
+                }
+            })),
+            ..Default::default()
+        };
+
+        assert!(!route_c_runtime_ready(Some(&runtime)));
+        assert_eq!(
+            choose_cli_for_runtime(&[], Some(&runtime), "codex".to_string(), None).unwrap(),
+            "codex"
+        );
+    }
+
+    #[test]
+    fn auto_route_skips_route_c_when_budget_is_exhausted() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: false,
+            server_runtime_ready: true,
+            server_runtime_status: Some(json!({
+                "ready": true,
+                "status": "ready",
+                "budget": {
+                    "status": "user_exhausted",
+                    "remainingCallsTodayForUser": 0
+                }
+            })),
+            ..Default::default()
+        };
+
+        assert!(!route_c_runtime_ready(Some(&runtime)));
+        assert_eq!(
+            choose_cli_for_runtime(&[], Some(&runtime), "codex".to_string(), None).unwrap(),
+            "codex"
         );
     }
 
@@ -378,6 +506,33 @@ mod tests {
         .expect_err("route C should not be selected when server runtime is not ready");
         assert!(err.contains("Route C"));
         assert!(err.contains("未就绪"));
+    }
+
+    #[test]
+    fn forced_route_c_reports_operational_protection_block() {
+        let runtime = NodeDevRuntimeProfile {
+            server_runtime_ready: true,
+            server_runtime_status: Some(json!({
+                "ready": true,
+                "status": "ready",
+                "admissionAvailability": {
+                    "ready": false,
+                    "reason": "user_concurrency_limited"
+                }
+            })),
+            ..Default::default()
+        };
+
+        let err = choose_cli_for_runtime(
+            &[],
+            Some(&runtime),
+            "codex".to_string(),
+            Some(PcRuntimeRoutePreference::RouteC),
+        )
+        .expect_err("route C should not bypass cloud admission protection");
+        assert!(err.contains("Route C"));
+        assert!(err.contains("限流"));
+        assert!(err.contains("预算"));
     }
 
     #[test]
