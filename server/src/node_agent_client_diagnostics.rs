@@ -32,6 +32,7 @@ pub(crate) async fn export_handler() -> (StatusCode, Json<Value>) {
     }
 }
 
+#[cfg(windows)]
 pub(crate) fn export_diagnostics_file() -> Result<(PathBuf, bool), String> {
     export_diagnostics().map(|export| (export.path, export.opened))
 }
