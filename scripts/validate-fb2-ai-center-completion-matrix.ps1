@@ -56,6 +56,19 @@ function Read-Fb2MatrixJson {
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
+function Read-Fb2MatrixJsonOrNull {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+    try {
+        Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
+    } catch {
+        $null
+    }
+}
+
 function Add-Fb2MatrixCheck {
     param(
         [System.Collections.ArrayList]$Checks,
@@ -99,6 +112,29 @@ function Find-Fb2MatrixRequirement {
     )
 
     @($Requirements | Where-Object { [string]$_.id -eq $Id } | Select-Object -First 1)
+}
+
+function Find-Fb2MatrixScenario {
+    param(
+        [object[]]$Scenarios,
+        [string]$Field,
+        [string]$Value
+    )
+
+    @($Scenarios | Where-Object { [string](Get-Fb2MatrixProperty $_ $Field "") -eq $Value } | Select-Object -First 1)
+}
+
+function Normalize-Fb2MatrixPath {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return ""
+    }
+    try {
+        return [System.IO.Path]::GetFullPath($Path).TrimEnd('\', '/').ToLowerInvariant()
+    } catch {
+        return $Path.TrimEnd('\', '/').ToLowerInvariant()
+    }
 }
 
 function Get-Fb2MatrixExpectedGroup {
@@ -211,6 +247,45 @@ function New-Fb2MatrixValidation {
     Add-Fb2MatrixCheck $checks "refresh missing matches matrix non-voice incomplete" ((@($refreshMissing).Count -eq @($nonVoiceIncomplete).Count) -and -not (@($nonVoiceIncomplete | Where-Object { -not (@($refreshMissing) -contains [string]$_.id) }))) ("refresh=$(@($refreshMissing) -join ',') matrix=$(@($nonVoiceIncomplete | ForEach-Object { $_.id }) -join ',')")
     Add-Fb2MatrixCheck $checks "refresh deferred includes voice if deferred" ((-not $voiceDeferred) -or (@($refreshDeferred) -contains "voice_final_evidence"))
 
+    $files = Get-Fb2MatrixProperty $Refresh "files"
+    $statusPath = [string](Get-Fb2MatrixProperty $files "status" "")
+    $exportedSamplePath = [string](Get-Fb2MatrixProperty $files "exported_context_pack_sample_set_validation" "")
+    $statusSummary = Read-Fb2MatrixJsonOrNull -Path $statusPath
+    $exportedSampleSet = Read-Fb2MatrixJsonOrNull -Path $exportedSamplePath
+    if ($null -ne $statusSummary -and $null -ne $exportedSampleSet) {
+        $selectedSamplePath = [string](Get-Fb2MatrixProperty (Get-Fb2MatrixProperty $statusSummary "latest_context_pack_sample_set") "path" "")
+        Add-Fb2MatrixCheck $checks "exported sample set selected by status" `
+            ((Normalize-Fb2MatrixPath -Path $selectedSamplePath) -eq (Normalize-Fb2MatrixPath -Path $exportedSamplePath)) `
+            ("selected=$selectedSamplePath exported=$exportedSamplePath")
+
+        $scenarioMap = @(
+            [ordered]@{ sample = "today_matches_context_pack"; answer = "today_matches_analysis" },
+            [ordered]@{ sample = "my_ticket_context_pack"; answer = "my_ticket_analysis" },
+            [ordered]@{ sample = "platform_order_context_pack"; answer = "platform_order_risk" },
+            [ordered]@{ sample = "group_opinion_context_pack"; answer = "group_opinion_summary" }
+        )
+        $selectedScenarios = @((Get-Fb2MatrixProperty (Get-Fb2MatrixProperty $statusSummary "latest_context_pack_sample_set") "scenarios" @()))
+        $answerScenarios = @((Get-Fb2MatrixProperty (Get-Fb2MatrixProperty $statusSummary "latest_context_answer_readiness") "scenarios" @()))
+        foreach ($mapping in $scenarioMap) {
+            $sampleId = [string]$mapping.sample
+            $answerId = [string]$mapping.answer
+            $exportedScenario = @(Find-Fb2MatrixScenario -Scenarios @($exportedSampleSet.scenarios) -Field "scenario" -Value $sampleId)
+            $selectedScenario = @(Find-Fb2MatrixScenario -Scenarios $selectedScenarios -Field "scenario" -Value $sampleId)
+            $answerScenario = @(Find-Fb2MatrixScenario -Scenarios $answerScenarios -Field "id" -Value $answerId)
+            $requirement = @(Find-Fb2MatrixRequirement -Requirements $requirements -Id $answerId)
+            $auditId = if (@($exportedScenario).Count -gt 0) { [string](Get-Fb2MatrixProperty $exportedScenario[0] "context_audit_id" "") } else { "" }
+            $sha = if (@($exportedScenario).Count -gt 0) { [string](Get-Fb2MatrixProperty $exportedScenario[0] "context_pack_sha256" "") } else { "" }
+            $evidence = if (@($requirement).Count -gt 0) { [string](Get-Fb2MatrixProperty $requirement[0] "evidence" "") } else { "" }
+            Add-Fb2MatrixCheck $checks "exported scenario present $sampleId" (-not [string]::IsNullOrWhiteSpace($auditId))
+            Add-Fb2MatrixCheck $checks "selected sample audit matches exported $sampleId" `
+                (@($selectedScenario).Count -gt 0 -and [string](Get-Fb2MatrixProperty $selectedScenario[0] "context_audit_id" "") -eq $auditId)
+            Add-Fb2MatrixCheck $checks "answer readiness audit matches exported $answerId" `
+                (@($answerScenario).Count -gt 0 -and [string](Get-Fb2MatrixProperty $answerScenario[0] "context_audit_id" "") -eq $auditId -and [string](Get-Fb2MatrixProperty $answerScenario[0] "context_pack_sha256" "") -eq $sha)
+            Add-Fb2MatrixCheck $checks "completion matrix evidence matches exported $answerId" `
+                ((-not [string]::IsNullOrWhiteSpace($auditId)) -and $evidence.Contains($auditId) -and ([string]::IsNullOrWhiteSpace($sha) -or $evidence.Contains($sha)))
+        }
+    }
+
     $failed = @($checks | Where-Object { -not [bool]$_.passed })
     [ordered]@{
         schema = "fb2.main_project.completion_matrix_validation.v1"
@@ -299,6 +374,73 @@ function Invoke-Fb2MatrixSelfTest {
             $validResult | ConvertTo-Json -Depth 8
             $failed++
         }
+
+        $scenarioAuditMap = @(
+            [ordered]@{ sample = "today_matches_context_pack"; answer = "today_matches_analysis"; audit = "audit-live-today"; sha = "sha-live-today" },
+            [ordered]@{ sample = "my_ticket_context_pack"; answer = "my_ticket_analysis"; audit = "audit-live-ticket"; sha = "sha-live-ticket" },
+            [ordered]@{ sample = "platform_order_context_pack"; answer = "platform_order_risk"; audit = "audit-live-platform"; sha = "sha-live-platform" },
+            [ordered]@{ sample = "group_opinion_context_pack"; answer = "group_opinion_summary"; audit = "audit-live-opinion"; sha = "sha-live-opinion" }
+        )
+        $exportedPath = Join-Path $tempRoot "fb2-repo-context-pack-samples-validation-current.json"
+        $statusPath = Join-Path $tempRoot "status-current.json"
+        $sampleScenarios = @(
+            foreach ($item in $scenarioAuditMap) {
+                [ordered]@{
+                    scenario = [string]$item.sample
+                    passed = $true
+                    context_audit_id = [string]$item.audit
+                    citation_source_count = 10
+                    source_kinds = @("context_audit")
+                    context_pack_sha256 = [string]$item.sha
+                }
+            }
+        )
+        [ordered]@{
+            schema = "fb2.main_project.context_pack_sample_set_validation.v1"
+            complete = $true
+            scenario_count = 4
+            passed_count = 4
+            failed_count = 0
+            scenarios = $sampleScenarios
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $exportedPath -Encoding UTF8
+        [ordered]@{
+            latest_context_pack_sample_set = [ordered]@{
+                path = $exportedPath
+                complete = $true
+                scenarios = $sampleScenarios
+            }
+            latest_context_answer_readiness = [ordered]@{
+                complete = $true
+                scenarios = @(
+                    foreach ($item in $scenarioAuditMap) {
+                        [ordered]@{
+                            id = [string]$item.answer
+                            context_audit_id = [string]$item.audit
+                            context_pack_sha256 = [string]$item.sha
+                        }
+                    }
+                )
+            }
+        } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $statusPath -Encoding UTF8
+        $consistent = New-Fb2MatrixFixtureRefresh
+        Add-Member -InputObject $consistent -NotePropertyName "files" -NotePropertyValue ([ordered]@{
+            status = $statusPath
+            exported_context_pack_sample_set_validation = $exportedPath
+        })
+        foreach ($item in $scenarioAuditMap) {
+            $requirement = @(Find-Fb2MatrixRequirement -Requirements @($consistent.completion_matrix.requirements) -Id ([string]$item.answer))
+            $requirement[0].evidence = "scenario=$($item.answer) context_audit_id=$($item.audit) context_pack_sha256=$($item.sha)"
+        }
+        $consistentResult = New-Fb2MatrixValidation -Refresh $consistent -SourcePath "selftest-consistent-exported.json"
+        if (-not [bool]$consistentResult.success) {
+            $consistentResult | ConvertTo-Json -Depth 8
+            $failed++
+        }
+        $staleMatrix = $consistent | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $staleRequirement = @(Find-Fb2MatrixRequirement -Requirements @($staleMatrix.completion_matrix.requirements) -Id "today_matches_analysis")
+        $staleRequirement[0].evidence = "scenario=today_matches_analysis context_audit_id=old-audit context_pack_sha256=old-sha"
+        $staleMatrixResult = New-Fb2MatrixValidation -Refresh $staleMatrix -SourcePath "selftest-stale-matrix.json"
+        if ([bool]$staleMatrixResult.success) { $failed++ }
 
         $missingRequirement = $valid | ConvertTo-Json -Depth 12 | ConvertFrom-Json
         $missingRequirement.completion_matrix.requirements = @($missingRequirement.completion_matrix.requirements | Where-Object { [string]$_.id -ne "my_ticket_analysis" })
