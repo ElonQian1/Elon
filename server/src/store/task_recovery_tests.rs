@@ -229,10 +229,7 @@ fn stale_cleanup_bulk_pressure_keeps_terminal_results_idempotent() {
     let excluded = excluded_task_ids.iter().cloned().collect::<HashSet<_>>();
 
     let changed = store
-        .mark_stale_running_tasks_with_channel_results_excluding(
-            10 * 60,
-            &excluded_task_ids,
-        )
+        .mark_stale_running_tasks_with_channel_results_excluding(10 * 60, &excluded_task_ids)
         .expect("bulk stale cleanup should succeed");
     assert_eq!(changed, tasks.len() - excluded_task_ids.len());
 
@@ -252,10 +249,7 @@ fn stale_cleanup_bulk_pressure_keeps_terminal_results_idempotent() {
     }
 
     let changed_again = store
-        .mark_stale_running_tasks_with_channel_results_excluding(
-            10 * 60,
-            &excluded_task_ids,
-        )
+        .mark_stale_running_tasks_with_channel_results_excluding(10 * 60, &excluded_task_ids)
         .expect("second bulk pass should be idempotent");
     assert_eq!(changed_again, 0);
     for (user_id, project_id, channel_id, task_id) in &tasks {
