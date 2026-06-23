@@ -379,10 +379,15 @@
         ? `${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
         : '未读取';
       const entryLine = clean(product.primary_entry_name) || '一龙PC节点.exe';
+      const startMenuFolder = clean(product.start_menu_folder_name);
+      const startMenuEntries = Array.isArray(product.start_menu_entries)
+        ? product.start_menu_entries.map(clean).filter(Boolean).slice(0, 5).join(' / ')
+        : '';
       const updateLine = clientUpdateLine(data, latestClientPackage);
       panel.innerHTML = [
         row('健康', clean(product.summary) || '未读取'),
         row('入口', entryLine),
+        row('开始菜单', startMenuFolder ? `${startMenuFolder}${startMenuEntries ? ` · ${startMenuEntries}` : ''}` : '未上报'),
         row('运行版本', clean(data.version) || '未知'),
         row('安装状态', `${installState} · ${running}`),
         row('安装包', packageLine),

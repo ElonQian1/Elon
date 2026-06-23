@@ -56,6 +56,8 @@ pub(crate) fn status_payload() -> Value {
                 "primary_entry_name": CLIENT_EXE_NAME,
                 "uninstall_entry_name": UNINSTALL_EXE_NAME,
                 "root_layout_expectation": root_layout_expectation(),
+                "start_menu_folder_name": "一龙PC节点",
+                "start_menu_entries": start_menu_entries(),
             },
             "reason": "Windows client install status is only available on Windows."
         })
@@ -157,6 +159,8 @@ fn product_status(installed: bool, running_from_install_dir: bool, layout: &Valu
         "primary_entry_name": CLIENT_EXE_NAME,
         "uninstall_entry_name": UNINSTALL_EXE_NAME,
         "root_layout_expectation": root_layout_expectation(),
+        "start_menu_folder_name": "一龙PC节点",
+        "start_menu_entries": start_menu_entries(),
         "missing_entry_count": missing_entry_count,
         "legacy_file_count": legacy_file_count,
         "unexpected_entry_count": unexpected_entry_count,
@@ -177,11 +181,23 @@ fn unsupported_product_status(reason: &str) -> Value {
         "primary_entry_name": CLIENT_EXE_NAME,
         "uninstall_entry_name": UNINSTALL_EXE_NAME,
         "root_layout_expectation": root_layout_expectation(),
+        "start_menu_folder_name": "一龙PC节点",
+        "start_menu_entries": start_menu_entries(),
     })
 }
 
 fn root_layout_expectation() -> String {
     format!("{CLIENT_EXE_NAME}、{UNINSTALL_EXE_NAME}、{INTERNAL_DIR_NAME}")
+}
+
+fn start_menu_entries() -> Vec<&'static str> {
+    vec![
+        "一龙PC节点",
+        "打开运行日志",
+        "导出诊断",
+        "检查更新",
+        "卸载一龙PC节点",
+    ]
 }
 
 #[cfg(any(windows, test))]
@@ -330,6 +346,11 @@ mod tests {
             status["product_status"]["primary_entry_name"],
             CLIENT_EXE_NAME
         );
+        assert!(status["product_status"]["start_menu_entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item.as_str() == Some("导出诊断")));
 
         let _ = fs::remove_dir_all(dir);
     }

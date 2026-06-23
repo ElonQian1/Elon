@@ -472,6 +472,11 @@ async function loadClientMaintenance() {
   const fromInstall = r.running_from_install_dir === undefined ? '未知' : (r.running_from_install_dir ? '是' : '否');
   const installedSha = String(r.installed_git_sha || (r.install && r.install.installed_git_sha) || '').trim();
   const packageVersion = String(r.installed_package_version || (r.install && r.install.installed_package_version) || '').trim();
+  const product = r.product_status || (r.install && r.install.product_status) || {};
+  const startMenuName = String(product.start_menu_folder_name || '').trim();
+  const startMenuEntries = Array.isArray(product.start_menu_entries)
+    ? product.start_menu_entries.map(v => String(v || '').trim()).filter(Boolean).slice(0, 5)
+    : [];
   const packageLine = installedSha
     ? `包 ${esc(shortHash(installedSha))}${packageVersion ? ' / ' + esc(packageVersion) : ''}`
     : '未读取包版本';
@@ -484,6 +489,7 @@ async function loadClientMaintenance() {
     `<span>客户端版本：${esc(r.version || '-')}</span>`,
     `<span>${packageLine}</span>`,
     `<span>${esc(layoutLine)}</span>`,
+    `<span>开始菜单：${startMenuName ? esc(startMenuName + ' · ' + startMenuEntries.join(' / ')) : '未上报'}</span>`,
   ].join('');
   paths.innerHTML = [
     `<span>安装目录：${pathCode(r.install_dir)}</span>`,

@@ -45,6 +45,9 @@ pub(crate) fn ensure_installed() -> Result<PathBuf> {
     let install_dir = paths::install_dir()?;
     if install_layout_ready(&install_dir) && paths::is_running_from_install_dir(&install_dir) {
         cleanup_legacy_files(&install_dir)?;
+        if let Err(error) = windows_integration::create_start_menu_shortcuts(&install_dir) {
+            eprintln!("警告：创建开始菜单入口失败：{error:#}");
+        }
         if let Err(error) = windows_integration::register_url_protocol(&install_dir) {
             eprintln!("警告：注册网页一键唤起入口失败：{error:#}");
         }
@@ -76,6 +79,9 @@ pub(crate) fn install_or_repair() -> Result<PathBuf> {
     if let Err(error) = windows_integration::create_desktop_shortcut(&install_dir) {
         eprintln!("警告：创建桌面快捷方式失败：{error:#}");
     }
+    if let Err(error) = windows_integration::create_start_menu_shortcuts(&install_dir) {
+        eprintln!("警告：创建开始菜单入口失败：{error:#}");
+    }
     if let Err(error) = windows_integration::enable_autostart(&install_dir) {
         eprintln!("警告：注册开机自启失败：{error:#}");
     }
@@ -91,6 +97,7 @@ pub(crate) fn uninstall() -> Result<()> {
     windows_integration::disable_autostart();
     windows_integration::remove_url_protocol();
     windows_integration::remove_desktop_shortcut();
+    windows_integration::remove_start_menu_shortcuts();
 
     if install_dir.exists() {
         let current = std::env::current_exe().unwrap_or_default();

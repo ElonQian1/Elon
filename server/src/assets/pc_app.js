@@ -2522,9 +2522,14 @@
     }
     const version = clean(data.version) || '--';
     const install = data.install || {};
+    const product = data.product_status || install.product_status || {};
     const installedSha = clean(data.installed_git_sha || install.installed_git_sha);
     const packageVersion = clean(data.installed_package_version || install.installed_package_version);
     const layoutStatus = clean(data.layout_status || install.layout_status);
+    const startMenuFolder = clean(product.start_menu_folder_name);
+    const startMenuEntries = Array.isArray(product.start_menu_entries)
+      ? product.start_menu_entries.map(clean).filter(Boolean).slice(0, 5).join(' / ')
+      : '';
     const installed = data.supported === false
       ? '当前平台不支持 Win 客户端维护'
       : data.installed
@@ -2541,7 +2546,8 @@
       clean(data.logs_dir) && `运行日志 ${clean(data.logs_dir)}`,
       clean(data.launcher_logs_dir) && `启动器日志 ${clean(data.launcher_logs_dir)}`,
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
-      clean(data.config_dir) && `配置 ${clean(data.config_dir)}`
+      clean(data.config_dir) && `配置 ${clean(data.config_dir)}`,
+      startMenuFolder && `开始菜单 ${startMenuFolder}${startMenuEntries ? '：' + startMenuEntries : ''}`
     ].filter(Boolean);
     els.settingsClientPaths.textContent = paths.join(' · ') || '未读取到本机维护路径';
     if (els.settingsCliBridgeStatus) {

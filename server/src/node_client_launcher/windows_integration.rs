@@ -22,6 +22,56 @@ const LEGACY_RUN_VALUE_NAMES: &[&str] = &[
     "elon-node-agent",
 ];
 
+#[derive(Clone, Copy)]
+#[cfg(any(windows, test))]
+enum ShortcutTarget {
+    Client,
+    Uninstall,
+}
+
+#[derive(Clone, Copy)]
+#[cfg(any(windows, test))]
+struct ShortcutSpec {
+    file_name: &'static str,
+    target: ShortcutTarget,
+    arguments: &'static str,
+    description: &'static str,
+}
+
+#[cfg(any(windows, test))]
+const START_MENU_SHORTCUTS: &[ShortcutSpec] = &[
+    ShortcutSpec {
+        file_name: "一龙PC节点.lnk",
+        target: ShortcutTarget::Client,
+        arguments: "",
+        description: "打开一龙 PC 工作台",
+    },
+    ShortcutSpec {
+        file_name: "打开运行日志.lnk",
+        target: ShortcutTarget::Client,
+        arguments: "--open-logs",
+        description: "打开一龙 PC 节点运行日志",
+    },
+    ShortcutSpec {
+        file_name: "导出诊断.lnk",
+        target: ShortcutTarget::Client,
+        arguments: "--export-diagnostics",
+        description: "导出一龙 PC 节点脱敏诊断文件",
+    },
+    ShortcutSpec {
+        file_name: "检查更新.lnk",
+        target: ShortcutTarget::Client,
+        arguments: "--check-update",
+        description: "检查并安装一龙 PC 节点更新",
+    },
+    ShortcutSpec {
+        file_name: "卸载一龙PC节点.lnk",
+        target: ShortcutTarget::Uninstall,
+        arguments: "",
+        description: "卸载一龙 PC 节点客户端",
+    },
+];
+
 pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
     #[cfg(not(windows))]
     let _ = install_dir;
@@ -50,6 +100,75 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
         }
     }
     Ok(())
+}
+
+pub(crate) fn create_start_menu_shortcuts(install_dir: &Path) -> Result<()> {
+    #[cfg(not(windows))]
+    let _ = install_dir;
+    #[cfg(windows)]
+    {
+        let client = paths::client_exe(install_dir);
+        let uninstall = paths::uninstall_exe(install_dir);
+        let workdir = install_dir.to_path_buf();
+        let specs = start_menu_shortcut_ps_items();
+        let script = format!(
+            r#"
+$programs = [Environment]::GetFolderPath('Programs')
+if ([string]::IsNullOrWhiteSpace($programs)) {{
+  $programs = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs'
+}}
+$folder = Join-Path $programs '{}'
+New-Item -ItemType Directory -Force -Path $folder | Out-Null
+$client = '{}'
+$uninstall = '{}'
+$workdir = '{}'
+$shell = New-Object -ComObject WScript.Shell
+$items = @(
+{}
+)
+foreach ($item in $items) {{
+  $shortcut = Join-Path $folder $item.Name
+  $link = $shell.CreateShortcut($shortcut)
+  $link.TargetPath = if ($item.Target -eq 'uninstall') {{ $uninstall }} else {{ $client }}
+  $link.Arguments = $item.Arguments
+  $link.WorkingDirectory = $workdir
+  $link.IconLocation = $link.TargetPath
+  $link.Description = $item.Description
+  $link.Save()
+}}
+"#,
+            launcher_command::ps_single_quote(APP_NAME),
+            launcher_command::ps_single_quote(&client.to_string_lossy()),
+            launcher_command::ps_single_quote(&uninstall.to_string_lossy()),
+            launcher_command::ps_single_quote(&workdir.to_string_lossy()),
+            specs
+        );
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        let status = launcher_command::status_hidden(&mut cmd).context("无法创建开始菜单入口")?;
+        if !status.success() {
+            anyhow::bail!("创建开始菜单入口失败");
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn remove_start_menu_shortcuts() {
+    #[cfg(windows)]
+    {
+        let script = format!(
+            r#"
+$programs = [Environment]::GetFolderPath('Programs')
+if ([string]::IsNullOrWhiteSpace($programs)) {{
+  $programs = Join-Path ([Environment]::GetFolderPath('StartMenu')) 'Programs'
+}}
+$folder = Join-Path $programs '{}'
+Remove-Item -LiteralPath $folder -Recurse -Force -ErrorAction SilentlyContinue
+"#,
+            launcher_command::ps_single_quote(APP_NAME)
+        );
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
+        let _ = launcher_command::status_hidden(&mut cmd);
+    }
 }
 
 pub(crate) fn register_url_protocol(install_dir: &Path) -> Result<()> {
@@ -176,10 +295,58 @@ Remove-Item -LiteralPath $shortcut -Force -ErrorAction SilentlyContinue
 }
 
 #[cfg(windows)]
+fn start_menu_shortcut_ps_items() -> String {
+    START_MENU_SHORTCUTS
+        .iter()
+        .map(|spec| {
+            format!(
+                "  @{{ Name='{}'; Target='{}'; Arguments='{}'; Description='{}' }}",
+                launcher_command::ps_single_quote(spec.file_name),
+                match spec.target {
+                    ShortcutTarget::Client => "client",
+                    ShortcutTarget::Uninstall => "uninstall",
+                },
+                launcher_command::ps_single_quote(spec.arguments),
+                launcher_command::ps_single_quote(spec.description)
+            )
+        })
+        .collect::<Vec<_>>()
+        .join(",\n")
+}
+
+#[cfg(windows)]
 fn remove_legacy_scheduled_task() {
     let mut cmd = launcher_command::silent_command("schtasks");
     cmd.args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"]);
     let _ = launcher_command::status_hidden(&mut cmd);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ShortcutTarget, START_MENU_SHORTCUTS};
+
+    #[test]
+    fn start_menu_shortcuts_cover_user_maintenance_flow() {
+        let names = START_MENU_SHORTCUTS
+            .iter()
+            .map(|spec| spec.file_name)
+            .collect::<Vec<_>>();
+
+        assert!(names.contains(&"一龙PC节点.lnk"));
+        assert!(names.contains(&"打开运行日志.lnk"));
+        assert!(names.contains(&"导出诊断.lnk"));
+        assert!(names.contains(&"检查更新.lnk"));
+        assert!(names.contains(&"卸载一龙PC节点.lnk"));
+        assert!(START_MENU_SHORTCUTS
+            .iter()
+            .all(|spec| spec.file_name.ends_with(".lnk")));
+        assert!(START_MENU_SHORTCUTS
+            .iter()
+            .any(|spec| spec.arguments == "--export-diagnostics"));
+        assert!(START_MENU_SHORTCUTS
+            .iter()
+            .any(|spec| matches!(spec.target, ShortcutTarget::Uninstall)));
+    }
 }
 
 #[cfg(windows)]
