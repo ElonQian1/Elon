@@ -69,20 +69,37 @@ pub(crate) fn spawn_group_summary_generation(
             external_context,
             None,
             summary,
-            group_summary_feedback_citation_sources(&post_id, &sources),
+            group_summary_feedback_validation_sources(&post_id, &sources),
         );
     });
 }
 
-fn group_summary_feedback_citation_sources(
-    _post_id: &str,
-    _sources: &[GroupSummarySourceMessage],
+fn group_summary_feedback_validation_sources(
+    post_id: &str,
+    sources: &[GroupSummarySourceMessage],
 ) -> Vec<Value> {
-    // Summary post identity is already carried by main_request_id. Do not add
-    // main-project local gmsg_* rows as fb2 cited_sources: fb2 matches feedback
-    // citations against its Context Pack audit registry, so arbitrary visible
-    // chat IDs pollute quality metrics as unmatched sources.
-    Vec::new()
+    let mut values = Vec::new();
+    let post_id = post_id.trim();
+    if !post_id.is_empty() {
+        values.push(json!({
+            "kind": "summary_post",
+            "id": post_id,
+            "label": "summary post"
+        }));
+    }
+    for source in sources.iter().take(48) {
+        let id = source.id.trim();
+        if id.is_empty() {
+            continue;
+        }
+        values.push(json!({
+            "kind": "group_message",
+            "id": id,
+            "message_id": id,
+            "label": "summary source message"
+        }));
+    }
+    values
 }
 
 pub(crate) fn build_context_pack(
@@ -587,8 +604,8 @@ mod tests {
     }
 
     #[test]
-    fn summary_feedback_extra_citations_exclude_main_group_messages() {
-        let citations = group_summary_feedback_citation_sources(
+    fn summary_feedback_validation_sources_include_local_group_message_ids() {
+        let citations = group_summary_feedback_validation_sources(
             "gsp-summary-1",
             &[
                 source_message("gmsg-1", "用户A"),
@@ -596,7 +613,13 @@ mod tests {
             ],
         );
 
-        assert!(citations.is_empty());
+        let ids = citations
+            .iter()
+            .filter_map(|source| source.get("id").and_then(Value::as_str))
+            .collect::<Vec<_>>();
+        assert!(ids.contains(&"gsp-summary-1"));
+        assert!(ids.contains(&"gmsg-1"));
+        assert!(ids.contains(&"gmsg-2"));
     }
 
     #[test]

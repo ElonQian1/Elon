@@ -1027,6 +1027,44 @@ mod tests {
     }
 
     #[test]
+    fn payload_allows_extra_validation_source_without_feedback_citation_pollution() {
+        let context = json!({
+            "app_id": "fb2",
+            "group": "official",
+            "status": "ready",
+            "source": "fb2:/api/main-project/context/pack",
+            "context_audit_id": "audit-1",
+            "citation_sources": []
+        });
+        let extra_sources = vec![json!({
+            "kind": "group_message",
+            "id": "gmsg_summary_1",
+            "message_id": "gmsg_summary_1"
+        })];
+
+        let payload = generated_answer_feedback_payload(
+            &context,
+            Some("fb2-user-1"),
+            "ext_fb2_official",
+            "social_group_summary_post:gsp-1",
+            "group_summary_post",
+            "相关发言引用 message_id gmsg_summary_1，只作为总结帖本地消息来源。",
+            None,
+            &extra_sources,
+        )
+        .expect("payload");
+
+        assert_eq!(payload["cited_source_count"], 0);
+        assert_eq!(payload["missing_context"], false);
+        assert_eq!(payload["wrong_context"], false);
+        assert_eq!(payload["answer_source_validation"]["status"], "ok");
+        assert_eq!(
+            payload["answer_source_validation"]["matched_source_ids"][0],
+            "gmsg_summary_1"
+        );
+    }
+
+    #[test]
     fn payload_requires_ready_fb2_context_pack_audit() {
         let context = json!({
             "app_id": "fb2",
