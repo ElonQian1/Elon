@@ -73,6 +73,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "direct-network.ps1")
+
+Set-ElonProjectDirectNetwork
+
 # ─────────────────────────────────────────────────────────────
 # 配置（修改这里以适应不同服务器）
 # ─────────────────────────────────────────────────────────────
@@ -80,7 +84,7 @@ $Target      = "x86_64-unknown-linux-musl"
 $Server      = "root@43.139.149.158"
 $RemoteDir   = "/root/Elon"
 $RemoteBin   = "$RemoteDir/server/target/release/elon-server"
-$SshOpts     = @("-o", "ProxyCommand=none")  # 绕过本地 VPN 代理
+$SshOpts     = @("-o", "ProxyCommand=none", "-o", "ProxyJump=none")  # 绕过本地 VPN/跳板代理
 
 # ─────────────────────────────────────────────────────────────
 # 路径推导（基于 git 仓库根，兼容任意 PC、任意路径）
@@ -95,6 +99,13 @@ if (-not $gitRoot) {
 }
 $RepoRoot  = $gitRoot.Trim()
 $ServerDir = Join-Path $RepoRoot "server"
+
+Push-Location $RepoRoot
+try {
+    Set-ElonProjectDirectGitSsh
+} finally {
+    Pop-Location
+}
 
 if (-not (Test-Path (Join-Path $ServerDir "Cargo.toml"))) {
     Write-Error "❌ 找不到 $ServerDir/Cargo.toml，请确认仓库结构。"
