@@ -116,6 +116,7 @@ function New-Fb2PromptValidation {
         "validate_handoff_prompt",
         "validate_visible_answer_policy",
         "validate_live_preflight_request",
+        "validate_tokenless_continuation",
         "no_write_direct_read",
         "data_only_preflight",
         "visible_regression_requires_authorization"
@@ -132,6 +133,7 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "exported context pack sample set validates fb2 repo samples" ($Content -match 'validate_exported_context_pack_sample_set.+ValidateSampleSet.+fb2-repo-context-pack-samples-validation-current\.json')
     Add-Fb2PromptValidationCheck $checks "public contract status validator present" ($Content -match 'validate_public_contract_status.+fb2-public-contract-status\.ps1')
     Add-Fb2PromptValidationCheck $checks "live preflight request validator present" ($Content -match 'validate_live_preflight_request.+validate-fb2-live-preflight-request\.ps1')
+    Add-Fb2PromptValidationCheck $checks "tokenless continuation validator present" ($Content -match 'validate_tokenless_continuation.+validate-fb2-tokenless-continuation\.ps1')
     Add-Fb2PromptValidationCheck $checks "data-only preflight is no visible write" ($Content -match 'data_only_preflight.+DataOnlyAcceptance.+PreflightOnly')
     Add-Fb2PromptValidationCheck $checks "visible regression is explicit" ($Content -match 'visible_regression_requires_authorization.+AllowVisibleMessages')
     Add-Fb2PromptValidationCheck $checks "voice pause is explicit" ($Content -match 'ASR/TTS final evidence.*暂停|ASR/TTS.*paused|voice_final_evidence')
@@ -223,6 +225,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - `validate_handoff_prompt`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1`
 - `validate_visible_answer_policy`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>`
 - `validate_live_preflight_request`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-live-preflight-request.ps1 -StatusPath target\fb2-ai-center\status-current.json`
+- `validate_tokenless_continuation`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-tokenless-continuation.ps1 -OutputPath target\fb2-ai-center\tokenless-continuation-validation-current.json`
 - `no_write_direct_read`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>`
 - `data_only_preflight`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>`
 - `visible_regression_requires_authorization`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>`

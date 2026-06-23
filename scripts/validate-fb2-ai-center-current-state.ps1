@@ -269,6 +269,12 @@ function New-Fb2CurrentStateValidation {
         -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-ai-center-handoff-prompt.ps1") `
         -Arguments @("-RefreshPath", $RefreshPath) `
         -ExpectedOutputPath (Join-Path $targetDir "handoff-prompt-validation-current.json")))
+    $tokenlessContinuationValidationPath = Join-Path $targetDir "tokenless-continuation-validation-current.json"
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_tokenless_continuation" `
+        -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-tokenless-continuation.ps1") `
+        -Arguments @("-RefreshPath", $RefreshPath, "-OutputPath", $tokenlessContinuationValidationPath) `
+        -ExpectedOutputPath $tokenlessContinuationValidationPath))
 
     $refresh = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
     $failedSteps = @($steps | Where-Object { -not [bool]$_.success -or -not [bool]$_.output_secret_safe })
@@ -279,6 +285,7 @@ function New-Fb2CurrentStateValidation {
     $publicContractStatus = Read-Fb2CurrentJsonOrNull -Path (Join-Path $targetDir "public-contract-status-current.json")
     $visibleAnswerPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $visibleAnswerPolicyValidationPath
     $livePreflightRequestValidation = Read-Fb2CurrentJsonOrNull -Path $livePreflightValidationPath
+    $tokenlessContinuationValidation = Read-Fb2CurrentJsonOrNull -Path $tokenlessContinuationValidationPath
     $result = [ordered]@{
         schema = "fb2.main_project.current_state_validation.v1"
         generated_at_utc = ([datetime]::UtcNow).ToString("o")
@@ -298,6 +305,7 @@ function New-Fb2CurrentStateValidation {
         exported_context_pack_sample_set_validation = $exportedSampleValidation
         visible_answer_policy_validation = $visibleAnswerPolicyValidation
         live_preflight_request_validation = $livePreflightRequestValidation
+        tokenless_continuation_validation = $tokenlessContinuationValidation
         safe_to_continue_without_secret = @((Get-Fb2CurrentProperty $blocking "safe_to_continue_without_secret" @()))
         requires_secret = @((Get-Fb2CurrentProperty $blocking "requires_secret" @()))
         note = "This gate refreshes and validates current machine evidence only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN."
@@ -328,7 +336,8 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },
-        [ordered]@{ name = "handoff_prompt"; script = "validate-fb2-ai-center-handoff-prompt.ps1" }
+        [ordered]@{ name = "handoff_prompt"; script = "validate-fb2-ai-center-handoff-prompt.ps1" },
+        [ordered]@{ name = "tokenless_continuation"; script = "validate-fb2-tokenless-continuation.ps1" }
     )
     try {
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
