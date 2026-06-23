@@ -7,6 +7,8 @@ use anyhow::Result;
 use rusqlite::params;
 use serde::Serialize;
 
+use crate::agent_runtime_error_summary::operational_error_summary;
+
 use super::{new_id, now, Store};
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -164,7 +166,7 @@ impl Store {
                 now(),
                 clean_optional(completion.model, 120),
                 completion.total_tokens.filter(|value| *value >= 0),
-                clean_optional(completion.error_summary, 500),
+                clean_error_summary(completion.error_summary),
             ],
         )?;
         Ok(())
@@ -264,6 +266,33 @@ fn clean_optional(value: Option<String>, max_chars: usize) -> Option<String> {
     value
         .map(|value| value.trim().chars().take(max_chars).collect::<String>())
         .filter(|value| !value.is_empty())
+}
+
+fn clean_error_summary(value: Option<String>) -> Option<String> {
+    let value = value?.trim().to_string();
+    if value.is_empty() {
+        return None;
+    }
+    if is_safe_error_code(&value) || is_operational_error_summary(&value) {
+        return Some(value.chars().take(500).collect());
+    }
+    Some(operational_error_summary(&value))
+}
+
+fn is_safe_error_code(value: &str) -> bool {
+    value.len() <= 120
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '.' | ':' | '/'))
+}
+
+fn is_operational_error_summary(value: &str) -> bool {
+    value.len() <= 220
+        && value.starts_with("category=")
+        && value.contains("fingerprint=")
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '-' | '=' | ',' | ' '))
 }
 
 #[cfg(test)]
@@ -461,8 +490,13 @@ mod tests {
         assert_eq!(events[0].total_tokens, Some(42));
         assert_eq!(
             events[0].error_summary.as_deref(),
-            Some("rate_limit fingerprint=abc secret prompt text")
+            Some("category=rate_limit, chars=45, fingerprint=d385d708e9876549")
         );
+        assert!(!events[0]
+            .error_summary
+            .as_deref()
+            .unwrap_or_default()
+            .contains("secret prompt text"));
         assert!(events[0].completed_at.is_some());
 
         let _ = std::fs::remove_file(path);

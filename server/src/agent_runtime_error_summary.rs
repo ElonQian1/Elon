@@ -15,13 +15,17 @@ pub(crate) fn operational_error_summary(body: &str) -> String {
 
 fn classify_error_hint(body: &str) -> &'static str {
     let lower = body.to_ascii_lowercase();
-    if lower.contains("rate limit") || lower.contains("429") {
+    if lower.contains("rate limit") || lower.contains("rate_limit") || lower.contains("429") {
         "rate_limit"
-    } else if lower.contains("timeout") || lower.contains("timed out") {
+    } else if lower.contains("timeout")
+        || lower.contains("timed out")
+        || lower.contains("timed_out")
+    {
         "timeout"
     } else if lower.contains("unauthorized")
         || lower.contains("forbidden")
         || lower.contains("api key")
+        || lower.contains("api_key")
         || lower.contains("401")
         || lower.contains("403")
     {

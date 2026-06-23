@@ -78,6 +78,14 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Path $BudgetModule `
         -Needle "budget_status_reports_exhausted_per_user_daily_call_limit" `
         -Message "Server Route C budget must test per-user daily limit exhaustion"
+    Assert-FileContains `
+        -Path (Join-Path $RepoRoot "server\src\store\route_c_budget.rs") `
+        -Needle "clean_error_summary" `
+        -Message "Route C budget audit must sanitize persisted error summaries"
+    Assert-FileContains `
+        -Path (Join-Path $RepoRoot "server\src\store\route_c_budget.rs") `
+        -Needle "secret prompt text" `
+        -Message "Route C budget audit must keep a regression test for prompt-text redaction"
     Write-Host "Static Route C runtime guard contract passed."
 }
 
