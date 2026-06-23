@@ -135,6 +135,11 @@
   color: #dce9ff;
 }
 
+.project-landing-workbench-action.tone-build span {
+  background: #514528;
+  color: #ffe9b8;
+}
+
 .project-landing-workbench-action.tone-chat span {
   background: #4a3d61;
   color: #f1e5ff;

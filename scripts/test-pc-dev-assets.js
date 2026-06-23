@@ -1087,8 +1087,8 @@ function testProjectLandingShellContract() {
   assert.ok(pcApp.includes("active: !state.activeChannelId"), 'project home should be active before a real channel is selected');
   assert.ok(pcApp.includes("data-project-home=\"1\""), 'project home entry should be clickable through a dedicated data attribute');
   assert.ok(
-    /async function selectProject\(projectId\)[\s\S]*?renderChannels\(\);\s*selectProjectLanding\(\);/.test(pcApp),
-    'opening a project should land on the project home before any real channel'
+    /async function selectProject\(projectId, options\)[\s\S]*?renderChannels\(\);[\s\S]*?const preferredKind[\s\S]*?selectProjectChannel\(preferredChannel\.id[\s\S]*?selectProjectLanding\(\);/.test(pcApp),
+    'opening a project should support both preferred start channels and the project home fallback'
   );
   assert.ok(
     /function selectProjectLanding\(\)[\s\S]*?state\.activeChannelId = ''[\s\S]*?projectLanding\.render\(\);/.test(pcApp),
@@ -1473,6 +1473,26 @@ function testPcProjectCreateSkipsStorageByDefault() {
   assert.ok(projectCreate.includes('自动选择代码存储（高级）'), 'PC create modal should keep auto storage as an explicit advanced choice');
 }
 
+function testPcProjectStartGuidance() {
+  const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
+  const projectCreate = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_create.js'), 'utf8');
+  assert.ok(projectCreate.includes("preferredChannelKind: 'ai_development'"), 'new project should open the development entry');
+  assert.ok(pcApp.includes('开始做应用'), 'project sidebar should expose a plain start entry');
+  assert.ok(pcApp.includes('生成安装包'), 'project sidebar should expose package generation as the delivery entry');
+  assert.ok(pcApp.includes('安装使用'), 'project sidebar should expose install/download as the usage entry');
+  assert.ok(pcApp.includes('输入你想做的应用或要修改的功能'), 'development composer should use a direct project prompt');
+  assert.ok(pcApp.includes('从这里开始做应用'), 'empty development channel should guide the first action');
+  assert.ok(pcApp.includes('做完后在这里生成安装包'), 'empty build channel should explain the application path');
+
+  const landing = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.js'), 'utf8');
+  assert.ok(landing.includes('开始做应用'), 'project landing should make development the primary action');
+  assert.ok(landing.includes('生成安装包'), 'project landing should make packaging visible');
+  assert.ok(landing.includes('生成安装包后，这里会出现安装入口。'), 'empty downloads should explain the application entry point');
+
+  const landingCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.css'), 'utf8');
+  assert.ok(landingCss.includes('.project-landing-workbench-action.tone-build'), 'landing CSS should style build action');
+}
+
 (async () => {
   testDevTasksContinueAction();
   testDevTasksHasOpenPendingApproval();
@@ -1495,6 +1515,7 @@ function testPcProjectCreateSkipsStorageByDefault() {
   testDevComposerForcedRoutePreference();
   testLocalAdminTokenWiring();
   testPcProjectCreateSkipsStorageByDefault();
+  testPcProjectStartGuidance();
 
   console.log('pc-dev-assets tests passed');
 })().catch((error) => {

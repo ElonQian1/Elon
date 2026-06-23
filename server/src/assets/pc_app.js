@@ -1041,12 +1041,12 @@
   function renderProjectChannels(query) {
     const channels = ((state.projectSpace && state.projectSpace.channels) || [])
       .filter((channel) => projectChannelSearchText(channel).includes(query));
-    const homeVisible = !query || '首页开始介绍下载overviewhome'.includes(query);
+    const homeVisible = !query || '安装使用下载应用首页开始介绍overviewhome'.includes(query);
     const homeButton = homeVisible ? channelButton({
         id: 'project-home',
         kind: 'project-home',
-        glyph: '首',
-        title: '首页',
+        glyph: '↓',
+        title: '安装使用',
         sub: '项目介绍与下载',
         active: !state.activeChannelId
       }) : '';
@@ -1059,13 +1059,12 @@
     } else {
       const grouped = groupedProjectChannels(channels);
       els.channelList.innerHTML = [
-        '<div class="channel-section">常用</div>',
-        homeButton,
-        grouped.primary.map(projectChannelButton).join('') || '<div class="empty-state">暂无常用频道</div>',
-        grouped.feedback.length ? '<div class="channel-section">反馈</div>' : '',
+        '<div class="channel-section">开始</div>',
+        grouped.start.map(projectChannelButton).join('') + homeButton || '<div class="empty-state">暂无入口</div>',
+        grouped.info.length ? '<div class="channel-section">项目资料</div>' : '',
+        grouped.info.map(projectChannelButton).join(''),
+        grouped.feedback.length ? '<div class="channel-section">需求反馈</div>' : '',
         grouped.feedback.map(projectChannelButton).join(''),
-        grouped.dev.length ? '<div class="channel-section">开发工具</div>' : '',
-        grouped.dev.map(projectChannelButton).join(''),
         grouped.other.length ? '<div class="channel-section">其他</div>' : '',
         grouped.other.map(projectChannelButton).join('')
       ].join('');
@@ -1079,7 +1078,7 @@
   }
 
   function groupedProjectChannels(channels) {
-    const grouped = { primary: [], feedback: [], dev: [], other: [] };
+    const grouped = { start: [], info: [], feedback: [], other: [] };
     (channels || []).forEach((channel) => {
       grouped[projectChannelGroup(channel)].push(channel);
     });
@@ -1093,7 +1092,8 @@
       glyph: channelGlyph(channel),
       title: channelTitle(channel),
       sub: channelSubtitle(channel),
-      active: channel.id === state.activeChannelId
+      active: channel.id === state.activeChannelId,
+      primary: channelKind(channel) === 'ai_development'
     });
   }
 
@@ -1108,9 +1108,9 @@
 
   function projectChannelGroup(channel) {
     const kind = channelKind(channel);
-    if (['announcements', 'docs', 'discussion'].includes(kind)) return 'primary';
+    if (['ai_development', 'builds'].includes(kind)) return 'start';
+    if (['announcements', 'docs', 'discussion'].includes(kind)) return 'info';
     if (['requirements', 'suggestions', 'issues'].includes(kind)) return 'feedback';
-    if (['ai_development', 'builds'].includes(kind)) return 'dev';
     return 'other';
   }
 
@@ -1130,7 +1130,7 @@
     const glyph = item.avatar || item.avatarFallback
       ? avatarElement('span', 'glyph channel-avatar', item.avatar, item.avatarFallback || item.title || item.glyph || '#', item.glyph || '#')
       : `<span class="glyph">${escapeHtml(item.glyph || '#')}</span>`;
-    return `<button class="channel-item ${item.active ? 'active' : ''}" type="button" ${attrs}>
+    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${item.active ? 'active' : ''}" type="button" ${attrs}>
       ${glyph}
       <span class="main"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.sub || '')}</span></span>
       ${typeof item.online === 'boolean' ? `<i class="presence-dot ${item.online ? 'online' : ''}"></i>` : ''}
@@ -1145,19 +1145,26 @@
     return clean(channel && (channel.kind || channel.channel_kind)).toLowerCase();
   }
 
+  function projectSpaceChannelByKind(kind) {
+    const target = clean(kind).toLowerCase();
+    return ((state.projectSpace && state.projectSpace.channels) || [])
+      .find((channel) => channelKind(channel) === target) || null;
+  }
+
   function channelTitle(channel) {
     const name = channelName(channel);
     const kind = channelKind(channel);
     const fallback = {
-      announcements: '公告',
-      docs: '文档',
-      discussion: '讨论',
-      requirements: '需求',
-      suggestions: '意见',
+      announcements: '项目公告',
+      docs: '项目文档',
+      discussion: '成员讨论',
+      requirements: '功能需求',
+      suggestions: '意见建议',
       issues: '问题反馈',
-      ai_development: 'AI开发',
-      builds: '构建发布'
+      ai_development: '开始做应用',
+      builds: '生成安装包'
     };
+    if (fallback[kind]) return fallback[kind];
     return (name === kind || name === clean(channel && channel.id)) ? (fallback[kind] || name) : name;
   }
 
@@ -1169,8 +1176,8 @@
       requirements: '功能需求',
       suggestions: '意见建议',
       issues: '问题反馈',
-      ai_development: 'AI 开发任务',
-      builds: '构建与发布'
+      ai_development: '向一龙AI说需求',
+      builds: '打包并交付应用'
     };
     return label[channelKind(channel)] || '项目频道';
   }
@@ -1178,6 +1185,7 @@
   function channelGlyph(channel) {
     const kind = channelKind(channel);
     if (kind === 'ai_development') return 'AI';
+    if (kind === 'builds') return '包';
     if (kind === 'announcements') return '!';
     if (kind === 'docs') return '文';
     return '#';
@@ -2089,7 +2097,7 @@
     return window.ElonVoiceProject.renderMain(voiceContext());
   }
 
-  async function selectProject(projectId) {
+  async function selectProject(projectId, options) {
     const project = state.projects.find((p) => String(p.id) === String(projectId));
     if (!project) return;
     state.activeKind = 'project';
@@ -2118,7 +2126,15 @@
       });
       projectReadiness.bindMemberPanel(projectById(projectId) || project);
       renderChannels();
-      selectProjectLanding();
+      const preferredKind = clean(options && options.preferredChannelKind).toLowerCase();
+      const preferredChannel = preferredKind ? projectSpaceChannelByKind(preferredKind) : null;
+      if (preferredChannel) {
+        await selectProjectChannel(preferredChannel.id, {
+          focusComposer: !!(options && options.focusComposer)
+        });
+      } else {
+        selectProjectLanding();
+      }
     } catch (error) {
       showError(error);
     }
@@ -2188,7 +2204,7 @@
     projectLanding.render();
   }
 
-  async function selectProjectChannel(channelId) {
+  async function selectProjectChannel(channelId, options) {
     const channel = ((state.projectSpace && state.projectSpace.channels) || [])
       .find((item) => String(item.id) === String(channelId));
     if (!channel) return;
@@ -2199,12 +2215,19 @@
     renderChannels();
     setHeader(channelGlyph(channel), channelTitle(channel), channelSubtitle(channel));
     const canWrite = state.activeChannelKind !== 'docs';
-    setComposer(canWrite, canWrite ? `在 #${channelTitle(channel)} 发送消息` : '文档频道只读', state.activeChannelKind === 'ai_development');
+    setComposer(
+      canWrite,
+      canWrite
+        ? (state.activeChannelKind === 'ai_development' ? '输入你想做的应用或要修改的功能' : `在 #${channelTitle(channel)} 发送消息`)
+        : '文档频道只读',
+      state.activeChannelKind === 'ai_development'
+    );
     setNodeMode(false);
     els.messageList.innerHTML = '<div class="empty-state">加载频道消息中…</div>';
     try {
       const data = await api(`/api/projects/${encodeURIComponent(state.activeProjectId)}/channels/${encodeURIComponent(channelId)}/messages?limit=120`);
       renderMessages(data.messages || [], 'project');
+      if (options && options.focusComposer) setTimeout(() => els.input.focus(), 0);
     } catch (error) {
       showError(error);
     }
@@ -2347,6 +2370,16 @@
     return `<div class="message-content ${escapeHtml(className)}">${escapeHtml(raw)}</div>`;
   }
 
+  function emptyMessagesHtml(scope) {
+    if (scope === 'project' && state.activeChannelKind === 'ai_development') {
+      return '<div class="empty-state"><strong>从这里开始做应用</strong><p>直接输入你想做的 App，或告诉一龙AI要修改什么功能。</p></div>';
+    }
+    if (scope === 'project' && state.activeChannelKind === 'builds') {
+      return '<div class="empty-state"><strong>做完后在这里生成安装包</strong><p>安装包生成后，入口会出现在「安装使用」。</p></div>';
+    }
+    return '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
+  }
+
   function renderMessages(messages, scope) {
     setNodeMode(false);
     const agentRunsHtml = scope === 'project' && agentRuns
@@ -2354,7 +2387,7 @@
       : '';
     if (!messages.length && !agentRunsHtml) {
       clearDevTaskRefresh();
-      els.messageList.innerHTML = '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
+      els.messageList.innerHTML = emptyMessagesHtml(scope);
       return;
     }
     const devTaskContext = scope === 'project' && devTasks
@@ -2381,7 +2414,7 @@
           ${contentHtml}
         </div>
       </article>`;
-    }).join('') : '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
+    }).join('') : emptyMessagesHtml(scope);
     els.messageList.innerHTML = `${messageRows}${agentRunsHtml}`;
     els.messageList.querySelectorAll('.project-share-action').forEach((button) => {
       button.addEventListener('click', () => handleProjectShareAction(button));

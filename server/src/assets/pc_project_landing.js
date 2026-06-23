@@ -418,21 +418,22 @@
 
     function workbenchActionsHtml(downloads) {
       const devChannel = channelByKind('ai_development');
+      const buildChannel = channelByKind('builds');
       const docsChannel = channelByKind('docs');
-      const discussionChannel = channelByKind('discussion') || channelByKind('requirements') || channelByKind('suggestions');
+      const hasDownload = downloads.some((item) => ACTIVE_STATUSES.has(item.status) && item.url);
       const actions = [
-        devChannel ? workbenchChannelAction('AI 开发', '继续开发', devChannel, 'dev') : null,
-        docsChannel ? workbenchChannelAction('项目文档', '查看文档', docsChannel, 'docs') : null,
-        discussionChannel ? workbenchChannelAction('协作讨论', '打开频道', discussionChannel, 'chat') : null,
-        downloads.some((item) => ACTIVE_STATUSES.has(item.status) && item.url)
+        devChannel ? workbenchChannelAction('开始做应用', '和一龙AI聊需求', devChannel, 'dev') : null,
+        buildChannel ? workbenchChannelAction('生成安装包', '打包并交付应用', buildChannel, 'build') : null,
+        hasDownload
           ? {
-            label: '下载交付',
-            sub: '可用客户端',
+            label: '安装使用',
+            sub: '下载可用客户端',
             glyph: '↓',
             tone: 'download',
             attrs: 'data-scroll-downloads="1"'
           }
-          : null
+          : null,
+        docsChannel ? workbenchChannelAction('项目文档', '查看资料说明', docsChannel, 'docs') : null
       ].filter(Boolean).slice(0, 4);
       if (!actions.length) return '';
       return `<section class="project-landing-workbench" aria-label="项目快捷入口">
@@ -518,8 +519,8 @@
     function downloadGroupsHtml(downloads) {
       if (!downloads.length) {
         return `<section class="project-landing-download-empty">
-          <strong>暂无可下载客户端</strong>
-          <span>项目负责人发布安装包后，这里会显示下载入口。</span>
+          <strong>还没有安装包</strong>
+          <span>生成安装包后，这里会出现安装入口。</span>
         </section>`;
       }
       return downloadGroups(downloads).map((group) => `<section class="project-landing-download-group group-${escapeHtml(group.key)}">
@@ -714,7 +715,7 @@
         </div>` : ''}
         ${targets.length ? `<div class="project-landing-section"><h2>适用人群</h2><div class="project-landing-tag-list">${targets.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div></div>` : ''}
         ${(channels.length || resourceButtons) ? `<div class="project-landing-section project-landing-actions-section">
-          <h2>常用入口</h2>
+          <h2>项目入口</h2>
           <div class="project-landing-footer">
             <div class="project-landing-channels">${channels.map(quickChannelHtml).join('')}</div>
             <div class="project-landing-resources">${resourceButtons}</div>

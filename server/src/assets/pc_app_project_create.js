@@ -245,7 +245,10 @@
           state.projects.unshift(project);
           renderProjectRail();
         }
-        if (project.id) await selectProject(project.id);
+        if (project.id) await selectProject(project.id, {
+          preferredChannelKind: 'ai_development',
+          focusComposer: true
+        });
         else await refreshActive();
       } catch (error) {
         setError(error.message || '创建失败');
