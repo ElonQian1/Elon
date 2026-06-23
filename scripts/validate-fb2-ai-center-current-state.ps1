@@ -182,6 +182,12 @@ function New-Fb2CurrentStateValidation {
     }
 
     [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_public_contract_status" `
+        -ScriptPath (Join-Path $PSScriptRoot "fb2-public-contract-status.ps1") `
+        -Arguments @("-OutputPath", (Join-Path $targetDir "public-contract-status-current.json")) `
+        -ExpectedOutputPath (Join-Path $targetDir "public-contract-status-current.json")))
+
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
         -Name "validate_server_deploy_status" `
         -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-main-server-deploy-status.ps1") `
         -Arguments @("-OutputPath", (Join-Path $targetDir "server-deploy-status-current.json")) `
@@ -270,6 +276,7 @@ function New-Fb2CurrentStateValidation {
     $completion = Get-Fb2CurrentProperty $refresh "completion_matrix"
     $gates = Get-Fb2CurrentProperty $completion "gates"
     $exportedSampleValidation = Get-Fb2CurrentProperty $refresh "exported_context_pack_sample_set_validation"
+    $publicContractStatus = Read-Fb2CurrentJsonOrNull -Path (Join-Path $targetDir "public-contract-status-current.json")
     $visibleAnswerPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $visibleAnswerPolicyValidationPath
     $livePreflightRequestValidation = Read-Fb2CurrentJsonOrNull -Path $livePreflightValidationPath
     $result = [ordered]@{
@@ -287,6 +294,7 @@ function New-Fb2CurrentStateValidation {
         voice_deferred_by_user = [bool](Get-Fb2CurrentProperty $gates "voice_deferred_by_user" $false)
         next_minimum_action = [string](Get-Fb2CurrentProperty $refresh "next_minimum_action" "")
         blocked_by_external_secret = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
+        public_contract_status = $publicContractStatus
         exported_context_pack_sample_set_validation = $exportedSampleValidation
         visible_answer_policy_validation = $visibleAnswerPolicyValidation
         live_preflight_request_validation = $livePreflightRequestValidation
@@ -312,6 +320,7 @@ function Invoke-Fb2CurrentStateSelfTest {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-current-state-selftest-" + [guid]::NewGuid().ToString("N"))
     $steps = @(
         [ordered]@{ name = "refresh_status"; script = "fb2-ai-center-refresh-current-status.ps1" },
+        [ordered]@{ name = "public_contract_status"; script = "fb2-public-contract-status.ps1" },
         [ordered]@{ name = "server_deploy_status"; script = "validate-fb2-main-server-deploy-status.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
