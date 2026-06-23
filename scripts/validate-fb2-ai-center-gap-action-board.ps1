@@ -106,11 +106,44 @@ function New-Fb2GapValidation {
 
     $checks = [System.Collections.ArrayList]::new()
     $board = Get-Fb2GapProperty $Refresh "gap_action_board"
+    $blocking = Get-Fb2GapProperty $Refresh "blocking_state"
     $actions = @(Get-Fb2GapProperty $board "actions" @())
 
     Add-Fb2GapCheck $checks "gap board schema" ([string](Get-Fb2GapProperty $board "schema" "") -eq "fb2.main_project.gap_action_board.v1")
     Add-Fb2GapCheck $checks "action count matches" ([int](Get-Fb2GapProperty $board "action_count" 0) -eq @($actions).Count) ("declared=$([int](Get-Fb2GapProperty $board 'action_count' 0)) actual=$(@($actions).Count)")
     Add-Fb2GapCheck $checks "has actions" (@($actions).Count -gt 0)
+
+    Add-Fb2GapCheck $checks "blocking state present" ($null -ne $blocking)
+    if ($null -ne $blocking) {
+        $safeWithoutSecret = @(Get-Fb2GapProperty $blocking "safe_to_continue_without_secret" @()) | ForEach-Object { [string]$_ }
+        $requiresSecret = @(Get-Fb2GapProperty $blocking "requires_secret" @()) | ForEach-Object { [string]$_ }
+        $deferredByUser = @(Get-Fb2GapProperty $blocking "deferred_by_user" @()) | ForEach-Object { [string]$_ }
+        Add-Fb2GapCheck $checks "blocking state uses external token" ([string](Get-Fb2GapProperty $blocking "external_secret" "") -eq "FB2_AI_CENTER_TOKEN")
+        Add-Fb2GapCheck $checks "blocking state marks token blocker" ([bool](Get-Fb2GapProperty $blocking "blocked_by_external_secret" $false))
+        Add-Fb2GapCheck $checks "blocking next action matches gap board" (
+            [string](Get-Fb2GapProperty $blocking "next_minimum_action" "") -eq [string](Get-Fb2GapProperty $board "next_minimum_action" "")
+        )
+
+        foreach ($item in @(
+                "public_contract_regression",
+                "status_refresh_selftest",
+                "offline_context_pack_sample_validation",
+                "handoff_documentation"
+            )) {
+            Add-Fb2GapCheck $checks "blocking safe without secret $item" ($safeWithoutSecret -contains $item)
+        }
+
+        foreach ($item in @(
+                "live_context_pack_permission_quality_refresh",
+                "current_user_order_live_verification",
+                "platform_order_summary_live_verification",
+                "feedback_quality_live_refresh"
+            )) {
+            Add-Fb2GapCheck $checks "blocking requires secret $item" ($requiresSecret -contains $item)
+        }
+
+        Add-Fb2GapCheck $checks "blocking records voice defer" ($deferredByUser -contains "ASR_TTS_final_evidence")
+    }
 
     foreach ($action in $actions) {
         $id = [string](Get-Fb2GapProperty $action "id" "")
@@ -165,8 +198,27 @@ function Invoke-Fb2GapSelfTest {
     try {
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
         $fixture = [pscustomobject]@{
+            blocking_state = [ordered]@{
+                blocked_by_external_secret = $true
+                external_secret = "FB2_AI_CENTER_TOKEN"
+                deferred_by_user = @("ASR_TTS_final_evidence")
+                safe_to_continue_without_secret = @(
+                    "public_contract_regression",
+                    "status_refresh_selftest",
+                    "offline_context_pack_sample_validation",
+                    "handoff_documentation"
+                )
+                requires_secret = @(
+                    "live_context_pack_permission_quality_refresh",
+                    "current_user_order_live_verification",
+                    "platform_order_summary_live_verification",
+                    "feedback_quality_live_refresh"
+                )
+                next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
+            }
             gap_action_board = [ordered]@{
                 schema = "fb2.main_project.gap_action_board.v1"
+                next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
                 action_count = 3
                 actions = @(
                     [ordered]@{
@@ -210,6 +262,12 @@ function Invoke-Fb2GapSelfTest {
         if (-not [bool]$validation.success) {
             $validation | ConvertTo-Json -Depth 8
             throw "SelfTest failed: gap validation fixture failed"
+        }
+        $badFixture = $fixture | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        $badFixture.blocking_state.safe_to_continue_without_secret = @("public_contract_regression", "status_refresh_selftest")
+        $badValidation = New-Fb2GapValidation -Refresh $badFixture -SourcePath "selftest-bad-missing-safe-list.json"
+        if ([bool]$badValidation.success) {
+            throw "SelfTest failed: missing blocking_state safe actions should fail"
         }
         "== SelfTest Summary =="
         "failed=0"
