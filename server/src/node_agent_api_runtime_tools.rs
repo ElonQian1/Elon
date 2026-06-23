@@ -224,6 +224,18 @@ fn tool_definitions() -> Value {
             })
         ),
         function_tool(
+            "git_log",
+            "Inspect recent project git history without modifying files.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "Optional project-relative file or directory to limit history. Defaults to the workspace root." },
+                    "limit": { "type": "integer", "minimum": 1, "maximum": 100, "description": "Maximum number of commits to return. Defaults to 20." }
+                },
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
             "write_file",
             "Create or replace a project-relative text file. Requires user approval when writes are enabled.",
             json!({
@@ -313,6 +325,9 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "git_diff"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "git_log"));
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "apply_patch"));

@@ -46,7 +46,7 @@ Invoke-Step "Static Route B runtime contract" {
         }
     }
 
-    foreach ($tool in @("list_dir", "search_files", "file_info", "read_file", "read_file_range", "git_status", "git_diff", "write_file", "apply_patch", "run_command")) {
+    foreach ($tool in @("list_dir", "search_files", "file_info", "read_file", "read_file_range", "git_status", "git_diff", "git_log", "write_file", "apply_patch", "run_command")) {
         Assert-FileContains `
             -Path $ApiRuntimeConfig `
             -Needle "`"$tool`"" `
@@ -114,6 +114,10 @@ Invoke-Step "Static Route B runtime contract" {
         -Path $PcDevRuntime `
         -Needle "git_diff" `
         -Message "Generated pc-dev runtime must expose read-only git_diff"
+    Assert-FileContains `
+        -Path $PcDevRuntime `
+        -Needle "git_log" `
+        -Message "Generated pc-dev runtime must expose read-only git_log"
     Assert-FileContains `
         -Path $PcDevRuntime `
         -Needle "Route B is intentionally conservative" `

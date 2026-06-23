@@ -120,6 +120,11 @@ impl ToolGuard {
                 let stat = action.get("stat").and_then(Value::as_bool).unwrap_or(false);
                 self.git_diff(path, cached, stat).await
             }
+            "git_log" => {
+                let path = action.get("path").and_then(Value::as_str);
+                let limit = optional_positive_usize(action, "limit")?.unwrap_or(20);
+                self.git_log(path, limit).await
+            }
             "write_file" => {
                 if self.read_only() {
                     bail!("write_file denied: read-only planning mode");
@@ -256,6 +261,27 @@ impl ToolGuard {
         if stat {
             args.push("--stat".to_string());
         }
+        if let Some(path) = path.map(str::trim).filter(|value| !value.is_empty()) {
+            if path != "." {
+                let full = self.resolve_safe_path(path)?;
+                let relative = display_relative_path(&self.workspace, &full);
+                args.push("--".to_string());
+                args.push(relative);
+            }
+        }
+        self.run_git(args).await
+    }
+
+    async fn git_log(&self, path: Option<&str>, limit: usize) -> Result<String> {
+        let count = limit.clamp(1, 100);
+        let mut args = vec![
+            "-c".to_string(),
+            "core.quotepath=false".to_string(),
+            "log".to_string(),
+            "--oneline".to_string(),
+            "--decorate".to_string(),
+            format!("--max-count={count}"),
+        ];
         if let Some(path) = path.map(str::trim).filter(|value| !value.is_empty()) {
             if path != "." {
                 let full = self.resolve_safe_path(path)?;
@@ -1204,8 +1230,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn git_status_and_diff_are_read_only_project_tools() {
-        let temp = temp_test_dir("git_status_and_diff_are_read_only_project_tools");
+    async fn git_status_diff_and_log_are_read_only_project_tools() {
+        let temp = temp_test_dir("git_status_diff_and_log_are_read_only_project_tools");
         init_git_repo(&temp);
         fs::write(temp.join("README.md"), "initial\n").unwrap();
         let add = std::process::Command::new("git")
@@ -1214,6 +1240,21 @@ mod tests {
             .status()
             .unwrap();
         assert!(add.success(), "git add should succeed");
+        let commit = std::process::Command::new("git")
+            .args([
+                "-c",
+                "user.name=Elon Test",
+                "-c",
+                "user.email=elon-test@example.invalid",
+                "commit",
+                "-m",
+                "initial commit",
+                "--no-gpg-sign",
+            ])
+            .current_dir(&temp)
+            .status()
+            .unwrap();
+        assert!(commit.success(), "git commit should succeed");
         fs::write(temp.join("README.md"), "changed\n").unwrap();
         let mut guard = ToolGuard::new(temp, None);
 
@@ -1235,6 +1276,17 @@ mod tests {
         assert!(diff.contains("-initial"));
         assert!(diff.contains("+changed"));
 
+        let log = guard
+            .invoke_action(&json!({
+                "tool": "git_log",
+                "path": "README.md",
+                "limit": 5
+            }))
+            .await;
+        assert!(log.contains("git -c core.quotepath=false log"));
+        assert!(log.contains("--max-count=5"));
+        assert!(log.contains("initial commit"));
+
         let unsafe_result = guard
             .invoke_action(&json!({
                 "tool": "git_diff",
@@ -1242,6 +1294,14 @@ mod tests {
             }))
             .await;
         assert!(unsafe_result.contains("path cannot target .git"));
+
+        let unsafe_log_result = guard
+            .invoke_action(&json!({
+                "tool": "git_log",
+                "path": ".git/config"
+            }))
+            .await;
+        assert!(unsafe_log_result.contains("path cannot target .git"));
     }
 
     #[tokio::test]

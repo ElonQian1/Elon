@@ -73,6 +73,11 @@ function Get-AgentActionTarget {
             $stat = [bool]$Action.stat
             return (Limit-AgentText "path=$path cached=$cached stat=$stat" 300)
         }
+        'git_log' {
+            $path = if ($Action.path) { [string]$Action.path } else { '.' }
+            $limit = if ($Action.limit) { [int]$Action.limit } else { 20 }
+            return (Limit-AgentText "path=$path limit=$limit" 300)
+        }
         'write_file' { return (Limit-AgentText ([string]$Action.path) 300) }
         'apply_patch' {
             $patchText = [string]$Action.patch
