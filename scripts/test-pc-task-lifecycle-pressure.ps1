@@ -58,6 +58,10 @@ Invoke-Step "Static pressure-test contract" {
         -Needle "stress_active_registry_rejects_duplicate_handles_and_cleans_up" `
         -Message "Active registry duplicate-handle pressure test is missing"
     Assert-FileContains `
+        -Path $PressureModule `
+        -Needle "stress_stale_codex_session_clear_is_scoped_under_many_tasks" `
+        -Message "Scoped stale Codex session cleanup pressure test is missing"
+    Assert-FileContains `
         -Path $ProjectAgentRunsModule `
         -Needle "stress_agent_run_summary_reads_long_run_to_terminal_status" `
         -Message "Long agent-run lifecycle summary pressure test is missing"

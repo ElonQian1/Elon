@@ -1,6 +1,7 @@
 use crate::{
     node_agent_active_task::ActiveCliPromptHandle,
     node_agent_active_task_registry::ActiveCliPromptRegistry,
+    node_agent_codex_session::clear_stale_session,
     node_agent_task_journal::{TaskJournal, TaskJournalRecord, TaskJournalStart},
     node_agent_task_resume::{task_attach_state, task_resume_contract},
 };
@@ -546,6 +547,106 @@ fn stress_restart_resume_contract_never_claims_lost_control_handles() {
             assert_eq!(resume_json["codex_session"], Value::Null);
         }
     }
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stress_stale_codex_session_clear_is_scoped_under_many_tasks() {
+    let dir = unique_test_dir("stale-codex-session-clear-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = TaskJournal::new(&dir);
+    let legacy = dir.join("legacy-codex-sessions.json");
+    let task_count = 180;
+    let mut legacy_sessions = BTreeMap::new();
+
+    for task_index in 0..task_count {
+        let req_id = format!("req-codex-session-{task_index:03}");
+        let scope_key = format!("scope-{task_index:03}");
+        let session_id = format!("session-{task_index:03}");
+        journal
+            .record_started(TaskJournalStart {
+                req_id: &req_id,
+                cli_name: "codex",
+                route: Some("route_a_external_cli"),
+                run_handle_id: Some(&req_id),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("codex session task should start");
+        journal
+            .record_codex_session(&req_id, &scope_key, &session_id)
+            .expect("codex session should persist");
+        legacy_sessions.insert(scope_key, format!("legacy-session-{task_index:03}"));
+    }
+    fs::write(
+        &legacy,
+        serde_json::to_string_pretty(&legacy_sessions).expect("legacy sessions should serialize"),
+    )
+    .expect("legacy sessions should write");
+
+    for task_index in (0..task_count).step_by(5) {
+        let req_id = format!("req-codex-session-{task_index:03}");
+        let scope_key = format!("scope-{task_index:03}");
+        clear_stale_session(&journal, &legacy, &req_id, &scope_key).await;
+    }
+
+    let registry = read_registry(&dir);
+    assert_eq!(registry.len(), task_count);
+    let legacy_after: BTreeMap<String, String> = serde_json::from_str(
+        &fs::read_to_string(&legacy).expect("legacy sessions should read after clears"),
+    )
+    .expect("legacy sessions should parse after clears");
+
+    for task_index in 0..task_count {
+        let req_id = format!("req-codex-session-{task_index:03}");
+        let scope_key = format!("scope-{task_index:03}");
+        let record = registry
+            .get(&req_id)
+            .expect("codex session task should remain in registry");
+        if task_index % 5 == 0 {
+            assert_eq!(
+                journal
+                    .load_codex_session(&scope_key)
+                    .expect("codex session cache should read"),
+                None,
+                "stale scope {scope_key} should be cleared from journal cache"
+            );
+            assert_eq!(
+                record.codex_session_id, None,
+                "stale scope {scope_key} should be cleared from its task record"
+            );
+            assert!(
+                !legacy_after.contains_key(&scope_key),
+                "stale scope {scope_key} should be cleared from legacy cache"
+            );
+        } else {
+            let expected_session = format!("session-{task_index:03}");
+            assert_eq!(
+                journal
+                    .load_codex_session(&scope_key)
+                    .expect("codex session cache should read"),
+                Some(expected_session.clone()),
+                "unrelated scope {scope_key} must stay resumable"
+            );
+            assert_eq!(
+                record.codex_session_id.as_deref(),
+                Some(expected_session.as_str()),
+                "unrelated task record {req_id} must keep its Codex session"
+            );
+            assert_eq!(
+                legacy_after.get(&scope_key).map(String::as_str),
+                Some(format!("legacy-session-{task_index:03}").as_str()),
+                "unrelated legacy scope {scope_key} must stay intact"
+            );
+        }
+    }
+
+    let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
+    assert_eq!(
+        events.matches(r#""type":"codex_session_cleared""#).count(),
+        task_count / 5
+    );
 
     let _ = fs::remove_dir_all(dir);
 }
