@@ -91,6 +91,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (61, "普通新用户 AI 试用额度配置", migration_v61),
     (62, "停止默认加入联合项目并清理旧成员关系", migration_v62),
     (63, "项目开发命令自动识别元数据", migration_v63),
+    (64, "Route C 服务器模型每日预算调用审计", migration_v64),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2189,6 +2190,28 @@ fn migration_v63(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_v64(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS route_c_runtime_budget_events (
+          id                  TEXT PRIMARY KEY,
+          user_id             TEXT NOT NULL,
+          request_fingerprint TEXT NOT NULL,
+          route_day           TEXT NOT NULL,
+          created_at          TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_route_c_budget_day_time
+          ON route_c_runtime_budget_events(route_day, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_route_c_budget_user_time
+          ON route_c_runtime_budget_events(user_id, created_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2435,6 +2458,36 @@ mod tests {
         assert_eq!(admin_role, "admin");
         assert_eq!(approved_count, 1);
         assert_eq!(regular_count, 1);
+    }
+
+    #[test]
+    fn migration_v64_creates_route_c_budget_events() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v64(&conn).expect("route c budget table should apply");
+
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES ('usr_route_c_budget', NULL, 'route-c-budget@example.com', 'hash', 'Route C', 'user', 'active', 'now', 'now')",
+            [],
+        )
+        .expect("user should insert");
+        conn.execute(
+            "INSERT INTO route_c_runtime_budget_events (
+               id, user_id, request_fingerprint, route_day, created_at
+             ) VALUES ('rcb_test', 'usr_route_c_budget', 'fp', '2026-06-23', 'now')",
+            [],
+        )
+        .expect("budget event should insert");
+
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM route_c_runtime_budget_events WHERE route_day='2026-06-23'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("budget event should count");
+        assert_eq!(count, 1);
     }
 
     fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {

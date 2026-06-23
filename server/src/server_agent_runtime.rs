@@ -79,7 +79,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         });
     let admission = admission_snapshot(&user.id, limits);
     let admission_availability = admission_availability(&admission);
-    let budget = server_runtime_budget_status();
+    let budget = server_runtime_budget_status(&state.store);
     let ready = policy.enabled && agent.is_some() && admission_availability.ready && budget.ready();
     Json(ServerAgentRuntimeStatus {
         ready,
@@ -169,7 +169,7 @@ pub async fn chat_handler(
             return admission_error_response(error);
         }
     };
-    let budget = match try_record_route_c_call() {
+    let budget = match try_record_route_c_call(&state.store, &user.id, &audit.request_fingerprint) {
         Ok(status) => status,
         Err(error) => {
             tracing::warn!(

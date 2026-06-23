@@ -1,10 +1,9 @@
 // server/src/server_agent_runtime_budget.rs
 
 use serde::Serialize;
-use std::{
-    sync::{Mutex, OnceLock},
-    time::{SystemTime, UNIX_EPOCH},
-};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::store::Store;
 
 const SECONDS_PER_DAY: u64 = 86_400;
 const DEFAULT_DAILY_CALL_LIMIT: Option<usize> = None;
@@ -33,12 +32,7 @@ pub(crate) struct ServerRuntimeBudgetStatus {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ServerRuntimeBudgetError {
     DailyCallLimitReached(ServerRuntimeBudgetStatus),
-}
-
-#[derive(Debug, Default)]
-struct RuntimeBudgetState {
-    day: u64,
-    used_calls: usize,
+    StoreUnavailable(ServerRuntimeBudgetStatus),
 }
 
 impl ServerRuntimeBudgetConfig {
@@ -63,7 +57,7 @@ impl ServerRuntimeBudgetConfig {
 
 impl ServerRuntimeBudgetStatus {
     pub(crate) fn ready(&self) -> bool {
-        self.status != "exhausted"
+        !matches!(self.status, "exhausted" | "unavailable")
     }
 }
 
@@ -71,6 +65,7 @@ impl ServerRuntimeBudgetError {
     pub(crate) fn retry_after_secs(&self) -> u64 {
         match self {
             Self::DailyCallLimitReached(status) => status.reset_after_secs,
+            Self::StoreUnavailable(_) => 30,
         }
     }
 
@@ -82,63 +77,105 @@ impl ServerRuntimeBudgetError {
                     "Route C 远程模型今日平台预算已用完：每日最多 {limit} 次服务器模型调用，请稍后再试或改用本机 CLI / 自带 API Key。"
                 )
             }
+            Self::StoreUnavailable(_) => {
+                "Route C 远程模型预算系统暂时不可用，请稍后再试或改用本机 CLI / 自带 API Key。"
+                    .to_string()
+            }
         }
     }
 
     pub(crate) fn status(&self) -> &ServerRuntimeBudgetStatus {
         match self {
-            Self::DailyCallLimitReached(status) => status,
+            Self::DailyCallLimitReached(status) | Self::StoreUnavailable(status) => status,
         }
     }
 }
 
-pub(crate) fn server_runtime_budget_status() -> ServerRuntimeBudgetStatus {
+pub(crate) fn server_runtime_budget_status(store: &Store) -> ServerRuntimeBudgetStatus {
     let config = ServerRuntimeBudgetConfig::current();
     let now = current_epoch_secs();
-    let mut state = budget_state()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    status_for_state(config, &mut state, now)
+    status_from_store(store, config, now)
 }
 
 pub(crate) fn try_record_route_c_call(
+    store: &Store,
+    user_id: &str,
+    request_fingerprint: &str,
 ) -> Result<ServerRuntimeBudgetStatus, ServerRuntimeBudgetError> {
     let config = ServerRuntimeBudgetConfig::current();
     let now = current_epoch_secs();
-    let mut state = budget_state()
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
-    record_for_state(config, &mut state, now)
+    record_from_store(store, config, user_id, request_fingerprint, now)
 }
 
-fn record_for_state(
+fn status_from_store(
+    store: &Store,
     config: ServerRuntimeBudgetConfig,
-    state: &mut RuntimeBudgetState,
-    now_secs: u64,
-) -> Result<ServerRuntimeBudgetStatus, ServerRuntimeBudgetError> {
-    reset_state_if_needed(state, now_secs);
-    if config
-        .daily_call_limit
-        .is_some_and(|limit| state.used_calls >= limit)
-    {
-        return Err(ServerRuntimeBudgetError::DailyCallLimitReached(
-            status_for_state(config, state, now_secs),
-        ));
-    }
-
-    state.used_calls += 1;
-    Ok(status_for_state(config, state, now_secs))
-}
-
-fn status_for_state(
-    config: ServerRuntimeBudgetConfig,
-    state: &mut RuntimeBudgetState,
     now_secs: u64,
 ) -> ServerRuntimeBudgetStatus {
-    reset_state_if_needed(state, now_secs);
+    let route_day = route_day_from_epoch_secs(now_secs);
+    match store.route_c_budget_count_for_day(&route_day) {
+        Ok(used) => status_for_used_calls(config, used, now_secs),
+        Err(error) => {
+            tracing::warn!(
+                target: "server_agent_runtime",
+                route_day,
+                error = %error,
+                "Route C daily budget status lookup failed"
+            );
+            if config.daily_call_limit.is_some() {
+                unavailable_status(config, now_secs)
+            } else {
+                status_for_used_calls(config, 0, now_secs)
+            }
+        }
+    }
+}
+
+fn record_from_store(
+    store: &Store,
+    config: ServerRuntimeBudgetConfig,
+    user_id: &str,
+    request_fingerprint: &str,
+    now_secs: u64,
+) -> Result<ServerRuntimeBudgetStatus, ServerRuntimeBudgetError> {
+    let route_day = route_day_from_epoch_secs(now_secs);
+    match store.route_c_budget_try_record_call(
+        user_id,
+        request_fingerprint,
+        &route_day,
+        config.daily_call_limit,
+    ) {
+        Ok((true, used)) => Ok(status_for_used_calls(config, used, now_secs)),
+        Ok((false, used)) => Err(ServerRuntimeBudgetError::DailyCallLimitReached(
+            status_for_used_calls(config, used, now_secs),
+        )),
+        Err(error) => {
+            tracing::warn!(
+                target: "server_agent_runtime",
+                user_id,
+                route_day,
+                error = %error,
+                "Route C daily budget event write failed"
+            );
+            if config.daily_call_limit.is_some() {
+                Err(ServerRuntimeBudgetError::StoreUnavailable(
+                    unavailable_status(config, now_secs),
+                ))
+            } else {
+                Ok(status_for_used_calls(config, 0, now_secs))
+            }
+        }
+    }
+}
+
+fn status_for_used_calls(
+    config: ServerRuntimeBudgetConfig,
+    used_calls_today: usize,
+    now_secs: u64,
+) -> ServerRuntimeBudgetStatus {
     let remaining_calls_today = config
         .daily_call_limit
-        .map(|limit| limit.saturating_sub(state.used_calls));
+        .map(|limit| limit.saturating_sub(used_calls_today));
     let status = match remaining_calls_today {
         Some(0) => "exhausted",
         Some(_) => "available",
@@ -148,24 +185,26 @@ fn status_for_state(
         enabled: config.daily_call_limit.is_some(),
         status,
         source: config.source,
-        used_calls_today: state.used_calls,
+        used_calls_today,
         daily_call_limit: config.daily_call_limit,
         remaining_calls_today,
         reset_after_secs: seconds_until_next_day(now_secs),
     }
 }
 
-fn reset_state_if_needed(state: &mut RuntimeBudgetState, now_secs: u64) {
-    let day = day_from_epoch_secs(now_secs);
-    if state.day != day {
-        state.day = day;
-        state.used_calls = 0;
+fn unavailable_status(
+    config: ServerRuntimeBudgetConfig,
+    now_secs: u64,
+) -> ServerRuntimeBudgetStatus {
+    ServerRuntimeBudgetStatus {
+        enabled: config.daily_call_limit.is_some(),
+        status: "unavailable",
+        source: config.source,
+        used_calls_today: 0,
+        daily_call_limit: config.daily_call_limit,
+        remaining_calls_today: None,
+        reset_after_secs: seconds_until_next_day(now_secs),
     }
-}
-
-fn budget_state() -> &'static Mutex<RuntimeBudgetState> {
-    static STATE: OnceLock<Mutex<RuntimeBudgetState>> = OnceLock::new();
-    STATE.get_or_init(|| Mutex::new(RuntimeBudgetState::default()))
 }
 
 fn current_epoch_secs() -> u64 {
@@ -175,8 +214,11 @@ fn current_epoch_secs() -> u64 {
         .unwrap_or_default()
 }
 
-fn day_from_epoch_secs(epoch_secs: u64) -> u64 {
-    epoch_secs / SECONDS_PER_DAY
+fn route_day_from_epoch_secs(epoch_secs: u64) -> String {
+    chrono::DateTime::<chrono::Utc>::from_timestamp(epoch_secs as i64, 0)
+        .unwrap_or_else(chrono::Utc::now)
+        .format("%Y-%m-%d")
+        .to_string()
 }
 
 fn seconds_until_next_day(epoch_secs: u64) -> u64 {
@@ -191,62 +233,52 @@ fn seconds_until_next_day(epoch_secs: u64) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{
-        record_for_state, status_for_state, RuntimeBudgetState, ServerRuntimeBudgetConfig,
-        ServerRuntimeBudgetError, DAILY_CALL_LIMIT_ENV, SECONDS_PER_DAY,
+        route_day_from_epoch_secs, status_for_used_calls, unavailable_status,
+        ServerRuntimeBudgetConfig, DAILY_CALL_LIMIT_ENV, SECONDS_PER_DAY,
     };
 
     #[test]
-    fn budget_defaults_to_unlimited_but_counts_visibility() {
+    fn budget_status_defaults_to_unlimited_but_preserves_usage_visibility() {
         let config = ServerRuntimeBudgetConfig::from_lookup(|_| None);
-        let mut state = RuntimeBudgetState::default();
+        let status = status_for_used_calls(config, 2, 10);
 
-        let first = record_for_state(config, &mut state, 10).unwrap();
-        let second = record_for_state(config, &mut state, 20).unwrap();
-
-        assert!(!second.enabled);
-        assert_eq!(second.status, "unlimited");
-        assert_eq!(first.used_calls_today, 1);
-        assert_eq!(second.used_calls_today, 2);
-        assert_eq!(second.remaining_calls_today, None);
+        assert!(!status.enabled);
+        assert_eq!(status.status, "unlimited");
+        assert_eq!(status.used_calls_today, 2);
+        assert_eq!(status.remaining_calls_today, None);
     }
 
     #[test]
-    fn budget_enforces_operator_daily_call_limit() {
+    fn budget_status_reports_exhausted_operator_daily_call_limit() {
         let config = ServerRuntimeBudgetConfig::from_lookup(|name| {
             (name == DAILY_CALL_LIMIT_ENV).then(|| "2".to_string())
         });
-        let mut state = RuntimeBudgetState::default();
+        let available = status_for_used_calls(config, 1, 10);
+        let exhausted = status_for_used_calls(config, 2, 11);
 
-        let first = record_for_state(config, &mut state, 10).unwrap();
-        let second = record_for_state(config, &mut state, 11).unwrap();
-        let exhausted = record_for_state(config, &mut state, 12).unwrap_err();
-
-        assert!(first.enabled);
-        assert_eq!(first.remaining_calls_today, Some(1));
-        assert_eq!(second.status, "exhausted");
-        assert_eq!(second.remaining_calls_today, Some(0));
-        assert!(matches!(
-            exhausted,
-            ServerRuntimeBudgetError::DailyCallLimitReached(_)
-        ));
-        assert!(exhausted.public_message().contains("每日最多 2 次"));
+        assert!(available.ready());
+        assert_eq!(available.remaining_calls_today, Some(1));
+        assert_eq!(exhausted.status, "exhausted");
+        assert_eq!(exhausted.remaining_calls_today, Some(0));
+        assert!(!exhausted.ready());
     }
 
     #[test]
-    fn budget_resets_on_next_utc_day() {
+    fn route_day_uses_utc_day_boundary() {
+        assert_eq!(route_day_from_epoch_secs(SECONDS_PER_DAY - 1), "1970-01-01");
+        assert_eq!(route_day_from_epoch_secs(SECONDS_PER_DAY), "1970-01-02");
+    }
+
+    #[test]
+    fn unavailable_budget_status_blocks_when_operator_limit_is_configured() {
         let config = ServerRuntimeBudgetConfig::from_lookup(|name| {
             (name == DAILY_CALL_LIMIT_ENV).then(|| "1".to_string())
         });
-        let mut state = RuntimeBudgetState::default();
+        let status = unavailable_status(config, 10);
 
-        let first = record_for_state(config, &mut state, SECONDS_PER_DAY - 2).unwrap();
-        let exhausted = status_for_state(config, &mut state, SECONDS_PER_DAY - 1);
-        let next_day = status_for_state(config, &mut state, SECONDS_PER_DAY + 1);
-
-        assert_eq!(first.remaining_calls_today, Some(0));
-        assert_eq!(exhausted.status, "exhausted");
-        assert_eq!(next_day.used_calls_today, 0);
-        assert_eq!(next_day.status, "available");
+        assert_eq!(status.status, "unavailable");
+        assert!(!status.ready());
+        assert_eq!(status.daily_call_limit, Some(1));
     }
 
     #[test]
@@ -255,8 +287,7 @@ mod tests {
             let config = ServerRuntimeBudgetConfig::from_lookup(|name| {
                 (name == DAILY_CALL_LIMIT_ENV).then(|| raw.to_string())
             });
-            let mut state = RuntimeBudgetState::default();
-            let status = status_for_state(config, &mut state, 10);
+            let status = status_for_used_calls(config, 0, 10);
 
             assert!(!status.enabled);
             assert_eq!(status.status, "unlimited");

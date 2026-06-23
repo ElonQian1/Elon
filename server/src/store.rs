@@ -50,6 +50,7 @@ mod project_space;
 mod project_storage;
 mod project_workspace_health_snapshots;
 mod projects;
+mod route_c_budget;
 mod social_ai_messages;
 mod social_ai_pending;
 mod social_ai_selected;
