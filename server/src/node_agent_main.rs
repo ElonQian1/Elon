@@ -73,6 +73,8 @@ mod node_agent_route_c_status;
 mod node_agent_runtime_approval;
 mod node_agent_runtime_events;
 mod node_agent_server_runtime;
+#[cfg(test)]
+mod node_agent_task_approval_cleanup_tests;
 mod node_agent_task_journal;
 mod node_agent_task_journal_api;
 mod node_agent_task_journal_events;
@@ -2567,6 +2569,10 @@ impl NodeRuntime {
     }
 
     async fn finish_cli_prompt(&self, req_id: &str) {
+        let cleared_approvals = self.tool_approvals.clear_req(req_id).await;
+        if cleared_approvals > 0 {
+            info!("已清理 PC 任务 {req_id} 的 {cleared_approvals} 个遗留工具审批");
+        }
         self.active_cli_prompts.remove(req_id).await;
     }
 

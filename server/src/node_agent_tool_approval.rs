@@ -91,6 +91,19 @@ impl ToolApprovalState {
         approvals
     }
 
+    pub(crate) async fn clear_req(&self, req_id: &str) -> usize {
+        let mut pending = self.pending.write().await;
+        let keys = pending
+            .iter()
+            .filter_map(|(key, approval)| (approval.req_id == req_id).then_some(key.clone()))
+            .collect::<Vec<_>>();
+        let removed = keys.len();
+        for key in keys {
+            pending.remove(&key);
+        }
+        removed
+    }
+
     async fn remove_key(&self, key: &str) {
         self.pending.write().await.remove(key);
     }
@@ -173,5 +186,24 @@ mod tests {
 
         assert!(state.decide("req", "tap_1_1", "deny").await);
         assert!(state.pending_for_req("req").await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn clear_req_removes_only_matching_waiters() {
+        let state = ToolApprovalState::default();
+        let mut first = state.register("req", "tap_1_1").await;
+        let mut second = state.register("req", "tap_1_2").await;
+        let mut other = state.register("other", "tap_2_1").await;
+
+        assert_eq!(state.clear_req("req").await, 2);
+        assert!(state.pending_for_req("req").await.is_empty());
+        assert_eq!(state.pending_for_req("other").await.len(), 1);
+        assert!(!state.decide("req", "tap_1_1", "approve").await);
+        assert!(!first.changed().await);
+        assert!(!second.changed().await);
+
+        assert!(state.decide("other", "tap_2_1", "approve").await);
+        assert!(other.changed().await);
+        assert_eq!(other.decision(), Some(ToolApprovalDecision::Approve));
     }
 }
