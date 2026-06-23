@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 发布后抽样验证已刷新：`contract-smoke-after-deploy-current.json` 证明 `123qwe/123qwe` 的 authenticated `chat-bootstrap`、live manifest、answer policy、domain blueprint 和 dynamic discovery 仍通过，`failed=0`、`skipped=1`；`read-only-direct-read-after-deploy-current.json` 证明官方群 `ext_fb2_official` 可直接 API 只读，`message_count=80`、`writes=false`。这两项是无副作用健康抽样，不能替代带 `FB2_AI_CENTER_TOKEN` 的本人订单、平台摘要、feedback/quality live 验证。
 - 2026-06-23 当前服务端发布闭环已刷新：发现线上 `/api/server/version` 仍停在 `d3998425` 后，已按项目脚本发布最新 `origin/main=b5bd210b` 到主项目服务端。线上验证 `/health=OK`，`/api/server/version` 返回 `versionName=0.3.680`、`gitSha=b5bd210bff40fb2c0f1ff9178b708bd963dc9c6d`，`fb2-public-contract-status.ps1` 返回 `success=true`、`passed_count=56`、`failed_count=0`。这只完成主项目公开契约/服务端部署闭环，不替代 `FB2_AI_CENTER_TOKEN` 下的受保护 live Context Pack、订单、权限和质量刷新。
 - 2026-06-23 当前 checkpoint 已同步到 `origin/main`：本轮把只读群聊直读 summary 校验接入当前状态总门禁，提交 `39640018` 已通过 `check-task-complete.ps1 -Kind CodePushed`。`validate-fb2-ai-center-current-state.ps1` 当前输出仍为 `data_goal_complete=true`、`full_final_complete=false`、`token_present=false`、`voice_deferred_by_user=true`。原主目录停在另一个分叉工作分支，不能强行快进；后续继续以干净 worktree 或最新 `origin/main` 为准。
 - 2026-06-23 当前交接入口进一步收敛为 `status-refresh-current.json` + `handoff-prompt-current.md`。前者保存机器字段和完成矩阵，后者把 owner 下一步、阻塞项、可执行命令和接手规则整理成可复制提示，并把 token/password 参数占位。后续会话先跑 `scripts\fb2-ai-center-refresh-current-status.ps1`，再按 prompt 决定是做无密钥回归，还是拿 `FB2_AI_CENTER_TOKEN` 跑 live data-only preflight。
