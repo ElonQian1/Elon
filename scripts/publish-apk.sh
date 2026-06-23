@@ -97,6 +97,58 @@ http_get_json() {
   curl -sS --fail --noproxy '*' --max-time 10 "$url"
 }
 
+git_fetch_hint() {
+  local output="${1:-}"
+  if [[ "$output" =~ (Could\ not\ resolve\ host|Name\ or\ service\ not\ known|Temporary\ failure\ in\ name\ resolution) ]]; then
+    printf '%s\n' "网络/DNS 无法解析 GitHub，请检查网络、DNS 或代理后重试。"
+  elif [[ "$output" =~ (Failed\ to\ connect|Connection\ timed\ out|Connection\ reset|Connection\ refused|Operation\ timed\ out|HTTP/2\ stream|early\ EOF|The\ remote\ end\ hung\ up\ unexpectedly) ]]; then
+    printf '%s\n' "网络连接到 GitHub 不稳定或超时，通常是临时抖动；脚本已短重试但仍失败。"
+  elif [[ "$output" =~ (Permission\ denied|Authentication\ failed|Repository\ not\ found|Could\ not\ read\ from\ remote\ repository|Host\ key\ verification\ failed|publickey) ]]; then
+    printf '%s\n' "Git 远端认证或仓库权限异常，请检查 SSH key、GitHub 权限和 origin 地址。"
+  else
+    printf '%s\n' "Git fetch 失败，原因未能自动分类；请查看原始输出。"
+  fi
+}
+
+git_fetch_with_retry() {
+  local attempts=3 delay=2 quiet="${1:-0}" i output hint
+  for ((i=1; i<=attempts; i++)); do
+    if output=$(git -C "$REPO_ROOT" fetch origin main 2>&1); then
+      if [[ "$quiet" != "1" && "$i" -gt 1 ]]; then
+        echo -e "${GREEN}   ✅ git fetch 重试成功（第 $i 次）${NC}"
+      fi
+      return 0
+    fi
+    if [[ "$quiet" != "1" ]]; then
+      hint="$(git_fetch_hint "$output")"
+      echo -e "${YELLOW}   ⚠️  git fetch 失败（第 $i/$attempts 次）：$hint${NC}" >&2
+    fi
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$delay"
+    fi
+  done
+  hint="$(git_fetch_hint "$output")"
+  if [[ "$quiet" != "1" ]]; then
+    echo "CODE_SYNC_STATUS=unknown_fetch_failed"
+    echo "APK_RELEASE_STATUS=not_attempted"
+    echo "SERVER_RELEASE_STATUS=not_attempted"
+    echo -e "${RED}❌ APK 发布未开始：git fetch origin main 连续失败 $attempts 次。$hint${NC}" >&2
+    echo -e "${YELLOW}   原始输出：$output${NC}" >&2
+  fi
+  return 1
+}
+
+print_publish_status() {
+  local apk_status="$1"
+  local code_status="${2:-synced}"
+  local server_status="${3:-not_attempted}"
+  local message="${4:-}"
+  [[ -n "$message" ]] && echo -e "${CYAN}   $message${NC}"
+  echo -e "${GRAY}   CODE_SYNC_STATUS=$code_status${NC}"
+  echo -e "${GRAY}   APK_RELEASE_STATUS=$apk_status${NC}"
+  echo -e "${GRAY}   SERVER_RELEASE_STATUS=$server_status${NC}"
+}
+
 # ── Release API ───────────────────────────────────────────────
 call_release_api() {
   local endpoint="$1"
@@ -389,7 +441,7 @@ is_git_ancestor() {
 
 live_apk_includes_build_base() {
   local live_json live_sha
-  git -C "$REPO_ROOT" fetch origin main >/dev/null 2>&1 || true
+  git_fetch_with_retry 1 || return 1
   live_json=$(curl -s --noproxy '*' --max-time 10 "$SERVER_URL/app/version.json" 2>/dev/null || true)
   [[ -n "$live_json" ]] || return 1
   live_sha=$(json_get "$live_json" "sourceSha")
@@ -399,7 +451,7 @@ live_apk_includes_build_base() {
 
 remote_advance_safe_for_apk() {
   local base_sha="$1" changed p
-  git -C "$REPO_ROOT" fetch origin main >/dev/null 2>&1 || true
+  git_fetch_with_retry 1 || return 1
   changed=$(git -C "$REPO_ROOT" diff --name-only "$base_sha..origin/main" 2>/dev/null || true)
   [[ -n "$changed" ]] || return 0
   while IFS= read -r p; do
@@ -415,7 +467,7 @@ remote_advance_safe_for_apk() {
 # Step 0: Git fetch + fast-forward
 # ═══════════════════════════════════════════════════════════════
 echo -e "${CYAN}🔄 同步最新代码...${NC}"
-git -C "$REPO_ROOT" fetch origin main
+git_fetch_with_retry
 
 DIRTY=$(git -C "$REPO_ROOT" status --porcelain)
 if [[ -n "$DIRTY" ]]; then
@@ -458,6 +510,7 @@ if [[ "$FORCE" == "0" && -n "$DEPLOYED_APK_SHA" ]]; then
     LIVE_CODE=$(json_get_int "$LIVE_VERSION" "versionCode")
     echo -e "${GREEN}   ✅ APK 运行代码未变化，复用线上发布版 v${LIVE_NAME} (build ${LIVE_CODE})${NC}"
     echo -e "${GREEN}   下载: $SERVER_URL/app/ElonSpeed-latest.apk${NC}"
+    print_publish_status "published" "synced" "not_attempted" "APK 已发布；当前 Android 运行代码未变化，复用线上版本。"
     echo -e "${GRAY}      如需强制重新打包：bash scripts/publish-apk.sh --force --changelog=\"$CHANGELOG\"${NC}"
     exit 0
   fi
@@ -521,6 +574,7 @@ if [[ "$FORCE" == "0" ]] && live_apk_includes_build_base; then
   echo -e "${GREEN}   ✅ 线上 APK 已包含本次源码，复用 v${LIVE_NAME} (build ${LIVE_CODE})${NC}"
   echo -e "${GREEN}   下载: $SERVER_URL/app/ElonSpeed-latest.apk${NC}"
   complete_release "false" "" 0 "" "live apk already includes build base"
+  print_publish_status "published" "synced" "not_attempted" "APK 已发布；线上 APK 已包含本次源码。"
   exit 0
 fi
 
@@ -580,14 +634,15 @@ echo -e "${GREEN}   本次发布对应源 SHA: ${SHA_SHORT} (无新增 release c
 # ═══════════════════════════════════════════════════════════════
 # Step 5: 上传前检查（防慢构建覆盖）
 # ═══════════════════════════════════════════════════════════════
-git -C "$REPO_ROOT" fetch origin main >/dev/null 2>&1 || true
+git_fetch_with_retry 1
 REMOTE_HEAD_NOW=$(git -C "$REPO_ROOT" rev-parse origin/main)
 if [[ "$REMOTE_HEAD_NOW" != "$SHA_FULL" ]]; then
   if remote_advance_safe_for_apk "$SHA_FULL"; then
     echo -e "${CYAN}   ℹ️  origin/main 已前进到 ${REMOTE_HEAD_NOW:0:7}，但新提交不影响 Android，继续发布。${NC}"
   else
-    echo -e "${CYAN}⏭️  origin/main 已从本次基础 ${SHA_SHORT} 前进到 ${REMOTE_HEAD_NOW:0:7}，且包含 Android 改动。为避免上传过期 APK，已停止；发布交由后续最新 main。${NC}"
+    echo -e "${CYAN}⏭️  origin/main 已从本次基础 ${SHA_SHORT} 前进到 ${REMOTE_HEAD_NOW:0:7}，且包含 Android 改动。为避免上传过期 APK，已停止；代码已合并，发布交给最新主线。${NC}"
     complete_release "false" "" 0 "" "origin/main moved to $REMOTE_HEAD_NOW and changed android files"
+    print_publish_status "superseded_by_newer_main" "synced" "not_attempted" "代码已合并，发布交给最新主线。"
     exit 0
   fi
 fi
@@ -614,10 +669,12 @@ if [[ "$FORCE" == "0" ]]; then
         SERVER_NOW_NAME=$(json_get "$SERVER_NOW" "versionName")
         echo -e "${GREEN}   ✅ 服务器已有更新 APK 且包含本次源码，复用 v${SERVER_NOW_NAME} (build ${SERVER_NOW_CODE})${NC}"
         complete_release "false" "" 0 "" "superseded by live apk that includes build base"
+        print_publish_status "published" "synced" "not_attempted" "APK 已发布；服务器已有更新 APK 且包含本次源码。"
       else
         echo -e "${YELLOW}⚠️  APK 发布已中止：服务器已有更新版本 (build $SERVER_NOW_CODE >= $NEW_CODE)${NC}"
-        echo -e "${YELLOW}   如确要覆盖（不推荐）：重跑加 --force${NC}"
+        echo -e "${YELLOW}   处理：代码已合并，发布交给最新主线；如确要覆盖（不推荐）：重跑加 --force${NC}"
         complete_release "false" "" 0 "" "server already has newer apk: build $SERVER_NOW_CODE"
+        print_publish_status "superseded_by_newer_main" "synced" "not_attempted" "代码已合并，发布交给最新主线。"
       fi
       exit 0
     fi
@@ -730,9 +787,10 @@ if [[ $DEPLOY_EXIT -eq 42 ]]; then
       ssh $SSH_OPTS "$SERVER_HOST" "rm -f '$APK_STAGE' '$JSON_STAGE'" > /dev/null 2>&1 || true
     fi
     complete_release "false" "" 0 "" "superseded by deployed apk $DEPLOYED_SHA"
+    print_publish_status "published" "synced" "not_attempted" "APK 已由更新主线发布，当前 staging 不覆盖。"
     exit 0
   fi
-  echo -e "${CYAN}⏭️  APK 上传 CAS 失败（并发冲突）。本次 staging 不覆盖；发布交由后续最新 main。${NC}"
+  echo -e "${CYAN}⏭️  APK 上传 CAS 失败（并发冲突）。本次 staging 不覆盖；代码已合并，发布交给最新主线。${NC}"
   if is_local_apk_deploy; then
     rm -f "$APK_STAGE" "$JSON_STAGE" 2>/dev/null || true
   else
@@ -740,6 +798,7 @@ if [[ $DEPLOY_EXIT -eq 42 ]]; then
     ssh $SSH_OPTS "$SERVER_HOST" "rm -f '$APK_STAGE' '$JSON_STAGE'" > /dev/null 2>&1 || true
   fi
   complete_release "false" "" 0 "" "cas mismatch in apk deploy"
+  print_publish_status "superseded_by_newer_main" "synced" "not_attempted" "代码已合并，发布交给最新主线。"
   exit 0
 fi
 
@@ -783,6 +842,7 @@ echo -e "${GREEN}✅ 发布完成！${NC}"
 echo -e "   版本: v${NEW_NAME} (build ${NEW_CODE}) — 服务器分配，未写入 git"
 echo -e "   SHA:  ${SHA_SHORT} (源代码 commit，无新增 release commit)"
 echo -e "   下载: $SERVER_URL/app/ElonSpeed-latest.apk"
+print_publish_status "published"
 echo -e "${CYAN}${SEP}${NC}"
 
 # 自动清理已合并、工作树干净的孤儿 task worktree

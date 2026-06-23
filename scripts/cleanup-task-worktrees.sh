@@ -34,7 +34,41 @@ cd "$repo_root"
 repo_leaf="$(basename "$repo_root")"
 current_wt="$(pwd -P)"
 
-git fetch origin >/dev/null
+git_fetch_hint() {
+  local output="${1:-}"
+  if [[ "$output" =~ (Could\ not\ resolve\ host|Name\ or\ service\ not\ known|Temporary\ failure\ in\ name\ resolution) ]]; then
+    printf '%s\n' "网络/DNS 无法解析 GitHub，请检查网络、DNS 或代理后重试。"
+  elif [[ "$output" =~ (Failed\ to\ connect|Connection\ timed\ out|Connection\ reset|Connection\ refused|Operation\ timed\ out|HTTP/2\ stream|early\ EOF|The\ remote\ end\ hung\ up\ unexpectedly) ]]; then
+    printf '%s\n' "网络连接到 GitHub 不稳定或超时，通常是临时抖动；脚本已短重试但仍失败。"
+  elif [[ "$output" =~ (Permission\ denied|Authentication\ failed|Repository\ not\ found|Could\ not\ read\ from\ remote\ repository|Host\ key\ verification\ failed|publickey) ]]; then
+    printf '%s\n' "Git 远端认证或仓库权限异常，请检查 SSH key、GitHub 权限和 origin 地址。"
+  else
+    printf '%s\n' "Git fetch 失败，原因未能自动分类；请查看原始输出。"
+  fi
+}
+
+git_fetch_with_retry() {
+  local attempts=3 delay=2 i output hint
+  for ((i=1; i<=attempts; i++)); do
+    if output=$(git fetch origin 2>&1); then
+      if [[ "$i" -gt 1 ]]; then
+        echo "GIT_FETCH_RETRY=success_after_$i"
+      fi
+      return 0
+    fi
+    hint="$(git_fetch_hint "$output")"
+    echo "GIT_FETCH_RETRY=attempt_$i/$attempts failed: $hint" >&2
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$delay"
+    fi
+  done
+  hint="$(git_fetch_hint "$output")"
+  echo "git fetch origin 连续失败 $attempts 次。$hint" >&2
+  echo "原始输出：$output" >&2
+  return 1
+}
+
+git_fetch_with_retry >/dev/null
 
 # 解析 worktree（仅采集任务命名）
 mapfile -t lines < <(git worktree list --porcelain)

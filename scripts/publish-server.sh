@@ -107,6 +107,54 @@ release_post() {
     "$url"
 }
 
+git_fetch_hint() {
+  local output="${1:-}"
+  if [[ "$output" =~ (Could\ not\ resolve\ host|Name\ or\ service\ not\ known|Temporary\ failure\ in\ name\ resolution) ]]; then
+    printf '%s\n' "网络/DNS 无法解析 GitHub，请检查网络、DNS 或代理后重试。"
+  elif [[ "$output" =~ (Failed\ to\ connect|Connection\ timed\ out|Connection\ reset|Connection\ refused|Operation\ timed\ out|HTTP/2\ stream|early\ EOF|The\ remote\ end\ hung\ up\ unexpectedly) ]]; then
+    printf '%s\n' "网络连接到 GitHub 不稳定或超时，通常是临时抖动；脚本已短重试但仍失败。"
+  elif [[ "$output" =~ (Permission\ denied|Authentication\ failed|Repository\ not\ found|Could\ not\ read\ from\ remote\ repository|Host\ key\ verification\ failed|publickey) ]]; then
+    printf '%s\n' "Git 远端认证或仓库权限异常，请检查 SSH key、GitHub 权限和 origin 地址。"
+  else
+    printf '%s\n' "Git fetch 失败，原因未能自动分类；请查看原始输出。"
+  fi
+}
+
+git_fetch_with_retry() {
+  local attempts=3 delay=2 i output hint
+  for ((i=1; i<=attempts; i++)); do
+    if output=$(git -C "$REPO_ROOT" fetch origin main 2>&1); then
+      if [[ "$i" -gt 1 ]]; then
+        echo -e "${GREEN}   ✅ git fetch 重试成功（第 $i 次）${NC}"
+      fi
+      return 0
+    fi
+    hint="$(git_fetch_hint "$output")"
+    echo -e "${YELLOW}   ⚠️  git fetch 失败（第 $i/$attempts 次）：$hint${NC}" >&2
+    if [[ "$i" -lt "$attempts" ]]; then
+      sleep "$delay"
+    fi
+  done
+  hint="$(git_fetch_hint "$output")"
+  echo "CODE_SYNC_STATUS=unknown_fetch_failed"
+  echo "SERVER_RELEASE_STATUS=not_attempted"
+  echo "APK_RELEASE_STATUS=not_attempted"
+  echo -e "${RED}❌ 后端发布未开始：git fetch origin main 连续失败 $attempts 次。$hint${NC}" >&2
+  echo -e "${YELLOW}   原始输出：$output${NC}" >&2
+  return 1
+}
+
+print_publish_status() {
+  local server_status="$1"
+  local code_status="${2:-synced}"
+  local apk_status="${3:-not_attempted}"
+  local message="${4:-}"
+  [[ -n "$message" ]] && echo -e "${CYAN}   $message${NC}"
+  echo -e "${GRAY}   CODE_SYNC_STATUS=$code_status${NC}"
+  echo -e "${GRAY}   SERVER_RELEASE_STATUS=$server_status${NC}"
+  echo -e "${GRAY}   APK_RELEASE_STATUS=$apk_status${NC}"
+}
+
 complete_release() {
   local success="$1"
   local version_name="${2:-}"
@@ -399,7 +447,7 @@ trap on_exit EXIT
 
 # ── 1. git fetch + fast-forward ───────────────────────────────
 echo -e "${YELLOW}1⃣  同步最新代码...${NC}"
-git -C "$REPO_ROOT" fetch origin main
+git_fetch_with_retry
 DIRTY=$(git -C "$REPO_ROOT" status --porcelain)
 if [ -n "$DIRTY" ]; then
   echo ""
@@ -633,9 +681,10 @@ if [ "$FORCE" -eq 0 ]; then
       echo -e "${YELLOW}   ⚠️  部署已中止：服务器版本更新${NC}"
       echo -e "${YELLOW}   服务器当前: $SHORT_SERVER（比本次 $SHA 更新）${NC}"
       echo -e "${YELLOW}   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。${NC}"
-      echo -e "${YELLOW}   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 --force 强制覆盖。${NC}"
+      echo -e "${YELLOW}   处理：代码已合并，发布交给最新主线；明确发布协调任务可重新运行，或用 --force 强制覆盖。${NC}"
       complete_release false "" "" "superseded by server sha $SERVER_SHA"
       echo -e "${YELLOW}   release/finish 已调用 (success=false)，分配的 v$ASSIGNED_VERSION 已释放。${NC}"
+      print_publish_status "superseded_by_newer_main" "synced" "not_attempted" "代码已合并，发布交给最新主线。"
       echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
       echo ""
       exit 0
@@ -703,9 +752,10 @@ if [ "$LOCK_EXIT" -eq 42 ]; then
   echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
   echo -e "${YELLOW}   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）${NC}"
   echo -e "${YELLOW}   $LOCK_OUT${NC}"
-  echo -e "${YELLOW}   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 --force 强制覆盖。${NC}"
+  echo -e "${YELLOW}   处理：代码已合并，发布交给最新主线；明确发布协调任务可重新运行，或用 --force 强制覆盖。${NC}"
   complete_release false "" "" "cas conflict inside flock: $LOCK_OUT"
   echo -e "${YELLOW}   release/finish 已调用 (success=false)，分配的 v$ASSIGNED_VERSION 已释放。${NC}"
+  print_publish_status "superseded_by_newer_main" "synced" "not_attempted" "代码已合并，发布交给最新主线。"
   echo -e "${YELLOW}═══════════════════════════════════════════════════${NC}"
   exit 0
 elif [ "$LOCK_EXIT" -ne 0 ]; then
@@ -760,6 +810,7 @@ echo -e "${GREEN}   ✅ 部署完成！${NC}"
 echo -e "${GRAY}   版本:   v$ASSIGNED_VERSION（服务器分配，未写入 git）${NC}"
 echo -e "${GRAY}   SHA:    $SHA${NC}"
 echo -e "${GRAY}   服务:   $SERVER_HTTP_BASE/health${NC}"
+print_publish_status "published"
 echo -e "${CYAN}═══════════════════════════════════════════════════${NC}"
 echo ""
 

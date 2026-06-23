@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Elon task completion check.
 
@@ -38,6 +38,57 @@ function Stop-Check {
     exit 1
 }
 
+function Get-GitFetchFailureHint {
+    param([string]$Output)
+
+    $text = if ($Output) { $Output } else { "" }
+    if ($text -match '(Could not resolve host|Name or service not known|Temporary failure in name resolution)') {
+        return "网络/DNS 无法解析 GitHub，请检查网络、DNS 或代理后重试。"
+    }
+    if ($text -match '(Failed to connect|Connection timed out|Connection reset|Connection refused|Operation timed out|HTTP/2 stream|early EOF|The remote end hung up unexpectedly)') {
+        return "网络连接到 GitHub 不稳定或超时，通常是临时抖动；脚本已短重试但仍失败。"
+    }
+    if ($text -match '(Permission denied|Authentication failed|Repository not found|Could not read from remote repository|Host key verification failed|publickey)') {
+        return "Git 远端认证或仓库权限异常，请检查 SSH key、GitHub 权限和 origin 地址。"
+    }
+    return "Git fetch 失败，原因未能自动分类；请查看原始输出。"
+}
+
+function Invoke-GitFetchWithRetry {
+    param(
+        [string[]]$GitArgs = @("fetch", "origin", "main"),
+        [int]$Attempts = 3,
+        [int]$DelaySeconds = 2
+    )
+
+    $lastOutput = ""
+    for ($i = 1; $i -le $Attempts; $i++) {
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = & git @GitArgs 2>&1
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+        $lastOutput = ($output -join "`n").Trim()
+        if ($LASTEXITCODE -eq 0) {
+            if ($i -gt 1) {
+                Write-Host "GIT_FETCH_RETRY=success_after_$i"
+            }
+            return
+        }
+
+        $hint = Get-GitFetchFailureHint -Output $lastOutput
+        Write-Host "GIT_FETCH_RETRY=attempt_$i/$Attempts failed: $hint" -ForegroundColor Yellow
+        if ($i -lt $Attempts) {
+            Start-Sleep -Seconds $DelaySeconds
+        }
+    }
+
+    $finalHint = Get-GitFetchFailureHint -Output $lastOutput
+    Stop-Check "无法确认远端 main 状态：git $($GitArgs -join ' ') 连续失败 $Attempts 次。$finalHint 原始输出：$lastOutput"
+}
+
 Set-Location $RepoRoot
 
 if (-not $SkipGitStatus) {
@@ -49,10 +100,7 @@ if (-not $SkipGitStatus) {
     }
 }
 
-git fetch origin main | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    Stop-Check "Could not fetch origin/main; remote state is unknown."
-}
+Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main")
 
 $head = (git rev-parse HEAD).Trim()
 $originMain = (git rev-parse origin/main).Trim()
@@ -66,6 +114,9 @@ if ($Kind -eq "CodePushed" -or $Kind -eq "CodeSync") {
     Write-Host "$Kind completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
+    Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  APK_RELEASE_STATUS=not_attempted"
+    Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     if ($head -eq $originMain) {
         Write-Host "  status:      local HEAD is the current origin/main tip"
     } else {
@@ -111,6 +162,9 @@ if ($Kind -eq "AndroidFeature") {
     Write-Host "Android APK completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
+    Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  APK_RELEASE_STATUS=published"
+    Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     Write-Host "  version:     v$($remoteVersion.versionName) (build $($remoteVersion.versionCode))"
     Write-Host "  APK gitSha:  $remoteGitSha"
     Write-Host "  download:    $ServerUrl/app/ElonSpeed-latest.apk"
@@ -121,6 +175,9 @@ if ($Kind -eq "DocsOnly") {
     Write-Host "DocsOnly completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
+    Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  APK_RELEASE_STATUS=not_attempted"
+    Write-Host "  SERVER_RELEASE_STATUS=not_attempted"
     exit 0
 }
 
@@ -157,6 +214,9 @@ if ($Kind -eq "Server") {
     Write-Host "Server completion check passed:" -ForegroundColor Green
     Write-Host "  HEAD:        $($head.Substring(0, 7))"
     Write-Host "  origin/main: $($originMain.Substring(0, 7))"
+    Write-Host "  CODE_SYNC_STATUS=synced"
+    Write-Host "  APK_RELEASE_STATUS=not_attempted"
+    Write-Host "  SERVER_RELEASE_STATUS=published"
     Write-Host "  health:      $($health | ConvertTo-Json -Compress)"
     Write-Host "  version:     v$($serverVersion.versionName) ($($serverVersion.gitSha))"
     exit 0

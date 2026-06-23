@@ -291,6 +291,75 @@ function Restore-ReleaseRustflags {
     }
 }
 
+function Get-GitFetchFailureHint {
+    param([string]$Output)
+
+    $text = if ($Output) { $Output } else { "" }
+    if ($text -match '(Could not resolve host|Name or service not known|Temporary failure in name resolution)') {
+        return "网络/DNS 无法解析 GitHub，请检查网络、DNS 或代理后重试。"
+    }
+    if ($text -match '(Failed to connect|Connection timed out|Connection reset|Connection refused|Operation timed out|HTTP/2 stream|early EOF|The remote end hung up unexpectedly)') {
+        return "网络连接到 GitHub 不稳定或超时，通常是临时抖动；脚本已短重试但仍失败。"
+    }
+    if ($text -match '(Permission denied|Authentication failed|Repository not found|Could not read from remote repository|Host key verification failed|publickey)') {
+        return "Git 远端认证或仓库权限异常，请检查 SSH key、GitHub 权限和 origin 地址。"
+    }
+    return "Git fetch 失败，原因未能自动分类；请查看原始输出。"
+}
+
+function Invoke-GitFetchWithRetry {
+    param(
+        [string[]]$GitArgs = @("fetch", "origin", "main"),
+        [int]$Attempts = 3,
+        [int]$DelaySeconds = 2,
+        [string]$FailureContext = "无法同步 origin/main"
+    )
+
+    $lastOutput = ""
+    for ($i = 1; $i -le $Attempts; $i++) {
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = & git -C $RepoRoot @GitArgs 2>&1
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+        $lastOutput = ($output -join "`n").Trim()
+        if ($LASTEXITCODE -eq 0) {
+            if ($i -gt 1) {
+                Write-Host "   ✅ git fetch 重试成功（第 $i 次）" -ForegroundColor Green
+            }
+            return
+        }
+
+        $hint = Get-GitFetchFailureHint -Output $lastOutput
+        Write-Host "   ⚠️  git fetch 失败（第 $i/$Attempts 次）：$hint" -ForegroundColor Yellow
+        if ($i -lt $Attempts) { Start-Sleep -Seconds $DelaySeconds }
+    }
+
+    $finalHint = Get-GitFetchFailureHint -Output $lastOutput
+    Write-Host "CODE_SYNC_STATUS=unknown_fetch_failed"
+    Write-Host "SERVER_RELEASE_STATUS=not_attempted"
+    Write-Host "APK_RELEASE_STATUS=not_attempted"
+    Write-Error "$FailureContext：git $($GitArgs -join ' ') 连续失败 $Attempts 次。$finalHint 原始输出：$lastOutput"
+}
+
+function Write-PublishStatus {
+    param(
+        [Parameter(Mandatory)] [string]$ServerReleaseStatus,
+        [string]$CodeSyncStatus = "synced",
+        [string]$ApkReleaseStatus = "not_attempted",
+        [string]$Message = ""
+    )
+
+    if ($Message) {
+        Write-Host "   $Message" -ForegroundColor Cyan
+    }
+    Write-Host "   CODE_SYNC_STATUS=$CodeSyncStatus" -ForegroundColor Gray
+    Write-Host "   SERVER_RELEASE_STATUS=$ServerReleaseStatus" -ForegroundColor Gray
+    Write-Host "   APK_RELEASE_STATUS=$ApkReleaseStatus" -ForegroundColor Gray
+}
+
 Import-LocalEnvFile (Join-Path $RepoRoot ".env.local")
 
 # ─────────────────────────────────────────────────────────────
@@ -468,8 +537,7 @@ if ($dirty) {
     Write-Error "工作区有未提交改动"
 }
 
-git -C $RepoRoot fetch origin main | Out-Null
-if ($LASTEXITCODE -ne 0) { Write-Error "git fetch origin main 失败" }
+Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main") -FailureContext "后端发布未开始：无法同步 origin/main"
 
 $localHead = (git -C $RepoRoot rev-parse HEAD).Trim()
 $remoteHead = (git -C $RepoRoot rev-parse origin/main).Trim()
@@ -705,8 +773,9 @@ if (-not $Force) {
             Write-Host "   ⚠️  部署已中止：服务器版本更新" -ForegroundColor Yellow
             Write-Host "   服务器当前: $shortServer（比本次 $Sha 更新）" -ForegroundColor Yellow
             Write-Host "   原因：另一个开发者已部署了更新版本，本次编译基于旧 commit。" -ForegroundColor Yellow
-            Write-Host "   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+            Write-Host "   处理：代码已合并，发布交给最新主线；明确发布协调任务可重新运行，或用 -Force 强制覆盖。" -ForegroundColor Yellow
             Write-Host "   release/finish 已调用 (success=false)，分配的 v$AssignedVersion 已释放。" -ForegroundColor Yellow
+            Write-PublishStatus -ServerReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
             Write-Host ""
             exit 0
@@ -778,8 +847,9 @@ if ($lockExit -eq 42) {
     Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
     Write-Host "   ⚠️  部署已中止：CAS 冲突（锁内检测到并发部署）" -ForegroundColor Yellow
     Write-Host "   $lockResult" -ForegroundColor Yellow
-    Write-Host "   处理：本次代码若已 push，则发布交由后续最新 main；明确发布协调任务可重新运行，或用 -Force 强制覆盖。" -ForegroundColor Yellow
+    Write-Host "   处理：代码已合并，发布交给最新主线；明确发布协调任务可重新运行，或用 -Force 强制覆盖。" -ForegroundColor Yellow
     Write-Host "   release/finish 已调用 (success=false)，分配的 v$AssignedVersion 已释放。" -ForegroundColor Yellow
+    Write-PublishStatus -ServerReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
     Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
     exit 0
 } elseif ($lockExit -ne 0) {
@@ -823,6 +893,7 @@ Write-Host "   版本:   v$AssignedVersion  (服务器分配，未写入 git)" -
 Write-Host "   SHA:    $Sha" -ForegroundColor Gray
 Write-Host "   服务:   http://43.139.149.158:8080/health" -ForegroundColor Gray
 Write-Host "   版本接口: http://43.139.149.158:8080/api/server/version" -ForegroundColor Gray
+Write-PublishStatus -ServerReleaseStatus "published"
 Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Cyan
 Write-Host ""
 

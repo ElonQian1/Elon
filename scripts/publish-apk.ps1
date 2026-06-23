@@ -420,6 +420,80 @@ function Format-ShortSha {
     return $Sha.Substring(0, 7)
 }
 
+function Get-GitFetchFailureHint {
+    param([string]$Output)
+
+    $text = if ($Output) { $Output } else { "" }
+    if ($text -match '(Could not resolve host|Name or service not known|Temporary failure in name resolution)') {
+        return "网络/DNS 无法解析 GitHub，请检查网络、DNS 或代理后重试。"
+    }
+    if ($text -match '(Failed to connect|Connection timed out|Connection reset|Connection refused|Operation timed out|HTTP/2 stream|early EOF|The remote end hung up unexpectedly)') {
+        return "网络连接到 GitHub 不稳定或超时，通常是临时抖动；脚本已短重试但仍失败。"
+    }
+    if ($text -match '(Permission denied|Authentication failed|Repository not found|Could not read from remote repository|Host key verification failed|publickey)') {
+        return "Git 远端认证或仓库权限异常，请检查 SSH key、GitHub 权限和 origin 地址。"
+    }
+    return "Git fetch 失败，原因未能自动分类；请查看原始输出。"
+}
+
+function Invoke-GitFetchWithRetry {
+    param(
+        [string[]]$GitArgs = @("fetch", "origin", "main"),
+        [int]$Attempts = 3,
+        [int]$DelaySeconds = 2,
+        [string]$FailureContext = "无法同步 origin/main",
+        [switch]$Quiet
+    )
+
+    $lastOutput = ""
+    for ($i = 1; $i -le $Attempts; $i++) {
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = & git -C $RepoRoot @GitArgs 2>&1
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+        $lastOutput = ($output -join "`n").Trim()
+        if ($LASTEXITCODE -eq 0) {
+            if (-not $Quiet -and $i -gt 1) {
+                Write-Host "   ✅ git fetch 重试成功（第 $i 次）" -ForegroundColor Green
+            }
+            return
+        }
+
+        if (-not $Quiet) {
+            $hint = Get-GitFetchFailureHint -Output $lastOutput
+            Write-Host "   ⚠️  git fetch 失败（第 $i/$Attempts 次）：$hint" -ForegroundColor Yellow
+        }
+        if ($i -lt $Attempts) { Start-Sleep -Seconds $DelaySeconds }
+    }
+
+    $finalHint = Get-GitFetchFailureHint -Output $lastOutput
+    if (-not $Quiet) {
+        Write-Host "CODE_SYNC_STATUS=unknown_fetch_failed"
+        Write-Host "APK_RELEASE_STATUS=not_attempted"
+        Write-Host "SERVER_RELEASE_STATUS=not_attempted"
+    }
+    Write-Error "$FailureContext：git $($GitArgs -join ' ') 连续失败 $Attempts 次。$finalHint 原始输出：$lastOutput"
+}
+
+function Write-ApkPublishStatus {
+    param(
+        [Parameter(Mandatory)] [string]$ApkReleaseStatus,
+        [string]$CodeSyncStatus = "synced",
+        [string]$ServerReleaseStatus = "not_attempted",
+        [string]$Message = ""
+    )
+
+    if ($Message) {
+        Write-Host "   $Message" -ForegroundColor Cyan
+    }
+    Write-Host "   CODE_SYNC_STATUS=$CodeSyncStatus" -ForegroundColor Gray
+    Write-Host "   APK_RELEASE_STATUS=$ApkReleaseStatus" -ForegroundColor Gray
+    Write-Host "   SERVER_RELEASE_STATUS=$ServerReleaseStatus" -ForegroundColor Gray
+}
+
 function Restore-GradleVersionFile {
     if ($null -eq $script:OriginalGradleContent) { return }
     [System.IO.File]::WriteAllText(
@@ -444,8 +518,7 @@ function Test-GitAncestor {
 }
 
 function Get-OriginMainSha {
-    git -C $RepoRoot fetch origin main --quiet
-    if ($LASTEXITCODE -ne 0) { Write-Error "git fetch origin main 失败，无法判断 APK 构建是否已过期。" }
+    Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main", "--quiet") -FailureContext "无法判断 APK 构建是否已过期" -Quiet
     $sha = (git -C $RepoRoot rev-parse origin/main 2>$null).Trim()
     if ($LASTEXITCODE -ne 0 -or $sha -notmatch '^[0-9a-f]{40}$') {
         Write-Error "无法读取 origin/main SHA。"
@@ -518,6 +591,7 @@ function Stop-StaleApkRelease {
     Complete-Release -Success:$false -ErrorMessage $Message
     if ($Success) {
         Write-Host "⏭️  $Message" -ForegroundColor Cyan
+        Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
         exit 0
     }
     Write-Error $Message
@@ -580,7 +654,7 @@ function Invoke-GradleReleaseBuild {
 function Test-RemoteAdvanceSafeForApk {
     param([string]$BaseSha)
     # 检查 BaseSha..origin/main 区间是否只动了非 Android 文件；如是则 APK 不受影响，可安全 rebase。
-    git -C $RepoRoot fetch origin main 2>$null | Out-Null
+    Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main") -FailureContext "无法判断远端前进是否影响 APK" -Quiet
     $changed = git -C $RepoRoot diff --name-only "$BaseSha..origin/main" 2>$null
     if (-not $changed) { return $true }
     foreach ($p in $changed) {
@@ -603,7 +677,7 @@ function Assert-ApkStillCurrentBeforeCommit {
         return
     }
 
-    Stop-StaleApkRelease -Success -Message "origin/main 已从 $((Format-ShortSha $BuildBaseSha)) 前进到 $((Format-ShortSha $freshness.RemoteHead))，且包含 Android 改动，本次 APK 产物已过期。已还原 build.gradle；代码已推送的任务到此收尾，APK 发布交由后续最新 main。"
+    Stop-StaleApkRelease -Success -Message "origin/main 已从 $((Format-ShortSha $BuildBaseSha)) 前进到 $((Format-ShortSha $freshness.RemoteHead))，且包含 Android 改动，本次 APK 产物已过期。已还原 build.gradle；代码已合并，发布交给最新主线。"
 }
 
 function Assert-ApkStillCurrentBeforeUpload {
@@ -615,6 +689,7 @@ function Assert-ApkStillCurrentBeforeUpload {
     if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
         Write-Host "⏭️  服务器已部署包含本 release commit 的更新 APK：$((Format-ShortSha $deployedSha))" -ForegroundColor Cyan
         Complete-Release -Success:$false -ErrorMessage "superseded by deployed apk $deployedSha"
+        Write-ApkPublishStatus -ApkReleaseStatus "published" -Message "APK 已由更新主线发布，当前代码已包含在线上 APK。"
         exit 0
     }
 
@@ -625,7 +700,8 @@ function Assert-ApkStillCurrentBeforeUpload {
             return
         }
         Complete-Release -Success:$false -ErrorMessage "origin/main moved to $remoteHead and changed android files"
-        Write-Host "⏭️  origin/main 已从本次基础 $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))，且包含 Android 改动。为避免上传过期 APK，已停止；发布交由后续最新 main。" -ForegroundColor Cyan
+        Write-Host "⏭️  origin/main 已从本次基础 $((Format-ShortSha $ReleaseSha)) 前进到 $((Format-ShortSha $remoteHead))，且包含 Android 改动。为避免上传过期 APK，已停止；代码已合并，发布交给最新主线。" -ForegroundColor Cyan
+        Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
         exit 0
     }
 }
@@ -699,6 +775,7 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
             Write-Host "⏭️  另一台机器已部署更新 APK：$((Format-ShortSha $deployedSha))。本次 staging 不覆盖。" -ForegroundColor Cyan
             ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
             Complete-Release -Success:$false -ErrorMessage "superseded by deployed apk $deployedSha"
+            Write-ApkPublishStatus -ApkReleaseStatus "published" -Message "APK 已由更新主线发布，当前 staging 不覆盖。"
             exit 0
         }
         if ($deployedSha -and (Test-GitAncestor $deployedSha $ReleaseSha) -and $Attempt -lt 3) {
@@ -708,7 +785,8 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
         }
         ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
         Complete-Release -Success:$false -ErrorMessage "cas mismatch in apk deploy"
-        Write-Host "⏭️  APK 上传 CAS 失败：服务器部署状态已变化，且未确认包含本 release commit。本次 staging 不覆盖；发布交由后续最新 main。" -ForegroundColor Cyan
+        Write-Host "⏭️  APK 上传 CAS 失败：服务器部署状态已变化，且未确认包含本 release commit。本次 staging 不覆盖；代码已合并，发布交给最新主线。" -ForegroundColor Cyan
+        Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
         exit 0
     }
 
@@ -721,8 +799,7 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
 # ── Step 0: Git fetch + fast-forward（发布只基于远端最新 main） ─────────────
 
 Write-Host "🔄 同步最新代码..." -ForegroundColor Cyan
-git -C $RepoRoot fetch origin main | Out-Null
-if ($LASTEXITCODE -ne 0) { Write-Error "git fetch origin main 失败" }
+Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main") -FailureContext "APK 发布未开始：无法同步 origin/main"
 
 $dirty = (git -C $RepoRoot status --porcelain 2>$null) | Out-String
 $dirty = $dirty.Trim()
@@ -923,9 +1000,10 @@ if (-not $Force) {
             } else {
                 Write-Host "   原因：服务器已有完全相同的版本（同 build 号 + 同 SHA），无需重复发布。" -ForegroundColor Yellow
             }
-            Write-Host "   处理：本次本机编译的 APK 作废；服务器分配的 build $newCode 槽位将释放回 in-flight 列表。" -ForegroundColor Yellow
+            Write-Host "   处理：代码已合并，发布交给最新主线；本次本机编译的 APK 作废，服务器分配的 build $newCode 槽位将释放回 in-flight 列表。" -ForegroundColor Yellow
             Write-Host "   如需本机验证已发布的新版 APK，直接下载 $ServerUrl/app/ElonSpeed-latest.apk。" -ForegroundColor Yellow
             Write-Host "   如确要覆盖（不推荐）：重跑加 -Force。" -ForegroundColor Yellow
+            Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
             Write-Host "═══════════════════════════════════════════════════" -ForegroundColor Yellow
             Write-Host ""
             Complete-Release -Success:$false -ErrorMessage "server already has newer apk: build $serverNowCode"
@@ -994,6 +1072,7 @@ Write-Host "✅ 发布完成！" -ForegroundColor Green
 Write-Host "   版本: v$versionName (build $newCode) — 服务器分配，未写入 git" -ForegroundColor White
 Write-Host "   SHA:  $sha (源代码 commit，无新增 release commit)" -ForegroundColor White
 Write-Host "   下载: $downloadUrl" -ForegroundColor White
+Write-ApkPublishStatus -ApkReleaseStatus "published"
 Write-Host ("=" * 60) -ForegroundColor Cyan
 
 # ── 启动局域网分发种子服务（后台无窗口，多项目共享守护进程）─────────────────
