@@ -29,7 +29,8 @@
     localAdminTokenHeader: LOCAL_ADMIN_HEADER_FALLBACK,
     clientMaintenance: null,
     clientPackageLatest: null,
-    localProjectInfo: null
+    localProjectInfo: null,
+    localNodeLaunchAttempted: false
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
   const PLAZA_FILTERS = [
@@ -1277,10 +1278,7 @@
     els.registerProjectBtn.addEventListener('click', registerLocalProject);
     els.settingsProjectPath.addEventListener('input', markLocalProjectPathDirty);
     els.refreshClientMaintenanceBtn.addEventListener('click', () => refreshClientMaintenance(true));
-    els.openNodeSetupFromSettingsBtn.addEventListener('click', () => {
-      closeSettings();
-      node.selectNode();
-    });
+    els.openNodeSetupFromSettingsBtn.addEventListener('click', openNodeSetupFromSettings);
     els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('logs', els.openClientLogsBtn));
     els.openClientLauncherLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('launcher_logs', els.openClientLauncherLogsBtn));
     els.openClientTaskJournalBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientTaskJournalBtn));
@@ -2657,19 +2655,25 @@
     const path = clean(els.settingsProjectPath && els.settingsProjectPath.value);
     const info = state.localProjectInfo || null;
     const blocked = !!(info && info.canRegister === false);
-    let title = '先启动本机节点';
-    let detail = `点击下方按钮；如果浏览器询问是否打开“一龙PC节点”，请选择允许。`;
-    let actionLabel = '启动本机节点';
+    const launchAttempted = !!state.localNodeLaunchAttempted && !connected;
+    let title = launchAttempted ? '没有检测到本机节点' : '先启动本机节点';
+    let detail = launchAttempted
+      ? '可能还没安装 Win 端，或浏览器没有成功拉起本机程序。请打开安装页面处理。'
+      : `点击下方按钮；如果浏览器询问是否打开“一龙PC节点”，请选择允许。`;
+    let actionLabel = launchAttempted ? '下载 / 安装本机节点' : '启动本机节点';
 
     if (connected && !path) {
+      state.localNodeLaunchAttempted = false;
       title = '本机节点已连接';
       detail = '现在选择一个项目文件夹即可加入列表。';
       actionLabel = '选择项目文件夹';
     } else if (connected && blocked) {
+      state.localNodeLaunchAttempted = false;
       title = '还差一点项目信息';
       detail = '打开“排查 / 高级设置”，补齐缺少字段后再注册。';
       actionLabel = '重新选择项目文件夹';
     } else if (connected && path) {
+      state.localNodeLaunchAttempted = false;
       title = '项目目录已选好';
       detail = '正在加入项目列表，完成后会自动打开项目。';
       actionLabel = '重新选择项目文件夹';
@@ -2678,7 +2682,8 @@
     if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = title;
     if (els.settingsNodeStatusDetail) els.settingsNodeStatusDetail.textContent = detail;
     els.settingsNodeStatusCard.classList.toggle('is-ready', connected && !!path && !blocked);
-    els.settingsNodeStatusCard.classList.toggle('is-pending', !connected);
+    els.settingsNodeStatusCard.classList.toggle('is-pending', !connected && !launchAttempted);
+    els.settingsNodeStatusCard.classList.toggle('is-help', launchAttempted);
     els.settingsNodeStatusCard.classList.toggle('is-warning', connected && blocked);
     if (els.chooseProjectFolderBtn && !els.chooseProjectFolderBtn.dataset.label) {
       els.chooseProjectFolderBtn.textContent = actionLabel;
@@ -2691,6 +2696,7 @@
 
   function applyClientMaintenanceStatus(data) {
     state.clientMaintenance = data || null;
+    if (data) state.localNodeLaunchAttempted = false;
     if (!els.settingsClientStatus || !els.settingsClientPaths) {
       updateWorkbenchOnboarding();
       return;
@@ -2843,15 +2849,23 @@
       if (els.settingsClientStatus) els.settingsClientStatus.textContent = '无法连接本机节点';
       if (els.settingsClientPaths) els.settingsClientPaths.textContent = clean(error.message || error);
       if (showResult) {
-        setSettingsResult('还没有检测到本机节点。先点“启动本机节点”；如果没有反应，再打开“安装 / 帮助”。', 'note');
+        state.localNodeLaunchAttempted = true;
+        updateWorkbenchOnboarding();
+        setSettingsResult('还没有检测到本机节点。请点击绿色按钮打开下载和安装页面。', 'note');
       }
     } finally {
       setSettingsBusy(els.refreshClientMaintenanceBtn, false);
     }
   }
 
+  function openNodeSetupFromSettings() {
+    closeSettings();
+    node.selectNode();
+  }
+
   function startLocalNodeFromSettings() {
     setSettingsResult('');
+    state.localNodeLaunchAttempted = true;
     if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = '正在尝试启动本机节点';
     if (els.settingsNodeStatusDetail) {
       els.settingsNodeStatusDetail.textContent = '如果浏览器弹出确认框，请选择允许；启动后会自动重新检测。';
@@ -2862,6 +2876,9 @@
     window.setTimeout(() => refreshClientMaintenance(false), 3000);
     window.setTimeout(() => {
       setSettingsBusy(els.chooseProjectFolderBtn, false);
+      if (!state.clientMaintenance) {
+        setSettingsResult('没有检测到本机节点。请点击绿色按钮打开下载和安装页面。', 'note');
+      }
       updateWorkbenchOnboarding();
     }, 3600);
   }
@@ -3102,6 +3119,10 @@
 
   async function chooseLocalProjectFolder(options) {
     if (!state.clientMaintenance) {
+      if (state.localNodeLaunchAttempted) {
+        openNodeSetupFromSettings();
+        return;
+      }
       startLocalNodeFromSettings();
       return;
     }
