@@ -132,6 +132,41 @@ function Get-Fb2RefreshCommandValue {
     return [string](Get-Fb2RefreshProperty $Fallback $Name "")
 }
 
+function Test-Fb2RefreshPublicCheckPassed {
+    param(
+        [object]$PublicStatus,
+        [string]$Id
+    )
+
+    foreach ($check in @((Get-Fb2RefreshProperty $PublicStatus "checks" @()))) {
+        if ([string](Get-Fb2RefreshProperty $check "id" "") -eq $Id) {
+            return [bool](Get-Fb2RefreshProperty $check "passed" $false)
+        }
+    }
+    return $false
+}
+
+function New-Fb2RefreshAnswerSourceValidationState {
+    param([object]$PublicStatus)
+
+    $schemaReady = Test-Fb2RefreshPublicCheckPassed `
+        -PublicStatus $PublicStatus `
+        -Id "tool_result_answer_source_validation_schema"
+    $toolSourcesReady = Test-Fb2RefreshPublicCheckPassed `
+        -PublicStatus $PublicStatus `
+        -Id "tool_result_answer_source_validation_tool_sources"
+
+    [ordered]@{
+        schema = "fb2.main_project.answer_source_validation_status.v1"
+        ready = ($schemaReady -and $toolSourcesReady)
+        schema_check = [bool]$schemaReady
+        tool_sources_check = [bool]$toolSourcesReady
+        feedback_payload_schema = "external_app.answer_source_validation.v1"
+        evidence_source = "public_contract_status.checks"
+        note = "Tracks whether generated-answer feedback exposes candidate/matched/unmatched source ids and matched_tool_source_ids without changing fb2 cited_sources semantics."
+    }
+}
+
 function New-Fb2RefreshTokenBridgeLivePreflight {
     param(
         [string]$ResultPath,
@@ -807,6 +842,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest ([string]$summary.output_dir -eq $output) "output_dir"
         Assert-Fb2RefreshSelfTest (@($summary.evidence_dirs).Count -eq 1) "isolated evidence dirs"
         Assert-Fb2RefreshSelfTest (-not [bool]$summary.public_contract_ready) "public contract skipped"
+        Assert-Fb2RefreshSelfTest ([string]$summary.answer_source_validation_status.schema -eq "fb2.main_project.answer_source_validation_status.v1") "answer source validation status schema"
+        Assert-Fb2RefreshSelfTest (-not [bool]$summary.answer_source_validation_ready) "answer source validation skipped"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.status)) "status file exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.goal_audit)) "goal audit file exists"
         Assert-Fb2RefreshSelfTest (Test-Path -LiteralPath ([string]$summary.files.handoff_markdown)) "handoff markdown exists"
@@ -985,6 +1022,7 @@ $status = Read-Fb2RefreshJson -Path $statusPath
 $goalAudit = Read-Fb2RefreshJson -Path $goalAuditPath
 $public = Read-Fb2RefreshJson -Path $publicPath
 $serverDeployStatus = Read-Fb2RefreshJson -Path $serverDeployStatusPath
+$answerSourceValidationStatus = New-Fb2RefreshAnswerSourceValidationState -PublicStatus $public
 $files = [ordered]@{
     status_refresh = $RefreshSummaryPath
     public_contract_status = $publicPath
@@ -1044,6 +1082,8 @@ $refreshSummary = [pscustomobject]@{
     evidence_dirs = @($evidence)
     files = $files
     public_contract_ready = [bool]($public -and $public.success)
+    answer_source_validation_ready = [bool]$answerSourceValidationStatus.ready
+    answer_source_validation_status = $answerSourceValidationStatus
     server_deploy_ready = [bool]($serverDeployStatus -and $serverDeployStatus.success)
     server_deploy_status = $serverDeployStatus
     user_scenario_audit_ready = [bool]$status.latest_user_scenario_audit.complete

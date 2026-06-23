@@ -180,6 +180,21 @@ function Test-Fb2CurrentExportedSampleState {
     return -not [string]::IsNullOrWhiteSpace($skippedReason)
 }
 
+function Test-Fb2CurrentAnswerSourceValidationState {
+    param([object]$State)
+
+    if ($null -eq $State) {
+        return $false
+    }
+    return (
+        [string](Get-Fb2CurrentProperty $State "schema" "") -eq "fb2.main_project.answer_source_validation_status.v1" -and
+        [bool](Get-Fb2CurrentProperty $State "ready" $false) -and
+        [bool](Get-Fb2CurrentProperty $State "schema_check" $false) -and
+        [bool](Get-Fb2CurrentProperty $State "tool_sources_check" $false) -and
+        [string](Get-Fb2CurrentProperty $State "feedback_payload_schema" "") -eq "external_app.answer_source_validation.v1"
+    )
+}
+
 function New-Fb2CurrentStateValidation {
     param(
         [string]$RefreshPath,
@@ -363,6 +378,12 @@ function New-Fb2CurrentStateValidation {
         -ExpectedOutputPath (Join-Path $targetDir "token-bridge-wrapper-validation-current.json")))
 
     $refresh = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
+    $answerSourceValidationState = Get-Fb2CurrentProperty $refresh "answer_source_validation_status"
+    [void]$steps.Add((New-Fb2CurrentInlineStep `
+        -Name "validate_answer_source_validation_status" `
+        -Success (Test-Fb2CurrentAnswerSourceValidationState -State $answerSourceValidationState) `
+        -JsonSuccess (Get-Fb2CurrentProperty $answerSourceValidationState "ready" $null) `
+        -Details ($answerSourceValidationState | ConvertTo-Json -Depth 4)))
     $failedSteps = @($steps | Where-Object { -not [bool]$_.success -or -not [bool]$_.output_secret_safe })
     $blocking = Get-Fb2CurrentProperty $refresh "blocking_state"
     $completion = Get-Fb2CurrentProperty $refresh "completion_matrix"
@@ -398,6 +419,7 @@ function New-Fb2CurrentStateValidation {
         next_minimum_action = [string](Get-Fb2CurrentProperty $refresh "next_minimum_action" "")
         blocked_by_external_secret = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
         public_contract_status = $publicContractStatus
+        answer_source_validation_status = $answerSourceValidationState
         project_direct_network_policy_validation = $directNetworkPolicyValidation
         exported_context_pack_sample_set_validation = $exportedSampleValidation
         visible_answer_policy_validation = $visibleAnswerPolicyValidation
@@ -516,6 +538,21 @@ function Invoke-Fb2CurrentStateSelfTest {
         $secretExportedSamples = $goodExportedSamples | ConvertTo-Json -Depth 8 | ConvertFrom-Json
         $secretExportedSamples.scenarios[0].contains_secret_like_text = $true
         if (Test-Fb2CurrentExportedSampleState -State $secretExportedSamples) {
+            $failed++
+        }
+        $goodAnswerSourceValidation = [pscustomobject]@{
+            schema = "fb2.main_project.answer_source_validation_status.v1"
+            ready = $true
+            schema_check = $true
+            tool_sources_check = $true
+            feedback_payload_schema = "external_app.answer_source_validation.v1"
+        }
+        if (-not (Test-Fb2CurrentAnswerSourceValidationState -State $goodAnswerSourceValidation)) {
+            $failed++
+        }
+        $badAnswerSourceValidation = $goodAnswerSourceValidation | ConvertTo-Json -Depth 4 | ConvertFrom-Json
+        $badAnswerSourceValidation.tool_sources_check = $false
+        if (Test-Fb2CurrentAnswerSourceValidationState -State $badAnswerSourceValidation) {
             $failed++
         }
 
