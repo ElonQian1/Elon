@@ -129,6 +129,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/assets/pc_app_task_snapshots.js",
             get(web::pc_app_task_snapshots_js),
         )
+        .route(
+            "/assets/pc_app_client_maintenance.js",
+            get(web::pc_app_client_maintenance_js),
+        )
         .route("/assets/pc_app.js", get(web::pc_app_js))
         .route("/health", get(api::health))
         .route("/healthz", get(api::health))

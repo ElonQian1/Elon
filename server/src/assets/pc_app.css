@@ -2508,6 +2508,19 @@ button { cursor: pointer; }
   border-radius: 6px;
   padding: 8px 10px;
   background: rgba(255,255,255,.03);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+.settings-client-action:hover:not(:disabled) {
+  border-color: rgba(88, 101, 242, .45);
+  background: rgba(88, 101, 242, .12);
+}
+.settings-client-action:focus-visible {
+  outline: 2px solid rgba(88, 101, 242, .75);
+  outline-offset: 2px;
 }
 .settings-client-action strong,
 .settings-client-action span {
@@ -2526,9 +2539,13 @@ button { cursor: pointer; }
 }
 .settings-client-action.is-disabled {
   opacity: .68;
+  cursor: not-allowed;
 }
 .settings-client-action.is-disabled strong {
   color: #ffe0a6;
+}
+.settings-client-action.is-primary strong {
+  color: #dbe4ff;
 }
 .settings-client-action.is-danger strong {
   color: #ffdede;

@@ -77,12 +77,7 @@
     settingsNodeStatusDetail: $('settingsNodeStatusDetail'), settingsStepNode: $('settingsStepNode'),
     settingsStepFolder: $('settingsStepFolder'), settingsStepRegister: $('settingsStepRegister'),
     openNodeSetupFromSettingsBtn: $('openNodeSetupFromSettingsBtn'),
-    refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'), openClientLogsBtn: $('openClientLogsBtn'),
-    openClientLauncherLogsBtn: $('openClientLauncherLogsBtn'),
-    openClientTaskJournalBtn: $('openClientTaskJournalBtn'),
-    openClientConfigBtn: $('openClientConfigBtn'), openClientInstallBtn: $('openClientInstallBtn'),
-    exportClientDiagnosticsBtn: $('exportClientDiagnosticsBtn'),
-    repairClientBtn: $('repairClientBtn'), checkClientUpdateBtn: $('checkClientUpdateBtn'), uninstallClientBtn: $('uninstallClientBtn'),
+    refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'),
     chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
     inspectProjectFolderBtn: $('inspectProjectFolderBtn'), registerProjectBtn: $('registerProjectBtn'),
     settingsProjectPath: $('settingsProjectPath'), settingsProjectName: $('settingsProjectName'),
@@ -105,6 +100,7 @@
   let devTasks = null;
   let agentRuns = null;
   let devTaskSnapshots = null;
+  let clientMaintenanceActions = null;
   let devTaskRefreshTimer = 0;
   const doctor = window.ElonPcDoctor.create({
     state, els, $, clean, escapeHtml, renderMembers, setHeader, setComposer,
@@ -155,6 +151,16 @@
     renderMessages,
     refreshActiveChannel: refreshActiveProjectChannel,
     logError: (error) => console.warn('PC task snapshot refresh failed', error)
+  });
+  clientMaintenanceActions = window.ElonPcClientMaintenance && window.ElonPcClientMaintenance.create({
+    clean,
+    escapeHtml,
+    localNodeApi,
+    setResult: setSettingsResult,
+    refreshMaintenance: refreshClientMaintenance,
+    launchProtocol: launchClientProtocol,
+    protocolUrlForTarget: clientProtocolUrlForTarget,
+    repairProtocolUrl: CLIENT_PROTOCOL_TARGETS.repair
   });
 
   function saveToken(token) {
@@ -1301,15 +1307,6 @@
     els.settingsProjectPath.addEventListener('input', markLocalProjectPathDirty);
     els.refreshClientMaintenanceBtn.addEventListener('click', () => refreshClientMaintenance(true));
     els.openNodeSetupFromSettingsBtn.addEventListener('click', openNodeSetupFromSettings);
-    els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('logs', els.openClientLogsBtn));
-    els.openClientLauncherLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('launcher_logs', els.openClientLauncherLogsBtn));
-    els.openClientTaskJournalBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientTaskJournalBtn));
-    els.openClientConfigBtn.addEventListener('click', () => openClientMaintenanceTarget('config_dir', els.openClientConfigBtn));
-    els.openClientInstallBtn.addEventListener('click', () => openClientMaintenanceTarget('install_dir', els.openClientInstallBtn));
-    els.exportClientDiagnosticsBtn.addEventListener('click', exportClientDiagnostics);
-    els.repairClientBtn.addEventListener('click', triggerClientRepair);
-    els.checkClientUpdateBtn.addEventListener('click', triggerClientUpdate);
-    els.uninstallClientBtn.addEventListener('click', triggerClientUninstall);
     if (els.settingsRuntimePermission) {
       els.settingsRuntimePermission.addEventListener('change', () => {
         syncSettingsRuntimePermissionHint();
@@ -2820,30 +2817,11 @@
 
   function renderClientMaintenanceActions(actions) {
     if (!els.settingsClientActions) return;
-    if (!Array.isArray(actions) || !actions.length) {
+    if (clientMaintenanceActions) {
+      clientMaintenanceActions.render(els.settingsClientActions, actions);
+    } else {
       els.settingsClientActions.textContent = '刷新本机助手后显示每个操作是否可用。';
-      return;
     }
-    els.settingsClientActions.innerHTML = `<div class="settings-client-actions">${actions.map((action) => {
-      const label = clean(action && action.label) || clean(action && action.id) || '维护操作';
-      const description = clean(action && action.description) || '本机助手未返回说明。';
-      const enabled = action && action.enabled !== false;
-      const tone = clean(action && action.tone);
-      const status = enabled ? '可用' : disabledMaintenanceActionReason(action);
-      const classes = [
-        'settings-client-action',
-        enabled ? 'is-enabled' : 'is-disabled',
-        tone === 'danger' ? 'is-danger' : ''
-      ].filter(Boolean).join(' ');
-      return `<div class="${classes}"><strong>${escapeHtml(label)} · ${escapeHtml(status)}</strong><span>${escapeHtml(description)}</span></div>`;
-    }).join('')}</div>`;
-  }
-
-  function disabledMaintenanceActionReason(action) {
-    const kind = clean(action && action.kind);
-    if (kind === 'repair') return '需要 Windows 本机助手';
-    if (kind === 'update' || kind === 'uninstall') return '需要完整安装';
-    return '当前环境不可用';
   }
 
   async function refreshLatestClientPackageVersion() {
@@ -3011,27 +2989,6 @@
     }, 3600);
   }
 
-  async function openClientMaintenanceTarget(target, button) {
-    setSettingsBusy(button, true, '打开中…');
-    try {
-      const data = await localNodeApi('/api/client-maintenance/open', {
-        method: 'POST',
-        body: JSON.stringify({ target })
-      });
-      setSettingsResult(`已打开：${escapeHtml(data.opened || target)}`);
-    } catch (error) {
-      const protocolUrl = clientProtocolUrlForTarget(target);
-      if (protocolUrl) {
-        launchClientProtocol(protocolUrl);
-        setSettingsResult(`本机助手暂时不可达，已请求 Win 端打开：${escapeHtml(target)}`);
-      } else {
-        setSettingsResult(escapeHtml(error.message || error), 'error');
-      }
-    } finally {
-      setSettingsBusy(button, false);
-    }
-  }
-
   function clientProtocolUrlForTarget(target) {
     return CLIENT_PROTOCOL_TARGETS[String(target || '').trim()] || '';
   }
@@ -3046,58 +3003,6 @@
       window.setTimeout(() => frame.remove(), 2000);
     } catch (_) {
       window.open(url, '_blank', 'noopener');
-    }
-  }
-
-  async function triggerClientUpdate() {
-    setSettingsBusy(els.checkClientUpdateBtn, true, '检查中…');
-    try {
-      const data = await localNodeApi('/api/client-maintenance/update', { method: 'POST' });
-      setSettingsResult(escapeHtml(data.message || '已开始后台检查更新。'));
-      setTimeout(() => refreshClientMaintenance(false), 2400);
-    } catch (error) {
-      setSettingsResult(escapeHtml(error.message || error), 'error');
-    } finally {
-      setSettingsBusy(els.checkClientUpdateBtn, false);
-    }
-  }
-
-  async function triggerClientRepair() {
-    setSettingsBusy(els.repairClientBtn, true, '修复中…');
-    try {
-      const data = await localNodeApi('/api/client-maintenance/repair', { method: 'POST' });
-      setSettingsResult(escapeHtml(data.message || '已开始后台修复客户端入口。'));
-      setTimeout(() => refreshClientMaintenance(false), 2400);
-    } catch (error) {
-      launchClientProtocol(CLIENT_PROTOCOL_TARGETS.repair);
-      setSettingsResult(`本机助手暂时不可达，已请求 Win 端修复客户端入口：${escapeHtml(error.message || error)}`, 'note');
-    } finally {
-      setSettingsBusy(els.repairClientBtn, false);
-    }
-  }
-
-  async function exportClientDiagnostics() {
-    setSettingsBusy(els.exportClientDiagnosticsBtn, true, '生成中…');
-    try {
-      const data = await localNodeApi('/api/client-maintenance/diagnostics/export', { method: 'POST' });
-      setSettingsResult(`已生成诊断信息：${escapeHtml(data.path || '')}`);
-    } catch (error) {
-      setSettingsResult(escapeHtml(error.message || error), 'error');
-    } finally {
-      setSettingsBusy(els.exportClientDiagnosticsBtn, false);
-    }
-  }
-
-  async function triggerClientUninstall() {
-    const ok = window.confirm('确认卸载一龙 Win 端本机助手？卸载会退出本机助手并清理安装目录。');
-    if (!ok) return;
-    setSettingsBusy(els.uninstallClientBtn, true, '卸载中…');
-    try {
-      const data = await localNodeApi('/api/client-maintenance/uninstall', { method: 'POST' });
-      setSettingsResult(escapeHtml(data.message || '已安排卸载。'));
-    } catch (error) {
-      setSettingsResult(escapeHtml(error.message || error), 'error');
-      setSettingsBusy(els.uninstallClientBtn, false);
     }
   }
 
