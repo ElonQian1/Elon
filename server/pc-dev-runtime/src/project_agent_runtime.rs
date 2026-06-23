@@ -1,6 +1,7 @@
 // server/pc-dev-runtime/src/project_agent_runtime.rs
 
 use crate::{
+    project_agent_runtime_lifecycle::agent_runtime_lifecycle_helpers,
     project_agent_runtime_patch::{
         agent_runtime_apply_patch_action_case, agent_runtime_apply_patch_helpers,
     },
@@ -92,6 +93,9 @@ scripts\elon.ps1 agent -AgentMode server-runtime -Prompt "Create a docs note" -D
 Route C does not expose the server API key to this PC. The server only returns structured local actions; this PC runtime still applies the same workspace path, dry-run, command policy, and confirmation checks as Route B.
 When the Windows client is installed and logged in, Route C can reuse the local node login token automatically. Manual `ELON_SERVER_TOKEN` is only needed for advanced or portable setups.
 `ELON_SERVER_AGENT` is optional and is honored only when the Elon server operator explicitly allows that agent through `ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS`; otherwise Route C uses the server default agent.
+
+## Task lifecycle logs
+Route B and Route C write one JSONL lifecycle trace per run under `.elon\agent-runs\`. The trace records run start, each model turn, requested tool names and targets, result sizes, and final completion or failure status. It intentionally avoids storing full file contents, tool output, prompts, or API keys.
 "#,
         req.project_id, req.template, req.user_id
     ))
@@ -109,6 +113,7 @@ fn agent_runtime_script() -> io::Result<String> {
     [string]$ServerUrl = '',
     [string]$ServerToken = '',
     [string]$ServerAgent = '',
+    [string]$RunId = '',
     [int]$MaxTurns = 6,
     [int]$MaxRunCommands = 8,
     [switch]$DryRun,
@@ -123,6 +128,9 @@ Set-Location $ProjectRoot
 if ($MaxRunCommands -lt 1) { $MaxRunCommands = 1 }
 if ($MaxRunCommands -gt 20) { $MaxRunCommands = 20 }
 $Script:AgentRunCommandCount = 0
+$Script:AgentRunId = ''
+$Script:AgentRunLogPath = ''
+$Script:AgentRunLifecycleClosed = $false
 $AgentCommandOutputMaxChars = 12000
 
 function Test-Tool {
@@ -166,6 +174,7 @@ function Show-AgentStatus {
     $cliNames = @('codex', 'claude', 'gemini', 'copilot')
     Write-Host 'Elon local agent runtime'
     Write-Host "Root: $ProjectRoot"
+    Write-Host "Run logs: .elon\agent-runs"
     Write-Host ''
     Write-Host 'Route A: cli-wrapper'
     foreach ($name in $cliNames) {
@@ -424,6 +433,8 @@ function Use-AgentRunCommandBudget {
     return $true
 }
 
+# __ELON_LIFECYCLE_HELPERS__
+
 # __ELON_APPLY_PATCH_HELPERS__
 
 function Test-AgentCommandAllowed {
@@ -657,49 +668,95 @@ function Invoke-AgentRuntimeLoop {
         [Parameter(Mandatory = $true)][scriptblock]$ChatCompletion
     )
     Require-Prompt
+    Initialize-AgentRunLifecycle -Label $Label
     $messages = @(
         @{ role = 'system'; content = (New-SystemPrompt) },
         @{ role = 'user'; content = $Prompt }
     )
 
-    for ($turn = 1; $turn -le $MaxTurns; $turn++) {
-        Write-Host "[$Label] turn $turn"
-        $response = & $ChatCompletion -Messages $messages
-        $content = Get-AssistantContent $response
-        $messages += @{ role = 'assistant'; content = $content }
-        $agent = ConvertFrom-AgentJson $content
+    try {
+        for ($turn = 1; $turn -le $MaxTurns; $turn++) {
+            Write-AgentRunEvent -Type 'turn_started' -Data ([ordered]@{ turn = $turn })
+            Write-Host "[$Label] turn $turn"
+            $response = & $ChatCompletion -Messages $messages
+            $content = Get-AssistantContent $response
+            $messages += @{ role = 'assistant'; content = $content }
+            $agent = ConvertFrom-AgentJson $content
 
-        if ($agent.message) {
-            Write-Host ([string]$agent.message)
-        }
+            if ($agent.message) {
+                Write-Host ([string]$agent.message)
+            }
 
-        $actions = @($agent.actions)
-        if ($actions.Count -eq 0) {
-            return
-        }
+            $actions = @($agent.actions)
+            Write-AgentRunEvent -Type 'assistant_response' -Data ([ordered]@{
+                turn = $turn
+                done = [bool]$agent.done
+                message_chars = if ($agent.message) { ([string]$agent.message).Length } else { 0 }
+                action_count = $actions.Count
+            })
 
-        $results = @()
-        foreach ($action in $actions) {
-            $tool = [string]$action.tool
-            Write-Host "[tool] $tool"
-            $result = Invoke-AgentAction $action
-            $results += [pscustomobject]@{
-                tool = $tool
-                result = $result
+            if ($actions.Count -eq 0) {
+                Complete-AgentRunLifecycle -Status completed -Data ([ordered]@{
+                    turn = $turn
+                    reason = 'no_actions'
+                })
+                return
+            }
+
+            $results = @()
+            foreach ($action in $actions) {
+                $tool = [string]$action.tool
+                $target = Get-AgentActionTarget $action
+                Write-Host "[tool] $tool"
+                Write-AgentRunEvent -Type 'tool_started' -Data ([ordered]@{
+                    turn = $turn
+                    tool = $tool
+                    target = $target
+                })
+                try {
+                    $result = Invoke-AgentAction $action
+                    Write-AgentRunEvent -Type 'tool_finished' -Data ([ordered]@{
+                        turn = $turn
+                        tool = $tool
+                        target = $target
+                        result_chars = if ($null -eq $result) { 0 } else { ([string]$result).Length }
+                    })
+                } catch {
+                    Write-AgentRunEvent -Type 'tool_failed' -Data ([ordered]@{
+                        turn = $turn
+                        tool = $tool
+                        target = $target
+                        error = $_.Exception.Message
+                    })
+                    throw
+                }
+                $results += [pscustomobject]@{
+                    tool = $tool
+                    result = $result
+                }
+            }
+
+            $messages += @{
+                role = 'user'
+                content = "Tool results JSON:`n" + ($results | ConvertTo-Json -Depth 8)
+            }
+
+            if ($agent.done -eq $true) {
+                Complete-AgentRunLifecycle -Status completed -Data ([ordered]@{
+                    turn = $turn
+                    reason = 'done_true'
+                })
+                return
             }
         }
 
-        $messages += @{
-            role = 'user'
-            content = "Tool results JSON:`n" + ($results | ConvertTo-Json -Depth 8)
-        }
-
-        if ($agent.done -eq $true) {
-            return
-        }
+        throw "$Label stopped after MaxTurns=$MaxTurns without done=true"
+    } catch {
+        Complete-AgentRunLifecycle -Status failed -Data ([ordered]@{
+            error = $_.Exception.Message
+        })
+        throw
     }
-
-    throw "$Label stopped after MaxTurns=$MaxTurns without done=true"
 }
 
 function Invoke-ApiRuntime {
@@ -729,6 +786,10 @@ switch ($Mode) {
     .replace(
         "# __ELON_APPLY_PATCH_HELPERS__",
         agent_runtime_apply_patch_helpers(),
+    )
+    .replace(
+        "# __ELON_LIFECYCLE_HELPERS__",
+        agent_runtime_lifecycle_helpers(),
     )
     .replace(
         "# __ELON_APPLY_PATCH_ACTION__",
@@ -771,7 +832,20 @@ mod tests {
         assert!(script.contains("Invoke-CliWrapper"));
         assert!(script.contains("Invoke-ApiRuntime"));
         assert!(script.contains("Invoke-ServerRuntime"));
+        assert!(script.contains("[string]$RunId = ''"));
         assert!(script.contains("/api/agent/runtime/chat"));
+        assert!(script.contains("Run logs: .elon\\agent-runs"));
+        assert!(script.contains("Initialize-AgentRunLifecycle"));
+        assert!(script.contains("Write-AgentRunEvent"));
+        assert!(script.contains("Get-AgentActionTarget"));
+        assert!(script.contains("Complete-AgentRunLifecycle"));
+        assert!(script.contains("'run_started'"));
+        assert!(script.contains("'turn_started'"));
+        assert!(script.contains("'tool_started'"));
+        assert!(script.contains("'tool_finished'"));
+        assert!(script.contains("'run_finished'"));
+        assert!(script.contains("'run_failed'"));
+        assert!(script.contains("result_chars"));
         assert!(script.contains("Resolve-SafePath"));
         assert!(script.contains("Parent path segments are not allowed"));
         assert!(script.contains("ReparsePoint"));
@@ -794,6 +868,7 @@ mod tests {
         assert!(script.contains("\"program\": \"git\""));
         assert!(script.contains("$shellMarkers"));
         assert!(script.contains("[regex]::IsMatch"));
+        assert!(!script.contains("__ELON_LIFECYCLE_HELPERS__"));
         assert!(!script.contains('\u{662f}'));
     }
 
@@ -811,6 +886,9 @@ mod tests {
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));
         assert!(doc.contains("-MaxRunCommands"));
+        assert!(doc.contains("Task lifecycle logs"));
+        assert!(doc.contains(".elon\\agent-runs\\"));
+        assert!(doc.contains("does not expose the server API key"));
     }
 
     #[cfg(windows)]
@@ -848,6 +926,29 @@ if ($errors.Count -gt 0) {
     exit 1
 }
 . $ScriptPath -Mode status -Yes | Out-Null
+Initialize-AgentRunLifecycle -Label 'api-runtime-test'
+Write-AgentRunEvent -Type 'turn_started' -Data ([ordered]@{ turn = 1 })
+Write-AgentRunEvent -Type 'tool_started' -Data ([ordered]@{ turn = 1; tool = 'read_file'; target = 'note.txt' })
+Write-AgentRunEvent -Type 'tool_finished' -Data ([ordered]@{ turn = 1; tool = 'read_file'; target = 'note.txt'; result_chars = 6 })
+Complete-AgentRunLifecycle -Status completed -Data ([ordered]@{ turn = 1; reason = 'test' })
+$logDir = Join-Path $Root '.elon\agent-runs'
+$logs = @(Get-ChildItem -LiteralPath $logDir -Filter '*.jsonl')
+if ($logs.Count -ne 1) {
+    Write-Error "expected one lifecycle log, got $($logs.Count)"
+    exit 1
+}
+$events = @(Get-Content -LiteralPath $logs[0].FullName | ForEach-Object { $_ | ConvertFrom-Json })
+$types = @($events | ForEach-Object { [string]$_.type })
+foreach ($expected in @('run_started', 'turn_started', 'tool_started', 'tool_finished', 'run_finished')) {
+    if (-not ($types -contains $expected)) {
+        Write-Error "missing lifecycle event: $expected"
+        exit 1
+    }
+}
+if (($events | ConvertTo-Json -Depth 20) -match 'hello') {
+    Write-Error 'lifecycle log should not store file content'
+    exit 1
+}
 $patch = @'
 diff --git a/note.txt b/note.txt
 --- a/note.txt
