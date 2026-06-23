@@ -872,6 +872,44 @@ function testProjectReadinessChecklist() {
   assert.ok(blockedHtml.includes('未找到 AI 开发频道'), 'blocked checklist should explain missing dev channel');
 }
 
+function testProjectLandingShellContract() {
+  const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
+  assert.ok(pcApp.includes("kind: 'project-home'"), 'project channel list should include a virtual project home entry');
+  assert.ok(pcApp.includes("sub: '项目介绍与下载'"), 'project home entry should explain it opens intro and downloads');
+  assert.ok(pcApp.includes("active: !state.activeChannelId"), 'project home should be active before a real channel is selected');
+  assert.ok(pcApp.includes("data-project-home=\"1\""), 'project home entry should be clickable through a dedicated data attribute');
+  assert.ok(
+    /async function selectProject\(projectId\)[\s\S]*?renderChannels\(\);\s*selectProjectLanding\(\);/.test(pcApp),
+    'opening a project should land on the project home before any real channel'
+  );
+  assert.ok(
+    /function selectProjectLanding\(\)[\s\S]*?state\.activeChannelId = ''[\s\S]*?projectLanding\.render\(\);/.test(pcApp),
+    'selectProjectLanding should clear channel state and render the landing surface'
+  );
+
+  const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
+  assert.ok(pcAppHtml.includes('/assets/pc_project_landing.css'), 'PC shell should load project landing CSS');
+  assert.ok(pcAppHtml.includes('/assets/pc_project_landing.js'), 'PC shell should load project landing JS');
+
+  const webRs = fs.readFileSync(path.join(repoRoot, 'server/src/web.rs'), 'utf8');
+  const routerRs = fs.readFileSync(path.join(repoRoot, 'server/src/router.rs'), 'utf8');
+  assert.ok(webRs.includes('PC_PROJECT_LANDING_JS'), 'project landing JS should be embedded in web.rs');
+  assert.ok(webRs.includes('PC_PROJECT_LANDING_CSS'), 'project landing CSS should be embedded in web.rs');
+  assert.ok(routerRs.includes('/assets/pc_project_landing.js'), 'project landing JS should be routed');
+  assert.ok(routerRs.includes('/assets/pc_project_landing.css'), 'project landing CSS should be routed');
+
+  const landingJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.js'), 'utf8');
+  assert.ok(landingJs.includes('project-landing-workbench'), 'project home should expose workbench quick actions');
+  assert.ok(landingJs.includes('project-landing-download-groups'), 'project home should expose delivery downloads');
+  assert.ok(landingJs.includes('data-workbench-channel-id'), 'project home should jump into key channels');
+  assert.ok(landingJs.includes('data-sync-landing'), 'project owners should be able to sync landing data');
+  assert.ok(landingJs.includes('data-rotate-landing-token'), 'project owners should be able to generate landing upload tokens');
+
+  const landingCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.css'), 'utf8');
+  assert.ok(landingCss.includes('.project-landing-workbench'), 'project landing CSS should style quick actions');
+  assert.ok(landingCss.includes('@media (max-width: 640px)'), 'project landing should keep a mobile responsive layout');
+}
+
 function testDevComposerRouteLabels() {
   let inserted = null;
   const fakeParent = {
@@ -1147,6 +1185,7 @@ function testLocalAdminTokenWiring() {
   await testTaskSnapshotsMergeLocalJournal();
   await testTaskSnapshotsReplaysLocalJournalMessages();
   testProjectReadinessChecklist();
+  testProjectLandingShellContract();
   testDevComposerRouteLabels();
   testDevComposerSkipsFailedRouteAProbe();
   testDevComposerFallsBackFromUnavailableStoredRoute();
