@@ -233,6 +233,7 @@ function New-Fb2MatrixValidation {
     $fullFinalComplete = [bool](Get-Fb2MatrixProperty $gates "full_final_complete" $false)
     $gateVoiceDeferred = [bool](Get-Fb2MatrixProperty $gates "voice_deferred_by_user" $false)
     $gateSameBatchFullFinalComplete = [bool](Get-Fb2MatrixProperty $gates "same_batch_full_final_acceptance_complete" $false)
+    $gateProtectedLivePreflightSatisfied = [bool](Get-Fb2MatrixProperty $gates "protected_live_preflight_satisfied" $false)
     $tokenPresent = [bool](Get-Fb2MatrixProperty $gates "token_present" $false)
     $nextAction = [string](Get-Fb2MatrixProperty $gates "next_minimum_action" "")
     $protectedLivePreflightSatisfied = [bool](Get-Fb2MatrixProperty $Refresh "protected_live_preflight_satisfied" $false)
@@ -250,6 +251,7 @@ function New-Fb2MatrixValidation {
     Add-Fb2MatrixCheck $checks "data goal gate matches non-voice requirements" ($dataGoalComplete -eq (@($nonVoiceIncomplete).Count -eq 0)) ("non_voice_incomplete=$(@($nonVoiceIncomplete | ForEach-Object { $_.id }) -join ',')")
     Add-Fb2MatrixCheck $checks "voice deferred gate matches voice requirement" ($gateVoiceDeferred -eq $voiceDeferred)
     Add-Fb2MatrixCheck $checks "same batch full final gate matches evidence" ($gateSameBatchFullFinalComplete -eq $sameBatchFullFinalComplete)
+    Add-Fb2MatrixCheck $checks "protected live preflight gate matches refresh" ($gateProtectedLivePreflightSatisfied -eq $protectedLivePreflightSatisfied) ("gate=$gateProtectedLivePreflightSatisfied refresh=$protectedLivePreflightSatisfied")
     Add-Fb2MatrixCheck $checks "full final implies data goal complete" ((-not $fullFinalComplete) -or $dataGoalComplete)
     Add-Fb2MatrixCheck $checks "full final implies voice complete" ((-not $fullFinalComplete) -or (@($voice).Count -gt 0 -and [bool](Get-Fb2MatrixProperty $voice[0] "complete" $false) -and -not [bool](Get-Fb2MatrixProperty $voice[0] "deferred" $false)))
     Add-Fb2MatrixCheck $checks "full final implies same-batch final acceptance" ((-not $fullFinalComplete) -or $gateSameBatchFullFinalComplete)
@@ -359,6 +361,7 @@ function New-Fb2MatrixFixtureRefresh {
                 data_goal_complete = $true
                 full_final_complete = $false
                 token_present = $false
+                protected_live_preflight_satisfied = $false
                 voice_deferred_by_user = $true
                 same_batch_full_final_acceptance_complete = $false
                 next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
@@ -495,6 +498,12 @@ function Invoke-Fb2MatrixSelfTest {
         $badSameBatchGate.completion_matrix.gates.same_batch_full_final_acceptance_complete = $true
         $badSameBatchGateResult = New-Fb2MatrixValidation -Refresh $badSameBatchGate -SourcePath "selftest-bad-same-batch-gate.json"
         if ([bool]$badSameBatchGateResult.success) { $failed++ }
+
+        $badProtectedPreflightGate = $valid | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $badProtectedPreflightGate | Add-Member -NotePropertyName "protected_live_preflight_satisfied" -NotePropertyValue $true -Force
+        $badProtectedPreflightGate.completion_matrix.gates.protected_live_preflight_satisfied = $false
+        $badProtectedPreflightGateResult = New-Fb2MatrixValidation -Refresh $badProtectedPreflightGate -SourcePath "selftest-bad-protected-preflight-gate.json"
+        if ([bool]$badProtectedPreflightGateResult.success) { $failed++ }
 
         $leaky = $valid | ConvertTo-Json -Depth 12 | ConvertFrom-Json
         $leaky.completion_matrix.requirements[0].evidence = "token=real-secret-token-1234567890"

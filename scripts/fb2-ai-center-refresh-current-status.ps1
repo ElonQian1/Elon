@@ -435,7 +435,8 @@ function Get-Fb2RefreshRequirementOwner {
 function New-Fb2RefreshCompletionMatrix {
     param(
         [object]$Status,
-        [object]$GoalAudit
+        [object]$GoalAudit,
+        [bool]$ProtectedLivePreflightSatisfied = $false
     )
 
     $requirements = @($GoalAudit.requirements)
@@ -476,6 +477,7 @@ function New-Fb2RefreshCompletionMatrix {
             data_goal_complete = [bool]$GoalAudit.data_goal_complete
             full_final_complete = [bool]$GoalAudit.full_final_complete
             token_present = $tokenPresent
+            protected_live_preflight_satisfied = $ProtectedLivePreflightSatisfied
             voice_deferred_by_user = @($GoalAudit.deferred_requirements) -contains "voice_final_evidence"
             same_batch_full_final_acceptance_complete = $sameBatchFullFinalComplete
             next_minimum_action = [string]$GoalAudit.next_minimum_action
@@ -883,6 +885,7 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest ([int]$summary.completion_deferred -eq [int]$summary.completion_matrix.totals.deferred) "top-level completion deferred"
         Assert-Fb2RefreshSelfTest ([int]$summary.completion_incomplete -eq [int]$summary.completion_matrix.totals.incomplete) "top-level completion incomplete"
         Assert-Fb2RefreshSelfTest ([bool]$summary.voice_deferred_by_user -eq [bool]$summary.completion_matrix.gates.voice_deferred_by_user) "top-level voice deferred flag"
+        Assert-Fb2RefreshSelfTest ([bool]$summary.protected_live_preflight_satisfied -eq [bool]$summary.completion_matrix.gates.protected_live_preflight_satisfied) "top-level protected live preflight flag"
         Assert-Fb2RefreshSelfTest ($null -ne $summary.full_final_completion_evidence) "full final completion evidence"
         Assert-Fb2RefreshSelfTest ($null -ne $summary.completion_matrix.gates.same_batch_full_final_acceptance_complete) "same batch full final gate"
         Assert-Fb2RefreshSelfTest ([string]$summary.evidence_freshness.schema -eq "fb2.main_project.evidence_freshness.v1") "evidence freshness schema"
@@ -1055,7 +1058,10 @@ $blockingState = New-Fb2RefreshBlockingState `
     -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied `
     -NextMinimumAction $effectiveNextMinimumAction
 $nextCommands = New-Fb2RefreshNextCommands -Status $status
-$completionMatrix = New-Fb2RefreshCompletionMatrix -Status $status -GoalAudit $goalAudit
+$completionMatrix = New-Fb2RefreshCompletionMatrix `
+    -Status $status `
+    -GoalAudit $goalAudit `
+    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied
 $completionMatrix.gates.next_minimum_action = $effectiveNextMinimumAction
 $gapActionBoard = New-Fb2RefreshGapActionBoard `
     -Status $status `
