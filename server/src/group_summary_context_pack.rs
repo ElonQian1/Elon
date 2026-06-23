@@ -410,7 +410,7 @@ pub(crate) fn ensure_fb2_summary_policy_shape(
         return summary.to_string();
     }
 
-    let summary = sanitize_unmatched_fb2_ext_ids(summary, context_pack, external_context);
+    let summary = sanitize_unmatched_fb2_source_ids(summary, context_pack, external_context);
 
     let has_data = contains_any(&summary, &["数据事实", "比赛事实"]);
     let has_opinion = contains_any(&summary, &["群友观点", "相关发言"]);
@@ -493,7 +493,7 @@ fn find_context_audit_id(value: &Value) -> Option<String> {
     }
 }
 
-fn sanitize_unmatched_fb2_ext_ids(
+fn sanitize_unmatched_fb2_source_ids(
     summary: &str,
     context_pack: &str,
     external_context: Option<&Value>,
@@ -505,17 +505,15 @@ fn sanitize_unmatched_fb2_ext_ids(
 
     while index < chars.len() {
         if starts_ext_source_token_at(&chars, index) {
-            let start = index;
-            index += 4;
-            while index < chars.len() && is_source_token_char(chars[index]) {
-                index += 1;
-            }
-            let token = chars[start..index].iter().collect::<String>();
-            if allowed_ids.contains(&token.to_ascii_lowercase()) {
-                out.push_str(&token);
-            } else {
-                out.push_str("未核验来源编号");
-            }
+            let (token, next_index) = read_ext_source_token(&chars, index);
+            push_allowed_or_redacted_source_token(&mut out, &allowed_ids, &token);
+            index = next_index;
+            continue;
+        }
+        if starts_uuid_source_token_at(&chars, index) {
+            let token = chars[index..index + 36].iter().collect::<String>();
+            push_allowed_or_redacted_source_token(&mut out, &allowed_ids, &token);
+            index += 36;
             continue;
         }
         out.push(chars[index]);
@@ -523,6 +521,27 @@ fn sanitize_unmatched_fb2_ext_ids(
     }
 
     out
+}
+
+fn read_ext_source_token(chars: &[char], mut index: usize) -> (String, usize) {
+    let start = index;
+    index += 4;
+    while index < chars.len() && is_source_token_char(chars[index]) {
+        index += 1;
+    }
+    (chars[start..index].iter().collect::<String>(), index)
+}
+
+fn push_allowed_or_redacted_source_token(
+    out: &mut String,
+    allowed_ids: &HashSet<String>,
+    token: &str,
+) {
+    if allowed_ids.contains(&token.to_ascii_lowercase()) {
+        out.push_str(token);
+    } else {
+        out.push_str("未核验来源编号");
+    }
 }
 
 fn fb2_summary_allowed_source_ids(
@@ -584,6 +603,30 @@ fn starts_ext_source_token_at(chars: &[char], index: usize) -> bool {
         && chars[index + 3] == '-'
 }
 
+fn starts_uuid_source_token_at(chars: &[char], index: usize) -> bool {
+    const UUID_LEN: usize = 36;
+    if index + UUID_LEN > chars.len() {
+        return false;
+    }
+    if index > 0 && is_source_token_char(chars[index - 1]) {
+        return false;
+    }
+    for offset in 0..UUID_LEN {
+        let ch = chars[index + offset];
+        let valid = match offset {
+            8 | 13 | 18 | 23 => ch == '-',
+            _ => ch.is_ascii_hexdigit(),
+        };
+        if !valid {
+            return false;
+        }
+    }
+    if index + UUID_LEN < chars.len() && is_source_token_char(chars[index + UUID_LEN]) {
+        return false;
+    }
+    true
+}
+
 fn is_source_token_char(ch: char) -> bool {
     ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':')
 }
@@ -623,30 +666,31 @@ mod tests {
     }
 
     #[test]
-    fn fb2_summary_shape_sanitizes_unmatched_ext_ids_and_appends_audit_source() {
+    fn fb2_summary_shape_sanitizes_unmatched_source_ids_and_appends_audit_source() {
         let context = serde_json::json!({
             "group_id": "ext_fb2_official",
             "external_app_context": {
                 "app_id": "fb2",
-                "context_audit_id": "audit-summary-1",
+                "context_audit_id": "ebb6bc08-47f4-491d-b8ec-40e6f48ef078",
                 "citation_sources": [
                     {"kind": "match", "id": "EXT-2589467", "label": "西班牙 vs 意大利"},
-                    {"kind": "context_audit", "id": "audit-summary-1", "label": "上下文审计"}
+                    {"kind": "context_audit", "id": "ebb6bc08-47f4-491d-b8ec-40e6f48ef078", "label": "上下文审计"}
                 ]
             }
         })
         .to_string();
 
         let shaped = ensure_fb2_summary_policy_shape(
-            "## 数据事实\n- 引用 EXT-2589467，也误写了 EXT-2589477。\n\n## 群友观点\n- 有讨论。\n\n## AI推断\n- 只做推断。\n\n## 风险边界\n- 不保证命中。",
+            "## 数据事实\n- 引用 EXT-2589467 和 ebb6bc08-47f4-491d-b8ec-40e6f48ef078，也误写了 EXT-2589477 与 d4a61f25-e6ec-4192-8c27-471662e15a63。\n\n## 群友观点\n- 有讨论。\n\n## AI推断\n- 只做推断。\n\n## 风险边界\n- 不保证命中。",
             &context,
             None,
         );
 
         assert!(shaped.contains("EXT-2589467"));
+        assert!(shaped.contains("ebb6bc08-47f4-491d-b8ec-40e6f48ef078"));
         assert!(!shaped.contains("EXT-2589477"));
+        assert!(!shaped.contains("d4a61f25-e6ec-4192-8c27-471662e15a63"));
         assert!(shaped.contains("未核验来源编号"));
-        assert!(shaped.contains("context_audit_id audit-summary-1"));
     }
 
     #[test]
