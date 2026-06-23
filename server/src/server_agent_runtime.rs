@@ -172,7 +172,7 @@ pub async fn chat_handler(
         }
     };
     let budget = match try_record_route_c_call(&state.store, &user.id, &audit.request_fingerprint) {
-        Ok(status) => status,
+        Ok(record) => record,
         Err(error) => {
             tracing::warn!(
                 target: "server_agent_runtime",
@@ -196,9 +196,10 @@ pub async fn chat_handler(
         message_count = audit.message_count,
         total_chars = audit.total_chars,
         max_message_chars = audit.max_message_chars,
-        budget_status = budget.status,
-        budget_used_calls_today = budget.used_calls_today,
-        budget_daily_call_limit = budget.daily_call_limit.unwrap_or_default(),
+        budget_status = budget.status.status,
+        budget_used_calls_today = budget.status.used_calls_today,
+        budget_daily_call_limit = budget.status.daily_call_limit.unwrap_or_default(),
+        budget_event_id = %budget.event_id,
         "pc_server_runtime request accepted"
     );
 
@@ -214,8 +215,26 @@ pub async fn chat_handler(
     .await
     {
         Ok(response) => match validate_server_runtime_output(&response, limits) {
-            Ok(()) => Json(response).into_response(),
+            Ok(()) => {
+                record_route_c_completion(
+                    &state,
+                    &budget.event_id,
+                    "success",
+                    response_model(&response).or_else(|| Some(agent.model.clone())),
+                    response_total_tokens(&response),
+                    None,
+                );
+                Json(response).into_response()
+            }
             Err(error) => {
+                record_route_c_completion(
+                    &state,
+                    &budget.event_id,
+                    "output_rejected",
+                    response_model(&response).or_else(|| Some(agent.model.clone())),
+                    response_total_tokens(&response),
+                    Some(error.kind().to_string()),
+                );
                 tracing::warn!(
                     target: "server_agent_runtime",
                     user_id = %user.id,
@@ -228,6 +247,14 @@ pub async fn chat_handler(
         },
         Err(error) => {
             let summary = operational_error_summary(&error.to_string());
+            record_route_c_completion(
+                &state,
+                &budget.event_id,
+                "provider_error",
+                Some(agent.model.clone()),
+                None,
+                Some(summary.clone()),
+            );
             tracing::warn!(
                 target: "server_agent_runtime",
                 user_id = %user.id,
@@ -305,12 +332,58 @@ fn budget_error_response(error: ServerRuntimeBudgetError) -> Response {
     response
 }
 
+fn record_route_c_completion(
+    state: &Arc<AppState>,
+    event_id: &str,
+    outcome: &str,
+    model: Option<String>,
+    total_tokens: Option<i64>,
+    error_summary: Option<String>,
+) {
+    if event_id.trim().is_empty() {
+        return;
+    }
+    if let Err(error) = state.store.route_c_budget_mark_completed(
+        event_id,
+        crate::store::route_c_budget::RouteCBudgetCompletion {
+            outcome: outcome.to_string(),
+            model,
+            total_tokens,
+            error_summary,
+        },
+    ) {
+        tracing::warn!(
+            target: "server_agent_runtime",
+            budget_event_id = %event_id,
+            error = %error,
+            "Route C completion audit update failed"
+        );
+    }
+}
+
+fn response_model(response: &Value) -> Option<String> {
+    response
+        .get("model")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn response_total_tokens(response: &Value) -> Option<i64> {
+    response
+        .get("usage")
+        .and_then(|usage| usage.get("total_tokens"))
+        .and_then(Value::as_i64)
+        .filter(|value| *value >= 0)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
         admission_error_response, audit_summary, budget_error_response, named_agent_config,
-        operational_error_summary, protection_status, provider_error_message,
-        validate_runtime_messages,
+        operational_error_summary, protection_status, provider_error_message, response_model,
+        response_total_tokens, validate_runtime_messages,
     };
     use crate::server_agent_runtime_budget::{ServerRuntimeBudgetError, ServerRuntimeBudgetStatus};
     use crate::server_agent_runtime_guard::ServerRuntimeAdmissionError;
@@ -380,6 +453,24 @@ mod tests {
         assert!(message.contains("fingerprint="));
         assert!(!message.contains("sk-secret"));
         assert!(!message.contains("user prompt text"));
+    }
+
+    #[test]
+    fn completion_audit_extracts_only_model_and_token_summary() {
+        let response = json!({
+            "model": "route-c-model",
+            "usage": {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15
+            },
+            "choices": [{
+                "message": {"content": "secret generated content"}
+            }]
+        });
+
+        assert_eq!(response_model(&response).as_deref(), Some("route-c-model"));
+        assert_eq!(response_total_tokens(&response), Some(15));
     }
 
     #[test]

@@ -48,6 +48,12 @@ pub(crate) enum ServerRuntimeBudgetError {
     StoreUnavailable(ServerRuntimeBudgetStatus),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ServerRuntimeBudgetRecord {
+    pub status: ServerRuntimeBudgetStatus,
+    pub event_id: String,
+}
+
 impl ServerRuntimeBudgetConfig {
     fn current() -> Self {
         Self::from_lookup(|name| std::env::var(name).ok())
@@ -146,7 +152,7 @@ pub(crate) fn try_record_route_c_call(
     store: &Store,
     user_id: &str,
     request_fingerprint: &str,
-) -> Result<ServerRuntimeBudgetStatus, ServerRuntimeBudgetError> {
+) -> Result<ServerRuntimeBudgetRecord, ServerRuntimeBudgetError> {
     let config = ServerRuntimeBudgetConfig::current();
     let now = current_epoch_secs();
     record_from_store(store, config, user_id, request_fingerprint, now)
@@ -216,7 +222,7 @@ fn record_from_store(
     user_id: &str,
     request_fingerprint: &str,
     now_secs: u64,
-) -> Result<ServerRuntimeBudgetStatus, ServerRuntimeBudgetError> {
+) -> Result<ServerRuntimeBudgetRecord, ServerRuntimeBudgetError> {
     let route_day = route_day_from_epoch_secs(now_secs);
     match store.route_c_budget_try_record_call(
         user_id,
@@ -226,14 +232,13 @@ fn record_from_store(
         config.per_user_daily_call_limit,
     ) {
         Ok(RouteCBudgetRecordResult::Recorded {
+            event_id,
             total_used,
             user_used,
-        }) => Ok(status_for_used_calls(
-            config,
-            total_used,
-            Some(user_used),
-            now_secs,
-        )),
+        }) => Ok(ServerRuntimeBudgetRecord {
+            event_id,
+            status: status_for_used_calls(config, total_used, Some(user_used), now_secs),
+        }),
         Ok(RouteCBudgetRecordResult::PlatformLimitReached {
             total_used,
             user_used,
@@ -259,7 +264,10 @@ fn record_from_store(
                     unavailable_status(config, now_secs),
                 ))
             } else {
-                Ok(status_for_used_calls(config, 0, Some(0), now_secs))
+                Ok(ServerRuntimeBudgetRecord {
+                    event_id: String::new(),
+                    status: status_for_used_calls(config, 0, Some(0), now_secs),
+                })
             }
         }
     }

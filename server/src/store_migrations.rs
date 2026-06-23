@@ -93,6 +93,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (63, "项目开发命令自动识别元数据", migration_v63),
     (64, "Route C 服务器模型每日预算调用审计", migration_v64),
     (65, "Route C 服务器模型用户日预算索引", migration_v65),
+    (66, "Route C 服务器模型调用完成态审计", migration_v66),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2222,6 +2223,40 @@ fn migration_v65(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_v66(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "route_c_runtime_budget_events",
+        "outcome",
+        "outcome TEXT NOT NULL DEFAULT 'admitted'",
+    )?;
+    add_column_if_missing(
+        conn,
+        "route_c_runtime_budget_events",
+        "completed_at",
+        "completed_at TEXT",
+    )?;
+    add_column_if_missing(conn, "route_c_runtime_budget_events", "model", "model TEXT")?;
+    add_column_if_missing(
+        conn,
+        "route_c_runtime_budget_events",
+        "total_tokens",
+        "total_tokens INTEGER",
+    )?;
+    add_column_if_missing(
+        conn,
+        "route_c_runtime_budget_events",
+        "error_summary",
+        "error_summary TEXT",
+    )?;
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_route_c_budget_outcome_time
+          ON route_c_runtime_budget_events(outcome, created_at DESC)",
+        [],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2513,6 +2548,65 @@ mod tests {
                    FROM sqlite_master
                   WHERE type='index'
                     AND name='idx_route_c_budget_day_user'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("index should be queryable");
+        assert_eq!(exists, 1);
+    }
+
+    #[test]
+    fn migration_v66_adds_route_c_completion_audit_columns() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v64(&conn).expect("route c budget table should apply");
+        migration_v66(&conn).expect("completion audit columns should apply");
+
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES ('usr_route_c_completion', NULL, 'route-c-completion@example.com', 'hash', 'Route C', 'user', 'active', 'now', 'now')",
+            [],
+        )
+        .expect("user should insert");
+        conn.execute(
+            "INSERT INTO route_c_runtime_budget_events (
+               id, user_id, request_fingerprint, route_day, created_at
+             ) VALUES ('rcb_completion', 'usr_route_c_completion', 'fp', '2026-06-23', 'now')",
+            [],
+        )
+        .expect("budget event should insert with default outcome");
+
+        let row: (
+            String,
+            Option<String>,
+            Option<String>,
+            Option<i64>,
+            Option<String>,
+        ) = conn
+            .query_row(
+                "SELECT outcome, completed_at, model, total_tokens, error_summary
+                   FROM route_c_runtime_budget_events
+                  WHERE id = 'rcb_completion'",
+                [],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
+            )
+            .expect("completion audit columns should load");
+        assert_eq!(row, ("admitted".to_string(), None, None, None, None));
+
+        let exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*)
+                   FROM sqlite_master
+                  WHERE type='index'
+                    AND name='idx_route_c_budget_outcome_time'",
                 [],
                 |row| row.get(0),
             )
