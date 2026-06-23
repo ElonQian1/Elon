@@ -172,6 +172,38 @@ function Write-Fb2TokenBridgeResult {
     $Result
 }
 
+function New-Fb2TokenBridgeRunResult {
+    param(
+        [bool]$Success,
+        [object]$PreflightExitCode,
+        [object]$CurrentStateExitCode,
+        [string]$Note
+    )
+
+    [ordered]@{
+        schema = "fb2.main_project.token_bridge_run.v1"
+        generated_at_utc = (Get-Date).ToUniversalTime().ToString("o")
+        success = $Success
+        fb2_base = $Fb2Base.TrimEnd("/")
+        server_host = $ServerHost
+        server_env_path = $ServerEnvPath
+        group_id = $GroupId
+        external_user_id = $ExternalUserId
+        run_data_only_preflight = [bool]$RunDataOnlyPreflight
+        run_current_state_after = [bool]$RunCurrentStateAfter
+        preflight_exit_code = $PreflightExitCode
+        current_state_exit_code = $CurrentStateExitCode
+        summary_path = $SummaryPath
+        token_passed_as_argument = $false
+        fb2_password_passed_to_child_argv = $false
+        token_written_to_output = $false
+        current_state_after_tokenless = [bool]$RunCurrentStateAfter
+        project_network_proxy_policy = "direct_no_proxy"
+        writes_visible_group_messages = $false
+        note = $Note
+    }
+}
+
 function Invoke-Fb2TokenBridgeSelfTest {
     param([string]$OutputPath)
 
@@ -321,6 +353,13 @@ try {
     }
 
     if ($RunCurrentStateAfter) {
+        $preCurrentStateResult = New-Fb2TokenBridgeRunResult `
+            -Success $true `
+            -PreflightExitCode $preflightExitCode `
+            -CurrentStateExitCode $null `
+            -Note "Preflight succeeded; current-state validation is about to run tokenless against this fresh no-write bridge evidence."
+        Write-Fb2TokenBridgeResult -Result $preCurrentStateResult -Path $OutputPath | Out-Null
+
         # Current-state validation is a handoff gate: prove the token bridge did not
         # leave a service token behind in ordinary no-secret continuation state.
         [System.Environment]::SetEnvironmentVariable("FB2_AI_CENTER_TOKEN", $null, "Process")
@@ -331,28 +370,11 @@ try {
         }
     }
 
-    $result = [ordered]@{
-        schema = "fb2.main_project.token_bridge_run.v1"
-        generated_at_utc = (Get-Date).ToUniversalTime().ToString("o")
-        success = $true
-        fb2_base = $Fb2Base.TrimEnd("/")
-        server_host = $ServerHost
-        server_env_path = $ServerEnvPath
-        group_id = $GroupId
-        external_user_id = $ExternalUserId
-        run_data_only_preflight = [bool]$RunDataOnlyPreflight
-        run_current_state_after = [bool]$RunCurrentStateAfter
-        preflight_exit_code = $preflightExitCode
-        current_state_exit_code = $currentStateExitCode
-        summary_path = $SummaryPath
-        token_passed_as_argument = $false
-        fb2_password_passed_to_child_argv = $false
-        token_written_to_output = $false
-        current_state_after_tokenless = [bool]$RunCurrentStateAfter
-        project_network_proxy_policy = "direct_no_proxy"
-        writes_visible_group_messages = $false
-        note = "Remote fb2 service token was read into process env only and restored after child scripts."
-    }
+    $result = New-Fb2TokenBridgeRunResult `
+        -Success $true `
+        -PreflightExitCode $preflightExitCode `
+        -CurrentStateExitCode $currentStateExitCode `
+        -Note "Remote fb2 service token was read into process env only and restored after child scripts."
     Write-Fb2TokenBridgeResult -Result $result -Path $OutputPath | Out-Null
     $result | ConvertTo-Json -Depth 10
 } finally {

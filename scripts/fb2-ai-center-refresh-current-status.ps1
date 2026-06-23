@@ -238,12 +238,15 @@ function Test-Fb2RefreshProtectedLivePreflightSatisfied {
         return $false
     }
 
+    $currentStateExitCode = Get-Fb2RefreshProperty $TokenBridgeLivePreflight "current_state_exit_code" $null
+    $currentStateExitCodeOk = ($null -eq $currentStateExitCode) -or ([int]$currentStateExitCode -eq 0)
+
     return (
         [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "exists" $false) -and
         [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "success" $false) -and
         [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "summary_exists" $false) -and
         [int](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "preflight_exit_code" -1) -eq 0 -and
-        [int](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "current_state_exit_code" -1) -eq 0 -and
+        $currentStateExitCodeOk -and
         -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "token_passed_as_argument" $true) -and
         -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "fb2_password_passed_to_child_argv" $true) -and
         -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "token_written_to_output" $true) -and

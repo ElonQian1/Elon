@@ -118,6 +118,8 @@ function Test-Fb2TokenlessProtectedLivePreflightSatisfied {
     $bridge = Get-Fb2TokenlessProperty $Refresh "token_bridge_live_preflight"
     $blocking = Get-Fb2TokenlessProperty $Refresh "blocking_state"
     $gapBoard = Get-Fb2TokenlessProperty $Refresh "gap_action_board"
+    $currentStateExitCode = Get-Fb2TokenlessProperty $bridge "current_state_exit_code" $null
+    $currentStateExitCodeOk = ($null -eq $currentStateExitCode) -or ([int]$currentStateExitCode -eq 0)
 
     return (
         [bool](Get-Fb2TokenlessProperty $Refresh "protected_live_preflight_satisfied" $false) -and
@@ -128,7 +130,7 @@ function Test-Fb2TokenlessProtectedLivePreflightSatisfied {
         [bool](Get-Fb2TokenlessProperty $bridge "success" $false) -and
         [bool](Get-Fb2TokenlessProperty $bridge "summary_exists" $false) -and
         [int](Get-Fb2TokenlessProperty $bridge "preflight_exit_code" -1) -eq 0 -and
-        [int](Get-Fb2TokenlessProperty $bridge "current_state_exit_code" -1) -eq 0 -and
+        $currentStateExitCodeOk -and
         -not [bool](Get-Fb2TokenlessProperty $bridge "token_passed_as_argument" $true) -and
         -not [bool](Get-Fb2TokenlessProperty $bridge "fb2_password_passed_to_child_argv" $true) -and
         -not [bool](Get-Fb2TokenlessProperty $bridge "token_written_to_output" $true) -and
@@ -467,6 +469,25 @@ function Invoke-Fb2TokenlessSelfTest {
         $bridgeGoodResult = New-Fb2TokenlessContinuationValidation -Refresh $bridgeGood -SourcePath "selftest-bridge-good.json"
         if (-not [bool]$bridgeGoodResult.success) {
             $bridgeGoodResult | ConvertTo-Json -Depth 8
+            $failed++
+        }
+
+        $bridgePending = New-Fb2TokenlessFixture -TempRoot $tempRoot -BridgeSatisfied
+        $bridgePending.token_bridge_live_preflight.current_state_exit_code = $null
+        $bridgePending.files.status_refresh = Join-Path $tempRoot "status-refresh-bridge-pending.json"
+        Set-Content -LiteralPath ([string]$bridgePending.files.status_refresh) -Value ($bridgePending | ConvertTo-Json -Depth 8) -Encoding UTF8
+        $bridgePendingResult = New-Fb2TokenlessContinuationValidation -Refresh $bridgePending -SourcePath "selftest-bridge-pending.json"
+        if (-not [bool]$bridgePendingResult.success) {
+            $bridgePendingResult | ConvertTo-Json -Depth 8
+            $failed++
+        }
+
+        $bridgeFailed = New-Fb2TokenlessFixture -TempRoot $tempRoot -BridgeSatisfied
+        $bridgeFailed.token_bridge_live_preflight.current_state_exit_code = 1
+        $bridgeFailed.files.status_refresh = Join-Path $tempRoot "status-refresh-bridge-failed.json"
+        Set-Content -LiteralPath ([string]$bridgeFailed.files.status_refresh) -Value ($bridgeFailed | ConvertTo-Json -Depth 8) -Encoding UTF8
+        $bridgeFailedResult = New-Fb2TokenlessContinuationValidation -Refresh $bridgeFailed -SourcePath "selftest-bridge-failed.json"
+        if ([bool]$bridgeFailedResult.success) {
             $failed++
         }
 

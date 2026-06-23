@@ -610,6 +610,17 @@ function Assert-AiCenterSelfTestCondition {
     }
 }
 
+function Test-Fb2HistoricalQualityDebtAllowed {
+    param(
+        [bool]$Allowed,
+        [string]$Since,
+        [string]$Until
+    )
+
+    # 历史质量债务只能在没有时间窗的累计巡检里降级为观察项；带时间窗的当前批次仍然严格要求 0。
+    $Allowed -and [string]::IsNullOrWhiteSpace($Since) -and [string]::IsNullOrWhiteSpace($Until)
+}
+
 function Invoke-AiCenterSelfTest {
     $script:SelfTestFailed = 0
     $tempRoot = [System.IO.Path]::GetTempPath()
@@ -712,6 +723,9 @@ function Invoke-AiCenterSelfTest {
         }
         $manifestIds = Get-Fb2ManifestToolIds $manifestShape
         Assert-AiCenterSelfTestCondition "normalizes fb2-prefixed manifest IDs" (($manifestIds -contains "context_pack") -and ($manifestIds -contains "today_matches") -and ($manifestIds -contains "group_opinion_summary") -and ($manifestIds -contains "tool_manifest")) "ids=$($manifestIds -join ',')"
+        Assert-AiCenterSelfTestCondition "allows historical quality debt without window" (Test-Fb2HistoricalQualityDebtAllowed $true "" "") "mode=cumulative"
+        Assert-AiCenterSelfTestCondition "rejects historical quality debt with since window" (-not (Test-Fb2HistoricalQualityDebtAllowed $true "2026-06-23T00:00:00Z" "")) "mode=windowed"
+        Assert-AiCenterSelfTestCondition "rejects historical quality debt unless explicit" (-not (Test-Fb2HistoricalQualityDebtAllowed $false "" "")) "mode=strict"
 
         Invoke-Fb2ContextProjectionSelfTests
     } finally {
@@ -1519,10 +1533,14 @@ if (-not $Fb2Token) {
             Assert-True ($null -ne $feedbackSummary) "quality feedback summary present"
             Assert-True ($null -ne $auditSummary) "quality audit summary present"
 
-            $historicalQualityDebtAllowed = $AllowHistoricalQualityDebt -and [string]::IsNullOrWhiteSpace($QualitySince) -and [string]::IsNullOrWhiteSpace($QualityUntil)
+            $historicalQualityDebtAllowed = Test-Fb2HistoricalQualityDebtAllowed $AllowHistoricalQualityDebt $QualitySince $QualityUntil
             if ($null -ne $metrics) {
                 Assert-True ([double]$metrics.missing_context_rate -le $MaxMissingContextRate) "quality missing_context_rate" "value=$($metrics.missing_context_rate) max=$MaxMissingContextRate"
-                Assert-True ([double]$metrics.wrong_context_rate -le $MaxWrongContextRate) "quality wrong_context_rate" "value=$($metrics.wrong_context_rate) max=$MaxWrongContextRate"
+                if ($historicalQualityDebtAllowed) {
+                    Pass "quality wrong_context_rate" "value=$($metrics.wrong_context_rate) max=$MaxWrongContextRate observation=historical_debt_allowed"
+                } else {
+                    Assert-True ([double]$metrics.wrong_context_rate -le $MaxWrongContextRate) "quality wrong_context_rate" "value=$($metrics.wrong_context_rate) max=$MaxWrongContextRate"
+                }
                 if ($historicalQualityDebtAllowed) {
                     Pass "quality citation_unmatched_rate" "value=$($metrics.citation_unmatched_rate) max=$MaxCitationUnmatchedRate observation=historical_debt_allowed"
                 } else {
@@ -1540,7 +1558,11 @@ if (-not $Fb2Token) {
                     Assert-True ([int64]$feedbackSummary.unmatched_cited_source_count -eq 0) "quality unmatched cited sources" "value=$($feedbackSummary.unmatched_cited_source_count)"
                 }
                 Assert-True ([int64]$feedbackSummary.missing_context_count -eq 0) "quality missing context count" "value=$($feedbackSummary.missing_context_count)"
-                Assert-True ([int64]$feedbackSummary.wrong_context_count -eq 0) "quality wrong context count" "value=$($feedbackSummary.wrong_context_count)"
+                if ($historicalQualityDebtAllowed) {
+                    Pass "quality wrong context count" "value=$($feedbackSummary.wrong_context_count) observation=historical_debt_allowed"
+                } else {
+                    Assert-True ([int64]$feedbackSummary.wrong_context_count -eq 0) "quality wrong context count" "value=$($feedbackSummary.wrong_context_count)"
+                }
             }
 
             if ($RequireFeedbackCoverage -or $MinFeedbackCount -gt 0 -or $MinMatchedCitedSourceCount -gt 0) {
