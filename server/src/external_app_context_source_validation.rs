@@ -20,8 +20,12 @@ impl SourceValidation {
         !self.unmatched_source_ids.is_empty()
     }
 
+    pub(crate) fn has_missing_explicit_sources(&self) -> bool {
+        self.candidate_source_ids.is_empty()
+    }
+
     pub(crate) fn note_fragment(&self) -> String {
-        if self.candidate_source_ids.is_empty() {
+        if self.has_missing_explicit_sources() {
             return "source_validation=no_explicit_source_ids".to_string();
         }
         if self.unmatched_source_ids.is_empty() {
@@ -57,6 +61,7 @@ impl SourceValidation {
             "context_audit_id": context_audit_id,
             "status": status,
             "has_unmatched_sources": self.has_unmatched_sources(),
+            "has_missing_explicit_sources": self.has_missing_explicit_sources(),
             "cited_source_count": cited_source_count,
             "candidate_source_ids": self.candidate_source_ids,
             "matched_source_ids": self.matched_source_ids,
@@ -477,7 +482,12 @@ mod tests {
         );
 
         assert!(!validation.has_unmatched_sources());
+        assert!(validation.has_missing_explicit_sources());
         assert!(validation.candidate_source_ids.is_empty());
+        let summary = validation.answer_source_validation_summary("main-req-1", "audit-1", 0);
+        assert_eq!(summary["status"], "no_explicit_source_ids");
+        assert_eq!(summary["has_missing_explicit_sources"], true);
+        assert_eq!(summary["has_unmatched_sources"], false);
     }
 
     #[test]

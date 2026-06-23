@@ -427,7 +427,7 @@ fn generated_answer_feedback_payload(
             context_audit_id,
             cited_source_count
         ),
-        "missing_context": false,
+        "missing_context": source_validation.has_missing_explicit_sources(),
         "wrong_context": source_validation.has_unmatched_sources(),
         "note": truncate_chars(
             &format!(
@@ -921,6 +921,15 @@ mod tests {
         .expect("payload");
 
         assert_eq!(payload["cited_source_count"], 0);
+        assert_eq!(payload["missing_context"], true);
+        assert_eq!(
+            payload["answer_source_validation"]["status"],
+            "no_explicit_source_ids"
+        );
+        assert_eq!(
+            payload["answer_source_validation"]["has_missing_explicit_sources"],
+            true
+        );
     }
 
     #[test]
@@ -949,6 +958,7 @@ mod tests {
         .expect("payload");
 
         assert_eq!(payload["cited_source_count"], 1);
+        assert_eq!(payload["missing_context"], false);
         assert_eq!(payload["wrong_context"], true);
         assert_eq!(payload["answer_source_validation"]["status"], "unmatched");
         assert_eq!(
@@ -994,6 +1004,7 @@ mod tests {
         .expect("payload");
 
         assert_eq!(payload["cited_source_count"], 0);
+        assert_eq!(payload["missing_context"], false);
         assert_eq!(payload["wrong_context"], false);
         assert_eq!(
             payload["answer_source_validation"]["schema"],

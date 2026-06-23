@@ -308,6 +308,7 @@ GET /api/main-project/context/tool-manifest
 - 主项目会在 executed tool JSON 前增加 `tool_fact_summary`，把 `match_analysis_brief.data.user_orders` 等当前用户订单样例提前投影，避免大赔率 JSON 被截断时丢失“我的票”结构信息。
 - 主项目会在 executed tool JSON 前增加 `tool_gap_summary`，把 `skipped/failed/unavailable` 工具结果提前投影；这些只代表数据缺口，不能编造成比赛、赔率、订单或群友观点事实。
 - 主项目会在 AI 回复生成后做来源 ID 校验：回复正文里出现的比赛、赔率、订单、票据、群消息、观点记忆、平台摘要和 audit 类 source id，必须能匹配本轮 `citation_sources`、选中消息额外来源、当前 `context_audit_id`，或 `success=true` 且 `grounding.status=grounded/weak` 的工具结果。未匹配来源会在 `/context/feedback` payload 中标记 `wrong_context=true`，写入 `note` 的 `source_validation=...`，并附带 `answer_source_validation schema=external_app.answer_source_validation.v1`。该摘要记录 `candidate_source_ids`、`matched_source_ids`、`unmatched_source_ids`、`matched_tool_source_ids` 和 `allowed_tool_source_ids`，用于证明单次回答没有伪造来源；tool-only source 可以进入该摘要，但不临时合成到 fb2 `cited_sources`。
+- 如果 AI 回复没有显式写出任何可追溯 source id，主项目会在 `/context/feedback` payload 中写入 `missing_context=true`，并在 `answer_source_validation` 中标记 `status=no_explicit_source_ids`、`has_missing_explicit_sources=true`。这代表回答缺少可审计来源，不等同于编造来源；编造或错写来源仍由 `wrong_context=true` 和 `status=unmatched` 表示。
 - 主项目会生成 `context_quality.warnings`，例如 `missing_context_pack`、`empty_matches`、`missing_tool_contract`。
 - 主项目日志只记录 `topic_hint_present`、`fallback_used`、`answer_policy_schema`、`context_quality_warning_count`、`tool_readiness_status` 等观测字段，不记录 shared secret、完整用户票据或题目原文。
 - AI 回答必须区分事实、群友观点和推断；上下文不足时要明确说明。

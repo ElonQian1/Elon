@@ -157,6 +157,7 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "context_pack_template_business_sources_exclude_feedback" (-not (Test-Fb2ContractContains $templateSourceKinds "feedback")) ($templateSourceKinds -join ",")
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_schema" ($toolResultEnvelope.answer_source_validation.schema -eq "external_app.answer_source_validation.v1") ([string]$toolResultEnvelope.answer_source_validation.schema)
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_tool_sources" ([string]$toolResultEnvelope.answer_source_validation.rule -match "matched_tool_source_ids") ([string]$toolResultEnvelope.answer_source_validation.rule)
+        New-Fb2PublicContractCheck "tool_result_answer_source_validation_missing_sources" ([string]$toolResultEnvelope.answer_source_validation.rule -match "has_missing_explicit_sources" -and [string]$toolResultEnvelope.answer_source_validation.rule -match "no_explicit_source_ids") ([string]$toolResultEnvelope.answer_source_validation.rule)
         New-Fb2PublicContractCheck "domain_lane_current_user_tickets" (Test-Fb2ContractContains $domainLaneIds "current_user_tickets") ($domainLaneIds -join ",")
         New-Fb2PublicContractCheck "domain_lane_group_opinions" (Test-Fb2ContractContains $domainLaneIds "group_opinions") ($domainLaneIds -join ",")
         New-Fb2PublicContractCheck "domain_lane_quality_feedback_audit" (Test-Fb2ContractContains $domainLaneIds "quality_feedback_audit") ($domainLaneIds -join ",")
@@ -376,7 +377,7 @@ function Invoke-Fb2PublicContractSelfTest {
         tool_result_envelope_contract = [pscustomobject]@{
             answer_source_validation = [pscustomobject]@{
                 schema = "external_app.answer_source_validation.v1"
-                rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
+                rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids, allowed_tool_source_ids, has_missing_explicit_sources, and no_explicit_source_ids status"
             }
         }
     }
@@ -429,6 +430,13 @@ function Invoke-Fb2PublicContractSelfTest {
         -Health "OK" `
         -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
         -Contract $badToolResultContract
+    $badMissingSourceContract = $syntheticContract | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+    $badMissingSourceContract.tool_result_envelope_contract.answer_source_validation.rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
+    $badMissingSourceStatus = New-Fb2PublicContractStatus `
+        -Base "http://example.invalid" `
+        -Health "OK" `
+        -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
+        -Contract $badMissingSourceContract
 
     $failed = 0
     if (-not [bool]$status.success) {
@@ -460,6 +468,12 @@ function Invoke-Fb2PublicContractSelfTest {
         $failed++
     } else {
         Write-Output "OK`tpublic contract selftest rejects missing tool source audit"
+    }
+    if ([bool]$badMissingSourceStatus.success) {
+        Write-Output "FAIL`tpublic contract selftest rejects missing no-source audit"
+        $failed++
+    } else {
+        Write-Output "OK`tpublic contract selftest rejects missing no-source audit"
     }
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"

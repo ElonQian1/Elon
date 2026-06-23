@@ -97,6 +97,7 @@ function Get-Fb2PublicContractSummaryState {
             answer_source_validation_rule = ""
             answer_source_validation_schema_check = $false
             answer_source_validation_tool_sources_check = $false
+            answer_source_validation_missing_sources_check = $false
             missing = @("public_contract_status_summary")
         }
     }
@@ -128,6 +129,7 @@ function Get-Fb2PublicContractSummaryState {
             answer_source_validation_rule = ""
             answer_source_validation_schema_check = $false
             answer_source_validation_tool_sources_check = $false
+            answer_source_validation_missing_sources_check = $false
             missing = @("public_contract_status_summary_parse_error")
         }
     }
@@ -170,13 +172,20 @@ function Get-Fb2PublicContractSummaryState {
         (Test-Fb2PublicContractSummaryCheckPassed -Status $status -Id "tool_result_answer_source_validation_tool_sources") `
             -or $answerSourceRule -match "matched_tool_source_ids"
     )
+    $answerSourceMissingSourcesCheck = (
+        (Test-Fb2PublicContractSummaryCheckPassed -Status $status -Id "tool_result_answer_source_validation_missing_sources") `
+            -or ($answerSourceRule -match "has_missing_explicit_sources" -and $answerSourceRule -match "no_explicit_source_ids")
+    )
     if ([string]::IsNullOrWhiteSpace($answerSourceSchema) -and $answerSourceSchemaCheck) {
         $answerSourceSchema = "external_app.answer_source_validation.v1"
     }
     if ([string]::IsNullOrWhiteSpace($answerSourceRule) -and $answerSourceToolSourcesCheck) {
         $answerSourceRule = "matched_tool_source_ids required by public contract checks"
     }
-    $answerSourceReady = ($answerSourceSchemaCheck -and $answerSourceToolSourcesCheck)
+    if ([string]::IsNullOrWhiteSpace($answerSourceRule) -and $answerSourceMissingSourcesCheck) {
+        $answerSourceRule = "has_missing_explicit_sources and no_explicit_source_ids required by public contract checks"
+    }
+    $answerSourceReady = ($answerSourceSchemaCheck -and $answerSourceToolSourcesCheck -and $answerSourceMissingSourcesCheck)
     $limitations = @((Get-Fb2PublicContractSummaryProperty $status "limitations" @()))
     $failedChecks = @((Get-Fb2PublicContractSummaryProperty $status "failed_checks" @()))
 
@@ -240,6 +249,7 @@ function Get-Fb2PublicContractSummaryState {
     }
     if (-not $answerSourceSchemaCheck) { $missing += "answer_source_validation_schema" }
     if (-not $answerSourceToolSourcesCheck) { $missing += "answer_source_validation_tool_sources" }
+    if (-not $answerSourceMissingSourcesCheck) { $missing += "answer_source_validation_missing_sources" }
     if (-not ($limitations -contains "does_not_verify_fb2_live_context_pack_or_orders")) {
         $missing += "public_contract_limitations_live_data_boundary"
     }
@@ -285,6 +295,7 @@ function Get-Fb2PublicContractSummaryState {
         answer_source_validation_rule = $answerSourceRule
         answer_source_validation_schema_check = $answerSourceSchemaCheck
         answer_source_validation_tool_sources_check = $answerSourceToolSourcesCheck
+        answer_source_validation_missing_sources_check = $answerSourceMissingSourcesCheck
         limitations = @($limitations)
         missing = @($missing | Select-Object -Unique)
     }

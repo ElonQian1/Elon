@@ -78,7 +78,7 @@ pub(crate) fn public_tool_result_envelope_guidance(app_id: &str) -> Option<Value
             "answer_source_validation": {
                 "schema": "external_app.answer_source_validation.v1",
                 "included_in": "/api/main-project/context/feedback payload",
-                "rule": "主项目会在 feedback payload 中附带单次回答引用闭环摘要，记录 candidate/matched/unmatched source ids、matched_tool_source_ids 和 allowed_tool_source_ids；该字段用于审计回答是否伪造来源，不会把 tool-only source 临时合成到 fb2 cited_sources。"
+                "rule": "主项目会在 feedback payload 中附带单次回答引用闭环摘要，记录 candidate/matched/unmatched source ids、matched_tool_source_ids、allowed_tool_source_ids 和 has_missing_explicit_sources；无显式来源 ID 时 feedback.missing_context=true/status=no_explicit_source_ids，未匹配来源 ID 时 feedback.wrong_context=true/status=unmatched。该字段用于审计回答是否缺来源或伪造来源，不会把 tool-only source 临时合成到 fb2 cited_sources。"
             },
             "anti_patterns": [
                 "raw_tool_response_in_prompt",
@@ -208,6 +208,10 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("matched_tool_source_ids"));
+        assert!(contract["answer_source_validation"]["rule"]
+            .as_str()
+            .unwrap()
+            .contains("has_missing_explicit_sources"));
     }
 
     #[test]
