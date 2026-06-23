@@ -128,6 +128,32 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "visible regression is explicit" ($Content -match 'visible_regression_requires_authorization.+AllowVisibleMessages')
     Add-Fb2PromptValidationCheck $checks "voice pause is explicit" ($Content -match 'ASR/TTS final evidence.*暂停|ASR/TTS.*paused|voice_final_evidence')
 
+    $requiredSafeWithoutSecret = @(
+        "public_contract_regression",
+        "status_refresh_selftest",
+        "offline_context_pack_sample_validation",
+        "handoff_documentation"
+    )
+    foreach ($item in $requiredSafeWithoutSecret) {
+        Add-Fb2PromptValidationCheck $checks "safe without secret $item" (
+            ($Content -match 'safe_to_continue_without_secret') -and
+            ($Content -match [regex]::Escape($item))
+        )
+    }
+
+    $requiredSecretGates = @(
+        "live_context_pack_permission_quality_refresh",
+        "current_user_order_live_verification",
+        "platform_order_summary_live_verification",
+        "feedback_quality_live_refresh"
+    )
+    foreach ($item in $requiredSecretGates) {
+        Add-Fb2PromptValidationCheck $checks "requires secret $item" (
+            ($Content -match 'requires_secret') -and
+            ($Content -match [regex]::Escape($item))
+        )
+    }
+
     $forbiddenPatterns = @(
         'Add-Fb2PromptLine',
         '\$\(\[bool\]',
@@ -190,8 +216,8 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 ## 阻塞与边界
 - external_secret: `FB2_AI_CENTER_TOKEN`
 - blocked_by_external_secret: `True`
-- safe_to_continue_without_secret: `public_contract_regression, status_refresh_selftest`
-- requires_secret: `live_context_pack_permission_quality_refresh`
+- safe_to_continue_without_secret: `public_contract_regression, status_refresh_selftest, offline_context_pack_sample_validation, handoff_documentation`
+- requires_secret: `live_context_pack_permission_quality_refresh, current_user_order_live_verification, platform_order_summary_live_verification, feedback_quality_live_refresh`
 
 ## 缺口行动板
 - gap_schema: `fb2.main_project.gap_action_board.v1`
