@@ -227,6 +227,22 @@ function New-Fb2CurrentStateValidation {
             -Details "missing_latest_data_only_acceptance_summary"))
     }
 
+    $livePreflightValidationPath = Join-Path $targetDir "live-preflight-request-validation-current.json"
+    if (-not [string]::IsNullOrWhiteSpace($statusPathForOptionalSteps) -and (Test-Path -LiteralPath $statusPathForOptionalSteps)) {
+        [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+            -Name "validate_live_preflight_request" `
+            -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-live-preflight-request.ps1") `
+            -Arguments @("-StatusPath", $statusPathForOptionalSteps, "-OutputPath", $livePreflightValidationPath) `
+            -ExpectedOutputPath $livePreflightValidationPath))
+    } else {
+        [void]$steps.Add((New-Fb2CurrentInlineStep `
+            -Name "validate_live_preflight_request" `
+            -Success $false `
+            -OutputPath "" `
+            -JsonSuccess $false `
+            -Details "missing_status_for_live_preflight_request"))
+    }
+
     [void]$steps.Add((Invoke-Fb2CurrentPwsh `
         -Name "validate_evidence_freshness" `
         -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-ai-center-evidence-freshness.ps1") `
@@ -255,6 +271,7 @@ function New-Fb2CurrentStateValidation {
     $gates = Get-Fb2CurrentProperty $completion "gates"
     $exportedSampleValidation = Get-Fb2CurrentProperty $refresh "exported_context_pack_sample_set_validation"
     $visibleAnswerPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $visibleAnswerPolicyValidationPath
+    $livePreflightRequestValidation = Read-Fb2CurrentJsonOrNull -Path $livePreflightValidationPath
     $result = [ordered]@{
         schema = "fb2.main_project.current_state_validation.v1"
         generated_at_utc = ([datetime]::UtcNow).ToString("o")
@@ -272,6 +289,7 @@ function New-Fb2CurrentStateValidation {
         blocked_by_external_secret = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
         exported_context_pack_sample_set_validation = $exportedSampleValidation
         visible_answer_policy_validation = $visibleAnswerPolicyValidation
+        live_preflight_request_validation = $livePreflightRequestValidation
         safe_to_continue_without_secret = @((Get-Fb2CurrentProperty $blocking "safe_to_continue_without_secret" @()))
         requires_secret = @((Get-Fb2CurrentProperty $blocking "requires_secret" @()))
         note = "This gate refreshes and validates current machine evidence only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN."
@@ -297,6 +315,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "server_deploy_status"; script = "validate-fb2-main-server-deploy-status.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
+        [ordered]@{ name = "live_preflight_request"; script = "validate-fb2-live-preflight-request.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },

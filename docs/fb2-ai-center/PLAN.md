@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 当前状态门禁新增“live 预检请求”独立校验：`validate-fb2-ai-center-current-state.ps1` 现在会运行 `validate-fb2-live-preflight-request.ps1`，并输出 `target\fb2-ai-center\live-preflight-request-validation-current.json`。真实运行已通过，`step_count=10 failed_count=0`，其中 `validate_live_preflight_request.success=true`、`ready_without_token=true`、`missing=FB2_AI_CENTER_TOKEN`。这项固定了下一步必须是带 token 的 no-write `DataOnlyAcceptance -PreflightOnly`，同时拒绝截图替代接口直读、拒绝 data-only 预检带可见写群、拒绝真实 token/password 写入交接命令。
 - 2026-06-23 当前状态门禁新增“可见回答策略证据”检查：`validate-fb2-ai-center-current-state.ps1` 会自动对最新 data-only/final acceptance summary 跑 `validate-fb2-visible-answer-policy.ps1`，并输出 `visible-answer-policy-validation-current.json`。这项确保真实群聊 `@EL`、长按 `AI回复` 和总结帖的回答证据包含来源、事实/推断分层、风险边界和反投注保证，不再只靠 status 字段间接推断。
 - 2026-06-23 当前状态门禁已新增“主项目服务端部署状态”检查：`scripts\validate-fb2-main-server-deploy-status.ps1` 会读取主项目 `/health`、`/api/server/version`，并用 `git merge-base --is-ancestor` 验证线上服务端 SHA 是否包含最新 `server` runtime commit。当前线上返回 `versionName=0.3.681`、`gitSha=8e31ab0a98319dea8d46fcbbf31a2d2c85fde60b`，最新 server runtime commit 为 `c5a432423a423ab1722ff39a387ef1870c548363`，`deployed_contains_latest_runtime_sha=true`。这允许后续文档/验收记录提交晚于服务端发布，同时仍能拦住真正的 server 代码未发布。
 - 2026-06-23 当前终局差距按机器矩阵判断：`completion_matrix.total=14`、`complete=13`、`deferred=1`、`incomplete=0`；非语音数据目标 `data_goal_complete=true`，完整终局 `full_final_complete=false`。唯一 deferred 是用户明确暂停的 `voice_final_evidence`；另一个不能替代的外部前置条件是 `FB2_AI_CENTER_TOKEN`，用于刷新受保护 live Context Pack、本人订单、平台摘要、权限和 feedback/quality。ASR/TTS 当前继续暂停，不纳入本轮推进。

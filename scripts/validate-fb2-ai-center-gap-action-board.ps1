@@ -188,6 +188,7 @@ function New-Fb2GapValidation {
             "validate_completion_matrix",
             "validate_handoff_prompt",
             "validate_visible_answer_policy",
+            "validate_live_preflight_request",
             "no_write_direct_read",
             "data_only_preflight",
             "visible_regression_requires_authorization"
@@ -212,6 +213,12 @@ function New-Fb2GapValidation {
 
         $visiblePolicyCommand = [string](Get-Fb2GapProperty $nextCommands "validate_visible_answer_policy" "")
         Add-Fb2GapCheck $checks "next command visible policy uses summary placeholder" ($visiblePolicyCommand -match "<DATA_ONLY_ACCEPTANCE_JSON>")
+
+        $livePreflightCommand = [string](Get-Fb2GapProperty $nextCommands "validate_live_preflight_request" "")
+        Add-Fb2GapCheck $checks "next command live preflight validates request" (
+            $livePreflightCommand -match "validate-fb2-live-preflight-request\.ps1" -and
+            $livePreflightCommand -match "status-current\.json"
+        )
 
         $readOnlyCommand = [string](Get-Fb2GapProperty $nextCommands "no_write_direct_read" "")
         Add-Fb2GapCheck $checks "next command read only direct read has no write flag" (
@@ -326,6 +333,7 @@ function Invoke-Fb2GapSelfTest {
                 validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
                 validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
                 validate_visible_answer_policy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>"
+                validate_live_preflight_request = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-live-preflight-request.ps1 -StatusPath target\fb2-ai-center\status-current.json"
                 no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>"
                 data_only_preflight = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>"
                 visible_regression_requires_authorization = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>"
