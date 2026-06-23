@@ -258,6 +258,22 @@
   opacity: .58;
 }
 
+.agent-run-continue {
+  height: 28px;
+  border: 1px solid rgba(88, 101, 242, .44);
+  border-radius: 6px;
+  background: rgba(88, 101, 242, .16);
+  color: #dfe4ff;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.agent-run-continue:hover {
+  background: rgba(88, 101, 242, .24);
+  color: var(--text);
+}
+
 .agent-run-list {
   display: grid;
   gap: 8px;
@@ -364,7 +380,8 @@
     grid-template-columns: 1fr;
   }
 
-  .agent-run-stop {
+  .agent-run-stop,
+  .agent-run-continue {
     justify-self: start;
   }
 

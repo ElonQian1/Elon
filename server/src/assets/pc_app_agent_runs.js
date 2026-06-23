@@ -7,6 +7,7 @@
     const localNodeApi = deps.localNodeApi;
     const activeProject = deps.activeProject;
     const sameId = deps.sameId || ((left, right) => String(left || '') === String(right || ''));
+    const draftContinuation = deps.draftContinuation;
     const confirmCancel = deps.confirm || ((message) => {
       if (typeof window !== 'undefined' && typeof window.confirm === 'function') return window.confirm(message);
       return true;
@@ -14,6 +15,7 @@
     const cache = new Map();
     const loading = new Set();
     const failures = new Set();
+    const continuationDrafts = new Map();
     let timer = 0;
 
     function clear() {
@@ -38,15 +40,18 @@
       if (cached.error) {
         return sectionShell('本机 Agent 运行', statusLine(cached.error, 'failed'), refreshButton());
       }
+      continuationDrafts.clear();
       const controls = Array.isArray(cached.activeControls) ? cached.activeControls : [];
+      const recentTasks = Array.isArray(cached.recentTasks) ? cached.recentTasks : [];
       const runs = Array.isArray(cached.runs) ? cached.runs : [];
-      if (!controls.length && !runs.length) {
+      if (!controls.length && !recentTasks.length && !runs.length) {
         return sectionShell('本机 Agent 运行', statusLine('暂无本机运行记录', 'muted'), refreshButton());
       }
       const controlItems = controls.map(renderControl).join('');
-      const runLimit = controls.length ? 3 : 4;
+      const taskItems = recentTasks.slice(0, controls.length ? 2 : 3).map(renderRecentTask).join('');
+      const runLimit = controls.length || recentTasks.length ? 2 : 4;
       const runItems = runs.slice(0, runLimit).map(renderRun).join('');
-      const items = `${controlItems}${runItems}`;
+      const items = `${controlItems}${taskItems}${runItems}`;
       return sectionShell('本机 Agent 运行', items, refreshButton());
     }
 
@@ -64,6 +69,14 @@
             button.disabled = false;
             reportError(error);
           });
+        });
+      });
+      root.querySelectorAll('[data-agent-run-action="continue"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const taskId = clean(button.dataset && button.dataset.taskId);
+          const draft = continuationDrafts.get(taskId);
+          if (!draft || typeof draftContinuation !== 'function') return;
+          draftContinuation(draft);
         });
       });
     }
@@ -128,6 +141,9 @@
         activeControls: Array.isArray(data && (data.active_controls || data.activeControls))
           ? (data.active_controls || data.activeControls)
           : [],
+        recentTasks: Array.isArray(data && (data.recent_tasks || data.recentTasks))
+          ? (data.recent_tasks || data.recentTasks)
+          : [],
         logDir: clean(data && (data.log_dir || data.logDir)),
         workspacePath: clean(data && (data.workspace_path || data.workspacePath)),
         loadedAt: Date.now()
@@ -163,6 +179,34 @@
           <small>${escapeHtml(meta || '本机控制句柄')}</small>
         </div>
         ${canCancel ? `<button class="agent-run-stop" type="button" data-agent-run-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>` : ''}
+      </article>`;
+    }
+
+    function renderRecentTask(task) {
+      const taskId = taskResumeId(task);
+      const resume = task && task.resume ? task.resume : null;
+      const status = statusMeta(task && (task.status || (resume && resume.status)));
+      const cliName = clean(task && (task.cli_name || task.cliName)) || 'agent';
+      const route = clean(task && task.route) || clean(resume && resume.continue_mode);
+      const updated = clean(task && (task.updated_at || task.updatedAt || task.updated_at_ms || task.updatedAtMs));
+      const strategy = clean(resume && resume.strategy && resume.strategy.label);
+      const canContinue = taskCanContinue(task);
+      const draft = continuationDraft(task);
+      if (canContinue && taskId && draft) continuationDrafts.set(taskId, draft);
+      const meta = [
+        cliName,
+        route,
+        strategy,
+        updated
+      ].filter(Boolean).join(' · ');
+      return `<article class="agent-run-item ${escapeHtml(status.tone)} agent-run-control">
+        <div class="agent-run-main">
+          <span class="agent-run-status">${escapeHtml(status.label)}</span>
+          <strong>${escapeHtml(shortRunId(taskId || cliName))}</strong>
+          <small>${escapeHtml(meta || '本机任务快照')}</small>
+          ${resumeHint(resume) ? `<p>${escapeHtml(resumeHint(resume))}</p>` : ''}
+        </div>
+        ${canContinue ? `<button class="agent-run-continue" type="button" data-agent-run-action="continue" data-task-id="${escapeHtml(taskId)}">继续</button>` : ''}
       </article>`;
     }
 
@@ -213,6 +257,7 @@
     function shouldPoll(cached) {
       if (!cached || cached.error) return true;
       if ((cached.activeControls || []).length) return true;
+      if ((cached.recentTasks || []).some((task) => clean(task && task.status).toLowerCase() === 'running')) return true;
       return (cached.runs || []).some((run) => clean(run && run.status).toLowerCase() === 'running');
     }
 
@@ -247,10 +292,47 @@
       ));
     }
 
+    function taskResumeId(task) {
+      return clean(task && (task.task_id || task.taskId || task.req_id || task.reqId));
+    }
+
+    function taskCanContinue(task) {
+      const taskId = taskResumeId(task);
+      const resume = task && task.resume ? task.resume : null;
+      const action = clean(resume && resume.next_action).toLowerCase();
+      return !!taskId && action === 'continue_from_snapshot';
+    }
+
+    function continuationDraft(task) {
+      const taskId = taskResumeId(task);
+      const resume = task && task.resume ? task.resume : null;
+      const strategy = clean(resume && resume.strategy && resume.strategy.label);
+      const reason = clean(resume && (resume.reason || (resume.strategy && resume.strategy.reason)));
+      const canCodex = resume && resume.can_resume_codex_session === true;
+      return [
+        '继续处理这个本机 Agent 任务。',
+        `本机请求 ID：${taskId}`,
+        strategy ? `恢复方式：${strategy}` : '恢复方式：基于本机 journal 快照继续',
+        reason ? `恢复原因：${reason}` : '',
+        canCodex ? '本机 Codex session 已记录，节点会优先自动续接；不要让用户手动粘贴 session id。' : '',
+        '原 CLI 终端不可重接；请先检查当前项目工作区状态，读取本机日志/快照，再继续完成剩余开发。'
+      ].filter(Boolean).join('\n\n');
+    }
+
+    function resumeHint(resume) {
+      if (!resume) return '';
+      const parts = [];
+      if (resume.can_replay_journal_events === true || resume.canReplayJournalEvents === true) parts.push('本机事件可回放');
+      if (resume.can_resume_codex_session === true || resume.canResumeCodexSession === true) parts.push('Codex 会话可续接');
+      if (resume.can_stream_live_output === false || resume.canStreamLiveOutput === false) parts.push('原 CLI 终端不可重接');
+      return parts.join('，');
+    }
+
     function statusMeta(status) {
       const value = clean(status).toLowerCase();
       if (value === 'completed' || value === 'done') return { tone: 'done', label: '完成' };
       if (value === 'failed' || value === 'error') return { tone: 'failed', label: '失败' };
+      if (value === 'canceled' || value === 'cancelled' || value === 'cancel_requested' || value === 'interrupted' || value === 'stopped') return { tone: 'failed', label: '已停止' };
       if (value === 'running') return { tone: 'running', label: '运行中' };
       return { tone: 'muted', label: value || '未知' };
     }

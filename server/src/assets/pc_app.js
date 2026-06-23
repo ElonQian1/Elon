@@ -126,6 +126,7 @@
     state, clean, escapeHtml, localNodeApi, sameId,
     activeProject: () => projectById(state.activeProjectId),
     renderMessages,
+    draftContinuation: draftProjectAiContinuation,
     logError: (error) => console.warn('PC agent run log refresh failed', error)
   });
   devTaskSnapshots = window.ElonPcTaskSnapshots && window.ElonPcTaskSnapshots.create({

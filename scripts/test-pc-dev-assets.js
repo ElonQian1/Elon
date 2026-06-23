@@ -773,7 +773,9 @@ async function testAgentRunsPanelLoadsProjectRuns() {
   let scheduled = null;
   let rendered = 0;
   let cancelHandler = null;
+  let continueHandler = null;
   let cancelDisabled = false;
+  let drafted = '';
   const calls = [];
   const sandbox = loadAsset('server/src/assets/pc_app_agent_runs.js', {
     setTimeout: (callback) => {
@@ -814,6 +816,22 @@ async function testAgentRunsPanelLoadsProjectRuns() {
           runtime_permission: 'project_write',
           can_cancel: true
         }],
+        recent_tasks: [{
+          task_id: 'req-detached',
+          cli_name: 'server-runtime',
+          route: 'route_c_server_runtime',
+          status: 'cancel_requested',
+          updated_at_ms: 200,
+          resume: {
+            status: 'detached',
+            can_replay_journal_events: true,
+            can_stream_live_output: false,
+            can_resume_codex_session: true,
+            next_action: 'continue_from_snapshot',
+            strategy: { kind: 'snapshot_continue', label: '基于快照继续' },
+            reason: '本机 journal 显示任务未终态，但当前节点已没有运行句柄'
+          }
+        }],
         runs: [{
           run_id: 'agent-20260623T010203Z-12345678',
           status: 'completed',
@@ -828,6 +846,7 @@ async function testAgentRunsPanelLoadsProjectRuns() {
     renderMessages: () => {
       rendered += 1;
     },
+    draftContinuation: (draft) => { drafted = draft; },
     logError: () => {}
   });
 
@@ -845,10 +864,18 @@ async function testAgentRunsPanelLoadsProjectRuns() {
   assert.ok(html.includes('read_file'), 'agent runs panel should render tool names');
   assert.ok(html.includes('route_c_server_runtime'), 'agent runs panel should render active control route');
   assert.ok(html.includes('data-agent-run-action="cancel"'), 'live control should expose stop action');
+  assert.ok(html.includes('data-agent-run-action="continue"'), 'detached local task should expose continue action');
+  assert.ok(html.includes('基于快照继续'), 'detached local task should explain snapshot continuation');
   assert.ok(!html.includes('prompt'), 'agent runs panel should not render prompt text');
 
   agentRuns.bindActions({
     querySelectorAll(selector) {
+      if (selector === '[data-agent-run-action="continue"]') {
+        return [{
+          dataset: { taskId: 'req-detached' },
+          addEventListener: (_event, callback) => { continueHandler = callback; }
+        }];
+      }
       if (selector !== '[data-agent-run-action="cancel"]') return [];
       return [{
         dataset: { taskId: 'req-live' },
@@ -859,6 +886,11 @@ async function testAgentRunsPanelLoadsProjectRuns() {
     }
   }, [], 'project');
   assert.ok(cancelHandler, 'agent runs panel should bind stop action');
+  assert.ok(continueHandler, 'agent runs panel should bind continue action');
+  continueHandler();
+  assert.ok(drafted.includes('本机请求 ID：req-detached'), 'continue draft should include local task id');
+  assert.ok(drafted.includes('原 CLI 终端不可重接'), 'continue draft should keep tty limitation explicit');
+  assert.ok(!drafted.includes('session-uuid'), 'continue draft should not leak raw codex session ids');
   await cancelHandler();
   assert.ok(calls.some((call) => call.pathName === '/api/task-journal/req-live/cancel'), 'stop action should call local task cancel API');
 }
@@ -1209,10 +1241,13 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('window.ElonPcAgentRuns.create'), 'PC app should create the local agent runs panel');
   assert.ok(pcApp.includes('agentRuns.renderSection'), 'PC app should render the local agent runs panel in project channels');
   assert.ok(pcApp.includes('agentRuns.schedule'), 'PC app should refresh local agent runs through the module');
+  assert.ok(pcApp.includes('draftContinuation: draftProjectAiContinuation'), 'PC app should let local agent runs draft continuation prompts');
 
   const agentRunsJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_agent_runs.js'), 'utf8');
   assert.ok(agentRunsJs.includes('/api/task-journal/'), 'agent runs panel should call the local task journal cancel API');
   assert.ok(agentRunsJs.includes('activeControls'), 'agent runs panel should render live local control handles');
+  assert.ok(agentRunsJs.includes('recentTasks'), 'agent runs panel should render recent local task resume contracts');
+  assert.ok(agentRunsJs.includes('原 CLI 终端不可重接'), 'agent runs continuation draft should keep tty limitation explicit');
 
   const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
   assert.ok(pcAppNode.includes('budget'), 'PC node page should read Route C daily budget');
@@ -1245,6 +1280,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(devTasksCss.includes('.agent-run-panel'), 'PC dev task CSS should style local agent run panel');
   assert.ok(devTasksCss.includes('.agent-run-tools'), 'PC dev task CSS should style local agent run tool pills');
   assert.ok(devTasksCss.includes('.agent-run-stop'), 'PC dev task CSS should style the local agent stop action');
+  assert.ok(devTasksCss.includes('.agent-run-continue'), 'PC dev task CSS should style the local agent continue action');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
@@ -1252,6 +1288,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAgentMain.includes('mod node_agent_task_lifecycle_pressure_tests;'), 'node agent should keep task lifecycle pressure tests wired');
   assert.ok(nodeAgentMain.includes('/api/project-agent-runs'), 'node agent should mount local project agent run logs API');
   assert.ok(nodeAgentMain.includes('active_cli_prompt_views_for_workspace'), 'node agent should expose live control handles by workspace');
+  assert.ok(nodeAgentMain.includes('task_journal_records_for_workspace'), 'node agent should expose task journal resume records by workspace');
   const taskJournalApi = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_task_journal_api.rs'), 'utf8');
   assert.ok(taskJournalApi.includes('post(cancel_task_journal)'), 'task journal API should expose a protected cancel endpoint');
 

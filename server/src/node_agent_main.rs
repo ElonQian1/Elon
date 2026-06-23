@@ -2543,6 +2543,25 @@ impl NodeRuntime {
             .collect()
     }
 
+    pub(crate) fn task_journal_records_for_workspace(
+        &self,
+        workspace: &Path,
+        limit: usize,
+    ) -> anyhow::Result<Vec<node_agent_task_journal::TaskJournalRecord>> {
+        let workspace = canonical_or_original(workspace);
+        Ok(self
+            .task_journal
+            .latest_records(limit)?
+            .into_iter()
+            .filter(|record| {
+                record
+                    .cwd
+                    .as_deref()
+                    .is_some_and(|cwd| cli_prompt_cwd_matches_workspace(cwd, &workspace))
+            })
+            .collect())
+    }
+
     async fn set_cli_prompt_os_pid(&self, req_id: &str, pid: Option<u32>) {
         self.active_cli_prompts.set_os_pid(req_id, pid).await;
     }

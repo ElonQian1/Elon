@@ -13,7 +13,14 @@ use std::{
     time::SystemTime,
 };
 
-use crate::{node_agent_active_task::ActiveCliPromptView, NodeRuntime};
+use crate::{
+    node_agent_active_task::ActiveCliPromptView,
+    node_agent_task_journal::TaskJournalRecord,
+    node_agent_task_resume::{
+        task_attach_state, task_resume_contract, TaskAttachState, TaskResumeContract,
+    },
+    NodeRuntime,
+};
 
 const MAX_RUNS: usize = 50;
 const DEFAULT_RUNS: usize = 20;
@@ -34,6 +41,7 @@ struct ProjectAgentRunsResponse {
     workspace_path: String,
     log_dir: String,
     active_controls: Vec<ProjectAgentRunControl>,
+    recent_tasks: Vec<ProjectAgentRunTaskResume>,
     runs: Vec<ProjectAgentRunSummary>,
 }
 
@@ -50,6 +58,21 @@ struct ProjectAgentRunControl {
     control_lease_expires_at_ms: u128,
     os_pid: Option<u32>,
     can_cancel: bool,
+}
+
+#[derive(Debug, Serialize)]
+struct ProjectAgentRunTaskResume {
+    task_id: String,
+    cli_name: String,
+    route: Option<String>,
+    cwd: Option<String>,
+    runtime_permission: Option<String>,
+    status: String,
+    started_at_ms: u128,
+    updated_at_ms: u128,
+    cancel_requested_at_ms: Option<u128>,
+    attach: TaskAttachState,
+    resume: TaskResumeContract,
 }
 
 #[derive(Debug, Serialize)]
@@ -86,11 +109,22 @@ pub(crate) async fn list_handler(
     match list_project_agent_runs(&req) {
         Ok(mut response) => {
             let workspace = PathBuf::from(&response.workspace_path);
-            response.active_controls = runtime
+            let active_views = runtime
                 .active_cli_prompt_views_for_workspace(&workspace)
-                .await
+                .await;
+            let active_task_ids: BTreeSet<String> =
+                active_views.iter().map(|view| view.req_id.clone()).collect();
+            response.active_controls = active_views
                 .into_iter()
                 .map(ProjectAgentRunControl::from)
+                .collect();
+            response.recent_tasks = runtime
+                .task_journal_records_for_workspace(&workspace, 100)
+                .unwrap_or_default()
+                .into_iter()
+                .filter(|record| !active_task_ids.contains(&record.req_id))
+                .take(6)
+                .map(project_task_resume_view)
                 .collect();
             (StatusCode::OK, Json(json!(response))).into_response()
         }
@@ -133,6 +167,7 @@ fn list_project_agent_runs(req: &ProjectAgentRunsReq) -> Result<ProjectAgentRuns
         workspace_path: workspace.to_string_lossy().to_string(),
         log_dir: log_dir.to_string_lossy().to_string(),
         active_controls: Vec::new(),
+        recent_tasks: Vec::new(),
         runs,
     })
 }
@@ -152,6 +187,24 @@ impl From<ActiveCliPromptView> for ProjectAgentRunControl {
             os_pid: view.os_pid,
             can_cancel: view.control_handle_live,
         }
+    }
+}
+
+fn project_task_resume_view(record: TaskJournalRecord) -> ProjectAgentRunTaskResume {
+    let attach = task_attach_state(Some(&record), None);
+    let resume = task_resume_contract(&attach);
+    ProjectAgentRunTaskResume {
+        task_id: record.req_id,
+        cli_name: record.cli_name,
+        route: record.route,
+        cwd: record.cwd,
+        runtime_permission: record.runtime_permission,
+        status: record.status,
+        started_at_ms: record.started_at_ms,
+        updated_at_ms: record.updated_at_ms,
+        cancel_requested_at_ms: record.cancel_requested_at_ms,
+        attach,
+        resume,
     }
 }
 
@@ -391,6 +444,7 @@ mod tests {
 
         assert!(response.ok);
         assert!(response.active_controls.is_empty());
+        assert!(response.recent_tasks.is_empty());
         assert_eq!(response.runs.len(), 1);
         let run = &response.runs[0];
         assert_eq!(run.run_id, "run-1");
@@ -432,6 +486,35 @@ mod tests {
         })
         .unwrap_err();
         assert!(error.to_string().contains("PC 本地路径不存在"));
+    }
+
+    #[test]
+    fn task_resume_view_uses_snapshot_continue_contract() {
+        let view = project_task_resume_view(TaskJournalRecord {
+            req_id: "req-detached".to_string(),
+            cli_name: "server-runtime".to_string(),
+            route: Some("route_c_server_runtime".to_string()),
+            run_handle_id: Some("req-detached".to_string()),
+            cwd: Some("D:/demo".to_string()),
+            runtime_permission: Some("project_write".to_string()),
+            os_pid: Some(42),
+            process_started_at_ms: Some(100),
+            codex_session_id: None,
+            codex_session_scope_key: None,
+            codex_session_updated_at_ms: None,
+            status: "cancel_requested".to_string(),
+            started_at_ms: 100,
+            updated_at_ms: 200,
+            cancel_requested_at_ms: Some(180),
+        });
+
+        assert_eq!(view.task_id, "req-detached");
+        assert_eq!(view.status, "cancel_requested");
+        let serialized = serde_json::to_string(&view).unwrap();
+        assert!(serialized.contains("continue_from_snapshot"));
+        assert!(serialized.contains("本机 journal"));
+        assert!(!serialized.contains("secret prompt"));
+        assert!(!serialized.contains("sk-live-secret"));
     }
 
     fn temp_dir(label: &str) -> PathBuf {
