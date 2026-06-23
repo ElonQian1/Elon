@@ -75,7 +75,7 @@ pub(crate) fn status_payload() -> Value {
                 "primary_entry_name": CLIENT_EXE_NAME,
                 "uninstall_entry_name": UNINSTALL_EXE_NAME,
                 "root_layout_expectation": root_layout_expectation(),
-                "start_menu_folder_name": "一龙PC节点",
+                "start_menu_folder_name": START_MENU_FOLDER_NAME,
                 "start_menu_entries": start_menu_entries(),
             },
             "reason": "Windows client install status is only available on Windows."
@@ -210,7 +210,7 @@ fn product_status(
         "primary_entry_name": CLIENT_EXE_NAME,
         "uninstall_entry_name": UNINSTALL_EXE_NAME,
         "root_layout_expectation": root_layout_expectation(),
-        "start_menu_folder_name": "一龙PC节点",
+        "start_menu_folder_name": START_MENU_FOLDER_NAME,
         "start_menu_entries": start_menu_entries(),
         "missing_entry_count": missing_entry_count,
         "legacy_file_count": legacy_file_count,
@@ -234,7 +234,7 @@ fn unsupported_product_status(reason: &str) -> Value {
         "primary_entry_name": CLIENT_EXE_NAME,
         "uninstall_entry_name": UNINSTALL_EXE_NAME,
         "root_layout_expectation": root_layout_expectation(),
-        "start_menu_folder_name": "一龙PC节点",
+        "start_menu_folder_name": START_MENU_FOLDER_NAME,
         "start_menu_entries": start_menu_entries(),
     })
 }
