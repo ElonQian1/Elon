@@ -225,11 +225,28 @@ $rs = @(git diff --name-only) + @(git ls-files --others --exclude-standard) |
 if ($rs) { rustfmt --edition 2021 $rs }
 ```
 
+如果用户明确要求做一次全量 Rust 格式化，必须走仓库脚本逐个指定 crate manifest，让 `cargo fmt` 从 `Cargo.toml` 读取 edition：
+
+```powershell
+# 只检查
+powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1
+
+# 全量写入格式化
+powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1 -Apply
+```
+
+Linux/macOS/服务器 CLI 使用：
+
+```bash
+bash scripts/format-rust.sh
+bash scripts/format-rust.sh --apply
+```
+
 **禁止**：
 - `cargo fmt`（无参数）：会扫描整个 crate 数百个历史文件，产生大量无关 diff，污染 PR 历史
 - 修改其他 AI 负责的 `.rs` 文件的格式
 
-> `rustfmt --edition 2021 <files>` 只格式化指定文件，几百毫秒完成，不触发重编译。仓库根目录也有 `rustfmt.toml` 固化 edition，显式参数用于避免 AI 或脚本在其他工作目录直接调用 rustfmt 时回退到旧默认 edition。
+> `rustfmt --edition 2021 <files>` 只格式化指定文件，几百毫秒完成，不触发重编译。仓库根目录也有 `rustfmt.toml` 固化 edition，显式参数和 `scripts/format-rust.*` 的 manifest-path 用于避免 AI 或脚本在其他工作目录直接调用 rustfmt 时回退到旧默认 edition。
 
 ---
 

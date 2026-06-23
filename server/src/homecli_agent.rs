@@ -38,7 +38,8 @@ use crate::types::AppState;
 // ── manager state ────────────────────────────────────────────────────────────
 
 const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
-const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
+const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
+    "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
 
 /// Snapshot of one connected PC agent.
@@ -400,7 +401,8 @@ impl AgentManager {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let pending = agent.pending.clone();
         pending.lock().await.insert(req_id.clone(), tx);
-        let send_result = agent.cmd_tx
+        let send_result = agent
+            .cmd_tx
             .send(homecli_proto::ServerToAgent::ProvisionProjectWorkspace {
                 req_id: req_id.clone(),
                 project_id,
@@ -450,7 +452,8 @@ impl AgentManager {
         let (tx, mut rx) = mpsc::unbounded_channel();
         let pending = agent.pending.clone();
         pending.lock().await.insert(req_id.clone(), tx);
-        let send_result = agent.cmd_tx
+        let send_result = agent
+            .cmd_tx
             .send(homecli_proto::ServerToAgent::PrepareProjectStorageRepo {
                 req_id: req_id.clone(),
                 project_id,
