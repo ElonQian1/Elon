@@ -364,11 +364,19 @@ fn is_field_name(value: &str) -> bool {
     matches!(
         value,
         "match_id"
+            | "match_ids"
             | "order_id"
+            | "order_ids"
             | "ticket_id"
+            | "ticket_ids"
             | "message_id"
+            | "message_ids"
             | "source_id"
+            | "source_ids"
+            | "source_message_id"
+            | "source_message_ids"
             | "context_audit_id"
+            | "context_audit_ids"
             | "memory_id"
             | "memory_ids"
             | "opinion_memory_id"
@@ -476,7 +484,7 @@ mod tests {
         let validation = validate_reply_sources(
             &context,
             None,
-            "2026-06-23 的 match_id 与 opinion_memory_id 字段缺失，所以这里只能说明数据不足。",
+            "2026-06-23 的 match_id、source_message_id 与 opinion_memory_id 字段缺失，所以这里只能说明数据不足。",
             &[],
             &[],
         );
