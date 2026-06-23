@@ -11,6 +11,8 @@ $RouteCStatusModule = Join-Path $RepoRoot "server\src\node_agent_route_c_status.
 $ServerRuntimeModule = Join-Path $RepoRoot "server\src\server_agent_runtime.rs"
 $GuardModule = Join-Path $RepoRoot "server\src\server_agent_runtime_guard.rs"
 $BudgetModule = Join-Path $RepoRoot "server\src\server_agent_runtime_budget.rs"
+$BudgetLedgerModule = Join-Path $RepoRoot "server\src\store\route_c_budget.rs"
+$RouteCAdminModule = Join-Path $RepoRoot "server\src\route_c_admin.rs"
 
 function Invoke-Step {
     param(
@@ -79,13 +81,21 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Needle "budget_status_reports_exhausted_per_user_daily_call_limit" `
         -Message "Server Route C budget must test per-user daily limit exhaustion"
     Assert-FileContains `
-        -Path (Join-Path $RepoRoot "server\src\store\route_c_budget.rs") `
+        -Path $BudgetLedgerModule `
         -Needle "clean_error_summary" `
         -Message "Route C budget audit must sanitize persisted error summaries"
     Assert-FileContains `
-        -Path (Join-Path $RepoRoot "server\src\store\route_c_budget.rs") `
+        -Path $BudgetLedgerModule `
         -Needle "secret prompt text" `
         -Message "Route C budget audit must keep a regression test for prompt-text redaction"
+    Assert-FileContains `
+        -Path $BudgetLedgerModule `
+        -Needle "route_c_budget_outcome_summaries" `
+        -Message "Route C budget audit must expose outcome summaries for operations triage"
+    Assert-FileContains `
+        -Path $RouteCAdminModule `
+        -Needle "outcomeSummaries" `
+        -Message "Route C admin budget report must return outcome summaries"
     Write-Host "Static Route C runtime guard contract passed."
 }
 
@@ -102,6 +112,7 @@ if (-not $SkipCargoTests) {
         Invoke-CargoTestFilter "server_agent_runtime_guard"
         Invoke-CargoTestFilter "server_agent_runtime_budget"
         Invoke-CargoTestFilter "server_agent_runtime"
+        Invoke-CargoTestFilter "route_c_budget"
     }
 }
 

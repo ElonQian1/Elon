@@ -57,6 +57,19 @@ pub async fn budget_report(
             );
         }
     };
+    let outcome_summaries = match state
+        .store
+        .route_c_budget_outcome_summaries(route_day.as_deref(), user_id.as_deref())
+    {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("admin route c budget outcome summary error: {e}");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "查询 Route C 调用结果摘要失败",
+            );
+        }
+    };
     let events = match state.store.route_c_budget_recent_events(
         route_day.as_deref(),
         user_id.as_deref(),
@@ -82,6 +95,7 @@ pub async fn budget_report(
             "userId": user_id,
         },
         "dailySummaries": summaries,
+        "outcomeSummaries": outcome_summaries,
         "recentEvents": events,
     }))
     .into_response()

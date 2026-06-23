@@ -27,6 +27,18 @@ pub(crate) struct RouteCBudgetDaySummary {
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub(crate) struct RouteCBudgetOutcomeSummary {
+    pub outcome: String,
+    pub total_calls: i64,
+    pub completed_calls: i64,
+    pub unique_users: i64,
+    pub total_tokens: Option<i64>,
+    pub first_created_at: Option<String>,
+    pub last_created_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub(crate) struct RouteCBudgetEventRow {
     pub id: String,
     pub user_id: String,
@@ -205,6 +217,44 @@ impl Store {
                     total_tokens: row.get(6)?,
                     first_created_at: row.get(7)?,
                     last_created_at: row.get(8)?,
+                })
+            })?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
+
+    pub(crate) fn route_c_budget_outcome_summaries(
+        &self,
+        route_day: Option<&str>,
+        user_id: Option<&str>,
+    ) -> Result<Vec<RouteCBudgetOutcomeSummary>> {
+        let route_day = route_day.map(str::trim).filter(|value| !value.is_empty());
+        let user_id = user_id.map(str::trim).filter(|value| !value.is_empty());
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT outcome,
+                    COUNT(*) AS total_calls,
+                    SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completed_calls,
+                    COUNT(DISTINCT user_id) AS unique_users,
+                    SUM(total_tokens) AS total_tokens,
+                    MIN(created_at) AS first_created_at,
+                    MAX(created_at) AS last_created_at
+               FROM route_c_runtime_budget_events
+              WHERE (?1 IS NULL OR route_day = ?1)
+                AND (?2 IS NULL OR user_id = ?2)
+              GROUP BY outcome
+              ORDER BY total_calls DESC, outcome ASC",
+        )?;
+        let rows = stmt
+            .query_map(params![route_day, user_id], |row| {
+                Ok(RouteCBudgetOutcomeSummary {
+                    outcome: row.get(0)?,
+                    total_calls: row.get(1)?,
+                    completed_calls: row.get(2)?,
+                    unique_users: row.get(3)?,
+                    total_tokens: row.get(4)?,
+                    first_created_at: row.get(5)?,
+                    last_created_at: row.get(6)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -609,6 +659,36 @@ mod tests {
         assert_eq!(summaries[1].route_day, "2026-06-22");
         assert_eq!(summaries[1].total_calls, 1);
         assert_eq!(summaries[1].completed_calls, 0);
+
+        let outcomes = store
+            .route_c_budget_outcome_summaries(Some("2026-06-23"), None)
+            .unwrap();
+        assert_eq!(outcomes.len(), 2);
+        let success = outcomes
+            .iter()
+            .find(|row| row.outcome == "success")
+            .expect("success outcome summary");
+        assert_eq!(success.total_calls, 1);
+        assert_eq!(success.completed_calls, 1);
+        assert_eq!(success.unique_users, 1);
+        assert_eq!(success.total_tokens, Some(120));
+        let provider_error = outcomes
+            .iter()
+            .find(|row| row.outcome == "provider_error")
+            .expect("provider_error outcome summary");
+        assert_eq!(provider_error.total_calls, 1);
+        assert_eq!(provider_error.completed_calls, 1);
+        assert_eq!(provider_error.unique_users, 1);
+        assert_eq!(provider_error.total_tokens, None);
+
+        let user_outcomes = store
+            .route_c_budget_outcome_summaries(None, Some(&user_a.id))
+            .unwrap();
+        assert!(user_outcomes.iter().any(|row| row.outcome == "admitted"));
+        assert!(user_outcomes.iter().any(|row| row.outcome == "success"));
+        assert!(!user_outcomes
+            .iter()
+            .any(|row| row.outcome == "provider_error"));
 
         let day_events = store
             .route_c_budget_recent_events(Some("2026-06-23"), None, 10)
