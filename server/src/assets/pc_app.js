@@ -1494,11 +1494,11 @@
       </div>`}
     </section>`;
     const registerBtn = $('projectRegisterLocalBtn');
-    if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench'));
+    if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }));
     const webBtn = $('projectOpenWebBtn');
     if (webBtn) webBtn.addEventListener('click', () => window.open('/web', '_blank'));
     const emptyRegisterBtn = $('projectEmptyRegisterBtn');
-    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench'));
+    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }));
     const emptyPlazaBtn = $('projectEmptyPlazaBtn');
     if (emptyPlazaBtn) emptyPlazaBtn.addEventListener('click', selectProjectPlaza);
     els.messageList.querySelectorAll('[data-open-project-id]').forEach((button) => {

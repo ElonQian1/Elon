@@ -1243,6 +1243,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(routerRs.includes('/assets/pc_app_agent_runs.js'), 'PC agent run asset should be routed');
 
   const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
+  const pcAppNormalized = pcApp.replace(/\r\n/g, '\n');
   assert.ok(pcApp.includes('X-Elon-Local-Admin-Token'), 'PC app should send local admin token header');
   assert.ok(pcApp.includes('refreshLocalAdminToken'), 'PC app should refresh the local admin token');
   assert.ok(pcApp.includes('resp.status === 403'), 'PC app should retry once after a stale local token');
@@ -1251,6 +1252,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('confirm_full_access: true'), 'full-access grant request should include explicit confirmation');
   assert.ok(pcApp.includes('ensureProjectInfoBeforeRegister'), 'project registration should inspect local folders before submit');
   assert.ok(pcApp.includes('正在自动读取目录信息'), 'project registration should explain auto inspection progress');
+  assert.ok(pcAppNormalized.includes("projectRegisterLocalBtn');\n    if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }))"), 'project page registration entry should open picker and auto-register');
+  assert.ok(pcAppNormalized.includes("projectEmptyRegisterBtn');\n    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }))"), 'empty project page registration entry should open picker and auto-register');
   assert.ok(pcApp.includes('settings-project-meta-row'), 'project inspection metadata should render as structured rows');
   assert.ok(pcApp.includes('registration.can_register'), 'project registration should read readiness from local inspect');
   assert.ok(pcApp.includes('autofill_fields'), 'project registration should display auto-filled fields');
