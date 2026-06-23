@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-24 04:47 当前重点已从 `source_message_id` 误报转为“保持非语音回归绿色，等待用户恢复 ASR/TTS”。主项目 validator 修复已发布到 `v0.3.766 / 34f05923e5f607787efab05164d5487d551cb611`，真实 visible data-only 回归 `target\fb2-ai-center\data-only-acceptance-20260623T204237Z.json` 已通过：`@EL`、长按 `AI回复`、总结帖、三类 feedback、summary post 模型生成、接口直读和质量窗口均为绿，`quality_missing_context_count=0`、`quality_wrong_context_count=0`、`quality_unmatched_cited_sources=0`。当前 `validate-fb2-ai-center-current-state.ps1` 为 `success=true failed_count=0 step_count=20 data_goal_complete=true protected_live_preflight_satisfied=true full_final_complete=false voice_deferred_by_user=true`；下一步不要重做 Context Pack/MCP/RAG，也不要恢复 ASR/TTS，除非用户明确解除语音暂停。
 - 2026-06-24 04:35 当前重点从“可见群聊能不能通”收敛为“来源校验不要误报字段名”：真实 visible data-only 回归已证明 `@EL`、长按 `AI回复`、总结帖、接口直读和三类 feedback 都能跑通，但 `source_message_id` 字段名被误识别成未注册来源，导致当前窗口 `wrong_context_count=1`。本轮修主项目 validator，让字段名占位不计入 source-like candidate，同时保留 `source-message-*` 等真实来源 token 的伪造检测；发布后重跑可见 data-only 回归，ASR/TTS 继续暂停。
 - 2026-06-24 04:20 当前重点从“fb2 应返回什么证据”继续补到“主项目应如何请求这些证据”：`GET /api/external/apps/fb2/context-contract` 现在暴露 `context_query_intent_contract schema=fb2.context_query_intent.v1`。fb2 子会话后续实现 `/context/pack` 时，应把入口、场景、lane、索引、权限 scope 和输出预算作为机器字段处理，而不是只靠自然语言 prompt。ASR/TTS 继续暂停；下一 checkpoint 优先按 Explorer 建议收紧 `protected_live_preflight_satisfied` 与历史 data-only 证据口径。
 - 2026-06-24 03:45 当前重点继续把 fb2 “长期快速检索”从索引蓝图推进到可审计证据形态：主项目公开契约已固定 `fb2.retrieval_evidence_item.v1`，要求每条被投影进 Context Pack 的比赛、赔率、本人订单、平台匿名摘要或群观点都有 `source_id/source_kind/lane_id/index_id/reason/freshness/permission_scope/citation_source_id`。fb2 子会话后续应按这个 shape 生成 `retrieval_evidence`，主项目只消费这些可引用投影，不复制 fb2 原始索引、数据库或 embedding。ASR/TTS 继续暂停，非语音回归优先保持 public contract、smoke、goal audit 全绿。
@@ -102,7 +103,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 $env:FB2_VISIBLE_SMOKE_PASSWORD='<FB2_PASSWORD>'
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\run-fb2-ai-center-token-bridge.ps1 -RunDataOnlyPreflight
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>
-# 最新严格直读样本：target\fb2-ai-center\data-only-acceptance-20260622T133357Z.json，直读、feedback、权限、quality 和观点采纳同批通过；ASR/TTS 仍暂停
+# 最新严格直读样本：target\fb2-ai-center\data-only-acceptance-20260623T204237Z.json，直读、feedback、权限、quality 和观点采纳同批通过；ASR/TTS 仍暂停
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -FinalAcceptance -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2Token <FB2_AI_CENTER_TOKEN> -ExternalUserId <fb2_user_uuid_with_orders> -VoiceDeviceEvidencePath <real-device-evidence.json>
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN> -VoiceDeviceEvidencePath <real-device-evidence.json>
