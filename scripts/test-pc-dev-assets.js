@@ -1333,6 +1333,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNormalized.includes("projectRegisterLocalBtn');\n    if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }))"), 'project page registration entry should open picker and auto-register');
   assert.ok(pcAppNormalized.includes("projectEmptyRegisterBtn');\n    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }))"), 'empty project page registration entry should open picker and auto-register');
   assert.ok(pcApp.includes('settings-project-meta-row'), 'project inspection metadata should render as structured rows');
+  assert.ok(pcApp.includes('projectRegistrationPreviewLine'), 'project registration should summarize the exact auto-filled registration payload');
+  assert.ok(pcApp.includes('is-register-preview'), 'project registration preview should be refreshable without re-inspecting the folder');
+  assert.ok(pcApp.includes("mode === 'full_access' ? '完全访问' : '项目内读写'"), 'project registration preview should surface full-access mode before submit');
   assert.ok(pcApp.includes('registration.can_register'), 'project registration should read readiness from local inspect');
   assert.ok(pcApp.includes('projectRegistrationResultKind'), 'project registration should style blocked and review-needed inspection results');
   assert.ok(pcApp.includes("registration.can_register === false) return 'error'"), 'blocked project registration inspection should show an error result');

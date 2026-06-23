@@ -1309,7 +1309,10 @@
     els.checkClientUpdateBtn.addEventListener('click', triggerClientUpdate);
     els.uninstallClientBtn.addEventListener('click', triggerClientUninstall);
     if (els.settingsRuntimePermission) {
-      els.settingsRuntimePermission.addEventListener('change', syncSettingsRuntimePermissionHint);
+      els.settingsRuntimePermission.addEventListener('change', () => {
+        syncSettingsRuntimePermissionHint();
+        refreshProjectRegistrationPreview();
+      });
       syncSettingsRuntimePermissionHint();
     }
     $('logoutBtn').addEventListener('click', logout);
@@ -3146,7 +3149,9 @@
     }
     const summary = clean(registration.summary) || (canRegister ? '已读取目录信息，可以注册。' : '目录信息不足，暂不能注册。');
     const statusTone = !canRegister ? 'error' : warnings.length ? 'warning' : 'ok';
+    const registerPreview = projectRegistrationPreviewLine();
     const rows = [
+      registerPreview && ['将注册', registerPreview, canRegister ? 'ok' : 'warning', 'is-register-preview'],
       ['目录', path],
       ['状态', summary, statusTone],
       ['Git', git],
@@ -3159,10 +3164,40 @@
       missingFields.length && ['缺少', missingFields.join('、'), 'error'],
       warnings.length && ['提醒', warnings.slice(0, 3).join('；'), 'warning']
     ].filter(Boolean);
-    els.settingsProjectMeta.innerHTML = rows.map(([label, value, tone]) => (
-      `<div class="settings-project-meta-row ${tone ? `is-${escapeHtml(tone)}` : ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
+    els.settingsProjectMeta.innerHTML = rows.map(([label, value, tone, extraClass]) => (
+      `<div class="settings-project-meta-row ${tone ? `is-${escapeHtml(tone)}` : ''} ${extraClass ? escapeHtml(extraClass) : ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
     )).join('');
     updateWorkbenchOnboarding();
+  }
+
+  function projectRegistrationPreviewLine() {
+    const name = clean(els.settingsProjectName && els.settingsProjectName.value);
+    const path = clean(els.settingsProjectPath && els.settingsProjectPath.value);
+    const repo = clean(els.settingsProjectRepo && els.settingsProjectRepo.value);
+    const branch = clean(els.settingsProjectBranch && els.settingsProjectBranch.value);
+    const mode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
+    const modeLabel = mode === 'full_access' ? '完全访问' : '项目内读写';
+    const devProfile = (state.localProjectInfo && state.localProjectInfo.devProfile) || {};
+    const commands = [
+      clean(devProfile.run_command) && `运行 ${clean(devProfile.run_command)}`,
+      clean(devProfile.test_command) && `测试 ${clean(devProfile.test_command)}`,
+      clean(devProfile.build_command) && `构建 ${clean(devProfile.build_command)}`
+    ].filter(Boolean);
+    const gitLine = repo
+      ? `Git ${repo}${branch ? ` @ ${branch}` : ''}`
+      : (branch ? `分支 ${branch}` : '');
+    return [
+      name && `项目 ${name}`,
+      gitLine || (path && '本地目录'),
+      `权限 ${modeLabel}`,
+      commands.length && `命令 ${commands.slice(0, 2).join(' / ')}`
+    ].filter(Boolean).join(' · ');
+  }
+
+  function refreshProjectRegistrationPreview() {
+    if (!els.settingsProjectMeta) return;
+    const preview = els.settingsProjectMeta.querySelector('.settings-project-meta-row.is-register-preview strong');
+    if (preview) preview.textContent = projectRegistrationPreviewLine();
   }
 
   function markLocalProjectPathDirty() {
