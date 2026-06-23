@@ -1441,6 +1441,17 @@ function testLocalAdminTokenWiring() {
   assert.ok(doctor.includes('localNodeApi(path, options || {})'), 'doctor project should reuse the protected local node API');
 }
 
+function testPcProjectCreateSkipsStorageByDefault() {
+  const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
+  assert.ok(pcAppHtml.includes('value="none">暂不使用代码存储'), 'PC create modal should default to no code storage');
+
+  const projectCreate = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_create.js'), 'utf8');
+  assert.ok(projectCreate.includes('const STORAGE_NONE'), 'PC create module should name the no-storage choice');
+  assert.ok(projectCreate.includes('skip_storage'), 'PC create submit should tell the server to skip storage by default');
+  assert.ok(projectCreate.includes('storageChoice === STORAGE_NONE'), 'PC create submit should only skip storage for the default choice');
+  assert.ok(projectCreate.includes('自动选择代码存储（高级）'), 'PC create modal should keep auto storage as an explicit advanced choice');
+}
+
 (async () => {
   testDevTasksContinueAction();
   testDevTasksHasOpenPendingApproval();
@@ -1462,6 +1473,7 @@ function testLocalAdminTokenWiring() {
   testDevComposerFallsBackFromUnavailableStoredRoute();
   testDevComposerForcedRoutePreference();
   testLocalAdminTokenWiring();
+  testPcProjectCreateSkipsStorageByDefault();
 
   console.log('pc-dev-assets tests passed');
 })().catch((error) => {

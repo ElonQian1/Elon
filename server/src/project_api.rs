@@ -31,6 +31,8 @@ pub struct CreateProjectRequest {
     pub node_id: Option<String>,
     /// 可选：项目代码母仓所在的 PC 硬盘节点；不传时优先自动使用当前用户的在线硬盘节点。
     pub storage_node_id: Option<String>,
+    /// PC 工作台新建项目默认跳过代码存储，先让用户拿到可用项目；高级场景再显式启用。
+    pub skip_storage: Option<bool>,
     /// 兼容未来扩展。当前只允许 "pc_node" / "pc" / 空值。
     pub execution_target: Option<String>,
 }
@@ -250,11 +252,13 @@ pub async fn create_project(
     let mut provision_branch = project.branch.clone();
     let mut storage_repo_created = None;
     let mut local_storage_clone_path = None;
+    let skip_storage = req.skip_storage.unwrap_or(false);
     if provision_repo_url
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .is_none()
+        && !skip_storage
     {
         let prepared_storage = match project_storage::maybe_prepare_project_storage_repo(
             &state,

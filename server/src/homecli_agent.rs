@@ -38,6 +38,8 @@ use crate::types::AppState;
 // ── manager state ────────────────────────────────────────────────────────────
 
 const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
+const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
+const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
 
 /// Snapshot of one connected PC agent.
 #[derive(Clone)]
@@ -396,9 +398,9 @@ impl AgentManager {
             .get(agent_id)
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
         let (tx, mut rx) = mpsc::unbounded_channel();
-        agent.pending.lock().await.insert(req_id.clone(), tx);
-        agent
-            .cmd_tx
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
+        let send_result = agent.cmd_tx
             .send(homecli_proto::ServerToAgent::ProvisionProjectWorkspace {
                 req_id: req_id.clone(),
                 project_id,
@@ -408,13 +410,24 @@ impl AgentManager {
                 repo_url,
                 branch,
             })
-            .map_err(|_| anyhow!("agent writer closed"))?;
+            .map_err(|_| anyhow!("agent writer closed"));
+        if let Err(error) = send_result {
+            pending.lock().await.remove(&req_id);
+            return Err(error);
+        }
         drop(agents);
 
-        match tokio::time::timeout(Duration::from_secs(120), rx.recv()).await {
+        let timeout = project_workspace_provision_timeout();
+        match tokio::time::timeout(timeout, rx.recv()).await {
             Ok(Some(msg)) => Ok(msg),
             Ok(None) => Err(anyhow!("agent disconnected before provisioning response")),
-            Err(_) => Err(anyhow!("project workspace provisioning timeout (120s)")),
+            Err(_) => {
+                pending.lock().await.remove(&req_id);
+                Err(anyhow!(
+                    "PC 节点创建项目工作区超时（{} 秒），请确认本机助手仍在运行后重试",
+                    timeout.as_secs()
+                ))
+            }
         }
     }
 
@@ -435,9 +448,9 @@ impl AgentManager {
             .get(agent_id)
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
         let (tx, mut rx) = mpsc::unbounded_channel();
-        agent.pending.lock().await.insert(req_id.clone(), tx);
-        agent
-            .cmd_tx
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
+        let send_result = agent.cmd_tx
             .send(homecli_proto::ServerToAgent::PrepareProjectStorageRepo {
                 req_id: req_id.clone(),
                 project_id,
@@ -447,13 +460,24 @@ impl AgentManager {
                 access_token,
                 prepare_worktree,
             })
-            .map_err(|_| anyhow!("agent writer closed"))?;
+            .map_err(|_| anyhow!("agent writer closed"));
+        if let Err(error) = send_result {
+            pending.lock().await.remove(&req_id);
+            return Err(error);
+        }
         drop(agents);
 
-        match tokio::time::timeout(Duration::from_secs(60), rx.recv()).await {
+        let timeout = project_storage_prepare_timeout();
+        match tokio::time::timeout(timeout, rx.recv()).await {
             Ok(Some(msg)) => Ok(msg),
             Ok(None) => Err(anyhow!("agent disconnected before storage repo response")),
-            Err(_) => Err(anyhow!("project storage repo prepare timeout (60s)")),
+            Err(_) => {
+                pending.lock().await.remove(&req_id);
+                Err(anyhow!(
+                    "PC 节点准备代码存储超时（{} 秒），请稍后重试或先不启用代码存储",
+                    timeout.as_secs()
+                ))
+            }
         }
     }
 
@@ -1081,6 +1105,23 @@ async fn run_agent_session(
 
 fn tool_approval_ack_key(req_id: &str, approval_id: &str, dispatch_id: &str) -> String {
     format!("{req_id}:{approval_id}:{dispatch_id}")
+}
+
+fn project_workspace_provision_timeout() -> Duration {
+    env_timeout(PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV, 30, 5, 180)
+}
+
+fn project_storage_prepare_timeout() -> Duration {
+    env_timeout(PROJECT_STORAGE_PREPARE_TIMEOUT_ENV, 15, 5, 120)
+}
+
+fn env_timeout(name: &str, default_secs: u64, min_secs: u64, max_secs: u64) -> Duration {
+    let seconds = std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(default_secs)
+        .clamp(min_secs, max_secs);
+    Duration::from_secs(seconds)
 }
 
 fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {

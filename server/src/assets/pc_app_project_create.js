@@ -4,6 +4,8 @@
       state, els, clean, escapeHtml, api, loadBaseData, selectProject,
       refreshActive, renderProjectRail, sameId
     } = ctx;
+    const STORAGE_NONE = 'none';
+    const STORAGE_AUTO = 'auto';
 
     function setBusy(button, busy, label) {
       if (!button) return;
@@ -160,16 +162,22 @@
         const configured = node.storage_repo_url_configured ? '可跨 PC' : '仅同机/需升级';
         return `<option value="${escapeHtml(nodeId)}">${escapeHtml(label)} · ${escapeHtml(shortId)} · ${escapeHtml(configured)}</option>`;
       }).join('');
-      els.pcProjectStorageNodeSelect.innerHTML = '<option value="">自动选择可用存储</option>' + storageOptions;
+      els.pcProjectStorageNodeSelect.innerHTML = [
+        `<option value="${STORAGE_NONE}">暂不使用代码存储（推荐）</option>`,
+        storageNodes.length ? `<option value="${STORAGE_AUTO}">自动选择代码存储（高级）</option>` : '',
+        storageOptions
+      ].join('');
+      els.pcProjectStorageNodeSelect.value = STORAGE_NONE;
       els.pcProjectStorageNodeSelect.disabled = false;
       els.pcProjectStorageHint.textContent = storageNodes.length
-        ? '可选代码存储会保存项目母仓；远程开发环境可从这里重建项目。'
-        : '没有可用代码存储时，项目仍会创建在所选开发环境上。';
+        ? '默认先创建在开发环境上；需要跨 PC 迁移时再启用代码存储。'
+        : '项目会直接创建在所选开发环境上。';
     }
 
     function open() {
       if (!state.token) return false;
       setError('');
+      setBusy(els.pcProjectCreateSubmitBtn, false);
       els.pcProjectNameInput.value = '';
       els.pcProjectDescInput.value = '';
       els.pcProjectTemplateSelect.value = 'android_kotlin';
@@ -179,12 +187,12 @@
       els.pcProjectNodeSelect.disabled = true;
       els.pcProjectNodeSelect.innerHTML = '<option value="">正在加载可用开发环境...</option>';
       els.pcProjectStorageNodeSelect.disabled = true;
-      els.pcProjectStorageNodeSelect.innerHTML = '<option value="">正在加载代码存储...</option>';
+      els.pcProjectStorageNodeSelect.innerHTML = `<option value="${STORAGE_NONE}">暂不使用代码存储</option>`;
       els.pcProjectCreateBackdrop.hidden = false;
       loadNodes().catch((error) => {
         els.pcProjectNodeSelect.innerHTML = '<option value="">加载开发环境失败</option>';
         els.pcProjectNodeSelect.disabled = true;
-        els.pcProjectStorageNodeSelect.innerHTML = '<option value="">加载代码存储失败</option>';
+        els.pcProjectStorageNodeSelect.innerHTML = `<option value="${STORAGE_NONE}">暂不使用代码存储</option>`;
         els.pcProjectStorageNodeSelect.disabled = true;
         els.pcProjectStorageHint.textContent = '';
         setError(error.message || '加载开发环境失败');
@@ -208,6 +216,12 @@
         return;
       }
       const repoUrl = clean(els.pcProjectRepoInput.value);
+      const storageChoice = clean(els.pcProjectStorageNodeSelect.value) || STORAGE_NONE;
+      const storageNodeId = (!repoUrl
+        && storageChoice !== STORAGE_NONE
+        && storageChoice !== STORAGE_AUTO)
+        ? storageChoice
+        : null;
       setBusy(els.pcProjectCreateSubmitBtn, true, '创建中...');
       try {
         const data = await api('/api/projects', {
@@ -220,7 +234,8 @@
             branch: clean(els.pcProjectBranchInput.value) || null,
             execution_target: 'pc_node',
             node_id: nodeId,
-            storage_node_id: repoUrl ? null : (clean(els.pcProjectStorageNodeSelect.value) || null)
+            storage_node_id: repoUrl || storageChoice === STORAGE_AUTO ? null : storageNodeId,
+            skip_storage: !!repoUrl || storageChoice === STORAGE_NONE
           })
         });
         const project = (data && data.project) || {};
