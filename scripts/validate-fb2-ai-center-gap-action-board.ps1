@@ -107,6 +107,7 @@ function New-Fb2GapValidation {
     $checks = [System.Collections.ArrayList]::new()
     $board = Get-Fb2GapProperty $Refresh "gap_action_board"
     $blocking = Get-Fb2GapProperty $Refresh "blocking_state"
+    $ownerNextActions = Get-Fb2GapProperty $Refresh "owner_next_actions"
     $nextCommands = Get-Fb2GapProperty $Refresh "next_commands"
     $actions = @(Get-Fb2GapProperty $board "actions" @())
 
@@ -144,6 +145,31 @@ function New-Fb2GapValidation {
         }
 
         Add-Fb2GapCheck $checks "blocking records voice defer" ($deferredByUser -contains "ASR_TTS_final_evidence")
+    }
+
+    Add-Fb2GapCheck $checks "owner next actions present" ($null -ne $ownerNextActions)
+    if ($null -ne $ownerNextActions) {
+        $mainProjectAction = [string](Get-Fb2GapProperty $ownerNextActions "main_project" "")
+        $fb2ProjectAction = [string](Get-Fb2GapProperty $ownerNextActions "fb2_project" "")
+        $sharedAction = [string](Get-Fb2GapProperty $ownerNextActions "shared" "")
+        Add-Fb2GapCheck $checks "owner main project keeps regressions green" (
+            $mainProjectAction -match "contract" -and
+            $mainProjectAction -match "status" -and
+            $mainProjectAction -match "FB2_AI_CENTER_TOKEN"
+        )
+        Add-Fb2GapCheck $checks "owner fb2 project provides token or live evidence" (
+            $fb2ProjectAction -match "FB2_AI_CENTER_TOKEN" -and
+            $fb2ProjectAction -match "live_Context_Pack|Context_Pack|Context Pack|permission|quality"
+        )
+        Add-Fb2GapCheck $checks "owner shared runs token preflight" (
+            $sharedAction -match "DataOnlyAcceptance_PreflightOnly" -and
+            $sharedAction -match "token|FB2_AI_CENTER_TOKEN"
+        )
+        Add-Fb2GapCheck $checks "owner actions secret safe" (
+            (Test-Fb2GapSecretSafe -Text $mainProjectAction) -and
+            (Test-Fb2GapSecretSafe -Text $fb2ProjectAction) -and
+            (Test-Fb2GapSecretSafe -Text $sharedAction)
+        )
     }
 
     Add-Fb2GapCheck $checks "next commands present" ($null -ne $nextCommands)
@@ -259,6 +285,11 @@ function Invoke-Fb2GapSelfTest {
     try {
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null
         $fixture = [pscustomobject]@{
+            owner_next_actions = [ordered]@{
+                main_project = "keep_contract_and_status_regressions_green_until_FB2_AI_CENTER_TOKEN_is_available"
+                fb2_project = "provide_FB2_AI_CENTER_TOKEN_or_export_equivalent_live_Context_Pack_permission_quality_evidence"
+                shared = "run_DataOnlyAcceptance_PreflightOnly_with_token_then_refresh_status_refresh_current_json"
+            }
             blocking_state = [ordered]@{
                 blocked_by_external_secret = $true
                 external_secret = "FB2_AI_CENTER_TOKEN"
@@ -349,6 +380,12 @@ function Invoke-Fb2GapSelfTest {
         $badCommandValidation = New-Fb2GapValidation -Refresh $badCommandFixture -SourcePath "selftest-bad-visible-preflight.json"
         if ([bool]$badCommandValidation.success) {
             throw "SelfTest failed: data_only_preflight with visible write should fail"
+        }
+        $badOwnerFixture = $fixture | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        $badOwnerFixture.owner_next_actions.fb2_project = "continue later"
+        $badOwnerValidation = New-Fb2GapValidation -Refresh $badOwnerFixture -SourcePath "selftest-bad-owner-next-actions.json"
+        if ([bool]$badOwnerValidation.success) {
+            throw "SelfTest failed: vague owner_next_actions should fail"
         }
         "== SelfTest Summary =="
         "failed=0"

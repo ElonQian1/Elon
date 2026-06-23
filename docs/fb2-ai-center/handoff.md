@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮把 `owner_next_actions` 也纳入 validator：主项目动作必须是保持 contract/status 回归直到 token 可用，fb2 子项目动作必须明确提供 `FB2_AI_CENTER_TOKEN` 或等价 live Context Pack/权限/质量证据，shared 动作必须是带 token 跑 `DataOnlyAcceptance_PreflightOnly` 后刷新 status。这样后续两个会话不会把“主项目还能做什么”和“必须 fb2 提供 token/live 证据”的边界写成模糊交接。
 - 2026-06-23 本轮把 `next_commands` 也纳入 JSON 级安全门禁：`validate-fb2-ai-center-gap-action-board.ps1` 会检查接手命令齐全、密钥/密码占位、离线 Context Pack 样本命令、只读群聊直读命令、无写群 data-only preflight 和需显式授权的可见群聊回归命令。后续如果 `status-refresh-current.json.next_commands` 漂移，例如把 `data_only_preflight` 误改成带 `AllowVisibleMessages`，validator 自测和正式验证都会失败。
 - 2026-06-23 本轮补齐 handoff prompt validator 自测负例：`validate-fb2-ai-center-handoff-prompt.ps1 -SelfTest` 现在会验证缺失无密钥动作边界的 prompt 必须失败，和真实密钥泄露、脚本片段泄露负例一起保护交接提示。后续如果调整 `blocking_state.safe_to_continue_without_secret` 或 handoff prompt 文案，要先跑该 selftest，再跑正式 validator。
 - 2026-06-23 本轮补强 `blocking_state` 的机器校验：`validate-fb2-ai-center-gap-action-board.ps1` 不再只看 `gap_action_board.actions`，还会直接检查 status refresh 里的无密钥可继续动作、需 `FB2_AI_CENTER_TOKEN` 的 live 验证动作、外部 token 阻塞、下一步动作一致性和 ASR/TTS 暂停边界。这样即使 handoff prompt 没重新生成，`status-refresh-current.json` 自身的阻塞/可推进边界也会被 validator 拦住。
