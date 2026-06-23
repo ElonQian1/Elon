@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮新增 `validate-fb2-ai-center-evidence-freshness.ps1`，用于独立校验 `status-refresh-current.json.evidence_freshness`：核心 artifact 必须来自当前 output dir，`generated_at_utc` 不能过期，顶层 token/data/full-final 标志要和 freshness 摘要一致，fb2-repo 样本验证 artifact 要和 `files.exported_context_pack_sample_set_validation` 对齐。接手会话在刷新 status 后应和 gap/completion/handoff validator 一起运行 `validate_evidence_freshness`，防止把历史 artifact 当作刚完成的 protected live 验证。
 - 2026-06-23 本轮把 `owner_next_actions` 也纳入 validator：主项目动作必须是保持 contract/status 回归直到 token 可用，fb2 子项目动作必须明确提供 `FB2_AI_CENTER_TOKEN` 或等价 live Context Pack/权限/质量证据，shared 动作必须是带 token 跑 `DataOnlyAcceptance_PreflightOnly` 后刷新 status。这样后续两个会话不会把“主项目还能做什么”和“必须 fb2 提供 token/live 证据”的边界写成模糊交接。
 - 2026-06-23 本轮把 `next_commands` 也纳入 JSON 级安全门禁：`validate-fb2-ai-center-gap-action-board.ps1` 会检查接手命令齐全、密钥/密码占位、离线 Context Pack 样本命令、只读群聊直读命令、无写群 data-only preflight 和需显式授权的可见群聊回归命令。后续如果 `status-refresh-current.json.next_commands` 漂移，例如把 `data_only_preflight` 误改成带 `AllowVisibleMessages`，validator 自测和正式验证都会失败。
 - 2026-06-23 本轮补齐 handoff prompt validator 自测负例：`validate-fb2-ai-center-handoff-prompt.ps1 -SelfTest` 现在会验证缺失无密钥动作边界的 prompt 必须失败，和真实密钥泄露、脚本片段泄露负例一起保护交接提示。后续如果调整 `blocking_state.safe_to_continue_without_secret` 或 handoff prompt 文案，要先跑该 selftest，再跑正式 validator。

@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-evidence-freshness.ps1`，把 `status-refresh-current.json.evidence_freshness` 做成独立机器门禁。该脚本检查 schema、generated_at 是否过期、artifact 数量是否一致、`status_refresh` / `handoff_prompt` 等核心 artifact 是否来自当前 output dir、token/data/full-final 标志是否与 refresh 顶层一致，并在有 fb2-repo Context Pack 样本验证文件时要求 freshness artifact 路径与 `files.exported_context_pack_sample_set_validation` 一致。`next_commands`、handoff prompt 和现有 validator 已新增 `validate_evidence_freshness`，避免历史证据被误当成当前 live 证据。
 - 2026-06-23 本轮继续加固 `owner_next_actions` 协作分工：`validate-fb2-ai-center-gap-action-board.ps1` 现在会检查主项目动作必须围绕 contract/status 回归直到 `FB2_AI_CENTER_TOKEN` 可用，fb2 子项目动作必须明确提供 `FB2_AI_CENTER_TOKEN` 或等价 live Context Pack/权限/质量证据，shared 动作必须指向带 token 的 `DataOnlyAcceptance_PreflightOnly` 后刷新 status。自测新增“fb2_project=continue later”这类含糊交接必须失败的负例。
 - 2026-06-23 本轮继续加固 `next_commands` JSON 本身：`validate-fb2-ai-center-gap-action-board.ps1` 现在会直接检查 `status-refresh-current.json.next_commands` 中 12 条接手命令是否存在、是否使用占位符而不是真实 token/password、Context Pack 样本导出/校验命令是否保留 `PrintExportRequest` / `ValidateSampleSet`、`no_write_direct_read` 是否只读不写群、`data_only_preflight` 是否没有 `AllowVisibleMessages`、可见群聊回归是否显式需要 `AllowVisibleMessages`。自测新增 data-only preflight 被误替换成可见写群命令的负例。
 - 2026-06-23 本轮补齐 `validate-fb2-ai-center-handoff-prompt.ps1 -SelfTest` 的边界负例：除了脚本片段和真实密钥泄露外，自测现在会构造缺失 `offline_context_pack_sample_validation` / `handoff_documentation` 的 handoff prompt，并要求 validator 必须失败。这样 handoff prompt 的无密钥/需密钥边界不是只靠正式运行时偶然覆盖，而是自测也能防止回退。
