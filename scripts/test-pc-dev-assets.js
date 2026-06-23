@@ -1318,6 +1318,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('launcher_logs_dir'), 'PC settings should display the client launcher logs directory');
   assert.ok(pcApp.includes('clientPackageLatest'), 'PC settings should keep latest Windows client package metadata');
   assert.ok(pcApp.includes('客户端已是最新'), 'PC settings should compare installed and latest client package versions');
+  assert.ok(pcApp.includes('clientStartMenuLine'), 'PC settings should summarize Windows start menu maintenance entry health');
+  assert.ok(pcApp.includes('missing_start_menu_entry_count'), 'PC settings should display missing start menu maintenance entries');
+  assert.ok(pcApp.includes('维护入口不完整'), 'PC settings should explain incomplete start menu maintenance entries');
   assert.ok(pcApp.includes('positionRailTooltip'), 'PC rail should position its custom hover tooltip');
   assert.ok(pcApp.includes('aria-describedby'), 'PC rail icons should expose the shared tooltip to assistive tech');
   assert.ok(pcApp.includes("button.removeAttribute('title')"), 'PC rail icons should avoid duplicate native tooltips');
@@ -1394,6 +1397,10 @@ function testLocalAdminTokenWiring() {
   const clientMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_maintenance.rs'), 'utf8');
   assert.ok(clientMaintenance.includes('maintenance_recent_events'), 'client maintenance status should expose recent maintenance events');
   assert.ok(clientMaintenance.includes('recent_maintenance_events'), 'client maintenance status should read recent maintenance log lines');
+  const clientInstallStatus = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_install_status.rs'), 'utf8');
+  assert.ok(clientInstallStatus.includes('start_menu_status'), 'client install status should expose start menu shortcut health');
+  assert.ok(clientInstallStatus.includes('missing_start_menu_entry_count'), 'client install status should count missing start menu entries');
+  assert.ok(clientInstallStatus.includes('missing_start_menu_shortcuts_are_actionable'), 'client install status should test missing start menu repair guidance');
   const taskJournalApi = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_task_journal_api.rs'), 'utf8');
   assert.ok(taskJournalApi.includes('post(cancel_task_journal)'), 'task journal API should expose a protected cancel endpoint');
 
@@ -1419,6 +1426,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAdmin.includes('api_base: apiBase || null'), 'standalone node admin page should save Route B API base');
   assert.ok(nodeAdmin.includes('logs_dir'), 'standalone node admin page should display runtime logs directory');
   assert.ok(nodeAdmin.includes('launcher_logs_dir'), 'standalone node admin page should display launcher logs directory');
+  assert.ok(nodeAdmin.includes('clientStartMenuLine'), 'standalone node admin page should summarize start menu shortcut health');
+  assert.ok(nodeAdmin.includes('missing_start_menu_entry_count'), 'standalone node admin page should show missing start menu entry counts');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('logs'"), 'standalone node admin page should open runtime logs');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('launcher_logs'"), 'standalone node admin page should open launcher logs');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('task_journal'"), 'standalone node admin page should keep task journal separate');
@@ -1433,6 +1442,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nativeNodeAdmin.includes('logs_dir'), 'PC node panel should display runtime logs directory');
   assert.ok(nativeNodeAdmin.includes('open_client_logs'), 'PC node panel should expose runtime logs action');
   assert.ok(nativeNodeAdmin.includes('launcher_logs_dir'), 'PC node panel should display launcher logs directory');
+  assert.ok(nativeNodeAdmin.includes('clientStartMenuLine'), 'PC node panel should summarize start menu shortcut health');
+  assert.ok(nativeNodeAdmin.includes('missing_start_menu_entry_count'), 'PC node panel should show missing start menu entry counts');
   assert.ok(nativeNodeAdmin.includes('open_launcher_logs'), 'PC node panel should expose launcher logs action');
   assert.ok(nativeNodeAdmin.includes('loadLatestClientPackageVersion'), 'PC node panel should fetch latest client package metadata');
   assert.ok(nativeNodeAdmin.includes('clientUpdateLine'), 'PC node panel should compare installed and latest client versions');

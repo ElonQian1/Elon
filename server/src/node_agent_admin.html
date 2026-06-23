@@ -473,10 +473,8 @@ async function loadClientMaintenance() {
   const installedSha = String(r.installed_git_sha || (r.install && r.install.installed_git_sha) || '').trim();
   const packageVersion = String(r.installed_package_version || (r.install && r.install.installed_package_version) || '').trim();
   const product = r.product_status || (r.install && r.install.product_status) || {};
-  const startMenuName = String(product.start_menu_folder_name || '').trim();
-  const startMenuEntries = Array.isArray(product.start_menu_entries)
-    ? product.start_menu_entries.map(v => String(v || '').trim()).filter(Boolean).slice(0, 5)
-    : [];
+  const startMenu = r.start_menu || (r.install && r.install.start_menu) || {};
+  const startMenuLine = clientStartMenuLine(product, startMenu);
   const packageLine = installedSha
     ? `包 ${esc(shortHash(installedSha))}${packageVersion ? ' / ' + esc(packageVersion) : ''}`
     : '未读取包版本';
@@ -489,7 +487,7 @@ async function loadClientMaintenance() {
     `<span>客户端版本：${esc(r.version || '-')}</span>`,
     `<span>${packageLine}</span>`,
     `<span>${esc(layoutLine)}</span>`,
-    `<span>开始菜单：${startMenuName ? esc(startMenuName + ' · ' + startMenuEntries.join(' / ')) : '未上报'}</span>`,
+    `<span>开始菜单：${startMenuLine ? esc(startMenuLine) : '未上报'}</span>`,
   ].join('');
   paths.innerHTML = [
     `<span>安装目录：${pathCode(r.install_dir)}</span>`,
@@ -499,6 +497,33 @@ async function loadClientMaintenance() {
     `<span>配置目录：${pathCode(r.config_dir)}</span>`,
     `<span>配置文件：${pathCode(r.state_file)}</span>`,
   ].join('');
+}
+
+function clientStartMenuLine(product, startMenu) {
+  const folder = String((startMenu && (startMenu.folder || startMenu.folder_name)) || (product && product.start_menu_folder_name) || '').trim();
+  const entriesSource = Array.isArray(startMenu && startMenu.entry_names)
+    ? startMenu.entry_names
+    : (Array.isArray(product && product.start_menu_entries) ? product.start_menu_entries : []);
+  const entries = entriesSource.map(v => String(v || '').trim()).filter(Boolean).slice(0, 5).join(' / ');
+  const status = clientStartMenuStatusLine(String((startMenu && startMenu.status) || (product && product.start_menu_status) || '').trim());
+  const missing = Number((product && product.missing_start_menu_entry_count)
+    || (Array.isArray(startMenu && startMenu.missing_entries) ? startMenu.missing_entries.length : 0)
+    || 0);
+  const parts = [];
+  if (entries) parts.push(entries);
+  if (status) parts.push(status);
+  if (missing > 0) parts.push(`缺 ${missing} 个入口`);
+  if (folder) return `${folder}${parts.length ? ' · ' + parts.join(' · ') : ''}`;
+  return parts.join(' · ');
+}
+
+function clientStartMenuStatusLine(status) {
+  const value = String(status || '').trim().toLowerCase();
+  if (!value || value === 'unknown') return '';
+  if (value === 'clean') return '入口完整';
+  if (value === 'missing') return '开始菜单文件夹缺失';
+  if (value === 'incomplete') return '维护入口不完整';
+  return value;
 }
 
 function setBusy(btn, text) {

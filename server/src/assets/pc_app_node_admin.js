@@ -367,6 +367,7 @@
       }
       const install = data.install || {};
       const product = data.product_status || install.product_status || {};
+      const startMenu = data.start_menu || install.start_menu || {};
       const installedSha = clean(data.installed_git_sha || install.installed_git_sha);
       const packageVersion = clean(data.installed_package_version || install.installed_package_version);
       const installState = data.supported === false
@@ -379,15 +380,12 @@
         ? `${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
         : '未读取';
       const entryLine = clean(product.primary_entry_name) || '一龙PC节点.exe';
-      const startMenuFolder = clean(product.start_menu_folder_name);
-      const startMenuEntries = Array.isArray(product.start_menu_entries)
-        ? product.start_menu_entries.map(clean).filter(Boolean).slice(0, 5).join(' / ')
-        : '';
+      const startMenuLine = clientStartMenuLine(product, startMenu);
       const updateLine = clientUpdateLine(data, latestClientPackage);
       panel.innerHTML = [
         row('健康', clean(product.summary) || '未读取'),
         row('入口', entryLine),
-        row('开始菜单', startMenuFolder ? `${startMenuFolder}${startMenuEntries ? ` · ${startMenuEntries}` : ''}` : '未上报'),
+        row('开始菜单', startMenuLine || '未上报'),
         row('运行版本', clean(data.version) || '未知'),
         row('安装状态', `${installState} · ${running}`),
         row('安装包', packageLine),
@@ -591,6 +589,33 @@
       if (value === 'incomplete') return '安装不完整';
       if (value === 'unsupported') return '非 Win 维护环境';
       return '目录状态未知';
+    }
+
+    function clientStartMenuLine(product, startMenu) {
+      const folder = clean(startMenu && (startMenu.folder || startMenu.folder_name)) || clean(product && product.start_menu_folder_name);
+      const entriesSource = Array.isArray(startMenu && startMenu.entry_names)
+        ? startMenu.entry_names
+        : (Array.isArray(product && product.start_menu_entries) ? product.start_menu_entries : []);
+      const entries = entriesSource.map(clean).filter(Boolean).slice(0, 5).join(' / ');
+      const status = clientStartMenuStatusLabel(clean((startMenu && startMenu.status) || (product && product.start_menu_status)));
+      const missing = Number((product && product.missing_start_menu_entry_count)
+        || (Array.isArray(startMenu && startMenu.missing_entries) ? startMenu.missing_entries.length : 0)
+        || 0);
+      const parts = [];
+      if (entries) parts.push(entries);
+      if (status) parts.push(status);
+      if (missing > 0) parts.push(`缺 ${missing} 个入口`);
+      if (folder) return `${folder}${parts.length ? ' · ' + parts.join(' · ') : ''}`;
+      return parts.join(' · ');
+    }
+
+    function clientStartMenuStatusLabel(status) {
+      const value = clean(status).toLowerCase();
+      if (!value || value === 'unknown') return '';
+      if (value === 'clean') return '入口完整';
+      if (value === 'missing') return '开始菜单文件夹缺失';
+      if (value === 'incomplete') return '维护入口不完整';
+      return value;
     }
 
     function hardwareLine(hardware) {

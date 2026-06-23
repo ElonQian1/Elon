@@ -2,11 +2,30 @@
 
 use serde_json::{json, Value};
 #[cfg(any(windows, test))]
-use std::{fs, path::Path};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 const CLIENT_EXE_NAME: &str = "一龙PC节点.exe";
 const UNINSTALL_EXE_NAME: &str = "卸载一龙PC节点.exe";
 const INTERNAL_DIR_NAME: &str = "_internal";
+const START_MENU_FOLDER_NAME: &str = "一龙PC节点";
+const START_MENU_ENTRY_NAMES: &[&str] = &[
+    "一龙PC节点",
+    "打开运行日志",
+    "导出诊断",
+    "检查更新",
+    "卸载一龙PC节点",
+];
+#[cfg(any(windows, test))]
+const START_MENU_SHORTCUT_FILES: &[&str] = &[
+    "一龙PC节点.lnk",
+    "打开运行日志.lnk",
+    "导出诊断.lnk",
+    "检查更新.lnk",
+    "卸载一龙PC节点.lnk",
+];
 
 #[cfg(any(windows, test))]
 const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
@@ -66,11 +85,22 @@ pub(crate) fn status_payload() -> Value {
 
 #[cfg(any(windows, test))]
 pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Path>) -> Value {
+    let start_menu_folder = default_start_menu_folder();
+    status_for_install_dir_with_start_menu(install_dir, current_exe, start_menu_folder.as_deref())
+}
+
+#[cfg(any(windows, test))]
+fn status_for_install_dir_with_start_menu(
+    install_dir: &Path,
+    current_exe: Option<&Path>,
+    start_menu_folder: Option<&Path>,
+) -> Value {
     let client_exe = install_dir.join(CLIENT_EXE_NAME);
     let uninstall_exe = install_dir.join(UNINSTALL_EXE_NAME);
     let internal_dir = install_dir.join(INTERNAL_DIR_NAME);
     let version_file = internal_dir.join("node-agent-version.json");
     let layout = root_layout_status(install_dir, &client_exe, &uninstall_exe, &internal_dir);
+    let start_menu = start_menu_status(start_menu_folder);
     let manifest = version_manifest_summary(&version_file);
     let installed = client_exe.exists() && uninstall_exe.exists();
     let running_from_install_dir = current_exe
@@ -86,7 +116,7 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_string();
-    let product_status = product_status(installed, running_from_install_dir, &layout);
+    let product_status = product_status(installed, running_from_install_dir, &layout, &start_menu);
 
     json!({
         "supported": true,
@@ -102,6 +132,7 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
         "version_manifest": manifest,
         "layout_status": layout["status"].clone(),
         "layout": layout,
+        "start_menu": start_menu,
         "product_status": product_status,
         "files": {
             "client_exe": file_meta(&client_exe),
@@ -113,15 +144,32 @@ pub(crate) fn status_for_install_dir(install_dir: &Path, current_exe: Option<&Pa
 }
 
 #[cfg(any(windows, test))]
-fn product_status(installed: bool, running_from_install_dir: bool, layout: &Value) -> Value {
+fn product_status(
+    installed: bool,
+    running_from_install_dir: bool,
+    layout: &Value,
+    start_menu: &Value,
+) -> Value {
     let layout_status = layout["status"].as_str().unwrap_or("unknown");
+    let start_menu_status = start_menu
+        .get("status")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
     let missing_entry_count = array_len(layout.get("missing_entries"));
     let legacy_file_count = array_len(layout.get("legacy_top_level_files"));
     let unexpected_entry_count = array_len(layout.get("unexpected_top_level_entries"));
+    let missing_start_menu_entry_count = array_len(start_menu.get("missing_entries"));
     let (status, summary) = if !installed {
         (
             "needs_repair",
             format!("安装不完整；请重新运行 {CLIENT_EXE_NAME}，客户端会自动修复安装目录。"),
+        )
+    } else if matches!(start_menu_status, "missing" | "incomplete") {
+        (
+            "repair_recommended",
+            format!(
+                "客户端可用，但开始菜单维护入口不完整；重新运行 {CLIENT_EXE_NAME} 会自动修复。"
+            ),
         )
     } else if layout_status == "clean" && running_from_install_dir {
         (
@@ -146,6 +194,9 @@ fn product_status(installed: bool, running_from_install_dir: bool, layout: &Valu
     } else if layout_status != "clean" {
         recommended_actions.push(format!("重新运行 {CLIENT_EXE_NAME} 收敛安装目录。"));
     }
+    if installed && matches!(start_menu_status, "missing" | "incomplete") {
+        recommended_actions.push(format!("重新运行 {CLIENT_EXE_NAME} 修复开始菜单维护入口。"));
+    }
     if installed && !running_from_install_dir {
         recommended_actions.push(format!("以后从安装目录运行 {CLIENT_EXE_NAME}。"));
     }
@@ -164,6 +215,8 @@ fn product_status(installed: bool, running_from_install_dir: bool, layout: &Valu
         "missing_entry_count": missing_entry_count,
         "legacy_file_count": legacy_file_count,
         "unexpected_entry_count": unexpected_entry_count,
+        "start_menu_status": start_menu_status,
+        "missing_start_menu_entry_count": missing_start_menu_entry_count,
         "recommended_actions": recommended_actions,
     })
 }
@@ -191,13 +244,7 @@ fn root_layout_expectation() -> String {
 }
 
 fn start_menu_entries() -> Vec<&'static str> {
-    vec![
-        "一龙PC节点",
-        "打开运行日志",
-        "导出诊断",
-        "检查更新",
-        "卸载一龙PC节点",
-    ]
+    START_MENU_ENTRY_NAMES.to_vec()
 }
 
 #[cfg(any(windows, test))]
@@ -257,6 +304,63 @@ fn root_layout_status(
 }
 
 #[cfg(any(windows, test))]
+fn default_start_menu_folder() -> Option<PathBuf> {
+    std::env::var_os("APPDATA").map(|appdata| {
+        PathBuf::from(appdata)
+            .join("Microsoft")
+            .join("Windows")
+            .join("Start Menu")
+            .join("Programs")
+            .join(START_MENU_FOLDER_NAME)
+    })
+}
+
+#[cfg(any(windows, test))]
+fn start_menu_status(folder: Option<&Path>) -> Value {
+    let Some(folder) = folder else {
+        return json!({
+            "status": "unknown",
+            "folder": Value::Null,
+            "folder_name": START_MENU_FOLDER_NAME,
+            "entry_names": START_MENU_ENTRY_NAMES,
+            "expected_entries": START_MENU_SHORTCUT_FILES,
+            "entries": [],
+            "missing_entries": [],
+        });
+    };
+
+    let mut entries = Vec::new();
+    if let Ok(read_dir) = fs::read_dir(folder) {
+        for entry in read_dir.flatten() {
+            entries.push(entry.file_name().to_string_lossy().to_string());
+        }
+    }
+    entries.sort();
+
+    let missing = START_MENU_SHORTCUT_FILES
+        .iter()
+        .filter_map(|name| (!folder.join(name).exists()).then_some(*name))
+        .collect::<Vec<_>>();
+    let status = if !folder.exists() {
+        "missing"
+    } else if !missing.is_empty() {
+        "incomplete"
+    } else {
+        "clean"
+    };
+
+    json!({
+        "status": status,
+        "folder": path_to_string(folder),
+        "folder_name": START_MENU_FOLDER_NAME,
+        "entry_names": START_MENU_ENTRY_NAMES,
+        "expected_entries": START_MENU_SHORTCUT_FILES,
+        "entries": entries,
+        "missing_entries": missing,
+    })
+}
+
+#[cfg(any(windows, test))]
 fn version_manifest_summary(path: &Path) -> Value {
     let Some(value) = safe_json_file(path) else {
         return json!({
@@ -307,9 +411,15 @@ fn path_to_string(path: &Path) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{status_for_install_dir, CLIENT_EXE_NAME, INTERNAL_DIR_NAME, UNINSTALL_EXE_NAME};
+    use super::{
+        status_for_install_dir, status_for_install_dir_with_start_menu, CLIENT_EXE_NAME,
+        INTERNAL_DIR_NAME, START_MENU_SHORTCUT_FILES, UNINSTALL_EXE_NAME,
+    };
     use serde_json::json;
-    use std::{fs, path::PathBuf};
+    use std::{
+        fs,
+        path::{Path, PathBuf},
+    };
 
     #[test]
     fn clean_layout_reports_manifest_sha() {
@@ -329,13 +439,24 @@ mod tests {
         )
         .unwrap();
 
-        let status = status_for_install_dir(&dir, Some(&dir.join(CLIENT_EXE_NAME)));
+        let start_menu = start_menu_dir("clean-menu");
+        write_shortcuts(&start_menu, START_MENU_SHORTCUT_FILES);
+        let status = status_for_install_dir_with_start_menu(
+            &dir,
+            Some(&dir.join(CLIENT_EXE_NAME)),
+            Some(&start_menu),
+        );
         assert_eq!(status["installed"], true);
         assert_eq!(status["layout_status"], "clean");
+        assert_eq!(status["start_menu"]["status"], "clean");
         assert_eq!(status["installed_git_sha"], "abc123");
         assert_eq!(status["running_from_install_dir"], true);
         assert_eq!(status["product_status"]["status"], "ready");
         assert_eq!(status["product_status"]["missing_entry_count"], 0);
+        assert_eq!(
+            status["product_status"]["missing_start_menu_entry_count"],
+            0
+        );
         assert_eq!(status["product_status"]["legacy_file_count"], 0);
         assert_eq!(status["product_status"]["unexpected_entry_count"], 0);
         assert!(status["product_status"]["summary"]
@@ -353,6 +474,7 @@ mod tests {
             .any(|item| item.as_str() == Some("导出诊断")));
 
         let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(start_menu);
     }
 
     #[test]
@@ -364,7 +486,8 @@ mod tests {
         fs::write(dir.join(UNINSTALL_EXE_NAME), "uninstall").unwrap();
         fs::write(dir.join("启动一龙节点.cmd"), "legacy").unwrap();
 
-        let status = status_for_install_dir(&dir, Some(&dir.join(CLIENT_EXE_NAME)));
+        let status =
+            status_for_install_dir_with_start_menu(&dir, Some(&dir.join(CLIENT_EXE_NAME)), None);
         assert_eq!(status["installed"], true);
         assert_eq!(status["layout_status"], "legacy_files_present");
         assert_eq!(status["product_status"]["status"], "cleanup_recommended");
@@ -408,11 +531,65 @@ mod tests {
         let _ = fs::remove_dir_all(dir);
     }
 
+    #[test]
+    fn missing_start_menu_shortcuts_are_actionable() {
+        let dir = unique_test_dir("missing-start-menu");
+        let internal = dir.join(INTERNAL_DIR_NAME);
+        let start_menu = start_menu_dir("partial-menu");
+        fs::create_dir_all(&internal).unwrap();
+        fs::create_dir_all(&start_menu).unwrap();
+        fs::write(dir.join(CLIENT_EXE_NAME), "client").unwrap();
+        fs::write(dir.join(UNINSTALL_EXE_NAME), "uninstall").unwrap();
+        fs::write(start_menu.join("一龙PC节点.lnk"), "shortcut").unwrap();
+
+        let status = status_for_install_dir_with_start_menu(
+            &dir,
+            Some(&dir.join(CLIENT_EXE_NAME)),
+            Some(&start_menu),
+        );
+
+        assert_eq!(status["installed"], true);
+        assert_eq!(status["layout_status"], "clean");
+        assert_eq!(status["start_menu"]["status"], "incomplete");
+        assert_eq!(status["product_status"]["status"], "repair_recommended");
+        assert_eq!(
+            status["product_status"]["missing_start_menu_entry_count"],
+            4
+        );
+        assert!(status["start_menu"]["missing_entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item.as_str() == Some("打开运行日志.lnk")));
+        assert!(status["product_status"]["recommended_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|item| item
+                .as_str()
+                .unwrap_or_default()
+                .contains("开始菜单维护入口")));
+
+        let _ = fs::remove_dir_all(dir);
+        let _ = fs::remove_dir_all(start_menu);
+    }
+
     fn unique_test_dir(suffix: &str) -> PathBuf {
         std::env::temp_dir().join(format!(
             "elon-client-install-status-test-{}-{}",
             std::process::id(),
             suffix
         ))
+    }
+
+    fn start_menu_dir(suffix: &str) -> PathBuf {
+        unique_test_dir(suffix).join("Programs").join("一龙PC节点")
+    }
+
+    fn write_shortcuts(folder: &Path, names: &[&str]) {
+        fs::create_dir_all(folder).unwrap();
+        for name in names {
+            fs::write(folder.join(name), "shortcut").unwrap();
+        }
     }
 }
