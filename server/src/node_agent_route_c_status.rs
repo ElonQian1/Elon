@@ -74,10 +74,66 @@ pub(crate) async fn server_runtime_status_from_cloud(
 }
 
 fn server_runtime_ready_from_status_value(value: &serde_json::Value) -> bool {
-    value
+    if !value
         .get("ready")
         .and_then(serde_json::Value::as_bool)
         .unwrap_or(false)
+    {
+        return false;
+    }
+    if value
+        .get("status")
+        .and_then(Value::as_str)
+        .is_some_and(route_c_status_is_blocking)
+    {
+        return false;
+    }
+    if object_bool_is_false(value.get("policy"), "enabled")
+        || object_bool_is_false(value.get("admissionAvailability"), "ready")
+        || object_bool_is_false(value.get("admissionAvailability"), "available")
+        || object_bool_is_false(value.get("agentPolicy"), "ready")
+    {
+        return false;
+    }
+    if object_status_is_blocking(value.get("admissionAvailability"))
+        || object_status_is_blocking(value.get("agentPolicy"))
+    {
+        return false;
+    }
+    true
+}
+
+fn object_bool_is_false(object: Option<&Value>, key: &str) -> bool {
+    object
+        .and_then(|value| value.get(key))
+        .and_then(Value::as_bool)
+        == Some(false)
+}
+
+fn object_status_is_blocking(object: Option<&Value>) -> bool {
+    let Some(status) = object
+        .and_then(|value| value.get("status").or_else(|| value.get("reason")))
+        .and_then(Value::as_str)
+    else {
+        return false;
+    };
+    route_c_status_is_blocking(status)
+}
+
+fn route_c_status_is_blocking(status: &str) -> bool {
+    matches!(
+        status.trim().to_ascii_lowercase().as_str(),
+        "disabled"
+            | "blocked"
+            | "limited"
+            | "rate_limited"
+            | "budget_exhausted"
+            | "platform_budget_exhausted"
+            | "user_budget_exhausted"
+            | "agent_policy_blocked"
+            | "no_server_api_key_agent"
+            | "unavailable"
+    )
 }
 
 fn normalize_status_value(value: &Value) -> Value {
@@ -181,6 +237,47 @@ mod tests {
         assert_eq!(status["status"], "limited");
         assert_eq!(status["admissionAvailability"]["reason"], "rate_limited");
         assert_eq!(status["admissionAvailability"]["retryAfterSecs"], 17);
+    }
+
+    #[test]
+    fn explicit_admission_or_policy_blocks_route_c_ready() {
+        assert!(!server_runtime_ready_from_status_value(&json!({
+            "ready": true,
+            "status": "limited"
+        })));
+        assert!(!server_runtime_ready_from_status_value(&json!({
+            "ready": true,
+            "status": "ready",
+            "policy": {"enabled": false}
+        })));
+        assert!(!server_runtime_ready_from_status_value(&json!({
+            "ready": true,
+            "status": "ready",
+            "admissionAvailability": {
+                "ready": false,
+                "reason": "user_budget_exhausted"
+            }
+        })));
+        assert!(!server_runtime_ready_from_status_value(&json!({
+            "ready": true,
+            "status": "ready",
+            "agentPolicy": {
+                "mode": "allowlist",
+                "ready": false,
+                "reason": "no_server_api_key_agent"
+            }
+        })));
+    }
+
+    #[test]
+    fn missing_optional_protection_fields_keep_legacy_ready_status() {
+        assert!(server_runtime_ready_from_status_value(&json!({
+            "ready": true,
+            "status": "ready",
+            "policy": null,
+            "agentPolicy": null,
+            "admissionAvailability": null
+        })));
     }
 
     #[test]
