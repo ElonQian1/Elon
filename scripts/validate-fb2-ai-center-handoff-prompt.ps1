@@ -240,6 +240,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 '@
     $badScript = $good + "`nAdd-Fb2PromptLine -Lines `$lines"
     $badSecret = $good -replace '<FB2_AI_CENTER_TOKEN>', 'real-secret-token-1234567890'
+    $badBoundary = $good -replace 'public_contract_regression, status_refresh_selftest, offline_context_pack_sample_validation, handoff_documentation', 'public_contract_regression, status_refresh_selftest'
 
     $failed = 0
     $goodResult = New-Fb2PromptValidation -Content $good -SourcePath "selftest-good.md"
@@ -251,6 +252,8 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
     if ([bool]$badScriptResult.success) { $failed++ }
     $badSecretResult = New-Fb2PromptValidation -Content $badSecret -SourcePath "selftest-secret.md"
     if ([bool]$badSecretResult.success) { $failed++ }
+    $badBoundaryResult = New-Fb2PromptValidation -Content $badBoundary -SourcePath "selftest-boundary.md"
+    if ([bool]$badBoundaryResult.success) { $failed++ }
 
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"
