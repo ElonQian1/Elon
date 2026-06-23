@@ -1,6 +1,7 @@
 // server/pc-dev-runtime/src/project_agent_runtime.rs
 
 use crate::{
+    project_agent_runtime_context::agent_runtime_context_helpers,
     project_agent_runtime_lifecycle::agent_runtime_lifecycle_helpers,
     project_agent_runtime_patch::{
         agent_runtime_apply_patch_action_case, agent_runtime_apply_patch_helpers,
@@ -75,7 +76,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget and truncates large command output before sending it back to the model. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -95,7 +96,7 @@ When the Windows client is installed and logged in, Route C can reuse the local 
 `ELON_SERVER_AGENT` is optional and is honored only when the Elon server operator explicitly allows that agent through `ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS`; otherwise Route C uses the server default agent.
 
 ## Task lifecycle logs
-Route B and Route C write one JSONL lifecycle trace per run under `.elon\agent-runs\`. The trace records run start, each model turn, requested tool names and targets, result sizes, and final completion or failure status. It intentionally avoids storing full file contents, tool output, prompts, or API keys.
+Route B and Route C write one JSONL lifecycle trace per run under `.elon\agent-runs\`. The trace records run start, context budget, each model turn, requested tool names and targets, result sizes, context compaction counts, and final completion or failure status. It intentionally avoids storing full file contents, tool output, prompts, or API keys.
 "#,
         req.project_id, req.template, req.user_id
     ))
@@ -116,6 +117,7 @@ fn agent_runtime_script() -> io::Result<String> {
     [string]$RunId = '',
     [int]$MaxTurns = 6,
     [int]$MaxRunCommands = 8,
+    [int]$MaxContextChars = 60000,
     [switch]$DryRun,
     [switch]$Yes
 )
@@ -127,7 +129,10 @@ Set-Location $ProjectRoot
 
 if ($MaxRunCommands -lt 1) { $MaxRunCommands = 1 }
 if ($MaxRunCommands -gt 20) { $MaxRunCommands = 20 }
+if ($MaxContextChars -lt 10000) { $MaxContextChars = 10000 }
+if ($MaxContextChars -gt 200000) { $MaxContextChars = 200000 }
 $Script:AgentRunCommandCount = 0
+$Script:AgentContextCompactionCount = 0
 $Script:AgentRunId = ''
 $Script:AgentRunLogPath = ''
 $Script:AgentRunLifecycleClosed = $false
@@ -435,6 +440,8 @@ function Use-AgentRunCommandBudget {
 
 # __ELON_LIFECYCLE_HELPERS__
 
+# __ELON_CONTEXT_HELPERS__
+
 # __ELON_APPLY_PATCH_HELPERS__
 
 function Test-AgentCommandAllowed {
@@ -740,6 +747,8 @@ function Invoke-AgentRuntimeLoop {
                 role = 'user'
                 content = "Tool results JSON:`n" + ($results | ConvertTo-Json -Depth 8)
             }
+            $compression = Compress-AgentRuntimeMessages -Messages $messages -Turn $turn
+            $messages = @($compression.Messages)
 
             if ($agent.done -eq $true) {
                 Complete-AgentRunLifecycle -Status completed -Data ([ordered]@{
@@ -790,6 +799,10 @@ switch ($Mode) {
     .replace(
         "# __ELON_LIFECYCLE_HELPERS__",
         agent_runtime_lifecycle_helpers(),
+    )
+    .replace(
+        "# __ELON_CONTEXT_HELPERS__",
+        agent_runtime_context_helpers(),
     )
     .replace(
         "# __ELON_APPLY_PATCH_ACTION__",
@@ -860,15 +873,21 @@ mod tests {
         assert!(!script.contains("__ELON_APPLY_PATCH_ACTION__"));
         assert!(script.contains("Test-AgentCommandAllowedParts"));
         assert!(script.contains("[int]$MaxRunCommands = 8"));
+        assert!(script.contains("[int]$MaxContextChars = 60000"));
         assert!(script.contains("$Script:AgentRunCommandCount"));
+        assert!(script.contains("$Script:AgentContextCompactionCount"));
         assert!(script.contains("Use-AgentRunCommandBudget"));
         assert!(script.contains("command budget exhausted"));
+        assert!(script.contains("Compress-AgentRuntimeMessages"));
+        assert!(script.contains("'context_compacted'"));
+        assert!(script.contains("max_context_chars"));
         assert!(script.contains("$AgentCommandOutputMaxChars = 12000"));
         assert!(script.contains("Limit-AgentText $output $AgentCommandOutputMaxChars"));
         assert!(script.contains("\"program\": \"git\""));
         assert!(script.contains("$shellMarkers"));
         assert!(script.contains("[regex]::IsMatch"));
         assert!(!script.contains("__ELON_LIFECYCLE_HELPERS__"));
+        assert!(!script.contains("__ELON_CONTEXT_HELPERS__"));
         assert!(!script.contains('\u{662f}'));
     }
 
@@ -886,6 +905,8 @@ mod tests {
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));
         assert!(doc.contains("-MaxRunCommands"));
+        assert!(doc.contains("-MaxContextChars"));
+        assert!(doc.contains("context budget"));
         assert!(doc.contains("Task lifecycle logs"));
         assert!(doc.contains(".elon\\agent-runs\\"));
         assert!(doc.contains("does not expose the server API key"));
@@ -925,11 +946,32 @@ if ($errors.Count -gt 0) {
     $errors | ForEach-Object { Write-Error $_.Message }
     exit 1
 }
-. $ScriptPath -Mode status -Yes | Out-Null
+. $ScriptPath -Mode status -Yes -MaxContextChars 10000 | Out-Null
 Initialize-AgentRunLifecycle -Label 'api-runtime-test'
 Write-AgentRunEvent -Type 'turn_started' -Data ([ordered]@{ turn = 1 })
 Write-AgentRunEvent -Type 'tool_started' -Data ([ordered]@{ turn = 1; tool = 'read_file'; target = 'note.txt' })
 Write-AgentRunEvent -Type 'tool_finished' -Data ([ordered]@{ turn = 1; tool = 'read_file'; target = 'note.txt'; result_chars = 6 })
+$messages = @(
+    @{ role = 'system'; content = 'system' },
+    @{ role = 'user'; content = 'prompt' },
+    @{ role = 'assistant'; content = ('a' * 7000) },
+    @{ role = 'user'; content = ('b' * 7000) },
+    @{ role = 'assistant'; content = ('c' * 7000) }
+)
+$compressed = Compress-AgentRuntimeMessages -Messages $messages -Turn 2
+if (-not $compressed.Compacted) {
+    Write-Error 'expected context compaction'
+    exit 1
+}
+if (@($compressed.Messages).Count -ge $messages.Count) {
+    Write-Error 'expected compaction to replace omitted messages'
+    exit 1
+}
+$serializedCompressed = $compressed.Messages | ConvertTo-Json -Depth 8
+if ($serializedCompressed -match ('a' * 40) -or $serializedCompressed -match ('b' * 40)) {
+    Write-Error 'compaction should not keep omitted old message body'
+    exit 1
+}
 Complete-AgentRunLifecycle -Status completed -Data ([ordered]@{ turn = 1; reason = 'test' })
 $logDir = Join-Path $Root '.elon\agent-runs'
 $logs = @(Get-ChildItem -LiteralPath $logDir -Filter '*.jsonl')
@@ -939,14 +981,19 @@ if ($logs.Count -ne 1) {
 }
 $events = @(Get-Content -LiteralPath $logs[0].FullName | ForEach-Object { $_ | ConvertFrom-Json })
 $types = @($events | ForEach-Object { [string]$_.type })
-foreach ($expected in @('run_started', 'turn_started', 'tool_started', 'tool_finished', 'run_finished')) {
+foreach ($expected in @('run_started', 'turn_started', 'tool_started', 'tool_finished', 'context_compacted', 'run_finished')) {
     if (-not ($types -contains $expected)) {
         Write-Error "missing lifecycle event: $expected"
         exit 1
     }
 }
-if (($events | ConvertTo-Json -Depth 20) -match 'hello') {
+$eventsJson = $events | ConvertTo-Json -Depth 20
+if ($eventsJson -match 'hello') {
     Write-Error 'lifecycle log should not store file content'
+    exit 1
+}
+if ($eventsJson -match ('a' * 40) -or $eventsJson -match ('b' * 40) -or $eventsJson -match ('c' * 40)) {
+    Write-Error 'lifecycle log should not store compacted message content'
     exit 1
 }
 $patch = @'

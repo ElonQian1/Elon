@@ -50,6 +50,7 @@ function Initialize-AgentRunLifecycle {
         prompt_chars = $Prompt.Length
         max_turns = $MaxTurns
         max_run_commands = $MaxRunCommands
+        max_context_chars = $MaxContextChars
         dry_run = [bool]$DryRun
         auto_approve = [bool]$Yes
     })
@@ -94,6 +95,7 @@ function Complete-AgentRunLifecycle {
     $payload = [ordered]@{
         status = $Status
         run_commands_used = $Script:AgentRunCommandCount
+        context_compactions = $Script:AgentContextCompactionCount
     }
     if ($null -ne $Data) {
         $payload.details = $Data
