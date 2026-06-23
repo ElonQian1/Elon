@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮继续加固 `next_commands` JSON 本身：`validate-fb2-ai-center-gap-action-board.ps1` 现在会直接检查 `status-refresh-current.json.next_commands` 中 12 条接手命令是否存在、是否使用占位符而不是真实 token/password、Context Pack 样本导出/校验命令是否保留 `PrintExportRequest` / `ValidateSampleSet`、`no_write_direct_read` 是否只读不写群、`data_only_preflight` 是否没有 `AllowVisibleMessages`、可见群聊回归是否显式需要 `AllowVisibleMessages`。自测新增 data-only preflight 被误替换成可见写群命令的负例。
 - 2026-06-23 本轮补齐 `validate-fb2-ai-center-handoff-prompt.ps1 -SelfTest` 的边界负例：除了脚本片段和真实密钥泄露外，自测现在会构造缺失 `offline_context_pack_sample_validation` / `handoff_documentation` 的 handoff prompt，并要求 validator 必须失败。这样 handoff prompt 的无密钥/需密钥边界不是只靠正式运行时偶然覆盖，而是自测也能防止回退。
 - 2026-06-23 本轮继续加固 `gap_action_board` 验收：`scripts\validate-fb2-ai-center-gap-action-board.ps1` 现在会直接校验 `status-refresh-current.json.blocking_state`，要求外部阻塞必须是 `FB2_AI_CENTER_TOKEN`、`next_minimum_action` 与缺口行动板一致、4 个无密钥动作和 4 个需密钥 live 验证动作齐全，并且 `ASR_TTS_final_evidence` 仍记录为用户暂停。自测新增缺失无密钥动作列表的负例，避免只靠 handoff prompt 间接发现边界漂移。
 - 2026-06-23 本轮继续加固 handoff prompt 验收：`scripts\validate-fb2-ai-center-handoff-prompt.ps1` 现在强制检查 `safe_to_continue_without_secret` 必须包含 `public_contract_regression`、`status_refresh_selftest`、`offline_context_pack_sample_validation`、`handoff_documentation`，同时 `requires_secret` 必须包含 live Context Pack/权限质量刷新、本人订单 live 验证、平台摘要 live 验证和 feedback quality live 刷新。这样后续接手会话不会把缺 `FB2_AI_CENTER_TOKEN` 的受保护 live 验证误写成可无密钥完成，也不会漏掉无密钥可继续做的离线样本和交接文档回归。

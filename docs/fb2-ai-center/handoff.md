@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮把 `next_commands` 也纳入 JSON 级安全门禁：`validate-fb2-ai-center-gap-action-board.ps1` 会检查接手命令齐全、密钥/密码占位、离线 Context Pack 样本命令、只读群聊直读命令、无写群 data-only preflight 和需显式授权的可见群聊回归命令。后续如果 `status-refresh-current.json.next_commands` 漂移，例如把 `data_only_preflight` 误改成带 `AllowVisibleMessages`，validator 自测和正式验证都会失败。
 - 2026-06-23 本轮补齐 handoff prompt validator 自测负例：`validate-fb2-ai-center-handoff-prompt.ps1 -SelfTest` 现在会验证缺失无密钥动作边界的 prompt 必须失败，和真实密钥泄露、脚本片段泄露负例一起保护交接提示。后续如果调整 `blocking_state.safe_to_continue_without_secret` 或 handoff prompt 文案，要先跑该 selftest，再跑正式 validator。
 - 2026-06-23 本轮补强 `blocking_state` 的机器校验：`validate-fb2-ai-center-gap-action-board.ps1` 不再只看 `gap_action_board.actions`，还会直接检查 status refresh 里的无密钥可继续动作、需 `FB2_AI_CENTER_TOKEN` 的 live 验证动作、外部 token 阻塞、下一步动作一致性和 ASR/TTS 暂停边界。这样即使 handoff prompt 没重新生成，`status-refresh-current.json` 自身的阻塞/可推进边界也会被 validator 拦住。
 - 2026-06-23 本轮补强 handoff prompt 的边界校验：`validate-fb2-ai-center-handoff-prompt.ps1` 会强制检查无密钥可继续事项完整列出公开契约回归、status refresh 自测、离线 Context Pack 样本校验和交接文档回归；同时要求需密钥事项完整列出 live Context Pack 权限质量刷新、本人订单 live 验证、平台摘要 live 验证和 feedback quality live 刷新。接手会话如果改了 `blocking_state` 或 handoff prompt，必须重新跑该 validator，避免把外部 token 阻塞项和可本地推进项混淆。

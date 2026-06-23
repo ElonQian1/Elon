@@ -107,6 +107,7 @@ function New-Fb2GapValidation {
     $checks = [System.Collections.ArrayList]::new()
     $board = Get-Fb2GapProperty $Refresh "gap_action_board"
     $blocking = Get-Fb2GapProperty $Refresh "blocking_state"
+    $nextCommands = Get-Fb2GapProperty $Refresh "next_commands"
     $actions = @(Get-Fb2GapProperty $board "actions" @())
 
     Add-Fb2GapCheck $checks "gap board schema" ([string](Get-Fb2GapProperty $board "schema" "") -eq "fb2.main_project.gap_action_board.v1")
@@ -143,6 +144,66 @@ function New-Fb2GapValidation {
         }
 
         Add-Fb2GapCheck $checks "blocking records voice defer" ($deferredByUser -contains "ASR_TTS_final_evidence")
+    }
+
+    Add-Fb2GapCheck $checks "next commands present" ($null -ne $nextCommands)
+    if ($null -ne $nextCommands) {
+        $requiredCommands = @(
+            "refresh_status",
+            "read_status_refresh",
+            "generate_context_pack_sample_request",
+            "validate_context_pack_sample_set",
+            "validate_exported_context_pack_sample_set",
+            "validate_gap_action_board",
+            "validate_completion_matrix",
+            "validate_handoff_prompt",
+            "validate_visible_answer_policy",
+            "no_write_direct_read",
+            "data_only_preflight",
+            "visible_regression_requires_authorization"
+        )
+        foreach ($name in $requiredCommands) {
+            $command = [string](Get-Fb2GapProperty $nextCommands $name "")
+            Add-Fb2GapCheck $checks "next command $name exists" (-not [string]::IsNullOrWhiteSpace($command))
+            Add-Fb2GapCheck $checks "next command $name secret safe" (Test-Fb2GapSecretSafe -Text $command)
+        }
+
+        $sampleRequestCommand = [string](Get-Fb2GapProperty $nextCommands "generate_context_pack_sample_request" "")
+        Add-Fb2GapCheck $checks "next command sample request prints export request" ($sampleRequestCommand -match "PrintExportRequest")
+
+        $sampleSetCommand = [string](Get-Fb2GapProperty $nextCommands "validate_context_pack_sample_set" "")
+        Add-Fb2GapCheck $checks "next command sample set validates samples" ($sampleSetCommand -match "ValidateSampleSet")
+
+        $exportedSampleCommand = [string](Get-Fb2GapProperty $nextCommands "validate_exported_context_pack_sample_set" "")
+        Add-Fb2GapCheck $checks "next command exported sample set keeps fb2 repo placeholder" (
+            $exportedSampleCommand -match "ValidateSampleSet" -and
+            $exportedSampleCommand -match "<fb2_repo>"
+        )
+
+        $visiblePolicyCommand = [string](Get-Fb2GapProperty $nextCommands "validate_visible_answer_policy" "")
+        Add-Fb2GapCheck $checks "next command visible policy uses summary placeholder" ($visiblePolicyCommand -match "<DATA_ONLY_ACCEPTANCE_JSON>")
+
+        $readOnlyCommand = [string](Get-Fb2GapProperty $nextCommands "no_write_direct_read" "")
+        Add-Fb2GapCheck $checks "next command read only direct read has no write flag" (
+            $readOnlyCommand -match "ReadOnlyDirectRead" -and
+            $readOnlyCommand -notmatch "AllowVisibleMessages" -and
+            $readOnlyCommand -notmatch "Fb2AiCenterToken"
+        )
+
+        $preflightCommand = [string](Get-Fb2GapProperty $nextCommands "data_only_preflight" "")
+        Add-Fb2GapCheck $checks "next command data preflight is no visible write" (
+            $preflightCommand -match "DataOnlyAcceptance" -and
+            $preflightCommand -match "PreflightOnly" -and
+            $preflightCommand -match "<FB2_AI_CENTER_TOKEN>" -and
+            $preflightCommand -notmatch "AllowVisibleMessages"
+        )
+
+        $visibleCommand = [string](Get-Fb2GapProperty $nextCommands "visible_regression_requires_authorization" "")
+        Add-Fb2GapCheck $checks "next command visible regression requires authorization" (
+            $visibleCommand -match "DataOnlyAcceptance" -and
+            $visibleCommand -match "AllowVisibleMessages" -and
+            $visibleCommand -match "<FB2_AI_CENTER_TOKEN>"
+        )
     }
 
     foreach ($action in $actions) {
@@ -216,6 +277,20 @@ function Invoke-Fb2GapSelfTest {
                 )
                 next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
             }
+            next_commands = [ordered]@{
+                refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
+                read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
+                generate_context_pack_sample_request = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -PrintExportRequest -ExternalUserId 6fe5aa17-0403-427a-8e91-7f414beca35d -OutputPath target\fb2-ai-center\context-pack-sample-request-current.json"
+                validate_context_pack_sample_set = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json"
+                validate_exported_context_pack_sample_set = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir <fb2_repo>\target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\fb2-repo-context-pack-samples-validation-current.json"
+                validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
+                validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
+                validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
+                validate_visible_answer_policy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>"
+                no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>"
+                data_only_preflight = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>"
+                visible_regression_requires_authorization = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>"
+            }
             gap_action_board = [ordered]@{
                 schema = "fb2.main_project.gap_action_board.v1"
                 next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
@@ -268,6 +343,12 @@ function Invoke-Fb2GapSelfTest {
         $badValidation = New-Fb2GapValidation -Refresh $badFixture -SourcePath "selftest-bad-missing-safe-list.json"
         if ([bool]$badValidation.success) {
             throw "SelfTest failed: missing blocking_state safe actions should fail"
+        }
+        $badCommandFixture = $fixture | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        $badCommandFixture.next_commands.data_only_preflight = $badCommandFixture.next_commands.visible_regression_requires_authorization
+        $badCommandValidation = New-Fb2GapValidation -Refresh $badCommandFixture -SourcePath "selftest-bad-visible-preflight.json"
+        if ([bool]$badCommandValidation.success) {
+            throw "SelfTest failed: data_only_preflight with visible write should fail"
         }
         "== SelfTest Summary =="
         "failed=0"
