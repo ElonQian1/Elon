@@ -69,6 +69,7 @@
     settingsVerifyBtn: $('settingsVerifyBtn'), settingsEditProfileBtn: $('settingsEditProfileBtn'), settingsLoginBtn: $('settingsLoginBtn'),
     settingsSecurityBtn: $('settingsSecurityBtn'), settingsDevicesBtn: $('settingsDevicesBtn'), settingsLogoutBtn: $('settingsLogoutBtn'),
     settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
+    settingsClientActions: $('settingsClientActions'),
     settingsCliBridgeStatus: $('settingsCliBridgeStatus'),
     settingsNodeStatusCard: $('settingsNodeStatusCard'), settingsNodeStatusTitle: $('settingsNodeStatusTitle'),
     settingsNodeStatusDetail: $('settingsNodeStatusDetail'), settingsStepNode: $('settingsStepNode'),
@@ -2697,6 +2698,7 @@
     if (!data) {
       els.settingsClientStatus.textContent = '尚未读取';
       els.settingsClientPaths.textContent = '任务记录、配置和安装目录会显示在这里。';
+      renderClientMaintenanceActions(null);
       if (els.settingsCliBridgeStatus) els.settingsCliBridgeStatus.textContent = '读取本机节点后显示会话连续性能力。';
       updateWorkbenchOnboarding();
       return;
@@ -2734,7 +2736,35 @@
     if (els.settingsCliBridgeStatus) {
       els.settingsCliBridgeStatus.textContent = cliSessionBridgeLine(data.cli_session_bridge);
     }
+    renderClientMaintenanceActions(data.maintenance_actions);
     updateWorkbenchOnboarding();
+  }
+
+  function renderClientMaintenanceActions(actions) {
+    if (!els.settingsClientActions) return;
+    if (!Array.isArray(actions) || !actions.length) {
+      els.settingsClientActions.textContent = '刷新本机节点后显示每个操作是否可用。';
+      return;
+    }
+    els.settingsClientActions.innerHTML = `<div class="settings-client-actions">${actions.map((action) => {
+      const label = clean(action && action.label) || clean(action && action.id) || '维护操作';
+      const description = clean(action && action.description) || '本机节点未返回说明。';
+      const enabled = action && action.enabled !== false;
+      const tone = clean(action && action.tone);
+      const status = enabled ? '可用' : disabledMaintenanceActionReason(action);
+      const classes = [
+        'settings-client-action',
+        enabled ? 'is-enabled' : 'is-disabled',
+        tone === 'danger' ? 'is-danger' : ''
+      ].filter(Boolean).join(' ');
+      return `<div class="${classes}"><strong>${escapeHtml(label)} · ${escapeHtml(status)}</strong><span>${escapeHtml(description)}</span></div>`;
+    }).join('')}</div>`;
+  }
+
+  function disabledMaintenanceActionReason(action) {
+    const kind = clean(action && action.kind);
+    if (kind === 'update' || kind === 'uninstall') return '需要完整安装';
+    return '当前环境不可用';
   }
 
   async function refreshLatestClientPackageVersion() {

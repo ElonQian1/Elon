@@ -1261,6 +1261,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
   assert.ok(pcApp.includes('openClientTaskJournalBtn'), 'PC settings should keep task journal separate from runtime logs');
   assert.ok(pcApp.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs separately');
+  assert.ok(pcApp.includes('settingsClientActions'), 'PC settings should render local maintenance action availability');
+  assert.ok(pcApp.includes('renderClientMaintenanceActions'), 'PC app should render maintenance_actions from local node');
+  assert.ok(pcApp.includes('disabledMaintenanceActionReason'), 'PC app should explain disabled maintenance actions');
   assert.ok(pcApp.includes("openClientMaintenanceTarget('logs'"), 'PC settings should open the runtime logs target');
   assert.ok(pcApp.includes("openClientMaintenanceTarget('launcher_logs'"), 'PC settings should open launcher logs target');
   assert.ok(pcApp.includes("openClientMaintenanceTarget('task_journal'"), 'PC settings should still open task journal explicitly');
@@ -1300,6 +1303,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');
   assert.ok(pcAppHtml.includes('openClientTaskJournalBtn'), 'PC settings should expose task journal as its own button');
   assert.ok(pcAppHtml.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs as its own button');
+  assert.ok(pcAppHtml.includes('settingsClientActions'), 'PC settings should expose maintenance action availability status');
   assert.ok(pcAppHtml.includes('打开运行日志'), 'PC settings should expose runtime logs as a user-facing action');
   assert.ok(pcAppHtml.includes('打开启动器日志'), 'PC settings should expose launcher logs as a user-facing action');
   assert.ok(pcAppHtml.includes('/assets/pc_app_agent_runs.js'), 'PC page should load the local agent runs module');
@@ -1308,6 +1312,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppCss.includes('.settings-project-meta-row'), 'PC app CSS should style structured project inspection metadata');
   assert.ok(pcAppCss.includes('.settings-project-meta-row.is-warning'), 'PC app CSS should style project registration warnings');
   assert.ok(pcAppCss.includes('.settings-project-meta-row.is-error'), 'PC app CSS should style blocked project registration state');
+  assert.ok(pcAppCss.includes('.settings-client-actions'), 'PC app CSS should style maintenance action availability cards');
+  assert.ok(pcAppCss.includes('.settings-client-actions-placeholder'), 'PC app CSS should style maintenance action loading text');
+  assert.ok(pcAppCss.includes('.settings-client-action.is-disabled'), 'PC app CSS should distinguish unavailable maintenance actions');
+  assert.ok(pcAppCss.includes('.settings-client-action.is-danger'), 'PC app CSS should distinguish destructive maintenance actions');
   assert.ok(pcAppCss.includes('.rail-avatar::before'), 'PC rail should render a Discord-like active indicator');
   assert.ok(pcAppCss.includes('.rail-avatar:focus-visible'), 'PC rail should have a keyboard focus state');
   assert.ok(pcAppCss.includes('border-radius: inherit'), 'PC rail images should clip to the current icon shape');
