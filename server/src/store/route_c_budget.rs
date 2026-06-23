@@ -29,11 +29,32 @@ pub(crate) struct RouteCBudgetEventRow {
     pub created_at: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RouteCBudgetRecordResult {
+    Recorded { total_used: usize, user_used: usize },
+    PlatformLimitReached { total_used: usize, user_used: usize },
+    UserLimitReached { total_used: usize, user_used: usize },
+}
+
 impl Store {
     pub(crate) fn route_c_budget_count_for_day(&self, route_day: &str) -> Result<usize> {
         let count: i64 = self.conn()?.query_row(
             "SELECT COUNT(*) FROM route_c_runtime_budget_events WHERE route_day = ?1",
             params![route_day],
+            |row| row.get(0),
+        )?;
+        Ok(count.max(0) as usize)
+    }
+
+    pub(crate) fn route_c_budget_count_for_day_and_user(
+        &self,
+        route_day: &str,
+        user_id: &str,
+    ) -> Result<usize> {
+        let count: i64 = self.conn()?.query_row(
+            "SELECT COUNT(*) FROM route_c_runtime_budget_events
+              WHERE route_day = ?1 AND user_id = ?2",
+            params![route_day, user_id],
             |row| row.get(0),
         )?;
         Ok(count.max(0) as usize)
@@ -45,7 +66,8 @@ impl Store {
         request_fingerprint: &str,
         route_day: &str,
         daily_call_limit: Option<usize>,
-    ) -> Result<(bool, usize)> {
+        per_user_daily_call_limit: Option<usize>,
+    ) -> Result<RouteCBudgetRecordResult> {
         let conn = self.conn.lock().unwrap();
         let tx = conn.unchecked_transaction()?;
         let current: i64 = tx.query_row(
@@ -53,10 +75,28 @@ impl Store {
             params![route_day],
             |row| row.get(0),
         )?;
-        let current = current.max(0) as usize;
-        if daily_call_limit.is_some_and(|limit| current >= limit) {
+        let total_used = current.max(0) as usize;
+        let user_current: i64 = tx.query_row(
+            "SELECT COUNT(*) FROM route_c_runtime_budget_events
+              WHERE route_day = ?1 AND user_id = ?2",
+            params![route_day, user_id],
+            |row| row.get(0),
+        )?;
+        let user_used = user_current.max(0) as usize;
+
+        if daily_call_limit.is_some_and(|limit| total_used >= limit) {
             tx.commit()?;
-            return Ok((false, current));
+            return Ok(RouteCBudgetRecordResult::PlatformLimitReached {
+                total_used,
+                user_used,
+            });
+        }
+        if per_user_daily_call_limit.is_some_and(|limit| user_used >= limit) {
+            tx.commit()?;
+            return Ok(RouteCBudgetRecordResult::UserLimitReached {
+                total_used,
+                user_used,
+            });
         }
 
         tx.execute(
@@ -72,7 +112,10 @@ impl Store {
             ],
         )?;
         tx.commit()?;
-        Ok((true, current + 1))
+        Ok(RouteCBudgetRecordResult::Recorded {
+            total_used: total_used + 1,
+            user_used: user_used + 1,
+        })
     }
 
     pub(crate) fn route_c_budget_day_summaries(
@@ -166,23 +209,113 @@ mod tests {
 
         assert_eq!(
             store
-                .route_c_budget_try_record_call(&user.id, "fp-1", "2026-06-23", Some(2))
+                .route_c_budget_try_record_call(&user.id, "fp-1", "2026-06-23", Some(2), None)
                 .unwrap(),
-            (true, 1)
+            RouteCBudgetRecordResult::Recorded {
+                total_used: 1,
+                user_used: 1
+            }
         );
         assert_eq!(
             store
-                .route_c_budget_try_record_call(&user.id, "fp-2", "2026-06-23", Some(2))
+                .route_c_budget_try_record_call(&user.id, "fp-2", "2026-06-23", Some(2), None)
                 .unwrap(),
-            (true, 2)
+            RouteCBudgetRecordResult::Recorded {
+                total_used: 2,
+                user_used: 2
+            }
         );
         assert_eq!(
             store
-                .route_c_budget_try_record_call(&user.id, "fp-3", "2026-06-23", Some(2))
+                .route_c_budget_try_record_call(&user.id, "fp-3", "2026-06-23", Some(2), None)
                 .unwrap(),
-            (false, 2)
+            RouteCBudgetRecordResult::PlatformLimitReached {
+                total_used: 2,
+                user_used: 2
+            }
         );
         assert_eq!(store.route_c_budget_count_for_day("2026-06-23").unwrap(), 2);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn route_c_budget_blocks_per_user_daily_limit_without_blocking_other_users() {
+        let (store, path) = temp_store();
+        let user_a = store
+            .create_user(
+                &format!(
+                    "route-c-budget-user-a-{}@example.com",
+                    Uuid::new_v4().simple()
+                ),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+        let user_b = store
+            .create_user(
+                &format!(
+                    "route-c-budget-user-b-{}@example.com",
+                    Uuid::new_v4().simple()
+                ),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        assert_eq!(
+            store
+                .route_c_budget_try_record_call(
+                    &user_a.id,
+                    "fp-a1",
+                    "2026-06-23",
+                    Some(10),
+                    Some(1)
+                )
+                .unwrap(),
+            RouteCBudgetRecordResult::Recorded {
+                total_used: 1,
+                user_used: 1
+            }
+        );
+        assert_eq!(
+            store
+                .route_c_budget_try_record_call(
+                    &user_a.id,
+                    "fp-a2",
+                    "2026-06-23",
+                    Some(10),
+                    Some(1)
+                )
+                .unwrap(),
+            RouteCBudgetRecordResult::UserLimitReached {
+                total_used: 1,
+                user_used: 1
+            }
+        );
+        assert_eq!(
+            store
+                .route_c_budget_try_record_call(
+                    &user_b.id,
+                    "fp-b1",
+                    "2026-06-23",
+                    Some(10),
+                    Some(1)
+                )
+                .unwrap(),
+            RouteCBudgetRecordResult::Recorded {
+                total_used: 2,
+                user_used: 1
+            }
+        );
+        assert_eq!(
+            store
+                .route_c_budget_count_for_day_and_user("2026-06-23", &user_a.id)
+                .unwrap(),
+            1
+        );
 
         let _ = std::fs::remove_file(path);
     }
@@ -200,7 +333,7 @@ mod tests {
             .unwrap();
 
         store
-            .route_c_budget_try_record_call(&user.id, "fp-1", "2026-06-23", Some(10))
+            .route_c_budget_try_record_call(&user.id, "fp-1", "2026-06-23", Some(10), None)
             .unwrap();
 
         assert_eq!(store.route_c_budget_count_for_day("2026-06-23").unwrap(), 1);
@@ -236,13 +369,13 @@ mod tests {
             .unwrap();
 
         store
-            .route_c_budget_try_record_call(&user_a.id, "fp-a1", "2026-06-22", None)
+            .route_c_budget_try_record_call(&user_a.id, "fp-a1", "2026-06-22", None, None)
             .unwrap();
         store
-            .route_c_budget_try_record_call(&user_a.id, "fp-a2", "2026-06-23", None)
+            .route_c_budget_try_record_call(&user_a.id, "fp-a2", "2026-06-23", None, None)
             .unwrap();
         store
-            .route_c_budget_try_record_call(&user_b.id, "fp-b1", "2026-06-23", None)
+            .route_c_budget_try_record_call(&user_b.id, "fp-b1", "2026-06-23", None, None)
             .unwrap();
 
         let summaries = store.route_c_budget_day_summaries(10).unwrap();

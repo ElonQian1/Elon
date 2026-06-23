@@ -508,7 +508,14 @@
       if (stateText === 'http_error') return `云端返回 ${clean(status.httpStatus) || '错误'} · 不会启用`;
       if (stateText === 'unavailable') return `${clean(status.reason) || '云端不可用'} · 不会启用`;
       const budget = status.budget || {};
-      if (stateText === 'budget_exhausted' || clean(budget.status) === 'exhausted') {
+      const budgetStatus = clean(budget.status);
+      if (stateText === 'user_budget_exhausted' || budgetStatus === 'user_exhausted') {
+        const retryAfter = numberField(budget, 'resetAfterSecs', 'reset_after_secs');
+        return retryAfter
+          ? `已保护 · 今日个人额度已用完 · ${retryAfter} 秒后重试`
+          : '已保护 · 今日个人额度已用完';
+      }
+      if (stateText === 'budget_exhausted' || budgetStatus === 'exhausted') {
         const retryAfter = numberField(budget, 'resetAfterSecs', 'reset_after_secs');
         return retryAfter
           ? `已保护 · 今日平台预算已用完 · ${retryAfter} 秒后重试`
@@ -535,12 +542,15 @@
       const remaining = numberField(admission, 'remainingRequestsPerMinute', 'remaining_requests_per_minute');
       const dailyLimit = numberField(budget, 'dailyCallLimit', 'daily_call_limit');
       const remainingBudget = numberField(budget, 'remainingCallsToday', 'remaining_calls_today');
+      const userDailyLimit = numberField(budget, 'perUserDailyCallLimit', 'per_user_daily_call_limit');
+      const remainingUserBudget = numberField(budget, 'remainingCallsTodayForUser', 'remaining_calls_today_for_user');
       const parts = [];
       if (agentSelection) parts.push('agent 受控');
       if (rpm) parts.push(`${rpm}/分钟`);
       if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
       if (Number.isFinite(remaining)) parts.push(`剩余 ${remaining}`);
       if (Number.isFinite(dailyLimit) && Number.isFinite(remainingBudget)) parts.push(`今日剩余 ${remainingBudget}/${dailyLimit}`);
+      if (Number.isFinite(userDailyLimit) && Number.isFinite(remainingUserBudget)) parts.push(`个人今日剩余 ${remainingUserBudget}/${userDailyLimit}`);
       return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
     }
 

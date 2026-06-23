@@ -1021,6 +1021,24 @@ Route C：服务器 runtime
 节点自己的工具层执行 list/read/write/run_command
 ```
 
+2026-06-23 增量：Route C 不是无限开放的“服务器免费模型”。服务端已经有运营保护层：
+
+```text
+ELON_SERVER_AGENT_RUNTIME_ENABLED
+  可无发布暂停 Route C
+
+ELON_SERVER_AGENT_RUNTIME_DAILY_CALL_LIMIT
+  限制平台每天最多服务器模型调用次数
+
+ELON_SERVER_AGENT_RUNTIME_PER_USER_DAILY_CALL_LIMIT
+  限制单个用户每天最多服务器模型调用次数
+
+ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS
+  默认只允许服务器默认 agent；需要显式 allowlist 才能选其他 agent
+```
+
+Win 客户端的 Route C 状态会区分平台预算耗尽和个人额度耗尽，并显示重试时间、平台剩余额度、个人剩余额度、并发和分钟级请求限制。
+
 已完成的边界：
 
 ```text
@@ -1028,6 +1046,7 @@ Route C：服务器 runtime
 read_only / project_write / full_access 权限字段
 Route B/C 本机工具白名单
 Route B/C 工具调用时间线
+Route C 平台日预算 + 用户日预算 + agent 选择保护
 本机 7799 管理 API token 保护
 Route A CLI 名称、路径、参数、cwd fail-closed 校验
 legacy relay 同步拒绝任意 CLI 和内置 runtime

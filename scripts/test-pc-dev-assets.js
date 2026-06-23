@@ -979,7 +979,13 @@ function testProjectReadinessChecklist() {
           status: 'ready',
           agent: { model: 'route-c-model' },
           limits: { maxRequestsPerMinute: 12, maxConcurrentPerUser: 2, maxConcurrentGlobal: 24 },
-          budget: { enabled: true, dailyCallLimit: 100, remainingCallsToday: 99 },
+          budget: {
+            enabled: true,
+            dailyCallLimit: 100,
+            remainingCallsToday: 99,
+            perUserDailyCallLimit: 10,
+            remainingCallsTodayForUser: 9
+          },
           admission: { remainingRequestsPerMinute: 11 },
           protection: { agentSelection: 'default server agent only' },
           policy: { enabled: true }
@@ -997,6 +1003,7 @@ function testProjectReadinessChecklist() {
   assert.ok(routeCHtml.includes('Route C · 服务器模型 route-c-model'), 'readiness should show Route C model route');
   assert.ok(routeCHtml.includes('agent 受控'), 'readiness should show Route C agent selection protection');
   assert.ok(routeCHtml.includes('今日剩余 99/100'), 'readiness should show Route C daily budget protection');
+  assert.ok(routeCHtml.includes('个人今日剩余 9/10'), 'readiness should show Route C per-user daily budget protection');
 
   const fullAccessHtml = create(readyState).renderMemberPanel({
     id: 'p1',
@@ -1278,7 +1285,10 @@ function testLocalAdminTokenWiring() {
   const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
   assert.ok(pcAppNode.includes('budget'), 'PC node page should read Route C daily budget');
   assert.ok(pcAppNode.includes('今日平台预算已用完'), 'PC node page should explain Route C daily budget fuse');
+  assert.ok(pcAppNode.includes('今日个人额度已用完'), 'PC node page should explain Route C per-user daily budget fuse');
   assert.ok(pcAppNode.includes('remainingCallsToday'), 'PC node page should show remaining Route C daily calls');
+  assert.ok(pcAppNode.includes('remainingCallsTodayForUser'), 'PC node page should show remaining Route C per-user daily calls');
+  assert.ok(pcAppNode.includes('perUserDailyCallLimit'), 'PC node page should show Route C per-user daily limit');
   assert.ok(pcAppNode.includes('admissionAvailability'), 'PC node page should read Route C admission availability');
   assert.ok(pcAppNode.includes('admission_availability'), 'PC node page should keep snake_case admission compatibility');
   assert.ok(pcAppNode.includes('agentSelection'), 'PC node page should display Route C agent selection protection');

@@ -92,6 +92,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (62, "停止默认加入联合项目并清理旧成员关系", migration_v62),
     (63, "项目开发命令自动识别元数据", migration_v63),
     (64, "Route C 服务器模型每日预算调用审计", migration_v64),
+    (65, "Route C 服务器模型用户日预算索引", migration_v65),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2212,6 +2213,15 @@ fn migration_v64(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_v65(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_route_c_budget_day_user
+          ON route_c_runtime_budget_events(route_day, user_id, created_at DESC)",
+        [],
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2488,6 +2498,26 @@ mod tests {
             )
             .expect("budget event should count");
         assert_eq!(count, 1);
+    }
+
+    #[test]
+    fn migration_v65_adds_route_c_budget_day_user_index() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v64(&conn).expect("route c budget table should apply");
+        migration_v65(&conn).expect("route c user budget index should apply");
+
+        let exists: i64 = conn
+            .query_row(
+                "SELECT COUNT(*)
+                   FROM sqlite_master
+                  WHERE type='index'
+                    AND name='idx_route_c_budget_day_user'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("index should be queryable");
+        assert_eq!(exists, 1);
     }
 
     fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {

@@ -14,7 +14,7 @@ use crate::{
     agent_llm_call::call_chat_llm_with_json_response_mode,
     project_auth::{auth_from_headers, json_error},
     server_agent_runtime_budget::{
-        server_runtime_budget_status, try_record_route_c_call, ServerRuntimeBudgetError,
+        server_runtime_budget_status_for_user, try_record_route_c_call, ServerRuntimeBudgetError,
         ServerRuntimeBudgetStatus,
     },
     server_agent_runtime_guard::{
@@ -79,7 +79,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         });
     let admission = admission_snapshot(&user.id, limits);
     let admission_availability = admission_availability(&admission);
-    let budget = server_runtime_budget_status(&state.store);
+    let budget = server_runtime_budget_status_for_user(&state.store, &user.id);
     let ready = policy.enabled && agent.is_some() && admission_availability.ready && budget.ready();
     Json(ServerAgentRuntimeStatus {
         ready,
@@ -87,6 +87,8 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
             "disabled"
         } else if agent.is_none() {
             "unavailable"
+        } else if budget.status == "user_exhausted" {
+            "user_budget_exhausted"
         } else if !budget.ready() {
             "budget_exhausted"
         } else if !admission_availability.ready {
@@ -350,6 +352,7 @@ mod tests {
         assert!(protection.agent_selection.contains("default server agent"));
         assert!(protection.admission_control.contains("global"));
         assert!(protection.budget_gate.contains("DAILY_CALL_LIMIT"));
+        assert!(protection.budget_gate.contains("PER_USER_DAILY_CALL_LIMIT"));
         assert!(protection
             .operational_switch
             .contains("ELON_SERVER_AGENT_RUNTIME_ENABLED"));
@@ -400,12 +403,40 @@ mod tests {
                 used_calls_today: 5,
                 daily_call_limit: Some(5),
                 remaining_calls_today: Some(0),
+                per_user_enabled: false,
+                per_user_source: "default",
+                used_calls_today_for_user: None,
+                per_user_daily_call_limit: None,
+                remaining_calls_today_for_user: None,
                 reset_after_secs: 3600,
             },
         ));
 
         assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "3600");
+    }
+
+    #[test]
+    fn user_budget_error_response_sets_retry_after_header() {
+        let response = budget_error_response(ServerRuntimeBudgetError::UserDailyCallLimitReached(
+            ServerRuntimeBudgetStatus {
+                enabled: true,
+                status: "user_exhausted",
+                source: "default",
+                used_calls_today: 5,
+                daily_call_limit: None,
+                remaining_calls_today: None,
+                per_user_enabled: true,
+                per_user_source: "test",
+                used_calls_today_for_user: Some(2),
+                per_user_daily_call_limit: Some(2),
+                remaining_calls_today_for_user: Some(0),
+                reset_after_secs: 1800,
+            },
+        ));
+
+        assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "1800");
     }
 
     #[test]
