@@ -233,6 +233,118 @@ function New-Fb2RefreshCompletionMatrix {
     }
 }
 
+function Get-Fb2RefreshPathScope {
+    param(
+        [string]$Path,
+        [string]$OutputDir,
+        [string[]]$EvidenceDirs
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return "missing"
+    }
+    try {
+        $fullPath = [System.IO.Path]::GetFullPath($Path)
+        $fullOutput = [System.IO.Path]::GetFullPath($OutputDir)
+    } catch {
+        return "unknown"
+    }
+    if ($fullPath.StartsWith($fullOutput, [System.StringComparison]::OrdinalIgnoreCase)) {
+        return "current_output_dir"
+    }
+    foreach ($dir in @($EvidenceDirs)) {
+        if ([string]::IsNullOrWhiteSpace($dir)) {
+            continue
+        }
+        try {
+            $fullDir = [System.IO.Path]::GetFullPath($dir)
+        } catch {
+            continue
+        }
+        if ($fullPath.StartsWith($fullDir, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return "history_evidence_dir"
+        }
+    }
+    return "outside_evidence_dirs"
+}
+
+function New-Fb2RefreshArtifactFreshness {
+    param(
+        [string]$Name,
+        [string]$Path,
+        [string]$OutputDir,
+        [string[]]$EvidenceDirs,
+        [datetime]$NowUtc
+    )
+
+    $exists = -not [string]::IsNullOrWhiteSpace($Path) -and (Test-Path -LiteralPath $Path)
+    $lastWriteUtc = $null
+    $ageMinutes = $null
+    if ($exists) {
+        $item = Get-Item -LiteralPath $Path
+        $lastWriteUtc = $item.LastWriteTimeUtc.ToString("o")
+        $ageMinutes = [math]::Round(($NowUtc - $item.LastWriteTimeUtc).TotalMinutes, 2)
+    }
+
+    [ordered]@{
+        name = $Name
+        path = $Path
+        exists = [bool]$exists
+        source_scope = Get-Fb2RefreshPathScope -Path $Path -OutputDir $OutputDir -EvidenceDirs $EvidenceDirs
+        last_write_utc = $lastWriteUtc
+        age_minutes = $ageMinutes
+    }
+}
+
+function New-Fb2RefreshEvidenceFreshness {
+    param(
+        [string]$OutputDir,
+        [string[]]$EvidenceDirs,
+        [object]$Files,
+        [object]$Status,
+        [object]$GoalAudit
+    )
+
+    $nowUtc = [datetime]::UtcNow
+    $artifactNames = @(
+        "public_contract_status",
+        "status",
+        "goal_audit",
+        "goal_audit_markdown",
+        "handoff",
+        "handoff_markdown",
+        "status_refresh",
+        "handoff_prompt"
+    )
+    $artifacts = @(
+        foreach ($name in $artifactNames) {
+            New-Fb2RefreshArtifactFreshness `
+                -Name $name `
+                -Path ([string](Get-Fb2RefreshProperty $Files $name "")) `
+                -OutputDir $OutputDir `
+                -EvidenceDirs $EvidenceDirs `
+                -NowUtc $nowUtc
+        }
+    )
+    $currentOutputCount = @($artifacts | Where-Object { $_.source_scope -eq "current_output_dir" -and $_.exists }).Count
+    $historyCount = @($artifacts | Where-Object { $_.source_scope -eq "history_evidence_dir" -and $_.exists }).Count
+
+    [ordered]@{
+        schema = "fb2.main_project.evidence_freshness.v1"
+        generated_at_utc = $nowUtc.ToString("o")
+        note = "artifact freshness only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN"
+        current_output_dir = $OutputDir
+        evidence_dirs = @($EvidenceDirs)
+        artifact_count = @($artifacts).Count
+        current_output_artifact_count = $currentOutputCount
+        history_artifact_count = $historyCount
+        token_present = [bool]$Status.environment.fb2_ai_center_token_present
+        data_goal_complete = [bool]$GoalAudit.data_goal_complete
+        full_final_complete = [bool]$GoalAudit.full_final_complete
+        artifacts = $artifacts
+    }
+}
+
 function New-Fb2RefreshBlockingState {
     param(
         [object]$Status,
@@ -296,6 +408,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight)) "data-only preflight command"
         Assert-Fb2RefreshSelfTest ([string]$summary.completion_matrix.schema -eq "fb2.main_project.completion_matrix.v1") "completion matrix schema"
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
+        Assert-Fb2RefreshSelfTest ([string]$summary.evidence_freshness.schema -eq "fb2.main_project.evidence_freshness.v1") "evidence freshness schema"
+        Assert-Fb2RefreshSelfTest (@($summary.evidence_freshness.artifacts).Count -gt 0) "evidence freshness artifacts"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
         "== SelfTest Summary =="
         "failed=0"
@@ -385,21 +499,28 @@ $ownerNextActions = New-Fb2RefreshOwnerActions -Status $status -GoalAudit $goalA
 $blockingState = New-Fb2RefreshBlockingState -Status $status -GoalAudit $goalAudit
 $nextCommands = New-Fb2RefreshNextCommands -Status $status
 $completionMatrix = New-Fb2RefreshCompletionMatrix -Status $status -GoalAudit $goalAudit
+$files = [ordered]@{
+    status_refresh = $RefreshSummaryPath
+    public_contract_status = $publicPath
+    status = $statusPath
+    goal_audit = $goalAuditPath
+    goal_audit_markdown = $goalAuditMarkdownPath
+    handoff = $handoffPath
+    handoff_markdown = $handoffMarkdownPath
+    handoff_prompt = $HandoffPromptPath
+}
+$evidenceFreshness = New-Fb2RefreshEvidenceFreshness `
+    -OutputDir $OutputDir `
+    -EvidenceDirs @($evidence) `
+    -Files $files `
+    -Status $status `
+    -GoalAudit $goalAudit
 
 $refreshSummary = [pscustomobject]@{
     schema = "fb2.main_project.status_refresh.v1"
     output_dir = $OutputDir
     evidence_dirs = @($evidence)
-    files = [ordered]@{
-        status_refresh = $RefreshSummaryPath
-        public_contract_status = $publicPath
-        status = $statusPath
-        goal_audit = $goalAuditPath
-        goal_audit_markdown = $goalAuditMarkdownPath
-        handoff = $handoffPath
-        handoff_markdown = $handoffMarkdownPath
-        handoff_prompt = $HandoffPromptPath
-    }
+    files = $files
     public_contract_ready = [bool]($public -and $public.success)
     user_scenario_audit_ready = [bool]$status.latest_user_scenario_audit.complete
     non_voice_historical_evidence_ready = [bool]$status.readiness.non_voice_historical_evidence_ready
@@ -411,6 +532,7 @@ $refreshSummary = [pscustomobject]@{
     blocking_state = $blockingState
     next_commands = $nextCommands
     completion_matrix = $completionMatrix
+    evidence_freshness = $evidenceFreshness
     missing_non_voice_requirements = @($goalAudit.missing_non_voice_requirements)
     deferred_requirements = @($goalAudit.deferred_requirements)
 }

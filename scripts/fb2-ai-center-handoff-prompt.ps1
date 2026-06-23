@@ -115,6 +115,8 @@ function New-Fb2HandoffPrompt {
     $commands = Get-Fb2PromptProperty $Refresh "next_commands"
     $blocking = Get-Fb2PromptProperty $Refresh "blocking_state"
     $ownerActions = Get-Fb2PromptProperty $Refresh "owner_next_actions"
+    $freshness = Get-Fb2PromptProperty $Refresh "evidence_freshness"
+    $freshnessArtifacts = @(Get-Fb2PromptProperty $freshness "artifacts" @())
     $requirements = @(Get-Fb2PromptProperty $matrix "requirements" @())
     $lines = [System.Collections.ArrayList]::new()
 
@@ -150,9 +152,26 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine $lines "- safe_to_continue_without_secret: `$(@($blocking.safe_to_continue_without_secret) -join ', ')`"
     Add-Fb2PromptLine $lines "- requires_secret: `$(@($blocking.requires_secret) -join ', ')`"
     Add-Fb2PromptLine $lines ""
+    Add-Fb2PromptLine $lines "## 证据新鲜度"
+    Add-Fb2PromptLine $lines "- freshness_schema: `$([string](Get-Fb2PromptProperty $freshness 'schema' ''))`"
+    Add-Fb2PromptLine $lines "- generated_at_utc: `$([string](Get-Fb2PromptProperty $freshness 'generated_at_utc' ''))`"
+    Add-Fb2PromptLine $lines "- note: `$([string](Get-Fb2PromptProperty $freshness 'note' ''))`"
+    Add-Fb2PromptLine $lines "- current_output_artifact_count: `$([int](Get-Fb2PromptProperty $freshness 'current_output_artifact_count' 0))`"
+    Add-Fb2PromptLine $lines "- history_artifact_count: `$([int](Get-Fb2PromptProperty $freshness 'history_artifact_count' 0))`"
+    $pipe = [char]124
+    Add-Fb2PromptLine -Lines $lines -Text ('{0} artifact {0} source {0} age_minutes {0} path {0}' -f $pipe)
+    Add-Fb2PromptLine -Lines $lines -Text ('{0}---{0}---{0}---:{0}---{0}' -f $pipe)
+    foreach ($artifact in $freshnessArtifacts) {
+        $name = Format-Fb2PromptCell $artifact.name 80
+        $source = Format-Fb2PromptCell $artifact.source_scope 80
+        $age = Format-Fb2PromptCell $artifact.age_minutes 40
+        $path = Format-Fb2PromptCell $artifact.path 180
+        Add-Fb2PromptLine -Lines $lines -Text ('{0} {1} {0} {2} {0} {3} {0} {4} {0}' -f $pipe, $name, $source, $age, $path)
+    }
+    Add-Fb2PromptLine $lines ""
     Add-Fb2PromptLine $lines "## 完成矩阵"
-    Add-Fb2PromptLine $lines "| group | owner | id | status | evidence | missing |"
-    Add-Fb2PromptLine $lines "|---|---|---|---|---|---|"
+    Add-Fb2PromptLine -Lines $lines -Text ('{0} group {0} owner {0} id {0} status {0} evidence {0} missing {0}' -f $pipe)
+    Add-Fb2PromptLine -Lines $lines -Text ('{0}---{0}---{0}---{0}---{0}---{0}---{0}' -f $pipe)
     foreach ($requirement in $requirements) {
         $group = Format-Fb2PromptCell $requirement.group 80
         $owner = Format-Fb2PromptCell $requirement.owner 80
@@ -160,7 +179,7 @@ function New-Fb2HandoffPrompt {
         $status = Format-Fb2PromptCell $requirement.status 80
         $evidence = Format-Fb2PromptCell $requirement.evidence 220
         $missing = Format-Fb2PromptCell $requirement.missing 160
-        Add-Fb2PromptLine $lines "| $group | $owner | $id | $status | $evidence | $missing |"
+        Add-Fb2PromptLine -Lines $lines -Text ('{0} {1} {0} {2} {0} {3} {0} {4} {0} {5} {0} {6} {0}' -f $pipe, $group, $owner, $id, $status, $evidence, $missing)
     }
     Add-Fb2PromptLine $lines ""
     Add-Fb2PromptLine $lines "## 接手规则"
@@ -225,6 +244,17 @@ function Invoke-Fb2PromptSelfTest {
                     [ordered]@{ id = "voice_final_evidence"; group = "voice_deferred_by_user"; owner = "paused_by_user"; title = "voice"; status = "deferred"; complete = $false; deferred = $true; evidence = ""; missing = "ASR/TTS is intentionally deferred by user" }
                 )
             }
+            evidence_freshness = [ordered]@{
+                schema = "fb2.main_project.evidence_freshness.v1"
+                generated_at_utc = "2026-06-23T00:00:00.0000000Z"
+                note = "artifact freshness only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN"
+                current_output_artifact_count = 2
+                history_artifact_count = 0
+                artifacts = @(
+                    [ordered]@{ name = "status"; source_scope = "current_output_dir"; age_minutes = 0; path = "target\fb2-ai-center\status-current.json" },
+                    [ordered]@{ name = "goal_audit"; source_scope = "current_output_dir"; age_minutes = 0; path = "target\fb2-ai-center\goal-audit-current.json" }
+                )
+            }
         }
         $fixture | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $refreshPath -Encoding UTF8
         & $PSCommandPath -RefreshPath $refreshPath -OutputPath $promptPath | Out-Null
@@ -232,6 +262,8 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest (Test-Path -LiteralPath $promptPath) "prompt file exists"
         Assert-Fb2PromptSelfTest ($content -match "fb2 AI Center") "prompt title"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_analysis") "matrix item"
+        Assert-Fb2PromptSelfTest ($content -match "证据新鲜度") "freshness section"
+        Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.evidence_freshness.v1") "freshness schema"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_AI_CENTER_TOKEN>") "token placeholder"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_PASSWORD>") "password placeholder"
         Assert-Fb2PromptSelfTest ($content -notmatch "secret-real-value") "token redacted"
