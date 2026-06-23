@@ -7,6 +7,9 @@ const MAX_MESSAGES: usize = 24;
 const MAX_MESSAGE_CHARS: usize = 32_000;
 const MAX_TOTAL_CHARS: usize = 80_000;
 const MAX_OUTPUT_TOKENS: usize = 3000;
+const MAX_ACTIONS: usize = 24;
+const MAX_ACTION_CHARS: usize = 64_000;
+const MAX_ACTIONS_TOTAL_CHARS: usize = 96_000;
 const MAX_REQUESTS_PER_MINUTE: usize = 12;
 const MAX_CONCURRENT_PER_USER: usize = 2;
 const MAX_CONCURRENT_GLOBAL: usize = 24;
@@ -16,6 +19,9 @@ const MAX_MESSAGES_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_MESSAGES";
 const MAX_MESSAGE_CHARS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_MESSAGE_CHARS";
 const MAX_TOTAL_CHARS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_TOTAL_CHARS";
 const MAX_OUTPUT_TOKENS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_OUTPUT_TOKENS";
+const MAX_ACTIONS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_ACTIONS";
+const MAX_ACTION_CHARS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_ACTION_CHARS";
+const MAX_ACTIONS_TOTAL_CHARS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_ACTIONS_TOTAL_CHARS";
 const MAX_REQUESTS_PER_MINUTE_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_REQUESTS_PER_MINUTE";
 const MAX_CONCURRENT_PER_USER_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_CONCURRENT_PER_USER";
 const MAX_CONCURRENT_GLOBAL_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_CONCURRENT_GLOBAL";
@@ -28,6 +34,9 @@ pub(crate) struct ServerAgentRuntimeLimits {
     pub max_message_chars: usize,
     pub max_total_chars: usize,
     pub max_output_tokens: usize,
+    pub max_actions: usize,
+    pub max_action_chars: usize,
+    pub max_actions_total_chars: usize,
     pub max_requests_per_minute: usize,
     pub max_concurrent_per_user: usize,
     pub max_concurrent_global: usize,
@@ -45,6 +54,9 @@ impl ServerAgentRuntimeLimits {
             max_message_chars: MAX_MESSAGE_CHARS,
             max_total_chars: MAX_TOTAL_CHARS,
             max_output_tokens: MAX_OUTPUT_TOKENS,
+            max_actions: MAX_ACTIONS,
+            max_action_chars: MAX_ACTION_CHARS,
+            max_actions_total_chars: MAX_ACTIONS_TOTAL_CHARS,
             max_requests_per_minute: MAX_REQUESTS_PER_MINUTE,
             max_concurrent_per_user: MAX_CONCURRENT_PER_USER,
             max_concurrent_global: MAX_CONCURRENT_GLOBAL,
@@ -76,6 +88,21 @@ impl ServerAgentRuntimeLimits {
                 defaults.max_output_tokens,
                 256,
                 12_000,
+            ),
+            max_actions: env_usize(&mut lookup, MAX_ACTIONS_ENV, defaults.max_actions, 0, 64),
+            max_action_chars: env_usize(
+                &mut lookup,
+                MAX_ACTION_CHARS_ENV,
+                defaults.max_action_chars,
+                1_000,
+                240_000,
+            ),
+            max_actions_total_chars: env_usize(
+                &mut lookup,
+                MAX_ACTIONS_TOTAL_CHARS_ENV,
+                defaults.max_actions_total_chars,
+                1_000,
+                500_000,
             ),
             max_requests_per_minute: env_usize(
                 &mut lookup,
@@ -172,7 +199,8 @@ fn env_f64(
 #[cfg(test)]
 mod tests {
     use super::{
-        ServerAgentRuntimeLimits, MAX_CONCURRENT_GLOBAL_ENV, MAX_CONCURRENT_PER_USER_ENV,
+        ServerAgentRuntimeLimits, MAX_ACTIONS_ENV, MAX_ACTIONS_TOTAL_CHARS_ENV,
+        MAX_ACTION_CHARS_ENV, MAX_CONCURRENT_GLOBAL_ENV, MAX_CONCURRENT_PER_USER_ENV,
         MAX_MESSAGES_ENV, MAX_MESSAGE_CHARS_ENV, MAX_OUTPUT_TOKENS_ENV,
         MAX_REQUESTS_PER_MINUTE_ENV, MAX_TOTAL_CHARS_ENV, TEMPERATURE_ENV,
     };
@@ -235,6 +263,9 @@ mod tests {
                 MAX_MESSAGE_CHARS_ENV => Some("6000"),
                 MAX_TOTAL_CHARS_ENV => Some("12000"),
                 MAX_OUTPUT_TOKENS_ENV => Some("1024"),
+                MAX_ACTIONS_ENV => Some("6"),
+                MAX_ACTION_CHARS_ENV => Some("8000"),
+                MAX_ACTIONS_TOTAL_CHARS_ENV => Some("16000"),
                 MAX_REQUESTS_PER_MINUTE_ENV => Some("3"),
                 MAX_CONCURRENT_PER_USER_ENV => Some("1"),
                 MAX_CONCURRENT_GLOBAL_ENV => Some("4"),
@@ -248,6 +279,9 @@ mod tests {
         assert_eq!(limits.max_message_chars, 6_000);
         assert_eq!(limits.max_total_chars, 12_000);
         assert_eq!(limits.max_output_tokens, 1024);
+        assert_eq!(limits.max_actions, 6);
+        assert_eq!(limits.max_action_chars, 8_000);
+        assert_eq!(limits.max_actions_total_chars, 16_000);
         assert_eq!(limits.max_requests_per_minute, 3);
         assert_eq!(limits.max_concurrent_per_user, 1);
         assert_eq!(limits.max_concurrent_global, 4);
@@ -263,6 +297,9 @@ mod tests {
                 MAX_MESSAGE_CHARS_ENV => Some("999999999"),
                 MAX_TOTAL_CHARS_ENV => Some("999999999"),
                 MAX_OUTPUT_TOKENS_ENV => Some("not-a-number"),
+                MAX_ACTIONS_ENV => Some("999"),
+                MAX_ACTION_CHARS_ENV => Some("999999999"),
+                MAX_ACTIONS_TOTAL_CHARS_ENV => Some("999999999"),
                 MAX_REQUESTS_PER_MINUTE_ENV => Some("0"),
                 MAX_CONCURRENT_PER_USER_ENV => Some("999"),
                 MAX_CONCURRENT_GLOBAL_ENV => Some("999"),
@@ -276,6 +313,12 @@ mod tests {
         assert_eq!(limits.max_message_chars, defaults.max_message_chars);
         assert_eq!(limits.max_total_chars, defaults.max_total_chars);
         assert_eq!(limits.max_output_tokens, defaults.max_output_tokens);
+        assert_eq!(limits.max_actions, defaults.max_actions);
+        assert_eq!(limits.max_action_chars, defaults.max_action_chars);
+        assert_eq!(
+            limits.max_actions_total_chars,
+            defaults.max_actions_total_chars
+        );
         assert_eq!(
             limits.max_requests_per_minute,
             defaults.max_requests_per_minute

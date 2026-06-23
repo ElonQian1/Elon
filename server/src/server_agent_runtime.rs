@@ -19,6 +19,7 @@ use crate::{
         ServerRuntimeAdmissionError, ServerRuntimeAdmissionSnapshot, ServerRuntimeProtectionStatus,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
+    server_agent_runtime_output::validate_server_runtime_output,
     server_agent_runtime_policy::{ServerAgentRuntimeAgentPolicy, ServerAgentRuntimePolicy},
     types::{AgentConfig, AgentsConfig, AppState},
 };
@@ -183,7 +184,19 @@ pub async fn chat_handler(
     )
     .await
     {
-        Ok(response) => Json(response).into_response(),
+        Ok(response) => match validate_server_runtime_output(&response, limits) {
+            Ok(()) => Json(response).into_response(),
+            Err(error) => {
+                tracing::warn!(
+                    target: "server_agent_runtime",
+                    user_id = %user.id,
+                    request_fingerprint = %audit.request_fingerprint,
+                    output_error = error.kind(),
+                    "pc_server_runtime provider response rejected by output guard"
+                );
+                json_error(StatusCode::BAD_GATEWAY, error.public_message())
+            }
+        },
         Err(error) => {
             let summary = operational_error_summary(&error.to_string());
             tracing::warn!(
@@ -294,6 +307,7 @@ mod tests {
         let protection = protection_status();
 
         assert!(protection.input_validation.contains("total_chars"));
+        assert!(protection.output_validation.contains("actions"));
         assert!(protection.input_validation.contains("message_chars"));
         assert!(protection.agent_selection.contains("default server agent"));
         assert!(protection.admission_control.contains("global"));

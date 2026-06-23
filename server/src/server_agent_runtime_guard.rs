@@ -17,6 +17,7 @@ use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ServerRuntimeProtectionStatus {
     pub input_validation: &'static str,
+    pub output_validation: &'static str,
     pub agent_selection: &'static str,
     pub admission_control: &'static str,
     pub operational_switch: &'static str,
@@ -37,6 +38,9 @@ pub(crate) struct ServerRuntimeAuditSummary {
     pub limit_max_message_chars: usize,
     pub limit_max_total_chars: usize,
     pub limit_max_output_tokens: usize,
+    pub limit_max_actions: usize,
+    pub limit_max_action_chars: usize,
+    pub limit_max_actions_total_chars: usize,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -89,6 +93,8 @@ pub(crate) struct ServerRuntimeAdmissionGuard {
 pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
     ServerRuntimeProtectionStatus {
         input_validation: "messages role/content/count/message_chars/total_chars",
+        output_validation:
+            "model JSON must be an object; actions must stay within count/action_chars/total_action_chars",
         agent_selection:
             "default server agent only unless ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS explicitly allows more",
         admission_control: "global and per-user concurrency plus rolling minute request limits",
@@ -374,6 +380,9 @@ pub(crate) fn audit_summary(
         limit_max_message_chars: limits.max_message_chars,
         limit_max_total_chars: limits.max_total_chars,
         limit_max_output_tokens: limits.max_output_tokens,
+        limit_max_actions: limits.max_actions,
+        limit_max_action_chars: limits.max_action_chars,
+        limit_max_actions_total_chars: limits.max_actions_total_chars,
     }
 }
 
@@ -427,6 +436,7 @@ mod tests {
     fn status_describes_operational_protections() {
         let status = protection_status();
         assert!(status.input_validation.contains("total_chars"));
+        assert!(status.output_validation.contains("actions"));
         assert!(status
             .agent_selection
             .contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
@@ -459,6 +469,9 @@ mod tests {
             max_message_chars: 32_000,
             max_total_chars: 80_000,
             max_output_tokens: 3000,
+            max_actions: 24,
+            max_action_chars: 64_000,
+            max_actions_total_chars: 96_000,
             max_requests_per_minute: 10,
             max_concurrent_per_user: 1,
             max_concurrent_global: 10,
@@ -487,6 +500,9 @@ mod tests {
             max_message_chars: 32_000,
             max_total_chars: 80_000,
             max_output_tokens: 3000,
+            max_actions: 24,
+            max_action_chars: 64_000,
+            max_actions_total_chars: 96_000,
             max_requests_per_minute: 1,
             max_concurrent_per_user: 10,
             max_concurrent_global: 10,
@@ -513,6 +529,9 @@ mod tests {
             max_message_chars: 32_000,
             max_total_chars: 80_000,
             max_output_tokens: 3000,
+            max_actions: 24,
+            max_action_chars: 64_000,
+            max_actions_total_chars: 96_000,
             max_requests_per_minute: 10,
             max_concurrent_per_user: 10,
             max_concurrent_global: usize::MAX,
@@ -523,6 +542,9 @@ mod tests {
             max_message_chars: 32_000,
             max_total_chars: 80_000,
             max_output_tokens: 3000,
+            max_actions: 24,
+            max_action_chars: 64_000,
+            max_actions_total_chars: 96_000,
             max_requests_per_minute: 10,
             max_concurrent_per_user: 10,
             max_concurrent_global: 1,
@@ -554,6 +576,9 @@ mod tests {
             max_message_chars: 32_000,
             max_total_chars: 80_000,
             max_output_tokens: 3000,
+            max_actions: 24,
+            max_action_chars: 64_000,
+            max_actions_total_chars: 96_000,
             max_requests_per_minute: 1,
             max_concurrent_per_user: 1,
             max_concurrent_global: 10,
