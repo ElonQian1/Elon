@@ -46,7 +46,7 @@ Invoke-Step "Static Route B runtime contract" {
         }
     }
 
-    foreach ($tool in @("list_dir", "read_file", "read_file_range", "write_file", "apply_patch", "run_command")) {
+    foreach ($tool in @("list_dir", "search_files", "read_file", "read_file_range", "write_file", "apply_patch", "run_command")) {
         Assert-FileContains `
             -Path $ApiRuntimeConfig `
             -Needle "`"$tool`"" `

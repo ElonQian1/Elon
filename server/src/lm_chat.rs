@@ -147,12 +147,7 @@ pub async fn lm_chat_handler(
         }
     };
 
-    let allow_agent_fallback = req
-        .agent
-        .as_deref()
-        .map(str::trim)
-        .unwrap_or("")
-        .is_empty();
+    let allow_agent_fallback = req.agent.as_deref().map(str::trim).unwrap_or("").is_empty();
     let (response, used_agent, used_fallback) = match call_chat_llm_with_default_fallback_options(
         &state,
         &agent,

@@ -76,7 +76,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `search_files`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `search_files` is read-only and bounded, so use it before broad file reads when locating symbols, filenames, TODOs, errors, or related code. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -289,8 +289,9 @@ Schema:
 {
   "message": "short human-readable progress or final answer",
   "done": false,
-  "actions": [
+    "actions": [
     {"tool": "list_dir", "path": "."},
+    {"tool": "search_files", "query": "TODO", "path": "src", "max_results": 40},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "read_file_range", "path": "src/main.rs", "start_line": 1, "line_count": 80},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
@@ -302,6 +303,7 @@ Schema:
 Rules:
 - Use paths relative to the project root.
 - Prefer read-only actions first.
+- Use search_files before broad file reads when you need to locate symbols, filenames, TODOs, errors, or related code.
 - Use read_file_range for large files or when you only need a specific section.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for local edits to existing project files.
@@ -547,6 +549,93 @@ function Test-AgentCommandAllowedParts {
     }
 }
 
+function Invoke-AgentSearchFiles {
+    param(
+        [string]$Path = '.',
+        [Parameter(Mandatory = $true)][string]$Query,
+        [int]$MaxResults = 50
+    )
+    $queryText = $Query.Trim()
+    if (-not $queryText) { return 'search_files error: query cannot be empty' }
+    if ($queryText.Length -gt 200) { return 'search_files error: query is too long' }
+    if ($MaxResults -lt 1) { $MaxResults = 1 }
+    if ($MaxResults -gt 200) { $MaxResults = 200 }
+
+    $root = Resolve-SafePath $Path
+    if (-not (Test-Path -LiteralPath $root -PathType Container)) {
+        return "search_files error: directory not found: $Path"
+    }
+
+    $projectRootFull = [System.IO.Path]::GetFullPath($ProjectRoot)
+    $projectRootPrefix = $projectRootFull
+    if (-not $projectRootPrefix.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+        $projectRootPrefix = $projectRootPrefix + [System.IO.Path]::DirectorySeparatorChar
+    }
+    $skipDirs = @('.git', '.hg', '.svn', 'node_modules', 'target', 'dist', 'build', '.gradle', '.idea', '.vscode', '.elon')
+    $queue = New-Object 'System.Collections.Generic.Queue[string]'
+    $results = New-Object 'System.Collections.Generic.List[string]'
+    $queue.Enqueue($root)
+    $filesScanned = 0
+    $truncated = $false
+
+    while ($queue.Count -gt 0) {
+        $dir = $queue.Dequeue()
+        $items = @(Get-ChildItem -LiteralPath $dir -Force -ErrorAction SilentlyContinue)
+        foreach ($item in $items) {
+            if (($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) { continue }
+            if ($item.PSIsContainer) {
+                if ($skipDirs -contains $item.Name) { continue }
+                $queue.Enqueue($item.FullName)
+                continue
+            }
+            $filesScanned += 1
+            if ($filesScanned -gt 2000) {
+                $truncated = $true
+                break
+            }
+
+            $full = [System.IO.Path]::GetFullPath($item.FullName)
+            $relative = $full
+            if ($full.StartsWith($projectRootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+                $relative = $full.Substring($projectRootPrefix.Length)
+            }
+            $relative = $relative.Replace('\', '/')
+
+            if ($relative.IndexOf($queryText, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+                $results.Add("$relative`: path match")
+            }
+            if ($results.Count -ge $MaxResults) {
+                $truncated = $true
+                break
+            }
+
+            if ($item.Length -gt 1048576) { continue }
+            try {
+                $lineNo = 0
+                foreach ($line in Get-Content -LiteralPath $full -ErrorAction Stop) {
+                    $lineNo += 1
+                    $text = [string]$line
+                    if ($text.IndexOf($queryText, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
+                    $snippet = (Limit-AgentText $text.Trim() 240).Replace("`t", ' ')
+                    $results.Add("$relative`:$lineNo`: $snippet")
+                    if ($results.Count -ge $MaxResults) {
+                        $truncated = $true
+                        break
+                    }
+                }
+            } catch {
+                continue
+            }
+            if ($results.Count -ge $MaxResults) { break }
+        }
+        if ($truncated -or $results.Count -ge $MaxResults) { break }
+    }
+
+    if ($results.Count -eq 0) { return "no matches for query: $queryText" }
+    if ($truncated) { $results.Add('[truncated]') }
+    return ($results -join "`n")
+}
+
 function Invoke-AgentAction {
     param([Parameter(Mandatory = $true)]$Action)
     $tool = [string]$Action.tool
@@ -559,6 +648,12 @@ function Invoke-AgentAction {
             }
             $items = Get-ChildItem -LiteralPath $full | Select-Object -First 200 Name, Mode, Length
             return ($items | Format-Table -AutoSize | Out-String)
+        }
+        'search_files' {
+            $path = if ($Action.path) { [string]$Action.path } else { '.' }
+            $query = [string]$Action.query
+            $maxResults = if ($Action.max_results) { [int]$Action.max_results } else { 50 }
+            return Invoke-AgentSearchFiles -Path $path -Query $query -MaxResults $maxResults
         }
         'read_file' {
             $path = [string]$Action.path
@@ -862,6 +957,9 @@ mod tests {
         assert!(script.contains("Resolve-SafePath"));
         assert!(script.contains("Parent path segments are not allowed"));
         assert!(script.contains("ReparsePoint"));
+        assert!(script.contains("'search_files'"));
+        assert!(script.contains("Invoke-AgentSearchFiles"));
+        assert!(script.contains("search_files error: query cannot be empty"));
         assert!(script.contains("'read_file_range'"));
         assert!(script.contains("start_line must be >= 1"));
         assert!(script.contains("$lineCount = 400"));
@@ -900,6 +998,7 @@ mod tests {
         assert!(doc.contains("ELON_AGENT_API_KEY"));
         assert!(doc.contains("ELON_SERVER_TOKEN"));
         assert!(doc.contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
+        assert!(doc.contains("search_files"));
         assert!(doc.contains("read_file_range"));
         assert!(doc.contains("apply_patch"));
         assert!(doc.contains("program"));
@@ -919,6 +1018,14 @@ mod tests {
         let scripts = root.join("scripts");
         fs::create_dir_all(&scripts).unwrap();
         fs::write(root.join("note.txt"), "hello\n").unwrap();
+        fs::create_dir_all(root.join("src")).unwrap();
+        fs::create_dir_all(root.join("target")).unwrap();
+        fs::write(
+            root.join("src").join("route_b.rs"),
+            "fn route_b_search() {}\nlet marker = \"needle\";\n",
+        )
+        .unwrap();
+        fs::write(root.join("target").join("ignored.txt"), "needle\n").unwrap();
         let script_path = scripts.join("elon-agent.ps1");
         fs::write(&script_path, agent_runtime_script().unwrap()).unwrap();
         let validation_path = root.join("validate-agent-runtime.ps1");
@@ -994,6 +1101,20 @@ if ($eventsJson -match 'hello') {
 }
 if ($eventsJson -match ('a' * 40) -or $eventsJson -match ('b' * 40) -or $eventsJson -match ('c' * 40)) {
     Write-Error 'lifecycle log should not store compacted message content'
+    exit 1
+}
+$search = Invoke-AgentSearchFiles -Path '.' -Query 'needle' -MaxResults 20
+if ($search -notmatch 'src/route_b.rs:2') {
+    Write-Error "search_files did not find content match: $search"
+    exit 1
+}
+if ($search -match 'target/ignored.txt') {
+    Write-Error "search_files should skip target output: $search"
+    exit 1
+}
+$pathSearch = Invoke-AgentSearchFiles -Path 'src' -Query 'route_b' -MaxResults 20
+if ($pathSearch -notmatch 'src/route_b.rs: path match') {
+    Write-Error "search_files did not find path match: $pathSearch"
     exit 1
 }
 $patch = @'

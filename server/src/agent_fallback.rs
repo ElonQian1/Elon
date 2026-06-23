@@ -72,9 +72,7 @@ pub(crate) async fn call_chat_llm_with_default_fallback_options(
     ))
 }
 
-pub(crate) async fn server_api_agents_in_fallback_order(
-    state: &Arc<AppState>,
-) -> Vec<AgentConfig> {
+pub(crate) async fn server_api_agents_in_fallback_order(state: &Arc<AppState>) -> Vec<AgentConfig> {
     let config = state.agents_config.read().await;
     ordered_server_api_agents(&config)
 }

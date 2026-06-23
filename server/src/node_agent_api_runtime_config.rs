@@ -8,6 +8,7 @@ const DEFAULT_OPENAI_API_BASE: &str = "https://api.openai.com/v1";
 
 const ROUTE_B_SUPPORTED_TOOLS: &[&str] = &[
     "list_dir",
+    "search_files",
     "read_file",
     "read_file_range",
     "write_file",
@@ -15,7 +16,8 @@ const ROUTE_B_SUPPORTED_TOOLS: &[&str] = &[
     "run_command",
 ];
 const ROUTE_B_APPROVAL_REQUIRED_TOOLS: &[&str] = &["write_file", "apply_patch", "run_command"];
-const ROUTE_B_READ_ONLY_TOOLS: &[&str] = &["list_dir", "read_file", "read_file_range"];
+const ROUTE_B_READ_ONLY_TOOLS: &[&str] =
+    &["list_dir", "search_files", "read_file", "read_file_range"];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub(crate) struct ApiRuntimeEnvStatus {
@@ -310,6 +312,9 @@ mod tests {
     fn tool_contract_exposes_route_b_capabilities_and_guardrails() {
         let contract = tool_contract();
         assert_eq!(contract.route, "route_b_api_runtime");
+        assert!(contract
+            .supported_tools
+            .contains(&"search_files".to_string()));
         assert!(contract
             .supported_tools
             .contains(&"read_file_range".to_string()));

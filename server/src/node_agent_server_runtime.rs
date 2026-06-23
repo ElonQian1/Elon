@@ -907,8 +907,9 @@ Schema:
 {
   "message": "short progress or final answer",
   "done": false,
-  "actions": [
+    "actions": [
     {"tool": "list_dir", "path": "."},
+    {"tool": "search_files", "query": "TODO", "path": "src", "max_results": 40},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "read_file_range", "path": "src/main.rs", "start_line": 120, "line_count": 80},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
@@ -920,6 +921,7 @@ Schema:
 Rules:
 - Paths must be relative to the current project workspace.
 - Prefer read-only actions first.
+- Use search_files before broad file reads when you need to locate symbols, filenames, TODOs, errors, or related code.
 - Use read_file_range instead of read_file for large files when you only need one section.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for intentional edits to existing project files.

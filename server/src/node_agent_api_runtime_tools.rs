@@ -150,6 +150,20 @@ fn tool_definitions() -> Value {
             })
         ),
         function_tool(
+            "search_files",
+            "Search project-relative file names and text contents without modifying files.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "Text to search for in file paths and text contents." },
+                    "path": { "type": "string", "description": "Optional project-relative directory to search. Defaults to the workspace root." },
+                    "max_results": { "type": "integer", "minimum": 1, "maximum": 200 }
+                },
+                "required": ["query"],
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
             "read_file",
             "Read a small project-relative text file.",
             json!({
@@ -250,6 +264,9 @@ mod tests {
 
         assert_eq!(payload["tool_choice"], "auto");
         let tools = payload["tools"].as_array().unwrap();
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "search_files"));
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "read_file_range"));

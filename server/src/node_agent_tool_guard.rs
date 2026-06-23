@@ -3,6 +3,7 @@
 use anyhow::{anyhow, bail, Context, Result};
 use serde_json::Value;
 use std::{
+    collections::VecDeque,
     path::{Path, PathBuf},
     time::Duration,
 };
@@ -10,6 +11,22 @@ use tokio::process::Command;
 
 const MAX_FILE_CHARS: usize = 40_000;
 const MAX_TOOL_RESULT_CHARS: usize = 24_000;
+const MAX_SEARCH_FILE_BYTES: u64 = 1024 * 1024;
+const MAX_SEARCH_FILES_SCANNED: usize = 2_000;
+const MAX_SEARCH_QUERY_CHARS: usize = 200;
+const SEARCH_SKIP_DIRS: &[&str] = &[
+    ".git",
+    ".hg",
+    ".svn",
+    "node_modules",
+    "target",
+    "dist",
+    "build",
+    ".gradle",
+    ".idea",
+    ".vscode",
+    ".elon",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum RuntimeToolMode {
@@ -69,6 +86,15 @@ impl ToolGuard {
             "list_dir" => {
                 let path = action.get("path").and_then(Value::as_str).unwrap_or(".");
                 self.list_dir(path).await
+            }
+            "search_files" => {
+                let query = action
+                    .get("query")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| anyhow!("query is required"))?;
+                let path = action.get("path").and_then(Value::as_str).unwrap_or(".");
+                let max_results = optional_positive_usize(action, "max_results")?.unwrap_or(50);
+                self.search_files(path, query, max_results).await
             }
             "read_file" => {
                 let path = required_str(action, "path")?;
@@ -139,6 +165,25 @@ impl ToolGuard {
         }
         rows.sort();
         Ok(rows.join("\n"))
+    }
+
+    async fn search_files(&self, path: &str, query: &str, max_results: usize) -> Result<String> {
+        let query = query.trim();
+        if query.is_empty() {
+            bail!("query cannot be empty");
+        }
+        if query.chars().count() > MAX_SEARCH_QUERY_CHARS {
+            bail!("query is too long");
+        }
+        let root = self.resolve_safe_path(path)?;
+        let workspace = self.workspace.clone();
+        let max_results = max_results.clamp(1, 200);
+        let query = query.to_string();
+        tokio::task::spawn_blocking(move || {
+            search_files_blocking(&workspace, &root, &query, max_results)
+        })
+        .await
+        .map_err(|error| anyhow!("search_files task failed: {error}"))?
     }
 
     async fn read_file(&self, path: &str) -> Result<String> {
@@ -341,6 +386,116 @@ impl ToolGuard {
         }
         Ok(())
     }
+}
+
+fn search_files_blocking(
+    workspace: &Path,
+    root: &Path,
+    query: &str,
+    max_results: usize,
+) -> Result<String> {
+    let metadata = std::fs::metadata(root)
+        .with_context(|| format!("search_files failed: {}", root.display()))?;
+    if !metadata.is_dir() {
+        bail!("search_files path must be a directory");
+    }
+
+    let query_lower = query.to_ascii_lowercase();
+    let mut queue = VecDeque::from([root.to_path_buf()]);
+    let mut results = Vec::new();
+    let mut files_scanned = 0usize;
+    let mut truncated = false;
+
+    while let Some(dir) = queue.pop_front() {
+        let entries = match std::fs::read_dir(&dir) {
+            Ok(entries) => entries,
+            Err(_) => continue,
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let name = entry.file_name().to_string_lossy().to_string();
+            let Ok(file_type) = entry.file_type() else {
+                continue;
+            };
+            if file_type.is_symlink() {
+                continue;
+            }
+            if path.is_dir() {
+                if should_skip_search_dir(&name) {
+                    continue;
+                }
+                queue.push_back(path);
+                continue;
+            }
+            if !path.is_file() {
+                continue;
+            }
+            files_scanned += 1;
+            if files_scanned > MAX_SEARCH_FILES_SCANNED {
+                truncated = true;
+                break;
+            }
+
+            let relative = display_relative_path(workspace, &path);
+            if relative.to_ascii_lowercase().contains(&query_lower) {
+                results.push(format!("{relative}: path match"));
+            }
+            if results.len() >= max_results {
+                truncated = true;
+                break;
+            }
+
+            let Ok(metadata) = std::fs::metadata(&path) else {
+                continue;
+            };
+            if metadata.len() > MAX_SEARCH_FILE_BYTES {
+                continue;
+            }
+            let Ok(text) = std::fs::read_to_string(&path) else {
+                continue;
+            };
+            for (index, line) in text.lines().enumerate() {
+                if !line.to_ascii_lowercase().contains(&query_lower) {
+                    continue;
+                }
+                let snippet = truncate_chars(line.trim(), 240).replace('\t', " ");
+                results.push(format!("{}:{}: {}", relative, index + 1, snippet));
+                if results.len() >= max_results {
+                    truncated = true;
+                    break;
+                }
+            }
+            if results.len() >= max_results {
+                break;
+            }
+        }
+        if truncated || results.len() >= max_results {
+            break;
+        }
+    }
+
+    if results.is_empty() {
+        return Ok(format!("no matches for query: {query}"));
+    }
+    if truncated {
+        results.push("[truncated]".to_string());
+    }
+    Ok(results.join("\n"))
+}
+
+fn should_skip_search_dir(name: &str) -> bool {
+    SEARCH_SKIP_DIRS
+        .iter()
+        .any(|skip| name.eq_ignore_ascii_case(skip))
+}
+
+fn display_relative_path(workspace: &Path, path: &Path) -> String {
+    path.strip_prefix(workspace)
+        .unwrap_or(path)
+        .to_string_lossy()
+        .replace('\\', "/")
+        .trim_start_matches('/')
+        .to_string()
 }
 
 #[derive(Debug, Clone)]
@@ -867,6 +1022,79 @@ mod tests {
             }))
             .await;
         assert!(unsafe_result.contains("parent path segments are not allowed"));
+    }
+
+    #[tokio::test]
+    async fn search_files_finds_path_and_content_matches_with_bounds() {
+        let temp = temp_test_dir("search_files_finds_path_and_content_matches_with_bounds");
+        fs::create_dir_all(temp.join("src")).unwrap();
+        fs::create_dir_all(temp.join("target")).unwrap();
+        fs::write(
+            temp.join("src").join("agent_runtime.rs"),
+            "fn route_b_search() {}\nlet marker = \"needle\";\n",
+        )
+        .unwrap();
+        fs::write(temp.join("target").join("ignored.txt"), "needle\n").unwrap();
+        let mut guard = ToolGuard::new(temp, None);
+
+        let content = guard
+            .invoke_action(&json!({
+                "tool": "search_files",
+                "query": "needle",
+                "path": ".",
+                "max_results": 20
+            }))
+            .await;
+        assert!(content.contains("src/agent_runtime.rs:2"));
+        assert!(!content.contains("target/ignored.txt"));
+
+        let path_match = guard
+            .invoke_action(&json!({
+                "tool": "search_files",
+                "query": "agent_runtime",
+                "path": "src",
+                "max_results": 20
+            }))
+            .await;
+        assert!(path_match.contains("src/agent_runtime.rs: path match"));
+
+        let limited = guard
+            .invoke_action(&json!({
+                "tool": "search_files",
+                "query": "route_b",
+                "path": "src",
+                "max_results": 1
+            }))
+            .await;
+        assert!(limited.contains("[truncated]"));
+    }
+
+    #[tokio::test]
+    async fn search_files_reuses_safe_path_guard() {
+        let temp = temp_test_dir("search_files_reuses_safe_path_guard");
+        fs::create_dir_all(temp.join(".git")).unwrap();
+        fs::write(temp.join(".git").join("config"), "secret = needle\n").unwrap();
+        let mut guard = ToolGuard::new(temp, None);
+
+        let unsafe_result = guard
+            .invoke_action(&json!({
+                "tool": "search_files",
+                "query": "needle",
+                "path": ".git",
+                "max_results": 20
+            }))
+            .await;
+        assert!(unsafe_result.contains("path cannot target .git"));
+
+        let empty_query = guard
+            .invoke_action(&json!({
+                "tool": "search_files",
+                "query": " ",
+                "path": ".",
+                "max_results": 20
+            }))
+            .await;
+        assert!(empty_query.contains("query cannot be empty"));
     }
 
     #[tokio::test]
