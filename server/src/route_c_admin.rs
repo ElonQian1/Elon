@@ -21,6 +21,11 @@ pub struct RouteCBudgetQuery {
     pub days: i64,
     #[serde(default = "default_limit")]
     pub limit: i64,
+    #[serde(
+        default = "default_stale_pending_after_secs",
+        alias = "stalePendingAfterSecs"
+    )]
+    pub stale_pending_after_secs: i64,
     pub route_day: Option<String>,
     pub user_id: Option<String>,
 }
@@ -31,6 +36,10 @@ fn default_days() -> i64 {
 
 fn default_limit() -> i64 {
     100
+}
+
+fn default_stale_pending_after_secs() -> i64 {
+    15 * 60
 }
 
 pub async fn budget_report(
@@ -44,10 +53,16 @@ pub async fn budget_report(
 
     let days = q.days.clamp(1, 90);
     let limit = q.limit.clamp(1, 500);
+    let stale_pending_after_secs = q.stale_pending_after_secs.clamp(60, 86_400);
+    let stale_pending_before =
+        (chrono::Utc::now() - chrono::Duration::seconds(stale_pending_after_secs)).to_rfc3339();
     let route_day = clean_optional(q.route_day);
     let user_id = clean_optional(q.user_id);
 
-    let summaries = match state.store.route_c_budget_day_summaries(days) {
+    let summaries = match state
+        .store
+        .route_c_budget_day_summaries_with_stale(days, Some(&stale_pending_before))
+    {
         Ok(rows) => rows,
         Err(e) => {
             tracing::warn!("admin route c budget summary error: {e}");
@@ -57,10 +72,11 @@ pub async fn budget_report(
             );
         }
     };
-    let outcome_summaries = match state
-        .store
-        .route_c_budget_outcome_summaries(route_day.as_deref(), user_id.as_deref())
-    {
+    let outcome_summaries = match state.store.route_c_budget_outcome_summaries_with_stale(
+        route_day.as_deref(),
+        user_id.as_deref(),
+        Some(&stale_pending_before),
+    ) {
         Ok(rows) => rows,
         Err(e) => {
             tracing::warn!("admin route c budget outcome summary error: {e}");
@@ -84,6 +100,21 @@ pub async fn budget_report(
             );
         }
     };
+    let stale_pending_events = match state.store.route_c_budget_stale_pending_events(
+        route_day.as_deref(),
+        user_id.as_deref(),
+        &stale_pending_before,
+        limit,
+    ) {
+        Ok(rows) => rows,
+        Err(e) => {
+            tracing::warn!("admin route c budget stale pending events error: {e}");
+            return json_error(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "查询 Route C 卡住调用审计失败",
+            );
+        }
+    };
 
     Json(json!({
         "ok": true,
@@ -91,12 +122,15 @@ pub async fn budget_report(
         "query": {
             "days": days,
             "limit": limit,
+            "stalePendingAfterSecs": stale_pending_after_secs,
+            "stalePendingBefore": stale_pending_before,
             "routeDay": route_day,
             "userId": user_id,
         },
         "dailySummaries": summaries,
         "outcomeSummaries": outcome_summaries,
         "recentEvents": events,
+        "stalePendingEvents": stale_pending_events,
     }))
     .into_response()
 }

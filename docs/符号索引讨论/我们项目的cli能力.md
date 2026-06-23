@@ -12,6 +12,8 @@ PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增�
 
 Win 客户端“注册本地项目”流程会自动读取常见项目清单来填项目名、描述、Git 远端、分支和运行/测试/构建命令；其中 Android/Gradle 项目会从 `settings.gradle` 或 `settings.gradle.kts` 的 `rootProject.name` 自动识别项目名，减少用户手填字段。
 
+Route C 远程模型能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。
+
 这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、更细粒度 full_access 高危命令策略。
 
 ---

@@ -17,6 +17,8 @@ pub(crate) struct RouteCBudgetDaySummary {
     pub route_day: String,
     pub total_calls: i64,
     pub completed_calls: i64,
+    pub pending_calls: i64,
+    pub stale_pending_calls: i64,
     pub success_calls: i64,
     pub failed_calls: i64,
     pub unique_users: i64,
@@ -31,6 +33,8 @@ pub(crate) struct RouteCBudgetOutcomeSummary {
     pub outcome: String,
     pub total_calls: i64,
     pub completed_calls: i64,
+    pub pending_calls: i64,
+    pub stale_pending_calls: i64,
     pub unique_users: i64,
     pub total_tokens: Option<i64>,
     pub first_created_at: Option<String>,
@@ -184,16 +188,22 @@ impl Store {
         Ok(())
     }
 
-    pub(crate) fn route_c_budget_day_summaries(
+    pub(crate) fn route_c_budget_day_summaries_with_stale(
         &self,
         days: i64,
+        stale_pending_before: Option<&str>,
     ) -> Result<Vec<RouteCBudgetDaySummary>> {
         let limit = days.clamp(1, 90);
+        let stale_pending_before = clean_optional_ref(stale_pending_before);
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT route_day,
                     COUNT(*) AS total_calls,
                     SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completed_calls,
+                    SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) AS pending_calls,
+                    SUM(CASE WHEN completed_at IS NULL
+                               AND ?2 IS NOT NULL
+                               AND created_at <= ?2 THEN 1 ELSE 0 END) AS stale_pending_calls,
                     SUM(CASE WHEN outcome = 'success' THEN 1 ELSE 0 END) AS success_calls,
                     SUM(CASE WHEN outcome != 'success' AND completed_at IS NOT NULL THEN 1 ELSE 0 END) AS failed_calls,
                     COUNT(DISTINCT user_id) AS unique_users,
@@ -206,35 +216,43 @@ impl Store {
               LIMIT ?1",
         )?;
         let rows = stmt
-            .query_map(params![limit], |row| {
+            .query_map(params![limit, stale_pending_before], |row| {
                 Ok(RouteCBudgetDaySummary {
                     route_day: row.get(0)?,
                     total_calls: row.get(1)?,
                     completed_calls: row.get(2)?,
-                    success_calls: row.get(3)?,
-                    failed_calls: row.get(4)?,
-                    unique_users: row.get(5)?,
-                    total_tokens: row.get(6)?,
-                    first_created_at: row.get(7)?,
-                    last_created_at: row.get(8)?,
+                    pending_calls: row.get(3)?,
+                    stale_pending_calls: row.get(4)?,
+                    success_calls: row.get(5)?,
+                    failed_calls: row.get(6)?,
+                    unique_users: row.get(7)?,
+                    total_tokens: row.get(8)?,
+                    first_created_at: row.get(9)?,
+                    last_created_at: row.get(10)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
     }
 
-    pub(crate) fn route_c_budget_outcome_summaries(
+    pub(crate) fn route_c_budget_outcome_summaries_with_stale(
         &self,
         route_day: Option<&str>,
         user_id: Option<&str>,
+        stale_pending_before: Option<&str>,
     ) -> Result<Vec<RouteCBudgetOutcomeSummary>> {
         let route_day = route_day.map(str::trim).filter(|value| !value.is_empty());
         let user_id = user_id.map(str::trim).filter(|value| !value.is_empty());
+        let stale_pending_before = clean_optional_ref(stale_pending_before);
         let conn = self.conn()?;
         let mut stmt = conn.prepare(
             "SELECT outcome,
                     COUNT(*) AS total_calls,
                     SUM(CASE WHEN completed_at IS NOT NULL THEN 1 ELSE 0 END) AS completed_calls,
+                    SUM(CASE WHEN completed_at IS NULL THEN 1 ELSE 0 END) AS pending_calls,
+                    SUM(CASE WHEN completed_at IS NULL
+                               AND ?3 IS NOT NULL
+                               AND created_at <= ?3 THEN 1 ELSE 0 END) AS stale_pending_calls,
                     COUNT(DISTINCT user_id) AS unique_users,
                     SUM(total_tokens) AS total_tokens,
                     MIN(created_at) AS first_created_at,
@@ -246,15 +264,17 @@ impl Store {
               ORDER BY total_calls DESC, outcome ASC",
         )?;
         let rows = stmt
-            .query_map(params![route_day, user_id], |row| {
+            .query_map(params![route_day, user_id, stale_pending_before], |row| {
                 Ok(RouteCBudgetOutcomeSummary {
                     outcome: row.get(0)?,
                     total_calls: row.get(1)?,
                     completed_calls: row.get(2)?,
-                    unique_users: row.get(3)?,
-                    total_tokens: row.get(4)?,
-                    first_created_at: row.get(5)?,
-                    last_created_at: row.get(6)?,
+                    pending_calls: row.get(3)?,
+                    stale_pending_calls: row.get(4)?,
+                    unique_users: row.get(5)?,
+                    total_tokens: row.get(6)?,
+                    first_created_at: row.get(7)?,
+                    last_created_at: row.get(8)?,
                 })
             })?
             .collect::<std::result::Result<Vec<_>, _>>()?;
@@ -298,6 +318,54 @@ impl Store {
             .collect::<std::result::Result<Vec<_>, _>>()?;
         Ok(rows)
     }
+
+    pub(crate) fn route_c_budget_stale_pending_events(
+        &self,
+        route_day: Option<&str>,
+        user_id: Option<&str>,
+        stale_pending_before: &str,
+        limit: i64,
+    ) -> Result<Vec<RouteCBudgetEventRow>> {
+        let limit = limit.clamp(1, 500);
+        let route_day = route_day.map(str::trim).filter(|value| !value.is_empty());
+        let user_id = user_id.map(str::trim).filter(|value| !value.is_empty());
+        let stale_pending_before = stale_pending_before.trim();
+        if stale_pending_before.is_empty() {
+            return Ok(Vec::new());
+        }
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, user_id, request_fingerprint, route_day, created_at,
+                    outcome, completed_at, model, total_tokens, error_summary
+               FROM route_c_runtime_budget_events
+              WHERE completed_at IS NULL
+                AND created_at <= ?1
+                AND (?2 IS NULL OR route_day = ?2)
+                AND (?3 IS NULL OR user_id = ?3)
+              ORDER BY created_at ASC, id ASC
+              LIMIT ?4",
+        )?;
+        let rows = stmt
+            .query_map(
+                params![stale_pending_before, route_day, user_id, limit],
+                |row| {
+                    Ok(RouteCBudgetEventRow {
+                        id: row.get(0)?,
+                        user_id: row.get(1)?,
+                        request_fingerprint: row.get(2)?,
+                        route_day: row.get(3)?,
+                        created_at: row.get(4)?,
+                        outcome: row.get(5)?,
+                        completed_at: row.get(6)?,
+                        model: row.get(7)?,
+                        total_tokens: row.get(8)?,
+                        error_summary: row.get(9)?,
+                    })
+                },
+            )?
+            .collect::<std::result::Result<Vec<_>, _>>()?;
+        Ok(rows)
+    }
 }
 
 fn clean_outcome(outcome: &str) -> String {
@@ -316,6 +384,10 @@ fn clean_optional(value: Option<String>, max_chars: usize) -> Option<String> {
     value
         .map(|value| value.trim().chars().take(max_chars).collect::<String>())
         .filter(|value| !value.is_empty())
+}
+
+fn clean_optional_ref(value: Option<&str>) -> Option<&str> {
+    value.map(str::trim).filter(|value| !value.is_empty())
 }
 
 fn clean_error_summary(value: Option<String>) -> Option<String> {
@@ -376,6 +448,17 @@ mod tests {
             }
             other => panic!("expected recorded budget event, got {other:?}"),
         }
+    }
+
+    fn set_budget_created_at(store: &Store, event_id: &str, created_at: &str) {
+        store
+            .conn()
+            .unwrap()
+            .execute(
+                "UPDATE route_c_runtime_budget_events SET created_at = ?1 WHERE id = ?2",
+                rusqlite::params![created_at, event_id],
+            )
+            .unwrap();
     }
 
     #[test]
@@ -579,6 +662,97 @@ mod tests {
     }
 
     #[test]
+    fn route_c_budget_reports_stale_pending_admissions() {
+        let (store, path) = temp_store();
+        let user = store
+            .create_user(
+                &format!(
+                    "route-c-budget-stale-{}@example.com",
+                    Uuid::new_v4().simple()
+                ),
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        let stale_event = recorded_event_id(
+            store
+                .route_c_budget_try_record_call(&user.id, "fp-stale", "2026-06-23", None, None)
+                .unwrap(),
+            1,
+            1,
+        );
+        let fresh_event = recorded_event_id(
+            store
+                .route_c_budget_try_record_call(&user.id, "fp-fresh", "2026-06-23", None, None)
+                .unwrap(),
+            2,
+            2,
+        );
+        let done_event = recorded_event_id(
+            store
+                .route_c_budget_try_record_call(&user.id, "fp-done", "2026-06-23", None, None)
+                .unwrap(),
+            3,
+            3,
+        );
+        set_budget_created_at(&store, &stale_event, "2026-06-23T00:00:00+00:00");
+        set_budget_created_at(&store, &fresh_event, "2026-06-23T00:20:00+00:00");
+        set_budget_created_at(&store, &done_event, "2026-06-23T00:00:00+00:00");
+        store
+            .route_c_budget_mark_completed(
+                &done_event,
+                RouteCBudgetCompletion {
+                    outcome: "success".to_string(),
+                    model: Some("route-c-fast".to_string()),
+                    total_tokens: Some(88),
+                    error_summary: None,
+                },
+            )
+            .unwrap();
+
+        let cutoff = "2026-06-23T00:15:00+00:00";
+        let summaries = store
+            .route_c_budget_day_summaries_with_stale(10, Some(cutoff))
+            .unwrap();
+        assert_eq!(summaries[0].route_day, "2026-06-23");
+        assert_eq!(summaries[0].total_calls, 3);
+        assert_eq!(summaries[0].completed_calls, 1);
+        assert_eq!(summaries[0].pending_calls, 2);
+        assert_eq!(summaries[0].stale_pending_calls, 1);
+        assert_eq!(summaries[0].success_calls, 1);
+
+        let outcomes = store
+            .route_c_budget_outcome_summaries_with_stale(Some("2026-06-23"), None, Some(cutoff))
+            .unwrap();
+        let admitted = outcomes
+            .iter()
+            .find(|row| row.outcome == "admitted")
+            .expect("pending admitted outcome summary");
+        assert_eq!(admitted.total_calls, 2);
+        assert_eq!(admitted.completed_calls, 0);
+        assert_eq!(admitted.pending_calls, 2);
+        assert_eq!(admitted.stale_pending_calls, 1);
+        let success = outcomes
+            .iter()
+            .find(|row| row.outcome == "success")
+            .expect("success outcome summary");
+        assert_eq!(success.pending_calls, 0);
+        assert_eq!(success.stale_pending_calls, 0);
+
+        let stale_events = store
+            .route_c_budget_stale_pending_events(Some("2026-06-23"), Some(&user.id), cutoff, 10)
+            .unwrap();
+        assert_eq!(stale_events.len(), 1);
+        assert_eq!(stale_events[0].id, stale_event);
+        assert_eq!(stale_events[0].completed_at, None);
+        assert_eq!(stale_events[0].request_fingerprint, "fp-stale");
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
     fn route_c_budget_admin_report_summarizes_and_filters_events() {
         let (store, path) = temp_store();
         let user_a = store
@@ -648,10 +822,14 @@ mod tests {
             )
             .unwrap();
 
-        let summaries = store.route_c_budget_day_summaries(10).unwrap();
+        let summaries = store
+            .route_c_budget_day_summaries_with_stale(10, None)
+            .unwrap();
         assert_eq!(summaries[0].route_day, "2026-06-23");
         assert_eq!(summaries[0].total_calls, 2);
         assert_eq!(summaries[0].completed_calls, 2);
+        assert_eq!(summaries[0].pending_calls, 0);
+        assert_eq!(summaries[0].stale_pending_calls, 0);
         assert_eq!(summaries[0].success_calls, 1);
         assert_eq!(summaries[0].failed_calls, 1);
         assert_eq!(summaries[0].unique_users, 2);
@@ -659,9 +837,11 @@ mod tests {
         assert_eq!(summaries[1].route_day, "2026-06-22");
         assert_eq!(summaries[1].total_calls, 1);
         assert_eq!(summaries[1].completed_calls, 0);
+        assert_eq!(summaries[1].pending_calls, 1);
+        assert_eq!(summaries[1].stale_pending_calls, 0);
 
         let outcomes = store
-            .route_c_budget_outcome_summaries(Some("2026-06-23"), None)
+            .route_c_budget_outcome_summaries_with_stale(Some("2026-06-23"), None, None)
             .unwrap();
         assert_eq!(outcomes.len(), 2);
         let success = outcomes
@@ -670,6 +850,8 @@ mod tests {
             .expect("success outcome summary");
         assert_eq!(success.total_calls, 1);
         assert_eq!(success.completed_calls, 1);
+        assert_eq!(success.pending_calls, 0);
+        assert_eq!(success.stale_pending_calls, 0);
         assert_eq!(success.unique_users, 1);
         assert_eq!(success.total_tokens, Some(120));
         let provider_error = outcomes
@@ -678,11 +860,13 @@ mod tests {
             .expect("provider_error outcome summary");
         assert_eq!(provider_error.total_calls, 1);
         assert_eq!(provider_error.completed_calls, 1);
+        assert_eq!(provider_error.pending_calls, 0);
+        assert_eq!(provider_error.stale_pending_calls, 0);
         assert_eq!(provider_error.unique_users, 1);
         assert_eq!(provider_error.total_tokens, None);
 
         let user_outcomes = store
-            .route_c_budget_outcome_summaries(None, Some(&user_a.id))
+            .route_c_budget_outcome_summaries_with_stale(None, Some(&user_a.id), None)
             .unwrap();
         assert!(user_outcomes.iter().any(|row| row.outcome == "admitted"));
         assert!(user_outcomes.iter().any(|row| row.outcome == "success"));
