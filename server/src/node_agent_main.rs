@@ -62,6 +62,7 @@ mod node_agent_codex_session;
 mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_local_admin;
+mod node_agent_project_agent_runs;
 mod node_agent_project_picker;
 mod node_agent_project_profile;
 mod node_agent_proxy;
@@ -2640,6 +2641,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
             .route(
                 "/api/project-folder/inspect",
                 axum::routing::post(node_agent_project_picker::inspect_local_project_folder),
+            )
+            .route(
+                "/api/project-agent-runs",
+                axum::routing::post(node_agent_project_agent_runs::list_handler),
             )
             .route(
                 "/api/full-access/grants",

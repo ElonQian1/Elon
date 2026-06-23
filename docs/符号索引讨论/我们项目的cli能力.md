@@ -8,7 +8,7 @@
 
 Route B/C 的本机工具能力已经包含 `list_dir`、`read_file`、`read_file_range`、`write_file`、`apply_patch`、`run_command`。其中 `write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`write_file` 审批会展示整文件替换 diff，并在敏感路径、旧/新内容命中敏感字段、过大 diff、二进制内容或非 UTF-8 旧文件时 fail-closed；用户批准后还会复查旧文件 hash，防止审批后文件被外部进程改动。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
 
-PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key，方便后续做任务恢复、压力测试和 PC UI 进度展示。
+PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要和尾部事件，方便后续做任务恢复、压力测试和 PC UI 进度展示。
 
 这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、更细粒度 full_access 高危命令策略。
 
