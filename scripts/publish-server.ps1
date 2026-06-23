@@ -668,7 +668,22 @@ Write-Host "  构建缓存: $BuildTargetDir" -ForegroundColor Gray
 function Remove-Worktree {
     if (Test-Path $TmpWorktree) {
         Write-Host "   🧹 清理临时工作树..." -ForegroundColor Gray
-        git -C $RepoRoot worktree remove $TmpWorktree --force 2>$null | Out-Null
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        $removeExit = 0
+        try {
+            git -C $RepoRoot worktree remove $TmpWorktree --force 2>$null | Out-Null
+            $removeExit = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+        if ($removeExit -ne 0 -and (Test-Path $TmpWorktree)) {
+            $leaf = Split-Path $TmpWorktree -Leaf
+            if ($leaf -notlike "elon-build-*") {
+                throw "Refusing to remove unexpected temp path: $TmpWorktree"
+            }
+            Remove-Item -LiteralPath $TmpWorktree -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
 }
 
