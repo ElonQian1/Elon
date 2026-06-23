@@ -326,13 +326,26 @@ fn is_source_like_token(token: &str) -> bool {
         "ticket-",
         "ticket_",
         "ticket:",
+        "msg-",
+        "msg_",
+        "msg:",
+        "message-",
+        "message_",
+        "message:",
+        "source-message-",
+        "source_message_",
+        "source_message:",
         "gmsg_",
         "gai_",
         "gsp_",
         "opinion-",
         "opinion_",
+        "opinion-memory-",
+        "opinion_memory_",
+        "opinion_memory:",
         "memory-",
         "memory_",
+        "memory:",
         "context_audit",
         "audit-",
         "audit_",
@@ -465,5 +478,59 @@ mod tests {
 
         assert!(!validation.has_unmatched_sources());
         assert!(validation.candidate_source_ids.is_empty());
+    }
+
+    #[test]
+    fn flags_fabricated_group_message_source_ids() {
+        let context = json!({
+            "context_audit_id": "audit-1",
+            "citation_sources": [
+                {"kind": "group_message", "id": "msg-1001"}
+            ]
+        });
+        let validation = validate_reply_sources(
+            &context,
+            None,
+            "群友观点：参考 msg-1001；但也写出了不存在的 message-404 和 source-message-500。",
+            &[],
+            &[],
+        );
+
+        assert!(validation.has_unmatched_sources());
+        assert_eq!(validation.matched_source_ids, vec!["msg-1001"]);
+        assert_eq!(
+            validation.unmatched_source_ids,
+            vec!["message-404", "source-message-500"]
+        );
+    }
+
+    #[test]
+    fn accepts_context_registered_group_message_aliases() {
+        let context = json!({
+            "context_audit_id": "audit-1",
+            "citation_sources": [
+                {
+                    "kind": "group_message",
+                    "id": "message-1001",
+                    "message_id": "msg-1001",
+                    "source_message_id": "source-message-1001"
+                }
+            ]
+        });
+        let validation = validate_reply_sources(
+            &context,
+            None,
+            "群友观点：引用 msg-1001 和 source-message-1001 后，只能作为讨论线索。",
+            &[],
+            &[],
+        );
+
+        assert!(!validation.has_unmatched_sources());
+        assert!(validation
+            .matched_source_ids
+            .contains(&"msg-1001".to_string()));
+        assert!(validation
+            .matched_source_ids
+            .contains(&"source-message-1001".to_string()));
     }
 }
