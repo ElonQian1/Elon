@@ -104,6 +104,14 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 
 主项目 smoke 会检查这些字段，防止后续把 fb2 AI 数据输入退化成无来源的大 JSON 或临时摘要。
 
+`GET /api/external/apps/fb2/context-contract` 还会返回 `context_projection_layer_contract schema=fb2.main_project.context_projection_layer.v1`。它是 `context-projection-layer.md` 的机器可读接口版，供 fb2 子会话和未来子项目直接从公开接口读取长期投影层规范：
+
+- 固定 AI-facing payload 为 `fb2_context_pack` XML-wrapped Markdown + compact JSON metadata。
+- 固定第一阶段为 REST Context Pack + tool manifest + `tools/execute`，MCP 只能作为后续包装。
+- 固定 6 条业务 lane、8 类 fb2 侧索引和 7 个用户场景，额外覆盖 `group_discussion_summary_post`。
+- 固定禁止输出：编造赔率、保证命中、泄露其它用户订单、把群观点冒充事实、无引用来源、raw embedding dump、full database dump。
+- 固定群聊验收只能用 direct API read 的 `message_id/type/sender_id/created_at/text_len/text_sha256`，截图只用于 UI 排查。
+
 `GET /api/external/apps/fb2/context-contract` 还会返回 `context_pack_template_contract schema=fb2.context_pack_template.v1`。它是 fb2 后端最直接的实现模板：
 
 - 正文格式必须是 `<fb2_context_pack>...</fb2_context_pack>` 包裹的 Markdown。

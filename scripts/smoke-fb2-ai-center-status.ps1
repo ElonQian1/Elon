@@ -556,6 +556,17 @@ function Invoke-Fb2StatusSelfTest {
                 context_pack_template_schema = "fb2.context_pack_template.v1"
                 context_pack_template_wrapper = "fb2_context_pack"
                 context_pack_template_sections = @("usage_boundary", "match_facts", "user_order_slice", "platform_order_summary", "group_opinion_slice", "retrieval_evidence", "quality_feedback")
+                context_projection_layer_schema = "fb2.main_project.context_projection_layer.v1"
+                context_projection_layer_complete = $true
+                context_projection_layer_lane_count = 6
+                context_projection_layer_lane_ids = @("match_facts_and_odds", "current_user_tickets", "platform_order_summary", "group_opinions", "opinion_learning_loop", "quality_feedback_audit")
+                context_projection_layer_index_count = 8
+                context_projection_layer_index_ids = @("match_index", "odds_snapshot_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "opinion_memory_index", "context_audit_index", "feedback_quality_index")
+                context_projection_layer_scenario_count = 7
+                context_projection_layer_scenario_ids = @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")
+                context_projection_layer_group_method = "direct_api_read"
+                context_projection_layer_screenshots_accepted = $false
+                context_projection_layer_group_fields = @("message_id", "type", "sender_id", "created_at", "text_len", "text_sha256")
                 domain_lane_count = 6
                 stores_fb2_business_data_in_main_project = $false
                 group_chat_evidence_schema = "fb2.main_project.group_chat_evidence.v1"
@@ -729,6 +740,14 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_public_contract_status.domain_context_index_schema -ne "fb2.main_project.domain_context_index.v1") { $failed++ }
         if ($snapshot.latest_public_contract_status.domain_context_index_count -lt 8) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.domain_context_index_ids) -contains "group_opinion_index")) { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_projection_layer_schema -ne "fb2.main_project.context_projection_layer.v1") { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_projection_layer_lane_count -lt 6) { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_projection_layer_index_count -lt 8) { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_projection_layer_scenario_count -lt 7) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.context_projection_layer_scenario_ids) -contains "group_discussion_summary_post")) { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_projection_layer_group_method -ne "direct_api_read") { $failed++ }
+        if ([bool]$snapshot.latest_public_contract_status.context_projection_layer_screenshots_accepted) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.context_projection_layer_group_fields) -contains "text_sha256")) { $failed++ }
         if ($snapshot.latest_public_contract_status.group_chat_test_method -ne "direct_api_read") { $failed++ }
         if ([bool]$snapshot.latest_public_contract_status.screenshots_accepted) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.required_group_message_fields) -contains "text_sha256")) { $failed++ }

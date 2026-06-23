@@ -67,6 +67,11 @@ function Get-Fb2PublicContractSummaryState {
             context_pack_template_schema = ""
             context_pack_template_wrapper = ""
             context_pack_template_sections = @()
+            context_projection_layer_schema = ""
+            context_projection_layer_lane_count = 0
+            context_projection_layer_index_count = 0
+            context_projection_layer_scenario_count = 0
+            context_projection_layer_scenario_ids = @()
             domain_context_index_schema = ""
             domain_context_index_count = 0
             domain_context_index_ids = @()
@@ -88,6 +93,11 @@ function Get-Fb2PublicContractSummaryState {
             context_pack_template_schema = ""
             context_pack_template_wrapper = ""
             context_pack_template_sections = @()
+            context_projection_layer_schema = ""
+            context_projection_layer_lane_count = 0
+            context_projection_layer_index_count = 0
+            context_projection_layer_scenario_count = 0
+            context_projection_layer_scenario_ids = @()
             domain_context_index_schema = ""
             domain_context_index_count = 0
             domain_context_index_ids = @()
@@ -109,6 +119,18 @@ function Get-Fb2PublicContractSummaryState {
     $templateSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_schema")
     $templateWrapper = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_wrapper")
     $templateSections = @((Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_sections" @()))
+    $projectionLayerSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_schema")
+    $projectionLayerComplete = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_complete")
+    $projectionLayerLaneCount = [int](Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_lane_count" 0)
+    $projectionLayerLaneIds = @((Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_lane_ids" @()))
+    $projectionLayerIndexCount = [int](Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_index_count" 0)
+    $projectionLayerIndexIds = @((Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_index_ids" @()))
+    $projectionLayerScenarioCount = [int](Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_scenario_count" 0)
+    $projectionLayerScenarioIds = @((Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_scenario_ids" @()))
+    $projectionLayerGroupMethod = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_group_method")
+    $projectionLayerScreenshotsRaw = Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_screenshots_accepted" $null
+    $projectionLayerScreenshotsAccepted = Test-Fb2PublicContractSummaryTruthy $projectionLayerScreenshotsRaw
+    $projectionLayerGroupFields = @((Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_group_fields" @()))
     $groupSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "group_chat_evidence_schema")
     $groupMethod = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "group_chat_test_method")
     $screenshotsRaw = Get-Fb2PublicContractSummaryProperty $summary "screenshots_accepted" $null
@@ -144,6 +166,29 @@ function Get-Fb2PublicContractSummaryState {
             $missing += "context_pack_template_section_$section"
         }
     }
+    if ($projectionLayerSchema -ne "fb2.main_project.context_projection_layer.v1") { $missing += "context_projection_layer_contract" }
+    if (-not $projectionLayerComplete) { $missing += "context_projection_layer_complete" }
+    if ($projectionLayerLaneCount -lt 6) { $missing += "context_projection_layer_lane_count" }
+    foreach ($laneId in @("match_facts_and_odds", "current_user_tickets", "platform_order_summary", "group_opinions", "opinion_learning_loop", "quality_feedback_audit")) {
+        if (-not ($projectionLayerLaneIds -contains $laneId)) {
+            $missing += "context_projection_layer_lane_$laneId"
+        }
+    }
+    if ($projectionLayerIndexCount -lt 8) { $missing += "context_projection_layer_index_count" }
+    foreach ($indexId in @("match_index", "odds_snapshot_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "opinion_memory_index", "context_audit_index", "feedback_quality_index")) {
+        if (-not ($projectionLayerIndexIds -contains $indexId)) {
+            $missing += "context_projection_layer_index_$indexId"
+        }
+    }
+    if ($projectionLayerScenarioCount -lt 7) { $missing += "context_projection_layer_scenario_count" }
+    foreach ($scenarioId in @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")) {
+        if (-not ($projectionLayerScenarioIds -contains $scenarioId)) {
+            $missing += "context_projection_layer_scenario_$scenarioId"
+        }
+    }
+    if ($projectionLayerGroupMethod -ne "direct_api_read") { $missing += "context_projection_layer_group_direct_api_read" }
+    if ($null -eq $projectionLayerScreenshotsRaw -or $projectionLayerScreenshotsAccepted) { $missing += "context_projection_layer_rejects_screenshots" }
+    if (-not ($projectionLayerGroupFields -contains "text_sha256")) { $missing += "context_projection_layer_group_field_text_sha256" }
     if ($groupSchema -ne "fb2.main_project.group_chat_evidence.v1") { $missing += "group_chat_evidence_contract" }
     if ($groupMethod -ne "direct_api_read") { $missing += "group_chat_direct_api_read_contract" }
     if ($null -eq $screenshotsRaw -or $screenshotsAccepted) { $missing += "group_chat_rejects_screenshots_contract" }
@@ -175,6 +220,16 @@ function Get-Fb2PublicContractSummaryState {
         context_pack_template_schema = $templateSchema
         context_pack_template_wrapper = $templateWrapper
         context_pack_template_sections = @($templateSections)
+        context_projection_layer_schema = $projectionLayerSchema
+        context_projection_layer_lane_count = $projectionLayerLaneCount
+        context_projection_layer_lane_ids = @($projectionLayerLaneIds)
+        context_projection_layer_index_count = $projectionLayerIndexCount
+        context_projection_layer_index_ids = @($projectionLayerIndexIds)
+        context_projection_layer_scenario_count = $projectionLayerScenarioCount
+        context_projection_layer_scenario_ids = @($projectionLayerScenarioIds)
+        context_projection_layer_group_method = $projectionLayerGroupMethod
+        context_projection_layer_screenshots_accepted = $projectionLayerScreenshotsAccepted
+        context_projection_layer_group_fields = @($projectionLayerGroupFields)
         domain_lane_count = [int](Get-Fb2PublicContractSummaryProperty $summary "domain_lane_count" 0)
         stores_fb2_business_data_in_main_project = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $summary "stores_fb2_business_data_in_main_project")
         group_chat_evidence_schema = $groupSchema

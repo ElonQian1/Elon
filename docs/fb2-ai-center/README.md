@@ -58,6 +58,8 @@
 
 fb2 子项目实现 `/api/main-project/context/pack` 时，优先读取主项目 `context-contract.context_pack_template_contract`。它是机器可读的 Markdown/XML 模板：正文必须是 `<fb2_context_pack>` 包裹的 Markdown，固定包含 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback` 七个小节；JSON metadata 必须包含 `context_audit_id`、`citation_sources`、`metrics`、`tool_contract`、`answer_policy` 和 `preflight_readiness` 等字段。MCP 可以以后包装这套 REST 契约，但不能绕过这份模板直接另建事实源。
 
+同一长期投影层现在也会通过主项目接口公开：`GET /api/external/apps/fb2/context-contract` 返回 `context_projection_layer_contract schema=fb2.main_project.context_projection_layer.v1`。它对应 `context-projection-layer.md`，固定 6 条业务 lane、8 类 fb2 侧索引、7 个用户场景、禁止输出和群聊 direct API read 证据字段；fb2 子会话不需要读取主项目本地文档也能按这份机器契约对齐。
+
 真实群聊验收必须以接口直读为准：`smoke-fb2-visible-chat.ps1` 和最终 wrapper 要读取群聊 baseline、`@EL` seed/回复、selected-message seed/`AI回复`、summary post 和 feedback/quality 结果，并把消息 ID、记录数、正文长度、正文 sha256、匹配/未匹配统计写入日志和 summary。最终 wrapper 的 summary 必须包含 `visible_direct_read_complete=true` 和 `visible_direct_read_evidence`，记录 baseline 群消息读取、`@EL` seed/回复回读、selected-message seed/回复回读和 summary-post 回读；缺任一接口回读正文证据时，最终 `success` 必须为 false。截图只能辅助排查 UI，不得作为“AI 已在群聊回答、引用和反馈已闭环”的证明。
 
 只需要确认当前账号能通过主项目群聊 API 直接读到 fb2 群消息时，先跑无写入预检：`scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>`。它只做 session bridge、群成员检查和 baseline 消息读取，输出 `text_len`、`text_sha256` 和 `writes=false`，并写出 `fb2.main_project.visible_chat_readonly.v1` summary JSON；summary 会带最近 20 条消息的 `recent_messages` 索引，只保存消息 ID、类型、发送方、时间、正文长度和 sha256，不保存正文。该模式不会发送 `@EL`、不会触发 selected-message `AI回复`、不会创建总结帖。

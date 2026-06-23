@@ -65,6 +65,7 @@ function Get-Fb2PublicContractChecks {
     )
 
     $domain = $Contract.domain_data_blueprint_contract
+    $projectionLayer = $Contract.context_projection_layer_contract
     $domainIndex = $Contract.domain_context_index_contract
     $template = $Contract.context_pack_template_contract
     $group = $Contract.group_chat_evidence_contract
@@ -76,6 +77,12 @@ function Get-Fb2PublicContractChecks {
     $domainSections = @($domain.required_context_pack_sections)
     $domainMetadata = @($domain.required_metadata)
     $domainAntiPatterns = @($domain.anti_patterns)
+    $projectionLayerLaneIds = @($projectionLayer.domain_lanes | ForEach-Object { $_.id })
+    $projectionLayerIndexIds = @($projectionLayer.domain_indexes | ForEach-Object { $_.id })
+    $projectionLayerScenarioIds = @($projectionLayer.user_scenarios | ForEach-Object { $_.id })
+    $projectionLayerForbidden = @($projectionLayer.forbidden_outputs)
+    $projectionLayerNotAllowed = @($projectionLayer.ai_facing_payload.not_allowed)
+    $projectionLayerGroupFields = @($projectionLayer.group_chat_evidence.required_fields)
     $domainIndexIds = @($domainIndex.indexes | ForEach-Object { $_.id })
     $domainIndexInputs = @($domainIndex.required_query_inputs)
     $domainIndexMetrics = @($domainIndex.required_metrics)
@@ -95,6 +102,30 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "domain_blueprint_no_copy" ($domain.stores_fb2_business_data_in_main_project -eq $false) "stores=$($domain.stores_fb2_business_data_in_main_project)"
         New-Fb2PublicContractCheck "domain_blueprint_rest_first" ($domain.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") ([string]$domain.first_phase_delivery)
         New-Fb2PublicContractCheck "domain_blueprint_mcp_future" ($domain.mcp_status -eq "future_wrapper_not_first_phase_fact_source") ([string]$domain.mcp_status)
+        New-Fb2PublicContractCheck "projection_layer_schema" ($projectionLayer.schema -eq "fb2.main_project.context_projection_layer.v1") ([string]$projectionLayer.schema)
+        New-Fb2PublicContractCheck "projection_layer_complete" ([bool]$projectionLayer.complete) "complete=$($projectionLayer.complete)"
+        New-Fb2PublicContractCheck "projection_layer_no_copy" ($projectionLayer.stores_fb2_business_data_in_main_project -eq $false) "stores=$($projectionLayer.stores_fb2_business_data_in_main_project)"
+        New-Fb2PublicContractCheck "projection_layer_rest_first" ($projectionLayer.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") ([string]$projectionLayer.first_phase_delivery)
+        New-Fb2PublicContractCheck "projection_layer_mcp_future" ($projectionLayer.mcp_status -eq "future_wrapper_not_first_phase_fact_source") ([string]$projectionLayer.mcp_status)
+        New-Fb2PublicContractCheck "projection_layer_wrapper" ($projectionLayer.ai_facing_payload.wrapper -eq "fb2_context_pack") ([string]$projectionLayer.ai_facing_payload.wrapper)
+        New-Fb2PublicContractCheck "projection_layer_domain_lane_count" ([int]$projectionLayer.domain_lane_count -eq 6) "lane_count=$($projectionLayer.domain_lane_count)"
+        New-Fb2PublicContractCheck "projection_layer_domain_index_count" ([int]$projectionLayer.domain_index_count -eq 8) "index_count=$($projectionLayer.domain_index_count)"
+        New-Fb2PublicContractCheck "projection_layer_user_scenario_count" ([int]$projectionLayer.user_scenario_count -eq 7) "scenario_count=$($projectionLayer.user_scenario_count)"
+        foreach ($laneId in @("match_facts_and_odds", "current_user_tickets", "platform_order_summary", "group_opinions", "opinion_learning_loop", "quality_feedback_audit")) {
+            New-Fb2PublicContractCheck "projection_layer_lane_$laneId" (Test-Fb2ContractContains $projectionLayerLaneIds $laneId) ($projectionLayerLaneIds -join ",")
+        }
+        foreach ($indexId in @("match_index", "odds_snapshot_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "opinion_memory_index", "context_audit_index", "feedback_quality_index")) {
+            New-Fb2PublicContractCheck "projection_layer_index_$indexId" (Test-Fb2ContractContains $projectionLayerIndexIds $indexId) ($projectionLayerIndexIds -join ",")
+        }
+        foreach ($scenarioId in @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")) {
+            New-Fb2PublicContractCheck "projection_layer_scenario_$scenarioId" (Test-Fb2ContractContains $projectionLayerScenarioIds $scenarioId) ($projectionLayerScenarioIds -join ",")
+        }
+        New-Fb2PublicContractCheck "projection_layer_forbidden_fabricated_odds" (Test-Fb2ContractContains $projectionLayerForbidden "fabricated_odds") ($projectionLayerForbidden -join ",")
+        New-Fb2PublicContractCheck "projection_layer_forbidden_raw_embedding_dump" (Test-Fb2ContractContains $projectionLayerForbidden "raw_embedding_dump") ($projectionLayerForbidden -join ",")
+        New-Fb2PublicContractCheck "projection_layer_not_allowed_full_database_dump" (Test-Fb2ContractContains $projectionLayerNotAllowed "full_database_dump") ($projectionLayerNotAllowed -join ",")
+        New-Fb2PublicContractCheck "projection_layer_group_direct_read" ($projectionLayer.group_chat_evidence.method -eq "direct_api_read") ([string]$projectionLayer.group_chat_evidence.method)
+        New-Fb2PublicContractCheck "projection_layer_group_rejects_screenshots" ($projectionLayer.group_chat_evidence.screenshots_accepted -eq $false) "screenshots_accepted=$($projectionLayer.group_chat_evidence.screenshots_accepted)"
+        New-Fb2PublicContractCheck "projection_layer_group_text_sha256" (Test-Fb2ContractContains $projectionLayerGroupFields "text_sha256") ($projectionLayerGroupFields -join ",")
         New-Fb2PublicContractCheck "domain_index_schema" ($domainIndex.schema -eq "fb2.main_project.domain_context_index.v1") ([string]$domainIndex.schema)
         New-Fb2PublicContractCheck "domain_index_complete" ([bool]$domainIndex.complete) "complete=$($domainIndex.complete)"
         New-Fb2PublicContractCheck "domain_index_count" ([int]$domainIndex.index_count -eq 8) "index_count=$($domainIndex.index_count)"
@@ -172,6 +203,17 @@ function New-Fb2PublicContractStatus {
         failed_checks = @($failed | ForEach-Object { $_.id })
         checks = @($checks)
         contract_summary = [ordered]@{
+            context_projection_layer_schema = [string]$Contract.context_projection_layer_contract.schema
+            context_projection_layer_complete = [bool]$Contract.context_projection_layer_contract.complete
+            context_projection_layer_lane_count = [int]$Contract.context_projection_layer_contract.domain_lane_count
+            context_projection_layer_lane_ids = @($Contract.context_projection_layer_contract.domain_lanes | ForEach-Object { $_.id })
+            context_projection_layer_index_count = [int]$Contract.context_projection_layer_contract.domain_index_count
+            context_projection_layer_index_ids = @($Contract.context_projection_layer_contract.domain_indexes | ForEach-Object { $_.id })
+            context_projection_layer_scenario_count = [int]$Contract.context_projection_layer_contract.user_scenario_count
+            context_projection_layer_scenario_ids = @($Contract.context_projection_layer_contract.user_scenarios | ForEach-Object { $_.id })
+            context_projection_layer_group_method = [string]$Contract.context_projection_layer_contract.group_chat_evidence.method
+            context_projection_layer_screenshots_accepted = [bool]$Contract.context_projection_layer_contract.group_chat_evidence.screenshots_accepted
+            context_projection_layer_group_fields = @($Contract.context_projection_layer_contract.group_chat_evidence.required_fields)
             domain_data_blueprint_schema = [string]$Contract.domain_data_blueprint_contract.schema
             domain_context_index_schema = [string]$Contract.domain_context_index_contract.schema
             domain_context_index_count = [int]$Contract.domain_context_index_contract.index_count
@@ -218,6 +260,53 @@ function Invoke-Fb2PublicContractSelfTest {
             required_context_pack_sections = @("group_opinion_slice")
             required_metadata = @("citation_sources")
             anti_patterns = @("full_database_dump")
+        }
+        context_projection_layer_contract = [pscustomobject]@{
+            schema = "fb2.main_project.context_projection_layer.v1"
+            complete = $true
+            stores_fb2_business_data_in_main_project = $false
+            first_phase_delivery = "rest_context_pack_plus_tool_manifest_plus_tools_execute"
+            mcp_status = "future_wrapper_not_first_phase_fact_source"
+            domain_lane_count = 6
+            domain_lanes = @(
+                [pscustomobject]@{ id = "match_facts_and_odds" },
+                [pscustomobject]@{ id = "current_user_tickets" },
+                [pscustomobject]@{ id = "platform_order_summary" },
+                [pscustomobject]@{ id = "group_opinions" },
+                [pscustomobject]@{ id = "opinion_learning_loop" },
+                [pscustomobject]@{ id = "quality_feedback_audit" }
+            )
+            domain_index_count = 8
+            domain_indexes = @(
+                [pscustomobject]@{ id = "match_index" },
+                [pscustomobject]@{ id = "odds_snapshot_index" },
+                [pscustomobject]@{ id = "current_user_ticket_index" },
+                [pscustomobject]@{ id = "platform_order_risk_index" },
+                [pscustomobject]@{ id = "group_opinion_index" },
+                [pscustomobject]@{ id = "opinion_memory_index" },
+                [pscustomobject]@{ id = "context_audit_index" },
+                [pscustomobject]@{ id = "feedback_quality_index" }
+            )
+            user_scenario_count = 7
+            user_scenarios = @(
+                [pscustomobject]@{ id = "today_matches_analysis" },
+                [pscustomobject]@{ id = "my_ticket_analysis" },
+                [pscustomobject]@{ id = "platform_order_risk" },
+                [pscustomobject]@{ id = "group_opinion_summary" },
+                [pscustomobject]@{ id = "selected_message_review" },
+                [pscustomobject]@{ id = "group_discussion_summary_post" },
+                [pscustomobject]@{ id = "source_reference_audit" }
+            )
+            forbidden_outputs = @("fabricated_odds", "raw_embedding_dump", "full_database_dump")
+            ai_facing_payload = [pscustomobject]@{
+                wrapper = "fb2_context_pack"
+                not_allowed = @("raw_html_prompt", "full_database_dump", "raw_embedding_dump")
+            }
+            group_chat_evidence = [pscustomobject]@{
+                method = "direct_api_read"
+                screenshots_accepted = $false
+                required_fields = @("message_id", "type", "sender_id", "created_at", "text_len", "text_sha256")
+            }
         }
         domain_context_index_contract = [pscustomobject]@{
             schema = "fb2.main_project.domain_context_index.v1"
@@ -311,6 +400,17 @@ function Invoke-Fb2PublicContractSelfTest {
         -Health "OK" `
         -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
         -Contract $badIndexContract
+    $badProjectionLayerContract = $syntheticContract | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+    $badProjectionLayerContract.context_projection_layer_contract.user_scenarios = @(
+        $badProjectionLayerContract.context_projection_layer_contract.user_scenarios |
+            Where-Object { $_.id -ne "group_discussion_summary_post" }
+    )
+    $badProjectionLayerContract.context_projection_layer_contract.user_scenario_count = 7
+    $badProjectionLayerStatus = New-Fb2PublicContractStatus `
+        -Base "http://example.invalid" `
+        -Health "OK" `
+        -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
+        -Contract $badProjectionLayerContract
 
     $failed = 0
     if (-not [bool]$status.success) {
@@ -330,6 +430,12 @@ function Invoke-Fb2PublicContractSelfTest {
         $failed++
     } else {
         Write-Output "OK`tpublic contract selftest rejects missing domain index"
+    }
+    if ([bool]$badProjectionLayerStatus.success) {
+        Write-Output "FAIL`tpublic contract selftest rejects missing projection layer scenario"
+        $failed++
+    } else {
+        Write-Output "OK`tpublic contract selftest rejects missing projection layer scenario"
     }
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"

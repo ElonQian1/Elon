@@ -22,6 +22,7 @@ use crate::{
     external_app_context_projection::{
         public_context_projection_guidance, public_domain_data_blueprint_guidance,
     },
+    external_app_context_projection_layer::public_context_projection_layer_guidance,
     external_app_context_quality::public_context_quality_guidance,
     external_app_context_readiness::public_context_readiness_guidance,
     external_app_context_tool_execution::public_tool_execution_guidance,
@@ -117,6 +118,14 @@ pub async fn get_external_app_context_contract(
             "schema": "external_app.domain_context_projection.v1",
             "required_sections": [],
             "source_registry": {}
+        })),
+        "context_projection_layer_contract": public_context_projection_layer_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.context_projection_layer.v1",
+            "complete": false,
+            "domain_lanes": [],
+            "domain_indexes": [],
+            "user_scenarios": []
         })),
         "domain_data_blueprint_contract": public_domain_data_blueprint_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

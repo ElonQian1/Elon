@@ -868,6 +868,7 @@ try {
     $answerPolicy = $contract.answer_policy_contract
     $contextPackTemplate = $contract.context_pack_template_contract
     $projectionContract = $contract.domain_context_projection_contract
+    $projectionLayerContract = $contract.context_projection_layer_contract
     $domainDataBlueprint = $contract.domain_data_blueprint_contract
     $domainContextIndex = $contract.domain_context_index_contract
     $groupChatEvidenceContract = $contract.group_chat_evidence_contract
@@ -882,6 +883,12 @@ try {
     $projectionPermissions = @($projectionContract.permission_projection)
     $projectionQualityRoutes = @($projectionContract.quality_closure.required_feedback_routes)
     $projectionReadiness = $projectionContract.quality_closure.minimum_non_synthetic_ready
+    $projectionLayerLaneIds = @($projectionLayerContract.domain_lanes | ForEach-Object { $_.id })
+    $projectionLayerIndexIds = @($projectionLayerContract.domain_indexes | ForEach-Object { $_.id })
+    $projectionLayerScenarioIds = @($projectionLayerContract.user_scenarios | ForEach-Object { $_.id })
+    $projectionLayerForbidden = @($projectionLayerContract.forbidden_outputs)
+    $projectionLayerNotAllowed = @($projectionLayerContract.ai_facing_payload.not_allowed)
+    $projectionLayerGroupFields = @($projectionLayerContract.group_chat_evidence.required_fields)
     $domainDataBlueprintLaneIds = @($domainDataBlueprint.lanes | ForEach-Object { $_.id })
     $domainDataBlueprintSections = @($domainDataBlueprint.required_context_pack_sections)
     $domainDataBlueprintMetadata = @($domainDataBlueprint.required_metadata)
@@ -1015,6 +1022,31 @@ try {
     Assert-True ([int]$projectionReadiness.opinion_adoption_count -ge 1) "domain projection readiness: opinion adoption count" "opinion_adoption_count=$($projectionReadiness.opinion_adoption_count)"
     Assert-True ([string]$projectionReadiness.opinion_memory_ref_count -eq "present") "domain projection readiness: opinion memory refs" "opinion_memory_ref_count=$($projectionReadiness.opinion_memory_ref_count)"
     Assert-Fb2DomainScenarioMatrixContract -ScenarioMatrix $projectionContract.domain_scenario_matrix
+
+    Assert-True ($projectionLayerContract.schema -eq "fb2.main_project.context_projection_layer.v1") "context projection layer schema" "$($projectionLayerContract.schema)"
+    Assert-True ($projectionLayerContract.complete -eq $true) "context projection layer complete" "complete=$($projectionLayerContract.complete)"
+    Assert-True ($projectionLayerContract.ai_facing_payload.wrapper -eq "fb2_context_pack") "context projection layer wrapper" "$($projectionLayerContract.ai_facing_payload.wrapper)"
+    Assert-True ($projectionLayerContract.first_phase_delivery -eq "rest_context_pack_plus_tool_manifest_plus_tools_execute") "context projection layer first phase" "$($projectionLayerContract.first_phase_delivery)"
+    Assert-True ($projectionLayerContract.mcp_status -eq "future_wrapper_not_first_phase_fact_source") "context projection layer mcp status" "$($projectionLayerContract.mcp_status)"
+    Assert-True ($projectionLayerContract.stores_fb2_business_data_in_main_project -eq $false) "context projection layer no main-project data copy" "stores=$($projectionLayerContract.stores_fb2_business_data_in_main_project)"
+    Assert-True ([int]$projectionLayerContract.domain_lane_count -eq 6) "context projection layer lane count" "lane_count=$($projectionLayerContract.domain_lane_count)"
+    foreach ($laneId in @("match_facts_and_odds", "current_user_tickets", "platform_order_summary", "group_opinions", "opinion_learning_loop", "quality_feedback_audit")) {
+        Assert-ContainsValue $projectionLayerLaneIds $laneId "context projection layer lane: $laneId"
+    }
+    Assert-True ([int]$projectionLayerContract.domain_index_count -eq 8) "context projection layer index count" "index_count=$($projectionLayerContract.domain_index_count)"
+    foreach ($indexId in @("match_index", "odds_snapshot_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "opinion_memory_index", "context_audit_index", "feedback_quality_index")) {
+        Assert-ContainsValue $projectionLayerIndexIds $indexId "context projection layer index: $indexId"
+    }
+    Assert-True ([int]$projectionLayerContract.user_scenario_count -eq 7) "context projection layer scenario count" "scenario_count=$($projectionLayerContract.user_scenario_count)"
+    foreach ($scenarioId in @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")) {
+        Assert-ContainsValue $projectionLayerScenarioIds $scenarioId "context projection layer scenario: $scenarioId"
+    }
+    Assert-ContainsValue $projectionLayerForbidden "fabricated_odds" "context projection layer forbidden: fabricated odds"
+    Assert-ContainsValue $projectionLayerForbidden "raw_embedding_dump" "context projection layer forbidden: raw embedding dump"
+    Assert-ContainsValue $projectionLayerNotAllowed "full_database_dump" "context projection layer not allowed: full database dump"
+    Assert-True ($projectionLayerContract.group_chat_evidence.method -eq "direct_api_read") "context projection layer group direct read" "$($projectionLayerContract.group_chat_evidence.method)"
+    Assert-True ($projectionLayerContract.group_chat_evidence.screenshots_accepted -eq $false) "context projection layer rejects screenshots" "screenshots_accepted=$($projectionLayerContract.group_chat_evidence.screenshots_accepted)"
+    Assert-ContainsValue $projectionLayerGroupFields "text_sha256" "context projection layer group field: text sha256"
 
     Assert-True ($domainDataBlueprint.schema -eq "fb2.main_project.domain_data_blueprint.v1") "domain data blueprint schema" "$($domainDataBlueprint.schema)"
     Assert-True ($domainDataBlueprint.complete -eq $true) "domain data blueprint complete" "complete=$($domainDataBlueprint.complete)"
