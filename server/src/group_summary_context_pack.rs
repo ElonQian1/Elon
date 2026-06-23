@@ -385,13 +385,15 @@ pub(crate) fn ensure_fb2_summary_policy_shape(summary: &str, context_pack: &str)
         return summary.to_string();
     }
 
-    let has_data = contains_any(summary, &["数据事实", "比赛事实"]);
-    let has_opinion = contains_any(summary, &["群友观点", "相关发言"]);
-    let has_inference = contains_any(summary, &["AI推断", "AI 推断"]);
-    let has_risk = contains_any(summary, &["风险边界", "不保证", "不能保证"]);
+    let summary = sanitize_unmatched_fb2_ext_ids(summary, context_pack);
+
+    let has_data = contains_any(&summary, &["数据事实", "比赛事实"]);
+    let has_opinion = contains_any(&summary, &["群友观点", "相关发言"]);
+    let has_inference = contains_any(&summary, &["AI推断", "AI 推断"]);
+    let has_risk = contains_any(&summary, &["风险边界", "不保证", "不能保证"]);
 
     if has_data && has_opinion && has_inference && has_risk {
-        return summary.to_string();
+        return ensure_fb2_summary_context_audit_source(&summary, context_pack);
     }
 
     let mut sections = Vec::new();
@@ -416,7 +418,7 @@ pub(crate) fn ensure_fb2_summary_policy_shape(summary: &str, context_pack: &str)
         sections.push("## 风险边界\n- 赛果不确定，不保证命中，不建议重注或梭哈。".to_string());
     }
 
-    sections.join("\n\n")
+    ensure_fb2_summary_context_audit_source(&sections.join("\n\n"), context_pack)
 }
 
 fn context_pack_has_fb2_external_context(context_pack: &str) -> bool {
@@ -433,6 +435,82 @@ fn context_pack_has_fb2_external_context(context_pack: &str) -> bool {
 
 fn contains_any(text: &str, needles: &[&str]) -> bool {
     needles.iter().any(|needle| text.contains(needle))
+}
+
+fn ensure_fb2_summary_context_audit_source(summary: &str, context_pack: &str) -> String {
+    let Some(context_audit_id) = extract_context_audit_id(context_pack) else {
+        return summary.to_string();
+    };
+    if summary.contains(&context_audit_id) {
+        return summary.to_string();
+    }
+    format!("{summary}\n\n## 来源审计\n- context_audit_id {context_audit_id}")
+}
+
+fn extract_context_audit_id(context_pack: &str) -> Option<String> {
+    let parsed: Value = serde_json::from_str(context_pack).ok()?;
+    find_context_audit_id(&parsed)
+}
+
+fn find_context_audit_id(value: &Value) -> Option<String> {
+    if let Some(id) = value
+        .get("context_audit_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|id| !id.is_empty())
+    {
+        return Some(id.to_string());
+    }
+    match value {
+        Value::Array(items) => items.iter().find_map(find_context_audit_id),
+        Value::Object(map) => map.values().find_map(find_context_audit_id),
+        _ => None,
+    }
+}
+
+fn sanitize_unmatched_fb2_ext_ids(summary: &str, context_pack: &str) -> String {
+    let lower_context = context_pack.to_ascii_lowercase();
+    let chars = summary.chars().collect::<Vec<_>>();
+    let mut out = String::with_capacity(summary.len());
+    let mut index = 0;
+
+    while index < chars.len() {
+        if starts_ext_source_token_at(&chars, index) {
+            let start = index;
+            index += 4;
+            while index < chars.len() && is_source_token_char(chars[index]) {
+                index += 1;
+            }
+            let token = chars[start..index].iter().collect::<String>();
+            if lower_context.contains(&token.to_ascii_lowercase()) {
+                out.push_str(&token);
+            } else {
+                out.push_str("未核验来源编号");
+            }
+            continue;
+        }
+        out.push(chars[index]);
+        index += 1;
+    }
+
+    out
+}
+
+fn starts_ext_source_token_at(chars: &[char], index: usize) -> bool {
+    if index + 4 > chars.len() {
+        return false;
+    }
+    if index > 0 && is_source_token_char(chars[index - 1]) {
+        return false;
+    }
+    chars[index].eq_ignore_ascii_case(&'e')
+        && chars[index + 1].eq_ignore_ascii_case(&'x')
+        && chars[index + 2].eq_ignore_ascii_case(&'t')
+        && chars[index + 3] == '-'
+}
+
+fn is_source_token_char(ch: char) -> bool {
+    ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | ':')
 }
 
 #[cfg(test)]
@@ -461,6 +539,32 @@ mod tests {
         );
 
         assert!(citations.is_empty());
+    }
+
+    #[test]
+    fn fb2_summary_shape_sanitizes_unmatched_ext_ids_and_appends_audit_source() {
+        let context = serde_json::json!({
+            "group_id": "ext_fb2_official",
+            "external_app_context": {
+                "app_id": "fb2",
+                "context_audit_id": "audit-summary-1",
+                "citation_sources": [
+                    {"kind": "match", "id": "EXT-2589467", "label": "西班牙 vs 意大利"},
+                    {"kind": "context_audit", "id": "audit-summary-1", "label": "上下文审计"}
+                ]
+            }
+        })
+        .to_string();
+
+        let shaped = ensure_fb2_summary_policy_shape(
+            "## 数据事实\n- 引用 EXT-2589467，也误写了 EXT-2589477。\n\n## 群友观点\n- 有讨论。\n\n## AI推断\n- 只做推断。\n\n## 风险边界\n- 不保证命中。",
+            &context,
+        );
+
+        assert!(shaped.contains("EXT-2589467"));
+        assert!(!shaped.contains("EXT-2589477"));
+        assert!(shaped.contains("未核验来源编号"));
+        assert!(shaped.contains("context_audit_id audit-summary-1"));
     }
 
     #[test]
