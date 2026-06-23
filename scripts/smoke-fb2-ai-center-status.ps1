@@ -637,6 +637,9 @@ function Invoke-Fb2StatusSelfTest {
         $failed = 0
         if (-not [bool]$snapshot.latest_data_only_acceptance.success) { $failed++ }
         if (-not [bool]$snapshot.latest_read_only_direct_read.complete) { $failed++ }
+        $leakyReadOnly = $readOnly.PSObject.Copy()
+        Add-Member -InputObject $leakyReadOnly -NotePropertyName "content" -NotePropertyValue "不应保存的群聊原文"
+        if (Test-ReadOnlyDirectReadSummaryComplete $leakyReadOnly) { $failed++ }
         if (-not [bool]$snapshot.readiness.non_voice_historical_evidence_ready) { $failed++ }
         if (-not [bool]$snapshot.latest_data_only_acceptance.direct_read_evidence_complete) { $failed++ }
         if (-not [bool]$snapshot.latest_data_only_acceptance.visible_answer_policy_complete) { $failed++ }

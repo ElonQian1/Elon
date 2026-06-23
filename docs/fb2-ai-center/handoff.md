@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮补 read-only direct-read 隐私门槛：`Test-ReadOnlyDirectReadSummaryComplete` 会拒绝 summary 顶层或 `recent_messages` 中的 `text/content/body/message_text/raw_text/sample_text/full_text` 等正文承载字段。后续无写群直读 summary 只能保存消息 ID、发送方、时间、`text_len` 和 `text_sha256`；如果保存了群聊原文，状态/最终 wrapper 自测会失败。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-visible-answer-policy.ps1`，用于离线复核 data-only/final acceptance summary 的 `visible_answer_policy_evidence`。状态快照现在输出 `latest_data_only_acceptance.visible_answer_policy_complete/missing`，`goal_gap_audit.completed` 会包含 `visible_answer_policy_validated`；非语音 ready 不再只看“有回复、有 feedback、有直读”，还要求回答策略证据证明来源、事实/推断分层、风险边界和反投注保证均通过。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-gap-action-board.ps1`，用于验证 `gap_action_board` 没有漂移。它会检查缺 token 项是否指向无写群 `DataOnlyAcceptance -PreflightOnly`，full final 项是否明确需要真实群写入授权，语音项是否仍是用户暂停，并确认命令/notes 没有真实 token/password。`next_commands.validate_gap_action_board` 已可直接运行。
 - 2026-06-23 本轮新增 `gap_action_board schema=fb2.main_project.gap_action_board.v1`。接手会话不再只看 `missing` 字符串，而是逐项看到 owner、所需证据、命令、是否可无密钥执行和是否需要真实群写入：缺 `FB2_AI_CENTER_TOKEN` 的 live 权限/质量刷新走无写群 `DataOnlyAcceptance -PreflightOnly`；same-batch full final 需要语音证据和可见群聊授权；`voice_final_evidence` 继续是用户暂停项。

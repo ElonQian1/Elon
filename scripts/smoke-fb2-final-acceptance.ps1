@@ -561,6 +561,24 @@ function Invoke-FinalAcceptanceSelfTest {
     $readOnlySummaryMissingHash = $readOnlySummaryOk.PSObject.Copy()
     $readOnlySummaryMissingHash.sample_text_sha256 = ""
     Assert-SelfTest (-not (Test-ReadOnlyDirectReadSummaryComplete $readOnlySummaryMissingHash)) "read-only direct-read rejects missing text hash"
+    $readOnlySummaryWithRawBody = $readOnlySummaryOk.PSObject.Copy()
+    Add-Member -InputObject $readOnlySummaryWithRawBody -NotePropertyName "content" -NotePropertyValue "不应保存的群聊原文"
+    Assert-SelfTest (-not (Test-ReadOnlyDirectReadSummaryComplete $readOnlySummaryWithRawBody)) "read-only direct-read rejects raw body"
+    $readOnlySummaryWithRecentRawBody = $readOnlySummaryOk.PSObject.Copy()
+    Add-Member -InputObject $readOnlySummaryWithRecentRawBody -NotePropertyName "recent_messages" -NotePropertyValue @(
+        [pscustomobject]@{
+            index = 0
+            message_id = "gai_raw"
+            kind = "ai_reply"
+            sender = "usr_elon_ai"
+            created_at = "2026-01-01T00:00:00Z"
+            text_len = 8
+            text_sha256 = "abcdef0123456789"
+            text = "不应保存"
+        }
+    )
+    Add-Member -InputObject $readOnlySummaryWithRecentRawBody -NotePropertyName "recent_message_count" -NotePropertyValue 1 -Force
+    Assert-SelfTest (-not (Test-ReadOnlyDirectReadSummaryComplete $readOnlySummaryWithRecentRawBody)) "read-only direct-read rejects recent raw body"
 
     $childScript = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-final-wrapper-child-{0}.ps1" -f ([guid]::NewGuid().ToString("N")))
     try {

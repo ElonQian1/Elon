@@ -38,6 +38,32 @@ function Build-ReadOnlyDirectReadEvidence {
     }
 }
 
+function Test-ReadOnlyDirectReadRawBodyFieldFree {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $true
+    }
+
+    $forbiddenNames = @(
+        "text",
+        "body",
+        "content",
+        "message",
+        "message_text",
+        "raw_text",
+        "sample_text",
+        "full_text"
+    )
+
+    foreach ($property in @($Value.PSObject.Properties)) {
+        if (@($forbiddenNames) -contains $property.Name) {
+            return $false
+        }
+    }
+    return $true
+}
+
 function Test-ReadOnlyDirectReadSummaryComplete {
     param([object]$Summary)
 
@@ -70,6 +96,9 @@ function Test-ReadOnlyDirectReadSummaryComplete {
     if ([string]$Summary.sample_text_sha256 -notmatch "^[0-9a-fA-F]{8,}$") {
         return $false
     }
+    if (-not (Test-ReadOnlyDirectReadRawBodyFieldFree $Summary)) {
+        return $false
+    }
 
     # 只读预检必须带正文指纹，避免只用消息 ID 或截图冒充接口回读。
     $evidence = [string]$Summary.direct_read_evidence
@@ -87,6 +116,9 @@ function Test-ReadOnlyDirectReadSummaryComplete {
             return $false
         }
         foreach ($message in $recentMessages) {
+            if (-not (Test-ReadOnlyDirectReadRawBodyFieldFree $message)) {
+                return $false
+            }
             if ([string]::IsNullOrWhiteSpace([string]$message.message_id)) {
                 return $false
             }
