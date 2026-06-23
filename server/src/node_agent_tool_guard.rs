@@ -110,6 +110,16 @@ impl ToolGuard {
                 let line_count = optional_positive_usize(action, "line_count")?.unwrap_or(120);
                 self.read_file_range(path, start_line, line_count).await
             }
+            "git_status" => self.git_status().await,
+            "git_diff" => {
+                let path = action.get("path").and_then(Value::as_str);
+                let cached = action
+                    .get("cached")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                let stat = action.get("stat").and_then(Value::as_bool).unwrap_or(false);
+                self.git_diff(path, cached, stat).await
+            }
             "write_file" => {
                 if self.read_only() {
                     bail!("write_file denied: read-only planning mode");
@@ -220,6 +230,66 @@ impl ToolGuard {
         }
         tokio::fs::write(&full, content).await?;
         Ok(format!("write_file ok: {path} ({} chars)", content.len()))
+    }
+
+    async fn git_status(&self) -> Result<String> {
+        self.run_git(vec![
+            "-c".to_string(),
+            "core.quotepath=false".to_string(),
+            "status".to_string(),
+            "--short".to_string(),
+            "--branch".to_string(),
+        ])
+        .await
+    }
+
+    async fn git_diff(&self, path: Option<&str>, cached: bool, stat: bool) -> Result<String> {
+        let mut args = vec![
+            "-c".to_string(),
+            "core.quotepath=false".to_string(),
+            "diff".to_string(),
+            "--no-ext-diff".to_string(),
+        ];
+        if cached {
+            args.push("--cached".to_string());
+        }
+        if stat {
+            args.push("--stat".to_string());
+        }
+        if let Some(path) = path.map(str::trim).filter(|value| !value.is_empty()) {
+            if path != "." {
+                let full = self.resolve_safe_path(path)?;
+                let relative = display_relative_path(&self.workspace, &full);
+                args.push("--".to_string());
+                args.push(relative);
+            }
+        }
+        self.run_git(args).await
+    }
+
+    async fn run_git(&self, args: Vec<String>) -> Result<String> {
+        let mut child_command = Command::new("git");
+        child_command.args(&args);
+        child_command.current_dir(&self.workspace);
+        hide_command_window(&mut child_command);
+        let output = tokio::time::timeout(Duration::from_secs(30), child_command.output())
+            .await
+            .map_err(|_| anyhow!("git tool timed out after 30s"))??;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = if stdout.trim().is_empty() {
+            "[no output]".to_string()
+        } else {
+            stdout.to_string()
+        };
+        let combined = format!(
+            "git {} exit={}\nstdout:\n{}\nstderr:\n{}",
+            args.join(" "),
+            output.status.code().unwrap_or(-1),
+            stdout,
+            stderr
+        );
+        Ok(truncate_chars(&combined, MAX_TOOL_RESULT_CHARS))
     }
 
     pub(crate) async fn write_file_diff_preview(&self, action: &Value) -> Result<Option<Value>> {
@@ -1127,6 +1197,47 @@ mod tests {
         let unsafe_result = guard
             .invoke_action(&json!({
                 "tool": "file_info",
+                "path": ".git/config"
+            }))
+            .await;
+        assert!(unsafe_result.contains("path cannot target .git"));
+    }
+
+    #[tokio::test]
+    async fn git_status_and_diff_are_read_only_project_tools() {
+        let temp = temp_test_dir("git_status_and_diff_are_read_only_project_tools");
+        init_git_repo(&temp);
+        fs::write(temp.join("README.md"), "initial\n").unwrap();
+        let add = std::process::Command::new("git")
+            .args(["add", "README.md"])
+            .current_dir(&temp)
+            .status()
+            .unwrap();
+        assert!(add.success(), "git add should succeed");
+        fs::write(temp.join("README.md"), "changed\n").unwrap();
+        let mut guard = ToolGuard::new(temp, None);
+
+        let status = guard
+            .invoke_action(&json!({
+                "tool": "git_status"
+            }))
+            .await;
+        assert!(status.contains("git -c core.quotepath=false status"));
+        assert!(status.contains("README.md"));
+
+        let diff = guard
+            .invoke_action(&json!({
+                "tool": "git_diff",
+                "path": "README.md"
+            }))
+            .await;
+        assert!(diff.contains("git -c core.quotepath=false diff"));
+        assert!(diff.contains("-initial"));
+        assert!(diff.contains("+changed"));
+
+        let unsafe_result = guard
+            .invoke_action(&json!({
+                "tool": "git_diff",
                 "path": ".git/config"
             }))
             .await;

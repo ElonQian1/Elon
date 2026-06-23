@@ -66,6 +66,13 @@ function Get-AgentActionTarget {
             $target = "{0}:{1}+{2}" -f [string]$Action.path, [int]$Action.start_line, [int]$Action.line_count
             return (Limit-AgentText $target 300)
         }
+        'git_status' { return 'git status --short --branch' }
+        'git_diff' {
+            $path = if ($Action.path) { [string]$Action.path } else { '.' }
+            $cached = [bool]$Action.cached
+            $stat = [bool]$Action.stat
+            return (Limit-AgentText "path=$path cached=$cached stat=$stat" 300)
+        }
         'write_file' { return (Limit-AgentText ([string]$Action.path) 300) }
         'apply_patch' {
             $patchText = [string]$Action.patch

@@ -202,6 +202,28 @@ fn tool_definitions() -> Value {
             })
         ),
         function_tool(
+            "git_status",
+            "Inspect git status for the current project without modifying files.",
+            json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
+            "git_diff",
+            "Inspect the current project git diff without modifying files.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "Optional project-relative file or directory to limit the diff. Defaults to the workspace root." },
+                    "cached": { "type": "boolean", "description": "Show staged changes instead of unstaged changes." },
+                    "stat": { "type": "boolean", "description": "Show only diff stat instead of the full diff." }
+                },
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
             "write_file",
             "Create or replace a project-relative text file. Requires user approval when writes are enabled.",
             json!({
@@ -285,6 +307,12 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "read_file_range"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "git_status"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "git_diff"));
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "apply_patch"));

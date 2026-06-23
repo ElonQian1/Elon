@@ -76,7 +76,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `search_files`, `file_info`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `search_files` is read-only and bounded, so use it before broad file reads when locating symbols, filenames, TODOs, errors, or related code. `file_info` is read-only and helps inspect unknown files or directories before reading them. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `search_files`, `file_info`, `read_file`, `read_file_range`, read-only `git_status` / `git_diff`, `write_file`, `apply_patch`, and a small allowlist of project commands. `search_files` is read-only and bounded, so use it before broad file reads when locating symbols, filenames, TODOs, errors, or related code. `file_info` is read-only and helps inspect unknown files or directories before reading them. `git_status` and `git_diff` are read-only git inspection tools and do not require command approval. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -295,9 +295,11 @@ Schema:
     {"tool": "file_info", "path": "src/main.rs"},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "read_file_range", "path": "src/main.rs", "start_line": 1, "line_count": 80},
+    {"tool": "git_status"},
+    {"tool": "git_diff", "path": "src/main.rs", "cached": false, "stat": false},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
     {"tool": "apply_patch", "patch": "unified diff", "check_only": false},
-    {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
+    {"tool": "run_command", "program": "cargo", "args": ["test"], "reason": "verify project tests"}
   ]
 }
 
@@ -307,6 +309,7 @@ Rules:
 - Use search_files before broad file reads when you need to locate symbols, filenames, TODOs, errors, or related code.
 - Use file_info before reading unknown files, binary-looking files, or directories.
 - Use read_file_range for large files or when you only need a specific section.
+- Use git_status and git_diff for read-only git inspection; do not spend run_command approvals on status/diff.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for local edits to existing project files.
 - Use write_file only for intentional new project files or full-file rewrites.
@@ -682,6 +685,46 @@ function Invoke-AgentFileInfo {
     return ($rows -join "`n")
 }
 
+function Invoke-AgentGitStatus {
+    $output = & git -c core.quotepath=false status --short --branch 2>&1 | Out-String
+    $text = "git -c core.quotepath=false status --short --branch exit=$LASTEXITCODE`n$output"
+    return Limit-AgentText $text $AgentCommandOutputMaxChars
+}
+
+function Invoke-AgentGitDiff {
+    param(
+        [string]$Path = '.',
+        [bool]$Cached = $false,
+        [bool]$Stat = $false
+    )
+    $args = @('-c', 'core.quotepath=false', 'diff', '--no-ext-diff')
+    if ($Cached) { $args += '--cached' }
+    if ($Stat) { $args += '--stat' }
+    $pathText = if ($Path) { $Path.Trim() } else { '' }
+    if ($pathText -and $pathText -ne '.') {
+        $full = Resolve-SafePath $pathText
+        $rootFull = [System.IO.Path]::GetFullPath($ProjectRoot)
+        $rootPrefix = $rootFull
+        if (-not $rootPrefix.EndsWith([System.IO.Path]::DirectorySeparatorChar)) {
+            $rootPrefix = $rootPrefix + [System.IO.Path]::DirectorySeparatorChar
+        }
+        $fullPath = [System.IO.Path]::GetFullPath($full)
+        if ($fullPath -eq $rootFull) {
+            $relative = '.'
+        } elseif ($fullPath.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            $relative = $fullPath.Substring($rootPrefix.Length)
+        } else {
+            $relative = $pathText
+        }
+        $relative = $relative.Replace('\', '/')
+        $args += '--'
+        $args += $relative
+    }
+    $output = & git @args 2>&1 | Out-String
+    $text = "git $($args -join ' ') exit=$LASTEXITCODE`n$output"
+    return Limit-AgentText $text $AgentCommandOutputMaxChars
+}
+
 function Invoke-AgentAction {
     param([Parameter(Mandatory = $true)]$Action)
     $tool = [string]$Action.tool
@@ -746,6 +789,15 @@ function Invoke-AgentAction {
                 $lineNo += 1
             }
             return ($numbered -join "`n")
+        }
+        'git_status' {
+            return Invoke-AgentGitStatus
+        }
+        'git_diff' {
+            $path = if ($Action.path) { [string]$Action.path } else { '.' }
+            $cached = if ($Action.cached) { [bool]$Action.cached } else { $false }
+            $stat = if ($Action.stat) { [bool]$Action.stat } else { $false }
+            return Invoke-AgentGitDiff -Path $path -Cached $cached -Stat $stat
         }
         'write_file' {
             $path = [string]$Action.path
@@ -1016,6 +1068,11 @@ mod tests {
         assert!(script.contains("'read_file_range'"));
         assert!(script.contains("start_line must be >= 1"));
         assert!(script.contains("$lineCount = 400"));
+        assert!(script.contains("'git_status'"));
+        assert!(script.contains("'git_diff'"));
+        assert!(script.contains("Invoke-AgentGitStatus"));
+        assert!(script.contains("Invoke-AgentGitDiff"));
+        assert!(script.contains("core.quotepath=false"));
         assert!(script.contains("'apply_patch'"));
         assert!(script.contains("Invoke-AgentApplyPatch"));
         assert!(script.contains("git apply"));
@@ -1034,7 +1091,9 @@ mod tests {
         assert!(script.contains("max_context_chars"));
         assert!(script.contains("$AgentCommandOutputMaxChars = 12000"));
         assert!(script.contains("Limit-AgentText $output $AgentCommandOutputMaxChars"));
-        assert!(script.contains("\"program\": \"git\""));
+        assert!(script.contains("\"tool\": \"git_status\""));
+        assert!(script.contains("\"tool\": \"git_diff\""));
+        assert!(script.contains("\"program\": \"cargo\""));
         assert!(script.contains("$shellMarkers"));
         assert!(script.contains("[regex]::IsMatch"));
         assert!(!script.contains("__ELON_LIFECYCLE_HELPERS__"));
@@ -1054,6 +1113,8 @@ mod tests {
         assert!(doc.contains("search_files"));
         assert!(doc.contains("file_info"));
         assert!(doc.contains("read_file_range"));
+        assert!(doc.contains("git_status"));
+        assert!(doc.contains("git_diff"));
         assert!(doc.contains("apply_patch"));
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));

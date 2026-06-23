@@ -913,9 +913,11 @@ Schema:
     {"tool": "file_info", "path": "src/main.rs"},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "read_file_range", "path": "src/main.rs", "start_line": 120, "line_count": 80},
+    {"tool": "git_status"},
+    {"tool": "git_diff", "path": "src/main.rs", "cached": false, "stat": false},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
     {"tool": "apply_patch", "patch": "unified diff", "check_only": false},
-    {"tool": "run_command", "program": "git", "args": ["status", "--short"], "reason": "inspect git state"}
+    {"tool": "run_command", "program": "cargo", "args": ["test"], "reason": "verify project tests"}
   ]
 }
 
@@ -925,6 +927,7 @@ Rules:
 - Use search_files before broad file reads when you need to locate symbols, filenames, TODOs, errors, or related code.
 - Use file_info before reading unknown files, binary-looking files, or directories.
 - Use read_file_range instead of read_file for large files when you only need one section.
+- Use git_status and git_diff for read-only git inspection; do not spend run_command approvals on status/diff.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for intentional edits to existing project files.
 - Use write_file only when replacing a full file or creating a small new project file.
@@ -936,7 +939,7 @@ Rules:
     .replace("{{runtime_identity}}", runtime_identity);
     if read_only {
         prompt.push_str(
-            "\nCurrent mode is read-only planning. Do not request write_file, apply_patch, or run_command.\n",
+            "\nCurrent mode is read-only planning. Do not request write_file, apply_patch, or run_command. You may still use git_status and git_diff.\n",
         );
     }
     prompt
@@ -1338,6 +1341,16 @@ mod tests {
             .as_array()
             .unwrap()
             .iter()
+            .any(|tool| tool["function"]["name"] == "git_status"));
+        assert!(payload["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["function"]["name"] == "git_diff"));
+        assert!(payload["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
             .any(|tool| tool["function"]["name"] == "run_command"));
         assert_eq!(payload["messages"][0]["content"], "Return JSON");
 
@@ -1372,10 +1385,14 @@ mod tests {
         let route_c = system_prompt("server-runtime", true);
 
         assert!(route_b.contains("Route B local API runtime"));
+        assert!(route_b.contains("\"tool\": \"git_status\""));
+        assert!(route_b.contains("\"tool\": \"git_diff\""));
+        assert!(route_b.contains("Use git_status and git_diff"));
         assert!(!route_b.contains("Route C server runtime for"));
         assert!(route_c.contains("Route C server runtime"));
         assert!(route_c.contains("read-only planning"));
         assert!(route_c.contains("Do not request write_file, apply_patch, or run_command"));
+        assert!(route_c.contains("You may still use git_status and git_diff"));
     }
 
     #[test]
