@@ -6,6 +6,7 @@
   const SOCIAL_AI_USER_ID = 'usr_elon_ai';
   const LOCAL_ADMIN_HEADER_FALLBACK = 'X-Elon-Local-Admin-Token';
   const CLIENT_PROTOCOL_TARGETS = {
+    open: 'elon-node://open',
     logs: 'elon-node://logs',
     launcher_logs: 'elon-node://launcher-logs',
     task_journal: 'elon-node://task-journal',
@@ -2569,6 +2570,9 @@
     [els.settingsAccountPanel, els.settingsWorkbenchPanel, els.settingsNotificationsPanel, els.settingsPlaceholderPanel].forEach((panel) => {
       if (panel) panel.classList.remove('active');
     });
+    if (els.settingsBackdrop) {
+      els.settingsBackdrop.classList.toggle('is-workbench-flow', selected === 'workbench');
+    }
     if (selected === 'account') {
       els.settingsAccountPanel.classList.add('active');
       $('settingsTitle').textContent = '账户';
@@ -2600,6 +2604,10 @@
     els.settingsBackdrop.hidden = false;
     setSettingsResult('');
     if (targetSection === 'workbench') {
+      if (els.settingsRuntimePermission) {
+        els.settingsRuntimePermission.value = 'project_write';
+        syncSettingsRuntimePermissionHint();
+      }
       updateWorkbenchOnboarding();
       refreshClientMaintenance(false);
     }
@@ -2648,24 +2656,32 @@
     const path = clean(els.settingsProjectPath && els.settingsProjectPath.value);
     const info = state.localProjectInfo || null;
     const blocked = !!(info && info.canRegister === false);
-    let title = '等待连接本机节点';
-    let detail = `请先启动一龙 PC 节点客户端，然后点刷新。`;
+    let title = '先启动本机节点';
+    let detail = `点击下方按钮；如果浏览器询问是否打开“一龙PC节点”，请选择允许。`;
+    let actionLabel = '启动本机节点';
 
     if (connected && !path) {
       title = '本机节点已连接';
-      detail = '现在可以选择电脑里的项目文件夹。';
+      detail = '现在选择一个项目文件夹即可加入列表。';
+      actionLabel = '选择项目文件夹';
     } else if (connected && blocked) {
-      title = '目录信息不足';
-      detail = '展开高级字段，补齐缺少的信息后再注册。';
+      title = '还差一点项目信息';
+      detail = '打开“排查 / 高级设置”，补齐缺少字段后再注册。';
+      actionLabel = '重新选择项目文件夹';
     } else if (connected && path) {
       title = '项目目录已选好';
-      detail = '继续注册后，它会出现在左侧项目列表里。';
+      detail = '正在加入项目列表，完成后会自动打开项目。';
+      actionLabel = '重新选择项目文件夹';
     }
 
     if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = title;
     if (els.settingsNodeStatusDetail) els.settingsNodeStatusDetail.textContent = detail;
     els.settingsNodeStatusCard.classList.toggle('is-ready', connected && !!path && !blocked);
-    els.settingsNodeStatusCard.classList.toggle('is-warning', !connected || blocked);
+    els.settingsNodeStatusCard.classList.toggle('is-pending', !connected);
+    els.settingsNodeStatusCard.classList.toggle('is-warning', connected && blocked);
+    if (els.chooseProjectFolderBtn && !els.chooseProjectFolderBtn.dataset.label) {
+      els.chooseProjectFolderBtn.textContent = actionLabel;
+    }
 
     setSetupStepState(els.settingsStepNode, connected ? 'done' : 'active');
     setSetupStepState(els.settingsStepFolder, path ? 'done' : (connected ? 'active' : ''));
@@ -2796,10 +2812,28 @@
       applyClientMaintenanceStatus(null);
       if (els.settingsClientStatus) els.settingsClientStatus.textContent = '无法连接本机节点';
       if (els.settingsClientPaths) els.settingsClientPaths.textContent = clean(error.message || error);
-      if (showResult) setSettingsResult(escapeHtml(error.message || error), 'error');
+      if (showResult) {
+        setSettingsResult('还没有检测到本机节点。先点“启动本机节点”；如果没有反应，再打开“安装 / 帮助”。', 'note');
+      }
     } finally {
       setSettingsBusy(els.refreshClientMaintenanceBtn, false);
     }
+  }
+
+  function startLocalNodeFromSettings() {
+    setSettingsResult('');
+    if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = '正在尝试启动本机节点';
+    if (els.settingsNodeStatusDetail) {
+      els.settingsNodeStatusDetail.textContent = '如果浏览器弹出确认框，请选择允许；启动后会自动重新检测。';
+    }
+    launchClientProtocol(CLIENT_PROTOCOL_TARGETS.open);
+    setSettingsBusy(els.chooseProjectFolderBtn, true, '等待启动…');
+    window.setTimeout(() => refreshClientMaintenance(false), 1200);
+    window.setTimeout(() => refreshClientMaintenance(false), 3000);
+    window.setTimeout(() => {
+      setSettingsBusy(els.chooseProjectFolderBtn, false);
+      updateWorkbenchOnboarding();
+    }, 3600);
   }
 
   async function openClientMaintenanceTarget(target, button) {
@@ -3037,6 +3071,10 @@
   }
 
   async function chooseLocalProjectFolder(options) {
+    if (!state.clientMaintenance) {
+      startLocalNodeFromSettings();
+      return;
+    }
     const autoRegister = !!(options && options.autoRegister);
     setSettingsResult('正在打开本机文件夹选择器…');
     setSettingsBusy(els.chooseProjectFolderBtn, true, '选择中…');
