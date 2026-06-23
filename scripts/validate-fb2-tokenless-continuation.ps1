@@ -167,6 +167,7 @@ function New-Fb2TokenlessContinuationValidation {
     $requiredCommands = @(
         "validate_public_contract_status",
         "validate_exported_context_pack_sample_set",
+        "validate_context_projection_log",
         "validate_current_state",
         "validate_gap_action_board",
         "validate_handoff_prompt",
@@ -186,6 +187,12 @@ function New-Fb2TokenlessContinuationValidation {
     Add-Fb2TokenlessCheck $checks "tokenless validator command targets this script" (
         $tokenlessCommand -match "validate-fb2-tokenless-continuation\.ps1" -and
         $tokenlessCommand -match "tokenless-continuation-validation-current\.json"
+    )
+
+    $projectionLogCommand = [string](Get-Fb2TokenlessProperty $commands "validate_context_projection_log" "")
+    Add-Fb2TokenlessCheck $checks "context projection validator command targets log evidence" (
+        $projectionLogCommand -match "validate-fb2-context-projection-log\.ps1" -and
+        $projectionLogCommand -match "context-projection-log-validation-current\.json"
     )
 
     $readOnlyCommand = [string](Get-Fb2TokenlessProperty $commands "no_write_direct_read" "")
@@ -302,6 +309,7 @@ function New-Fb2TokenlessFixture {
         next_commands = [ordered]@{
             validate_public_contract_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-public-contract-status.ps1 -OutputPath target\fb2-ai-center\public-contract-status-current.json"
             validate_exported_context_pack_sample_set = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir <fb2_repo>\target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\fb2-repo-context-pack-samples-validation-current.json"
+            validate_context_projection_log = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-projection-log.ps1 -StatusPath target\fb2-ai-center\status-current.json -OutputPath target\fb2-ai-center\context-projection-log-validation-current.json"
             validate_current_state = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1"
             validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
             validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
