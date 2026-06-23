@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 21:13 当前主项目侧下一步不是重做数据方案，而是保持非语音闭环回归为绿：线上主项目 `v0.3.726 / e182096115fa77b53aa77c691f4952fee5fea8e3` 已通过部署状态、公开契约、fb2-repo 样本、只读群聊 direct read、可见回答策略、live preflight request、Context Projection、七类用户场景、权限/质量、completion matrix、handoff prompt、tokenless continuation 和 token bridge wrapper 共 17 步 current-state 验证。`data_goal_complete=true`、`protected_live_preflight_satisfied=true`、`full_final_complete=false`、`voice_deferred_by_user=true` 是当前正确结论；继续推进时只应做无写群/无密钥回归或用户恢复 ASR/TTS 后补真机语音证据，不要把 MCP/RAG 或重新复制 fb2 数据当成第一阶段 blocker。
 - 2026-06-23 当前状态口径已升级为“token bridge 必须证明 service token 不进 argv/output，fb2 密码也不进子进程 argv”。`status-refresh-current.json` 只有在 bridge 结果新鲜、无写群、direct-no-proxy、`token_passed_as_argument=false`、`fb2_password_passed_to_child_argv=false`、`token_written_to_output=false` 且 preflight/current-state exit code 均为 0 时才置 `protected_live_preflight_satisfied=true`。本轮已用当前进程环境变量重跑 token bridge，最新状态为 `protected_live_preflight_satisfied=true`、`blocked_by_external_secret=false`、`next_minimum_action=keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses`；继续重跑时仍只在当前 PowerShell 进程设置 `FB2_VISIBLE_SMOKE_PASSWORD`，不要把 fb2 密码放进子进程参数。
 - 2026-06-23 当前线上状态脚本遵守“不走代理”要求：主项目公开契约和服务端部署状态检查均清空常见代理变量，设置 `NO_PROXY/no_proxy=*`，并使用 `Invoke-RestMethod -NoProxy`。新增或修改项目访问脚本时必须保持同一策略。
 - 2026-06-23 当前交接隐私门禁覆盖 refresh.files 中的 JSON/Markdown/text artifact 与 token bridge summary；真实密码命令示例必须写 `<FB2_PASSWORD>`，不得把真实用户名/密码组合、真实 token、群聊正文、订单明细或 Context Pack 原文体写入 docs/target 证据。
