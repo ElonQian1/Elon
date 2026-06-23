@@ -111,6 +111,50 @@ function Add-SwitchArg {
     }
 }
 
+function Export-SmokeChildSecretEnv {
+    param(
+        [string]$Name,
+        [string]$Value
+    )
+    if (-not [string]::IsNullOrWhiteSpace($Value)) {
+        [System.Environment]::SetEnvironmentVariable($Name, $Value, "Process")
+    }
+}
+
+function Test-SmokeChildCommandSecretSafe {
+    param([string[]]$CommandArgs)
+
+    $joined = @($CommandArgs) -join " "
+    foreach ($pattern in @(
+            "(?i)-MainToken\s+",
+            "(?i)-Fb2Token\s+",
+            "(?i)-Fb2AiCenterToken\s+",
+            "(?i)-Fb2UserToken\s+",
+            "(?i)-Fb2Password\s+"
+        )) {
+        if ($joined -match $pattern) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Assert-SmokeChildCommandSecretSafe {
+    param(
+        [string]$Name,
+        [System.Collections.Generic.List[string]]$CommandArgs
+    )
+
+    if (-not (Test-SmokeChildCommandSecretSafe -CommandArgs @($CommandArgs))) {
+        Fail-FinalAcceptance "$Name child command contains token or password arguments."
+    }
+}
+
+Export-SmokeChildSecretEnv "ELON_MAIN_TOKEN" $MainToken
+Export-SmokeChildSecretEnv "FB2_AI_CENTER_TOKEN" $Fb2AiCenterToken
+Export-SmokeChildSecretEnv "FB2_USER_TOKEN" $Fb2UserToken
+Export-SmokeChildSecretEnv "FB2_VISIBLE_SMOKE_PASSWORD" $Fb2Password
+
 function Invoke-JsonOrNull {
     param([string]$Url)
     try {
@@ -542,6 +586,16 @@ function Invoke-FinalAcceptanceSelfTest {
     Assert-SelfTest ($argHelperList -contains "-DataOnlyAcceptance") "argument helper adds enabled switch"
     Assert-SelfTest (-not ($argHelperList -contains "-EmptyValue")) "argument helper skips blank value"
     Assert-SelfTest (-not ($argHelperList -contains "-DisabledSwitch")) "argument helper skips disabled switch"
+    $secretSafeArgs = [System.Collections.Generic.List[string]]::new()
+    foreach ($arg in @("-NoProfile", "-File", "child.ps1", "-Fb2Username", "123qwe")) {
+        [void]$secretSafeArgs.Add($arg)
+    }
+    $secretUnsafeArgs = [System.Collections.Generic.List[string]]::new()
+    foreach ($arg in @("-NoProfile", "-File", "child.ps1", "-Fb2Password", "secret")) {
+        [void]$secretUnsafeArgs.Add($arg)
+    }
+    Assert-SelfTest (Test-SmokeChildCommandSecretSafe -CommandArgs @($secretSafeArgs)) "child command secret-safe guard accepts env-only args"
+    Assert-SelfTest (-not (Test-SmokeChildCommandSecretSafe -CommandArgs @($secretUnsafeArgs))) "child command secret-safe guard rejects password argv"
     Assert-SelfTest ((Resolve-VisibleMainGroupId "official") -eq "ext_fb2_official") "visible group maps fb2 local id"
     Assert-SelfTest ((Resolve-VisibleMainGroupId "ext_fb2_official") -eq "ext_fb2_official") "visible group keeps main group id"
     Assert-SelfTest ((Resolve-DataOnlyVisibleMinOpinionAdoptionCount -CurrentValue 1 -WasExplicit $false -AllowNoNewOpinionAdoptionInShortWindow $false) -eq 1) "data-only visible keeps opinion adoption default"
@@ -943,12 +997,8 @@ if ($PreflightOnly) {
     [void]$preflightArgs.Add("-File")
     [void]$preflightArgs.Add($centerScript)
     Add-Arg $preflightArgs "-MainBase" $MainBase
-    Add-Arg $preflightArgs "-MainToken" $MainToken
     Add-Arg $preflightArgs "-Fb2Base" $Fb2Base
-    Add-Arg $preflightArgs "-Fb2Token" $Fb2AiCenterToken
-    Add-Arg $preflightArgs "-Fb2UserToken" $Fb2UserToken
     Add-Arg $preflightArgs "-Fb2Username" $Fb2Username
-    Add-Arg $preflightArgs "-Fb2Password" $Fb2Password
     Add-Arg $preflightArgs "-GroupId" $GroupId
     Add-Arg $preflightArgs "-ExternalUserId" $ExternalUserId
     Add-Arg $preflightArgs "-RequestTimeoutSec" $RequestTimeoutSec
@@ -981,6 +1031,7 @@ if ($PreflightOnly) {
 
     $preflightLogPath = Join-Path $summaryDir "$logPrefix-$stamp-preflight.log"
     $preflightName = if ($DataOnlyAcceptance) { "data-only preflight without visible messages" } else { "final preflight without visible messages" }
+    Assert-SmokeChildCommandSecretSafe $preflightName $preflightArgs
     $preflightResult = Invoke-SmokeScript $preflightName $preflightArgs $preflightLogPath
 
     $readOnlyArgs = [System.Collections.Generic.List[string]]::new()
@@ -990,19 +1041,16 @@ if ($PreflightOnly) {
     [void]$readOnlyArgs.Add("-File")
     [void]$readOnlyArgs.Add($visibleScript)
     Add-Arg $readOnlyArgs "-MainBase" $MainBase
-    Add-Arg $readOnlyArgs "-MainToken" $MainToken
     Add-Arg $readOnlyArgs "-Fb2Base" $Fb2Base
-    Add-Arg $readOnlyArgs "-Fb2Token" $Fb2UserToken
-    Add-Arg $readOnlyArgs "-Fb2AiCenterToken" $Fb2AiCenterToken
     Add-Arg $readOnlyArgs "-Fb2UserId" $ExternalUserId
     Add-Arg $readOnlyArgs "-Fb2Username" $Fb2Username
-    Add-Arg $readOnlyArgs "-Fb2Password" $Fb2Password
     Add-Arg $readOnlyArgs "-GroupId" $visibleMainGroupId
     Add-Arg $readOnlyArgs "-RequestTimeoutSec" $RequestTimeoutSec
     Add-SwitchArg $readOnlyArgs "-ReadOnlyDirectRead" $true
     $readOnlyLogPath = Join-Path $summaryDir "$logPrefix-$stamp-readonly-visible-chat.log"
     $readOnlySummaryPath = Join-Path $summaryDir "$logPrefix-$stamp-readonly-visible-chat.json"
     Add-Arg $readOnlyArgs "-SummaryPath" $readOnlySummaryPath
+    Assert-SmokeChildCommandSecretSafe "preflight read-only direct group read" $readOnlyArgs
     $readOnlyResult = Invoke-SmokeScript "preflight read-only direct group read" $readOnlyArgs $readOnlyLogPath
     $readOnlySummary = Read-JsonFileOrNull $readOnlySummaryPath
     $readOnlyDirectReadComplete = Test-ReadOnlyDirectReadSummaryComplete $readOnlySummary
@@ -1058,13 +1106,9 @@ $visibleArgs = [System.Collections.Generic.List[string]]::new()
 [void]$visibleArgs.Add("-File")
 [void]$visibleArgs.Add($visibleScript)
 Add-Arg $visibleArgs "-MainBase" $MainBase
-Add-Arg $visibleArgs "-MainToken" $MainToken
 Add-Arg $visibleArgs "-Fb2Base" $Fb2Base
-Add-Arg $visibleArgs "-Fb2Token" $Fb2UserToken
-Add-Arg $visibleArgs "-Fb2AiCenterToken" $Fb2AiCenterToken
 Add-Arg $visibleArgs "-Fb2UserId" $ExternalUserId
 Add-Arg $visibleArgs "-Fb2Username" $Fb2Username
-Add-Arg $visibleArgs "-Fb2Password" $Fb2Password
 Add-Arg $visibleArgs "-GroupId" $visibleMainGroupId
 Add-Arg $visibleArgs "-RequestTimeoutSec" $RequestTimeoutSec
 Add-Arg $visibleArgs "-PollTimeoutSec" $PollTimeoutSec
@@ -1075,6 +1119,7 @@ if ($DataOnlyAcceptance) {
     Add-SwitchArg $visibleArgs "-AllowSummaryFallback" $true
 }
 
+Assert-SmokeChildCommandSecretSafe "visible group chat smoke" $visibleArgs
 $visibleResult = Invoke-SmokeScript "visible group chat smoke" $visibleArgs $visibleLogPath
 $visibleLines = @($visibleResult.output)
 
@@ -1085,12 +1130,8 @@ $centerArgs = [System.Collections.Generic.List[string]]::new()
 [void]$centerArgs.Add("-File")
 [void]$centerArgs.Add($centerScript)
 Add-Arg $centerArgs "-MainBase" $MainBase
-Add-Arg $centerArgs "-MainToken" $MainToken
 Add-Arg $centerArgs "-Fb2Base" $Fb2Base
-Add-Arg $centerArgs "-Fb2Token" $Fb2AiCenterToken
-Add-Arg $centerArgs "-Fb2UserToken" $Fb2UserToken
 Add-Arg $centerArgs "-Fb2Username" $Fb2Username
-Add-Arg $centerArgs "-Fb2Password" $Fb2Password
 Add-Arg $centerArgs "-GroupId" $GroupId
 Add-Arg $centerArgs "-ExternalUserId" $ExternalUserId
 Add-Arg $centerArgs "-RequestTimeoutSec" $RequestTimeoutSec
@@ -1112,6 +1153,7 @@ if ($DataOnlyAcceptance) {
 }
 
 $centerName = if ($DataOnlyAcceptance) { "data-only no-skip acceptance" } else { "final no-skip acceptance" }
+Assert-SmokeChildCommandSecretSafe $centerName $centerArgs
 $centerResult = Invoke-SmokeScript $centerName $centerArgs $centerLogPath
 $centerLines = @($centerResult.output)
 
