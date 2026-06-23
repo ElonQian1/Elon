@@ -141,6 +141,20 @@ function New-Fb2CurrentStateValidation {
             -ExpectedOutputPath $RefreshPath))
     }
 
+    $refreshForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
+    $filesForOptionalSteps = Get-Fb2CurrentProperty $refreshForOptionalSteps "files"
+    $statusPathForOptionalSteps = [string](Get-Fb2CurrentProperty $filesForOptionalSteps "status" "")
+    $statusForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $statusPathForOptionalSteps
+    $latestReadOnly = Get-Fb2CurrentProperty $statusForOptionalSteps "latest_read_only_direct_read"
+    $latestReadOnlyPath = [string](Get-Fb2CurrentProperty $latestReadOnly "path" "")
+    if (-not [string]::IsNullOrWhiteSpace($latestReadOnlyPath) -and (Test-Path -LiteralPath $latestReadOnlyPath)) {
+        [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+            -Name "validate_read_only_direct_read" `
+            -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-visible-readonly-summary.ps1") `
+            -Arguments @("-SummaryPath", $latestReadOnlyPath, "-OutputPath", (Join-Path $targetDir "visible-readonly-summary-validation-current.json")) `
+            -ExpectedOutputPath (Join-Path $targetDir "visible-readonly-summary-validation-current.json")))
+    }
+
     [void]$steps.Add((Invoke-Fb2CurrentPwsh `
         -Name "validate_evidence_freshness" `
         -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-ai-center-evidence-freshness.ps1") `
@@ -204,6 +218,7 @@ function Invoke-Fb2CurrentStateSelfTest {
     $tempRoot = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-current-state-selftest-" + [guid]::NewGuid().ToString("N"))
     $steps = @(
         [ordered]@{ name = "refresh_status"; script = "fb2-ai-center-refresh-current-status.ps1" },
+        [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },

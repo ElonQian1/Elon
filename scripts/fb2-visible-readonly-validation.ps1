@@ -133,3 +133,89 @@ function Test-ReadOnlyDirectReadSummaryComplete {
 
     return $true
 }
+
+function New-ReadOnlyDirectReadValidation {
+    param(
+        [object]$Summary,
+        [string]$SourcePath
+    )
+
+    $complete = Test-ReadOnlyDirectReadSummaryComplete $Summary
+    $evidence = if ($complete) { Build-ReadOnlyDirectReadEvidence $Summary } else { $null }
+    [ordered]@{
+        schema = "fb2.main_project.visible_chat_readonly_validation.v1"
+        source_summary = $SourcePath
+        success = [bool]$complete
+        evidence = $evidence
+        checks = [ordered]@{
+            schema = ([string]$Summary.schema -eq "fb2.main_project.visible_chat_readonly.v1")
+            mode = ([string]$Summary.mode -eq "read_only_direct_read")
+            writes_false = (-not [bool]$Summary.writes)
+            direct_read_complete = [bool]$Summary.direct_read_complete
+            message_count_positive = ([int]$Summary.message_count -gt 0)
+            sample_text_len_positive = ([int]$Summary.sample_text_len -gt 0)
+            sample_text_sha256_present = ([string]$Summary.sample_text_sha256 -match "^[0-9a-fA-F]{8,}$")
+            raw_body_field_free = (Test-ReadOnlyDirectReadRawBodyFieldFree $Summary)
+            recent_messages_count_matches = (
+                $null -eq $Summary.PSObject.Properties["recent_messages"] -or
+                [int]$Summary.recent_message_count -eq @($Summary.recent_messages).Count
+            )
+        }
+    }
+}
+
+function Invoke-ReadOnlyDirectReadValidationSelfTest {
+    $valid = [pscustomobject]@{
+        schema = "fb2.main_project.visible_chat_readonly.v1"
+        mode = "read_only_direct_read"
+        writes = $false
+        api = "/api/me/groups/{group_id}/messages"
+        group_id = "ext_fb2_official"
+        direct_read_complete = $true
+        message_count = 1
+        sample_message_id = "gai_readonly"
+        sample_sender = "usr_elon_ai"
+        sample_text_len = 12
+        sample_text_sha256 = "abcdef0123456789"
+        direct_read_evidence = "group=ext_fb2_official count=1 sample_message=gai_readonly text_len=12 text_sha256=abcdef0123456789"
+        recent_message_count = 1
+        recent_ai_message_count = 1
+        latest_ai_message_id = "gai_readonly"
+        recent_messages = @(
+            [pscustomobject]@{
+                index = 0
+                message_id = "gai_readonly"
+                kind = "ai_reply"
+                sender = "usr_elon_ai"
+                created_at = "2026-06-23T00:00:00Z"
+                text_len = 12
+                text_sha256 = "abcdef0123456789"
+            }
+        )
+    }
+    $failed = 0
+    if (-not (Test-ReadOnlyDirectReadSummaryComplete $valid)) { $failed++ }
+    if (-not [bool](New-ReadOnlyDirectReadValidation -Summary $valid -SourcePath "selftest-valid.json").success) { $failed++ }
+
+    $withWrite = $valid | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $withWrite.writes = $true
+    if (Test-ReadOnlyDirectReadSummaryComplete $withWrite) { $failed++ }
+
+    $missingHash = $valid | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $missingHash.sample_text_sha256 = ""
+    if (Test-ReadOnlyDirectReadSummaryComplete $missingHash) { $failed++ }
+
+    $rawBody = $valid | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    Add-Member -InputObject $rawBody -NotePropertyName "text" -NotePropertyValue "raw message body"
+    if (Test-ReadOnlyDirectReadSummaryComplete $rawBody) { $failed++ }
+
+    $recentRawBody = $valid | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    Add-Member -InputObject $recentRawBody.recent_messages[0] -NotePropertyName "content" -NotePropertyValue "raw message body"
+    if (Test-ReadOnlyDirectReadSummaryComplete $recentRawBody) { $failed++ }
+
+    Write-Output "== SelfTest Summary =="
+    Write-Output "failed=$failed"
+    if ($failed -gt 0) {
+        exit 1
+    }
+}

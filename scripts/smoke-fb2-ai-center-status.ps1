@@ -94,7 +94,8 @@ function Get-Fb2StatusSummaryDirectories {
 function Get-LatestFileByPatternAcrossDirectories {
     param(
         [string[]]$Directories,
-        [string]$Pattern
+        [string]$Pattern,
+        [string]$ExcludeNameRegex = ""
     )
 
     $files = @()
@@ -102,7 +103,11 @@ function Get-LatestFileByPatternAcrossDirectories {
         if ([string]::IsNullOrWhiteSpace($directory) -or -not (Test-Path -LiteralPath $directory)) {
             continue
         }
-        $files += @(Get-ChildItem -LiteralPath $directory -Filter $Pattern -File -ErrorAction SilentlyContinue)
+        $matched = @(Get-ChildItem -LiteralPath $directory -Filter $Pattern -File -ErrorAction SilentlyContinue)
+        if (-not [string]::IsNullOrWhiteSpace($ExcludeNameRegex)) {
+            $matched = @($matched | Where-Object { $_.Name -notmatch $ExcludeNameRegex })
+        }
+        $files += $matched
     }
     $ordered = @($files | Sort-Object LastWriteTimeUtc -Descending)
     if ($ordered.Count -eq 0) {
@@ -189,7 +194,7 @@ function Build-Fb2AiCenterStatusSnapshot {
 
     $latestDataFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "data-only-acceptance-*.json"
     $latestFinalFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "final-acceptance-*.json"
-    $latestReadOnlyFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "read-only-direct-read*.json"
+    $latestReadOnlyFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "read-only-direct-read*.json" -ExcludeNameRegex "validation"
     $latestAiCenterLogFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "*ai-center.log"
     $latestSampleRequestFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-sample-request*.json"
     $latestSampleSetFile = Get-LatestFb2ContextSampleSetValidationFile -Directories $summaryDirectories
