@@ -236,6 +236,19 @@ fn tool_definitions() -> Value {
             })
         ),
         function_tool(
+            "git_show",
+            "Inspect one git commit or revision without modifying files.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "revision": { "type": "string", "description": "Git revision or commit SHA to inspect. Defaults to HEAD." },
+                    "path": { "type": "string", "description": "Optional project-relative file or directory to limit the shown commit." },
+                    "stat": { "type": "boolean", "description": "Show commit stat together with the selected revision." }
+                },
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
             "write_file",
             "Create or replace a project-relative text file. Requires user approval when writes are enabled.",
             json!({
@@ -328,6 +341,9 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "git_log"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "git_show"));
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "apply_patch"));

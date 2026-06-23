@@ -125,6 +125,15 @@ impl ToolGuard {
                 let limit = optional_positive_usize(action, "limit")?.unwrap_or(20);
                 self.git_log(path, limit).await
             }
+            "git_show" => {
+                let revision = action
+                    .get("revision")
+                    .and_then(Value::as_str)
+                    .unwrap_or("HEAD");
+                let path = action.get("path").and_then(Value::as_str);
+                let stat = action.get("stat").and_then(Value::as_bool).unwrap_or(false);
+                self.git_show(revision, path, stat).await
+            }
             "write_file" => {
                 if self.read_only() {
                     bail!("write_file denied: read-only planning mode");
@@ -282,6 +291,30 @@ impl ToolGuard {
             "--decorate".to_string(),
             format!("--max-count={count}"),
         ];
+        if let Some(path) = path.map(str::trim).filter(|value| !value.is_empty()) {
+            if path != "." {
+                let full = self.resolve_safe_path(path)?;
+                let relative = display_relative_path(&self.workspace, &full);
+                args.push("--".to_string());
+                args.push(relative);
+            }
+        }
+        self.run_git(args).await
+    }
+
+    async fn git_show(&self, revision: &str, path: Option<&str>, stat: bool) -> Result<String> {
+        let revision = safe_git_revision(revision)?;
+        let mut args = vec![
+            "-c".to_string(),
+            "core.quotepath=false".to_string(),
+            "show".to_string(),
+            "--no-ext-diff".to_string(),
+            "--decorate".to_string(),
+        ];
+        if stat {
+            args.push("--stat".to_string());
+        }
+        args.push(revision);
         if let Some(path) = path.map(str::trim).filter(|value| !value.is_empty()) {
             if path != "." {
                 let full = self.resolve_safe_path(path)?;
@@ -681,6 +714,32 @@ fn optional_positive_usize(action: &Value, key: &str) -> Result<Option<usize>> {
     usize::try_from(value)
         .map(Some)
         .map_err(|_| anyhow!("{key} is too large"))
+}
+
+fn safe_git_revision(revision: &str) -> Result<String> {
+    let revision = revision.trim();
+    if revision.is_empty() {
+        bail!("revision cannot be empty");
+    }
+    if revision.len() > 120 {
+        bail!("revision is too long");
+    }
+    if revision.starts_with('-') {
+        bail!("revision cannot start with '-': {revision}");
+    }
+    if revision.contains("..") || revision.contains('\\') {
+        bail!("revision contains unsupported syntax: {revision}");
+    }
+    if !revision.chars().all(|ch| {
+        ch.is_ascii_alphanumeric()
+            || matches!(
+                ch,
+                '_' | '-' | '.' | '/' | ':' | '@' | '{' | '}' | '~' | '^'
+            )
+    }) {
+        bail!("revision contains unsupported characters: {revision}");
+    }
+    Ok(revision.to_string())
 }
 
 fn normalize_path(path: PathBuf) -> Result<PathBuf> {
@@ -1287,6 +1346,27 @@ mod tests {
         assert!(log.contains("--max-count=5"));
         assert!(log.contains("initial commit"));
 
+        let show = guard
+            .invoke_action(&json!({
+                "tool": "git_show",
+                "revision": "HEAD",
+                "path": "README.md",
+                "stat": true
+            }))
+            .await;
+        assert!(show.contains("git -c core.quotepath=false show"));
+        assert!(show.contains("--stat"));
+        assert!(show.contains("initial commit"));
+        assert!(show.contains("README.md"));
+
+        let unsafe_revision = guard
+            .invoke_action(&json!({
+                "tool": "git_show",
+                "revision": "--help"
+            }))
+            .await;
+        assert!(unsafe_revision.contains("revision cannot start with '-'"));
+
         let unsafe_result = guard
             .invoke_action(&json!({
                 "tool": "git_diff",
@@ -1302,6 +1382,15 @@ mod tests {
             }))
             .await;
         assert!(unsafe_log_result.contains("path cannot target .git"));
+
+        let unsafe_show_result = guard
+            .invoke_action(&json!({
+                "tool": "git_show",
+                "revision": "HEAD",
+                "path": ".git/config"
+            }))
+            .await;
+        assert!(unsafe_show_result.contains("path cannot target .git"));
     }
 
     #[tokio::test]

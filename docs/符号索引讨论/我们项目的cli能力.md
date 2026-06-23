@@ -6,7 +6,7 @@
 - 路线 B：Win 节点使用用户本机配置的 OpenAI-compatible API key，模型调用走本机，文件读写和命令执行也在本机受控执行。
 - 路线 C：用户没有本机 CLI、也没有自己的 API key 时，Win 节点请求我们服务器提供模型能力，但文件读写和命令执行仍留在用户本机节点。
 
-Route B/C 的本机工具能力已经包含 `list_dir`、`search_files`、`file_info`、`read_file`、`read_file_range`、只读 `git_status` / `git_diff` / `git_log`、`write_file`、`apply_patch`、`run_command`。其中 `git_status`、`git_diff`、`git_log` 是项目内只读 Git 检查工具，不消耗命令审批；`write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`write_file` 审批会展示整文件替换 diff，并在敏感路径、旧/新内容命中敏感字段、过大 diff、二进制内容或非 UTF-8 旧文件时 fail-closed；用户批准后还会复查旧文件 hash，防止审批后文件被外部进程改动。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
+Route B/C 的本机工具能力已经包含 `list_dir`、`search_files`、`file_info`、`read_file`、`read_file_range`、只读 `git_status` / `git_diff` / `git_log` / `git_show`、`write_file`、`apply_patch`、`run_command`。其中 `git_status`、`git_diff`、`git_log`、`git_show` 是项目内只读 Git 检查工具，不消耗命令审批；`write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`write_file` 审批会展示整文件替换 diff，并在敏感路径、旧/新内容命中敏感字段、过大 diff、二进制内容或非 UTF-8 旧文件时 fail-closed；用户批准后还会复查旧文件 hash，防止审批后文件被外部进程改动。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
 
 PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要和尾部事件，方便后续做任务恢复、压力测试和 PC UI 进度展示。
 
