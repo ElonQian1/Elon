@@ -83,9 +83,12 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "domain_index_count" ([int]$domainIndex.index_count -eq 8) "index_count=$($domainIndex.index_count)"
         New-Fb2PublicContractCheck "domain_index_no_copy" ($domainIndex.stores_fb2_business_data_in_main_project -eq $false) "stores=$($domainIndex.stores_fb2_business_data_in_main_project)"
         New-Fb2PublicContractCheck "domain_index_match" (Test-Fb2ContractContains $domainIndexIds "match_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_odds_snapshot" (Test-Fb2ContractContains $domainIndexIds "odds_snapshot_index") ($domainIndexIds -join ",")
         New-Fb2PublicContractCheck "domain_index_user_ticket" (Test-Fb2ContractContains $domainIndexIds "current_user_ticket_index") ($domainIndexIds -join ",")
         New-Fb2PublicContractCheck "domain_index_platform_risk" (Test-Fb2ContractContains $domainIndexIds "platform_order_risk_index") ($domainIndexIds -join ",")
         New-Fb2PublicContractCheck "domain_index_group_opinion" (Test-Fb2ContractContains $domainIndexIds "group_opinion_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_opinion_memory" (Test-Fb2ContractContains $domainIndexIds "opinion_memory_index") ($domainIndexIds -join ",")
+        New-Fb2PublicContractCheck "domain_index_context_audit" (Test-Fb2ContractContains $domainIndexIds "context_audit_index") ($domainIndexIds -join ",")
         New-Fb2PublicContractCheck "domain_index_feedback_quality" (Test-Fb2ContractContains $domainIndexIds "feedback_quality_index") ($domainIndexIds -join ",")
         New-Fb2PublicContractCheck "domain_index_topic_hint" (Test-Fb2ContractContains $domainIndexInputs "topic_hint") ($domainIndexInputs -join ",")
         New-Fb2PublicContractCheck "domain_index_metrics_budget" (Test-Fb2ContractContains $domainIndexMetrics "budget_status") ($domainIndexMetrics -join ",")
@@ -274,6 +277,23 @@ function Invoke-Fb2PublicContractSelfTest {
         -Health "OK" `
         -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
         -Contract $badContract
+    $badIndexContract = $syntheticContract | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+    $badIndexContract.domain_context_index_contract.indexes = @(
+        [pscustomobject]@{ id = "match_index" },
+        [pscustomobject]@{ id = "odds_snapshot_index" },
+        [pscustomobject]@{ id = "current_user_ticket_index" },
+        [pscustomobject]@{ id = "platform_order_risk_index" },
+        [pscustomobject]@{ id = "group_opinion_index" },
+        [pscustomobject]@{ id = "context_audit_index" },
+        [pscustomobject]@{ id = "feedback_quality_index" },
+        [pscustomobject]@{ id = "unrelated_extra_index" }
+    )
+    $badIndexContract.domain_context_index_contract.index_count = 8
+    $badIndexStatus = New-Fb2PublicContractStatus `
+        -Base "http://example.invalid" `
+        -Health "OK" `
+        -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
+        -Contract $badIndexContract
 
     $failed = 0
     if (-not [bool]$status.success) {
@@ -287,6 +307,12 @@ function Invoke-Fb2PublicContractSelfTest {
         $failed++
     } else {
         Write-Output "OK`tpublic contract selftest rejects screenshots"
+    }
+    if ([bool]$badIndexStatus.success) {
+        Write-Output "FAIL`tpublic contract selftest rejects missing domain index"
+        $failed++
+    } else {
+        Write-Output "OK`tpublic contract selftest rejects missing domain index"
     }
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"
