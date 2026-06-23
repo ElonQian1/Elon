@@ -141,7 +141,7 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 可执行命令"
-    foreach ($name in @("refresh_status", "read_status_refresh", "validate_gap_action_board", "validate_completion_matrix", "validate_visible_answer_policy", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
+    foreach ($name in @("refresh_status", "read_status_refresh", "validate_gap_action_board", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
         $value = Protect-Fb2PromptSecret -Text ([string](Get-Fb2PromptProperty $commands $name ""))
         if (-not [string]::IsNullOrWhiteSpace($value)) {
             Add-Fb2PromptLine -Lines $lines -Text ('- `{0}`: `{1}`' -f $name, $value)
@@ -242,6 +242,7 @@ function Invoke-Fb2PromptSelfTest {
                 read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
                 validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
                 validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
+                validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
                 validate_visible_answer_policy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>"
                 no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Password secret-real-password"
                 data_only_preflight = '$env:FB2_AI_CENTER_TOKEN="secret-real-value"; pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Token secret-real-value'
@@ -307,6 +308,7 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "缺口行动板") "gap action section"
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.gap_action_board.v1") "gap action schema"
         Assert-Fb2PromptSelfTest ($content -match "validate_completion_matrix") "completion matrix validation command"
+        Assert-Fb2PromptSelfTest ($content -match "validate_handoff_prompt") "handoff prompt validation command"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_AI_CENTER_TOKEN>") "token placeholder"
         Assert-Fb2PromptSelfTest ($content -match "<FB2_PASSWORD>") "password placeholder"
         Assert-Fb2PromptSelfTest ($content -notmatch "secret-real-value") "token redacted"

@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮新增 handoff prompt 独立验收：`scripts\validate-fb2-ai-center-handoff-prompt.ps1` 会读取 `target\fb2-ai-center\handoff-prompt-current.md`，检查标题、schema、当前闸门、owner 下一步、可执行命令、缺口行动板、证据新鲜度、完成矩阵、接手规则、密钥占位和 ASR/TTS 暂停边界，并拒绝 PowerShell 脚本片段、`System.Object[]`、真实 token/password 泄露。`status-refresh-current.json.next_commands.validate_handoff_prompt` 与 `handoff-prompt-current.md` 已同步输出该命令；接手会话在修改 refresh、completion matrix 或 handoff prompt 后必须运行它，避免交接提示本身漂移。
 - 2026-06-23 本轮新增 completion matrix 独立验收：`scripts\validate-fb2-ai-center-completion-matrix.ps1` 会读取 `status-refresh-current.json.completion_matrix`，逐项验证 14 个 requirement、分组/owner、totals/groups、`data_goal_complete`、`full_final_complete`、语音 deferred 和 secret redaction。`status-refresh-current.json.next_commands.validate_completion_matrix` 与 `handoff-prompt-current.md` 已同步输出该命令；接手会话应在修改 goal audit、completion matrix 或 refresh 编排后运行它，避免把旧证据或 data-only 证据误判成 full final。
 - 2026-06-23 本轮补齐公开契约 domain index 回归：`fb2-public-contract-status.ps1` 现在对 8 类 index 全部做单项检查，新增覆盖 `odds_snapshot_index`、`opinion_memory_index`、`context_audit_index`，并用 selftest 证明 `index_count=8` 但缺真实 index 时会失败。线上公开契约当前 `passed_count=56`、`failed_count=0`，`domain_context_index_ids` 包含比赛、赔率、当前用户票据、平台风险、群观点、观点记忆、上下文审计和反馈质量。该项只证明主项目公开契约没有漂移，不证明 fb2 protected live 数据已经刷新。
 - 2026-06-23 本轮修复 `status-refresh-current.json` 的 artifact 新鲜度显示：`status_refresh` 和 `handoff_prompt` 在脚本末尾生成，现已按 current-run generated 记录，正式刷新输出里二者均为 `exists=true`、`source_scope=current_output_dir`、`age_minutes=0.0`。接手会话可继续用 `evidence_freshness` 区分当前输出和历史证据，但不能把该字段当作 protected fb2 live 数据已刷新；缺 `FB2_AI_CENTER_TOKEN` 的结论不变。
@@ -234,6 +235,13 @@
 - 每次 fb2 或主项目 AI Center 改动后运行：
   `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1`
   需要验证 live fb2 数据时先设置 `FB2_AI_CENTER_TOKEN`；需要验证平台摘要时加 `-IncludePlatformOrderSummary`；需要验证“我的票”时加 `-ExternalUserId <fb2_user_uuid>`。
+- 每次修改 status refresh、completion matrix、gap action board 或 handoff prompt 后，先运行：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1`
+  再运行：
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1`
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1`
+  `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1`
+  这三项只验证本地交接 artifact 和边界，不替代带 `FB2_AI_CENTER_TOKEN` 的 protected live 数据刷新。
 - 需要验证 authenticated `chat-bootstrap` 的语音 SDK 契约时，传 `-MainToken <token>`，或传 `-Fb2Username/-Fb2Password` 让脚本通过 fb2 session bridge 自动获取主项目 token；这条 smoke 不会写真实群聊。
 - 需要验证 fb2 用户端 APK 发布状态时加 `-CheckFb2ApkVersion`；默认最低版本为 `1.1.48`，可用 `-MinFb2ApkVersion` 临时提高门槛。
 - 需要把主项目本地语音 SDK 编译也纳入验收时加 `-CheckLocalVoiceSdkBuild`。
