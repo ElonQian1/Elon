@@ -105,6 +105,7 @@ function New-Fb2PromptValidation {
         "read_status_refresh",
         "generate_context_pack_sample_request",
         "validate_context_pack_sample_set",
+        "validate_exported_context_pack_sample_set",
         "validate_gap_action_board",
         "validate_completion_matrix",
         "validate_handoff_prompt",
@@ -122,6 +123,7 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "password placeholder present" ($Content -match '<FB2_PASSWORD>')
     Add-Fb2PromptValidationCheck $checks "context pack sample request prints export request" ($Content -match 'generate_context_pack_sample_request.+PrintExportRequest')
     Add-Fb2PromptValidationCheck $checks "context pack sample set validates sample set" ($Content -match 'validate_context_pack_sample_set.+ValidateSampleSet')
+    Add-Fb2PromptValidationCheck $checks "exported context pack sample set validates fb2 repo samples" ($Content -match 'validate_exported_context_pack_sample_set.+ValidateSampleSet.+fb2-repo-context-pack-samples-validation-current\.json')
     Add-Fb2PromptValidationCheck $checks "data-only preflight is no visible write" ($Content -match 'data_only_preflight.+DataOnlyAcceptance.+PreflightOnly')
     Add-Fb2PromptValidationCheck $checks "visible regression is explicit" ($Content -match 'visible_regression_requires_authorization.+AllowVisibleMessages')
     Add-Fb2PromptValidationCheck $checks "voice pause is explicit" ($Content -match 'ASR/TTS final evidence.*暂停|ASR/TTS.*paused|voice_final_evidence')
@@ -176,6 +178,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - `read_status_refresh`: `Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json`
 - `generate_context_pack_sample_request`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -PrintExportRequest -ExternalUserId <fb2_user_uuid_with_orders> -OutputPath target\fb2-ai-center\context-pack-sample-request-current.json`
 - `validate_context_pack_sample_set`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json`
+- `validate_exported_context_pack_sample_set`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir <fb2_repo>\target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\fb2-repo-context-pack-samples-validation-current.json`
 - `validate_gap_action_board`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1`
 - `validate_completion_matrix`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1`
 - `validate_handoff_prompt`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1`

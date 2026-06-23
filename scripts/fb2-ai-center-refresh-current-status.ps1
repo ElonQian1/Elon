@@ -148,12 +148,17 @@ function New-Fb2RefreshNextCommands {
     if ([string]::IsNullOrWhiteSpace($sampleSetCommand)) {
         $sampleSetCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json"
     }
+    $exportedSampleSetCommand = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "validate_exported_context_pack_sample_set"
+    if ([string]::IsNullOrWhiteSpace($exportedSampleSetCommand)) {
+        $exportedSampleSetCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir <fb2_repo>\target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\fb2-repo-context-pack-samples-validation-current.json"
+    }
 
     [ordered]@{
         refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
         read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
         generate_context_pack_sample_request = $sampleRequestCommand
         validate_context_pack_sample_set = $sampleSetCommand
+        validate_exported_context_pack_sample_set = $exportedSampleSetCommand
         validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
         validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
         validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
@@ -338,7 +343,8 @@ function New-Fb2RefreshEvidenceFreshness {
         "handoff",
         "handoff_markdown",
         "status_refresh",
-        "handoff_prompt"
+        "handoff_prompt",
+        "exported_context_pack_sample_set_validation"
     )
     $artifacts = @(
         foreach ($name in $artifactNames) {
@@ -573,6 +579,7 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.refresh_status)) "refresh command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.generate_context_pack_sample_request)) "context pack sample request command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_context_pack_sample_set)) "context pack sample set validation command"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_exported_context_pack_sample_set)) "exported context pack sample set validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_gap_action_board)) "gap action validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_completion_matrix)) "completion matrix validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_handoff_prompt)) "handoff prompt validation command"
@@ -695,6 +702,7 @@ $files = [ordered]@{
     handoff = $handoffPath
     handoff_markdown = $handoffMarkdownPath
     handoff_prompt = $HandoffPromptPath
+    exported_context_pack_sample_set_validation = (Join-Path $OutputDir "fb2-repo-context-pack-samples-validation-current.json")
 }
 $evidenceFreshness = New-Fb2RefreshEvidenceFreshness `
     -OutputDir $OutputDir `
