@@ -19,8 +19,9 @@ use crate::{
     },
     server_agent_runtime_guard::{
         admission_availability, admission_snapshot, audit_summary, operational_error_summary,
-        protection_status, try_acquire_runtime_admission, ServerRuntimeAdmissionAvailability,
-        ServerRuntimeAdmissionError, ServerRuntimeAdmissionSnapshot, ServerRuntimeProtectionStatus,
+        protection_status, try_acquire_runtime_admission_for_request,
+        ServerRuntimeAdmissionAvailability, ServerRuntimeAdmissionError,
+        ServerRuntimeAdmissionSnapshot, ServerRuntimeProtectionStatus,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
     server_agent_runtime_output::validate_server_runtime_output,
@@ -175,7 +176,11 @@ pub async fn chat_handler(
                 );
             }
         };
-    let _admission = match try_acquire_runtime_admission(&user.id, limits) {
+    let _admission = match try_acquire_runtime_admission_for_request(
+        &user.id,
+        limits,
+        Some(&audit.request_fingerprint),
+    ) {
         Ok(guard) => guard,
         Err(error) => {
             tracing::warn!(
@@ -457,6 +462,9 @@ mod tests {
         assert!(protection.agent_selection.contains("default server agent"));
         assert!(protection.agent_selection.contains("server_api_key"));
         assert!(protection.admission_control.contains("global"));
+        assert!(protection
+            .duplicate_request_debounce
+            .contains("DUPLICATE_WINDOW_SECS"));
         assert!(protection.budget_gate.contains("DAILY_CALL_LIMIT"));
         assert!(protection.budget_gate.contains("PER_USER_DAILY_CALL_LIMIT"));
         assert!(protection
@@ -552,6 +560,16 @@ mod tests {
 
         assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "23");
+    }
+
+    #[test]
+    fn duplicate_admission_error_response_sets_retry_after_header() {
+        let response = admission_error_response(ServerRuntimeAdmissionError::DuplicateRecent {
+            retry_after_secs: 5,
+        });
+
+        assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "5");
     }
 
     #[test]

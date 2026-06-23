@@ -196,6 +196,7 @@ mod tests {
             max_requests_per_minute: 4,
             max_concurrent_per_user: 1,
             max_concurrent_global: 8,
+            duplicate_request_window_secs: 5,
             temperature: 0.2,
         }
     }

@@ -1021,7 +1021,7 @@ Route C：服务器 runtime
 节点自己的工具层执行 list/read/write/run_command
 ```
 
-2026-06-23 增量：Route C 不是无限开放的“服务器免费模型”。服务端已经有运营保护层：
+2026-06-24 增量：Route C 不是无限开放的“服务器免费模型”。服务端已经有运营保护层：
 
 ```text
 ELON_SERVER_AGENT_RUNTIME_ENABLED
@@ -1033,6 +1033,9 @@ ELON_SERVER_AGENT_RUNTIME_DAILY_CALL_LIMIT
 ELON_SERVER_AGENT_RUNTIME_PER_USER_DAILY_CALL_LIMIT
   限制单个用户每天最多服务器模型调用次数
 
+ELON_SERVER_AGENT_RUNTIME_DUPLICATE_WINDOW_SECS
+  限制同一用户在短时间内重复提交同一请求，默认 5 秒，可设 0 关闭
+
 ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS
   默认只允许服务器默认 agent；需要显式 allowlist 才能选其他 agent
 
@@ -1040,7 +1043,7 @@ Route C agent usage_mode
   只允许 server_api_key；user_api_key_proxy / CLI 类 / Copilot 类 agent 即使被误配为默认或 allowlist，也不会被 Route C 调用
 ```
 
-Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽、agent 模式不允许，并显示重试时间、平台剩余额度、个人剩余额度、并发和分钟级请求限制。
+Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽、agent 模式不允许，并显示重试时间、平台剩余额度、个人剩余额度、并发、分钟级请求限制和重复请求防抖窗口。
 
 已完成的边界：
 
@@ -1049,7 +1052,7 @@ Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽�
 read_only / project_write / full_access 权限字段
 Route B/C 本机工具白名单
 Route B/C 工具调用时间线
-Route C 平台日预算 + 用户日预算 + agent 选择保护 + server_api_key-only 硬门槛
+Route C 平台日预算 + 用户日预算 + 重复请求防抖 + agent 选择保护 + server_api_key-only 硬门槛
 本机 7799 管理 API token 保护
 Route A CLI 名称、路径、参数、cwd fail-closed 校验
 legacy relay 同步拒绝任意 CLI 和内置 runtime

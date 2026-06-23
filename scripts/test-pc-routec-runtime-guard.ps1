@@ -86,6 +86,18 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Message "Server Route C guard must test admission capacity reasons"
     Assert-FileContains `
         -Path $GuardModule `
+        -Needle "admission_gate_debounces_duplicate_request_fingerprints" `
+        -Message "Server Route C guard must debounce duplicate request fingerprints"
+    Assert-FileContains `
+        -Path $GuardModule `
+        -Needle "ELON_SERVER_AGENT_RUNTIME_DUPLICATE_WINDOW_SECS" `
+        -Message "Server Route C protection status must document duplicate request debounce"
+    Assert-FileContains `
+        -Path $ServerRuntimeModule `
+        -Needle "try_acquire_runtime_admission_for_request" `
+        -Message "Server Route C chat path must apply duplicate request fingerprint admission"
+    Assert-FileContains `
+        -Path $GuardModule `
         -Needle "server_api_key usage_mode only" `
         -Message "Server Route C protection status must document server_api_key-only selection"
     Assert-FileContains `

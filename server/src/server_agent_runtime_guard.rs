@@ -20,6 +20,7 @@ pub(crate) struct ServerRuntimeProtectionStatus {
     pub output_validation: &'static str,
     pub agent_selection: &'static str,
     pub admission_control: &'static str,
+    pub duplicate_request_debounce: &'static str,
     pub budget_gate: &'static str,
     pub operational_switch: &'static str,
     pub billing_gate: &'static str,
@@ -57,6 +58,8 @@ pub(crate) struct ServerRuntimeAdmissionSnapshot {
     pub max_requests_per_minute: usize,
     pub remaining_requests_per_minute: usize,
     pub rate_limit_retry_after_secs: Option<u64>,
+    pub duplicate_request_window_secs: usize,
+    pub recent_duplicate_fingerprints: usize,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -83,11 +86,15 @@ pub(crate) enum ServerRuntimeAdmissionError {
         max_requests_per_minute: usize,
         retry_after_secs: u64,
     },
+    DuplicateRecent {
+        retry_after_secs: u64,
+    },
 }
 
 #[derive(Debug)]
 pub(crate) struct ServerRuntimeAdmissionGuard {
     user_id: String,
+    duplicate_window_secs: usize,
     released: bool,
 }
 
@@ -99,6 +106,8 @@ pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
         agent_selection:
             "server_api_key usage_mode only; default server agent only unless ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS explicitly allows more",
         admission_control: "global and per-user concurrency plus rolling minute request limits",
+        duplicate_request_debounce:
+            "same user/request fingerprint is rejected inside ELON_SERVER_AGENT_RUNTIME_DUPLICATE_WINDOW_SECS",
         budget_gate:
             "optional ELON_SERVER_AGENT_RUNTIME_DAILY_CALL_LIMIT platform fuse plus ELON_SERVER_AGENT_RUNTIME_PER_USER_DAILY_CALL_LIMIT user fuse",
         operational_switch: "ELON_SERVER_AGENT_RUNTIME_ENABLED can disable Route C without redeploy",
@@ -110,16 +119,22 @@ pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
     }
 }
 
-pub(crate) fn try_acquire_runtime_admission(
+pub(crate) fn try_acquire_runtime_admission_for_request(
     user_id: &str,
     limits: ServerAgentRuntimeLimits,
+    request_fingerprint: Option<&str>,
 ) -> Result<ServerRuntimeAdmissionGuard, ServerRuntimeAdmissionError> {
     let user_id = user_id.trim().to_string();
+    let request_fingerprint = request_fingerprint
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned);
     let mut state = admission_state()
         .lock()
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let now = Instant::now();
     let window = Duration::from_secs(60);
+    let duplicate_window = Duration::from_secs(limits.duplicate_request_window_secs as u64);
     if state.in_flight_global >= limits.max_concurrent_global {
         return Err(ServerRuntimeAdmissionError::TooManyGlobalConcurrent {
             max_concurrent_global: limits.max_concurrent_global,
@@ -130,6 +145,13 @@ pub(crate) fn try_acquire_runtime_admission(
     entry
         .recent
         .retain(|recorded| now.duration_since(*recorded) < window);
+    if limits.duplicate_request_window_secs > 0 {
+        entry
+            .recent_fingerprints
+            .retain(|_, recorded| now.duration_since(*recorded) < duplicate_window);
+    } else {
+        entry.recent_fingerprints.clear();
+    }
 
     if entry.in_flight >= limits.max_concurrent_per_user {
         return Err(ServerRuntimeAdmissionError::TooManyConcurrent {
@@ -152,12 +174,27 @@ pub(crate) fn try_acquire_runtime_admission(
             retry_after_secs,
         });
     }
+    if let Some(fingerprint) = request_fingerprint.as_ref() {
+        if let Some(recorded) = entry.recent_fingerprints.get(fingerprint) {
+            let retry_after_secs = duplicate_window
+                .saturating_sub(now.duration_since(*recorded))
+                .as_secs()
+                .max(1);
+            return Err(ServerRuntimeAdmissionError::DuplicateRecent { retry_after_secs });
+        }
+    }
 
     entry.in_flight += 1;
     entry.recent.push_back(now);
+    if limits.duplicate_request_window_secs > 0 {
+        if let Some(fingerprint) = request_fingerprint {
+            entry.recent_fingerprints.insert(fingerprint, now);
+        }
+    }
     state.in_flight_global += 1;
     Ok(ServerRuntimeAdmissionGuard {
         user_id,
+        duplicate_window_secs: limits.duplicate_request_window_secs,
         released: false,
     })
 }
@@ -167,7 +204,8 @@ impl ServerRuntimeAdmissionError {
         match self {
             Self::RateLimited {
                 retry_after_secs, ..
-            } => *retry_after_secs,
+            }
+            | Self::DuplicateRecent { retry_after_secs } => *retry_after_secs,
             Self::TooManyGlobalConcurrent { .. } | Self::TooManyConcurrent { .. } => 1,
         }
     }
@@ -189,6 +227,9 @@ impl ServerRuntimeAdmissionError {
                 retry_after_secs,
             } => format!(
                 "Route C 远程模型请求过快：每分钟最多 {max_requests_per_minute} 次，请 {retry_after_secs} 秒后重试"
+            ),
+            Self::DuplicateRecent { retry_after_secs } => format!(
+                "Route C 远程模型检测到相同请求刚刚提交，请 {retry_after_secs} 秒后重试或等待当前任务结果"
             ),
         }
     }
@@ -216,10 +257,18 @@ impl Drop for ServerRuntimeAdmissionGuard {
         entry.in_flight = entry.in_flight.saturating_sub(1);
         let now = Instant::now();
         let window = Duration::from_secs(60);
+        let duplicate_window = Duration::from_secs(self.duplicate_window_secs as u64);
         entry
             .recent
             .retain(|recorded| now.duration_since(*recorded) < window);
-        if entry.in_flight == 0 && entry.recent.is_empty() {
+        if self.duplicate_window_secs > 0 {
+            entry
+                .recent_fingerprints
+                .retain(|_, recorded| now.duration_since(*recorded) < duplicate_window);
+        } else {
+            entry.recent_fingerprints.clear();
+        }
+        if entry.in_flight == 0 && entry.recent.is_empty() && entry.recent_fingerprints.is_empty() {
             state.users.remove(&self.user_id);
         }
     }
@@ -237,26 +286,44 @@ pub(crate) fn admission_snapshot(
     let window = Duration::from_secs(60);
 
     let mut should_remove_user = false;
-    let (in_flight_for_user, recent_requests_per_minute, rate_limit_retry_after_secs) =
-        if let Some(entry) = state.users.get_mut(user_id) {
+    let duplicate_window = Duration::from_secs(limits.duplicate_request_window_secs as u64);
+    let (
+        in_flight_for_user,
+        recent_requests_per_minute,
+        rate_limit_retry_after_secs,
+        recent_duplicate_fingerprints,
+    ) = if let Some(entry) = state.users.get_mut(user_id) {
+        entry
+            .recent
+            .retain(|recorded| now.duration_since(*recorded) < window);
+        if limits.duplicate_request_window_secs > 0 {
             entry
-                .recent
-                .retain(|recorded| now.duration_since(*recorded) < window);
-            should_remove_user = entry.in_flight == 0 && entry.recent.is_empty();
-            let retry_after = if entry.recent.len() >= limits.max_requests_per_minute {
-                entry.recent.front().map(|oldest| {
-                    window
-                        .saturating_sub(now.duration_since(*oldest))
-                        .as_secs()
-                        .max(1)
-                })
-            } else {
-                None
-            };
-            (entry.in_flight, entry.recent.len(), retry_after)
+                .recent_fingerprints
+                .retain(|_, recorded| now.duration_since(*recorded) < duplicate_window);
         } else {
-            (0, 0, None)
+            entry.recent_fingerprints.clear();
+        }
+        should_remove_user =
+            entry.in_flight == 0 && entry.recent.is_empty() && entry.recent_fingerprints.is_empty();
+        let retry_after = if entry.recent.len() >= limits.max_requests_per_minute {
+            entry.recent.front().map(|oldest| {
+                window
+                    .saturating_sub(now.duration_since(*oldest))
+                    .as_secs()
+                    .max(1)
+            })
+        } else {
+            None
         };
+        (
+            entry.in_flight,
+            entry.recent.len(),
+            retry_after,
+            entry.recent_fingerprints.len(),
+        )
+    } else {
+        (0, 0, None, 0)
+    };
     if should_remove_user {
         state.users.remove(user_id);
     }
@@ -279,6 +346,8 @@ pub(crate) fn admission_snapshot(
             .max_requests_per_minute
             .saturating_sub(recent_requests_per_minute),
         rate_limit_retry_after_secs,
+        duplicate_request_window_secs: limits.duplicate_request_window_secs,
+        recent_duplicate_fingerprints,
     }
 }
 
@@ -327,6 +396,7 @@ struct RuntimeAdmissionState {
 struct UserRuntimeAdmission {
     in_flight: usize,
     recent: VecDeque<Instant>,
+    recent_fingerprints: HashMap<String, Instant>,
 }
 
 fn admission_state() -> &'static Mutex<RuntimeAdmissionState> {
@@ -393,7 +463,7 @@ pub(crate) fn audit_summary(
 mod tests {
     use super::{
         admission_availability, admission_snapshot, audit_summary, operational_error_summary,
-        protection_status, try_acquire_runtime_admission, ServerRuntimeAdmissionError,
+        protection_status, try_acquire_runtime_admission_for_request, ServerRuntimeAdmissionError,
         ServerRuntimeAdmissionSnapshot,
     };
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
@@ -446,6 +516,9 @@ mod tests {
         assert!(status.admission_control.contains("global"));
         assert!(status.admission_control.contains("concurrency"));
         assert!(status
+            .duplicate_request_debounce
+            .contains("ELON_SERVER_AGENT_RUNTIME_DUPLICATE_WINDOW_SECS"));
+        assert!(status
             .budget_gate
             .contains("ELON_SERVER_AGENT_RUNTIME_DAILY_CALL_LIMIT"));
         assert!(status
@@ -484,11 +557,12 @@ mod tests {
             max_requests_per_minute: 10,
             max_concurrent_per_user: 1,
             max_concurrent_global: 10,
+            duplicate_request_window_secs: 5,
             temperature: 0.2,
         };
 
-        let first = try_acquire_runtime_admission(&user_id, limits).unwrap();
-        let second = try_acquire_runtime_admission(&user_id, limits).unwrap_err();
+        let first = try_acquire_runtime_admission_for_request(&user_id, limits, None).unwrap();
+        let second = try_acquire_runtime_admission_for_request(&user_id, limits, None).unwrap_err();
         assert_eq!(
             second,
             ServerRuntimeAdmissionError::TooManyConcurrent {
@@ -497,7 +571,8 @@ mod tests {
         );
 
         drop(first);
-        let after_release = try_acquire_runtime_admission(&user_id, limits).unwrap();
+        let after_release =
+            try_acquire_runtime_admission_for_request(&user_id, limits, None).unwrap();
         drop(after_release);
     }
 
@@ -515,12 +590,13 @@ mod tests {
             max_requests_per_minute: 1,
             max_concurrent_per_user: 10,
             max_concurrent_global: 10,
+            duplicate_request_window_secs: 5,
             temperature: 0.2,
         };
 
-        let first = try_acquire_runtime_admission(&user_id, limits).unwrap();
+        let first = try_acquire_runtime_admission_for_request(&user_id, limits, None).unwrap();
         drop(first);
-        let second = try_acquire_runtime_admission(&user_id, limits).unwrap_err();
+        let second = try_acquire_runtime_admission_for_request(&user_id, limits, None).unwrap_err();
         assert!(matches!(
             second,
             ServerRuntimeAdmissionError::RateLimited {
@@ -544,6 +620,7 @@ mod tests {
             max_requests_per_minute: 10,
             max_concurrent_per_user: 10,
             max_concurrent_global: usize::MAX,
+            duplicate_request_window_secs: 5,
             temperature: 0.2,
         };
         let capped_limits = ServerAgentRuntimeLimits {
@@ -557,13 +634,16 @@ mod tests {
             max_requests_per_minute: 10,
             max_concurrent_per_user: 10,
             max_concurrent_global: 1,
+            duplicate_request_window_secs: 5,
             temperature: 0.2,
         };
 
         let first_user = unique_user("global-a");
         let second_user = unique_user("global-b");
-        let first = try_acquire_runtime_admission(&first_user, open_limits).unwrap();
-        let second = try_acquire_runtime_admission(&second_user, capped_limits).unwrap_err();
+        let first =
+            try_acquire_runtime_admission_for_request(&first_user, open_limits, None).unwrap();
+        let second = try_acquire_runtime_admission_for_request(&second_user, capped_limits, None)
+            .unwrap_err();
         assert_eq!(
             second,
             ServerRuntimeAdmissionError::TooManyGlobalConcurrent {
@@ -573,7 +653,8 @@ mod tests {
         assert!(second.public_message().contains("全局任务过多"));
 
         drop(first);
-        let after_release = try_acquire_runtime_admission(&second_user, open_limits).unwrap();
+        let after_release =
+            try_acquire_runtime_admission_for_request(&second_user, open_limits, None).unwrap();
         drop(after_release);
     }
 
@@ -591,16 +672,19 @@ mod tests {
             max_requests_per_minute: 1,
             max_concurrent_per_user: 1,
             max_concurrent_global: 10,
+            duplicate_request_window_secs: 5,
             temperature: 0.2,
         };
 
-        let guard = try_acquire_runtime_admission(&user_id, limits).unwrap();
+        let guard = try_acquire_runtime_admission_for_request(&user_id, limits, None).unwrap();
         let snapshot = admission_snapshot(&user_id, limits);
         assert_eq!(snapshot.in_flight_for_user, 1);
         assert_eq!(snapshot.remaining_concurrent_for_user, 0);
         assert_eq!(snapshot.recent_requests_per_minute, 1);
         assert_eq!(snapshot.remaining_requests_per_minute, 0);
         assert!(matches!(snapshot.rate_limit_retry_after_secs, Some(1..=60)));
+        assert_eq!(snapshot.duplicate_request_window_secs, 5);
+        assert_eq!(snapshot.recent_duplicate_fingerprints, 0);
         assert!(!serde_json::to_string(&snapshot).unwrap().contains(&user_id));
 
         drop(guard);
@@ -621,6 +705,8 @@ mod tests {
             max_requests_per_minute: 12,
             remaining_requests_per_minute: 12,
             rate_limit_retry_after_secs: None,
+            duplicate_request_window_secs: 5,
+            recent_duplicate_fingerprints: 0,
         };
 
         assert!(admission_availability(&snapshot).ready);
@@ -657,6 +743,81 @@ mod tests {
             max_concurrent_per_user: 1,
         };
         assert_eq!(concurrent.retry_after_secs(), 1);
+
+        let duplicate = ServerRuntimeAdmissionError::DuplicateRecent {
+            retry_after_secs: 5,
+        };
+        assert_eq!(duplicate.retry_after_secs(), 5);
+        assert!(duplicate.public_message().contains("相同请求"));
+    }
+
+    #[test]
+    fn admission_gate_debounces_duplicate_request_fingerprints() {
+        let user_id = unique_user("duplicate");
+        let limits = ServerAgentRuntimeLimits {
+            max_messages: 24,
+            max_message_chars: 32_000,
+            max_total_chars: 80_000,
+            max_output_tokens: 3000,
+            max_actions: 24,
+            max_action_chars: 64_000,
+            max_actions_total_chars: 96_000,
+            max_requests_per_minute: 10,
+            max_concurrent_per_user: 10,
+            max_concurrent_global: 10,
+            duplicate_request_window_secs: 5,
+            temperature: 0.2,
+        };
+
+        let first =
+            try_acquire_runtime_admission_for_request(&user_id, limits, Some("fingerprint-a"))
+                .unwrap();
+        let duplicate =
+            try_acquire_runtime_admission_for_request(&user_id, limits, Some("fingerprint-a"))
+                .unwrap_err();
+        assert!(matches!(
+            duplicate,
+            ServerRuntimeAdmissionError::DuplicateRecent {
+                retry_after_secs: 1..=5
+            }
+        ));
+
+        let snapshot = admission_snapshot(&user_id, limits);
+        assert_eq!(snapshot.recent_duplicate_fingerprints, 1);
+
+        let distinct =
+            try_acquire_runtime_admission_for_request(&user_id, limits, Some("fingerprint-b"))
+                .unwrap();
+        drop(distinct);
+        drop(first);
+    }
+
+    #[test]
+    fn admission_gate_can_disable_duplicate_request_debounce() {
+        let user_id = unique_user("duplicate-disabled");
+        let limits = ServerAgentRuntimeLimits {
+            max_messages: 24,
+            max_message_chars: 32_000,
+            max_total_chars: 80_000,
+            max_output_tokens: 3000,
+            max_actions: 24,
+            max_action_chars: 64_000,
+            max_actions_total_chars: 96_000,
+            max_requests_per_minute: 10,
+            max_concurrent_per_user: 10,
+            max_concurrent_global: 10,
+            duplicate_request_window_secs: 0,
+            temperature: 0.2,
+        };
+
+        let first =
+            try_acquire_runtime_admission_for_request(&user_id, limits, Some("fingerprint-a"))
+                .unwrap();
+        let second =
+            try_acquire_runtime_admission_for_request(&user_id, limits, Some("fingerprint-a"))
+                .unwrap();
+        drop(second);
+        drop(first);
     }
 
     fn unique_user(label: &str) -> String {

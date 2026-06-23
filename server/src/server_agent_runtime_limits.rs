@@ -13,6 +13,7 @@ const MAX_ACTIONS_TOTAL_CHARS: usize = 96_000;
 const MAX_REQUESTS_PER_MINUTE: usize = 12;
 const MAX_CONCURRENT_PER_USER: usize = 2;
 const MAX_CONCURRENT_GLOBAL: usize = 24;
+const DUPLICATE_REQUEST_WINDOW_SECS: usize = 5;
 const TEMPERATURE: f64 = 0.2;
 
 const MAX_MESSAGES_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_MESSAGES";
@@ -25,6 +26,7 @@ const MAX_ACTIONS_TOTAL_CHARS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_ACTIONS
 const MAX_REQUESTS_PER_MINUTE_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_REQUESTS_PER_MINUTE";
 const MAX_CONCURRENT_PER_USER_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_CONCURRENT_PER_USER";
 const MAX_CONCURRENT_GLOBAL_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_MAX_CONCURRENT_GLOBAL";
+const DUPLICATE_REQUEST_WINDOW_SECS_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_DUPLICATE_WINDOW_SECS";
 const TEMPERATURE_ENV: &str = "ELON_SERVER_AGENT_RUNTIME_TEMPERATURE";
 
 #[derive(Debug, Clone, Copy, Serialize)]
@@ -40,6 +42,7 @@ pub(crate) struct ServerAgentRuntimeLimits {
     pub max_requests_per_minute: usize,
     pub max_concurrent_per_user: usize,
     pub max_concurrent_global: usize,
+    pub duplicate_request_window_secs: usize,
     pub temperature: f64,
 }
 
@@ -60,6 +63,7 @@ impl ServerAgentRuntimeLimits {
             max_requests_per_minute: MAX_REQUESTS_PER_MINUTE,
             max_concurrent_per_user: MAX_CONCURRENT_PER_USER,
             max_concurrent_global: MAX_CONCURRENT_GLOBAL,
+            duplicate_request_window_secs: DUPLICATE_REQUEST_WINDOW_SECS,
             temperature: TEMPERATURE,
         }
     }
@@ -124,6 +128,13 @@ impl ServerAgentRuntimeLimits {
                 defaults.max_concurrent_global,
                 1,
                 128,
+            ),
+            duplicate_request_window_secs: env_usize(
+                &mut lookup,
+                DUPLICATE_REQUEST_WINDOW_SECS_ENV,
+                defaults.duplicate_request_window_secs,
+                0,
+                300,
             ),
             temperature: env_f64(&mut lookup, TEMPERATURE_ENV, defaults.temperature, 0.0, 2.0),
         }
@@ -199,10 +210,10 @@ fn env_f64(
 #[cfg(test)]
 mod tests {
     use super::{
-        ServerAgentRuntimeLimits, MAX_ACTIONS_ENV, MAX_ACTIONS_TOTAL_CHARS_ENV,
-        MAX_ACTION_CHARS_ENV, MAX_CONCURRENT_GLOBAL_ENV, MAX_CONCURRENT_PER_USER_ENV,
-        MAX_MESSAGES_ENV, MAX_MESSAGE_CHARS_ENV, MAX_OUTPUT_TOKENS_ENV,
-        MAX_REQUESTS_PER_MINUTE_ENV, MAX_TOTAL_CHARS_ENV, TEMPERATURE_ENV,
+        ServerAgentRuntimeLimits, DUPLICATE_REQUEST_WINDOW_SECS_ENV, MAX_ACTIONS_ENV,
+        MAX_ACTIONS_TOTAL_CHARS_ENV, MAX_ACTION_CHARS_ENV, MAX_CONCURRENT_GLOBAL_ENV,
+        MAX_CONCURRENT_PER_USER_ENV, MAX_MESSAGES_ENV, MAX_MESSAGE_CHARS_ENV,
+        MAX_OUTPUT_TOKENS_ENV, MAX_REQUESTS_PER_MINUTE_ENV, MAX_TOTAL_CHARS_ENV, TEMPERATURE_ENV,
     };
     use serde_json::json;
 
@@ -269,6 +280,7 @@ mod tests {
                 MAX_REQUESTS_PER_MINUTE_ENV => Some("3"),
                 MAX_CONCURRENT_PER_USER_ENV => Some("1"),
                 MAX_CONCURRENT_GLOBAL_ENV => Some("4"),
+                DUPLICATE_REQUEST_WINDOW_SECS_ENV => Some("9"),
                 TEMPERATURE_ENV => Some("0.1"),
                 _ => None,
             }
@@ -285,6 +297,7 @@ mod tests {
         assert_eq!(limits.max_requests_per_minute, 3);
         assert_eq!(limits.max_concurrent_per_user, 1);
         assert_eq!(limits.max_concurrent_global, 4);
+        assert_eq!(limits.duplicate_request_window_secs, 9);
         assert_eq!(limits.temperature, 0.1);
     }
 
@@ -303,6 +316,7 @@ mod tests {
                 MAX_REQUESTS_PER_MINUTE_ENV => Some("0"),
                 MAX_CONCURRENT_PER_USER_ENV => Some("999"),
                 MAX_CONCURRENT_GLOBAL_ENV => Some("999"),
+                DUPLICATE_REQUEST_WINDOW_SECS_ENV => Some("999"),
                 TEMPERATURE_ENV => Some("nan"),
                 _ => None,
             }
@@ -328,6 +342,19 @@ mod tests {
             defaults.max_concurrent_per_user
         );
         assert_eq!(limits.max_concurrent_global, defaults.max_concurrent_global);
+        assert_eq!(
+            limits.duplicate_request_window_secs,
+            defaults.duplicate_request_window_secs
+        );
         assert_eq!(limits.temperature, defaults.temperature);
+    }
+
+    #[test]
+    fn runtime_limits_allow_disabling_duplicate_request_debounce() {
+        let limits = ServerAgentRuntimeLimits::from_lookup(|name| {
+            (name == DUPLICATE_REQUEST_WINDOW_SECS_ENV).then(|| "0".to_string())
+        });
+
+        assert_eq!(limits.duplicate_request_window_secs, 0);
     }
 }

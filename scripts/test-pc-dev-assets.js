@@ -995,7 +995,12 @@ function testProjectReadinessChecklist() {
         server_runtime_status: {
           status: 'ready',
           agent: { model: 'route-c-model' },
-          limits: { maxRequestsPerMinute: 12, maxConcurrentPerUser: 2, maxConcurrentGlobal: 24 },
+          limits: {
+            maxRequestsPerMinute: 12,
+            maxConcurrentPerUser: 2,
+            maxConcurrentGlobal: 24,
+            duplicateRequestWindowSecs: 5
+          },
           budget: {
             enabled: true,
             dailyCallLimit: 100,
@@ -1019,6 +1024,7 @@ function testProjectReadinessChecklist() {
   });
   assert.ok(routeCHtml.includes('Route C · 服务器模型 route-c-model'), 'readiness should show Route C model route');
   assert.ok(routeCHtml.includes('agent 受控'), 'readiness should show Route C agent selection protection');
+  assert.ok(routeCHtml.includes('重复防抖 5秒'), 'readiness should show Route C duplicate request debounce protection');
   assert.ok(routeCHtml.includes('今日剩余 99/100'), 'readiness should show Route C daily budget protection');
   assert.ok(routeCHtml.includes('个人今日剩余 9/10'), 'readiness should show Route C per-user daily budget protection');
 
@@ -1388,12 +1394,16 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNode.includes('server_api_key'), 'PC node page should show the required Route C server API key mode');
   assert.ok(pcAppNode.includes('routeCLimitedReasonText'), 'PC node page should explain Route C limited reasons');
   assert.ok(pcAppNode.includes('秒后重试'), 'PC node page should show Route C retry-after hints');
+  assert.ok(pcAppNode.includes('duplicateRequestWindowSecs'), 'PC node page should show Route C duplicate request debounce');
+  assert.ok(pcAppNode.includes('重复防抖'), 'PC node page should label Route C duplicate request debounce');
   const readinessJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_readiness.js'), 'utf8');
   assert.ok(readinessJs.includes('admissionAvailability'), 'project readiness should read Route C admission availability');
   assert.ok(readinessJs.includes('routeCLimitedReasonText'), 'project readiness should explain Route C limited reasons');
   assert.ok(readinessJs.includes('unsupported_agent_usage_mode'), 'project readiness should explain unsupported Route C agent usage modes');
   assert.ok(readinessJs.includes('server_api_key'), 'project readiness should show the required Route C server API key mode');
   assert.ok(readinessJs.includes('秒后重试'), 'project readiness should show Route C retry-after hints');
+  assert.ok(readinessJs.includes('duplicateRequestWindowSecs'), 'project readiness should show Route C duplicate request debounce');
+  assert.ok(readinessJs.includes('重复防抖'), 'project readiness should label Route C duplicate request debounce');
 
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
   assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');

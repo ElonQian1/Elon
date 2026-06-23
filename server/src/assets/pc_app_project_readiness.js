@@ -364,6 +364,8 @@
         || numberField(admission, 'maxConcurrentPerUser', 'max_concurrent_per_user');
       const global = numberField(limits, 'maxConcurrentGlobal', 'max_concurrent_global')
         || numberField(admission, 'maxConcurrentGlobal', 'max_concurrent_global');
+      const duplicateWindow = numberField(limits, 'duplicateRequestWindowSecs', 'duplicate_request_window_secs')
+        || numberField(admission, 'duplicateRequestWindowSecs', 'duplicate_request_window_secs');
       const remaining = numberField(admission, 'remainingRequestsPerMinute', 'remaining_requests_per_minute');
       const dailyLimit = numberField(budget, 'dailyCallLimit', 'daily_call_limit');
       const remainingBudget = numberField(budget, 'remainingCallsToday', 'remaining_calls_today');
@@ -373,6 +375,7 @@
       if (agentSelection) parts.push('agent 受控');
       if (rpm) parts.push(`${rpm}/分钟`);
       if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
+      if (duplicateWindow) parts.push(`重复防抖 ${duplicateWindow}秒`);
       if (Number.isFinite(remaining)) parts.push(`剩余 ${remaining}`);
       if (Number.isFinite(dailyLimit) && Number.isFinite(remainingBudget)) parts.push(`今日剩余 ${remainingBudget}/${dailyLimit}`);
       if (Number.isFinite(userDailyLimit) && Number.isFinite(remainingUserBudget)) parts.push(`个人今日剩余 ${remainingUserBudget}/${userDailyLimit}`);
