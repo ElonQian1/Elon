@@ -7,6 +7,10 @@
     const localNodeApi = deps.localNodeApi;
     const activeProject = deps.activeProject;
     const sameId = deps.sameId || ((left, right) => String(left || '') === String(right || ''));
+    const confirmCancel = deps.confirm || ((message) => {
+      if (typeof window !== 'undefined' && typeof window.confirm === 'function') return window.confirm(message);
+      return true;
+    });
     const cache = new Map();
     const loading = new Set();
     const failures = new Set();
@@ -34,11 +38,15 @@
       if (cached.error) {
         return sectionShell('本机 Agent 运行', statusLine(cached.error, 'failed'), refreshButton());
       }
+      const controls = Array.isArray(cached.activeControls) ? cached.activeControls : [];
       const runs = Array.isArray(cached.runs) ? cached.runs : [];
-      if (!runs.length) {
+      if (!controls.length && !runs.length) {
         return sectionShell('本机 Agent 运行', statusLine('暂无本机运行记录', 'muted'), refreshButton());
       }
-      const items = runs.slice(0, 4).map(renderRun).join('');
+      const controlItems = controls.map(renderControl).join('');
+      const runLimit = controls.length ? 3 : 4;
+      const runItems = runs.slice(0, runLimit).map(renderRun).join('');
+      const items = `${controlItems}${runItems}`;
       return sectionShell('本机 Agent 运行', items, refreshButton());
     }
 
@@ -46,6 +54,17 @@
       if (!root) return;
       root.querySelectorAll('[data-agent-run-action="refresh"]').forEach((button) => {
         button.addEventListener('click', () => loadNow(messages, scope, { force: true }).catch(reportError));
+      });
+      root.querySelectorAll('[data-agent-run-action="cancel"]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const taskId = clean(button.dataset && button.dataset.taskId);
+          if (!taskId) return;
+          button.disabled = true;
+          cancelTask(taskId, messages, scope).catch((error) => {
+            button.disabled = false;
+            reportError(error);
+          });
+        });
       });
     }
 
@@ -106,10 +125,45 @@
     function normalizeResponse(data) {
       return {
         runs: Array.isArray(data && data.runs) ? data.runs : [],
+        activeControls: Array.isArray(data && (data.active_controls || data.activeControls))
+          ? (data.active_controls || data.activeControls)
+          : [],
         logDir: clean(data && (data.log_dir || data.logDir)),
         workspacePath: clean(data && (data.workspace_path || data.workspacePath)),
         loadedAt: Date.now()
       };
+    }
+
+    async function cancelTask(taskId, messages, scope) {
+      if (!confirmCancel(`停止本机 Agent 运行 ${shortRunId(taskId)}？`)) return;
+      await localNodeApi(`/api/task-journal/${encodeURIComponent(taskId)}/cancel`, {
+        method: 'POST',
+        cache: 'no-store'
+      });
+      await loadNow(messages, scope, { force: true });
+    }
+
+    function renderControl(control) {
+      const taskId = controlTaskId(control);
+      const route = clean(control && control.route) || 'local-runtime';
+      const cliName = clean(control && (control.cli_name || control.cliName)) || 'agent';
+      const permission = clean(control && (control.runtime_permission || control.runtimePermission));
+      const pid = clean(control && (control.os_pid || control.osPid));
+      const canCancel = taskId && control && control.can_cancel !== false && control.canCancel !== false;
+      const meta = [
+        cliName,
+        route,
+        permission,
+        pid ? `PID ${pid}` : ''
+      ].filter(Boolean).join(' · ');
+      return `<article class="agent-run-item running agent-run-control">
+        <div class="agent-run-main">
+          <span class="agent-run-status">运行中</span>
+          <strong>${escapeHtml(shortRunId(taskId || route))}</strong>
+          <small>${escapeHtml(meta || '本机控制句柄')}</small>
+        </div>
+        ${canCancel ? `<button class="agent-run-stop" type="button" data-agent-run-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>` : ''}
+      </article>`;
     }
 
     function renderRun(run) {
@@ -158,6 +212,7 @@
 
     function shouldPoll(cached) {
       if (!cached || cached.error) return true;
+      if ((cached.activeControls || []).length) return true;
       return (cached.runs || []).some((run) => clean(run && run.status).toLowerCase() === 'running');
     }
 
@@ -182,6 +237,14 @@
 
     function cacheKey(project, workspacePath) {
       return `${clean(project && project.id)}:${workspacePath}`;
+    }
+
+    function controlTaskId(control) {
+      return clean(control && (
+        control.task_id || control.taskId ||
+        control.req_id || control.reqId ||
+        control.run_handle_id || control.runHandleId
+      ));
     }
 
     function statusMeta(status) {

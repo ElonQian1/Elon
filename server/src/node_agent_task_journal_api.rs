@@ -43,10 +43,21 @@ struct LocalTaskJournalResponse {
     resume: TaskResumeContract,
 }
 
+#[derive(Debug, Serialize)]
+struct LocalTaskCancelResponse {
+    ok: bool,
+    task_id: String,
+    status: &'static str,
+    message: &'static str,
+}
+
 pub(crate) fn routes() -> Router<Arc<NodeRuntime>> {
     Router::new()
         .route("/api/task-journal", get(list_task_journal))
-        .route("/api/task-journal/:task_id", get(get_task_journal))
+        .route(
+            "/api/task-journal/:task_id",
+            get(get_task_journal).post(cancel_task_journal),
+        )
 }
 
 async fn list_task_journal(
@@ -99,6 +110,43 @@ async fn get_task_journal(
         }
         Err(error) => internal_error(error),
     }
+}
+
+async fn cancel_task_journal(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Path(task_id): Path<String>,
+) -> Response {
+    let task_id = task_id.trim().to_string();
+    if let Err(message) = validate_task_id(&task_id) {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "ok": false,
+                "error": message,
+            })),
+        )
+            .into_response();
+    }
+
+    if runtime.cancel_cli_prompt(&task_id).await {
+        return Json(LocalTaskCancelResponse {
+            ok: true,
+            task_id,
+            status: "cancel_requested",
+            message: "已向本机运行控制句柄发送停止信号。",
+        })
+        .into_response();
+    }
+
+    (
+        StatusCode::NOT_FOUND,
+        Json(json!({
+            "ok": false,
+            "task_id": task_id,
+            "error": "任务不在运行中或当前节点已没有控制句柄。",
+        })),
+    )
+        .into_response()
 }
 
 fn validate_task_id(task_id: &str) -> Result<(), &'static str> {

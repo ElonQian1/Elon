@@ -37,7 +37,7 @@ use homecli_proto::{
     PROTO_VERSION,
 };
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::{mpsc, watch, Notify, RwLock};
@@ -2501,7 +2501,7 @@ impl NodeRuntime {
         self.active_cli_prompts.try_insert(handle).await
     }
 
-    async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
+    pub(crate) async fn cancel_cli_prompt(&self, req_id: &str) -> bool {
         let canceled = self
             .active_cli_prompts
             .cancel_tx(req_id)
@@ -2524,6 +2524,23 @@ impl NodeRuntime {
         self.active_cli_prompts
             .view(req_id, pending_approvals)
             .await
+    }
+
+    pub(crate) async fn active_cli_prompt_views_for_workspace(
+        &self,
+        workspace: &Path,
+    ) -> Vec<node_agent_active_task::ActiveCliPromptView> {
+        let workspace = canonical_or_original(workspace);
+        self.active_cli_prompts
+            .views_without_approvals()
+            .await
+            .into_iter()
+            .filter(|view| {
+                view.cwd
+                    .as_deref()
+                    .is_some_and(|cwd| cli_prompt_cwd_matches_workspace(cwd, &workspace))
+            })
+            .collect()
     }
 
     async fn set_cli_prompt_os_pid(&self, req_id: &str, pid: Option<u32>) {
@@ -2583,6 +2600,18 @@ impl NodeRuntime {
     async fn set_models(&self, models: Vec<ModelCapability>) {
         self.status.write().await.models_cached = models;
     }
+}
+
+fn cli_prompt_cwd_matches_workspace(cwd: &str, workspace: &Path) -> bool {
+    let cwd = cwd.trim();
+    if cwd.is_empty() {
+        return false;
+    }
+    canonical_or_original(Path::new(cwd)).starts_with(workspace)
+}
+
+fn canonical_or_original(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
 }
 
 fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {

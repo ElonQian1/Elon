@@ -772,6 +772,8 @@ function testDevTasksRequiresActiveApprovalHandle() {
 async function testAgentRunsPanelLoadsProjectRuns() {
   let scheduled = null;
   let rendered = 0;
+  let cancelHandler = null;
+  let cancelDisabled = false;
   const calls = [];
   const sandbox = loadAsset('server/src/assets/pc_app_agent_runs.js', {
     setTimeout: (callback) => {
@@ -792,13 +794,26 @@ async function testAgentRunsPanelLoadsProjectRuns() {
     escapeHtml,
     sameId: (left, right) => String(left || '') === String(right || ''),
     activeProject: () => ({ id: 'p1', workspace_path: 'D:/demo' }),
+    confirm: () => true,
     localNodeApi: async (pathName, options) => {
       calls.push({ pathName, options });
-      const body = JSON.parse(options.body);
+      if (pathName === '/api/task-journal/req-live/cancel') {
+        assert.strictEqual(options.method, 'POST', 'agent runs cancel should use POST');
+        return { ok: true, status: 'cancel_requested' };
+      }
       assert.strictEqual(pathName, '/api/project-agent-runs', 'agent runs panel should call local agent-runs endpoint');
+      const body = JSON.parse(options.body);
       assert.strictEqual(body.workspace_path, 'D:/demo', 'agent runs request should use project workspace path');
       return {
         ok: true,
+        active_controls: [{
+          task_id: 'req-live',
+          run_handle_id: 'req-live',
+          cli_name: 'server-runtime',
+          route: 'route_c_server_runtime',
+          runtime_permission: 'project_write',
+          can_cancel: true
+        }],
         runs: [{
           run_id: 'agent-20260623T010203Z-12345678',
           status: 'completed',
@@ -828,7 +843,24 @@ async function testAgentRunsPanelLoadsProjectRuns() {
   assert.ok(html.includes('完成'), 'agent runs panel should render completion status');
   assert.ok(html.includes('api-runtime'), 'agent runs panel should render runtime mode');
   assert.ok(html.includes('read_file'), 'agent runs panel should render tool names');
+  assert.ok(html.includes('route_c_server_runtime'), 'agent runs panel should render active control route');
+  assert.ok(html.includes('data-agent-run-action="cancel"'), 'live control should expose stop action');
   assert.ok(!html.includes('prompt'), 'agent runs panel should not render prompt text');
+
+  agentRuns.bindActions({
+    querySelectorAll(selector) {
+      if (selector !== '[data-agent-run-action="cancel"]') return [];
+      return [{
+        dataset: { taskId: 'req-live' },
+        set disabled(value) { cancelDisabled = value; },
+        get disabled() { return cancelDisabled; },
+        addEventListener: (_event, callback) => { cancelHandler = callback; }
+      }];
+    }
+  }, [], 'project');
+  assert.ok(cancelHandler, 'agent runs panel should bind stop action');
+  await cancelHandler();
+  assert.ok(calls.some((call) => call.pathName === '/api/task-journal/req-live/cancel'), 'stop action should call local task cancel API');
 }
 
 function testProjectReadinessChecklist() {
@@ -1178,6 +1210,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('agentRuns.renderSection'), 'PC app should render the local agent runs panel in project channels');
   assert.ok(pcApp.includes('agentRuns.schedule'), 'PC app should refresh local agent runs through the module');
 
+  const agentRunsJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_agent_runs.js'), 'utf8');
+  assert.ok(agentRunsJs.includes('/api/task-journal/'), 'agent runs panel should call the local task journal cancel API');
+  assert.ok(agentRunsJs.includes('activeControls'), 'agent runs panel should render live local control handles');
+
   const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
   assert.ok(pcAppNode.includes('budget'), 'PC node page should read Route C daily budget');
   assert.ok(pcAppNode.includes('今日平台预算已用完'), 'PC node page should explain Route C daily budget fuse');
@@ -1208,12 +1244,16 @@ function testLocalAdminTokenWiring() {
   const devTasksCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_dev_tasks.css'), 'utf8');
   assert.ok(devTasksCss.includes('.agent-run-panel'), 'PC dev task CSS should style local agent run panel');
   assert.ok(devTasksCss.includes('.agent-run-tools'), 'PC dev task CSS should style local agent run tool pills');
+  assert.ok(devTasksCss.includes('.agent-run-stop'), 'PC dev task CSS should style the local agent stop action');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
   assert.ok(nodeAgentMain.includes('/api/client-maintenance/diagnostics/export'), 'node agent should mount diagnostics export route');
   assert.ok(nodeAgentMain.includes('mod node_agent_task_lifecycle_pressure_tests;'), 'node agent should keep task lifecycle pressure tests wired');
   assert.ok(nodeAgentMain.includes('/api/project-agent-runs'), 'node agent should mount local project agent run logs API');
+  assert.ok(nodeAgentMain.includes('active_cli_prompt_views_for_workspace'), 'node agent should expose live control handles by workspace');
+  const taskJournalApi = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_task_journal_api.rs'), 'utf8');
+  assert.ok(taskJournalApi.includes('post(cancel_task_journal)'), 'task journal API should expose a protected cancel endpoint');
 
   const nodeClientLauncher = fs.readFileSync(path.join(repoRoot, 'server/src/node_client_launcher/mod.rs'), 'utf8');
   assert.ok(nodeClientLauncher.includes('ExportDiagnostics'), 'Windows client launcher should expose a direct diagnostics export command');

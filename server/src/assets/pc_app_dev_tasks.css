@@ -238,6 +238,26 @@
   color: var(--text);
 }
 
+.agent-run-stop {
+  height: 28px;
+  border: 1px solid rgba(237, 66, 69, .42);
+  border-radius: 6px;
+  background: rgba(237, 66, 69, .12);
+  color: #ffd6d6;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.agent-run-stop:hover:not(:disabled) {
+  background: rgba(237, 66, 69, .2);
+}
+
+.agent-run-stop:disabled {
+  cursor: wait;
+  opacity: .58;
+}
+
 .agent-run-list {
   display: grid;
   gap: 8px;
@@ -268,6 +288,11 @@
   border: 1px solid rgba(255, 255, 255, .07);
   border-radius: 7px;
   background: #20232a;
+}
+
+.agent-run-control {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
 }
 
 .agent-run-item.running {
@@ -333,6 +358,14 @@
 @media (max-width: 720px) {
   .agent-run-panel {
     margin-left: 0;
+  }
+
+  .agent-run-control {
+    grid-template-columns: 1fr;
+  }
+
+  .agent-run-stop {
+    justify-self: start;
   }
 
   .dev-task-card-foot {

@@ -52,6 +52,17 @@ impl ActiveCliPromptRegistry {
         Some(handle.view(pending_approvals))
     }
 
+    pub(crate) async fn views_without_approvals(&self) -> Vec<ActiveCliPromptView> {
+        let mut prompts = self.prompts.write().await;
+        prompts
+            .values_mut()
+            .map(|handle| {
+                handle.touch();
+                handle.view(Vec::new())
+            })
+            .collect()
+    }
+
     pub(crate) async fn set_os_pid(&self, req_id: &str, pid: Option<u32>) {
         if let Some(handle) = self.prompts.write().await.get_mut(req_id) {
             handle.set_os_pid(pid);
@@ -124,5 +135,29 @@ mod tests {
         assert!(registry.remove("req-1").await);
         assert!(!registry.remove("req-1").await);
         assert!(registry.cancel_tx("req-1").await.is_none());
+    }
+
+    #[tokio::test]
+    async fn views_without_approvals_exposes_live_handles() {
+        let registry = ActiveCliPromptRegistry::new();
+        assert!(
+            registry
+                .try_insert(handle("req-1", "route_b_api_runtime"))
+                .await
+        );
+        assert!(
+            registry
+                .try_insert(handle("req-2", "route_c_server_runtime"))
+                .await
+        );
+
+        let mut views = registry.views_without_approvals().await;
+        views.sort_by(|left, right| left.req_id.cmp(&right.req_id));
+
+        assert_eq!(views.len(), 2);
+        assert_eq!(views[0].req_id, "req-1");
+        assert_eq!(views[0].run_handle_id, "req-1");
+        assert!(views[0].control_handle_live);
+        assert!(views[0].pending_approvals.is_empty());
     }
 }

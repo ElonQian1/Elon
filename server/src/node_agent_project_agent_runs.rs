@@ -1,7 +1,7 @@
 // server/src/node_agent_project_agent_runs.rs
 
 use anyhow::{Context, Result};
-use axum::{http::StatusCode, response::IntoResponse, Json};
+use axum::{extract::State, http::StatusCode, response::IntoResponse, Json};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
@@ -9,8 +9,11 @@ use std::{
     fs::{self, File},
     io::{BufRead, BufReader},
     path::{Path, PathBuf},
+    sync::Arc,
     time::SystemTime,
 };
+
+use crate::{node_agent_active_task::ActiveCliPromptView, NodeRuntime};
 
 const MAX_RUNS: usize = 50;
 const DEFAULT_RUNS: usize = 20;
@@ -30,7 +33,23 @@ struct ProjectAgentRunsResponse {
     ok: bool,
     workspace_path: String,
     log_dir: String,
+    active_controls: Vec<ProjectAgentRunControl>,
     runs: Vec<ProjectAgentRunSummary>,
+}
+
+#[derive(Debug, Serialize)]
+struct ProjectAgentRunControl {
+    task_id: String,
+    run_handle_id: String,
+    cli_name: String,
+    route: String,
+    cwd: Option<String>,
+    runtime_permission: Option<String>,
+    started_at_ms: u128,
+    last_heartbeat_ms: u128,
+    control_lease_expires_at_ms: u128,
+    os_pid: Option<u32>,
+    can_cancel: bool,
 }
 
 #[derive(Debug, Serialize)]
@@ -60,9 +79,21 @@ struct ProjectAgentRunEventView {
     data: Value,
 }
 
-pub(crate) async fn list_handler(Json(req): Json<ProjectAgentRunsReq>) -> impl IntoResponse {
+pub(crate) async fn list_handler(
+    State(runtime): State<Arc<NodeRuntime>>,
+    Json(req): Json<ProjectAgentRunsReq>,
+) -> impl IntoResponse {
     match list_project_agent_runs(&req) {
-        Ok(response) => (StatusCode::OK, Json(json!(response))).into_response(),
+        Ok(mut response) => {
+            let workspace = PathBuf::from(&response.workspace_path);
+            response.active_controls = runtime
+                .active_cli_prompt_views_for_workspace(&workspace)
+                .await
+                .into_iter()
+                .map(ProjectAgentRunControl::from)
+                .collect();
+            (StatusCode::OK, Json(json!(response))).into_response()
+        }
         Err(error) => (
             StatusCode::BAD_REQUEST,
             Json(json!({
@@ -101,8 +132,27 @@ fn list_project_agent_runs(req: &ProjectAgentRunsReq) -> Result<ProjectAgentRuns
         ok: true,
         workspace_path: workspace.to_string_lossy().to_string(),
         log_dir: log_dir.to_string_lossy().to_string(),
+        active_controls: Vec::new(),
         runs,
     })
+}
+
+impl From<ActiveCliPromptView> for ProjectAgentRunControl {
+    fn from(view: ActiveCliPromptView) -> Self {
+        Self {
+            task_id: view.req_id,
+            run_handle_id: view.run_handle_id,
+            cli_name: view.cli_name,
+            route: view.route,
+            cwd: view.cwd,
+            runtime_permission: view.runtime_permission,
+            started_at_ms: view.started_at_ms,
+            last_heartbeat_ms: view.last_heartbeat_ms,
+            control_lease_expires_at_ms: view.control_lease_expires_at_ms,
+            os_pid: view.os_pid,
+            can_cancel: view.control_handle_live,
+        }
+    }
 }
 
 fn validate_workspace(raw: &str) -> Result<PathBuf> {
@@ -340,6 +390,7 @@ mod tests {
         let _ = fs::remove_dir_all(root);
 
         assert!(response.ok);
+        assert!(response.active_controls.is_empty());
         assert_eq!(response.runs.len(), 1);
         let run = &response.runs[0];
         assert_eq!(run.run_id, "run-1");
