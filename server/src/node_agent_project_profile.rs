@@ -65,6 +65,10 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
         return profile;
     }
 
+    if let Some(workspace) = shallow_workspace_project_profile(path) {
+        return workspace;
+    }
+
     if let Some(dotnet) = dotnet_project_profile(path) {
         return dotnet;
     }
@@ -74,6 +78,171 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
     }
 
     profile
+}
+
+fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
+    const MAX_DETECTED_FILES: usize = 8;
+    let mut detected_files = Vec::new();
+    let mut project_types = Vec::new();
+    let mut package_managers = Vec::new();
+    let mut cargo_manifest = None;
+    let mut node_module = None;
+    let mut gradle_dir = None;
+
+    for module in [
+        "server", "backend", "api", "app", "web", "frontend", "client", "android",
+    ] {
+        let module_path = path.join(module);
+        if !module_path.is_dir() {
+            continue;
+        }
+
+        let cargo = module_path.join("Cargo.toml");
+        if cargo.is_file() {
+            push_unique(&mut detected_files, format!("{module}/Cargo.toml"));
+            push_unique(&mut project_types, "Rust".to_string());
+            push_unique(&mut package_managers, "Cargo".to_string());
+            if cargo_manifest.is_none() {
+                cargo_manifest = Some(format!("{module}/Cargo.toml"));
+            }
+        }
+
+        let package_json = module_path.join("package.json");
+        if package_json.is_file() {
+            push_unique(&mut detected_files, format!("{module}/package.json"));
+            push_unique(&mut project_types, "Node.js".to_string());
+            let manager = node_package_manager(&module_path);
+            push_unique(&mut package_managers, manager.clone());
+            if node_module.is_none() {
+                let scripts = read_package_json_scripts(&package_json);
+                node_module = Some(NodeWorkspaceModule {
+                    module: module.to_string(),
+                    manager,
+                    run_script: scripts
+                        .as_ref()
+                        .and_then(|scripts| first_script_name(scripts, &["dev", "start"])),
+                    test_script: scripts
+                        .as_ref()
+                        .and_then(|scripts| first_script_name(scripts, &["test"])),
+                    build_script: scripts
+                        .as_ref()
+                        .and_then(|scripts| first_script_name(scripts, &["build"])),
+                });
+            }
+        }
+
+        let gradle = module_path.join("build.gradle");
+        let gradle_kts = module_path.join("build.gradle.kts");
+        if gradle.is_file() || gradle_kts.is_file() {
+            push_unique(
+                &mut detected_files,
+                if gradle.is_file() {
+                    format!("{module}/build.gradle")
+                } else {
+                    format!("{module}/build.gradle.kts")
+                },
+            );
+            push_unique(&mut project_types, "Gradle".to_string());
+            push_unique(&mut package_managers, "Gradle".to_string());
+            if gradle_dir.is_none() {
+                gradle_dir = Some(module.to_string());
+            }
+        }
+
+        if detected_files.len() >= MAX_DETECTED_FILES {
+            break;
+        }
+    }
+
+    if detected_files.is_empty() {
+        return None;
+    }
+
+    detected_files.truncate(MAX_DETECTED_FILES);
+    let project_type = if project_types.len() == 1 {
+        project_types.pop()
+    } else {
+        Some(format!("多模块项目（{}）", project_types.join(" + ")))
+    };
+    let package_manager = if package_managers.len() == 1 {
+        package_managers.pop()
+    } else {
+        Some(package_managers.join(" / "))
+    };
+
+    let (run_command, test_command, build_command) = workspace_commands(
+        cargo_manifest.as_deref(),
+        node_module.as_ref(),
+        gradle_dir.as_deref(),
+    );
+
+    Some(ProjectProfile {
+        project_type,
+        package_manager,
+        run_command,
+        test_command,
+        build_command,
+        detected_files,
+    })
+}
+
+#[derive(Debug)]
+struct NodeWorkspaceModule {
+    module: String,
+    manager: String,
+    run_script: Option<String>,
+    test_script: Option<String>,
+    build_script: Option<String>,
+}
+
+fn workspace_commands(
+    cargo_manifest: Option<&str>,
+    node_module: Option<&NodeWorkspaceModule>,
+    gradle_module: Option<&str>,
+) -> (Option<String>, Option<String>, Option<String>) {
+    if let Some(manifest) = cargo_manifest {
+        return (
+            Some(format!("cargo run --manifest-path {manifest}")),
+            Some(format!("cargo test --manifest-path {manifest}")),
+            Some(format!("cargo build --manifest-path {manifest}")),
+        );
+    }
+    if let Some(module) = node_module {
+        return (
+            module.run_script.as_deref().map(|script| {
+                node_workspace_script_command(&module.manager, &module.module, script)
+            }),
+            module.test_script.as_deref().map(|script| {
+                node_workspace_script_command(&module.manager, &module.module, script)
+            }),
+            module.build_script.as_deref().map(|script| {
+                node_workspace_script_command(&module.manager, &module.module, script)
+            }),
+        );
+    }
+    if let Some(module) = gradle_module {
+        return (
+            None,
+            Some(format!("gradle -p {module} test")),
+            Some(format!("gradle -p {module} build")),
+        );
+    }
+    (None, None, None)
+}
+
+fn node_workspace_script_command(manager: &str, module: &str, script: &str) -> String {
+    match manager {
+        "pnpm" => format!("pnpm --dir {module} {script}"),
+        "yarn" => format!("yarn --cwd {module} {script}"),
+        "bun" => format!("bun --cwd {module} run {script}"),
+        _ => format!("npm --prefix {module} run {script}"),
+    }
+}
+
+fn push_unique(values: &mut Vec<String>, value: String) {
+    if !values.iter().any(|existing| existing == &value) {
+        values.push(value);
+    }
 }
 
 fn node_package_manager(path: &Path) -> String {
@@ -89,12 +258,7 @@ fn node_package_manager(path: &Path) -> String {
 }
 
 fn apply_package_json_scripts(profile: &mut ProjectProfile, package_json: &Path) {
-    let Some(scripts) = std::fs::read_to_string(package_json)
-        .ok()
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .and_then(|value| value.get("scripts").cloned())
-        .and_then(|scripts| scripts.as_object().cloned())
-    else {
+    let Some(scripts) = read_package_json_scripts(package_json) else {
         return;
     };
     let manager = profile.package_manager.as_deref().unwrap_or("npm");
@@ -103,20 +267,32 @@ fn apply_package_json_scripts(profile: &mut ProjectProfile, package_json: &Path)
     profile.build_command = first_script_command(manager, &scripts, &["build"]);
 }
 
+fn read_package_json_scripts(package_json: &Path) -> Option<serde_json::Map<String, Value>> {
+    std::fs::read_to_string(package_json)
+        .ok()
+        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+        .and_then(|value| value.get("scripts").cloned())
+        .and_then(|scripts| scripts.as_object().cloned())
+}
+
 fn first_script_command(
     manager: &str,
     scripts: &serde_json::Map<String, Value>,
     names: &[&str],
 ) -> Option<String> {
+    first_script_name(scripts, names).map(|name| match manager {
+        "yarn" => format!("yarn {name}"),
+        "pnpm" => format!("pnpm {name}"),
+        "bun" => format!("bun run {name}"),
+        _ => format!("npm run {name}"),
+    })
+}
+
+fn first_script_name(scripts: &serde_json::Map<String, Value>, names: &[&str]) -> Option<String> {
     names
         .iter()
         .find(|name| scripts.get(**name).is_some())
-        .map(|name| match manager {
-            "yarn" => format!("yarn {name}"),
-            "pnpm" => format!("pnpm {name}"),
-            "bun" => format!("bun run {name}"),
-            _ => format!("npm run {name}"),
-        })
+        .map(|name| (*name).to_string())
 }
 
 fn gradle_command(path: &Path, task: &str) -> String {
@@ -429,5 +605,82 @@ mod tests {
         assert!(profile
             .detected_files
             .contains(&"requirements.txt".to_string()));
+    }
+
+    #[test]
+    fn detects_shallow_rust_android_workspace_from_repo_root() {
+        let dir = temp_project("workspace-rust-android");
+        std::fs::create_dir_all(dir.join("server")).unwrap();
+        std::fs::create_dir_all(dir.join("android")).unwrap();
+        std::fs::write(
+            dir.join("server").join("Cargo.toml"),
+            "[package]\nname='demo'\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("android").join("build.gradle.kts"), "plugins {}\n").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(
+            profile.project_type.as_deref(),
+            Some("多模块项目（Rust + Gradle）")
+        );
+        assert_eq!(profile.package_manager.as_deref(), Some("Cargo / Gradle"));
+        assert_eq!(
+            profile.test_command.as_deref(),
+            Some("cargo test --manifest-path server/Cargo.toml")
+        );
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("cargo build --manifest-path server/Cargo.toml")
+        );
+        assert!(profile
+            .detected_files
+            .contains(&"server/Cargo.toml".to_string()));
+        assert!(profile
+            .detected_files
+            .contains(&"android/build.gradle.kts".to_string()));
+    }
+
+    #[test]
+    fn detects_shallow_node_workspace_from_repo_root() {
+        let dir = temp_project("workspace-node");
+        std::fs::create_dir_all(dir.join("web")).unwrap();
+        std::fs::write(
+            dir.join("web").join("package.json"),
+            r#"{"scripts":{"dev":"vite","test":"vitest","build":"vite build"}}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("web").join("pnpm-lock.yaml"), "").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Node.js"));
+        assert_eq!(profile.package_manager.as_deref(), Some("pnpm"));
+        assert_eq!(profile.run_command.as_deref(), Some("pnpm --dir web dev"));
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("pnpm --dir web build")
+        );
+        assert!(profile
+            .detected_files
+            .contains(&"web/package.json".to_string()));
+    }
+
+    #[test]
+    fn shallow_node_workspace_keeps_missing_scripts_empty() {
+        let dir = temp_project("workspace-node-no-scripts");
+        std::fs::create_dir_all(dir.join("web")).unwrap();
+        std::fs::write(dir.join("web").join("package.json"), r#"{"scripts":{}}"#).unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Node.js"));
+        assert!(profile.run_command.is_none());
+        assert!(profile.test_command.is_none());
+        assert!(profile.build_command.is_none());
     }
 }

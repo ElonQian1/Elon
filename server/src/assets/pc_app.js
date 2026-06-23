@@ -1210,7 +1210,7 @@
     els.settingsBackdrop.addEventListener('click', (event) => {
       if (event.target === els.settingsBackdrop) closeSettings();
     });
-    els.chooseProjectFolderBtn.addEventListener('click', chooseLocalProjectFolder);
+    els.chooseProjectFolderBtn.addEventListener('click', () => chooseLocalProjectFolder({ autoRegister: true }));
     els.inspectProjectFolderBtn.addEventListener('click', inspectLocalProjectFolder);
     els.registerProjectBtn.addEventListener('click', registerLocalProject);
     els.settingsProjectPath.addEventListener('input', markLocalProjectPathDirty);
@@ -2484,7 +2484,7 @@
         chooseLocalProjectFolder({ autoRegister: true });
         return;
       }
-      els.settingsProjectPath.focus();
+      els.chooseProjectFolderBtn.focus();
     }, 0);
   }
 

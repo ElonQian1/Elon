@@ -273,18 +273,27 @@
             </div>
             <div class="settings-section-title">注册本地项目</div>
             <label class="settings-field">
-              <span>项目目录</span>
-              <div class="input-action">
-                <input id="settingsProjectPath" placeholder="选择一个本机项目文件夹" />
-                <button class="text-button" id="chooseProjectFolderBtn" type="button">选择文件夹</button>
-              </div>
+              <span>AI 运行权限</span>
+              <select id="settingsRuntimePermission">
+                <option value="project_write">仅项目内写入</option>
+                <option value="full_access">完全访问</option>
+              </select>
             </label>
-            <label class="settings-field">
-              <span>项目名称</span>
-              <input id="settingsProjectName" placeholder="选择目录后自动填写" />
-            </label>
+            <p class="settings-panel-caption" id="settingsRuntimePermissionHint">AI 只能读写当前项目目录，并运行开发相关命令。</p>
+            <div class="settings-project-bind">
+              <button class="send-button" id="chooseProjectFolderBtn" type="button">选择并注册项目</button>
+            </div>
+            <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
             <details class="settings-advanced">
-              <summary>Git 和描述（自动读取，可修改）</summary>
+              <summary>手动确认字段</summary>
+              <label class="settings-field">
+                <span>项目目录</span>
+                <input id="settingsProjectPath" placeholder="选择目录后自动填写" />
+              </label>
+              <label class="settings-field">
+                <span>项目名称</span>
+                <input id="settingsProjectName" placeholder="选择目录后自动填写" />
+              </label>
               <label class="settings-field">
                 <span>Git 远端 origin</span>
                 <input id="settingsProjectRepo" placeholder="选择目录后自动读取" />
@@ -297,20 +306,11 @@
                 <span>描述</span>
                 <textarea id="settingsProjectDesc" rows="2" placeholder="可选"></textarea>
               </label>
+              <div class="settings-actions">
+                <button class="text-button" id="inspectProjectFolderBtn" type="button">重新读取目录信息</button>
+                <button class="text-button" id="registerProjectBtn" type="button">按当前字段注册</button>
+              </div>
             </details>
-            <label class="settings-field">
-              <span>AI 运行权限</span>
-              <select id="settingsRuntimePermission">
-                <option value="project_write">仅项目内写入</option>
-                <option value="full_access">完全访问</option>
-              </select>
-            </label>
-            <p class="settings-panel-caption" id="settingsRuntimePermissionHint">AI 只能读写当前项目目录，并运行开发相关命令。</p>
-            <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
-            <div class="settings-actions">
-              <button class="text-button" id="inspectProjectFolderBtn" type="button">读取目录信息</button>
-              <button class="send-button" id="registerProjectBtn" type="button">注册到云端</button>
-            </div>
             <div id="settingsProjectResult"></div>
           </section>
           <section class="settings-panel" id="settingsNotificationsPanel" data-settings-panel="notifications">
