@@ -130,6 +130,7 @@ function Test-Fb2TokenlessProtectedLivePreflightSatisfied {
         [int](Get-Fb2TokenlessProperty $bridge "preflight_exit_code" -1) -eq 0 -and
         [int](Get-Fb2TokenlessProperty $bridge "current_state_exit_code" -1) -eq 0 -and
         -not [bool](Get-Fb2TokenlessProperty $bridge "token_passed_as_argument" $true) -and
+        -not [bool](Get-Fb2TokenlessProperty $bridge "fb2_password_passed_to_child_argv" $true) -and
         -not [bool](Get-Fb2TokenlessProperty $bridge "token_written_to_output" $true) -and
         -not [bool](Get-Fb2TokenlessProperty $bridge "writes_visible_group_messages" $true) -and
         [bool](Get-Fb2TokenlessProperty $bridge "current_state_after_tokenless" $false) -and
@@ -153,11 +154,14 @@ function New-Fb2TokenlessContinuationValidation {
     $gapBoard = Get-Fb2TokenlessProperty $Refresh "gap_action_board"
     $freshness = Get-Fb2TokenlessProperty $Refresh "evidence_freshness"
     $exportedSamples = Get-Fb2TokenlessProperty $Refresh "exported_context_pack_sample_set_validation"
+    $tokenBridge = Get-Fb2TokenlessProperty $Refresh "token_bridge_live_preflight"
     $safeWithoutSecret = @(Get-Fb2TokenlessProperty $blocking "safe_to_continue_without_secret" @()) | ForEach-Object { [string]$_ }
     $requiresSecret = @(Get-Fb2TokenlessProperty $blocking "requires_secret" @()) | ForEach-Object { [string]$_ }
     $protectedLivePreflightSatisfied = Test-Fb2TokenlessProtectedLivePreflightSatisfied -Refresh $Refresh
     $expectedNextAction = if ($protectedLivePreflightSatisfied) {
         "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+    } elseif ([bool](Get-Fb2TokenlessProperty $tokenBridge "exists" $false)) {
+        "rerun_token_bridge_with_FB2_VISIBLE_SMOKE_PASSWORD_env_then_refresh_status"
     } else {
         "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
     }
@@ -423,6 +427,7 @@ function New-Fb2TokenlessFixture {
             preflight_exit_code = if ($BridgeSatisfied) { 0 } else { $null }
             current_state_exit_code = if ($BridgeSatisfied) { 0 } else { $null }
             token_passed_as_argument = $false
+            fb2_password_passed_to_child_argv = $false
             token_written_to_output = $false
             writes_visible_group_messages = $false
             current_state_after_tokenless = [bool]$BridgeSatisfied

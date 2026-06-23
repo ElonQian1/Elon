@@ -235,8 +235,11 @@ function New-Fb2MatrixValidation {
     $tokenPresent = [bool](Get-Fb2MatrixProperty $gates "token_present" $false)
     $nextAction = [string](Get-Fb2MatrixProperty $gates "next_minimum_action" "")
     $protectedLivePreflightSatisfied = [bool](Get-Fb2MatrixProperty $Refresh "protected_live_preflight_satisfied" $false)
+    $tokenBridge = Get-Fb2MatrixProperty $Refresh "token_bridge_live_preflight"
     $expectedTokenlessReadyNextAction = if ($protectedLivePreflightSatisfied) {
         "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+    } elseif ([bool](Get-Fb2MatrixProperty $tokenBridge "exists" $false)) {
+        "rerun_token_bridge_with_FB2_VISIBLE_SMOKE_PASSWORD_env_then_refresh_status"
     } else {
         "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
     }

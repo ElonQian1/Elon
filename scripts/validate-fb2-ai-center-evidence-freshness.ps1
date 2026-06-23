@@ -229,6 +229,9 @@ function New-Fb2FreshnessValidation {
         $bridgeGeneratedAt = ConvertTo-Fb2FreshnessDate -Value (Get-Fb2FreshnessProperty $tokenBridge "generated_at_utc" $null)
         Add-Fb2FreshnessCheck $checks "protected bridge generated_at parseable" ($null -ne $bridgeGeneratedAt)
         Add-Fb2FreshnessCheck $checks "protected bridge freshness flag true" ([bool](Get-Fb2FreshnessProperty $tokenBridge "fresh" $false))
+        Add-Fb2FreshnessCheck $checks "protected bridge service token not passed as argv" (-not [bool](Get-Fb2FreshnessProperty $tokenBridge "token_passed_as_argument" $true))
+        Add-Fb2FreshnessCheck $checks "protected bridge fb2 password not passed as child argv" (-not [bool](Get-Fb2FreshnessProperty $tokenBridge "fb2_password_passed_to_child_argv" $true))
+        Add-Fb2FreshnessCheck $checks "protected bridge service token not written to output" (-not [bool](Get-Fb2FreshnessProperty $tokenBridge "token_written_to_output" $true))
     }
 
     $exportedSamplePath = [string](Get-Fb2FreshnessProperty $files "exported_context_pack_sample_set_validation" "")
@@ -303,6 +306,9 @@ function Invoke-Fb2FreshnessSelfTest {
     $bridge | Add-Member -NotePropertyName "token_bridge_live_preflight" -NotePropertyValue ([ordered]@{
         generated_at_utc = $now.ToString("o")
         fresh = $true
+        token_passed_as_argument = $false
+        fb2_password_passed_to_child_argv = $false
+        token_written_to_output = $false
     }) -Force
     $bridge.evidence_freshness.note = "artifact freshness includes fresh no-write token bridge live preflight; ASR/TTS final evidence remains deferred by user"
     $bridgeArtifacts = @($bridge.evidence_freshness.artifacts)

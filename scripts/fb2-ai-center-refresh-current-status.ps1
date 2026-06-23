@@ -152,6 +152,7 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
             preflight_exit_code = $null
             current_state_exit_code = $null
             token_passed_as_argument = $null
+            fb2_password_passed_to_child_argv = $null
             token_written_to_output = $null
             writes_visible_group_messages = $null
             project_network_proxy_policy = ""
@@ -182,6 +183,7 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
         preflight_exit_code = Get-Fb2RefreshProperty $result "preflight_exit_code" $null
         current_state_exit_code = Get-Fb2RefreshProperty $result "current_state_exit_code" $null
         token_passed_as_argument = [bool](Get-Fb2RefreshProperty $result "token_passed_as_argument" $true)
+        fb2_password_passed_to_child_argv = [bool](Get-Fb2RefreshProperty $result "fb2_password_passed_to_child_argv" $true)
         token_written_to_output = [bool](Get-Fb2RefreshProperty $result "token_written_to_output" $true)
         writes_visible_group_messages = [bool](Get-Fb2RefreshProperty $result "writes_visible_group_messages" $true)
         project_network_proxy_policy = [string](Get-Fb2RefreshProperty $result "project_network_proxy_policy" "")
@@ -208,6 +210,7 @@ function Test-Fb2RefreshProtectedLivePreflightSatisfied {
         [int](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "preflight_exit_code" -1) -eq 0 -and
         [int](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "current_state_exit_code" -1) -eq 0 -and
         -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "token_passed_as_argument" $true) -and
+        -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "fb2_password_passed_to_child_argv" $true) -and
         -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "token_written_to_output" $true) -and
         -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "writes_visible_group_messages" $true) -and
         [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "current_state_after_tokenless" $false) -and
@@ -219,7 +222,8 @@ function Test-Fb2RefreshProtectedLivePreflightSatisfied {
 function Resolve-Fb2RefreshNextMinimumAction {
     param(
         [object]$GoalAudit,
-        [bool]$ProtectedLivePreflightSatisfied
+        [bool]$ProtectedLivePreflightSatisfied,
+        [object]$TokenBridgeLivePreflight
     )
 
     if ([bool](Get-Fb2RefreshProperty $GoalAudit "full_final_complete" $false)) {
@@ -230,6 +234,9 @@ function Resolve-Fb2RefreshNextMinimumAction {
     }
     if ($ProtectedLivePreflightSatisfied) {
         return "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+    }
+    if ([bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "exists" $false)) {
+        return "rerun_token_bridge_with_FB2_VISIBLE_SMOKE_PASSWORD_env_then_refresh_status"
     }
     return [string](Get-Fb2RefreshProperty $GoalAudit "next_minimum_action" "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly")
 }
@@ -606,6 +613,18 @@ function New-Fb2RefreshGapActionBoard {
     $deferred = @($deferred | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
 
     $actions = [System.Collections.ArrayList]::new()
+    if ($NextMinimumAction -eq "rerun_token_bridge_with_FB2_VISIBLE_SMOKE_PASSWORD_env_then_refresh_status") {
+        [void]$actions.Add((New-Fb2RefreshGapAction `
+            -Id "token_bridge_live_preflight_regression" `
+            -Status "needs_rerun" `
+            -Owner "main_project" `
+            -EvidenceNeeded "fresh token bridge result with service token not in argv/output and fb2_password_passed_to_child_argv=false" `
+            -Command ([string]$NextCommands.data_only_preflight_via_fb2_server_token_bridge) `
+            -Notes "Set FB2_VISIBLE_SMOKE_PASSWORD in the current process, rerun the no-write bridge, then refresh status; do not pass the fb2 password on the child command line." `
+            -CanRunWithoutSecret $true `
+            -RequiresVisibleGroupWrite $false `
+            -DeferredByUser $false))
+    }
     foreach ($id in $missing) {
         $text = [string]$id
         if ($text -eq "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh") {
@@ -955,7 +974,8 @@ $tokenBridgeLivePreflight = New-Fb2RefreshTokenBridgeLivePreflight `
 $protectedLivePreflightSatisfied = Test-Fb2RefreshProtectedLivePreflightSatisfied -TokenBridgeLivePreflight $tokenBridgeLivePreflight
 $effectiveNextMinimumAction = Resolve-Fb2RefreshNextMinimumAction `
     -GoalAudit $goalAudit `
-    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied
+    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied `
+    -TokenBridgeLivePreflight $tokenBridgeLivePreflight
 $ownerNextActions = New-Fb2RefreshOwnerActions `
     -Status $status `
     -GoalAudit $goalAudit `

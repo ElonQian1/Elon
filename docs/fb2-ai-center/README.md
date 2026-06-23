@@ -9,7 +9,7 @@
 - 第一阶段不做完整 MCP/RAG。先用 HTTP Context Pack，把 fb2 业务上下文转成模型友好的 Markdown/XML，再由主项目注入群聊 AI；后续 MCP 只能作为现有 REST Context Pack、tool manifest 和 tools/execute 的适配包装层，不能另立事实源。
 - ASR、TTS、Context Pack 拉取免费；只有 AI 生成回复内容消耗 token/额度。
 - fb2 不应该复制主项目内部聊天页代码。Android 原生侧优先接 `android/chat-voice-kit`，H5/WebView 侧按 `ChatVoiceInteractionContract` 还原。
-- 当前非语音 live 数据预检已可由主项目 token bridge 证明：当 bridge 证据新鲜且 no-write/direct-no-proxy 时，`status-refresh-current.json.protected_live_preflight_satisfied=true`、`blocked_by_external_secret=false`；下一步是保持非语音回归为绿，ASR/TTS 按用户暂停状态等待恢复。
+- 当前非语音 live 数据预检可由主项目 token bridge 证明，但 bridge 证据必须同时证明 no-write、direct-no-proxy、service token 不进 argv/output、fb2 密码不进子进程 argv。旧 bridge 结果如果缺少 `fb2_password_passed_to_child_argv=false`，`status-refresh-current.json.protected_live_preflight_satisfied` 会保持 `false`，下一步是用当前进程环境变量 `FB2_VISIBLE_SMOKE_PASSWORD` 重跑 no-write bridge；ASR/TTS 仍按用户暂停状态等待恢复。
 - 访问主项目/fb2 项目资源默认不走代理；状态脚本应清空常见 proxy 环境变量、设置 `NO_PROXY/no_proxy=*`，并在 PowerShell HTTP 请求使用 `-NoProxy`。
 
 ## 已有主项目能力

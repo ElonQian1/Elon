@@ -98,6 +98,26 @@ function Find-Fb2GapAction {
     @($Actions | Where-Object { [string]$_.id -eq $Id } | Select-Object -First 1)
 }
 
+function Test-Fb2GapProtectedLivePreflightProof {
+    param([object]$Refresh)
+
+    $bridge = Get-Fb2GapProperty $Refresh "token_bridge_live_preflight"
+    return (
+        [bool](Get-Fb2GapProperty $bridge "exists" $false) -and
+        [bool](Get-Fb2GapProperty $bridge "success" $false) -and
+        [bool](Get-Fb2GapProperty $bridge "summary_exists" $false) -and
+        [int](Get-Fb2GapProperty $bridge "preflight_exit_code" -1) -eq 0 -and
+        [int](Get-Fb2GapProperty $bridge "current_state_exit_code" -1) -eq 0 -and
+        -not [bool](Get-Fb2GapProperty $bridge "token_passed_as_argument" $true) -and
+        -not [bool](Get-Fb2GapProperty $bridge "fb2_password_passed_to_child_argv" $true) -and
+        -not [bool](Get-Fb2GapProperty $bridge "token_written_to_output" $true) -and
+        -not [bool](Get-Fb2GapProperty $bridge "writes_visible_group_messages" $true) -and
+        [bool](Get-Fb2GapProperty $bridge "current_state_after_tokenless" $false) -and
+        [string](Get-Fb2GapProperty $bridge "project_network_proxy_policy" "") -eq "direct_no_proxy" -and
+        [bool](Get-Fb2GapProperty $bridge "fresh" $false)
+    )
+}
+
 function New-Fb2GapValidation {
     param(
         [object]$Refresh,
@@ -115,6 +135,7 @@ function New-Fb2GapValidation {
         [bool](Get-Fb2GapProperty $blocking "protected_live_preflight_satisfied" $false) -or
         [bool](Get-Fb2GapProperty $board "protected_live_preflight_satisfied" $false)
     )
+    $protectedLivePreflightProof = Test-Fb2GapProtectedLivePreflightProof -Refresh $Refresh
 
     Add-Fb2GapCheck $checks "gap board schema" ([string](Get-Fb2GapProperty $board "schema" "") -eq "fb2.main_project.gap_action_board.v1")
     Add-Fb2GapCheck $checks "action count matches" ([int](Get-Fb2GapProperty $board "action_count" 0) -eq @($actions).Count) ("declared=$([int](Get-Fb2GapProperty $board 'action_count' 0)) actual=$(@($actions).Count)")
@@ -132,6 +153,9 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "protected preflight source recorded when satisfied" (
             (-not $protectedLivePreflightSatisfied) -or
             [string](Get-Fb2GapProperty $blocking "protected_live_preflight_satisfied_by" "") -eq "token_bridge_live_preflight"
+        )
+        Add-Fb2GapCheck $checks "protected preflight proof complete when satisfied" (
+            (-not $protectedLivePreflightSatisfied) -or $protectedLivePreflightProof
         )
         Add-Fb2GapCheck $checks "blocking next action matches gap board" (
             [string](Get-Fb2GapProperty $blocking "next_minimum_action" "") -eq [string](Get-Fb2GapProperty $board "next_minimum_action" "")
@@ -478,6 +502,21 @@ function Invoke-Fb2GapSelfTest {
         $bridgeFixture.gap_action_board.next_minimum_action = "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
         $bridgeFixture.gap_action_board | Add-Member -NotePropertyName "blocked_by_external_secret" -NotePropertyValue $false -Force
         $bridgeFixture.gap_action_board | Add-Member -NotePropertyName "protected_live_preflight_satisfied" -NotePropertyValue $true -Force
+        $bridgeFixture | Add-Member -NotePropertyName "protected_live_preflight_satisfied" -NotePropertyValue $true -Force
+        $bridgeFixture | Add-Member -NotePropertyName "token_bridge_live_preflight" -NotePropertyValue ([ordered]@{
+            exists = $true
+            success = $true
+            summary_exists = $true
+            preflight_exit_code = 0
+            current_state_exit_code = 0
+            token_passed_as_argument = $false
+            fb2_password_passed_to_child_argv = $false
+            token_written_to_output = $false
+            writes_visible_group_messages = $false
+            current_state_after_tokenless = $true
+            project_network_proxy_policy = "direct_no_proxy"
+            fresh = $true
+        }) -Force
         $bridgeFixture.gap_action_board.actions = @(
             $bridgeFixture.gap_action_board.actions | Where-Object { [string]$_.id -ne "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh" }
         )
