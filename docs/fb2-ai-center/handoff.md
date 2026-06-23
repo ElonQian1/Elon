@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮已把七类用户场景审计做成独立门禁：新增 `scripts\validate-fb2-user-scenario-audit.ps1`，并接入 `validate_current_state`、`next_commands`、gap action board、handoff prompt 和 tokenless continuation。接手会话现在应查看 `target\fb2-ai-center\user-scenario-audit-validation-current.json`；它逐项证明今日比赛、我的票、平台订单风险、群观点、长按消息复核、总结帖和来源审计均有 source kinds、answer layers、forbidden outputs 和证据 hash，同时拒绝 raw text/full text/content/body 泄漏。该门禁只读本地 `status-current.json`，不访问 fb2、不写群、不保存订单或群聊正文。
 - 2026-06-23 本轮已把 fb2 数据投影日志做成独立门禁：新增 `validate-fb2-context-projection-log.ps1`，并接入 `validate_current_state`、`next_commands`、gap action board、handoff prompt 和 tokenless continuation。接手会话现在应查看 `target\fb2-ai-center\context-projection-log-validation-current.json`；它证明本地 AI Center 证据中已覆盖今日比赛、我的票、平台匿名摘要、群观点、来源匹配和观点采纳检查，但仍不是带 `FB2_AI_CENTER_TOKEN` 的 protected live refresh。
 - 2026-06-23 本轮已把“无 token 还能继续什么/必须等 token 什么”做成独立门禁：新增 `validate-fb2-tokenless-continuation.ps1`，并接入 `validate_current_state`、`next_commands`、gap action board 和 handoff prompt。接手会话现在应先看 `target\fb2-ai-center\tokenless-continuation-validation-current.json`；它证明缺 `FB2_AI_CENTER_TOKEN` 时只能做公开契约、离线样本、handoff/状态回归和无写群直读，不能把受保护 live 订单/平台摘要/feedback/quality 刷新或可见群聊写入当成无密钥可完成事项。
 - 2026-06-23 本轮已把公开契约回归加入 `validate_current_state` 独立步骤：`validate_public_contract_status` 会直接运行 `fb2-public-contract-status.ps1`，输出 `public-contract-status-current.json` 并嵌入 current-state 的 `public_contract_status`。后续接手会话不应只靠历史发布记录判断主项目契约；先看这一步是否通过。它只证明主项目公开契约、domain index、Context Pack 模板和群聊 direct-read 证据契约在线，不证明受保护 live 订单/平台摘要/feedback 已刷新。

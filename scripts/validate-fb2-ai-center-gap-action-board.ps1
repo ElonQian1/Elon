@@ -181,6 +181,7 @@ function New-Fb2GapValidation {
             "validate_context_pack_sample_set",
             "validate_exported_context_pack_sample_set",
             "validate_context_projection_log",
+            "validate_user_scenario_audit",
             "validate_current_state",
             "validate_public_contract_status",
             "validate_server_deploy_status",
@@ -218,6 +219,12 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "next command context projection validates log evidence" (
             $projectionLogCommand -match "validate-fb2-context-projection-log\.ps1" -and
             $projectionLogCommand -match "context-projection-log-validation-current\.json"
+        )
+
+        $userScenarioCommand = [string](Get-Fb2GapProperty $nextCommands "validate_user_scenario_audit" "")
+        Add-Fb2GapCheck $checks "next command user scenario validates product scenarios" (
+            $userScenarioCommand -match "validate-fb2-user-scenario-audit\.ps1" -and
+            $userScenarioCommand -match "user-scenario-audit-validation-current\.json"
         )
 
         $publicContractCommand = [string](Get-Fb2GapProperty $nextCommands "validate_public_contract_status" "")
@@ -347,6 +354,7 @@ function Invoke-Fb2GapSelfTest {
                 validate_context_pack_sample_set = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json"
                 validate_exported_context_pack_sample_set = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir <fb2_repo>\target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\fb2-repo-context-pack-samples-validation-current.json"
                 validate_context_projection_log = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-projection-log.ps1 -StatusPath target\fb2-ai-center\status-current.json -OutputPath target\fb2-ai-center\context-projection-log-validation-current.json"
+                validate_user_scenario_audit = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-user-scenario-audit.ps1 -StatusPath target\fb2-ai-center\status-current.json -OutputPath target\fb2-ai-center\user-scenario-audit-validation-current.json"
                 validate_current_state = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1"
                 validate_public_contract_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-public-contract-status.ps1 -OutputPath target\fb2-ai-center\public-contract-status-current.json"
                 validate_server_deploy_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-main-server-deploy-status.ps1"

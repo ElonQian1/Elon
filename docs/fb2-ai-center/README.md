@@ -97,6 +97,8 @@ fb2 子会话导出样本后，用 `pwsh -NoProfile -ExecutionPolicy Bypass -Fil
 
 状态快照还会输出 `latest_user_scenario_audit schema=fb2.main_project.user_scenario_audit.v1`。该字段把用户真实问题映射为可审计产品场景：今日比赛、我的票、平台订单风险、群观点、长按消息复核、总结帖和来源审计。它同时固定当前上下文路线：`context_format=xml_wrapped_markdown_context_pack_with_json_metadata`，`mcp_status=not_first_phase_use_rest_context_pack_and_tool_manifest_first`；也就是说，fb2 先提供 REST Context Pack + tool manifest + tools/execute 闭环，MCP 以后只作为包装层或增强层，不作为第一阶段事实源。
 
+需要独立验证七类用户问题场景时，运行 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-user-scenario-audit.ps1 -StatusPath target\fb2-ai-center\status-current.json`。输出 schema 为 `fb2.main_project.user_scenario_audit_validation.v1`，会逐项校验七个 scenario id、source kinds、answer layers、forbidden outputs、Context Pack sha、群聊直读 `text_len/text_sha256`、feedback complete、source audit `unmatched=0`，并拒绝 raw text/full text/content/body 等正文泄漏。该脚本只读本地 status，不访问 fb2、不写群、不保存订单或群聊正文；`validate-fb2-ai-center-current-state.ps1` 已把它作为 `validate_user_scenario_audit` 独立步骤运行。
+
 状态快照还会输出 `latest_domain_data_blueprint schema=fb2.main_project.domain_data_blueprint.v1`。该字段回答“fb2 长期到底要给主项目 AI 什么数据工具”：比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计 6 条 lane；每条 lane 都有 Context Pack 小节、source kinds、主工具、权限 scope、回答分层、禁止输出和未来索引。它明确主项目不复制 fb2 业务数据，第一阶段仍走 REST Context Pack + tool manifest + tools/execute，MCP 以后只做权限和审计不变的包装。
 
 同一口径也会通过主项目接口公开：`GET /api/external/apps/fb2/context-contract` 返回 `domain_data_blueprint_contract`。fb2 子会话和未来子项目不需要读取主项目本地脚本，就能从接口拿到长期 lane 蓝图和格式边界。

@@ -265,6 +265,22 @@ function New-Fb2CurrentStateValidation {
             -Details "missing_status_for_context_projection_log"))
     }
 
+    $userScenarioValidationPath = Join-Path $targetDir "user-scenario-audit-validation-current.json"
+    if (-not [string]::IsNullOrWhiteSpace($statusPathForOptionalSteps) -and (Test-Path -LiteralPath $statusPathForOptionalSteps)) {
+        [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+            -Name "validate_user_scenario_audit" `
+            -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-user-scenario-audit.ps1") `
+            -Arguments @("-StatusPath", $statusPathForOptionalSteps, "-OutputPath", $userScenarioValidationPath) `
+            -ExpectedOutputPath $userScenarioValidationPath))
+    } else {
+        [void]$steps.Add((New-Fb2CurrentInlineStep `
+            -Name "validate_user_scenario_audit" `
+            -Success $false `
+            -OutputPath "" `
+            -JsonSuccess $false `
+            -Details "missing_status_for_user_scenario_audit"))
+    }
+
     [void]$steps.Add((Invoke-Fb2CurrentPwsh `
         -Name "validate_evidence_freshness" `
         -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-ai-center-evidence-freshness.ps1") `
@@ -303,6 +319,7 @@ function New-Fb2CurrentStateValidation {
     $livePreflightRequestValidation = Read-Fb2CurrentJsonOrNull -Path $livePreflightValidationPath
     $tokenlessContinuationValidation = Read-Fb2CurrentJsonOrNull -Path $tokenlessContinuationValidationPath
     $contextProjectionLogValidation = Read-Fb2CurrentJsonOrNull -Path $contextProjectionValidationPath
+    $userScenarioAuditValidation = Read-Fb2CurrentJsonOrNull -Path $userScenarioValidationPath
     $result = [ordered]@{
         schema = "fb2.main_project.current_state_validation.v1"
         generated_at_utc = ([datetime]::UtcNow).ToString("o")
@@ -324,6 +341,7 @@ function New-Fb2CurrentStateValidation {
         live_preflight_request_validation = $livePreflightRequestValidation
         tokenless_continuation_validation = $tokenlessContinuationValidation
         context_projection_log_validation = $contextProjectionLogValidation
+        user_scenario_audit_validation = $userScenarioAuditValidation
         safe_to_continue_without_secret = @((Get-Fb2CurrentProperty $blocking "safe_to_continue_without_secret" @()))
         requires_secret = @((Get-Fb2CurrentProperty $blocking "requires_secret" @()))
         note = "This gate refreshes and validates current machine evidence only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN."
@@ -352,6 +370,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
         [ordered]@{ name = "live_preflight_request"; script = "validate-fb2-live-preflight-request.ps1" },
         [ordered]@{ name = "context_projection_log"; script = "validate-fb2-context-projection-log.ps1" },
+        [ordered]@{ name = "user_scenario_audit"; script = "validate-fb2-user-scenario-audit.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },
