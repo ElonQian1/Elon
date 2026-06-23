@@ -656,7 +656,9 @@ if (-not $SkipBuild) {
 # ─────────────────────────────────────────────────────────────
 # 3. 编译（临时工作树 — 确保从干净 commit 构建）
 # ─────────────────────────────────────────────────────────────
-$TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha"
+$TmpWorktreeRunId = ([Guid]::NewGuid().ToString("N")).Substring(0, 8)
+# 同一 SHA 可能被多个会话同时发布；临时 worktree 必须按进程隔离，避免先 claim 版本后撞目录失败。
+$TmpWorktree  = Join-Path (Split-Path $RepoRoot -Parent) "elon-build-$Sha-$PID-$TmpWorktreeRunId"
 # 优先使用机器级中性目录，让多个 Rust 后端共享同一份 server-musl target。
 # 未配置 RUST_SERVER_MUSL_TARGET_DIR/RUST_MUSL_TARGET_DIR 时，保留旧的 ELON_BUILD_TARGET_DIR/elon-server-musl 兼容路径。
 $BuildTargetDir = Resolve-ServerMuslTargetDir -RepoRoot $RepoRoot
