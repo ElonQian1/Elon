@@ -232,10 +232,13 @@ function New-Fb2MatrixValidation {
     $dataGoalComplete = [bool](Get-Fb2MatrixProperty $gates "data_goal_complete" $false)
     $fullFinalComplete = [bool](Get-Fb2MatrixProperty $gates "full_final_complete" $false)
     $gateVoiceDeferred = [bool](Get-Fb2MatrixProperty $gates "voice_deferred_by_user" $false)
+    $gateSameBatchFullFinalComplete = [bool](Get-Fb2MatrixProperty $gates "same_batch_full_final_acceptance_complete" $false)
     $tokenPresent = [bool](Get-Fb2MatrixProperty $gates "token_present" $false)
     $nextAction = [string](Get-Fb2MatrixProperty $gates "next_minimum_action" "")
     $protectedLivePreflightSatisfied = [bool](Get-Fb2MatrixProperty $Refresh "protected_live_preflight_satisfied" $false)
     $tokenBridge = Get-Fb2MatrixProperty $Refresh "token_bridge_live_preflight"
+    $fullFinalEvidence = Get-Fb2MatrixProperty $Refresh "full_final_completion_evidence"
+    $sameBatchFullFinalComplete = -not [bool](Get-Fb2MatrixProperty $fullFinalEvidence "missing_same_batch_full_final" $true)
     $expectedTokenlessReadyNextAction = if ($protectedLivePreflightSatisfied) {
         "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
     } elseif ([bool](Get-Fb2MatrixProperty $tokenBridge "exists" $false)) {
@@ -246,8 +249,10 @@ function New-Fb2MatrixValidation {
 
     Add-Fb2MatrixCheck $checks "data goal gate matches non-voice requirements" ($dataGoalComplete -eq (@($nonVoiceIncomplete).Count -eq 0)) ("non_voice_incomplete=$(@($nonVoiceIncomplete | ForEach-Object { $_.id }) -join ',')")
     Add-Fb2MatrixCheck $checks "voice deferred gate matches voice requirement" ($gateVoiceDeferred -eq $voiceDeferred)
+    Add-Fb2MatrixCheck $checks "same batch full final gate matches evidence" ($gateSameBatchFullFinalComplete -eq $sameBatchFullFinalComplete)
     Add-Fb2MatrixCheck $checks "full final implies data goal complete" ((-not $fullFinalComplete) -or $dataGoalComplete)
     Add-Fb2MatrixCheck $checks "full final implies voice complete" ((-not $fullFinalComplete) -or (@($voice).Count -gt 0 -and [bool](Get-Fb2MatrixProperty $voice[0] "complete" $false) -and -not [bool](Get-Fb2MatrixProperty $voice[0] "deferred" $false)))
+    Add-Fb2MatrixCheck $checks "full final implies same-batch final acceptance" ((-not $fullFinalComplete) -or $gateSameBatchFullFinalComplete)
     Add-Fb2MatrixCheck $checks "tokenless non-voice ready next action matches protected preflight state" (($tokenPresent -or -not $dataGoalComplete -or $fullFinalComplete) -or $nextAction -eq $expectedTokenlessReadyNextAction) ("expected=$expectedTokenlessReadyNextAction next=$nextAction")
     Add-Fb2MatrixCheck $checks "next action secret safe" (Test-Fb2MatrixSecretSafe -Text $nextAction)
 
@@ -355,6 +360,7 @@ function New-Fb2MatrixFixtureRefresh {
                 full_final_complete = $false
                 token_present = $false
                 voice_deferred_by_user = $true
+                same_batch_full_final_acceptance_complete = $false
                 next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
             }
             groups = [ordered]@{
@@ -366,6 +372,11 @@ function New-Fb2MatrixFixtureRefresh {
                 other = 0
             }
             requirements = $requirements
+        }
+        full_final_completion_evidence = [ordered]@{
+            exists = $false
+            voice_final_evidence_path_present = $false
+            missing_same_batch_full_final = $true
         }
         missing_non_voice_requirements = @()
         deferred_requirements = @("voice_final_evidence")
@@ -479,6 +490,11 @@ function Invoke-Fb2MatrixSelfTest {
         $badFullFinal.completion_matrix.gates.full_final_complete = $true
         $badFullFinalResult = New-Fb2MatrixValidation -Refresh $badFullFinal -SourcePath "selftest-bad-full-final.json"
         if ([bool]$badFullFinalResult.success) { $failed++ }
+
+        $badSameBatchGate = $valid | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+        $badSameBatchGate.completion_matrix.gates.same_batch_full_final_acceptance_complete = $true
+        $badSameBatchGateResult = New-Fb2MatrixValidation -Refresh $badSameBatchGate -SourcePath "selftest-bad-same-batch-gate.json"
+        if ([bool]$badSameBatchGateResult.success) { $failed++ }
 
         $leaky = $valid | ConvertTo-Json -Depth 12 | ConvertFrom-Json
         $leaky.completion_matrix.requirements[0].evidence = "token=real-secret-token-1234567890"

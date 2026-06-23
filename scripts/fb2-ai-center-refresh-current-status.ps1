@@ -407,6 +407,8 @@ function New-Fb2RefreshCompletionMatrix {
     $deferredCount = @($items | Where-Object { [bool]$_.deferred }).Count
     $incompleteCount = @($items | Where-Object { -not [bool]$_.complete -and -not [bool]$_.deferred }).Count
     $tokenPresent = [bool]$Status.environment.fb2_ai_center_token_present
+    $fullFinalEvidence = Get-Fb2RefreshProperty $GoalAudit "full_final_completion_evidence"
+    $sameBatchFullFinalComplete = -not [bool](Get-Fb2RefreshProperty $fullFinalEvidence "missing_same_batch_full_final" $true)
 
     [ordered]@{
         schema = "fb2.main_project.completion_matrix.v1"
@@ -421,6 +423,7 @@ function New-Fb2RefreshCompletionMatrix {
             full_final_complete = [bool]$GoalAudit.full_final_complete
             token_present = $tokenPresent
             voice_deferred_by_user = @($GoalAudit.deferred_requirements) -contains "voice_final_evidence"
+            same_batch_full_final_acceptance_complete = $sameBatchFullFinalComplete
             next_minimum_action = [string]$GoalAudit.next_minimum_action
         }
         groups = [ordered]@{
@@ -817,6 +820,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight_via_fb2_server_token_bridge)) "data-only token bridge preflight command"
         Assert-Fb2RefreshSelfTest ([string]$summary.completion_matrix.schema -eq "fb2.main_project.completion_matrix.v1") "completion matrix schema"
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
+        Assert-Fb2RefreshSelfTest ($null -ne $summary.full_final_completion_evidence) "full final completion evidence"
+        Assert-Fb2RefreshSelfTest ($null -ne $summary.completion_matrix.gates.same_batch_full_final_acceptance_complete) "same batch full final gate"
         Assert-Fb2RefreshSelfTest ([string]$summary.evidence_freshness.schema -eq "fb2.main_project.evidence_freshness.v1") "evidence freshness schema"
         Assert-Fb2RefreshSelfTest (@($summary.evidence_freshness.artifacts).Count -gt 0) "evidence freshness artifacts"
         Assert-Fb2RefreshSelfTest ([string]$summary.token_bridge_live_preflight.schema -eq "fb2.main_project.token_bridge_live_preflight.v1") "token bridge live preflight schema"
@@ -1025,6 +1030,7 @@ $refreshSummary = [pscustomobject]@{
     token_bridge_live_preflight = $tokenBridgeLivePreflight
     exported_context_pack_sample_set_validation = $exportedSampleValidationState
     completion_matrix = $completionMatrix
+    full_final_completion_evidence = $goalAudit.full_final_completion_evidence
     gap_action_board = $gapActionBoard
     evidence_freshness = $evidenceFreshness
     missing_non_voice_requirements = @($goalAudit.missing_non_voice_requirements)
