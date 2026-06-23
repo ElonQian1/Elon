@@ -4,6 +4,7 @@ use crate::{
     node_agent_codex_session::clear_stale_session,
     node_agent_task_journal::{TaskJournal, TaskJournalRecord, TaskJournalStart},
     node_agent_task_resume::{task_attach_state, task_resume_contract},
+    node_agent_tool_approval::{ToolApprovalDecision, ToolApprovalState},
 };
 use serde_json::{json, Value};
 use std::{
@@ -911,6 +912,112 @@ async fn stress_active_registry_rejects_duplicate_handles_and_cleans_up() {
     assert_eq!(removed_count.load(Ordering::SeqCst), task_count);
     assert_eq!(registry.len().await, 0);
     assert!(registry.cancel_tx("req-active-000").await.is_none());
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stress_tool_approval_state_keeps_waiters_scoped_and_single_consume() {
+    let state = ToolApprovalState::default();
+    let task_count = 64;
+    let approvals_per_task = 4;
+    let mut waiters = Vec::new();
+
+    for task_index in 0..task_count {
+        let req_id = format!("req-approval-{task_index:03}");
+        for approval_index in 0..approvals_per_task {
+            let approval_id = format!("tap_{task_index}_{approval_index}");
+            let expected = if (task_index + approval_index) % 2 == 0 {
+                ToolApprovalDecision::Approve
+            } else {
+                ToolApprovalDecision::Deny
+            };
+            let waiter = state.register(&req_id, &approval_id).await;
+            waiters.push((req_id.clone(), approval_id, expected, waiter));
+        }
+    }
+
+    for task_index in 0..task_count {
+        let req_id = format!("req-approval-{task_index:03}");
+        let pending = state.pending_for_req(&req_id).await;
+        assert_eq!(
+            pending.len(),
+            approvals_per_task,
+            "pending approval list must stay scoped to {req_id}"
+        );
+        assert!(pending.iter().all(|approval| approval
+            .approval_id
+            .starts_with(&format!("tap_{task_index}_"))));
+    }
+
+    let consumed_count = Arc::new(AtomicUsize::new(0));
+    let mut deciders = Vec::new();
+    for task_index in 0..task_count {
+        for approval_index in 0..approvals_per_task {
+            let req_id = format!("req-approval-{task_index:03}");
+            let approval_id = format!("tap_{task_index}_{approval_index}");
+            let decision = if (task_index + approval_index) % 2 == 0 {
+                "approve"
+            } else {
+                "deny"
+            };
+            for duplicate_attempt in 0..2 {
+                let state = state.clone();
+                let req_id = req_id.clone();
+                let approval_id = approval_id.clone();
+                let consumed_count = Arc::clone(&consumed_count);
+                deciders.push(tokio::spawn(async move {
+                    assert!(
+                        !state.decide(&req_id, "missing-approval", "approve").await,
+                        "wrong approval id must not consume {req_id}"
+                    );
+                    assert!(
+                        !state.decide(&req_id, &approval_id, "maybe").await,
+                        "invalid decision must not consume {req_id}/{approval_id}"
+                    );
+                    if state.decide(&req_id, &approval_id, decision).await {
+                        consumed_count.fetch_add(1, Ordering::SeqCst);
+                    } else if duplicate_attempt == 0 {
+                        assert!(
+                            state.pending_for_req(&req_id).await.is_empty()
+                                || !state
+                                    .pending_for_req(&req_id)
+                                    .await
+                                    .iter()
+                                    .any(|pending| pending.approval_id == approval_id),
+                            "failed first attempt should only happen after another duplicate consumed it"
+                        );
+                    }
+                }));
+            }
+        }
+    }
+
+    for decider in deciders {
+        decider
+            .await
+            .expect("approval pressure decider should not panic");
+    }
+    assert_eq!(
+        consumed_count.load(Ordering::SeqCst),
+        task_count * approvals_per_task,
+        "each pending approval must be consumed exactly once"
+    );
+
+    for (req_id, _approval_id, expected, mut waiter) in waiters {
+        assert!(
+            waiter.changed().await,
+            "waiter for {req_id} should observe a terminal decision"
+        );
+        assert_eq!(waiter.decision(), Some(expected));
+        waiter.cleanup().await;
+    }
+
+    for task_index in 0..task_count {
+        let req_id = format!("req-approval-{task_index:03}");
+        assert!(
+            state.pending_for_req(&req_id).await.is_empty(),
+            "all approvals for {req_id} should be consumed or cleaned up"
+        );
+    }
 }
 
 fn read_registry(dir: &std::path::Path) -> BTreeMap<String, TaskJournalRecord> {
