@@ -19,6 +19,7 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
     let package_json = path.join("package.json");
     let gradle = path.join("build.gradle");
     let gradle_kts = path.join("build.gradle.kts");
+    let go_mod = path.join("go.mod");
 
     if cargo.exists() {
         profile.project_type = Some("Rust".to_string());
@@ -65,6 +66,10 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
         return profile;
     }
 
+    if go_mod.exists() {
+        return go_project_profile(path);
+    }
+
     if let Some(workspace) = shallow_workspace_project_profile(path) {
         return workspace;
     }
@@ -88,9 +93,10 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
     let mut cargo_manifest = None;
     let mut node_module = None;
     let mut gradle_dir = None;
+    let mut go_module = None;
 
     for module in [
-        "server", "backend", "api", "app", "web", "frontend", "client", "android",
+        "server", "backend", "api", "app", "cmd", "web", "frontend", "client", "android",
     ] {
         let module_path = path.join(module);
         if !module_path.is_dir() {
@@ -149,6 +155,16 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
             }
         }
 
+        let go_mod = module_path.join("go.mod");
+        if go_mod.is_file() {
+            push_unique(&mut detected_files, format!("{module}/go.mod"));
+            push_unique(&mut project_types, "Go".to_string());
+            push_unique(&mut package_managers, "go".to_string());
+            if go_module.is_none() {
+                go_module = Some(module.to_string());
+            }
+        }
+
         if detected_files.len() >= MAX_DETECTED_FILES {
             break;
         }
@@ -173,6 +189,7 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
     let (run_command, test_command, build_command) = workspace_commands(
         cargo_manifest.as_deref(),
         node_module.as_ref(),
+        go_module.as_deref(),
         gradle_dir.as_deref(),
     );
 
@@ -198,6 +215,7 @@ struct NodeWorkspaceModule {
 fn workspace_commands(
     cargo_manifest: Option<&str>,
     node_module: Option<&NodeWorkspaceModule>,
+    go_module: Option<&str>,
     gradle_module: Option<&str>,
 ) -> (Option<String>, Option<String>, Option<String>) {
     if let Some(manifest) = cargo_manifest {
@@ -218,6 +236,13 @@ fn workspace_commands(
             module.build_script.as_deref().map(|script| {
                 node_workspace_script_command(&module.manager, &module.module, script)
             }),
+        );
+    }
+    if let Some(module) = go_module {
+        return (
+            Some(format!("go -C {module} run .")),
+            Some(format!("go -C {module} test ./...")),
+            Some(format!("go -C {module} build ./...")),
         );
     }
     if let Some(module) = gradle_module {
@@ -302,6 +327,21 @@ fn gradle_command(path: &Path, task: &str) -> String {
         format!("./gradlew {task}")
     } else {
         format!("gradle {task}")
+    }
+}
+
+fn go_project_profile(path: &Path) -> ProjectProfile {
+    let mut detected_files = vec!["go.mod".to_string()];
+    if path.join("go.sum").exists() {
+        detected_files.push("go.sum".to_string());
+    }
+    ProjectProfile {
+        project_type: Some("Go".to_string()),
+        package_manager: Some("go".to_string()),
+        run_command: Some("go run .".to_string()),
+        test_command: Some("go test ./...".to_string()),
+        build_command: Some("go build ./...".to_string()),
+        detected_files,
     }
 }
 
@@ -521,6 +561,24 @@ mod tests {
     }
 
     #[test]
+    fn detects_go_project_commands() {
+        let dir = temp_project("go");
+        std::fs::write(dir.join("go.mod"), "module github.com/example/pc-agent\n").unwrap();
+        std::fs::write(dir.join("go.sum"), "").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Go"));
+        assert_eq!(profile.package_manager.as_deref(), Some("go"));
+        assert_eq!(profile.run_command.as_deref(), Some("go run ."));
+        assert_eq!(profile.test_command.as_deref(), Some("go test ./..."));
+        assert_eq!(profile.build_command.as_deref(), Some("go build ./..."));
+        assert!(profile.detected_files.contains(&"go.mod".to_string()));
+        assert!(profile.detected_files.contains(&"go.sum".to_string()));
+    }
+
+    #[test]
     fn detects_dotnet_solution_and_project_commands() {
         let dir = temp_project("dotnet");
         std::fs::write(dir.join("Demo.sln"), "").unwrap();
@@ -667,6 +725,35 @@ mod tests {
         assert!(profile
             .detected_files
             .contains(&"web/package.json".to_string()));
+    }
+
+    #[test]
+    fn detects_shallow_go_workspace_from_repo_root() {
+        let dir = temp_project("workspace-go");
+        std::fs::create_dir_all(dir.join("server")).unwrap();
+        std::fs::write(
+            dir.join("server").join("go.mod"),
+            "module github.com/example/server\n",
+        )
+        .unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Go"));
+        assert_eq!(profile.package_manager.as_deref(), Some("go"));
+        assert_eq!(profile.run_command.as_deref(), Some("go -C server run ."));
+        assert_eq!(
+            profile.test_command.as_deref(),
+            Some("go -C server test ./...")
+        );
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("go -C server build ./...")
+        );
+        assert!(profile
+            .detected_files
+            .contains(&"server/go.mod".to_string()));
     }
 
     #[test]

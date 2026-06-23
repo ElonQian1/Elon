@@ -277,6 +277,9 @@ fn detect_project_identity(
     ) {
         return identity;
     }
+    if let Some(identity) = identity_from_go_mod(&fallback_name, &path.join("go.mod")) {
+        return identity;
+    }
     if let Some(identity) = identity_from_readme(&fallback_name, path) {
         return identity;
     }
@@ -330,6 +333,12 @@ fn identity_from_toml_manifest(
         toml_section_string(manifest_path, section, "description"),
         source,
     )
+}
+
+fn identity_from_go_mod(fallback_name: &str, go_mod: &Path) -> Option<ProjectIdentity> {
+    let module_path = go_module_path(go_mod)?;
+    let name = go_module_name(&module_path)?;
+    identity_from_parts(fallback_name, Some(name), None, "go.mod")
 }
 
 fn identity_from_readme(fallback_name: &str, path: &Path) -> Option<ProjectIdentity> {
@@ -521,6 +530,41 @@ fn parse_toml_string(value: &str) -> Option<String> {
         return rest.split_once('\'').map(|(text, _)| text.to_string());
     }
     None
+}
+
+fn go_module_path(go_mod: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(go_mod).ok()?;
+    text.lines().find_map(|raw_line| {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with("//") {
+            return None;
+        }
+        line.strip_prefix("module ")
+            .map(str::trim)
+            .and_then(|value| clean_project_text(value, 240))
+    })
+}
+
+fn go_module_name(module_path: &str) -> Option<String> {
+    let mut parts = module_path
+        .trim()
+        .trim_end_matches('/')
+        .rsplit('/')
+        .filter(|part| !part.trim().is_empty());
+    let first = parts.next()?.trim();
+    let name = if is_go_major_version_suffix(first) {
+        parts.next().unwrap_or(first).trim()
+    } else {
+        first
+    };
+    clean_project_text(name.trim_end_matches(".git"), 120)
+}
+
+fn is_go_major_version_suffix(value: &str) -> bool {
+    let Some(rest) = value.strip_prefix('v') else {
+        return false;
+    };
+    rest.len() <= 3 && rest.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn inspect_agent_runtime_freshness(project_root: &Path) -> AgentRuntimeFreshness {
@@ -891,6 +935,26 @@ mod tests {
         assert_eq!(identity.name, "repair-agent");
         assert_eq!(identity.description.as_deref(), Some("Windows 维修代理"));
         assert_eq!(identity.source.as_deref(), Some("Cargo.toml"));
+    }
+
+    #[test]
+    fn detects_project_identity_from_go_mod() {
+        let dir = temp_project("identity-go");
+        std::fs::write(
+            dir.join("go.mod"),
+            "module github.com/example/pc-node-runtime/v2\n\ngo 1.22\n",
+        )
+        .unwrap();
+
+        let identity = detect_project_identity(&dir, None, None);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "pc-node-runtime");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("绑定到本 PC 节点的本地项目: pc-node-runtime")
+        );
+        assert_eq!(identity.source.as_deref(), Some("go.mod"));
     }
 
     #[test]
