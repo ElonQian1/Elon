@@ -13,8 +13,11 @@ use anyhow::{anyhow, Result};
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use futures::{SinkExt, StreamExt};
 use homecli_proto::{AgentToServer, CliWorkspaceStatus, ServerToAgent, PROTO_VERSION};
-use std::time::Duration;
-use tokio::sync::mpsc;
+use std::{collections::HashMap, sync::Arc, time::Duration};
+use tokio::{
+    sync::{mpsc, Mutex},
+    task::AbortHandle,
+};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::{info, warn};
 
@@ -22,6 +25,8 @@ use tracing::{info, warn};
 const WS_PING_INTERVAL: Duration = Duration::from_secs(30);
 /// 读超时：90s 内如果未收到任何 WS frame（包括 Pong），视为 zombie，强制断开重连
 const WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
+
+type RunningCliTasks = Arc<Mutex<HashMap<String, AbortHandle>>>;
 
 /// 从环境变量读取 relay 配置，启动后台连接循环（自动重连）
 pub fn spawn_if_configured() {
@@ -102,6 +107,7 @@ async fn run_relay_session(
     // 拆分读写，用 channel 让并发任务向 WS 写消息
     let (ws_write, mut ws_read) = ws_stream.split();
     let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
+    let running_cli_tasks: RunningCliTasks = Arc::new(Mutex::new(HashMap::new()));
 
     // 写任务：drain out_rx → ws_write
     let writer = tokio::spawn(async move {
@@ -209,15 +215,30 @@ async fn run_relay_session(
                 prompt,
             } => {
                 let tx = out_tx.clone();
-                tokio::spawn(handle_cli_prompt(
-                    req_id,
-                    cli,
-                    extra_args,
-                    cwd,
-                    project_context,
-                    prompt,
-                    tx,
-                ));
+                let tasks = running_cli_tasks.clone();
+                let req_id_for_task = req_id.clone();
+                let req_id_for_cleanup = req_id.clone();
+                let handle = tokio::spawn(async move {
+                    handle_cli_prompt(
+                        req_id_for_task,
+                        cli,
+                        extra_args,
+                        cwd,
+                        project_context,
+                        prompt,
+                        tx,
+                    )
+                    .await;
+                    tasks.lock().await.remove(&req_id_for_cleanup);
+                });
+                let abort_handle = handle.abort_handle();
+                running_cli_tasks
+                    .lock()
+                    .await
+                    .insert(req_id.clone(), abort_handle);
+                if handle.is_finished() {
+                    running_cli_tasks.lock().await.remove(&req_id);
+                }
             }
 
             ServerToAgent::Ping { nonce } => {
@@ -361,8 +382,34 @@ async fn run_relay_session(
                 let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
 
-            ServerToAgent::Cancel { .. } => {
-                // TODO: 取消正在运行的 CLI 任务（当前忽略）
+            ServerToAgent::Cancel { task_id } => {
+                let abort = running_cli_tasks.lock().await.remove(&task_id);
+                if let Some(abort) = abort {
+                    warn!("[relay-client] 收到取消请求，终止 CLI 任务: {task_id}");
+                    abort.abort();
+                    let done = AgentToServer::CliDone {
+                        req_id: task_id,
+                        exit_ok: false,
+                        error: Some("任务已取消".into()),
+                        prompt_tokens: None,
+                        cached_input_tokens: None,
+                        completion_tokens: None,
+                        reasoning_tokens: None,
+                        total_tokens: None,
+                        model: None,
+                        workspace_status: None,
+                    };
+                    let _ = out_tx.send(Message::Text(serde_json::to_string(&done)?));
+                } else {
+                    warn!("[relay-client] 收到取消请求，但未找到运行中的 CLI 任务: {task_id}");
+                    let err = AgentToServer::TaskError {
+                        task_id,
+                        message:
+                            "未找到运行中的本地 CLI 任务，可能已经结束或不在此 relay 客户端执行"
+                                .into(),
+                    };
+                    let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
+                }
             }
 
             ServerToAgent::ToolApprovalDecision { .. } => {

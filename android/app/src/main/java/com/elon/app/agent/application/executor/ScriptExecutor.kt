@@ -184,7 +184,8 @@ class ScriptExecutor(
                     
                     // 执行 AI 建议的恢复操作
                     if (recoveryResult.recoveryAction != null) {
-                        executeRecoveryAction(recoveryResult.recoveryAction)
+                        val recovered = executeRecoveryAction(recoveryResult.recoveryAction)
+                        logs.add(if (recovered) "🤖 恢复操作已执行" else "⚠️ 恢复操作未支持，保留原失败结果")
                         delay(500)
                     }
                     
@@ -297,10 +298,22 @@ class ScriptExecutor(
                 // 尝试恢复
                 if (config.aiRecoveryEnabled && verification.suggestion != null) {
                     logs.add("🤖 尝试恢复: ${verification.suggestion}")
-                    // TODO: 执行恢复操作
+                    val recovered = executeRecoveryAction(verification.suggestion)
+                    logs.add(if (recovered) "🤖 恢复操作已执行" else "⚠️ 恢复操作未支持")
                 }
                 
                 onStepComplete?.invoke(stepNum, false, verification.reason)
+                return ExecutionResult(
+                    success = false,
+                    stepsExecuted = index,
+                    totalSteps = script.steps.size,
+                    error = "步骤 $stepNum AI验证失败: ${verification.reason}",
+                    failedStepIndex = index,
+                    logs = logs,
+                    extractedData = extractedData,
+                    aiInterventions = aiInterventions,
+                    popupsDismissed = popupsDismissed
+                )
             }
             
             delay(config.stepDelayMs)
@@ -377,8 +390,21 @@ class ScriptExecutor(
                 
                 AgentAction.CUSTOM_ACTION -> {
                     logs.add("🤖 AI 执行自定义操作: ${decision.customAction}")
-                    // TODO: 执行 AI 建议的自定义操作
-                    decision.customAction?.let { executeCustomAction(it) }
+                    val customAction = decision.customAction
+                    val executed = customAction != null && executeCustomAction(customAction)
+                    if (!executed) {
+                        return ExecutionResult(
+                            success = false,
+                            stepsExecuted = stepIndex,
+                            totalSteps = script.steps.size,
+                            error = "AI 自定义操作未支持: ${customAction ?: "空操作"}",
+                            failedStepIndex = stepIndex,
+                            logs = logs,
+                            extractedData = extractedData,
+                            aiInterventions = aiInterventions,
+                            popupsDismissed = popupsDismissed
+                        )
+                    }
                 }
                 
                 AgentAction.ABORT -> {
@@ -576,14 +602,33 @@ $goal
         }
     }
     
-    private fun executeRecoveryAction(action: String) {
+    private suspend fun executeRecoveryAction(action: String): Boolean {
         Log.d(TAG, "执行恢复操作: $action")
-        // TODO: 解析并执行恢复操作
+        return executeSafeTextAction(action)
     }
     
-    private fun executeCustomAction(action: String) {
+    private suspend fun executeCustomAction(action: String): Boolean {
         Log.d(TAG, "执行自定义操作: $action")
-        // TODO: 解析并执行自定义操作
+        return executeSafeTextAction(action)
+    }
+
+    private suspend fun executeSafeTextAction(action: String): Boolean {
+        val normalized = action.lowercase()
+        return when {
+            normalized.contains("wait") || normalized.contains("等待") -> {
+                delay(1000)
+                true
+            }
+            normalized.contains("back") || normalized.contains("返回") -> {
+                service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                delay(500)
+                true
+            }
+            else -> {
+                Log.w(TAG, "不支持的 AI 动作，拒绝默认成功: $action")
+                false
+            }
+        }
     }
     
     // ==================== 解析方法 ====================

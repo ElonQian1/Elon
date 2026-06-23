@@ -38,11 +38,13 @@ class AgentRuntime(
     /**
      * 开始执行目标
      */
-    suspend fun executeGoal(goal: Goal) {
+    suspend fun executeGoal(goal: Goal): AgentExecutionResult {
         currentGoal = goal
         state = AgentRunState.THINKING
         stepCount = 0
         errorCount = 0
+        var success = false
+        var message = "目标执行已停止"
         
         memory.workingMemory = WorkingMemory(goal)
         memory.addShortTerm(MemoryEntry(
@@ -57,6 +59,7 @@ class AgentRuntime(
             // 超时检查
             if (System.currentTimeMillis() - startTime > goal.timeoutSeconds * 1000) {
                 Log.w("AgentRuntime", "目标执行超时")
+                message = "目标执行超时（${goal.timeoutSeconds} 秒）"
                 state = AgentRunState.STOPPED
                 break
             }
@@ -64,14 +67,27 @@ class AgentRuntime(
             // 步数检查
             if (stepCount >= goal.maxSteps) {
                 Log.w("AgentRuntime", "达到最大步数限制")
+                message = "达到最大步数限制（${goal.maxSteps} 步）"
                 state = AgentRunState.STOPPED
                 break
             }
             
             when (state) {
-                AgentRunState.THINKING -> handleThinking()
+                AgentRunState.THINKING -> {
+                    val completed = handleThinking()
+                    if (completed) {
+                        success = true
+                        message = "AI 判断目标已完成"
+                    }
+                }
                 AgentRunState.EXECUTING -> handleExecuting()
-                AgentRunState.OBSERVING -> handleObserving()
+                AgentRunState.OBSERVING -> {
+                    val completed = handleObserving()
+                    if (completed) {
+                        success = true
+                        message = "目标完成条件满足"
+                    }
+                }
                 AgentRunState.PAUSED -> delay(100)
                 AgentRunState.WAITING_FOR_APPROVAL -> delay(100)
                 AgentRunState.RECOVERING -> handleRecovering()
@@ -81,13 +97,23 @@ class AgentRuntime(
             stepCount++
         }
         
-        Log.i("AgentRuntime", "目标执行完成，共 $stepCount 步")
+        if (!success && errorCount >= 3) {
+            message = "连续错误过多，已停止执行"
+        }
+        Log.i("AgentRuntime", "目标执行完成，共 $stepCount 步，success=$success")
+        return AgentExecutionResult(
+            success = success,
+            stepsExecuted = stepCount,
+            message = message,
+            finalState = state,
+            errorCount = errorCount
+        )
     }
     
     /**
      * 思考阶段：调用 AI 决定下一步动作
      */
-    private suspend fun handleThinking() {
+    private suspend fun handleThinking(): Boolean {
         try {
             memory.addShortTerm(MemoryEntry(
                 timestamp = System.currentTimeMillis(),
@@ -107,6 +133,7 @@ class AgentRuntime(
             if (decision.isComplete) {
                 Log.i("AgentRuntime", "AI 判断目标已完成")
                 state = AgentRunState.STOPPED
+                return true
             } else if (decision.action != null) {
                 memory.addShortTerm(MemoryEntry(
                     timestamp = System.currentTimeMillis(),
@@ -133,6 +160,7 @@ class AgentRuntime(
                 state = AgentRunState.RECOVERING
             }
         }
+        return false
     }
     
     /**
@@ -146,7 +174,7 @@ class AgentRuntime(
     /**
      * 观察阶段：获取屏幕状态
      */
-    private suspend fun handleObserving() {
+    private suspend fun handleObserving(): Boolean {
         try {
             val screen = screenReader.readCurrentScreen()
             val summary = screen.getClickableElementsSummary()
@@ -162,6 +190,7 @@ class AgentRuntime(
             if (isGoalComplete) {
                 Log.i("AgentRuntime", "目标完成条件满足")
                 state = AgentRunState.STOPPED
+                return true
             } else {
                 state = AgentRunState.THINKING
             }
@@ -170,6 +199,7 @@ class AgentRuntime(
             Log.e("AgentRuntime", "观察阶段出错", e)
             state = AgentRunState.RECOVERING
         }
+        return false
     }
     
     /**
@@ -313,6 +343,14 @@ class AgentRuntime(
     fun resume() { state = AgentRunState.THINKING }
     fun stop() { state = AgentRunState.STOPPED }
 }
+
+data class AgentExecutionResult(
+    val success: Boolean,
+    val stepsExecuted: Int,
+    val message: String,
+    val finalState: AgentRunState,
+    val errorCount: Int
+)
 
 /**
  * AI 客户端接口

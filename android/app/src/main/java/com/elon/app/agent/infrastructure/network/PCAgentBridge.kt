@@ -50,6 +50,7 @@ class PCAgentBridge(
     
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
     private var screenSyncJob: Job? = null
+    private var currentGoalJob: Job? = null
     private var currentGoalId: String? = null
     
     /**
@@ -114,6 +115,12 @@ class PCAgentBridge(
                 "Agent 运行时未初始化"
             )
         }
+        if (currentGoalJob?.isActive == true) {
+            return AgentProtocol.errorMessage(
+                ErrorCode.UNKNOWN,
+                "已有目标正在执行，请先停止当前目标"
+            )
+        }
         
         // 创建目标
         val goal = Goal(
@@ -126,7 +133,7 @@ class PCAgentBridge(
         currentGoalId = goal.id
         
         // 异步执行目标
-        scope.launch {
+        currentGoalJob = scope.launch {
             try {
                 val startTime = System.currentTimeMillis()
                 
@@ -138,16 +145,16 @@ class PCAgentBridge(
                 ))
                 
                 // 执行目标
-                runtime.executeGoal(goal)
+                val result = runtime.executeGoal(goal)
                 
                 val duration = System.currentTimeMillis() - startTime
                 
                 // 发送完成结果
                 webSocketServer.broadcast(AgentProtocol.resultMessage(
                     goalId = goal.id,
-                    success = true,  // TODO: 从 runtime 获取实际结果
-                    stepsExecuted = 0,  // TODO: 从 runtime 获取
-                    message = "目标执行完成",
+                    success = result.success,
+                    stepsExecuted = result.stepsExecuted,
+                    message = result.message,
                     duration = duration
                 ))
                 
@@ -158,6 +165,8 @@ class PCAgentBridge(
                     "目标执行失败: ${e.message}",
                     e.stackTraceToString()
                 ))
+            } finally {
+                currentGoalJob = null
             }
         }
         
@@ -204,6 +213,8 @@ class PCAgentBridge(
             }
             AgentCommand.STOP -> {
                 agentRuntimeProvider()?.stop()
+                currentGoalJob?.cancel()
+                currentGoalJob = null
                 AgentProtocol.statusMessage(AgentRunState.STOPPED)
             }
             AgentCommand.ANALYZE_SCREEN -> {
@@ -233,11 +244,17 @@ class PCAgentBridge(
      * 获取当前状态
      */
     private fun getStatus(): OutgoingMessage {
-        val runtime = agentRuntimeProvider()
+        val snapshot = agentRuntimeProvider()?.getSnapshot()
+        val goal = snapshot?.currentGoal
+        val progress = if (goal != null && goal.maxSteps > 0) {
+            (snapshot.progress.toFloat() / goal.maxSteps.toFloat()).coerceIn(0f, 1f)
+        } else {
+            0f
+        }
         return AgentProtocol.statusMessage(
-            state = AgentRunState.IDLE,  // 简化：总是返回 IDLE
-            currentGoal = null,
-            progress = 0f
+            state = snapshot?.state ?: AgentRunState.IDLE,
+            currentGoal = goal?.description,
+            progress = progress
         )
     }
     
@@ -475,6 +492,8 @@ class PCAgentBridge(
      */
     fun release() {
         stopScreenSync()
+        currentGoalJob?.cancel()
+        currentGoalJob = null
         scope.cancel()
     }
 }

@@ -870,6 +870,17 @@ class ScriptEngine(
                     // AI 自定义操作（不在脚本中）
                     val customResult = executeCustomAIAction(aiDecision)
                     logs.add("🤖 AI自定义操作: ${aiDecision.action}")
+                    if (!customResult) {
+                        val error = "AI自定义操作未执行: ${aiDecision.action}"
+                        log("❌ $error")
+                        return ScriptExecutionResult(
+                            success = false,
+                            stepsExecuted = currentStepIndex,
+                            totalSteps = script.steps.size,
+                            error = error,
+                            logs = logs
+                        )
+                    }
                 }
                 ScriptAIDecisionType.WAIT -> {
                     // AI 决定等待
@@ -1746,8 +1757,30 @@ class ScriptEngine(
     
     private suspend fun executeAssert(step: ScriptStep): StepResult {
         val condition = step.condition ?: return StepResult(false, "No condition")
-        // TODO: 实现断言检查
-        return StepResult(true)
+        val root = getRootNode() ?: return StepResult(false, "No window")
+        val texts = mutableListOf<String>()
+        extractTexts(root, texts, 100)
+        val screenText = texts.joinToString("\n")
+        val expected = condition.value.toString()
+        val target = condition.target
+        val matched = when (condition.type) {
+            ConditionType.TEXT_CONTAINS, ConditionType.ELEMENT_EXISTS -> {
+                screenText.contains(expected, ignoreCase = true) ||
+                    target.isNotBlank() && screenText.contains(target, ignoreCase = true)
+            }
+            ConditionType.TEXT_MATCHES -> {
+                runCatching { Regex(expected).containsMatchIn(screenText) }
+                    .getOrElse { screenText.contains(expected, ignoreCase = true) }
+            }
+            else -> {
+                return StepResult(false, "Unsupported assert condition: ${condition.type}")
+            }
+        }
+        return if (matched) {
+            StepResult(true)
+        } else {
+            StepResult(false, "断言失败: ${condition.type} target=${condition.target} expected=$expected")
+        }
     }
     
     private suspend fun executeAIDecide(step: ScriptStep): StepResult {
@@ -1771,10 +1804,57 @@ $elements
         
         val messages = listOf(Message(role = "user", content = prompt))
         val response = aiClient.chat(messages)
-        // 解析并执行 AI 决策
-        // TODO: 实现 AI 决策执行
-        
-        return StepResult(true)
+        return executeStructuredAIDecision(response)
+    }
+
+    private suspend fun executeStructuredAIDecision(response: String): StepResult {
+        return try {
+            val json = extractJson(response)
+            val map = gson.fromJson<Map<String, Any>>(json, object : TypeToken<Map<String, Any>>() {}.type)
+            val action = (map["action"] as? String)?.lowercase()?.trim()
+                ?: return StepResult(false, "AI 决策缺少 action")
+            val params = map["params"] as? Map<*, *> ?: emptyMap<String, Any>()
+            when (action) {
+                "tap", "click" -> {
+                    val x = numberParam(params, "x")
+                    val y = numberParam(params, "y")
+                    val text = params["text"] as? String
+                    when {
+                        x != null && y != null -> performTap(x, y)
+                        !text.isNullOrBlank() -> {
+                            val root = getRootNode() ?: return StepResult(false, "No window")
+                            val node = findMatchingNodeEnhanced(root, text, null, null)
+                                ?: findMatchingNodeEnhanced(root, null, text, null)
+                                ?: return StepResult(false, "未找到可点击文本: $text")
+                            val rect = android.graphics.Rect()
+                            node.getBoundsInScreen(rect)
+                            performTap(rect.centerX(), rect.centerY())
+                        }
+                        else -> StepResult(false, "tap 需要 x/y 或 text 参数")
+                    }
+                }
+                "swipe" -> {
+                    val direction = params["direction"] as? String
+                        ?: return StepResult(false, "swipe 需要 direction 参数")
+                    performSwipe(direction)
+                }
+                "wait" -> {
+                    val ms = numberParam(params, "ms")
+                        ?: numberParam(params, "waitMs")
+                        ?: 1000
+                    delay(ms.toLong().coerceIn(100L, 10_000L))
+                    StepResult(true)
+                }
+                "back" -> {
+                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                    delay(500)
+                    StepResult(true)
+                }
+                else -> StepResult(false, "不支持的 AI 决策动作: $action")
+            }
+        } catch (e: Exception) {
+            StepResult(false, "AI 决策解析失败: ${e.message}")
+        }
     }
     
     // ========== 辅助函数 ==========
@@ -2591,10 +2671,31 @@ $currentScreen
      * 执行 AI 自定义操作
      */
     private suspend fun executeCustomAIAction(decision: ScriptAIDecision): Boolean {
-        // 解析 AI 的自定义操作并执行
         log("🤖 执行AI自定义操作: ${decision.action}")
-        // TODO: 实现具体的自定义操作解析和执行
-        return true
+        val action = decision.action.lowercase()
+        return when {
+            action.contains("等待") || action.contains("wait") -> {
+                delay((decision.waitMs ?: 1000L).coerceIn(100L, 10_000L))
+                true
+            }
+            action.contains("返回") || action.contains("back") -> {
+                service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                delay(500)
+                true
+            }
+            else -> {
+                log("❌ 无法安全解析 AI 自定义操作，已拒绝默认成功: ${decision.action}")
+                false
+            }
+        }
+    }
+
+    private fun numberParam(params: Map<*, *>, key: String): Int? {
+        return when (val value = params[key]) {
+            is Number -> value.toInt()
+            is String -> value.toIntOrNull()
+            else -> null
+        }
     }
 }
 
