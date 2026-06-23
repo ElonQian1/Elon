@@ -17,6 +17,23 @@ if (-not $MainBase) {
 }
 $MainBase = $MainBase.TrimEnd("/")
 
+function Set-Fb2PublicDirectNetwork {
+    foreach ($name in @("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")) {
+        [System.Environment]::SetEnvironmentVariable($name, $null, "Process")
+    }
+    [System.Environment]::SetEnvironmentVariable("NO_PROXY", "*", "Process")
+    [System.Environment]::SetEnvironmentVariable("no_proxy", "*", "Process")
+}
+
+function Invoke-Fb2PublicDirectRest {
+    param(
+        [string]$Uri,
+        [int]$TimeoutSec
+    )
+
+    Invoke-RestMethod -Method Get -Uri $Uri -TimeoutSec $TimeoutSec -NoProxy
+}
+
 function Test-Fb2ContractContains {
     param(
         [object]$Values,
@@ -326,9 +343,10 @@ if ($SelfTest) {
     return
 }
 
-$health = Invoke-RestMethod -Method Get -Uri "$MainBase/health" -TimeoutSec $RequestTimeoutSec
-$version = Invoke-RestMethod -Method Get -Uri "$MainBase/api/server/version" -TimeoutSec $RequestTimeoutSec
-$contract = Invoke-RestMethod -Method Get -Uri "$MainBase/api/external/apps/fb2/context-contract" -TimeoutSec $RequestTimeoutSec
+Set-Fb2PublicDirectNetwork
+$health = Invoke-Fb2PublicDirectRest -Uri "$MainBase/health" -TimeoutSec $RequestTimeoutSec
+$version = Invoke-Fb2PublicDirectRest -Uri "$MainBase/api/server/version" -TimeoutSec $RequestTimeoutSec
+$contract = Invoke-Fb2PublicDirectRest -Uri "$MainBase/api/external/apps/fb2/context-contract" -TimeoutSec $RequestTimeoutSec
 $status = New-Fb2PublicContractStatus -Base $MainBase -Health $health -Version $version -Contract $contract
 
 if ($OutputPath) {

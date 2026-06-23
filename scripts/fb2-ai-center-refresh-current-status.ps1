@@ -70,6 +70,34 @@ function Read-Fb2RefreshJson {
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
+function ConvertTo-Fb2RefreshDate {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $null
+    }
+    if ($Value -is [DateTimeOffset]) {
+        return $Value.ToUniversalTime()
+    }
+    if ($Value -is [DateTime]) {
+        $dateTime = [DateTime]$Value
+        if ($dateTime.Kind -eq [DateTimeKind]::Unspecified) {
+            $dateTime = [DateTime]::SpecifyKind($dateTime, [DateTimeKind]::Utc)
+        }
+        return ([DateTimeOffset]$dateTime).ToUniversalTime()
+    }
+    $text = [string]$Value
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $null
+    }
+    try {
+        $styles = [System.Globalization.DateTimeStyles]::AssumeUniversal -bor [System.Globalization.DateTimeStyles]::AdjustToUniversal
+        return [DateTimeOffset]::Parse($text, [System.Globalization.CultureInfo]::InvariantCulture, $styles).ToUniversalTime()
+    } catch {
+        return $null
+    }
+}
+
 function Get-Fb2RefreshProperty {
     param(
         [object]$Object,
@@ -107,7 +135,8 @@ function Get-Fb2RefreshCommandValue {
 function New-Fb2RefreshTokenBridgeLivePreflight {
     param(
         [string]$ResultPath,
-        [string]$SummaryPath
+        [string]$SummaryPath,
+        [double]$MaxAgeMinutes = 120
     )
 
     $result = Read-Fb2RefreshJson -Path $ResultPath
@@ -127,6 +156,10 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
             writes_visible_group_messages = $null
             project_network_proxy_policy = ""
             note = "No token bridge live preflight result in current output dir."
+            generated_at_utc = ""
+            age_minutes = $null
+            max_age_minutes = $MaxAgeMinutes
+            fresh = $false
         }
     }
 
@@ -135,6 +168,9 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
         $SummaryPath = $resultSummaryPath
         $summaryExists = Test-Path -LiteralPath $SummaryPath
     }
+    $generatedAt = ConvertTo-Fb2RefreshDate -Value (Get-Fb2RefreshProperty $result "generated_at_utc" $null)
+    $ageMinutes = if ($null -eq $generatedAt) { $null } else { ([DateTimeOffset]::UtcNow - $generatedAt).TotalMinutes }
+    $fresh = ($null -ne $ageMinutes -and [double]$ageMinutes -ge 0 -and [double]$ageMinutes -le $MaxAgeMinutes)
 
     [ordered]@{
         schema = "fb2.main_project.token_bridge_live_preflight.v1"
@@ -150,8 +186,52 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
         writes_visible_group_messages = [bool](Get-Fb2RefreshProperty $result "writes_visible_group_messages" $true)
         project_network_proxy_policy = [string](Get-Fb2RefreshProperty $result "project_network_proxy_policy" "")
         current_state_after_tokenless = [bool](Get-Fb2RefreshProperty $result "current_state_after_tokenless" $false)
+        generated_at_utc = if ($null -eq $generatedAt) { "" } else { $generatedAt.ToString("o") }
+        age_minutes = $ageMinutes
+        max_age_minutes = $MaxAgeMinutes
+        fresh = $fresh
         note = "This is no-write bridge evidence only; full final still follows completion_matrix."
     }
+}
+
+function Test-Fb2RefreshProtectedLivePreflightSatisfied {
+    param([object]$TokenBridgeLivePreflight)
+
+    if ($null -eq $TokenBridgeLivePreflight) {
+        return $false
+    }
+
+    return (
+        [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "exists" $false) -and
+        [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "success" $false) -and
+        [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "summary_exists" $false) -and
+        [int](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "preflight_exit_code" -1) -eq 0 -and
+        [int](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "current_state_exit_code" -1) -eq 0 -and
+        -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "token_passed_as_argument" $true) -and
+        -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "token_written_to_output" $true) -and
+        -not [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "writes_visible_group_messages" $true) -and
+        [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "current_state_after_tokenless" $false) -and
+        [string](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "project_network_proxy_policy" "") -eq "direct_no_proxy" -and
+        [bool](Get-Fb2RefreshProperty $TokenBridgeLivePreflight "fresh" $false)
+    )
+}
+
+function Resolve-Fb2RefreshNextMinimumAction {
+    param(
+        [object]$GoalAudit,
+        [bool]$ProtectedLivePreflightSatisfied
+    )
+
+    if ([bool](Get-Fb2RefreshProperty $GoalAudit "full_final_complete" $false)) {
+        return "goal_complete"
+    }
+    if (-not [bool](Get-Fb2RefreshProperty $GoalAudit "data_goal_complete" $false)) {
+        return [string](Get-Fb2RefreshProperty $GoalAudit "next_minimum_action" "fix_missing_non_voice_requirements")
+    }
+    if ($ProtectedLivePreflightSatisfied) {
+        return "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+    }
+    return [string](Get-Fb2RefreshProperty $GoalAudit "next_minimum_action" "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly")
 }
 
 function New-Fb2RefreshExportedSampleValidationState {
@@ -183,7 +263,8 @@ function New-Fb2RefreshExportedSampleValidationState {
 function New-Fb2RefreshOwnerActions {
     param(
         [object]$Status,
-        [object]$GoalAudit
+        [object]$GoalAudit,
+        [bool]$ProtectedLivePreflightSatisfied
     )
 
     $tokenPresent = [bool]$Status.environment.fb2_ai_center_token_present
@@ -191,18 +272,24 @@ function New-Fb2RefreshOwnerActions {
     $fullFinalComplete = [bool]$GoalAudit.full_final_complete
 
     [ordered]@{
-        main_project = if ($dataGoalComplete -and -not $tokenPresent) {
+        main_project = if ($dataGoalComplete -and $ProtectedLivePreflightSatisfied) {
+            "keep_contract_status_and_token_bridge_regressions_green_until_ASR_TTS_resumes"
+        } elseif ($dataGoalComplete -and -not $tokenPresent) {
             "keep_contract_and_status_regressions_green_until_FB2_AI_CENTER_TOKEN_is_available"
         } else {
             "refresh_status_goal_audit_and_handoff_after_each_contract_or_smoke_change"
         }
-        fb2_project = if (-not $tokenPresent) {
+        fb2_project = if ($dataGoalComplete -and $ProtectedLivePreflightSatisfied) {
+            "keep_live_context_pack_orders_platform_summary_group_opinion_and_feedback_endpoints_current"
+        } elseif (-not $tokenPresent) {
             "provide_FB2_AI_CENTER_TOKEN_or_export_equivalent_live_Context_Pack_permission_quality_evidence"
         } else {
             "keep_live_context_pack_orders_platform_summary_group_opinion_and_feedback_endpoints_current"
         }
         shared = if ($fullFinalComplete) {
             "final_acceptance_complete"
+        } elseif ($dataGoalComplete -and $ProtectedLivePreflightSatisfied) {
+            "non_voice_live_preflight_satisfied_by_token_bridge_ASR_TTS_final_evidence_deferred_by_user"
         } elseif ($dataGoalComplete) {
             "run_DataOnlyAcceptance_PreflightOnly_with_token_then_refresh_status_refresh_current_json"
         } else {
@@ -416,7 +503,8 @@ function New-Fb2RefreshEvidenceFreshness {
         [string[]]$EvidenceDirs,
         [object]$Files,
         [object]$Status,
-        [object]$GoalAudit
+        [object]$GoalAudit,
+        [bool]$ProtectedLivePreflightSatisfied
     )
 
     $nowUtc = [datetime]::UtcNow
@@ -455,7 +543,11 @@ function New-Fb2RefreshEvidenceFreshness {
     [ordered]@{
         schema = "fb2.main_project.evidence_freshness.v1"
         generated_at_utc = $nowUtc.ToString("o")
-        note = "artifact freshness only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN"
+        note = if ($ProtectedLivePreflightSatisfied) {
+            "artifact freshness includes fresh no-write token bridge live preflight; ASR/TTS final evidence remains deferred by user"
+        } else {
+            "artifact freshness only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN or a fresh token bridge preflight"
+        }
         current_output_dir = $OutputDir
         evidence_dirs = @($EvidenceDirs)
         artifact_count = @($artifacts).Count
@@ -500,11 +592,16 @@ function New-Fb2RefreshGapActionBoard {
         [object]$GoalAudit,
         [object]$BlockingState,
         [object]$NextCommands,
-        [object]$CompletionMatrix
+        [object]$CompletionMatrix,
+        [bool]$ProtectedLivePreflightSatisfied,
+        [string]$NextMinimumAction
     )
 
     $missing = @($Status.goal_gap_audit.missing) + @($GoalAudit.missing_non_voice_requirements)
     $missing = @($missing | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    if ($ProtectedLivePreflightSatisfied) {
+        $missing = @($missing | Where-Object { [string]$_ -ne "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh" })
+    }
     $deferred = @($GoalAudit.deferred_requirements) + @($Status.goal_gap_audit.deferred_by_user)
     $deferred = @($deferred | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
 
@@ -601,9 +698,10 @@ function New-Fb2RefreshGapActionBoard {
 
     [ordered]@{
         schema = "fb2.main_project.gap_action_board.v1"
-        next_minimum_action = [string]$GoalAudit.next_minimum_action
+        next_minimum_action = $NextMinimumAction
         blocked_by_external_secret = [bool]$BlockingState.blocked_by_external_secret
         external_secret = [string]$BlockingState.external_secret
+        protected_live_preflight_satisfied = $ProtectedLivePreflightSatisfied
         action_count = @($actions).Count
         actions = @($actions)
     }
@@ -612,18 +710,26 @@ function New-Fb2RefreshGapActionBoard {
 function New-Fb2RefreshBlockingState {
     param(
         [object]$Status,
-        [object]$GoalAudit
+        [object]$GoalAudit,
+        [bool]$ProtectedLivePreflightSatisfied,
+        [string]$NextMinimumAction
     )
 
+    $tokenPresent = [bool]$Status.environment.fb2_ai_center_token_present
+    $blockedByExternalSecret = (-not $tokenPresent) -and (-not $ProtectedLivePreflightSatisfied)
+
     [ordered]@{
-        blocked_by_external_secret = -not [bool]$Status.environment.fb2_ai_center_token_present
+        blocked_by_external_secret = $blockedByExternalSecret
         external_secret = "FB2_AI_CENTER_TOKEN"
+        protected_live_preflight_satisfied = $ProtectedLivePreflightSatisfied
+        protected_live_preflight_satisfied_by = if ($ProtectedLivePreflightSatisfied) { "token_bridge_live_preflight" } else { "" }
         deferred_by_user = @($Status.goal_gap_audit.deferred_by_user)
         safe_to_continue_without_secret = @(
             "public_contract_regression",
             "status_refresh_selftest",
             "offline_context_pack_sample_validation",
-            "handoff_documentation"
+            "handoff_documentation",
+            "token_bridge_live_preflight_regression"
         )
         requires_secret = @(
             "live_context_pack_permission_quality_refresh",
@@ -631,7 +737,7 @@ function New-Fb2RefreshBlockingState {
             "platform_order_summary_live_verification",
             "feedback_quality_live_refresh"
         )
-        next_minimum_action = [string]$GoalAudit.next_minimum_action
+        next_minimum_action = $NextMinimumAction
     }
 }
 
@@ -829,16 +935,6 @@ $status = Read-Fb2RefreshJson -Path $statusPath
 $goalAudit = Read-Fb2RefreshJson -Path $goalAuditPath
 $public = Read-Fb2RefreshJson -Path $publicPath
 $serverDeployStatus = Read-Fb2RefreshJson -Path $serverDeployStatusPath
-$ownerNextActions = New-Fb2RefreshOwnerActions -Status $status -GoalAudit $goalAudit
-$blockingState = New-Fb2RefreshBlockingState -Status $status -GoalAudit $goalAudit
-$nextCommands = New-Fb2RefreshNextCommands -Status $status
-$completionMatrix = New-Fb2RefreshCompletionMatrix -Status $status -GoalAudit $goalAudit
-$gapActionBoard = New-Fb2RefreshGapActionBoard `
-    -Status $status `
-    -GoalAudit $goalAudit `
-    -BlockingState $blockingState `
-    -NextCommands $nextCommands `
-    -CompletionMatrix $completionMatrix
 $files = [ordered]@{
     status_refresh = $RefreshSummaryPath
     public_contract_status = $publicPath
@@ -856,12 +952,37 @@ $files = [ordered]@{
 $tokenBridgeLivePreflight = New-Fb2RefreshTokenBridgeLivePreflight `
     -ResultPath ([string]$files.token_bridge_live_preflight) `
     -SummaryPath ([string]$files.token_bridge_live_preflight_summary)
+$protectedLivePreflightSatisfied = Test-Fb2RefreshProtectedLivePreflightSatisfied -TokenBridgeLivePreflight $tokenBridgeLivePreflight
+$effectiveNextMinimumAction = Resolve-Fb2RefreshNextMinimumAction `
+    -GoalAudit $goalAudit `
+    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied
+$ownerNextActions = New-Fb2RefreshOwnerActions `
+    -Status $status `
+    -GoalAudit $goalAudit `
+    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied
+$blockingState = New-Fb2RefreshBlockingState `
+    -Status $status `
+    -GoalAudit $goalAudit `
+    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied `
+    -NextMinimumAction $effectiveNextMinimumAction
+$nextCommands = New-Fb2RefreshNextCommands -Status $status
+$completionMatrix = New-Fb2RefreshCompletionMatrix -Status $status -GoalAudit $goalAudit
+$completionMatrix.gates.next_minimum_action = $effectiveNextMinimumAction
+$gapActionBoard = New-Fb2RefreshGapActionBoard `
+    -Status $status `
+    -GoalAudit $goalAudit `
+    -BlockingState $blockingState `
+    -NextCommands $nextCommands `
+    -CompletionMatrix $completionMatrix `
+    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied `
+    -NextMinimumAction $effectiveNextMinimumAction
 $evidenceFreshness = New-Fb2RefreshEvidenceFreshness `
     -OutputDir $OutputDir `
     -EvidenceDirs @($evidence) `
     -Files $files `
     -Status $status `
-    -GoalAudit $goalAudit
+    -GoalAudit $goalAudit `
+    -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied
 
 $refreshSummary = [pscustomobject]@{
     schema = "fb2.main_project.status_refresh.v1"
@@ -876,7 +997,8 @@ $refreshSummary = [pscustomobject]@{
     data_goal_complete = [bool]$goalAudit.data_goal_complete
     full_final_complete = [bool]$goalAudit.full_final_complete
     token_present = [bool]$status.environment.fb2_ai_center_token_present
-    next_minimum_action = [string]$goalAudit.next_minimum_action
+    protected_live_preflight_satisfied = $protectedLivePreflightSatisfied
+    next_minimum_action = $effectiveNextMinimumAction
     owner_next_actions = $ownerNextActions
     blocking_state = $blockingState
     next_commands = $nextCommands

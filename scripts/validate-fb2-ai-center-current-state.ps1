@@ -330,6 +330,12 @@ function New-Fb2CurrentStateValidation {
     $tokenlessContinuationValidation = Read-Fb2CurrentJsonOrNull -Path $tokenlessContinuationValidationPath
     $contextProjectionLogValidation = Read-Fb2CurrentJsonOrNull -Path $contextProjectionValidationPath
     $userScenarioAuditValidation = Read-Fb2CurrentJsonOrNull -Path $userScenarioValidationPath
+    $protectedLivePreflightSatisfied = [bool](Get-Fb2CurrentProperty $refresh "protected_live_preflight_satisfied" $false)
+    $statusNote = if ($protectedLivePreflightSatisfied) {
+        "Protected no-write live fb2 data preflight has already been satisfied by token bridge; full final still waits for ASR/TTS evidence because the user paused voice work."
+    } else {
+        "This gate refreshes and validates current machine evidence only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN or the token bridge preflight."
+    }
     $result = [ordered]@{
         schema = "fb2.main_project.current_state_validation.v1"
         generated_at_utc = ([datetime]::UtcNow).ToString("o")
@@ -342,6 +348,7 @@ function New-Fb2CurrentStateValidation {
         data_goal_complete = [bool](Get-Fb2CurrentProperty $refresh "data_goal_complete" $false)
         full_final_complete = [bool](Get-Fb2CurrentProperty $refresh "full_final_complete" $false)
         token_present = [bool](Get-Fb2CurrentProperty $refresh "token_present" $false)
+        protected_live_preflight_satisfied = $protectedLivePreflightSatisfied
         voice_deferred_by_user = [bool](Get-Fb2CurrentProperty $gates "voice_deferred_by_user" $false)
         next_minimum_action = [string](Get-Fb2CurrentProperty $refresh "next_minimum_action" "")
         blocked_by_external_secret = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
@@ -354,7 +361,7 @@ function New-Fb2CurrentStateValidation {
         user_scenario_audit_validation = $userScenarioAuditValidation
         safe_to_continue_without_secret = @((Get-Fb2CurrentProperty $blocking "safe_to_continue_without_secret" @()))
         requires_secret = @((Get-Fb2CurrentProperty $blocking "requires_secret" @()))
-        note = "This gate refreshes and validates current machine evidence only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN."
+        note = $statusNote
     }
 
     $parent = Split-Path -Parent $OutputPath

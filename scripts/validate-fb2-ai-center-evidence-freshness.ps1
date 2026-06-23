@@ -145,9 +145,15 @@ function New-Fb2FreshnessValidation {
     $freshness = Get-Fb2FreshnessProperty $Refresh "evidence_freshness"
     $files = Get-Fb2FreshnessProperty $Refresh "files"
     $artifacts = @(Get-Fb2FreshnessProperty $freshness "artifacts" @())
+    $protectedLivePreflightSatisfied = [bool](Get-Fb2FreshnessProperty $Refresh "protected_live_preflight_satisfied" $false)
+    $tokenBridge = Get-Fb2FreshnessProperty $Refresh "token_bridge_live_preflight"
 
     Add-Fb2FreshnessCheck $checks "freshness schema" ([string](Get-Fb2FreshnessProperty $freshness "schema" "") -eq "fb2.main_project.evidence_freshness.v1")
-    Add-Fb2FreshnessCheck $checks "freshness note says protected live needs token" ([string](Get-Fb2FreshnessProperty $freshness "note" "") -match "protected live fb2 data still requires FB2_AI_CENTER_TOKEN")
+    if ($protectedLivePreflightSatisfied) {
+        Add-Fb2FreshnessCheck $checks "freshness note records protected bridge evidence" ([string](Get-Fb2FreshnessProperty $freshness "note" "") -match "token bridge")
+    } else {
+        Add-Fb2FreshnessCheck $checks "freshness note says protected live needs token or bridge" ([string](Get-Fb2FreshnessProperty $freshness "note" "") -match "protected live fb2 data still requires FB2_AI_CENTER_TOKEN|fresh token bridge preflight")
+    }
     Add-Fb2FreshnessCheck $checks "artifact count matches" ([int](Get-Fb2FreshnessProperty $freshness "artifact_count" 0) -eq @($artifacts).Count) ("declared=$([int](Get-Fb2FreshnessProperty $freshness 'artifact_count' 0)) actual=$(@($artifacts).Count)")
 
     $generatedAt = ConvertTo-Fb2FreshnessDate -Value (Get-Fb2FreshnessProperty $freshness "generated_at_utc" $null)
@@ -206,6 +212,23 @@ function New-Fb2FreshnessValidation {
             $artifactItem = @($artifact)[0]
             Add-Fb2FreshnessCheck $checks "generated artifact $name age zero in summary" ([double](Get-Fb2FreshnessProperty $artifactItem "age_minutes" -1) -eq 0.0)
         }
+    }
+
+    if ($protectedLivePreflightSatisfied) {
+        foreach ($name in @("token_bridge_live_preflight", "token_bridge_live_preflight_summary")) {
+            $artifact = Find-Fb2FreshnessArtifact -Artifacts $artifacts -Name $name
+            Add-Fb2FreshnessCheck $checks "protected bridge artifact $name present" (@($artifact).Count -gt 0)
+            if (@($artifact).Count -gt 0) {
+                $artifactItem = @($artifact)[0]
+                $ageMinutes = [double](Get-Fb2FreshnessProperty $artifactItem "age_minutes" ([double]::PositiveInfinity))
+                Add-Fb2FreshnessCheck $checks "protected bridge artifact $name exists" ([bool](Get-Fb2FreshnessProperty $artifactItem "exists" $false))
+                Add-Fb2FreshnessCheck $checks "protected bridge artifact $name is current output" ([string](Get-Fb2FreshnessProperty $artifactItem "source_scope" "") -eq "current_output_dir")
+                Add-Fb2FreshnessCheck $checks "protected bridge artifact $name not stale" ($ageMinutes -le $MaxAgeMinutes) ("age_minutes={0:N2} max={1:N2}" -f $ageMinutes, $MaxAgeMinutes)
+            }
+        }
+        $bridgeGeneratedAt = ConvertTo-Fb2FreshnessDate -Value (Get-Fb2FreshnessProperty $tokenBridge "generated_at_utc" $null)
+        Add-Fb2FreshnessCheck $checks "protected bridge generated_at parseable" ($null -ne $bridgeGeneratedAt)
+        Add-Fb2FreshnessCheck $checks "protected bridge freshness flag true" ([bool](Get-Fb2FreshnessProperty $tokenBridge "fresh" $false))
     }
 
     $exportedSamplePath = [string](Get-Fb2FreshnessProperty $files "exported_context_pack_sample_set_validation" "")
@@ -272,6 +295,25 @@ function Invoke-Fb2FreshnessSelfTest {
     $good = New-Fb2FreshnessValidation -Refresh $fixture -SourcePath "selftest-good.json" -MaxAgeMinutes 120
     if (-not [bool]$good.success) {
         $good | ConvertTo-Json -Depth 8
+        $failed++
+    }
+
+    $bridge = $fixture | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+    $bridge | Add-Member -NotePropertyName "protected_live_preflight_satisfied" -NotePropertyValue $true -Force
+    $bridge | Add-Member -NotePropertyName "token_bridge_live_preflight" -NotePropertyValue ([ordered]@{
+        generated_at_utc = $now.ToString("o")
+        fresh = $true
+    }) -Force
+    $bridge.evidence_freshness.note = "artifact freshness includes fresh no-write token bridge live preflight; ASR/TTS final evidence remains deferred by user"
+    $bridgeArtifacts = @($bridge.evidence_freshness.artifacts)
+    $bridgeArtifacts += [ordered]@{ name = "token_bridge_live_preflight"; path = "target\fb2-ai-center\token-bridge-data-only-preflight-current.json"; exists = $true; source_scope = "current_output_dir"; last_write_utc = $now.ToString("o"); age_minutes = 0.01 }
+    $bridgeArtifacts += [ordered]@{ name = "token_bridge_live_preflight_summary"; path = "target\fb2-ai-center\token-bridge-data-only-preflight-summary-current.json"; exists = $true; source_scope = "current_output_dir"; last_write_utc = $now.ToString("o"); age_minutes = 0.01 }
+    $bridge.evidence_freshness.artifacts = $bridgeArtifacts
+    $bridge.evidence_freshness.artifact_count = @($bridgeArtifacts).Count
+    $bridge.evidence_freshness.current_output_artifact_count = @($bridgeArtifacts).Count
+    $bridgeResult = New-Fb2FreshnessValidation -Refresh $bridge -SourcePath "selftest-bridge.json" -MaxAgeMinutes 120
+    if (-not [bool]$bridgeResult.success) {
+        $bridgeResult | ConvertTo-Json -Depth 8
         $failed++
     }
 

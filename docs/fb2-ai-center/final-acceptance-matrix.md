@@ -13,7 +13,7 @@
 
 | 要求 | 验收证据 | 当前状态 |
 |---|---|---|
-| `chat-bootstrap` | `smoke-fb2-ai-center.ps1 -MainToken` 或 `-Fb2Username/-Fb2Password` 检查默认群、语音 composer、AI 回复、计费策略 | 最新 data-only summary 已用 `123qwe/123qwe` 通过 fb2 session bridge 验证 authenticated bootstrap、AI 回复入口和 billing；full final 仍需语音证据 |
+| `chat-bootstrap` | `smoke-fb2-ai-center.ps1 -MainToken` 或 `-Fb2Username/-Fb2Password` 检查默认群、语音 composer、AI 回复、计费策略 | 最新 data-only summary 已用 `123qwe/<FB2_PASSWORD>` 通过 fb2 session bridge 验证 authenticated bootstrap、AI 回复入口和 billing；full final 仍需语音证据 |
 | `context-contract` | 默认 smoke 检查 answer policy、六类评测场景、live manifest execution policy | 已覆盖 |
 | 公开契约线上状态 | `fb2-public-contract-status.ps1` 检查 `/health`、`/api/server/version`、`domain_data_blueprint_contract`、`group_chat_evidence_contract` 和 live manifest | 该项只证明主项目公开契约已部署；不替代 fb2 service-token live Context Pack、订单、权限和质量验收 |
 | fb2 场景矩阵进入运行时 prompt | Rust 单测验证 `format_external_context()` 输出 `<fb2_domain_scenario_guidance schema="fb2.domain_scenario_prompt.v1">`，且从同一 `fb2_domain_scenario_matrix()` 读取 required citations / forbidden outputs | 本轮已补运行时 prompt guidance，覆盖 @EL 和长按 `AI回复` 共用链路；发布后需 live 验证服务端 SHA |

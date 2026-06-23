@@ -112,6 +112,32 @@ function Test-Fb2TokenlessFileExists {
     -not [string]::IsNullOrWhiteSpace($Path) -and (Test-Path -LiteralPath $Path)
 }
 
+function Test-Fb2TokenlessProtectedLivePreflightSatisfied {
+    param([object]$Refresh)
+
+    $bridge = Get-Fb2TokenlessProperty $Refresh "token_bridge_live_preflight"
+    $blocking = Get-Fb2TokenlessProperty $Refresh "blocking_state"
+    $gapBoard = Get-Fb2TokenlessProperty $Refresh "gap_action_board"
+
+    return (
+        [bool](Get-Fb2TokenlessProperty $Refresh "protected_live_preflight_satisfied" $false) -and
+        [bool](Get-Fb2TokenlessProperty $blocking "protected_live_preflight_satisfied" $false) -and
+        [string](Get-Fb2TokenlessProperty $blocking "protected_live_preflight_satisfied_by" "") -eq "token_bridge_live_preflight" -and
+        [bool](Get-Fb2TokenlessProperty $gapBoard "protected_live_preflight_satisfied" $false) -and
+        [bool](Get-Fb2TokenlessProperty $bridge "exists" $false) -and
+        [bool](Get-Fb2TokenlessProperty $bridge "success" $false) -and
+        [bool](Get-Fb2TokenlessProperty $bridge "summary_exists" $false) -and
+        [int](Get-Fb2TokenlessProperty $bridge "preflight_exit_code" -1) -eq 0 -and
+        [int](Get-Fb2TokenlessProperty $bridge "current_state_exit_code" -1) -eq 0 -and
+        -not [bool](Get-Fb2TokenlessProperty $bridge "token_passed_as_argument" $true) -and
+        -not [bool](Get-Fb2TokenlessProperty $bridge "token_written_to_output" $true) -and
+        -not [bool](Get-Fb2TokenlessProperty $bridge "writes_visible_group_messages" $true) -and
+        [bool](Get-Fb2TokenlessProperty $bridge "current_state_after_tokenless" $false) -and
+        [string](Get-Fb2TokenlessProperty $bridge "project_network_proxy_policy" "") -eq "direct_no_proxy" -and
+        [bool](Get-Fb2TokenlessProperty $bridge "fresh" $false)
+    )
+}
+
 function New-Fb2TokenlessContinuationValidation {
     param(
         [object]$Refresh,
@@ -129,6 +155,12 @@ function New-Fb2TokenlessContinuationValidation {
     $exportedSamples = Get-Fb2TokenlessProperty $Refresh "exported_context_pack_sample_set_validation"
     $safeWithoutSecret = @(Get-Fb2TokenlessProperty $blocking "safe_to_continue_without_secret" @()) | ForEach-Object { [string]$_ }
     $requiresSecret = @(Get-Fb2TokenlessProperty $blocking "requires_secret" @()) | ForEach-Object { [string]$_ }
+    $protectedLivePreflightSatisfied = Test-Fb2TokenlessProtectedLivePreflightSatisfied -Refresh $Refresh
+    $expectedNextAction = if ($protectedLivePreflightSatisfied) {
+        "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+    } else {
+        "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
+    }
 
     Add-Fb2TokenlessCheck $checks "refresh schema" ([string](Get-Fb2TokenlessProperty $Refresh "schema" "") -eq "fb2.main_project.status_refresh.v1")
     Add-Fb2TokenlessCheck $checks "public contract ready" ([bool](Get-Fb2TokenlessProperty $Refresh "public_contract_ready" $false))
@@ -136,9 +168,9 @@ function New-Fb2TokenlessContinuationValidation {
     Add-Fb2TokenlessCheck $checks "data goal complete" ([bool](Get-Fb2TokenlessProperty $Refresh "data_goal_complete" $false))
     Add-Fb2TokenlessCheck $checks "full final remains incomplete" (-not [bool](Get-Fb2TokenlessProperty $Refresh "full_final_complete" $true))
     Add-Fb2TokenlessCheck $checks "token absent" (-not [bool](Get-Fb2TokenlessProperty $Refresh "token_present" $true))
-    Add-Fb2TokenlessCheck $checks "next action waits for token preflight" (
-        [string](Get-Fb2TokenlessProperty $Refresh "next_minimum_action" "") -eq "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
-    )
+    Add-Fb2TokenlessCheck $checks "next action matches protected preflight state" (
+        [string](Get-Fb2TokenlessProperty $Refresh "next_minimum_action" "") -eq $expectedNextAction
+    ) ("expected=$expectedNextAction actual=$([string](Get-Fb2TokenlessProperty $Refresh 'next_minimum_action' ''))")
 
     Add-Fb2TokenlessCheck $checks "completion schema" ([string](Get-Fb2TokenlessProperty $completion "schema" "") -eq "fb2.main_project.completion_matrix.v1")
     Add-Fb2TokenlessCheck $checks "completion gates match refresh" (
@@ -149,12 +181,18 @@ function New-Fb2TokenlessContinuationValidation {
     Add-Fb2TokenlessCheck $checks "voice remains deferred" ([bool](Get-Fb2TokenlessProperty $gates "voice_deferred_by_user" $false))
 
     Add-Fb2TokenlessCheck $checks "blocking state uses external token" ([string](Get-Fb2TokenlessProperty $blocking "external_secret" "") -eq "FB2_AI_CENTER_TOKEN")
-    Add-Fb2TokenlessCheck $checks "blocking state still blocked by token" ([bool](Get-Fb2TokenlessProperty $blocking "blocked_by_external_secret" $false))
+    Add-Fb2TokenlessCheck $checks "blocking state matches protected preflight state" (
+        [bool](Get-Fb2TokenlessProperty $blocking "blocked_by_external_secret" $true) -eq (-not $protectedLivePreflightSatisfied)
+    )
+    Add-Fb2TokenlessCheck $checks "protected live preflight proof complete when marked satisfied" (
+        (-not [bool](Get-Fb2TokenlessProperty $Refresh "protected_live_preflight_satisfied" $false)) -or $protectedLivePreflightSatisfied
+    )
     Add-Fb2TokenlessCheck $checks "safe without secret list complete" (Test-Fb2TokenlessContainsAll -Values $safeWithoutSecret -Required @(
             "public_contract_regression",
             "status_refresh_selftest",
             "offline_context_pack_sample_validation",
-            "handoff_documentation"
+            "handoff_documentation",
+            "token_bridge_live_preflight_regression"
         ))
     Add-Fb2TokenlessCheck $checks "requires secret list complete" (Test-Fb2TokenlessContainsAll -Values $requiresSecret -Required @(
             "live_context_pack_permission_quality_refresh",
@@ -239,7 +277,9 @@ function New-Fb2TokenlessContinuationValidation {
     )
 
     Add-Fb2TokenlessCheck $checks "gap action board schema" ([string](Get-Fb2TokenlessProperty $gapBoard "schema" "") -eq "fb2.main_project.gap_action_board.v1")
-    Add-Fb2TokenlessCheck $checks "gap action board blocked by token" ([bool](Get-Fb2TokenlessProperty $gapBoard "blocked_by_external_secret" $false))
+    Add-Fb2TokenlessCheck $checks "gap action board blocking matches protected preflight state" (
+        [bool](Get-Fb2TokenlessProperty $gapBoard "blocked_by_external_secret" $true) -eq (-not $protectedLivePreflightSatisfied)
+    )
     Add-Fb2TokenlessCheck $checks "evidence freshness schema" ([string](Get-Fb2TokenlessProperty $freshness "schema" "") -eq "fb2.main_project.evidence_freshness.v1")
     Add-Fb2TokenlessCheck $checks "exported samples have status" ($null -ne $exportedSamples)
     if ($null -ne $exportedSamples) {
@@ -276,6 +316,7 @@ function New-Fb2TokenlessContinuationValidation {
 function New-Fb2TokenlessFixture {
     param(
         [string]$TempRoot,
+        [switch]$BridgeSatisfied,
         [switch]$BadTokenPresent,
         [switch]$BadVisiblePreflight,
         [switch]$BadSecretLeak,
@@ -283,11 +324,23 @@ function New-Fb2TokenlessFixture {
         [switch]$BadPublicContract
     )
 
+    $nextAction = if ($BridgeSatisfied) {
+        "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+    } else {
+        "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
+    }
+    $blockedByExternalSecret = -not [bool]$BridgeSatisfied
     $commandToken = if ($BadSecretLeak) { "real-secret-token-1234567890" } else { "<FB2_AI_CENTER_TOKEN>" }
     $safeList = if ($BadMissingSafeItem) {
         @("public_contract_regression", "status_refresh_selftest")
     } else {
-        @("public_contract_regression", "status_refresh_selftest", "offline_context_pack_sample_validation", "handoff_documentation")
+        @(
+            "public_contract_regression",
+            "status_refresh_selftest",
+            "offline_context_pack_sample_validation",
+            "handoff_documentation",
+            "token_bridge_live_preflight_regression"
+        )
     }
     $dataOnlyCommand = if ($BadVisiblePreflight) {
         "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -AllowVisibleMessages -Fb2AiCenterToken $commandToken"
@@ -310,7 +363,8 @@ function New-Fb2TokenlessFixture {
         data_goal_complete = $true
         full_final_complete = $false
         token_present = [bool]$BadTokenPresent
-        next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
+        protected_live_preflight_satisfied = [bool]$BridgeSatisfied
+        next_minimum_action = $nextAction
         files = [ordered]@{
             status_refresh = $refreshPath
             status = $statusPath
@@ -318,8 +372,10 @@ function New-Fb2TokenlessFixture {
             handoff_prompt = $handoffPromptPath
         }
         blocking_state = [ordered]@{
-            blocked_by_external_secret = $true
+            blocked_by_external_secret = $blockedByExternalSecret
             external_secret = "FB2_AI_CENTER_TOKEN"
+            protected_live_preflight_satisfied = [bool]$BridgeSatisfied
+            protected_live_preflight_satisfied_by = if ($BridgeSatisfied) { "token_bridge_live_preflight" } else { "" }
             safe_to_continue_without_secret = $safeList
             requires_secret = @(
                 "live_context_pack_permission_quality_refresh",
@@ -351,11 +407,26 @@ function New-Fb2TokenlessFixture {
                 full_final_complete = $false
                 token_present = [bool]$BadTokenPresent
                 voice_deferred_by_user = $true
+                next_minimum_action = $nextAction
             }
         }
         gap_action_board = [ordered]@{
             schema = "fb2.main_project.gap_action_board.v1"
-            blocked_by_external_secret = $true
+            blocked_by_external_secret = $blockedByExternalSecret
+            protected_live_preflight_satisfied = [bool]$BridgeSatisfied
+        }
+        token_bridge_live_preflight = [ordered]@{
+            exists = [bool]$BridgeSatisfied
+            success = [bool]$BridgeSatisfied
+            summary_exists = [bool]$BridgeSatisfied
+            preflight_exit_code = if ($BridgeSatisfied) { 0 } else { $null }
+            current_state_exit_code = if ($BridgeSatisfied) { 0 } else { $null }
+            token_passed_as_argument = $false
+            token_written_to_output = $false
+            writes_visible_group_messages = $false
+            current_state_after_tokenless = [bool]$BridgeSatisfied
+            project_network_proxy_policy = if ($BridgeSatisfied) { "direct_no_proxy" } else { "" }
+            fresh = [bool]$BridgeSatisfied
         }
         evidence_freshness = [ordered]@{
             schema = "fb2.main_project.evidence_freshness.v1"
@@ -379,6 +450,15 @@ function Invoke-Fb2TokenlessSelfTest {
         $goodResult = New-Fb2TokenlessContinuationValidation -Refresh $good -SourcePath "selftest-good.json"
         if (-not [bool]$goodResult.success) {
             $goodResult | ConvertTo-Json -Depth 8
+            $failed++
+        }
+
+        $bridgeGood = New-Fb2TokenlessFixture -TempRoot $tempRoot -BridgeSatisfied
+        $bridgeGood.files.status_refresh = Join-Path $tempRoot "status-refresh-bridge-good.json"
+        Set-Content -LiteralPath ([string]$bridgeGood.files.status_refresh) -Value ($bridgeGood | ConvertTo-Json -Depth 8) -Encoding UTF8
+        $bridgeGoodResult = New-Fb2TokenlessContinuationValidation -Refresh $bridgeGood -SourcePath "selftest-bridge-good.json"
+        if (-not [bool]$bridgeGoodResult.success) {
+            $bridgeGoodResult | ConvertTo-Json -Depth 8
             $failed++
         }
 

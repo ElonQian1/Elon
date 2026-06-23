@@ -18,6 +18,23 @@ if (-not $MainBase) {
 }
 $MainBase = $MainBase.TrimEnd("/")
 
+function Set-Fb2DeployDirectNetwork {
+    foreach ($name in @("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy")) {
+        [System.Environment]::SetEnvironmentVariable($name, $null, "Process")
+    }
+    [System.Environment]::SetEnvironmentVariable("NO_PROXY", "*", "Process")
+    [System.Environment]::SetEnvironmentVariable("no_proxy", "*", "Process")
+}
+
+function Invoke-Fb2DeployDirectRest {
+    param(
+        [string]$Uri,
+        [int]$TimeoutSec
+    )
+
+    Invoke-RestMethod -Method Get -Uri $Uri -TimeoutSec $TimeoutSec -NoProxy
+}
+
 function Get-Fb2DeployRepoRoot {
     Split-Path -Parent $PSScriptRoot
 }
@@ -177,8 +194,9 @@ if ($SelfTest) {
 
 $root = Get-Fb2DeployRepoRoot
 $latestRuntimeSha = Get-Fb2DeployLatestRuntimeCommit -Root $root -Paths $RuntimePaths
-$health = Invoke-RestMethod -Method Get -Uri "$MainBase/health" -TimeoutSec $RequestTimeoutSec
-$version = Invoke-RestMethod -Method Get -Uri "$MainBase/api/server/version" -TimeoutSec $RequestTimeoutSec
+Set-Fb2DeployDirectNetwork
+$health = Invoke-Fb2DeployDirectRest -Uri "$MainBase/health" -TimeoutSec $RequestTimeoutSec
+$version = Invoke-Fb2DeployDirectRest -Uri "$MainBase/api/server/version" -TimeoutSec $RequestTimeoutSec
 $deployedContains = Test-Fb2DeployShaContainsRuntime -LatestRuntimeSha $latestRuntimeSha -DeployedSha ([string]$version.gitSha) -Root $root
 $status = New-Fb2MainServerDeployStatus `
     -Base $MainBase `

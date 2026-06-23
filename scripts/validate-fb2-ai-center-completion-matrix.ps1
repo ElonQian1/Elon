@@ -234,12 +234,18 @@ function New-Fb2MatrixValidation {
     $gateVoiceDeferred = [bool](Get-Fb2MatrixProperty $gates "voice_deferred_by_user" $false)
     $tokenPresent = [bool](Get-Fb2MatrixProperty $gates "token_present" $false)
     $nextAction = [string](Get-Fb2MatrixProperty $gates "next_minimum_action" "")
+    $protectedLivePreflightSatisfied = [bool](Get-Fb2MatrixProperty $Refresh "protected_live_preflight_satisfied" $false)
+    $expectedTokenlessReadyNextAction = if ($protectedLivePreflightSatisfied) {
+        "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+    } else {
+        "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
+    }
 
     Add-Fb2MatrixCheck $checks "data goal gate matches non-voice requirements" ($dataGoalComplete -eq (@($nonVoiceIncomplete).Count -eq 0)) ("non_voice_incomplete=$(@($nonVoiceIncomplete | ForEach-Object { $_.id }) -join ',')")
     Add-Fb2MatrixCheck $checks "voice deferred gate matches voice requirement" ($gateVoiceDeferred -eq $voiceDeferred)
     Add-Fb2MatrixCheck $checks "full final implies data goal complete" ((-not $fullFinalComplete) -or $dataGoalComplete)
     Add-Fb2MatrixCheck $checks "full final implies voice complete" ((-not $fullFinalComplete) -or (@($voice).Count -gt 0 -and [bool](Get-Fb2MatrixProperty $voice[0] "complete" $false) -and -not [bool](Get-Fb2MatrixProperty $voice[0] "deferred" $false)))
-    Add-Fb2MatrixCheck $checks "tokenless non-voice ready next action is token preflight" (($tokenPresent -or -not $dataGoalComplete -or $fullFinalComplete) -or $nextAction -eq "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly") ("next=$nextAction")
+    Add-Fb2MatrixCheck $checks "tokenless non-voice ready next action matches protected preflight state" (($tokenPresent -or -not $dataGoalComplete -or $fullFinalComplete) -or $nextAction -eq $expectedTokenlessReadyNextAction) ("expected=$expectedTokenlessReadyNextAction next=$nextAction")
     Add-Fb2MatrixCheck $checks "next action secret safe" (Test-Fb2MatrixSecretSafe -Text $nextAction)
 
     $refreshMissing = @((Get-Fb2MatrixProperty $Refresh "missing_non_voice_requirements" @()))

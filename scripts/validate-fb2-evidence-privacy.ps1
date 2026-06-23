@@ -98,6 +98,12 @@ function Test-Fb2PrivacySecretSafe {
     if ($Text -match '(?i)(bearer|token|password|secret)[=:]\s*(?!<)[A-Za-z0-9_\-\.]{12,}') {
         return $false
     }
+    if ($Text -match '(?i)"(?:FB2_AI_CENTER_TOKEN|FB2_MAIN_PROJECT_SHARED_SECRET|token|password|secret)"\s*:\s*"(?!<)[^"]{6,}"') {
+        return $false
+    }
+    if ($Text -match '(?i)123qwe/123qwe') {
+        return $false
+    }
     return $true
 }
 
@@ -235,15 +241,17 @@ function New-Fb2PrivacyValidation {
     }
 
     $artifactPaths = [System.Collections.Generic.List[string]]::new()
-    foreach ($path in @(
-            $RefreshPath,
-            $StatusPath,
-            [string](Get-Fb2PrivacyProperty $files "goal_audit" ""),
-            [string](Get-Fb2PrivacyProperty $files "handoff" ""),
-            [string](Get-Fb2PrivacyProperty $files "public_contract_status" ""),
-            [string](Get-Fb2PrivacyProperty $files "exported_context_pack_sample_set_validation" ""),
-            (Join-Path $root "target\fb2-ai-center\token-bridge-data-only-preflight-current.json")
-        )) {
+    $candidatePaths = [System.Collections.ArrayList]::new()
+    [void]$candidatePaths.Add($RefreshPath)
+    [void]$candidatePaths.Add($StatusPath)
+    if ($null -ne $files) {
+        foreach ($property in @($files.PSObject.Properties)) {
+            [void]$candidatePaths.Add([string]$property.Value)
+        }
+    }
+    [void]$candidatePaths.Add((Join-Path $root "target\fb2-ai-center\token-bridge-data-only-preflight-current.json"))
+
+    foreach ($path in @($candidatePaths)) {
         if (-not [string]::IsNullOrWhiteSpace($path)) {
             $resolved = Resolve-Fb2PrivacyPath -Path $path -Root $root
             if (-not $artifactPaths.Contains($resolved)) {
@@ -284,13 +292,17 @@ function New-Fb2PrivacyValidation {
             [void]$secretUnsafeFiles.Add($path)
         }
 
-        try {
-            $json = $rawText | ConvertFrom-Json
-            foreach ($finding in @(Find-Fb2PrivacyRawEvidence -Node $json -Path ([System.IO.Path]::GetFileName($path)))) {
-                [void]$rawFindings.Add($finding)
+        $extension = [System.IO.Path]::GetExtension($path)
+        $looksLikeJson = $extension -ieq ".json" -or $rawText.TrimStart().StartsWith("{") -or $rawText.TrimStart().StartsWith("[")
+        if ($looksLikeJson) {
+            try {
+                $json = $rawText | ConvertFrom-Json
+                foreach ($finding in @(Find-Fb2PrivacyRawEvidence -Node $json -Path ([System.IO.Path]::GetFileName($path)))) {
+                    [void]$rawFindings.Add($finding)
+                }
+            } catch {
+                Add-Fb2PrivacyCheck $checks "artifact parseable $([System.IO.Path]::GetFileName($path))" $false $_.Exception.Message
             }
-        } catch {
-            Add-Fb2PrivacyCheck $checks "artifact parseable $([System.IO.Path]::GetFileName($path))" $false $_.Exception.Message
         }
     }
 
@@ -350,6 +362,8 @@ function Invoke-Fb2PrivacySelfTest {
         $statusPath = Join-Path $tempRoot "status.json"
         $goalPath = Join-Path $tempRoot "goal.json"
         $handoffPath = Join-Path $tempRoot "handoff.json"
+        $handoffMarkdownPath = Join-Path $tempRoot "handoff.md"
+        $handoffPromptPath = Join-Path $tempRoot "handoff-prompt.md"
         $publicPath = Join-Path $tempRoot "public.json"
         $samplesPath = Join-Path $tempRoot "samples.json"
         $refreshPath = Join-Path $tempRoot "refresh.json"
@@ -384,6 +398,8 @@ function Invoke-Fb2PrivacySelfTest {
                 status = $statusPath
                 goal_audit = $goalPath
                 handoff = $handoffPath
+                handoff_markdown = $handoffMarkdownPath
+                handoff_prompt = $handoffPromptPath
                 public_contract_status = $publicPath
                 exported_context_pack_sample_set_validation = $samplesPath
             }
@@ -398,6 +414,8 @@ function Invoke-Fb2PrivacySelfTest {
             )) {
             $pair[1] | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $pair[0] -Encoding UTF8
         }
+        Set-Content -LiteralPath $handoffMarkdownPath -Value "safe handoff uses -Fb2Password <FB2_PASSWORD>" -Encoding UTF8
+        Set-Content -LiteralPath $handoffPromptPath -Value "safe prompt uses <FB2_AI_CENTER_TOKEN>" -Encoding UTF8
 
         $good = New-Fb2PrivacyValidation -RefreshPath $refreshPath -OutputPath $outputPath
         $badSecretPath = Join-Path $tempRoot "bad-secret.json"
@@ -418,11 +436,18 @@ function Invoke-Fb2PrivacySelfTest {
         [ordered]@{ schema = "fb2.main_project.status_refresh.v1"; files = [ordered]@{ status = $badEvidencePath } } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $badEvidenceRefreshPath -Encoding UTF8
         $badEvidence = New-Fb2PrivacyValidation -RefreshPath $badEvidenceRefreshPath -OutputPath (Join-Path $tempRoot "bad-evidence-out.json")
 
+        $badMarkdownPath = Join-Path $tempRoot "bad-secret.md"
+        $badMarkdownRefreshPath = Join-Path $tempRoot "bad-markdown-refresh.json"
+        Set-Content -LiteralPath $badMarkdownPath -Value "pwsh -File smoke.ps1 -Fb2Password 123qwe" -Encoding UTF8
+        [ordered]@{ schema = "fb2.main_project.status_refresh.v1"; files = [ordered]@{ status = $statusPath; handoff_markdown = $badMarkdownPath } } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $badMarkdownRefreshPath -Encoding UTF8
+        $badMarkdown = New-Fb2PrivacyValidation -RefreshPath $badMarkdownRefreshPath -OutputPath (Join-Path $tempRoot "bad-markdown-out.json")
+
         $failed = 0
         if (-not [bool]$good.success) { $failed++ }
         if ([bool]$badSecret.success) { $failed++ }
         if ([bool]$badRaw.success) { $failed++ }
         if ([bool]$badEvidence.success) { $failed++ }
+        if ([bool]$badMarkdown.success) { $failed++ }
 
         Write-Output "== SelfTest Summary =="
         Write-Output "failed=$failed"

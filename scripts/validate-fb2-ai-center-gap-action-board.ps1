@@ -110,6 +110,11 @@ function New-Fb2GapValidation {
     $ownerNextActions = Get-Fb2GapProperty $Refresh "owner_next_actions"
     $nextCommands = Get-Fb2GapProperty $Refresh "next_commands"
     $actions = @(Get-Fb2GapProperty $board "actions" @())
+    $protectedLivePreflightSatisfied = (
+        [bool](Get-Fb2GapProperty $Refresh "protected_live_preflight_satisfied" $false) -or
+        [bool](Get-Fb2GapProperty $blocking "protected_live_preflight_satisfied" $false) -or
+        [bool](Get-Fb2GapProperty $board "protected_live_preflight_satisfied" $false)
+    )
 
     Add-Fb2GapCheck $checks "gap board schema" ([string](Get-Fb2GapProperty $board "schema" "") -eq "fb2.main_project.gap_action_board.v1")
     Add-Fb2GapCheck $checks "action count matches" ([int](Get-Fb2GapProperty $board "action_count" 0) -eq @($actions).Count) ("declared=$([int](Get-Fb2GapProperty $board 'action_count' 0)) actual=$(@($actions).Count)")
@@ -121,7 +126,13 @@ function New-Fb2GapValidation {
         $requiresSecret = @(Get-Fb2GapProperty $blocking "requires_secret" @()) | ForEach-Object { [string]$_ }
         $deferredByUser = @(Get-Fb2GapProperty $blocking "deferred_by_user" @()) | ForEach-Object { [string]$_ }
         Add-Fb2GapCheck $checks "blocking state uses external token" ([string](Get-Fb2GapProperty $blocking "external_secret" "") -eq "FB2_AI_CENTER_TOKEN")
-        Add-Fb2GapCheck $checks "blocking state marks token blocker" ([bool](Get-Fb2GapProperty $blocking "blocked_by_external_secret" $false))
+        Add-Fb2GapCheck $checks "blocking state matches protected preflight state" (
+            [bool](Get-Fb2GapProperty $blocking "blocked_by_external_secret" $true) -eq (-not $protectedLivePreflightSatisfied)
+        )
+        Add-Fb2GapCheck $checks "protected preflight source recorded when satisfied" (
+            (-not $protectedLivePreflightSatisfied) -or
+            [string](Get-Fb2GapProperty $blocking "protected_live_preflight_satisfied_by" "") -eq "token_bridge_live_preflight"
+        )
         Add-Fb2GapCheck $checks "blocking next action matches gap board" (
             [string](Get-Fb2GapProperty $blocking "next_minimum_action" "") -eq [string](Get-Fb2GapProperty $board "next_minimum_action" "")
         )
@@ -130,7 +141,8 @@ function New-Fb2GapValidation {
                 "public_contract_regression",
                 "status_refresh_selftest",
                 "offline_context_pack_sample_validation",
-                "handoff_documentation"
+                "handoff_documentation",
+                "token_bridge_live_preflight_regression"
             )) {
             Add-Fb2GapCheck $checks "blocking safe without secret $item" ($safeWithoutSecret -contains $item)
         }
@@ -152,19 +164,34 @@ function New-Fb2GapValidation {
         $mainProjectAction = [string](Get-Fb2GapProperty $ownerNextActions "main_project" "")
         $fb2ProjectAction = [string](Get-Fb2GapProperty $ownerNextActions "fb2_project" "")
         $sharedAction = [string](Get-Fb2GapProperty $ownerNextActions "shared" "")
-        Add-Fb2GapCheck $checks "owner main project keeps regressions green" (
-            $mainProjectAction -match "contract" -and
-            $mainProjectAction -match "status" -and
-            $mainProjectAction -match "FB2_AI_CENTER_TOKEN"
-        )
-        Add-Fb2GapCheck $checks "owner fb2 project provides token or live evidence" (
-            $fb2ProjectAction -match "FB2_AI_CENTER_TOKEN" -and
-            $fb2ProjectAction -match "live_Context_Pack|Context_Pack|Context Pack|permission|quality"
-        )
-        Add-Fb2GapCheck $checks "owner shared runs token preflight" (
-            $sharedAction -match "DataOnlyAcceptance_PreflightOnly" -and
-            $sharedAction -match "token|FB2_AI_CENTER_TOKEN"
-        )
+        if ($protectedLivePreflightSatisfied) {
+            Add-Fb2GapCheck $checks "owner main project keeps bridge regressions green" (
+                $mainProjectAction -match "contract" -and
+                $mainProjectAction -match "status" -and
+                $mainProjectAction -match "token_bridge"
+            )
+            Add-Fb2GapCheck $checks "owner fb2 project keeps live endpoints current" (
+                $fb2ProjectAction -match "live_context_pack|context_pack|orders|platform_summary|group_opinion|feedback"
+            )
+            Add-Fb2GapCheck $checks "owner shared records bridge satisfied and voice deferred" (
+                $sharedAction -match "token_bridge" -and
+                $sharedAction -match "ASR_TTS"
+            )
+        } else {
+            Add-Fb2GapCheck $checks "owner main project keeps regressions green" (
+                $mainProjectAction -match "contract" -and
+                $mainProjectAction -match "status" -and
+                $mainProjectAction -match "FB2_AI_CENTER_TOKEN"
+            )
+            Add-Fb2GapCheck $checks "owner fb2 project provides token or live evidence" (
+                $fb2ProjectAction -match "FB2_AI_CENTER_TOKEN" -and
+                $fb2ProjectAction -match "live_Context_Pack|Context_Pack|Context Pack|permission|quality"
+            )
+            Add-Fb2GapCheck $checks "owner shared runs token preflight" (
+                $sharedAction -match "DataOnlyAcceptance_PreflightOnly" -and
+                $sharedAction -match "token|FB2_AI_CENTER_TOKEN"
+            )
+        }
         Add-Fb2GapCheck $checks "owner actions secret safe" (
             (Test-Fb2GapSecretSafe -Text $mainProjectAction) -and
             (Test-Fb2GapSecretSafe -Text $fb2ProjectAction) -and
@@ -295,8 +322,12 @@ function New-Fb2GapValidation {
     }
 
     $tokenAction = Find-Fb2GapAction -Actions $actions -Id "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh"
-    Add-Fb2GapCheck $checks "token refresh action exists" (@($tokenAction).Count -gt 0)
-    if (@($tokenAction).Count -gt 0) {
+    if ($protectedLivePreflightSatisfied) {
+        Add-Fb2GapCheck $checks "token refresh action absent after protected preflight" (@($tokenAction).Count -eq 0)
+    } else {
+        Add-Fb2GapCheck $checks "token refresh action exists" (@($tokenAction).Count -gt 0)
+    }
+    if (-not $protectedLivePreflightSatisfied -and @($tokenAction).Count -gt 0) {
         $command = [string](Get-Fb2GapProperty $tokenAction[0] "command" "")
         Add-Fb2GapCheck $checks "token refresh action blocked by secret" ([string](Get-Fb2GapProperty $tokenAction[0] "status" "") -eq "blocked_by_external_secret")
         Add-Fb2GapCheck $checks "token refresh action no write group" (-not [bool](Get-Fb2GapProperty $tokenAction[0] "requires_visible_group_write" $true))
@@ -352,7 +383,8 @@ function Invoke-Fb2GapSelfTest {
                     "public_contract_regression",
                     "status_refresh_selftest",
                     "offline_context_pack_sample_validation",
-                    "handoff_documentation"
+                    "handoff_documentation",
+                    "token_bridge_live_preflight_regression"
                 )
                 requires_secret = @(
                     "live_context_pack_permission_quality_refresh",
@@ -433,6 +465,26 @@ function Invoke-Fb2GapSelfTest {
         if (-not [bool]$validation.success) {
             $validation | ConvertTo-Json -Depth 8
             throw "SelfTest failed: gap validation fixture failed"
+        }
+        $bridgeFixture = $fixture | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        $bridgeFixture.owner_next_actions.main_project = "keep_contract_status_and_token_bridge_regressions_green_until_ASR_TTS_resumes"
+        $bridgeFixture.owner_next_actions.fb2_project = "keep_live_context_pack_orders_platform_summary_group_opinion_and_feedback_endpoints_current"
+        $bridgeFixture.owner_next_actions.shared = "non_voice_live_preflight_satisfied_by_token_bridge_ASR_TTS_final_evidence_deferred_by_user"
+        $bridgeFixture.blocking_state.blocked_by_external_secret = $false
+        $bridgeFixture.blocking_state | Add-Member -NotePropertyName "protected_live_preflight_satisfied" -NotePropertyValue $true -Force
+        $bridgeFixture.blocking_state | Add-Member -NotePropertyName "protected_live_preflight_satisfied_by" -NotePropertyValue "token_bridge_live_preflight" -Force
+        $bridgeFixture.blocking_state.next_minimum_action = "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+        $bridgeFixture.gap_action_board.next_minimum_action = "keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses"
+        $bridgeFixture.gap_action_board | Add-Member -NotePropertyName "blocked_by_external_secret" -NotePropertyValue $false -Force
+        $bridgeFixture.gap_action_board | Add-Member -NotePropertyName "protected_live_preflight_satisfied" -NotePropertyValue $true -Force
+        $bridgeFixture.gap_action_board.actions = @(
+            $bridgeFixture.gap_action_board.actions | Where-Object { [string]$_.id -ne "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh" }
+        )
+        $bridgeFixture.gap_action_board.action_count = @($bridgeFixture.gap_action_board.actions).Count
+        $bridgeValidation = New-Fb2GapValidation -Refresh $bridgeFixture -SourcePath "selftest-bridge-satisfied.json"
+        if (-not [bool]$bridgeValidation.success) {
+            $bridgeValidation | ConvertTo-Json -Depth 8
+            throw "SelfTest failed: bridge satisfied gap validation fixture failed"
         }
         $badFixture = $fixture | ConvertTo-Json -Depth 8 | ConvertFrom-Json
         $badFixture.blocking_state.safe_to_continue_without_secret = @("public_contract_regression", "status_refresh_selftest")

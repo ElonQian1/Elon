@@ -9,6 +9,8 @@
 - 第一阶段不做完整 MCP/RAG。先用 HTTP Context Pack，把 fb2 业务上下文转成模型友好的 Markdown/XML，再由主项目注入群聊 AI；后续 MCP 只能作为现有 REST Context Pack、tool manifest 和 tools/execute 的适配包装层，不能另立事实源。
 - ASR、TTS、Context Pack 拉取免费；只有 AI 生成回复内容消耗 token/额度。
 - fb2 不应该复制主项目内部聊天页代码。Android 原生侧优先接 `android/chat-voice-kit`，H5/WebView 侧按 `ChatVoiceInteractionContract` 还原。
+- 当前非语音 live 数据预检已可由主项目 token bridge 证明：当 bridge 证据新鲜且 no-write/direct-no-proxy 时，`status-refresh-current.json.protected_live_preflight_satisfied=true`、`blocked_by_external_secret=false`；下一步是保持非语音回归为绿，ASR/TTS 按用户暂停状态等待恢复。
+- 访问主项目/fb2 项目资源默认不走代理；状态脚本应清空常见 proxy 环境变量、设置 `NO_PROXY/no_proxy=*`，并在 PowerShell HTTP 请求使用 `-NoProxy`。
 
 ## 已有主项目能力
 
@@ -57,7 +59,7 @@ fb2 子项目实现 `/api/main-project/context/pack` 时，优先读取主项目
 
 真实群聊验收必须以接口直读为准：`smoke-fb2-visible-chat.ps1` 和最终 wrapper 要读取群聊 baseline、`@EL` seed/回复、selected-message seed/`AI回复`、summary post 和 feedback/quality 结果，并把消息 ID、记录数、正文长度、正文 sha256、匹配/未匹配统计写入日志和 summary。最终 wrapper 的 summary 必须包含 `visible_direct_read_complete=true` 和 `visible_direct_read_evidence`，记录 baseline 群消息读取、`@EL` seed/回复回读、selected-message seed/回复回读和 summary-post 回读；缺任一接口回读正文证据时，最终 `success` 必须为 false。截图只能辅助排查 UI，不得作为“AI 已在群聊回答、引用和反馈已闭环”的证明。
 
-只需要确认当前账号能通过主项目群聊 API 直接读到 fb2 群消息时，先跑无写入预检：`scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password 123qwe`。它只做 session bridge、群成员检查和 baseline 消息读取，输出 `text_len`、`text_sha256` 和 `writes=false`，并写出 `fb2.main_project.visible_chat_readonly.v1` summary JSON；summary 会带最近 20 条消息的 `recent_messages` 索引，只保存消息 ID、类型、发送方、时间、正文长度和 sha256，不保存正文。该模式不会发送 `@EL`、不会触发 selected-message `AI回复`、不会创建总结帖。
+只需要确认当前账号能通过主项目群聊 API 直接读到 fb2 群消息时，先跑无写入预检：`scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>`。它只做 session bridge、群成员检查和 baseline 消息读取，输出 `text_len`、`text_sha256` 和 `writes=false`，并写出 `fb2.main_project.visible_chat_readonly.v1` summary JSON；summary 会带最近 20 条消息的 `recent_messages` 索引，只保存消息 ID、类型、发送方、时间、正文长度和 sha256，不保存正文。该模式不会发送 `@EL`、不会触发 selected-message `AI回复`、不会创建总结帖。
 
 需要独立验证本地证据没有保存群聊正文、订单明细或真实密钥时，跑 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-evidence-privacy.ps1 -RefreshPath target\fb2-ai-center\status-refresh-current.json`。输出 schema 为 `fb2.main_project.evidence_privacy_validation.v1`，会读取 refresh/status/goal-audit/handoff/public-contract/sample validation 等 JSON artifact，拒绝真实 `FB2_AI_CENTER_TOKEN` / 密码、`text/content/body/message_text/raw_text/sample_text/full_text` 等正文承载字段，以及 `<fb2_context_pack>` 原文体；合格证据只能保留 `message_id`、`source_ids`、`text_len`、`text_sha256`、`context_pack_sha256`、audit id 和统计字段。
 
@@ -68,8 +70,8 @@ readiness 和总结帖状态也要分层：full final 必须要求 fb2 authentic
 `-DataOnlyAcceptance -AllowVisibleMessages` 默认仍要求 `MinOpinionAdoptionCount=1`，避免真实群聊只产生 feedback 却没有观点采纳闭环。只有明确要做短窗口回归且接受“本轮不新增观点采纳”时，才允许加 `-AllowNoNewOpinionAdoptionInShortWindow`；该 opt-out 不能作为 full final 的观点采纳证据。
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>
-pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password 123qwe -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>
 ```
 
 ```powershell
