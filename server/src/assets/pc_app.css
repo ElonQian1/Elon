@@ -859,7 +859,7 @@ button { cursor: pointer; }
   min-width: 0;
   min-height: 0;
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr) 72px;
+  grid-template-rows: 58px minmax(0, 1fr) auto auto;
   background: #242529;
 }
 .pc-shell.has-auth-banner .chat-column {
@@ -1560,13 +1560,16 @@ button { cursor: pointer; }
   grid-template-columns: 42px minmax(0, 1fr) 68px;
   gap: 10px;
   align-items: end;
+  min-height: 72px;
   padding: 12px 16px;
   border-top: 1px solid #1b1c20;
 }
 .composer textarea {
   height: 46px;
+  min-height: 46px;
   max-height: 120px;
   resize: none;
+  overflow-y: hidden;
   border: 0;
   border-radius: 8px;
   outline: none;

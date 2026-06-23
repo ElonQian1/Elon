@@ -13,6 +13,7 @@ mod agent;
 mod agent_api_loop;
 mod agent_balloon;
 mod agent_config;
+mod agent_fallback;
 mod agent_intent;
 mod agent_llm_call;
 mod agent_prompts;

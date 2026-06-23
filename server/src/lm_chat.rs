@@ -22,7 +22,7 @@ use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     agent_api_loop::resolve_agent,
-    agent_llm_call::call_chat_llm,
+    agent_fallback::call_chat_llm_with_default_fallback_options,
     conversation_router::{resolve_system_conversation_route, ConversationEntryKind},
     project_auth::{auth_from_headers, json_error},
     types::AppState,
@@ -147,8 +147,25 @@ pub async fn lm_chat_handler(
         }
     };
 
-    let response = match call_chat_llm(&state, &agent, &messages, &user.id, "lm_chat").await {
-        Ok(r) => r,
+    let allow_agent_fallback = req
+        .agent
+        .as_deref()
+        .map(str::trim)
+        .unwrap_or("")
+        .is_empty();
+    let (response, used_agent, used_fallback) = match call_chat_llm_with_default_fallback_options(
+        &state,
+        &agent,
+        allow_agent_fallback,
+        &messages,
+        &user.id,
+        "lm_chat",
+        0.8,
+        700,
+    )
+    .await
+    {
+        Ok(result) => result,
         Err(e) => {
             return json_error(
                 StatusCode::INTERNAL_SERVER_ERROR,
@@ -156,6 +173,15 @@ pub async fn lm_chat_handler(
             );
         }
     };
+    if used_fallback {
+        tracing::warn!(
+            user_id = %user.id,
+            preferred_agent = %agent.name,
+            used_agent = %used_agent.name,
+            model = %used_agent.model,
+            "默认聊天模型失败后已自动切换备用代理"
+        );
+    }
 
     let reply = response["choices"][0]["message"]["content"]
         .as_str()
@@ -218,6 +244,9 @@ pub async fn lm_chat_handler(
         "conversation_id": conversation_id,
         "project_id": route.project_id,
         "project_name": route.project_name,
+        "agent_used": used_agent.name,
+        "model_used": used_agent.model,
+        "agent_fallback": used_fallback,
         "scope": route.entry_key,
     }))
     .into_response()

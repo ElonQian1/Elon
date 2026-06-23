@@ -370,6 +370,22 @@
     el.classList.toggle('show', n > 0);
   }
 
+  function resetComposerInputHeight() {
+    if (!els.input) return;
+    els.input.style.height = '46px';
+    els.input.style.overflowY = 'hidden';
+  }
+
+  function autosizeComposerInput() {
+    if (!els.input) return;
+    const minHeight = 46;
+    const maxHeight = 120;
+    els.input.style.height = `${minHeight}px`;
+    const nextHeight = Math.min(maxHeight, Math.max(minHeight, els.input.scrollHeight));
+    els.input.style.height = `${nextHeight}px`;
+    els.input.style.overflowY = els.input.scrollHeight > maxHeight ? 'auto' : 'hidden';
+  }
+
   function setAuthClaimBanner(visible) {
     if (!els.authClaimBanner || !els.pcShell) return;
     els.authClaimBanner.hidden = !visible;
@@ -1281,8 +1297,7 @@
       sendCurrentMessage(false);
     });
     els.input.addEventListener('input', () => {
-      els.input.style.height = '46px';
-      els.input.style.height = Math.min(120, els.input.scrollHeight) + 'px';
+      autosizeComposerInput();
     });
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && els.pcAuthBackdrop && !els.pcAuthBackdrop.hidden) {
@@ -2452,7 +2467,7 @@
       if (state.activeKind === 'doctor') {
         await doctor.sendComposerMessage(content);
         els.input.value = '';
-        els.input.style.height = '46px';
+        resetComposerInputHeight();
       } else if (state.activeKind === 'ai') {
         const conversationId = state.activeAiConversationId || newAiConversationId();
         const conversationTitle = state.activeAiConversationTitle || aiTitleFromContent(content);
@@ -2468,7 +2483,7 @@
         if (agent) body.agent = agent;
         await api('/api/llm/chat', { method: 'POST', body: JSON.stringify(body) });
         els.input.value = '';
-        els.input.style.height = '46px';
+        resetComposerInputHeight();
         await loadAiConversations();
         await selectAiAssistant(true, conversationId);
       } else if (state.activeKind === 'friends' && state.activePeer) {
@@ -2477,6 +2492,7 @@
           : `/api/me/friends/${encodeURIComponent(state.activePeer.id)}/messages`;
         await api(path, { method: 'POST', body: JSON.stringify({ content }) });
         els.input.value = '';
+        resetComposerInputHeight();
         await selectPeer(state.activePeer.kind, state.activePeer.id);
       } else if (state.activeKind === 'project-conversation' && state.activeProjectId && state.activeConversationId) {
         const project = projectById(state.activeProjectId);
@@ -2491,7 +2507,7 @@
         const agent = models.selectedAgentForRequest();
         if (agent) body.agent = agent;
         els.input.value = '';
-        els.input.style.height = '46px';
+        resetComposerInputHeight();
         els.messageList.innerHTML = `<div class="empty-state">
           <strong>一龙AI正在处理</strong>
           <p>这条对话会保存在「${escapeHtml(project ? titleOf(project) : '当前项目')}」下面。</p>
@@ -2520,6 +2536,7 @@
         }
         await api(path, { method: 'POST', body: JSON.stringify(body) });
         els.input.value = '';
+        resetComposerInputHeight();
         await selectProjectChannel(state.activeChannelId);
       }
     } catch (error) {
