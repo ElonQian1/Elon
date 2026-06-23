@@ -25,6 +25,7 @@ function Get-Fb2GoalCompletionState {
         [bool]$VisibleAnswerPolicyComplete,
         [bool]$ContextProjectionComplete,
         [bool]$VoiceEvidencePathPresent,
+        [bool]$FullFinalAcceptanceComplete = $false,
         [object]$FinalEvidence
     )
 
@@ -50,12 +51,15 @@ function Get-Fb2GoalCompletionState {
     if ($VisibleAnswerPolicyComplete) { $readyItems += "visible_answer_policy" } else { $missingItems += "visible_answer_policy" }
     if ($permissionQualityReady) { $readyItems += "permission_quality_feedback" } else { $missingItems += "permission_quality_feedback" }
     if ($VoiceEvidencePathPresent) { $readyItems += "voice_final_evidence_path_present" } else { $missingItems += "voice_final_evidence_path_present" }
+    if ($FullFinalAcceptanceComplete) { $readyItems += "same_batch_full_final_acceptance" } else { $missingItems += "same_batch_full_final_acceptance" }
 
     $nonVoiceReady = ($contextDataReady -and $hasMyTicketOrders -and $hasPlatformSummary -and $groupChatDirectReadReady -and $visibleAiFeedbackReady -and $VisibleAnswerPolicyComplete -and $permissionQualityReady)
-    $fullFinalReady = ($nonVoiceReady -and $VoiceEvidencePathPresent)
+    $fullFinalReady = ($nonVoiceReady -and $VoiceEvidencePathPresent -and $FullFinalAcceptanceComplete)
 
     $stage = if ($fullFinalReady) {
-        "full_final_evidence_path_present"
+        "full_final_acceptance_ready"
+    } elseif ($nonVoiceReady -and $VoiceEvidencePathPresent) {
+        "non_voice_data_chat_permission_quality_ready_waiting_full_final_acceptance"
     } elseif ($nonVoiceReady) {
         "non_voice_data_chat_permission_quality_ready_voice_deferred"
     } elseif ($groupChatDirectReadReady -or $contextDataReady) {
@@ -65,6 +69,8 @@ function Get-Fb2GoalCompletionState {
     }
 
     $nextMinimumAction = if ($fullFinalReady) {
+        "full_final_ready_verify_current_release_state"
+    } elseif ($nonVoiceReady -and $VoiceEvidencePathPresent) {
         "run_full_final_acceptance_with_current_voice_evidence"
     } elseif ($nonVoiceReady) {
         "resume_ASR_TTS_later_and_provide_final_ready_voice_device_evidence"
@@ -88,6 +94,7 @@ function Get-Fb2GoalCompletionState {
             visible_answer_policy = $VisibleAnswerPolicyComplete
             permission_quality_feedback = $permissionQualityReady
             voice_final_evidence_path_present = $VoiceEvidencePathPresent
+            same_batch_full_final_acceptance = $FullFinalAcceptanceComplete
         }
         next_minimum_action = $nextMinimumAction
     }

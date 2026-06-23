@@ -170,6 +170,60 @@ function Test-TruthyJsonValue {
     return ([string]$Value) -match "^(true|True|1)$"
 }
 
+function Test-Fb2StatusExitCodeZero {
+    param([object]$Value)
+
+    if ($null -eq $Value) {
+        return $false
+    }
+    return ([string]$Value) -eq "0"
+}
+
+function Get-Fb2FullFinalAcceptanceSummaryState {
+    param(
+        [object]$LatestFinal,
+        [bool]$FullFinalSuccess,
+        [bool]$FullFinalFeedbackComplete,
+        [bool]$FullFinalDirectReadComplete
+    )
+
+    $exists = $null -ne $LatestFinal
+    $mode = [string](Get-JsonProperty $LatestFinal "mode" "")
+    $acceptanceScope = [string](Get-JsonProperty $LatestFinal "acceptance_scope" "")
+    $voiceStatus = [string](Get-JsonProperty $LatestFinal "voice_status" "")
+    $visibleExitZero = Test-Fb2StatusExitCodeZero (Get-JsonProperty $LatestFinal "visible_chat_exit_code")
+    $centerExitZero = Test-Fb2StatusExitCodeZero (Get-JsonProperty $LatestFinal "final_acceptance_exit_code")
+    $missing = @()
+
+    if (-not $exists) { $missing += "final_acceptance_summary" }
+    if (-not $FullFinalSuccess) { $missing += "success" }
+    if ($mode -ne "visible_final_acceptance") { $missing += "mode_visible_final_acceptance" }
+    if ($acceptanceScope -ne "full_final_acceptance") { $missing += "acceptance_scope_full_final_acceptance" }
+    if ($voiceStatus -ne "required") { $missing += "voice_status_required" }
+    if (-not $visibleExitZero) { $missing += "visible_chat_exit_code_zero" }
+    if (-not $centerExitZero) { $missing += "final_acceptance_exit_code_zero" }
+    if (-not $FullFinalFeedbackComplete) { $missing += "feedback_complete" }
+    if (-not $FullFinalDirectReadComplete) { $missing += "direct_read_evidence_complete" }
+
+    [ordered]@{
+        complete = ($exists `
+            -and $FullFinalSuccess `
+            -and $mode -eq "visible_final_acceptance" `
+            -and $acceptanceScope -eq "full_final_acceptance" `
+            -and $voiceStatus -eq "required" `
+            -and $visibleExitZero `
+            -and $centerExitZero `
+            -and $FullFinalFeedbackComplete `
+            -and $FullFinalDirectReadComplete)
+        missing = @($missing)
+        mode = $mode
+        acceptance_scope = $acceptanceScope
+        voice_status = $voiceStatus
+        visible_chat_exit_code_zero = $visibleExitZero
+        final_acceptance_exit_code_zero = $centerExitZero
+    }
+}
+
 function Get-GitValueOrEmpty {
     param([string[]]$GitArgs)
 
@@ -232,6 +286,11 @@ function Build-Fb2AiCenterStatusSnapshot {
     $fullFinalFeedbackComplete = Test-TruthyJsonValue (Get-JsonProperty $fullFinalFeedbackCoverage "complete")
     $fullFinalDirectReadState = Get-Fb2DataOnlyDirectReadEvidenceState $latestFinal
     $fullFinalDirectReadComplete = [bool]$fullFinalDirectReadState.complete
+    $fullFinalAcceptanceState = Get-Fb2FullFinalAcceptanceSummaryState `
+        -LatestFinal $latestFinal `
+        -FullFinalSuccess $fullFinalSuccess `
+        -FullFinalFeedbackComplete $fullFinalFeedbackComplete `
+        -FullFinalDirectReadComplete $fullFinalDirectReadComplete
     $tokenPresent = -not [string]::IsNullOrWhiteSpace($env:FB2_AI_CENTER_TOKEN)
     $voiceEvidencePath = [string]$env:FB2_VOICE_DEVICE_EVIDENCE_PATH
     $voiceEvidencePathPresent = -not [string]::IsNullOrWhiteSpace($voiceEvidencePath)
@@ -243,6 +302,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -VisibleAnswerPolicyComplete $visibleAnswerPolicyComplete `
         -ContextProjectionComplete ([bool]$contextProjectionState.complete) `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent `
+        -FullFinalAcceptanceComplete ([bool]$fullFinalAcceptanceState.complete) `
         -FinalEvidence $finalEvidence
     $userScenarioAudit = Get-Fb2UserScenarioAuditState `
         -LatestData $latestData `
@@ -424,6 +484,8 @@ function Build-Fb2AiCenterStatusSnapshot {
             feedback_complete = $fullFinalFeedbackComplete
             direct_read_evidence_complete = $fullFinalDirectReadComplete
             direct_read_evidence_mode = [string]$fullFinalDirectReadState.mode
+            full_final_summary_complete = [bool]$fullFinalAcceptanceState.complete
+            full_final_summary_missing = @($fullFinalAcceptanceState.missing)
             final_acceptance_exit_code = [string](Get-JsonProperty $latestFinal "final_acceptance_exit_code" "")
             visible_chat_exit_code = [string](Get-JsonProperty $latestFinal "visible_chat_exit_code" "")
             scenario_my_ticket_orders = [string](Get-JsonProperty $fullFinalEvidence "scenario_my_ticket_orders" "")
@@ -463,6 +525,7 @@ function Build-Fb2AiCenterStatusSnapshot {
 
 function Invoke-Fb2StatusSelfTest {
     $tmp = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-ai-status-{0}" -f ([guid]::NewGuid().ToString("N")))
+    $previousVoiceEvidencePath = [Environment]::GetEnvironmentVariable("FB2_VOICE_DEVICE_EVIDENCE_PATH", "Process")
     New-Item -ItemType Directory -Path $tmp -Force | Out-Null
     try {
         $data = [ordered]@{
@@ -694,6 +757,13 @@ function Invoke-Fb2StatusSelfTest {
         ) | Set-Content -Path (Join-Path $tmp "data-only-acceptance-test-ai-center.log") -Encoding UTF8
         $snapshot = Build-Fb2AiCenterStatusSnapshot -Directory $tmp
         $failed = 0
+        $env:FB2_VOICE_DEVICE_EVIDENCE_PATH = Join-Path $tmp "voice-device-evidence.json"
+        $voicePathOnlySnapshot = Build-Fb2AiCenterStatusSnapshot -Directory $tmp
+        if (-not [bool]$voicePathOnlySnapshot.goal_completion.non_voice_ready) { $failed++ }
+        if ([bool]$voicePathOnlySnapshot.goal_completion.full_final_ready) { $failed++ }
+        if (-not (@($voicePathOnlySnapshot.goal_completion.missing_items) -contains "same_batch_full_final_acceptance")) { $failed++ }
+        if ([bool]$voicePathOnlySnapshot.latest_final_acceptance.full_final_summary_complete) { $failed++ }
+        if (-not (@($voicePathOnlySnapshot.latest_final_acceptance.full_final_summary_missing) -contains "final_acceptance_summary")) { $failed++ }
         if (-not [bool]$snapshot.latest_data_only_acceptance.success) { $failed++ }
         if (-not [bool]$snapshot.latest_read_only_direct_read.complete) { $failed++ }
         $leakyReadOnly = $readOnly.PSObject.Copy()
@@ -826,6 +896,11 @@ function Invoke-Fb2StatusSelfTest {
             exit 1
         }
     } finally {
+        if ($null -eq $previousVoiceEvidencePath) {
+            Remove-Item Env:\FB2_VOICE_DEVICE_EVIDENCE_PATH -ErrorAction SilentlyContinue
+        } else {
+            $env:FB2_VOICE_DEVICE_EVIDENCE_PATH = $previousVoiceEvidencePath
+        }
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
