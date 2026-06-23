@@ -156,6 +156,7 @@ mod project_ws_session;
 mod read_receipt_events;
 mod release_claim;
 mod release_manager;
+mod route_c_admin;
 mod router;
 mod server_agent_runtime;
 mod server_agent_runtime_budget;

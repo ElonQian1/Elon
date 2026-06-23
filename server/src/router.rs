@@ -20,9 +20,9 @@ use crate::{
     project_conversation_identity, project_deletion, project_docs, project_downloads, project_git,
     project_join_requests, project_landing_api, project_membership, project_runtime_permission_api,
     project_space, project_space_task_snapshot, project_storage_git, project_store,
-    project_workspace_health, project_workspace_recovery, release_claim, server_agent_runtime,
-    speech_translate, token_usage_api, user_api, user_archive_api, user_memory_api,
-    voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
+    project_workspace_health, project_workspace_recovery, release_claim, route_c_admin,
+    server_agent_runtime, speech_translate, token_usage_api, user_api, user_archive_api,
+    user_memory_api, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
     voice_ws_virtual_mic, web,
 };
 
@@ -859,6 +859,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/admin/node-compute-runs",
             get(node_compute_admin::list_runs),
+        )
+        .route(
+            "/api/admin/route-c/budget",
+            get(route_c_admin::budget_report),
         )
         .route(
             "/api/admin/node-payouts/:payout_id/paid",
