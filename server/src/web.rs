@@ -45,6 +45,7 @@ const PC_APP_NOTIFICATIONS_JS: &str = include_str!("assets/pc_app_notifications.
 const PC_APP_MODELS_JS: &str = include_str!("assets/pc_app_models.js");
 const PC_APP_DEV_COMPOSER_JS: &str = include_str!("assets/pc_app_dev_composer.js");
 const PC_APP_DEV_TASKS_JS: &str = include_str!("assets/pc_app_dev_tasks.js");
+const PC_APP_AGENT_RUNS_JS: &str = include_str!("assets/pc_app_agent_runs.js");
 const PC_APP_TASK_SNAPSHOTS_JS: &str = include_str!("assets/pc_app_task_snapshots.js");
 const PC_APP_JS: &str = include_str!("assets/pc_app.js");
 
@@ -434,6 +435,19 @@ pub async fn pc_app_dev_tasks_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PC_APP_DEV_TASKS_JS,
+    )
+}
+
+pub async fn pc_app_agent_runs_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_AGENT_RUNS_JS,
     )
 }
 

@@ -118,6 +118,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(web::pc_app_dev_tasks_js),
         )
         .route(
+            "/assets/pc_app_agent_runs.js",
+            get(web::pc_app_agent_runs_js),
+        )
+        .route(
             "/assets/pc_app_task_snapshots.js",
             get(web::pc_app_task_snapshots_js),
         )

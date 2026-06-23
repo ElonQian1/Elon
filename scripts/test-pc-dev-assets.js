@@ -769,6 +769,68 @@ function testDevTasksRequiresActiveApprovalHandle() {
   assert.ok(activeApprovalHtml.includes('data-approval-id="tap_live"'), 'approval button should keep the active approval id');
 }
 
+async function testAgentRunsPanelLoadsProjectRuns() {
+  let scheduled = null;
+  let rendered = 0;
+  const calls = [];
+  const sandbox = loadAsset('server/src/assets/pc_app_agent_runs.js', {
+    setTimeout: (callback) => {
+      scheduled = callback;
+      return 1;
+    },
+    clearTimeout: () => {}
+  });
+  const state = {
+    activeKind: 'project',
+    activeProjectId: 'p1',
+    activeChannelId: 'dev',
+    activeChannelKind: 'ai_development'
+  };
+  const agentRuns = sandbox.window.ElonPcAgentRuns.create({
+    state,
+    clean,
+    escapeHtml,
+    sameId: (left, right) => String(left || '') === String(right || ''),
+    activeProject: () => ({ id: 'p1', workspace_path: 'D:/demo' }),
+    localNodeApi: async (pathName, options) => {
+      calls.push({ pathName, options });
+      const body = JSON.parse(options.body);
+      assert.strictEqual(pathName, '/api/project-agent-runs', 'agent runs panel should call local agent-runs endpoint');
+      assert.strictEqual(body.workspace_path, 'D:/demo', 'agent runs request should use project workspace path');
+      return {
+        ok: true,
+        runs: [{
+          run_id: 'agent-20260623T010203Z-12345678',
+          status: 'completed',
+          mode: 'api-runtime',
+          turn_count: 2,
+          tool_count: 3,
+          tool_names: ['read_file', 'run_command'],
+          updated_at: '2026-06-23T01:02:03Z'
+        }]
+      };
+    },
+    renderMessages: () => {
+      rendered += 1;
+    },
+    logError: () => {}
+  });
+
+  assert.ok(agentRuns.renderSection().includes('读取中'), 'agent runs panel should show loading state before the first fetch');
+  assert.strictEqual(agentRuns.schedule([], 'project'), true, 'agent runs panel should schedule a local fetch');
+  assert.ok(scheduled, 'agent runs panel should register a polling timer');
+  await scheduled();
+
+  assert.strictEqual(calls.length, 1, 'agent runs panel should fetch once');
+  assert.strictEqual(rendered, 1, 'agent runs panel should re-render after loading data');
+  const html = agentRuns.renderSection();
+  assert.ok(html.includes('本机 Agent 运行'), 'agent runs panel should render its title');
+  assert.ok(html.includes('完成'), 'agent runs panel should render completion status');
+  assert.ok(html.includes('api-runtime'), 'agent runs panel should render runtime mode');
+  assert.ok(html.includes('read_file'), 'agent runs panel should render tool names');
+  assert.ok(!html.includes('prompt'), 'agent runs panel should not render prompt text');
+}
+
 function testProjectReadinessChecklist() {
   const sandbox = loadAsset('server/src/assets/pc_app_project_readiness.js');
   const create = (state) => sandbox.window.ElonPcProjectReadiness.create({
@@ -1080,6 +1142,8 @@ function testLocalAdminTokenWiring() {
   const routerRs = fs.readFileSync(path.join(repoRoot, 'server/src/router.rs'), 'utf8');
   assert.ok(webRs.includes('pc_app_task_snapshots.js'), 'PC task snapshot asset should be embedded in web.rs');
   assert.ok(routerRs.includes('/assets/pc_app_task_snapshots.js'), 'PC task snapshot asset should be routed');
+  assert.ok(webRs.includes('pc_app_agent_runs.js'), 'PC agent run asset should be embedded in web.rs');
+  assert.ok(routerRs.includes('/assets/pc_app_agent_runs.js'), 'PC agent run asset should be routed');
 
   const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
   assert.ok(pcApp.includes('X-Elon-Local-Admin-Token'), 'PC app should send local admin token header');
@@ -1110,6 +1174,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('positionRailTooltip'), 'PC rail should position its custom hover tooltip');
   assert.ok(pcApp.includes('aria-describedby'), 'PC rail icons should expose the shared tooltip to assistive tech');
   assert.ok(pcApp.includes("button.removeAttribute('title')"), 'PC rail icons should avoid duplicate native tooltips');
+  assert.ok(pcApp.includes('window.ElonPcAgentRuns.create'), 'PC app should create the local agent runs panel');
+  assert.ok(pcApp.includes('agentRuns.renderSection'), 'PC app should render the local agent runs panel in project channels');
+  assert.ok(pcApp.includes('agentRuns.schedule'), 'PC app should refresh local agent runs through the module');
 
   const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
   assert.ok(pcAppNode.includes('budget'), 'PC node page should read Route C daily budget');
@@ -1128,6 +1195,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppHtml.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs as its own button');
   assert.ok(pcAppHtml.includes('打开运行日志'), 'PC settings should expose runtime logs as a user-facing action');
   assert.ok(pcAppHtml.includes('打开启动器日志'), 'PC settings should expose launcher logs as a user-facing action');
+  assert.ok(pcAppHtml.includes('/assets/pc_app_agent_runs.js'), 'PC page should load the local agent runs module');
 
   const pcAppCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
   assert.ok(pcAppCss.includes('.settings-project-meta-row'), 'PC app CSS should style structured project inspection metadata');
@@ -1137,11 +1205,15 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppCss.includes('.rail-avatar:focus-visible'), 'PC rail should have a keyboard focus state');
   assert.ok(pcAppCss.includes('border-radius: inherit'), 'PC rail images should clip to the current icon shape');
   assert.ok(pcAppCss.includes('--rail-tooltip-arrow-y'), 'PC rail tooltip arrow should track clamped tooltip position');
+  const devTasksCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_dev_tasks.css'), 'utf8');
+  assert.ok(devTasksCss.includes('.agent-run-panel'), 'PC dev task CSS should style local agent run panel');
+  assert.ok(devTasksCss.includes('.agent-run-tools'), 'PC dev task CSS should style local agent run tool pills');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
   assert.ok(nodeAgentMain.includes('/api/client-maintenance/diagnostics/export'), 'node agent should mount diagnostics export route');
   assert.ok(nodeAgentMain.includes('mod node_agent_task_lifecycle_pressure_tests;'), 'node agent should keep task lifecycle pressure tests wired');
+  assert.ok(nodeAgentMain.includes('/api/project-agent-runs'), 'node agent should mount local project agent run logs API');
 
   const nodeClientLauncher = fs.readFileSync(path.join(repoRoot, 'server/src/node_client_launcher/mod.rs'), 'utf8');
   assert.ok(nodeClientLauncher.includes('ExportDiagnostics'), 'Windows client launcher should expose a direct diagnostics export command');
@@ -1200,6 +1272,7 @@ function testLocalAdminTokenWiring() {
   await testTaskSnapshotsPollsSnapshotEndpoint();
   await testTaskSnapshotsMergeLocalJournal();
   await testTaskSnapshotsReplaysLocalJournalMessages();
+  await testAgentRunsPanelLoadsProjectRuns();
   testProjectReadinessChecklist();
   testProjectLandingShellContract();
   testDevComposerRouteLabels();

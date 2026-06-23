@@ -86,6 +86,7 @@
   let models = null;
   let devComposer = null;
   let devTasks = null;
+  let agentRuns = null;
   let devTaskSnapshots = null;
   let devTaskRefreshTimer = 0;
   const doctor = window.ElonPcDoctor.create({
@@ -120,6 +121,12 @@
     cancelTask: cancelProjectAiTask,
     approveTool: approveProjectTool,
     draftContinuation: draftProjectAiContinuation
+  });
+  agentRuns = window.ElonPcAgentRuns && window.ElonPcAgentRuns.create({
+    state, clean, escapeHtml, localNodeApi, sameId,
+    activeProject: () => projectById(state.activeProjectId),
+    renderMessages,
+    logError: (error) => console.warn('PC agent run log refresh failed', error)
   });
   devTaskSnapshots = window.ElonPcTaskSnapshots && window.ElonPcTaskSnapshots.create({
     state, api, localNodeApi, clean, sameId, devTasks,
@@ -2221,7 +2228,10 @@
 
   function renderMessages(messages, scope) {
     setNodeMode(false);
-    if (!messages.length) {
+    const agentRunsHtml = scope === 'project' && agentRuns
+      ? agentRuns.renderSection(messages, scope)
+      : '';
+    if (!messages.length && !agentRunsHtml) {
       clearDevTaskRefresh();
       els.messageList.innerHTML = '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
       return;
@@ -2229,7 +2239,7 @@
     const devTaskContext = scope === 'project' && devTasks
       ? devTasks.buildContext(messages, devTaskSnapshots ? devTaskSnapshots.contextExtras() : null)
       : null;
-    els.messageList.innerHTML = messages.map((message) => {
+    const messageRows = messages.length ? messages.map((message) => {
       const role = clean(message.role || message.kind || message.message_kind);
       const fallbackName = role.startsWith('ai_')
         ? '一龙开发Agent'
@@ -2250,13 +2260,16 @@
           ${contentHtml}
         </div>
       </article>`;
-    }).join('');
+    }).join('') : '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
+    els.messageList.innerHTML = `${messageRows}${agentRunsHtml}`;
     els.messageList.querySelectorAll('.project-share-action').forEach((button) => {
       button.addEventListener('click', () => handleProjectShareAction(button));
     });
     if (devTasks) devTasks.bindActions(els.messageList);
+    if (agentRuns) agentRuns.bindActions(els.messageList, messages, scope);
     if (markdown.bindCopyButtons) markdown.bindCopyButtons(els.messageList);
     scheduleDevTaskRefresh(messages, scope, devTaskContext);
+    if (agentRuns) agentRuns.schedule(messages, scope);
     els.messageList.scrollTop = els.messageList.scrollHeight;
   }
 
@@ -2266,6 +2279,7 @@
       devTaskRefreshTimer = 0;
     }
     if (devTaskSnapshots) devTaskSnapshots.clear();
+    if (agentRuns) agentRuns.clear();
   }
 
   function scheduleDevTaskRefresh(messages, scope, devTaskContext) {

@@ -197,7 +197,144 @@
   background: rgba(237, 66, 69, .16);
 }
 
+.agent-run-panel {
+  max-width: 760px;
+  margin: 12px 0 0 64px;
+  border: 1px solid rgba(88, 101, 242, .24);
+  border-radius: 8px;
+  background: #23262e;
+  color: var(--text-soft);
+  overflow: hidden;
+}
+
+.agent-run-panel-head {
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 11px 9px 13px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+
+.agent-run-panel-head strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.agent-run-refresh {
+  height: 26px;
+  border: 1px solid #40444f;
+  border-radius: 6px;
+  background: #2e323b;
+  color: var(--text-soft);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.agent-run-refresh:hover {
+  background: #393e49;
+  color: var(--text);
+}
+
+.agent-run-list {
+  display: grid;
+  gap: 8px;
+  padding: 10px 11px 11px;
+}
+
+.agent-run-empty {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.agent-run-empty.running {
+  color: #dce2ff;
+}
+
+.agent-run-empty.warning {
+  color: #ffe0a3;
+}
+
+.agent-run-empty.failed {
+  color: #ffd6d6;
+}
+
+.agent-run-item {
+  display: grid;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 7px;
+  background: #20232a;
+}
+
+.agent-run-item.running {
+  border-color: rgba(88, 101, 242, .38);
+}
+
+.agent-run-item.done {
+  border-color: rgba(35, 165, 90, .42);
+}
+
+.agent-run-item.failed {
+  border-color: rgba(237, 66, 69, .44);
+}
+
+.agent-run-main {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.agent-run-main strong {
+  color: var(--text);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.agent-run-main small,
+.agent-run-main p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.agent-run-status {
+  justify-self: start;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .06);
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.agent-run-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.agent-run-tools span {
+  max-width: 100%;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: rgba(88, 101, 242, .14);
+  color: #dfe4ff;
+  font-size: 11px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 720px) {
+  .agent-run-panel {
+    margin-left: 0;
+  }
+
   .dev-task-card-foot {
     align-items: stretch;
     flex-direction: column;
