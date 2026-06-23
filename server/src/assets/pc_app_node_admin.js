@@ -381,9 +381,11 @@
         : '未读取';
       const entryLine = clean(product.primary_entry_name) || '一龙PC节点.exe';
       const startMenuLine = clientStartMenuLine(product, startMenu);
+      const recommendedLine = clientRecommendedActionsLine(product);
       const updateLine = clientUpdateLine(data, latestClientPackage);
       panel.innerHTML = [
         row('健康', clean(product.summary) || '未读取'),
+        row('建议', recommendedLine || '无需处理'),
         row('入口', entryLine),
         row('开始菜单', startMenuLine || '未上报'),
         row('运行版本', clean(data.version) || '未知'),
@@ -608,6 +610,13 @@
       if (missing > 0) parts.push(`缺 ${missing} 个入口`);
       if (folder) return `${folder}${parts.length ? ' · ' + parts.join(' · ') : ''}`;
       return parts.join(' · ');
+    }
+
+    function clientRecommendedActionsLine(product) {
+      const actions = Array.isArray(product && product.recommended_actions)
+        ? product.recommended_actions.map(clean).filter(Boolean)
+        : [];
+      return actions.slice(0, 3).join(' / ');
     }
 
     function clientStartMenuStatusLabel(status) {

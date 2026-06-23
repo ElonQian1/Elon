@@ -2782,6 +2782,7 @@
     const packageVersion = clean(data.installed_package_version || install.installed_package_version);
     const layoutStatus = clean(data.layout_status || install.layout_status);
     const startMenuLine = clientStartMenuLine(product, startMenu);
+    const recommendedLine = clientRecommendedActionsLine(product);
     const installed = data.supported === false
       ? '当前平台不支持 Win 客户端维护'
       : data.installed
@@ -2801,6 +2802,7 @@
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
       clean(data.config_dir) && `配置 ${clean(data.config_dir)}`,
       recentMaintenance && `最近维护 ${recentMaintenance}`,
+      recommendedLine && `建议 ${recommendedLine}`,
       startMenuLine && `开始菜单 ${startMenuLine}`
     ].filter(Boolean);
     els.settingsClientPaths.textContent = paths.join(' · ') || '未读取到本机维护路径';
@@ -2924,6 +2926,13 @@
     if (missing > 0) parts.push(`缺 ${missing} 个入口`);
     if (folder) return `${folder}${parts.length ? '：' + parts.join(' · ') : ''}`;
     return parts.join(' · ');
+  }
+
+  function clientRecommendedActionsLine(product) {
+    const actions = Array.isArray(product && product.recommended_actions)
+      ? product.recommended_actions.map(clean).filter(Boolean)
+      : [];
+    return actions.slice(0, 3).join(' / ');
   }
 
   function clientStartMenuStatusLabel(status) {

@@ -475,6 +475,7 @@ async function loadClientMaintenance() {
   const product = r.product_status || (r.install && r.install.product_status) || {};
   const startMenu = r.start_menu || (r.install && r.install.start_menu) || {};
   const startMenuLine = clientStartMenuLine(product, startMenu);
+  const recommendedLine = clientRecommendedActionsLine(product);
   const packageLine = installedSha
     ? `包 ${esc(shortHash(installedSha))}${packageVersion ? ' / ' + esc(packageVersion) : ''}`
     : '未读取包版本';
@@ -487,6 +488,7 @@ async function loadClientMaintenance() {
     `<span>客户端版本：${esc(r.version || '-')}</span>`,
     `<span>${packageLine}</span>`,
     `<span>${esc(layoutLine)}</span>`,
+    `<span>建议：${recommendedLine ? esc(recommendedLine) : '无需处理'}</span>`,
     `<span>开始菜单：${startMenuLine ? esc(startMenuLine) : '未上报'}</span>`,
   ].join('');
   paths.innerHTML = [
@@ -515,6 +517,13 @@ function clientStartMenuLine(product, startMenu) {
   if (missing > 0) parts.push(`缺 ${missing} 个入口`);
   if (folder) return `${folder}${parts.length ? ' · ' + parts.join(' · ') : ''}`;
   return parts.join(' · ');
+}
+
+function clientRecommendedActionsLine(product) {
+  const actions = Array.isArray(product && product.recommended_actions)
+    ? product.recommended_actions.map(v => String(v || '').trim()).filter(Boolean)
+    : [];
+  return actions.slice(0, 3).join(' / ');
 }
 
 function clientStartMenuStatusLine(status) {

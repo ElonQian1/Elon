@@ -1359,6 +1359,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('clientPackageLatest'), 'PC settings should keep latest Windows client package metadata');
   assert.ok(pcApp.includes('客户端已是最新'), 'PC settings should compare installed and latest client package versions');
   assert.ok(pcApp.includes('clientStartMenuLine'), 'PC settings should summarize Windows start menu maintenance entry health');
+  assert.ok(pcApp.includes('clientRecommendedActionsLine'), 'PC settings should summarize recommended Windows client maintenance actions');
+  assert.ok(pcApp.includes('recommended_actions'), 'PC settings should read recommended client maintenance actions from local node');
+  assert.ok(pcApp.includes('建议'), 'PC settings should show a user-facing maintenance recommendation');
   assert.ok(pcApp.includes('missing_start_menu_entry_count'), 'PC settings should display missing start menu maintenance entries');
   assert.ok(pcApp.includes('维护入口不完整'), 'PC settings should explain incomplete start menu maintenance entries');
   assert.ok(pcApp.includes('positionRailTooltip'), 'PC rail should position its custom hover tooltip');
@@ -1475,6 +1478,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAdmin.includes('logs_dir'), 'standalone node admin page should display runtime logs directory');
   assert.ok(nodeAdmin.includes('launcher_logs_dir'), 'standalone node admin page should display launcher logs directory');
   assert.ok(nodeAdmin.includes('clientStartMenuLine'), 'standalone node admin page should summarize start menu shortcut health');
+  assert.ok(nodeAdmin.includes('clientRecommendedActionsLine'), 'standalone node admin page should summarize recommended maintenance actions');
+  assert.ok(nodeAdmin.includes('recommended_actions'), 'standalone node admin page should read recommended maintenance actions');
   assert.ok(nodeAdmin.includes('missing_start_menu_entry_count'), 'standalone node admin page should show missing start menu entry counts');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('logs'"), 'standalone node admin page should open runtime logs');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('launcher_logs'"), 'standalone node admin page should open launcher logs');
@@ -1491,6 +1496,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nativeNodeAdmin.includes('open_client_logs'), 'PC node panel should expose runtime logs action');
   assert.ok(nativeNodeAdmin.includes('launcher_logs_dir'), 'PC node panel should display launcher logs directory');
   assert.ok(nativeNodeAdmin.includes('clientStartMenuLine'), 'PC node panel should summarize start menu shortcut health');
+  assert.ok(nativeNodeAdmin.includes('clientRecommendedActionsLine'), 'PC node panel should summarize recommended maintenance actions');
+  assert.ok(nativeNodeAdmin.includes('recommended_actions'), 'PC node panel should read recommended maintenance actions');
   assert.ok(nativeNodeAdmin.includes('missing_start_menu_entry_count'), 'PC node panel should show missing start menu entry counts');
   assert.ok(nativeNodeAdmin.includes('open_launcher_logs'), 'PC node panel should expose launcher logs action');
   assert.ok(nativeNodeAdmin.includes('loadLatestClientPackageVersion'), 'PC node panel should fetch latest client package metadata');
