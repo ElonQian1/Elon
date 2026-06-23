@@ -10,6 +10,8 @@ Route B/C 的本机工具能力已经包含 `list_dir`、`search_files`、`file_
 
 PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要和尾部事件，方便后续做任务恢复、压力测试和 PC UI 进度展示。
 
+Win 客户端“注册本地项目”流程会自动读取常见项目清单来填项目名、描述、Git 远端、分支和运行/测试/构建命令；其中 Android/Gradle 项目会从 `settings.gradle` 或 `settings.gradle.kts` 的 `rootProject.name` 自动识别项目名，减少用户手填字段。
+
 这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、更细粒度 full_access 高危命令策略。
 
 ---

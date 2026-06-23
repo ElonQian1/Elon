@@ -28,6 +28,20 @@ pub(crate) fn detect_manifest_project_identity(
             &project_root.join("src-tauri/tauri.conf.json"),
         )
     })
+    .or_else(|| {
+        identity_from_gradle_settings(
+            fallback_name,
+            &project_root.join("settings.gradle.kts"),
+            "settings.gradle.kts",
+        )
+    })
+    .or_else(|| {
+        identity_from_gradle_settings(
+            fallback_name,
+            &project_root.join("settings.gradle"),
+            "settings.gradle",
+        )
+    })
 }
 
 fn identity_from_tauri_config(
@@ -69,6 +83,42 @@ fn read_json_manifest(path: &Path) -> Option<Value> {
     std::fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+}
+
+fn identity_from_gradle_settings(
+    fallback_name: &str,
+    settings_path: &Path,
+    source: &str,
+) -> Option<ManifestProjectIdentity> {
+    if !settings_path.is_file() {
+        return None;
+    }
+    let text = std::fs::read_to_string(settings_path).ok()?;
+    identity_from_parts(fallback_name, gradle_root_project_name(&text), None, source)
+}
+
+fn gradle_root_project_name(settings_text: &str) -> Option<String> {
+    settings_text.lines().take(400).find_map(|raw_line| {
+        let line = raw_line.trim();
+        if line.starts_with("//") || line.starts_with("/*") || line.starts_with('*') {
+            return None;
+        }
+        let value = line
+            .strip_prefix("rootProject.name")?
+            .trim_start()
+            .strip_prefix('=')?
+            .trim_start();
+        quoted_gradle_value(value).and_then(|text| clean_project_text(text, 120))
+    })
+}
+
+fn quoted_gradle_value(value: &str) -> Option<&str> {
+    let quote = value.chars().next()?;
+    if quote != '"' && quote != '\'' {
+        return None;
+    }
+    let body = &value[quote.len_utf8()..];
+    body.find(quote).map(|end| &body[..end])
 }
 
 fn first_json_path_string(value: &Value, paths: &[&str]) -> Option<String> {
@@ -181,5 +231,56 @@ mod tests {
             identity.description.as_deref(),
             Some("绑定到本 PC 节点的本地项目: Desktop Agent")
         );
+    }
+
+    #[test]
+    fn detects_gradle_root_project_name() {
+        let dir = temp_project("gradle");
+        std::fs::write(
+            dir.join("settings.gradle"),
+            "pluginManagement {}\nrootProject.name = 'AndroidWorkbench'\n",
+        )
+        .unwrap();
+
+        let identity = detect_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "AndroidWorkbench");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("绑定到本 PC 节点的本地项目: AndroidWorkbench")
+        );
+        assert_eq!(identity.source, "settings.gradle");
+    }
+
+    #[test]
+    fn detects_gradle_kts_root_project_name() {
+        let dir = temp_project("gradle-kts");
+        std::fs::write(
+            dir.join("settings.gradle.kts"),
+            "dependencyResolutionManagement {}\nrootProject.name = \"ComposeDesk\"\n",
+        )
+        .unwrap();
+
+        let identity = detect_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "ComposeDesk");
+        assert_eq!(identity.source, "settings.gradle.kts");
+    }
+
+    #[test]
+    fn ignores_commented_gradle_root_project_name() {
+        let dir = temp_project("gradle-commented");
+        std::fs::write(
+            dir.join("settings.gradle"),
+            "// rootProject.name = 'IgnoredName'\nrootProject.name = 'RealName'\n",
+        )
+        .unwrap();
+
+        let identity = detect_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "RealName");
     }
 }

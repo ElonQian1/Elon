@@ -1342,6 +1342,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('registration.warnings') && pcApp.includes("? 'note' : 'ok'"), 'review-needed project registration inspection should show a note result');
   assert.ok(pcApp.includes('autofill_fields'), 'project registration should display auto-filled fields');
   assert.ok(pcApp.includes('目录信息不足'), 'project registration should block submission when required fields are missing');
+  const manifestIdentityRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_manifest_identity.rs'), 'utf8');
+  assert.ok(manifestIdentityRs.includes('settings.gradle.kts'), 'local project identity should inspect Gradle Kotlin settings files');
+  assert.ok(manifestIdentityRs.includes('settings.gradle'), 'local project identity should inspect Gradle settings files');
+  assert.ok(manifestIdentityRs.includes('rootProject.name'), 'local project identity should derive Android/Gradle project names');
   assert.ok(pcApp.includes('project.agent_runtime'), 'project registration should display local Agent Runtime freshness');
   assert.ok(pcApp.includes('Agent Runtime'), 'project registration should label Agent Runtime freshness in settings');
   assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
