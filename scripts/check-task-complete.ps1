@@ -8,7 +8,9 @@
     landed. AndroidFeature verifies that local
     HEAD equals origin/main and that server /app/version.json points at the
     pushed source commit. APK version numbers are assigned by the server.
-    Server verifies /health and /api/server/version.
+    Server verifies /health and that /api/server/version.gitSha points at
+    the pushed source commit. Server version numbers are assigned by the
+    release claim API and are not compared with server/Cargo.toml.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodeSync
@@ -29,7 +31,6 @@ param(
 $ErrorActionPreference = "Stop"
 
 $RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
-$ServerCargoPath = Join-Path $RepoRoot "server\Cargo.toml"
 $ServerUrl = "http://43.139.149.158:8080"
 
 function Stop-Check {
@@ -192,23 +193,18 @@ if ($Kind -eq "Server") {
         Stop-Check "Server health check failed: $_"
     }
 
-    if (-not (Test-Path $ServerCargoPath)) {
-        Stop-Check "server/Cargo.toml was not found: $ServerCargoPath"
-    }
-    $serverCargo = Get-Content $ServerCargoPath -Encoding UTF8 -Raw
-    $localServerVersion = [regex]::Match($serverCargo, '(?m)^version\s*=\s*"([^"]+)"').Groups[1].Value
-    if (-not $localServerVersion) {
-        Stop-Check "Could not read server package version from server/Cargo.toml."
-    }
-
     try {
         $serverVersion = Invoke-RestMethod "$ServerUrl/api/server/version" -TimeoutSec 10
     } catch {
         Stop-Check "Server version check failed: $_"
     }
 
-    if ([string]$serverVersion.versionName -ne $localServerVersion) {
-        Stop-Check "Server version mismatch: local v$localServerVersion, server v$($serverVersion.versionName)."
+    $serverSha = [string]$serverVersion.gitSha
+    if ([string]::IsNullOrWhiteSpace($serverSha)) {
+        Stop-Check "Server version check did not include gitSha; deployed provenance is unknown."
+    }
+    if ($serverSha -ne $head) {
+        Stop-Check "Server gitSha mismatch: local $($head.Substring(0, 7)), server $($serverSha.Substring(0, [Math]::Min(7, $serverSha.Length)))."
     }
 
     Write-Host "Server completion check passed:" -ForegroundColor Green
