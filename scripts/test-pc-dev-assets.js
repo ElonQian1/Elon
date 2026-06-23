@@ -1303,6 +1303,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNormalized.includes("projectEmptyRegisterBtn');\n    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }))"), 'empty project page registration entry should open picker and auto-register');
   assert.ok(pcApp.includes('settings-project-meta-row'), 'project inspection metadata should render as structured rows');
   assert.ok(pcApp.includes('registration.can_register'), 'project registration should read readiness from local inspect');
+  assert.ok(pcApp.includes('projectRegistrationResultKind'), 'project registration should style blocked and review-needed inspection results');
+  assert.ok(pcApp.includes("registration.can_register === false) return 'error'"), 'blocked project registration inspection should show an error result');
+  assert.ok(pcApp.includes('registration.warnings') && pcApp.includes("? 'note' : 'ok'"), 'review-needed project registration inspection should show a note result');
   assert.ok(pcApp.includes('autofill_fields'), 'project registration should display auto-filled fields');
   assert.ok(pcApp.includes('目录信息不足'), 'project registration should block submission when required fields are missing');
   assert.ok(pcApp.includes('project.agent_runtime'), 'project registration should display local Agent Runtime freshness');

@@ -3157,6 +3157,12 @@
     return clean(registration.summary) || fallback;
   }
 
+  function projectRegistrationResultKind(data) {
+    const registration = (data && data.registration) || {};
+    if (registration.can_register === false) return 'error';
+    return Array.isArray(registration.warnings) && registration.warnings.length ? 'note' : 'ok';
+  }
+
   function normalizeRuntimePermission(value) {
     return clean(value) === 'full_access' ? 'full_access' : 'project_write';
   }
@@ -3214,11 +3220,17 @@
       applyLocalProjectInfo(data);
       const registration = (data && data.registration) || {};
       if (autoRegister && registration.can_register !== false) {
-        setSettingsResult(projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支，正在注册…'));
+        setSettingsResult(
+          projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支，正在注册…'),
+          projectRegistrationResultKind(data)
+        );
         await registerLocalProject({ fromAutoPick: true });
         return;
       }
-      setSettingsResult(projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支。'));
+      setSettingsResult(
+        projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支。'),
+        projectRegistrationResultKind(data)
+      );
     } catch (error) {
       setSettingsResult(escapeHtml(error.message || error), 'error');
     } finally {
@@ -3235,7 +3247,10 @@
     setSettingsBusy(els.inspectProjectFolderBtn, true, '读取中…');
     try {
       const data = await inspectProjectPath(path);
-      setSettingsResult(projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支。'));
+      setSettingsResult(
+        projectRegistrationSummary(data, '已读取项目目录、Git 远端和当前分支。'),
+        projectRegistrationResultKind(data)
+      );
     } catch (error) {
       setSettingsResult(escapeHtml(error.message || error), 'error');
     } finally {
