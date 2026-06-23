@@ -89,6 +89,15 @@ function Get-Fb2PublicContractSummaryState {
             domain_context_index_schema = ""
             domain_context_index_count = 0
             domain_context_index_ids = @()
+            retrieval_evidence_item_shape_ready = $false
+            context_pack_template_retrieval_evidence_schema = ""
+            context_pack_template_retrieval_evidence_fields = @()
+            domain_projection_retrieval_evidence_schema = ""
+            domain_projection_retrieval_evidence_fields = @()
+            context_projection_layer_retrieval_evidence_schema = ""
+            context_projection_layer_retrieval_evidence_fields = @()
+            domain_context_index_retrieval_evidence_schema = ""
+            domain_context_index_retrieval_evidence_fields = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -121,6 +130,15 @@ function Get-Fb2PublicContractSummaryState {
             domain_context_index_schema = ""
             domain_context_index_count = 0
             domain_context_index_ids = @()
+            retrieval_evidence_item_shape_ready = $false
+            context_pack_template_retrieval_evidence_schema = ""
+            context_pack_template_retrieval_evidence_fields = @()
+            domain_projection_retrieval_evidence_schema = ""
+            domain_projection_retrieval_evidence_fields = @()
+            context_projection_layer_retrieval_evidence_schema = ""
+            context_projection_layer_retrieval_evidence_fields = @()
+            domain_context_index_retrieval_evidence_schema = ""
+            domain_context_index_retrieval_evidence_fields = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -145,6 +163,14 @@ function Get-Fb2PublicContractSummaryState {
     $templateSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_schema")
     $templateWrapper = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_wrapper")
     $templateSections = @((Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_sections" @()))
+    $templateRetrievalSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_retrieval_evidence_schema")
+    $templateRetrievalFields = @((Get-Fb2PublicContractSummaryProperty $summary "context_pack_template_retrieval_evidence_fields" @()))
+    $domainProjectionRetrievalSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "domain_projection_retrieval_evidence_schema")
+    $domainProjectionRetrievalFields = @((Get-Fb2PublicContractSummaryProperty $summary "domain_projection_retrieval_evidence_fields" @()))
+    $projectionLayerRetrievalSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_retrieval_evidence_schema")
+    $projectionLayerRetrievalFields = @((Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_retrieval_evidence_fields" @()))
+    $domainIndexRetrievalSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "domain_context_index_retrieval_evidence_schema")
+    $domainIndexRetrievalFields = @((Get-Fb2PublicContractSummaryProperty $summary "domain_context_index_retrieval_evidence_fields" @()))
     $projectionLayerSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_schema")
     $projectionLayerComplete = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_complete")
     $projectionLayerLaneCount = [int](Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_lane_count" 0)
@@ -186,6 +212,19 @@ function Get-Fb2PublicContractSummaryState {
         $answerSourceRule = "has_missing_explicit_sources and no_explicit_source_ids required by public contract checks"
     }
     $answerSourceReady = ($answerSourceSchemaCheck -and $answerSourceToolSourcesCheck -and $answerSourceMissingSourcesCheck)
+    $retrievalEvidenceRequiredFields = @("source_id", "source_kind", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
+    $retrievalEvidenceShapeReady = (
+        $templateRetrievalSchema -eq "fb2.retrieval_evidence_item.v1" `
+            -and $domainProjectionRetrievalSchema -eq "fb2.retrieval_evidence_item.v1" `
+            -and $projectionLayerRetrievalSchema -eq "fb2.retrieval_evidence_item.v1" `
+            -and $domainIndexRetrievalSchema -eq "fb2.retrieval_evidence_item.v1"
+    )
+    foreach ($field in $retrievalEvidenceRequiredFields) {
+        if (-not ($templateRetrievalFields -contains $field)) { $retrievalEvidenceShapeReady = $false }
+        if (-not ($domainProjectionRetrievalFields -contains $field)) { $retrievalEvidenceShapeReady = $false }
+        if (-not ($projectionLayerRetrievalFields -contains $field)) { $retrievalEvidenceShapeReady = $false }
+        if (-not ($domainIndexRetrievalFields -contains $field)) { $retrievalEvidenceShapeReady = $false }
+    }
     $limitations = @((Get-Fb2PublicContractSummaryProperty $status "limitations" @()))
     $failedChecks = @((Get-Fb2PublicContractSummaryProperty $status "failed_checks" @()))
 
@@ -250,6 +289,7 @@ function Get-Fb2PublicContractSummaryState {
     if (-not $answerSourceSchemaCheck) { $missing += "answer_source_validation_schema" }
     if (-not $answerSourceToolSourcesCheck) { $missing += "answer_source_validation_tool_sources" }
     if (-not $answerSourceMissingSourcesCheck) { $missing += "answer_source_validation_missing_sources" }
+    if (-not $retrievalEvidenceShapeReady) { $missing += "retrieval_evidence_item_shape" }
     if (-not ($limitations -contains "does_not_verify_fb2_live_context_pack_or_orders")) {
         $missing += "public_contract_limitations_live_data_boundary"
     }
@@ -270,6 +310,15 @@ function Get-Fb2PublicContractSummaryState {
         domain_context_index_schema = $domainIndexSchema
         domain_context_index_count = $domainIndexCount
         domain_context_index_ids = @($domainIndexIds)
+        retrieval_evidence_item_shape_ready = $retrievalEvidenceShapeReady
+        context_pack_template_retrieval_evidence_schema = $templateRetrievalSchema
+        context_pack_template_retrieval_evidence_fields = @($templateRetrievalFields)
+        domain_projection_retrieval_evidence_schema = $domainProjectionRetrievalSchema
+        domain_projection_retrieval_evidence_fields = @($domainProjectionRetrievalFields)
+        context_projection_layer_retrieval_evidence_schema = $projectionLayerRetrievalSchema
+        context_projection_layer_retrieval_evidence_fields = @($projectionLayerRetrievalFields)
+        domain_context_index_retrieval_evidence_schema = $domainIndexRetrievalSchema
+        domain_context_index_retrieval_evidence_fields = @($domainIndexRetrievalFields)
         context_pack_template_schema = $templateSchema
         context_pack_template_wrapper = $templateWrapper
         context_pack_template_sections = @($templateSections)

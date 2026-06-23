@@ -98,6 +98,7 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - `source_registry.quality_history_kinds` 固定质量历史来源：`feedback`、`opinion_adoption`，默认 `default_chat_fact=false`；只有显式标注 `scope=quality_history` 时，才可以作为“历史质量反馈/观点采纳记录”引用，不能冒充比赛、赔率、订单或群友观点事实。
 - `domain_scenario_matrix` 把六类真实用户问题映射到必须召回的 Context Pack 小节、主项目可自动工具、权限请求、source kinds、feedback 路由和可验收信号：今日比赛、我的票、平台订单风险、群观点、长按消息复核、来源审计。
 - `retrieval_projection` 要求 fb2 返回召回理由、命中词、新鲜度、权限范围和是否截断，而不只是返回一堆数据。
+- `retrieval_projection.item_shape schema=fb2.retrieval_evidence_item.v1` 固定每条召回证据必需字段：`evidence_id`、`source_id`、`source_kind`、`section_id`、`lane_id`、`index_id`、`reason`、`freshness`、`permission_scope`、`citation_source_id`。`source_id` 必须能追到 `citation_sources[].id`、`context_audit_id` 或 grounded/weak 工具结果的 `source_ids`；`permission_scope` 必须与数据 lane 和请求头一致。
 - `permission_projection` 固定用户订单、平台匿名摘要和群观点的权限头与禁止泄漏项。
 - `quality_closure` 固定 feedback、feedback-summary、opinion-adoption-summary、quality-summary 的闭环口径。
 - `anti_patterns` 明确禁止 `raw_html_prompt`、`giant_json_prompt`、`full_database_dump`、`raw_embedding_dump`、`uncited_odds`、`uncited_order`、`platform_order_detail_leak` 等输入形态。
@@ -118,6 +119,7 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - Markdown 小节顺序固定为 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`。
 - 每个小节都声明 `required_when`、`required_source_kinds` 和 `empty_rule`，空数据时要说明缺口，不能省略后让模型猜。
 - `citation_source_shape.business_source_kinds` 只包含业务事实来源；`feedback`、`opinion_adoption` 位于 `quality_history_kinds`，默认不能当比赛或订单事实。
+- `retrieval_evidence_item_shape schema=fb2.retrieval_evidence_item.v1` 是 `retrieval_evidence` 小节的行级结构。fb2 子项目应把每个被召回的比赛、赔率、本人订单、平台匿名摘要、群消息或观点记忆都投影成一条 item，至少包含来源 ID、来源类型、lane/index、召回理由、新鲜度、权限 scope 和可用于回答反馈的 `citation_source_id`。
 - `minimal_markdown_template` 可直接给 fb2 子会话作为生成样板；后续 MCP 只能包装这套 REST Context Pack，不替代它。
 
 `GET /api/external/apps/fb2/context-contract` 还会返回 `domain_data_blueprint_contract schema=fb2.main_project.domain_data_blueprint.v1`。它是长期数据工具蓝图，回答“fb2 到底给主项目 AI 什么数据、是不是先 MCP”：
@@ -133,6 +135,7 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - 固定 8 类内部领域索引：`match_index`、`odds_snapshot_index`、`current_user_ticket_index`、`platform_order_risk_index`、`group_opinion_index`、`opinion_memory_index`、`context_audit_index`、`feedback_quality_index`。
 - 每个 index 都声明 lane、source kinds、lookup keys、required fields、permission scope、Context Pack 小节、主工具、新鲜度规则和 forbidden outputs。
 - `index_output_boundary.model_visible_output=retrieval_evidence_section_plus_citation_sources`，模型只看可引用摘要和 source id，不看原始索引或全量表。
+- `retrieval_evidence_output_shape schema=fb2.retrieval_evidence_item.v1` 要求索引命中的最终可见输出必须落到同一个 item shape。索引可以在 fb2 内部用缓存、BM25、向量或规则检索，但主项目只接收 `reason/freshness/permission_scope/citation_source_id` 这些可审计投影字段。
 - `required_query_inputs` 固定 `group_id`、`topic_hint`、用户订单场景的 `external_user_id`、长按消息场景的 `selected_message_id`、平台汇总场景的 scope。
 - `required_metrics` 固定 `index_latency_ms`、`retrieved_source_count`、`source_counts`、`stale_source_count`、`permission_denied_count`、`budget_status`、`fallback_used`。
 - 禁止 `raw_embedding_dump`、`full_database_dump`、`uncited_index_hit`、其它用户订单明细和平台订单明细泄漏。

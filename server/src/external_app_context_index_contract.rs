@@ -147,6 +147,24 @@ pub(crate) fn public_context_index_guidance(app_id: &str) -> Option<Value> {
                 "retrieval_evidence must explain selected indexes, query keys, freshness, permission scope and missing_context.",
                 "Quality feedback and opinion adoption are quality history, not match facts."
             ],
+            "retrieval_evidence_output_shape": {
+                "schema": "fb2.retrieval_evidence_item.v1",
+                "required_fields": [
+                    "evidence_id",
+                    "source_id",
+                    "source_kind",
+                    "section_id",
+                    "lane_id",
+                    "index_id",
+                    "reason",
+                    "freshness",
+                    "permission_scope",
+                    "citation_source_id"
+                ],
+                "index_id_rule": "index_id must match one of this contract's indexes when the evidence is produced by fb2 domain retrieval.",
+                "citation_rule": "Every evidence item used as a fact must have source_id/citation_source_id resolvable through citation_sources or grounded tool source_ids.",
+                "privacy_rule": "Evidence can summarize why a private or aggregated source was selected, but must not include raw user identities, other-user order rows, or raw group message bodies."
+            },
             "required_metrics": [
                 "index_latency_ms",
                 "retrieved_source_count",
@@ -230,6 +248,26 @@ mod tests {
             .unwrap();
         assert!(not_allowed.contains(&json!("raw_embedding_dump")));
         assert!(not_allowed.contains(&json!("full_database_dump")));
+
+        assert_eq!(
+            contract["retrieval_evidence_output_shape"]["schema"],
+            "fb2.retrieval_evidence_item.v1"
+        );
+        let evidence_fields = contract["retrieval_evidence_output_shape"]["required_fields"]
+            .as_array()
+            .unwrap();
+        for field in [
+            "source_id",
+            "source_kind",
+            "lane_id",
+            "index_id",
+            "reason",
+            "freshness",
+            "permission_scope",
+            "citation_source_id",
+        ] {
+            assert!(evidence_fields.contains(&json!(field)));
+        }
     }
 
     #[test]

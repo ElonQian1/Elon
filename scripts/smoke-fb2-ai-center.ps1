@@ -905,6 +905,7 @@ try {
     $projectionQualityHistoryKinds = @($projectionContract.source_registry.quality_history_kinds | ForEach-Object { $_.kind })
     $projectionAntiPatterns = @($projectionContract.anti_patterns)
     $projectionRetrievalFields = @($projectionContract.retrieval_projection.recommended_fields)
+    $projectionRetrievalItemFields = @($projectionContract.retrieval_projection.item_shape.required_fields)
     $projectionPermissions = @($projectionContract.permission_projection)
     $projectionQualityRoutes = @($projectionContract.quality_closure.required_feedback_routes)
     $projectionReadiness = $projectionContract.quality_closure.minimum_non_synthetic_ready
@@ -914,6 +915,7 @@ try {
     $projectionLayerForbidden = @($projectionLayerContract.forbidden_outputs)
     $projectionLayerNotAllowed = @($projectionLayerContract.ai_facing_payload.not_allowed)
     $projectionLayerGroupFields = @($projectionLayerContract.group_chat_evidence.required_fields)
+    $projectionLayerRetrievalFields = @($projectionLayerContract.retrieval_evidence_contract.required_fields)
     $domainDataBlueprintLaneIds = @($domainDataBlueprint.lanes | ForEach-Object { $_.id })
     $domainDataBlueprintSections = @($domainDataBlueprint.required_context_pack_sections)
     $domainDataBlueprintMetadata = @($domainDataBlueprint.required_metadata)
@@ -922,6 +924,7 @@ try {
     $domainContextIndexInputs = @($domainContextIndex.required_query_inputs)
     $domainContextIndexMetrics = @($domainContextIndex.required_metrics)
     $domainContextIndexNotAllowed = @($domainContextIndex.index_output_boundary.not_allowed)
+    $domainContextIndexRetrievalFields = @($domainContextIndex.retrieval_evidence_output_shape.required_fields)
     $groupChatEvidenceFields = @($groupChatEvidenceContract.required_group_message_fields)
     $groupChatVisibleEvidence = @($groupChatEvidenceContract.required_visible_flow_evidence)
     $toolResultEnvelopeContract = $contract.tool_result_envelope_contract
@@ -936,6 +939,7 @@ try {
     $templateMetadata = @($contextPackTemplate.required_metadata)
     $templateBusinessKinds = @($contextPackTemplate.citation_source_shape.business_source_kinds)
     $templateQualityKinds = @($contextPackTemplate.citation_source_shape.quality_history_kinds | ForEach-Object { $_.kind })
+    $templateRetrievalFields = @($contextPackTemplate.retrieval_evidence_item_shape.required_fields)
     Assert-True ($contract.live_tool_manifest.status -eq "ready") "live manifest ready" "tool_count=$($contract.live_tool_manifest.tool_count)"
     Assert-True ($policy.schema -eq "external_app.live_tool_execution_policy.v1") "live manifest execution policy"
     Assert-True (($policy.chat_auto_executable_tool_ids -contains "search_matches") -and ($policy.chat_auto_executable_tool_ids -contains "search_group_opinions")) "auto executable core tools"
@@ -979,6 +983,10 @@ try {
     Assert-ContainsValue $templateQualityKinds "opinion_adoption" "context pack template quality history kind: opinion adoption"
     Assert-ContainsValue @($contextPackTemplate.body.not_allowed) "full_database_dump" "context pack template anti-pattern: full database dump"
     Assert-ContainsValue @($contextPackTemplate.answer_boundaries) "不得承诺投注命中，不得建议重注或梭哈。" "context pack template betting boundary"
+    Assert-True ($contextPackTemplate.retrieval_evidence_item_shape.schema -eq "fb2.retrieval_evidence_item.v1") "context pack template retrieval evidence shape" "$($contextPackTemplate.retrieval_evidence_item_shape.schema)"
+    foreach ($fieldName in @("source_id", "source_kind", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")) {
+        Assert-ContainsValue $templateRetrievalFields $fieldName "context pack template retrieval evidence field: $fieldName"
+    }
 
     $todayScenario = Find-EvalScenario $evalScenarios "today_matches_analysis"
     Assert-ScenarioContains $todayScenario "required_source_kinds" @("match", "odds") "eval scenario today source kinds"
@@ -1039,6 +1047,10 @@ try {
     Assert-ContainsValue $projectionRetrievalFields "match_reason" "domain projection retrieval field: match reason"
     Assert-ContainsValue $projectionRetrievalFields "permission_scope" "domain projection retrieval field: permission scope"
     Assert-ContainsValue $projectionRetrievalFields "truncated" "domain projection retrieval field: truncated"
+    Assert-True ($projectionContract.retrieval_projection.item_shape.schema -eq "fb2.retrieval_evidence_item.v1") "domain projection retrieval evidence shape" "$($projectionContract.retrieval_projection.item_shape.schema)"
+    foreach ($fieldName in @("source_id", "source_kind", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")) {
+        Assert-ContainsValue $projectionRetrievalItemFields $fieldName "domain projection retrieval evidence field: $fieldName"
+    }
     Assert-ContainsValue $projectionQualityRoutes "/api/main-project/context/feedback" "domain projection quality route: feedback"
     Assert-ContainsValue $projectionQualityRoutes "/api/main-project/context/feedback-summary" "domain projection quality route: feedback summary"
     Assert-ContainsValue $projectionQualityRoutes "/api/main-project/context/opinion-adoption-summary" "domain projection quality route: opinion adoption summary"
@@ -1069,6 +1081,8 @@ try {
     Assert-ContainsValue $projectionLayerForbidden "fabricated_odds" "context projection layer forbidden: fabricated odds"
     Assert-ContainsValue $projectionLayerForbidden "raw_embedding_dump" "context projection layer forbidden: raw embedding dump"
     Assert-ContainsValue $projectionLayerNotAllowed "full_database_dump" "context projection layer not allowed: full database dump"
+    Assert-True ($projectionLayerContract.retrieval_evidence_contract.schema -eq "fb2.retrieval_evidence_item.v1") "context projection layer retrieval evidence shape" "$($projectionLayerContract.retrieval_evidence_contract.schema)"
+    Assert-ContainsValue $projectionLayerRetrievalFields "citation_source_id" "context projection layer retrieval evidence field: citation source id"
     Assert-True ($projectionLayerContract.group_chat_evidence.method -eq "direct_api_read") "context projection layer group direct read" "$($projectionLayerContract.group_chat_evidence.method)"
     Assert-True ($projectionLayerContract.group_chat_evidence.screenshots_accepted -eq $false) "context projection layer rejects screenshots" "screenshots_accepted=$($projectionLayerContract.group_chat_evidence.screenshots_accepted)"
     Assert-ContainsValue $projectionLayerGroupFields "text_sha256" "context projection layer group field: text sha256"
@@ -1102,6 +1116,9 @@ try {
     Assert-ContainsValue $domainContextIndexMetrics "budget_status" "domain context index metric: budget status"
     Assert-ContainsValue $domainContextIndexNotAllowed "raw_embedding_dump" "domain context index anti-pattern: raw embedding dump"
     Assert-ContainsValue $domainContextIndexNotAllowed "full_database_dump" "domain context index anti-pattern: full database dump"
+    Assert-True ($domainContextIndex.retrieval_evidence_output_shape.schema -eq "fb2.retrieval_evidence_item.v1") "domain context index retrieval evidence shape" "$($domainContextIndex.retrieval_evidence_output_shape.schema)"
+    Assert-ContainsValue $domainContextIndexRetrievalFields "index_id" "domain context index retrieval evidence field: index id"
+    Assert-ContainsValue $domainContextIndexRetrievalFields "citation_source_id" "domain context index retrieval evidence field: citation source id"
 
     Assert-True ($groupChatEvidenceContract.schema -eq "fb2.main_project.group_chat_evidence.v1") "group chat evidence schema" "$($groupChatEvidenceContract.schema)"
     Assert-True ($groupChatEvidenceContract.group_chat_test_method -eq "direct_api_read") "group chat evidence direct read" "$($groupChatEvidenceContract.group_chat_test_method)"

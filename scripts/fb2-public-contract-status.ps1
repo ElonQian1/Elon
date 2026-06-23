@@ -65,6 +65,7 @@ function Get-Fb2PublicContractChecks {
     )
 
     $domain = $Contract.domain_data_blueprint_contract
+    $projection = $Contract.domain_context_projection_contract
     $projectionLayer = $Contract.context_projection_layer_contract
     $domainIndex = $Contract.domain_context_index_contract
     $template = $Contract.context_pack_template_contract
@@ -74,6 +75,10 @@ function Get-Fb2PublicContractChecks {
     $templateSections = @($template.required_section_order)
     $templateMetadata = @($template.required_metadata)
     $templateSourceKinds = @($template.citation_source_shape.business_source_kinds)
+    $templateRetrievalFields = @($template.retrieval_evidence_item_shape.required_fields)
+    $projectionRetrievalFields = @($projection.retrieval_projection.item_shape.required_fields)
+    $projectionLayerRetrievalFields = @($projectionLayer.retrieval_evidence_contract.required_fields)
+    $domainIndexRetrievalFields = @($domainIndex.retrieval_evidence_output_shape.required_fields)
     $domainLaneIds = @($domain.lanes | ForEach-Object { $_.id })
     $domainSections = @($domain.required_context_pack_sections)
     $domainMetadata = @($domain.required_metadata)
@@ -155,6 +160,19 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "context_pack_template_order_source_kind" (Test-Fb2ContractContains $templateSourceKinds "user_order") ($templateSourceKinds -join ",")
         New-Fb2PublicContractCheck "context_pack_template_opinion_source_kind" (Test-Fb2ContractContains $templateSourceKinds "opinion_memory") ($templateSourceKinds -join ",")
         New-Fb2PublicContractCheck "context_pack_template_business_sources_exclude_feedback" (-not (Test-Fb2ContractContains $templateSourceKinds "feedback")) ($templateSourceKinds -join ",")
+        New-Fb2PublicContractCheck "context_pack_template_retrieval_evidence_shape_schema" ($template.retrieval_evidence_item_shape.schema -eq "fb2.retrieval_evidence_item.v1") ([string]$template.retrieval_evidence_item_shape.schema)
+        foreach ($field in @("source_id", "source_kind", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")) {
+            New-Fb2PublicContractCheck "context_pack_template_retrieval_evidence_field_$field" (Test-Fb2ContractContains $templateRetrievalFields $field) ($templateRetrievalFields -join ",")
+        }
+        New-Fb2PublicContractCheck "domain_projection_retrieval_evidence_shape_schema" ($projection.retrieval_projection.item_shape.schema -eq "fb2.retrieval_evidence_item.v1") ([string]$projection.retrieval_projection.item_shape.schema)
+        foreach ($field in @("source_id", "source_kind", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")) {
+            New-Fb2PublicContractCheck "domain_projection_retrieval_evidence_field_$field" (Test-Fb2ContractContains $projectionRetrievalFields $field) ($projectionRetrievalFields -join ",")
+        }
+        New-Fb2PublicContractCheck "projection_layer_retrieval_evidence_shape_schema" ($projectionLayer.retrieval_evidence_contract.schema -eq "fb2.retrieval_evidence_item.v1") ([string]$projectionLayer.retrieval_evidence_contract.schema)
+        New-Fb2PublicContractCheck "projection_layer_retrieval_evidence_citation_source_id" (Test-Fb2ContractContains $projectionLayerRetrievalFields "citation_source_id") ($projectionLayerRetrievalFields -join ",")
+        New-Fb2PublicContractCheck "domain_index_retrieval_evidence_shape_schema" ($domainIndex.retrieval_evidence_output_shape.schema -eq "fb2.retrieval_evidence_item.v1") ([string]$domainIndex.retrieval_evidence_output_shape.schema)
+        New-Fb2PublicContractCheck "domain_index_retrieval_evidence_index_id" (Test-Fb2ContractContains $domainIndexRetrievalFields "index_id") ($domainIndexRetrievalFields -join ",")
+        New-Fb2PublicContractCheck "domain_index_retrieval_evidence_citation_source_id" (Test-Fb2ContractContains $domainIndexRetrievalFields "citation_source_id") ($domainIndexRetrievalFields -join ",")
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_schema" ($toolResultEnvelope.answer_source_validation.schema -eq "external_app.answer_source_validation.v1") ([string]$toolResultEnvelope.answer_source_validation.schema)
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_tool_sources" ([string]$toolResultEnvelope.answer_source_validation.rule -match "matched_tool_source_ids") ([string]$toolResultEnvelope.answer_source_validation.rule)
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_missing_sources" ([string]$toolResultEnvelope.answer_source_validation.rule -match "has_missing_explicit_sources" -and [string]$toolResultEnvelope.answer_source_validation.rule -match "no_explicit_source_ids") ([string]$toolResultEnvelope.answer_source_validation.rule)
@@ -218,13 +236,21 @@ function New-Fb2PublicContractStatus {
             context_projection_layer_group_method = [string]$Contract.context_projection_layer_contract.group_chat_evidence.method
             context_projection_layer_screenshots_accepted = [bool]$Contract.context_projection_layer_contract.group_chat_evidence.screenshots_accepted
             context_projection_layer_group_fields = @($Contract.context_projection_layer_contract.group_chat_evidence.required_fields)
+            context_projection_layer_retrieval_evidence_schema = [string]$Contract.context_projection_layer_contract.retrieval_evidence_contract.schema
+            context_projection_layer_retrieval_evidence_fields = @($Contract.context_projection_layer_contract.retrieval_evidence_contract.required_fields)
             domain_data_blueprint_schema = [string]$Contract.domain_data_blueprint_contract.schema
+            domain_projection_retrieval_evidence_schema = [string]$Contract.domain_context_projection_contract.retrieval_projection.item_shape.schema
+            domain_projection_retrieval_evidence_fields = @($Contract.domain_context_projection_contract.retrieval_projection.item_shape.required_fields)
             domain_context_index_schema = [string]$Contract.domain_context_index_contract.schema
             domain_context_index_count = [int]$Contract.domain_context_index_contract.index_count
             domain_context_index_ids = @($Contract.domain_context_index_contract.indexes | ForEach-Object { $_.id })
+            domain_context_index_retrieval_evidence_schema = [string]$Contract.domain_context_index_contract.retrieval_evidence_output_shape.schema
+            domain_context_index_retrieval_evidence_fields = @($Contract.domain_context_index_contract.retrieval_evidence_output_shape.required_fields)
             context_pack_template_schema = [string]$Contract.context_pack_template_contract.schema
             context_pack_template_wrapper = [string]$Contract.context_pack_template_contract.body.wrapper
             context_pack_template_sections = @($Contract.context_pack_template_contract.required_section_order)
+            context_pack_template_retrieval_evidence_schema = [string]$Contract.context_pack_template_contract.retrieval_evidence_item_shape.schema
+            context_pack_template_retrieval_evidence_fields = @($Contract.context_pack_template_contract.retrieval_evidence_item_shape.required_fields)
             domain_lane_count = [int]$Contract.domain_data_blueprint_contract.lane_count
             stores_fb2_business_data_in_main_project = [bool]$Contract.domain_data_blueprint_contract.stores_fb2_business_data_in_main_project
             group_chat_evidence_schema = [string]$Contract.group_chat_evidence_contract.schema
@@ -250,6 +276,18 @@ function New-Fb2PublicContractStatus {
 }
 
 function Invoke-Fb2PublicContractSelfTest {
+    $retrievalEvidenceFields = @(
+        "evidence_id",
+        "source_id",
+        "source_kind",
+        "section_id",
+        "lane_id",
+        "index_id",
+        "reason",
+        "freshness",
+        "permission_scope",
+        "citation_source_id"
+    )
     $syntheticContract = [pscustomobject]@{
         domain_data_blueprint_contract = [pscustomobject]@{
             schema = "fb2.main_project.domain_data_blueprint.v1"
@@ -313,6 +351,18 @@ function Invoke-Fb2PublicContractSelfTest {
                 screenshots_accepted = $false
                 required_fields = @("message_id", "type", "sender_id", "created_at", "text_len", "text_sha256")
             }
+            retrieval_evidence_contract = [pscustomobject]@{
+                schema = "fb2.retrieval_evidence_item.v1"
+                required_fields = $retrievalEvidenceFields
+            }
+        }
+        domain_context_projection_contract = [pscustomobject]@{
+            retrieval_projection = [pscustomobject]@{
+                item_shape = [pscustomobject]@{
+                    schema = "fb2.retrieval_evidence_item.v1"
+                    required_fields = $retrievalEvidenceFields
+                }
+            }
         }
         domain_context_index_contract = [pscustomobject]@{
             schema = "fb2.main_project.domain_context_index.v1"
@@ -333,6 +383,10 @@ function Invoke-Fb2PublicContractSelfTest {
             required_metrics = @("index_latency_ms", "budget_status")
             index_output_boundary = [pscustomobject]@{
                 not_allowed = @("raw_embedding_dump", "full_database_dump")
+            }
+            retrieval_evidence_output_shape = [pscustomobject]@{
+                schema = "fb2.retrieval_evidence_item.v1"
+                required_fields = $retrievalEvidenceFields
             }
         }
         context_pack_template_contract = [pscustomobject]@{
@@ -355,6 +409,10 @@ function Invoke-Fb2PublicContractSelfTest {
             required_metadata = @("context_pack_version", "generated_at", "context_audit_id", "citation_sources", "preflight_readiness")
             citation_source_shape = [pscustomobject]@{
                 business_source_kinds = @("context_audit", "match", "odds", "user_order", "ticket", "group_message", "opinion_memory", "platform_order_summary")
+            }
+            retrieval_evidence_item_shape = [pscustomobject]@{
+                schema = "fb2.retrieval_evidence_item.v1"
+                required_fields = $retrievalEvidenceFields
             }
         }
         group_chat_evidence_contract = [pscustomobject]@{
@@ -437,6 +495,13 @@ function Invoke-Fb2PublicContractSelfTest {
         -Health "OK" `
         -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
         -Contract $badMissingSourceContract
+    $badRetrievalEvidenceContract = $syntheticContract | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+    $badRetrievalEvidenceContract.context_pack_template_contract.retrieval_evidence_item_shape.required_fields = @("source_id", "reason")
+    $badRetrievalEvidenceStatus = New-Fb2PublicContractStatus `
+        -Base "http://example.invalid" `
+        -Health "OK" `
+        -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
+        -Contract $badRetrievalEvidenceContract
 
     $failed = 0
     if (-not [bool]$status.success) {
@@ -474,6 +539,12 @@ function Invoke-Fb2PublicContractSelfTest {
         $failed++
     } else {
         Write-Output "OK`tpublic contract selftest rejects missing no-source audit"
+    }
+    if ([bool]$badRetrievalEvidenceStatus.success) {
+        Write-Output "FAIL`tpublic contract selftest rejects incomplete retrieval evidence shape"
+        $failed++
+    } else {
+        Write-Output "OK`tpublic contract selftest rejects incomplete retrieval evidence shape"
     }
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"

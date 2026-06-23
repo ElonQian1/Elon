@@ -260,6 +260,8 @@ function New-Fb2GoalAuditReport {
     $domainIndexCount = [int](Get-Fb2GoalAuditProperty $public "domain_context_index_count" 0)
     $domainIndexIds = @((Get-Fb2GoalAuditProperty $public "domain_context_index_ids" @()))
     $domainIndexMissing = @((Get-Fb2GoalAuditProperty $public "missing" @()))
+    $retrievalEvidenceReady = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $public "retrieval_evidence_item_shape_ready")
+    $retrievalEvidenceFields = @((Get-Fb2GoalAuditProperty $public "context_pack_template_retrieval_evidence_fields" @()))
     $requiredDomainIndexes = @(
         "match_index",
         "odds_snapshot_index",
@@ -367,6 +369,13 @@ function New-Fb2GoalAuditReport {
         -Complete $domainIndexReady `
         -Evidence "schema=$domainIndexSchema count=$domainIndexCount indexes=$(@($domainIndexIds) -join ',')" `
         -Missing ($missingDomainIndexes -join ",")
+
+    $items += New-Fb2GoalAuditRequirement `
+        -Id "retrieval_evidence_item_contract" `
+        -Title "fb2 Context Pack explains every recalled fact with source id, index, reason, freshness, permission scope and citation id" `
+        -Complete $retrievalEvidenceReady `
+        -Evidence "ready=$retrievalEvidenceReady fields=$(@($retrievalEvidenceFields) -join ',')" `
+        -Missing $(if ($retrievalEvidenceReady) { "" } else { "retrieval_evidence_item_shape" })
 
     $items += New-Fb2GoalAuditScenarioRequirement -UserScenarioAudit $scenarioAudit -ScenarioId "today_matches_analysis" -Title "用户问今天比赛怎么看时可读取比赛事实和赔率"
     $items += New-Fb2GoalAuditScenarioRequirement -UserScenarioAudit $scenarioAudit -ScenarioId "my_ticket_analysis" -Title "用户问帮我分析我的票时只读取本人订单/票据"
@@ -543,6 +552,8 @@ function Invoke-Fb2GoalAuditSelfTest {
                 "context_audit_index",
                 "feedback_quality_index"
             )
+            retrieval_evidence_item_shape_ready = $true
+            context_pack_template_retrieval_evidence_fields = @("evidence_id", "source_id", "source_kind", "section_id", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
             answer_source_validation_ready = $true
             answer_source_validation_schema = "external_app.answer_source_validation.v1"
             answer_source_validation_rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
@@ -620,6 +631,7 @@ function Invoke-Fb2GoalAuditSelfTest {
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "main_project_contract_smoke")) { $failed++ }
     if (-not (Test-Fb2GoalAuditTextPresent (Get-Fb2GoalAuditProperty $report.evidence_summary "contract_smoke_summary"))) { $failed++ }
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "domain_context_index_contract")) { $failed++ }
+    if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "retrieval_evidence_item_contract")) { $failed++ }
 
     $badScenario = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $badScenario.latest_user_scenario_audit.scenarios[1].complete = $false
@@ -632,6 +644,12 @@ function Invoke-Fb2GoalAuditSelfTest {
     $badDomainIndexReport = New-Fb2GoalAuditReport -Status $badDomainIndex -SourcePath "selftest-bad-domain-index.json"
     if ([bool]$badDomainIndexReport.data_goal_complete) { $failed++ }
     if (-not (@($badDomainIndexReport.missing_non_voice_requirements) -contains "domain_context_index_contract")) { $failed++ }
+
+    $badRetrievalEvidence = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
+    $badRetrievalEvidence.latest_public_contract_status.retrieval_evidence_item_shape_ready = $false
+    $badRetrievalEvidenceReport = New-Fb2GoalAuditReport -Status $badRetrievalEvidence -SourcePath "selftest-bad-retrieval-evidence.json"
+    if ([bool]$badRetrievalEvidenceReport.data_goal_complete) { $failed++ }
+    if (-not (@($badRetrievalEvidenceReport.missing_non_voice_requirements) -contains "retrieval_evidence_item_contract")) { $failed++ }
 
     $badContractSmoke = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $badContractSmoke.latest_contract_smoke_summary.gates.chat_bootstrap_ready = $false

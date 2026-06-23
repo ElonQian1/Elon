@@ -32,10 +32,29 @@ Context Pack 不是普通 Markdown 摘要，而是 fb2 域数据投影。主项�
 | `user_order_slice` | 当前用户自己的票据和组合风险 | `order_id`、`ticket_id`、current-user 权限 |
 | `platform_order_summary` | 平台/店铺匿名聚合，不泄露个人 | `platform_order_summary` |
 | `group_opinion_slice` | 群友观点、分歧、长期观点记忆 | `message_id`、`opinion_memory_id` |
-| `retrieval_evidence` | 说明为什么这些数据被召回，以及缺口 | `context_audit_id`、reason、freshness |
+| `retrieval_evidence` | 说明为什么这些数据被召回，以及缺口 | `context_audit_id`、`source_id`、`reason`、freshness、permission scope |
 | `quality_feedback` | 回答后如何回填来源、采纳观点和错误上下文 | `main_request_id`、`context_audit_id` |
 
 fb2 可以在内部使用数据库索引、缓存、向量库、MCP 或领域召回器，但给主项目 AI 的最终结果必须是这个可引用、可审计、可裁剪的投影，不直接暴露原始索引或 embedding。
+
+`retrieval_evidence` 不是自由文本日志。主项目公开契约已经固定 `fb2.retrieval_evidence_item.v1`，fb2 每条可见召回证据至少要投影为：
+
+```json
+{
+  "evidence_id": "ev_...",
+  "source_id": "match_... | order_... | message_... | platform_summary_... | context_audit_id",
+  "source_kind": "match | odds | user_order | ticket | group_message | opinion_memory | platform_order_summary | context_audit",
+  "section_id": "match_facts | user_order_slice | platform_order_summary | group_opinion_slice | retrieval_evidence",
+  "lane_id": "match_facts_and_odds | current_user_tickets | platform_order_summary | group_opinions | opinion_learning_loop | quality_feedback_audit",
+  "index_id": "match_index | odds_snapshot_index | current_user_ticket_index | platform_order_risk_index | group_opinion_index | opinion_memory_index | context_audit_index | feedback_quality_index",
+  "reason": "why this source was selected for the user question",
+  "freshness": "fresh | stale | unknown",
+  "permission_scope": "group_context | current_user_only | anonymous_aggregate_only | single_group_context | audit_metadata_only",
+  "citation_source_id": "id from citation_sources or grounded tool source_ids"
+}
+```
+
+如果没有可用业务数据，也要输出 context-audit 级证据说明缺口，不能让模型自己猜赔率、订单或群友观点。
 
 主项目会传 `topic_hint`，fb2 应优先根据它召回：
 

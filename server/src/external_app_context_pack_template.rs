@@ -135,6 +135,33 @@ pub(crate) fn public_context_pack_template_guidance(app_id: &str) -> Option<Valu
                 ],
                 "rule": "AI 回复中出现的比赛、赔率、订单、票据、群消息、观点记忆和平台摘要事实，必须能匹配 citation_sources 或 grounded tool source_ids。"
             },
+            "retrieval_evidence_item_shape": {
+                "schema": "fb2.retrieval_evidence_item.v1",
+                "required_fields": [
+                    "evidence_id",
+                    "source_id",
+                    "source_kind",
+                    "section_id",
+                    "lane_id",
+                    "index_id",
+                    "reason",
+                    "freshness",
+                    "permission_scope",
+                    "citation_source_id"
+                ],
+                "recommended_fields": [
+                    "query_terms",
+                    "score",
+                    "updated_at",
+                    "truncated",
+                    "missing_context",
+                    "context_audit_id"
+                ],
+                "source_id_rule": "source_id 必须能匹配 citation_sources[].id、context_audit_id 或已执行 grounded/weak tool result 的 source_ids。",
+                "reason_rule": "reason 必须说明该比赛、赔率、订单、平台摘要或群观点为什么与本次 topic_hint / selected_message / user order 请求相关。",
+                "permission_rule": "permission_scope 必须与数据 lane 一致：current_user_only 不能混入其它用户订单，anonymous_aggregate_only 不能暴露单个用户明细，single_group_context 不能混入私聊。",
+                "empty_rule": "没有可召回业务数据时仍输出至少一条 context_audit 证据，missing_context 写明比赛、赔率、订单或群观点缺口。"
+            },
             "answer_boundaries": [
                 "数据事实、用户订单、平台汇总、群友观点、AI推断、风险边界必须分层。",
                 "没有 source id 的赔率、订单、伤停、群友观点只能说信息不足。",
@@ -190,6 +217,26 @@ mod tests {
         let metadata = contract["required_metadata"].as_array().unwrap();
         assert!(metadata.contains(&json!("citation_sources")));
         assert!(metadata.contains(&json!("preflight_readiness")));
+
+        assert_eq!(
+            contract["retrieval_evidence_item_shape"]["schema"],
+            "fb2.retrieval_evidence_item.v1"
+        );
+        let evidence_fields = contract["retrieval_evidence_item_shape"]["required_fields"]
+            .as_array()
+            .unwrap();
+        for field in [
+            "source_id",
+            "source_kind",
+            "lane_id",
+            "index_id",
+            "reason",
+            "freshness",
+            "permission_scope",
+            "citation_source_id",
+        ] {
+            assert!(evidence_fields.contains(&json!(field)));
+        }
 
         let business_kinds = contract["citation_source_shape"]["business_source_kinds"]
             .as_array()

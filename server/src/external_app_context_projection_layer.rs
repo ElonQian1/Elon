@@ -77,6 +77,23 @@ pub(crate) fn public_context_projection_layer_guidance(app_id: &str) -> Option<V
                 {"id": "feedback_quality_index", "owner": "fb2", "main_project_receives": "projected_evidence_only"}
             ],
             "domain_index_count": 8,
+            "retrieval_evidence_contract": {
+                "schema": "fb2.retrieval_evidence_item.v1",
+                "model_visible_section": "retrieval_evidence",
+                "required_fields": [
+                    "evidence_id",
+                    "source_id",
+                    "source_kind",
+                    "section_id",
+                    "lane_id",
+                    "index_id",
+                    "reason",
+                    "freshness",
+                    "permission_scope",
+                    "citation_source_id"
+                ],
+                "rule": "Every model-visible recalled business fact must have a retrieval evidence item that explains source selection, permission scope, freshness, and the citation source id used for feedback."
+            },
             "user_scenarios": [
                 {
                     "id": "today_matches_analysis",
@@ -205,6 +222,14 @@ mod tests {
             assert!(index_ids.contains(&index.to_string()));
         }
         assert_eq!(contract["domain_index_count"], 8);
+        assert_eq!(
+            contract["retrieval_evidence_contract"]["schema"],
+            "fb2.retrieval_evidence_item.v1"
+        );
+        assert!(contract["retrieval_evidence_contract"]["required_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("citation_source_id")));
 
         let scenario_ids = ids(&contract, "user_scenarios");
         for scenario in [

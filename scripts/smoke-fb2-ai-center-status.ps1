@@ -621,9 +621,15 @@ function Invoke-Fb2StatusSelfTest {
                     "context_audit_index",
                     "feedback_quality_index"
                 )
+                domain_context_index_retrieval_evidence_schema = "fb2.retrieval_evidence_item.v1"
+                domain_context_index_retrieval_evidence_fields = @("evidence_id", "source_id", "source_kind", "section_id", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
                 context_pack_template_schema = "fb2.context_pack_template.v1"
                 context_pack_template_wrapper = "fb2_context_pack"
                 context_pack_template_sections = @("usage_boundary", "match_facts", "user_order_slice", "platform_order_summary", "group_opinion_slice", "retrieval_evidence", "quality_feedback")
+                context_pack_template_retrieval_evidence_schema = "fb2.retrieval_evidence_item.v1"
+                context_pack_template_retrieval_evidence_fields = @("evidence_id", "source_id", "source_kind", "section_id", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
+                domain_projection_retrieval_evidence_schema = "fb2.retrieval_evidence_item.v1"
+                domain_projection_retrieval_evidence_fields = @("evidence_id", "source_id", "source_kind", "section_id", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
                 context_projection_layer_schema = "fb2.main_project.context_projection_layer.v1"
                 context_projection_layer_complete = $true
                 context_projection_layer_lane_count = 6
@@ -635,6 +641,8 @@ function Invoke-Fb2StatusSelfTest {
                 context_projection_layer_group_method = "direct_api_read"
                 context_projection_layer_screenshots_accepted = $false
                 context_projection_layer_group_fields = @("message_id", "type", "sender_id", "created_at", "text_len", "text_sha256")
+                context_projection_layer_retrieval_evidence_schema = "fb2.retrieval_evidence_item.v1"
+                context_projection_layer_retrieval_evidence_fields = @("evidence_id", "source_id", "source_kind", "section_id", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
                 domain_lane_count = 6
                 stores_fb2_business_data_in_main_project = $false
                 group_chat_evidence_schema = "fb2.main_project.group_chat_evidence.v1"
@@ -643,7 +651,7 @@ function Invoke-Fb2StatusSelfTest {
                 required_group_message_fields = @("message_id", "type", "sender_id", "created_at", "text_len", "text_sha256")
                 live_tool_count = 3
                 answer_source_validation_schema = "external_app.answer_source_validation.v1"
-                answer_source_validation_rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
+                answer_source_validation_rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids, allowed_tool_source_ids, has_missing_explicit_sources, and no_explicit_source_ids"
             }
             limitations = @(
                 "public_contract_only_no_fb2_service_token_required",
@@ -825,6 +833,9 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_public_contract_status.context_projection_layer_group_method -ne "direct_api_read") { $failed++ }
         if ([bool]$snapshot.latest_public_contract_status.context_projection_layer_screenshots_accepted) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.context_projection_layer_group_fields) -contains "text_sha256")) { $failed++ }
+        if (-not [bool]$snapshot.latest_public_contract_status.retrieval_evidence_item_shape_ready) { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_pack_template_retrieval_evidence_schema -ne "fb2.retrieval_evidence_item.v1") { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.context_pack_template_retrieval_evidence_fields) -contains "citation_source_id")) { $failed++ }
         if ($snapshot.latest_public_contract_status.group_chat_test_method -ne "direct_api_read") { $failed++ }
         if ([bool]$snapshot.latest_public_contract_status.screenshots_accepted) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.required_group_message_fields) -contains "text_sha256")) { $failed++ }
@@ -855,6 +866,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "user_scenario_audit_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "domain_data_blueprint_fixed")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "domain_context_index_contract")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "retrieval_evidence_item_contract")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "main_project_contract_smoke")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "voice_final_evidence")) { $failed++ }
@@ -865,6 +877,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.direct_group_chat_read_complete) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.visible_answer_policy_complete) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.domain_context_index_contract_complete) { $failed++ }
+        if (-not [bool]$snapshot.goal_gap_audit.current_flags.retrieval_evidence_item_shape_ready) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.main_project_contract_smoke_complete) { $failed++ }
         if ($snapshot.goal_gap_audit.evidence_refs.domain_context_index_count -ne 8) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.evidence_refs.domain_context_index_ids) -contains "odds_snapshot_index")) { $failed++ }

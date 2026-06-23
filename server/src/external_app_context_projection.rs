@@ -85,6 +85,32 @@ pub(crate) fn public_context_projection_guidance(app_id: &str) -> Option<Value> 
                     "permission_scope",
                     "truncated"
                 ],
+                "item_shape": {
+                    "schema": "fb2.retrieval_evidence_item.v1",
+                    "required_fields": [
+                        "evidence_id",
+                        "source_id",
+                        "source_kind",
+                        "section_id",
+                        "lane_id",
+                        "index_id",
+                        "reason",
+                        "freshness",
+                        "permission_scope",
+                        "citation_source_id"
+                    ],
+                    "linking_rules": [
+                        "source_id must resolve to citation_sources[].id, context_audit_id, or grounded/weak tool_result.source_ids",
+                        "citation_source_id must point at the exact source registry entry used by the answer",
+                        "index_id must be one of the domain_context_index_contract indexes when the evidence comes from fb2 retrieval",
+                        "permission_scope must match the lane and request headers before the evidence can be model-visible"
+                    ],
+                    "privacy_rules": [
+                        "current_user_only evidence cannot contain other user order detail",
+                        "anonymous_aggregate_only evidence cannot contain single-user order rows",
+                        "single_group_context evidence cannot contain private messages"
+                    ]
+                },
                 "rule": "fb2 不只返回数据，还要说明为什么这些比赛、订单或观点与用户问题相关，方便主项目后续做质量评测。"
             },
             "permission_projection": [
@@ -517,6 +543,29 @@ mod tests {
         ] {
             assert!(array_contains(retrieval_fields, field));
         }
+        assert_eq!(
+            contract["retrieval_projection"]["item_shape"]["schema"],
+            "fb2.retrieval_evidence_item.v1"
+        );
+        let evidence_fields = &contract["retrieval_projection"]["item_shape"]["required_fields"];
+        for field in [
+            "source_id",
+            "source_kind",
+            "lane_id",
+            "index_id",
+            "reason",
+            "freshness",
+            "permission_scope",
+            "citation_source_id",
+        ] {
+            assert!(array_contains(evidence_fields, field));
+        }
+        let linking_rules = &contract["retrieval_projection"]["item_shape"]["linking_rules"];
+        assert!(linking_rules
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|rule| rule.as_str().unwrap().contains("citation_sources[].id")));
 
         let permissions = contract["permission_projection"].as_array().unwrap();
         let user_orders = permission_for(permissions, "user_orders");

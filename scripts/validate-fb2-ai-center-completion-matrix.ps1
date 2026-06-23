@@ -141,7 +141,7 @@ function Get-Fb2MatrixExpectedGroup {
     param([string]$Id)
 
     switch -Regex ($Id) {
-        "^(context_pack_contract|main_project_contract_smoke|domain_context_index_contract)$" { return "main_project_contract" }
+        "^(context_pack_contract|main_project_contract_smoke|domain_context_index_contract|retrieval_evidence_item_contract)$" { return "main_project_contract" }
         "^(today_matches_analysis|my_ticket_analysis|platform_order_risk|group_opinion_summary|selected_message_review|group_discussion_summary_post|source_reference_audit)$" { return "user_scenarios" }
         "^(permission_safety|feedback_quality_loop)$" { return "permission_and_quality" }
         "^direct_group_chat_read$" { return "group_chat_direct_read" }
@@ -177,6 +177,7 @@ function New-Fb2MatrixValidation {
         "context_pack_contract",
         "main_project_contract_smoke",
         "domain_context_index_contract",
+        "retrieval_evidence_item_contract",
         "today_matches_analysis",
         "my_ticket_analysis",
         "platform_order_risk",
@@ -340,6 +341,7 @@ function New-Fb2MatrixFixtureRefresh {
         "context_pack_contract",
         "main_project_contract_smoke",
         "domain_context_index_contract",
+        "retrieval_evidence_item_contract",
         "today_matches_analysis",
         "my_ticket_analysis",
         "platform_order_risk",
@@ -356,7 +358,7 @@ function New-Fb2MatrixFixtureRefresh {
     [pscustomobject]@{
         completion_matrix = [ordered]@{
             schema = "fb2.main_project.completion_matrix.v1"
-            totals = [ordered]@{ total = 14; complete = 13; deferred = 1; incomplete = 0 }
+            totals = [ordered]@{ total = 15; complete = 14; deferred = 1; incomplete = 0 }
             gates = [ordered]@{
                 data_goal_complete = $true
                 full_final_complete = $false
@@ -367,7 +369,7 @@ function New-Fb2MatrixFixtureRefresh {
                 next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
             }
             groups = [ordered]@{
-                main_project_contract = 3
+                main_project_contract = 4
                 user_scenarios = 7
                 permission_and_quality = 2
                 group_chat_direct_read = 1
@@ -474,7 +476,7 @@ function Invoke-Fb2MatrixSelfTest {
         if ([bool]$missingRequirementResult.success) { $failed++ }
 
         $badTotals = $valid | ConvertTo-Json -Depth 12 | ConvertFrom-Json
-        $badTotals.completion_matrix.totals.complete = 14
+        $badTotals.completion_matrix.totals.complete = 13
         $badTotalsResult = New-Fb2MatrixValidation -Refresh $badTotals -SourcePath "selftest-bad-totals.json"
         if ([bool]$badTotalsResult.success) { $failed++ }
 
