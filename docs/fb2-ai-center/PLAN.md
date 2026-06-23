@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-23 当前服务端发布闭环已刷新：发现线上 `/api/server/version` 仍停在 `d3998425` 后，已按项目脚本发布最新 `origin/main=b5bd210b` 到主项目服务端。线上验证 `/health=OK`，`/api/server/version` 返回 `versionName=0.3.680`、`gitSha=b5bd210bff40fb2c0f1ff9178b708bd963dc9c6d`，`fb2-public-contract-status.ps1` 返回 `success=true`、`passed_count=56`、`failed_count=0`。这只完成主项目公开契约/服务端部署闭环，不替代 `FB2_AI_CENTER_TOKEN` 下的受保护 live Context Pack、订单、权限和质量刷新。
 - 2026-06-23 当前 checkpoint 已同步到 `origin/main`：本轮把只读群聊直读 summary 校验接入当前状态总门禁，提交 `39640018` 已通过 `check-task-complete.ps1 -Kind CodePushed`。`validate-fb2-ai-center-current-state.ps1` 当前输出仍为 `data_goal_complete=true`、`full_final_complete=false`、`token_present=false`、`voice_deferred_by_user=true`。原主目录停在另一个分叉工作分支，不能强行快进；后续继续以干净 worktree 或最新 `origin/main` 为准。
 - 2026-06-23 当前交接入口进一步收敛为 `status-refresh-current.json` + `handoff-prompt-current.md`。前者保存机器字段和完成矩阵，后者把 owner 下一步、阻塞项、可执行命令和接手规则整理成可复制提示，并把 token/password 参数占位。后续会话先跑 `scripts\fb2-ai-center-refresh-current-status.ps1`，再按 prompt 决定是做无密钥回归，还是拿 `FB2_AI_CENTER_TOKEN` 跑 live data-only preflight。
 - 2026-06-23 当前长期数据工具路线已机器化为 `latest_domain_data_blueprint` 和 `context-contract.domain_data_blueprint_contract`：fb2 的比赛赔率、当前用户票据、平台匿名摘要、群观点、观点学习闭环、质量反馈审计分别是独立 lane。每条 lane 都要能投影到 Context Pack 小节、source kinds、主工具、权限 scope、回答分层和禁止输出；主项目不复制 fb2 业务数据，MCP/RAG 只作为后续包装或内部召回增强，不能替代 REST Context Pack 的事实源和审计。
