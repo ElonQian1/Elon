@@ -22,13 +22,14 @@ function Get-Fb2GoalCompletionState {
         [bool]$FeedbackComplete,
         [bool]$DataDirectReadComplete,
         [bool]$ReadOnlyDirectReadComplete,
+        [bool]$VisibleAnswerPolicyComplete,
         [bool]$ContextProjectionComplete,
         [bool]$VoiceEvidencePathPresent,
         [object]$FinalEvidence
     )
 
     $groupChatDirectReadReady = ($DataDirectReadComplete -or $ReadOnlyDirectReadComplete)
-    $visibleAiFeedbackReady = ($DataSuccess -and $FeedbackComplete -and $DataDirectReadComplete)
+    $visibleAiFeedbackReady = ($DataSuccess -and $FeedbackComplete -and $DataDirectReadComplete -and $VisibleAnswerPolicyComplete)
     $contextDataReady = ($DataSuccess -and $ContextProjectionComplete)
 
     $hasMyTicketOrders = Test-Fb2GoalEvidencePresent $FinalEvidence.scenario_my_ticket_orders
@@ -46,10 +47,11 @@ function Get-Fb2GoalCompletionState {
     if ($hasPlatformSummary) { $readyItems += "platform_order_summary" } else { $missingItems += "platform_order_summary" }
     if ($groupChatDirectReadReady) { $readyItems += "direct_group_chat_read" } else { $missingItems += "direct_group_chat_read" }
     if ($visibleAiFeedbackReady) { $readyItems += "visible_ai_feedback" } else { $missingItems += "visible_ai_feedback" }
+    if ($VisibleAnswerPolicyComplete) { $readyItems += "visible_answer_policy" } else { $missingItems += "visible_answer_policy" }
     if ($permissionQualityReady) { $readyItems += "permission_quality_feedback" } else { $missingItems += "permission_quality_feedback" }
     if ($VoiceEvidencePathPresent) { $readyItems += "voice_final_evidence_path_present" } else { $missingItems += "voice_final_evidence_path_present" }
 
-    $nonVoiceReady = ($contextDataReady -and $hasMyTicketOrders -and $hasPlatformSummary -and $groupChatDirectReadReady -and $visibleAiFeedbackReady -and $permissionQualityReady)
+    $nonVoiceReady = ($contextDataReady -and $hasMyTicketOrders -and $hasPlatformSummary -and $groupChatDirectReadReady -and $visibleAiFeedbackReady -and $VisibleAnswerPolicyComplete -and $permissionQualityReady)
     $fullFinalReady = ($nonVoiceReady -and $VoiceEvidencePathPresent)
 
     $stage = if ($fullFinalReady) {
@@ -83,6 +85,7 @@ function Get-Fb2GoalCompletionState {
             platform_order_summary = $hasPlatformSummary
             direct_group_chat_read = $groupChatDirectReadReady
             visible_ai_feedback = $visibleAiFeedbackReady
+            visible_answer_policy = $VisibleAnswerPolicyComplete
             permission_quality_feedback = $permissionQualityReady
             voice_final_evidence_path_present = $VoiceEvidencePathPresent
         }

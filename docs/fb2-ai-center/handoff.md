@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮新增 `scripts\validate-fb2-visible-answer-policy.ps1`，用于离线复核 data-only/final acceptance summary 的 `visible_answer_policy_evidence`。状态快照现在输出 `latest_data_only_acceptance.visible_answer_policy_complete/missing`，`goal_gap_audit.completed` 会包含 `visible_answer_policy_validated`；非语音 ready 不再只看“有回复、有 feedback、有直读”，还要求回答策略证据证明来源、事实/推断分层、风险边界和反投注保证均通过。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-gap-action-board.ps1`，用于验证 `gap_action_board` 没有漂移。它会检查缺 token 项是否指向无写群 `DataOnlyAcceptance -PreflightOnly`，full final 项是否明确需要真实群写入授权，语音项是否仍是用户暂停，并确认命令/notes 没有真实 token/password。`next_commands.validate_gap_action_board` 已可直接运行。
 - 2026-06-23 本轮新增 `gap_action_board schema=fb2.main_project.gap_action_board.v1`。接手会话不再只看 `missing` 字符串，而是逐项看到 owner、所需证据、命令、是否可无密钥执行和是否需要真实群写入：缺 `FB2_AI_CENTER_TOKEN` 的 live 权限/质量刷新走无写群 `DataOnlyAcceptance -PreflightOnly`；same-batch full final 需要语音证据和可见群聊授权；`voice_final_evidence` 继续是用户暂停项。
 - 2026-06-23 本轮在 `status-refresh-current.json` 和 `handoff-prompt-current.md` 中增加 `evidence_freshness schema=fb2.main_project.evidence_freshness.v1`。接手会话可以直接看每个 artifact 的 `source_scope`、`last_write_utc` 和 `age_minutes`，区分当前刷新生成的 summary 与历史证据目录；这只是本地 artifact 新鲜度，不代表受保护 fb2 live Context Pack/订单/质量已经重新验证。缺 `FB2_AI_CENTER_TOKEN` 时仍只能做无密钥回归。

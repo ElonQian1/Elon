@@ -11,6 +11,7 @@ $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "fb2-visible-readonly-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-data-only-direct-read-validation.ps1")
+. (Join-Path $PSScriptRoot "fb2-visible-answer-policy-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-projection-log-validation.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-sample-request-status.ps1")
 . (Join-Path $PSScriptRoot "fb2-context-sample-set-status.ps1")
@@ -195,6 +196,8 @@ function Build-Fb2AiCenterStatusSnapshot {
     $dataOnlyHasCurrentDirectReadGate = $null -ne (Get-JsonProperty $latestData "visible_direct_read_complete" $null)
     $dataDirectReadState = Get-Fb2DataOnlyDirectReadEvidenceState $latestData
     $dataDirectReadComplete = [bool]$dataDirectReadState.complete
+    $visibleAnswerPolicyState = Get-Fb2VisibleAnswerPolicyState $latestData
+    $visibleAnswerPolicyComplete = [bool]$visibleAnswerPolicyState.complete
     $fullFinalSuccess = Test-TruthyJsonValue (Get-JsonProperty $latestFinal "success")
     $fullFinalFeedbackComplete = Test-TruthyJsonValue (Get-JsonProperty $fullFinalFeedbackCoverage "complete")
     $fullFinalDirectReadState = Get-Fb2DataOnlyDirectReadEvidenceState $latestFinal
@@ -207,6 +210,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -FeedbackComplete $feedbackComplete `
         -DataDirectReadComplete $dataDirectReadComplete `
         -ReadOnlyDirectReadComplete $readOnlyComplete `
+        -VisibleAnswerPolicyComplete $visibleAnswerPolicyComplete `
         -ContextProjectionComplete ([bool]$contextProjectionState.complete) `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent `
         -FinalEvidence $finalEvidence
@@ -223,6 +227,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -LatestReadOnly $latestReadOnly `
         -FeedbackCoverage $feedbackCoverage `
         -DataDirectReadState $dataDirectReadState `
+        -VisibleAnswerPolicyState $visibleAnswerPolicyState `
         -ContextProjectionState $contextProjectionState `
         -SampleRequestState $sampleRequestState `
         -SampleSetState $sampleSetState `
@@ -274,6 +279,9 @@ function Build-Fb2AiCenterStatusSnapshot {
     if ($null -ne $latestData -and -not $dataDirectReadComplete) {
         $blockers += "latest_data_only_summary_predates_visible_direct_read_complete_gate"
     }
+    if ($null -ne $latestData -and -not $visibleAnswerPolicyComplete) {
+        $blockers += "latest_data_only_summary_missing_visible_answer_policy_evidence"
+    }
     if (-not $readOnlyComplete) {
         $blockers += "missing_or_incomplete_read_only_direct_group_read_summary"
     }
@@ -299,6 +307,9 @@ function Build-Fb2AiCenterStatusSnapshot {
     if ($null -ne $latestData -and -not $dataOnlyHasCurrentDirectReadGate -and $dataDirectReadComplete) {
         $refreshGaps += "latest_data_only_summary_uses_legacy_visible_direct_read_evidence_object"
     }
+    if (@($visibleAnswerPolicyState.optional_missing).Count -gt 0) {
+        $refreshGaps += "latest_data_only_summary_uses_legacy_visible_answer_policy_optional_fields"
+    }
     if (-not [bool]$publicContractStatus.complete) {
         $refreshGaps += "missing_or_incomplete_public_contract_status_summary"
     }
@@ -315,8 +326,8 @@ function Build-Fb2AiCenterStatusSnapshot {
         } else {
             $nextActions += "generate_context_pack_sample_request_or_set_FB2_AI_CENTER_TOKEN"
         }
-    } elseif ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete)) {
-        $nextActions += "run_DataOnlyAcceptance_AllowVisibleMessages_for_non_voice_regression_if_user_allows_visible_messages"
+        } elseif ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete)) {
+            $nextActions += "run_DataOnlyAcceptance_AllowVisibleMessages_for_non_voice_regression_if_user_allows_visible_messages"
     } else {
         $nextActions += "rerun_DataOnlyAcceptance_PreflightOnly_to_refresh_live_context_permission_quality_summary"
     }
@@ -360,6 +371,10 @@ function Build-Fb2AiCenterStatusSnapshot {
             direct_read_evidence_complete = $dataDirectReadComplete
             direct_read_evidence_mode = [string]$dataDirectReadState.mode
             direct_read_evidence_missing = @($dataDirectReadState.missing)
+            visible_answer_policy_complete = $visibleAnswerPolicyComplete
+            visible_answer_policy_mode = [string]$visibleAnswerPolicyState.mode
+            visible_answer_policy_missing = @($visibleAnswerPolicyState.missing)
+            visible_answer_policy_optional_missing = @($visibleAnswerPolicyState.optional_missing)
             summary_post_ready_for_mode = Test-TruthyJsonValue (Get-JsonProperty $latestData "summary_post_ready_for_mode")
             final_acceptance_exit_code = [string](Get-JsonProperty $latestData "final_acceptance_exit_code" "")
             visible_chat_exit_code = [string](Get-JsonProperty $latestData "visible_chat_exit_code" "")
@@ -402,7 +417,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         latest_public_contract_status = $publicContractStatus
         latest_contract_smoke_summary = $contractSmokeSummary
         readiness = [ordered]@{
-            non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and [bool]$contextProjectionState.complete)
+            non_voice_historical_evidence_ready = ($dataSuccess -and $feedbackComplete -and ($dataDirectReadComplete -or $readOnlyComplete) -and $visibleAnswerPolicyComplete -and [bool]$contextProjectionState.complete)
             full_final_ready = $false
             asr_tts_status = if ($voiceEvidencePathPresent) { "voice_evidence_path_configured_but_not_verified_by_this_status_script" } else { "deferred_or_missing" }
         }
@@ -437,6 +452,26 @@ function Invoke-Fb2StatusSelfTest {
                 selected_message_seed = "group=ext_fb2_official message=gmsg_selected text_len=71 text_sha256=abcdef0123456789"
                 selected_message_reply = "group=ext_fb2_official message=gai_selected text_len=292 text_sha256=abcdef0123456789"
                 summary_post = "group=ext_fb2_official post=gsp_summary status=ready text_len=2291 text_sha256=abcdef0123456789"
+            }
+            visible_answer_policy_evidence = [ordered]@{
+                visible_mention_reply_text = "length=448"
+                visible_mention_sources = "patterns=来源|match_id|context_audit_id"
+                visible_mention_fact_split = "patterns=数据事实|AI推断"
+                visible_mention_risk_boundary = "patterns=风险边界|不保证"
+                visible_mention_no_guarantee = ""
+                selected_message_reply_text = "length=292"
+                selected_message_sources = "patterns=来源|message_id"
+                selected_message_fact_split = "patterns=数据事实|AI推断"
+                selected_message_risk_boundary = "patterns=风险边界|不建议"
+                selected_message_no_guarantee = ""
+                selected_message_rejects_claim = "patterns=不合理|风险"
+                selected_message_references_claim = "patterns=肯定赢盘|重注"
+                summary_post_text = "length=2291"
+                summary_post_sources = "patterns=来源|message_id"
+                summary_post_fact_split = "patterns=数据事实|群友观点|AI推断"
+                summary_post_risk_boundary = "patterns=风险边界|不诱导"
+                summary_post_no_guarantee = ""
+                summary_post_model_ready = "model_ready=True fallback_used=False fallback_allowed=False"
             }
             final_acceptance_evidence = [ordered]@{
                 scenario_my_ticket_orders = "count=10 min=1"
@@ -604,6 +639,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.latest_read_only_direct_read.complete) { $failed++ }
         if (-not [bool]$snapshot.readiness.non_voice_historical_evidence_ready) { $failed++ }
         if (-not [bool]$snapshot.latest_data_only_acceptance.direct_read_evidence_complete) { $failed++ }
+        if (-not [bool]$snapshot.latest_data_only_acceptance.visible_answer_policy_complete) { $failed++ }
         if ($snapshot.latest_data_only_acceptance.direct_read_evidence_mode -ne "legacy_evidence_object") { $failed++ }
         if (@($snapshot.blockers) -contains "latest_data_only_summary_predates_visible_direct_read_complete_gate") { $failed++ }
         if (-not (@($snapshot.refresh_gaps) -contains "latest_data_only_summary_uses_legacy_visible_direct_read_evidence_object")) { $failed++ }
@@ -659,6 +695,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.goal_completion.missing_items) -contains "voice_final_evidence_path_present")) { $failed++ }
         if ($snapshot.goal_gap_audit.schema -ne "fb2.main_project.goal_gap_audit.v1") { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "direct_group_chat_read")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "visible_answer_policy_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_pack_sample_set_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_answer_readiness_validated")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "user_scenario_audit_validated")) { $failed++ }
@@ -672,6 +709,7 @@ function Invoke-Fb2StatusSelfTest {
         if ([bool]$snapshot.goal_gap_audit.direct_read_policy.screenshots_accepted) { $failed++ }
         if ($snapshot.goal_gap_audit.next_smallest_action -ne "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly") { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.direct_group_chat_read_complete) { $failed++ }
+        if (-not [bool]$snapshot.goal_gap_audit.current_flags.visible_answer_policy_complete) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.domain_context_index_contract_complete) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.main_project_contract_smoke_complete) { $failed++ }
         if ($snapshot.goal_gap_audit.evidence_refs.domain_context_index_count -ne 8) { $failed++ }

@@ -47,6 +47,7 @@ function Get-Fb2GoalGapAuditState {
         [object]$LatestReadOnly,
         [object]$FeedbackCoverage,
         [object]$DataDirectReadState,
+        [object]$VisibleAnswerPolicyState,
         [object]$ContextProjectionState,
         [object]$SampleRequestState,
         [object]$SampleSetState,
@@ -70,6 +71,7 @@ function Get-Fb2GoalGapAuditState {
     $latestDataSuccess = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $LatestData "success")
     $feedbackComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $FeedbackCoverage "complete")
     $dataDirectReadComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $DataDirectReadState "complete")
+    $visibleAnswerPolicyComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $VisibleAnswerPolicyState "complete")
     $readOnlyDirectReadComplete = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $LatestReadOnly "direct_read_complete")
     $readOnlyWrites = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $LatestReadOnly "writes")
     $readOnlyDirectReadComplete = ($readOnlyDirectReadComplete -and -not $readOnlyWrites)
@@ -120,6 +122,7 @@ function Get-Fb2GoalGapAuditState {
     $fullFinalReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $GoalCompletion "full_final_ready")
 
     if ($directGroupChatReadComplete) { $completed += "direct_group_chat_read" } else { $missing += "direct_group_chat_read" }
+    if ($visibleAnswerPolicyComplete) { $completed += "visible_answer_policy_validated" } else { $missing += "visible_answer_policy_validation" }
     if ($contextProjectionComplete) { $completed += "context_pack_projection" } else { $missing += "context_pack_projection" }
     if ($sampleRequestComplete) { $completed += "context_pack_sample_request_ready" } else { $missing += "context_pack_sample_request" }
     if ($sampleSetComplete) { $completed += "context_pack_sample_set_validated" } else { $missing += "context_pack_sample_set_validation" }
@@ -128,7 +131,7 @@ function Get-Fb2GoalGapAuditState {
     if ($domainDataBlueprintComplete) { $completed += "domain_data_blueprint_fixed" } else { $missing += "domain_data_blueprint" }
     if ($domainContextIndexComplete) { $completed += "domain_context_index_contract" } else { $missing += "domain_context_index_contract" }
     if ($contractSmokeComplete) { $completed += "main_project_contract_smoke" } else { $missing += "main_project_contract_smoke" }
-    if ($latestDataSuccess -and $feedbackComplete -and $dataDirectReadComplete) {
+    if ($latestDataSuccess -and $feedbackComplete -and $dataDirectReadComplete -and $visibleAnswerPolicyComplete) {
         $completed += "live_data_only_visible_chat_feedback_historical_ready"
     } else {
         $missing += "live_data_only_visible_chat_feedback_refresh"
@@ -154,7 +157,7 @@ function Get-Fb2GoalGapAuditState {
         "send_context_pack_sample_request_to_fb2_or_set_FB2_AI_CENTER_TOKEN"
     } elseif (-not $TokenPresent) {
         "generate_context_pack_sample_request_or_set_FB2_AI_CENTER_TOKEN"
-    } elseif (-not $latestDataSuccess -or -not $dataDirectReadComplete -or -not $feedbackComplete) {
+    } elseif (-not $latestDataSuccess -or -not $dataDirectReadComplete -or -not $feedbackComplete -or -not $visibleAnswerPolicyComplete) {
         "run_DataOnlyAcceptance_PreflightOnly_to_refresh_live_context_permission_quality_summary"
     } elseif (-not $VoiceEvidencePathPresent) {
         "keep_ASR_TTS_deferred_until_final_ready_voice_device_evidence_is_available"
@@ -185,6 +188,7 @@ function Get-Fb2GoalGapAuditState {
             data_only_success = $latestDataSuccess
             feedback_complete = $feedbackComplete
             data_direct_read_complete = $dataDirectReadComplete
+            visible_answer_policy_complete = $visibleAnswerPolicyComplete
             read_only_direct_read_complete = $readOnlyDirectReadComplete
             direct_group_chat_read_complete = $directGroupChatReadComplete
             context_projection_complete = $contextProjectionComplete

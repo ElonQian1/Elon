@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮新增 `scripts\fb2-visible-answer-policy-validation.ps1` 和命令入口 `scripts\validate-fb2-visible-answer-policy.ps1`，把真实群聊验收 summary 中的 `visible_answer_policy_evidence` 做成可离线复核的机器门槛：`@EL`、长按 `AI回复`、summary post 都必须有正文长度、来源引用、事实/推断分层、风险边界和反投注保证证据；长按场景还必须证明已反驳“肯定赢盘/重注”等原文。`smoke-fb2-ai-center-status.ps1` 现在输出 `visible_answer_policy_complete/missing`，并把非语音 ready 和 `goal_gap_audit.completed` 绑定到该证据，避免只凭“有回复、有 feedback”误判用户回答体验完成。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-gap-action-board.ps1`，专门离线验证 `gap_action_board` 是否仍安全可执行：检查 schema/action_count、每项 owner/evidence、命令和 notes 不泄露 token/password、缺 token 项必须是无写群 `DataOnlyAcceptance -PreflightOnly`、full final 必须标记真实群写入授权、语音项必须保持暂停。`status-refresh-current.json.next_commands` 也新增 `validate_gap_action_board`，后续接手可直接运行。
 - 2026-06-23 本轮给 `status-refresh-current.json` 新增 `gap_action_board schema=fb2.main_project.gap_action_board.v1`，并同步展示到 `handoff-prompt-current.md`。它把剩余缺口从字符串变成可执行动作：`FB2_AI_CENTER_TOKEN_live_permission_quality_refresh` 指向带 token 的无写群 `DataOnlyAcceptance -PreflightOnly`；`full_final_acceptance_same_batch_voice_and_visible_chat` 标记需要同批 full final 与显式授权的可见群聊回归；`voice_final_evidence` 标记为用户暂停。每项都带 owner、所需证据、命令、是否可无密钥执行、是否会写群。
 - 2026-06-23 本轮给 `status-refresh-current.json` 新增 `evidence_freshness schema=fb2.main_project.evidence_freshness.v1`，并同步展示到 `handoff-prompt-current.md`。它只描述本地 artifact 新鲜度：各 summary/prompt 文件是否存在、来自 `current_output_dir` 还是历史证据目录、`last_write_utc` 和 `age_minutes`；不会把历史 evidence 伪装成刚刚完成的受保护 live 验证。该字段继续明确 protected live fb2 数据仍需要 `FB2_AI_CENTER_TOKEN`。
