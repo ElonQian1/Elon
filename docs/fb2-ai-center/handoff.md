@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-gap-action-board.ps1`，用于验证 `gap_action_board` 没有漂移。它会检查缺 token 项是否指向无写群 `DataOnlyAcceptance -PreflightOnly`，full final 项是否明确需要真实群写入授权，语音项是否仍是用户暂停，并确认命令/notes 没有真实 token/password。`next_commands.validate_gap_action_board` 已可直接运行。
 - 2026-06-23 本轮新增 `gap_action_board schema=fb2.main_project.gap_action_board.v1`。接手会话不再只看 `missing` 字符串，而是逐项看到 owner、所需证据、命令、是否可无密钥执行和是否需要真实群写入：缺 `FB2_AI_CENTER_TOKEN` 的 live 权限/质量刷新走无写群 `DataOnlyAcceptance -PreflightOnly`；same-batch full final 需要语音证据和可见群聊授权；`voice_final_evidence` 继续是用户暂停项。
 - 2026-06-23 本轮在 `status-refresh-current.json` 和 `handoff-prompt-current.md` 中增加 `evidence_freshness schema=fb2.main_project.evidence_freshness.v1`。接手会话可以直接看每个 artifact 的 `source_scope`、`last_write_utc` 和 `age_minutes`，区分当前刷新生成的 summary 与历史证据目录；这只是本地 artifact 新鲜度，不代表受保护 fb2 live Context Pack/订单/质量已经重新验证。缺 `FB2_AI_CENTER_TOKEN` 时仍只能做无密钥回归。
 - 2026-06-23 本轮新增 `target\fb2-ai-center\handoff-prompt-current.md` 作为可复制交接提示，由 `scripts\fb2-ai-center-handoff-prompt.ps1` 从 `status-refresh-current.json` 生成，并由刷新总入口自动调用。它会汇总当前 gates、owner 下一步、无写群/带 token/需授权命令、阻塞项、完成矩阵和接手规则；其中 `FB2_AI_CENTER_TOKEN`、`-Fb2AiCenterToken`、`-Fb2Token`、`-Fb2Password` 都会被替换成占位。后续同步给 fb2 子会话时优先贴这个 prompt，再附 `status-refresh-current.json`。

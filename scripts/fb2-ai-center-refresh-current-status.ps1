@@ -144,6 +144,7 @@ function New-Fb2RefreshNextCommands {
     [ordered]@{
         refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
         read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
+        validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
         no_write_direct_read = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "no_write_direct_read"
         data_only_preflight = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "data_only_preflight"
         visible_regression_requires_authorization = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "visible_regression_requires_authorization"
@@ -451,7 +452,7 @@ function New-Fb2RefreshGapActionBoard {
         if (@($actions | Where-Object { [string]$_.id -eq $text }).Count -gt 0) {
             continue
         }
-        if ($text -eq "voice_final_evidence") {
+        if ($text -eq "voice_final_evidence" -or $text -eq "ASR_TTS_final_evidence") {
             [void]$actions.Add((New-Fb2RefreshGapAction `
                 -Id $text `
                 -Status "deferred_by_user" `
@@ -546,6 +547,7 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest ([bool]$summary.blocking_state.blocked_by_external_secret) "selftest token blocked"
         Assert-Fb2RefreshSelfTest ([string]$summary.blocking_state.external_secret -eq "FB2_AI_CENTER_TOKEN") "external secret name"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.refresh_status)) "refresh command"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_gap_action_board)) "gap action validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight)) "data-only preflight command"
         Assert-Fb2RefreshSelfTest ([string]$summary.completion_matrix.schema -eq "fb2.main_project.completion_matrix.v1") "completion matrix schema"
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"

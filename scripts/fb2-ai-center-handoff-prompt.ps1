@@ -141,7 +141,7 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine $lines "- shared: `$([string]$ownerActions.shared)`"
     Add-Fb2PromptLine $lines ""
     Add-Fb2PromptLine $lines "## 可执行命令"
-    foreach ($name in @("refresh_status", "read_status_refresh", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
+    foreach ($name in @("refresh_status", "read_status_refresh", "validate_gap_action_board", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
         $value = Protect-Fb2PromptSecret -Text ([string](Get-Fb2PromptProperty $commands $name ""))
         if (-not [string]::IsNullOrWhiteSpace($value)) {
             Add-Fb2PromptLine $lines "- `${name}`: ``$value``"
@@ -240,6 +240,7 @@ function Invoke-Fb2PromptSelfTest {
             next_commands = [ordered]@{
                 refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
                 read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
+                validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
                 no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Password secret-real-password"
                 data_only_preflight = '$env:FB2_AI_CENTER_TOKEN="secret-real-value"; pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Token secret-real-value'
                 visible_regression_requires_authorization = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages"
