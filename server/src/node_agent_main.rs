@@ -2697,6 +2697,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::post(node_agent_client_maintenance::update_handler),
             )
             .route(
+                "/api/client-maintenance/repair",
+                axum::routing::post(node_agent_client_maintenance::repair_handler),
+            )
+            .route(
                 "/api/client-maintenance/uninstall",
                 axum::routing::post(node_agent_client_maintenance::uninstall_handler),
             )

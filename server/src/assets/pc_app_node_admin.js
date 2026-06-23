@@ -331,6 +331,18 @@
       });
     }
 
+    async function repairClient(buttonId) {
+      await withBusy(buttonId || 'nodeClientRepair', '修复中...', async () => {
+        try {
+          const data = await api('/api/client-maintenance/repair', { method: 'POST' });
+          setResult('nodeClientResult', data.message || '已开始后台修复客户端入口。');
+          window.setTimeout(() => loadClientMaintenance(true), 2400);
+        } catch (error) {
+          setResult('nodeClientResult', error.message || error, 'error');
+        }
+      });
+    }
+
     async function uninstallClient(buttonId, confirmation) {
       if (!window.confirm(confirmation || '确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。')) return;
       await withBusy(buttonId || 'nodeClientUninstall', '卸载中...', async () => {
@@ -352,6 +364,7 @@
       const buttonId = button.id;
       if (kind === 'open_target') return openClientTarget(target, buttonId);
       if (kind === 'export_diagnostics') return exportClientDiagnostics(buttonId);
+      if (kind === 'repair') return repairClient(buttonId);
       if (kind === 'update') return updateClient(buttonId);
       if (kind === 'uninstall') return uninstallClient(buttonId, confirmation);
       setResult('nodeClientResult', '未知客户端维护动作。', 'error');
@@ -426,6 +439,7 @@
         { id: 'open_task_journal', kind: 'open_target', target: 'task_journal', label: '任务日志', enabled: true },
         { id: 'open_diagnostics_dir', kind: 'open_target', target: 'diagnostics_dir', label: '诊断目录', enabled: true },
         { id: 'export_diagnostics', kind: 'export_diagnostics', label: '导出诊断', enabled: true },
+        { id: 'repair_client', kind: 'repair', label: '修复客户端', tone: 'primary', enabled: true },
         { id: 'check_update', kind: 'update', label: '检查更新', tone: 'primary', enabled: true },
         { id: 'uninstall_client', kind: 'uninstall', label: '卸载', tone: 'danger', enabled: true }
       ];

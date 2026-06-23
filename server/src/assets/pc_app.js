@@ -12,7 +12,8 @@
     task_journal: 'elon-node://task-journal',
     config_dir: 'elon-node://config',
     install_dir: 'elon-node://install-dir',
-    diagnostics_dir: 'elon-node://diagnostics'
+    diagnostics_dir: 'elon-node://diagnostics',
+    repair: 'elon-node://repair'
   };
   const $ = (id) => document.getElementById(id);
   const state = {
@@ -81,7 +82,7 @@
     openClientTaskJournalBtn: $('openClientTaskJournalBtn'),
     openClientConfigBtn: $('openClientConfigBtn'), openClientInstallBtn: $('openClientInstallBtn'),
     exportClientDiagnosticsBtn: $('exportClientDiagnosticsBtn'),
-    checkClientUpdateBtn: $('checkClientUpdateBtn'), uninstallClientBtn: $('uninstallClientBtn'),
+    repairClientBtn: $('repairClientBtn'), checkClientUpdateBtn: $('checkClientUpdateBtn'), uninstallClientBtn: $('uninstallClientBtn'),
     chooseProjectFolderBtn: $('chooseProjectFolderBtn'),
     inspectProjectFolderBtn: $('inspectProjectFolderBtn'), registerProjectBtn: $('registerProjectBtn'),
     settingsProjectPath: $('settingsProjectPath'), settingsProjectName: $('settingsProjectName'),
@@ -1306,6 +1307,7 @@
     els.openClientConfigBtn.addEventListener('click', () => openClientMaintenanceTarget('config_dir', els.openClientConfigBtn));
     els.openClientInstallBtn.addEventListener('click', () => openClientMaintenanceTarget('install_dir', els.openClientInstallBtn));
     els.exportClientDiagnosticsBtn.addEventListener('click', exportClientDiagnostics);
+    els.repairClientBtn.addEventListener('click', triggerClientRepair);
     els.checkClientUpdateBtn.addEventListener('click', triggerClientUpdate);
     els.uninstallClientBtn.addEventListener('click', triggerClientUninstall);
     if (els.settingsRuntimePermission) {
@@ -2839,6 +2841,7 @@
 
   function disabledMaintenanceActionReason(action) {
     const kind = clean(action && action.kind);
+    if (kind === 'repair') return '需要 Windows 本机助手';
     if (kind === 'update' || kind === 'uninstall') return '需要完整安装';
     return '当前环境不可用';
   }
@@ -3052,6 +3055,20 @@
       setSettingsResult(escapeHtml(error.message || error), 'error');
     } finally {
       setSettingsBusy(els.checkClientUpdateBtn, false);
+    }
+  }
+
+  async function triggerClientRepair() {
+    setSettingsBusy(els.repairClientBtn, true, '修复中…');
+    try {
+      const data = await localNodeApi('/api/client-maintenance/repair', { method: 'POST' });
+      setSettingsResult(escapeHtml(data.message || '已开始后台修复客户端入口。'));
+      setTimeout(() => refreshClientMaintenance(false), 2400);
+    } catch (error) {
+      launchClientProtocol(CLIENT_PROTOCOL_TARGETS.repair);
+      setSettingsResult(`本机助手暂时不可达，已请求 Win 端修复客户端入口：${escapeHtml(error.message || error)}`, 'note');
+    } finally {
+      setSettingsBusy(els.repairClientBtn, false);
     }
   }
 

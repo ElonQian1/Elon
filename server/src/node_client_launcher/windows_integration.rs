@@ -65,6 +65,12 @@ const START_MENU_SHORTCUTS: &[ShortcutSpec] = &[
         description: "检查并安装一龙 PC 节点更新",
     },
     ShortcutSpec {
+        file_name: "修复客户端.lnk",
+        target: ShortcutTarget::Client,
+        arguments: "--repair",
+        description: "修复一龙 PC 节点主程序、卸载程序、开始菜单和自启动",
+    },
+    ShortcutSpec {
         file_name: "卸载一龙PC节点.lnk",
         target: ShortcutTarget::Uninstall,
         arguments: "",
@@ -336,6 +342,7 @@ mod tests {
         assert!(names.contains(&"打开运行日志.lnk"));
         assert!(names.contains(&"导出诊断.lnk"));
         assert!(names.contains(&"检查更新.lnk"));
+        assert!(names.contains(&"修复客户端.lnk"));
         assert!(names.contains(&"卸载一龙PC节点.lnk"));
         assert!(START_MENU_SHORTCUTS
             .iter()
@@ -343,6 +350,9 @@ mod tests {
         assert!(START_MENU_SHORTCUTS
             .iter()
             .any(|spec| spec.arguments == "--export-diagnostics"));
+        assert!(START_MENU_SHORTCUTS
+            .iter()
+            .any(|spec| spec.arguments == "--repair"));
         assert!(START_MENU_SHORTCUTS
             .iter()
             .any(|spec| matches!(spec.target, ShortcutTarget::Uninstall)));

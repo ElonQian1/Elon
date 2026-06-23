@@ -107,7 +107,11 @@ impl ClientCommand {
         if args.iter().any(|arg| arg == "--uninstall") || uninstall_exe {
             return Self::Uninstall;
         }
-        if args.iter().any(|arg| arg == "--install") {
+        if args
+            .iter()
+            .any(|arg| arg == "--install" || arg == "--repair")
+            || repair_requested(args)
+        {
             return Self::Install;
         }
         if args
@@ -155,6 +159,19 @@ fn diagnostics_export_requested(args: &[String]) -> bool {
     })
 }
 
+fn repair_requested(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        let value = arg.trim().trim_matches('"').to_ascii_lowercase();
+        matches!(
+            value.as_str(),
+            "elon-node://repair"
+                | "elon-node://maintenance/repair"
+                | "elon-node://install"
+                | "elon-node://maintenance/install"
+        )
+    })
+}
+
 fn exe_stem_contains(needle: &str) -> bool {
     std::env::current_exe()
         .ok()
@@ -175,6 +192,14 @@ mod tests {
         assert!(matches!(
             ClientCommand::from_args(&["--check-update".to_string()], false),
             ClientCommand::Update
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["--repair".to_string()], false),
+            ClientCommand::Install
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["elon-node://repair".to_string()], false),
+            ClientCommand::Install
         ));
         assert!(matches!(
             ClientCommand::from_args(&["--export-diagnostics".to_string()], false),

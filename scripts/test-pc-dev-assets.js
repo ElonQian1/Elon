@@ -1346,6 +1346,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('Agent Runtime'), 'project registration should label Agent Runtime freshness in settings');
   assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
   assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
+  assert.ok(pcApp.includes('/api/client-maintenance/repair'), 'PC app should repair the Windows client through local node');
+  assert.ok(pcApp.includes('repairClientBtn'), 'PC app should wire the client repair button');
+  assert.ok(pcApp.includes('elon-node://repair'), 'PC app should fall back to the Windows repair protocol');
   assert.ok(pcApp.includes('openClientTaskJournalBtn'), 'PC settings should keep task journal separate from runtime logs');
   assert.ok(pcApp.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs separately');
   assert.ok(pcApp.includes('settingsClientActions'), 'PC settings should render local maintenance action availability');
@@ -1424,6 +1427,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppHtml.includes('settingsClientActions'), 'PC settings should expose maintenance action availability status');
   assert.ok(pcAppHtml.includes('打开运行日志'), 'PC settings should expose runtime logs as a user-facing action');
   assert.ok(pcAppHtml.includes('打开启动器日志'), 'PC settings should expose launcher logs as a user-facing action');
+  assert.ok(pcAppHtml.includes('修复客户端入口'), 'PC settings should expose a direct client repair action');
   assert.ok(pcAppHtml.includes('/assets/pc_app_agent_runs.js'), 'PC page should load the local agent runs module');
 
   const pcAppCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
@@ -1450,6 +1454,7 @@ function testLocalAdminTokenWiring() {
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
   assert.ok(nodeAgentMain.includes('/api/client-maintenance/diagnostics/export'), 'node agent should mount diagnostics export route');
+  assert.ok(nodeAgentMain.includes('/api/client-maintenance/repair'), 'node agent should mount client repair route');
   assert.ok(nodeAgentMain.includes('mod node_agent_task_lifecycle_pressure_tests;'), 'node agent should keep task lifecycle pressure tests wired');
   assert.ok(nodeAgentMain.includes('/api/project-agent-runs'), 'node agent should mount local project agent run logs API');
   assert.ok(nodeAgentMain.includes('active_cli_prompt_views_for_workspace'), 'node agent should expose live control handles by workspace');
@@ -1457,10 +1462,13 @@ function testLocalAdminTokenWiring() {
   const clientMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_maintenance.rs'), 'utf8');
   assert.ok(clientMaintenance.includes('maintenance_recent_events'), 'client maintenance status should expose recent maintenance events');
   assert.ok(clientMaintenance.includes('recent_maintenance_events'), 'client maintenance status should read recent maintenance log lines');
+  assert.ok(clientMaintenance.includes('repair_handler'), 'client maintenance should expose a repair handler');
+  assert.ok(clientMaintenance.includes('repair_client'), 'client maintenance should publish a repair action');
   const clientInstallStatus = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_install_status.rs'), 'utf8');
   assert.ok(clientInstallStatus.includes('start_menu_status'), 'client install status should expose start menu shortcut health');
   assert.ok(clientInstallStatus.includes('missing_start_menu_entry_count'), 'client install status should count missing start menu entries');
   assert.ok(clientInstallStatus.includes('missing_start_menu_shortcuts_are_actionable'), 'client install status should test missing start menu repair guidance');
+  assert.ok(clientInstallStatus.includes('修复客户端.lnk'), 'client install status should expect the repair start-menu shortcut');
   const taskJournalApi = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_task_journal_api.rs'), 'utf8');
   assert.ok(taskJournalApi.includes('post(cancel_task_journal)'), 'task journal API should expose a protected cancel endpoint');
 
@@ -1468,12 +1476,14 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeClientLauncher.includes('ExportDiagnostics'), 'Windows client launcher should expose a direct diagnostics export command');
   assert.ok(nodeClientLauncher.includes('--export-diagnostics'), 'Windows client launcher should accept a diagnostics export flag');
   assert.ok(nodeClientLauncher.includes('--check-update'), 'Windows client launcher should accept a user-facing update check alias');
+  assert.ok(nodeClientLauncher.includes('--repair'), 'Windows client launcher should accept a direct repair alias');
 
   const launcherReadme = fs.readFileSync(path.join(repoRoot, 'scripts/node-agent-launcher/README.txt'), 'utf8');
   assert.ok(launcherReadme.includes('--export-diagnostics'), 'Windows client README should document diagnostics export from the single exe');
   assert.ok(launcherReadme.includes('--open-logs'), 'Windows client README should document runtime log entry from the single exe');
   assert.ok(launcherReadme.includes('--open-launcher-logs'), 'Windows client README should document launcher log entry from the single exe');
   assert.ok(launcherReadme.includes('--check-update'), 'Windows client README should document update check from the single exe');
+  assert.ok(launcherReadme.includes('--repair'), 'Windows client README should document client repair from the single exe');
 
   const taskLifecyclePressureScript = fs.readFileSync(path.join(repoRoot, 'scripts/test-pc-task-lifecycle-pressure.ps1'), 'utf8');
   assert.ok(taskLifecyclePressureScript.includes('node_agent_task_lifecycle_pressure_tests'), 'PC task lifecycle pressure gate should run pressure tests');
@@ -1488,6 +1498,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAdmin.includes('launcher_logs_dir'), 'standalone node admin page should display launcher logs directory');
   assert.ok(nodeAdmin.includes('clientStartMenuLine'), 'standalone node admin page should summarize start menu shortcut health');
   assert.ok(nodeAdmin.includes('clientRecommendedActionsLine'), 'standalone node admin page should summarize recommended maintenance actions');
+  assert.ok(nodeAdmin.includes('/api/client-maintenance/repair'), 'standalone node admin page should call client repair route');
+  assert.ok(nodeAdmin.includes('修复客户端入口'), 'standalone node admin page should expose a repair action');
   assert.ok(nodeAdmin.includes('recommended_actions'), 'standalone node admin page should read recommended maintenance actions');
   assert.ok(nodeAdmin.includes('missing_start_menu_entry_count'), 'standalone node admin page should show missing start menu entry counts');
   assert.ok(nodeAdmin.includes("openMaintenanceTarget('logs'"), 'standalone node admin page should open runtime logs');
@@ -1506,6 +1518,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nativeNodeAdmin.includes('launcher_logs_dir'), 'PC node panel should display launcher logs directory');
   assert.ok(nativeNodeAdmin.includes('clientStartMenuLine'), 'PC node panel should summarize start menu shortcut health');
   assert.ok(nativeNodeAdmin.includes('clientRecommendedActionsLine'), 'PC node panel should summarize recommended maintenance actions');
+  assert.ok(nativeNodeAdmin.includes('/api/client-maintenance/repair'), 'PC node panel should call client repair route');
+  assert.ok(nativeNodeAdmin.includes("'repair'"), 'PC node panel should handle repair maintenance actions');
   assert.ok(nativeNodeAdmin.includes('recommended_actions'), 'PC node panel should read recommended maintenance actions');
   assert.ok(nativeNodeAdmin.includes('missing_start_menu_entry_count'), 'PC node panel should show missing start menu entry counts');
   assert.ok(nativeNodeAdmin.includes('open_launcher_logs'), 'PC node panel should expose launcher logs action');

@@ -16,6 +16,7 @@ const START_MENU_ENTRY_NAMES: &[&str] = &[
     "打开运行日志",
     "导出诊断",
     "检查更新",
+    "修复客户端",
     "卸载一龙PC节点",
 ];
 #[cfg(any(windows, test))]
@@ -24,6 +25,7 @@ const START_MENU_SHORTCUT_FILES: &[&str] = &[
     "打开运行日志.lnk",
     "导出诊断.lnk",
     "检查更新.lnk",
+    "修复客户端.lnk",
     "卸载一龙PC节点.lnk",
 ];
 
@@ -554,7 +556,7 @@ mod tests {
         assert_eq!(status["product_status"]["status"], "repair_recommended");
         assert_eq!(
             status["product_status"]["missing_start_menu_entry_count"],
-            4
+            START_MENU_SHORTCUT_FILES.len() - 1
         );
         assert!(status["start_menu"]["missing_entries"]
             .as_array()

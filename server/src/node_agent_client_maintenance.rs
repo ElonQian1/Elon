@@ -62,6 +62,25 @@ pub(crate) async fn update_handler() -> (StatusCode, Json<Value>) {
     }
 }
 
+pub(crate) async fn repair_handler() -> (StatusCode, Json<Value>) {
+    match spawn_client_action(ClientAction::Repair) {
+        Ok(()) => {
+            record_maintenance_event("repair", true, "scheduled");
+            (
+                StatusCode::OK,
+                Json(json!({
+                    "ok": true,
+                    "message": "已开始后台修复客户端入口；会重新创建主程序、卸载程序、开始菜单和开机自启。"
+                })),
+            )
+        }
+        Err(error) => {
+            record_maintenance_event("repair", false, &error);
+            error_response(StatusCode::BAD_REQUEST, error)
+        }
+    }
+}
+
 pub(crate) async fn uninstall_handler() -> (StatusCode, Json<Value>) {
     match spawn_client_action(ClientAction::Uninstall) {
         Ok(()) => {
@@ -158,6 +177,20 @@ fn maintenance_actions(install: &Value) -> Value {
         .get("layout_status")
         .and_then(Value::as_str)
         .unwrap_or("unknown");
+    let product_status = install
+        .get("product_status")
+        .and_then(Value::as_object)
+        .and_then(|object| object.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let repair_tone = if matches!(
+        product_status,
+        "needs_repair" | "repair_recommended" | "cleanup_recommended"
+    ) {
+        "primary"
+    } else {
+        "neutral"
+    };
     let can_use_installed_client = supported && installed;
 
     Value::Array(vec![
@@ -219,6 +252,16 @@ fn maintenance_actions(install: &Value) -> Value {
             "",
             supported,
             "neutral",
+            None,
+        ),
+        action(
+            "repair_client",
+            "repair",
+            "修复客户端入口",
+            "重新创建主程序、卸载程序、开始菜单、开机自启和网页唤起协议，不需要用户理解安装目录。",
+            "",
+            supported,
+            repair_tone,
             None,
         ),
         action(
@@ -398,15 +441,33 @@ fn spawn_client_action(action: ClientAction) -> Result<(), String> {
     #[cfg(windows)]
     {
         let installed = installed_paths()?;
+        let current_exe =
+            std::env::current_exe().map_err(|error| format!("无法定位当前客户端程序: {error}"))?;
         let (program, arg) = match action {
-            ClientAction::Update => (&installed.client_exe, "--update"),
-            ClientAction::Uninstall => (&installed.uninstall_exe, "--uninstall"),
+            ClientAction::Repair => (
+                if installed.client_exe.exists() {
+                    installed.client_exe.clone()
+                } else {
+                    current_exe
+                },
+                "--repair",
+            ),
+            ClientAction::Update => (installed.client_exe.clone(), "--update"),
+            ClientAction::Uninstall => (installed.uninstall_exe.clone(), "--uninstall"),
         };
         if !program.exists() {
             return Err(format!("缺少客户端程序: {}", program.display()));
         }
-        let mut command = Command::new(program);
-        command.arg(arg).current_dir(&installed.install_dir);
+        let current_dir = if installed.install_dir.exists() {
+            installed.install_dir.clone()
+        } else {
+            program
+                .parent()
+                .map(Path::to_path_buf)
+                .unwrap_or_else(|| PathBuf::from("."))
+        };
+        let mut command = Command::new(&program);
+        command.arg(arg).current_dir(current_dir);
         apply_hidden_window(&mut command);
         command
             .stdin(Stdio::null())
@@ -590,6 +651,7 @@ struct InstalledPaths {
 }
 
 enum ClientAction {
+    Repair,
     Update,
     Uninstall,
 }
@@ -667,6 +729,14 @@ mod tests {
             .any(|action| {
                 action["id"].as_str() == Some("open_launcher_logs")
                     && action["target"].as_str() == Some("launcher_logs")
+            }));
+        assert!(status["maintenance_actions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|action| {
+                action["id"].as_str() == Some("repair_client")
+                    && action["kind"].as_str() == Some("repair")
             }));
         assert!(status["maintenance_actions"]
             .as_array()
