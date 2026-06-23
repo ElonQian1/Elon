@@ -193,6 +193,13 @@ function New-Fb2CurrentStateValidation {
         -Arguments @("-OutputPath", (Join-Path $targetDir "server-deploy-status-current.json")) `
         -ExpectedOutputPath (Join-Path $targetDir "server-deploy-status-current.json")))
 
+    $directNetworkPolicyValidationPath = Join-Path $targetDir "project-direct-network-policy-validation-current.json"
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_project_direct_network_policy" `
+        -ScriptPath (Join-Path $PSScriptRoot "validate-project-direct-network-policy.ps1") `
+        -Arguments @("-OutputPath", $directNetworkPolicyValidationPath) `
+        -ExpectedOutputPath $directNetworkPolicyValidationPath))
+
     $refreshForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
     $exportedSampleState = Get-Fb2CurrentProperty $refreshForOptionalSteps "exported_context_pack_sample_set_validation"
     if ($null -ne $exportedSampleState) {
@@ -337,6 +344,7 @@ function New-Fb2CurrentStateValidation {
     $tokenlessContinuationValidation = Read-Fb2CurrentJsonOrNull -Path $tokenlessContinuationValidationPath
     $contextProjectionLogValidation = Read-Fb2CurrentJsonOrNull -Path $contextProjectionValidationPath
     $userScenarioAuditValidation = Read-Fb2CurrentJsonOrNull -Path $userScenarioValidationPath
+    $directNetworkPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $directNetworkPolicyValidationPath
     $protectedLivePreflightSatisfied = [bool](Get-Fb2CurrentProperty $refresh "protected_live_preflight_satisfied" $false)
     $statusNote = if ($protectedLivePreflightSatisfied) {
         "Protected no-write live fb2 data preflight has already been satisfied by token bridge; full final still waits for ASR/TTS evidence because the user paused voice work."
@@ -360,6 +368,7 @@ function New-Fb2CurrentStateValidation {
         next_minimum_action = [string](Get-Fb2CurrentProperty $refresh "next_minimum_action" "")
         blocked_by_external_secret = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
         public_contract_status = $publicContractStatus
+        project_direct_network_policy_validation = $directNetworkPolicyValidation
         exported_context_pack_sample_set_validation = $exportedSampleValidation
         visible_answer_policy_validation = $visibleAnswerPolicyValidation
         live_preflight_request_validation = $livePreflightRequestValidation
@@ -390,6 +399,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "refresh_status"; script = "fb2-ai-center-refresh-current-status.ps1" },
         [ordered]@{ name = "public_contract_status"; script = "fb2-public-contract-status.ps1" },
         [ordered]@{ name = "server_deploy_status"; script = "validate-fb2-main-server-deploy-status.ps1" },
+        [ordered]@{ name = "project_direct_network_policy"; script = "validate-project-direct-network-policy.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
         [ordered]@{ name = "live_preflight_request"; script = "validate-fb2-live-preflight-request.ps1" },
