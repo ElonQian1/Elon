@@ -69,6 +69,10 @@
     settingsSecurityBtn: $('settingsSecurityBtn'), settingsDevicesBtn: $('settingsDevicesBtn'), settingsLogoutBtn: $('settingsLogoutBtn'),
     settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
     settingsCliBridgeStatus: $('settingsCliBridgeStatus'),
+    settingsNodeStatusCard: $('settingsNodeStatusCard'), settingsNodeStatusTitle: $('settingsNodeStatusTitle'),
+    settingsNodeStatusDetail: $('settingsNodeStatusDetail'), settingsStepNode: $('settingsStepNode'),
+    settingsStepFolder: $('settingsStepFolder'), settingsStepRegister: $('settingsStepRegister'),
+    openNodeSetupFromSettingsBtn: $('openNodeSetupFromSettingsBtn'),
     refreshClientMaintenanceBtn: $('refreshClientMaintenanceBtn'), openClientLogsBtn: $('openClientLogsBtn'),
     openClientLauncherLogsBtn: $('openClientLauncherLogsBtn'),
     openClientTaskJournalBtn: $('openClientTaskJournalBtn'),
@@ -1271,6 +1275,10 @@
     els.registerProjectBtn.addEventListener('click', registerLocalProject);
     els.settingsProjectPath.addEventListener('input', markLocalProjectPathDirty);
     els.refreshClientMaintenanceBtn.addEventListener('click', () => refreshClientMaintenance(true));
+    els.openNodeSetupFromSettingsBtn.addEventListener('click', () => {
+      closeSettings();
+      node.selectNode();
+    });
     els.openClientLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('logs', els.openClientLogsBtn));
     els.openClientLauncherLogsBtn.addEventListener('click', () => openClientMaintenanceTarget('launcher_logs', els.openClientLauncherLogsBtn));
     els.openClientTaskJournalBtn.addEventListener('click', () => openClientMaintenanceTarget('task_journal', els.openClientTaskJournalBtn));
@@ -2567,8 +2575,8 @@
       els.settingsSubtitle.textContent = '账号信息、登录状态和安全设置';
     } else if (selected === 'workbench') {
       els.settingsWorkbenchPanel.classList.add('active');
-      $('settingsTitle').textContent = 'PC 工作台设置';
-      els.settingsSubtitle.textContent = '本地项目注册和节点绑定';
+      $('settingsTitle').textContent = '本地项目';
+      els.settingsSubtitle.textContent = '选择文件夹并加入项目列表';
     } else if (selected === 'notifications') {
       els.settingsNotificationsPanel.classList.add('active');
       $('settingsTitle').textContent = '通知';
@@ -2591,7 +2599,10 @@
     setSettingsSection(targetSection);
     els.settingsBackdrop.hidden = false;
     setSettingsResult('');
-    if (targetSection === 'workbench') refreshClientMaintenance(false);
+    if (targetSection === 'workbench') {
+      updateWorkbenchOnboarding();
+      refreshClientMaintenance(false);
+    }
     setTimeout(() => {
       if (targetSection !== 'workbench') return;
       if (autoPickAndRegister) {
@@ -2625,13 +2636,53 @@
     }
   }
 
+  function setSetupStepState(element, stateName) {
+    if (!element) return;
+    element.classList.remove('is-active', 'is-done');
+    if (stateName) element.classList.add(`is-${stateName}`);
+  }
+
+  function updateWorkbenchOnboarding() {
+    if (!els.settingsNodeStatusCard) return;
+    const connected = !!state.clientMaintenance;
+    const path = clean(els.settingsProjectPath && els.settingsProjectPath.value);
+    const info = state.localProjectInfo || null;
+    const blocked = !!(info && info.canRegister === false);
+    let title = '等待连接本机节点';
+    let detail = `请先启动一龙 PC 节点客户端，然后点刷新。`;
+
+    if (connected && !path) {
+      title = '本机节点已连接';
+      detail = '现在可以选择电脑里的项目文件夹。';
+    } else if (connected && blocked) {
+      title = '目录信息不足';
+      detail = '展开高级字段，补齐缺少的信息后再注册。';
+    } else if (connected && path) {
+      title = '项目目录已选好';
+      detail = '继续注册后，它会出现在左侧项目列表里。';
+    }
+
+    if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = title;
+    if (els.settingsNodeStatusDetail) els.settingsNodeStatusDetail.textContent = detail;
+    els.settingsNodeStatusCard.classList.toggle('is-ready', connected && !!path && !blocked);
+    els.settingsNodeStatusCard.classList.toggle('is-warning', !connected || blocked);
+
+    setSetupStepState(els.settingsStepNode, connected ? 'done' : 'active');
+    setSetupStepState(els.settingsStepFolder, path ? 'done' : (connected ? 'active' : ''));
+    setSetupStepState(els.settingsStepRegister, connected && path && !blocked ? 'active' : '');
+  }
+
   function applyClientMaintenanceStatus(data) {
     state.clientMaintenance = data || null;
-    if (!els.settingsClientStatus || !els.settingsClientPaths) return;
+    if (!els.settingsClientStatus || !els.settingsClientPaths) {
+      updateWorkbenchOnboarding();
+      return;
+    }
     if (!data) {
       els.settingsClientStatus.textContent = '尚未读取';
       els.settingsClientPaths.textContent = '任务记录、配置和安装目录会显示在这里。';
       if (els.settingsCliBridgeStatus) els.settingsCliBridgeStatus.textContent = '读取本机节点后显示会话连续性能力。';
+      updateWorkbenchOnboarding();
       return;
     }
     const version = clean(data.version) || '--';
@@ -2667,6 +2718,7 @@
     if (els.settingsCliBridgeStatus) {
       els.settingsCliBridgeStatus.textContent = cliSessionBridgeLine(data.cli_session_bridge);
     }
+    updateWorkbenchOnboarding();
   }
 
   async function refreshLatestClientPackageVersion() {
@@ -2890,6 +2942,7 @@
     const agentRuntimeTone = agentRuntimeStatus === 'current' ? 'ok' : (agentRuntimeSummary ? 'warning' : '');
     if (!path) {
       els.settingsProjectMeta.textContent = '尚未选择项目目录';
+      updateWorkbenchOnboarding();
       return;
     }
     const summary = clean(registration.summary) || (canRegister ? '已读取目录信息，可以注册。' : '目录信息不足，暂不能注册。');
@@ -2910,6 +2963,7 @@
     els.settingsProjectMeta.innerHTML = rows.map(([label, value, tone]) => (
       `<div class="settings-project-meta-row ${tone ? `is-${escapeHtml(tone)}` : ''}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(value)}</strong></div>`
     )).join('');
+    updateWorkbenchOnboarding();
   }
 
   function markLocalProjectPathDirty() {
@@ -2918,6 +2972,7 @@
     els.settingsProjectMeta.textContent = path
       ? '注册前会自动读取目录、Git 远端、当前分支和项目命令。'
       : '尚未选择项目目录';
+    updateWorkbenchOnboarding();
   }
 
   function projectInfoMatchesPath(path) {

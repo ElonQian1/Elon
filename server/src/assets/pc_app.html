@@ -96,8 +96,8 @@
         </button>
         <button class="account-menu-row" id="pcSettingsMenuBtn" type="button" role="menuitem">
           <span>
-            <strong>PC 工作台设置</strong>
-            <small>本地项目注册和节点绑定</small>
+            <strong>本地项目</strong>
+            <small>把电脑里的项目加入工作台</small>
           </span>
         </button>
         <button class="account-menu-row danger" id="logoutMenuBtn" type="button" role="menuitem">
@@ -163,9 +163,9 @@
           <button class="settings-nav-sub" type="button" data-settings-section="devices">已登录的设备</button>
           <button class="settings-nav-item" id="settingsWorkbenchTab" type="button" data-settings-section="workbench" role="tab" aria-selected="false">
             <span class="settings-nav-icon" aria-hidden="true">⚙</span>
-            <span>PC 工作台设置</span>
+            <span>本地项目</span>
           </button>
-          <button class="settings-nav-sub" type="button" data-settings-section="workbench">本地项目注册</button>
+          <button class="settings-nav-sub" type="button" data-settings-section="workbench">添加项目</button>
           <button class="settings-nav-item" id="settingsNotificationsTab" type="button" data-settings-section="notifications" role="tab" aria-selected="false">
             <span class="settings-nav-icon" aria-hidden="true">●</span>
             <span>通知</span>
@@ -229,16 +229,83 @@
             </div>
           </section>
           <section class="settings-panel" id="settingsWorkbenchPanel" data-settings-panel="workbench">
-            <h2>PC 工作台设置</h2>
-            <p class="settings-panel-caption">把本机项目绑定到当前 PC 节点，注册后会出现在项目入口里。</p>
-            <div class="settings-section-title">客户端维护</div>
-            <div class="settings-info-list settings-maintenance-list">
-              <div class="settings-info-row">
+            <h2>添加本地项目</h2>
+            <p class="settings-panel-caption">选择电脑里的项目文件夹，添加后会出现在项目列表里。</p>
+            <div class="settings-onboarding" id="settingsNodeStatusCard">
+              <div class="settings-onboarding-head">
+                <div>
+                  <span>当前状态</span>
+                  <strong id="settingsNodeStatusTitle">正在检测本机节点</strong>
+                  <small id="settingsNodeStatusDetail">连接后就可以选择项目文件夹。</small>
+                </div>
+                <div class="settings-onboarding-actions">
+                  <button class="text-button" id="openNodeSetupFromSettingsBtn" type="button">打开本机节点</button>
+                  <button class="text-button" id="refreshClientMaintenanceBtn" type="button">刷新</button>
+                </div>
+              </div>
+              <div class="settings-setup-steps" aria-label="本地项目添加进度">
+                <div class="settings-setup-step" id="settingsStepNode">
+                  <span>1</span>
+                  <strong>连接节点</strong>
+                </div>
+                <div class="settings-setup-step" id="settingsStepFolder">
+                  <span>2</span>
+                  <strong>选择文件夹</strong>
+                </div>
+                <div class="settings-setup-step" id="settingsStepRegister">
+                  <span>3</span>
+                  <strong>加入项目列表</strong>
+                </div>
+              </div>
+            </div>
+            <label class="settings-field settings-permission-field">
+              <span>AI 运行权限</span>
+              <select id="settingsRuntimePermission">
+                <option value="project_write">仅项目内写入</option>
+                <option value="full_access">完全访问</option>
+              </select>
+            </label>
+            <p class="settings-panel-caption" id="settingsRuntimePermissionHint">AI 只能读写当前项目目录，并运行开发相关命令。</p>
+            <div class="settings-project-bind">
+              <button class="send-button" id="chooseProjectFolderBtn" type="button">选择项目文件夹</button>
+            </div>
+            <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
+            <div id="settingsProjectResult"></div>
+            <details class="settings-advanced">
+              <summary>高级：手动确认字段</summary>
+              <label class="settings-field">
+                <span>项目目录</span>
+                <input id="settingsProjectPath" placeholder="选择目录后自动填写" />
+              </label>
+              <label class="settings-field">
+                <span>项目名称</span>
+                <input id="settingsProjectName" placeholder="选择目录后自动填写" />
+              </label>
+              <label class="settings-field">
+                <span>Git 远端 origin</span>
+                <input id="settingsProjectRepo" placeholder="选择目录后自动读取" />
+              </label>
+              <label class="settings-field">
+                <span>Git 当前分支</span>
+                <input id="settingsProjectBranch" placeholder="选择目录后自动读取" />
+              </label>
+              <label class="settings-field">
+                <span>描述</span>
+                <textarea id="settingsProjectDesc" rows="2" placeholder="可选"></textarea>
+              </label>
+              <div class="settings-actions">
+                <button class="text-button" id="inspectProjectFolderBtn" type="button">重新读取目录信息</button>
+                <button class="text-button" id="registerProjectBtn" type="button">按当前字段注册</button>
+              </div>
+            </details>
+            <details class="settings-advanced settings-maintenance-details">
+              <summary>高级维护与日志</summary>
+              <div class="settings-info-list settings-maintenance-list">
+                <div class="settings-info-row">
                 <div>
                   <span>本机节点客户端</span>
                   <strong id="settingsClientStatus">尚未读取</strong>
                 </div>
-                <button class="text-button" id="refreshClientMaintenanceBtn" type="button">刷新状态</button>
               </div>
               <div class="settings-info-row">
                 <div>
@@ -271,47 +338,7 @@
                 </div>
               </div>
             </div>
-            <div class="settings-section-title">注册本地项目</div>
-            <label class="settings-field">
-              <span>AI 运行权限</span>
-              <select id="settingsRuntimePermission">
-                <option value="project_write">仅项目内写入</option>
-                <option value="full_access">完全访问</option>
-              </select>
-            </label>
-            <p class="settings-panel-caption" id="settingsRuntimePermissionHint">AI 只能读写当前项目目录，并运行开发相关命令。</p>
-            <div class="settings-project-bind">
-              <button class="send-button" id="chooseProjectFolderBtn" type="button">选择并注册项目</button>
-            </div>
-            <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
-            <details class="settings-advanced">
-              <summary>手动确认字段</summary>
-              <label class="settings-field">
-                <span>项目目录</span>
-                <input id="settingsProjectPath" placeholder="选择目录后自动填写" />
-              </label>
-              <label class="settings-field">
-                <span>项目名称</span>
-                <input id="settingsProjectName" placeholder="选择目录后自动填写" />
-              </label>
-              <label class="settings-field">
-                <span>Git 远端 origin</span>
-                <input id="settingsProjectRepo" placeholder="选择目录后自动读取" />
-              </label>
-              <label class="settings-field">
-                <span>Git 当前分支</span>
-                <input id="settingsProjectBranch" placeholder="选择目录后自动读取" />
-              </label>
-              <label class="settings-field">
-                <span>描述</span>
-                <textarea id="settingsProjectDesc" rows="2" placeholder="可选"></textarea>
-              </label>
-              <div class="settings-actions">
-                <button class="text-button" id="inspectProjectFolderBtn" type="button">重新读取目录信息</button>
-                <button class="text-button" id="registerProjectBtn" type="button">按当前字段注册</button>
-              </div>
             </details>
-            <div id="settingsProjectResult"></div>
           </section>
           <section class="settings-panel" id="settingsNotificationsPanel" data-settings-panel="notifications">
             <h2>通知</h2>
