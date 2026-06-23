@@ -437,7 +437,7 @@ mod tests {
         let context_pack =
             r#"{"external_app_context":{"answer_policy":{"schema":"fb2.answer_policy.v1"}}}"#;
 
-        let shaped = ensure_fb2_summary_policy_shape(summary, context_pack);
+        let shaped = ensure_fb2_summary_policy_shape(summary, context_pack, None);
 
         assert!(shaped.contains("## 数据事实"));
         assert!(shaped.contains("## AI推断"));
@@ -451,7 +451,7 @@ mod tests {
         let summary = "## 摘要\n- 普通群总结。";
 
         assert_eq!(
-            ensure_fb2_summary_policy_shape(summary, r#"{"task":"group_summary_post"}"#),
+            ensure_fb2_summary_policy_shape(summary, r#"{"task":"group_summary_post"}"#, None),
             summary
         );
     }

@@ -1,7 +1,7 @@
 //! Context Pack construction and async generation for group summary posts.
 
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{collections::HashSet, sync::Arc};
 use tracing::{info, warn};
 
 use crate::{
@@ -28,7 +28,7 @@ pub(crate) fn spawn_group_summary_generation(
         let result = generate_group_summary(&state, &user_id, &context_pack).await;
         let (summary, status, model_used, error) = match result {
             Ok((summary, model)) => (
-                ensure_fb2_summary_policy_shape(&summary, &context_pack),
+                ensure_fb2_summary_policy_shape(&summary, &context_pack, external_context.as_ref()),
                 "ready",
                 Some(model),
                 None,
@@ -36,7 +36,11 @@ pub(crate) fn spawn_group_summary_generation(
             Err(error) => {
                 let fallback = fallback_summary(&sources, &error.to_string());
                 (
-                    ensure_fb2_summary_policy_shape(&fallback, &context_pack),
+                    ensure_fb2_summary_policy_shape(
+                        &fallback,
+                        &context_pack,
+                        external_context.as_ref(),
+                    ),
                     "ready_with_fallback",
                     None,
                     Some(error.to_string()),
@@ -379,13 +383,17 @@ fn fallback_summary(messages: &[GroupSummarySourceMessage], error: &str) -> Stri
     out
 }
 
-pub(crate) fn ensure_fb2_summary_policy_shape(summary: &str, context_pack: &str) -> String {
+pub(crate) fn ensure_fb2_summary_policy_shape(
+    summary: &str,
+    context_pack: &str,
+    external_context: Option<&Value>,
+) -> String {
     let summary = summary.trim();
     if summary.is_empty() || !context_pack_has_fb2_external_context(context_pack) {
         return summary.to_string();
     }
 
-    let summary = sanitize_unmatched_fb2_ext_ids(summary, context_pack);
+    let summary = sanitize_unmatched_fb2_ext_ids(summary, context_pack, external_context);
 
     let has_data = contains_any(&summary, &["数据事实", "比赛事实"]);
     let has_opinion = contains_any(&summary, &["群友观点", "相关发言"]);
@@ -468,8 +476,12 @@ fn find_context_audit_id(value: &Value) -> Option<String> {
     }
 }
 
-fn sanitize_unmatched_fb2_ext_ids(summary: &str, context_pack: &str) -> String {
-    let lower_context = context_pack.to_ascii_lowercase();
+fn sanitize_unmatched_fb2_ext_ids(
+    summary: &str,
+    context_pack: &str,
+    external_context: Option<&Value>,
+) -> String {
+    let allowed_ids = fb2_summary_allowed_source_ids(context_pack, external_context);
     let chars = summary.chars().collect::<Vec<_>>();
     let mut out = String::with_capacity(summary.len());
     let mut index = 0;
@@ -482,7 +494,7 @@ fn sanitize_unmatched_fb2_ext_ids(summary: &str, context_pack: &str) -> String {
                 index += 1;
             }
             let token = chars[start..index].iter().collect::<String>();
-            if lower_context.contains(&token.to_ascii_lowercase()) {
+            if allowed_ids.contains(&token.to_ascii_lowercase()) {
                 out.push_str(&token);
             } else {
                 out.push_str("未核验来源编号");
@@ -493,6 +505,52 @@ fn sanitize_unmatched_fb2_ext_ids(summary: &str, context_pack: &str) -> String {
         index += 1;
     }
 
+    out
+}
+
+fn fb2_summary_allowed_source_ids(
+    context_pack: &str,
+    external_context: Option<&Value>,
+) -> HashSet<String> {
+    let mut out = HashSet::new();
+    let parsed_context;
+    let context = if let Some(context) = external_context {
+        Some(context)
+    } else {
+        parsed_context = serde_json::from_str::<Value>(context_pack).ok();
+        parsed_context
+            .as_ref()
+            .and_then(|pack| pack.get("external_app_context"))
+    };
+    let Some(context) = context else {
+        return out;
+    };
+
+    if let Some(context_audit_id) = context
+        .get("context_audit_id")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        out.insert(context_audit_id.to_ascii_lowercase());
+    }
+    for source in context
+        .get("citation_sources")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+    {
+        for field in ["id", "message_id", "source_message_id", "context_audit_id"] {
+            if let Some(value) = source
+                .get(field)
+                .and_then(Value::as_str)
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+            {
+                out.insert(value.to_ascii_lowercase());
+            }
+        }
+    }
     out
 }
 
@@ -559,6 +617,7 @@ mod tests {
         let shaped = ensure_fb2_summary_policy_shape(
             "## 数据事实\n- 引用 EXT-2589467，也误写了 EXT-2589477。\n\n## 群友观点\n- 有讨论。\n\n## AI推断\n- 只做推断。\n\n## 风险边界\n- 不保证命中。",
             &context,
+            None,
         );
 
         assert!(shaped.contains("EXT-2589467"));
