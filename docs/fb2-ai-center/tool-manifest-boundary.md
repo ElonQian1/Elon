@@ -104,6 +104,8 @@ fb2 当前可以把 answer policy 放在 `tool_contract.answer_policy` 下；只
 
 feedback 回写只能采用 AI 回复正文显式提到的 `source_ids`，且工具结果必须 `success=true`、`grounding.status=grounded/weak`。未被回答提到、权限 visibility 不匹配或工具失败的 source id 不能写回 fb2 cited sources。
 
+主项目回写 `/context/feedback` 时还会附带 `answer_source_validation schema=external_app.answer_source_validation.v1`。它是单次回答的引用闭环审计摘要，记录候选、命中、未命中、命中的工具来源和允许的工具来源；它不会改变 `cited_sources` 的统计语义，也不会把 tool-only source 临时合成成 fb2 业务事实来源。
+
 ## 主项目验收口径
 
 - live manifest 漂移检查关注 `chat_auto_executable_tool_ids` 和主项目静态 allowlist 是否对齐。

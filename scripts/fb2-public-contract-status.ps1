@@ -68,6 +68,7 @@ function Get-Fb2PublicContractChecks {
     $projectionLayer = $Contract.context_projection_layer_contract
     $domainIndex = $Contract.domain_context_index_contract
     $template = $Contract.context_pack_template_contract
+    $toolResultEnvelope = $Contract.tool_result_envelope_contract
     $group = $Contract.group_chat_evidence_contract
     $manifest = $Contract.live_tool_manifest
     $templateSections = @($template.required_section_order)
@@ -154,6 +155,8 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "context_pack_template_order_source_kind" (Test-Fb2ContractContains $templateSourceKinds "user_order") ($templateSourceKinds -join ",")
         New-Fb2PublicContractCheck "context_pack_template_opinion_source_kind" (Test-Fb2ContractContains $templateSourceKinds "opinion_memory") ($templateSourceKinds -join ",")
         New-Fb2PublicContractCheck "context_pack_template_business_sources_exclude_feedback" (-not (Test-Fb2ContractContains $templateSourceKinds "feedback")) ($templateSourceKinds -join ",")
+        New-Fb2PublicContractCheck "tool_result_answer_source_validation_schema" ($toolResultEnvelope.answer_source_validation.schema -eq "external_app.answer_source_validation.v1") ([string]$toolResultEnvelope.answer_source_validation.schema)
+        New-Fb2PublicContractCheck "tool_result_answer_source_validation_tool_sources" ([string]$toolResultEnvelope.answer_source_validation.rule -match "matched_tool_source_ids") ([string]$toolResultEnvelope.answer_source_validation.rule)
         New-Fb2PublicContractCheck "domain_lane_current_user_tickets" (Test-Fb2ContractContains $domainLaneIds "current_user_tickets") ($domainLaneIds -join ",")
         New-Fb2PublicContractCheck "domain_lane_group_opinions" (Test-Fb2ContractContains $domainLaneIds "group_opinions") ($domainLaneIds -join ",")
         New-Fb2PublicContractCheck "domain_lane_quality_feedback_audit" (Test-Fb2ContractContains $domainLaneIds "quality_feedback_audit") ($domainLaneIds -join ",")
@@ -368,6 +371,12 @@ function Invoke-Fb2PublicContractSelfTest {
             tool_count = 3
             tool_ids = @("context_pack", "match_analysis_brief", "group_opinion_summary")
         }
+        tool_result_envelope_contract = [pscustomobject]@{
+            answer_source_validation = [pscustomobject]@{
+                schema = "external_app.answer_source_validation.v1"
+                rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
+            }
+        }
     }
     $status = New-Fb2PublicContractStatus `
         -Base "http://example.invalid" `
@@ -411,6 +420,13 @@ function Invoke-Fb2PublicContractSelfTest {
         -Health "OK" `
         -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
         -Contract $badProjectionLayerContract
+    $badToolResultContract = $syntheticContract | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+    $badToolResultContract.tool_result_envelope_contract.answer_source_validation.rule = "missing tool source audit ids"
+    $badToolResultStatus = New-Fb2PublicContractStatus `
+        -Base "http://example.invalid" `
+        -Health "OK" `
+        -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
+        -Contract $badToolResultContract
 
     $failed = 0
     if (-not [bool]$status.success) {
@@ -436,6 +452,12 @@ function Invoke-Fb2PublicContractSelfTest {
         $failed++
     } else {
         Write-Output "OK`tpublic contract selftest rejects missing projection layer scenario"
+    }
+    if ([bool]$badToolResultStatus.success) {
+        Write-Output "FAIL`tpublic contract selftest rejects missing tool source audit"
+        $failed++
+    } else {
+        Write-Output "OK`tpublic contract selftest rejects missing tool source audit"
     }
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"

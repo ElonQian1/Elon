@@ -1,7 +1,7 @@
 //! external_app_context_source_validation.rs
 //! Validate fb2 source ids mentioned by generated answers.
 
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::{HashMap, HashSet};
 
 const MAX_VALIDATION_IDS: usize = 16;
@@ -11,6 +11,8 @@ pub(crate) struct SourceValidation {
     matched_source_ids: Vec<String>,
     unmatched_source_ids: Vec<String>,
     candidate_source_ids: Vec<String>,
+    allowed_tool_source_ids: Vec<String>,
+    matched_tool_source_ids: Vec<String>,
 }
 
 impl SourceValidation {
@@ -34,6 +36,36 @@ impl SourceValidation {
             compact_ids(&self.unmatched_source_ids)
         )
     }
+
+    pub(crate) fn answer_source_validation_summary(
+        &self,
+        main_request_id: &str,
+        context_audit_id: &str,
+        cited_source_count: usize,
+    ) -> Value {
+        // 该摘要只用于审计单次回答引用闭环，不改变 fb2 cited_sources 的统计口径。
+        let status = if self.candidate_source_ids.is_empty() {
+            "no_explicit_source_ids"
+        } else if self.unmatched_source_ids.is_empty() {
+            "ok"
+        } else {
+            "unmatched"
+        };
+        json!({
+            "schema": "external_app.answer_source_validation.v1",
+            "main_request_id": main_request_id,
+            "context_audit_id": context_audit_id,
+            "status": status,
+            "has_unmatched_sources": self.has_unmatched_sources(),
+            "cited_source_count": cited_source_count,
+            "candidate_source_ids": self.candidate_source_ids,
+            "matched_source_ids": self.matched_source_ids,
+            "unmatched_source_ids": self.unmatched_source_ids,
+            "matched_tool_source_ids": self.matched_tool_source_ids,
+            "allowed_tool_source_ids": self.allowed_tool_source_ids,
+            "rule": "AI answer source ids must come from the Context Pack source registry, selected-message extras, the context audit id, or grounded/weak tool results."
+        })
+    }
 }
 
 pub(crate) fn validate_reply_sources(
@@ -44,10 +76,17 @@ pub(crate) fn validate_reply_sources(
     extra_citation_sources: &[Value],
 ) -> SourceValidation {
     let allowed = allowed_source_ids(context, tool_results, cited_sources, extra_citation_sources);
+    let allowed_tool_source_ids = allowed_tool_source_ids(tool_results);
+    let tool_source_lookup = allowed_tool_source_ids
+        .iter()
+        .map(|id| id.to_ascii_lowercase())
+        .collect::<HashSet<_>>();
     let candidates = reply_source_candidates(reply_text, &allowed);
     let mut matched_source_ids = Vec::new();
     let mut unmatched_source_ids = Vec::new();
+    let mut matched_tool_source_ids = Vec::new();
     let mut matched_seen = HashSet::new();
+    let mut matched_tool_seen = HashSet::new();
     let mut unmatched_seen = HashSet::new();
 
     for candidate in &candidates {
@@ -55,6 +94,11 @@ pub(crate) fn validate_reply_sources(
         if let Some(canonical) = allowed.get(&key) {
             if matched_seen.insert(canonical.to_ascii_lowercase()) {
                 matched_source_ids.push(canonical.clone());
+            }
+            if tool_source_lookup.contains(&canonical.to_ascii_lowercase())
+                && matched_tool_seen.insert(canonical.to_ascii_lowercase())
+            {
+                matched_tool_source_ids.push(canonical.clone());
             }
         } else if unmatched_seen.insert(key) {
             unmatched_source_ids.push(candidate.clone());
@@ -70,7 +114,32 @@ pub(crate) fn validate_reply_sources(
         matched_source_ids,
         unmatched_source_ids,
         candidate_source_ids: candidates,
+        allowed_tool_source_ids,
+        matched_tool_source_ids,
     }
+}
+
+fn allowed_tool_source_ids(tool_results: Option<&Value>) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut seen = HashSet::new();
+    for result in grounded_or_weak_tool_results(tool_results) {
+        for source_id in result
+            .get("source_ids")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(source_id_as_string)
+        {
+            let key = source_id.to_ascii_lowercase();
+            if seen.insert(key) {
+                out.push(source_id);
+                if out.len() >= MAX_VALIDATION_IDS {
+                    return out;
+                }
+            }
+        }
+    }
+    out
 }
 
 fn allowed_source_ids(
@@ -360,6 +429,18 @@ mod tests {
 
         assert!(!validation.has_unmatched_sources());
         assert_eq!(validation.matched_source_ids, vec!["order-tool-1"]);
+        assert_eq!(validation.matched_tool_source_ids, vec!["order-tool-1"]);
+        assert_eq!(validation.allowed_tool_source_ids, vec!["order-tool-1"]);
+        let summary = validation.answer_source_validation_summary("main-req-1", "audit-1", 0);
+        assert_eq!(
+            summary["schema"],
+            "external_app.answer_source_validation.v1"
+        );
+        assert_eq!(summary["status"], "ok");
+        assert_eq!(summary["main_request_id"], "main-req-1");
+        assert_eq!(summary["context_audit_id"], "audit-1");
+        assert_eq!(summary["matched_tool_source_ids"][0], "order-tool-1");
+        assert_eq!(summary["cited_source_count"], 0);
     }
 
     #[test]

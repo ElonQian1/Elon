@@ -421,6 +421,12 @@ fn generated_answer_feedback_payload(
         "group_id": group_id,
         "cited_source_count": cited_source_count,
         "cited_sources": cited_sources,
+        // 独立审计字段：记录本次回答引用是否闭环，不把 tool-only source 合成到 cited_sources。
+        "answer_source_validation": source_validation.answer_source_validation_summary(
+            main_request_id,
+            context_audit_id,
+            cited_source_count
+        ),
         "missing_context": false,
         "wrong_context": source_validation.has_unmatched_sources(),
         "note": truncate_chars(
@@ -950,6 +956,11 @@ mod tests {
 
         assert_eq!(payload["cited_source_count"], 1);
         assert_eq!(payload["wrong_context"], true);
+        assert_eq!(payload["answer_source_validation"]["status"], "unmatched");
+        assert_eq!(
+            payload["answer_source_validation"]["unmatched_source_ids"][0],
+            "order-404"
+        );
         assert!(payload["note"]
             .as_str()
             .unwrap()
@@ -990,6 +1001,20 @@ mod tests {
 
         assert_eq!(payload["cited_source_count"], 0);
         assert_eq!(payload["wrong_context"], false);
+        assert_eq!(
+            payload["answer_source_validation"]["schema"],
+            "external_app.answer_source_validation.v1"
+        );
+        assert_eq!(payload["answer_source_validation"]["status"], "ok");
+        assert_eq!(
+            payload["answer_source_validation"]["matched_tool_source_ids"][0],
+            "order-tool-1"
+        );
+        assert_eq!(
+            payload["answer_source_validation"]["allowed_tool_source_ids"][0],
+            "order-tool-1"
+        );
+        assert_eq!(payload["answer_source_validation"]["cited_source_count"], 0);
         assert!(payload["note"]
             .as_str()
             .unwrap()

@@ -75,6 +75,11 @@ pub(crate) fn public_tool_result_envelope_guidance(app_id: &str) -> Option<Value
             },
             "visibility_contract": visibility_contract(),
             "feedback_writeback_rule": "只有 AI 回复正文显式提到的 source_id，且工具结果 success=true、grounding.status=grounded/weak，才允许写回 fb2 feedback.cited_sources；unsafe/unavailable 或未被提到的 source_id 不能写回。",
+            "answer_source_validation": {
+                "schema": "external_app.answer_source_validation.v1",
+                "included_in": "/api/main-project/context/feedback payload",
+                "rule": "主项目会在 feedback payload 中附带单次回答引用闭环摘要，记录 candidate/matched/unmatched source ids、matched_tool_source_ids 和 allowed_tool_source_ids；该字段用于审计回答是否伪造来源，不会把 tool-only source 临时合成到 fb2 cited_sources。"
+            },
             "anti_patterns": [
                 "raw_tool_response_in_prompt",
                 "tool_result_without_source_ids",
@@ -195,6 +200,14 @@ mod tests {
         assert!(quality_kinds.iter().any(|kind| kind["kind"] == "feedback"
             && kind["scope"] == "quality_history"
             && kind["default_chat_fact"] == false));
+        assert_eq!(
+            contract["answer_source_validation"]["schema"],
+            "external_app.answer_source_validation.v1"
+        );
+        assert!(contract["answer_source_validation"]["rule"]
+            .as_str()
+            .unwrap()
+            .contains("matched_tool_source_ids"));
     }
 
     #[test]
