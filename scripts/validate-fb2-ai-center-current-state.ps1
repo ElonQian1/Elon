@@ -319,6 +319,21 @@ function New-Fb2CurrentStateValidation {
             -JsonSuccess $false `
             -Details "missing_latest_data_only_acceptance_summary"))
     }
+    $qualityTrendValidationPath = Join-Path $targetDir "quality-trend-validation-current.json"
+    if (-not [string]::IsNullOrWhiteSpace($latestDataOnlyPath) -and (Test-Path -LiteralPath $latestDataOnlyPath)) {
+        [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+            -Name "validate_quality_trend" `
+            -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-quality-trend.ps1") `
+            -Arguments @("-SummaryPath", $latestDataOnlyPath, "-OutputPath", $qualityTrendValidationPath) `
+            -ExpectedOutputPath $qualityTrendValidationPath))
+    } else {
+        [void]$steps.Add((New-Fb2CurrentInlineStep `
+            -Name "validate_quality_trend" `
+            -Success $false `
+            -OutputPath "" `
+            -JsonSuccess $false `
+            -Details "missing_latest_data_only_acceptance_summary"))
+    }
 
     $livePreflightValidationPath = Join-Path $targetDir "live-preflight-request-validation-current.json"
     if (-not [string]::IsNullOrWhiteSpace($statusPathForOptionalSteps) -and (Test-Path -LiteralPath $statusPathForOptionalSteps)) {
@@ -434,6 +449,7 @@ function New-Fb2CurrentStateValidation {
     $exportedSampleValidation = Get-Fb2CurrentProperty $refresh "exported_context_pack_sample_set_validation"
     $publicContractStatus = Read-Fb2CurrentJsonOrNull -Path (Join-Path $targetDir "public-contract-status-current.json")
     $visibleAnswerPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $visibleAnswerPolicyValidationPath
+    $qualityTrendValidation = Read-Fb2CurrentJsonOrNull -Path $qualityTrendValidationPath
     $livePreflightRequestValidation = Read-Fb2CurrentJsonOrNull -Path $livePreflightValidationPath
     $tokenlessContinuationValidation = Read-Fb2CurrentJsonOrNull -Path $tokenlessContinuationValidationPath
     $contextProjectionLogValidation = Read-Fb2CurrentJsonOrNull -Path $contextProjectionValidationPath
@@ -466,6 +482,7 @@ function New-Fb2CurrentStateValidation {
         project_direct_network_policy_validation = $directNetworkPolicyValidation
         exported_context_pack_sample_set_validation = $exportedSampleValidation
         visible_answer_policy_validation = $visibleAnswerPolicyValidation
+        quality_trend_validation = $qualityTrendValidation
         live_preflight_request_validation = $livePreflightRequestValidation
         tokenless_continuation_validation = $tokenlessContinuationValidation
         context_projection_log_validation = $contextProjectionLogValidation
@@ -497,6 +514,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "project_direct_network_policy"; script = "validate-project-direct-network-policy.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
+        [ordered]@{ name = "quality_trend"; script = "validate-fb2-quality-trend.ps1" },
         [ordered]@{ name = "live_preflight_request"; script = "validate-fb2-live-preflight-request.ps1" },
         [ordered]@{ name = "context_projection_log"; script = "validate-fb2-context-projection-log.ps1" },
         [ordered]@{ name = "context_projection_layer_doc"; script = "validate-fb2-context-projection-layer-doc.ps1" },
