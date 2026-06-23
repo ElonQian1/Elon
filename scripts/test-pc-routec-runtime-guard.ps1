@@ -73,9 +73,21 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Needle "admission_availability.ready" `
         -Message "Server Route C status must include admission readiness in ready calculation"
     Assert-FileContains `
+        -Path $ServerRuntimeModule `
+        -Needle "server_runtime_agent_usage_mode_allowed" `
+        -Message "Server Route C runtime must reject non server_api_key agents"
+    Assert-FileContains `
+        -Path $ServerRuntimeModule `
+        -Needle "unsupported_agent_usage_mode" `
+        -Message "Server Route C status must expose unsupported agent usage mode"
+    Assert-FileContains `
         -Path $GuardModule `
         -Needle "admission_availability_reports_capacity_reason" `
         -Message "Server Route C guard must test admission capacity reasons"
+    Assert-FileContains `
+        -Path $GuardModule `
+        -Needle "server_api_key usage_mode only" `
+        -Message "Server Route C protection status must document server_api_key-only selection"
     Assert-FileContains `
         -Path $BudgetModule `
         -Needle "budget_status_reports_exhausted_per_user_daily_call_limit" `

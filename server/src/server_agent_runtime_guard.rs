@@ -97,7 +97,7 @@ pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
         output_validation:
             "model JSON must be an object; actions must stay within count/action_chars/total_action_chars",
         agent_selection:
-            "default server agent only unless ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS explicitly allows more",
+            "server_api_key usage_mode only; default server agent only unless ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS explicitly allows more",
         admission_control: "global and per-user concurrency plus rolling minute request limits",
         budget_gate:
             "optional ELON_SERVER_AGENT_RUNTIME_DAILY_CALL_LIMIT platform fuse plus ELON_SERVER_AGENT_RUNTIME_PER_USER_DAILY_CALL_LIMIT user fuse",

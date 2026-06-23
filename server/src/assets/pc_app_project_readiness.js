@@ -328,6 +328,7 @@
       const policy = status.policy || {};
       if (policy.enabled === false || stateText === 'disabled') return '已关闭 · 运维开关保护';
       if (stateText === 'missing_token') return '未登录 · 不会调用服务器模型';
+      if (stateText === 'unsupported_agent_usage_mode') return 'agent 模式不允许 · 只允许 server_api_key · 不会启用';
       if (stateText === 'http_error') return `云端返回 ${clean(status.httpStatus) || '错误'} · 不会启用`;
       if (stateText === 'unavailable') return `${clean(status.reason) || '云端不可用'} · 不会启用`;
       const budget = status.budget || {};

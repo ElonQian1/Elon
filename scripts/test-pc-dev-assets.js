@@ -1052,6 +1052,31 @@ function testProjectReadinessChecklist() {
   assert.ok(limitedRouteCHtml.includes('请求频率已达上限'), 'readiness should explain Route C admission limited reasons');
   assert.ok(limitedRouteCHtml.includes('17 秒后重试'), 'readiness should show Route C admission retry-after hints');
 
+  const unsupportedAgentHtml = create({
+    nodes: [{
+      node_id: 'node-c-agent-mode',
+      online: true,
+      server_runtime_ready: false,
+      allowed_clis: [],
+      dev_runtime: {
+        server_runtime_ready: false,
+        server_runtime_status: {
+          status: 'unsupported_agent_usage_mode',
+          policy: { enabled: true }
+        }
+      }
+    }],
+    projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
+  }).renderMemberPanel({
+    id: 'p-route-c-agent-mode',
+    role: 'owner',
+    node_id: 'node-c-agent-mode',
+    workspace_path: 'D:/demo',
+    runtime_permission: 'project_write'
+  });
+  assert.ok(unsupportedAgentHtml.includes('agent 模式不允许'), 'readiness should explain Route C agent usage-mode protection');
+  assert.ok(unsupportedAgentHtml.includes('server_api_key'), 'readiness should show the required Route C server API key mode');
+
   const fullAccessHtml = create(readyState).renderMemberPanel({
     id: 'p1',
     role: 'owner',
@@ -1359,11 +1384,15 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNode.includes('admission_availability'), 'PC node page should keep snake_case admission compatibility');
   assert.ok(pcAppNode.includes('agentSelection'), 'PC node page should display Route C agent selection protection');
   assert.ok(pcAppNode.includes('agent_selection'), 'PC node page should keep snake_case agent selection compatibility');
+  assert.ok(pcAppNode.includes('unsupported_agent_usage_mode'), 'PC node page should explain unsupported Route C agent usage modes');
+  assert.ok(pcAppNode.includes('server_api_key'), 'PC node page should show the required Route C server API key mode');
   assert.ok(pcAppNode.includes('routeCLimitedReasonText'), 'PC node page should explain Route C limited reasons');
   assert.ok(pcAppNode.includes('秒后重试'), 'PC node page should show Route C retry-after hints');
   const readinessJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_readiness.js'), 'utf8');
   assert.ok(readinessJs.includes('admissionAvailability'), 'project readiness should read Route C admission availability');
   assert.ok(readinessJs.includes('routeCLimitedReasonText'), 'project readiness should explain Route C limited reasons');
+  assert.ok(readinessJs.includes('unsupported_agent_usage_mode'), 'project readiness should explain unsupported Route C agent usage modes');
+  assert.ok(readinessJs.includes('server_api_key'), 'project readiness should show the required Route C server API key mode');
   assert.ok(readinessJs.includes('秒后重试'), 'project readiness should show Route C retry-after hints');
 
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');

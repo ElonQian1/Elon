@@ -66,17 +66,21 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
     let limits = ServerAgentRuntimeLimits::current();
     let policy = ServerAgentRuntimePolicy::current();
     let agent_policy = ServerAgentRuntimeAgentPolicy::current();
-    let agent = resolve_server_runtime_agent(&state, None, &agent_policy)
-        .await
-        .ok()
-        .map(|agent| {
-            let usage_mode = agent.usage_mode().to_string();
-            ServerAgentRuntimeAgentStatus {
-                name: agent.name,
-                model: agent.model,
-                usage_mode,
-            }
-        });
+    let resolved_agent = resolve_server_runtime_agent(&state, None, &agent_policy).await;
+    let agent_status = match &resolved_agent {
+        Ok(_) => "ready",
+        Err(ServerRuntimeAgentResolveError::NotAllowed) => "agent_not_allowed",
+        Err(ServerRuntimeAgentResolveError::UnsupportedUsageMode) => "unsupported_agent_usage_mode",
+        Err(ServerRuntimeAgentResolveError::Unavailable) => "unavailable",
+    };
+    let agent = resolved_agent.as_ref().ok().map(|agent| {
+        let usage_mode = agent.usage_mode().to_string();
+        ServerAgentRuntimeAgentStatus {
+            name: agent.name.clone(),
+            model: agent.model.clone(),
+            usage_mode,
+        }
+    });
     let admission = admission_snapshot(&user.id, limits);
     let admission_availability = admission_availability(&admission);
     let budget = server_runtime_budget_status_for_user(&state.store, &user.id);
@@ -86,7 +90,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         status: if !policy.enabled {
             "disabled"
         } else if agent.is_none() {
-            "unavailable"
+            agent_status
         } else if budget.status == "user_exhausted" {
             "user_budget_exhausted"
         } else if !budget.ready() {
@@ -156,6 +160,19 @@ pub async fn chat_handler(
             }
             Err(ServerRuntimeAgentResolveError::Unavailable) => {
                 return json_error(StatusCode::SERVICE_UNAVAILABLE, "服务器未配置可用 AI 代理");
+            }
+            Err(ServerRuntimeAgentResolveError::UnsupportedUsageMode) => {
+                tracing::warn!(
+                    target: "server_agent_runtime",
+                    user_id = %user.id,
+                    requested_agent = req.agent.as_deref().unwrap_or(""),
+                    request_fingerprint = %audit.request_fingerprint,
+                    "pc_server_runtime request rejected by unsupported agent usage mode"
+                );
+                return json_error(
+                    StatusCode::SERVICE_UNAVAILABLE,
+                    unsupported_agent_usage_mode_message(),
+                );
             }
         };
     let _admission = match try_acquire_runtime_admission(&user.id, limits) {
@@ -279,15 +296,20 @@ async fn resolve_server_runtime_agent(
     if !agent_policy.allows_requested_agent(agent_name, &agents.default_agent) {
         return Err(ServerRuntimeAgentResolveError::NotAllowed);
     }
-    if let Some(agent_name) = agent_name {
-        return named_agent_config(&agents, agent_name)
+    let agent = if let Some(agent_name) = agent_name {
+        named_agent_config(&agents, agent_name)
             .cloned()
-            .ok_or(ServerRuntimeAgentResolveError::Unavailable);
+            .ok_or(ServerRuntimeAgentResolveError::Unavailable)?
+    } else {
+        agents
+            .get_agent(None)
+            .cloned()
+            .ok_or(ServerRuntimeAgentResolveError::Unavailable)?
+    };
+    if !server_runtime_agent_usage_mode_allowed(&agent) {
+        return Err(ServerRuntimeAgentResolveError::UnsupportedUsageMode);
     }
-    agents
-        .get_agent(None)
-        .cloned()
-        .ok_or(ServerRuntimeAgentResolveError::Unavailable)
+    Ok(agent)
 }
 
 fn named_agent_config<'a>(agents: &'a AgentsConfig, agent_name: &str) -> Option<&'a AgentConfig> {
@@ -303,7 +325,16 @@ fn named_agent_config<'a>(agents: &'a AgentsConfig, agent_name: &str) -> Option<
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ServerRuntimeAgentResolveError {
     NotAllowed,
+    UnsupportedUsageMode,
     Unavailable,
+}
+
+fn server_runtime_agent_usage_mode_allowed(agent: &AgentConfig) -> bool {
+    agent.usage_mode() == "server_api_key"
+}
+
+fn unsupported_agent_usage_mode_message() -> &'static str {
+    "Route C 服务器模型只允许使用平台 server_api_key agent；当前 agent 不是服务器 API Key 模式，请由平台运营调整默认 agent 或 allowlist。"
 }
 
 fn validate_runtime_messages(messages: &[Value]) -> Result<(), &'static str> {
@@ -383,7 +414,8 @@ mod tests {
     use super::{
         admission_error_response, audit_summary, budget_error_response, named_agent_config,
         operational_error_summary, protection_status, provider_error_message, response_model,
-        response_total_tokens, validate_runtime_messages,
+        response_total_tokens, server_runtime_agent_usage_mode_allowed,
+        unsupported_agent_usage_mode_message, validate_runtime_messages,
     };
     use crate::server_agent_runtime_budget::{ServerRuntimeBudgetError, ServerRuntimeBudgetStatus};
     use crate::server_agent_runtime_guard::ServerRuntimeAdmissionError;
@@ -423,6 +455,7 @@ mod tests {
         assert!(protection.output_validation.contains("actions"));
         assert!(protection.input_validation.contains("message_chars"));
         assert!(protection.agent_selection.contains("default server agent"));
+        assert!(protection.agent_selection.contains("server_api_key"));
         assert!(protection.admission_control.contains("global"));
         assert!(protection.budget_gate.contains("DAILY_CALL_LIMIT"));
         assert!(protection.budget_gate.contains("PER_USER_DAILY_CALL_LIMIT"));
@@ -453,6 +486,43 @@ mod tests {
         assert!(message.contains("fingerprint="));
         assert!(!message.contains("sk-secret"));
         assert!(!message.contains("user prompt text"));
+    }
+
+    #[test]
+    fn route_c_agent_usage_mode_must_be_server_api_key() {
+        let server_key_agent = AgentConfig {
+            name: "main".to_string(),
+            api_base: "https://api.example.com/v1".to_string(),
+            api_key: "sk-test".to_string(),
+            model: "route-c-model".to_string(),
+            embedding_model: None,
+            usage_mode: Some("server_api_key".to_string()),
+        };
+        let legacy_server_key_agent = AgentConfig {
+            usage_mode: None,
+            ..server_key_agent.clone()
+        };
+        let user_proxy_agent = AgentConfig {
+            usage_mode: Some("user_api_key_proxy".to_string()),
+            ..server_key_agent.clone()
+        };
+        let copilot_agent = AgentConfig {
+            name: "copilot:gpt-4o".to_string(),
+            api_base: "https://api.githubcopilot.com".to_string(),
+            usage_mode: Some("server_codex_cli".to_string()),
+            ..server_key_agent
+        };
+
+        assert!(server_runtime_agent_usage_mode_allowed(
+            &legacy_server_key_agent
+        ));
+        assert!(server_runtime_agent_usage_mode_allowed(&AgentConfig {
+            usage_mode: Some("server_api_key".to_string()),
+            ..legacy_server_key_agent
+        }));
+        assert!(!server_runtime_agent_usage_mode_allowed(&user_proxy_agent));
+        assert!(!server_runtime_agent_usage_mode_allowed(&copilot_agent));
+        assert!(unsupported_agent_usage_mode_message().contains("server_api_key"));
     }
 
     #[test]
