@@ -44,6 +44,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+. (Join-Path $PSScriptRoot "direct-network.ps1")
+
+Set-ElonProjectDirectNetwork
+
 # ── Release API helper（同 publish-server.ps1） ─────────────────────────────
 $ReleaseApiBase = "$($null)"
 $ReleaseApiBase = "http://43.139.149.158:8080/api/release"
@@ -173,6 +177,13 @@ $UserGradleProps = Join-Path $env:USERPROFILE ".gradle\gradle.properties"
 $OriginalGradleContent = $null
 $BuildBaseSha = $null
 $LocalHeadSha = $null
+
+Push-Location $RepoRoot
+try {
+    Set-ElonProjectDirectGitSsh
+} finally {
+    Pop-Location
+}
 
 function Get-ServerApkVersionBaseline {
     $candidates = @()
@@ -450,7 +461,7 @@ function Invoke-GitFetchWithRetry {
         $oldPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         try {
-            $output = & git -C $RepoRoot @GitArgs 2>&1
+            $output = & git -C $RepoRoot -c http.proxy= -c https.proxy= @GitArgs 2>&1
         } finally {
             $ErrorActionPreference = $oldPreference
         }
@@ -1056,7 +1067,14 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($env:APP_UPDATE_BROADCAST_TOKEN)) {
         $headers["Authorization"] = "Bearer $env:APP_UPDATE_BROADCAST_TOKEN"
     }
-    $broadcast = Invoke-RestMethod -Method Post -Uri $broadcastUrl -Headers $headers -TimeoutSec 10
+    $broadcastParams = @{
+        Method = "Post"
+        Uri = $broadcastUrl
+        Headers = $headers
+        TimeoutSec = 10
+    }
+    $broadcastParams = Add-ElonProjectDirectRequestParameters -Params $broadcastParams -CommandName "Invoke-RestMethod"
+    $broadcast = Invoke-RestMethod @broadcastParams
     Write-Host "   ✅ 已通知在线连接: $($broadcast.receivers)" -ForegroundColor Green
 } catch {
     Write-Warning "   ⚠️  实时广播失败: $_（不影响 APK 发布，离线/未收到用户仍会定期检查）"

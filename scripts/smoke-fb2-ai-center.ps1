@@ -50,6 +50,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "fb2-ai-center-contract-smoke-summary.ps1")
+. (Join-Path $PSScriptRoot "direct-network.ps1")
+
+Set-ElonProjectDirectNetwork
 
 if (-not $MainBase) {
     $MainBase = $env:ELON_MAIN_BASE
@@ -418,6 +421,7 @@ function Invoke-Json {
             $params["ContentType"] = "application/json"
             $params["Body"] = ($Body | ConvertTo-Json -Depth 8 -Compress)
         }
+        $params = Add-ElonProjectDirectRequestParameters -Params $params -CommandName "Invoke-RestMethod"
         try {
             return Invoke-RestMethod @params
         } catch {
@@ -447,6 +451,7 @@ function Invoke-HttpStatus {
         $params["ContentType"] = "application/json"
         $params["Body"] = ($Body | ConvertTo-Json -Depth 8 -Compress)
     }
+    $params = Add-ElonProjectDirectRequestParameters -Params $params -CommandName "Invoke-WebRequest"
     Invoke-WebRequest @params
 }
 
@@ -784,7 +789,13 @@ try {
 Write-Output "== Main project contract =="
 
 try {
-    $health = (Invoke-WebRequest -Uri "$MainBase/health" -UseBasicParsing -TimeoutSec 10).Content.Trim()
+    $healthParams = @{
+        Uri = "$MainBase/health"
+        UseBasicParsing = $true
+        TimeoutSec = 10
+    }
+    $healthParams = Add-ElonProjectDirectRequestParameters -Params $healthParams -CommandName "Invoke-WebRequest"
+    $health = (Invoke-WebRequest @healthParams).Content.Trim()
     Assert-True ($health -eq "OK") "main health" $health
 } catch {
     Fail "main health" $_.Exception.Message
@@ -1214,7 +1225,14 @@ if ($CheckFb2ApkVersion) {
         Assert-True ([int64]$appVersion.size -gt 0) "fb2 APK size" "$($appVersion.size)"
         Assert-True ([bool]$apkUrl) "fb2 APK url" $apkUrl
 
-        $head = Invoke-WebRequest -UseBasicParsing -Uri $apkUrl -Method Head -TimeoutSec $RequestTimeoutSec
+        $headParams = @{
+            UseBasicParsing = $true
+            Uri = $apkUrl
+            Method = "Head"
+            TimeoutSec = $RequestTimeoutSec
+        }
+        $headParams = Add-ElonProjectDirectRequestParameters -Params $headParams -CommandName "Invoke-WebRequest"
+        $head = Invoke-WebRequest @headParams
         $contentType = [string]$head.Headers["Content-Type"]
         $contentDisposition = [string]$head.Headers["Content-Disposition"]
         Assert-True (($contentType -like "*android.package-archive*") -or ($contentDisposition -like "*.apk*")) "fb2 APK download head" "contentType=$contentType disposition=$contentDisposition"

@@ -35,6 +35,9 @@ param(
 $ErrorActionPreference = "Stop"
 
 . (Join-Path $PSScriptRoot "fb2-visible-readonly-validation.ps1")
+. (Join-Path $PSScriptRoot "direct-network.ps1")
+
+Set-ElonProjectDirectNetwork
 
 if (-not $MainBase) { $MainBase = $env:ELON_MAIN_BASE }
 if (-not $MainBase) { $MainBase = "http://43.139.149.158:8080" }
@@ -111,7 +114,13 @@ function Add-SwitchArg {
 function Invoke-JsonOrNull {
     param([string]$Url)
     try {
-        Invoke-RestMethod -Uri $Url -Method Get -TimeoutSec 15
+        $params = @{
+            Uri = $Url
+            Method = "Get"
+            TimeoutSec = 15
+        }
+        $params = Add-ElonProjectDirectRequestParameters -Params $params -CommandName "Invoke-RestMethod"
+        Invoke-RestMethod @params
     } catch {
         $null
     }
@@ -135,6 +144,7 @@ function Invoke-Json {
         $params.ContentType = "application/json"
         $params.Body = ($Body | ConvertTo-Json -Depth 8)
     }
+    $params = Add-ElonProjectDirectRequestParameters -Params $params -CommandName "Invoke-RestMethod"
     Invoke-RestMethod @params
 }
 

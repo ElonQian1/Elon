@@ -48,6 +48,9 @@ $script:Failed = 0
 $script:Skipped = 0
 
 . (Join-Path $PSScriptRoot "fb2-visible-readonly-summary.ps1")
+. (Join-Path $PSScriptRoot "direct-network.ps1")
+
+Set-ElonProjectDirectNetwork
 
 function Write-Check {
     param([string]$Status, [string]$Name, [string]$Detail = "")
@@ -122,6 +125,7 @@ function Invoke-Json {
         $params["ContentType"] = "application/json"
         $params["Body"] = ($Body | ConvertTo-Json -Depth 12 -Compress)
     }
+    $params = Add-ElonProjectDirectRequestParameters -Params $params -CommandName "Invoke-RestMethod"
     Invoke-RestMethod @params
 }
 

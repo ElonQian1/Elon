@@ -33,6 +33,12 @@ $ErrorActionPreference = "Stop"
 $RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $ServerUrl = "http://43.139.149.158:8080"
 
+. (Join-Path $PSScriptRoot "direct-network.ps1")
+
+Set-ElonProjectDirectNetwork
+Set-Location $RepoRoot
+Set-ElonProjectDirectGitSsh
+
 function Stop-Check {
     param([string]$Message)
     Write-Error $Message
@@ -67,7 +73,7 @@ function Invoke-GitFetchWithRetry {
         $oldPreference = $ErrorActionPreference
         $ErrorActionPreference = "Continue"
         try {
-            $output = & git @GitArgs 2>&1
+            $output = & git -c http.proxy= -c https.proxy= @GitArgs 2>&1
         } finally {
             $ErrorActionPreference = $oldPreference
         }
@@ -132,7 +138,12 @@ if ($Kind -eq "AndroidFeature") {
     }
 
     try {
-        $remoteVersion = Invoke-RestMethod "$ServerUrl/app/version.json" -TimeoutSec 10
+        $remoteVersionParams = @{
+            Uri = "$ServerUrl/app/version.json"
+            TimeoutSec = 10
+        }
+        $remoteVersionParams = Add-ElonProjectDirectRequestParameters -Params $remoteVersionParams -CommandName "Invoke-RestMethod"
+        $remoteVersion = Invoke-RestMethod @remoteVersionParams
     } catch {
         Stop-Check "Could not read server /app/version.json: $_"
     }
@@ -147,10 +158,25 @@ if ($Kind -eq "AndroidFeature") {
     }
 
     try {
-        $apkHead = Invoke-WebRequest -Uri "$ServerUrl/app/ElonSpeed-latest.apk" -Method Head -TimeoutSec 10 -UseBasicParsing
+        $apkHeadParams = @{
+            Uri = "$ServerUrl/app/ElonSpeed-latest.apk"
+            Method = "Head"
+            TimeoutSec = 10
+            UseBasicParsing = $true
+        }
+        $apkHeadParams = Add-ElonProjectDirectRequestParameters -Params $apkHeadParams -CommandName "Invoke-WebRequest"
+        $apkHead = Invoke-WebRequest @apkHeadParams
     } catch {
         try {
-            $apkHead = Invoke-WebRequest -Uri "$ServerUrl/app/ElonSpeed-latest.apk" -Method Get -Headers @{ Range = "bytes=0-0" } -TimeoutSec 10 -UseBasicParsing
+            $apkGetParams = @{
+                Uri = "$ServerUrl/app/ElonSpeed-latest.apk"
+                Method = "Get"
+                Headers = @{ Range = "bytes=0-0" }
+                TimeoutSec = 10
+                UseBasicParsing = $true
+            }
+            $apkGetParams = Add-ElonProjectDirectRequestParameters -Params $apkGetParams -CommandName "Invoke-WebRequest"
+            $apkHead = Invoke-WebRequest @apkGetParams
         } catch {
             Stop-Check "APK download URL is unavailable: $_"
         }
@@ -188,13 +214,23 @@ if ($Kind -eq "Server") {
     }
 
     try {
-        $health = Invoke-RestMethod "$ServerUrl/health" -TimeoutSec 10
+        $healthParams = @{
+            Uri = "$ServerUrl/health"
+            TimeoutSec = 10
+        }
+        $healthParams = Add-ElonProjectDirectRequestParameters -Params $healthParams -CommandName "Invoke-RestMethod"
+        $health = Invoke-RestMethod @healthParams
     } catch {
         Stop-Check "Server health check failed: $_"
     }
 
     try {
-        $serverVersion = Invoke-RestMethod "$ServerUrl/api/server/version" -TimeoutSec 10
+        $serverVersionParams = @{
+            Uri = "$ServerUrl/api/server/version"
+            TimeoutSec = 10
+        }
+        $serverVersionParams = Add-ElonProjectDirectRequestParameters -Params $serverVersionParams -CommandName "Invoke-RestMethod"
+        $serverVersion = Invoke-RestMethod @serverVersionParams
     } catch {
         Stop-Check "Server version check failed: $_"
     }
