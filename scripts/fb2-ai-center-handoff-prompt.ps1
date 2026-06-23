@@ -133,6 +133,8 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- data_goal_complete: `{0}`' -f [bool]$gates.data_goal_complete)
     Add-Fb2PromptLine -Lines $lines -Text ('- full_final_complete: `{0}`' -f [bool]$gates.full_final_complete)
     Add-Fb2PromptLine -Lines $lines -Text ('- token_present: `{0}`' -f [bool]$gates.token_present)
+    Add-Fb2PromptLine -Lines $lines -Text ('- protected_live_preflight_satisfied: `{0}`' -f [bool]$gates.protected_live_preflight_satisfied)
+    Add-Fb2PromptLine -Lines $lines -Text ('- answer_source_validation_ready: `{0}`' -f [bool](Get-Fb2PromptProperty $Refresh 'answer_source_validation_ready' $false))
     Add-Fb2PromptLine -Lines $lines -Text ('- voice_deferred_by_user: `{0}`' -f [bool]$gates.voice_deferred_by_user)
     Add-Fb2PromptLine -Lines $lines -Text ('- next_minimum_action: `{0}`' -f [string]$gates.next_minimum_action)
     Add-Fb2PromptLine -Lines $lines -Text ('- totals: complete `{0}` / deferred `{1}` / incomplete `{2}` / total `{3}`' -f [int]$totals.complete, [int]$totals.deferred, [int]$totals.incomplete, [int]$totals.total)
@@ -300,6 +302,7 @@ function Invoke-Fb2PromptSelfTest {
                     data_goal_complete = $true
                     full_final_complete = $false
                     token_present = $false
+                    protected_live_preflight_satisfied = $true
                     voice_deferred_by_user = $true
                     next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
                 }
@@ -342,11 +345,14 @@ function Invoke-Fb2PromptSelfTest {
                 )
             }
         }
+        $fixture | Add-Member -NotePropertyName "answer_source_validation_ready" -NotePropertyValue $true -Force
         $fixture | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $refreshPath -Encoding UTF8
         & $PSCommandPath -RefreshPath $refreshPath -OutputPath $promptPath | Out-Null
         $content = Get-Content -LiteralPath $promptPath -Raw
         Assert-Fb2PromptSelfTest (Test-Path -LiteralPath $promptPath) "prompt file exists"
         Assert-Fb2PromptSelfTest ($content -match "fb2 AI Center") "prompt title"
+        Assert-Fb2PromptSelfTest ($content -match "protected_live_preflight_satisfied") "protected live preflight gate"
+        Assert-Fb2PromptSelfTest ($content -match "answer_source_validation_ready") "answer source validation gate"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_analysis") "matrix item"
         Assert-Fb2PromptSelfTest ($content -match "证据新鲜度") "freshness section"
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.evidence_freshness.v1") "freshness schema"

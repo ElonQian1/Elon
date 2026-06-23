@@ -94,6 +94,8 @@ function New-Fb2PromptValidation {
             "data_goal_complete",
             "full_final_complete",
             "token_present",
+            "protected_live_preflight_satisfied",
+            "answer_source_validation_ready",
             "voice_deferred_by_user",
             "next_minimum_action"
         )) {
@@ -111,6 +113,7 @@ function New-Fb2PromptValidation {
         "validate_current_state",
         "validate_public_contract_status",
         "validate_server_deploy_status",
+        "validate_project_direct_network_policy",
         "validate_read_only_direct_read",
         "validate_gap_action_board",
         "validate_evidence_freshness",
@@ -209,6 +212,8 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - data_goal_complete: `True`
 - full_final_complete: `False`
 - token_present: `False`
+- protected_live_preflight_satisfied: `True`
+- answer_source_validation_ready: `True`
 - voice_deferred_by_user: `True`
 - next_minimum_action: `set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly`
 - totals: complete `13` / deferred `1` / incomplete `0` / total `14`
@@ -229,6 +234,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - `validate_current_state`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1`
 - `validate_public_contract_status`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-public-contract-status.ps1 -OutputPath target\fb2-ai-center\public-contract-status-current.json`
 - `validate_server_deploy_status`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-main-server-deploy-status.ps1`
+- `validate_project_direct_network_policy`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-project-direct-network-policy.ps1 -OutputPath target\fb2-ai-center\project-direct-network-policy-validation-current.json`
 - `validate_read_only_direct_read`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json`
 - `validate_gap_action_board`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1`
 - `validate_evidence_freshness`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1`
