@@ -1,0 +1,363 @@
+use serde::Serialize;
+use serde_json::Value;
+use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct TaskApprovalJournalSnapshot {
+    pub approvals: Vec<TaskApprovalJournalItem>,
+    pub pending_count: usize,
+    pub decided_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TaskApprovalJournalItem {
+    pub approval_id: String,
+    pub tool: Option<String>,
+    pub status: &'static str,
+    pub decision: Option<String>,
+    pub required_seq: Option<usize>,
+    pub decision_seq: Option<usize>,
+}
+
+#[derive(Debug, Clone, Default, Serialize)]
+pub(crate) struct TaskApprovalStateSnapshot {
+    pub approvals: Vec<TaskApprovalStateItem>,
+    pub total_count: usize,
+    pub actionable_count: usize,
+    pub decided_count: usize,
+    pub unavailable_count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct TaskApprovalStateItem {
+    pub approval_id: String,
+    pub tool: Option<String>,
+    pub status: &'static str,
+    pub decision: Option<String>,
+    pub actionable: bool,
+    pub label: &'static str,
+    pub tone: &'static str,
+    pub meta: &'static str,
+    pub required_seq: Option<usize>,
+    pub decision_seq: Option<usize>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) struct TaskApprovalJournalTracker {
+    approvals: BTreeMap<String, ApprovalAccumulator>,
+}
+
+#[derive(Debug, Default)]
+struct ApprovalAccumulator {
+    approval_id: String,
+    tool: Option<String>,
+    required_seq: Option<usize>,
+    decision_seq: Option<usize>,
+    decision: Option<String>,
+}
+
+impl TaskApprovalJournalTracker {
+    pub(crate) fn observe_event(&mut self, seq: usize, event: &Value) {
+        let Some(inner) = tool_event_payload(event) else {
+            return;
+        };
+        match inner.get("type").and_then(Value::as_str) {
+            Some("tool_approval_required") => self.observe_required(seq, inner),
+            Some("tool_approval_decision") => self.observe_decision(seq, inner),
+            _ => {}
+        }
+    }
+
+    pub(crate) fn finish(self) -> TaskApprovalJournalSnapshot {
+        let mut approvals: Vec<_> = self
+            .approvals
+            .into_values()
+            .map(|approval| approval.into_item())
+            .collect();
+        approvals.sort_by(|left, right| {
+            first_seq(left)
+                .cmp(&first_seq(right))
+                .then_with(|| left.approval_id.cmp(&right.approval_id))
+        });
+        let pending_count = approvals
+            .iter()
+            .filter(|approval| approval.status == "pending")
+            .count();
+        let decided_count = approvals.len().saturating_sub(pending_count);
+        TaskApprovalJournalSnapshot {
+            approvals,
+            pending_count,
+            decided_count,
+        }
+    }
+
+    fn observe_required(&mut self, seq: usize, event: &Value) {
+        let Some(approval_id) = approval_id(event) else {
+            return;
+        };
+        let entry = self
+            .approvals
+            .entry(approval_id.to_string())
+            .or_insert_with(|| ApprovalAccumulator {
+                approval_id: approval_id.to_string(),
+                ..ApprovalAccumulator::default()
+            });
+        entry.required_seq = Some(entry.required_seq.map_or(seq, |current| current.min(seq)));
+        if entry.tool.as_deref().unwrap_or_default().is_empty() {
+            entry.tool = optional_string(event.get("tool"));
+        }
+    }
+
+    fn observe_decision(&mut self, seq: usize, event: &Value) {
+        let Some(approval_id) = approval_id(event) else {
+            return;
+        };
+        let entry = self
+            .approvals
+            .entry(approval_id.to_string())
+            .or_insert_with(|| ApprovalAccumulator {
+                approval_id: approval_id.to_string(),
+                ..ApprovalAccumulator::default()
+            });
+        entry.decision_seq = Some(seq);
+        entry.decision = decision_value(event);
+        if entry.tool.as_deref().unwrap_or_default().is_empty() {
+            entry.tool = optional_string(event.get("tool"));
+        }
+    }
+}
+
+impl TaskApprovalJournalSnapshot {
+    pub(crate) fn resolve_runtime_state(
+        &self,
+        active_approval_ids: &[String],
+        can_approve_tools: bool,
+    ) -> TaskApprovalStateSnapshot {
+        let active: BTreeSet<&str> = active_approval_ids.iter().map(String::as_str).collect();
+        let approvals: Vec<_> = self
+            .approvals
+            .iter()
+            .map(|approval| approval.resolve(&active, can_approve_tools))
+            .collect();
+        let actionable_count = approvals.iter().filter(|item| item.actionable).count();
+        let decided_count = approvals
+            .iter()
+            .filter(|item| {
+                matches!(
+                    item.status,
+                    "approved" | "denied" | "processed" | "canceled"
+                )
+            })
+            .count();
+        let unavailable_count = approvals
+            .iter()
+            .filter(|item| matches!(item.status, "unavailable" | "expired"))
+            .count();
+        TaskApprovalStateSnapshot {
+            total_count: approvals.len(),
+            approvals,
+            actionable_count,
+            decided_count,
+            unavailable_count,
+        }
+    }
+}
+
+impl TaskApprovalJournalItem {
+    fn resolve(
+        &self,
+        active_approval_ids: &BTreeSet<&str>,
+        can_approve_tools: bool,
+    ) -> TaskApprovalStateItem {
+        if self.status != "pending" {
+            return state_item(self, self.status, false);
+        }
+        if can_approve_tools && active_approval_ids.contains(self.approval_id.as_str()) {
+            return state_item(self, "actionable", true);
+        }
+        state_item(self, "unavailable", false)
+    }
+}
+
+impl ApprovalAccumulator {
+    fn into_item(self) -> TaskApprovalJournalItem {
+        let status = decision_status(self.decision.as_deref());
+        TaskApprovalJournalItem {
+            approval_id: self.approval_id,
+            tool: self.tool,
+            status,
+            decision: self.decision,
+            required_seq: self.required_seq,
+            decision_seq: self.decision_seq,
+        }
+    }
+}
+
+fn state_item(
+    approval: &TaskApprovalJournalItem,
+    status: &'static str,
+    actionable: bool,
+) -> TaskApprovalStateItem {
+    let (label, tone, meta) = state_labels(status);
+    TaskApprovalStateItem {
+        approval_id: approval.approval_id.clone(),
+        tool: approval.tool.clone(),
+        status,
+        decision: approval.decision.clone(),
+        actionable,
+        label,
+        tone,
+        meta,
+        required_seq: approval.required_seq,
+        decision_seq: approval.decision_seq,
+    }
+}
+
+fn state_labels(status: &str) -> (&'static str, &'static str, &'static str) {
+    match status {
+        "actionable" => ("等待确认", "approval", "可在本机继续审批"),
+        "approved" => ("已批准", "done", "继续执行工具"),
+        "denied" => ("已拒绝", "canceled", "工具不会执行"),
+        "expired" => ("已过期", "canceled", "审批已过期"),
+        "canceled" => ("已取消", "canceled", "任务已停止"),
+        "processed" => ("已处理", "done", "审批已处理"),
+        _ => ("已失效", "failed", "本机没有活动审批等待器"),
+    }
+}
+
+fn decision_status(decision: Option<&str>) -> &'static str {
+    match decision.map(|value| value.trim().to_ascii_lowercase()) {
+        None => "pending",
+        Some(value) if matches!(value.as_str(), "approve" | "approved" | "allow" | "allowed") => {
+            "approved"
+        }
+        Some(value)
+            if matches!(
+                value.as_str(),
+                "deny" | "denied" | "reject" | "rejected" | "disallow" | "disallowed"
+            ) =>
+        {
+            "denied"
+        }
+        Some(value) if matches!(value.as_str(), "timeout" | "expired") => "expired",
+        Some(value) if matches!(value.as_str(), "cancel" | "canceled" | "cancelled") => "canceled",
+        Some(_) => "processed",
+    }
+}
+
+fn decision_value(event: &Value) -> Option<String> {
+    optional_string(event.get("decision"))
+        .or_else(|| optional_string(event.get("status")))
+        .or_else(|| optional_string(event.get("result")))
+}
+
+fn tool_event_payload(event: &Value) -> Option<&Value> {
+    match event.get("type").and_then(Value::as_str) {
+        Some("tool_event") => event.get("event"),
+        Some("tool_approval_required" | "tool_approval_decision") => Some(event),
+        _ => None,
+    }
+}
+
+fn approval_id(event: &Value) -> Option<&str> {
+    event
+        .get("approval_id")
+        .or_else(|| event.get("approvalId"))
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+}
+
+fn optional_string(value: Option<&Value>) -> Option<String> {
+    value
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn first_seq(approval: &TaskApprovalJournalItem) -> usize {
+    approval
+        .required_seq
+        .or(approval.decision_seq)
+        .unwrap_or(usize::MAX)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TaskApprovalJournalTracker;
+    use serde_json::json;
+
+    #[test]
+    fn records_required_and_decision_state() {
+        let mut tracker = TaskApprovalJournalTracker::default();
+        tracker.observe_event(
+            3,
+            &json!({
+                "type": "tool_event",
+                "event": {
+                    "type": "tool_approval_required",
+                    "approval_id": "tap_1_1",
+                    "tool": "write_file"
+                }
+            }),
+        );
+        tracker.observe_event(
+            7,
+            &json!({
+                "type": "tool_event",
+                "event": {
+                    "type": "tool_approval_decision",
+                    "approval_id": "tap_1_1",
+                    "tool": "write_file",
+                    "decision": "approve"
+                }
+            }),
+        );
+
+        let snapshot = tracker.finish();
+        assert_eq!(snapshot.pending_count, 0);
+        assert_eq!(snapshot.decided_count, 1);
+        assert_eq!(snapshot.approvals[0].status, "approved");
+        assert_eq!(snapshot.approvals[0].required_seq, Some(3));
+        assert_eq!(snapshot.approvals[0].decision_seq, Some(7));
+    }
+
+    #[test]
+    fn pending_approval_resolves_to_actionable_when_waiter_is_live() {
+        let mut tracker = TaskApprovalJournalTracker::default();
+        tracker.observe_event(
+            1,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_1_1",
+                "tool": "run_command"
+            }),
+        );
+
+        let state = tracker
+            .finish()
+            .resolve_runtime_state(&["tap_1_1".to_string()], true);
+        assert_eq!(state.actionable_count, 1);
+        assert_eq!(state.approvals[0].status, "actionable");
+        assert!(state.approvals[0].actionable);
+    }
+
+    #[test]
+    fn pending_approval_resolves_to_unavailable_without_live_waiter() {
+        let mut tracker = TaskApprovalJournalTracker::default();
+        tracker.observe_event(
+            1,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_1_1",
+                "tool": "run_command"
+            }),
+        );
+
+        let state = tracker.finish().resolve_runtime_state(&[], false);
+        assert_eq!(state.unavailable_count, 1);
+        assert_eq!(state.approvals[0].status, "unavailable");
+        assert!(!state.approvals[0].actionable);
+    }
+}

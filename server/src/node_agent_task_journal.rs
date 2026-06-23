@@ -12,6 +12,7 @@ use std::{
 };
 
 use crate::{
+    node_agent_task_approval_snapshot::{TaskApprovalJournalSnapshot, TaskApprovalJournalTracker},
     node_agent_task_journal_events::{
         cli_chunk_event, is_terminal_status, normalize_finish_error, normalize_finish_status,
     },
@@ -70,6 +71,7 @@ pub(crate) struct TaskJournalEventView {
 pub(crate) struct TaskJournalSnapshot {
     pub task_id: String,
     pub record: Option<TaskJournalRecord>,
+    pub approvals: TaskApprovalJournalSnapshot,
     pub events: Vec<TaskJournalEventView>,
     pub last_event_seq: usize,
     pub has_more: bool,
@@ -356,6 +358,7 @@ impl TaskJournal {
             Ok(TaskJournalSnapshot {
                 task_id: task_id.to_string(),
                 record,
+                approvals: event_scan.approvals,
                 events: event_scan.events,
                 last_event_seq: event_scan.last_event_seq,
                 has_more: event_scan.has_more,
@@ -467,7 +470,11 @@ impl TaskJournal {
                     continue;
                 }
             };
-            if seq <= since || !event_belongs_to_task(&event, task_id) {
+            if !event_belongs_to_task(&event, task_id) {
+                continue;
+            }
+            scan.approval_tracker.observe_event(seq, &event);
+            if seq <= since {
                 continue;
             }
             if scan.events.len() >= event_limit {
@@ -480,7 +487,7 @@ impl TaskJournal {
         if scan.last_event_seq == 0 && scan.scanned_last_seq > since {
             scan.last_event_seq = scan.scanned_last_seq;
         }
-        Ok(scan)
+        Ok(scan.finish())
     }
 
     #[cfg(test)]
@@ -495,6 +502,15 @@ struct TaskJournalEventScan {
     last_event_seq: usize,
     scanned_last_seq: usize,
     has_more: bool,
+    approval_tracker: TaskApprovalJournalTracker,
+    approvals: TaskApprovalJournalSnapshot,
+}
+
+impl TaskJournalEventScan {
+    fn finish(mut self) -> Self {
+        self.approvals = std::mem::take(&mut self.approval_tracker).finish();
+        self
+    }
 }
 
 fn event_belongs_to_task(event: &Value, task_id: &str) -> bool {

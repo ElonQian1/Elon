@@ -12,6 +12,7 @@ use serde_json::json;
 use std::sync::Arc;
 
 use crate::{
+    node_agent_task_approval_snapshot::TaskApprovalStateSnapshot,
     node_agent_task_journal::{TaskJournalEventView, TaskJournalRecord},
     node_agent_task_resume::{
         task_attach_state, task_resume_contract, TaskAttachState, TaskResumeContract,
@@ -41,6 +42,7 @@ struct LocalTaskJournalResponse {
     has_more: bool,
     attach: TaskAttachState,
     resume: TaskResumeContract,
+    approval_state: TaskApprovalStateSnapshot,
 }
 
 #[derive(Debug, Serialize)]
@@ -96,6 +98,9 @@ async fn get_task_journal(
             // 本地 API 只暴露进程恢复所需的最小字段；prompt/API key 从未写入 journal。
             let attach = task_attach_state(snapshot.record.as_ref(), active);
             let resume = task_resume_contract(&attach);
+            let approval_state = snapshot
+                .approvals
+                .resolve_runtime_state(resume.active_approval_ids(), resume.can_approve_tools());
             Json(LocalTaskJournalResponse {
                 ok: true,
                 task_id: snapshot.task_id,
@@ -105,6 +110,7 @@ async fn get_task_journal(
                 has_more: snapshot.has_more,
                 attach,
                 resume,
+                approval_state,
             })
             .into_response()
         }

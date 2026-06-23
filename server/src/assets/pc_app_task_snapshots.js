@@ -88,6 +88,7 @@
         pc_req_id: clean(data.pc_req_id || data.pcReqId),
         attach: data.attach || null,
         resume: data.resume || null,
+        approval_state: data.approval_state || data.approvalState || null,
         local_journal: null,
         local_journal_seq: 0,
         local_journal_has_more: false
@@ -108,6 +109,7 @@
         snapshot.local_journal_has_more = !!journal.has_more;
         snapshot.attach = mergeAttach(snapshot, journal);
         snapshot.resume = mergeResume(snapshot, journal);
+        snapshot.approval_state = mergeApprovalState(snapshot, journal);
         appendLocalJournalMessages(snapshot, journal, taskId);
         if (journal.last_event_seq > since) localCursors.set(journalTaskId, journal.last_event_seq);
         localFailures.delete(journalTaskId);
@@ -130,7 +132,8 @@
         last_event_seq: Number.isFinite(lastSeq) ? lastSeq : 0,
         has_more: !!(data.has_more || data.hasMore),
         attach: data.attach || null,
-        resume: data.resume || null
+        resume: data.resume || null,
+        approval_state: data.approval_state || data.approvalState || null
       };
     }
 
@@ -149,6 +152,12 @@
     function mergeResume(snapshot, journal) {
       if (journal && journal.resume) return journal.resume;
       return snapshot.resume || null;
+    }
+
+    function mergeApprovalState(snapshot, journal) {
+      const localState = journal && journal.approval_state ? journal.approval_state : null;
+      if (localState) return Object.assign({}, snapshot.approval_state || {}, localState, { source: 'local_journal' });
+      return snapshot.approval_state || null;
     }
 
     function appendLocalJournalMessages(snapshot, journal, taskId) {
@@ -187,7 +196,8 @@
       if (localJournalSeq(snapshot) > localJournalSeq(previous)) return true;
       if (taskStatus(previous.task) !== taskStatus(snapshot.task)) return true;
       return attachStatus(previous.attach) !== attachStatus(snapshot.attach)
-        || resumeStatus(previous.resume) !== resumeStatus(snapshot.resume);
+        || resumeStatus(previous.resume) !== resumeStatus(snapshot.resume)
+        || approvalStatus(previous.approval_state) !== approvalStatus(snapshot.approval_state);
     }
 
     function lastSeqOf(snapshot) {
@@ -231,6 +241,15 @@
       const action = clean(resume && resume.next_action).toLowerCase();
       const strategy = clean(resume && resume.strategy && resume.strategy.kind).toLowerCase();
       return `${status}:${action}:${strategy}`;
+    }
+
+    function approvalStatus(approvalState) {
+      const approvals = Array.isArray(approvalState && approvalState.approvals) ? approvalState.approvals : [];
+      return approvals.map((item) => [
+        clean(item && (item.approval_id || item.approvalId)),
+        clean(item && item.status).toLowerCase(),
+        item && item.actionable === true ? '1' : '0'
+      ].join(':')).join('|');
     }
 
     function taskIsTerminal(task) {

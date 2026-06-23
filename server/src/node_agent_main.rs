@@ -75,6 +75,7 @@ mod node_agent_runtime_events;
 mod node_agent_server_runtime;
 #[cfg(test)]
 mod node_agent_task_approval_cleanup_tests;
+mod node_agent_task_approval_snapshot;
 mod node_agent_task_journal;
 mod node_agent_task_journal_api;
 mod node_agent_task_journal_events;

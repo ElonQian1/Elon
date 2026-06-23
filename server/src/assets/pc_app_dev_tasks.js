@@ -40,7 +40,7 @@
           task.failed = !task.canceled && /失败|错误|error|failed/i.test(content);
         }
       });
-      mergeSnapshotState(tasks, extras && extras.snapshots);
+      mergeSnapshotState(tasks, approvals, extras && extras.snapshots);
       return { tasks, approvals };
     }
 
@@ -58,12 +58,13 @@
         apkUrl: '',
         attach: null,
         resume: null,
+        approvalState: null,
         pcReqId: '',
         lastEventSeq: 0
       };
     }
 
-    function mergeSnapshotState(tasks, snapshots) {
+    function mergeSnapshotState(tasks, approvals, snapshots) {
       if (!snapshots || typeof snapshots.forEach !== 'function') return;
       snapshots.forEach((snapshot, snapshotTaskId) => {
         const taskId = clean(snapshotTaskId || (snapshot && snapshot.task && snapshot.task.id));
@@ -81,6 +82,11 @@
         if (attach) task.attach = attach;
         const resume = snapshot && snapshot.resume ? snapshot.resume : null;
         if (resume) task.resume = resume;
+        const approvalState = snapshot && (snapshot.approval_state || snapshot.approvalState);
+        if (approvalState) {
+          task.approvalState = approvalState;
+          rememberApprovalSnapshotState(approvals, taskId, approvalState);
+        }
         const pcReqId = clean(snapshot && (snapshot.pc_req_id || snapshot.pcReqId));
         if (pcReqId) task.pcReqId = pcReqId;
         const seq = Number(snapshot && (snapshot.last_event_seq || snapshot.lastEventSeq || 0));
@@ -472,6 +478,64 @@
       }
     }
 
+    function rememberApprovalSnapshotState(approvals, taskId, approvalState) {
+      if (!approvals || !taskId || !approvalState) return;
+      const items = Array.isArray(approvalState.approvals) ? approvalState.approvals : [];
+      items.forEach((item) => {
+        const approvalId = clean(item && (item.approval_id || item.approvalId));
+        if (!approvalId) return;
+        const state = approvalSnapshotCardState(item);
+        if (!state) return;
+        approvals.set(approvalKey(taskId, approvalId), state);
+      });
+    }
+
+    function approvalSnapshotCardState(item) {
+      const status = clean(item && item.status).toLowerCase();
+      const actionable = item && item.actionable === true;
+      if (actionable) {
+        return {
+          status: 'pending',
+          tool: clean(item.tool),
+          tone: clean(item.tone) || 'approval',
+          label: clean(item.label) || '等待确认',
+          meta: clean(item.meta) || '可在本机继续审批'
+        };
+      }
+      if (!status) return null;
+      return {
+        status,
+        tool: clean(item.tool),
+        tone: clean(item.tone) || approvalStateTone(status),
+        label: clean(item.label) || approvalStateLabel(status),
+        meta: clean(item.meta) || approvalStateMeta(status)
+      };
+    }
+
+    function approvalStateTone(status) {
+      if (['approved', 'processed'].includes(status)) return 'done';
+      if (['denied', 'expired', 'canceled'].includes(status)) return 'canceled';
+      return 'failed';
+    }
+
+    function approvalStateLabel(status) {
+      if (status === 'approved') return '已批准';
+      if (status === 'denied') return '已拒绝';
+      if (status === 'expired') return '已过期';
+      if (status === 'canceled') return '已取消';
+      if (status === 'processed') return '已处理';
+      return '已失效';
+    }
+
+    function approvalStateMeta(status) {
+      if (status === 'approved') return '继续执行工具';
+      if (status === 'denied') return '工具不会执行';
+      if (status === 'expired') return '审批已过期';
+      if (status === 'canceled') return '任务已停止';
+      if (status === 'processed') return '审批已处理';
+      return '本机没有活动审批等待器';
+    }
+
     function approvalStateFor(context, taskId, approvalId) {
       if (!context || !context.approvals || !taskId || !approvalId) return null;
       return context.approvals.get(approvalKey(taskId, approvalId)) || null;
@@ -605,6 +669,8 @@
     }
 
     function approvalIsActionable(task, approvalId) {
+      const snapshotItem = approvalSnapshotItem(task, approvalId);
+      if (snapshotItem) return snapshotItem.actionable === true;
       const resume = task && task.resume ? task.resume : null;
       if (!resume) return true;
       if (resume.can_approve_tools !== true) return false;
@@ -612,6 +678,13 @@
         ? resume.active_approval_ids.map(clean).filter(Boolean)
         : [];
       return activeIds.includes(clean(approvalId));
+    }
+
+    function approvalSnapshotItem(task, approvalId) {
+      const approvalState = task && task.approvalState ? task.approvalState : null;
+      const items = Array.isArray(approvalState && approvalState.approvals) ? approvalState.approvals : [];
+      const target = clean(approvalId);
+      return items.find((item) => clean(item && (item.approval_id || item.approvalId)) === target) || null;
     }
 
     function attachMeta(task, fallback) {

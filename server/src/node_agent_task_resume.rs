@@ -235,6 +235,16 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
     }
 }
 
+impl TaskResumeContract {
+    pub(crate) fn can_approve_tools(&self) -> bool {
+        self.can_approve_tools
+    }
+
+    pub(crate) fn active_approval_ids(&self) -> &[String] {
+        &self.active_approval_ids
+    }
+}
+
 fn tty_reattach_status() -> TaskResumeTtyReattach {
     TaskResumeTtyReattach {
         status: "not_supported",
