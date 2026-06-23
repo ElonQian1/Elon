@@ -2761,6 +2761,7 @@
       ? `包 ${shortHash(installedSha)}${packageVersion ? ` / ${packageVersion}` : ''}`
       : '未读取包版本';
     const updateLine = clientUpdateLine(data, state.clientPackageLatest);
+    const recentMaintenance = clientMaintenanceEventsLine(data.maintenance_recent_events);
     els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running} · ${packageLine} · ${updateLine} · ${clientLayoutLabel(layoutStatus)}`;
     const paths = [
       clean(data.install_dir) && `安装 ${clean(data.install_dir)}`,
@@ -2768,6 +2769,7 @@
       clean(data.launcher_logs_dir) && `启动器日志 ${clean(data.launcher_logs_dir)}`,
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
       clean(data.config_dir) && `配置 ${clean(data.config_dir)}`,
+      recentMaintenance && `最近维护 ${recentMaintenance}`,
       startMenuFolder && `开始菜单 ${startMenuFolder}${startMenuEntries ? '：' + startMenuEntries : ''}`
     ].filter(Boolean);
     els.settingsClientPaths.textContent = paths.join(' · ') || '未读取到本机维护路径';
@@ -2832,6 +2834,23 @@
     if (!installedSha) return `可检查更新 · 最新 ${latestLabel}`;
     if (installedSha === remoteSha) return `客户端已是最新 · ${latestLabel}`;
     return `可更新 · 当前 ${shortHash(installedSha)} · 最新 ${latestLabel}`;
+  }
+
+  function clientMaintenanceEventsLine(events) {
+    if (!Array.isArray(events) || !events.length) return '';
+    const latest = events[0] || {};
+    const action = clientMaintenanceActionLabel(clean(latest.action));
+    const ok = latest.ok === false ? '失败' : '成功';
+    const detail = clean(latest.detail);
+    return [action, ok, detail].filter(Boolean).join(' · ');
+  }
+
+  function clientMaintenanceActionLabel(action) {
+    if (action === 'open_target') return '打开维护目录';
+    if (action === 'update') return '检查更新';
+    if (action === 'uninstall') return '卸载';
+    if (action === 'export_diagnostics') return '导出诊断';
+    return action || '维护动作';
   }
 
   function shortHash(value) {

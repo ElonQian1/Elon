@@ -96,6 +96,7 @@ fn status_payload() -> Value {
         "launcher_logs_dir": optional_path_to_value(paths.launcher_logs_dir.as_deref()),
         "launcher_log_file": optional_path_to_value(paths.launcher_log_file.as_deref()),
         "diagnostics_dir": path_to_string(&paths.diagnostics_dir),
+        "maintenance_recent_events": recent_maintenance_events(&paths.maintenance_log_file, 5),
         "maintenance_targets": [
             { "target": "install_dir", "label": "安装目录", "purpose": "确认根目录只保留主程序、卸载程序和 _internal。" },
             { "target": "logs", "label": "运行日志", "purpose": "查看客户端维护、更新、卸载等本机运行日志。" },
@@ -460,6 +461,35 @@ fn record_maintenance_event(action: &str, ok: bool, detail: &str) {
     }
 }
 
+fn recent_maintenance_events(path: &Path, limit: usize) -> Value {
+    if limit == 0 {
+        return Value::Array(Vec::new());
+    }
+    let Ok(text) = fs::read_to_string(path) else {
+        return Value::Array(Vec::new());
+    };
+    let mut events = Vec::new();
+    for line in text.lines().rev() {
+        if events.len() >= limit {
+            break;
+        }
+        let Ok(raw) = serde_json::from_str::<Value>(line) else {
+            continue;
+        };
+        let action = raw.get("action").and_then(Value::as_str).unwrap_or("");
+        if action.trim().is_empty() {
+            continue;
+        }
+        events.push(json!({
+            "at_ms": raw.get("at_ms").filter(|value| value.is_number()).cloned().unwrap_or(Value::Null),
+            "action": truncate_chars(action, 80),
+            "ok": raw.get("ok").and_then(Value::as_bool).unwrap_or(false),
+            "detail": truncate_chars(raw.get("detail").and_then(Value::as_str).unwrap_or(""), 180),
+        }));
+    }
+    Value::Array(events)
+}
+
 fn truncate_chars(value: &str, max_chars: usize) -> String {
     let trimmed = value.trim();
     if trimmed.chars().count() <= max_chars {
@@ -567,9 +597,10 @@ enum ClientAction {
 #[cfg(test)]
 mod tests {
     use super::{
-        install_dir_from_local_app_data, maintenance_target, status_payload, truncate_chars,
+        install_dir_from_local_app_data, maintenance_target, recent_maintenance_events,
+        status_payload, truncate_chars,
     };
-    use std::path::PathBuf;
+    use std::{fs, path::PathBuf};
 
     #[test]
     fn install_dir_is_under_local_app_data_elon_node() {
@@ -601,6 +632,7 @@ mod tests {
         assert!(status.get("launcher_logs_dir").is_some());
         assert!(status.get("launcher_log_file").is_some());
         assert!(status["diagnostics_dir"].as_str().is_some());
+        assert!(status["maintenance_recent_events"].as_array().is_some());
         assert!(status["maintenance_targets"]
             .as_array()
             .unwrap()
@@ -661,5 +693,35 @@ mod tests {
         let long = "x".repeat(700);
         assert_eq!(truncate_chars(&long, 500).chars().count(), 500);
         assert_eq!(truncate_chars("  ok  ", 500), "ok");
+    }
+
+    #[test]
+    fn recent_maintenance_events_are_newest_first_and_bounded() {
+        let path = std::env::temp_dir().join(format!(
+            "elon-client-maintenance-events-{}.jsonl",
+            std::process::id()
+        ));
+        let long_detail = "x".repeat(220);
+        fs::write(
+            &path,
+            format!(
+                "not-json\n\
+                 {{\"at_ms\":1,\"action\":\"open_target\",\"ok\":true,\"detail\":\"{long_detail}\"}}\n\
+                 {{\"at_ms\":2,\"action\":\"\",\"ok\":true,\"detail\":\"ignored\"}}\n\
+                 {{\"at_ms\":3,\"action\":\"update\",\"ok\":false,\"detail\":\"failed\"}}\n\
+                 {{\"at_ms\":4,\"action\":\"uninstall\",\"ok\":true,\"detail\":\"scheduled\"}}\n"
+            ),
+        )
+        .expect("maintenance event fixture should write");
+
+        let events = recent_maintenance_events(&path, 3);
+        let items = events.as_array().expect("events should be an array");
+        assert_eq!(items.len(), 3);
+        assert_eq!(items[0]["action"].as_str(), Some("uninstall"));
+        assert_eq!(items[1]["action"].as_str(), Some("update"));
+        assert_eq!(items[2]["action"].as_str(), Some("open_target"));
+        assert!(items[2]["detail"].as_str().unwrap().chars().count() <= 180);
+
+        let _ = fs::remove_file(path);
     }
 }

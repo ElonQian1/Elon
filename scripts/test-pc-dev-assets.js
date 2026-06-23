@@ -1307,6 +1307,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs separately');
   assert.ok(pcApp.includes('settingsClientActions'), 'PC settings should render local maintenance action availability');
   assert.ok(pcApp.includes('renderClientMaintenanceActions'), 'PC app should render maintenance_actions from local node');
+  assert.ok(pcApp.includes('maintenance_recent_events'), 'PC app should read recent client maintenance events');
+  assert.ok(pcApp.includes('clientMaintenanceEventsLine'), 'PC app should summarize recent client maintenance events');
+  assert.ok(pcApp.includes('最近维护'), 'PC settings should show the latest maintenance event inline');
   assert.ok(pcApp.includes('disabledMaintenanceActionReason'), 'PC app should explain disabled maintenance actions');
   assert.ok(pcApp.includes("openClientMaintenanceTarget('logs'"), 'PC settings should open the runtime logs target');
   assert.ok(pcApp.includes("openClientMaintenanceTarget('launcher_logs'"), 'PC settings should open launcher logs target');
@@ -1388,6 +1391,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAgentMain.includes('/api/project-agent-runs'), 'node agent should mount local project agent run logs API');
   assert.ok(nodeAgentMain.includes('active_cli_prompt_views_for_workspace'), 'node agent should expose live control handles by workspace');
   assert.ok(nodeAgentMain.includes('task_journal_records_for_workspace'), 'node agent should expose task journal resume records by workspace');
+  const clientMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_maintenance.rs'), 'utf8');
+  assert.ok(clientMaintenance.includes('maintenance_recent_events'), 'client maintenance status should expose recent maintenance events');
+  assert.ok(clientMaintenance.includes('recent_maintenance_events'), 'client maintenance status should read recent maintenance log lines');
   const taskJournalApi = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_task_journal_api.rs'), 'utf8');
   assert.ok(taskJournalApi.includes('post(cancel_task_journal)'), 'task journal API should expose a protected cancel endpoint');
 
