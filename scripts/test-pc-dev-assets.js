@@ -1098,6 +1098,11 @@ function testLocalAdminTokenWiring() {
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
   assert.ok(nodeAgentMain.includes('/api/client-maintenance/diagnostics/export'), 'node agent should mount diagnostics export route');
+  assert.ok(nodeAgentMain.includes('mod node_agent_task_lifecycle_pressure_tests;'), 'node agent should keep task lifecycle pressure tests wired');
+
+  const taskLifecyclePressureScript = fs.readFileSync(path.join(repoRoot, 'scripts/test-pc-task-lifecycle-pressure.ps1'), 'utf8');
+  assert.ok(taskLifecyclePressureScript.includes('node_agent_task_lifecycle_pressure_tests'), 'PC task lifecycle pressure gate should run pressure tests');
+  assert.ok(taskLifecyclePressureScript.includes('node_agent_task_journal'), 'PC task lifecycle pressure gate should cover task journal tests');
 
   const nodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_admin.html'), 'utf8');
   assert.ok(nodeAdmin.includes('X-Elon-Local-Admin-Token'), 'standalone node admin page should send local admin token header');
