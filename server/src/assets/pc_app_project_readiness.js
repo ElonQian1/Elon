@@ -389,14 +389,23 @@
       const contract = localToolContract(node);
       const supported = arrayStrings(contract.supported_tools || contract.supportedTools);
       if (!supported.length) return '未上报';
-      const core = ['read_file_range', 'apply_patch', 'run_command']
+      const readTools = ['search_files', 'list_dir', 'file_info', 'read_file', 'read_file_range']
         .filter((tool) => supported.includes(tool));
       const approvals = arrayStrings(contract.approval_required_tools || contract.approvalRequiredTools);
-      const approvalCore = approvals.filter((tool) => ['write_file', 'apply_patch', 'run_command'].includes(tool));
-      const approvalText = approvalCore.length
-        ? `${approvalCore.join('/')} 需确认`
-        : '审批策略未上报';
-      return `${(core.length ? core : supported.slice(0, 3)).join(' / ')} · ${approvalText}`;
+      const writeTools = ['write_file', 'apply_patch', 'run_command']
+        .filter((tool) => supported.includes(tool));
+      const approvalCore = writeTools.filter((tool) => approvals.includes(tool));
+      const parts = [];
+      if (readTools.length) parts.push(`只读 ${readTools.join('/')}`);
+      if (approvalCore.length) parts.push(`需确认 ${approvalCore.join('/')}`);
+      if (writeTools.length && approvalCore.length < writeTools.length) {
+        const unreported = writeTools.filter((tool) => !approvalCore.includes(tool));
+        parts.push(`写入 ${unreported.join('/')}`);
+      }
+      const shown = new Set([...readTools, ...writeTools]);
+      const others = supported.filter((tool) => !shown.has(tool));
+      if (others.length) parts.push(`其他 ${others.join('/')}`);
+      return parts.length ? parts.join(' · ') : supported.join(' / ');
     }
 
     function arrayStrings(value) {

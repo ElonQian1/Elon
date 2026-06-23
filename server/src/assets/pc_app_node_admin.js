@@ -528,7 +528,8 @@
       const approvals = arrayStrings(contract.approval_required_tools || contract.approvalRequiredTools);
       const readOnly = arrayStrings(contract.read_only_tools || contract.readOnlyTools);
       const limitations = arrayStrings(contract.limitations);
-      const core = ['read_file_range', 'apply_patch', 'run_command'].filter((tool) => supported.includes(tool));
+      const core = ['search_files', 'file_info', 'read_file_range', 'apply_patch', 'run_command']
+        .filter((tool) => supported.includes(tool));
       target.innerHTML = `
         <div class="node-contract-head">
           <strong>${escapeHtml(clean(contract.label) || 'Route B 本机 API runtime')}</strong>
