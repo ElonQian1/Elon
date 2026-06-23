@@ -3,8 +3,7 @@
 use std::path::Path;
 
 use crate::node_agent_project_profile_node::{
-    detect_node_project_profile, detect_node_workspace_module, node_workspace_script_command,
-    NodeWorkspaceModule,
+    detect_node_project_profile, detect_node_workspace_module, NodeWorkspaceModule,
 };
 use crate::node_agent_project_profile_python::{
     detect_python_project_profile, python_workspace_commands, PythonWorkspaceModule,
@@ -214,15 +213,9 @@ fn workspace_commands(
     }
     if let Some(module) = node_module {
         return (
-            module.run_script.as_deref().map(|script| {
-                node_workspace_script_command(&module.manager, &module.module, script)
-            }),
-            module.test_script.as_deref().map(|script| {
-                node_workspace_script_command(&module.manager, &module.module, script)
-            }),
-            module.build_script.as_deref().map(|script| {
-                node_workspace_script_command(&module.manager, &module.module, script)
-            }),
+            module.run_command.clone(),
+            module.test_command.clone(),
+            module.build_command.clone(),
         );
     }
     if let Some(module) = go_module {
@@ -389,6 +382,50 @@ mod tests {
         assert_eq!(profile.test_command.as_deref(), Some("bun run test"));
         assert_eq!(profile.build_command.as_deref(), Some("bun run build"));
         assert!(profile.detected_files.contains(&"bun.lockb".to_string()));
+    }
+
+    #[test]
+    fn detects_node_alternate_script_names() {
+        let dir = temp_project("node-alternate-scripts");
+        std::fs::write(dir.join("yarn.lock"), "").unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"scripts":{"serve":"vite","check":"tsc --noEmit","compile":"vite build"}}"#,
+        )
+        .unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Node.js"));
+        assert_eq!(profile.package_manager.as_deref(), Some("yarn"));
+        assert_eq!(profile.run_command.as_deref(), Some("yarn serve"));
+        assert_eq!(profile.test_command.as_deref(), Some("yarn check"));
+        assert_eq!(profile.build_command.as_deref(), Some("yarn compile"));
+    }
+
+    #[test]
+    fn detects_node_vite_fallback_without_scripts() {
+        let dir = temp_project("node-vite-fallback");
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"devDependencies":{"vite":"^5.0.0"}}"#,
+        )
+        .unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Node.js"));
+        assert_eq!(
+            profile.run_command.as_deref(),
+            Some("npm exec vite -- --host 127.0.0.1")
+        );
+        assert!(profile.test_command.is_none());
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("npm exec vite -- build")
+        );
     }
 
     #[test]
@@ -621,5 +658,31 @@ mod tests {
         assert!(profile.run_command.is_none());
         assert!(profile.test_command.is_none());
         assert!(profile.build_command.is_none());
+    }
+
+    #[test]
+    fn detects_shallow_node_vite_workspace_fallback_from_repo_root() {
+        let dir = temp_project("workspace-node-vite-fallback");
+        std::fs::create_dir_all(dir.join("web")).unwrap();
+        std::fs::write(
+            dir.join("web").join("package.json"),
+            r#"{"devDependencies":{"vite":"^5.0.0"}}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("web").join("pnpm-lock.yaml"), "").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Node.js"));
+        assert_eq!(
+            profile.run_command.as_deref(),
+            Some("pnpm --dir web exec vite --host 127.0.0.1")
+        );
+        assert!(profile.test_command.is_none());
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("pnpm --dir web exec vite build")
+        );
     }
 }
