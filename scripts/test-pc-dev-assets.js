@@ -1277,6 +1277,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('positionRailTooltip'), 'PC rail should position its custom hover tooltip');
   assert.ok(pcApp.includes('aria-describedby'), 'PC rail icons should expose the shared tooltip to assistive tech');
   assert.ok(pcApp.includes("button.removeAttribute('title')"), 'PC rail icons should avoid duplicate native tooltips');
+  const projectRailRender = pcAppNormalized.match(/function renderProjectRail\(\) \{[\s\S]*?function filterText/)?.[0] || '';
+  assert.ok(projectRailRender.includes("const iconMarkup = icon ?"), 'project rail should render explicit image markup when an icon exists');
+  assert.ok(projectRailRender.includes(": ''"), 'project rail fallback should be visual-only instead of inserting title initials');
+  assert.ok(!projectRailRender.includes('firstChar'), 'project rail should not display project name initials inside rail icons');
   assert.ok(pcApp.includes('window.ElonPcAgentRuns.create'), 'PC app should create the local agent runs panel');
   assert.ok(pcApp.includes('agentRuns.renderSection'), 'PC app should render the local agent runs panel in project channels');
   assert.ok(pcApp.includes('agentRuns.schedule'), 'PC app should refresh local agent runs through the module');
@@ -1322,6 +1326,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppCss.includes('.rail-avatar::before'), 'PC rail should render a Discord-like active indicator');
   assert.ok(pcAppCss.includes('.rail-avatar:focus-visible'), 'PC rail should have a keyboard focus state');
   assert.ok(pcAppCss.includes('border-radius: inherit'), 'PC rail images should clip to the current icon shape');
+  assert.ok(pcAppCss.includes('.rail-avatar.project .rail-icon.fallback'), 'PC rail should style project fallback icons');
+  assert.ok(pcAppCss.includes('font-size: 0'), 'PC rail fallback icons should hide accidental title text');
+  assert.ok(pcAppCss.includes('color: transparent'), 'PC rail fallback icons should not expose text initials visually');
   assert.ok(pcAppCss.includes('--rail-tooltip-arrow-y'), 'PC rail tooltip arrow should track clamped tooltip position');
   const devTasksCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_dev_tasks.css'), 'utf8');
   assert.ok(devTasksCss.includes('.agent-run-panel'), 'PC dev task CSS should style local agent run panel');
