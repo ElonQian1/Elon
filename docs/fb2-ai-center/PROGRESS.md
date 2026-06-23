@@ -10,6 +10,7 @@
 
 ## 已完成
 
+- 2026-06-23 本轮把 fb2 live Context Pack 样本导出和离线校验命令接入 `status-refresh-current.json.next_commands` 与 `handoff-prompt-current.md`：新增 `generate_context_pack_sample_request` 和 `validate_context_pack_sample_set`。前者生成四类 `/api/main-project/context/pack` 样本导出请求，后者统一校验 `target\fb2-ai-center\samples` 下 today matches、my ticket、platform order、group opinion 四类样本的 XML-wrapped Markdown、`context_audit_id`、`citation_sources` 和 source kinds。`validate-fb2-ai-center-handoff-prompt.ps1` 已把这两个命令设为必需项，并要求分别包含 `-PrintExportRequest` 和 `-ValidateSampleSet`。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-handoff-prompt.ps1`，给 `target\fb2-ai-center\handoff-prompt-current.md` 增加独立机器验收。该脚本检查 prompt 标题、schema、当前闸门、owner 下一步、可执行命令、缺口行动板、证据新鲜度、完成矩阵和接手规则，要求 `validate_handoff_prompt`、`DataOnlyAcceptance -PreflightOnly`、`AllowVisibleMessages` 等关键命令存在，并拒绝 `Add-Fb2PromptLine`、PowerShell 表达式片段、真实 token/password 或 `System.Object[]` 泄露。`fb2-ai-center-refresh-current-status.ps1` 和 `fb2-ai-center-handoff-prompt.ps1` 已同步输出该命令。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-ai-center-completion-matrix.ps1`，给 `status-refresh-current.json.completion_matrix` 增加独立离线门禁。该脚本硬检查 14 项终极目标 requirement 是否齐全、分组/owner 是否正确、totals/groups 是否和明细一致、`data_goal_complete` 是否只在非语音全部完成时为 true、`full_final_complete` 是否不能在语音仍 deferred 时误报完成，并拒绝 evidence/missing 中泄露 token/password。`fb2-ai-center-refresh-current-status.ps1` 的 `next_commands` 和 `handoff-prompt-current.md` 已新增 `validate_completion_matrix`，同时修正 handoff prompt 里命令名被渲染成字面 `${name}` 的问题。
 - 2026-06-23 本轮补齐 `scripts\fb2-public-contract-status.ps1` 的 8 类领域索引硬检查：之前公开契约 smoke 只单独校验 5 类 index，可能漏掉 `odds_snapshot_index`、`opinion_memory_index`、`context_audit_index` 漂移。本轮新增这三项检查，并给 `-SelfTest` 增加“`index_count=8` 但漏掉 `opinion_memory_index`、用无关 index 填充”的负例。线上公开契约复核通过，`passed_count=56`、`failed_count=0`，8 类 index 均存在；该检查仍只是公开契约状态，不替代 `FB2_AI_CENTER_TOKEN` 下的 live Context Pack/权限/质量刷新。
@@ -191,6 +192,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1 -SelfTest
+pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -SelfTest
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe -SkipVoiceContractChecks
 cargo test --manifest-path server\Cargo.toml external_app_context_projection -- --nocapture
 pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -Fb2Username 123qwe -Fb2Password 123qwe

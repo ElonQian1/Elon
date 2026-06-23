@@ -140,10 +140,20 @@ function New-Fb2RefreshNextCommands {
     $liveCommands = Get-Fb2RefreshProperty $livePreflight "commands"
     $coordination = Get-Fb2RefreshProperty $Status "coordination"
     $safeCommands = Get-Fb2RefreshProperty $coordination "safe_commands"
+    $sampleRequestCommand = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "generate_context_pack_sample_request"
+    if ([string]::IsNullOrWhiteSpace($sampleRequestCommand)) {
+        $sampleRequestCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -PrintExportRequest -ExternalUserId <fb2_user_uuid_with_orders> -OutputPath target\fb2-ai-center\context-pack-sample-request-current.json"
+    }
+    $sampleSetCommand = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "validate_context_pack_sample_set"
+    if ([string]::IsNullOrWhiteSpace($sampleSetCommand)) {
+        $sampleSetCommand = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json"
+    }
 
     [ordered]@{
         refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
         read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
+        generate_context_pack_sample_request = $sampleRequestCommand
+        validate_context_pack_sample_set = $sampleSetCommand
         validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
         validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
         validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
@@ -561,6 +571,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest ([bool]$summary.blocking_state.blocked_by_external_secret) "selftest token blocked"
         Assert-Fb2RefreshSelfTest ([string]$summary.blocking_state.external_secret -eq "FB2_AI_CENTER_TOKEN") "external secret name"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.refresh_status)) "refresh command"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.generate_context_pack_sample_request)) "context pack sample request command"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_context_pack_sample_set)) "context pack sample set validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_gap_action_board)) "gap action validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_completion_matrix)) "completion matrix validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_handoff_prompt)) "handoff prompt validation command"
