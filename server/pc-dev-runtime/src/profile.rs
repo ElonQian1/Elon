@@ -102,6 +102,8 @@ fn local_tool_contract() -> NodeDevRuntimeToolContract {
         ],
         supported_tools: vec![
             "list_dir".to_string(),
+            "search_files".to_string(),
+            "file_info".to_string(),
             "read_file".to_string(),
             "read_file_range".to_string(),
             "write_file".to_string(),
@@ -213,6 +215,10 @@ mod tests {
         assert!(contract
             .supported_tools
             .contains(&"apply_patch".to_string()));
+        assert!(contract
+            .supported_tools
+            .contains(&"search_files".to_string()));
+        assert!(contract.supported_tools.contains(&"file_info".to_string()));
         assert!(contract
             .supported_tools
             .contains(&"read_file_range".to_string()));
