@@ -11,14 +11,14 @@
 //!   - 意图分析（携带意图分类 prompt）
 
 use axum::{
-    extract::State,
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use crate::{
     agent_api_loop::resolve_agent,
@@ -35,8 +35,10 @@ pub struct LmChatRequest {
     pub messages: Vec<Value>,
     /// 可选：指定使用哪个 agent（model）
     pub agent: Option<String>,
-    /// 可选：会话 ID；为空时服务器自动生成新会话
+    /// 可选：会话 ID；客户端要开启新会话时应传入新的 ID。
     pub conversation_id: Option<String>,
+    /// 可选：会话标题，用于普通聊天历史列表展示。
+    pub conversation_title: Option<String>,
     /// 可选：聊天归档作用域。默认 phone_control；普通聊天传 chat_memory。
     pub scope: Option<String>,
 }
@@ -76,7 +78,9 @@ pub async fn lm_chat_handler(
             &route.project_id,
             &user.id,
             req.conversation_id.as_deref(),
-            Some(&route.conversation_title),
+            req.conversation_title
+                .as_deref()
+                .or(Some(route.conversation_title.as_str())),
         )
         .unwrap_or_else(|_| {
             req.conversation_id
@@ -217,4 +221,85 @@ pub async fn lm_chat_handler(
         "scope": route.entry_key,
     }))
     .into_response()
+}
+
+pub async fn list_ai_chat_conversations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let route = match resolve_system_conversation_route(
+        &state.store,
+        &user.id,
+        ConversationEntryKind::ChatMemory,
+    ) {
+        Ok(route) => route,
+        Err(e) => {
+            tracing::warn!("确保普通聊天归档项目失败 user={}: {e}", user.id);
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, "创建聊天归档项目失败");
+        }
+    };
+    let limit = query
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(50);
+    match state
+        .store
+        .list_user_conversations(&route.project_id, &user.id, limit)
+    {
+        Ok(conversations) => Json(json!({
+            "conversations": conversations,
+            "project_id": route.project_id,
+            "project_name": route.project_name,
+            "scope": route.entry_key,
+        }))
+        .into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+pub async fn list_ai_chat_conversation_messages(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(conversation_id): Path<String>,
+    Query(query): Query<HashMap<String, String>>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let route = match resolve_system_conversation_route(
+        &state.store,
+        &user.id,
+        ConversationEntryKind::ChatMemory,
+    ) {
+        Ok(route) => route,
+        Err(e) => {
+            tracing::warn!("确保普通聊天归档项目失败 user={}: {e}", user.id);
+            return json_error(StatusCode::INTERNAL_SERVER_ERROR, "创建聊天归档项目失败");
+        }
+    };
+    let limit = query
+        .get("limit")
+        .and_then(|value| value.parse::<i64>().ok())
+        .unwrap_or(120);
+    match state.store.list_user_conversation_messages(
+        &route.project_id,
+        &user.id,
+        &conversation_id,
+        limit,
+    ) {
+        Ok(messages) => Json(json!({
+            "messages": messages,
+            "conversation_id": conversation_id,
+            "project_id": route.project_id,
+            "scope": route.entry_key,
+        }))
+        .into_response(),
+        Err(e) => json_error(StatusCode::NOT_FOUND, e.to_string()),
+    }
 }

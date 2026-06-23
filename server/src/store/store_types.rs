@@ -44,6 +44,35 @@ pub struct ConversationMessage {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct UserConversationEntry {
+    pub id: String,
+    pub project_id: String,
+    pub user_id: String,
+    pub title: Option<String>,
+    pub status: String,
+    pub message_count: i64,
+    pub last_message: Option<String>,
+    pub last_message_role: Option<String>,
+    pub last_message_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserConversationMessage {
+    pub id: String,
+    pub project_id: String,
+    pub conversation_id: Option<String>,
+    pub task_id: Option<String>,
+    pub user_id: Option<String>,
+    pub sender_name: Option<String>,
+    pub role: String,
+    pub content: String,
+    pub created_at: String,
+    pub outgoing: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct PublicUser {
     pub id: String,
     pub account: String,

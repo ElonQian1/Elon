@@ -2,12 +2,12 @@
 //!
 //! 负责会话的创建/幂等更新、消息写入、消息历史查询以及管理后台会话总览。
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
 use super::{
     clean_optional, new_id, now, safe_external_id, AdminConversationEntry, ConversationMessage,
-    Store,
+    Store, UserConversationEntry, UserConversationMessage,
 };
 
 impl Store {
@@ -101,6 +101,135 @@ impl Store {
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
         Ok(messages)
+    }
+
+    /// 列出当前用户在指定归档项目下的会话摘要。
+    pub fn list_user_conversations(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserConversationEntry>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT
+               c.id,
+               c.project_id,
+               c.user_id,
+               c.title,
+               c.status,
+               (SELECT COUNT(*) FROM messages m
+                WHERE m.project_id = c.project_id
+                  AND m.conversation_id = c.id) AS message_count,
+               (SELECT m2.content FROM messages m2
+                WHERE m2.project_id = c.project_id
+                  AND m2.conversation_id = c.id
+                ORDER BY m2.created_at DESC, m2.id DESC LIMIT 1) AS last_message,
+               (SELECT m2.role FROM messages m2
+                WHERE m2.project_id = c.project_id
+                  AND m2.conversation_id = c.id
+                ORDER BY m2.created_at DESC, m2.id DESC LIMIT 1) AS last_message_role,
+               (SELECT m2.created_at FROM messages m2
+                WHERE m2.project_id = c.project_id
+                  AND m2.conversation_id = c.id
+                ORDER BY m2.created_at DESC, m2.id DESC LIMIT 1) AS last_message_at,
+               c.created_at,
+               c.updated_at
+             FROM conversations c
+             WHERE c.project_id = ?1
+               AND c.user_id = ?2
+             ORDER BY c.updated_at DESC
+             LIMIT ?3",
+        )?;
+        let rows = stmt
+            .query_map(params![project_id, user_id, limit.clamp(1, 100)], |row| {
+                Ok(UserConversationEntry {
+                    id: row.get(0)?,
+                    project_id: row.get(1)?,
+                    user_id: row.get(2)?,
+                    title: row.get(3)?,
+                    status: row.get(4)?,
+                    message_count: row.get(5)?,
+                    last_message: row.get(6)?,
+                    last_message_role: row.get(7)?,
+                    last_message_at: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
+    }
+
+    /// 读取当前用户自己的某个普通会话消息。
+    pub fn list_user_conversation_messages(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        conversation_id: &str,
+        limit: i64,
+    ) -> Result<Vec<UserConversationMessage>> {
+        let conversation_id = safe_external_id(conversation_id, "default");
+        let conn = self.conn()?;
+        let exists: Option<i64> = conn
+            .query_row(
+                "SELECT 1 FROM conversations
+                 WHERE project_id = ?1 AND user_id = ?2 AND id = ?3",
+                params![project_id, user_id, conversation_id],
+                |row| row.get(0),
+            )
+            .optional()?;
+        if exists.is_none() {
+            return Err(anyhow!("会话不存在"));
+        }
+
+        let mut stmt = conn.prepare(
+            "SELECT id, project_id, conversation_id, task_id, user_id, sender_name,
+                    role, content, created_at, outgoing
+             FROM (
+                SELECT m.id,
+                       m.project_id,
+                       m.conversation_id,
+                       m.task_id,
+                       m.user_id,
+                       CASE
+                         WHEN m.user_id = ?2 THEN COALESCE(u.nickname, u.phone, u.email, '我')
+                         WHEN LOWER(m.role) IN ('assistant', 'ai') THEN '一龙AI'
+                         ELSE COALESCE(u.nickname, u.phone, u.email, m.user_id, m.role)
+                       END AS sender_name,
+                       m.role,
+                       m.content,
+                       m.created_at,
+                       CASE WHEN m.user_id = ?2 OR LOWER(m.role) = 'user' THEN 1 ELSE 0 END AS outgoing
+                FROM messages m
+                LEFT JOIN users u ON u.id = m.user_id
+                WHERE m.project_id = ?1
+                  AND m.conversation_id = ?3
+                ORDER BY m.created_at DESC, m.id DESC
+                LIMIT ?4
+             )
+             ORDER BY created_at ASC, id ASC",
+        )?;
+        let rows = stmt
+            .query_map(
+                params![project_id, user_id, conversation_id, limit.clamp(1, 200)],
+                |row| {
+                    Ok(UserConversationMessage {
+                        id: row.get(0)?,
+                        project_id: row.get(1)?,
+                        conversation_id: row.get(2)?,
+                        task_id: row.get(3)?,
+                        user_id: row.get(4)?,
+                        sender_name: row.get(5)?,
+                        role: row.get(6)?,
+                        content: row.get(7)?,
+                        created_at: row.get(8)?,
+                        outgoing: row.get::<_, i64>(9)? != 0,
+                    })
+                },
+            )?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(rows)
     }
 
     /// 管理员总览：列出某项目下所有会话，附带消息数、任务数和最后任务状态。
