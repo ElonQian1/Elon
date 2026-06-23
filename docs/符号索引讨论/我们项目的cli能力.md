@@ -16,7 +16,7 @@ CLI TTY 接管方案当前明确走“有限连续性”契约：不重新接管
 
 Win 客户端“注册本地项目”流程会自动读取常见项目清单来填项目名、描述、Git 远端、分支和运行/测试/构建命令；其中 Android/Gradle 项目会从 `settings.gradle` 或 `settings.gradle.kts` 的 `rootProject.name` 自动识别项目名，.NET 项目会从 `.sln` 或 `.csproj` 自动识别名称和描述，Python 项目会识别 `pyproject.toml`、`requirements.txt`、`uv.lock`、`poetry.lock`、`Pipfile`、`manage.py`，选择 monorepo 根目录时也会浅层识别 `backend/`、`api/` 等 Python 子模块，减少用户手填字段。
 
-Route C 远程模型能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。Win 节点读取服务器 Route C 状态时会 fail-closed：如果 `policy.enabled=false`、`admissionAvailability.ready=false`、用户/平台预算耗尽、频率限制或 agentPolicy 明确不可用，即使顶层 `ready=true` 也不会把 Route C 显示成可用。
+Route C 远程模型能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。`/api/agent/runtime/status` 会返回结构化 `blockingReasons`，把运维开关、agent 策略、server_api_key-only、平台预算、个人额度、限流等不可用原因统一给 Win 节点和 PC UI。Win 节点读取服务器 Route C 状态时会 fail-closed：如果 `policy.enabled=false`、`admissionAvailability.ready=false`、用户/平台预算耗尽、频率限制、`agentPolicy` 明确不可用，或 `blockingReasons` 非空，即使顶层 `ready=true` 也不会把 Route C 显示成可用。
 
 这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、更细粒度 full_access 高危命令策略。
 
@@ -1063,7 +1063,7 @@ Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽�
 read_only / project_write / full_access 权限字段
 Route B/C 本机工具白名单
 Route B/C 工具调用时间线
-Route C 平台日预算 + 用户日预算 + 重复请求防抖 + agent 选择保护 + server_api_key-only 硬门槛
+Route C 平台日预算 + 用户日预算 + 重复请求防抖 + agent 选择保护 + server_api_key-only 硬门槛 + 结构化 blockingReasons
 Win 客户端维护面板展示安装状态、开始菜单健康、日志入口、修复客户端入口、更新/卸载动作和下一步建议
 客户端维护按钮已经改成后端 `maintenance_actions` 契约驱动；页面按 `kind/target/enabled/tone/confirmation` 渲染日志、诊断、配置、修复、更新和卸载动作，避免前端硬编码按钮和后端能力漂移
 本机 7799 管理 API token 保护

@@ -100,6 +100,14 @@ fn server_runtime_ready_from_status_value(value: &serde_json::Value) -> bool {
     {
         return false;
     }
+    if value
+        .get("blockingReasons")
+        .or_else(|| value.get("blocking_reasons"))
+        .and_then(Value::as_array)
+        .is_some_and(|reasons| !reasons.is_empty())
+    {
+        return false;
+    }
     true
 }
 
@@ -156,6 +164,11 @@ fn normalize_status_value(value: &Value) -> Value {
             .or_else(|| value.get("admission_availability"))
             .cloned()
             .unwrap_or(Value::Null),
+        "blockingReasons": value
+            .get("blockingReasons")
+            .or_else(|| value.get("blocking_reasons"))
+            .cloned()
+            .unwrap_or_else(|| json!([])),
     })
 }
 
@@ -217,6 +230,7 @@ mod tests {
         assert_eq!(status["admission"]["remainingRequestsPerMinute"], 11);
         assert_eq!(status["admissionAvailability"]["ready"], true);
         assert_eq!(status["agentPolicy"]["mode"], "default_agent_only");
+        assert_eq!(status["blockingReasons"], json!([]));
         assert!(status.get("ignored").is_none());
     }
 
@@ -267,6 +281,15 @@ mod tests {
                 "reason": "no_server_api_key_agent"
             }
         })));
+        assert!(!server_runtime_ready_from_status_value(&json!({
+            "ready": true,
+            "status": "ready",
+            "blockingReasons": [{
+                "code": "platform_budget_exhausted",
+                "scope": "budget",
+                "message": "Route C 今日平台预算已用完"
+            }]
+        })));
     }
 
     #[test]
@@ -296,6 +319,27 @@ mod tests {
             status["agentPolicy"]["source"],
             "ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"
         );
+    }
+
+    #[test]
+    fn normalizes_blocking_reasons_for_node_profile() {
+        let status = normalize_status_value(&json!({
+            "ready": false,
+            "status": "budget_exhausted",
+            "blockingReasons": [{
+                "code": "platform_budget_exhausted",
+                "scope": "budget",
+                "message": "Route C 今日平台预算已用完",
+                "retryAfterSecs": 3600
+            }]
+        }));
+
+        assert!(!server_runtime_ready_from_status_value(&status));
+        assert_eq!(
+            status["blockingReasons"][0]["code"],
+            "platform_budget_exhausted"
+        );
+        assert_eq!(status["blockingReasons"][0]["retryAfterSecs"], 3600);
     }
 
     #[test]

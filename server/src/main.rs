@@ -167,6 +167,7 @@ mod server_agent_runtime_guard;
 mod server_agent_runtime_limits;
 mod server_agent_runtime_output;
 mod server_agent_runtime_policy;
+mod server_agent_runtime_status;
 mod server_trace;
 mod social_ai;
 mod social_ai_agents;

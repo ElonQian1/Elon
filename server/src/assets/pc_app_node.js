@@ -502,6 +502,8 @@
       const status = (runtime && (runtime.server_runtime_status || runtime.serverRuntimeStatus)) || null;
       if (!status) return '未上报';
       const stateText = clean(status.status);
+      const blocking = routeCBlockingReasonsText(status);
+      if (blocking) return blocking;
       const policy = status.policy || {};
       if (policy.enabled === false || stateText === 'disabled') return '已关闭 · 运维开关保护';
       if (stateText === 'missing_token') return '未登录 · 不会调用服务器模型';
@@ -558,6 +560,34 @@
       if (Number.isFinite(dailyLimit) && Number.isFinite(remainingBudget)) parts.push(`今日剩余 ${remainingBudget}/${dailyLimit}`);
       if (Number.isFinite(userDailyLimit) && Number.isFinite(remainingUserBudget)) parts.push(`个人今日剩余 ${remainingUserBudget}/${userDailyLimit}`);
       return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
+    }
+
+    function routeCBlockingReasonsText(status) {
+      const reasons = Array.isArray(status.blockingReasons)
+        ? status.blockingReasons
+        : (Array.isArray(status.blocking_reasons) ? status.blocking_reasons : []);
+      const parts = reasons
+        .map((reason) => {
+          const message = clean(reason.message || reason.publicMessage || reason.public_message)
+            || routeCBlockReasonCodeText(clean(reason.code));
+          if (!message) return '';
+          const retryAfter = numberField(reason, 'retryAfterSecs', 'retry_after_secs');
+          return retryAfter ? `${message} · ${retryAfter} 秒后重试` : message;
+        })
+        .filter(Boolean);
+      if (!parts.length) return '';
+      return `已保护 · ${parts.slice(0, 3).join(' · ')}`;
+    }
+
+    function routeCBlockReasonCodeText(code) {
+      if (code === 'operator_disabled') return '运维开关保护';
+      if (code === 'no_server_api_key_agent') return 'agent 模式不允许';
+      if (code === 'agent_policy_blocked') return 'agent 策略拦截';
+      if (code === 'agent_unavailable') return '服务器 agent 不可用';
+      if (code === 'platform_budget_exhausted') return '今日平台预算已用完';
+      if (code === 'user_budget_exhausted') return '今日个人额度已用完';
+      if (code === 'budget_unavailable') return '预算系统暂时不可用';
+      return routeCLimitedReasonText(code);
     }
 
     function routeCAgentPolicyLabel(status) {

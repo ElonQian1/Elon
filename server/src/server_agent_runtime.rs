@@ -6,7 +6,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::Value;
 use std::sync::Arc;
 
@@ -15,17 +15,18 @@ use crate::{
     project_auth::{auth_from_headers, json_error},
     server_agent_runtime_budget::{
         server_runtime_budget_status_for_user, try_record_route_c_call, ServerRuntimeBudgetError,
-        ServerRuntimeBudgetStatus,
     },
     server_agent_runtime_guard::{
         admission_availability, admission_snapshot, audit_summary, operational_error_summary,
-        protection_status, try_acquire_runtime_admission_for_request,
-        ServerRuntimeAdmissionAvailability, ServerRuntimeAdmissionError,
-        ServerRuntimeAdmissionSnapshot, ServerRuntimeProtectionStatus,
+        protection_status, try_acquire_runtime_admission_for_request, ServerRuntimeAdmissionError,
     },
     server_agent_runtime_limits::ServerAgentRuntimeLimits,
     server_agent_runtime_output::validate_server_runtime_output,
     server_agent_runtime_policy::{ServerAgentRuntimeAgentPolicy, ServerAgentRuntimePolicy},
+    server_agent_runtime_status::{
+        route_c_blocking_reasons, route_c_status_code, ServerAgentRuntimeAgentStatus,
+        ServerAgentRuntimeStatus,
+    },
     types::{AgentConfig, AgentsConfig, AppState},
 };
 
@@ -34,30 +35,6 @@ use crate::{
 pub struct ServerAgentRuntimeRequest {
     pub messages: Vec<Value>,
     pub agent: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-struct ServerAgentRuntimeStatus {
-    ready: bool,
-    status: &'static str,
-    agent: Option<ServerAgentRuntimeAgentStatus>,
-    limits: ServerAgentRuntimeLimits,
-    protection: ServerRuntimeProtectionStatus,
-    policy: ServerAgentRuntimePolicy,
-    #[serde(rename = "agentPolicy")]
-    agent_policy: ServerAgentRuntimeAgentPolicy,
-    budget: ServerRuntimeBudgetStatus,
-    admission: ServerRuntimeAdmissionSnapshot,
-    #[serde(rename = "admissionAvailability")]
-    admission_availability: ServerRuntimeAdmissionAvailability,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ServerAgentRuntimeAgentStatus {
-    name: String,
-    model: String,
-    usage_mode: String,
 }
 
 pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
@@ -88,21 +65,22 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
     let admission_availability = admission_availability(&admission);
     let budget = server_runtime_budget_status_for_user(&state.store, &user.id);
     let ready = policy.enabled && agent.is_some() && admission_availability.ready && budget.ready();
+    let blocking_reasons = route_c_blocking_reasons(
+        &policy,
+        agent.is_some(),
+        agent_status,
+        &budget,
+        &admission_availability,
+    );
     Json(ServerAgentRuntimeStatus {
         ready,
-        status: if !policy.enabled {
-            "disabled"
-        } else if agent.is_none() {
-            agent_status
-        } else if budget.status == "user_exhausted" {
-            "user_budget_exhausted"
-        } else if !budget.ready() {
-            "budget_exhausted"
-        } else if !admission_availability.ready {
-            "limited"
-        } else {
-            "ready"
-        },
+        status: route_c_status_code(
+            &policy,
+            agent.is_some(),
+            agent_status,
+            &budget,
+            &admission_availability,
+        ),
         agent,
         limits,
         protection: protection_status(),
@@ -111,6 +89,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         budget,
         admission,
         admission_availability,
+        blocking_reasons,
     })
     .into_response()
 }
@@ -424,17 +403,10 @@ mod tests {
         operational_error_summary, protection_status, provider_error_message, response_model,
         response_total_tokens, server_runtime_agent_usage_mode_allowed,
         unsupported_agent_usage_mode_message, validate_runtime_messages,
-        ServerAgentRuntimeAgentStatus, ServerAgentRuntimeStatus,
     };
     use crate::server_agent_runtime_budget::{ServerRuntimeBudgetError, ServerRuntimeBudgetStatus};
-    use crate::server_agent_runtime_guard::{
-        ServerRuntimeAdmissionAvailability, ServerRuntimeAdmissionError,
-        ServerRuntimeAdmissionSnapshot,
-    };
+    use crate::server_agent_runtime_guard::ServerRuntimeAdmissionError;
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
-    use crate::server_agent_runtime_policy::{
-        ServerAgentRuntimeAgentPolicy, ServerAgentRuntimePolicy,
-    };
     use crate::types::{AgentConfig, AgentsConfig};
     use axum::http::header;
     use serde_json::json;
@@ -482,67 +454,6 @@ mod tests {
             .contains("ELON_SERVER_AGENT_RUNTIME_ENABLED"));
         assert!(protection.billing_gate.contains("call_chat_llm"));
         assert!(protection.request_fingerprint.contains("sha256"));
-    }
-
-    #[test]
-    fn runtime_status_serializes_agent_policy_for_operations() {
-        let status = ServerAgentRuntimeStatus {
-            ready: true,
-            status: "ready",
-            agent: Some(ServerAgentRuntimeAgentStatus {
-                name: "main".to_string(),
-                model: "route-c-model".to_string(),
-                usage_mode: "server_api_key".to_string(),
-            }),
-            limits: ServerAgentRuntimeLimits::current(),
-            protection: protection_status(),
-            policy: ServerAgentRuntimePolicy::from_env_value(None),
-            agent_policy: ServerAgentRuntimeAgentPolicy::from_env_value(Some("route-c-fast")),
-            budget: ServerRuntimeBudgetStatus {
-                enabled: false,
-                status: "unlimited",
-                source: "default",
-                used_calls_today: 0,
-                daily_call_limit: None,
-                remaining_calls_today: None,
-                per_user_enabled: false,
-                per_user_source: "default",
-                used_calls_today_for_user: None,
-                per_user_daily_call_limit: None,
-                remaining_calls_today_for_user: None,
-                reset_after_secs: 60,
-            },
-            admission: ServerRuntimeAdmissionSnapshot {
-                in_flight_global: 0,
-                max_concurrent_global: 24,
-                remaining_concurrent_global: 24,
-                in_flight_for_user: 0,
-                max_concurrent_per_user: 2,
-                remaining_concurrent_for_user: 2,
-                recent_requests_per_minute: 0,
-                max_requests_per_minute: 12,
-                remaining_requests_per_minute: 12,
-                rate_limit_retry_after_secs: None,
-                duplicate_request_window_secs: 5,
-                recent_duplicate_fingerprints: 0,
-            },
-            admission_availability: ServerRuntimeAdmissionAvailability {
-                ready: true,
-                reason: None,
-                public_message: None,
-                retry_after_secs: None,
-            },
-        };
-
-        let value = serde_json::to_value(status).unwrap();
-
-        assert_eq!(value["agentPolicy"]["mode"], "allowlist");
-        assert_eq!(
-            value["agentPolicy"]["source"],
-            "ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"
-        );
-        assert!(value.get("agent_policy").is_none());
-        assert!(value["agentPolicy"].get("allowedAgents").is_none());
     }
 
     #[test]
