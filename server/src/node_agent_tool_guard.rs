@@ -96,6 +96,10 @@ impl ToolGuard {
                 let max_results = optional_positive_usize(action, "max_results")?.unwrap_or(50);
                 self.search_files(path, query, max_results).await
             }
+            "file_info" => {
+                let path = required_str(action, "path")?;
+                self.file_info(path).await
+            }
             "read_file" => {
                 let path = required_str(action, "path")?;
                 self.read_file(path).await
@@ -184,6 +188,11 @@ impl ToolGuard {
         })
         .await
         .map_err(|error| anyhow!("search_files task failed: {error}"))?
+    }
+
+    async fn file_info(&self, path: &str) -> Result<String> {
+        let full = self.resolve_safe_path(path)?;
+        crate::node_agent_file_info::file_info(&full, path).await
     }
 
     async fn read_file(&self, path: &str) -> Result<String> {
@@ -1095,6 +1104,33 @@ mod tests {
             }))
             .await;
         assert!(empty_query.contains("query cannot be empty"));
+    }
+
+    #[tokio::test]
+    async fn file_info_reuses_safe_path_guard_and_reports_shape() {
+        let temp = temp_test_dir("file_info_reuses_safe_path_guard_and_reports_shape");
+        fs::create_dir_all(temp.join("src")).unwrap();
+        fs::create_dir_all(temp.join(".git")).unwrap();
+        fs::write(temp.join("src").join("main.rs"), "one\ntwo\n").unwrap();
+        let mut guard = ToolGuard::new(temp, None);
+
+        let info = guard
+            .invoke_action(&json!({
+                "tool": "file_info",
+                "path": "src/main.rs"
+            }))
+            .await;
+        assert!(info.contains("file_info ok: src/main.rs"));
+        assert!(info.contains("kind=file"));
+        assert!(info.contains("line_count=2"));
+
+        let unsafe_result = guard
+            .invoke_action(&json!({
+                "tool": "file_info",
+                "path": ".git/config"
+            }))
+            .await;
+        assert!(unsafe_result.contains("path cannot target .git"));
     }
 
     #[tokio::test]

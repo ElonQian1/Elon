@@ -76,7 +76,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `search_files`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `search_files` is read-only and bounded, so use it before broad file reads when locating symbols, filenames, TODOs, errors, or related code. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `search_files`, `file_info`, `read_file`, `read_file_range`, `write_file`, `apply_patch`, and a small allowlist of project commands. `search_files` is read-only and bounded, so use it before broad file reads when locating symbols, filenames, TODOs, errors, or related code. `file_info` is read-only and helps inspect unknown files or directories before reading them. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -292,6 +292,7 @@ Schema:
     "actions": [
     {"tool": "list_dir", "path": "."},
     {"tool": "search_files", "query": "TODO", "path": "src", "max_results": 40},
+    {"tool": "file_info", "path": "src/main.rs"},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "read_file_range", "path": "src/main.rs", "start_line": 1, "line_count": 80},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
@@ -304,6 +305,7 @@ Rules:
 - Use paths relative to the project root.
 - Prefer read-only actions first.
 - Use search_files before broad file reads when you need to locate symbols, filenames, TODOs, errors, or related code.
+- Use file_info before reading unknown files, binary-looking files, or directories.
 - Use read_file_range for large files or when you only need a specific section.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for local edits to existing project files.
@@ -636,6 +638,50 @@ function Invoke-AgentSearchFiles {
     return ($results -join "`n")
 }
 
+function Invoke-AgentFileInfo {
+    param([Parameter(Mandatory = $true)][string]$Path)
+    $full = Resolve-SafePath $Path
+    if (-not (Test-Path -LiteralPath $full)) {
+        return "file_info error: path not found: $Path"
+    }
+    $item = Get-Item -LiteralPath $full -Force
+    $kind = if ($item.PSIsContainer) { 'dir' } elseif ($item -is [System.IO.FileInfo]) { 'file' } else { 'other' }
+    $rows = New-Object 'System.Collections.Generic.List[string]'
+    $rows.Add("file_info ok: $($Path.Trim())")
+    $rows.Add("kind=$kind")
+    $rows.Add("modified_utc=$($item.LastWriteTimeUtc.ToString('o'))")
+
+    if ($kind -eq 'file') {
+        $rows.Add("bytes=$($item.Length)")
+        if ($item.Length -gt 1048576) {
+            $rows.Add('line_probe=skipped_large_file')
+            $rows.Add('line_probe_max_bytes=1048576')
+            $rows.Add('advice=use read_file_range only if you know the needed line span')
+        } else {
+            try {
+                $text = Get-Content -LiteralPath $full -Raw -ErrorAction Stop
+                if ($null -eq $text) { $text = '' }
+                $lineCount = if ($text.Length -eq 0) { 0 } else { @($text -split "`r`n|`n|`r").Count }
+                if ($lineCount -gt 0 -and $text -match "(`r`n|`n|`r)$") { $lineCount -= 1 }
+                $rows.Add('line_probe=text')
+                $rows.Add("line_count=$lineCount")
+                $rows.Add('advice=use read_file_range before broad reads on large files')
+            } catch {
+                $rows.Add('line_probe=non_text_or_unreadable')
+                $rows.Add('advice=do not use read_file on binary or unreadable files')
+            }
+        }
+    } elseif ($kind -eq 'dir') {
+        $items = @(Get-ChildItem -LiteralPath $full -Force -ErrorAction SilentlyContinue | Select-Object -First 201)
+        $sampled = [Math]::Min($items.Count, 200)
+        $rows.Add("entries_sampled=$sampled")
+        $rows.Add("entries_truncated=$($items.Count -gt 200)")
+        $rows.Add('advice=use list_dir to inspect names in this directory')
+    }
+
+    return ($rows -join "`n")
+}
+
 function Invoke-AgentAction {
     param([Parameter(Mandatory = $true)]$Action)
     $tool = [string]$Action.tool
@@ -654,6 +700,10 @@ function Invoke-AgentAction {
             $query = [string]$Action.query
             $maxResults = if ($Action.max_results) { [int]$Action.max_results } else { 50 }
             return Invoke-AgentSearchFiles -Path $path -Query $query -MaxResults $maxResults
+        }
+        'file_info' {
+            $path = [string]$Action.path
+            return Invoke-AgentFileInfo -Path $path
         }
         'read_file' {
             $path = [string]$Action.path
@@ -960,6 +1010,9 @@ mod tests {
         assert!(script.contains("'search_files'"));
         assert!(script.contains("Invoke-AgentSearchFiles"));
         assert!(script.contains("search_files error: query cannot be empty"));
+        assert!(script.contains("'file_info'"));
+        assert!(script.contains("Invoke-AgentFileInfo"));
+        assert!(script.contains("line_probe=skipped_large_file"));
         assert!(script.contains("'read_file_range'"));
         assert!(script.contains("start_line must be >= 1"));
         assert!(script.contains("$lineCount = 400"));
@@ -999,6 +1052,7 @@ mod tests {
         assert!(doc.contains("ELON_SERVER_TOKEN"));
         assert!(doc.contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
         assert!(doc.contains("search_files"));
+        assert!(doc.contains("file_info"));
         assert!(doc.contains("read_file_range"));
         assert!(doc.contains("apply_patch"));
         assert!(doc.contains("program"));
@@ -1115,6 +1169,11 @@ if ($search -match 'target/ignored.txt') {
 $pathSearch = Invoke-AgentSearchFiles -Path 'src' -Query 'route_b' -MaxResults 20
 if ($pathSearch -notmatch 'src/route_b.rs: path match') {
     Write-Error "search_files did not find path match: $pathSearch"
+    exit 1
+}
+$fileInfo = Invoke-AgentAction ([pscustomobject]@{ tool = 'file_info'; path = 'src/route_b.rs' })
+if ($fileInfo -notmatch 'kind=file' -or $fileInfo -notmatch 'line_probe=text' -or $fileInfo -notmatch 'line_count=2') {
+    Write-Error "file_info did not report file shape: $fileInfo"
     exit 1
 }
 $patch = @'

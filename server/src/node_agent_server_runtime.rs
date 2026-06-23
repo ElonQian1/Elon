@@ -905,11 +905,12 @@ Return strict JSON only, without markdown fences.
 
 Schema:
 {
-  "message": "short progress or final answer",
-  "done": false,
+    "message": "short progress or final answer",
+    "done": false,
     "actions": [
     {"tool": "list_dir", "path": "."},
     {"tool": "search_files", "query": "TODO", "path": "src", "max_results": 40},
+    {"tool": "file_info", "path": "src/main.rs"},
     {"tool": "read_file", "path": "README.md"},
     {"tool": "read_file_range", "path": "src/main.rs", "start_line": 120, "line_count": 80},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
@@ -922,6 +923,7 @@ Rules:
 - Paths must be relative to the current project workspace.
 - Prefer read-only actions first.
 - Use search_files before broad file reads when you need to locate symbols, filenames, TODOs, errors, or related code.
+- Use file_info before reading unknown files, binary-looking files, or directories.
 - Use read_file_range instead of read_file for large files when you only need one section.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for intentional edits to existing project files.
@@ -1327,6 +1329,11 @@ mod tests {
         assert_eq!(payload["temperature"], 0.2);
         assert_eq!(payload["response_format"]["type"], "json_object");
         assert_eq!(payload["tool_choice"], "auto");
+        assert!(payload["tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["function"]["name"] == "file_info"));
         assert!(payload["tools"]
             .as_array()
             .unwrap()

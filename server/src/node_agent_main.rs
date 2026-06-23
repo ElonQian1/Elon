@@ -59,6 +59,7 @@ mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
 mod node_agent_client_maintenance;
 mod node_agent_codex_session;
+mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_local_admin;

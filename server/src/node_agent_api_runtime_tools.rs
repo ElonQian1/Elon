@@ -164,6 +164,18 @@ fn tool_definitions() -> Value {
             })
         ),
         function_tool(
+            "file_info",
+            "Inspect one project-relative file or directory before deciding whether to read it.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "path": { "type": "string", "description": "Project-relative file or directory path." }
+                },
+                "required": ["path"],
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
             "read_file",
             "Read a small project-relative text file.",
             json!({
@@ -267,6 +279,9 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "search_files"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "file_info"));
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "read_file_range"));

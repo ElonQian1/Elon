@@ -46,7 +46,7 @@ Invoke-Step "Static Route B runtime contract" {
         }
     }
 
-    foreach ($tool in @("list_dir", "search_files", "read_file", "read_file_range", "write_file", "apply_patch", "run_command")) {
+    foreach ($tool in @("list_dir", "search_files", "file_info", "read_file", "read_file_range", "write_file", "apply_patch", "run_command")) {
         Assert-FileContains `
             -Path $ApiRuntimeConfig `
             -Needle "`"$tool`"" `
@@ -102,6 +102,10 @@ Invoke-Step "Static Route B runtime contract" {
         -Needle "limited_runtime_response_text" `
         -Message "Route B provider response body reads must stay bounded"
 
+    Assert-FileContains `
+        -Path $PcDevRuntime `
+        -Needle "file_info" `
+        -Message "Generated pc-dev runtime must expose file_info"
     Assert-FileContains `
         -Path $PcDevRuntime `
         -Needle "Route B is intentionally conservative" `
