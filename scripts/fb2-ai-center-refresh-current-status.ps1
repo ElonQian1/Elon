@@ -4,9 +4,11 @@ param(
     [string]$OutputDir = "",
     [string[]]$EvidenceDirs = @(),
     [string]$MainWorkspaceEvidenceDir = "",
+    [string]$Fb2RepoPath = "",
     [string]$RefreshSummaryPath = "",
     [string]$HandoffPromptPath = "",
     [switch]$SkipPublicContract,
+    [switch]$SkipExportedContextPackSampleValidation,
     [switch]$SelfTest
 )
 
@@ -100,6 +102,32 @@ function Get-Fb2RefreshCommandValue {
         return $value
     }
     return [string](Get-Fb2RefreshProperty $Fallback $Name "")
+}
+
+function New-Fb2RefreshExportedSampleValidationState {
+    param(
+        [string]$Fb2Repo,
+        [string]$SamplesDir,
+        [string]$OutputPath,
+        [bool]$Enabled,
+        [bool]$Attempted,
+        [string]$SkippedReason,
+        [object]$Summary
+    )
+
+    [ordered]@{
+        enabled = $Enabled
+        attempted = $Attempted
+        skipped_reason = $SkippedReason
+        fb2_repo_path = $Fb2Repo
+        samples_dir = $SamplesDir
+        output_path = $OutputPath
+        success = [bool]($Summary -and $Summary.complete)
+        complete = [bool]($Summary -and $Summary.complete)
+        scenario_count = if ($Summary) { [int]$Summary.scenario_count } else { 0 }
+        passed_count = if ($Summary) { [int]$Summary.passed_count } else { 0 }
+        failed_count = if ($Summary) { [int]$Summary.failed_count } else { 0 }
+    }
 }
 
 function New-Fb2RefreshOwnerActions {
@@ -566,7 +594,7 @@ function Invoke-Fb2RefreshSelfTest {
     try {
         New-Item -ItemType Directory -Force -Path $output | Out-Null
         # 自测必须无网络、无 token、无主工作区依赖；这里只验证编排脚本能生成稳定机器摘要。
-        $raw = & $PSCommandPath -OutputDir $output -MainWorkspaceEvidenceDir $missingEvidence -SkipPublicContract
+        $raw = & $PSCommandPath -OutputDir $output -MainWorkspaceEvidenceDir $missingEvidence -Fb2RepoPath $missingEvidence -SkipPublicContract
         $summary = $raw | ConvertFrom-Json
         Assert-Fb2RefreshSelfTest ($summary.schema -eq "fb2.main_project.status_refresh.v1") "schema"
         Assert-Fb2RefreshSelfTest ([string]$summary.output_dir -eq $output) "output_dir"
@@ -585,6 +613,8 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.generate_context_pack_sample_request)) "context pack sample request command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_context_pack_sample_set)) "context pack sample set validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_exported_context_pack_sample_set)) "exported context pack sample set validation command"
+        Assert-Fb2RefreshSelfTest (-not [bool]$summary.exported_context_pack_sample_set_validation.attempted) "selftest skips missing exported sample validation"
+        Assert-Fb2RefreshSelfTest ([string]$summary.exported_context_pack_sample_set_validation.skipped_reason -eq "samples_dir_missing") "selftest exported sample missing reason"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_current_state)) "current state validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_server_deploy_status)) "server deploy status validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_read_only_direct_read)) "read-only direct read validation command"
@@ -628,6 +658,13 @@ if ([string]::IsNullOrWhiteSpace($OutputDir)) {
 } else {
     $OutputDir = Resolve-Fb2RefreshPath -Path $OutputDir -Root $root
 }
+if ([string]::IsNullOrWhiteSpace($Fb2RepoPath)) {
+    $Fb2RepoPath = $env:FB2_REPO_PATH
+}
+if ([string]::IsNullOrWhiteSpace($Fb2RepoPath)) {
+    $Fb2RepoPath = "D:\rust\active-projects\fb2"
+}
+$Fb2RepoPath = Resolve-Fb2RefreshPath -Path $Fb2RepoPath -Root $root
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 if ([string]::IsNullOrWhiteSpace($RefreshSummaryPath)) {
@@ -670,6 +707,35 @@ $goalAuditPath = Join-Path $OutputDir "goal-audit-current.json"
 $goalAuditMarkdownPath = Join-Path $OutputDir "goal-audit-current.md"
 $handoffPath = Join-Path $OutputDir "handoff-current.json"
 $handoffMarkdownPath = Join-Path $OutputDir "handoff-current.md"
+$exportedSampleSetValidationPath = Join-Path $OutputDir "fb2-repo-context-pack-samples-validation-current.json"
+$exportedSamplesDir = Join-Path $Fb2RepoPath "target\fb2-ai-center\samples"
+$exportedSampleValidationSummary = $null
+$exportedSampleValidationAttempted = $false
+$exportedSampleValidationSkipReason = ""
+
+if ($SkipExportedContextPackSampleValidation) {
+    $exportedSampleValidationSkipReason = "skipped_by_flag"
+} elseif (-not (Test-Path -LiteralPath $exportedSamplesDir)) {
+    $exportedSampleValidationSkipReason = "samples_dir_missing"
+} else {
+    $exportedSampleValidationAttempted = $true
+    & (Join-Path $PSScriptRoot "validate-fb2-context-pack.ps1") `
+        -ValidateSampleSet `
+        -SamplesDir $exportedSamplesDir `
+        -OutputPath $exportedSampleSetValidationPath | Out-Null
+    $exportedSampleValidationSummary = Read-Fb2RefreshJson -Path $exportedSampleSetValidationPath
+}
+if (-not $exportedSampleValidationAttempted -and (Test-Path -LiteralPath $exportedSampleSetValidationPath)) {
+    Remove-Item -LiteralPath $exportedSampleSetValidationPath -Force
+}
+$exportedSampleValidationState = New-Fb2RefreshExportedSampleValidationState `
+    -Fb2Repo $Fb2RepoPath `
+    -SamplesDir $exportedSamplesDir `
+    -OutputPath $exportedSampleSetValidationPath `
+    -Enabled (-not [bool]$SkipExportedContextPackSampleValidation) `
+    -Attempted $exportedSampleValidationAttempted `
+    -SkippedReason $exportedSampleValidationSkipReason `
+    -Summary $exportedSampleValidationSummary
 
 if (-not $SkipPublicContract) {
     & (Join-Path $PSScriptRoot "fb2-public-contract-status.ps1") -OutputPath $publicPath | Out-Null
@@ -715,7 +781,7 @@ $files = [ordered]@{
     handoff = $handoffPath
     handoff_markdown = $handoffMarkdownPath
     handoff_prompt = $HandoffPromptPath
-    exported_context_pack_sample_set_validation = (Join-Path $OutputDir "fb2-repo-context-pack-samples-validation-current.json")
+    exported_context_pack_sample_set_validation = $exportedSampleSetValidationPath
 }
 $evidenceFreshness = New-Fb2RefreshEvidenceFreshness `
     -OutputDir $OutputDir `
@@ -741,6 +807,7 @@ $refreshSummary = [pscustomobject]@{
     owner_next_actions = $ownerNextActions
     blocking_state = $blockingState
     next_commands = $nextCommands
+    exported_context_pack_sample_set_validation = $exportedSampleValidationState
     completion_matrix = $completionMatrix
     gap_action_board = $gapActionBoard
     evidence_freshness = $evidenceFreshness
