@@ -209,6 +209,17 @@ fn context_gap_summary(context: &Value) -> Value {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .unwrap_or("unknown");
+    let context_budget_trimmed = context
+        .get("_context_budget")
+        .and_then(|budget| budget.get("trimmed"))
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let partial = context_budget_trimmed
+        || matches!(readiness_status, "degraded" | "partial")
+        || matches!(budget_status, "too_large")
+        || warnings
+            .iter()
+            .any(|warning| warning.as_str() == "fb2_budget_too_large");
     let blocking = status != "ready"
         || matches!(
             readiness_status,
@@ -235,16 +246,15 @@ fn context_gap_summary(context: &Value) -> Value {
             "platform_order_summary": !context.get("platform_order_summary").unwrap_or(&Value::Null).is_null()
         },
         "truncation": {
-            "context_budget_trimmed": context
-                .get("_context_budget")
-                .and_then(|budget| budget.get("trimmed"))
-                .and_then(Value::as_bool)
-                .unwrap_or(false),
+            "context_budget_trimmed": context_budget_trimmed,
             "fields": truncated_fields(context)
         },
         "fact_answer_allowed": !blocking,
+        "partial_answer_only": partial,
         "required_user_notice": if blocking {
             "fb2_context_gap_or_unverified_data_present"
+        } else if partial {
+            "fb2_context_partial_or_truncated_context_present"
         } else {
             "none"
         }
@@ -569,5 +579,10 @@ mod tests {
             .contains(&json!("matches")));
         assert_eq!(summary["business_data_available"]["user_orders"], true);
         assert_eq!(summary["fact_answer_allowed"], true);
+        assert_eq!(summary["partial_answer_only"], true);
+        assert_eq!(
+            summary["required_user_notice"],
+            "fb2_context_partial_or_truncated_context_present"
+        );
     }
 }

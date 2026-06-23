@@ -130,7 +130,7 @@ function New-Fb2MainPromptProjectionValidation {
             ($texts.context_budget.Contains($field)) `
             $field $files.context_budget
     }
-    foreach ($field in @('fact_answer_allowed', 'required_user_notice', 'business_data_available', 'truncation', 'fb2_context_gap_or_unverified_data_present')) {
+    foreach ($field in @('fact_answer_allowed', 'partial_answer_only', 'required_user_notice', 'business_data_available', 'truncation', 'fb2_context_gap_or_unverified_data_present', 'fb2_context_partial_or_truncated_context_present')) {
         Add-Fb2PromptCheck $checks `
             "context_gap_summary includes $field" `
             ($texts.context_budget.Contains($field)) `
@@ -249,7 +249,7 @@ fn context_fact_summary() {
     "match_count user_order_count group_message_count source_id_samples citation_source_samples user_order_samples current_user_only_after_external_user_id_header_check";
 }
 fn context_gap_summary() {
-    "fact_answer_allowed required_user_notice business_data_available truncation fb2_context_gap_or_unverified_data_present";
+    "fact_answer_allowed partial_answer_only required_user_notice business_data_available truncation fb2_context_gap_or_unverified_data_present fb2_context_partial_or_truncated_context_present";
 }
 '@
     Set-Content -LiteralPath (Join-Path $serverSrc "external_app_context_tool_prompt.rs") -Encoding UTF8 -Value @'
