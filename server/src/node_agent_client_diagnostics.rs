@@ -32,6 +32,10 @@ pub(crate) async fn export_handler() -> (StatusCode, Json<Value>) {
     }
 }
 
+pub(crate) fn export_diagnostics_file() -> Result<(PathBuf, bool), String> {
+    export_diagnostics().map(|export| (export.path, export.opened))
+}
+
 fn export_diagnostics() -> Result<ClientDiagnosticExport, String> {
     let paths = DiagnosticPaths::default();
     fs::create_dir_all(&paths.diagnostics_dir).map_err(|error| {

@@ -29,6 +29,7 @@ enum ClientCommand {
     Install,
     Uninstall,
     Update,
+    ExportDiagnostics,
     OpenMaintenance(maintenance_protocol::MaintenanceProtocolTarget),
 }
 
@@ -84,6 +85,10 @@ fn run_command(command: ClientCommand) -> Result<()> {
             let install_dir = paths::install_dir()?;
             let _ = updater::update_client_if_needed(&install_dir)?;
         }
+        ClientCommand::ExportDiagnostics => {
+            crate::node_agent_client_diagnostics::export_diagnostics_file()
+                .map_err(anyhow::Error::msg)?;
+        }
         ClientCommand::OpenMaintenance(target) => {
             let install_dir = paths::install_dir()?;
             maintenance_protocol::open_target(target, &install_dir)?;
@@ -95,14 +100,24 @@ fn run_command(command: ClientCommand) -> Result<()> {
 impl ClientCommand {
     fn from_env() -> Self {
         let args: Vec<String> = std::env::args().skip(1).collect();
-        if args.iter().any(|arg| arg == "--uninstall") || exe_stem_contains(UNINSTALL_NAME) {
+        Self::from_args(&args, exe_stem_contains(UNINSTALL_NAME))
+    }
+
+    fn from_args(args: &[String], uninstall_exe: bool) -> Self {
+        if args.iter().any(|arg| arg == "--uninstall") || uninstall_exe {
             return Self::Uninstall;
         }
         if args.iter().any(|arg| arg == "--install") {
             return Self::Install;
         }
-        if args.iter().any(|arg| arg == "--update") {
+        if args
+            .iter()
+            .any(|arg| arg == "--update" || arg == "--check-update")
+        {
             return Self::Update;
+        }
+        if diagnostics_export_requested(args) {
+            return Self::ExportDiagnostics;
         }
         if let Some(target) = maintenance_protocol::target_from_args(&args) {
             return Self::OpenMaintenance(target);
@@ -119,9 +134,25 @@ impl ClientCommand {
             Self::Install => "install",
             Self::Uninstall => "uninstall",
             Self::Update => "update",
+            Self::ExportDiagnostics => "export_diagnostics",
             Self::OpenMaintenance(target) => target.action_name(),
         }
     }
+}
+
+fn diagnostics_export_requested(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        let value = arg.trim().trim_matches('"').to_ascii_lowercase();
+        matches!(
+            value.as_str(),
+            "--export-diagnostics" | "--diagnostics-export" | "--support-bundle"
+        ) || matches!(
+            value.as_str(),
+            "elon-node://diagnostics/export"
+                | "elon-node://maintenance/diagnostics/export"
+                | "elon-node://support-bundle"
+        )
+    })
 }
 
 fn exe_stem_contains(needle: &str) -> bool {
@@ -133,4 +164,37 @@ fn exe_stem_contains(needle: &str) -> bool {
         })
         .map(|stem| stem.contains(needle))
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ClientCommand, UNINSTALL_NAME};
+
+    #[test]
+    fn client_command_accepts_productized_maintenance_aliases() {
+        assert!(matches!(
+            ClientCommand::from_args(&["--check-update".to_string()], false),
+            ClientCommand::Update
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["--export-diagnostics".to_string()], false),
+            ClientCommand::ExportDiagnostics
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["--support-bundle".to_string()], false),
+            ClientCommand::ExportDiagnostics
+        ));
+        assert!(matches!(
+            ClientCommand::from_args(&["elon-node://diagnostics/export".to_string()], false),
+            ClientCommand::ExportDiagnostics
+        ));
+    }
+
+    #[test]
+    fn uninstall_exe_name_still_routes_to_uninstall() {
+        assert!(matches!(
+            ClientCommand::from_args(&[UNINSTALL_NAME.to_string()], true),
+            ClientCommand::Uninstall
+        ));
+    }
 }

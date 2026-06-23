@@ -30,6 +30,24 @@
   cmd:
   "%LOCALAPPDATA%\ElonNode\一龙PC节点.exe" --uninstall
 
+维护与诊断：
+
+- 导出脱敏诊断包（会自动打开诊断文件所在位置）：
+
+  "%LOCALAPPDATA%\ElonNode\一龙PC节点.exe" --export-diagnostics
+
+- 打开运行日志：
+
+  "%LOCALAPPDATA%\ElonNode\一龙PC节点.exe" --open-logs
+
+- 打开启动器日志：
+
+  "%LOCALAPPDATA%\ElonNode\一龙PC节点.exe" --open-launcher-logs
+
+- 后台检查更新：
+
+  "%LOCALAPPDATA%\ElonNode\一龙PC节点.exe" --check-update
+
 目录说明：
 
 - 顶层只保留两个用户可识别入口：「一龙PC节点.exe」和「卸载一龙PC节点.exe」。

@@ -1138,6 +1138,17 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAgentMain.includes('/api/client-maintenance/diagnostics/export'), 'node agent should mount diagnostics export route');
   assert.ok(nodeAgentMain.includes('mod node_agent_task_lifecycle_pressure_tests;'), 'node agent should keep task lifecycle pressure tests wired');
 
+  const nodeClientLauncher = fs.readFileSync(path.join(repoRoot, 'server/src/node_client_launcher/mod.rs'), 'utf8');
+  assert.ok(nodeClientLauncher.includes('ExportDiagnostics'), 'Windows client launcher should expose a direct diagnostics export command');
+  assert.ok(nodeClientLauncher.includes('--export-diagnostics'), 'Windows client launcher should accept a diagnostics export flag');
+  assert.ok(nodeClientLauncher.includes('--check-update'), 'Windows client launcher should accept a user-facing update check alias');
+
+  const launcherReadme = fs.readFileSync(path.join(repoRoot, 'scripts/node-agent-launcher/README.txt'), 'utf8');
+  assert.ok(launcherReadme.includes('--export-diagnostics'), 'Windows client README should document diagnostics export from the single exe');
+  assert.ok(launcherReadme.includes('--open-logs'), 'Windows client README should document runtime log entry from the single exe');
+  assert.ok(launcherReadme.includes('--open-launcher-logs'), 'Windows client README should document launcher log entry from the single exe');
+  assert.ok(launcherReadme.includes('--check-update'), 'Windows client README should document update check from the single exe');
+
   const taskLifecyclePressureScript = fs.readFileSync(path.join(repoRoot, 'scripts/test-pc-task-lifecycle-pressure.ps1'), 'utf8');
   assert.ok(taskLifecyclePressureScript.includes('node_agent_task_lifecycle_pressure_tests'), 'PC task lifecycle pressure gate should run pressure tests');
   assert.ok(taskLifecyclePressureScript.includes('node_agent_task_journal'), 'PC task lifecycle pressure gate should cover task journal tests');
