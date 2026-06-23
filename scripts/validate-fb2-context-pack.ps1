@@ -16,6 +16,9 @@ param(
 
 $ErrorActionPreference = "Stop"
 $script:Failed = 0
+$CompactContextMatchLimit = 3
+$CompactContextDiscussionLimit = 6
+$CompactContextOrderLimit = 2
 
 function Write-CheckOk {
     param(
@@ -223,13 +226,13 @@ function New-Fb2ContextPackSampleRequest {
         New-Fb2ContextPackSampleScenario `
             -Id "today_matches_context_pack" `
             -Question $Hint `
-            -Path "/api/main-project/context/pack?group_id=$Group&topic_hint=$encodedHint&limit=10&discussion_limit=20" `
+            -Path "/api/main-project/context/pack?group_id=$Group&topic_hint=$encodedHint&limit=$CompactContextMatchLimit&discussion_limit=$CompactContextDiscussionLimit&order_limit=$CompactContextOrderLimit" `
             -Headers @{ "X-FB2-AI-CENTER-TOKEN" = "<service-token>" } `
             -ExpectedKinds @("match", "odds", "context_audit")
         New-Fb2ContextPackSampleScenario `
             -Id "my_ticket_context_pack" `
             -Question "帮我分析我的票" `
-            -Path "/api/main-project/context/pack?group_id=$Group&external_user_id=$effectiveUserId&topic_hint=$ticketHint&limit=10&order_limit=10" `
+            -Path "/api/main-project/context/pack?group_id=$Group&external_user_id=$effectiveUserId&topic_hint=$ticketHint&limit=$CompactContextMatchLimit&discussion_limit=$CompactContextDiscussionLimit&order_limit=$CompactContextOrderLimit" `
             -Headers @{
                 "X-FB2-AI-CENTER-TOKEN" = "<service-token>"
                 "X-FB2-AI-CONTEXT-USER-ID" = $effectiveUserId
@@ -238,7 +241,7 @@ function New-Fb2ContextPackSampleRequest {
         New-Fb2ContextPackSampleScenario `
             -Id "platform_order_context_pack" `
             -Question "平台今天订单风险怎么样" `
-            -Path "/api/main-project/context/pack?group_id=$Group&topic_hint=$platformHint&include_platform_orders=true&limit=10" `
+            -Path "/api/main-project/context/pack?group_id=$Group&topic_hint=$platformHint&include_platform_orders=true&limit=$CompactContextMatchLimit&discussion_limit=$CompactContextDiscussionLimit&order_limit=$CompactContextOrderLimit" `
             -Headers @{
                 "X-FB2-AI-CENTER-TOKEN" = "<service-token>"
                 "X-FB2-AI-CONTEXT-SCOPE" = "platform_order_summary"
@@ -247,7 +250,7 @@ function New-Fb2ContextPackSampleRequest {
         New-Fb2ContextPackSampleScenario `
             -Id "group_opinion_context_pack" `
             -Question "群里大家怎么看这场" `
-            -Path "/api/main-project/context/pack?group_id=$Group&topic_hint=$opinionHint&limit=10&discussion_limit=30" `
+            -Path "/api/main-project/context/pack?group_id=$Group&topic_hint=$opinionHint&limit=$CompactContextMatchLimit&discussion_limit=$CompactContextDiscussionLimit&order_limit=$CompactContextOrderLimit" `
             -Headers @{ "X-FB2-AI-CENTER-TOKEN" = "<service-token>" } `
             -ExpectedKinds @("group_message", "opinion_memory", "context_audit")
     )

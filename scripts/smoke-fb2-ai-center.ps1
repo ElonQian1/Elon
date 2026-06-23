@@ -85,6 +85,10 @@ if (-not $Fb2Password) {
 $MainBase = $MainBase.TrimEnd("/")
 $Fb2Base = $Fb2Base.TrimEnd("/")
 $amp = [char]38
+$CompactContextMatchLimit = 3
+$CompactContextDiscussionLimit = 6
+$CompactContextOrderLimit = 2
+$CompactOpinionSummaryLimit = 12
 $script:Failed = 0
 $script:Skipped = 0
 $script:Fb2ContractSmokeChecks = [System.Collections.Generic.List[object]]::new()
@@ -1359,7 +1363,7 @@ if (-not $Fb2Token) {
 
     try {
         $topic = Encode-QueryValue "今天比赛怎么看"
-        $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)topic_hint=$topic$($amp)limit=10$($amp)discussion_limit=20"
+        $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)topic_hint=$topic$($amp)limit=$CompactContextMatchLimit$($amp)discussion_limit=$CompactContextDiscussionLimit$($amp)order_limit=$CompactContextOrderLimit"
         $pack = Invoke-Json -Url $url -Headers $fb2Headers
         Assert-True ($pack.success -eq $true) "scenario: today matches context pack"
         Assert-True ([bool]$pack.data.context_audit_id) "scenario: today matches context audit" "$($pack.data.context_audit_id)"
@@ -1392,7 +1396,7 @@ if (-not $Fb2Token) {
 
     try {
         $query = Encode-QueryValue "群里大家怎么看这场"
-        $url = "$Fb2Base/api/main-project/context/group-opinion-summary?group_id=$GroupId$($amp)query=$query$($amp)limit=80"
+        $url = "$Fb2Base/api/main-project/context/group-opinion-summary?group_id=$GroupId$($amp)query=$query$($amp)limit=$CompactOpinionSummaryLimit"
         $opinions = Invoke-Json -Url $url -Headers $fb2Headers
         Assert-True ($opinions.success -eq $true) "scenario: group opinions summary"
         Assert-True ($null -ne $opinions.data.opinion_summary) "scenario: group opinions summary field"
@@ -1448,7 +1452,7 @@ if (-not $Fb2Token) {
         try {
             $topic = Encode-QueryValue "帮我分析我的票"
             $userHeaders = Fb2-Headers -UserId $ExternalUserId
-            $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)external_user_id=$ExternalUserId$($amp)topic_hint=$topic$($amp)limit=10$($amp)order_limit=10"
+            $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)external_user_id=$ExternalUserId$($amp)topic_hint=$topic$($amp)limit=$CompactContextMatchLimit$($amp)discussion_limit=$CompactContextDiscussionLimit$($amp)order_limit=$CompactContextOrderLimit"
             $orders = Invoke-Json -Url $url -Headers $userHeaders
             Assert-True ($orders.success -eq $true) "scenario: my ticket context pack"
             Assert-True ([bool]$orders.data.context_audit_id) "scenario: my ticket context audit" "$($orders.data.context_audit_id)"
@@ -1502,7 +1506,7 @@ if (-not $Fb2Token) {
             $permissionSince = (Get-Date).ToUniversalTime().AddSeconds(-5).ToString("o")
             try {
                 $topic = Encode-QueryValue "帮我分析我的票"
-                $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)external_user_id=$ExternalUserId$($amp)topic_hint=$topic$($amp)limit=3$($amp)order_limit=1"
+                $url = "$Fb2Base/api/main-project/context/pack?group_id=$GroupId$($amp)external_user_id=$ExternalUserId$($amp)topic_hint=$topic$($amp)limit=$CompactContextMatchLimit$($amp)discussion_limit=$CompactContextDiscussionLimit$($amp)order_limit=1"
                 $missingUserHeader = Invoke-HttpStatus -Url $url -Headers $fb2Headers
                 Assert-StatusCode $missingUserHeader 403 "permission: context pack requires current user header"
 

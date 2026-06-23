@@ -2,6 +2,9 @@
 
 use serde_json::{json, Value};
 
+use crate::external_app_context_config::{
+    DEFAULT_DISCUSSION_LIMIT, DEFAULT_MATCH_LIMIT, DEFAULT_ORDER_LIMIT,
+};
 use crate::external_app_usage_policy::default_usage_policy;
 
 pub(crate) fn public_context_pack_example(app_id: &str) -> Option<Value> {
@@ -13,9 +16,9 @@ pub(crate) fn public_context_pack_example(app_id: &str) -> Option<Value> {
                 "group_id": "official",
                 "external_user_id": "fb2-user-id",
                 "topic_hint": "总结预测今天的比赛",
-                "limit": 30,
-                "discussion_limit": 80,
-                "order_limit": 20,
+                "limit": DEFAULT_MATCH_LIMIT,
+                "discussion_limit": DEFAULT_DISCUSSION_LIMIT,
+                "order_limit": DEFAULT_ORDER_LIMIT,
                 "include_platform_orders": false
             },
             "response_shape": {

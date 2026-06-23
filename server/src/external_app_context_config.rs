@@ -6,9 +6,9 @@ pub(crate) const FB2_CONTEXT_USER_ID_HEADER: &str = "X-FB2-AI-CONTEXT-USER-ID";
 pub(crate) const FB2_CONTEXT_SCOPE_HEADER: &str = "X-FB2-AI-CONTEXT-SCOPE";
 pub(crate) const FB2_PLATFORM_ORDER_SUMMARY_SCOPE: &str = "platform_order_summary";
 
-const DEFAULT_MATCH_LIMIT: u32 = 30;
-const DEFAULT_DISCUSSION_LIMIT: u32 = 80;
-const DEFAULT_ORDER_LIMIT: u32 = 20;
+pub(crate) const DEFAULT_MATCH_LIMIT: u32 = 3;
+pub(crate) const DEFAULT_DISCUSSION_LIMIT: u32 = 6;
+pub(crate) const DEFAULT_ORDER_LIMIT: u32 = 2;
 const DEFAULT_TIMEOUT_SECS: u64 = 6;
 const DEFAULT_TOOL_EXECUTION_TIMEOUT_SECS: u64 = 6;
 
@@ -240,6 +240,13 @@ mod tests {
     fn env_flag_defaults_when_missing() {
         assert!(env_flag("__ELON_TEST_MISSING_FLAG__", true));
         assert!(!env_flag("__ELON_TEST_MISSING_FLAG__", false));
+    }
+
+    #[test]
+    fn defaults_use_compact_chat_context_budget() {
+        assert_eq!(DEFAULT_MATCH_LIMIT, 3);
+        assert_eq!(DEFAULT_DISCUSSION_LIMIT, 6);
+        assert_eq!(DEFAULT_ORDER_LIMIT, 2);
     }
 
     #[test]

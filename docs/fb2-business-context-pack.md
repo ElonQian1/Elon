@@ -68,14 +68,16 @@ X-FB2-AI-CENTER-TOKEN: <shared-secret>
 group_id=official
 external_user_id=<fb2-user-id-if-linked>
 topic_hint=<user-question-or-summary-topic>
-limit=30
-discussion_limit=80
-order_limit=20
+limit=3
+discussion_limit=6
+order_limit=2
 lottery_type=JingCai|BeiDan
 include_platform_orders=true|false
 ```
 
 `include_platform_orders` 默认不开启，避免普通聊天无意拉取平台级经营数据。
+
+默认 `limit/discussion_limit/order_limit` 是聊天首轮紧凑预算，目标是让 Context Pack 保持在可直接进入 prompt 的 12k 字符线附近；用户追问某场比赛、某张票或群观点细节时，再由主项目通过 tool manifest 执行细粒度工具补数据。
 
 fb2 可读取主项目侧推荐契约：
 

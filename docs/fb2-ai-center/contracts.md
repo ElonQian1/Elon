@@ -182,9 +182,9 @@ X-FB2-AI-CONTEXT-SCOPE: platform_order_summary  # only when include_platform_ord
 group_id=official
 external_user_id=<fb2-user-id-if-linked>
 topic_hint=<user-question-or-summary-topic>
-limit=30
-discussion_limit=80
-order_limit=20
+limit=3
+discussion_limit=6
+order_limit=2
 lottery_type=JingCai|BeiDan
 include_platform_orders=false
 ```

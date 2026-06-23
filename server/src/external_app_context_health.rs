@@ -2,6 +2,10 @@
 
 use serde_json::{json, Value};
 
+use crate::external_app_context_config::{
+    DEFAULT_DISCUSSION_LIMIT, DEFAULT_MATCH_LIMIT, DEFAULT_ORDER_LIMIT,
+};
+
 pub(crate) fn public_context_health(app_id: &str) -> Value {
     match app_id {
         "fb2" => fb2_context_health(),
@@ -57,9 +61,9 @@ fn fb2_context_health() -> Value {
             "platform_order_context_enabled": env_flag("ELON_EXTERNAL_APP_FB2_PLATFORM_ORDER_CONTEXT", false),
             "max_context_chars": max_chars,
             "timeout_secs": env_u64("ELON_EXTERNAL_APP_FB2_CONTEXT_TIMEOUT_SECS", 6, 2, 30),
-            "match_limit": env_u32("ELON_EXTERNAL_APP_FB2_MATCH_CONTEXT_LIMIT", 30, 1, 100),
-            "discussion_limit": env_u32("ELON_EXTERNAL_APP_FB2_DISCUSSION_CONTEXT_LIMIT", 80, 1, 200),
-            "order_limit": env_u32("ELON_EXTERNAL_APP_FB2_ORDER_CONTEXT_LIMIT", 20, 1, 100)
+            "match_limit": env_u32("ELON_EXTERNAL_APP_FB2_MATCH_CONTEXT_LIMIT", DEFAULT_MATCH_LIMIT, 1, 100),
+            "discussion_limit": env_u32("ELON_EXTERNAL_APP_FB2_DISCUSSION_CONTEXT_LIMIT", DEFAULT_DISCUSSION_LIMIT, 1, 200),
+            "order_limit": env_u32("ELON_EXTERNAL_APP_FB2_ORDER_CONTEXT_LIMIT", DEFAULT_ORDER_LIMIT, 1, 100)
         },
         "warnings": warnings,
         "recommended_actions": recommended_actions,
