@@ -623,6 +623,12 @@ function Invoke-Fb2StatusSelfTest {
                 )
                 domain_context_index_retrieval_evidence_schema = "fb2.retrieval_evidence_item.v1"
                 domain_context_index_retrieval_evidence_fields = @("evidence_id", "source_id", "source_kind", "section_id", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
+                context_query_intent_schema = "fb2.context_query_intent.v1"
+                context_query_intent_complete = $true
+                context_query_intent_scenario_count = 7
+                context_query_intent_scenario_ids = @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")
+                context_query_intent_entrypoint_ids = @("group_mention_at_el", "selected_message_ai_reply", "group_summary_post", "chat_bootstrap_ai_reply")
+                context_query_intent_required_fields = @("query_intent_id", "entrypoint", "scenario_id", "group_id", "topic_hint", "intent_lanes", "requested_indexes", "permission_scope", "source_request", "output_limits")
                 context_pack_template_schema = "fb2.context_pack_template.v1"
                 context_pack_template_wrapper = "fb2_context_pack"
                 context_pack_template_sections = @("usage_boundary", "match_facts", "user_order_slice", "platform_order_summary", "group_opinion_slice", "retrieval_evidence", "quality_feedback")
@@ -836,6 +842,12 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.latest_public_contract_status.retrieval_evidence_item_shape_ready) { $failed++ }
         if ($snapshot.latest_public_contract_status.context_pack_template_retrieval_evidence_schema -ne "fb2.retrieval_evidence_item.v1") { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.context_pack_template_retrieval_evidence_fields) -contains "citation_source_id")) { $failed++ }
+        if (-not [bool]$snapshot.latest_public_contract_status.context_query_intent_contract_ready) { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_query_intent_schema -ne "fb2.context_query_intent.v1") { $failed++ }
+        if ($snapshot.latest_public_contract_status.context_query_intent_scenario_count -lt 7) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.context_query_intent_scenario_ids) -contains "my_ticket_analysis")) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.context_query_intent_entrypoint_ids) -contains "selected_message_ai_reply")) { $failed++ }
+        if (-not (@($snapshot.latest_public_contract_status.context_query_intent_required_fields) -contains "topic_hint")) { $failed++ }
         if ($snapshot.latest_public_contract_status.group_chat_test_method -ne "direct_api_read") { $failed++ }
         if ([bool]$snapshot.latest_public_contract_status.screenshots_accepted) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.required_group_message_fields) -contains "text_sha256")) { $failed++ }
@@ -867,6 +879,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "domain_data_blueprint_fixed")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "domain_context_index_contract")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "retrieval_evidence_item_contract")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.completed) -contains "context_query_intent_contract")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.completed) -contains "main_project_contract_smoke")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh")) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.missing) -contains "voice_final_evidence")) { $failed++ }
@@ -878,9 +891,11 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.visible_answer_policy_complete) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.domain_context_index_contract_complete) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.retrieval_evidence_item_shape_ready) { $failed++ }
+        if (-not [bool]$snapshot.goal_gap_audit.current_flags.context_query_intent_contract_ready) { $failed++ }
         if (-not [bool]$snapshot.goal_gap_audit.current_flags.main_project_contract_smoke_complete) { $failed++ }
         if ($snapshot.goal_gap_audit.evidence_refs.domain_context_index_count -ne 8) { $failed++ }
         if (-not (@($snapshot.goal_gap_audit.evidence_refs.domain_context_index_ids) -contains "odds_snapshot_index")) { $failed++ }
+        if (-not (@($snapshot.goal_gap_audit.evidence_refs.context_query_intent_required_fields) -contains "topic_hint")) { $failed++ }
         if ($snapshot.goal_gap_audit.evidence_refs.contract_smoke_check_count -ne 12) { $failed++ }
         if ([string]$snapshot.goal_gap_audit.evidence_refs.contract_smoke_live_data_status -ne "skipped_missing_FB2_AI_CENTER_TOKEN") { $failed++ }
         if ($snapshot.live_preflight_request.schema -ne "fb2.main_project.live_preflight_request.v1") { $failed++ }

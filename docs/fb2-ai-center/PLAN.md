@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-24 04:20 当前重点从“fb2 应返回什么证据”继续补到“主项目应如何请求这些证据”：`GET /api/external/apps/fb2/context-contract` 现在暴露 `context_query_intent_contract schema=fb2.context_query_intent.v1`。fb2 子会话后续实现 `/context/pack` 时，应把入口、场景、lane、索引、权限 scope 和输出预算作为机器字段处理，而不是只靠自然语言 prompt。ASR/TTS 继续暂停；下一 checkpoint 优先按 Explorer 建议收紧 `protected_live_preflight_satisfied` 与历史 data-only 证据口径。
 - 2026-06-24 03:45 当前重点继续把 fb2 “长期快速检索”从索引蓝图推进到可审计证据形态：主项目公开契约已固定 `fb2.retrieval_evidence_item.v1`，要求每条被投影进 Context Pack 的比赛、赔率、本人订单、平台匿名摘要或群观点都有 `source_id/source_kind/lane_id/index_id/reason/freshness/permission_scope/citation_source_id`。fb2 子会话后续应按这个 shape 生成 `retrieval_evidence`，主项目只消费这些可引用投影，不复制 fb2 原始索引、数据库或 embedding。ASR/TTS 继续暂停，非语音回归优先保持 public contract、smoke、goal audit 全绿。
 - 2026-06-24 03:15 当前重点继续收紧“AI 回答必须有来源引用”的质量闭环：generated-answer feedback 现在区分两类来源问题，回答没有显式 source id 时写回 `missing_context=true` 且 `answer_source_validation.status=no_explicit_source_ids`，回答写出未注册来源时写回 `wrong_context=true` 且 `status=unmatched`。后续 fb2 `/context/quality-summary` 可以分别统计缺来源和编造来源；真实群聊批次仍要求当前窗口 `quality_missing_context_count=0`、`quality_wrong_context_count=0`、`quality_unmatched_cited_sources=0`。ASR/TTS 仍暂停，继续只做非语音回归和发布验证。
 - 2026-06-24 02:56 当前重点继续收紧“AI 回答不得编造群友观点/来源”的运行时闭环：生成后来源校验已能识别 `msg-*`、`message-*`、`source-message-*`、`opinion-memory-*` 等群聊/观点来源 token。后续若模型在 fb2 群聊回答中写出未在 Context Pack、选中消息额外来源、当前 `context_audit_id` 或 grounded/weak 工具结果中的群消息/观点来源，feedback 会进入 `wrong_context=true`，供 fb2 quality summary 观察。ASR/TTS 仍暂停，下一步保持非语音回归绿色并在恢复语音前不要重开 voice scope。

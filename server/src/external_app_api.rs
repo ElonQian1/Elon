@@ -24,6 +24,7 @@ use crate::{
     },
     external_app_context_projection_layer::public_context_projection_layer_guidance,
     external_app_context_quality::public_context_quality_guidance,
+    external_app_context_query_intent::public_context_query_intent_guidance,
     external_app_context_readiness::public_context_readiness_guidance,
     external_app_context_tool_execution::public_tool_execution_guidance,
     external_app_context_tool_result_contract::public_tool_result_envelope_guidance,
@@ -138,6 +139,12 @@ pub async fn get_external_app_context_contract(
             "schema": "external_app.domain_context_index.v1",
             "complete": false,
             "indexes": []
+        })),
+        "context_query_intent_contract": public_context_query_intent_guidance(app.id).unwrap_or_else(|| json!({
+            "app_id": app.id,
+            "schema": "external_app.context_query_intent.v1",
+            "complete": false,
+            "scenario_intents": []
         })),
         "group_chat_evidence_contract": public_group_chat_evidence_guidance(app.id).unwrap_or_else(|| json!({
             "app_id": app.id,

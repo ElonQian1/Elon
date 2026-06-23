@@ -262,6 +262,10 @@ function New-Fb2GoalAuditReport {
     $domainIndexMissing = @((Get-Fb2GoalAuditProperty $public "missing" @()))
     $retrievalEvidenceReady = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $public "retrieval_evidence_item_shape_ready")
     $retrievalEvidenceFields = @((Get-Fb2GoalAuditProperty $public "context_pack_template_retrieval_evidence_fields" @()))
+    $contextQueryIntentReady = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $public "context_query_intent_contract_ready")
+    $contextQueryIntentSchema = [string](Get-Fb2GoalAuditProperty $public "context_query_intent_schema")
+    $contextQueryIntentScenarioIds = @((Get-Fb2GoalAuditProperty $public "context_query_intent_scenario_ids" @()))
+    $contextQueryIntentRequiredFields = @((Get-Fb2GoalAuditProperty $public "context_query_intent_required_fields" @()))
     $requiredDomainIndexes = @(
         "match_index",
         "odds_snapshot_index",
@@ -376,6 +380,13 @@ function New-Fb2GoalAuditReport {
         -Complete $retrievalEvidenceReady `
         -Evidence "ready=$retrievalEvidenceReady fields=$(@($retrievalEvidenceFields) -join ',')" `
         -Missing $(if ($retrievalEvidenceReady) { "" } else { "retrieval_evidence_item_shape" })
+
+    $items += New-Fb2GoalAuditRequirement `
+        -Id "context_query_intent_contract" `
+        -Title "主项目向 fb2 请求 Context Pack 时有稳定 query intent，能表达入口、场景、lane、索引和权限 scope" `
+        -Complete $contextQueryIntentReady `
+        -Evidence "ready=$contextQueryIntentReady schema=$contextQueryIntentSchema scenarios=$(@($contextQueryIntentScenarioIds) -join ',') fields=$(@($contextQueryIntentRequiredFields) -join ',')" `
+        -Missing $(if ($contextQueryIntentReady) { "" } else { "context_query_intent_contract" })
 
     $items += New-Fb2GoalAuditScenarioRequirement -UserScenarioAudit $scenarioAudit -ScenarioId "today_matches_analysis" -Title "用户问今天比赛怎么看时可读取比赛事实和赔率"
     $items += New-Fb2GoalAuditScenarioRequirement -UserScenarioAudit $scenarioAudit -ScenarioId "my_ticket_analysis" -Title "用户问帮我分析我的票时只读取本人订单/票据"
@@ -554,6 +565,10 @@ function Invoke-Fb2GoalAuditSelfTest {
             )
             retrieval_evidence_item_shape_ready = $true
             context_pack_template_retrieval_evidence_fields = @("evidence_id", "source_id", "source_kind", "section_id", "lane_id", "index_id", "reason", "freshness", "permission_scope", "citation_source_id")
+            context_query_intent_contract_ready = $true
+            context_query_intent_schema = "fb2.context_query_intent.v1"
+            context_query_intent_scenario_ids = @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")
+            context_query_intent_required_fields = @("query_intent_id", "entrypoint", "scenario_id", "group_id", "topic_hint", "intent_lanes", "requested_indexes", "permission_scope", "source_request", "output_limits")
             answer_source_validation_ready = $true
             answer_source_validation_schema = "external_app.answer_source_validation.v1"
             answer_source_validation_rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
@@ -632,6 +647,7 @@ function Invoke-Fb2GoalAuditSelfTest {
     if (-not (Test-Fb2GoalAuditTextPresent (Get-Fb2GoalAuditProperty $report.evidence_summary "contract_smoke_summary"))) { $failed++ }
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "domain_context_index_contract")) { $failed++ }
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "retrieval_evidence_item_contract")) { $failed++ }
+    if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "context_query_intent_contract")) { $failed++ }
 
     $badScenario = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $badScenario.latest_user_scenario_audit.scenarios[1].complete = $false
@@ -650,6 +666,10 @@ function Invoke-Fb2GoalAuditSelfTest {
     $badRetrievalEvidenceReport = New-Fb2GoalAuditReport -Status $badRetrievalEvidence -SourcePath "selftest-bad-retrieval-evidence.json"
     if ([bool]$badRetrievalEvidenceReport.data_goal_complete) { $failed++ }
     if (-not (@($badRetrievalEvidenceReport.missing_non_voice_requirements) -contains "retrieval_evidence_item_contract")) { $failed++ }
+    $badQueryIntent = $status | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+    $badQueryIntent.latest_public_contract_status.context_query_intent_contract_ready = $false
+    $badQueryIntentReport = New-Fb2GoalAuditReport -Status $badQueryIntent -SourcePath "selftest-bad-query-intent.json"
+    if (-not (@($badQueryIntentReport.missing_non_voice_requirements) -contains "context_query_intent_contract")) { $failed++ }
 
     $badContractSmoke = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $badContractSmoke.latest_contract_smoke_summary.gates.chat_bootstrap_ready = $false

@@ -102,6 +102,11 @@ function Get-Fb2GoalGapAuditState {
     $answerSourceValidationRule = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $PublicContractStatus "answer_source_validation_rule")
     $retrievalEvidenceItemShapeReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $PublicContractStatus "retrieval_evidence_item_shape_ready")
     $retrievalEvidenceItemFields = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "context_pack_template_retrieval_evidence_fields" @()))
+    $contextQueryIntentReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $PublicContractStatus "context_query_intent_contract_ready")
+    $contextQueryIntentSchema = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $PublicContractStatus "context_query_intent_schema")
+    $contextQueryIntentScenarioIds = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "context_query_intent_scenario_ids" @()))
+    $contextQueryIntentEntrypointIds = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "context_query_intent_entrypoint_ids" @()))
+    $contextQueryIntentRequiredFields = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "context_query_intent_required_fields" @()))
     # 领域索引是 fb2 长期快速检索的公开契约；它只约束 fb2 内部索引和 Context Pack 投影，不让主项目复制业务数据。
     $domainContextIndexComplete = (
         (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $PublicContractStatus "complete")) `
@@ -136,6 +141,7 @@ function Get-Fb2GoalGapAuditState {
     if ($domainDataBlueprintComplete) { $completed += "domain_data_blueprint_fixed" } else { $missing += "domain_data_blueprint" }
     if ($domainContextIndexComplete) { $completed += "domain_context_index_contract" } else { $missing += "domain_context_index_contract" }
     if ($retrievalEvidenceItemShapeReady) { $completed += "retrieval_evidence_item_contract" } else { $missing += "retrieval_evidence_item_contract" }
+    if ($contextQueryIntentReady) { $completed += "context_query_intent_contract" } else { $missing += "context_query_intent_contract" }
     if ($answerSourceValidationReady) { $completed += "answer_source_validation_contract" } else { $missing += "answer_source_validation_contract" }
     if ($contractSmokeComplete) { $completed += "main_project_contract_smoke" } else { $missing += "main_project_contract_smoke" }
     if ($latestDataSuccess -and $feedbackComplete -and $dataDirectReadComplete -and $visibleAnswerPolicyComplete) {
@@ -204,6 +210,7 @@ function Get-Fb2GoalGapAuditState {
             answer_readiness_complete = $answerReadinessComplete
             domain_context_index_contract_complete = $domainContextIndexComplete
             retrieval_evidence_item_shape_ready = $retrievalEvidenceItemShapeReady
+            context_query_intent_contract_ready = $contextQueryIntentReady
             answer_source_validation_ready = $answerSourceValidationReady
             main_project_contract_smoke_complete = $contractSmokeComplete
             non_voice_ready = $nonVoiceReady
@@ -225,6 +232,10 @@ function Get-Fb2GoalGapAuditState {
             domain_context_index_count = $domainIndexCount
             domain_context_index_ids = @($domainIndexIds)
             retrieval_evidence_item_fields = @($retrievalEvidenceItemFields)
+            context_query_intent_schema = $contextQueryIntentSchema
+            context_query_intent_scenario_ids = @($contextQueryIntentScenarioIds)
+            context_query_intent_entrypoint_ids = @($contextQueryIntentEntrypointIds)
+            context_query_intent_required_fields = @($contextQueryIntentRequiredFields)
             answer_source_validation_schema = $answerSourceValidationSchema
             answer_source_validation_rule = $answerSourceValidationRule
             contract_smoke_summary_path = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "path")

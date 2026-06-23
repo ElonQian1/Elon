@@ -137,6 +137,13 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - `index_output_boundary.model_visible_output=retrieval_evidence_section_plus_citation_sources`，模型只看可引用摘要和 source id，不看原始索引或全量表。
 - `retrieval_evidence_output_shape schema=fb2.retrieval_evidence_item.v1` 要求索引命中的最终可见输出必须落到同一个 item shape。索引可以在 fb2 内部用缓存、BM25、向量或规则检索，但主项目只接收 `reason/freshness/permission_scope/citation_source_id` 这些可审计投影字段。
 - `required_query_inputs` 固定 `group_id`、`topic_hint`、用户订单场景的 `external_user_id`、长按消息场景的 `selected_message_id`、平台汇总场景的 scope。
+
+`GET /api/external/apps/fb2/context-contract` 还会返回 `context_query_intent_contract schema=fb2.context_query_intent.v1`。它是主项目请求 fb2 Context Pack 的输入契约，不是输出摘要：
+
+- `request_shape.required_fields` 固定 `query_intent_id`、`entrypoint`、`scenario_id`、`group_id`、`topic_hint`、`intent_lanes`、`requested_indexes`、`permission_scope`、`source_request`、`output_limits`。
+- `entrypoints` 固定 `group_mention_at_el`、`selected_message_ai_reply`、`group_summary_post`、`chat_bootstrap_ai_reply`。
+- `scenario_intents` 把 7 类用户场景映射到 lane/index/权限 scope。例如“帮我分析我的票”必须走 `current_user_tickets`、`current_user_ticket_index` 和 `current_user_only`；“平台今天订单风险”必须走 `platform_order_summary`、`platform_order_risk_index` 和匿名聚合 scope。
+- `routing_rules` 要求 `topic_hint` 是紧凑提示，不是群聊全文；权限头缺失或错配时必须拒绝并审计，不能静默扩大数据范围。
 - `required_metrics` 固定 `index_latency_ms`、`retrieved_source_count`、`source_counts`、`stale_source_count`、`permission_denied_count`、`budget_status`、`fallback_used`。
 - 禁止 `raw_embedding_dump`、`full_database_dump`、`uncited_index_hit`、其它用户订单明细和平台订单明细泄漏。
 

@@ -141,7 +141,7 @@ function Get-Fb2MatrixExpectedGroup {
     param([string]$Id)
 
     switch -Regex ($Id) {
-        "^(context_pack_contract|main_project_contract_smoke|domain_context_index_contract|retrieval_evidence_item_contract)$" { return "main_project_contract" }
+        "^(context_pack_contract|main_project_contract_smoke|domain_context_index_contract|retrieval_evidence_item_contract|context_query_intent_contract)$" { return "main_project_contract" }
         "^(today_matches_analysis|my_ticket_analysis|platform_order_risk|group_opinion_summary|selected_message_review|group_discussion_summary_post|source_reference_audit)$" { return "user_scenarios" }
         "^(permission_safety|feedback_quality_loop)$" { return "permission_and_quality" }
         "^direct_group_chat_read$" { return "group_chat_direct_read" }
@@ -178,6 +178,7 @@ function New-Fb2MatrixValidation {
         "main_project_contract_smoke",
         "domain_context_index_contract",
         "retrieval_evidence_item_contract",
+        "context_query_intent_contract",
         "today_matches_analysis",
         "my_ticket_analysis",
         "platform_order_risk",
@@ -342,6 +343,7 @@ function New-Fb2MatrixFixtureRefresh {
         "main_project_contract_smoke",
         "domain_context_index_contract",
         "retrieval_evidence_item_contract",
+        "context_query_intent_contract",
         "today_matches_analysis",
         "my_ticket_analysis",
         "platform_order_risk",
@@ -358,7 +360,7 @@ function New-Fb2MatrixFixtureRefresh {
     [pscustomobject]@{
         completion_matrix = [ordered]@{
             schema = "fb2.main_project.completion_matrix.v1"
-            totals = [ordered]@{ total = 15; complete = 14; deferred = 1; incomplete = 0 }
+            totals = [ordered]@{ total = 16; complete = 15; deferred = 1; incomplete = 0 }
             gates = [ordered]@{
                 data_goal_complete = $true
                 full_final_complete = $false
@@ -369,7 +371,7 @@ function New-Fb2MatrixFixtureRefresh {
                 next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
             }
             groups = [ordered]@{
-                main_project_contract = 4
+                main_project_contract = 5
                 user_scenarios = 7
                 permission_and_quality = 2
                 group_chat_direct_read = 1

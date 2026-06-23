@@ -413,7 +413,7 @@ function Get-Fb2RefreshRequirementGroup {
     param([string]$Id)
 
     switch -Regex ($Id) {
-        "^(context_pack_contract|main_project_contract_smoke|domain_context_index_contract|retrieval_evidence_item_contract)$" { return "main_project_contract" }
+        "^(context_pack_contract|main_project_contract_smoke|domain_context_index_contract|retrieval_evidence_item_contract|context_query_intent_contract)$" { return "main_project_contract" }
         "^(today_matches_analysis|my_ticket_analysis|platform_order_risk|group_opinion_summary|selected_message_review|group_discussion_summary_post|source_reference_audit)$" { return "user_scenarios" }
         "^(permission_safety|feedback_quality_loop)$" { return "permission_and_quality" }
         "^direct_group_chat_read$" { return "group_chat_direct_read" }

@@ -68,6 +68,7 @@ function Get-Fb2PublicContractChecks {
     $projection = $Contract.domain_context_projection_contract
     $projectionLayer = $Contract.context_projection_layer_contract
     $domainIndex = $Contract.domain_context_index_contract
+    $queryIntent = $Contract.context_query_intent_contract
     $template = $Contract.context_pack_template_contract
     $toolResultEnvelope = $Contract.tool_result_envelope_contract
     $group = $Contract.group_chat_evidence_contract
@@ -93,6 +94,11 @@ function Get-Fb2PublicContractChecks {
     $domainIndexInputs = @($domainIndex.required_query_inputs)
     $domainIndexMetrics = @($domainIndex.required_metrics)
     $domainIndexNotAllowed = @($domainIndex.index_output_boundary.not_allowed)
+    $queryIntentRequiredFields = @($queryIntent.request_shape.required_fields)
+    $queryIntentEntrypointIds = @($queryIntent.entrypoints | ForEach-Object { $_.id })
+    $queryIntentScenarioIds = @($queryIntent.scenario_intents | ForEach-Object { $_.scenario_id })
+    $queryIntentAcceptanceSignals = @($queryIntent.acceptance_signals)
+    $queryIntentPrivacyRules = @($queryIntent.privacy_rules)
     $groupFields = @($group.required_group_message_fields)
     $groupFlow = @($group.required_visible_flow_evidence)
     $toolIds = @($manifest.tool_ids)
@@ -173,6 +179,21 @@ function Get-Fb2PublicContractChecks {
         New-Fb2PublicContractCheck "domain_index_retrieval_evidence_shape_schema" ($domainIndex.retrieval_evidence_output_shape.schema -eq "fb2.retrieval_evidence_item.v1") ([string]$domainIndex.retrieval_evidence_output_shape.schema)
         New-Fb2PublicContractCheck "domain_index_retrieval_evidence_index_id" (Test-Fb2ContractContains $domainIndexRetrievalFields "index_id") ($domainIndexRetrievalFields -join ",")
         New-Fb2PublicContractCheck "domain_index_retrieval_evidence_citation_source_id" (Test-Fb2ContractContains $domainIndexRetrievalFields "citation_source_id") ($domainIndexRetrievalFields -join ",")
+        New-Fb2PublicContractCheck "context_query_intent_schema" ($queryIntent.schema -eq "fb2.context_query_intent.v1") ([string]$queryIntent.schema)
+        New-Fb2PublicContractCheck "context_query_intent_complete" ([bool]$queryIntent.complete) "complete=$($queryIntent.complete)"
+        New-Fb2PublicContractCheck "context_query_intent_no_copy" ($queryIntent.stores_fb2_business_data_in_main_project -eq $false) "stores=$($queryIntent.stores_fb2_business_data_in_main_project)"
+        New-Fb2PublicContractCheck "context_query_intent_scenario_count" ([int]$queryIntent.scenario_count -eq 7) "scenario_count=$($queryIntent.scenario_count)"
+        foreach ($field in @("query_intent_id", "entrypoint", "scenario_id", "group_id", "topic_hint", "intent_lanes", "requested_indexes", "permission_scope", "source_request", "output_limits")) {
+            New-Fb2PublicContractCheck "context_query_intent_field_$field" (Test-Fb2ContractContains $queryIntentRequiredFields $field) ($queryIntentRequiredFields -join ",")
+        }
+        foreach ($entrypointId in @("group_mention_at_el", "selected_message_ai_reply", "group_summary_post", "chat_bootstrap_ai_reply")) {
+            New-Fb2PublicContractCheck "context_query_intent_entrypoint_$entrypointId" (Test-Fb2ContractContains $queryIntentEntrypointIds $entrypointId) ($queryIntentEntrypointIds -join ",")
+        }
+        foreach ($scenarioId in @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")) {
+            New-Fb2PublicContractCheck "context_query_intent_scenario_$scenarioId" (Test-Fb2ContractContains $queryIntentScenarioIds $scenarioId) ($queryIntentScenarioIds -join ",")
+        }
+        New-Fb2PublicContractCheck "context_query_intent_retrieval_evidence_link" (Test-Fb2ContractContains $queryIntentAcceptanceSignals "retrieval_evidence_items_reference_query_intent") ($queryIntentAcceptanceSignals -join ",")
+        New-Fb2PublicContractCheck "context_query_intent_privacy_hash_only" (($queryIntentPrivacyRules -join "`n") -match "text_sha256" -and ($queryIntentPrivacyRules -join "`n") -match "raw group message bodies") ($queryIntentPrivacyRules -join " | ")
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_schema" ($toolResultEnvelope.answer_source_validation.schema -eq "external_app.answer_source_validation.v1") ([string]$toolResultEnvelope.answer_source_validation.schema)
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_tool_sources" ([string]$toolResultEnvelope.answer_source_validation.rule -match "matched_tool_source_ids") ([string]$toolResultEnvelope.answer_source_validation.rule)
         New-Fb2PublicContractCheck "tool_result_answer_source_validation_missing_sources" ([string]$toolResultEnvelope.answer_source_validation.rule -match "has_missing_explicit_sources" -and [string]$toolResultEnvelope.answer_source_validation.rule -match "no_explicit_source_ids") ([string]$toolResultEnvelope.answer_source_validation.rule)
@@ -246,6 +267,12 @@ function New-Fb2PublicContractStatus {
             domain_context_index_ids = @($Contract.domain_context_index_contract.indexes | ForEach-Object { $_.id })
             domain_context_index_retrieval_evidence_schema = [string]$Contract.domain_context_index_contract.retrieval_evidence_output_shape.schema
             domain_context_index_retrieval_evidence_fields = @($Contract.domain_context_index_contract.retrieval_evidence_output_shape.required_fields)
+            context_query_intent_schema = [string]$Contract.context_query_intent_contract.schema
+            context_query_intent_complete = [bool]$Contract.context_query_intent_contract.complete
+            context_query_intent_scenario_count = [int]$Contract.context_query_intent_contract.scenario_count
+            context_query_intent_scenario_ids = @($Contract.context_query_intent_contract.scenario_intents | ForEach-Object { $_.scenario_id })
+            context_query_intent_entrypoint_ids = @($Contract.context_query_intent_contract.entrypoints | ForEach-Object { $_.id })
+            context_query_intent_required_fields = @($Contract.context_query_intent_contract.request_shape.required_fields)
             context_pack_template_schema = [string]$Contract.context_pack_template_contract.schema
             context_pack_template_wrapper = [string]$Contract.context_pack_template_contract.body.wrapper
             context_pack_template_sections = @($Contract.context_pack_template_contract.required_section_order)
@@ -415,6 +442,46 @@ function Invoke-Fb2PublicContractSelfTest {
                 required_fields = $retrievalEvidenceFields
             }
         }
+        context_query_intent_contract = [pscustomobject]@{
+            schema = "fb2.context_query_intent.v1"
+            complete = $true
+            stores_fb2_business_data_in_main_project = $false
+            scenario_count = 7
+            request_shape = [pscustomobject]@{
+                required_fields = @(
+                    "query_intent_id",
+                    "entrypoint",
+                    "scenario_id",
+                    "group_id",
+                    "topic_hint",
+                    "intent_lanes",
+                    "requested_indexes",
+                    "permission_scope",
+                    "source_request",
+                    "output_limits"
+                )
+            }
+            entrypoints = @(
+                [pscustomobject]@{ id = "group_mention_at_el" },
+                [pscustomobject]@{ id = "selected_message_ai_reply" },
+                [pscustomobject]@{ id = "group_summary_post" },
+                [pscustomobject]@{ id = "chat_bootstrap_ai_reply" }
+            )
+            scenario_intents = @(
+                [pscustomobject]@{ scenario_id = "today_matches_analysis" },
+                [pscustomobject]@{ scenario_id = "my_ticket_analysis" },
+                [pscustomobject]@{ scenario_id = "platform_order_risk" },
+                [pscustomobject]@{ scenario_id = "group_opinion_summary" },
+                [pscustomobject]@{ scenario_id = "selected_message_review" },
+                [pscustomobject]@{ scenario_id = "group_discussion_summary_post" },
+                [pscustomobject]@{ scenario_id = "source_reference_audit" }
+            )
+            acceptance_signals = @("retrieval_evidence_items_reference_query_intent")
+            privacy_rules = @(
+                "Do not copy fb2 raw databases, embeddings, full order rows, raw group message bodies, real tokens, or passwords into the main project.",
+                "Audit artifacts may keep ids, source ids, text_len, text_sha256, counts, freshness and permission scope."
+            )
+        }
         group_chat_evidence_contract = [pscustomobject]@{
             schema = "fb2.main_project.group_chat_evidence.v1"
             group_chat_test_method = "direct_api_read"
@@ -502,6 +569,16 @@ function Invoke-Fb2PublicContractSelfTest {
         -Health "OK" `
         -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
         -Contract $badRetrievalEvidenceContract
+    $badQueryIntentContract = $syntheticContract | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+    $badQueryIntentContract.context_query_intent_contract.scenario_intents = @(
+        $badQueryIntentContract.context_query_intent_contract.scenario_intents |
+            Where-Object { $_.scenario_id -ne "my_ticket_analysis" }
+    )
+    $badQueryIntentStatus = New-Fb2PublicContractStatus `
+        -Base "http://example.invalid" `
+        -Health "OK" `
+        -Version ([pscustomobject]@{ versionName = "selftest"; gitSha = "abc123" }) `
+        -Contract $badQueryIntentContract
 
     $failed = 0
     if (-not [bool]$status.success) {
@@ -545,6 +622,12 @@ function Invoke-Fb2PublicContractSelfTest {
         $failed++
     } else {
         Write-Output "OK`tpublic contract selftest rejects incomplete retrieval evidence shape"
+    }
+    if ([bool]$badQueryIntentStatus.success) {
+        Write-Output "FAIL`tpublic contract selftest rejects incomplete query intent contract"
+        $failed++
+    } else {
+        Write-Output "OK`tpublic contract selftest rejects incomplete query intent contract"
     }
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"

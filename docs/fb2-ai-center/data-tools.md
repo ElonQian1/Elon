@@ -66,6 +66,34 @@ fb2 可以在内部使用数据库索引、缓存、向量库、MCP 或领域召
 
 如果主项目回退调用 `/api/main-project/context/today-matches`，fb2 也应读取 `group_id`、`topic_hint` 和 `lottery_type`，返回更贴近问题的轻量比赛上下文。
 
+主项目公开契约还固定了输入意图 `fb2.context_query_intent.v1`。fb2 不应只解析自然语言，而应优先读取这些字段：
+
+```json
+{
+  "query_intent_id": "qi_...",
+  "entrypoint": "group_mention_at_el | selected_message_ai_reply | group_summary_post | chat_bootstrap_ai_reply",
+  "scenario_id": "today_matches_analysis | my_ticket_analysis | platform_order_risk | group_opinion_summary | selected_message_review | group_discussion_summary_post | source_reference_audit",
+  "group_id": "ext_fb2_official",
+  "topic_hint": "帮我分析今天比赛和我的票",
+  "intent_lanes": ["match_facts_and_odds", "current_user_tickets"],
+  "requested_indexes": ["match_index", "odds_snapshot_index", "current_user_ticket_index"],
+  "permission_scope": "current_user_only",
+  "source_request": {
+    "external_user_id": "fb2-user-uuid",
+    "selected_message_id": null,
+    "include_platform_orders": false
+  },
+  "output_limits": {
+    "max_context_chars": 12000,
+    "max_sources_per_lane": 12,
+    "max_group_messages": 20,
+    "freshness_window_hours": 48
+  }
+}
+```
+
+这些字段用于选择 fb2 内部索引和权限裁剪；最终给模型看的仍是 `<fb2_context_pack>`、`citation_sources` 和 `retrieval_evidence`，不能把原始订单表、群聊正文或 embedding 直接交给主项目。
+
 这一阶段 AI 只使用一次性上下文，不自动调用 fb2 细分工具。
 
 ## 阶段 2：Declared Tools

@@ -116,6 +116,8 @@ fb2 子会话导出样本后，用 `pwsh -NoProfile -ExecutionPolicy Bypass -Fil
 
 `retrieval_evidence` 的行级结构由同一接口的 `fb2.retrieval_evidence_item.v1` 固定。fb2 返回给主项目的每条可见召回证据都要说明 `source_id/source_kind/lane_id/index_id/reason/freshness/permission_scope/citation_source_id`，用来证明 AI 回答引用的比赛、赔率、订单、平台摘要或群观点不是凭空生成，也没有越权读取。
 
+同一接口还会返回 `context_query_intent_contract schema=fb2.context_query_intent.v1`。它固定主项目请求 fb2 Context Pack 的输入意图：`query_intent_id`、`entrypoint`、`scenario_id`、`group_id/topic_hint`、`intent_lanes`、`requested_indexes`、`permission_scope`、`source_request` 和 `output_limits`。fb2 应按该契约选择比赛、赔率、本人订单、平台匿名摘要或群观点索引；缺该契约时，公开契约状态和终局矩阵都不能把长期数据接入判为完整。
+
 真实群聊直读口径也会通过主项目接口公开：`GET /api/external/apps/fb2/context-contract` 返回 `group_chat_evidence_contract`。它声明 `group_chat_test_method=direct_api_read`、`screenshots_accepted=false`，并要求 `message_id`、`text_len`、`text_sha256` 等字段；后续测试 fb2 对话优先用该契约和群聊 API，而不是截图。
 
 状态快照还会输出 `live_preflight_request schema=fb2.main_project.live_preflight_request.v1`。该字段不包含任何 secret，只说明当前是否已经具备“拿到 `FB2_AI_CENTER_TOKEN` 后立即刷新 live 权限/质量/feedback”的条件，并给出无写群 `-DataOnlyAcceptance -PreflightOnly` 命令、目标用户、目标群和验收门槛。它的 `evidence_policy` 固定为 `group_chat_test_method=direct_api_read`、`screenshots_accepted=false`，群聊验证必须有消息 ID、正文长度和正文 hash。当前如果 `ready_without_token=true` 且 `missing=FB2_AI_CENTER_TOKEN`，说明主项目侧下一步不是改格式，也不是看截图，而是补 token 跑 live preflight。

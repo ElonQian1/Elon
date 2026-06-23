@@ -98,6 +98,13 @@ function Get-Fb2PublicContractSummaryState {
             context_projection_layer_retrieval_evidence_fields = @()
             domain_context_index_retrieval_evidence_schema = ""
             domain_context_index_retrieval_evidence_fields = @()
+            context_query_intent_contract_ready = $false
+            context_query_intent_schema = ""
+            context_query_intent_complete = $false
+            context_query_intent_scenario_count = 0
+            context_query_intent_scenario_ids = @()
+            context_query_intent_entrypoint_ids = @()
+            context_query_intent_required_fields = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -139,6 +146,13 @@ function Get-Fb2PublicContractSummaryState {
             context_projection_layer_retrieval_evidence_fields = @()
             domain_context_index_retrieval_evidence_schema = ""
             domain_context_index_retrieval_evidence_fields = @()
+            context_query_intent_contract_ready = $false
+            context_query_intent_schema = ""
+            context_query_intent_complete = $false
+            context_query_intent_scenario_count = 0
+            context_query_intent_scenario_ids = @()
+            context_query_intent_entrypoint_ids = @()
+            context_query_intent_required_fields = @()
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
@@ -171,6 +185,12 @@ function Get-Fb2PublicContractSummaryState {
     $projectionLayerRetrievalFields = @((Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_retrieval_evidence_fields" @()))
     $domainIndexRetrievalSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "domain_context_index_retrieval_evidence_schema")
     $domainIndexRetrievalFields = @((Get-Fb2PublicContractSummaryProperty $summary "domain_context_index_retrieval_evidence_fields" @()))
+    $queryIntentSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_query_intent_schema")
+    $queryIntentComplete = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $summary "context_query_intent_complete")
+    $queryIntentScenarioCount = [int](Get-Fb2PublicContractSummaryProperty $summary "context_query_intent_scenario_count" 0)
+    $queryIntentScenarioIds = @((Get-Fb2PublicContractSummaryProperty $summary "context_query_intent_scenario_ids" @()))
+    $queryIntentEntrypointIds = @((Get-Fb2PublicContractSummaryProperty $summary "context_query_intent_entrypoint_ids" @()))
+    $queryIntentRequiredFields = @((Get-Fb2PublicContractSummaryProperty $summary "context_query_intent_required_fields" @()))
     $projectionLayerSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_schema")
     $projectionLayerComplete = Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_complete")
     $projectionLayerLaneCount = [int](Get-Fb2PublicContractSummaryProperty $summary "context_projection_layer_lane_count" 0)
@@ -224,6 +244,20 @@ function Get-Fb2PublicContractSummaryState {
         if (-not ($domainProjectionRetrievalFields -contains $field)) { $retrievalEvidenceShapeReady = $false }
         if (-not ($projectionLayerRetrievalFields -contains $field)) { $retrievalEvidenceShapeReady = $false }
         if (-not ($domainIndexRetrievalFields -contains $field)) { $retrievalEvidenceShapeReady = $false }
+    }
+    $queryIntentReady = (
+        $queryIntentSchema -eq "fb2.context_query_intent.v1" `
+            -and $queryIntentComplete `
+            -and $queryIntentScenarioCount -ge 7
+    )
+    foreach ($field in @("query_intent_id", "entrypoint", "scenario_id", "group_id", "topic_hint", "intent_lanes", "requested_indexes", "permission_scope", "source_request", "output_limits")) {
+        if (-not ($queryIntentRequiredFields -contains $field)) { $queryIntentReady = $false }
+    }
+    foreach ($entrypointId in @("group_mention_at_el", "selected_message_ai_reply", "group_summary_post", "chat_bootstrap_ai_reply")) {
+        if (-not ($queryIntentEntrypointIds -contains $entrypointId)) { $queryIntentReady = $false }
+    }
+    foreach ($scenarioId in @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")) {
+        if (-not ($queryIntentScenarioIds -contains $scenarioId)) { $queryIntentReady = $false }
     }
     $limitations = @((Get-Fb2PublicContractSummaryProperty $status "limitations" @()))
     $failedChecks = @((Get-Fb2PublicContractSummaryProperty $status "failed_checks" @()))
@@ -290,6 +324,7 @@ function Get-Fb2PublicContractSummaryState {
     if (-not $answerSourceToolSourcesCheck) { $missing += "answer_source_validation_tool_sources" }
     if (-not $answerSourceMissingSourcesCheck) { $missing += "answer_source_validation_missing_sources" }
     if (-not $retrievalEvidenceShapeReady) { $missing += "retrieval_evidence_item_shape" }
+    if (-not $queryIntentReady) { $missing += "context_query_intent_contract" }
     if (-not ($limitations -contains "does_not_verify_fb2_live_context_pack_or_orders")) {
         $missing += "public_contract_limitations_live_data_boundary"
     }
@@ -319,6 +354,13 @@ function Get-Fb2PublicContractSummaryState {
         context_projection_layer_retrieval_evidence_fields = @($projectionLayerRetrievalFields)
         domain_context_index_retrieval_evidence_schema = $domainIndexRetrievalSchema
         domain_context_index_retrieval_evidence_fields = @($domainIndexRetrievalFields)
+        context_query_intent_contract_ready = $queryIntentReady
+        context_query_intent_schema = $queryIntentSchema
+        context_query_intent_complete = $queryIntentComplete
+        context_query_intent_scenario_count = $queryIntentScenarioCount
+        context_query_intent_scenario_ids = @($queryIntentScenarioIds)
+        context_query_intent_entrypoint_ids = @($queryIntentEntrypointIds)
+        context_query_intent_required_fields = @($queryIntentRequiredFields)
         context_pack_template_schema = $templateSchema
         context_pack_template_wrapper = $templateWrapper
         context_pack_template_sections = @($templateSections)

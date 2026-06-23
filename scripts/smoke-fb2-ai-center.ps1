@@ -896,6 +896,7 @@ try {
     $projectionLayerContract = $contract.context_projection_layer_contract
     $domainDataBlueprint = $contract.domain_data_blueprint_contract
     $domainContextIndex = $contract.domain_context_index_contract
+    $contextQueryIntent = $contract.context_query_intent_contract
     $groupChatEvidenceContract = $contract.group_chat_evidence_contract
     $toolExecutionContract = $contract.tool_execution_contract
     $toolExecutionPlan = $toolExecutionContract.main_project_execution_result.plan
@@ -925,6 +926,9 @@ try {
     $domainContextIndexMetrics = @($domainContextIndex.required_metrics)
     $domainContextIndexNotAllowed = @($domainContextIndex.index_output_boundary.not_allowed)
     $domainContextIndexRetrievalFields = @($domainContextIndex.retrieval_evidence_output_shape.required_fields)
+    $queryIntentRequiredFields = @($contextQueryIntent.request_shape.required_fields)
+    $queryIntentEntrypointIds = @($contextQueryIntent.entrypoints | ForEach-Object { $_.id })
+    $queryIntentScenarioIds = @($contextQueryIntent.scenario_intents | ForEach-Object { $_.scenario_id })
     $groupChatEvidenceFields = @($groupChatEvidenceContract.required_group_message_fields)
     $groupChatVisibleEvidence = @($groupChatEvidenceContract.required_visible_flow_evidence)
     $toolResultEnvelopeContract = $contract.tool_result_envelope_contract
@@ -1119,6 +1123,22 @@ try {
     Assert-True ($domainContextIndex.retrieval_evidence_output_shape.schema -eq "fb2.retrieval_evidence_item.v1") "domain context index retrieval evidence shape" "$($domainContextIndex.retrieval_evidence_output_shape.schema)"
     Assert-ContainsValue $domainContextIndexRetrievalFields "index_id" "domain context index retrieval evidence field: index id"
     Assert-ContainsValue $domainContextIndexRetrievalFields "citation_source_id" "domain context index retrieval evidence field: citation source id"
+
+    Assert-True ($contextQueryIntent.schema -eq "fb2.context_query_intent.v1") "context query intent schema" "$($contextQueryIntent.schema)"
+    Assert-True ($contextQueryIntent.complete -eq $true) "context query intent complete" "complete=$($contextQueryIntent.complete)"
+    Assert-True ($contextQueryIntent.stores_fb2_business_data_in_main_project -eq $false) "context query intent no main-project data copy" "stores=$($contextQueryIntent.stores_fb2_business_data_in_main_project)"
+    Assert-True ([int]$contextQueryIntent.scenario_count -eq 7) "context query intent scenario count" "scenario_count=$($contextQueryIntent.scenario_count)"
+    foreach ($fieldName in @("query_intent_id", "entrypoint", "scenario_id", "group_id", "topic_hint", "intent_lanes", "requested_indexes", "permission_scope", "source_request", "output_limits")) {
+        Assert-ContainsValue $queryIntentRequiredFields $fieldName "context query intent required field: $fieldName"
+    }
+    foreach ($entrypointId in @("group_mention_at_el", "selected_message_ai_reply", "group_summary_post", "chat_bootstrap_ai_reply")) {
+        Assert-ContainsValue $queryIntentEntrypointIds $entrypointId "context query intent entrypoint: $entrypointId"
+    }
+    foreach ($scenarioId in @("today_matches_analysis", "my_ticket_analysis", "platform_order_risk", "group_opinion_summary", "selected_message_review", "group_discussion_summary_post", "source_reference_audit")) {
+        Assert-ContainsValue $queryIntentScenarioIds $scenarioId "context query intent scenario: $scenarioId"
+    }
+    Assert-ContainsValue @($contextQueryIntent.acceptance_signals) "retrieval_evidence_items_reference_query_intent" "context query intent acceptance: retrieval evidence linkage"
+    Assert-ContainsValue @($contextQueryIntent.privacy_rules) "Audit artifacts may keep ids, source ids, text_len, text_sha256, counts, freshness and permission scope." "context query intent privacy boundary"
 
     Assert-True ($groupChatEvidenceContract.schema -eq "fb2.main_project.group_chat_evidence.v1") "group chat evidence schema" "$($groupChatEvidenceContract.schema)"
     Assert-True ($groupChatEvidenceContract.group_chat_test_method -eq "direct_api_read") "group chat evidence direct read" "$($groupChatEvidenceContract.group_chat_test_method)"
