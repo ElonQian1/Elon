@@ -45,6 +45,56 @@ pub(crate) fn detect_manifest_project_identity(
     .or_else(|| identity_from_dotnet_solution_or_project(fallback_name, project_root))
 }
 
+pub(crate) fn detect_shallow_manifest_project_identity(
+    fallback_name: &str,
+    project_root: &Path,
+) -> Option<ManifestProjectIdentity> {
+    for module in [
+        "server", "backend", "api", "app", "cmd", "web", "frontend", "client", "android",
+    ] {
+        let module_root = project_root.join(module);
+        if !module_root.is_dir() {
+            continue;
+        }
+        if let Some(identity) = detect_module_manifest_project_identity(fallback_name, &module_root)
+        {
+            return Some(identity.with_source_prefix(module));
+        }
+    }
+    None
+}
+
+fn detect_module_manifest_project_identity(
+    fallback_name: &str,
+    module_root: &Path,
+) -> Option<ManifestProjectIdentity> {
+    identity_from_json_manifest(
+        fallback_name,
+        &module_root.join("package.json"),
+        &["displayName", "display_name", "name"],
+        &["description"],
+        "package.json",
+    )
+    .or_else(|| {
+        identity_from_toml_manifest(
+            fallback_name,
+            &module_root.join("Cargo.toml"),
+            "package",
+            "Cargo.toml",
+        )
+    })
+    .or_else(|| {
+        identity_from_toml_manifest(
+            fallback_name,
+            &module_root.join("pyproject.toml"),
+            "project",
+            "pyproject.toml",
+        )
+    })
+    .or_else(|| identity_from_go_mod(fallback_name, &module_root.join("go.mod")))
+    .or_else(|| detect_manifest_project_identity(fallback_name, module_root))
+}
+
 fn identity_from_tauri_config(
     fallback_name: &str,
     manifest_path: &Path,
@@ -84,6 +134,118 @@ fn read_json_manifest(path: &Path) -> Option<Value> {
     std::fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+}
+
+fn identity_from_toml_manifest(
+    fallback_name: &str,
+    manifest_path: &Path,
+    section: &str,
+    source: &str,
+) -> Option<ManifestProjectIdentity> {
+    if !manifest_path.is_file() {
+        return None;
+    }
+    identity_from_parts(
+        fallback_name,
+        toml_section_string(manifest_path, section, "name"),
+        toml_section_string(manifest_path, section, "description"),
+        source,
+    )
+}
+
+fn toml_section_string(path: &Path, section: &str, key: &str) -> Option<String> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let mut in_section = false;
+    for raw_line in text.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        if line.starts_with('[') && line.ends_with(']') {
+            in_section = line.trim_start_matches('[').trim_end_matches(']').trim() == section;
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        let Some((left, right)) = line.split_once('=') else {
+            continue;
+        };
+        if left.trim() == key {
+            return parse_toml_string(right.trim())
+                .and_then(|value| clean_project_text(&value, 240));
+        }
+    }
+    None
+}
+
+fn parse_toml_string(value: &str) -> Option<String> {
+    let value = value.trim();
+    if let Some(rest) = value.strip_prefix('"') {
+        let mut escaped = false;
+        let mut output = String::new();
+        for ch in rest.chars() {
+            if escaped {
+                output.push(ch);
+                escaped = false;
+                continue;
+            }
+            if ch == '\\' {
+                escaped = true;
+                continue;
+            }
+            if ch == '"' {
+                return Some(output);
+            }
+            output.push(ch);
+        }
+        return None;
+    }
+    if let Some(rest) = value.strip_prefix('\'') {
+        return rest.split_once('\'').map(|(text, _)| text.to_string());
+    }
+    None
+}
+
+fn identity_from_go_mod(fallback_name: &str, go_mod: &Path) -> Option<ManifestProjectIdentity> {
+    let module_path = go_module_path(go_mod)?;
+    let name = go_module_name(&module_path)?;
+    identity_from_parts(fallback_name, Some(name), None, "go.mod")
+}
+
+fn go_module_path(go_mod: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(go_mod).ok()?;
+    text.lines().find_map(|raw_line| {
+        let line = raw_line.trim();
+        if line.is_empty() || line.starts_with("//") {
+            return None;
+        }
+        line.strip_prefix("module ")
+            .map(str::trim)
+            .and_then(|value| clean_project_text(value, 240))
+    })
+}
+
+fn go_module_name(module_path: &str) -> Option<String> {
+    let mut parts = module_path
+        .trim()
+        .trim_end_matches('/')
+        .rsplit('/')
+        .filter(|part| !part.trim().is_empty());
+    let first = parts.next()?.trim();
+    let name = if is_go_major_version_suffix(first) {
+        parts.next().unwrap_or(first).trim()
+    } else {
+        first
+    };
+    clean_project_text(name.trim_end_matches(".git"), 120)
+}
+
+fn is_go_major_version_suffix(value: &str) -> bool {
+    let Some(rest) = value.strip_prefix('v') else {
+        return false;
+    };
+    rest.len() <= 3 && rest.chars().all(|ch| ch.is_ascii_digit())
 }
 
 fn identity_from_dotnet_solution_or_project(
@@ -231,6 +393,13 @@ fn identity_from_parts(
     })
 }
 
+impl ManifestProjectIdentity {
+    fn with_source_prefix(mut self, prefix: &str) -> Self {
+        self.source = format!("{prefix}/{}", self.source);
+        self
+    }
+}
+
 fn clean_project_text(value: &str, max_chars: usize) -> Option<String> {
     let value = value.trim();
     if value.is_empty() {
@@ -245,7 +414,7 @@ fn default_project_description(name: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::detect_manifest_project_identity;
+    use super::{detect_manifest_project_identity, detect_shallow_manifest_project_identity};
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -403,5 +572,65 @@ mod tests {
         assert_eq!(identity.name, "WorkerHost");
         assert_eq!(identity.description.as_deref(), Some("后台任务服务"));
         assert_eq!(identity.source, "Worker.Host.csproj");
+    }
+
+    #[test]
+    fn detects_shallow_package_json_identity() {
+        let dir = temp_project("shallow-node");
+        std::fs::create_dir_all(dir.join("web")).unwrap();
+        std::fs::write(
+            dir.join("web").join("package.json"),
+            r#"{"displayName":"PC 工作台","description":"Discord 风格本机开发入口"}"#,
+        )
+        .unwrap();
+
+        let identity = detect_shallow_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "PC 工作台");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("Discord 风格本机开发入口")
+        );
+        assert_eq!(identity.source, "web/package.json");
+    }
+
+    #[test]
+    fn detects_shallow_cargo_identity() {
+        let dir = temp_project("shallow-rust");
+        std::fs::create_dir_all(dir.join("server")).unwrap();
+        std::fs::write(
+            dir.join("server").join("Cargo.toml"),
+            "[package]\nname = \"pc-node-agent\"\ndescription = 'Win 节点运行时'\n",
+        )
+        .unwrap();
+
+        let identity = detect_shallow_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "pc-node-agent");
+        assert_eq!(identity.description.as_deref(), Some("Win 节点运行时"));
+        assert_eq!(identity.source, "server/Cargo.toml");
+    }
+
+    #[test]
+    fn detects_shallow_go_identity() {
+        let dir = temp_project("shallow-go");
+        std::fs::create_dir_all(dir.join("api")).unwrap();
+        std::fs::write(
+            dir.join("api").join("go.mod"),
+            "module github.com/example/local-node-api/v2\n\ngo 1.22\n",
+        )
+        .unwrap();
+
+        let identity = detect_shallow_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "local-node-api");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("绑定到本 PC 节点的本地项目: local-node-api")
+        );
+        assert_eq!(identity.source, "api/go.mod");
     }
 }

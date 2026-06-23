@@ -6,8 +6,11 @@ use serde_json::{json, Value};
 use std::path::{Path, PathBuf};
 
 use crate::{
-    node_agent_project_manifest_identity::detect_manifest_project_identity,
-    node_agent_project_profile::detect_project_profile, project_landing, project_workspace_inspect,
+    node_agent_project_manifest_identity::{
+        detect_manifest_project_identity, detect_shallow_manifest_project_identity,
+    },
+    node_agent_project_profile::detect_project_profile,
+    project_landing, project_workspace_inspect,
 };
 
 #[derive(Debug, Deserialize)]
@@ -287,6 +290,13 @@ fn detect_project_identity(
     }
     if let Some(identity) = identity_from_go_mod(&fallback_name, &path.join("go.mod")) {
         return identity;
+    }
+    if let Some(identity) = detect_shallow_manifest_project_identity(&fallback_name, path) {
+        return ProjectIdentity {
+            name: identity.name,
+            description: identity.description,
+            source: Some(identity.source),
+        };
     }
     if let Some(identity) = identity_from_readme(&fallback_name, path) {
         return identity;
@@ -963,6 +973,25 @@ mod tests {
             Some("绑定到本 PC 节点的本地项目: pc-node-runtime")
         );
         assert_eq!(identity.source.as_deref(), Some("go.mod"));
+    }
+
+    #[test]
+    fn detects_project_identity_from_shallow_module_manifest() {
+        let dir = temp_project("identity-shallow-module");
+        std::fs::create_dir_all(dir.join("web")).unwrap();
+        std::fs::write(
+            dir.join("web").join("package.json"),
+            r#"{"name":"desktop-workbench","description":"PC 端项目工作台"}"#,
+        )
+        .unwrap();
+        std::fs::write(dir.join("README.md"), "# 根目录 README\n\n通用仓库说明").unwrap();
+
+        let identity = detect_project_identity(&dir, None, None);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "desktop-workbench");
+        assert_eq!(identity.description.as_deref(), Some("PC 端项目工作台"));
+        assert_eq!(identity.source.as_deref(), Some("web/package.json"));
     }
 
     #[test]
