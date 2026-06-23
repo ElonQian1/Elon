@@ -963,10 +963,10 @@ try {
         Assert-True ($domainScenarioSelectionContract.Contains($fieldName)) "tool execution plan domain scenario selection field: $fieldName" $domainScenarioSelectionContract
     }
     Assert-True ($answerPolicy.schema -eq "fb2.answer_policy.v1") "answer policy schema"
-    Assert-True (@($answerPolicy.canonical_eval_questions).Count -ge 6) "answer policy canonical eval questions" "count=$(@($answerPolicy.canonical_eval_questions).Count)"
+    Assert-True (@($answerPolicy.canonical_eval_questions).Count -ge 7) "answer policy canonical eval questions" "count=$(@($answerPolicy.canonical_eval_questions).Count)"
     Assert-True (($evalScenarioIds -contains "today_matches_analysis") -and ($evalScenarioIds -contains "my_ticket_analysis")) "answer policy core eval scenarios"
     Assert-True (($evalScenarioIds -contains "platform_order_risk") -and ($evalScenarioIds -contains "group_opinion_summary")) "answer policy aggregate eval scenarios"
-    Assert-True (($evalScenarioIds -contains "selected_message_review") -and ($evalScenarioIds -contains "source_reference_audit")) "answer policy audit eval scenarios"
+    Assert-True (($evalScenarioIds -contains "selected_message_review") -and ($evalScenarioIds -contains "group_discussion_summary_post") -and ($evalScenarioIds -contains "source_reference_audit")) "answer policy summary/audit eval scenarios"
 
     Assert-True ($contextPackTemplate.schema -eq "fb2.context_pack_template.v1") "context pack template schema" "$($contextPackTemplate.schema)"
     Assert-True ($contextPackTemplate.complete -eq $true) "context pack template complete" "complete=$($contextPackTemplate.complete)"
@@ -1021,6 +1021,12 @@ try {
     Assert-ScenarioContains $selectedScenario "required_query_fields" @("selected_message_id", "topic_hint") "eval scenario selected query fields"
     Assert-ScenarioContains $selectedScenario "required_citations" @("selected_message_id", "match_id", "context_audit_id") "eval scenario selected citations"
     Assert-ScenarioContains $selectedScenario "forbidden_outputs" @("unsupported_claim_verdict", "guaranteed_win") "eval scenario selected forbidden outputs"
+
+    $summaryScenario = Find-EvalScenario $evalScenarios "group_discussion_summary_post"
+    Assert-ScenarioContains $summaryScenario "entrypoints" @("summary_post", "group_summary_post") "eval scenario summary post entrypoints"
+    Assert-ScenarioContains $summaryScenario "required_source_kinds" @("group_message", "opinion_memory", "context_audit") "eval scenario summary post source kinds"
+    Assert-ScenarioContains $summaryScenario "required_citations" @("message_id", "opinion_memory_id", "context_audit_id") "eval scenario summary post citations"
+    Assert-ScenarioContains $summaryScenario "forbidden_outputs" @("fabricated_group_view", "group_opinion_as_fact") "eval scenario summary post forbidden outputs"
 
     $auditScenario = Find-EvalScenario $evalScenarios "source_reference_audit"
     Assert-ScenarioContains $auditScenario "required_source_kinds" @("citation_sources") "eval scenario source audit source kinds"

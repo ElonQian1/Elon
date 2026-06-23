@@ -446,6 +446,29 @@ pub(crate) fn fb2_domain_scenario_matrix() -> Value {
             "forbidden_outputs": ["unsupported_claim_verdict", "guaranteed_win"]
         },
         {
+            "id": "group_discussion_summary_post",
+            "user_question": "总结今天群聊讨论。",
+            "entrypoints": ["summary_post", "group_summary_post"],
+            "context_pack_sections": ["group_opinion_slice", "match_facts", "retrieval_evidence", "quality_feedback"],
+            "primary_tools": ["group_opinion_summary", "opinion_memories", "context_feedback_summary"],
+            "required_source_kinds": ["group_message", "opinion_memory", "context_audit"],
+            "required_citations": ["message_id", "opinion_memory_id", "context_audit_id"],
+            "permission_scope": "group_visible",
+            "required_request": ["group_id", "topic_hint"],
+            "feedback_routes": [
+                "/api/main-project/context/feedback",
+                "/api/main-project/context/opinion-adoption-summary",
+                "/api/main-project/context/quality-summary"
+            ],
+            "acceptance_signals": [
+                "summary_has_group_discussion",
+                "summary_has_source_references",
+                "matched_cited_sources",
+                "summary_post_feedback_recorded"
+            ],
+            "forbidden_outputs": ["fabricated_group_view", "group_opinion_as_fact", "guaranteed_win"]
+        },
+        {
             "id": "source_reference_audit",
             "user_question": "你刚才依据了哪些比赛、订单和群消息？",
             "entrypoints": ["group_followup", "chat_bootstrap_ai_reply"],
@@ -651,7 +674,7 @@ mod tests {
     fn fb2_domain_projection_declares_scenario_matrix() {
         let contract = public_context_projection_guidance("fb2").unwrap();
         let matrix = contract["domain_scenario_matrix"].as_array().unwrap();
-        assert_eq!(matrix.len(), 6);
+        assert_eq!(matrix.len(), 7);
 
         let today = scenario(matrix, "today_matches_analysis");
         assert!(array_contains(
@@ -717,6 +740,24 @@ mod tests {
         assert!(array_contains(
             &selected["acceptance_signals"],
             "reply_rejects_guarantee_claims"
+        ));
+
+        let summary_post = scenario(matrix, "group_discussion_summary_post");
+        assert!(array_contains(
+            &summary_post["entrypoints"],
+            "group_summary_post"
+        ));
+        assert!(array_contains(
+            &summary_post["required_source_kinds"],
+            "opinion_memory"
+        ));
+        assert!(array_contains(
+            &summary_post["acceptance_signals"],
+            "summary_post_feedback_recorded"
+        ));
+        assert!(array_contains(
+            &summary_post["forbidden_outputs"],
+            "fabricated_group_view"
         ));
 
         let audit = scenario(matrix, "source_reference_audit");

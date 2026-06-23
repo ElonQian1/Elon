@@ -70,13 +70,13 @@ GET /api/external/apps/fb2/context-contract
 
 - 给 fb2 代理读取主项目认可的 Context Pack 示例、质量告警、工具契约、观测指标和计费策略。
 - 给 fb2 代理读取 `answer_policy_contract`（`fb2.answer_policy.v1`），用于固定 AI 回答边界、引用规则和评测问题。
-- `answer_policy_contract.eval_scenarios` 是机器可读评测矩阵，覆盖 `today_matches_analysis`、`my_ticket_analysis`、`platform_order_risk`、`group_opinion_summary`、`selected_message_review`、`source_reference_audit`，声明每个场景的入口、优先上下文、必需来源、引用和禁止输出。
+- `answer_policy_contract.eval_scenarios` 是机器可读评测矩阵，覆盖 `today_matches_analysis`、`my_ticket_analysis`、`platform_order_risk`、`group_opinion_summary`、`selected_message_review`、`group_discussion_summary_post`、`source_reference_audit`，声明每个场景的入口、优先上下文、必需来源、引用和禁止输出。
 - 给 fb2 代理读取 `context_readiness_contract`，用于自动判断本次 Context Pack 是 `blocked`、`degraded` 还是 `ready`。
 - 这个接口不返回密钥，不读取 fb2 业务数据。
 
 主项目实际拉取 fb2 上下文后，会把 `answer_policy_contract.prompt_answer_rules` 投影成 prompt 里的 `<answer_rules>`，也会给归一化结果补 `answer_policy` 并放进 prompt metadata。fb2 不返回 `answer_policy` 时，主项目使用默认策略，但 fb2 的 Context Pack 和工具结果必须能支撑这些回答边界。
 
-运行时回答 prompt 还会注入 `<fb2_domain_scenario_guidance schema="fb2.domain_scenario_prompt.v1">`。该块由主项目根据 `topic_hint`、工具计划和 Context Pack 数据识别六类场景，并从 `domain_context_projection_contract.domain_scenario_matrix` 的同一源头读取 `required_citations` 和 `forbidden_outputs`。fb2 后续新增工具或字段时，应先更新矩阵，再让主项目 prompt/planner 复用同一源头，避免 contract 与模型实际提示漂移。
+运行时回答 prompt 还会注入 `<fb2_domain_scenario_guidance schema="fb2.domain_scenario_prompt.v1">`。该块由主项目根据 `topic_hint`、工具计划和 Context Pack 数据识别七类场景，并从 `domain_context_projection_contract.domain_scenario_matrix` 的同一源头读取 `required_citations` 和 `forbidden_outputs`。fb2 后续新增工具或字段时，应先更新矩阵，再让主项目 prompt/planner 复用同一源头，避免 contract 与模型实际提示漂移。
 
 工具规划和执行审计 metadata 同步包含 `domain_scenario_selection schema=fb2.domain_scenario_selection.v1`。它不是给模型看的正文，而是机器可读计划字段：每个选中场景都带 `permission_scope`、`primary_tools`、`required_citations` 和 `forbidden_outputs`。后续排查“AI 为什么查了这些 fb2 工具 / 为什么不能回答平台订单明细 / 为什么必须引用 order_id 或 message_id”时，应优先看 executed tools 里的 plan metadata，而不是只看最终自然语言回复。
 
@@ -96,7 +96,7 @@ fb2 给主项目 AI 的事实输入必须先投影成任务相关的 Context Pac
 - `required_sections` 固定 `usage_boundary`、`match_facts`、`user_order_slice`、`platform_order_summary`、`group_opinion_slice`、`retrieval_evidence`、`quality_feedback`。
 - `source_registry.required_kinds` 固定业务事实来源：`context_audit`、`match`、`odds`、`user_order`、`ticket`、`group_message`、`opinion_memory`、`platform_order_summary`。
 - `source_registry.quality_history_kinds` 固定质量历史来源：`feedback`、`opinion_adoption`，默认 `default_chat_fact=false`；只有显式标注 `scope=quality_history` 时，才可以作为“历史质量反馈/观点采纳记录”引用，不能冒充比赛、赔率、订单或群友观点事实。
-- `domain_scenario_matrix` 把六类真实用户问题映射到必须召回的 Context Pack 小节、主项目可自动工具、权限请求、source kinds、feedback 路由和可验收信号：今日比赛、我的票、平台订单风险、群观点、长按消息复核、来源审计。
+- `domain_scenario_matrix` 把七类真实用户问题映射到必须召回的 Context Pack 小节、主项目可自动工具、权限请求、source kinds、feedback 路由和可验收信号：今日比赛、我的票、平台订单风险、群观点、长按消息复核、群聊总结帖、来源审计。
 - `retrieval_projection` 要求 fb2 返回召回理由、命中词、新鲜度、权限范围和是否截断，而不只是返回一堆数据。
 - `retrieval_projection.item_shape schema=fb2.retrieval_evidence_item.v1` 固定每条召回证据必需字段：`evidence_id`、`source_id`、`source_kind`、`section_id`、`lane_id`、`index_id`、`reason`、`freshness`、`permission_scope`、`citation_source_id`。`source_id` 必须能追到 `citation_sources[].id`、`context_audit_id` 或 grounded/weak 工具结果的 `source_ids`；`permission_scope` 必须与数据 lane 和请求头一致。
 - `permission_projection` 固定用户订单、平台匿名摘要和群观点的权限头与禁止泄漏项。

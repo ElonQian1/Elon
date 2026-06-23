@@ -152,6 +152,9 @@ fn infer_scenarios_from_tools(scenarios: &mut BTreeSet<&'static str>, tool_names
             "group_opinion_summary" | "search_group_opinions" | "opinion_memories" => {
                 scenarios.insert("group_opinion_summary");
             }
+            "group_summary_post" | "summary_post" | "create_group_summary_post" => {
+                scenarios.insert("group_discussion_summary_post");
+            }
             "opinion_result_review_summary" | "opinion_result_reviews" => {
                 scenarios.insert("selected_message_review");
             }
@@ -196,6 +199,20 @@ fn infer_scenarios_from_topic(scenarios: &mut BTreeSet<&'static str>, topic_hint
         ],
     ) {
         scenarios.insert("group_opinion_summary");
+    }
+    if contains_any(
+        topic,
+        &[
+            "总结帖",
+            "群聊总结",
+            "讨论总结",
+            "总结今天",
+            "总结一下",
+            "汇总讨论",
+            "summary post",
+        ],
+    ) {
+        scenarios.insert("group_discussion_summary_post");
     }
     if contains_any(
         topic,
@@ -288,6 +305,7 @@ fn scenario_guidance(id: &str) -> Option<&'static str> {
         "platform_order_risk" => "只使用 anonymous_aggregate_only 的 platform_order_summary；可以讲平台集中度和风险，不得暴露单个用户订单、身份或下注明细。",
         "group_opinion_summary" => "把 group_message/opinion_memory 标成群友观点；采纳观点时说明只是群友观点输入，不是比赛事实。",
         "selected_message_review" => "围绕 selected_message_id 复核这条消息；只能判断已由比赛/群观点/复盘来源支持的部分，遇到稳赢、包赢、重注、梭哈等说法必须指出风险。",
+        "group_discussion_summary_post" => "生成群聊总结帖时只汇总 group_message/opinion_memory/context_audit 中真实出现的讨论和观点；必须列出来源引用和风险边界，不得把群友观点写成比赛事实。",
         "source_reference_audit" => "回答“依据了哪些来源”时只列当前 Context Pack、工具结果和 feedback 中真实存在的来源 ID；没有的来源明确说没有，不得补造。",
         _ => return None,
     };
@@ -394,6 +412,31 @@ mod tests {
         assert!(block.contains("scenario=platform_order_risk"));
         assert!(block.contains("anonymous_aggregate_only"));
         assert!(block.contains("不得暴露单个用户订单"));
+    }
+
+    #[test]
+    fn emits_summary_post_guidance_for_group_discussion_summary_intent() {
+        let context = json!({
+            "app_id": "fb2",
+            "context_audit_id": "audit-summary",
+            "group_messages": [{"message_id": "msg-1"}],
+            "opinion_memories": [{"opinion_memory_id": "mem-1"}]
+        });
+        let execution = json!({
+            "app_id": "fb2",
+            "plan": {
+                "topic_hint": "总结今天群聊讨论，生成总结帖",
+                "planned_tools": [{"name": "group_summary_post"}]
+            },
+            "results": []
+        });
+
+        let block = prompt_domain_scenario_guidance(Some(&context), Some(&execution));
+
+        assert!(block.contains("scenario=group_discussion_summary_post"));
+        assert!(block.contains("message_id/opinion_memory_id/context_audit_id"));
+        assert!(block.contains("群聊总结帖"));
+        assert!(block.contains("不得把群友观点写成比赛事实"));
     }
 
     #[test]

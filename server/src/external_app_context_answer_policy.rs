@@ -65,6 +65,7 @@ pub(crate) fn public_answer_policy_guidance(app_id: &str) -> Option<Value> {
                 "分析 match_id=m-001 这场，赔率变化说明什么？",
                 "帮我看看我今天的票风险在哪里？",
                 "总结群里大家对这场比赛的不同观点。",
+                "生成一篇今天群聊讨论总结帖。",
                 "平台今天订单集中在哪些方向？只说匿名聚合。",
                 "你刚才依据了哪些比赛、订单和群消息？"
             ],
@@ -126,6 +127,17 @@ pub(crate) fn public_answer_policy_guidance(app_id: &str) -> Option<Value> {
                     "required_answer_sections": ["data_facts", "group_opinions", "ai_inference"],
                     "required_citations": ["selected_message_id", "match_id", "context_audit_id"],
                     "forbidden_outputs": ["unsupported_claim_verdict", "guaranteed_win"]
+                },
+                {
+                    "id": "group_discussion_summary_post",
+                    "question": "总结今天群聊讨论。",
+                    "entrypoints": ["summary_post", "group_summary_post"],
+                    "preferred_context": ["context_pack", "group_opinion_summary", "context_feedback_summary"],
+                    "required_query_fields": ["group_id", "topic_hint"],
+                    "required_source_kinds": ["group_message", "opinion_memory", "context_audit"],
+                    "required_answer_sections": ["group_opinions", "source_references", "risk_boundary"],
+                    "required_citations": ["message_id", "opinion_memory_id", "context_audit_id"],
+                    "forbidden_outputs": ["fabricated_group_view", "group_opinion_as_fact", "guaranteed_win"]
                 },
                 {
                     "id": "source_reference_audit",
@@ -206,6 +218,7 @@ mod tests {
             "platform_order_risk",
             "group_opinion_summary",
             "selected_message_review",
+            "group_discussion_summary_post",
             "source_reference_audit",
         ] {
             assert!(scenarios

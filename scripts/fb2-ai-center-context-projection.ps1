@@ -89,9 +89,10 @@ function Assert-Fb2DomainScenarioMatrixContract {
 
     $scenarios = @($ScenarioMatrix)
     $scenarioIds = @($scenarios | ForEach-Object { $_.id })
+    Assert-True (@($scenarioIds).Count -ge 7) "domain projection scenario matrix: scenario count" "count=$(@($scenarioIds).Count)"
     Assert-True (($scenarioIds -contains "today_matches_analysis") -and ($scenarioIds -contains "my_ticket_analysis")) "domain projection scenario matrix: core scenarios"
     Assert-True (($scenarioIds -contains "platform_order_risk") -and ($scenarioIds -contains "group_opinion_summary")) "domain projection scenario matrix: aggregate scenarios"
-    Assert-True (($scenarioIds -contains "selected_message_review") -and ($scenarioIds -contains "source_reference_audit")) "domain projection scenario matrix: audit scenarios"
+    Assert-True (($scenarioIds -contains "selected_message_review") -and ($scenarioIds -contains "group_discussion_summary_post") -and ($scenarioIds -contains "source_reference_audit")) "domain projection scenario matrix: summary and audit scenarios"
 
     $ticketScenario = Find-EvalScenario $scenarios "my_ticket_analysis"
     Assert-ScenarioContains $ticketScenario "context_pack_sections" @("match_facts", "user_order_slice", "retrieval_evidence") "domain projection scenario my ticket sections"
@@ -111,6 +112,12 @@ function Assert-Fb2DomainScenarioMatrixContract {
     $selectedScenario = Find-EvalScenario $scenarios "selected_message_review"
     Assert-ScenarioContains $selectedScenario "trigger_source_ids" @("selected_message_id") "domain projection scenario selected trigger source"
     Assert-ScenarioContains $selectedScenario "acceptance_signals" @("reply_rejects_guarantee_claims", "reply_has_risk_boundary") "domain projection scenario selected acceptance"
+
+    $summaryScenario = Find-EvalScenario $scenarios "group_discussion_summary_post"
+    Assert-ScenarioContains $summaryScenario "entrypoints" @("summary_post", "group_summary_post") "domain projection scenario summary post entrypoints"
+    Assert-ScenarioContains $summaryScenario "required_source_kinds" @("group_message", "opinion_memory", "context_audit") "domain projection scenario summary post source kinds"
+    Assert-ScenarioContains $summaryScenario "required_citations" @("message_id", "opinion_memory_id", "context_audit_id") "domain projection scenario summary post citations"
+    Assert-ScenarioContains $summaryScenario "forbidden_outputs" @("fabricated_group_view", "group_opinion_as_fact") "domain projection scenario summary post forbidden"
 }
 
 function New-Fb2ContextProjectionSelfTestData {
@@ -180,6 +187,13 @@ function New-Fb2DomainScenarioMatrixSelfTestData {
             id = "selected_message_review"
             trigger_source_ids = @("selected_message_id")
             acceptance_signals = @("reply_rejects_guarantee_claims", "reply_has_risk_boundary")
+        },
+        [pscustomobject]@{
+            id = "group_discussion_summary_post"
+            entrypoints = @("summary_post", "group_summary_post")
+            required_source_kinds = @("group_message", "opinion_memory", "context_audit")
+            required_citations = @("message_id", "opinion_memory_id", "context_audit_id")
+            forbidden_outputs = @("fabricated_group_view", "group_opinion_as_fact")
         },
         [pscustomobject]@{
             id = "source_reference_audit"

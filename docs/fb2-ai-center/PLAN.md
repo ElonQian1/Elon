@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-24 当前重点新增“群聊总结帖场景源头收口”：主项目把 `group_discussion_summary_post` 正式纳入 `answer_policy_contract.eval_scenarios`、`domain_context_projection_contract.domain_scenario_matrix`、运行时 `<fb2_domain_scenario_guidance>` 和 prompt projection 静态门禁。后续 fb2 总结帖入口不再只靠临时 topic 或用户场景审计兜底，而是会得到明确的 required citations、forbidden outputs 和总结帖回答边界。
 - 2026-06-24 当前重点新增“Context Pack 部分可用语义”：主项目 prompt metadata 的 `context_gap_summary` 现在区分阻断型缺口和部分/已裁剪上下文。`empty/blocked/unavailable/not_configured` 仍会让 `fact_answer_allowed=false`；`too_large`、主项目预算裁剪、readiness `degraded/partial` 会输出 `partial_answer_only=true` 和 `required_user_notice=fb2_context_partial_or_truncated_context_present`。这样 AI 可以基于已有比赛/订单/群观点保守回答，但必须说明上下文不完整，不能把超预算或裁剪后的数据当成完整事实。
 - 2026-06-24 当前重点新增“prompt 投影门禁”：`validate-fb2-ai-center-current-state.ps1` 现在会运行 `validate-fb2-main-prompt-projection.ps1`，确认主项目发给模型的 prompt 里保留 Context Pack XML 边界、事实摘要、缺口摘要、预算摘要、回答规则、场景 guidance、工具事实摘要、工具缺口摘要和生成后来源/缺口防护。该门禁只读源码，不访问网络、不写群、不处理 ASR/TTS，用于防止“契约存在但模型实际看不到 fb2 关键数据”的退化。
 - 2026-06-24 当前重点新增“运行时路由门禁”：`validate-fb2-ai-center-current-state.ps1` 现在会运行 `validate-fb2-main-runtime-routing.ps1`，确认主项目群聊 `@EL`、长按 `AI回复`、总结帖三类入口都把可见用户问题/选中消息/总结主题整理为 `topic_hint`，并传入 fb2 Context Pack、today-matches fallback、工具 planner、工具执行审计和日志观测。该门禁只读源码，不访问网络、不写群、不处理 ASR/TTS，用于防止后续 UI 入口能触发 AI 但没有带 fb2 业务查询意图。

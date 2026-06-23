@@ -156,7 +156,7 @@ function New-Fb2MainPromptProjectionValidation {
         "domain scenario guidance is injected as XML with source rules" `
         ($texts.scenario_prompt.Contains('<fb2_domain_scenario_guidance schema=') -and $texts.scenario_prompt.Contains('fb2.domain_scenario_prompt.v1') -and $texts.scenario_prompt.Contains('<scenario_rules>') -and $texts.scenario_prompt.Contains('不能发明 match_id')) `
         "fb2_domain_scenario_guidance + scenario_rules" $files.scenario_prompt
-    foreach ($scenario in @('today_matches_analysis', 'my_ticket_analysis', 'platform_order_risk', 'group_opinion_summary', 'selected_message_review', 'source_reference_audit')) {
+    foreach ($scenario in @('today_matches_analysis', 'my_ticket_analysis', 'platform_order_risk', 'group_opinion_summary', 'selected_message_review', 'group_discussion_summary_post', 'source_reference_audit')) {
         Add-Fb2PromptCheck $checks `
             "domain scenario guidance covers $scenario" `
             ($texts.scenario_prompt.Contains($scenario)) `
@@ -262,7 +262,7 @@ fn prompt_executed_tools_block() {
     Set-Content -LiteralPath (Join-Path $serverSrc "external_app_context_scenario_prompt.rs") -Encoding UTF8 -Value @'
 fn prompt_domain_scenario_guidance() {
     "<fb2_domain_scenario_guidance schema=\"fb2.domain_scenario_prompt.v1\"><scenario_rules>不能发明 match_id</scenario_rules></fb2_domain_scenario_guidance>";
-    "today_matches_analysis my_ticket_analysis platform_order_risk group_opinion_summary selected_message_review source_reference_audit";
+    "today_matches_analysis my_ticket_analysis platform_order_risk group_opinion_summary selected_message_review group_discussion_summary_post source_reference_audit";
 }
 '@
     Set-Content -LiteralPath (Join-Path $serverSrc "external_app_context_gap_notice.rs") -Encoding UTF8 -Value @'
