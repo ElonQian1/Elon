@@ -507,6 +507,13 @@
       if (stateText === 'missing_token') return '未登录 · 不会调用服务器模型';
       if (stateText === 'http_error') return `云端返回 ${clean(status.httpStatus) || '错误'} · 不会启用`;
       if (stateText === 'unavailable') return `${clean(status.reason) || '云端不可用'} · 不会启用`;
+      const budget = status.budget || {};
+      if (stateText === 'budget_exhausted' || clean(budget.status) === 'exhausted') {
+        const retryAfter = numberField(budget, 'resetAfterSecs', 'reset_after_secs');
+        return retryAfter
+          ? `已保护 · 今日平台预算已用完 · ${retryAfter} 秒后重试`
+          : '已保护 · 今日平台预算已用完';
+      }
       const availability = status.admissionAvailability || status.admission_availability || {};
       if (stateText === 'limited' || availability.ready === false) {
         const retryAfter = numberField(availability, 'retryAfterSecs', 'retry_after_secs');
@@ -526,11 +533,14 @@
       const global = numberField(limits, 'maxConcurrentGlobal', 'max_concurrent_global')
         || numberField(admission, 'maxConcurrentGlobal', 'max_concurrent_global');
       const remaining = numberField(admission, 'remainingRequestsPerMinute', 'remaining_requests_per_minute');
+      const dailyLimit = numberField(budget, 'dailyCallLimit', 'daily_call_limit');
+      const remainingBudget = numberField(budget, 'remainingCallsToday', 'remaining_calls_today');
       const parts = [];
       if (agentSelection) parts.push('agent 受控');
       if (rpm) parts.push(`${rpm}/分钟`);
       if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
       if (Number.isFinite(remaining)) parts.push(`剩余 ${remaining}`);
+      if (Number.isFinite(dailyLimit) && Number.isFinite(remainingBudget)) parts.push(`今日剩余 ${remainingBudget}/${dailyLimit}`);
       return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
     }
 

@@ -158,6 +158,7 @@ mod release_claim;
 mod release_manager;
 mod router;
 mod server_agent_runtime;
+mod server_agent_runtime_budget;
 mod server_agent_runtime_guard;
 mod server_agent_runtime_limits;
 mod server_agent_runtime_output;

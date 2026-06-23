@@ -13,6 +13,10 @@ use std::sync::Arc;
 use crate::{
     agent_llm_call::call_chat_llm_with_json_response_mode,
     project_auth::{auth_from_headers, json_error},
+    server_agent_runtime_budget::{
+        server_runtime_budget_status, try_record_route_c_call, ServerRuntimeBudgetError,
+        ServerRuntimeBudgetStatus,
+    },
     server_agent_runtime_guard::{
         admission_availability, admission_snapshot, audit_summary, operational_error_summary,
         protection_status, try_acquire_runtime_admission, ServerRuntimeAdmissionAvailability,
@@ -39,6 +43,7 @@ struct ServerAgentRuntimeStatus {
     limits: ServerAgentRuntimeLimits,
     protection: ServerRuntimeProtectionStatus,
     policy: ServerAgentRuntimePolicy,
+    budget: ServerRuntimeBudgetStatus,
     admission: ServerRuntimeAdmissionSnapshot,
     #[serde(rename = "admissionAvailability")]
     admission_availability: ServerRuntimeAdmissionAvailability,
@@ -74,13 +79,16 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         });
     let admission = admission_snapshot(&user.id, limits);
     let admission_availability = admission_availability(&admission);
-    let ready = policy.enabled && agent.is_some() && admission_availability.ready;
+    let budget = server_runtime_budget_status();
+    let ready = policy.enabled && agent.is_some() && admission_availability.ready && budget.ready();
     Json(ServerAgentRuntimeStatus {
         ready,
         status: if !policy.enabled {
             "disabled"
         } else if agent.is_none() {
             "unavailable"
+        } else if !budget.ready() {
+            "budget_exhausted"
         } else if !admission_availability.ready {
             "limited"
         } else {
@@ -90,6 +98,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         limits,
         protection: protection_status(),
         policy,
+        budget,
         admission,
         admission_availability,
     })
@@ -160,6 +169,21 @@ pub async fn chat_handler(
             return admission_error_response(error);
         }
     };
+    let budget = match try_record_route_c_call() {
+        Ok(status) => status,
+        Err(error) => {
+            tracing::warn!(
+                target: "server_agent_runtime",
+                user_id = %user.id,
+                request_fingerprint = %audit.request_fingerprint,
+                budget_status = error.status().status,
+                daily_call_limit = error.status().daily_call_limit.unwrap_or_default(),
+                used_calls_today = error.status().used_calls_today,
+                "pc_server_runtime request rejected by daily budget fuse"
+            );
+            return budget_error_response(error);
+        }
+    };
     tracing::info!(
         target: "server_agent_runtime",
         user_id = %user.id,
@@ -170,6 +194,9 @@ pub async fn chat_handler(
         message_count = audit.message_count,
         total_chars = audit.total_chars,
         max_message_chars = audit.max_message_chars,
+        budget_status = budget.status,
+        budget_used_calls_today = budget.used_calls_today,
+        budget_daily_call_limit = budget.daily_call_limit.unwrap_or_default(),
         "pc_server_runtime request accepted"
     );
 
@@ -267,12 +294,23 @@ fn admission_error_response(error: ServerRuntimeAdmissionError) -> Response {
     response
 }
 
+fn budget_error_response(error: ServerRuntimeBudgetError) -> Response {
+    let retry_after = error.retry_after_secs().to_string();
+    let mut response = json_error(StatusCode::TOO_MANY_REQUESTS, error.public_message());
+    if let Ok(value) = HeaderValue::from_str(&retry_after) {
+        response.headers_mut().insert(header::RETRY_AFTER, value);
+    }
+    response
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        admission_error_response, audit_summary, named_agent_config, operational_error_summary,
-        protection_status, provider_error_message, validate_runtime_messages,
+        admission_error_response, audit_summary, budget_error_response, named_agent_config,
+        operational_error_summary, protection_status, provider_error_message,
+        validate_runtime_messages,
     };
+    use crate::server_agent_runtime_budget::{ServerRuntimeBudgetError, ServerRuntimeBudgetStatus};
     use crate::server_agent_runtime_guard::ServerRuntimeAdmissionError;
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
     use crate::types::{AgentConfig, AgentsConfig};
@@ -311,6 +349,7 @@ mod tests {
         assert!(protection.input_validation.contains("message_chars"));
         assert!(protection.agent_selection.contains("default server agent"));
         assert!(protection.admission_control.contains("global"));
+        assert!(protection.budget_gate.contains("DAILY_CALL_LIMIT"));
         assert!(protection
             .operational_switch
             .contains("ELON_SERVER_AGENT_RUNTIME_ENABLED"));
@@ -349,6 +388,24 @@ mod tests {
 
         assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
         assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "23");
+    }
+
+    #[test]
+    fn budget_error_response_sets_retry_after_header() {
+        let response = budget_error_response(ServerRuntimeBudgetError::DailyCallLimitReached(
+            ServerRuntimeBudgetStatus {
+                enabled: true,
+                status: "exhausted",
+                source: "test",
+                used_calls_today: 5,
+                daily_call_limit: Some(5),
+                remaining_calls_today: Some(0),
+                reset_after_secs: 3600,
+            },
+        ));
+
+        assert_eq!(response.status(), axum::http::StatusCode::TOO_MANY_REQUESTS);
+        assert_eq!(response.headers().get(header::RETRY_AFTER).unwrap(), "3600");
     }
 
     #[test]

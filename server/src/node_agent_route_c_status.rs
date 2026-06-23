@@ -88,6 +88,7 @@ fn normalize_status_value(value: &Value) -> Value {
         "limits": value.get("limits").cloned().unwrap_or(Value::Null),
         "protection": value.get("protection").cloned().unwrap_or(Value::Null),
         "policy": value.get("policy").cloned().unwrap_or(Value::Null),
+        "budget": value.get("budget").cloned().unwrap_or(Value::Null),
         "admission": value.get("admission").cloned().unwrap_or(Value::Null),
         "admissionAvailability": value
             .get("admissionAvailability")
@@ -142,6 +143,7 @@ mod tests {
             "limits": {"maxRequestsPerMinute": 12, "maxConcurrentPerUser": 2},
             "protection": {"admissionControl": "global and per-user concurrency"},
             "policy": {"enabled": true},
+            "budget": {"enabled": true, "dailyCallLimit": 100, "remainingCallsToday": 99},
             "admission": {"remainingRequestsPerMinute": 11},
             "admissionAvailability": {"ready": true},
             "ignored": "not forwarded"
@@ -149,6 +151,7 @@ mod tests {
 
         assert!(server_runtime_ready_from_status_value(&status));
         assert_eq!(status["limits"]["maxRequestsPerMinute"], 12);
+        assert_eq!(status["budget"]["remainingCallsToday"], 99);
         assert_eq!(status["admission"]["remainingRequestsPerMinute"], 11);
         assert_eq!(status["admissionAvailability"]["ready"], true);
         assert!(status.get("ignored").is_none());

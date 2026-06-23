@@ -20,6 +20,7 @@ pub(crate) struct ServerRuntimeProtectionStatus {
     pub output_validation: &'static str,
     pub agent_selection: &'static str,
     pub admission_control: &'static str,
+    pub budget_gate: &'static str,
     pub operational_switch: &'static str,
     pub billing_gate: &'static str,
     pub audit: &'static str,
@@ -98,6 +99,8 @@ pub(crate) fn protection_status() -> ServerRuntimeProtectionStatus {
         agent_selection:
             "default server agent only unless ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS explicitly allows more",
         admission_control: "global and per-user concurrency plus rolling minute request limits",
+        budget_gate:
+            "optional ELON_SERVER_AGENT_RUNTIME_DAILY_CALL_LIMIT daily platform call fuse",
         operational_switch: "ELON_SERVER_AGENT_RUNTIME_ENABLED can disable Route C without redeploy",
         billing_gate: "shared with call_chat_llm_with_options",
         audit:
@@ -442,6 +445,9 @@ mod tests {
             .contains("ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"));
         assert!(status.admission_control.contains("global"));
         assert!(status.admission_control.contains("concurrency"));
+        assert!(status
+            .budget_gate
+            .contains("ELON_SERVER_AGENT_RUNTIME_DAILY_CALL_LIMIT"));
         assert!(status
             .operational_switch
             .contains("ELON_SERVER_AGENT_RUNTIME_ENABLED"));
