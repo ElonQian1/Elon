@@ -120,6 +120,8 @@ function New-Fb2HandoffPrompt {
     $gapBoard = Get-Fb2PromptProperty $Refresh "gap_action_board"
     $gapActions = @(Get-Fb2PromptProperty $gapBoard "actions" @())
     $requirements = @(Get-Fb2PromptProperty $matrix "requirements" @())
+    $exportedSamples = Get-Fb2PromptProperty $Refresh "exported_context_pack_sample_set_validation"
+    $exportedSampleScenarios = @(Get-Fb2PromptProperty $exportedSamples "scenarios" @())
     $lines = [System.Collections.ArrayList]::new()
 
     Add-Fb2PromptLine -Lines $lines -Text "# fb2 AI Center 下一轮执行提示"
@@ -139,6 +141,22 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- main_project: `{0}`' -f [string]$ownerActions.main_project)
     Add-Fb2PromptLine -Lines $lines -Text ('- fb2_project: `{0}`' -f [string]$ownerActions.fb2_project)
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## fb2 导出样本"
+    Add-Fb2PromptLine -Lines $lines -Text ('- attempted: `{0}` / complete: `{1}` / passed: `{2}` / failed: `{3}`' -f [bool](Get-Fb2PromptProperty $exportedSamples 'attempted' $false), [bool](Get-Fb2PromptProperty $exportedSamples 'complete' $false), [int](Get-Fb2PromptProperty $exportedSamples 'passed_count' 0), [int](Get-Fb2PromptProperty $exportedSamples 'failed_count' 0))
+    if (@($exportedSampleScenarios).Count -gt 0) {
+        $pipe = [char]124
+        Add-Fb2PromptLine -Lines $lines -Text ('{0} scenario {0} audit {0} sources {0} kinds {0} sha256 {0}' -f $pipe)
+        Add-Fb2PromptLine -Lines $lines -Text ('{0}---{0}---{0}---:{0}---{0}---{0}' -f $pipe)
+        foreach ($scenario in $exportedSampleScenarios) {
+            $scenarioId = Format-Fb2PromptCell $scenario.scenario 80
+            $auditId = Format-Fb2PromptCell $scenario.context_audit_id 80
+            $sourceCount = Format-Fb2PromptCell $scenario.citation_source_count 30
+            $kinds = Format-Fb2PromptCell (@(Get-Fb2PromptProperty $scenario 'source_kinds' @()) -join ', ') 180
+            $sha = Format-Fb2PromptCell $scenario.context_pack_sha256 80
+            Add-Fb2PromptLine -Lines $lines -Text ('{0} {1} {0} {2} {0} {3} {0} {4} {0} {5} {0}' -f $pipe, $scenarioId, $auditId, $sourceCount, $kinds, $sha)
+        }
+    }
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 可执行命令"
     foreach ($name in @("refresh_status", "read_status_refresh", "generate_context_pack_sample_request", "validate_context_pack_sample_set", "validate_exported_context_pack_sample_set", "validate_context_projection_log", "validate_user_scenario_audit", "validate_current_state", "validate_public_contract_status", "validate_server_deploy_status", "validate_project_direct_network_policy", "validate_read_only_direct_read", "validate_gap_action_board", "validate_evidence_freshness", "validate_evidence_privacy", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "validate_live_preflight_request", "validate_tokenless_continuation", "no_write_direct_read", "data_only_preflight", "data_only_preflight_via_fb2_server_token_bridge", "visible_regression_requires_authorization")) {
@@ -237,6 +255,18 @@ function Invoke-Fb2PromptSelfTest {
                 safe_to_continue_without_secret = @("status_refresh_selftest")
                 requires_secret = @("live_context_pack_permission_quality_refresh")
             }
+            exported_context_pack_sample_set_validation = [ordered]@{
+                attempted = $true
+                complete = $true
+                passed_count = 4
+                failed_count = 0
+                scenarios = @(
+                    [ordered]@{ scenario = "today_matches_context_pack"; context_audit_id = "audit-today"; citation_source_count = 23; source_kinds = @("match", "odds", "context_audit"); context_pack_sha256 = ("a" * 64) },
+                    [ordered]@{ scenario = "my_ticket_context_pack"; context_audit_id = "audit-ticket"; citation_source_count = 43; source_kinds = @("user_order", "ticket", "context_audit"); context_pack_sha256 = ("b" * 64) },
+                    [ordered]@{ scenario = "platform_order_context_pack"; context_audit_id = "audit-platform"; citation_source_count = 24; source_kinds = @("platform_order_summary", "context_audit"); context_pack_sha256 = ("c" * 64) },
+                    [ordered]@{ scenario = "group_opinion_context_pack"; context_audit_id = "audit-opinion"; citation_source_count = 24; source_kinds = @("group_message", "opinion_memory", "context_audit"); context_pack_sha256 = ("d" * 64) }
+                )
+            }
             next_commands = [ordered]@{
                 refresh_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1"
                 read_status_refresh = "Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json"
@@ -322,6 +352,8 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.evidence_freshness.v1") "freshness schema"
         Assert-Fb2PromptSelfTest ($content -match "缺口行动板") "gap action section"
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.gap_action_board.v1") "gap action schema"
+        Assert-Fb2PromptSelfTest ($content -match "fb2 导出样本") "exported sample section"
+        Assert-Fb2PromptSelfTest ($content -match "today_matches_context_pack") "exported sample row"
         Assert-Fb2PromptSelfTest ($content -match "generate_context_pack_sample_request") "context pack sample request command"
         Assert-Fb2PromptSelfTest ($content -match "validate_context_pack_sample_set") "context pack sample set validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_exported_context_pack_sample_set") "exported context pack sample set validation command"

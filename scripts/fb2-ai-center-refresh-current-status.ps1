@@ -252,6 +252,22 @@ function New-Fb2RefreshExportedSampleValidationState {
         [object]$Summary
     )
 
+    $scenarioSummaries = @()
+    if ($Summary) {
+        $scenarioSummaries = @((Get-Fb2RefreshProperty $Summary "scenarios" @()) | ForEach-Object {
+                [ordered]@{
+                    scenario = [string](Get-Fb2RefreshProperty $_ "scenario" "")
+                    path = [string](Get-Fb2RefreshProperty $_ "path" "")
+                    passed = [bool](Get-Fb2RefreshProperty $_ "passed" $false)
+                    context_audit_id = [string](Get-Fb2RefreshProperty $_ "context_audit_id" "")
+                    citation_source_count = [int](Get-Fb2RefreshProperty $_ "citation_source_count" 0)
+                    source_kinds = @((Get-Fb2RefreshProperty $_ "source_kinds" @()) | ForEach-Object { [string]$_ })
+                    context_pack_sha256 = [string](Get-Fb2RefreshProperty $_ "context_pack_sha256" "")
+                    contains_secret_like_text = [bool](Get-Fb2RefreshProperty $_ "contains_secret_like_text" $true)
+                }
+            })
+    }
+
     [ordered]@{
         enabled = $Enabled
         attempted = $Attempted
@@ -264,6 +280,8 @@ function New-Fb2RefreshExportedSampleValidationState {
         scenario_count = if ($Summary) { [int]$Summary.scenario_count } else { 0 }
         passed_count = if ($Summary) { [int]$Summary.passed_count } else { 0 }
         failed_count = if ($Summary) { [int]$Summary.failed_count } else { 0 }
+        secret_like_scenarios = if ($Summary) { @((Get-Fb2RefreshProperty $Summary "secret_like_scenarios" @()) | ForEach-Object { [string]$_ }) } else { @() }
+        scenarios = @($scenarioSummaries)
     }
 }
 

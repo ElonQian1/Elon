@@ -145,7 +145,37 @@ function Test-Fb2CurrentExportedSampleState {
         return $true
     }
     if ($attempted) {
-        return $complete
+        if (-not $complete) {
+            return $false
+        }
+        $requiredScenarios = @(
+            "today_matches_context_pack",
+            "my_ticket_context_pack",
+            "platform_order_context_pack",
+            "group_opinion_context_pack"
+        )
+        $scenarios = @(Get-Fb2CurrentProperty $State "scenarios" @())
+        if (@($scenarios).Count -ne 4) {
+            return $false
+        }
+        foreach ($scenarioId in $requiredScenarios) {
+            $scenario = @($scenarios | Where-Object { [string](Get-Fb2CurrentProperty $_ "scenario" "") -eq $scenarioId }) | Select-Object -First 1
+            if ($null -eq $scenario) {
+                return $false
+            }
+            $auditId = [string](Get-Fb2CurrentProperty $scenario "context_audit_id" "")
+            $citationCount = [int](Get-Fb2CurrentProperty $scenario "citation_source_count" 0)
+            $sha = [string](Get-Fb2CurrentProperty $scenario "context_pack_sha256" "")
+            $sourceKinds = @(Get-Fb2CurrentProperty $scenario "source_kinds" @())
+            $containsSecret = [bool](Get-Fb2CurrentProperty $scenario "contains_secret_like_text" $true)
+            if (-not [bool](Get-Fb2CurrentProperty $scenario "passed" $false)) {
+                return $false
+            }
+            if ([string]::IsNullOrWhiteSpace($auditId) -or $citationCount -le 0 -or $sourceKinds.Count -eq 0 -or $sha -notmatch "^[0-9a-f]{64}$" -or $containsSecret) {
+                return $false
+            }
+        }
+        return $true
     }
     return -not [string]::IsNullOrWhiteSpace($skippedReason)
 }
@@ -466,6 +496,26 @@ function Invoke-Fb2CurrentStateSelfTest {
             complete = $false
         }
         if (Test-Fb2CurrentExportedSampleState -State $failedExportedSamples) {
+            $failed++
+        }
+        $goodExportedSamples = [pscustomobject]@{
+            enabled = $true
+            attempted = $true
+            skipped_reason = ""
+            complete = $true
+            scenarios = @(
+                [pscustomobject]@{ scenario = "today_matches_context_pack"; passed = $true; context_audit_id = "audit-today"; citation_source_count = 3; source_kinds = @("match", "odds", "context_audit"); context_pack_sha256 = ("a" * 64); contains_secret_like_text = $false },
+                [pscustomobject]@{ scenario = "my_ticket_context_pack"; passed = $true; context_audit_id = "audit-ticket"; citation_source_count = 3; source_kinds = @("user_order", "ticket", "context_audit"); context_pack_sha256 = ("b" * 64); contains_secret_like_text = $false },
+                [pscustomobject]@{ scenario = "platform_order_context_pack"; passed = $true; context_audit_id = "audit-platform"; citation_source_count = 2; source_kinds = @("platform_order_summary", "context_audit"); context_pack_sha256 = ("c" * 64); contains_secret_like_text = $false },
+                [pscustomobject]@{ scenario = "group_opinion_context_pack"; passed = $true; context_audit_id = "audit-opinion"; citation_source_count = 3; source_kinds = @("group_message", "opinion_memory", "context_audit"); context_pack_sha256 = ("d" * 64); contains_secret_like_text = $false }
+            )
+        }
+        if (-not (Test-Fb2CurrentExportedSampleState -State $goodExportedSamples)) {
+            $failed++
+        }
+        $secretExportedSamples = $goodExportedSamples | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        $secretExportedSamples.scenarios[0].contains_secret_like_text = $true
+        if (Test-Fb2CurrentExportedSampleState -State $secretExportedSamples) {
             $failed++
         }
 
