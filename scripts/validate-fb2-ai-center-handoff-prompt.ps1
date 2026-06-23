@@ -114,6 +114,7 @@ function New-Fb2PromptValidation {
         "validate_read_only_direct_read",
         "validate_gap_action_board",
         "validate_evidence_freshness",
+        "validate_evidence_privacy",
         "validate_completion_matrix",
         "validate_handoff_prompt",
         "validate_visible_answer_policy",
@@ -138,6 +139,7 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "public contract status validator present" ($Content -match 'validate_public_contract_status.+fb2-public-contract-status\.ps1')
     Add-Fb2PromptValidationCheck $checks "live preflight request validator present" ($Content -match 'validate_live_preflight_request.+validate-fb2-live-preflight-request\.ps1')
     Add-Fb2PromptValidationCheck $checks "tokenless continuation validator present" ($Content -match 'validate_tokenless_continuation.+validate-fb2-tokenless-continuation\.ps1')
+    Add-Fb2PromptValidationCheck $checks "evidence privacy validator present" ($Content -match 'validate_evidence_privacy.+validate-fb2-evidence-privacy\.ps1')
     Add-Fb2PromptValidationCheck $checks "data-only preflight is no visible write" ($Content -match 'data_only_preflight.+DataOnlyAcceptance.+PreflightOnly')
     Add-Fb2PromptValidationCheck $checks "visible regression is explicit" ($Content -match 'visible_regression_requires_authorization.+AllowVisibleMessages')
     Add-Fb2PromptValidationCheck $checks "voice pause is explicit" ($Content -match 'ASR/TTS final evidence.*暂停|ASR/TTS.*paused|voice_final_evidence')
@@ -227,6 +229,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - `validate_read_only_direct_read`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json`
 - `validate_gap_action_board`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1`
 - `validate_evidence_freshness`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1`
+- `validate_evidence_privacy`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-evidence-privacy.ps1`
 - `validate_completion_matrix`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1`
 - `validate_handoff_prompt`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1`
 - `validate_visible_answer_policy`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>`

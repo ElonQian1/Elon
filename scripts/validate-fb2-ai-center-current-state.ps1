@@ -287,6 +287,11 @@ function New-Fb2CurrentStateValidation {
         -Arguments @("-RefreshPath", $RefreshPath) `
         -ExpectedOutputPath (Join-Path $targetDir "evidence-freshness-validation-current.json")))
     [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_evidence_privacy" `
+        -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-evidence-privacy.ps1") `
+        -Arguments @("-RefreshPath", $RefreshPath) `
+        -ExpectedOutputPath (Join-Path $targetDir "evidence-privacy-validation-current.json")))
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
         -Name "validate_gap_action_board" `
         -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-ai-center-gap-action-board.ps1") `
         -Arguments @("-RefreshPath", $RefreshPath) `
@@ -372,6 +377,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "context_projection_log"; script = "validate-fb2-context-projection-log.ps1" },
         [ordered]@{ name = "user_scenario_audit"; script = "validate-fb2-user-scenario-audit.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
+        [ordered]@{ name = "evidence_privacy"; script = "validate-fb2-evidence-privacy.ps1" },
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },
         [ordered]@{ name = "handoff_prompt"; script = "validate-fb2-ai-center-handoff-prompt.ps1" },

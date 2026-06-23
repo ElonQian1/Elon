@@ -188,6 +188,7 @@ function New-Fb2GapValidation {
             "validate_read_only_direct_read",
             "validate_gap_action_board",
             "validate_evidence_freshness",
+            "validate_evidence_privacy",
             "validate_completion_matrix",
             "validate_handoff_prompt",
             "validate_visible_answer_policy",
@@ -246,6 +247,11 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "next command tokenless continuation validates boundary" (
             $tokenlessCommand -match "validate-fb2-tokenless-continuation\.ps1" -and
             $tokenlessCommand -match "tokenless-continuation-validation-current\.json"
+        )
+
+        $privacyCommand = [string](Get-Fb2GapProperty $nextCommands "validate_evidence_privacy" "")
+        Add-Fb2GapCheck $checks "next command evidence privacy validates raw-body boundary" (
+            $privacyCommand -match "validate-fb2-evidence-privacy\.ps1"
         )
 
         $readOnlyCommand = [string](Get-Fb2GapProperty $nextCommands "no_write_direct_read" "")
@@ -361,6 +367,7 @@ function Invoke-Fb2GapSelfTest {
                 validate_read_only_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json"
                 validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
                 validate_evidence_freshness = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1"
+                validate_evidence_privacy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-evidence-privacy.ps1"
                 validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
                 validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
                 validate_visible_answer_policy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>"

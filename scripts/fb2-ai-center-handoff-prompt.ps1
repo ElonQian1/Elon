@@ -141,7 +141,7 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 可执行命令"
-    foreach ($name in @("refresh_status", "read_status_refresh", "generate_context_pack_sample_request", "validate_context_pack_sample_set", "validate_exported_context_pack_sample_set", "validate_context_projection_log", "validate_user_scenario_audit", "validate_current_state", "validate_public_contract_status", "validate_server_deploy_status", "validate_read_only_direct_read", "validate_gap_action_board", "validate_evidence_freshness", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "validate_live_preflight_request", "validate_tokenless_continuation", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
+    foreach ($name in @("refresh_status", "read_status_refresh", "generate_context_pack_sample_request", "validate_context_pack_sample_set", "validate_exported_context_pack_sample_set", "validate_context_projection_log", "validate_user_scenario_audit", "validate_current_state", "validate_public_contract_status", "validate_server_deploy_status", "validate_read_only_direct_read", "validate_gap_action_board", "validate_evidence_freshness", "validate_evidence_privacy", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "validate_live_preflight_request", "validate_tokenless_continuation", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
         $value = Protect-Fb2PromptSecret -Text ([string](Get-Fb2PromptProperty $commands $name ""))
         if (-not [string]::IsNullOrWhiteSpace($value)) {
             Add-Fb2PromptLine -Lines $lines -Text ('- `{0}`: `{1}`' -f $name, $value)
@@ -251,6 +251,7 @@ function Invoke-Fb2PromptSelfTest {
                 validate_read_only_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json"
                 validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
                 validate_evidence_freshness = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1"
+                validate_evidence_privacy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-evidence-privacy.ps1"
                 validate_completion_matrix = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-completion-matrix.ps1"
                 validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
                 validate_visible_answer_policy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-answer-policy.ps1 -SummaryPath <DATA_ONLY_ACCEPTANCE_JSON>"
@@ -329,6 +330,7 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "validate_server_deploy_status") "server deploy status validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_read_only_direct_read") "read-only direct read validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_evidence_freshness") "evidence freshness validation command"
+        Assert-Fb2PromptSelfTest ($content -match "validate_evidence_privacy") "evidence privacy validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_completion_matrix") "completion matrix validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_handoff_prompt") "handoff prompt validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_live_preflight_request") "live preflight request validation command"

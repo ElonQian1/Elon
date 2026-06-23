@@ -57,6 +57,8 @@ fb2 子项目实现 `/api/main-project/context/pack` 时，优先读取主项目
 
 只需要确认当前账号能通过主项目群聊 API 直接读到 fb2 群消息时，先跑无写入预检：`scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password 123qwe`。它只做 session bridge、群成员检查和 baseline 消息读取，输出 `text_len`、`text_sha256` 和 `writes=false`，并写出 `fb2.main_project.visible_chat_readonly.v1` summary JSON；summary 会带最近 20 条消息的 `recent_messages` 索引，只保存消息 ID、类型、发送方、时间、正文长度和 sha256，不保存正文。该模式不会发送 `@EL`、不会触发 selected-message `AI回复`、不会创建总结帖。
 
+需要独立验证本地证据没有保存群聊正文、订单明细或真实密钥时，跑 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-evidence-privacy.ps1 -RefreshPath target\fb2-ai-center\status-refresh-current.json`。输出 schema 为 `fb2.main_project.evidence_privacy_validation.v1`，会读取 refresh/status/goal-audit/handoff/public-contract/sample validation 等 JSON artifact，拒绝真实 `FB2_AI_CENTER_TOKEN` / 密码、`text/content/body/message_text/raw_text/sample_text/full_text` 等正文承载字段，以及 `<fb2_context_pack>` 原文体；合格证据只能保留 `message_id`、`source_ids`、`text_len`、`text_sha256`、`context_pack_sha256`、audit id 和统计字段。
+
 fb2 回答的防编造保护分两层：prompt 内的 `context_gap_summary` 会提示模型哪些数据缺失；生成后还会经过 `external_app_context_gap_notice`。只要 fb2 外部上下文报告 readiness 阻断/降级、Context Pack 为空/过大/被截断或缺少可引用 Context Pack，最终聊天回复必须追加 `数据缺口` 行，明确不能把缺失数据编造成比赛、赔率、订单或群友观点事实。
 
 readiness 和总结帖状态也要分层：full final 必须要求 fb2 authenticated readiness 为 `ready`，并要求 summary post 为模型生成 `ready`；data-only 当前允许 readiness `partial` 和 summary `ready_with_fallback`，但 summary 必须显式写出 `summary_post_fallback_used`、`summary_post_ready_for_mode` 和 readiness 允许原因。`degraded`、`blocked`、`unavailable` 不能通过 data-only 或 full final。

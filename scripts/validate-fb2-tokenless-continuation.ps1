@@ -171,6 +171,7 @@ function New-Fb2TokenlessContinuationValidation {
         "validate_user_scenario_audit",
         "validate_current_state",
         "validate_gap_action_board",
+        "validate_evidence_privacy",
         "validate_handoff_prompt",
         "validate_live_preflight_request",
         "validate_tokenless_continuation",
@@ -200,6 +201,11 @@ function New-Fb2TokenlessContinuationValidation {
     Add-Fb2TokenlessCheck $checks "user scenario validator command targets product audit" (
         $userScenarioCommand -match "validate-fb2-user-scenario-audit\.ps1" -and
         $userScenarioCommand -match "user-scenario-audit-validation-current\.json"
+    )
+
+    $privacyCommand = [string](Get-Fb2TokenlessProperty $commands "validate_evidence_privacy" "")
+    Add-Fb2TokenlessCheck $checks "evidence privacy validator command targets raw-body boundary" (
+        $privacyCommand -match "validate-fb2-evidence-privacy\.ps1"
     )
 
     $readOnlyCommand = [string](Get-Fb2TokenlessProperty $commands "no_write_direct_read" "")
@@ -320,6 +326,7 @@ function New-Fb2TokenlessFixture {
             validate_user_scenario_audit = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-user-scenario-audit.ps1 -StatusPath target\fb2-ai-center\status-current.json -OutputPath target\fb2-ai-center\user-scenario-audit-validation-current.json"
             validate_current_state = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1"
             validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
+            validate_evidence_privacy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-evidence-privacy.ps1"
             validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
             validate_live_preflight_request = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-live-preflight-request.ps1 -StatusPath target\fb2-ai-center\status-current.json"
             validate_tokenless_continuation = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-tokenless-continuation.ps1 -OutputPath target\fb2-ai-center\tokenless-continuation-validation-current.json"
