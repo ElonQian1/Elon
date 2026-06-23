@@ -6,6 +6,7 @@
 
 ## 2026-06-22 线上验证快照
 
+- 2026-06-23 本轮修复 `status-refresh-current.json` 的 artifact 新鲜度显示：`status_refresh` 和 `handoff_prompt` 在脚本末尾生成，现已按 current-run generated 记录，正式刷新输出里二者均为 `exists=true`、`source_scope=current_output_dir`、`age_minutes=0.0`。接手会话可继续用 `evidence_freshness` 区分当前输出和历史证据，但不能把该字段当作 protected fb2 live 数据已刷新；缺 `FB2_AI_CENTER_TOKEN` 的结论不变。
 - 2026-06-23 08:54 当前主项目侧本轮收尾：上一轮代码已通过 `CodePushed` 门禁，`HEAD=origin/main=dd8e4dda`，worktree 干净。重新刷新 `status-refresh-current.json` 后仍显示非语音数据/聊天/权限/反馈闭环完成，`full_final_complete=false`；缺口仍是 `FB2_AI_CENTER_TOKEN` 的受保护 live preflight 刷新，以及用户已暂停的 ASR/TTS final-ready 真机证据。本轮另按 direct API read 口径只读 `ext_fb2_official`：`message_count=80`、样本 `gai_06537010425c467595cee04c585b2edf`、`text_len=292`、`text_sha256=b6f9bceebb28841a1380c002b3103e3d4264c8f1b4577a0af2855f537061fc1a`、`writes=false`。本次没有写真实群、没有截图验收、没有处理 ASR/TTS。
 - 2026-06-23 本轮补 read-only direct-read 隐私门槛：`Test-ReadOnlyDirectReadSummaryComplete` 会拒绝 summary 顶层或 `recent_messages` 中的 `text/content/body/message_text/raw_text/sample_text/full_text` 等正文承载字段。后续无写群直读 summary 只能保存消息 ID、发送方、时间、`text_len` 和 `text_sha256`；如果保存了群聊原文，状态/最终 wrapper 自测会失败。
 - 2026-06-23 本轮新增 `scripts\validate-fb2-visible-answer-policy.ps1`，用于离线复核 data-only/final acceptance summary 的 `visible_answer_policy_evidence`。状态快照现在输出 `latest_data_only_acceptance.visible_answer_policy_complete/missing`，`goal_gap_audit.completed` 会包含 `visible_answer_policy_validated`；非语音 ready 不再只看“有回复、有 feedback、有直读”，还要求回答策略证据证明来源、事实/推断分层、风险边界和反投注保证均通过。

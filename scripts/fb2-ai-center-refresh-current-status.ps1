@@ -276,13 +276,19 @@ function New-Fb2RefreshArtifactFreshness {
         [string]$Path,
         [string]$OutputDir,
         [string[]]$EvidenceDirs,
-        [datetime]$NowUtc
+        [datetime]$NowUtc,
+        [switch]$GeneratedInCurrentRun
     )
 
     $exists = -not [string]::IsNullOrWhiteSpace($Path) -and (Test-Path -LiteralPath $Path)
     $lastWriteUtc = $null
     $ageMinutes = $null
-    if ($exists) {
+    if ($GeneratedInCurrentRun) {
+        # 这两个文件在最终 summary 写入后才落盘；这里用本轮生成时间，避免交接误读为旧 artifact。
+        $exists = -not [string]::IsNullOrWhiteSpace($Path)
+        $lastWriteUtc = $NowUtc.ToString("o")
+        $ageMinutes = 0.0
+    } elseif ($exists) {
         $item = Get-Item -LiteralPath $Path
         $lastWriteUtc = $item.LastWriteTimeUtc.ToString("o")
         $ageMinutes = [math]::Round(($NowUtc - $item.LastWriteTimeUtc).TotalMinutes, 2)
@@ -308,6 +314,10 @@ function New-Fb2RefreshEvidenceFreshness {
     )
 
     $nowUtc = [datetime]::UtcNow
+    $generatedInCurrentRun = @{
+        status_refresh = $true
+        handoff_prompt = $true
+    }
     $artifactNames = @(
         "public_contract_status",
         "status",
@@ -325,7 +335,8 @@ function New-Fb2RefreshEvidenceFreshness {
                 -Path ([string](Get-Fb2RefreshProperty $Files $name "")) `
                 -OutputDir $OutputDir `
                 -EvidenceDirs $EvidenceDirs `
-                -NowUtc $nowUtc
+                -NowUtc $nowUtc `
+                -GeneratedInCurrentRun:$generatedInCurrentRun.ContainsKey($name)
         }
     )
     $currentOutputCount = @($artifacts | Where-Object { $_.source_scope -eq "current_output_dir" -and $_.exists }).Count
@@ -555,6 +566,13 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
         Assert-Fb2RefreshSelfTest ([string]$summary.evidence_freshness.schema -eq "fb2.main_project.evidence_freshness.v1") "evidence freshness schema"
         Assert-Fb2RefreshSelfTest (@($summary.evidence_freshness.artifacts).Count -gt 0) "evidence freshness artifacts"
+        $generatedArtifacts = @($summary.evidence_freshness.artifacts | Where-Object { @("status_refresh", "handoff_prompt") -contains [string]$_.name })
+        Assert-Fb2RefreshSelfTest (@($generatedArtifacts).Count -eq 2) "generated artifacts present"
+        foreach ($artifact in $generatedArtifacts) {
+            Assert-Fb2RefreshSelfTest ([bool]$artifact.exists) "generated artifact exists flag $($artifact.name)"
+            Assert-Fb2RefreshSelfTest ([string]$artifact.source_scope -eq "current_output_dir") "generated artifact scope $($artifact.name)"
+            Assert-Fb2RefreshSelfTest ([double]$artifact.age_minutes -eq 0.0) "generated artifact current age $($artifact.name)"
+        }
         Assert-Fb2RefreshSelfTest ([string]$summary.gap_action_board.schema -eq "fb2.main_project.gap_action_board.v1") "gap action board schema"
         Assert-Fb2RefreshSelfTest (@($summary.gap_action_board.actions).Count -gt 0) "gap action board actions"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
