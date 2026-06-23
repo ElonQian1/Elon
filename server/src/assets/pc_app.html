@@ -36,7 +36,7 @@
       <button class="rail-avatar doctor" id="doctorRail" type="button" data-label="电脑医生" aria-label="电脑医生">
         <span class="rail-icon doctor-icon" aria-hidden="true"></span>
       </button>
-      <button class="rail-avatar node" id="nodeRail" type="button" data-label="PC 节点" aria-label="PC 节点">
+      <button class="rail-avatar node" id="nodeRail" type="button" data-label="本机助手" aria-label="本机助手">
         <span class="rail-icon node-icon" aria-hidden="true"></span>
         <small id="nodeBadge"></small>
       </button>
@@ -96,8 +96,8 @@
         </button>
         <button class="account-menu-row" id="pcSettingsMenuBtn" type="button" role="menuitem">
           <span>
-            <strong>本地项目</strong>
-            <small>把电脑里的项目加入工作台</small>
+            <strong>导入电脑代码</strong>
+            <small>把已有代码文件夹加入工作台</small>
           </span>
         </button>
         <button class="account-menu-row danger" id="logoutMenuBtn" type="button" role="menuitem">
@@ -120,7 +120,7 @@
         </div>
         <div class="topbar-actions">
           <button class="text-button" id="openLegacyWebBtn" type="button">网页版</button>
-          <button class="text-button" id="openLocalNodeBtn" type="button">本机节点</button>
+          <button class="text-button" id="openLocalNodeBtn" type="button">本机助手</button>
         </div>
       </header>
 
@@ -163,9 +163,9 @@
           <button class="settings-nav-sub" type="button" data-settings-section="devices">已登录的设备</button>
           <button class="settings-nav-item" id="settingsWorkbenchTab" type="button" data-settings-section="workbench" role="tab" aria-selected="false">
             <span class="settings-nav-icon" aria-hidden="true">⚙</span>
-            <span>本地项目</span>
+            <span>电脑代码</span>
           </button>
-          <button class="settings-nav-sub" type="button" data-settings-section="workbench">添加项目</button>
+          <button class="settings-nav-sub" type="button" data-settings-section="workbench">导入文件夹</button>
           <button class="settings-nav-item" id="settingsNotificationsTab" type="button" data-settings-section="notifications" role="tab" aria-selected="false">
             <span class="settings-nav-icon" aria-hidden="true">●</span>
             <span>通知</span>
@@ -229,22 +229,22 @@
             </div>
           </section>
           <section class="settings-panel" id="settingsWorkbenchPanel" data-settings-panel="workbench">
-            <h2>添加本地项目</h2>
-            <p class="settings-panel-caption">先连接这台电脑，再选择项目文件夹。</p>
+            <h2>导入电脑代码文件夹</h2>
+            <p class="settings-panel-caption">把这台电脑已有的代码加入项目列表。普通新建项目请回到项目页点击“新建项目”。</p>
             <div class="settings-onboarding" id="settingsNodeStatusCard">
               <div class="settings-onboarding-head">
                 <div>
-                  <strong id="settingsNodeStatusTitle">正在检测本机节点</strong>
-                  <small id="settingsNodeStatusDetail">连接后就可以选择项目文件夹。</small>
+                  <strong id="settingsNodeStatusTitle">正在检测一龙 Win 端</strong>
+                  <small id="settingsNodeStatusDetail">连接后就可以选择电脑里的代码文件夹。</small>
                 </div>
                 <div class="settings-onboarding-actions">
                   <button class="text-button" id="refreshClientMaintenanceBtn" type="button">重新检测</button>
-                  <button class="text-button" id="openNodeSetupFromSettingsBtn" type="button">安装 / 帮助</button>
+                  <button class="text-button" id="openNodeSetupFromSettingsBtn" type="button">为什么需要</button>
                 </div>
               </div>
             </div>
             <div class="settings-project-bind">
-              <button class="send-button" id="chooseProjectFolderBtn" type="button">启动本机节点</button>
+              <button class="send-button" id="chooseProjectFolderBtn" type="button">连接这台电脑</button>
             </div>
             <div class="settings-project-meta" id="settingsProjectMeta">尚未选择项目目录</div>
             <div id="settingsProjectResult"></div>
@@ -287,7 +287,7 @@
               <div class="settings-info-list settings-maintenance-list">
                 <div class="settings-info-row">
                 <div>
-                  <span>本机节点客户端</span>
+                  <span>本机助手客户端</span>
                   <strong id="settingsClientStatus">尚未读取</strong>
                 </div>
               </div>
@@ -308,13 +308,13 @@
               <div class="settings-info-row settings-client-action-row">
                 <div>
                   <span>可用维护操作</span>
-                  <div id="settingsClientActions" class="settings-client-actions-placeholder">刷新本机节点后显示每个操作是否可用。</div>
+                  <div id="settingsClientActions" class="settings-client-actions-placeholder">刷新本机助手后显示每个操作是否可用。</div>
                 </div>
               </div>
               <div class="settings-info-row">
                 <div>
                   <span>更新和卸载</span>
-                  <strong>检查更新会使用完整客户端包；卸载会退出本机节点并清理安装目录。</strong>
+                  <strong>检查更新会使用完整客户端包；卸载会退出本机助手并清理安装目录。</strong>
                 </div>
                 <div class="settings-row-actions">
                   <button class="text-button" id="checkClientUpdateBtn" type="button">检查更新</button>
@@ -324,7 +324,7 @@
               <div class="settings-info-row">
                 <div>
                   <span>CLI 会话桥接</span>
-                  <strong id="settingsCliBridgeStatus">读取本机节点后显示会话连续性能力。</strong>
+                  <strong id="settingsCliBridgeStatus">读取本机助手后显示会话连续性能力。</strong>
                 </div>
               </div>
             </div>

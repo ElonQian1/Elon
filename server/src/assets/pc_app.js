@@ -203,7 +203,7 @@
     try {
       return await fetch(nodeAdminEndpoint(path), request);
     } catch (error) {
-      throw new Error(`无法连接本机 PC 节点 ${state.nodeAdminUrl}，请确认一龙 PC 节点正在运行并已更新。`);
+      throw new Error(`无法连接本机助手 ${state.nodeAdminUrl}，请确认一龙 Win 端正在运行并已更新。`);
     }
   }
 
@@ -1480,30 +1480,40 @@
           <p>集中管理个人项目、联合项目和已加入的协作空间。</p>
         </div>
         <div class="pc-project-actions">
-          <button class="text-button" type="button" id="projectRegisterLocalBtn">注册本地项目</button>
+          <button class="send-button" type="button" id="projectCreateBtn">新建项目</button>
+          <button class="text-button" type="button" id="projectRegisterLocalBtn">导入电脑代码文件夹</button>
           <button class="text-button" type="button" id="projectOpenWebBtn">打开网页版项目页</button>
         </div>
       </div>
       ${projects.length ? `<div class="pc-project-grid">${projects.map(renderProjectCard).join('')}</div>` : `<div class="pc-project-empty">
         <strong>还没有项目</strong>
-        <span>可以注册本机代码目录，或从项目广场加入公开项目。</span>
+        <span>可以新建一个项目，或导入这台电脑上已有的代码文件夹。</span>
         <div class="pc-project-empty-actions">
-          <button class="send-button" type="button" id="projectEmptyRegisterBtn">注册本地项目</button>
+          <button class="send-button" type="button" id="projectEmptyCreateBtn">新建项目</button>
+          <button class="text-button" type="button" id="projectEmptyRegisterBtn">导入电脑代码文件夹</button>
           <button class="text-button" type="button" id="projectEmptyPlazaBtn">去项目广场</button>
         </div>
       </div>`}
     </section>`;
+    const createBtn = $('projectCreateBtn');
+    if (createBtn) createBtn.addEventListener('click', openWebNewProject);
     const registerBtn = $('projectRegisterLocalBtn');
-    if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }));
+    if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench'));
     const webBtn = $('projectOpenWebBtn');
     if (webBtn) webBtn.addEventListener('click', () => window.open('/web', '_blank'));
+    const emptyCreateBtn = $('projectEmptyCreateBtn');
+    if (emptyCreateBtn) emptyCreateBtn.addEventListener('click', openWebNewProject);
     const emptyRegisterBtn = $('projectEmptyRegisterBtn');
-    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }));
+    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench'));
     const emptyPlazaBtn = $('projectEmptyPlazaBtn');
     if (emptyPlazaBtn) emptyPlazaBtn.addEventListener('click', selectProjectPlaza);
     els.messageList.querySelectorAll('[data-open-project-id]').forEach((button) => {
       button.addEventListener('click', () => selectProject(button.dataset.openProjectId));
     });
+  }
+
+  function openWebNewProject() {
+    window.open('/web?tab=project&newProject=1', '_blank');
   }
 
   function renderProjectCard(project) {
@@ -2578,8 +2588,8 @@
       els.settingsSubtitle.textContent = '账号信息、登录状态和安全设置';
     } else if (selected === 'workbench') {
       els.settingsWorkbenchPanel.classList.add('active');
-      $('settingsTitle').textContent = '本地项目';
-      els.settingsSubtitle.textContent = '选择文件夹并加入项目列表';
+      $('settingsTitle').textContent = '导入电脑代码';
+      els.settingsSubtitle.textContent = '只在导入本机已有代码时需要';
     } else if (selected === 'notifications') {
       els.settingsNotificationsPanel.classList.add('active');
       $('settingsTitle').textContent = '通知';
@@ -2656,27 +2666,27 @@
     const info = state.localProjectInfo || null;
     const blocked = !!(info && info.canRegister === false);
     const launchAttempted = !!state.localNodeLaunchAttempted && !connected;
-    let title = launchAttempted ? '没有检测到本机节点' : '先启动本机节点';
+    let title = launchAttempted ? '还不能读取电脑文件夹' : '需要连接这台电脑';
     let detail = launchAttempted
-      ? '可能还没安装 Win 端，或浏览器没有成功拉起本机程序。请打开安装页面处理。'
-      : `点击下方按钮；如果浏览器询问是否打开“一龙PC节点”，请选择允许。`;
-    let actionLabel = launchAttempted ? '下载 / 安装本机节点' : '启动本机节点';
+      ? '可能还没安装一龙 Win 端，或浏览器没有成功打开本机助手。'
+      : '网页不能直接读取本机文件夹或运行 Git，需要一龙 Win 端帮你选择目录。';
+    let actionLabel = launchAttempted ? '下载 / 安装一龙 Win 端' : '连接这台电脑';
 
     if (connected && !path) {
       state.localNodeLaunchAttempted = false;
-      title = '本机节点已连接';
-      detail = '现在选择一个项目文件夹即可加入列表。';
-      actionLabel = '选择项目文件夹';
+      title = '已连接这台电脑';
+      detail = '现在可以选择电脑里的代码文件夹。';
+      actionLabel = '选择代码文件夹';
     } else if (connected && blocked) {
       state.localNodeLaunchAttempted = false;
       title = '还差一点项目信息';
       detail = '打开“排查 / 高级设置”，补齐缺少字段后再注册。';
-      actionLabel = '重新选择项目文件夹';
+      actionLabel = '重新选择代码文件夹';
     } else if (connected && path) {
       state.localNodeLaunchAttempted = false;
       title = '项目目录已选好';
       detail = '正在加入项目列表，完成后会自动打开项目。';
-      actionLabel = '重新选择项目文件夹';
+      actionLabel = '重新选择代码文件夹';
     }
 
     if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = title;
@@ -2705,7 +2715,7 @@
       els.settingsClientStatus.textContent = '尚未读取';
       els.settingsClientPaths.textContent = '任务记录、配置和安装目录会显示在这里。';
       renderClientMaintenanceActions(null);
-      if (els.settingsCliBridgeStatus) els.settingsCliBridgeStatus.textContent = '读取本机节点后显示会话连续性能力。';
+      if (els.settingsCliBridgeStatus) els.settingsCliBridgeStatus.textContent = '读取本机助手后显示会话连续性能力。';
       updateWorkbenchOnboarding();
       return;
     }
@@ -2749,12 +2759,12 @@
   function renderClientMaintenanceActions(actions) {
     if (!els.settingsClientActions) return;
     if (!Array.isArray(actions) || !actions.length) {
-      els.settingsClientActions.textContent = '刷新本机节点后显示每个操作是否可用。';
+      els.settingsClientActions.textContent = '刷新本机助手后显示每个操作是否可用。';
       return;
     }
     els.settingsClientActions.innerHTML = `<div class="settings-client-actions">${actions.map((action) => {
       const label = clean(action && action.label) || clean(action && action.id) || '维护操作';
-      const description = clean(action && action.description) || '本机节点未返回说明。';
+      const description = clean(action && action.description) || '本机助手未返回说明。';
       const enabled = action && action.enabled !== false;
       const tone = clean(action && action.tone);
       const status = enabled ? '可用' : disabledMaintenanceActionReason(action);
@@ -2829,7 +2839,7 @@
   function cliSessionBridgeLine(bridge) {
     const summary = clean(bridge && bridge.summary);
     if (summary) return summary;
-    if (!bridge) return '本机节点未返回 CLI 会话桥接状态。';
+    if (!bridge) return '本机助手未返回 CLI 会话桥接状态。';
     const modes = Array.isArray(bridge.continuity_modes)
       ? bridge.continuity_modes.map(clean).filter(Boolean).slice(0, 3).join(' / ')
       : '';
@@ -2846,12 +2856,12 @@
       if (showResult) setSettingsResult('客户端维护状态已刷新。');
     } catch (error) {
       applyClientMaintenanceStatus(null);
-      if (els.settingsClientStatus) els.settingsClientStatus.textContent = '无法连接本机节点';
+      if (els.settingsClientStatus) els.settingsClientStatus.textContent = '无法连接本机助手';
       if (els.settingsClientPaths) els.settingsClientPaths.textContent = clean(error.message || error);
       if (showResult) {
         state.localNodeLaunchAttempted = true;
         updateWorkbenchOnboarding();
-        setSettingsResult('还没有检测到本机节点。请点击绿色按钮打开下载和安装页面。', 'note');
+        setSettingsResult('还不能读取电脑文件夹。请点击绿色按钮打开下载和安装页面。', 'note');
       }
     } finally {
       setSettingsBusy(els.refreshClientMaintenanceBtn, false);
@@ -2866,9 +2876,9 @@
   function startLocalNodeFromSettings() {
     setSettingsResult('');
     state.localNodeLaunchAttempted = true;
-    if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = '正在尝试启动本机节点';
+    if (els.settingsNodeStatusTitle) els.settingsNodeStatusTitle.textContent = '正在连接这台电脑';
     if (els.settingsNodeStatusDetail) {
-      els.settingsNodeStatusDetail.textContent = '如果浏览器弹出确认框，请选择允许；启动后会自动重新检测。';
+      els.settingsNodeStatusDetail.textContent = '如果浏览器弹出确认框，请选择允许；连接成功后会自动进入文件夹选择。';
     }
     launchClientProtocol(CLIENT_PROTOCOL_TARGETS.open);
     setSettingsBusy(els.chooseProjectFolderBtn, true, '等待启动…');
@@ -2877,7 +2887,7 @@
     window.setTimeout(() => {
       setSettingsBusy(els.chooseProjectFolderBtn, false);
       if (!state.clientMaintenance) {
-        setSettingsResult('没有检测到本机节点。请点击绿色按钮打开下载和安装页面。', 'note');
+        setSettingsResult('还不能读取电脑文件夹。请点击绿色按钮打开下载和安装页面。', 'note');
       }
       updateWorkbenchOnboarding();
     }, 3600);
@@ -2895,7 +2905,7 @@
       const protocolUrl = clientProtocolUrlForTarget(target);
       if (protocolUrl) {
         launchClientProtocol(protocolUrl);
-        setSettingsResult(`本机节点暂时不可达，已请求 Win 端打开：${escapeHtml(target)}`);
+        setSettingsResult(`本机助手暂时不可达，已请求 Win 端打开：${escapeHtml(target)}`);
       } else {
         setSettingsResult(escapeHtml(error.message || error), 'error');
       }
@@ -2947,7 +2957,7 @@
   }
 
   async function triggerClientUninstall() {
-    const ok = window.confirm('确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。');
+    const ok = window.confirm('确认卸载一龙 Win 端本机助手？卸载会退出本机助手并清理安装目录。');
     if (!ok) return;
     setSettingsBusy(els.uninstallClientBtn, true, '卸载中…');
     try {
@@ -3106,7 +3116,7 @@
 
   async function grantLocalProjectFullAccess(project, workspacePath) {
     const projectId = clean(project && project.id);
-    if (!projectId) throw new Error('云端项目 ID 缺失，无法写入本机完全访问授权。');
+    if (!projectId) throw new Error('云端项目 ID 缺失，无法写入这台电脑的完全访问授权。');
     await localNodeApi('/api/full-access/grants', {
       method: 'POST',
       body: JSON.stringify({
@@ -3205,7 +3215,7 @@
     }
     const runtimeMode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
     if (runtimeMode === 'full_access') {
-      const ok = window.confirm(`确认给项目「${name}」开启本机完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；这次确认会写入当前 PC 节点的本机授权记录。`);
+      const ok = window.confirm(`确认给项目「${name}」开启本机完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；这次确认会写入这台电脑的本机授权记录。`);
       if (!ok) {
         setSettingsResult('已取消完全访问授权，项目尚未注册。');
         setSettingsBusy(els.registerProjectBtn, false);

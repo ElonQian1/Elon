@@ -2357,15 +2357,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       </select>
     </div>
     <div>
-      <label for="projectNodeSelect">PC 节点</label>
+      <label for="projectNodeSelect">开发环境</label>
       <select id="projectNodeSelect" disabled>
-        <option value="">正在加载你的 PC 节点...</option>
+        <option value="">正在加载可用开发环境...</option>
       </select>
     </div>
     <div>
-      <label for="projectStorageNodeSelect">代码硬盘节点（可选）</label>
+      <label for="projectStorageNodeSelect">代码存储（可选）</label>
       <select id="projectStorageNodeSelect" disabled>
-        <option value="">自动选择可用硬盘节点</option>
+        <option value="">自动选择可用存储</option>
       </select>
       <div class="hint-text" id="projectStorageHint"></div>
     </div>
@@ -2953,7 +2953,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       '项目 ID：' + (data.project_id || (currentProject && currentProject.id) || ''),
       '来源：' + (data.source_type || ''),
       '工作区：' + (data.workspace || ''),
-      data.storage_node_id ? '硬盘节点：' + data.storage_node_id : '',
+      data.storage_node_id ? '代码存储：' + data.storage_node_id : '',
       data.storage_worktree_path ? '本机硬盘目录：' + data.storage_worktree_path : '',
       data.storage_repo_url ? '硬盘 Git 地址：' + data.storage_repo_url : '',
       data.storage_repo_path ? '硬盘母仓：' + data.storage_repo_path : '',
@@ -5419,12 +5419,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectBranchInput.value = '';
     if (projectStorageHint) projectStorageHint.textContent = '';
     loadProjectCreateNodes().catch((err) => {
-      projectNodeSelect.innerHTML = '<option value="">加载 PC 节点失败</option>';
+      projectNodeSelect.innerHTML = '<option value="">加载开发环境失败</option>';
       projectNodeSelect.disabled = true;
-      projectStorageNodeSelect.innerHTML = '<option value="">加载硬盘节点失败</option>';
+      projectStorageNodeSelect.innerHTML = '<option value="">加载代码存储失败</option>';
       projectStorageNodeSelect.disabled = true;
       if (projectStorageHint) projectStorageHint.textContent = '';
-      newProjectError.textContent = err.message || '加载 PC 节点失败';
+      newProjectError.textContent = err.message || '加载开发环境失败';
     });
     newProjectMask.classList.add('active');
     setTimeout(() => projectNameInput.focus(), 50);
@@ -5432,16 +5432,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function closeNewProject() { newProjectMask.classList.remove('active'); }
   async function loadProjectCreateNodes() {
     projectNodeSelect.disabled = true;
-    projectNodeSelect.innerHTML = '<option value="">正在加载在线 PC 节点...</option>';
+    projectNodeSelect.innerHTML = '<option value="">正在加载可用开发环境...</option>';
     projectStorageNodeSelect.disabled = true;
-    projectStorageNodeSelect.innerHTML = '<option value="">正在加载硬盘节点...</option>';
+    projectStorageNodeSelect.innerHTML = '<option value="">正在加载代码存储...</option>';
     const res = await api('/api/nodes');
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data.error || '加载 PC 节点失败');
+    if (!res.ok) throw new Error(data.error || '加载开发环境失败');
     const nodes = (data.nodes || []).filter((node) => node.online && (node.node_id || node.agent_id));
     if (!nodes.length) {
-      projectNodeSelect.innerHTML = '<option value="">没有在线 PC 节点</option>';
-      projectStorageNodeSelect.innerHTML = '<option value="">没有在线硬盘节点</option>';
+      projectNodeSelect.innerHTML = '<option value="">没有在线开发环境</option>';
+      projectStorageNodeSelect.innerHTML = '<option value="">没有可用代码存储</option>';
       return;
     }
     const orderedNodes = nodes.slice().sort((left, right) => {
@@ -5458,7 +5458,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }).join('');
     projectNodeSelect.innerHTML = selectableCount > 0
       ? options
-      : '<option value="">暂无可创建项目的 PC 节点</option>' + options;
+      : '<option value="">暂无可创建项目的开发环境</option>' + options;
     projectNodeSelect.disabled = false;
     const storageNodes = nodes
       .filter((node) => (node.storage_ready || (node.storage && node.storage.enabled)) && node.storage_repo_url_configured)
@@ -5479,19 +5479,19 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const selected = preferredStorageReady && nodeId === preferredStorageNodeId ? ' selected' : '';
       return `<option value="${escapeHtml(nodeId)}"${selected}>${escapeHtml(label)} · ${escapeHtml(shortId)} · ${escapeHtml(configured)}</option>`;
     }).join('');
-    projectStorageNodeSelect.innerHTML = '<option value="">自动选择可用硬盘节点</option>' + storageOptions;
+    projectStorageNodeSelect.innerHTML = '<option value="">自动选择可用存储</option>' + storageOptions;
     projectStorageNodeSelect.disabled = false;
     if (projectStorageHint) {
       if (preferredStorageReady) {
-        projectStorageHint.textContent = '已自动选择当前 Windows PC 作为代码硬盘节点，项目会在本机硬盘保留可见目录。';
+        projectStorageHint.textContent = '已自动选择当前 Windows PC 保存代码，项目会在本机硬盘保留可见目录。';
       } else if (preferredStorageNode) {
-        projectStorageHint.textContent = '当前 Windows PC 尚未启用可跨 PC 的硬盘服务；可在本地管理页启用硬盘服务并确认已安装 Git。';
+        projectStorageHint.textContent = '当前 Windows PC 尚未启用跨设备代码存储；可在本地管理页启用硬盘服务并确认已安装 Git。';
       } else if (preferredStorageNodeId) {
-        projectStorageHint.textContent = '当前 Windows PC 暂未连接到账号节点列表，先按在线硬盘节点自动选择。';
+        projectStorageHint.textContent = '当前 Windows PC 暂未连接到账号设备列表，先按在线代码存储自动选择。';
       } else {
         projectStorageHint.textContent = storageNodes.length
-          ? '可选硬盘节点会保存项目母仓；远程算力节点可从这里重建项目。'
-          : '没有可用硬盘节点时，项目仍会创建在所选 PC 算力节点上。';
+          ? '可选代码存储会保存项目母仓；远程开发环境可从这里重建项目。'
+          : '没有可用代码存储时，项目仍会创建在所选开发环境上。';
       }
     }
   }
@@ -5520,7 +5520,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     createProjectBtn.disabled = true;
     newProjectError.textContent = '';
     try {
-      if (!projectNodeSelect.value) throw new Error('请先选择一个可创建项目的 PC 节点');
+      if (!projectNodeSelect.value) throw new Error('请先选择一个可创建项目的开发环境');
       const res = await api('/api/projects', {
         method: 'POST',
         body: JSON.stringify({
@@ -6734,7 +6734,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       return;
     }
     showApp();
-    switchTab(pageParams.get('tab') === 'profile' ? 'profilePage' : 'chatPage');
+    const requestedTab = pageParams.get('tab');
+    const shouldOpenNewProject = pageParams.get('newProject') === '1';
+    if (shouldOpenNewProject || requestedTab === 'project' || requestedTab === 'projects') {
+      switchTab('projectPage');
+      if (shouldOpenNewProject) setTimeout(openNewProject, 80);
+    } else {
+      switchTab(requestedTab === 'profile' ? 'profilePage' : 'chatPage');
+    }
     connectAppSocket();
     // 后续数据加载失败不踢回登录页，仅在控制台告警
     Promise.all([
