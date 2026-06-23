@@ -382,6 +382,63 @@
       </form>
     </section>
   </div>
+  <div class="pc-project-create-backdrop" id="pcProjectCreateBackdrop" hidden>
+    <form class="pc-project-create-dialog" id="pcProjectCreateForm" role="dialog" aria-modal="true" aria-labelledby="pcProjectCreateTitle">
+      <header class="pc-project-create-header">
+        <div>
+          <strong id="pcProjectCreateTitle">新建项目</strong>
+          <span>云端 APK 开发项目</span>
+        </div>
+        <button class="pc-project-create-close" id="pcProjectCreateCloseBtn" type="button" title="关闭">×</button>
+      </header>
+      <div class="pc-project-create-body">
+        <label class="settings-field">
+          <span>项目名</span>
+          <input id="pcProjectNameInput" maxlength="40" required placeholder="例如：记账小助手" autocomplete="off" />
+        </label>
+        <label class="settings-field">
+          <span>一句话描述（可选）</span>
+          <textarea id="pcProjectDescInput" rows="3" placeholder="想做什么样的 App？给 AI 一点上下文"></textarea>
+        </label>
+        <label class="settings-field">
+          <span>起步模板</span>
+          <select id="pcProjectTemplateSelect">
+            <option value="android_kotlin">Android（Kotlin）</option>
+            <option value="android_compose">Android（Compose）</option>
+          </select>
+        </label>
+        <label class="settings-field">
+          <span>开发环境</span>
+          <select id="pcProjectNodeSelect" disabled>
+            <option value="">正在加载可用开发环境...</option>
+          </select>
+        </label>
+        <label class="settings-field">
+          <span>代码存储（可选）</span>
+          <select id="pcProjectStorageNodeSelect" disabled>
+            <option value="">自动选择可用存储</option>
+          </select>
+        </label>
+        <div class="pc-project-create-hint" id="pcProjectStorageHint"></div>
+        <details class="settings-advanced pc-project-create-advanced">
+          <summary>Git 设置（可选）</summary>
+          <label class="settings-field">
+            <span>Git 远端</span>
+            <input id="pcProjectRepoInput" placeholder="git@github.com:you/project.git" autocomplete="off" />
+          </label>
+          <label class="settings-field">
+            <span>Git 分支</span>
+            <input id="pcProjectBranchInput" placeholder="main" autocomplete="off" />
+          </label>
+        </details>
+        <div class="pc-project-create-error" id="pcProjectCreateError"></div>
+      </div>
+      <footer class="pc-project-create-actions">
+        <button class="text-button" id="pcProjectCreateCancelBtn" type="button">取消</button>
+        <button class="send-button" id="pcProjectCreateSubmitBtn" type="submit">创建</button>
+      </footer>
+    </form>
+  </div>
 
   <script src="/assets/pc_app_utils.js"></script>
   <script src="/assets/pc_app_markdown.js"></script>
@@ -394,6 +451,7 @@
   <script src="/assets/pc_voice_project.js"></script>
   <script src="/assets/pc_app_notifications.js"></script>
   <script src="/assets/pc_app_models.js"></script>
+  <script src="/assets/pc_app_project_create.js"></script>
   <script src="/assets/pc_app_dev_composer.js"></script>
   <script src="/assets/pc_app_dev_tasks.js"></script>
   <script src="/assets/pc_app_agent_runs.js"></script>

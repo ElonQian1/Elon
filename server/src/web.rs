@@ -43,6 +43,7 @@ const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
 const PC_VOICE_PROJECT_JS: &str = include_str!("assets/pc_voice_project.js");
 const PC_APP_NOTIFICATIONS_JS: &str = include_str!("assets/pc_app_notifications.js");
 const PC_APP_MODELS_JS: &str = include_str!("assets/pc_app_models.js");
+const PC_APP_PROJECT_CREATE_JS: &str = include_str!("assets/pc_app_project_create.js");
 const PC_APP_DEV_COMPOSER_JS: &str = include_str!("assets/pc_app_dev_composer.js");
 const PC_APP_DEV_TASKS_JS: &str = include_str!("assets/pc_app_dev_tasks.js");
 const PC_APP_AGENT_RUNS_JS: &str = include_str!("assets/pc_app_agent_runs.js");
@@ -409,6 +410,19 @@ pub async fn pc_app_models_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PC_APP_MODELS_JS,
+    )
+}
+
+pub async fn pc_app_project_create_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        PC_APP_PROJECT_CREATE_JS,
     )
 }
 

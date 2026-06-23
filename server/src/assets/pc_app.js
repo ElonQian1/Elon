@@ -88,10 +88,18 @@
     settingsProjectDesc: $('settingsProjectDesc'), settingsProjectRepo: $('settingsProjectRepo'),
     settingsProjectBranch: $('settingsProjectBranch'), settingsProjectMeta: $('settingsProjectMeta'),
     settingsProjectResult: $('settingsProjectResult'), settingsRuntimePermission: $('settingsRuntimePermission'),
-    settingsRuntimePermissionHint: $('settingsRuntimePermissionHint')
+    settingsRuntimePermissionHint: $('settingsRuntimePermissionHint'),
+    pcProjectCreateBackdrop: $('pcProjectCreateBackdrop'), pcProjectCreateForm: $('pcProjectCreateForm'),
+    pcProjectCreateCloseBtn: $('pcProjectCreateCloseBtn'), pcProjectCreateCancelBtn: $('pcProjectCreateCancelBtn'),
+    pcProjectNameInput: $('pcProjectNameInput'), pcProjectDescInput: $('pcProjectDescInput'),
+    pcProjectTemplateSelect: $('pcProjectTemplateSelect'), pcProjectNodeSelect: $('pcProjectNodeSelect'),
+    pcProjectStorageNodeSelect: $('pcProjectStorageNodeSelect'), pcProjectStorageHint: $('pcProjectStorageHint'),
+    pcProjectRepoInput: $('pcProjectRepoInput'), pcProjectBranchInput: $('pcProjectBranchInput'),
+    pcProjectCreateError: $('pcProjectCreateError'), pcProjectCreateSubmitBtn: $('pcProjectCreateSubmitBtn')
   };
 
   let models = null;
+  let projectCreate = null;
   let devComposer = null;
   let devTasks = null;
   let agentRuns = null;
@@ -118,6 +126,10 @@
     api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject
   });
   models = window.ElonPcModels.create({ state, els, clean, escapeHtml, api });
+  projectCreate = window.ElonPcProjectCreate.create({
+    state, els, clean, escapeHtml, api, loadBaseData, selectProject,
+    refreshActive, renderProjectRail, sameId
+  });
   devComposer = window.ElonPcDevComposer.create({
     state, els, clean, escapeHtml, openSettings,
     selectNode: () => node.selectNode(),
@@ -1244,6 +1256,7 @@
     els.pcAuthCloseBtn.addEventListener('click', closeAuthModal);
     document.addEventListener('pointerdown', keepAuthModalOpenOnOutsideClick, true);
     document.addEventListener('click', keepAuthModalOpenOnOutsideClick, true);
+    projectCreate.bindEvents();
     [els.aiRail, els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail, els.apkRail].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     els.apkRail.addEventListener('click', selectApkDownload);
@@ -1310,6 +1323,10 @@
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape' && els.pcAuthBackdrop && !els.pcAuthBackdrop.hidden) {
         closeAuthModal();
+        return;
+      }
+      if (event.key === 'Escape' && els.pcProjectCreateBackdrop && !els.pcProjectCreateBackdrop.hidden) {
+        projectCreate.close();
         return;
       }
       if (event.key === 'Escape' && els.accountMenu && !els.accountMenu.hidden) {
@@ -1496,13 +1513,13 @@
       </div>`}
     </section>`;
     const createBtn = $('projectCreateBtn');
-    if (createBtn) createBtn.addEventListener('click', openWebNewProject);
+    if (createBtn) createBtn.addEventListener('click', openPcProjectCreate);
     const registerBtn = $('projectRegisterLocalBtn');
     if (registerBtn) registerBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }));
     const webBtn = $('projectOpenWebBtn');
     if (webBtn) webBtn.addEventListener('click', () => window.open('/web', '_blank'));
     const emptyCreateBtn = $('projectEmptyCreateBtn');
-    if (emptyCreateBtn) emptyCreateBtn.addEventListener('click', openWebNewProject);
+    if (emptyCreateBtn) emptyCreateBtn.addEventListener('click', openPcProjectCreate);
     const emptyRegisterBtn = $('projectEmptyRegisterBtn');
     if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }));
     const emptyPlazaBtn = $('projectEmptyPlazaBtn');
@@ -1512,8 +1529,13 @@
     });
   }
 
-  function openWebNewProject() {
-    window.open('/web?tab=project&newProject=1', '_blank');
+  function openPcProjectCreate() {
+    if (!state.token) {
+      openAuthModal('login');
+      return;
+    }
+    closeSettings();
+    projectCreate.open();
   }
 
   function renderProjectCard(project) {

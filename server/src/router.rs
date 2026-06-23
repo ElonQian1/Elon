@@ -110,6 +110,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/assets/pc_app_models.js", get(web::pc_app_models_js))
         .route(
+            "/assets/pc_app_project_create.js",
+            get(web::pc_app_project_create_js),
+        )
+        .route(
             "/assets/pc_app_dev_composer.js",
             get(web::pc_app_dev_composer_js),
         )
