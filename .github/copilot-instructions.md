@@ -75,6 +75,7 @@
 - **后端运行代码变更**：先 commit + push 到 `origin/main`，再运行 `.\scripts\publish-server.ps1`；脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`。版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。并行任务若发布被后续 main 或服务器版本超越，汇报代码已推送和发布被最新主线接管，不要重复 rebase 重跑。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
 - **Android 新功能默认先同步代码到远端主线**；只有用户明确要求交付安装包、下载链接或线上 APK 时，才把发布成功作为完成定义
 - **新建文件必须显式 `git add`**：`git add server/src/main.rs` 不会自动包含同目录新建的 `.rs` 文件；提交前必须检查 `git status --short | Select-String "^\?\?"` 确认无遗漏——遗漏新文件会导致其他开发者编译失败
+- **Rust 全量格式化必须带 crate edition**：不要在仓库根裸跑 `rustfmt` 或无 manifest 的 `cargo fmt`；全量检查用 `powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1`（Linux：`bash scripts/format-rust.sh`），全量写入用 `-Apply` / `--apply`。脚本会逐个 `Cargo.toml` 调 `cargo fmt --manifest-path`，让 rustfmt 使用 crate 里的显式 `edition`。
 
 ---
 

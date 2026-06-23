@@ -553,6 +553,145 @@ fn stress_restart_resume_contract_never_claims_lost_control_handles() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+async fn stress_restart_waiting_approvals_fall_back_to_snapshot_continue() {
+    let dir = unique_test_dir("restart-waiting-approval-pressure");
+    let _ = fs::remove_dir_all(&dir);
+    let journal = TaskJournal::new(&dir);
+    let registry = ActiveCliPromptRegistry::new();
+    let approval_state = ToolApprovalState::default();
+    let task_count = 72;
+
+    for task_index in 0..task_count {
+        let route = if task_index % 2 == 0 {
+            "route_b_api_runtime"
+        } else {
+            "route_c_server_runtime"
+        };
+        let cli_name = if task_index % 2 == 0 {
+            "api-runtime"
+        } else {
+            "server-runtime"
+        };
+        let req_id = format!("req-restart-approval-{task_index:03}");
+        let approval_id = format!("tap_{task_index}_1");
+        journal
+            .record_started(TaskJournalStart {
+                req_id: &req_id,
+                cli_name,
+                route: Some(route),
+                run_handle_id: Some(&req_id),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("waiting-approval task should start before restart pressure");
+        journal
+            .record_cli_chunk(
+                &req_id,
+                "runtime",
+                &serde_json::to_string(&json!({
+                    "type": "tool_approval_required",
+                    "approval_id": approval_id,
+                    "tool": "write_file",
+                    "status": "waiting_approval"
+                }))
+                .expect("approval event should serialize"),
+            )
+            .expect("waiting approval event should persist before restart");
+
+        let (_waiter, pending) = {
+            let waiter = approval_state.register(&req_id, &approval_id).await;
+            let pending = approval_state.pending_for_req(&req_id).await;
+            (waiter, pending)
+        };
+        assert_eq!(
+            pending
+                .iter()
+                .map(|approval| approval.approval_id.as_str())
+                .collect::<Vec<_>>(),
+            vec![approval_id.as_str()],
+            "live task should expose its pending approval before restart"
+        );
+
+        let (handle, _cancel_rx) = active_handle_with_rx(&req_id, route);
+        assert!(
+            registry.try_insert(handle).await,
+            "live handle should be inserted before restart"
+        );
+        let active = registry
+            .view(&req_id, pending)
+            .await
+            .expect("live handle should be visible before restart");
+        let record = read_registry(&dir)
+            .get(&req_id)
+            .cloned()
+            .expect("journal record should exist before restart");
+        let live_resume = task_resume_contract(&task_attach_state(Some(&record), Some(active)));
+        let live_resume_json =
+            serde_json::to_value(live_resume).expect("live resume should serialize");
+        assert_eq!(live_resume_json["status"], "live");
+        assert_eq!(live_resume_json["can_approve_tools"], true);
+        assert_eq!(
+            live_resume_json["active_approval_ids"],
+            json!([approval_id])
+        );
+        assert_eq!(
+            live_resume_json["strategy"]["kind"],
+            "control_handle_reconnect"
+        );
+    }
+
+    let restarted_approval_state = ToolApprovalState::default();
+    let registry_after_restart = read_registry(&dir);
+    assert_eq!(registry_after_restart.len(), task_count);
+    for task_index in 0..task_count {
+        let req_id = format!("req-restart-approval-{task_index:03}");
+        let approval_id = format!("tap_{task_index}_1");
+        let record = registry_after_restart
+            .get(&req_id)
+            .expect("waiting-approval record should survive restart");
+        let resume = task_resume_contract(&task_attach_state(Some(record), None));
+        let resume_json = serde_json::to_value(resume).expect("detached resume should serialize");
+
+        assert_eq!(resume_json["status"], "detached");
+        assert_eq!(resume_json["strategy"]["kind"], "snapshot_continue");
+        assert_eq!(resume_json["next_action"], "continue_from_snapshot");
+        assert_eq!(resume_json["can_reconnect"], false);
+        assert_eq!(resume_json["can_cancel"], false);
+        assert_eq!(resume_json["can_approve_tools"], false);
+        assert_eq!(resume_json["active_approval_ids"], json!([]));
+        assert_eq!(resume_json["run_handle"], Value::Null);
+        assert!(
+            restarted_approval_state
+                .pending_for_req(&req_id)
+                .await
+                .is_empty(),
+            "approval waiters are in-memory only and must not survive restart"
+        );
+
+        let snapshot = journal
+            .snapshot(&req_id, 0, 20)
+            .expect("waiting approval snapshot should replay after restart");
+        assert!(snapshot.events.iter().any(|event| {
+            event.event.get("type").and_then(Value::as_str) == Some("tool_event")
+                && event
+                    .event
+                    .get("event")
+                    .and_then(|value| value.get("type"))
+                    .and_then(Value::as_str)
+                    == Some("tool_approval_required")
+                && event
+                    .event
+                    .get("event")
+                    .and_then(|value| value.get("approval_id"))
+                    .and_then(Value::as_str)
+                    == Some(approval_id.as_str())
+        }));
+    }
+
+    let _ = fs::remove_dir_all(dir);
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn stress_stale_codex_session_clear_is_scoped_under_many_tasks() {
     let dir = unique_test_dir("stale-codex-session-clear-pressure");
     let _ = fs::remove_dir_all(&dir);
