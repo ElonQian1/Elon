@@ -1016,6 +1016,36 @@ function testProjectReadinessChecklist() {
   assert.ok(routeCHtml.includes('今日剩余 99/100'), 'readiness should show Route C daily budget protection');
   assert.ok(routeCHtml.includes('个人今日剩余 9/10'), 'readiness should show Route C per-user daily budget protection');
 
+  const limitedRouteCHtml = create({
+    nodes: [{
+      node_id: 'node-c-limited',
+      online: true,
+      server_runtime_ready: false,
+      allowed_clis: [],
+      dev_runtime: {
+        server_runtime_ready: false,
+        server_runtime_status: {
+          status: 'limited',
+          admissionAvailability: {
+            ready: false,
+            reason: 'rate_limited',
+            retryAfterSecs: 17
+          },
+          policy: { enabled: true }
+        }
+      }
+    }],
+    projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
+  }).renderMemberPanel({
+    id: 'p-route-c-limited',
+    role: 'owner',
+    node_id: 'node-c-limited',
+    workspace_path: 'D:/demo',
+    runtime_permission: 'project_write'
+  });
+  assert.ok(limitedRouteCHtml.includes('请求频率已达上限'), 'readiness should explain Route C admission limited reasons');
+  assert.ok(limitedRouteCHtml.includes('17 秒后重试'), 'readiness should show Route C admission retry-after hints');
+
   const fullAccessHtml = create(readyState).renderMemberPanel({
     id: 'p1',
     role: 'owner',
@@ -1316,6 +1346,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNode.includes('agent_selection'), 'PC node page should keep snake_case agent selection compatibility');
   assert.ok(pcAppNode.includes('routeCLimitedReasonText'), 'PC node page should explain Route C limited reasons');
   assert.ok(pcAppNode.includes('秒后重试'), 'PC node page should show Route C retry-after hints');
+  const readinessJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_readiness.js'), 'utf8');
+  assert.ok(readinessJs.includes('admissionAvailability'), 'project readiness should read Route C admission availability');
+  assert.ok(readinessJs.includes('routeCLimitedReasonText'), 'project readiness should explain Route C limited reasons');
+  assert.ok(readinessJs.includes('秒后重试'), 'project readiness should show Route C retry-after hints');
 
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
   assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');

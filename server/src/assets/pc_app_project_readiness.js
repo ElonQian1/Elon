@@ -344,6 +344,14 @@
           ? `已保护 · 今日平台预算已用完 · ${retryAfter} 秒后重试`
           : '已保护 · 今日平台预算已用完';
       }
+      const availability = status.admissionAvailability || status.admission_availability || {};
+      if (stateText === 'limited' || availability.ready === false) {
+        const retryAfter = numberField(availability, 'retryAfterSecs', 'retry_after_secs');
+        const message = clean(availability.publicMessage || availability.public_message)
+          || routeCLimitedReasonText(clean(availability.reason))
+          || '当前容量已满';
+        return retryAfter ? `已保护 · ${message} · ${retryAfter} 秒后重试` : `已保护 · ${message}`;
+      }
 
       const limits = status.limits || {};
       const admission = status.admission || {};
@@ -368,6 +376,13 @@
       if (Number.isFinite(dailyLimit) && Number.isFinite(remainingBudget)) parts.push(`今日剩余 ${remainingBudget}/${dailyLimit}`);
       if (Number.isFinite(userDailyLimit) && Number.isFinite(remainingUserBudget)) parts.push(`个人今日剩余 ${remainingUserBudget}/${userDailyLimit}`);
       return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
+    }
+
+    function routeCLimitedReasonText(reason) {
+      if (reason === 'global_concurrency_limited') return '平台并发已满';
+      if (reason === 'user_concurrency_limited') return '当前用户并发已满';
+      if (reason === 'rate_limited') return '请求频率已达上限';
+      return '';
     }
 
     function localToolContractLabel(node) {
