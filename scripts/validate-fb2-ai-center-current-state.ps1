@@ -110,6 +110,46 @@ function Invoke-Fb2CurrentPwsh {
     }
 }
 
+function New-Fb2CurrentInlineStep {
+    param(
+        [string]$Name,
+        [bool]$Success,
+        [string]$OutputPath = "",
+        [object]$JsonSuccess = $null,
+        [string]$Details = ""
+    )
+
+    [ordered]@{
+        name = $Name
+        exit_code = 0
+        success = [bool]$Success
+        output_path = $OutputPath
+        output_exists = [string]::IsNullOrWhiteSpace($OutputPath) -or (Test-Path -LiteralPath $OutputPath)
+        output_parseable = $true
+        json_success = $JsonSuccess
+        output_secret_safe = Test-Fb2CurrentSecretSafe -Text $Details
+    }
+}
+
+function Test-Fb2CurrentExportedSampleState {
+    param([object]$State)
+
+    if ($null -eq $State) {
+        return $false
+    }
+    $enabled = [bool](Get-Fb2CurrentProperty $State "enabled" $false)
+    $attempted = [bool](Get-Fb2CurrentProperty $State "attempted" $false)
+    $complete = [bool](Get-Fb2CurrentProperty $State "complete" $false)
+    $skippedReason = [string](Get-Fb2CurrentProperty $State "skipped_reason" "")
+    if (-not $enabled) {
+        return $true
+    }
+    if ($attempted) {
+        return $complete
+    }
+    return -not [string]::IsNullOrWhiteSpace($skippedReason)
+}
+
 function New-Fb2CurrentStateValidation {
     param(
         [string]$RefreshPath,
@@ -148,6 +188,15 @@ function New-Fb2CurrentStateValidation {
         -ExpectedOutputPath (Join-Path $targetDir "server-deploy-status-current.json")))
 
     $refreshForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
+    $exportedSampleState = Get-Fb2CurrentProperty $refreshForOptionalSteps "exported_context_pack_sample_set_validation"
+    if ($null -ne $exportedSampleState) {
+        [void]$steps.Add((New-Fb2CurrentInlineStep `
+            -Name "validate_exported_context_pack_sample_set" `
+            -Success (Test-Fb2CurrentExportedSampleState -State $exportedSampleState) `
+            -OutputPath ([string](Get-Fb2CurrentProperty $exportedSampleState "output_path" "")) `
+            -JsonSuccess (Get-Fb2CurrentProperty $exportedSampleState "success" $null) `
+            -Details ($exportedSampleState | ConvertTo-Json -Depth 6)))
+    }
     $filesForOptionalSteps = Get-Fb2CurrentProperty $refreshForOptionalSteps "files"
     $statusPathForOptionalSteps = [string](Get-Fb2CurrentProperty $filesForOptionalSteps "status" "")
     $statusForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $statusPathForOptionalSteps
@@ -187,6 +236,7 @@ function New-Fb2CurrentStateValidation {
     $blocking = Get-Fb2CurrentProperty $refresh "blocking_state"
     $completion = Get-Fb2CurrentProperty $refresh "completion_matrix"
     $gates = Get-Fb2CurrentProperty $completion "gates"
+    $exportedSampleValidation = Get-Fb2CurrentProperty $refresh "exported_context_pack_sample_set_validation"
     $result = [ordered]@{
         schema = "fb2.main_project.current_state_validation.v1"
         generated_at_utc = ([datetime]::UtcNow).ToString("o")
@@ -202,6 +252,7 @@ function New-Fb2CurrentStateValidation {
         voice_deferred_by_user = [bool](Get-Fb2CurrentProperty $gates "voice_deferred_by_user" $false)
         next_minimum_action = [string](Get-Fb2CurrentProperty $refresh "next_minimum_action" "")
         blocked_by_external_secret = [bool](Get-Fb2CurrentProperty $blocking "blocked_by_external_secret" $false)
+        exported_context_pack_sample_set_validation = $exportedSampleValidation
         safe_to_continue_without_secret = @((Get-Fb2CurrentProperty $blocking "safe_to_continue_without_secret" @()))
         requires_secret = @((Get-Fb2CurrentProperty $blocking "requires_secret" @()))
         note = "This gate refreshes and validates current machine evidence only; protected live fb2 data still requires FB2_AI_CENTER_TOKEN."
@@ -261,6 +312,28 @@ function Invoke-Fb2CurrentStateSelfTest {
             -ScriptPath $invalidOutputScript `
             -ExpectedOutputPath $invalidOutputPath
         if ([bool]$invalidOutput.success -or -not [bool]$invalidOutput.output_exists -or [bool]$invalidOutput.output_parseable) {
+            $failed++
+        }
+
+        if (Test-Fb2CurrentExportedSampleState -State $null) {
+            $failed++
+        }
+        $skippedExportedSamples = [pscustomobject]@{
+            enabled = $true
+            attempted = $false
+            skipped_reason = "samples_dir_missing"
+            complete = $false
+        }
+        if (-not (Test-Fb2CurrentExportedSampleState -State $skippedExportedSamples)) {
+            $failed++
+        }
+        $failedExportedSamples = [pscustomobject]@{
+            enabled = $true
+            attempted = $true
+            skipped_reason = ""
+            complete = $false
+        }
+        if (Test-Fb2CurrentExportedSampleState -State $failedExportedSamples) {
             $failed++
         }
 
