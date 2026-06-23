@@ -9,6 +9,7 @@ $RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $ServerCargo = Join-Path $RepoRoot "server\Cargo.toml"
 $NodeAgentMain = Join-Path $RepoRoot "server\src\node_agent_main.rs"
 $PressureModule = Join-Path $RepoRoot "server\src\node_agent_task_lifecycle_pressure_tests.rs"
+$ProjectAgentRunsModule = Join-Path $RepoRoot "server\src\node_agent_project_agent_runs.rs"
 
 function Invoke-Step {
     param(
@@ -56,6 +57,10 @@ Invoke-Step "Static pressure-test contract" {
         -Path $PressureModule `
         -Needle "stress_active_registry_rejects_duplicate_handles_and_cleans_up" `
         -Message "Active registry duplicate-handle pressure test is missing"
+    Assert-FileContains `
+        -Path $ProjectAgentRunsModule `
+        -Needle "stress_agent_run_summary_reads_long_run_to_terminal_status" `
+        -Message "Long agent-run lifecycle summary pressure test is missing"
     Write-Host "Static pressure-test contract passed."
 }
 
@@ -64,6 +69,15 @@ if (-not $SkipJournalUnitTests) {
         cargo test --manifest-path $ServerCargo node_agent_task_journal -- --nocapture
         if ($LASTEXITCODE -ne 0) {
             throw "Task journal unit tests failed with exit code $LASTEXITCODE"
+        }
+    }
+}
+
+if (-not $SkipPressureTests) {
+    Invoke-Step "Agent run lifecycle summary pressure tests" {
+        cargo test --manifest-path $ServerCargo node_agent_project_agent_runs -- --nocapture
+        if ($LASTEXITCODE -ne 0) {
+            throw "Agent run lifecycle summary pressure tests failed with exit code $LASTEXITCODE"
         }
     }
 }

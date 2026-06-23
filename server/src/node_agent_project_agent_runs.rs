@@ -26,7 +26,6 @@ const MAX_RUNS: usize = 50;
 const DEFAULT_RUNS: usize = 20;
 const MAX_EVENTS_PER_RUN: usize = 200;
 const DEFAULT_EVENTS_PER_RUN: usize = 20;
-const MAX_EVENT_LINES_SCANNED: usize = 2_000;
 const RECENT_TASK_CANDIDATE_LIMIT: usize = 100;
 const RECENT_TASKS_LIMIT: usize = 6;
 
@@ -290,7 +289,7 @@ fn parse_agent_run_file(path: &Path, event_limit: usize) -> Result<ProjectAgentR
         .to_string();
 
     let mut summary = AgentRunSummaryBuilder::new(fallback_run_id, file_name, event_limit);
-    for line in reader.lines().take(MAX_EVENT_LINES_SCANNED) {
+    for line in reader.lines() {
         let line = line?;
         if line.trim().is_empty() {
             continue;
@@ -401,6 +400,7 @@ impl AgentRunSummaryBuilder {
     }
 
     fn finish(self) -> Result<ProjectAgentRunSummary> {
+        let visible_event_count = self.events.len();
         Ok(ProjectAgentRunSummary {
             run_id: self.run_id,
             file_name: self.file_name,
@@ -409,8 +409,8 @@ impl AgentRunSummaryBuilder {
             started_at: self.started_at,
             updated_at: self.updated_at,
             event_count: self.event_count,
-            scanned_event_count: self.event_count.min(MAX_EVENT_LINES_SCANNED),
-            truncated: self.event_count >= MAX_EVENT_LINES_SCANNED,
+            scanned_event_count: self.event_count,
+            truncated: self.event_count > visible_event_count,
             turn_count: self.turn_numbers.len(),
             tool_count: self.tool_count,
             tool_names: self.tool_names.into_iter().collect(),
@@ -493,6 +493,65 @@ mod tests {
 
         assert!(response.ok);
         assert!(response.runs.is_empty());
+    }
+
+    #[test]
+    fn stress_agent_run_summary_reads_long_run_to_terminal_status() {
+        let root = temp_dir("agent-runs-long-terminal");
+        let log_dir = root.join(".elon").join("agent-runs");
+        fs::create_dir_all(&log_dir).unwrap();
+        let mut lines = Vec::new();
+        lines.push(
+            r#"{"ts":"2026-06-23T01:00:00Z","run_id":"run-long","type":"run_started","data":{"mode":"server-runtime","prompt_chars":22,"max_context_chars":60000}}"#
+                .to_string(),
+        );
+        for turn in 1..=2_100 {
+            lines.push(format!(
+                r#"{{"ts":"2026-06-23T01:00:01Z","run_id":"run-long","type":"turn_started","data":{{"turn":{turn}}}}}"#
+            ));
+            lines.push(format!(
+                r#"{{"ts":"2026-06-23T01:00:02Z","run_id":"run-long","type":"tool_started","data":{{"turn":{turn},"tool":"read_file","target":"src/lib.rs"}}}}"#
+            ));
+            lines.push(format!(
+                r#"{{"ts":"2026-06-23T01:00:03Z","run_id":"run-long","type":"tool_finished","data":{{"turn":{turn},"tool":"read_file","target":"src/lib.rs","result_chars":64}}}}"#
+            ));
+        }
+        lines.push(
+            r#"{"ts":"2026-06-23T01:59:58Z","run_id":"run-long","type":"context_compacted","data":{"turn":2100,"before_chars":90000,"after_chars":42000,"omitted_messages":300,"omitted_chars":48000,"max_context_chars":60000,"compaction_count":7}}"#
+                .to_string(),
+        );
+        lines.push(
+            r#"{"ts":"2026-06-23T01:59:59Z","run_id":"run-long","type":"run_finished","data":{"status":"completed","run_commands_used":8,"context_compactions":7}}"#
+                .to_string(),
+        );
+        fs::write(log_dir.join("run-long.jsonl"), lines.join("\n")).unwrap();
+
+        let response = list_project_agent_runs(&ProjectAgentRunsReq {
+            workspace_path: root.to_string_lossy().to_string(),
+            limit: Some(1),
+            event_limit: Some(5),
+        })
+        .unwrap();
+        let _ = fs::remove_dir_all(root);
+
+        let run = response.runs.first().expect("long run should be listed");
+        assert_eq!(run.run_id, "run-long");
+        assert_eq!(run.status, "completed");
+        assert_eq!(run.mode.as_deref(), Some("server-runtime"));
+        assert_eq!(run.event_count, 6_303);
+        assert_eq!(run.scanned_event_count, run.event_count);
+        assert!(run.truncated);
+        assert_eq!(run.turn_count, 2_100);
+        assert_eq!(run.tool_count, 2_100);
+        assert_eq!(run.tool_names, vec!["read_file"]);
+        assert_eq!(run.events.len(), 5);
+        assert_eq!(
+            run.events.last().map(|event| event.event_type.as_str()),
+            Some("run_finished")
+        );
+        assert!(serde_json::to_string(run)
+            .unwrap()
+            .contains("context_compacted"));
     }
 
     #[test]
