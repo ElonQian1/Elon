@@ -834,6 +834,7 @@ async function testAgentRunsPanelLoadsProjectRuns() {
       assert.strictEqual(body.workspace_path, 'D:/demo', 'agent runs request should use project workspace path');
       return {
         ok: true,
+        log_dir: 'D:/demo/.elon/agent-runs',
         active_controls: [{
           task_id: 'req-live',
           run_handle_id: 'req-live',
@@ -847,7 +848,10 @@ async function testAgentRunsPanelLoadsProjectRuns() {
           cli_name: 'server-runtime',
           route: 'route_c_server_runtime',
           status: 'cancel_requested',
+          cwd: 'D:/demo',
+          runtime_permission: 'project_write',
           updated_at_ms: 200,
+          attach: { status: 'detached', source: 'local_journal' },
           resume: {
             status: 'detached',
             can_replay_journal_events: true,
@@ -915,7 +919,14 @@ async function testAgentRunsPanelLoadsProjectRuns() {
   assert.ok(continueHandler, 'agent runs panel should bind continue action');
   continueHandler();
   assert.ok(drafted.includes('本机请求 ID：req-detached'), 'continue draft should include local task id');
+  assert.ok(drafted.includes('项目目录：D:/demo'), 'continue draft should include project workspace path');
+  assert.ok(drafted.includes('本机日志目录：D:/demo/.elon/agent-runs'), 'continue draft should include local agent run log directory');
+  assert.ok(drafted.includes('运行路线：route_c_server_runtime'), 'continue draft should include runtime route');
+  assert.ok(drafted.includes('运行权限：project_write'), 'continue draft should include runtime permission');
+  assert.ok(drafted.includes('现场状态：detached / local_journal'), 'continue draft should include attach source');
+  assert.ok(drafted.includes('本机 journal 事件可回放'), 'continue draft should tell the next agent to replay local journal events');
   assert.ok(drafted.includes('原 CLI 终端不可重接'), 'continue draft should keep tty limitation explicit');
+  assert.ok(drafted.includes('不要假装已经接管原来的 CLI 窗口'), 'continue draft should forbid pretending the old TTY is attached');
   assert.ok(!drafted.includes('session-uuid'), 'continue draft should not leak raw codex session ids');
   await cancelHandler();
   assert.ok(calls.some((call) => call.pathName === '/api/task-journal/req-live/cancel'), 'stop action should call local task cancel API');

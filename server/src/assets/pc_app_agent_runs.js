@@ -48,7 +48,10 @@
         return sectionShell('本机 Agent 运行', statusLine('暂无本机运行记录', 'muted'), refreshButton());
       }
       const controlItems = controls.map(renderControl).join('');
-      const taskItems = recentTasks.slice(0, controls.length ? 2 : 3).map(renderRecentTask).join('');
+      const taskItems = recentTasks
+        .slice(0, controls.length ? 2 : 3)
+        .map((task) => renderRecentTask(task, cached))
+        .join('');
       const runLimit = controls.length || recentTasks.length ? 2 : 4;
       const runItems = runs.slice(0, runLimit).map(renderRun).join('');
       const items = `${controlItems}${taskItems}${runItems}`;
@@ -182,7 +185,7 @@
       </article>`;
     }
 
-    function renderRecentTask(task) {
+    function renderRecentTask(task, context) {
       const taskId = taskResumeId(task);
       const resume = task && task.resume ? task.resume : null;
       const status = statusMeta(task && (task.status || (resume && resume.status)));
@@ -191,7 +194,7 @@
       const updated = clean(task && (task.updated_at || task.updatedAt || task.updated_at_ms || task.updatedAtMs));
       const strategy = clean(resume && resume.strategy && resume.strategy.label);
       const canContinue = taskCanContinue(task);
-      const draft = continuationDraft(task);
+      const draft = continuationDraft(task, context);
       if (canContinue && taskId && draft) continuationDrafts.set(taskId, draft);
       const meta = [
         cliName,
@@ -303,20 +306,51 @@
       return !!taskId && action === 'continue_from_snapshot';
     }
 
-    function continuationDraft(task) {
+    function continuationDraft(task, context) {
       const taskId = taskResumeId(task);
       const resume = task && task.resume ? task.resume : null;
       const strategy = clean(resume && resume.strategy && resume.strategy.label);
       const reason = clean(resume && (resume.reason || (resume.strategy && resume.strategy.reason)));
-      const canCodex = resume && resume.can_resume_codex_session === true;
+      const canCodex = resumeFlag(resume, 'can_resume_codex_session', 'canResumeCodexSession');
+      const canReplay = resumeFlag(resume, 'can_replay_journal_events', 'canReplayJournalEvents');
+      const cannotStream = resumeFlag(resume, 'can_stream_live_output', 'canStreamLiveOutput') === false;
+      const cwd = clean(task && (task.cwd || task.workspace_path || task.workspacePath))
+        || clean(context && context.workspacePath);
+      const logDir = clean(context && context.logDir);
+      const route = clean(task && task.route) || clean(resume && resume.continue_mode);
+      const permission = clean(task && (task.runtime_permission || task.runtimePermission));
+      const status = clean(task && (task.status || (resume && resume.status)));
+      const updated = clean(task && (task.updated_at || task.updatedAt || task.updated_at_ms || task.updatedAtMs));
+      const attach = task && task.attach ? task.attach : null;
+      const attachStatus = clean(attach && attach.status);
+      const attachSource = clean(attach && attach.source);
+      const contextLines = [
+        cwd ? `项目目录：${cwd}` : '',
+        logDir ? `本机日志目录：${logDir}` : '',
+        route ? `运行路线：${route}` : '',
+        permission ? `运行权限：${permission}` : '',
+        status ? `任务状态：${status}` : '',
+        updated ? `最后更新：${updated}` : '',
+        attachStatus || attachSource ? `现场状态：${[attachStatus, attachSource].filter(Boolean).join(' / ')}` : '',
+        canReplay ? '本机 journal 事件可回放' : '',
+        canCodex ? '本机 Codex session 已记录，节点会优先自动续接；不要让用户手动粘贴 session id。' : '',
+        cannotStream ? '原 CLI 终端不可重接' : ''
+      ].filter(Boolean);
       return [
         '继续处理这个本机 Agent 任务。',
         `本机请求 ID：${taskId}`,
+        contextLines.length ? `交接上下文：\n${contextLines.join('\n')}` : '',
         strategy ? `恢复方式：${strategy}` : '恢复方式：基于本机 journal 快照继续',
         reason ? `恢复原因：${reason}` : '',
-        canCodex ? '本机 Codex session 已记录，节点会优先自动续接；不要让用户手动粘贴 session id。' : '',
-        '原 CLI 终端不可重接；请先检查当前项目工作区状态，读取本机日志/快照，再继续完成剩余开发。'
+        '不要假装已经接管原来的 CLI 窗口；请先检查当前项目工作区状态，读取本机日志/快照，再继续完成剩余开发。'
       ].filter(Boolean).join('\n\n');
+    }
+
+    function resumeFlag(resume, snakeKey, camelKey) {
+      if (!resume) return undefined;
+      if (typeof resume[snakeKey] === 'boolean') return resume[snakeKey];
+      if (typeof resume[camelKey] === 'boolean') return resume[camelKey];
+      return undefined;
     }
 
     function resumeHint(resume) {
