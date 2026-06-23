@@ -42,6 +42,7 @@ pub(crate) fn detect_manifest_project_identity(
             "settings.gradle",
         )
     })
+    .or_else(|| identity_from_dotnet_solution_or_project(fallback_name, project_root))
 }
 
 fn identity_from_tauri_config(
@@ -83,6 +84,88 @@ fn read_json_manifest(path: &Path) -> Option<Value> {
     std::fs::read_to_string(path)
         .ok()
         .and_then(|text| serde_json::from_str::<Value>(&text).ok())
+}
+
+fn identity_from_dotnet_solution_or_project(
+    fallback_name: &str,
+    project_root: &Path,
+) -> Option<ManifestProjectIdentity> {
+    if let Some(solution) = first_file_with_extension(project_root, "sln") {
+        let name = solution
+            .file_stem()
+            .and_then(|value| value.to_str())
+            .and_then(|value| clean_project_text(value, 120));
+        let source = solution
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("*.sln")
+            .to_string();
+        if let Some(identity) = identity_from_parts(fallback_name, name, None, &source) {
+            return Some(identity);
+        }
+    }
+    identity_from_dotnet_project(fallback_name, project_root)
+}
+
+fn identity_from_dotnet_project(
+    fallback_name: &str,
+    project_root: &Path,
+) -> Option<ManifestProjectIdentity> {
+    let project = first_file_with_extension(project_root, "csproj")?;
+    let source = project
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("*.csproj")
+        .to_string();
+    let text = std::fs::read_to_string(&project).ok();
+    let name = text
+        .as_deref()
+        .and_then(|text| first_xml_tag_text(text, &["AssemblyName", "PackageId"]))
+        .or_else(|| {
+            project
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .and_then(|value| clean_project_text(value, 120))
+        });
+    let description = text
+        .as_deref()
+        .and_then(|text| first_xml_tag_text(text, &["Description"]));
+    identity_from_parts(fallback_name, name, description, &source)
+}
+
+fn first_file_with_extension(project_root: &Path, extension: &str) -> Option<std::path::PathBuf> {
+    let mut files = std::fs::read_dir(project_root)
+        .ok()?
+        .filter_map(Result::ok)
+        .filter_map(|entry| {
+            let file_type = entry.file_type().ok()?;
+            if !file_type.is_file() {
+                return None;
+            }
+            let path = entry.path();
+            path.extension()
+                .and_then(|value| value.to_str())
+                .map(str::to_ascii_lowercase)
+                .filter(|value| value == extension)
+                .map(|_| path)
+        })
+        .collect::<Vec<_>>();
+    files.sort_by_key(|path| {
+        path.file_name()
+            .map(|value| value.to_string_lossy().to_ascii_lowercase())
+            .unwrap_or_default()
+    });
+    files.into_iter().next()
+}
+
+fn first_xml_tag_text(text: &str, tags: &[&str]) -> Option<String> {
+    tags.iter().find_map(|tag| {
+        let open = format!("<{tag}>");
+        let close = format!("</{tag}>");
+        let start = text.find(&open)? + open.len();
+        let end = text[start..].find(&close)? + start;
+        clean_project_text(&text[start..end], 240)
+    })
 }
 
 fn identity_from_gradle_settings(
@@ -282,5 +365,43 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
 
         assert_eq!(identity.name, "RealName");
+    }
+
+    #[test]
+    fn detects_dotnet_solution_name() {
+        let dir = temp_project("dotnet-sln");
+        std::fs::write(dir.join("OpsDesk.sln"), "").unwrap();
+
+        let identity = detect_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "OpsDesk");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("绑定到本 PC 节点的本地项目: OpsDesk")
+        );
+        assert_eq!(identity.source, "OpsDesk.sln");
+    }
+
+    #[test]
+    fn detects_dotnet_project_identity_when_no_solution_exists() {
+        let dir = temp_project("dotnet-csproj");
+        std::fs::write(
+            dir.join("Worker.Host.csproj"),
+            r#"<Project>
+  <PropertyGroup>
+    <AssemblyName>WorkerHost</AssemblyName>
+    <Description>后台任务服务</Description>
+  </PropertyGroup>
+</Project>"#,
+        )
+        .unwrap();
+
+        let identity = detect_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "WorkerHost");
+        assert_eq!(identity.description.as_deref(), Some("后台任务服务"));
+        assert_eq!(identity.source, "Worker.Host.csproj");
     }
 }
