@@ -106,7 +106,6 @@ function New-Fb2TokenBridgePreflightArguments {
     param(
         [string]$ScriptPath,
         [string]$Username,
-        [string]$Password,
         [string]$ExternalUser,
         [string]$Group,
         [string]$Summary,
@@ -123,7 +122,6 @@ function New-Fb2TokenBridgePreflightArguments {
             "-DataOnlyAcceptance",
             "-PreflightOnly",
             "-Fb2Username", $Username,
-            "-Fb2Password", $Password,
             "-ExternalUserId", $ExternalUser,
             "-GroupId", $Group,
             "-RequestTimeoutSec", ([string]$RequestTimeout),
@@ -152,6 +150,9 @@ function Test-Fb2TokenBridgeCommandSecretSafe {
     if ($joined -match "(?i)X-FB2-AI-CENTER-TOKEN") {
         return $false
     }
+    if ($joined -match "(?i)-Fb2Password\s+") {
+        return $false
+    }
     return $true
 }
 
@@ -178,7 +179,6 @@ function Invoke-Fb2TokenBridgeSelfTest {
     $fakeArgs = New-Fb2TokenBridgePreflightArguments `
         -ScriptPath (Join-Path $root "scripts\smoke-fb2-final-acceptance.ps1") `
         -Username "123qwe" `
-        -Password "<FB2_PASSWORD>" `
         -ExternalUser "6fe5aa17-0403-427a-8e91-7f414beca35d" `
         -Group "official" `
         -Summary "" `
@@ -190,6 +190,10 @@ function Invoke-Fb2TokenBridgeSelfTest {
     [void]$checks.Add([ordered]@{
         name = "preflight command does not pass service token as argv"
         passed = (Test-Fb2TokenBridgeCommandSecretSafe -CommandArgs $fakeArgs)
+    })
+    [void]$checks.Add([ordered]@{
+        name = "preflight command does not pass fb2 password as argv"
+        passed = ((@($fakeArgs) -join " ") -notmatch "(?i)-Fb2Password\s+")
     })
     [void]$checks.Add([ordered]@{
         name = "preflight command is no-write mode"
@@ -247,7 +251,7 @@ if ([string]::IsNullOrWhiteSpace($Fb2Password)) {
     $Fb2Password = [System.Environment]::GetEnvironmentVariable("FB2_VISIBLE_SMOKE_PASSWORD", "Process")
 }
 if ($RunDataOnlyPreflight -and [string]::IsNullOrWhiteSpace($Fb2Password)) {
-    throw "Fb2Password or FB2_VISIBLE_SMOKE_PASSWORD is required for 123qwe login preflight."
+    throw "FB2_VISIBLE_SMOKE_PASSWORD is required for 123qwe login preflight. -Fb2Password is kept only for legacy manual runs; prefer the environment variable so the password does not appear in command history."
 }
 
 $root = Get-Fb2TokenBridgeRepoRoot
@@ -299,7 +303,6 @@ try {
         $preflightArgs = New-Fb2TokenBridgePreflightArguments `
             -ScriptPath (Join-Path $root "scripts\smoke-fb2-final-acceptance.ps1") `
             -Username $Fb2Username `
-            -Password $Fb2Password `
             -ExternalUser $ExternalUserId `
             -Group $GroupId `
             -Summary $SummaryPath `
@@ -343,6 +346,7 @@ try {
         current_state_exit_code = $currentStateExitCode
         summary_path = $SummaryPath
         token_passed_as_argument = $false
+        fb2_password_passed_to_child_argv = $false
         token_written_to_output = $false
         current_state_after_tokenless = [bool]$RunCurrentStateAfter
         project_network_proxy_policy = "direct_no_proxy"
