@@ -32,6 +32,20 @@ function Test-Fb2PublicContractSummaryTruthy {
     return ([string]$Value) -match "^(true|True|1)$"
 }
 
+function Test-Fb2PublicContractSummaryCheckPassed {
+    param(
+        [object]$Status,
+        [string]$Id
+    )
+
+    foreach ($check in @((Get-Fb2PublicContractSummaryProperty $Status "checks" @()))) {
+        if ([string](Get-Fb2PublicContractSummaryProperty $check "id" "") -eq $Id) {
+            return Test-Fb2PublicContractSummaryTruthy (Get-Fb2PublicContractSummaryProperty $check "passed")
+        }
+    }
+    return $false
+}
+
 function ConvertTo-Fb2PublicContractSummaryText {
     param([object]$Value)
 
@@ -78,6 +92,11 @@ function Get-Fb2PublicContractSummaryState {
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
+            answer_source_validation_ready = $false
+            answer_source_validation_schema = ""
+            answer_source_validation_rule = ""
+            answer_source_validation_schema_check = $false
+            answer_source_validation_tool_sources_check = $false
             missing = @("public_contract_status_summary")
         }
     }
@@ -104,6 +123,11 @@ function Get-Fb2PublicContractSummaryState {
             group_chat_test_method = ""
             screenshots_accepted = $false
             required_group_message_fields = @()
+            answer_source_validation_ready = $false
+            answer_source_validation_schema = ""
+            answer_source_validation_rule = ""
+            answer_source_validation_schema_check = $false
+            answer_source_validation_tool_sources_check = $false
             missing = @("public_contract_status_summary_parse_error")
         }
     }
@@ -136,6 +160,23 @@ function Get-Fb2PublicContractSummaryState {
     $screenshotsRaw = Get-Fb2PublicContractSummaryProperty $summary "screenshots_accepted" $null
     $screenshotsAccepted = Test-Fb2PublicContractSummaryTruthy $screenshotsRaw
     $requiredFields = @((Get-Fb2PublicContractSummaryProperty $summary "required_group_message_fields" @()))
+    $answerSourceSchema = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "answer_source_validation_schema")
+    $answerSourceRule = ConvertTo-Fb2PublicContractSummaryText (Get-Fb2PublicContractSummaryProperty $summary "answer_source_validation_rule")
+    $answerSourceSchemaCheck = (
+        (Test-Fb2PublicContractSummaryCheckPassed -Status $status -Id "tool_result_answer_source_validation_schema") `
+            -or $answerSourceSchema -eq "external_app.answer_source_validation.v1"
+    )
+    $answerSourceToolSourcesCheck = (
+        (Test-Fb2PublicContractSummaryCheckPassed -Status $status -Id "tool_result_answer_source_validation_tool_sources") `
+            -or $answerSourceRule -match "matched_tool_source_ids"
+    )
+    if ([string]::IsNullOrWhiteSpace($answerSourceSchema) -and $answerSourceSchemaCheck) {
+        $answerSourceSchema = "external_app.answer_source_validation.v1"
+    }
+    if ([string]::IsNullOrWhiteSpace($answerSourceRule) -and $answerSourceToolSourcesCheck) {
+        $answerSourceRule = "matched_tool_source_ids required by public contract checks"
+    }
+    $answerSourceReady = ($answerSourceSchemaCheck -and $answerSourceToolSourcesCheck)
     $limitations = @((Get-Fb2PublicContractSummaryProperty $status "limitations" @()))
     $failedChecks = @((Get-Fb2PublicContractSummaryProperty $status "failed_checks" @()))
 
@@ -197,6 +238,8 @@ function Get-Fb2PublicContractSummaryState {
             $missing += "group_chat_required_field_$field"
         }
     }
+    if (-not $answerSourceSchemaCheck) { $missing += "answer_source_validation_schema" }
+    if (-not $answerSourceToolSourcesCheck) { $missing += "answer_source_validation_tool_sources" }
     if (-not ($limitations -contains "does_not_verify_fb2_live_context_pack_or_orders")) {
         $missing += "public_contract_limitations_live_data_boundary"
     }
@@ -237,6 +280,11 @@ function Get-Fb2PublicContractSummaryState {
         screenshots_accepted = $screenshotsAccepted
         required_group_message_fields = @($requiredFields)
         live_tool_count = [int](Get-Fb2PublicContractSummaryProperty $summary "live_tool_count" 0)
+        answer_source_validation_ready = $answerSourceReady
+        answer_source_validation_schema = $answerSourceSchema
+        answer_source_validation_rule = $answerSourceRule
+        answer_source_validation_schema_check = $answerSourceSchemaCheck
+        answer_source_validation_tool_sources_check = $answerSourceToolSourcesCheck
         limitations = @($limitations)
         missing = @($missing | Select-Object -Unique)
     }

@@ -24,6 +24,7 @@ function Get-Fb2GoalCompletionState {
         [bool]$ReadOnlyDirectReadComplete,
         [bool]$VisibleAnswerPolicyComplete,
         [bool]$ContextProjectionComplete,
+        [bool]$AnswerSourceValidationReady = $false,
         [bool]$VoiceEvidencePathPresent,
         [bool]$FullFinalAcceptanceComplete = $false,
         [object]$FinalEvidence
@@ -38,7 +39,7 @@ function Get-Fb2GoalCompletionState {
     $hasPermissionAudit = Test-Fb2GoalEvidencePresent $FinalEvidence.permission_total_blocks
     $hasQualityNoUnmatched = Test-Fb2GoalEvidenceZero $FinalEvidence.quality_unmatched_cited_sources
     $hasOpinionAdoption = Test-Fb2GoalEvidencePresent $FinalEvidence.quality_non_synthetic_adoption_count
-    $permissionQualityReady = ($hasPermissionAudit -and $hasQualityNoUnmatched -and $hasOpinionAdoption)
+    $permissionQualityReady = ($hasPermissionAudit -and $hasQualityNoUnmatched -and $hasOpinionAdoption -and $AnswerSourceValidationReady)
 
     $readyItems = @()
     $missingItems = @()
@@ -49,6 +50,7 @@ function Get-Fb2GoalCompletionState {
     if ($groupChatDirectReadReady) { $readyItems += "direct_group_chat_read" } else { $missingItems += "direct_group_chat_read" }
     if ($visibleAiFeedbackReady) { $readyItems += "visible_ai_feedback" } else { $missingItems += "visible_ai_feedback" }
     if ($VisibleAnswerPolicyComplete) { $readyItems += "visible_answer_policy" } else { $missingItems += "visible_answer_policy" }
+    if ($AnswerSourceValidationReady) { $readyItems += "answer_source_validation" } else { $missingItems += "answer_source_validation" }
     if ($permissionQualityReady) { $readyItems += "permission_quality_feedback" } else { $missingItems += "permission_quality_feedback" }
     if ($VoiceEvidencePathPresent) { $readyItems += "voice_final_evidence_path_present" } else { $missingItems += "voice_final_evidence_path_present" }
     if ($FullFinalAcceptanceComplete) { $readyItems += "same_batch_full_final_acceptance" } else { $missingItems += "same_batch_full_final_acceptance" }
@@ -92,6 +94,7 @@ function Get-Fb2GoalCompletionState {
             direct_group_chat_read = $groupChatDirectReadReady
             visible_ai_feedback = $visibleAiFeedbackReady
             visible_answer_policy = $VisibleAnswerPolicyComplete
+            answer_source_validation = $AnswerSourceValidationReady
             permission_quality_feedback = $permissionQualityReady
             voice_final_evidence_path_present = $VoiceEvidencePathPresent
             same_batch_full_final_acceptance = $FullFinalAcceptanceComplete

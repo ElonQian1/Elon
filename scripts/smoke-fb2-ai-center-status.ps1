@@ -151,6 +151,9 @@ function Get-JsonProperty {
     if ($null -eq $Object) {
         return $Default
     }
+    if ($Object -is [System.Collections.IDictionary] -and $Object.Contains($Name)) {
+        return $Object[$Name]
+    }
     $property = $Object.PSObject.Properties[$Name]
     if ($null -eq $property) {
         return $Default
@@ -268,6 +271,7 @@ function Build-Fb2AiCenterStatusSnapshot {
     $domainDataBlueprint = Get-Fb2DomainDataBlueprintState
     $publicContractStatus = Get-Fb2PublicContractSummaryState -Path $(if ($null -eq $latestPublicContractFile) { "" } else { $latestPublicContractFile.FullName })
     $contractSmokeSummary = Get-Fb2ContractSmokeSummaryState -Path $(if ($null -eq $latestContractSmokeFile) { "" } else { $latestContractSmokeFile.FullName })
+    $answerSourceValidationReady = Test-TruthyJsonValue (Get-JsonProperty $publicContractStatus "answer_source_validation_ready")
 
     $feedbackCoverage = Get-JsonProperty $latestData "feedback_coverage"
     $finalEvidence = Get-JsonProperty $latestData "final_acceptance_evidence"
@@ -301,6 +305,7 @@ function Build-Fb2AiCenterStatusSnapshot {
         -ReadOnlyDirectReadComplete $readOnlyComplete `
         -VisibleAnswerPolicyComplete $visibleAnswerPolicyComplete `
         -ContextProjectionComplete ([bool]$contextProjectionState.complete) `
+        -AnswerSourceValidationReady $answerSourceValidationReady `
         -VoiceEvidencePathPresent $voiceEvidencePathPresent `
         -FullFinalAcceptanceComplete ([bool]$fullFinalAcceptanceState.complete) `
         -FinalEvidence $finalEvidence
@@ -637,6 +642,8 @@ function Invoke-Fb2StatusSelfTest {
                 screenshots_accepted = $false
                 required_group_message_fields = @("message_id", "type", "sender_id", "created_at", "text_len", "text_sha256")
                 live_tool_count = 3
+                answer_source_validation_schema = "external_app.answer_source_validation.v1"
+                answer_source_validation_rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
             }
             limitations = @(
                 "public_contract_only_no_fb2_service_token_required",
@@ -821,6 +828,9 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_public_contract_status.group_chat_test_method -ne "direct_api_read") { $failed++ }
         if ([bool]$snapshot.latest_public_contract_status.screenshots_accepted) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.required_group_message_fields) -contains "text_sha256")) { $failed++ }
+        if (-not [bool]$snapshot.latest_public_contract_status.answer_source_validation_ready) { $failed++ }
+        if ($snapshot.latest_public_contract_status.answer_source_validation_schema -ne "external_app.answer_source_validation.v1") { $failed++ }
+        if (-not ([string]$snapshot.latest_public_contract_status.answer_source_validation_rule -match "matched_tool_source_ids")) { $failed++ }
         if (-not (@($snapshot.latest_public_contract_status.limitations) -contains "does_not_verify_fb2_live_context_pack_or_orders")) { $failed++ }
         if (@($snapshot.refresh_gaps) -contains "missing_or_incomplete_public_contract_status_summary") { $failed++ }
         if ($snapshot.latest_contract_smoke_summary.schema -ne "fb2.main_project.contract_smoke_summary.v1") { $failed++ }

@@ -324,6 +324,13 @@ function New-Fb2GoalAuditReport {
     $directReadComplete = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $data "direct_read_evidence_complete")
     $fullFeedbackComplete = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $fullSource "feedback_complete")
     $fullDirectReadComplete = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $fullSource "direct_read_evidence_complete")
+    $answerSourceValidationReady = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $public "answer_source_validation_ready")
+    $answerSourceValidationSchema = [string](Get-Fb2GoalAuditProperty $public "answer_source_validation_schema")
+    $answerSourceValidationRule = [string](Get-Fb2GoalAuditProperty $public "answer_source_validation_rule")
+    $feedbackQualityMissing = @()
+    if (-not $feedbackComplete) { $feedbackQualityMissing += "feedback_complete" }
+    if (-not (Test-Fb2GoalAuditZeroText $qualityUnmatched)) { $feedbackQualityMissing += "quality_unmatched_cited_sources" }
+    if (-not $answerSourceValidationReady) { $feedbackQualityMissing += "answer_source_validation_ready" }
     $voiceEvidencePresent = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $requirements "voice_final_evidence_path_present")
     $voiceDeferred = ((@($deferred) -contains "ASR_TTS_final_evidence") -and -not $voiceEvidencePresent)
     $sameBatchFullFinalMissing = @($gapMissing) -contains "full_final_acceptance_same_batch_voice_and_visible_chat"
@@ -377,9 +384,10 @@ function New-Fb2GoalAuditReport {
 
     $items += New-Fb2GoalAuditRequirement `
         -Id "feedback_quality_loop" `
-        -Title "回答后写回 feedback/quality，引用来源 unmatched 为 0" `
-        -Complete ($feedbackComplete -and (Test-Fb2GoalAuditZeroText $qualityUnmatched)) `
-        -Evidence "feedback_complete=$feedbackComplete quality_unmatched_cited_sources=$qualityUnmatched"
+        -Title "回答后写回 feedback/quality，引用来源 unmatched 为 0，并暴露回答来源审计" `
+        -Complete ($feedbackComplete -and (Test-Fb2GoalAuditZeroText $qualityUnmatched) -and $answerSourceValidationReady) `
+        -Evidence "feedback_complete=$feedbackComplete quality_unmatched_cited_sources=$qualityUnmatched answer_source_validation_ready=$answerSourceValidationReady schema=$answerSourceValidationSchema rule=$answerSourceValidationRule" `
+        -Missing (@($feedbackQualityMissing | Select-Object -Unique) -join ",")
 
     $items += New-Fb2GoalAuditRequirement `
         -Id "direct_group_chat_read" `
@@ -535,6 +543,9 @@ function Invoke-Fb2GoalAuditSelfTest {
                 "context_audit_index",
                 "feedback_quality_index"
             )
+            answer_source_validation_ready = $true
+            answer_source_validation_schema = "external_app.answer_source_validation.v1"
+            answer_source_validation_rule = "records candidate/matched/unmatched source ids plus matched_tool_source_ids and allowed_tool_source_ids"
             missing = @()
         }
         latest_context_pack_sample_set = [pscustomobject]@{ complete = $true }

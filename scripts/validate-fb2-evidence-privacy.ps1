@@ -246,11 +246,13 @@ function New-Fb2PrivacyValidation {
     [void]$candidatePaths.Add($StatusPath)
     if ($null -ne $files) {
         foreach ($property in @($files.PSObject.Properties)) {
-            [void]$candidatePaths.Add([string]$property.Value)
+            $candidate = Resolve-Fb2PrivacyPath -Path ([string]$property.Value) -Root $root
+            if (($property.Name -in @("token_bridge_live_preflight", "token_bridge_live_preflight_summary")) -and -not (Test-Path -LiteralPath $candidate)) {
+                continue
+            }
+            [void]$candidatePaths.Add($candidate)
         }
     }
-    [void]$candidatePaths.Add((Join-Path $root "target\fb2-ai-center\token-bridge-data-only-preflight-current.json"))
-
     foreach ($path in @($candidatePaths)) {
         if (-not [string]::IsNullOrWhiteSpace($path)) {
             $resolved = Resolve-Fb2PrivacyPath -Path $path -Root $root
@@ -262,6 +264,9 @@ function New-Fb2PrivacyValidation {
 
     $bridgeResultPath = Join-Path $root "target\fb2-ai-center\token-bridge-data-only-preflight-current.json"
     if (Test-Path -LiteralPath $bridgeResultPath) {
+        if (-not $artifactPaths.Contains($bridgeResultPath)) {
+            $artifactPaths.Add($bridgeResultPath)
+        }
         try {
             $bridgeResult = Read-Fb2PrivacyJson -Path $bridgeResultPath
             $bridgeSummaryPath = [string](Get-Fb2PrivacyProperty $bridgeResult "summary_path" "")

@@ -97,6 +97,9 @@ function Get-Fb2GoalGapAuditState {
     $domainIndexIds = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "domain_context_index_ids" @()))
     $domainIndexMissingIds = @($requiredDomainIndexes | Where-Object { -not (@($domainIndexIds) -contains $_) })
     $publicContractMissing = @((Get-Fb2GoalGapAuditProperty $PublicContractStatus "missing" @()))
+    $answerSourceValidationReady = Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $PublicContractStatus "answer_source_validation_ready")
+    $answerSourceValidationSchema = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $PublicContractStatus "answer_source_validation_schema")
+    $answerSourceValidationRule = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $PublicContractStatus "answer_source_validation_rule")
     # 领域索引是 fb2 长期快速检索的公开契约；它只约束 fb2 内部索引和 Context Pack 投影，不让主项目复制业务数据。
     $domainContextIndexComplete = (
         (Test-Fb2GoalGapAuditTruthy (Get-Fb2GoalGapAuditProperty $PublicContractStatus "complete")) `
@@ -130,6 +133,7 @@ function Get-Fb2GoalGapAuditState {
     if ($userScenarioAuditComplete) { $completed += "user_scenario_audit_validated" } else { $missing += "user_scenario_audit" }
     if ($domainDataBlueprintComplete) { $completed += "domain_data_blueprint_fixed" } else { $missing += "domain_data_blueprint" }
     if ($domainContextIndexComplete) { $completed += "domain_context_index_contract" } else { $missing += "domain_context_index_contract" }
+    if ($answerSourceValidationReady) { $completed += "answer_source_validation_contract" } else { $missing += "answer_source_validation_contract" }
     if ($contractSmokeComplete) { $completed += "main_project_contract_smoke" } else { $missing += "main_project_contract_smoke" }
     if ($latestDataSuccess -and $feedbackComplete -and $dataDirectReadComplete -and $visibleAnswerPolicyComplete) {
         $completed += "live_data_only_visible_chat_feedback_historical_ready"
@@ -196,6 +200,7 @@ function Get-Fb2GoalGapAuditState {
             sample_set_complete = $sampleSetComplete
             answer_readiness_complete = $answerReadinessComplete
             domain_context_index_contract_complete = $domainContextIndexComplete
+            answer_source_validation_ready = $answerSourceValidationReady
             main_project_contract_smoke_complete = $contractSmokeComplete
             non_voice_ready = $nonVoiceReady
             full_final_ready = $fullFinalReady
@@ -215,6 +220,8 @@ function Get-Fb2GoalGapAuditState {
             domain_context_index_schema = $domainIndexSchema
             domain_context_index_count = $domainIndexCount
             domain_context_index_ids = @($domainIndexIds)
+            answer_source_validation_schema = $answerSourceValidationSchema
+            answer_source_validation_rule = $answerSourceValidationRule
             contract_smoke_summary_path = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "path")
             contract_smoke_check_count = [int](Get-Fb2GoalGapAuditProperty $ContractSmokeSummary "check_count" 0)
             contract_smoke_live_data_status = ConvertTo-Fb2GoalGapAuditText (Get-Fb2GoalGapAuditProperty $contractSmokeGates "fb2_live_data_status")

@@ -231,6 +231,8 @@ function New-Fb2PublicContractStatus {
             screenshots_accepted = [bool]$Contract.group_chat_evidence_contract.screenshots_accepted
             required_group_message_fields = @($Contract.group_chat_evidence_contract.required_group_message_fields)
             live_tool_count = [int]$Contract.live_tool_manifest.tool_count
+            answer_source_validation_schema = [string]$Contract.tool_result_envelope_contract.answer_source_validation.schema
+            answer_source_validation_rule = [string]$Contract.tool_result_envelope_contract.answer_source_validation.rule
         }
         limitations = @(
             "public_contract_only_no_fb2_service_token_required",
