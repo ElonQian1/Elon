@@ -38,6 +38,7 @@
 
 - 本任务的计划入口是 `docs/fb2-ai-center/PLAN.md`。仓库根目录如果出现其它 `PLAN.md`，可能属于 PC 节点、发布或其它并行任务，不代表 fb2 AI Center 当前计划。
 - `contracts.md`：主项目和 fb2 之间的 HTTP、上下文、工具和 SDK 契约。
+- `context-projection-layer.md`：fb2 业务数据给主项目 AI 的长期投影层规范，固定 XML-wrapped Markdown + compact metadata、REST Context Pack 优先、MCP 后续包装、6 条业务 lane、8 类索引、7 个用户场景、禁止输出和群聊接口直读证据。
 - `roadmap.md`：P0 到 P3 的执行顺序和验收目标。
 - `data-tools.md`：fb2 应该提供哪些业务数据能力，以及从 Context Pack 走向 MCP/tools 的路径。
 - `tool-manifest-boundary.md`：固定 live tool manifest、聊天自动工具、manifest-only 能力、integration-only 质量/权限端点和 source registry 的边界。

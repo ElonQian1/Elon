@@ -265,6 +265,13 @@ function New-Fb2CurrentStateValidation {
             -Details "missing_status_for_context_projection_log"))
     }
 
+    $contextProjectionLayerDocValidationPath = Join-Path $targetDir "context-projection-layer-doc-validation-current.json"
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_context_projection_layer_doc" `
+        -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-context-projection-layer-doc.ps1") `
+        -Arguments @("-OutputPath", $contextProjectionLayerDocValidationPath) `
+        -ExpectedOutputPath $contextProjectionLayerDocValidationPath))
+
     $userScenarioValidationPath = Join-Path $targetDir "user-scenario-audit-validation-current.json"
     if (-not [string]::IsNullOrWhiteSpace($statusPathForOptionalSteps) -and (Test-Path -LiteralPath $statusPathForOptionalSteps)) {
         [void]$steps.Add((Invoke-Fb2CurrentPwsh `
@@ -387,6 +394,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
         [ordered]@{ name = "live_preflight_request"; script = "validate-fb2-live-preflight-request.ps1" },
         [ordered]@{ name = "context_projection_log"; script = "validate-fb2-context-projection-log.ps1" },
+        [ordered]@{ name = "context_projection_layer_doc"; script = "validate-fb2-context-projection-layer-doc.ps1" },
         [ordered]@{ name = "user_scenario_audit"; script = "validate-fb2-user-scenario-audit.ps1" },
         [ordered]@{ name = "evidence_freshness"; script = "validate-fb2-ai-center-evidence-freshness.ps1" },
         [ordered]@{ name = "evidence_privacy"; script = "validate-fb2-evidence-privacy.ps1" },
