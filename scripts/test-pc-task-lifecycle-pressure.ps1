@@ -54,6 +54,10 @@ Invoke-Step "Static pressure-test contract" {
         -Needle "stress_restart_resume_contract_never_claims_lost_control_handles" `
         -Message "Restart resume pressure test is missing"
     Assert-FileContains `
+        -Path (Join-Path $RepoRoot "server\src\node_agent_task_resume.rs") `
+        -Needle "no_original_cli_tty_reattach" `
+        -Message "Task resume contract must keep original CLI TTY reattach limitation structured"
+    Assert-FileContains `
         -Path $PressureModule `
         -Needle "stress_active_registry_rejects_duplicate_handles_and_cleans_up" `
         -Message "Active registry duplicate-handle pressure test is missing"

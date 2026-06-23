@@ -30,11 +30,22 @@ pub(crate) struct TaskResumeContract {
     can_resume_codex_session: bool,
     codex_session: Option<TaskResumeCodexSession>,
     continue_mode: &'static str,
+    tty_reattach: TaskResumeTtyReattach,
     run_handle: Option<TaskResumeRunHandle>,
     strategy: TaskResumeStrategy,
     limitations: Vec<&'static str>,
     next_action: &'static str,
     reason: &'static str,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TaskResumeTtyReattach {
+    status: &'static str,
+    supported: bool,
+    mode: &'static str,
+    fallback: &'static str,
+    reason: &'static str,
+    required_future_work: Vec<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -132,6 +143,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_resume_codex_session,
             codex_session,
             continue_mode: attach.continue_mode,
+            tty_reattach: tty_reattach_status(),
             run_handle,
             strategy: TaskResumeStrategy {
                 kind: "control_handle_reconnect",
@@ -156,6 +168,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_resume_codex_session,
             codex_session,
             continue_mode: attach.continue_mode,
+            tty_reattach: tty_reattach_status(),
             run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
@@ -180,6 +193,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_resume_codex_session,
             codex_session,
             continue_mode: attach.continue_mode,
+            tty_reattach: tty_reattach_status(),
             run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
@@ -204,6 +218,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_resume_codex_session: false,
             codex_session: None,
             continue_mode: "snapshot_continue",
+            tty_reattach: tty_reattach_status(),
             run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "cloud_snapshot_only",
@@ -217,6 +232,21 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             next_action: "refresh_snapshot",
             reason: attach.reason,
         },
+    }
+}
+
+fn tty_reattach_status() -> TaskResumeTtyReattach {
+    TaskResumeTtyReattach {
+        status: "not_supported",
+        supported: false,
+        mode: "no_original_cli_tty_reattach",
+        fallback: "journal_replay_snapshot_continue_and_codex_session_resume",
+        reason: "当前节点只能重连本机控制句柄、回放 journal、处理仍在内存中的审批 waiter，不能重新接管已经打开的原 CLI 终端 TTY。",
+        required_future_work: vec![
+            "为 Route A CLI 子进程建立可恢复 PTY/ConPTY 会话层。",
+            "把 PTY 会话 id、生命周期和安全授权写入本机 journal。",
+            "在前端接入 attach 协议前，继续使用 journal 回放和快照续跑。",
+        ],
     }
 }
 
@@ -355,6 +385,9 @@ mod tests {
         );
         assert_eq!(resume.next_action, "wait_or_cancel");
         assert_eq!(resume.strategy.kind, "control_handle_reconnect");
+        assert_eq!(resume.tty_reattach.status, "not_supported");
+        assert!(!resume.tty_reattach.supported);
+        assert_eq!(resume.tty_reattach.mode, "no_original_cli_tty_reattach");
     }
 
     #[test]
@@ -371,6 +404,10 @@ mod tests {
         assert_eq!(resume.next_action, "continue_from_snapshot");
         assert_eq!(resume.strategy.kind, "snapshot_continue");
         assert!(resume.strategy.requires_new_task);
+        assert_eq!(
+            resume.tty_reattach.fallback,
+            "journal_replay_snapshot_continue_and_codex_session_resume"
+        );
     }
 
     #[test]
@@ -444,5 +481,6 @@ mod tests {
         assert_eq!(missing.status, "missing");
         assert_eq!(missing.strategy.kind, "cloud_snapshot_only");
         assert!(!missing.strategy.uses_local_journal);
+        assert_eq!(missing.tty_reattach.status, "not_supported");
     }
 }
