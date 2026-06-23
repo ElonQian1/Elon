@@ -122,6 +122,7 @@ function New-Fb2PromptValidation {
         "validate_tokenless_continuation",
         "no_write_direct_read",
         "data_only_preflight",
+        "data_only_preflight_via_fb2_server_token_bridge",
         "visible_regression_requires_authorization"
     )
     foreach ($command in $requiredCommands) {
@@ -141,6 +142,7 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "tokenless continuation validator present" ($Content -match 'validate_tokenless_continuation.+validate-fb2-tokenless-continuation\.ps1')
     Add-Fb2PromptValidationCheck $checks "evidence privacy validator present" ($Content -match 'validate_evidence_privacy.+validate-fb2-evidence-privacy\.ps1')
     Add-Fb2PromptValidationCheck $checks "data-only preflight is no visible write" ($Content -match 'data_only_preflight.+DataOnlyAcceptance.+PreflightOnly')
+    Add-Fb2PromptValidationCheck $checks "token bridge preflight is no visible write" ($Content -match 'data_only_preflight_via_fb2_server_token_bridge.+run-fb2-ai-center-token-bridge\.ps1.+RunDataOnlyPreflight')
     Add-Fb2PromptValidationCheck $checks "visible regression is explicit" ($Content -match 'visible_regression_requires_authorization.+AllowVisibleMessages')
     Add-Fb2PromptValidationCheck $checks "voice pause is explicit" ($Content -match 'ASR/TTS final evidence.*暂停|ASR/TTS.*paused|voice_final_evidence')
 
@@ -237,6 +239,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - `validate_tokenless_continuation`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-tokenless-continuation.ps1 -OutputPath target\fb2-ai-center\tokenless-continuation-validation-current.json`
 - `no_write_direct_read`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>`
 - `data_only_preflight`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>`
+- `data_only_preflight_via_fb2_server_token_bridge`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\run-fb2-ai-center-token-bridge.ps1 -RunDataOnlyPreflight -Fb2Password <FB2_PASSWORD>`
 - `visible_regression_requires_authorization`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>`
 
 ## 阻塞与边界

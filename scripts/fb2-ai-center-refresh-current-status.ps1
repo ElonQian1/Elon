@@ -104,6 +104,56 @@ function Get-Fb2RefreshCommandValue {
     return [string](Get-Fb2RefreshProperty $Fallback $Name "")
 }
 
+function New-Fb2RefreshTokenBridgeLivePreflight {
+    param(
+        [string]$ResultPath,
+        [string]$SummaryPath
+    )
+
+    $result = Read-Fb2RefreshJson -Path $ResultPath
+    $summaryExists = -not [string]::IsNullOrWhiteSpace($SummaryPath) -and (Test-Path -LiteralPath $SummaryPath)
+    if ($null -eq $result) {
+        return [ordered]@{
+            schema = "fb2.main_project.token_bridge_live_preflight.v1"
+            exists = $false
+            success = $false
+            result_path = $ResultPath
+            summary_path = $SummaryPath
+            summary_exists = [bool]$summaryExists
+            preflight_exit_code = $null
+            current_state_exit_code = $null
+            token_passed_as_argument = $null
+            token_written_to_output = $null
+            writes_visible_group_messages = $null
+            project_network_proxy_policy = ""
+            note = "No token bridge live preflight result in current output dir."
+        }
+    }
+
+    $resultSummaryPath = [string](Get-Fb2RefreshProperty $result "summary_path" $SummaryPath)
+    if (-not [string]::IsNullOrWhiteSpace($resultSummaryPath)) {
+        $SummaryPath = $resultSummaryPath
+        $summaryExists = Test-Path -LiteralPath $SummaryPath
+    }
+
+    [ordered]@{
+        schema = "fb2.main_project.token_bridge_live_preflight.v1"
+        exists = $true
+        success = [bool](Get-Fb2RefreshProperty $result "success" $false)
+        result_path = $ResultPath
+        summary_path = $SummaryPath
+        summary_exists = [bool]$summaryExists
+        preflight_exit_code = Get-Fb2RefreshProperty $result "preflight_exit_code" $null
+        current_state_exit_code = Get-Fb2RefreshProperty $result "current_state_exit_code" $null
+        token_passed_as_argument = [bool](Get-Fb2RefreshProperty $result "token_passed_as_argument" $true)
+        token_written_to_output = [bool](Get-Fb2RefreshProperty $result "token_written_to_output" $true)
+        writes_visible_group_messages = [bool](Get-Fb2RefreshProperty $result "writes_visible_group_messages" $true)
+        project_network_proxy_policy = [string](Get-Fb2RefreshProperty $result "project_network_proxy_policy" "")
+        current_state_after_tokenless = [bool](Get-Fb2RefreshProperty $result "current_state_after_tokenless" $false)
+        note = "This is no-write bridge evidence only; full final still follows completion_matrix."
+    }
+}
+
 function New-Fb2RefreshExportedSampleValidationState {
     param(
         [string]$Fb2Repo,
@@ -203,6 +253,7 @@ function New-Fb2RefreshNextCommands {
         validate_tokenless_continuation = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-tokenless-continuation.ps1 -OutputPath target\fb2-ai-center\tokenless-continuation-validation-current.json"
         no_write_direct_read = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "no_write_direct_read"
         data_only_preflight = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "data_only_preflight"
+        data_only_preflight_via_fb2_server_token_bridge = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\run-fb2-ai-center-token-bridge.ps1 -RunDataOnlyPreflight -Fb2Password <FB2_PASSWORD>"
         visible_regression_requires_authorization = Get-Fb2RefreshCommandValue -Primary $liveCommands -Fallback $safeCommands -Name "visible_regression_requires_authorization"
     }
 }
@@ -383,7 +434,9 @@ function New-Fb2RefreshEvidenceFreshness {
         "handoff_markdown",
         "status_refresh",
         "handoff_prompt",
-        "exported_context_pack_sample_set_validation"
+        "exported_context_pack_sample_set_validation",
+        "token_bridge_live_preflight",
+        "token_bridge_live_preflight_summary"
     )
     $artifacts = @(
         foreach ($name in $artifactNames) {
@@ -636,10 +689,13 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_live_preflight_request)) "live preflight request validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.validate_tokenless_continuation)) "tokenless continuation validation command"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight)) "data-only preflight command"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight_via_fb2_server_token_bridge)) "data-only token bridge preflight command"
         Assert-Fb2RefreshSelfTest ([string]$summary.completion_matrix.schema -eq "fb2.main_project.completion_matrix.v1") "completion matrix schema"
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
         Assert-Fb2RefreshSelfTest ([string]$summary.evidence_freshness.schema -eq "fb2.main_project.evidence_freshness.v1") "evidence freshness schema"
         Assert-Fb2RefreshSelfTest (@($summary.evidence_freshness.artifacts).Count -gt 0) "evidence freshness artifacts"
+        Assert-Fb2RefreshSelfTest ([string]$summary.token_bridge_live_preflight.schema -eq "fb2.main_project.token_bridge_live_preflight.v1") "token bridge live preflight schema"
+        Assert-Fb2RefreshSelfTest (-not [bool]$summary.token_bridge_live_preflight.exists) "selftest token bridge absent"
         $generatedArtifacts = @($summary.evidence_freshness.artifacts | Where-Object { @("status_refresh", "handoff_prompt") -contains [string]$_.name })
         Assert-Fb2RefreshSelfTest (@($generatedArtifacts).Count -eq 2) "generated artifacts present"
         foreach ($artifact in $generatedArtifacts) {
@@ -794,7 +850,12 @@ $files = [ordered]@{
     handoff_markdown = $handoffMarkdownPath
     handoff_prompt = $HandoffPromptPath
     exported_context_pack_sample_set_validation = $exportedSampleSetValidationPath
+    token_bridge_live_preflight = Join-Path $OutputDir "token-bridge-data-only-preflight-current.json"
+    token_bridge_live_preflight_summary = Join-Path $OutputDir "token-bridge-data-only-preflight-summary-current.json"
 }
+$tokenBridgeLivePreflight = New-Fb2RefreshTokenBridgeLivePreflight `
+    -ResultPath ([string]$files.token_bridge_live_preflight) `
+    -SummaryPath ([string]$files.token_bridge_live_preflight_summary)
 $evidenceFreshness = New-Fb2RefreshEvidenceFreshness `
     -OutputDir $OutputDir `
     -EvidenceDirs @($evidence) `
@@ -819,6 +880,7 @@ $refreshSummary = [pscustomobject]@{
     owner_next_actions = $ownerNextActions
     blocking_state = $blockingState
     next_commands = $nextCommands
+    token_bridge_live_preflight = $tokenBridgeLivePreflight
     exported_context_pack_sample_set_validation = $exportedSampleValidationState
     completion_matrix = $completionMatrix
     gap_action_board = $gapActionBoard

@@ -241,13 +241,30 @@ function New-Fb2PrivacyValidation {
             [string](Get-Fb2PrivacyProperty $files "goal_audit" ""),
             [string](Get-Fb2PrivacyProperty $files "handoff" ""),
             [string](Get-Fb2PrivacyProperty $files "public_contract_status" ""),
-            [string](Get-Fb2PrivacyProperty $files "exported_context_pack_sample_set_validation" "")
+            [string](Get-Fb2PrivacyProperty $files "exported_context_pack_sample_set_validation" ""),
+            (Join-Path $root "target\fb2-ai-center\token-bridge-data-only-preflight-current.json")
         )) {
         if (-not [string]::IsNullOrWhiteSpace($path)) {
             $resolved = Resolve-Fb2PrivacyPath -Path $path -Root $root
             if (-not $artifactPaths.Contains($resolved)) {
                 $artifactPaths.Add($resolved)
             }
+        }
+    }
+
+    $bridgeResultPath = Join-Path $root "target\fb2-ai-center\token-bridge-data-only-preflight-current.json"
+    if (Test-Path -LiteralPath $bridgeResultPath) {
+        try {
+            $bridgeResult = Read-Fb2PrivacyJson -Path $bridgeResultPath
+            $bridgeSummaryPath = [string](Get-Fb2PrivacyProperty $bridgeResult "summary_path" "")
+            if (-not [string]::IsNullOrWhiteSpace($bridgeSummaryPath)) {
+                $resolvedSummaryPath = Resolve-Fb2PrivacyPath -Path $bridgeSummaryPath -Root $root
+                if (-not $artifactPaths.Contains($resolvedSummaryPath)) {
+                    $artifactPaths.Add($resolvedSummaryPath)
+                }
+            }
+        } catch {
+            Add-Fb2PrivacyCheck $checks "token bridge result parseable for privacy expansion" $false $_.Exception.Message
         }
     }
 

@@ -312,6 +312,11 @@ function New-Fb2CurrentStateValidation {
         -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-tokenless-continuation.ps1") `
         -Arguments @("-RefreshPath", $RefreshPath, "-OutputPath", $tokenlessContinuationValidationPath) `
         -ExpectedOutputPath $tokenlessContinuationValidationPath))
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_token_bridge_wrapper" `
+        -ScriptPath (Join-Path $PSScriptRoot "run-fb2-ai-center-token-bridge.ps1") `
+        -Arguments @("-SelfTest", "-OutputPath", (Join-Path $targetDir "token-bridge-wrapper-validation-current.json")) `
+        -ExpectedOutputPath (Join-Path $targetDir "token-bridge-wrapper-validation-current.json")))
 
     $refresh = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
     $failedSteps = @($steps | Where-Object { -not [bool]$_.success -or -not [bool]$_.output_secret_safe })
@@ -381,7 +386,8 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "gap_action_board"; script = "validate-fb2-ai-center-gap-action-board.ps1" },
         [ordered]@{ name = "completion_matrix"; script = "validate-fb2-ai-center-completion-matrix.ps1" },
         [ordered]@{ name = "handoff_prompt"; script = "validate-fb2-ai-center-handoff-prompt.ps1" },
-        [ordered]@{ name = "tokenless_continuation"; script = "validate-fb2-tokenless-continuation.ps1" }
+        [ordered]@{ name = "tokenless_continuation"; script = "validate-fb2-tokenless-continuation.ps1" },
+        [ordered]@{ name = "token_bridge_wrapper"; script = "run-fb2-ai-center-token-bridge.ps1" }
     )
     try {
         New-Item -ItemType Directory -Force -Path $tempRoot | Out-Null

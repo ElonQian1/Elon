@@ -177,6 +177,7 @@ function New-Fb2TokenlessContinuationValidation {
         "validate_tokenless_continuation",
         "no_write_direct_read",
         "data_only_preflight",
+        "data_only_preflight_via_fb2_server_token_bridge",
         "visible_regression_requires_authorization"
     )
     foreach ($name in $requiredCommands) {
@@ -221,6 +222,14 @@ function New-Fb2TokenlessContinuationValidation {
         $preflightCommand -match "PreflightOnly" -and
         $preflightCommand -match "<FB2_AI_CENTER_TOKEN>" -and
         $preflightCommand -notmatch "AllowVisibleMessages"
+    )
+
+    $tokenBridgeCommand = [string](Get-Fb2TokenlessProperty $commands "data_only_preflight_via_fb2_server_token_bridge" "")
+    Add-Fb2TokenlessCheck $checks "token bridge preflight remains no visible write" (
+        $tokenBridgeCommand -match "run-fb2-ai-center-token-bridge\.ps1" -and
+        $tokenBridgeCommand -match "RunDataOnlyPreflight" -and
+        $tokenBridgeCommand -notmatch "AllowVisibleMessages" -and
+        $tokenBridgeCommand -notmatch "Fb2AiCenterToken"
     )
 
     $visibleCommand = [string](Get-Fb2TokenlessProperty $commands "visible_regression_requires_authorization" "")
@@ -332,6 +341,7 @@ function New-Fb2TokenlessFixture {
             validate_tokenless_continuation = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-tokenless-continuation.ps1 -OutputPath target\fb2-ai-center\tokenless-continuation-validation-current.json"
             no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Password <FB2_PASSWORD>"
             data_only_preflight = $dataOnlyCommand
+            data_only_preflight_via_fb2_server_token_bridge = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\run-fb2-ai-center-token-bridge.ps1 -RunDataOnlyPreflight -Fb2Password <FB2_PASSWORD>"
             visible_regression_requires_authorization = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2AiCenterToken $commandToken"
         }
         completion_matrix = [ordered]@{

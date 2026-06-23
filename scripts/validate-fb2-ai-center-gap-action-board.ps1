@@ -196,6 +196,7 @@ function New-Fb2GapValidation {
             "validate_tokenless_continuation",
             "no_write_direct_read",
             "data_only_preflight",
+            "data_only_preflight_via_fb2_server_token_bridge",
             "visible_regression_requires_authorization"
         )
         foreach ($name in $requiredCommands) {
@@ -267,6 +268,14 @@ function New-Fb2GapValidation {
             $preflightCommand -match "PreflightOnly" -and
             $preflightCommand -match "<FB2_AI_CENTER_TOKEN>" -and
             $preflightCommand -notmatch "AllowVisibleMessages"
+        )
+
+        $tokenBridgeCommand = [string](Get-Fb2GapProperty $nextCommands "data_only_preflight_via_fb2_server_token_bridge" "")
+        Add-Fb2GapCheck $checks "next command token bridge preflight is no visible write" (
+            $tokenBridgeCommand -match "run-fb2-ai-center-token-bridge\.ps1" -and
+            $tokenBridgeCommand -match "RunDataOnlyPreflight" -and
+            $tokenBridgeCommand -notmatch "AllowVisibleMessages" -and
+            $tokenBridgeCommand -notmatch "Fb2AiCenterToken"
         )
 
         $visibleCommand = [string](Get-Fb2GapProperty $nextCommands "visible_regression_requires_authorization" "")
@@ -375,6 +384,7 @@ function Invoke-Fb2GapSelfTest {
                 validate_tokenless_continuation = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-tokenless-continuation.ps1 -OutputPath target\fb2-ai-center\tokenless-continuation-validation-current.json"
                 no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD>"
                 data_only_preflight = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>"
+                data_only_preflight_via_fb2_server_token_bridge = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\run-fb2-ai-center-token-bridge.ps1 -RunDataOnlyPreflight -Fb2Password <FB2_PASSWORD>"
                 visible_regression_requires_authorization = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages -Fb2Username 123qwe -Fb2Password <FB2_PASSWORD> -Fb2AiCenterToken <FB2_AI_CENTER_TOKEN>"
             }
             gap_action_board = [ordered]@{

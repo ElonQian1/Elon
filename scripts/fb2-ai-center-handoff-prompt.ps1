@@ -141,7 +141,7 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 可执行命令"
-    foreach ($name in @("refresh_status", "read_status_refresh", "generate_context_pack_sample_request", "validate_context_pack_sample_set", "validate_exported_context_pack_sample_set", "validate_context_projection_log", "validate_user_scenario_audit", "validate_current_state", "validate_public_contract_status", "validate_server_deploy_status", "validate_read_only_direct_read", "validate_gap_action_board", "validate_evidence_freshness", "validate_evidence_privacy", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "validate_live_preflight_request", "validate_tokenless_continuation", "no_write_direct_read", "data_only_preflight", "visible_regression_requires_authorization")) {
+    foreach ($name in @("refresh_status", "read_status_refresh", "generate_context_pack_sample_request", "validate_context_pack_sample_set", "validate_exported_context_pack_sample_set", "validate_context_projection_log", "validate_user_scenario_audit", "validate_current_state", "validate_public_contract_status", "validate_server_deploy_status", "validate_read_only_direct_read", "validate_gap_action_board", "validate_evidence_freshness", "validate_evidence_privacy", "validate_completion_matrix", "validate_handoff_prompt", "validate_visible_answer_policy", "validate_live_preflight_request", "validate_tokenless_continuation", "no_write_direct_read", "data_only_preflight", "data_only_preflight_via_fb2_server_token_bridge", "visible_regression_requires_authorization")) {
         $value = Protect-Fb2PromptSecret -Text ([string](Get-Fb2PromptProperty $commands $name ""))
         if (-not [string]::IsNullOrWhiteSpace($value)) {
             Add-Fb2PromptLine -Lines $lines -Text ('- `{0}`: `{1}`' -f $name, $value)
@@ -200,7 +200,7 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text "## 接手规则"
     Add-Fb2PromptLine -Lines $lines -Text '- 先运行 `refresh_status`，再读取 `status-refresh-current.json`。'
     Add-Fb2PromptLine -Lines $lines -Text '- 没有 `FB2_AI_CENTER_TOKEN` 时，只做公开契约、离线样本、无写群直读和文档/脚本回归。'
-    Add-Fb2PromptLine -Lines $lines -Text '- 有 token 后，先跑 `data_only_preflight`，刷新 live Context Pack、本人订单、平台摘要、权限和质量证据。'
+    Add-Fb2PromptLine -Lines $lines -Text '- 有 token 或可用 fb2 服务器 SSH 权限后，先跑 `data_only_preflight` 或 `data_only_preflight_via_fb2_server_token_bridge`，刷新 live Context Pack、本人订单、平台摘要、权限和质量证据。'
     Add-Fb2PromptLine -Lines $lines -Text '- 真实群聊可见写入必须另有明确授权；截图不能替代 API 直读 summary。'
     Add-Fb2PromptLine -Lines $lines -Text '- ASR/TTS final evidence 仍按用户要求暂停，不能把 `full_final_complete=false` 改成完成。'
 
@@ -259,6 +259,7 @@ function Invoke-Fb2PromptSelfTest {
                 validate_tokenless_continuation = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-tokenless-continuation.ps1 -OutputPath target\fb2-ai-center\tokenless-continuation-validation-current.json"
                 no_write_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -ReadOnlyDirectRead -Fb2Password secret-real-password"
                 data_only_preflight = '$env:FB2_AI_CENTER_TOKEN="secret-real-value"; pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly -Fb2Token secret-real-value'
+                data_only_preflight_via_fb2_server_token_bridge = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\run-fb2-ai-center-token-bridge.ps1 -RunDataOnlyPreflight -Fb2Password secret-real-password"
                 visible_regression_requires_authorization = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-visible-chat.ps1 -AllowVisibleMessages"
             }
             completion_matrix = [ordered]@{

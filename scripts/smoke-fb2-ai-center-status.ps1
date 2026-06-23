@@ -95,6 +95,7 @@ function Get-LatestFileByPatternAcrossDirectories {
     param(
         [string[]]$Directories,
         [string]$Pattern,
+        [string]$IncludeNameRegex = "",
         [string]$ExcludeNameRegex = ""
     )
 
@@ -104,6 +105,9 @@ function Get-LatestFileByPatternAcrossDirectories {
             continue
         }
         $matched = @(Get-ChildItem -LiteralPath $directory -Filter $Pattern -File -ErrorAction SilentlyContinue)
+        if (-not [string]::IsNullOrWhiteSpace($IncludeNameRegex)) {
+            $matched = @($matched | Where-Object { $_.Name -match $IncludeNameRegex })
+        }
         if (-not [string]::IsNullOrWhiteSpace($ExcludeNameRegex)) {
             $matched = @($matched | Where-Object { $_.Name -notmatch $ExcludeNameRegex })
         }
@@ -192,8 +196,8 @@ function Build-Fb2AiCenterStatusSnapshot {
     }
     $summaryDirectories = Get-Fb2StatusSummaryDirectories -PrimaryDirectory $Directory -ExtraDirectories $ExtraDirectories
 
-    $latestDataFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "data-only-acceptance-*.json"
-    $latestFinalFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "final-acceptance-*.json"
+    $latestDataFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "data-only-acceptance-*.json" -IncludeNameRegex "^data-only-acceptance-\d{8}T\d{6}Z\.json$"
+    $latestFinalFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "final-acceptance-*.json" -IncludeNameRegex "^final-acceptance-\d{8}T\d{6}Z\.json$"
     $latestReadOnlyFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "read-only-direct-read*.json" -ExcludeNameRegex "validation"
     $latestAiCenterLogFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "*ai-center.log"
     $latestSampleRequestFile = Get-LatestFileByPatternAcrossDirectories -Directories $summaryDirectories -Pattern "context-pack-sample-request*.json"
@@ -521,7 +525,7 @@ function Invoke-Fb2StatusSelfTest {
             direct_read_evidence = "group=ext_fb2_official count=80 sample_message=gai_sample text_len=292 text_sha256=abcdef0123456789"
             api = "/api/me/groups/{group_id}/messages"
         }
-        $data | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "data-only-acceptance-test.json") -Encoding UTF8
+        $data | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "data-only-acceptance-20260622T133357Z.json") -Encoding UTF8
         $readOnly | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "read-only-direct-read-test.json") -Encoding UTF8
         [ordered]@{
             schema = "fb2.main_project.public_contract_status.v1"
