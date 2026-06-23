@@ -2951,9 +2951,13 @@
   }
 
   function cliSessionBridgeLine(bridge) {
-    const summary = clean(bridge && bridge.summary);
-    if (summary) return summary;
     if (!bridge) return '本机助手未返回 CLI 会话桥接状态。';
+    const summary = clean(bridge.display_summary || bridge.summary);
+    const actions = Array.isArray(bridge.recommended_next_actions)
+      ? bridge.recommended_next_actions.map(clean).filter(Boolean).slice(0, 2).join(' / ')
+      : '';
+    if (summary && actions) return `${summary} 下一步：${actions}`;
+    if (summary) return summary;
     const modes = Array.isArray(bridge.continuity_modes)
       ? bridge.continuity_modes.map(clean).filter(Boolean).slice(0, 3).join(' / ')
       : '';

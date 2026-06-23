@@ -320,9 +320,13 @@ function pathCode(path) {
   return `<code title="${esc(path)}">${esc(path)}</code>`;
 }
 function cliSessionBridgeLine(bridge) {
-  const summary = String((bridge && bridge.summary) || '').trim();
-  if (summary) return summary;
   if (!bridge) return '本机节点未返回 CLI 会话桥接状态';
+  const summary = String((bridge.display_summary || bridge.summary || '')).trim();
+  const actions = Array.isArray(bridge.recommended_next_actions)
+    ? bridge.recommended_next_actions.map(v => String(v || '').trim()).filter(Boolean).slice(0, 2).join(' / ')
+    : '';
+  if (summary && actions) return `${summary} 下一步：${actions}`;
+  if (summary) return summary;
   const modes = Array.isArray(bridge.continuity_modes)
     ? bridge.continuity_modes.map(v => String(v || '').trim()).filter(Boolean).slice(0, 3).join(' / ')
     : '';
