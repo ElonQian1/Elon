@@ -117,7 +117,7 @@ fn local_project_info(
         anyhow::bail!("workspace_path 必须指向一个目录");
     }
 
-    let identity = detect_project_identity(&path, landing);
+    let identity = detect_project_identity(&path, landing, inspect.git_remote_origin.as_deref());
     let profile = detect_project_profile(&path);
     let agent_runtime = inspect_agent_runtime_freshness(&path);
     let project = LocalProjectInfo {
@@ -249,7 +249,11 @@ struct ProjectIdentity {
     source: Option<String>,
 }
 
-fn detect_project_identity(path: &Path, landing: Option<&Value>) -> ProjectIdentity {
+fn detect_project_identity(
+    path: &Path,
+    landing: Option<&Value>,
+    git_remote_origin: Option<&str>,
+) -> ProjectIdentity {
     let fallback_name = project_name(path);
     if let Some(identity) = identity_from_landing(&fallback_name, landing) {
         return identity;
@@ -274,6 +278,9 @@ fn detect_project_identity(path: &Path, landing: Option<&Value>) -> ProjectIdent
         return identity;
     }
     if let Some(identity) = identity_from_readme(&fallback_name, path) {
+        return identity;
+    }
+    if let Some(identity) = identity_from_git_remote(git_remote_origin) {
         return identity;
     }
     ProjectIdentity {
@@ -372,6 +379,24 @@ fn identity_from_readme(fallback_name: &str, path: &Path) -> Option<ProjectIdent
 
     let description = clean_project_text(&description_lines.join(" "), 240);
     identity_from_parts(fallback_name, title, description, source)
+}
+
+fn identity_from_git_remote(remote: Option<&str>) -> Option<ProjectIdentity> {
+    let remote = remote.map(str::trim).filter(|value| !value.is_empty())?;
+    let trimmed = remote.trim_end_matches('/');
+    let mut name_part = trimmed.rsplit(['/', ':']).next().unwrap_or(trimmed).trim();
+    if let Some(stripped) = name_part.strip_suffix(".git") {
+        name_part = stripped;
+    }
+    let name = clean_project_text(name_part, 120)?;
+    if name == "." || name == ".." {
+        return None;
+    }
+    Some(ProjectIdentity {
+        description: Some(default_project_description(&name)),
+        name,
+        source: Some("Git 远端".to_string()),
+    })
 }
 
 fn identity_from_parts(
@@ -820,7 +845,8 @@ mod tests {
             "tagline": "给运营团队使用的客服项目"
         });
 
-        let identity = detect_project_identity(PathBuf::from("C:\\demo").as_path(), Some(&landing));
+        let identity =
+            detect_project_identity(PathBuf::from("C:\\demo").as_path(), Some(&landing), None);
 
         assert_eq!(identity.name, "智能客服工作台");
         assert_eq!(
@@ -842,7 +868,7 @@ mod tests {
         )
         .unwrap();
 
-        let identity = detect_project_identity(&dir, None);
+        let identity = detect_project_identity(&dir, None, None);
         let _ = std::fs::remove_dir_all(&dir);
 
         assert_eq!(identity.name, "agent-desk");
@@ -859,7 +885,7 @@ mod tests {
         )
         .unwrap();
 
-        let identity = detect_project_identity(&dir, None);
+        let identity = detect_project_identity(&dir, None, None);
         let _ = std::fs::remove_dir_all(&dir);
 
         assert_eq!(identity.name, "repair-agent");
@@ -876,7 +902,7 @@ mod tests {
         )
         .unwrap();
 
-        let identity = detect_project_identity(&dir, None);
+        let identity = detect_project_identity(&dir, None, None);
         let _ = std::fs::remove_dir_all(&dir);
 
         assert_eq!(identity.name, "网络诊断助手");
@@ -897,12 +923,63 @@ mod tests {
         .unwrap();
         std::fs::write(dir.join("README.md"), "# README 名称\n\nREADME 描述").unwrap();
 
-        let identity = detect_project_identity(&dir, None);
+        let identity = detect_project_identity(&dir, None, None);
         let _ = std::fs::remove_dir_all(&dir);
 
         assert_eq!(identity.name, "package-name");
         assert_eq!(identity.description.as_deref(), Some("manifest desc"));
         assert_eq!(identity.source.as_deref(), Some("package.json"));
+    }
+
+    #[test]
+    fn detects_project_identity_from_git_remote_when_no_manifest_or_readme() {
+        let dir = temp_project("identity-git-remote");
+
+        let identity = detect_project_identity(
+            &dir,
+            None,
+            Some("https://github.com/example/acme-desktop-agent.git"),
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "acme-desktop-agent");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("绑定到本 PC 节点的本地项目: acme-desktop-agent")
+        );
+        assert_eq!(identity.source.as_deref(), Some("Git 远端"));
+    }
+
+    #[test]
+    fn detects_project_identity_from_ssh_git_remote() {
+        let dir = temp_project("identity-ssh-git-remote");
+
+        let identity = detect_project_identity(
+            &dir,
+            None,
+            Some("git@github.com:example/win-client-runtime.git"),
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "win-client-runtime");
+        assert_eq!(identity.source.as_deref(), Some("Git 远端"));
+    }
+
+    #[test]
+    fn readme_identity_takes_precedence_over_git_remote() {
+        let dir = temp_project("identity-readme-before-git");
+        std::fs::write(dir.join("README.md"), "# README 名称\n\nREADME 描述").unwrap();
+
+        let identity = detect_project_identity(
+            &dir,
+            None,
+            Some("https://github.com/example/git-remote-name.git"),
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "README 名称");
+        assert_eq!(identity.description.as_deref(), Some("README 描述"));
+        assert_eq!(identity.source.as_deref(), Some("README.md"));
     }
 
     #[test]
