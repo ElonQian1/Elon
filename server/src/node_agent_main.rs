@@ -67,6 +67,7 @@ mod node_agent_project_agent_runs;
 mod node_agent_project_manifest_identity;
 mod node_agent_project_picker;
 mod node_agent_project_profile;
+mod node_agent_project_profile_python;
 mod node_agent_proxy;
 mod node_agent_route_c_status;
 mod node_agent_runtime_approval;

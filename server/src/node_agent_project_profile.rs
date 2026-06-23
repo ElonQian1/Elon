@@ -3,6 +3,10 @@
 use serde_json::Value;
 use std::path::Path;
 
+use crate::node_agent_project_profile_python::{
+    detect_python_project_profile, python_workspace_commands, PythonWorkspaceModule,
+};
+
 #[derive(Debug, Default)]
 pub(crate) struct ProjectProfile {
     pub(crate) project_type: Option<String>,
@@ -78,7 +82,7 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
         return dotnet;
     }
 
-    if let Some(python) = python_project_profile(path) {
+    if let Some(python) = detect_python_project_profile(path) {
         return python;
     }
 
@@ -94,6 +98,7 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
     let mut node_module = None;
     let mut gradle_dir = None;
     let mut go_module = None;
+    let mut python_module = None;
 
     for module in [
         "server", "backend", "api", "app", "cmd", "web", "frontend", "client", "android",
@@ -165,6 +170,23 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
             }
         }
 
+        if let Some(python) = detect_python_project_profile(&module_path) {
+            for file in python.detected_files {
+                push_unique(&mut detected_files, format!("{module}/{file}"));
+            }
+            push_unique(&mut project_types, "Python".to_string());
+            let manager = python.package_manager.unwrap_or_else(|| "pip".to_string());
+            push_unique(&mut package_managers, manager.clone());
+            if python_module.is_none() {
+                python_module = Some(PythonWorkspaceModule {
+                    module: module.to_string(),
+                    manager,
+                    has_manage_py: module_path.join("manage.py").is_file(),
+                    has_pyproject: module_path.join("pyproject.toml").is_file(),
+                });
+            }
+        }
+
         if detected_files.len() >= MAX_DETECTED_FILES {
             break;
         }
@@ -190,6 +212,7 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
         cargo_manifest.as_deref(),
         node_module.as_ref(),
         go_module.as_deref(),
+        python_module.as_ref(),
         gradle_dir.as_deref(),
     );
 
@@ -216,6 +239,7 @@ fn workspace_commands(
     cargo_manifest: Option<&str>,
     node_module: Option<&NodeWorkspaceModule>,
     go_module: Option<&str>,
+    python_module: Option<&PythonWorkspaceModule>,
     gradle_module: Option<&str>,
 ) -> (Option<String>, Option<String>, Option<String>) {
     if let Some(manifest) = cargo_manifest {
@@ -244,6 +268,9 @@ fn workspace_commands(
             Some(format!("go -C {module} test ./...")),
             Some(format!("go -C {module} build ./...")),
         );
+    }
+    if let Some(module) = python_module {
+        return python_workspace_commands(module);
     }
     if let Some(module) = gradle_module {
         return (
@@ -384,90 +411,6 @@ fn directory_files_with_extensions(path: &Path, extensions: &[&str]) -> Vec<Stri
                 .then_some(file_name)
         })
         .collect()
-}
-
-fn python_project_profile(path: &Path) -> Option<ProjectProfile> {
-    let pyproject = path.join("pyproject.toml");
-    let requirements = path.join("requirements.txt");
-    let pytest_ini = path.join("pytest.ini");
-    let manage_py = path.join("manage.py");
-    let poetry_lock = path.join("poetry.lock");
-    let uv_lock = path.join("uv.lock");
-    let pipfile = path.join("Pipfile");
-
-    let detected = [
-        (&pyproject, "pyproject.toml"),
-        (&requirements, "requirements.txt"),
-        (&pytest_ini, "pytest.ini"),
-        (&manage_py, "manage.py"),
-        (&poetry_lock, "poetry.lock"),
-        (&uv_lock, "uv.lock"),
-        (&pipfile, "Pipfile"),
-    ]
-    .into_iter()
-    .filter_map(|(path, name)| path.exists().then_some(name.to_string()))
-    .collect::<Vec<_>>();
-    if detected.is_empty() {
-        return None;
-    }
-
-    let manager = python_package_manager(path);
-    let mut profile = ProjectProfile {
-        project_type: Some("Python".to_string()),
-        package_manager: Some(manager.clone()),
-        run_command: None,
-        test_command: Some(python_tool_command(&manager, "pytest")),
-        build_command: python_build_command(&manager, pyproject.exists()),
-        detected_files: detected,
-    };
-    if manage_py.exists() {
-        profile.run_command = Some(python_manage_command(&manager));
-    }
-    Some(profile)
-}
-
-fn python_package_manager(path: &Path) -> String {
-    if path.join("uv.lock").exists() {
-        "uv".to_string()
-    } else if path.join("poetry.lock").exists() {
-        "Poetry".to_string()
-    } else if path.join("Pipfile").exists() {
-        "Pipenv".to_string()
-    } else if path.join("pyproject.toml").exists() {
-        "pyproject".to_string()
-    } else {
-        "pip".to_string()
-    }
-}
-
-fn python_tool_command(manager: &str, tool: &str) -> String {
-    match manager {
-        "uv" => format!("uv run {tool}"),
-        "Poetry" => format!("poetry run {tool}"),
-        "Pipenv" => format!("pipenv run {tool}"),
-        _ => format!("python -m {tool}"),
-    }
-}
-
-fn python_manage_command(manager: &str) -> String {
-    match manager {
-        "uv" => "uv run python manage.py runserver".to_string(),
-        "Poetry" => "poetry run python manage.py runserver".to_string(),
-        "Pipenv" => "pipenv run python manage.py runserver".to_string(),
-        _ => "python manage.py runserver".to_string(),
-    }
-}
-
-fn python_build_command(manager: &str, has_pyproject: bool) -> Option<String> {
-    if !has_pyproject {
-        return None;
-    }
-    Some(match manager {
-        "uv" => "uv build".to_string(),
-        "Poetry" => "poetry build".to_string(),
-        "Pipenv" => "pipenv run python -m build".to_string(),
-        _ => "python -m build".to_string(),
-    })
 }
 
 #[cfg(test)]
@@ -614,58 +557,6 @@ mod tests {
     }
 
     #[test]
-    fn detects_plain_pyproject_python_projects() {
-        let dir = temp_project("python-pyproject");
-        std::fs::write(dir.join("pyproject.toml"), "[project]\nname='demo'\n").unwrap();
-
-        let profile = detect_project_profile(&dir);
-        let _ = std::fs::remove_dir_all(&dir);
-
-        assert_eq!(profile.project_type.as_deref(), Some("Python"));
-        assert_eq!(profile.package_manager.as_deref(), Some("pyproject"));
-        assert_eq!(profile.test_command.as_deref(), Some("python -m pytest"));
-        assert_eq!(profile.build_command.as_deref(), Some("python -m build"));
-    }
-
-    #[test]
-    fn detects_uv_django_python_projects() {
-        let dir = temp_project("python-uv-django");
-        std::fs::write(dir.join("pyproject.toml"), "[project]\nname='demo'\n").unwrap();
-        std::fs::write(dir.join("uv.lock"), "").unwrap();
-        std::fs::write(dir.join("manage.py"), "").unwrap();
-
-        let profile = detect_project_profile(&dir);
-        let _ = std::fs::remove_dir_all(&dir);
-
-        assert_eq!(profile.package_manager.as_deref(), Some("uv"));
-        assert_eq!(
-            profile.run_command.as_deref(),
-            Some("uv run python manage.py runserver")
-        );
-        assert_eq!(profile.test_command.as_deref(), Some("uv run pytest"));
-        assert_eq!(profile.build_command.as_deref(), Some("uv build"));
-        assert!(profile.detected_files.contains(&"manage.py".to_string()));
-    }
-
-    #[test]
-    fn detects_requirements_python_projects() {
-        let dir = temp_project("python-requirements");
-        std::fs::write(dir.join("requirements.txt"), "pytest\n").unwrap();
-        std::fs::write(dir.join("pytest.ini"), "[pytest]\n").unwrap();
-
-        let profile = detect_project_profile(&dir);
-        let _ = std::fs::remove_dir_all(&dir);
-
-        assert_eq!(profile.project_type.as_deref(), Some("Python"));
-        assert_eq!(profile.package_manager.as_deref(), Some("pip"));
-        assert_eq!(profile.test_command.as_deref(), Some("python -m pytest"));
-        assert!(profile.build_command.is_none());
-        assert!(profile
-            .detected_files
-            .contains(&"requirements.txt".to_string()));
-    }
-
-    #[test]
     fn detects_shallow_rust_android_workspace_from_repo_root() {
         let dir = temp_project("workspace-rust-android");
         std::fs::create_dir_all(dir.join("server")).unwrap();
@@ -754,6 +645,63 @@ mod tests {
         assert!(profile
             .detected_files
             .contains(&"server/go.mod".to_string()));
+    }
+
+    #[test]
+    fn detects_shallow_python_workspace_from_repo_root() {
+        let dir = temp_project("workspace-python");
+        std::fs::create_dir_all(dir.join("backend")).unwrap();
+        std::fs::write(
+            dir.join("backend").join("pyproject.toml"),
+            "[project]\nname='demo-api'\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("backend").join("uv.lock"), "").unwrap();
+        std::fs::write(dir.join("backend").join("manage.py"), "").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Python"));
+        assert_eq!(profile.package_manager.as_deref(), Some("uv"));
+        assert_eq!(
+            profile.run_command.as_deref(),
+            Some("uv run --project backend python backend/manage.py runserver")
+        );
+        assert_eq!(
+            profile.test_command.as_deref(),
+            Some("uv run --project backend pytest")
+        );
+        assert_eq!(profile.build_command.as_deref(), Some("uv build backend"));
+        assert!(profile
+            .detected_files
+            .contains(&"backend/pyproject.toml".to_string()));
+        assert!(profile
+            .detected_files
+            .contains(&"backend/uv.lock".to_string()));
+    }
+
+    #[test]
+    fn detects_shallow_python_requirements_workspace_from_repo_root() {
+        let dir = temp_project("workspace-python-requirements");
+        std::fs::create_dir_all(dir.join("api")).unwrap();
+        std::fs::write(dir.join("api").join("requirements.txt"), "pytest\n").unwrap();
+        std::fs::write(dir.join("api").join("pytest.ini"), "[pytest]\n").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Python"));
+        assert_eq!(profile.package_manager.as_deref(), Some("pip"));
+        assert!(profile.run_command.is_none());
+        assert_eq!(
+            profile.test_command.as_deref(),
+            Some("python -m pytest api")
+        );
+        assert!(profile.build_command.is_none());
+        assert!(profile
+            .detected_files
+            .contains(&"api/requirements.txt".to_string()));
     }
 
     #[test]
