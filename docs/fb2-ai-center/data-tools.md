@@ -94,6 +94,8 @@ fb2 可以在内部使用数据库索引、缓存、向量库、MCP 或领域召
 
 这些字段用于选择 fb2 内部索引和权限裁剪；最终给模型看的仍是 `<fb2_context_pack>`、`citation_sources` 和 `retrieval_evidence`，不能把原始订单表、群聊正文或 embedding 直接交给主项目。
 
+Context Pack 必须有体积预算。主项目当前用 `scripts\validate-fb2-context-pack-budget.ps1` 验证 fb2 live 样本摘要：每个场景硬上限暂定 `context_pack_chars <= 24000`，超过即视为回归；长期目标线是 `context_pack_chars <= 12000`，超过目标但未超过硬上限先作为 warning，推动 fb2 继续优化内部索引、top-k 召回和摘要投影。这个门禁只看 sample validation summary 中的字符数、引用数和 sha256，不读取 Context Pack 原文，避免把订单或群聊正文写入主项目证据。
+
 这一阶段 AI 只使用一次性上下文，不自动调用 fb2 细分工具。
 
 ## 阶段 2：Declared Tools

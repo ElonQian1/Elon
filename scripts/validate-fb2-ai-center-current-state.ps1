@@ -290,6 +290,22 @@ function New-Fb2CurrentStateValidation {
             -JsonSuccess (Get-Fb2CurrentProperty $exportedSampleState "success" $null) `
             -Details ($exportedSampleState | ConvertTo-Json -Depth 6)))
     }
+    $contextPackBudgetValidationPath = Join-Path $targetDir "context-pack-budget-validation-current.json"
+    $exportedSampleValidationPath = [string](Get-Fb2CurrentProperty $exportedSampleState "output_path" "")
+    if (-not [string]::IsNullOrWhiteSpace($exportedSampleValidationPath) -and (Test-Path -LiteralPath $exportedSampleValidationPath)) {
+        [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+            -Name "validate_context_pack_budget" `
+            -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-context-pack-budget.ps1") `
+            -Arguments @("-SummaryPath", $exportedSampleValidationPath, "-OutputPath", $contextPackBudgetValidationPath) `
+            -ExpectedOutputPath $contextPackBudgetValidationPath))
+    } else {
+        [void]$steps.Add((New-Fb2CurrentInlineStep `
+            -Name "validate_context_pack_budget" `
+            -Success $false `
+            -OutputPath "" `
+            -JsonSuccess $false `
+            -Details "missing_exported_context_pack_sample_validation_summary"))
+    }
     $filesForOptionalSteps = Get-Fb2CurrentProperty $refreshForOptionalSteps "files"
     $statusPathForOptionalSteps = [string](Get-Fb2CurrentProperty $filesForOptionalSteps "status" "")
     $statusForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $statusPathForOptionalSteps
@@ -448,6 +464,7 @@ function New-Fb2CurrentStateValidation {
     $gates = Get-Fb2CurrentProperty $completion "gates"
     $exportedSampleValidation = Get-Fb2CurrentProperty $refresh "exported_context_pack_sample_set_validation"
     $publicContractStatus = Read-Fb2CurrentJsonOrNull -Path (Join-Path $targetDir "public-contract-status-current.json")
+    $contextPackBudgetValidation = Read-Fb2CurrentJsonOrNull -Path $contextPackBudgetValidationPath
     $visibleAnswerPolicyValidation = Read-Fb2CurrentJsonOrNull -Path $visibleAnswerPolicyValidationPath
     $qualityTrendValidation = Read-Fb2CurrentJsonOrNull -Path $qualityTrendValidationPath
     $livePreflightRequestValidation = Read-Fb2CurrentJsonOrNull -Path $livePreflightValidationPath
@@ -481,6 +498,7 @@ function New-Fb2CurrentStateValidation {
         answer_source_validation_status = $answerSourceValidationState
         project_direct_network_policy_validation = $directNetworkPolicyValidation
         exported_context_pack_sample_set_validation = $exportedSampleValidation
+        context_pack_budget_validation = $contextPackBudgetValidation
         visible_answer_policy_validation = $visibleAnswerPolicyValidation
         quality_trend_validation = $qualityTrendValidation
         live_preflight_request_validation = $livePreflightRequestValidation
@@ -514,6 +532,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "project_direct_network_policy"; script = "validate-project-direct-network-policy.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
+        [ordered]@{ name = "context_pack_budget"; script = "validate-fb2-context-pack-budget.ps1" },
         [ordered]@{ name = "quality_trend"; script = "validate-fb2-quality-trend.ps1" },
         [ordered]@{ name = "live_preflight_request"; script = "validate-fb2-live-preflight-request.ps1" },
         [ordered]@{ name = "context_projection_log"; script = "validate-fb2-context-projection-log.ps1" },
