@@ -44,6 +44,8 @@ struct ServerAgentRuntimeStatus {
     limits: ServerAgentRuntimeLimits,
     protection: ServerRuntimeProtectionStatus,
     policy: ServerAgentRuntimePolicy,
+    #[serde(rename = "agentPolicy")]
+    agent_policy: ServerAgentRuntimeAgentPolicy,
     budget: ServerRuntimeBudgetStatus,
     admission: ServerRuntimeAdmissionSnapshot,
     #[serde(rename = "admissionAvailability")]
@@ -105,6 +107,7 @@ pub async fn status_handler(State(state): State<Arc<AppState>>, headers: HeaderM
         limits,
         protection: protection_status(),
         policy,
+        agent_policy,
         budget,
         admission,
         admission_availability,
@@ -421,10 +424,17 @@ mod tests {
         operational_error_summary, protection_status, provider_error_message, response_model,
         response_total_tokens, server_runtime_agent_usage_mode_allowed,
         unsupported_agent_usage_mode_message, validate_runtime_messages,
+        ServerAgentRuntimeAgentStatus, ServerAgentRuntimeStatus,
     };
     use crate::server_agent_runtime_budget::{ServerRuntimeBudgetError, ServerRuntimeBudgetStatus};
-    use crate::server_agent_runtime_guard::ServerRuntimeAdmissionError;
+    use crate::server_agent_runtime_guard::{
+        ServerRuntimeAdmissionAvailability, ServerRuntimeAdmissionError,
+        ServerRuntimeAdmissionSnapshot,
+    };
     use crate::server_agent_runtime_limits::ServerAgentRuntimeLimits;
+    use crate::server_agent_runtime_policy::{
+        ServerAgentRuntimeAgentPolicy, ServerAgentRuntimePolicy,
+    };
     use crate::types::{AgentConfig, AgentsConfig};
     use axum::http::header;
     use serde_json::json;
@@ -472,6 +482,67 @@ mod tests {
             .contains("ELON_SERVER_AGENT_RUNTIME_ENABLED"));
         assert!(protection.billing_gate.contains("call_chat_llm"));
         assert!(protection.request_fingerprint.contains("sha256"));
+    }
+
+    #[test]
+    fn runtime_status_serializes_agent_policy_for_operations() {
+        let status = ServerAgentRuntimeStatus {
+            ready: true,
+            status: "ready",
+            agent: Some(ServerAgentRuntimeAgentStatus {
+                name: "main".to_string(),
+                model: "route-c-model".to_string(),
+                usage_mode: "server_api_key".to_string(),
+            }),
+            limits: ServerAgentRuntimeLimits::current(),
+            protection: protection_status(),
+            policy: ServerAgentRuntimePolicy::from_env_value(None),
+            agent_policy: ServerAgentRuntimeAgentPolicy::from_env_value(Some("route-c-fast")),
+            budget: ServerRuntimeBudgetStatus {
+                enabled: false,
+                status: "unlimited",
+                source: "default",
+                used_calls_today: 0,
+                daily_call_limit: None,
+                remaining_calls_today: None,
+                per_user_enabled: false,
+                per_user_source: "default",
+                used_calls_today_for_user: None,
+                per_user_daily_call_limit: None,
+                remaining_calls_today_for_user: None,
+                reset_after_secs: 60,
+            },
+            admission: ServerRuntimeAdmissionSnapshot {
+                in_flight_global: 0,
+                max_concurrent_global: 24,
+                remaining_concurrent_global: 24,
+                in_flight_for_user: 0,
+                max_concurrent_per_user: 2,
+                remaining_concurrent_for_user: 2,
+                recent_requests_per_minute: 0,
+                max_requests_per_minute: 12,
+                remaining_requests_per_minute: 12,
+                rate_limit_retry_after_secs: None,
+                duplicate_request_window_secs: 5,
+                recent_duplicate_fingerprints: 0,
+            },
+            admission_availability: ServerRuntimeAdmissionAvailability {
+                ready: true,
+                reason: None,
+                public_message: None,
+                retry_after_secs: None,
+            },
+        };
+
+        let value = serde_json::to_value(status).unwrap();
+
+        assert_eq!(value["agentPolicy"]["mode"], "allowlist");
+        assert_eq!(
+            value["agentPolicy"]["source"],
+            "ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"
+        );
+        assert!(value.get("agent_policy").is_none());
+        assert!(value["agentPolicy"].get("allowedAgents").is_none());
     }
 
     #[test]

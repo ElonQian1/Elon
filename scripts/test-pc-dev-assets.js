@@ -1396,6 +1396,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNode.includes('admission_availability'), 'PC node page should keep snake_case admission compatibility');
   assert.ok(pcAppNode.includes('agentSelection'), 'PC node page should display Route C agent selection protection');
   assert.ok(pcAppNode.includes('agent_selection'), 'PC node page should keep snake_case agent selection compatibility');
+  assert.ok(pcAppNode.includes('routeCAgentPolicyLabel'), 'PC node page should display Route C agent policy mode');
+  assert.ok(pcAppNode.includes('agentPolicy'), 'PC node page should read Route C agentPolicy status');
+  assert.ok(pcAppNode.includes('agent策略 白名单'), 'PC node page should label Route C allowlist policy');
   assert.ok(pcAppNode.includes('unsupported_agent_usage_mode'), 'PC node page should explain unsupported Route C agent usage modes');
   assert.ok(pcAppNode.includes('server_api_key'), 'PC node page should show the required Route C server API key mode');
   assert.ok(pcAppNode.includes('routeCLimitedReasonText'), 'PC node page should explain Route C limited reasons');
@@ -1404,6 +1407,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNode.includes('重复防抖'), 'PC node page should label Route C duplicate request debounce');
   const readinessJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_readiness.js'), 'utf8');
   assert.ok(readinessJs.includes('admissionAvailability'), 'project readiness should read Route C admission availability');
+  assert.ok(readinessJs.includes('routeCAgentPolicyLabel'), 'project readiness should display Route C agent policy mode');
+  assert.ok(readinessJs.includes('agentPolicy'), 'project readiness should read Route C agentPolicy status');
+  assert.ok(readinessJs.includes('agent策略 白名单'), 'project readiness should label Route C allowlist policy');
   assert.ok(readinessJs.includes('routeCLimitedReasonText'), 'project readiness should explain Route C limited reasons');
   assert.ok(readinessJs.includes('unsupported_agent_usage_mode'), 'project readiness should explain unsupported Route C agent usage modes');
   assert.ok(readinessJs.includes('server_api_key'), 'project readiness should show the required Route C server API key mode');

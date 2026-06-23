@@ -81,6 +81,14 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Needle "unsupported_agent_usage_mode" `
         -Message "Server Route C status must expose unsupported agent usage mode"
     Assert-FileContains `
+        -Path $ServerRuntimeModule `
+        -Needle "agentPolicy" `
+        -Message "Server Route C status must expose structured agent selection policy"
+    Assert-FileContains `
+        -Path $RouteCStatusModule `
+        -Needle "agentPolicy" `
+        -Message "Route C node cloud status must preserve agent policy"
+    Assert-FileContains `
         -Path $GuardModule `
         -Needle "admission_availability_reports_capacity_reason" `
         -Message "Server Route C guard must test admission capacity reasons"

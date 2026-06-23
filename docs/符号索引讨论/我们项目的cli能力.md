@@ -1041,9 +1041,12 @@ ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS
 
 Route C agent usage_mode
   只允许 server_api_key；user_api_key_proxy / CLI 类 / Copilot 类 agent 即使被误配为默认或 allowlist，也不会被 Route C 调用
+
+Route C agentPolicy 状态
+  /api/agent/runtime/status 结构化暴露 default_agent_only / allowlist / any，Win 客户端 Route C 保护状态会展示 agent 策略
 ```
 
-Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽、agent 模式不允许，并显示重试时间、平台剩余额度、个人剩余额度、并发、分钟级请求限制和重复请求防抖窗口。
+Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽、agent 模式不允许，并显示重试时间、平台剩余额度、个人剩余额度、并发、分钟级请求限制、重复请求防抖窗口和 agent 策略。
 
 已完成的边界：
 

@@ -358,6 +358,7 @@
       const admission = status.admission || {};
       const protection = status.protection || {};
       const agentSelection = clean(protection.agentSelection || protection.agent_selection);
+      const agentPolicy = routeCAgentPolicyLabel(status);
       const rpm = numberField(limits, 'maxRequestsPerMinute', 'max_requests_per_minute')
         || numberField(admission, 'maxRequestsPerMinute', 'max_requests_per_minute');
       const perUser = numberField(limits, 'maxConcurrentPerUser', 'max_concurrent_per_user')
@@ -372,7 +373,8 @@
       const userDailyLimit = numberField(budget, 'perUserDailyCallLimit', 'per_user_daily_call_limit');
       const remainingUserBudget = numberField(budget, 'remainingCallsTodayForUser', 'remaining_calls_today_for_user');
       const parts = [];
-      if (agentSelection) parts.push('agent 受控');
+      if (agentPolicy) parts.push(agentPolicy);
+      else if (agentSelection) parts.push('agent 受控');
       if (rpm) parts.push(`${rpm}/分钟`);
       if (perUser || global) parts.push(`并发 ${perUser || '?'} / ${global || '?'}`);
       if (duplicateWindow) parts.push(`重复防抖 ${duplicateWindow}秒`);
@@ -380,6 +382,16 @@
       if (Number.isFinite(dailyLimit) && Number.isFinite(remainingBudget)) parts.push(`今日剩余 ${remainingBudget}/${dailyLimit}`);
       if (Number.isFinite(userDailyLimit) && Number.isFinite(remainingUserBudget)) parts.push(`个人今日剩余 ${remainingUserBudget}/${userDailyLimit}`);
       return parts.length ? `已保护 · ${parts.join(' · ')}` : '已保护 · 限额策略已上报';
+    }
+
+    function routeCAgentPolicyLabel(status) {
+      const policy = (status && (status.agentPolicy || status.agent_policy)) || {};
+      const mode = clean(policy.mode);
+      if (!mode) return '';
+      if (mode === 'default_agent_only') return 'agent策略 默认';
+      if (mode === 'allowlist') return 'agent策略 白名单';
+      if (mode === 'any') return 'agent策略 开放';
+      return `agent策略 ${mode}`;
     }
 
     function routeCLimitedReasonText(reason) {

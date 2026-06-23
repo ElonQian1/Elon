@@ -88,6 +88,11 @@ fn normalize_status_value(value: &Value) -> Value {
         "limits": value.get("limits").cloned().unwrap_or(Value::Null),
         "protection": value.get("protection").cloned().unwrap_or(Value::Null),
         "policy": value.get("policy").cloned().unwrap_or(Value::Null),
+        "agentPolicy": value
+            .get("agentPolicy")
+            .or_else(|| value.get("agent_policy"))
+            .cloned()
+            .unwrap_or(Value::Null),
         "budget": value.get("budget").cloned().unwrap_or(Value::Null),
         "admission": value.get("admission").cloned().unwrap_or(Value::Null),
         "admissionAvailability": value
@@ -143,6 +148,7 @@ mod tests {
             "limits": {"maxRequestsPerMinute": 12, "maxConcurrentPerUser": 2},
             "protection": {"admissionControl": "global and per-user concurrency"},
             "policy": {"enabled": true},
+            "agentPolicy": {"mode": "default_agent_only", "source": "default"},
             "budget": {"enabled": true, "dailyCallLimit": 100, "remainingCallsToday": 99},
             "admission": {"remainingRequestsPerMinute": 11},
             "admissionAvailability": {"ready": true},
@@ -154,6 +160,7 @@ mod tests {
         assert_eq!(status["budget"]["remainingCallsToday"], 99);
         assert_eq!(status["admission"]["remainingRequestsPerMinute"], 11);
         assert_eq!(status["admissionAvailability"]["ready"], true);
+        assert_eq!(status["agentPolicy"]["mode"], "default_agent_only");
         assert!(status.get("ignored").is_none());
     }
 
@@ -174,6 +181,24 @@ mod tests {
         assert_eq!(status["status"], "limited");
         assert_eq!(status["admissionAvailability"]["reason"], "rate_limited");
         assert_eq!(status["admissionAvailability"]["retryAfterSecs"], 17);
+    }
+
+    #[test]
+    fn normalizes_snake_case_agent_policy_for_older_servers() {
+        let status = normalize_status_value(&json!({
+            "ready": true,
+            "status": "ready",
+            "agent_policy": {
+                "mode": "allowlist",
+                "source": "ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"
+            }
+        }));
+
+        assert_eq!(status["agentPolicy"]["mode"], "allowlist");
+        assert_eq!(
+            status["agentPolicy"]["source"],
+            "ELON_SERVER_AGENT_RUNTIME_ALLOWED_AGENTS"
+        );
     }
 
     #[test]
