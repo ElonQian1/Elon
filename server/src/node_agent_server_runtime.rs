@@ -627,6 +627,21 @@ where
                         continue;
                     }
                     ApprovalOutcome::Canceled => {
+                        send_chunk(
+                            &out_tx,
+                            task_journal.as_ref(),
+                            req_id,
+                            tool_approval_decision_chunk(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &approval_id,
+                                &tool,
+                                "cancel",
+                                "canceled",
+                                Some(&action),
+                            ),
+                        );
                         send_runtime_canceled(
                             &out_tx,
                             task_journal.as_ref(),
@@ -1243,7 +1258,10 @@ mod tests {
         runtime_response_too_large_message, system_prompt, ApiRuntimeConfig, RuntimeLoopOptions,
         MAX_RUNTIME_HTTP_BODY_BYTES,
     };
-    use crate::{node_agent_tool_approval::ToolApprovalState, node_agent_tool_guard::ToolGuard};
+    use crate::{
+        node_agent_task_journal::TaskJournal, node_agent_tool_approval::ToolApprovalState,
+        node_agent_tool_guard::ToolGuard,
+    };
     use anyhow::anyhow;
     use homecli_proto::AgentToServer;
     use serde_json::{json, Value};
@@ -1707,6 +1725,85 @@ mod tests {
             "denied write_file must not create the file"
         );
         let _ = cancel_tx.send(true);
+    }
+
+    #[tokio::test]
+    async fn runtime_records_canceled_approval_decision_in_journal() {
+        let workspace = temp_test_dir("runtime_records_canceled_approval_decision_in_journal");
+        let target = workspace.join("blocked.txt");
+        let task_journal = TaskJournal::new(workspace.join(".journal"));
+        let journal_for_runtime = task_journal.clone();
+        let approval_state = ToolApprovalState::default();
+        let (cancel_tx, cancel_rx) = watch::channel(false);
+        let (out_tx, mut out_rx) = mpsc::unbounded_channel();
+        let req_id = "req-cancel-approval".to_string();
+        let runtime_req_id = req_id.clone();
+        let runtime = tokio::spawn(async move {
+            run_runtime_loop(
+                RuntimeLoopOptions {
+                    req_id: &runtime_req_id,
+                    label: "test-runtime",
+                    guard: ToolGuard::new(workspace, Some("project_write")),
+                    prompt: "write a file",
+                    approval_state: Some(approval_state),
+                    cancel_rx,
+                    out_tx,
+                    task_journal: Some(journal_for_runtime),
+                    initial_model: Some("test-model".to_string()),
+                },
+                move |_| async move {
+                    Ok(chat_response(json!({
+                        "message": "need write",
+                        "done": false,
+                        "actions": [{
+                            "tool": "write_file",
+                            "path": "blocked.txt",
+                            "content": "should not be written"
+                        }]
+                    })))
+                },
+            )
+            .await
+            .unwrap()
+        });
+
+        let approval = next_tool_event(&mut out_rx, "tool_approval_required").await;
+        assert_eq!(approval["approval_id"], "tap_1_1");
+        assert_eq!(approval["tool"], "write_file");
+        cancel_tx.send(true).expect("cancel should reach runtime");
+
+        let decision = next_tool_event(&mut out_rx, "tool_approval_decision").await;
+        assert_eq!(decision["approval_id"], "tap_1_1");
+        assert_eq!(decision["decision"], "cancel");
+        assert_eq!(decision["status"], "canceled");
+        let canceled = next_tool_event(&mut out_rx, "runtime_status").await;
+        assert_eq!(canceled["phase"], "canceled");
+
+        let result = runtime.await.unwrap();
+        assert!(!result.exit_ok);
+        assert!(
+            !target.exists(),
+            "canceled approval must not execute write_file"
+        );
+
+        let snapshot = task_journal
+            .snapshot(&req_id, 0, 20)
+            .expect("approval decision should be replayable from local journal");
+        assert!(snapshot.events.iter().any(|entry| {
+            entry.event.get("type").and_then(Value::as_str) == Some("tool_event")
+                && entry
+                    .event
+                    .get("event")
+                    .and_then(|event| event.get("type"))
+                    .and_then(Value::as_str)
+                    == Some("tool_approval_decision")
+                && entry
+                    .event
+                    .get("event")
+                    .and_then(|event| event.get("status"))
+                    .and_then(Value::as_str)
+                    == Some("canceled")
+        }));
     }
 
     #[tokio::test]

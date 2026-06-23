@@ -583,9 +583,18 @@ async function testTaskSnapshotsReplaysLocalJournalMessages() {
             text: JSON.stringify({ type: 'tool_approval_required', tool: 'write_file', approval_id: 'tap_local' }),
             event: { type: 'tool_approval_required', tool: 'write_file', approval_id: 'tap_local' }
           }
+        },
+        {
+          seq: 5,
+          event: {
+            type: 'tool_event',
+            req_id: 'req-replay',
+            text: JSON.stringify({ type: 'tool_approval_decision', tool: 'write_file', approval_id: 'tap_local', decision: 'cancel', status: 'canceled' }),
+            event: { type: 'tool_approval_decision', tool: 'write_file', approval_id: 'tap_local', decision: 'cancel', status: 'canceled' }
+          }
         }
       ],
-      last_event_seq: 4,
+      last_event_seq: 5,
       attach: { status: 'live', live: true, source: 'local_journal' },
       resume: { status: 'live', can_replay_journal_events: true, next_action: 'wait_or_cancel' }
     }),
@@ -599,7 +608,24 @@ async function testTaskSnapshotsReplaysLocalJournalMessages() {
   await scheduled();
   assert.ok(rendered.some((message) => clean(message.content).includes('本机 stdout')), 'local stdout should be appended as progress');
   assert.ok(rendered.some((message) => message.content.includes('"tool_call"')), 'local tool event should be appended as progress');
-  assert.ok(rendered.some((message) => message.content.includes('[本机回放] write_file 等待审批')), 'local-only approval should be read-only replay text');
+  assert.ok(rendered.some((message) => message.content.includes('"tool_approval_required"')), 'local approval replay should preserve the structured event');
+  assert.ok(rendered.some((message) => message.content.includes('"approval_id":"tap_local"')), 'local approval replay should keep the approval id for state recovery');
+  assert.ok(rendered.some((message) => message.content.includes('"tool_approval_decision"')), 'local approval terminal state should be replayed');
+
+  const devSandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = devSandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    cancelTask: () => {},
+    approveTool: async () => {}
+  });
+  const context = devTasks.buildContext(rendered, snapshots.contextExtras());
+  const approvalMessage = rendered.find((message) => message.content.includes('"tool_approval_required"'));
+  const approvalHtml = devTasks.renderMessage(approvalMessage, context);
+  assert.ok(approvalHtml.includes('write_file 已取消'), 'local replay should close the approval card with its exact terminal state');
+  assert.ok(!approvalHtml.includes('data-decision="approve"'), 'closed local replay approval must not expose approval buttons');
 }
 
 function testDevTasksUsesLocalJournalAttachLabel() {

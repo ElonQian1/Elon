@@ -170,10 +170,7 @@
       const type = clean(event && event.type).toLowerCase();
       if (!['cli_chunk', 'tool_event'].includes(type)) return null;
       const inner = event && event.event ? event.event : null;
-      const innerType = clean(inner && inner.type).toLowerCase();
-      const content = innerType === 'tool_approval_required'
-        ? localApprovalReplayText(inner)
-        : clean(event.text || (inner ? JSON.stringify(inner) : ''));
+      const content = clean(event.text || (inner ? JSON.stringify(inner) : ''));
       if (!content) return null;
       return {
         kind: 'ai_progress',
@@ -182,12 +179,6 @@
         local_journal_seq: Number(entry.seq || 0),
         local_journal: true
       };
-    }
-
-    function localApprovalReplayText(event) {
-      const tool = clean(event && event.tool) || 'tool';
-      const approvalId = clean(event && event.approval_id);
-      return `[本机回放] ${tool} 等待审批${approvalId ? `（${approvalId}）` : ''}`;
     }
 
     function shouldRenderSnapshot(previous, snapshot, since) {
