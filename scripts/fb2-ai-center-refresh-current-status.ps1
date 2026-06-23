@@ -803,6 +803,7 @@ function Invoke-Fb2RefreshSelfTest {
         $raw = & $PSCommandPath -OutputDir $output -MainWorkspaceEvidenceDir $missingEvidence -Fb2RepoPath $missingEvidence -SkipPublicContract
         $summary = $raw | ConvertFrom-Json
         Assert-Fb2RefreshSelfTest ($summary.schema -eq "fb2.main_project.status_refresh.v1") "schema"
+        Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.generated_at_utc)) "top-level generated_at_utc"
         Assert-Fb2RefreshSelfTest ([string]$summary.output_dir -eq $output) "output_dir"
         Assert-Fb2RefreshSelfTest (@($summary.evidence_dirs).Count -eq 1) "isolated evidence dirs"
         Assert-Fb2RefreshSelfTest (-not [bool]$summary.public_contract_ready) "public contract skipped"
@@ -840,6 +841,11 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight_via_fb2_server_token_bridge)) "data-only token bridge preflight command"
         Assert-Fb2RefreshSelfTest ([string]$summary.completion_matrix.schema -eq "fb2.main_project.completion_matrix.v1") "completion matrix schema"
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
+        Assert-Fb2RefreshSelfTest ([int]$summary.completion_total -eq [int]$summary.completion_matrix.totals.total) "top-level completion total"
+        Assert-Fb2RefreshSelfTest ([int]$summary.completion_complete -eq [int]$summary.completion_matrix.totals.complete) "top-level completion complete"
+        Assert-Fb2RefreshSelfTest ([int]$summary.completion_deferred -eq [int]$summary.completion_matrix.totals.deferred) "top-level completion deferred"
+        Assert-Fb2RefreshSelfTest ([int]$summary.completion_incomplete -eq [int]$summary.completion_matrix.totals.incomplete) "top-level completion incomplete"
+        Assert-Fb2RefreshSelfTest ([bool]$summary.voice_deferred_by_user -eq [bool]$summary.completion_matrix.gates.voice_deferred_by_user) "top-level voice deferred flag"
         Assert-Fb2RefreshSelfTest ($null -ne $summary.full_final_completion_evidence) "full final completion evidence"
         Assert-Fb2RefreshSelfTest ($null -ne $summary.completion_matrix.gates.same_batch_full_final_acceptance_complete) "same batch full final gate"
         Assert-Fb2RefreshSelfTest ([string]$summary.evidence_freshness.schema -eq "fb2.main_project.evidence_freshness.v1") "evidence freshness schema"
@@ -1028,9 +1034,12 @@ $evidenceFreshness = New-Fb2RefreshEvidenceFreshness `
     -Status $status `
     -GoalAudit $goalAudit `
     -ProtectedLivePreflightSatisfied $protectedLivePreflightSatisfied
+$voiceDeferredByUser = [bool](Get-Fb2RefreshProperty (Get-Fb2RefreshProperty $completionMatrix "gates" $null) "voice_deferred_by_user" $false)
+$completionTotals = Get-Fb2RefreshProperty $completionMatrix "totals" $null
 
 $refreshSummary = [pscustomobject]@{
     schema = "fb2.main_project.status_refresh.v1"
+    generated_at_utc = [string]$evidenceFreshness.generated_at_utc
     output_dir = $OutputDir
     evidence_dirs = @($evidence)
     files = $files
@@ -1043,6 +1052,11 @@ $refreshSummary = [pscustomobject]@{
     full_final_complete = [bool]$goalAudit.full_final_complete
     token_present = [bool]$status.environment.fb2_ai_center_token_present
     protected_live_preflight_satisfied = $protectedLivePreflightSatisfied
+    voice_deferred_by_user = $voiceDeferredByUser
+    completion_total = [int](Get-Fb2RefreshProperty $completionTotals "total" 0)
+    completion_complete = [int](Get-Fb2RefreshProperty $completionTotals "complete" 0)
+    completion_deferred = [int](Get-Fb2RefreshProperty $completionTotals "deferred" 0)
+    completion_incomplete = [int](Get-Fb2RefreshProperty $completionTotals "incomplete" 0)
     next_minimum_action = $effectiveNextMinimumAction
     owner_next_actions = $ownerNextActions
     blocking_state = $blockingState
