@@ -419,29 +419,61 @@
     function workbenchActionsHtml(downloads) {
       const devChannel = channelByKind('ai_development');
       const buildChannel = channelByKind('builds');
-      const docsChannel = channelByKind('docs');
       const hasDownload = downloads.some((item) => ACTIVE_STATUSES.has(item.status) && item.url);
-      const actions = [
-        devChannel ? workbenchChannelAction('开始做应用', '和一龙AI聊需求', devChannel, 'dev') : null,
-        buildChannel ? workbenchChannelAction('生成安装包', '打包并交付应用', buildChannel, 'build') : null,
-        hasDownload
-          ? {
+      const primary = devChannel
+        ? workbenchChannelAction('开始做应用', '描述需求或要改的功能', devChannel, 'dev')
+        : (buildChannel
+          ? workbenchChannelAction('生成安装包', '查看打包和交付进度', buildChannel, 'build')
+          : (hasDownload ? {
             label: '安装使用',
             sub: '下载可用客户端',
             glyph: '↓',
             tone: 'download',
             attrs: 'data-scroll-downloads="1"'
-          }
-          : null,
-        docsChannel ? workbenchChannelAction('项目文档', '查看资料说明', docsChannel, 'docs') : null
-      ].filter(Boolean).slice(0, 4);
-      if (!actions.length) return '';
-      return `<section class="project-landing-workbench" aria-label="项目快捷入口">
-        ${actions.map((action) => `<button class="project-landing-workbench-action tone-${escapeHtml(action.tone)}" type="button" ${action.attrs}>
-          <span>${escapeHtml(action.glyph)}</span>
-          <strong>${escapeHtml(action.label)}</strong>
-          <small>${escapeHtml(action.sub)}</small>
-        </button>`).join('')}
+          } : null));
+      const steps = [
+        {
+          number: '1',
+          title: '开始做应用',
+          text: devChannel ? '先把想做的 App 或要改的功能说给一龙 AI。' : '当前项目还没有 AI 开发频道。',
+          actionLabel: '开始',
+          attrs: devChannel ? `data-workbench-channel-id="${escapeHtml(devChannel.id)}"` : '',
+          tone: 'dev',
+          current: !!devChannel,
+          disabled: !devChannel
+        },
+        {
+          number: '2',
+          title: '生成安装包',
+          text: buildChannel ? '需求做完后，再到这里打包交付。' : '打包频道还没有配置。',
+          actionLabel: '打包',
+          attrs: buildChannel ? `data-workbench-channel-id="${escapeHtml(buildChannel.id)}"` : '',
+          tone: 'build',
+          current: !devChannel && !!buildChannel,
+          disabled: !buildChannel
+        },
+        {
+          number: '3',
+          title: '安装使用',
+          text: hasDownload ? '安装包已经可用，可以下载体验。' : '安装包生成后，这里会出现下载入口。',
+          actionLabel: hasDownload ? '下载' : '等待',
+          attrs: hasDownload ? 'data-scroll-downloads="1"' : '',
+          tone: 'download',
+          current: !devChannel && !buildChannel && hasDownload,
+          disabled: !hasDownload
+        }
+      ];
+      if (!primary && steps.every((step) => step.disabled)) return '';
+      return `<section class="project-landing-start" aria-label="新手开始">
+        <div class="project-landing-start-main">
+          <div class="project-landing-start-copy">
+            <span>建议第一步</span>
+            <h2>${escapeHtml(devChannel ? '先从「开始做应用」说需求' : (hasDownload ? '应用已可安装，先下载体验' : '先补齐项目入口'))}</h2>
+            <p>${escapeHtml(devChannel ? '新项目先进 AI 开发频道：描述你想做什么、要改什么，完成后再生成安装包。' : (hasDownload ? '这个项目已经有可用安装包，可以先安装试用，再回到需求频道继续迭代。' : '当前项目缺少可执行入口，请先检查项目频道配置。'))}</p>
+          </div>
+          ${primary ? primaryActionHtml(primary) : ''}
+        </div>
+        <div class="project-landing-start-steps">${steps.map(startStepHtml).join('')}</div>
       </section>`;
     }
 
@@ -453,6 +485,26 @@
         tone,
         attrs: `data-workbench-channel-id="${escapeHtml(channel.id)}"`
       };
+    }
+
+    function primaryActionHtml(action) {
+      return `<button class="project-landing-primary-action tone-${escapeHtml(action.tone)}" type="button" ${action.attrs}>
+        <span>${escapeHtml(action.glyph)}</span>
+        <strong>${escapeHtml(action.label)}</strong>
+        <small>${escapeHtml(action.sub)}</small>
+      </button>`;
+    }
+
+    function startStepHtml(step) {
+      const attrs = step.disabled ? 'disabled aria-disabled="true"' : step.attrs;
+      return `<button class="project-landing-step tone-${escapeHtml(step.tone)} ${step.current ? 'current' : ''} ${step.disabled ? 'disabled' : ''}" type="button" ${attrs}>
+        <span class="project-landing-step-number">${escapeHtml(step.number)}</span>
+        <span class="project-landing-step-copy">
+          <strong>${escapeHtml(step.title)}</strong>
+          <small>${escapeHtml(step.text)}</small>
+        </span>
+        <em>${escapeHtml(step.actionLabel)}</em>
+      </button>`;
     }
 
     function iconHtml(project) {
@@ -706,9 +758,9 @@
             <p>${escapeHtml(tagline)}</p>
           </div>
         </header>
-        <div class="project-landing-summary">${escapeHtml(description)}</div>
         ${workbenchActionsHtml(downloads)}
-        <div class="project-landing-download-groups">${downloadGroupsHtml(downloads)}</div>
+        <div class="project-landing-summary">${escapeHtml(description)}</div>
+        ${downloads.length ? `<div class="project-landing-download-groups">${downloadGroupsHtml(downloads)}</div>` : ''}
         ${features.length ? `<div class="project-landing-section">
           <h2>项目亮点</h2>
           <div class="project-landing-feature-grid">${features.map((item) => `<span>${escapeHtml(item)}</span>`).join('')}</div>

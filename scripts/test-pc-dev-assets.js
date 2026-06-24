@@ -1168,7 +1168,8 @@ function testProjectReadinessChecklist() {
 function testProjectLandingShellContract() {
   const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
   assert.ok(pcApp.includes("kind: 'project-home'"), 'project channel list should include a virtual project home entry');
-  assert.ok(pcApp.includes("sub: '项目介绍与下载'"), 'project home entry should explain it opens intro and downloads');
+  assert.ok(pcApp.includes("title: '项目首页'"), 'project home entry should be labeled as the project overview');
+  assert.ok(pcApp.includes("sub: '下一步与下载'"), 'project home entry should explain it opens next steps and downloads');
   assert.ok(pcApp.includes("active: !state.activeChannelId"), 'project home should be active before a real channel is selected');
   assert.ok(pcApp.includes("data-project-home=\"1\""), 'project home entry should be clickable through a dedicated data attribute');
   assert.ok(
@@ -1192,14 +1193,14 @@ function testProjectLandingShellContract() {
   assert.ok(routerRs.includes('/assets/pc_project_landing.css'), 'project landing CSS should be routed');
 
   const landingJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.js'), 'utf8');
-  assert.ok(landingJs.includes('project-landing-workbench'), 'project home should expose workbench quick actions');
+  assert.ok(landingJs.includes('project-landing-start'), 'project home should expose guided next-step actions');
   assert.ok(landingJs.includes('project-landing-download-groups'), 'project home should expose delivery downloads');
   assert.ok(landingJs.includes('data-workbench-channel-id'), 'project home should jump into key channels');
   assert.ok(landingJs.includes('data-sync-landing'), 'project owners should be able to sync landing data');
   assert.ok(landingJs.includes('data-rotate-landing-token'), 'project owners should be able to generate landing upload tokens');
 
   const landingCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.css'), 'utf8');
-  assert.ok(landingCss.includes('.project-landing-workbench'), 'project landing CSS should style quick actions');
+  assert.ok(landingCss.includes('.project-landing-start'), 'project landing CSS should style guided next steps');
   assert.ok(landingCss.includes('@media (max-width: 640px)'), 'project landing should keep a mobile responsive layout');
 }
 
@@ -1658,7 +1659,8 @@ function testPcProjectStartGuidance() {
   assert.ok(landing.includes('生成安装包后，这里会出现安装入口。'), 'empty downloads should explain the application entry point');
 
   const landingCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.css'), 'utf8');
-  assert.ok(landingCss.includes('.project-landing-workbench-action.tone-build'), 'landing CSS should style build action');
+  assert.ok(landingCss.includes('.project-landing-primary-action.tone-build'), 'landing CSS should style build as a primary fallback');
+  assert.ok(landingCss.includes('.project-landing-step.current'), 'landing CSS should highlight the current guided step');
 }
 
 (async () => {

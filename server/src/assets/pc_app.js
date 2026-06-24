@@ -1048,13 +1048,13 @@
   function renderProjectChannels(query) {
     const channels = ((state.projectSpace && state.projectSpace.channels) || [])
       .filter((channel) => projectChannelSearchText(channel).includes(query));
-    const homeVisible = !query || '安装使用下载应用首页开始介绍overviewhome'.includes(query);
+    const homeVisible = !query || '项目首页下一步入口安装使用下载应用首页开始介绍overviewhome'.includes(query);
     const homeButton = homeVisible ? channelButton({
         id: 'project-home',
         kind: 'project-home',
-        glyph: '↓',
-        title: '安装使用',
-        sub: '项目介绍与下载',
+        glyph: '首',
+        title: '项目首页',
+        sub: '下一步与下载',
         active: !state.activeChannelId
       }) : '';
     if (query) {
@@ -1065,9 +1065,12 @@
       ].join('');
     } else {
       const grouped = groupedProjectChannels(channels);
+      const startChannels = grouped.start.map(projectChannelButton).join('');
       els.channelList.innerHTML = [
-        '<div class="channel-section">开始</div>',
-        grouped.start.map(projectChannelButton).join('') + homeButton || '<div class="empty-state">暂无入口</div>',
+        homeButton ? '<div class="channel-section">概览</div>' : '',
+        homeButton,
+        startChannels ? '<div class="channel-section">开始</div>' : '',
+        startChannels || (!homeButton ? '<div class="empty-state">暂无入口</div>' : ''),
         grouped.info.length ? '<div class="channel-section">项目资料</div>' : '',
         grouped.info.map(projectChannelButton).join(''),
         grouped.feedback.length ? '<div class="channel-section">需求反馈</div>' : '',
