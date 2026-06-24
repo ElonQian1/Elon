@@ -90,6 +90,7 @@ mod node_agent_task_resume;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_workspace_match;
+mod node_agent_workspace_modules;
 mod node_agent_write_preview;
 #[cfg(windows)]
 mod node_client_launcher;

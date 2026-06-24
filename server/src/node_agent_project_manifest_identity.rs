@@ -3,6 +3,8 @@
 use serde_json::Value;
 use std::path::Path;
 
+use crate::node_agent_workspace_modules::workspace_module_candidates;
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub(crate) struct ManifestProjectIdentity {
     pub(crate) name: String,
@@ -49,16 +51,12 @@ pub(crate) fn detect_shallow_manifest_project_identity(
     fallback_name: &str,
     project_root: &Path,
 ) -> Option<ManifestProjectIdentity> {
-    for module in [
-        "server", "backend", "api", "app", "cmd", "web", "frontend", "client", "android",
-    ] {
-        let module_root = project_root.join(module);
-        if !module_root.is_dir() {
-            continue;
-        }
+    for candidate in workspace_module_candidates(project_root) {
+        let module = candidate.module;
+        let module_root = candidate.path;
         if let Some(identity) = detect_module_manifest_project_identity(fallback_name, &module_root)
         {
-            return Some(identity.with_source_prefix(module));
+            return Some(identity.with_source_prefix(&module));
         }
     }
     None
@@ -593,6 +591,27 @@ mod tests {
             Some("Discord 风格本机开发入口")
         );
         assert_eq!(identity.source, "web/package.json");
+    }
+
+    #[test]
+    fn detects_packages_package_json_identity() {
+        let dir = temp_project("packages-node");
+        std::fs::create_dir_all(dir.join("packages").join("admin")).unwrap();
+        std::fs::write(
+            dir.join("packages").join("admin").join("package.json"),
+            r#"{"displayName":"后台管理台","description":"本地 monorepo 子应用"}"#,
+        )
+        .unwrap();
+
+        let identity = detect_shallow_manifest_project_identity("folder-name", &dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(identity.name, "后台管理台");
+        assert_eq!(
+            identity.description.as_deref(),
+            Some("本地 monorepo 子应用")
+        );
+        assert_eq!(identity.source, "packages/admin/package.json");
     }
 
     #[test]

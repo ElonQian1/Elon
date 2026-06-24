@@ -1407,9 +1407,12 @@ function testLocalAdminTokenWiring() {
   const projectProfileNodeRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_profile_node.rs'), 'utf8');
   const projectProfileRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_profile.rs'), 'utf8');
   const projectPickerRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_picker.rs'), 'utf8');
+  const workspaceModulesRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_workspace_modules.rs'), 'utf8');
   assert.ok(projectPickerRs.includes('register_payload'), 'local project inspect should expose a registration payload');
   assert.ok(projectPickerRs.includes('next_action'), 'local project inspect should expose a next registration action');
   assert.ok(projectPickerRs.includes('LocalProjectDevProfilePayload'), 'local project inspect should include a dev profile payload');
+  assert.ok(projectProfileRs.includes('workspace_module_candidates'), 'local project profile should reuse workspace module discovery');
+  assert.ok(workspaceModulesRs.includes('packages') && workspaceModulesRs.includes('apps'), 'workspace module discovery should inspect common monorepo roots');
   assert.ok(projectProfileNodeRs.includes('@tauri-apps/cli'), 'local project profile should detect Tauri desktop projects');
   assert.ok(projectProfileNodeRs.includes('Electron 桌面应用'), 'local project profile should detect Electron desktop projects');
   assert.ok(projectProfileRs.includes('wails.json'), 'local project profile should detect Wails desktop projects');

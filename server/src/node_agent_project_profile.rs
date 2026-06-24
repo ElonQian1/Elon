@@ -8,6 +8,7 @@ use crate::node_agent_project_profile_node::{
 use crate::node_agent_project_profile_python::{
     detect_python_project_profile, python_workspace_commands, PythonWorkspaceModule,
 };
+use crate::node_agent_workspace_modules::workspace_module_candidates;
 
 #[derive(Debug, Default)]
 pub(crate) struct ProjectProfile {
@@ -90,13 +91,9 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
     let mut go_module = None;
     let mut python_module = None;
 
-    for module in [
-        "server", "backend", "api", "app", "cmd", "web", "frontend", "client", "android",
-    ] {
-        let module_path = path.join(module);
-        if !module_path.is_dir() {
-            continue;
-        }
+    for candidate in workspace_module_candidates(path) {
+        let module = candidate.module.as_str();
+        let module_path = candidate.path;
 
         let cargo = module_path.join("Cargo.toml");
         if cargo.is_file() {
@@ -628,6 +625,36 @@ mod tests {
         assert!(profile
             .detected_files
             .contains(&"web/package.json".to_string()));
+    }
+
+    #[test]
+    fn detects_packages_node_workspace_from_repo_root() {
+        let dir = temp_project("workspace-packages-node");
+        let package = dir.join("packages").join("web");
+        std::fs::create_dir_all(&package).unwrap();
+        std::fs::write(
+            package.join("package.json"),
+            r#"{"scripts":{"dev":"vite","test":"vitest","build":"vite build"}}"#,
+        )
+        .unwrap();
+        std::fs::write(package.join("pnpm-lock.yaml"), "").unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Node.js"));
+        assert_eq!(profile.package_manager.as_deref(), Some("pnpm"));
+        assert_eq!(
+            profile.run_command.as_deref(),
+            Some("pnpm --dir packages/web dev")
+        );
+        assert_eq!(
+            profile.test_command.as_deref(),
+            Some("pnpm --dir packages/web test")
+        );
+        assert!(profile
+            .detected_files
+            .contains(&"packages/web/package.json".to_string()));
     }
 
     #[test]
