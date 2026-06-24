@@ -18,7 +18,9 @@ Win 客户端“注册本地项目”流程会自动读取常见项目清单来�
 
 Route C 远程模型能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。`/api/agent/runtime/status` 会返回结构化 `blockingReasons`，把运维开关、agent 策略、server_api_key-only、平台预算、个人额度、限流等不可用原因统一给 Win 节点和 PC UI。Win 节点读取服务器 Route C 状态时会 fail-closed：如果 `policy.enabled=false`、`admissionAvailability.ready=false`、用户/平台预算耗尽、频率限制、`agentPolicy` 明确不可用，或 `blockingReasons` 非空，即使顶层 `ready=true` 也不会把 Route C 显示成可用。
 
-这还不是完整 Codex 桌面版 parity。后续仍建议补：跨节点重启后可继续审批的审批状态落库、任务恢复入口、full_access 高危策略的运营后台可视化。
+Win 节点 `/api/status` 会返回 `runtime_policy`，结构化暴露 full_access 的真实边界：Route A full_access 只适用于本机已安装 CLI 且需要本机项目授权；Route B/C 即使 full_access，也不会绕过工作区路径检查、命令白名单、工具审批或高危 `git push` 拦截。PC 页面和后续运营面板可以直接读取 `runtime_policy.fullAccess`、`runtime_policy.routeBC.highRiskGitPushDenied` 和 `full_access_grant_count` 做可视化，不再只靠文档记忆。
+
+这还不是完整 Codex 桌面版 parity。后续仍建议补：跨节点重启后可继续审批的审批状态落库、任务恢复入口。
 
 ---
 
@@ -1072,15 +1074,12 @@ legacy relay 同步拒绝任意 CLI 和内置 runtime
 Route B/C 即使开启 full_access，也不会放宽本机 run_command 命令白名单；Git 推送会继续拒绝 --force / --delete / --mirror / --all / --tags / +refspec / :branch 等高危参数，正常 HEAD:main 推送仍可审批执行
 ```
 
-还不能说完全等同 Codex Desktop。下一步必须补：
+还不能说完全等同 Codex Desktop。按 2026-06-24 当前主线，下一步主要补：
 
 ```text
-Route B/C apply_patch
-diff preview
-逐工具审批 approve/deny
-full_access 本机确认
-任务恢复
-read_file_range
+跨节点重启后可继续审批的审批状态落库
+PC UI 任务恢复入口
+原 CLI TTY 接管仍仅支持有限连续性，不支持重新 attach 原 TTY
 ```
 
 我建议你下一步直接做 **v0.1：生成脚本 + 预览 + 写入 + 手动确认运行**。这个版本安全、可控，而且已经能完成很多真实 PC 自动化任务。

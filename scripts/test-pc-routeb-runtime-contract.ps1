@@ -11,6 +11,8 @@ $PcDevRuntimeCargo = Join-Path $RepoRoot "server\pc-dev-runtime\Cargo.toml"
 $ApiRuntimeConfig = Join-Path $RepoRoot "server\src\node_agent_api_runtime_config.rs"
 $ApiRuntimeTools = Join-Path $RepoRoot "server\src\node_agent_api_runtime_tools.rs"
 $ServerRuntime = Join-Path $RepoRoot "server\src\node_agent_server_runtime.rs"
+$FullAccessPolicy = Join-Path $RepoRoot "server\src\node_agent_full_access.rs"
+$NodeAgentMain = Join-Path $RepoRoot "server\src\node_agent_main.rs"
 $PcDevRuntime = Join-Path $RepoRoot "server\pc-dev-runtime\src\project_agent_runtime.rs"
 
 function Invoke-Step {
@@ -40,7 +42,7 @@ function Assert-FileContains {
 Set-Location $RepoRoot
 
 Invoke-Step "Static Route B runtime contract" {
-    foreach ($path in @($ApiRuntimeConfig, $ApiRuntimeTools, $ServerRuntime, $PcDevRuntime)) {
+    foreach ($path in @($ApiRuntimeConfig, $ApiRuntimeTools, $ServerRuntime, $FullAccessPolicy, $NodeAgentMain, $PcDevRuntime)) {
         if (-not (Test-Path -LiteralPath $path)) {
             throw "Missing Route B runtime file: $path"
         }
@@ -103,6 +105,25 @@ Invoke-Step "Static Route B runtime contract" {
         -Message "Route B provider response body reads must stay bounded"
 
     Assert-FileContains `
+        -Path $FullAccessPolicy `
+        -Needle "runtime_policy_summary" `
+        -Message "Full access policy must expose a structured runtime policy summary"
+    Assert-FileContains `
+        -Path $NodeAgentMain `
+        -Needle "`"runtime_policy`": node_agent_full_access::runtime_policy_summary()" `
+        -Message "Node /api/status must expose runtime_policy for local operations visibility"
+    Assert-FileContains `
+        -Path $FullAccessPolicy `
+        -Needle "keeps_workspace_path_checks_command_allowlist_and_tool_approvals" `
+        -Message "Route B/C full_access must not bypass workspace, command, or approval safety"
+    foreach ($marker in @("--force*", "--delete", "--mirror", "+refspec", ":branch")) {
+        Assert-FileContains `
+            -Path $FullAccessPolicy `
+            -Needle "`"$marker`"" `
+            -Message "Full access policy summary must expose high-risk git push denial marker $marker"
+    }
+
+    Assert-FileContains `
         -Path $PcDevRuntime `
         -Needle "file_info" `
         -Message "Generated pc-dev runtime must expose file_info"
@@ -148,6 +169,11 @@ if (-not $SkipServerRuntimeTests) {
         cargo test --manifest-path $ServerCargo api_runtime_ -- --nocapture
         if ($LASTEXITCODE -ne 0) {
             throw "node_agent_server_runtime api_runtime tests failed with exit code $LASTEXITCODE"
+        }
+
+        cargo test --manifest-path $ServerCargo node_agent_full_access -- --nocapture
+        if ($LASTEXITCODE -ne 0) {
+            throw "node_agent_full_access tests failed with exit code $LASTEXITCODE"
         }
     }
 }

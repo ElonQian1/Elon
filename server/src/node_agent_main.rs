@@ -2930,6 +2930,7 @@ async fn admin_status(
         "hardware": hardware,
         "storage": storage,
         "full_access_grant_count": full_access_grant_count,
+        "runtime_policy": node_agent_full_access::runtime_policy_summary(),
         "cli_session_bridge": node_agent_cli_session_bridge::status_payload(),
         "models": live,
     });

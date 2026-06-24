@@ -13,6 +13,11 @@ use std::{
 use tokio::sync::RwLock;
 
 const ROUTE_A_CLIS: &[&str] = &["codex", "copilot", "claude", "gemini"];
+const ROUTE_BC_APPROVAL_REQUIRED_TOOLS: &[&str] = &["write_file", "apply_patch", "run_command"];
+const ROUTE_BC_HIGH_RISK_GIT_PUSH_DENIED: &[&str] = &[
+    "-f", "-d", "--force*", "--delete", "--mirror", "--all", "--tags", "--prune", "+refspec",
+    ":branch",
+];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct FullAccessGrant {
@@ -164,6 +169,29 @@ pub(crate) async fn list_handler(
             "grants": runtime.full_access_grants.list().await,
         })),
     )
+}
+
+pub(crate) fn runtime_policy_summary() -> serde_json::Value {
+    json!({
+        "schema": "elon.pc_node.runtime_policy.v1",
+        "fullAccess": {
+            "routeAInstalledCliOnly": true,
+            "routeARequiresLocalProjectGrant": true,
+            "routeBCDoesNotBypassSafety": true,
+            "routeBCFullAccessEffect": "keeps_workspace_path_checks_command_allowlist_and_tool_approvals",
+        },
+        "routeBC": {
+            "workspaceBoundary": "workspace_relative_no_git_no_symlink_escape",
+            "approvalRequiredTools": ROUTE_BC_APPROVAL_REQUIRED_TOOLS,
+            "commandPolicy": "structured_project_command_allowlist",
+            "highRiskGitPushDenied": ROUTE_BC_HIGH_RISK_GIT_PUSH_DENIED,
+        },
+        "operatorVisibility": {
+            "statusEndpoint": "/api/status",
+            "policyField": "runtime_policy",
+            "grantCountField": "full_access_grant_count",
+        }
+    })
 }
 
 fn default_grants_path() -> PathBuf {
@@ -325,5 +353,43 @@ mod tests {
         )
         .await
         .expect("built-in runtime keeps its own sandbox guard");
+    }
+
+    #[test]
+    fn runtime_policy_summary_exposes_route_bc_safety_limits() {
+        let summary = runtime_policy_summary();
+
+        assert_eq!(summary["schema"], "elon.pc_node.runtime_policy.v1");
+        assert_eq!(summary["fullAccess"]["routeAInstalledCliOnly"], true);
+        assert_eq!(
+            summary["fullAccess"]["routeBCFullAccessEffect"],
+            "keeps_workspace_path_checks_command_allowlist_and_tool_approvals"
+        );
+        assert_eq!(
+            summary["operatorVisibility"]["policyField"],
+            "runtime_policy"
+        );
+
+        let approval_tools = summary["routeBC"]["approvalRequiredTools"]
+            .as_array()
+            .expect("approvalRequiredTools should be an array");
+        for tool in ["write_file", "apply_patch", "run_command"] {
+            assert!(
+                approval_tools
+                    .iter()
+                    .any(|item| item.as_str() == Some(tool)),
+                "missing approval tool {tool}"
+            );
+        }
+
+        let denied = summary["routeBC"]["highRiskGitPushDenied"]
+            .as_array()
+            .expect("highRiskGitPushDenied should be an array");
+        for arg in ["--force*", "--delete", "--mirror", "+refspec", ":branch"] {
+            assert!(
+                denied.iter().any(|item| item.as_str() == Some(arg)),
+                "missing high-risk git push marker {arg}"
+            );
+        }
     }
 }
