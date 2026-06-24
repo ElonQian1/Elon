@@ -16,8 +16,36 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.graphics.drawable.RoundedBitmapDrawableFactory
 import java.text.DateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoUnit
 import java.util.Date
+import java.util.Locale
 import kotlin.math.sin
+
+private val homeListClockFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale.CHINA)
+private val homeListMonthDayFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
+private val homeListYearMonthDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
+private val homeListWeekdays = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
+private const val PROJECT_MARKER_VISUAL_OFFSET_DP = -4
+
+private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): String {
+    if (timestampMs <= 0L) return ""
+    val zone = ZoneId.systemDefault()
+    val dateTime = Instant.ofEpochMilli(timestampMs).atZone(zone)
+    val today = Instant.ofEpochMilli(nowMs).atZone(zone).toLocalDate()
+    val date = dateTime.toLocalDate()
+    val dayDiff = ChronoUnit.DAYS.between(date, today)
+    return when {
+        dayDiff == 0L -> dateTime.format(homeListClockFormatter)
+        dayDiff == 1L -> "昨天"
+        dayDiff == 2L -> "前天"
+        dayDiff in 3L..6L -> homeListWeekdays[dateTime.dayOfWeek.value - 1]
+        date.year == today.year -> dateTime.format(homeListMonthDayFormatter)
+        else -> dateTime.format(homeListYearMonthDayFormatter)
+    }
+}
 
 internal class MainHomeRows(
     private val activity: AppCompatActivity,
@@ -149,21 +177,27 @@ internal class MainHomeRows(
         if (time == null && !showProjectMarker) return null
 
         return LinearLayout(activity).apply {
-            val columnWidth = if (showProjectMarker) dp(44) else LinearLayout.LayoutParams.WRAP_CONTENT
             layoutParams = LinearLayout.LayoutParams(
-                columnWidth,
+                LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 marginStart = dp(8)
             }
-            gravity = Gravity.CENTER_HORIZONTAL
+            if (showProjectMarker) {
+                minimumWidth = dp(44)
+            }
+            gravity = Gravity.END
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(14), 0, 0)
 
             time?.let { value ->
                 addView(TextView(activity).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT
+                    )
                     includeFontPadding = false
-                    text = timeFormatter.format(Date(value))
+                    text = formatHomeListTime(value)
                     setTextColor(Color.parseColor("#A8A8A8"))
                     textSize = 12f
                 })
@@ -181,6 +215,7 @@ internal class MainHomeRows(
         return ImageView(activity).apply {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             scaleType = ImageView.ScaleType.FIT_CENTER
+            translationX = dp(PROJECT_MARKER_VISUAL_OFFSET_DP).toFloat()
             setImageResource(R.drawable.ic_home_project_marker)
         }
     }

@@ -336,12 +336,14 @@
       align-self: stretch;
       display: flex;
       flex-direction: column;
-      align-items: center;
+      align-items: flex-end;
       padding-top: 14px;
     }
     .conversation-item .time {
       font-size: 12px; color: var(--ink-soft);
       flex-shrink: 0;
+      text-align: right;
+      white-space: nowrap;
     }
     .conversation-item .project-marker {
       width: 42px;
@@ -349,6 +351,7 @@
       margin-top: 2px;
       object-fit: contain;
       pointer-events: none;
+      transform: translateX(-4px);
     }
     .conversation-item .item-delete {
       display: none;
@@ -2991,13 +2994,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function formatTime(iso) {
     if (!iso) return '';
     try {
-      const d = new Date(iso);
-      if (isNaN(d.getTime())) return '';
-      const now = new Date();
-      if (d.toDateString() === now.toDateString()) {
-        return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
-      }
-      return (d.getMonth() + 1) + '/' + d.getDate();
+      const ms = new Date(iso).getTime();
+      return Number.isFinite(ms) ? formatListTimeMs(ms) : '';
     } catch { return ''; }
   }
   function parseServerTime(value) {
@@ -3007,7 +3005,24 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function formatListTimeMs(ms) {
     if (!ms) return '';
-    return formatTime(new Date(ms).toISOString());
+    const d = new Date(ms);
+    if (isNaN(d.getTime())) return '';
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dayDiff = Math.round((today - day) / 86400000);
+    if (dayDiff === 0) {
+      return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0');
+    }
+    if (dayDiff === 1) return '昨天';
+    if (dayDiff === 2) return '前天';
+    if (dayDiff > 2 && dayDiff < 7) {
+      return ['周日', '周一', '周二', '周三', '周四', '周五', '周六'][d.getDay()];
+    }
+    if (d.getFullYear() === now.getFullYear()) {
+      return (d.getMonth() + 1) + '月' + d.getDate() + '日';
+    }
+    return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日';
   }
   function normalizeSearch(value) {
     return String(value || '').trim().toLowerCase();
