@@ -73,13 +73,14 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 1. **任务开始前**：先运行机器预检脚本，Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`
 2. 脚本会把本地 `main` 当作只同步基线：先直连 fetch，再在 `main` 干净时快进到最新 `origin/main`，最后创建带时间、PID 和短随机 ID 的独立任务 worktree
 3. 如果预检脚本输出 `WORKTREE_CREATED=true`，必须切换到 `WORKTREE_PATH` 后再编辑文件；原工作区只保留 `main` 基线，不继续叠加新改动
-4. 任务开始 **前后** 各执行一次 `git status --short`，识别当前工作区是否有其他 AI 的未提交改动
-5. `git add` 只加自己任务相关的文件
-6. 发现其他代理未提交改动 → **不回退、不覆盖**，回到预检脚本创建的 worktree 继续
-7. 提交前执行 `git fetch origin main` 了解远端是否前进；不要为了“永远基于最新远端”在提交前反复 rebase。自己的提交完成后第一时间 push。
-8. **每次 commit 后必须立即 `git push origin HEAD:main`**；只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main` 一次，把自己的提交接到远端最新提交之后再推。
-9. push 成功后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed`（Linux/macOS 可用同等 git 祖先检查），确认本次 HEAD 已包含在 `origin/main`。
-10. 如果本次是在隔离 worktree 中提交并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件追上远端；不 `git add`、不 stash、不删除/移动未跟踪文件。若本地未跟踪文件与远端新增同名路径冲突，停止并报告路径。
+4. 修改预检脚本、worktree 清理脚本或本工作流说明后，必须运行 `powershell -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1`；该门禁会验证干净非 main worktree 显式传 `-CreateWorktree` 时仍会创建新 worktree，避免多 AI 并行规则退化
+5. 任务开始 **前后** 各执行一次 `git status --short`，识别当前工作区是否有其他 AI 的未提交改动
+6. `git add` 只加自己任务相关的文件
+7. 发现其他代理未提交改动 → **不回退、不覆盖**，回到预检脚本创建的 worktree 继续
+8. 提交前执行 `git fetch origin main` 了解远端是否前进；不要为了“永远基于最新远端”在提交前反复 rebase。自己的提交完成后第一时间 push。
+9. **每次 commit 后必须立即 `git push origin HEAD:main`**；只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main` 一次，把自己的提交接到远端最新提交之后再推。
+10. push 成功后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed`（Linux/macOS 可用同等 git 祖先检查），确认本次 HEAD 已包含在 `origin/main`。
+11. 如果本次是在隔离 worktree 中提交并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件追上远端；不 `git add`、不 stash、不删除/移动未跟踪文件。若本地未跟踪文件与远端新增同名路径冲突，停止并报告路径。
 
 ### 本地 main 基线和任务 worktree
 
