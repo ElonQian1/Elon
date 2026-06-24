@@ -14,7 +14,7 @@
 - 访问主项目/fb2 项目资源默认不走代理；状态脚本应清空常见 proxy 环境变量、设置 `NO_PROXY/no_proxy=*`，并在 PowerShell HTTP 请求使用 `-NoProxy`。
 - fb2 live Context Pack 样本如果带 `opinion_result_review_summary`，主项目样本校验必须把它归为 `quality_history_source_kinds`，而不是 `business_source_kinds`。它只能作为历史观点复盘/质量学习证据，不能被当成比赛、赔率、订单、平台摘要或群友观点事实。
 - `latest_context_answer_readiness` 也必须继承这套分类：`present_source_kinds` 是完整来源列表，`business_source_kinds` 才能用于判断四类核心问题事实是否足够，`quality_history_source_kinds` 只用于历史复盘/质量学习说明。
-- 2026-06-24 子项目最新协作状态：fb2 `origin/main` 已推进到 `1b0cdc2b fix(ai-context): align final gate topic`。最新三个关键 checkpoint 是 `01972c2d feat(ai-context): add 123qwe public review quality drill`、`fbe2c857 test(ai-context): cover match index dry run`、`1b0cdc2b fix(ai-context): align final gate topic`：公开群 `123qwe` 复盘质量 drill 已让 `opinion_result_review_surface=ready_quality_threshold_passed`，公开比赛 `match_context_index` 维护刷新有 dry-run 自测防退化，最终验收默认 topic 已对齐真实中文业务问题“今天比赛怎么看”。主项目本阶段只消费 Context Pack、tool manifest、read-only tools、retrieval trace、P4-lite/report 和复盘质量 summary；`answer_time_refresh_allowed=false`、`maintenance_rest` refresh 工具不得放进普通回答链路。
+- 2026-06-24 子项目最新协作状态：fb2 `origin/main` 已推进到 `d93287e9 feat(ai-context): add p4 vector readiness plan`。最新关键 checkpoint 是 `165e50f2 feat(ai-context): compress context pack first pass`、`d4efde21 fix(ai-context): clarify p4 optional gate status`、`d93287e9 feat(ai-context): add p4 vector readiness plan`，以及之前的 `01972c2d` 公开 `123qwe` 复盘质量 drill、`fbe2c857` match index dry-run 自测、`1b0cdc2b` final gate topic 对齐。主项目本阶段只消费 Context Pack、tool manifest、read-only tools、retrieval trace、P4-lite/report、P4 vector readiness plan 和复盘质量 summary；`answer_time_refresh_allowed=false`、`maintenance_rest` refresh 工具不得放进普通回答链路。
 
 ## 双项目协作方式
 
@@ -23,6 +23,7 @@
 - 两边可以由同一个 Codex 会话分别修改，但必须分别遵守各自 `AGENTS.md`、各自 worktree、各自提交/发布脚本；不要在主项目 worktree 里直接改 fb2，也不要把 fb2 业务表结构硬编码进主项目。
 - 跨会话沟通以仓库证据为准：先看 `origin/main`、`docs/FB2_MAIN_PROJECT_AI_CONTEXT.md`、`docs/MAIN_PROJECT_CONTEXT_PACK_CONTRACT.md`、`docs/AI_CONTEXT_24X7_OPERATIONS.md`、`docs/fb2-ai-center/README.md`、`PROGRESS.md` 和工具 manifest；只有契约或 owner 边界不一致时，再给子会话发送明确清单。
 - 主项目对 fb2 最新 P4-lite 能力的处理规则：可以读取 `fb2_context_retrieval_trace_v1` 和 `fb2_p4_lite_candidate_retrieval_v1` 报告来解释“为什么 AI 没拿到某条比赛/订单/群观点”；不得把 `match_context_index`、odds snapshot、opinion memory refresh 等维护作业放进用户回答时自动执行。
+- 主项目对 fb2 最新 P4 向量计划的处理规则：`fb2_p4_vector_readiness_plan_v1` 只是只读计划/设计入口。它可以显示 `ready_to_start_vector_contract_design=true`，但必须同时保持 `writes_embedding_rows=false`、`does_not_enable_vector=true`、`ready_to_build_embedding_store=false`、`ready_to_enable_answer_time_vector_candidates=false`。在 fb2 提交 source allowlist、chunk schema、权限过滤 SQL、离线 embedding 构建、shadow eval 和 answer-time readthrough 之前，主项目不得把 P4 vector/RAG 当成生产 grounding、不得把 vector candidates 注入用户回答。
 - 主项目对 fb2 最新复盘质量能力的处理规则：可以规划 `opinion_result_review_summary` / `opinion_result_reviews` 来说明历史观点复盘质量、样本量和采纳情况；只能把它们描述为历史质量/学习证据，不得写成未来比赛事实或投注命中承诺。
 
 ## 已有主项目能力
