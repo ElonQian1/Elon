@@ -22,6 +22,11 @@ import kotlin.concurrent.thread
 
 private const val SOCIAL_SUMMARY_REFRESH_MS = 8_000L
 
+private sealed class SuspendedSocialChat {
+    data class Friend(val friend: AppFriend) : SuspendedSocialChat()
+    data class Group(val group: AppGroup) : SuspendedSocialChat()
+}
+
 class MainActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityMainBinding
@@ -35,6 +40,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
     private var pendingProjectIconId: String? = null
+    private var suspendedSocialChatForProjectReturn: SuspendedSocialChat? = null
     private val projectIconPicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         val projectId = pendingProjectIconId
         pendingProjectIconId = null
@@ -551,12 +557,15 @@ class MainActivity : AppCompatActivity() {
                 friendChatActions.closeFriendChat()
                 groupChatActions.closeGroupChat()
                 projectSpaceController.closeChannelChat()
+                suspendedSocialChatForProjectReturn = null
                 syncVisibleChatNotificationState()
             },
             onProjectChannelClosed = {
                 projectSpaceController.closeChannelChat()
                 syncVisibleChatNotificationState()
             },
+            suspendSocialChatForProjectReturn = ::suspendSocialChatForProjectReturn,
+            restoreSocialChatForProjectReturn = ::restoreSocialChatForProjectReturn,
             showProjectMembers = { projectSpaceController.showMembers() },
             loadMarketplace = { marketplaceActions.loadProjects() },
             onAgentTabSelected = { agentPageController.refresh() },
@@ -592,6 +601,41 @@ class MainActivity : AppCompatActivity() {
             return
         }
         startActivity(SocialAiVoiceCallActivity.createIntent(this, serverUrl, userId))
+    }
+
+    private fun suspendSocialChatForProjectReturn(): Boolean {
+        groupChatActions.currentGroup()?.let { group ->
+            suspendedSocialChatForProjectReturn = SuspendedSocialChat.Group(group)
+            groupChatActions.closeGroupChat()
+            friendChatActions.closeFriendChat()
+            syncVisibleChatNotificationState()
+            return true
+        }
+        friendChatActions.currentFriend()?.let { friend ->
+            suspendedSocialChatForProjectReturn = SuspendedSocialChat.Friend(friend)
+            friendChatActions.closeFriendChat()
+            groupChatActions.closeGroupChat()
+            syncVisibleChatNotificationState()
+            return true
+        }
+        return false
+    }
+
+    private fun restoreSocialChatForProjectReturn(animate: Boolean): Boolean {
+        val target = suspendedSocialChatForProjectReturn ?: return false
+        suspendedSocialChatForProjectReturn = null
+        when (target) {
+            is SuspendedSocialChat.Friend -> {
+                groupChatActions.closeGroupChat()
+                friendChatActions.openFriend(target.friend, animate)
+            }
+            is SuspendedSocialChat.Group -> {
+                friendChatActions.closeFriendChat()
+                groupChatActions.openGroup(target.group, animate)
+            }
+        }
+        syncVisibleChatNotificationState()
+        return true
     }
 
     private val marketplaceActions: MainMarketplaceActions by lazy {

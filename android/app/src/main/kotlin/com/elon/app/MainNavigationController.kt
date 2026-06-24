@@ -50,6 +50,8 @@ internal class MainNavigationController(
     private val maybePrewarmCodexSession: (String) -> Unit,
     private val onFriendChatClosed: () -> Unit,
     private val onProjectChannelClosed: () -> Unit,
+    private val suspendSocialChatForProjectReturn: () -> Boolean,
+    private val restoreSocialChatForProjectReturn: (Boolean) -> Boolean,
     private val showProjectMembers: () -> Unit,
     private val loadMarketplace: () -> Unit,
     private val onAgentTabSelected: () -> Unit,
@@ -57,6 +59,7 @@ internal class MainNavigationController(
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
+        SOCIAL_CHAT,
         PROJECTS,
         PROJECT_SPACE
     }
@@ -359,6 +362,12 @@ internal class MainNavigationController(
             collapseInputComposer(false)
             when (chatReturnTarget) {
                 ChatReturnTarget.PROJECTS -> showProjectHome(animate = true)
+                ChatReturnTarget.SOCIAL_CHAT -> {
+                    onProjectChannelClosed()
+                    if (!restoreSocialChatForProjectReturn(true)) {
+                        showConversationHome(animate = true)
+                    }
+                }
                 ChatReturnTarget.PROJECT_SPACE -> {
                     onProjectChannelClosed()
                     showProjectSpace(projectSpaceTitle, animate = true)
@@ -585,8 +594,15 @@ internal class MainNavigationController(
     fun showProjectPersonalChat(title: String, animate: Boolean = false) {
         if (pageTransitionRunning) return
         clearMessageSelection()
-        onFriendChatClosed()
-        chatReturnTarget = ChatReturnTarget.PROJECT_SPACE
+        val returnTarget = projectPersonalChatReturnTarget()
+        chatReturnTarget = if (
+            returnTarget == ChatReturnTarget.FRIENDS &&
+            suspendSocialChatForProjectReturn()
+        ) {
+            ChatReturnTarget.SOCIAL_CHAT
+        } else {
+            returnTarget
+        }
         val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
@@ -625,6 +641,15 @@ internal class MainNavigationController(
         }
         setSendEnabled(!isActiveConversationWorking())
         maybePrewarmCodexSession("show_project_personal_chat")
+    }
+
+    private fun projectPersonalChatReturnTarget(): ChatReturnTarget {
+        if (binding.chatPage.visibility == View.VISIBLE) return chatReturnTarget
+        if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
+            return ChatReturnTarget.PROJECT_SPACE
+        }
+        if (binding.conversationPage.visibility == View.VISIBLE) return ChatReturnTarget.FRIENDS
+        return ChatReturnTarget.PROJECTS
     }
 
     fun showProjectManagement(animate: Boolean = false) {
