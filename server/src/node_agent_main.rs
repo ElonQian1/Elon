@@ -83,6 +83,8 @@ mod node_agent_task_journal_api;
 mod node_agent_task_journal_events;
 mod node_agent_task_journal_lock;
 #[cfg(test)]
+mod node_agent_task_journal_recovery_tests;
+#[cfg(test)]
 mod node_agent_task_lifecycle_pressure_tests;
 mod node_agent_task_resume;
 mod node_agent_tool_approval;

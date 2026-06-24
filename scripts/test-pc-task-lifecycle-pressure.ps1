@@ -9,6 +9,7 @@ $RepoRoot = git -C $PSScriptRoot rev-parse --show-toplevel
 $ServerCargo = Join-Path $RepoRoot "server\Cargo.toml"
 $NodeAgentMain = Join-Path $RepoRoot "server\src\node_agent_main.rs"
 $PressureModule = Join-Path $RepoRoot "server\src\node_agent_task_lifecycle_pressure_tests.rs"
+$JournalRecoveryModule = Join-Path $RepoRoot "server\src\node_agent_task_journal_recovery_tests.rs"
 $ProjectAgentRunsModule = Join-Path $RepoRoot "server\src\node_agent_project_agent_runs.rs"
 
 function Invoke-Step {
@@ -41,10 +42,25 @@ Invoke-Step "Static pressure-test contract" {
     if (-not (Test-Path -LiteralPath $PressureModule)) {
         throw "Missing node_agent_task_lifecycle_pressure_tests.rs"
     }
+    if (-not (Test-Path -LiteralPath $JournalRecoveryModule)) {
+        throw "Missing node_agent_task_journal_recovery_tests.rs"
+    }
     Assert-FileContains `
         -Path $NodeAgentMain `
         -Needle "mod node_agent_task_lifecycle_pressure_tests;" `
         -Message "node_agent_task_lifecycle_pressure_tests module is not wired into node-agent tests"
+    Assert-FileContains `
+        -Path $NodeAgentMain `
+        -Needle "mod node_agent_task_journal_recovery_tests;" `
+        -Message "node_agent_task_journal_recovery_tests module is not wired into node-agent tests"
+    Assert-FileContains `
+        -Path $JournalRecoveryModule `
+        -Needle "corrupt_registry_falls_back_to_last_valid_backup_and_recovers_on_next_write" `
+        -Message "Task journal registry backup recovery test is missing"
+    Assert-FileContains `
+        -Path (Join-Path $RepoRoot "server\src\node_agent_task_journal.rs") `
+        -Needle "registry.json.bak" `
+        -Message "Task journal registry writes must maintain a last-good backup"
     Assert-FileContains `
         -Path $PressureModule `
         -Needle "stress_concurrent_task_journal_writes_keep_registry_and_events_consistent" `
@@ -93,6 +109,13 @@ if (-not $SkipJournalUnitTests) {
         cargo test --manifest-path $ServerCargo node_agent_task_journal -- --nocapture
         if ($LASTEXITCODE -ne 0) {
             throw "Task journal unit tests failed with exit code $LASTEXITCODE"
+        }
+    }
+
+    Invoke-Step "Task journal registry recovery tests" {
+        cargo test --manifest-path $ServerCargo node_agent_task_journal_recovery_tests -- --nocapture
+        if ($LASTEXITCODE -ne 0) {
+            throw "Task journal registry recovery tests failed with exit code $LASTEXITCODE"
         }
     }
 }

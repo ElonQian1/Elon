@@ -6,8 +6,9 @@ use serde_json::{json, Value};
 use std::{
     collections::BTreeMap,
     fs::{self, File, OpenOptions},
-    io::{BufRead, BufReader, Write},
+    io::{BufRead, BufReader, ErrorKind, Write},
     path::{Path, PathBuf},
+    process,
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -369,17 +370,68 @@ impl TaskJournal {
     fn load_registry(&self) -> Result<BTreeMap<String, TaskJournalRecord>> {
         let path = self.registry_path();
         if !path.exists() {
+            let backup_path = self.registry_backup_path();
+            if backup_path.exists() {
+                return load_registry_file(&backup_path);
+            }
             return Ok(BTreeMap::new());
         }
-        let text = fs::read_to_string(&path).with_context(|| format!("读取 {:?}", path))?;
-        serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))
+        match load_registry_file(&path) {
+            Ok(registry) => Ok(registry),
+            Err(primary_error) => {
+                let backup_path = self.registry_backup_path();
+                if !backup_path.exists() {
+                    return Err(primary_error);
+                }
+                match load_registry_file(&backup_path) {
+                    Ok(registry) => {
+                        tracing::warn!(
+                            path = %path.display(),
+                            backup_path = %backup_path.display(),
+                            error = %primary_error,
+                            "task journal registry is unreadable; using last valid backup"
+                        );
+                        Ok(registry)
+                    }
+                    Err(backup_error) => Err(primary_error)
+                        .with_context(|| format!("备用任务 registry 也无法读取: {backup_error}")),
+                }
+            }
+        }
     }
 
     fn save_registry(&self, registry: &BTreeMap<String, TaskJournalRecord>) -> Result<()> {
         self.ensure_dir()?;
         let path = self.registry_path();
+        let backup_path = self.registry_backup_path();
+        let previous_path = self.registry_previous_path();
+        let temp_path = self.registry_temp_path();
         let text = serde_json::to_string_pretty(registry)?;
-        fs::write(&path, text).with_context(|| format!("写入 {:?}", path))
+        write_registry_temp_file(&temp_path, text.as_bytes())?;
+        remove_file_if_exists(&previous_path)?;
+        if path.exists() {
+            let replacement_path = if load_registry_file(&path).is_ok() {
+                previous_path.clone()
+            } else {
+                self.registry_corrupt_path()
+            };
+            remove_file_if_exists(&replacement_path)?;
+            fs::rename(&path, &replacement_path).with_context(|| {
+                format!("移动旧任务 registry {:?} -> {:?}", path, replacement_path)
+            })?;
+        }
+        fs::rename(&temp_path, &path)
+            .with_context(|| format!("替换任务 registry {:?} -> {:?}", temp_path, path))?;
+        if let Err(error) = fs::copy(&path, &backup_path) {
+            tracing::warn!(
+                path = %path.display(),
+                backup_path = %backup_path.display(),
+                error = %error,
+                "task journal registry backup update failed"
+            );
+        }
+        remove_file_if_exists(&previous_path)?;
+        Ok(())
     }
 
     fn append_event(&self, event: serde_json::Value) -> Result<()> {
@@ -400,6 +452,27 @@ impl TaskJournal {
 
     fn registry_path(&self) -> PathBuf {
         self.dir.join("registry.json")
+    }
+
+    fn registry_backup_path(&self) -> PathBuf {
+        self.dir.join("registry.json.bak")
+    }
+
+    fn registry_previous_path(&self) -> PathBuf {
+        self.dir.join("registry.json.previous")
+    }
+
+    fn registry_temp_path(&self) -> PathBuf {
+        self.dir
+            .join(format!("registry.json.tmp-{}", process::id()))
+    }
+
+    fn registry_corrupt_path(&self) -> PathBuf {
+        self.dir.join(format!(
+            "registry-corrupt-{}-{}.json",
+            now_ms(),
+            process::id()
+        ))
     }
 
     fn events_path(&self) -> PathBuf {
@@ -518,6 +591,26 @@ fn event_belongs_to_task(event: &Value, task_id: &str) -> bool {
         .get("req_id")
         .and_then(|value| value.as_str())
         .is_some_and(|req_id| req_id == task_id)
+}
+
+fn load_registry_file(path: &Path) -> Result<BTreeMap<String, TaskJournalRecord>> {
+    let text = fs::read_to_string(path).with_context(|| format!("读取 {:?}", path))?;
+    serde_json::from_str(&text).with_context(|| format!("解析 {:?}", path))
+}
+
+fn write_registry_temp_file(path: &Path, bytes: &[u8]) -> Result<()> {
+    let mut file = File::create(path).with_context(|| format!("创建 {:?}", path))?;
+    file.write_all(bytes)
+        .with_context(|| format!("写入 {:?}", path))?;
+    file.sync_all().with_context(|| format!("同步 {:?}", path))
+}
+
+fn remove_file_if_exists(path: &Path) -> Result<()> {
+    match fs::remove_file(path) {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(error).with_context(|| format!("删除 {:?}", path)),
+    }
 }
 
 fn now_ms() -> u128 {
