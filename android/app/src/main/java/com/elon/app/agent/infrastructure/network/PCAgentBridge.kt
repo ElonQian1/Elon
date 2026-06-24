@@ -226,7 +226,7 @@ class PCAgentBridge(
             }
             else -> {
                 AgentProtocol.errorMessage(
-                    ErrorCode.UNKNOWN,
+                    ErrorCode.UNSUPPORTED_COMMAND,
                     "命令暂未实现: $command"
                 )
             }

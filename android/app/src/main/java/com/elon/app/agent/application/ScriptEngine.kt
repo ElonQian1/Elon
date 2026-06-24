@@ -1184,9 +1184,22 @@ class ScriptEngine(
                 searchBox.getBoundsInScreen(rect)
                 performTap(rect.centerX(), rect.centerY())
                 delay(500)
-                // TODO: 输入文本
+                val inputResult = executeInputText(
+                    ScriptStep(
+                        index = step.index,
+                        type = StepType.INPUT_TEXT,
+                        description = "输入搜索关键词",
+                        params = mapOf("text" to text),
+                        onFail = step.onFail,
+                        maxRetries = step.maxRetries
+                    )
+                )
+                if (!inputResult.success) {
+                    return inputResult
+                }
+                return StepResult(true, "Search text entered")
             }
-            return StepResult(true, "Search initiated")
+            return StepResult(false, "Search box not found")
         }
         
         // 如果有contains，当作FIND_AND_TAP处理

@@ -268,6 +268,7 @@ enum class QueryType {
 enum class ErrorCode {
     UNKNOWN,
     INVALID_MESSAGE,
+    UNSUPPORTED_COMMAND,
     GOAL_FAILED,
     TOOL_ERROR,
     AI_ERROR,
