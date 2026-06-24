@@ -62,6 +62,7 @@ function Assert-DocumentContains {
 Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
 Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WORKTREE_CREATED=true"
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "WORKTREE_PATH"
+Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "nested worktree"
 Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "origin/main"
 
 $tempBase = [System.IO.Path]::GetTempPath()
