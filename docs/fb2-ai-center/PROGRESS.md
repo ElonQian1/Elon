@@ -10,6 +10,8 @@
 
 ## 已完成
 
+- 2026-06-24 12:13 本轮继续主项目侧非语音交接输出收口，不修改 fb2 仓库、不访问 fb2 live 接口、不发送真实群消息、不恢复 ASR/TTS。`scripts\fb2-ai-center-handoff-prompt.ps1` 的“fb2 导出样本”表现在从单一 `kinds` 混合列改为 `business` 和 `quality_history` 两列；没有新字段的旧 summary 会按 `source_kinds` 自动拆分。`scripts\validate-fb2-ai-center-handoff-prompt.ps1` 会解析该表，要求 `opinion_result_review_summary` 不得出现在 business 列，且出现时必须位于 quality history 列；自测新增坏分类负例，避免下一轮交接提示把历史复盘摘要重新显示成比赛/订单事实来源。
+
 - 2026-06-24 11:59 本轮继续主项目侧非语音回答准备态收口，不修改 fb2 仓库、不访问 fb2 live 接口、不发送真实群消息、不恢复 ASR/TTS。`scripts\fb2-context-answer-readiness-status.ps1` 现在会把样本集里的来源继续透传为 `source_kinds`、`business_source_kinds` 和 `quality_history_source_kinds`；四类核心问题的 `required_source_kinds` 只按业务事实来源检查，避免 `opinion_result_review_summary` 这类历史复盘质量摘要误参与“比赛/订单事实是否足够”的判断。`scripts\smoke-fb2-ai-center-status.ps1 -SelfTest` 已把包含 `opinion_result_review_summary` 的样本纳入回归，并断言它只能出现在 answer-readiness 的 `quality_history_source_kinds`；`scripts\validate-fb2-ai-center-completion-matrix.ps1` 也会检查 answer readiness 不把该来源列为业务事实。
 
 - 2026-06-24 11:33 本轮继续主项目侧非语音样本交接收口，不修改 fb2 仓库、不访问 fb2 live 接口、不发送真实群消息、不恢复 ASR/TTS。`scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet` 现在会把 citation source kinds 拆分为 `business_source_kinds` 和 `quality_history_source_kinds`；`opinion_result_review_summary` 会被归为质量历史来源，并明确从业务事实来源中排除。`scripts\fb2-context-sample-set-status.ps1` 兼容旧 summary，没有新字段时会从 `source_kinds` 推导同样分类；`validate-fb2-ai-center-current-state.ps1 -SelfTest` 会拒绝把 `opinion_result_review_summary` 放进业务来源的样本状态。用 fb2 仓库当前四类 live 样本重跑验证通过：`success=true passed_count=4 quality_history_source_kinds=opinion_result_review_summary business_has_review=false`。

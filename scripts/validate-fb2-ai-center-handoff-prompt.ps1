@@ -80,6 +80,7 @@ function New-Fb2PromptValidation {
     foreach ($section in @(
             "## 当前闸门",
             "## Owner 下一步",
+            "## fb2 导出样本",
             "## 可执行命令",
             "## 阻塞与边界",
             "## 缺口行动板",
@@ -90,6 +91,26 @@ function New-Fb2PromptValidation {
         Add-Fb2PromptValidationCheck $checks "section $section" ($Content.Contains($section))
     }
     Add-Fb2PromptValidationCheck $checks "section ## 线上主项目" ($Content.Contains("## 线上主项目"))
+    Add-Fb2PromptValidationCheck $checks "exported sample table has business source column" ($Content -match '\|\s*scenario\s*\|\s*audit\s*\|\s*sources\s*\|\s*business\s*\|\s*quality_history\s*\|\s*sha256\s*\|')
+    $exportedSampleRows = @($Content -split "(`r`n|`n|`r)" | Where-Object { $_ -match '^\|\s*[^|]+_context_pack\s*\|' })
+    $reviewSummaryBusinessCells = @()
+    $reviewSummaryMissingQualityCells = @()
+    foreach ($row in $exportedSampleRows) {
+        $cells = @($row -split '\|' | ForEach-Object { $_.Trim() })
+        if ($cells.Count -lt 7) {
+            continue
+        }
+        $businessCell = [string]$cells[4]
+        $qualityCell = [string]$cells[5]
+        if ($businessCell -match 'opinion_result_review_summary') {
+            $reviewSummaryBusinessCells += $row
+        }
+        if (($row -match 'opinion_result_review_summary') -and ($qualityCell -notmatch 'opinion_result_review_summary')) {
+            $reviewSummaryMissingQualityCells += $row
+        }
+    }
+    Add-Fb2PromptValidationCheck $checks "review summary is not shown as exported sample business source" (@($reviewSummaryBusinessCells).Count -eq 0) (@($reviewSummaryBusinessCells) -join "`n")
+    Add-Fb2PromptValidationCheck $checks "review summary is shown as exported sample quality history source" (@($reviewSummaryMissingQualityCells).Count -eq 0) (@($reviewSummaryMissingQualityCells) -join "`n")
 
     foreach ($field in @(
             "data_goal_complete",
@@ -255,6 +276,12 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - fb2_project: `provide_FB2_AI_CENTER_TOKEN_or_export_equivalent_live_Context_Pack_permission_quality_evidence`
 - shared: `run_DataOnlyAcceptance_PreflightOnly_with_token_then_refresh_status_refresh_current_json`
 
+## fb2 导出样本
+- attempted: `True` / complete: `True` / passed: `4` / failed: `0`
+| scenario | audit | sources | business | quality_history | sha256 |
+|---|---|---:|---|---|---|
+| today_matches_context_pack | audit-today | 23 | match, odds, context_audit | opinion_result_review_summary | aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
+
 ## 可执行命令
 - `refresh_status`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-ai-center-refresh-current-status.ps1`
 - `read_status_refresh`: `Get-Content -Raw -LiteralPath target\fb2-ai-center\status-refresh-current.json | ConvertFrom-Json`
@@ -310,6 +337,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
     $badScript = $good + "`nAdd-Fb2PromptLine -Lines `$lines"
     $badSecret = $good -replace '<FB2_AI_CENTER_TOKEN>', 'real-secret-token-1234567890'
     $badBoundary = $good -replace 'public_contract_regression, status_refresh_selftest, context_format_route_regression, offline_context_pack_sample_validation, handoff_documentation', 'public_contract_regression, status_refresh_selftest'
+    $badSourceClassification = $good -replace 'match, odds, context_audit \| opinion_result_review_summary', 'match, odds, context_audit, opinion_result_review_summary | '
 
     $failed = 0
     $goodResult = New-Fb2PromptValidation -Content $good -SourcePath "selftest-good.md"
@@ -323,6 +351,8 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
     if ([bool]$badSecretResult.success) { $failed++ }
     $badBoundaryResult = New-Fb2PromptValidation -Content $badBoundary -SourcePath "selftest-boundary.md"
     if ([bool]$badBoundaryResult.success) { $failed++ }
+    $badSourceClassificationResult = New-Fb2PromptValidation -Content $badSourceClassification -SourcePath "selftest-source-classification.md"
+    if ([bool]$badSourceClassificationResult.success) { $failed++ }
 
     Write-Output "== SelfTest Summary =="
     Write-Output "failed=$failed"

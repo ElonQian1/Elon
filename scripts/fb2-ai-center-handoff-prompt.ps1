@@ -47,6 +47,25 @@ function Get-Fb2PromptProperty {
     return $property.Value
 }
 
+function Get-Fb2PromptQualityHistoryKinds {
+    @(
+        "feedback",
+        "opinion_adoption",
+        "opinion_result_review_summary"
+    )
+}
+
+function Split-Fb2PromptSourceKinds {
+    param([string[]]$SourceKinds)
+
+    $qualityKinds = @(Get-Fb2PromptQualityHistoryKinds)
+    $uniqueKinds = @($SourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    [ordered]@{
+        business = @($uniqueKinds | Where-Object { $qualityKinds -notcontains [string]$_ })
+        quality_history = @($uniqueKinds | Where-Object { $qualityKinds -contains [string]$_ })
+    }
+}
+
 function Read-Fb2PromptJson {
     param([string]$Path)
 
@@ -160,15 +179,26 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- attempted: `{0}` / complete: `{1}` / passed: `{2}` / failed: `{3}`' -f [bool](Get-Fb2PromptProperty $exportedSamples 'attempted' $false), [bool](Get-Fb2PromptProperty $exportedSamples 'complete' $false), [int](Get-Fb2PromptProperty $exportedSamples 'passed_count' 0), [int](Get-Fb2PromptProperty $exportedSamples 'failed_count' 0))
     if (@($exportedSampleScenarios).Count -gt 0) {
         $pipe = [char]124
-        Add-Fb2PromptLine -Lines $lines -Text ('{0} scenario {0} audit {0} sources {0} kinds {0} sha256 {0}' -f $pipe)
-        Add-Fb2PromptLine -Lines $lines -Text ('{0}---{0}---{0}---:{0}---{0}---{0}' -f $pipe)
+        Add-Fb2PromptLine -Lines $lines -Text ('{0} scenario {0} audit {0} sources {0} business {0} quality_history {0} sha256 {0}' -f $pipe)
+        Add-Fb2PromptLine -Lines $lines -Text ('{0}---{0}---{0}---:{0}---{0}---{0}---{0}' -f $pipe)
         foreach ($scenario in $exportedSampleScenarios) {
             $scenarioId = Format-Fb2PromptCell $scenario.scenario 80
             $auditId = Format-Fb2PromptCell $scenario.context_audit_id 80
             $sourceCount = Format-Fb2PromptCell $scenario.citation_source_count 30
-            $kinds = Format-Fb2PromptCell (@(Get-Fb2PromptProperty $scenario 'source_kinds' @()) -join ', ') 180
+            $sourceKinds = @((Get-Fb2PromptProperty $scenario 'source_kinds' @()) | ForEach-Object { [string]$_ })
+            $splitKinds = Split-Fb2PromptSourceKinds -SourceKinds $sourceKinds
+            $businessKinds = @((Get-Fb2PromptProperty $scenario 'business_source_kinds' @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+            if ($businessKinds.Count -eq 0) {
+                $businessKinds = @($splitKinds["business"])
+            }
+            $qualityKinds = @((Get-Fb2PromptProperty $scenario 'quality_history_source_kinds' @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+            if ($qualityKinds.Count -eq 0) {
+                $qualityKinds = @($splitKinds["quality_history"])
+            }
+            $business = Format-Fb2PromptCell (@($businessKinds) -join ', ') 180
+            $quality = Format-Fb2PromptCell (@($qualityKinds) -join ', ') 180
             $sha = Format-Fb2PromptCell $scenario.context_pack_sha256 80
-            Add-Fb2PromptLine -Lines $lines -Text ('{0} {1} {0} {2} {0} {3} {0} {4} {0} {5} {0}' -f $pipe, $scenarioId, $auditId, $sourceCount, $kinds, $sha)
+            Add-Fb2PromptLine -Lines $lines -Text ('{0} {1} {0} {2} {0} {3} {0} {4} {0} {5} {0} {6} {0}' -f $pipe, $scenarioId, $auditId, $sourceCount, $business, $quality, $sha)
         }
     }
     Add-Fb2PromptLine -Lines $lines -Text ""
@@ -288,7 +318,7 @@ function Invoke-Fb2PromptSelfTest {
                 passed_count = 4
                 failed_count = 0
                 scenarios = @(
-                    [ordered]@{ scenario = "today_matches_context_pack"; context_audit_id = "audit-today"; citation_source_count = 23; source_kinds = @("match", "odds", "context_audit"); context_pack_sha256 = ("a" * 64) },
+                    [ordered]@{ scenario = "today_matches_context_pack"; context_audit_id = "audit-today"; citation_source_count = 23; source_kinds = @("match", "odds", "context_audit", "opinion_result_review_summary"); context_pack_sha256 = ("a" * 64) },
                     [ordered]@{ scenario = "my_ticket_context_pack"; context_audit_id = "audit-ticket"; citation_source_count = 43; source_kinds = @("user_order", "ticket", "context_audit"); context_pack_sha256 = ("b" * 64) },
                     [ordered]@{ scenario = "platform_order_context_pack"; context_audit_id = "audit-platform"; citation_source_count = 24; source_kinds = @("platform_order_summary", "context_audit"); context_pack_sha256 = ("c" * 64) },
                     [ordered]@{ scenario = "group_opinion_context_pack"; context_audit_id = "audit-opinion"; citation_source_count = 24; source_kinds = @("group_message", "opinion_memory", "context_audit"); context_pack_sha256 = ("d" * 64) }
@@ -386,6 +416,8 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.gap_action_board.v1") "gap action schema"
         Assert-Fb2PromptSelfTest ($content -match "fb2 导出样本") "exported sample section"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_context_pack") "exported sample row"
+        Assert-Fb2PromptSelfTest ($content -match "\|\s*scenario\s*\|\s*audit\s*\|\s*sources\s*\|\s*business\s*\|\s*quality_history\s*\|\s*sha256\s*\|") "exported sample table classifies sources"
+        Assert-Fb2PromptSelfTest ($content -match "\|\s*today_matches_context_pack\s*\|[^\r\n]+\|\s*match, odds, context_audit\s*\|\s*opinion_result_review_summary\s*\|") "review summary shown as quality history"
         Assert-Fb2PromptSelfTest ($content -match "generate_context_pack_sample_request") "context pack sample request command"
         Assert-Fb2PromptSelfTest ($content -match "validate_context_pack_sample_set") "context pack sample set validation command"
         Assert-Fb2PromptSelfTest ($content -match "validate_exported_context_pack_sample_set") "exported context pack sample set validation command"

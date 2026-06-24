@@ -25,6 +25,7 @@
 
 ## 当前重点
 
+- 2026-06-24 12:13 当前重点继续把来源分类从机器状态推到交接提示层。下一轮主项目或 fb2 子会话通常直接读 `handoff-prompt-current.md`，所以导出样本表必须展示 `business` / `quality_history` 两列，不能只展示混合 `source_kinds`。`opinion_result_review_summary` 若出现在 handoff prompt，只能出现在 `quality_history` 列。
 - 2026-06-24 11:59 当前重点从样本集来源分类继续推进到 answer-readiness 来源分类。`latest_context_answer_readiness` 不仅要判断四类核心问题是否具备必需 source kinds，还要保留 `business_source_kinds` 和 `quality_history_source_kinds`，并且只用业务事实来源判断“今天比赛/我的票/平台订单/群观点”是否可回答。`opinion_result_review_summary` 只能作为历史复盘质量信号，不得支撑未来比赛事实或订单事实。
 - 2026-06-24 11:33 当前重点继续做主项目侧非语音样本交接精度收口。fb2 最新四类 live Context Pack 样本都会带 `opinion_result_review_summary` citation source；主项目样本校验现在必须把它归入 `quality_history_source_kinds`，并从 `business_source_kinds` 排除，避免后续会话把历史赛后复盘质量摘要误当成比赛事实、用户订单事实或平台订单事实。该改动只影响离线 validation/status artifact，不读取 Context Pack 原文、不访问 fb2、不写真实群消息、不恢复 ASR/TTS。
 - 2026-06-24 11:15 当前重点从“检查子项目最新状态”收敛为“把 fb2 最新质量/检索 checkpoint 纳入主项目接手口径”。fb2 当前 `origin/main=1b0cdc2b`，已经完成公开 `123qwe` 复盘质量 drill、`match_context_index` dry-run 防误 POST 自测、final gate 默认中文 topic 对齐。主项目下一轮不需要重做 Context Pack/MCP/RAG，也不需要恢复 ASR/TTS；最小动作是保持 `validate_context_format_route`、runtime routing、prompt projection、quality trend、token bridge/current-state 这些非语音门禁为绿，并在 fb2 新增字段或工具时继续先补契约和 smoke。
