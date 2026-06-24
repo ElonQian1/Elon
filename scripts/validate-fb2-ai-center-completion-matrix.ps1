@@ -212,6 +212,11 @@ function New-Fb2MatrixValidation {
         Add-Fb2MatrixCheck $checks "planned p4 chunk manifest scope complete delegated" ([string](Get-Fb2MatrixProperty $p4 "chunk_manifest_current_scope_complete" "") -eq "reported_by_fb2_chunk_manifest_runtime")
         Add-Fb2MatrixCheck $checks "planned p4 embedding dry-run report version" ([string](Get-Fb2MatrixProperty $p4 "embedding_build_dry_run_report_version" "") -eq "fb2_p4_embedding_build_dry_run_v1")
         Add-Fb2MatrixCheck $checks "planned p4 embedding dry-run no-write status" ([string](Get-Fb2MatrixProperty $p4 "dry_run_status" "") -eq "dry_run_available_no_writes")
+        Add-Fb2MatrixCheck $checks "planned p4 embedding transaction preflight report version" ([string](Get-Fb2MatrixProperty $p4 "embedding_transaction_preflight_report_version" "") -eq "fb2_p4_embedding_transaction_preflight_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 embedding transaction preflight no-write status" ([string](Get-Fb2MatrixProperty $p4 "embedding_transaction_preflight_status" "") -eq "transaction_preflight_available_no_writes")
+        Add-Fb2MatrixCheck $checks "planned p4 embedding transaction planned entries delegated" ([string](Get-Fb2MatrixProperty $p4 "embedding_transaction_preflight_planned_entry_count" "") -eq "reported_by_fb2_embedding_transaction_preflight_runtime")
+        Add-Fb2MatrixCheck $checks "planned p4 embedding transaction skipped sources delegated" ([string](Get-Fb2MatrixProperty $p4 "embedding_transaction_preflight_skipped_source_count" "") -eq "reported_by_fb2_embedding_transaction_preflight_runtime")
+        Add-Fb2MatrixCheck $checks "planned p4 embedding transaction blocking reasons delegated" ([string](Get-Fb2MatrixProperty $p4 "embedding_transaction_preflight_blocking_reasons" "") -eq "reported_by_fb2_embedding_transaction_preflight_runtime")
         Add-Fb2MatrixCheck $checks "planned p4 vector status" ([string](Get-Fb2MatrixProperty $p4 "status" "") -eq "contract_design_committed_embedding_not_started")
         Add-Fb2MatrixCheck $checks "planned p4 vector non-blocking" (-not [bool](Get-Fb2MatrixProperty $p4 "blocks_data_goal" $true))
         Add-Fb2MatrixCheck $checks "planned p4 vector not production grounding" (-not [bool](Get-Fb2MatrixProperty $p4 "production_grounding" $true))
@@ -219,6 +224,9 @@ function New-Fb2MatrixValidation {
         Add-Fb2MatrixCheck $checks "planned p4 embedding dry-run flag" ([bool](Get-Fb2MatrixProperty $p4 "dry_run" $false))
         Add-Fb2MatrixCheck $checks "planned p4 chunk manifest file not written" (-not [bool](Get-Fb2MatrixProperty $p4 "writes_chunk_manifest_file" $true))
         Add-Fb2MatrixCheck $checks "planned p4 manifest rows not persisted" (-not [bool](Get-Fb2MatrixProperty $p4 "persists_manifest_rows" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 transaction rows not persisted" (-not [bool](Get-Fb2MatrixProperty $p4 "persists_transaction_rows" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 tables not created or migrated" (-not [bool](Get-Fb2MatrixProperty $p4 "creates_or_migrates_tables" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 embedding provider not called" (-not [bool](Get-Fb2MatrixProperty $p4 "calls_embedding_provider" $true))
         Add-Fb2MatrixCheck $checks "planned p4 embedding rows not written" (-not [bool](Get-Fb2MatrixProperty $p4 "writes_embedding_rows" $true))
         Add-Fb2MatrixCheck $checks "planned p4 vector store not written" (-not [bool](Get-Fb2MatrixProperty $p4 "writes_vector_store" $true))
         Add-Fb2MatrixCheck $checks "planned p4 source enumerator writes no public group messages" (-not [bool](Get-Fb2MatrixProperty $p4 "writes_public_group_messages" $true))
@@ -228,6 +236,7 @@ function New-Fb2MatrixValidation {
         Add-Fb2MatrixCheck $checks "planned p4 source payload not included" (-not [bool](Get-Fb2MatrixProperty $p4 "source_payload_included" $true))
         Add-Fb2MatrixCheck $checks "planned p4 embedding text not included" (-not [bool](Get-Fb2MatrixProperty $p4 "embedding_text_included" $true))
         Add-Fb2MatrixCheck $checks "planned p4 vector does not enable vector" ([bool](Get-Fb2MatrixProperty $p4 "does_not_enable_vector" $false))
+        Add-Fb2MatrixCheck $checks "planned p4 embedding transaction not executable" (-not [bool](Get-Fb2MatrixProperty $p4 "ready_to_execute_embedding_transaction" $true))
         Add-Fb2MatrixCheck $checks "planned p4 not ready to write embeddings" (-not [bool](Get-Fb2MatrixProperty $p4 "ready_to_write_embeddings" $true))
         Add-Fb2MatrixCheck $checks "planned p4 vector embedding not ready" (-not [bool](Get-Fb2MatrixProperty $p4 "ready_to_build_embedding_store" $true))
         Add-Fb2MatrixCheck $checks "planned p4 vector answer-time disabled" (-not [bool](Get-Fb2MatrixProperty $p4 "ready_to_enable_answer_time_vector_candidates" $true))
@@ -448,6 +457,11 @@ function New-Fb2MatrixFixtureRefresh {
                     chunk_manifest_current_scope_complete = "reported_by_fb2_chunk_manifest_runtime"
                     embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                     dry_run_status = "dry_run_available_no_writes"
+                    embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
+                    embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
+                    embedding_transaction_preflight_planned_entry_count = "reported_by_fb2_embedding_transaction_preflight_runtime"
+                    embedding_transaction_preflight_skipped_source_count = "reported_by_fb2_embedding_transaction_preflight_runtime"
+                    embedding_transaction_preflight_blocking_reasons = "reported_by_fb2_embedding_transaction_preflight_runtime"
                     status = "contract_design_committed_embedding_not_started"
                     blocks_data_goal = $false
                     production_grounding = $false
@@ -455,6 +469,9 @@ function New-Fb2MatrixFixtureRefresh {
                     dry_run = $true
                     writes_chunk_manifest_file = $false
                     persists_manifest_rows = $false
+                    persists_transaction_rows = $false
+                    creates_or_migrates_tables = $false
+                    calls_embedding_provider = $false
                     writes_embedding_rows = $false
                     writes_vector_store = $false
                     writes_public_group_messages = $false
@@ -464,6 +481,7 @@ function New-Fb2MatrixFixtureRefresh {
                     source_payload_included = $false
                     embedding_text_included = $false
                     does_not_enable_vector = $true
+                    ready_to_execute_embedding_transaction = $false
                     ready_to_write_embeddings = $false
                     ready_to_build_embedding_store = $false
                     ready_to_enable_answer_time_vector_candidates = $false

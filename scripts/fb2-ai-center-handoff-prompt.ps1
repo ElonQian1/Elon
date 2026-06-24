@@ -183,8 +183,8 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 计划能力 / 非生产边界"
-    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
-    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|---|---|"
+    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
+    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|---|---|---|"
     foreach ($capability in $plannedCapabilities) {
         $capId = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'id' '') 80
         $capStatus = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'status' '') 120
@@ -200,15 +200,18 @@ function New-Fb2HandoffPrompt {
         $capChunkManifest = Format-Fb2PromptCell (($capChunkManifestReportVersion, $capChunkManifestStatus | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 140
         $capDryRunStatusValue = [string](Get-Fb2PromptProperty $capability 'dry_run_status' '')
         $capDryRunStatusCell = Format-Fb2PromptCell $capDryRunStatusValue 80
+        $capTransactionPreflightReportVersion = [string](Get-Fb2PromptProperty $capability 'embedding_transaction_preflight_report_version' '')
+        $capTransactionPreflightStatus = [string](Get-Fb2PromptProperty $capability 'embedding_transaction_preflight_status' '')
+        $capTransactionPreflight = Format-Fb2PromptCell (($capTransactionPreflightReportVersion, $capTransactionPreflightStatus | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 160
         $capProduction = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'production_grounding' '') 40
         $capBlocks = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'blocks_data_goal' '') 40
         $capAnswerTime = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'answer_time_vector_candidates_enabled' '') 40
         $capNextRaw = [string](Get-Fb2PromptProperty $capability 'next_action' '')
         if (-not [string]::IsNullOrWhiteSpace($capDryRunStatusValue)) {
-            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
+            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); persists_transaction_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_transaction_rows' $false)); calls_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'calls_embedding_provider' $false)); ready_to_execute_embedding_transaction=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_embedding_transaction' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
         }
         $capNext = Format-Fb2PromptCell $capNextRaw 260
-        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capChunkManifest | $capDryRunStatusCell | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
+        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capChunkManifest | $capDryRunStatusCell | $capTransactionPreflight | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
     }
     $p4SourceSafety = @($plannedCapabilities | Where-Object {
             [string](Get-Fb2PromptProperty $_ 'source_enumerator_report_version' '') -eq 'fb2_p4_source_enumerator_v1'
@@ -225,6 +228,13 @@ function New-Fb2HandoffPrompt {
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'source_payload_included' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'embedding_text_included' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'ready_for_shadow_eval' $false))
+        Add-Fb2PromptLine -Lines $lines -Text ("- p4_embedding_transaction_preflight_safety: persists_transaction_rows={0}; creates_or_migrates_tables={1}; calls_embedding_provider={2}; ready_to_execute_embedding_transaction={3}; writes_embedding_rows={4}; writes_vector_store={5};" -f `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'persists_transaction_rows' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'creates_or_migrates_tables' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'calls_embedding_provider' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'ready_to_execute_embedding_transaction' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'writes_embedding_rows' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'writes_vector_store' $false))
     }
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## fb2 导出样本"
@@ -376,12 +386,18 @@ function Invoke-Fb2PromptSelfTest {
                     embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                     status = "contract_design_committed_embedding_not_started"
                     dry_run_status = "dry_run_available_no_writes"
+                    embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
+                    embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
                     writes_chunk_manifest_file = $false
                     persists_manifest_rows = $false
+                    persists_transaction_rows = $false
+                    creates_or_migrates_tables = $false
+                    calls_embedding_provider = $false
                     source_payload_included = $false
                     embedding_text_included = $false
                     writes_vector_store = $false
                     writes_public_group_messages = $false
+                    ready_to_execute_embedding_transaction = $false
                     ready_to_write_embeddings = $false
                     ready_for_shadow_eval = $false
                     candidate_rows_require_live_hydration = $true
@@ -457,12 +473,18 @@ function Invoke-Fb2PromptSelfTest {
                         embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                         status = "contract_design_committed_embedding_not_started"
                         dry_run_status = "dry_run_available_no_writes"
+                        embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
+                        embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
+                        persists_transaction_rows = $false
+                        creates_or_migrates_tables = $false
+                        calls_embedding_provider = $false
                         source_payload_included = $false
                         embedding_text_included = $false
                         writes_vector_store = $false
                         writes_public_group_messages = $false
+                        ready_to_execute_embedding_transaction = $false
                         ready_to_write_embeddings = $false
                         ready_for_shadow_eval = $false
                         candidate_rows_require_live_hydration = $true
@@ -499,12 +521,18 @@ function Invoke-Fb2PromptSelfTest {
                         embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                         status = "contract_design_committed_embedding_not_started"
                         dry_run_status = "dry_run_available_no_writes"
+                        embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
+                        embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
+                        persists_transaction_rows = $false
+                        creates_or_migrates_tables = $false
+                        calls_embedding_provider = $false
                         source_payload_included = $false
                         embedding_text_included = $false
                         writes_vector_store = $false
                         writes_public_group_messages = $false
+                        ready_to_execute_embedding_transaction = $false
                         ready_to_write_embeddings = $false
                         ready_for_shadow_eval = $false
                         candidate_rows_require_live_hydration = $true
@@ -555,6 +583,8 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "fb2_p4_chunk_manifest_v1") "planned chunk manifest report"
         Assert-Fb2PromptSelfTest ($content -match "id_only_no_write_manifest_available") "planned chunk manifest status"
         Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_build_dry_run_v1") "planned embedding dry-run report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_transaction_preflight_v1") "planned embedding transaction preflight report"
+        Assert-Fb2PromptSelfTest ($content -match "transaction_preflight_available_no_writes") "planned embedding transaction preflight status"
         Assert-Fb2PromptSelfTest ($content -match "contract_design_committed_embedding_not_started") "planned vector status"
         Assert-Fb2PromptSelfTest ($content -match "production_grounding") "planned vector production boundary"
         Assert-Fb2PromptSelfTest ($content -match "blocks_data_goal") "planned vector non-blocking boundary"
@@ -565,6 +595,9 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "persists_manifest_rows") "planned chunk manifest no row persistence boundary"
         Assert-Fb2PromptSelfTest ($content -match "source_payload_included") "planned chunk manifest no source payload boundary"
         Assert-Fb2PromptSelfTest ($content -match "embedding_text_included") "planned chunk manifest no embedding text boundary"
+        Assert-Fb2PromptSelfTest ($content -match "persists_transaction_rows") "planned embedding transaction no row persistence boundary"
+        Assert-Fb2PromptSelfTest ($content -match "calls_embedding_provider") "planned embedding transaction no provider call boundary"
+        Assert-Fb2PromptSelfTest ($content -match "ready_to_execute_embedding_transaction") "planned embedding transaction not executable boundary"
         Assert-Fb2PromptSelfTest ($content -match "fb2 导出样本") "exported sample section"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_context_pack") "exported sample row"
         Assert-Fb2PromptSelfTest ($content -match "\|\s*scenario\s*\|\s*audit\s*\|\s*sources\s*\|\s*business\s*\|\s*quality_history\s*\|\s*sha256\s*\|") "exported sample table classifies sources"

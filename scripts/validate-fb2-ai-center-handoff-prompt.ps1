@@ -119,6 +119,8 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "planned chunk manifest report visible" ($Content -match 'fb2_p4_chunk_manifest_v1')
     Add-Fb2PromptValidationCheck $checks "planned chunk manifest status visible" ($Content -match 'id_only_no_write_manifest_available')
     Add-Fb2PromptValidationCheck $checks "planned embedding dry-run report visible" ($Content -match 'fb2_p4_embedding_build_dry_run_v1')
+    Add-Fb2PromptValidationCheck $checks "planned embedding transaction preflight report visible" ($Content -match 'fb2_p4_embedding_transaction_preflight_v1')
+    Add-Fb2PromptValidationCheck $checks "planned embedding transaction preflight status visible" ($Content -match 'transaction_preflight_available_no_writes')
     Add-Fb2PromptValidationCheck $checks "planned vector status visible" ($Content -match 'contract_design_committed_embedding_not_started')
     Add-Fb2PromptValidationCheck $checks "planned vector production boundary visible" ($Content -match 'production_grounding')
     Add-Fb2PromptValidationCheck $checks "planned vector non-blocking boundary visible" ($Content -match 'blocks_data_goal')
@@ -130,6 +132,9 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "planned chunk manifest no row persistence boundary visible" ($Content -match 'persists_manifest_rows')
     Add-Fb2PromptValidationCheck $checks "planned chunk manifest no source payload boundary visible" ($Content -match 'source_payload_included')
     Add-Fb2PromptValidationCheck $checks "planned chunk manifest no embedding text boundary visible" ($Content -match 'embedding_text_included')
+    Add-Fb2PromptValidationCheck $checks "planned embedding transaction no row persistence boundary visible" ($Content -match 'persists_transaction_rows')
+    Add-Fb2PromptValidationCheck $checks "planned embedding transaction no provider call boundary visible" ($Content -match 'calls_embedding_provider')
+    Add-Fb2PromptValidationCheck $checks "planned embedding transaction not executable boundary visible" ($Content -match 'ready_to_execute_embedding_transaction')
 
     foreach ($field in @(
             "data_goal_complete",
@@ -296,10 +301,11 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - shared: `run_DataOnlyAcceptance_PreflightOnly_with_token_then_refresh_status_refresh_current_json`
 
 ## 计划能力 / 非生产边界
-| id | status | contract | source_enumerator | chunk_manifest | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |
-|---|---|---|---|---|---|---|---|---|
-| p4_vector | contract_design_committed_embedding_not_started | fb2_p4_vector_contract_v1 / fb2_p4_vector_readiness_plan_v1 / fb2_p4_embedding_build_dry_run_v1 | fb2_p4_source_enumerator_v1 / source_specific_no_write_sample_available | fb2_p4_chunk_manifest_v1 / id_only_no_write_manifest_available | False | False | False | dry_run_available_no_writes; writes_vector_store=false; writes_public_group_messages=false; writes_chunk_manifest_file=false; persists_manifest_rows=false; ready_to_write_embeddings=false; candidate_rows_require_live_hydration=true. |
+| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |
+|---|---|---|---|---|---|---|---|---|---|---|
+| p4_vector | contract_design_committed_embedding_not_started | fb2_p4_vector_contract_v1 / fb2_p4_vector_readiness_plan_v1 / fb2_p4_embedding_build_dry_run_v1 | fb2_p4_source_enumerator_v1 / source_specific_no_write_sample_available | fb2_p4_chunk_manifest_v1 / id_only_no_write_manifest_available | dry_run_available_no_writes | fb2_p4_embedding_transaction_preflight_v1 / transaction_preflight_available_no_writes | False | False | False | writes_vector_store=false; writes_public_group_messages=false; writes_chunk_manifest_file=false; persists_manifest_rows=false; persists_transaction_rows=false; calls_embedding_provider=false; ready_to_execute_embedding_transaction=false; ready_to_write_embeddings=false; candidate_rows_require_live_hydration=true. |
 - p4_chunk_manifest_safety: writes_chunk_manifest_file=False; persists_manifest_rows=False; source_payload_included=False; embedding_text_included=False; ready_for_shadow_eval=False;
+- p4_embedding_transaction_preflight_safety: persists_transaction_rows=False; creates_or_migrates_tables=False; calls_embedding_provider=False; ready_to_execute_embedding_transaction=False; writes_embedding_rows=False; writes_vector_store=False;
 
 ## fb2 导出样本
 - attempted: `True` / complete: `True` / passed: `4` / failed: `0`

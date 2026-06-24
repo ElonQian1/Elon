@@ -251,7 +251,12 @@ function New-Fb2GoalAuditPlannedCapabilities {
             chunk_manifest_current_scope_complete = "reported_by_fb2_chunk_manifest_runtime"
             embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
             dry_run_status = "dry_run_available_no_writes"
-            source_ref = "fb2 9aa581e1 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_chunk_manifest.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1"
+            embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
+            embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
+            embedding_transaction_preflight_planned_entry_count = "reported_by_fb2_embedding_transaction_preflight_runtime"
+            embedding_transaction_preflight_skipped_source_count = "reported_by_fb2_embedding_transaction_preflight_runtime"
+            embedding_transaction_preflight_blocking_reasons = "reported_by_fb2_embedding_transaction_preflight_runtime"
+            source_ref = "fb2 a555efd7 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_chunk_manifest.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1 / scripts/report_main_project_p4_embedding_transaction_preflight.ps1"
             gap_type = "planned_non_blocking"
             blocks_data_goal = $false
             production_grounding = $false
@@ -259,6 +264,9 @@ function New-Fb2GoalAuditPlannedCapabilities {
             dry_run = $true
             writes_chunk_manifest_file = $false
             persists_manifest_rows = $false
+            persists_transaction_rows = $false
+            creates_or_migrates_tables = $false
+            calls_embedding_provider = $false
             writes_embedding_rows = $false
             writes_vector_store = $false
             writes_public_group_messages = $false
@@ -268,6 +276,7 @@ function New-Fb2GoalAuditPlannedCapabilities {
             source_payload_included = $false
             embedding_text_included = $false
             does_not_enable_vector = $true
+            ready_to_execute_embedding_transaction = $false
             ready_to_write_embeddings = $false
             ready_to_build_embedding_store = $false
             ready_to_enable_answer_time_vector_candidates = $false
@@ -280,7 +289,7 @@ function New-Fb2GoalAuditPlannedCapabilities {
             requires_secret = $false
             requires_visible_group_write = $false
             command = ""
-            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator, chunk manifest, and embedding dry-run are only no-write planning evidence before idempotent embedding write transaction design, sanitized embedding text materialization, shadow eval, hydration, and explicit answer-time readthrough gates."
+            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator, chunk manifest, embedding dry-run, and transaction preflight are only no-write planning evidence before sanitized embedding text materialization, content hash fixture, shadow eval, hydration, and explicit answer-time readthrough gates."
         }
     )
 }
@@ -729,10 +738,18 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ([string]$planned[0].chunk_manifest_current_scope_complete -ne "reported_by_fb2_chunk_manifest_runtime") { $failed++ }
     if ([string]$planned[0].embedding_build_dry_run_report_version -ne "fb2_p4_embedding_build_dry_run_v1") { $failed++ }
     if ([string]$planned[0].dry_run_status -ne "dry_run_available_no_writes") { $failed++ }
+    if ([string]$planned[0].embedding_transaction_preflight_report_version -ne "fb2_p4_embedding_transaction_preflight_v1") { $failed++ }
+    if ([string]$planned[0].embedding_transaction_preflight_status -ne "transaction_preflight_available_no_writes") { $failed++ }
+    if ([string]$planned[0].embedding_transaction_preflight_planned_entry_count -ne "reported_by_fb2_embedding_transaction_preflight_runtime") { $failed++ }
+    if ([string]$planned[0].embedding_transaction_preflight_skipped_source_count -ne "reported_by_fb2_embedding_transaction_preflight_runtime") { $failed++ }
+    if ([string]$planned[0].embedding_transaction_preflight_blocking_reasons -ne "reported_by_fb2_embedding_transaction_preflight_runtime") { $failed++ }
     if (-not [bool]$planned[0].read_only) { $failed++ }
     if (-not [bool]$planned[0].dry_run) { $failed++ }
     if ([bool]$planned[0].writes_chunk_manifest_file) { $failed++ }
     if ([bool]$planned[0].persists_manifest_rows) { $failed++ }
+    if ([bool]$planned[0].persists_transaction_rows) { $failed++ }
+    if ([bool]$planned[0].creates_or_migrates_tables) { $failed++ }
+    if ([bool]$planned[0].calls_embedding_provider) { $failed++ }
     if ([bool]$planned[0].writes_vector_store) { $failed++ }
     if ([bool]$planned[0].writes_public_group_messages) { $failed++ }
     if ([bool]$planned[0].writes_feedback_or_adoption) { $failed++ }
@@ -740,6 +757,7 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ([bool]$planned[0].refresh_operations_used) { $failed++ }
     if ([bool]$planned[0].source_payload_included) { $failed++ }
     if ([bool]$planned[0].embedding_text_included) { $failed++ }
+    if ([bool]$planned[0].ready_to_execute_embedding_transaction) { $failed++ }
     if ([bool]$planned[0].ready_to_write_embeddings) { $failed++ }
     if (-not [bool]$planned[0].candidate_rows_require_live_hydration) { $failed++ }
     if ([bool]$planned[0].vector_rows_are_model_input) { $failed++ }
