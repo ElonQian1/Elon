@@ -18,7 +18,7 @@ Win 客户端“注册本地项目”流程会自动读取常见项目清单来�
 
 Route C 远程模型能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。`/api/agent/runtime/status` 会返回结构化 `blockingReasons`，把运维开关、agent 策略、server_api_key-only、平台预算、个人额度、限流等不可用原因统一给 Win 节点和 PC UI。Win 节点读取服务器 Route C 状态时会 fail-closed：如果 `policy.enabled=false`、`admissionAvailability.ready=false`、用户/平台预算耗尽、频率限制、`agentPolicy` 明确不可用，或 `blockingReasons` 非空，即使顶层 `ready=true` 也不会把 Route C 显示成可用。
 
-这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、更细粒度 full_access 高危命令策略。
+这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、full_access 高危策略的运营后台可视化。
 
 ---
 
@@ -1069,6 +1069,7 @@ Win 客户端维护面板展示安装状态、开始菜单健康、日志入口�
 本机 7799 管理 API token 保护
 Route A CLI 名称、路径、参数、cwd fail-closed 校验
 legacy relay 同步拒绝任意 CLI 和内置 runtime
+Route B/C 即使开启 full_access，也不会放宽本机 run_command 命令白名单；Git 推送会继续拒绝 --force / --delete / --mirror / --all / --tags / +refspec / :branch 等高危参数，正常 HEAD:main 推送仍可审批执行
 ```
 
 还不能说完全等同 Codex Desktop。下一步必须补：

@@ -814,6 +814,9 @@ fn command_allowed(command: &str) -> bool {
     if blocked.iter().any(|pattern| lower.contains(pattern)) {
         return false;
     }
+    if legacy_git_push_has_high_risk_args(&lower) {
+        return false;
+    }
     let allowed_prefixes = [
         "git status",
         "git diff",
@@ -939,10 +942,37 @@ fn git_args_allowed(args: &[String]) -> bool {
     };
     match first {
         "status" | "diff" | "log" | "show" | "branch" | "remote" | "fetch" | "add" | "commit"
-        | "push" => true,
+        | "push" => first != "push" || !git_push_args_high_risk(args),
         "pull" => args.iter().any(|arg| arg == "--ff-only"),
         _ => false,
     }
+}
+
+fn legacy_git_push_has_high_risk_args(command: &str) -> bool {
+    let mut parts = command.split_whitespace();
+    if parts.next() != Some("git") || parts.next() != Some("push") {
+        return false;
+    }
+    parts.any(high_risk_git_push_arg)
+}
+
+fn git_push_args_high_risk(args: &[String]) -> bool {
+    args.iter()
+        .skip(1)
+        .any(|arg| high_risk_git_push_arg(arg.as_str()))
+}
+
+fn high_risk_git_push_arg(arg: &str) -> bool {
+    let lower = arg.trim().to_ascii_lowercase();
+    if lower.is_empty() {
+        return true;
+    }
+    matches!(
+        lower.as_str(),
+        "-f" | "-d" | "--delete" | "--mirror" | "--all" | "--tags" | "--prune"
+    ) || lower.starts_with("--force")
+        || lower.starts_with('+')
+        || lower.starts_with(':')
 }
 
 fn package_manager_args_allowed(args: &[String], run_required: bool) -> bool {
@@ -1039,6 +1069,7 @@ mod tests {
     #[test]
     fn command_policy_allows_project_checks() {
         assert!(command_allowed("git status --short"));
+        assert!(command_allowed("git push origin HEAD:main"));
         assert!(command_allowed("cargo check"));
         assert!(command_allowed("npm run build"));
         assert!(command_allowed("pnpm run typecheck"));
@@ -1059,6 +1090,9 @@ mod tests {
             "cargo test --manifest-path C:\\outside\\Cargo.toml"
         ));
         assert!(!command_allowed("npm run build `n Remove-Item -Recurse ."));
+        assert!(!command_allowed("git push --force origin main"));
+        assert!(!command_allowed("git push origin :main"));
+        assert!(!command_allowed("git push --mirror origin"));
     }
 
     #[test]
@@ -1066,6 +1100,14 @@ mod tests {
         assert!(structured_command_allowed(
             "git",
             &["status".to_string(), "--short".to_string()]
+        ));
+        assert!(structured_command_allowed(
+            "git",
+            &[
+                "push".to_string(),
+                "origin".to_string(),
+                "HEAD:main".to_string()
+            ]
         ));
         assert!(structured_command_allowed(
             "cargo",
@@ -1102,6 +1144,30 @@ mod tests {
         assert!(!structured_command_allowed(
             "rustfmt",
             &["src/../main.rs".to_string()]
+        ));
+        assert!(!structured_command_allowed(
+            "git",
+            &[
+                "push".to_string(),
+                "--force".to_string(),
+                "origin".to_string()
+            ]
+        ));
+        assert!(!structured_command_allowed(
+            "git",
+            &[
+                "push".to_string(),
+                "origin".to_string(),
+                ":main".to_string()
+            ]
+        ));
+        assert!(!structured_command_allowed(
+            "git",
+            &[
+                "push".to_string(),
+                "origin".to_string(),
+                "+HEAD:main".to_string()
+            ]
         ));
     }
 
