@@ -127,9 +127,9 @@ function New-Fb2ContextFormatRouteValidation {
 
     Add-Fb2FormatCheck $checks `
         "handoff records current fb2 repository coordination evidence" `
-        (Test-Fb2FormatAllTokens $texts.handoff @("7b712780", "fb2_context_retrieval_trace_v1", "fb2_p4_lite_candidate_retrieval_v1", "answer-time", "refresh")) `
+        (Test-Fb2FormatAllTokens $texts.handoff @("1b0cdc2b", "01972c2d", "fbe2c857", "opinion_result_review_surface", "ready_quality_threshold_passed", "final gate topic", "answer-time", "refresh")) `
         $files.handoff `
-        "Handoff must record the current fb2 side progress and answer-time refresh boundary."
+        "Handoff must record the current fb2 side progress, review-quality readiness, final gate topic, and answer-time refresh boundary."
 
     Add-Fb2FormatCheck $checks `
         "data-tools define domain route and retrieval evidence" `
@@ -191,7 +191,7 @@ function New-Fb2ContextFormatRouteValidation {
             no_business_data_copy_to_main_project = $true
             required_evidence_shape = "fb2.retrieval_evidence_item.v1"
             required_query_intent = "fb2.context_query_intent.v1"
-            latest_fb2_coordination = "read_context_retrieval_trace_and_p4_lite_reports_but_do_not_run_maintenance_refresh_during_answer_generation"
+            latest_fb2_coordination = "read_context_retrieval_trace_p4_lite_reports_and_opinion_result_review_quality_but_do_not_run_maintenance_refresh_during_answer_generation"
         }
         note = "Guards the fb2 AI Center context-format route derived from repo-map and symbol-index guidance: clean XML-wrapped Markdown for model-readable business projection, compact JSON metadata for machines, REST Context Pack first, MCP/RAG only as later wrappers."
     }
@@ -238,7 +238,7 @@ rest_context_pack_plus_tool_manifest_plus_tools_execute fb2_context_pack retriev
 index_guides_rest_context_pack_and_tool_manifest project_to_xml_wrapped_markdown_context_pack retrieval_evidence_output_shape stores_fb2_business_data_in_main_project
 fb2.context_query_intent.v1 topic_hint requested_indexes permission_scope retrieval_evidence_items_reference_query_intent
 domainDataBlueprint.context_format
-fb2_context_retrieval_trace_v1 fb2_p4_lite_candidate_retrieval_v1 match_context_index answer_time_refresh_allowed=false maintenance_rest 7b712780 answer-time refresh
+fb2_context_retrieval_trace_v1 fb2_p4_lite_candidate_retrieval_v1 match_context_index answer_time_refresh_allowed=false maintenance_rest 1b0cdc2b 01972c2d fbe2c857 opinion_result_review_surface ready_quality_threshold_passed final gate topic answer-time refresh
 "@
     foreach ($relativePath in @(
             "docs\repo map模块问题\repo map格式建议.md",

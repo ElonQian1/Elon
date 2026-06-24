@@ -11,7 +11,7 @@
 - fb2 不应该复制主项目内部聊天页代码。Android 原生侧优先接 `android/chat-voice-kit`，H5/WebView 侧按 `ChatVoiceInteractionContract` 还原。
 - 当前非语音 live 数据预检可由主项目 token bridge 证明，但 bridge 证据必须同时证明 no-write、direct-no-proxy、service token 不进 argv/output、fb2 密码不进子进程 argv。旧 bridge 结果如果缺少 `fb2_password_passed_to_child_argv=false`，`status-refresh-current.json.protected_live_preflight_satisfied` 会保持 `false`，下一步是用当前进程环境变量 `FB2_VISIBLE_SMOKE_PASSWORD` 重跑 no-write bridge；加 `-RunCurrentStateAfter` 时，bridge 会先刷新 authenticated contract smoke canonical summary，再清掉 service token 跑 tokenless current-state。ASR/TTS 仍按用户暂停状态等待恢复。
 - 访问主项目/fb2 项目资源默认不走代理；状态脚本应清空常见 proxy 环境变量、设置 `NO_PROXY/no_proxy=*`，并在 PowerShell HTTP 请求使用 `-NoProxy`。
-- 2026-06-24 子项目最新协作状态：fb2 `origin/main` 已推进到 `7b712780 fix(ai-context): require explicit match index refresh`，近期提交在做 `fb2_context_retrieval_trace_v1`、`fb2_p4_lite_candidate_retrieval_v1`、P4-lite 候选召回守门、公开比赛 `match_context_index` 显式小窗口刷新和质量/观点记忆证据。主项目本阶段只消费 Context Pack、tool manifest 和 read-only tools；`answer_time_refresh_allowed=false`、`maintenance_rest` refresh 工具不得放进普通回答链路。
+- 2026-06-24 子项目最新协作状态：fb2 `origin/main` 已推进到 `1b0cdc2b fix(ai-context): align final gate topic`。最新三个关键 checkpoint 是 `01972c2d feat(ai-context): add 123qwe public review quality drill`、`fbe2c857 test(ai-context): cover match index dry run`、`1b0cdc2b fix(ai-context): align final gate topic`：公开群 `123qwe` 复盘质量 drill 已让 `opinion_result_review_surface=ready_quality_threshold_passed`，公开比赛 `match_context_index` 维护刷新有 dry-run 自测防退化，最终验收默认 topic 已对齐真实中文业务问题“今天比赛怎么看”。主项目本阶段只消费 Context Pack、tool manifest、read-only tools、retrieval trace、P4-lite/report 和复盘质量 summary；`answer_time_refresh_allowed=false`、`maintenance_rest` refresh 工具不得放进普通回答链路。
 
 ## 双项目协作方式
 
@@ -20,6 +20,7 @@
 - 两边可以由同一个 Codex 会话分别修改，但必须分别遵守各自 `AGENTS.md`、各自 worktree、各自提交/发布脚本；不要在主项目 worktree 里直接改 fb2，也不要把 fb2 业务表结构硬编码进主项目。
 - 跨会话沟通以仓库证据为准：先看 `origin/main`、`docs/FB2_MAIN_PROJECT_AI_CONTEXT.md`、`docs/MAIN_PROJECT_CONTEXT_PACK_CONTRACT.md`、`docs/AI_CONTEXT_24X7_OPERATIONS.md`、`docs/fb2-ai-center/README.md`、`PROGRESS.md` 和工具 manifest；只有契约或 owner 边界不一致时，再给子会话发送明确清单。
 - 主项目对 fb2 最新 P4-lite 能力的处理规则：可以读取 `fb2_context_retrieval_trace_v1` 和 `fb2_p4_lite_candidate_retrieval_v1` 报告来解释“为什么 AI 没拿到某条比赛/订单/群观点”；不得把 `match_context_index`、odds snapshot、opinion memory refresh 等维护作业放进用户回答时自动执行。
+- 主项目对 fb2 最新复盘质量能力的处理规则：可以规划 `opinion_result_review_summary` / `opinion_result_reviews` 来说明历史观点复盘质量、样本量和采纳情况；只能把它们描述为历史质量/学习证据，不得写成未来比赛事实或投注命中承诺。
 
 ## 已有主项目能力
 
