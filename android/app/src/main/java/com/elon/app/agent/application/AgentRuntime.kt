@@ -445,8 +445,45 @@ class AgentRuntime(
     }
     
     private fun checkGoalCompletion(screen: UINode): Boolean {
-        // 检查完成条件
-        return false
+        val condition = currentGoal?.completionCondition ?: return false
+        return when (condition) {
+            is CompletionCondition.ElementAppears -> screen.containsVisibleToken(condition.text)
+            is CompletionCondition.ElementDisappears -> !screen.containsVisibleToken(condition.text)
+            is CompletionCondition.ReachPage -> {
+                val tokens = screen.collectVisibleTokens()
+                tokens.any { it.contains(condition.packageName, ignoreCase = true) } &&
+                    tokens.any { it.contains(condition.activityName, ignoreCase = true) }
+            }
+            is CompletionCondition.Custom -> condition.predicate(
+                ScreenSnapshot(
+                    timestamp = System.currentTimeMillis(),
+                    packageName = null,
+                    activityName = null,
+                    elements = screen.collectVisibleTokens()
+                )
+            )
+            CompletionCondition.AIDecided -> false
+        }
+    }
+
+    private fun UINode.containsVisibleToken(expected: String): Boolean {
+        if (expected.isBlank()) return false
+        return collectVisibleTokens().any { token ->
+            token.contains(expected, ignoreCase = true)
+        }
+    }
+
+    private fun UINode.collectVisibleTokens(): List<String> {
+        val tokens = mutableListOf<String>()
+        fun visit(node: UINode) {
+            listOf(node.text, node.contentDescription, node.resourceId, node.className)
+                .filterNotNull()
+                .filter { it.isNotBlank() }
+                .forEach { tokens.add(it) }
+            node.children.forEach(::visit)
+        }
+        visit(this)
+        return tokens
     }
     
     fun getSnapshot(): AgentSnapshot {
