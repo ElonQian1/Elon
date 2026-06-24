@@ -9,6 +9,7 @@ $ServerCargo = Join-Path $RepoRoot "server\Cargo.toml"
 $RuntimeChoiceModule = Join-Path $RepoRoot "server\src\pc_agent_runtime_choice.rs"
 $RouteCStatusModule = Join-Path $RepoRoot "server\src\node_agent_route_c_status.rs"
 $ServerRuntimeModule = Join-Path $RepoRoot "server\src\server_agent_runtime.rs"
+$RuntimeStatusModule = Join-Path $RepoRoot "server\src\server_agent_runtime_status.rs"
 $GuardModule = Join-Path $RepoRoot "server\src\server_agent_runtime_guard.rs"
 $BudgetModule = Join-Path $RepoRoot "server\src\server_agent_runtime_budget.rs"
 $BudgetLedgerModule = Join-Path $RepoRoot "server\src\store\route_c_budget.rs"
@@ -81,9 +82,13 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Needle "unsupported_agent_usage_mode" `
         -Message "Server Route C status must expose unsupported agent usage mode"
     Assert-FileContains `
-        -Path $ServerRuntimeModule `
+        -Path $RuntimeStatusModule `
         -Needle "agentPolicy" `
         -Message "Server Route C status must expose structured agent selection policy"
+    Assert-FileContains `
+        -Path $RuntimeStatusModule `
+        -Needle "runtime_status_serializes_agent_policy_for_operations" `
+        -Message "Server Route C status must test serialized agentPolicy visibility"
     Assert-FileContains `
         -Path $RouteCStatusModule `
         -Needle "agentPolicy" `
@@ -128,6 +133,14 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Path $RouteCAdminModule `
         -Needle "outcomeSummaries" `
         -Message "Route C admin budget report must return outcome summaries"
+    Assert-FileContains `
+        -Path $RouteCAdminModule `
+        -Needle "actionItems" `
+        -Message "Route C admin budget report must return operator action items"
+    Assert-FileContains `
+        -Path $RouteCAdminModule `
+        -Needle "route_c_operation_action_items_surface_budget_and_stale_pending" `
+        -Message "Route C admin action items must test stale pending and budget exhaustion"
     Write-Host "Static Route C runtime guard contract passed."
 }
 
