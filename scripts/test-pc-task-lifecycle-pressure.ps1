@@ -83,6 +83,10 @@ Invoke-Step "Static pressure-test contract" {
         -Message "Task resume contract must distinguish approval waiters lost after restart"
     Assert-FileContains `
         -Path $PressureModule `
+        -Needle "approval_checkpoint" `
+        -Message "Restart waiting-approval pressure test must prove persisted approval checkpoints survive replay"
+    Assert-FileContains `
+        -Path $PressureModule `
         -Needle "stress_active_registry_rejects_duplicate_handles_and_cleans_up" `
         -Message "Active registry duplicate-handle pressure test is missing"
     Assert-FileContains `

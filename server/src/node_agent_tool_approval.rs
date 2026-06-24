@@ -9,6 +9,8 @@ use std::{
 
 use tokio::sync::{watch, RwLock};
 
+pub(crate) const TOOL_APPROVAL_TIMEOUT_SECS: u64 = 30 * 60;
+
 #[derive(Clone, Default)]
 pub(crate) struct ToolApprovalState {
     pending: Arc<RwLock<HashMap<String, PendingToolApproval>>>,
@@ -26,37 +28,47 @@ struct PendingToolApproval {
     req_id: String,
     approval_id: String,
     registered_at_ms: u128,
+    expires_at_ms: u128,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct PendingToolApprovalView {
     pub approval_id: String,
     pub registered_at_ms: u128,
+    pub expires_at_ms: u128,
 }
 
 pub(crate) struct ToolApprovalWaiter {
     key: String,
     rx: watch::Receiver<Option<ToolApprovalDecision>>,
     state: ToolApprovalState,
+    registered_at_ms: u128,
+    expires_at_ms: u128,
 }
 
 impl ToolApprovalState {
     pub(crate) async fn register(&self, req_id: &str, approval_id: &str) -> ToolApprovalWaiter {
         let key = approval_key(req_id, approval_id);
         let (tx, rx) = watch::channel(None);
+        let registered_at_ms = now_ms();
+        let expires_at_ms =
+            registered_at_ms.saturating_add(u128::from(TOOL_APPROVAL_TIMEOUT_SECS) * 1_000);
         self.pending.write().await.insert(
             key.clone(),
             PendingToolApproval {
                 tx,
                 req_id: req_id.to_string(),
                 approval_id: approval_id.to_string(),
-                registered_at_ms: now_ms(),
+                registered_at_ms,
+                expires_at_ms,
             },
         );
         ToolApprovalWaiter {
             key,
             rx,
             state: self.clone(),
+            registered_at_ms,
+            expires_at_ms,
         }
     }
 
@@ -81,6 +93,7 @@ impl ToolApprovalState {
             .map(|pending| PendingToolApprovalView {
                 approval_id: pending.approval_id.clone(),
                 registered_at_ms: pending.registered_at_ms,
+                expires_at_ms: pending.expires_at_ms,
             })
             .collect();
         approvals.sort_by(|left, right| {
@@ -116,6 +129,14 @@ impl ToolApprovalWaiter {
 
     pub(crate) fn decision(&self) -> Option<ToolApprovalDecision> {
         self.rx.borrow().clone()
+    }
+
+    pub(crate) fn registered_at_ms(&self) -> u128 {
+        self.registered_at_ms
+    }
+
+    pub(crate) fn expires_at_ms(&self) -> u128 {
+        self.expires_at_ms
     }
 
     pub(crate) async fn cleanup(&self) {
@@ -177,12 +198,15 @@ mod tests {
     #[tokio::test]
     async fn pending_for_req_lists_only_live_waiters() {
         let state = ToolApprovalState::default();
-        let _first = state.register("req", "tap_1_1").await;
+        let first = state.register("req", "tap_1_1").await;
         let _other = state.register("other", "tap_2_1").await;
 
         let pending = state.pending_for_req("req").await;
         assert_eq!(pending.len(), 1);
         assert_eq!(pending[0].approval_id, "tap_1_1");
+        assert_eq!(pending[0].registered_at_ms, first.registered_at_ms());
+        assert_eq!(pending[0].expires_at_ms, first.expires_at_ms());
+        assert!(pending[0].expires_at_ms > pending[0].registered_at_ms);
 
         assert!(state.decide("req", "tap_1_1", "deny").await);
         assert!(state.pending_for_req("req").await.is_empty());

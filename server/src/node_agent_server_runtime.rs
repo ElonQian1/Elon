@@ -6,9 +6,10 @@ use crate::{
         requires_tool_approval, wait_for_tool_approval, ApprovalOutcome,
     },
     node_agent_runtime_events::{
-        runtime_status_chunk, runtime_summary_chunk, tool_approval_decision_chunk,
-        tool_approval_id, tool_approval_required_chunk, tool_approval_required_chunk_with_diff,
-        tool_call_chunk, tool_name, tool_result_chunk,
+        runtime_status_chunk, runtime_summary_chunk, tool_approval_checkpoint,
+        tool_approval_decision_chunk, tool_approval_id,
+        tool_approval_required_chunk_with_diff_and_checkpoint, tool_call_chunk, tool_name,
+        tool_result_chunk,
     },
     node_agent_task_journal::TaskJournal,
     node_agent_tool_approval::ToolApprovalState,
@@ -511,21 +512,37 @@ where
                     task_journal.as_ref(),
                     req_id,
                     match approval_diff.as_ref() {
-                        Some(diff) => tool_approval_required_chunk_with_diff(
+                        Some(diff) => tool_approval_required_chunk_with_diff_and_checkpoint(
                             req_id,
                             turn,
                             tool_index,
                             &approval_id,
                             &action,
                             diff.clone(),
+                            tool_approval_checkpoint(
+                                &action,
+                                diff,
+                                waiter.registered_at_ms(),
+                                waiter.expires_at_ms(),
+                            ),
                         ),
-                        None => tool_approval_required_chunk(
-                            req_id,
-                            turn,
-                            tool_index,
-                            &approval_id,
-                            &action,
-                        ),
+                        None => {
+                            let diff = Value::Null;
+                            tool_approval_required_chunk_with_diff_and_checkpoint(
+                                req_id,
+                                turn,
+                                tool_index,
+                                &approval_id,
+                                &action,
+                                diff.clone(),
+                                tool_approval_checkpoint(
+                                    &action,
+                                    &diff,
+                                    waiter.registered_at_ms(),
+                                    waiter.expires_at_ms(),
+                                ),
+                            )
+                        }
                     },
                 );
                 match wait_for_tool_approval(&mut waiter, &mut cancel_rx).await {
@@ -1821,6 +1838,31 @@ mod tests {
         let approval = next_tool_event(&mut out_rx, "tool_approval_required").await;
         assert_eq!(approval["approval_id"], "tap_1_1");
         assert_eq!(approval["tool"], "write_file");
+        assert_eq!(
+            approval["approval_checkpoint"]["schema"],
+            "elon.routebc.tool_approval_checkpoint.v1"
+        );
+        assert_eq!(
+            approval["approval_checkpoint"]["restart_recovery"]["next_action"],
+            "continue_from_snapshot"
+        );
+        assert_eq!(
+            approval["approval_checkpoint"]["restart_recovery"]["supported"].as_bool(),
+            Some(false)
+        );
+        assert!(
+            approval["approval_checkpoint"]["action_sha256"]
+                .as_str()
+                .unwrap_or_default()
+                .len()
+                >= 64
+        );
+        assert!(
+            !serde_json::to_string(&approval["approval_checkpoint"])
+                .unwrap()
+                .contains("should not be written"),
+            "approval checkpoint must not store write_file content"
+        );
         cancel_tx.send(true).expect("cancel should reach runtime");
 
         let decision = next_tool_event(&mut out_rx, "tool_approval_decision").await;
@@ -1840,6 +1882,19 @@ mod tests {
         let snapshot = task_journal
             .snapshot(&req_id, 0, 20)
             .expect("approval decision should be replayable from local journal");
+        assert_eq!(snapshot.approvals.approvals.len(), 1);
+        let checkpoint = snapshot.approvals.approvals[0]
+            .checkpoint
+            .as_ref()
+            .expect("approval checkpoint should persist through task journal");
+        assert_eq!(
+            checkpoint["schema"],
+            "elon.routebc.tool_approval_checkpoint.v1"
+        );
+        assert_eq!(
+            checkpoint["restart_recovery"]["next_action"],
+            "continue_from_snapshot"
+        );
         assert!(snapshot.events.iter().any(|entry| {
             entry.event.get("type").and_then(Value::as_str) == Some("tool_event")
                 && entry

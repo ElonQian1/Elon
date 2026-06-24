@@ -1,6 +1,8 @@
 // server/src/node_agent_runtime_events.rs
 
-use crate::node_agent_tool_guard::truncate_chars;
+use crate::{
+    node_agent_tool_approval::TOOL_APPROVAL_TIMEOUT_SECS, node_agent_tool_guard::truncate_chars,
+};
 use serde_json::{json, Map, Value};
 use sha2::{Digest, Sha256};
 
@@ -133,8 +135,71 @@ pub(crate) fn tool_approval_required_chunk_with_diff(
     action: &Value,
     diff: Value,
 ) -> String {
+    tool_approval_required_chunk_inner(req_id, turn, index, approval_id, action, diff, None)
+}
+
+pub(crate) fn tool_approval_required_chunk_with_diff_and_checkpoint(
+    req_id: &str,
+    turn: usize,
+    index: usize,
+    approval_id: &str,
+    action: &Value,
+    diff: Value,
+    checkpoint: Value,
+) -> String {
+    tool_approval_required_chunk_inner(
+        req_id,
+        turn,
+        index,
+        approval_id,
+        action,
+        diff,
+        Some(checkpoint),
+    )
+}
+
+pub(crate) fn tool_approval_checkpoint(
+    action: &Value,
+    diff: &Value,
+    registered_at_ms: u128,
+    expires_at_ms: u128,
+) -> Value {
+    let diff_fingerprint = diff_fingerprint(diff);
+    json!({
+        "schema": "elon.routebc.tool_approval_checkpoint.v1",
+        "registered_at_ms": registered_at_ms,
+        "expires_at_ms": expires_at_ms,
+        "timeout_secs": TOOL_APPROVAL_TIMEOUT_SECS,
+        "action_sha256": sha256_json(action),
+        "diff_sha256": sha256_json(&diff_fingerprint),
+        "diff_fingerprint": diff_fingerprint,
+        "restart_recovery": {
+            "supported": false,
+            "next_action": "continue_from_snapshot",
+            "reason": "审批请求已持久化安全指纹，但节点重启后仍需重新校验任务、工作区和工具请求后才能开放续批。"
+        },
+        "revalidate_before_execute": [
+            "approval_id",
+            "task_id",
+            "workspace_path",
+            "action_sha256",
+            "diff_sha256",
+            "tool_guard_policy"
+        ]
+    })
+}
+
+fn tool_approval_required_chunk_inner(
+    req_id: &str,
+    turn: usize,
+    index: usize,
+    approval_id: &str,
+    action: &Value,
+    diff: Value,
+    checkpoint: Option<Value>,
+) -> String {
     let tool = tool_name(action);
-    let event = json!({
+    let mut event = json!({
         "type": "tool_approval_required",
         "schema": "elon.routebc.tool_approval.v1",
         "req_id": req_id,
@@ -148,6 +213,9 @@ pub(crate) fn tool_approval_required_chunk_with_diff(
         "index": index,
         "status": "pending"
     });
+    if let Some(checkpoint) = checkpoint {
+        event["approval_checkpoint"] = checkpoint;
+    }
     event_line(event)
 }
 
@@ -278,6 +346,23 @@ fn diff_preview(action: &Value) -> Value {
     })
 }
 
+fn diff_fingerprint(diff: &Value) -> Value {
+    match diff {
+        Value::Object(map) => {
+            let mut out = Map::new();
+            for (key, value) in map {
+                if key == "preview" {
+                    out.insert("preview_removed".to_string(), Value::Bool(true));
+                    continue;
+                }
+                out.insert(key.clone(), value.clone());
+            }
+            Value::Object(out)
+        }
+        _ => diff.clone(),
+    }
+}
+
 fn tool_risk(tool: &str) -> &'static str {
     match tool {
         "run_command" => "command",
@@ -289,6 +374,13 @@ fn tool_risk(tool: &str) -> &'static str {
 fn sha256_hex(text: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(text.as_bytes());
+    hex::encode(hasher.finalize())
+}
+
+fn sha256_json(value: &Value) -> String {
+    let bytes = serde_json::to_vec(value).unwrap_or_default();
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
     hex::encode(hasher.finalize())
 }
 
@@ -369,8 +461,9 @@ fn is_secret_key(key: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        runtime_status_chunk, runtime_summary_chunk, tool_approval_required_chunk,
-        tool_approval_required_chunk_with_diff, tool_call_chunk, tool_result_chunk,
+        runtime_status_chunk, runtime_summary_chunk, tool_approval_checkpoint,
+        tool_approval_required_chunk, tool_approval_required_chunk_with_diff,
+        tool_approval_required_chunk_with_diff_and_checkpoint, tool_call_chunk, tool_result_chunk,
     };
     use serde_json::{json, Value};
 
@@ -536,5 +629,58 @@ mod tests {
         assert_eq!(event["diff"]["source"], "write_file");
         assert_eq!(event["diff"]["files"][0], "src/main.rs");
         assert!(event["diff"]["preview"].as_str().unwrap().contains("+new"));
+    }
+
+    #[test]
+    fn approval_checkpoint_hashes_action_without_exposing_write_content() {
+        let action = json!({
+            "tool": "write_file",
+            "path": "src/main.rs",
+            "content": "new secret body"
+        });
+        let diff = json!({
+            "format": "unified",
+            "source": "write_file",
+            "preview": "--- a/src/main.rs\n+++ b/src/main.rs\n-old\n+new secret body\n",
+            "truncated": false,
+            "files": ["src/main.rs"],
+            "new_sha256": "b".repeat(64)
+        });
+        let checkpoint = tool_approval_checkpoint(&action, &diff, 100, 200);
+        let checkpoint_text = serde_json::to_string(&checkpoint).unwrap();
+
+        assert_eq!(
+            checkpoint["schema"],
+            "elon.routebc.tool_approval_checkpoint.v1"
+        );
+        assert_eq!(checkpoint["registered_at_ms"], 100);
+        assert_eq!(checkpoint["expires_at_ms"], 200);
+        assert_eq!(
+            checkpoint["restart_recovery"]["next_action"],
+            "continue_from_snapshot"
+        );
+        assert_eq!(
+            checkpoint["restart_recovery"]["supported"].as_bool(),
+            Some(false)
+        );
+        assert!(checkpoint["action_sha256"].as_str().unwrap().len() >= 64);
+        assert!(checkpoint["diff_sha256"].as_str().unwrap().len() >= 64);
+        assert_eq!(
+            checkpoint["diff_fingerprint"]["preview_removed"].as_bool(),
+            Some(true)
+        );
+        assert!(!checkpoint_text.contains("new secret body"));
+
+        let line = tool_approval_required_chunk_with_diff_and_checkpoint(
+            "req", 1, 2, "tap_1_2", &action, diff, checkpoint,
+        );
+        let event: Value = serde_json::from_str(line.trim()).unwrap();
+        assert_eq!(
+            event["approval_checkpoint"]["schema"],
+            "elon.routebc.tool_approval_checkpoint.v1"
+        );
+        assert!(!serde_json::to_string(&event["approval_checkpoint"])
+            .unwrap()
+            .contains("new secret body"));
     }
 }

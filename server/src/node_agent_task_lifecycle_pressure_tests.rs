@@ -601,7 +601,18 @@ async fn stress_restart_waiting_approvals_fall_back_to_snapshot_continue() {
                     "type": "tool_approval_required",
                     "approval_id": approval_id,
                     "tool": "write_file",
-                    "status": "waiting_approval"
+                    "status": "waiting_approval",
+                    "approval_checkpoint": {
+                        "schema": "elon.routebc.tool_approval_checkpoint.v1",
+                        "registered_at_ms": 10_000 + task_index,
+                        "expires_at_ms": 20_000 + task_index,
+                        "action_sha256": "a".repeat(64),
+                        "diff_sha256": "b".repeat(64),
+                        "restart_recovery": {
+                            "supported": false,
+                            "next_action": "continue_from_snapshot"
+                        }
+                    }
                 }))
                 .expect("approval event should serialize"),
             )
@@ -683,6 +694,23 @@ async fn stress_restart_waiting_approvals_fall_back_to_snapshot_continue() {
             .expect("waiting approval snapshot should replay after restart");
         assert_eq!(snapshot.approvals.pending_count, 1);
         assert_eq!(snapshot.approvals.approvals[0].approval_id, approval_id);
+        let checkpoint = snapshot.approvals.approvals[0]
+            .checkpoint
+            .as_ref()
+            .expect("approval checkpoint should survive restart replay");
+        assert_eq!(
+            checkpoint["schema"],
+            "elon.routebc.tool_approval_checkpoint.v1"
+        );
+        assert_eq!(
+            checkpoint["restart_recovery"]["next_action"],
+            "continue_from_snapshot"
+        );
+        assert_eq!(
+            checkpoint["restart_recovery"]["supported"].as_bool(),
+            Some(false),
+            "checkpoint persistence must not claim restart approval is safe yet"
+        );
         let resume_with_journal =
             task_resume_contract_with_journal_approvals(&attach, &snapshot.approvals);
         let resume_with_journal_json =
@@ -703,6 +731,7 @@ async fn stress_restart_waiting_approvals_fall_back_to_snapshot_continue() {
         assert_eq!(approval_state.actionable_count, 0);
         assert_eq!(approval_state.unavailable_count, 1);
         assert_eq!(approval_state.approvals[0].status, "unavailable");
+        assert!(approval_state.approvals[0].checkpoint.is_some());
         assert!(!approval_state.approvals[0].actionable);
         assert!(snapshot.events.iter().any(|event| {
             event.event.get("type").and_then(Value::as_str) == Some("tool_event")
@@ -1118,6 +1147,12 @@ async fn stress_tool_approval_state_keeps_waiters_scoped_and_single_consume() {
         assert!(pending.iter().all(|approval| approval
             .approval_id
             .starts_with(&format!("tap_{task_index}_"))));
+        assert!(
+            pending
+                .iter()
+                .all(|approval| approval.expires_at_ms > approval.registered_at_ms),
+            "pending approvals should expose a bounded expiry for UI/recovery checks"
+        );
     }
 
     let consumed_count = Arc::new(AtomicUsize::new(0));

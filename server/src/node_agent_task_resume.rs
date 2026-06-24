@@ -497,6 +497,7 @@ mod tests {
             pending_approvals: vec![PendingToolApprovalView {
                 approval_id: "tap_1_1".to_string(),
                 registered_at_ms: 3,
+                expires_at_ms: 30_003,
             }],
         }
     }

@@ -15,6 +15,7 @@ pub(crate) struct TaskApprovalJournalItem {
     pub tool: Option<String>,
     pub status: &'static str,
     pub decision: Option<String>,
+    pub checkpoint: Option<Value>,
     pub required_seq: Option<usize>,
     pub decision_seq: Option<usize>,
 }
@@ -37,6 +38,7 @@ pub(crate) struct TaskApprovalStateItem {
     pub actionable: bool,
     pub next_action: &'static str,
     pub requires_new_task: bool,
+    pub checkpoint: Option<Value>,
     pub label: &'static str,
     pub tone: &'static str,
     pub meta: &'static str,
@@ -56,6 +58,7 @@ struct ApprovalAccumulator {
     required_seq: Option<usize>,
     decision_seq: Option<usize>,
     decision: Option<String>,
+    checkpoint: Option<Value>,
 }
 
 impl TaskApprovalJournalTracker {
@@ -107,6 +110,9 @@ impl TaskApprovalJournalTracker {
         entry.required_seq = Some(entry.required_seq.map_or(seq, |current| current.min(seq)));
         if entry.tool.as_deref().unwrap_or_default().is_empty() {
             entry.tool = optional_string(event.get("tool"));
+        }
+        if entry.checkpoint.is_none() {
+            entry.checkpoint = approval_checkpoint(event);
         }
     }
 
@@ -203,6 +209,7 @@ impl ApprovalAccumulator {
             tool: self.tool,
             status,
             decision: self.decision,
+            checkpoint: self.checkpoint,
             required_seq: self.required_seq,
             decision_seq: self.decision_seq,
         }
@@ -223,6 +230,7 @@ fn state_item(
         actionable,
         next_action: policy.next_action,
         requires_new_task: policy.requires_new_task,
+        checkpoint: approval.checkpoint.clone(),
         label: policy.label,
         tone: policy.tone,
         meta: policy.meta,
@@ -351,6 +359,14 @@ fn approval_id(event: &Value) -> Option<&str> {
         .filter(|value| !value.is_empty())
 }
 
+fn approval_checkpoint(event: &Value) -> Option<Value> {
+    event
+        .get("approval_checkpoint")
+        .or_else(|| event.get("approvalCheckpoint"))
+        .filter(|value| value.is_object())
+        .cloned()
+}
+
 fn optional_string(value: Option<&Value>) -> Option<String> {
     value
         .and_then(Value::as_str)
@@ -450,6 +466,47 @@ mod tests {
         assert!(!state.approvals[0].actionable);
         assert_eq!(state.approvals[0].next_action, "continue_from_snapshot");
         assert!(state.approvals[0].requires_new_task);
+    }
+
+    #[test]
+    fn required_approval_keeps_restart_checkpoint() {
+        let mut tracker = TaskApprovalJournalTracker::default();
+        tracker.observe_event(
+            1,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_1_1",
+                "tool": "write_file",
+                "approval_checkpoint": {
+                    "schema": "elon.routebc.tool_approval_checkpoint.v1",
+                    "registered_at_ms": 10,
+                    "expires_at_ms": 20,
+                    "action_sha256": "a".repeat(64),
+                    "restart_recovery": {
+                        "supported": false,
+                        "next_action": "continue_from_snapshot"
+                    }
+                }
+            }),
+        );
+
+        let snapshot = tracker.finish();
+        assert_eq!(
+            snapshot.approvals[0].checkpoint.as_ref().unwrap()["schema"],
+            "elon.routebc.tool_approval_checkpoint.v1"
+        );
+
+        let state = snapshot.resolve_runtime_state_for_task_status(&[], false, None);
+        let checkpoint = state.approvals[0]
+            .checkpoint
+            .as_ref()
+            .expect("checkpoint should be exposed to local task journal API");
+        assert_eq!(checkpoint["expires_at_ms"], 20);
+        assert_eq!(
+            checkpoint["restart_recovery"]["next_action"],
+            "continue_from_snapshot"
+        );
+        assert_eq!(state.approvals[0].next_action, "continue_from_snapshot");
     }
 
     #[test]

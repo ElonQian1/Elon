@@ -6,11 +6,11 @@ use serde_json::Value;
 use tokio::sync::watch;
 
 use crate::{
-    node_agent_tool_approval::{ToolApprovalDecision, ToolApprovalWaiter},
+    node_agent_tool_approval::{
+        ToolApprovalDecision, ToolApprovalWaiter, TOOL_APPROVAL_TIMEOUT_SECS,
+    },
     node_agent_tool_guard::ToolGuard,
 };
-
-const TOOL_APPROVAL_TIMEOUT_SECS: u64 = 30 * 60;
 
 pub(crate) enum ApprovalOutcome {
     Approved,
