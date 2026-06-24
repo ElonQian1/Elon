@@ -1398,6 +1398,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcNodeAdminJsForMaintenance.includes('exportClientDiagnostics'), 'PC node admin module should wire the diagnostics export action');
   assert.ok(pcNodeAdminJsForMaintenance.includes('/api/client-maintenance/repair'), 'PC node admin module should repair the Windows client through local node');
   assert.ok(pcNodeAdminJsForMaintenance.includes('repairClient'), 'PC node admin module should wire the client repair action');
+  assert.ok(pcNodeAdminJsForMaintenance.includes('maintenance_overview'), 'PC node admin should read the productized client maintenance overview');
+  assert.ok(pcNodeAdminJsForMaintenance.includes('overview.primary_action_label'), 'PC node admin should display the overview primary action');
   assert.ok(pcApp.includes('elon-node://repair'), 'PC app should fall back to the Windows repair protocol');
   const pcClientMaintenanceJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_client_maintenance.js'), 'utf8');
   assert.ok(pcClientMaintenanceJs.includes('/api/client-maintenance/open'), 'PC client maintenance module should open maintenance targets through local node');
@@ -1409,6 +1411,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcClientMaintenanceJs.includes('/api/client-maintenance/repair'), 'PC client maintenance module should repair the Windows client through local node');
   assert.ok(pcApp.includes('settingsClientActions'), 'PC settings should render local maintenance action availability');
   assert.ok(pcApp.includes('renderClientMaintenanceActions'), 'PC app should render maintenance_actions from local node');
+  assert.ok(pcApp.includes('maintenance_overview'), 'PC settings should read the productized Windows client maintenance overview');
+  assert.ok(pcApp.includes('overview.title'), 'PC settings should show the maintenance overview title');
+  assert.ok(pcApp.includes('overview.detail'), 'PC settings should show the maintenance overview detail');
   assert.ok(pcApp.includes('maintenance_recent_events'), 'PC app should read recent client maintenance events');
   assert.ok(pcApp.includes('clientMaintenanceEventsLine'), 'PC app should summarize recent client maintenance events');
   assert.ok(pcApp.includes('最近维护'), 'PC settings should show the latest maintenance event inline');
@@ -1518,6 +1523,8 @@ function testLocalAdminTokenWiring() {
   const projectAgentRuns = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_agent_runs.rs'), 'utf8');
   assert.ok(projectAgentRuns.includes('recovery_entry'), 'project agent runs API should expose a top-level recovery entry');
   const clientMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_maintenance.rs'), 'utf8');
+  assert.ok(clientMaintenance.includes('maintenance_overview'), 'client maintenance status should expose a productized overview');
+  assert.ok(clientMaintenance.includes('safe_to_share_diagnostics'), 'client maintenance overview should state diagnostics sharing safety');
   assert.ok(clientMaintenance.includes('maintenance_recent_events'), 'client maintenance status should expose recent maintenance events');
   assert.ok(clientMaintenance.includes('recent_maintenance_events'), 'client maintenance status should read recent maintenance log lines');
   assert.ok(clientMaintenance.includes('primary_maintenance_action'), 'client maintenance status should expose the primary maintenance action');

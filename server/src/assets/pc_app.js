@@ -2779,6 +2779,7 @@
     const version = clean(data.version) || '--';
     const install = data.install || {};
     const product = data.product_status || install.product_status || {};
+    const overview = data.maintenance_overview || {};
     const startMenu = data.start_menu || install.start_menu || {};
     const installedSha = clean(data.installed_git_sha || install.installed_git_sha);
     const packageVersion = clean(data.installed_package_version || install.installed_package_version);
@@ -2786,6 +2787,8 @@
     const startMenuLine = clientStartMenuLine(product, startMenu);
     const recommendedLine = clientRecommendedActionsLine(product);
     const primaryMaintenanceLine = clientPrimaryMaintenanceActionLine(data.primary_maintenance_action);
+    const overviewTitle = clean(overview.title);
+    const overviewDetail = clean(overview.detail);
     const installed = data.supported === false
       ? '当前平台不支持 Win 客户端维护'
       : data.installed
@@ -2797,8 +2800,10 @@
       : '未读取包版本';
     const updateLine = clientUpdateLine(data, state.clientPackageLatest);
     const recentMaintenance = clientMaintenanceEventsLine(data.maintenance_recent_events);
-    els.settingsClientStatus.textContent = `v${version} · ${installed} · ${running} · ${packageLine} · ${updateLine} · ${clientLayoutLabel(layoutStatus)}`;
+    const overviewPrefix = overviewTitle ? `${overviewTitle} · ` : '';
+    els.settingsClientStatus.textContent = `${overviewPrefix}v${version} · ${installed} · ${running} · ${packageLine} · ${updateLine} · ${clientLayoutLabel(layoutStatus)}`;
     const paths = [
+      overviewDetail && `维护说明 ${overviewDetail}`,
       clean(data.install_dir) && `安装 ${clean(data.install_dir)}`,
       clean(data.logs_dir) && `运行日志 ${clean(data.logs_dir)}`,
       clean(data.launcher_logs_dir) && `启动器日志 ${clean(data.launcher_logs_dir)}`,

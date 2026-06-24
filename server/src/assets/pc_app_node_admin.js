@@ -380,6 +380,7 @@
       }
       const install = data.install || {};
       const product = data.product_status || install.product_status || {};
+      const overview = data.maintenance_overview || {};
       const startMenu = data.start_menu || install.start_menu || {};
       const installedSha = clean(data.installed_git_sha || install.installed_git_sha);
       const packageVersion = clean(data.installed_package_version || install.installed_package_version);
@@ -397,8 +398,9 @@
       const recommendedLine = clientRecommendedActionsLine(product);
       const updateLine = clientUpdateLine(data, latestClientPackage);
       panel.innerHTML = [
-        row('健康', clean(product.summary) || '未读取'),
-        row('建议', recommendedLine || '无需处理'),
+        row('健康', clean(overview.title) || clean(product.summary) || '未读取'),
+        row('建议', clean(overview.detail) || recommendedLine || '无需处理'),
+        row('首要操作', clean(overview.primary_action_label) || '未上报'),
         row('入口', entryLine),
         row('开始菜单', startMenuLine || '未上报'),
         row('运行版本', clean(data.version) || '未知'),

@@ -102,6 +102,7 @@ pub(crate) async fn uninstall_handler() -> (StatusCode, Json<Value>) {
 
 fn status_payload() -> Value {
     let paths = maintenance_paths();
+    let recent_events = recent_maintenance_events(&paths.maintenance_log_file, 5);
     let payload = json!({
         "ok": true,
         "platform": std::env::consts::OS,
@@ -115,7 +116,7 @@ fn status_payload() -> Value {
         "launcher_logs_dir": optional_path_to_value(paths.launcher_logs_dir.as_deref()),
         "launcher_log_file": optional_path_to_value(paths.launcher_log_file.as_deref()),
         "diagnostics_dir": path_to_string(&paths.diagnostics_dir),
-        "maintenance_recent_events": recent_maintenance_events(&paths.maintenance_log_file, 5),
+        "maintenance_recent_events": recent_events,
         "maintenance_targets": [
             { "target": "install_dir", "label": "安装目录", "purpose": "确认根目录只保留主程序、卸载程序和 _internal。" },
             { "target": "logs", "label": "运行日志", "purpose": "查看客户端维护、更新、卸载等本机运行日志。" },
@@ -157,9 +158,15 @@ fn with_install_status(mut payload: Value) -> Value {
             }
         }
         let actions = maintenance_actions(&install);
+        let primary = primary_maintenance_action(&actions);
+        let recent_events = object
+            .get("maintenance_recent_events")
+            .cloned()
+            .unwrap_or_else(|| Value::Array(Vec::new()));
+        object.insert("primary_maintenance_action".to_string(), primary.clone());
         object.insert(
-            "primary_maintenance_action".to_string(),
-            primary_maintenance_action(&actions),
+            "maintenance_overview".to_string(),
+            maintenance_overview(&install, &primary, &recent_events),
         );
         object.insert("maintenance_actions".to_string(), actions);
     }
@@ -338,6 +345,115 @@ fn primary_maintenance_action(actions: &Value) -> Value {
         })
         .cloned()
         .unwrap_or(Value::Null)
+}
+
+fn maintenance_overview(install: &Value, primary_action: &Value, recent_events: &Value) -> Value {
+    let supported = install
+        .get("supported")
+        .and_then(Value::as_bool)
+        .unwrap_or(cfg!(windows));
+    let installed = install
+        .get("installed")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let layout_status = install
+        .get("layout_status")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let product_status = install
+        .get("product_status")
+        .and_then(Value::as_object)
+        .and_then(|object| object.get("status"))
+        .and_then(Value::as_str)
+        .unwrap_or("unknown");
+    let product_summary = install
+        .get("product_status")
+        .and_then(Value::as_object)
+        .and_then(|object| object.get("summary"))
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let primary_action_id = primary_action
+        .get("id")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let primary_action_label = primary_action
+        .get("label")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let primary_recommendation = primary_action
+        .get("recommendation")
+        .and_then(Value::as_str)
+        .unwrap_or("");
+    let recent_failure_count = recent_events
+        .as_array()
+        .map(|events| {
+            events
+                .iter()
+                .filter(|event| event.get("ok").and_then(Value::as_bool) == Some(false))
+                .count()
+        })
+        .unwrap_or(0);
+    let latest_failure_action = recent_events.as_array().and_then(|events| {
+        events
+            .iter()
+            .find(|event| event.get("ok").and_then(Value::as_bool) == Some(false))
+            .and_then(|event| event.get("action"))
+            .and_then(Value::as_str)
+    });
+    let needs_repair = matches!(
+        product_status,
+        "needs_repair" | "repair_recommended" | "cleanup_recommended"
+    ) || !matches!(layout_status, "clean" | "unknown");
+
+    let (status, severity, title, detail) = if !supported {
+        (
+            "unsupported",
+            "warning",
+            "当前平台不支持 Win 客户端维护",
+            primary_recommendation,
+        )
+    } else if recent_failure_count > 0 {
+        (
+            "attention",
+            "warning",
+            "最近维护动作失败",
+            "最近维护日志里有失败记录，建议先导出诊断或执行首要建议。",
+        )
+    } else if !installed || needs_repair {
+        (
+            "attention",
+            "warning",
+            "建议修复客户端入口",
+            if primary_recommendation.is_empty() {
+                product_summary
+            } else {
+                primary_recommendation
+            },
+        )
+    } else {
+        (
+            "ready",
+            "ok",
+            "Win 客户端入口正常",
+            if product_summary.is_empty() {
+                primary_recommendation
+            } else {
+                product_summary
+            },
+        )
+    };
+
+    json!({
+        "status": status,
+        "severity": severity,
+        "title": title,
+        "detail": detail,
+        "primary_action_id": primary_action_id,
+        "primary_action_label": primary_action_label,
+        "recent_failure_count": recent_failure_count,
+        "latest_failure_action": latest_failure_action,
+        "safe_to_share_diagnostics": true,
+    })
 }
 
 struct MaintenanceRecommendation {
@@ -747,8 +863,9 @@ enum ClientAction {
 #[cfg(test)]
 mod tests {
     use super::{
-        install_dir_from_local_app_data, maintenance_actions, maintenance_target,
-        primary_maintenance_action, recent_maintenance_events, status_payload, truncate_chars,
+        install_dir_from_local_app_data, maintenance_actions, maintenance_overview,
+        maintenance_target, primary_maintenance_action, recent_maintenance_events, status_payload,
+        truncate_chars,
     };
     use serde_json::json;
     use std::{fs, path::PathBuf};
@@ -868,6 +985,14 @@ mod tests {
             .as_str()
             .is_some());
         assert_eq!(
+            status["maintenance_overview"]["safe_to_share_diagnostics"].as_bool(),
+            Some(true)
+        );
+        assert!(status["maintenance_overview"]["title"].as_str().is_some());
+        assert!(status["maintenance_overview"]["primary_action_id"]
+            .as_str()
+            .is_some());
+        assert_eq!(
             status["product_status"]["primary_entry_name"].as_str(),
             Some(crate::node_client_launcher::CLIENT_EXE_NAME)
         );
@@ -975,6 +1100,62 @@ mod tests {
             .as_str()
             .unwrap_or_default()
             .contains("检查"));
+    }
+
+    #[test]
+    fn maintenance_overview_marks_ready_client_as_ok() {
+        let actions = maintenance_actions(&json!({
+            "supported": true,
+            "installed": true,
+            "layout_status": "clean",
+            "product_status": { "status": "ready", "summary": "客户端入口正常" }
+        }));
+        let primary = primary_maintenance_action(&actions);
+        let overview = maintenance_overview(
+            &json!({
+                "supported": true,
+                "installed": true,
+                "layout_status": "clean",
+                "product_status": { "status": "ready", "summary": "客户端入口正常" }
+            }),
+            &primary,
+            &json!([]),
+        );
+
+        assert_eq!(overview["status"].as_str(), Some("ready"));
+        assert_eq!(overview["severity"].as_str(), Some("ok"));
+        assert_eq!(overview["primary_action_id"].as_str(), Some("check_update"));
+        assert_eq!(overview["recent_failure_count"].as_u64(), Some(0));
+    }
+
+    #[test]
+    fn maintenance_overview_surfaces_recent_failures() {
+        let actions = maintenance_actions(&json!({
+            "supported": true,
+            "installed": true,
+            "layout_status": "clean",
+            "product_status": { "status": "ready", "summary": "客户端入口正常" }
+        }));
+        let primary = primary_maintenance_action(&actions);
+        let overview = maintenance_overview(
+            &json!({
+                "supported": true,
+                "installed": true,
+                "layout_status": "clean",
+                "product_status": { "status": "ready", "summary": "客户端入口正常" }
+            }),
+            &primary,
+            &json!([
+                { "action": "repair", "ok": false, "detail": "failed" },
+                { "action": "update", "ok": true, "detail": "scheduled" }
+            ]),
+        );
+
+        assert_eq!(overview["status"].as_str(), Some("attention"));
+        assert_eq!(overview["severity"].as_str(), Some("warning"));
+        assert_eq!(overview["recent_failure_count"].as_u64(), Some(1));
+        assert_eq!(overview["latest_failure_action"].as_str(), Some("repair"));
+        assert!(!overview.to_string().contains("failed"));
     }
 
     #[test]
