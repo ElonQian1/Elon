@@ -224,6 +224,7 @@ impl TaskJournal {
             let mut registry = self.load_registry()?;
             let mut current_status = None;
             let mut ignored = false;
+            let mut registry_changed = false;
             if let Some(record) = registry.get_mut(req_id) {
                 if is_terminal_status(&record.status) {
                     ignored = true;
@@ -233,9 +234,12 @@ impl TaskJournal {
                     record.updated_at_ms = now;
                     record.cancel_requested_at_ms = Some(now);
                     current_status = Some(record.status.clone());
+                    registry_changed = true;
                 }
             }
-            self.save_registry(&registry)?;
+            if registry_changed {
+                self.save_registry(&registry)?;
+            }
             let mut event = json!({
                 "type": "cancel_requested",
                 "req_id": req_id,
@@ -695,6 +699,41 @@ mod tests {
         assert_eq!(events.matches(r#""type":"finished""#).count(), 1);
         assert!(events.contains(r#""status":"canceled""#));
         assert!(events.contains(r#""error":"用户已停止 PC CLI 任务""#));
+        let _ = fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn late_cancel_after_terminal_is_audit_only() {
+        let dir = unique_test_dir("late-cancel-terminal");
+        let journal = TaskJournal::new(&dir);
+        journal
+            .record_started(TaskJournalStart {
+                req_id: "req-1",
+                cli_name: "server-runtime",
+                route: Some("route_c_server_runtime"),
+                run_handle_id: Some("req-1"),
+                cwd: Some("D:/demo"),
+                runtime_permission: Some("project_write"),
+            })
+            .expect("started event should persist");
+        journal
+            .record_finished_with_outcome("req-1", "done", None)
+            .expect("terminal outcome should persist");
+        journal
+            .record_cancel_requested("req-1")
+            .expect("late cancel should remain auditable");
+
+        let registry = journal
+            .read_registry_for_test()
+            .expect("registry should read");
+        let record = registry.get("req-1").expect("record should exist");
+        assert_eq!(record.status, "done");
+        assert!(record.cancel_requested_at_ms.is_none());
+
+        let events = fs::read_to_string(dir.join("events.jsonl")).expect("events should read");
+        assert_eq!(events.matches(r#""type":"cancel_requested""#).count(), 1);
+        assert!(events.contains(r#""ignored":true"#));
+        assert!(events.contains(r#""reason":"task_already_terminal""#));
         let _ = fs::remove_dir_all(dir);
     }
 

@@ -228,7 +228,21 @@ fn stress_late_cancel_requests_never_reopen_terminal_tasks() {
             .record_cancel_requested(&req_id)
             .expect("late cancel request should remain auditable");
 
-        let registry = read_registry(&dir);
+        assert!(
+            matches!(expected_status, "done" | "failed" | "canceled"),
+            "fixture must only generate terminal outcomes"
+        );
+    }
+
+    let registry = read_registry(&dir);
+    assert_eq!(registry.len(), 300);
+    assert_eq!(count_status(&registry, "done"), 100);
+    assert_eq!(count_status(&registry, "failed"), 100);
+    assert_eq!(count_status(&registry, "canceled"), 100);
+    assert_eq!(count_status(&registry, "cancel_requested"), 0);
+    for task_index in 0..300 {
+        let (_, _, expected_status) = terminal_outcomes[task_index % terminal_outcomes.len()];
+        let req_id = format!("req-late-cancel-{task_index:03}");
         let record = registry
             .get(&req_id)
             .expect("terminal record should stay in registry");
@@ -241,13 +255,6 @@ fn stress_late_cancel_requests_never_reopen_terminal_tasks() {
             "late cancel after terminal should not look like an active cancel request"
         );
     }
-
-    let registry = read_registry(&dir);
-    assert_eq!(registry.len(), 300);
-    assert_eq!(count_status(&registry, "done"), 100);
-    assert_eq!(count_status(&registry, "failed"), 100);
-    assert_eq!(count_status(&registry, "canceled"), 100);
-    assert_eq!(count_status(&registry, "cancel_requested"), 0);
 
     let sample = journal
         .snapshot("req-late-cancel-002", 0, 20)
