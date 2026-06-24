@@ -64,7 +64,7 @@
 - **APK 签名密钥不得泄露**，相关操作只走自动化脚本
 - **每个用户的修改是隔离的**，不能让一个用户的操作影响其他用户
 - **代码变更记录用户身份**，commit 信息中包含用户标识
-- **任务开始先跑机器预检**：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。只要输出 `WORKTREE_CREATED=true`，必须切过去执行
+- **任务开始先跑机器预检**：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。只要输出 `WORKTREE_CREATED=true`，必须切过去执行。脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录；若为 `BLOCKED_CREATE_WORKTREE_FIRST`，当前目录不能继续改
 - **PowerShell 版本边界**：Windows `powershell.exe` 5.1 只用于 bootstrap/兼容脚本；任何头部带 `#requires -Version 7.0` 的脚本必须用 `pwsh` 运行。先用 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-pwsh7.ps1` 检查本机；缺 PowerShell 7 时安装 `winget install --id Microsoft.PowerShell --source winget` 或转到有 `pwsh` 的环境。绝不要删除 `#requires`、降级语法或复制一套低版本逻辑来绕过 PS7 要求；需要 PS5 入口时只写薄 wrapper 或明确命名的 `*-ps5.ps1`，并保留原 PS7 脚本。
 - **主工作区只做 main 基线**：`main` checkout 是共享同步基线，不作为业务编辑区。多个本地 AI 并行时，各自只能在预检脚本创建的 `codex/task-*` worktree 中修改、验证、提交和推送，避免互相占用 `main`
 - **预检/worktree 流程改动必须跑门禁**：修改 `scripts/ai-task-preflight.*`、`scripts/cleanup-task-worktrees.*` 或相关并行 AI/Git 工作流说明后，运行 `powershell -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1`；该测试会锁住 `-CreateWorktree`、`WORKTREE_PATH` 和 `main` 基线规则

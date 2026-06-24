@@ -15,7 +15,7 @@
 
 ## 项目进入规则（APK / Web / 服务器 Codex CLI 通用）
 
-1. 每次进入项目先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。如果脚本创建了 worktree，必须切到 `WORKTREE_PATH` 后再观察目录结构和修改文件。
+1. 每次进入项目先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。如果脚本创建了 worktree，必须切到 `WORKTREE_PATH` 后再观察目录结构和修改文件。脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录；如果是 `BLOCKED_CREATE_WORKTREE_FIRST`，当前目录不能继续改。
 2. 如果存在 `AGENTS.md`、`CODEX.md` 或 `README.md`，先读轻量入口；`.github/instructions/*.md` 和 `docs/` 只在当前任务需要时读取。
 3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建的任务 worktree 开始。当前任务自己的提交完成后第一时间 push；只有 push 被 non-fast-forward 拒绝时才 rebase。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。

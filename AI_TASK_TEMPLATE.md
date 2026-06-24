@@ -18,7 +18,7 @@
 
 ## 工作要求
 
-1. 先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。如果输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再修改。
+1. 先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。如果输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再修改；脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录。
 2. 先列出相关文件和为什么相关。
 3. 修改前输出文件计划 JSON。
 4. 不修改无关文件，不回退他人改动。

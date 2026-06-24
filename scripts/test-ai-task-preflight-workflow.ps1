@@ -47,6 +47,10 @@ $preflightShContent = Get-Content -Raw -LiteralPath $preflightSh
 $expectedPsNeedsWorktree = '$needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline'
 Assert-Contains $preflightContent $expectedPsNeedsWorktree "PowerShell preflight must not treat -CreateWorktree alone as a need for another worktree."
 Assert-Contains $preflightShContent 'if [[ "$always_create_worktree" -eq 1 || "$dirty" -eq 1 || "$behind" -gt 0 || "$branch" == "main" ]]; then' "Shell preflight must not treat --create-worktree alone as a need for another worktree."
+Assert-Contains $preflightContent "function Write-AiWorkflowGuard" "PowerShell preflight must print the AI workflow guard."
+Assert-Contains $preflightShContent "write_ai_workflow_guard()" "Shell preflight must print the AI workflow guard."
+Assert-Contains $preflightContent "EDIT_ROOT=" "PowerShell preflight must expose the only safe edit root."
+Assert-Contains $preflightShContent "EDIT_ROOT=" "Shell preflight must expose the only safe edit root."
 
 function Assert-DocumentContains {
     param(
@@ -73,11 +77,16 @@ function Assert-DocumentDoesNotContain {
 }
 
 Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
+Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "EDIT_ROOT"
 Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WORKTREE_CREATED=true"
+Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "EDIT_ROOT"
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "WORKTREE_PATH"
+Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "EDIT_ROOT"
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "nested worktree"
 Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "origin/main"
+Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "EDIT_ROOT"
 Assert-DocumentContains -RelativePath "AI_TASK_TEMPLATE.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
+Assert-DocumentContains -RelativePath "AI_TASK_TEMPLATE.md" -Snippet "EDIT_ROOT"
 Assert-DocumentContains -RelativePath ".github\prompts\elon-dev-task.prompt.md" -Snippet "WORKTREE_PATH"
 Assert-DocumentContains -RelativePath ".github\prompts\elon-apk-release.prompt.md" -Snippet "WORKTREE_PATH"
 Assert-DocumentContains -RelativePath ".github\agents\elon-implementer.agent.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
@@ -160,6 +169,10 @@ try {
     Assert-Contains $outputText "BEHIND=0" "Fixture should not be behind origin/main."
     Assert-Contains $outputText "WORKTREE_CREATED=false" "Clean current non-main worktree must not create another worktree just because -CreateWorktree was passed."
     Assert-Contains $outputText "NEXT=Workspace is already isolated and current enough for direct edits." "Clean current non-main worktree should remain usable."
+    Assert-Contains $outputText "AI_WORKFLOW_GUARD_BEGIN" "Preflight output must include the self-contained AI workflow guard."
+    Assert-Contains $outputText "EDIT_ROOT=" "Preflight output must expose the safe edit root."
+    Assert-Contains $outputText "EDIT_STATE=current_worktree_ok" "Clean current non-main worktree must be marked as directly editable."
+    Assert-Contains $outputText "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main." "Preflight guard must warn that main is a baseline only."
 
     $createdChildren = @(Get-ChildItem -LiteralPath $createdWorktreeParent -Force)
     if ($createdChildren.Count -ne 0) {

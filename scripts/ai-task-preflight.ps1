@@ -161,6 +161,22 @@ function Invoke-GitFetchWithRetry {
     throw "git $($GitArgs -join ' ') failed after $Attempts attempts. $finalHint`n原始输出：$lastOutput"
 }
 
+function Write-AiWorkflowGuard {
+    param(
+        [string]$EditRoot,
+        [string]$State
+    )
+
+    Write-Host "AI_WORKFLOW_GUARD_BEGIN"
+    Write-Host "EDIT_ROOT=$EditRoot"
+    Write-Host "EDIT_STATE=$State"
+    Write-Host "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
+    Write-Host "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
+    Write-Host "RULE_PUSH=after commit run git push origin HEAD:main, then scripts\check-task-complete.ps1 -Kind CodePushed."
+    Write-Host "RULE_FINISH=after push sync the main baseline with git pull --ff-only and run scripts\cleanup-task-worktrees.ps1 -Apply."
+    Write-Host "AI_WORKFLOW_GUARD_END"
+}
+
 $repoRoot = GitOutput @("rev-parse", "--show-toplevel")
 Set-Location -LiteralPath $repoRoot
 
@@ -235,14 +251,17 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     Write-Host "WORKTREE_PATH=$worktreePath"
     Write-Host "WORKTREE_BASE=$(git rev-parse --short origin/main)"
     Write-Host "NEXT=cd `"$worktreePath`""
+    Write-AiWorkflowGuard -EditRoot $worktreePath -State "created_worktree"
     $createdWorktree = $true
     $createdWorktreePath = $worktreePath
 } elseif ($needsWorktree) {
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Run powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree before editing."
+    Write-AiWorkflowGuard -EditRoot "BLOCKED_CREATE_WORKTREE_FIRST" -State "blocked_needs_worktree"
 } else {
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Workspace is already isolated and current enough for direct edits."
+    Write-AiWorkflowGuard -EditRoot $repoRoot -State "current_worktree_ok"
 }
 
 # ─────────────────────────────────────────────────────────────

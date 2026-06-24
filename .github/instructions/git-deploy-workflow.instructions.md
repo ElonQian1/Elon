@@ -72,7 +72,7 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 
 1. **任务开始前**：先运行机器预检脚本，Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`
 2. 脚本会把本地 `main` 当作只同步基线：先直连 fetch，再在 `main` 干净时快进到最新 `origin/main`，最后创建带时间、PID 和短随机 ID 的独立任务 worktree
-3. 如果预检脚本输出 `WORKTREE_CREATED=true`，必须切换到 `WORKTREE_PATH` 后再编辑文件；原工作区只保留 `main` 基线，不继续叠加新改动
+3. 如果预检脚本输出 `WORKTREE_CREATED=true`，必须切换到 `WORKTREE_PATH` 后再编辑文件；脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录；原工作区只保留 `main` 基线，不继续叠加新改动
 4. 修改预检脚本、worktree 清理脚本或本工作流说明后，必须运行 `powershell -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1`；该门禁会验证 `main` 必须派生任务 worktree，同时干净、未落后、已隔离的非 `main` worktree 显式传 `-CreateWorktree` 时不会重复创建嵌套 worktree（nested worktree）
 5. 任务开始 **前后** 各执行一次 `git status --short`，识别当前工作区是否有其他 AI 的未提交改动
 6. `git add` 只加自己任务相关的文件

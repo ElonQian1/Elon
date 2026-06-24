@@ -86,6 +86,20 @@ git_fetch_with_retry() {
   return 1
 }
 
+write_ai_workflow_guard() {
+  local edit_root="$1"
+  local state="$2"
+
+  echo "AI_WORKFLOW_GUARD_BEGIN"
+  echo "EDIT_ROOT=$edit_root"
+  echo "EDIT_STATE=$state"
+  echo "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main."
+  echo "RULE_BEFORE_EDIT=cd to EDIT_ROOT/WORKTREE_PATH and run git status --short --branch before editing."
+  echo "RULE_PUSH=after commit run git push origin HEAD:main, then run the CodePushed ancestor check for this platform."
+  echo "RULE_FINISH=after push sync the main baseline with git pull --ff-only and run scripts/cleanup-task-worktrees.sh --apply."
+  echo "AI_WORKFLOW_GUARD_END"
+}
+
 sync_local_main_baseline() {
   if ! git rev-parse --verify origin/main >/dev/null 2>&1; then
     echo "MAIN_BASELINE_SYNC=skipped_no_origin_main"
@@ -203,14 +217,17 @@ if [[ "$create_worktree" -eq 1 && "$needs_worktree" -eq 1 ]]; then
   echo "WORKTREE_PATH=$worktree_path"
   echo "WORKTREE_BASE=$(git rev-parse --short origin/main)"
   echo "NEXT=cd \"$worktree_path\""
+  write_ai_workflow_guard "$worktree_path" "created_worktree"
   created_worktree=1
   created_worktree_path="$worktree_path"
 elif [[ "$needs_worktree" -eq 1 ]]; then
   echo "WORKTREE_CREATED=false"
   echo "NEXT=Run bash scripts/ai-task-preflight.sh --create-worktree before editing."
+  write_ai_workflow_guard "BLOCKED_CREATE_WORKTREE_FIRST" "blocked_needs_worktree"
 else
   echo "WORKTREE_CREATED=false"
   echo "NEXT=Workspace is already isolated and current enough for direct edits."
+  write_ai_workflow_guard "$repo_root" "current_worktree_ok"
 fi
 
 # 自动清理已合并、工作树干净的孤儿 task worktree。要禁用：--skip-auto-cleanup
