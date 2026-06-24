@@ -1297,12 +1297,22 @@ button { cursor: pointer; }
   cursor: default;
 }
 .message-row {
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  display: flex;
+  align-items: flex-start;
   gap: 12px;
   padding: 10px 0;
 }
+.message-row.other {
+  justify-content: flex-start;
+}
+.message-row.own {
+  justify-content: flex-end;
+}
+.message-row.own .message-avatar {
+  order: 2;
+}
 .message-avatar {
+  flex: 0 0 40px;
   width: 40px;
   height: 40px;
   border-radius: 50%;
@@ -1312,20 +1322,44 @@ button { cursor: pointer; }
   font-weight: 800;
   color: white;
 }
-.message-body { min-width: 0; }
+.message-body {
+  min-width: 0;
+  max-width: min(760px, calc(100% - 54px));
+}
+.message-row.own .message-body {
+  order: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  max-width: min(680px, 78%);
+}
 .message-meta {
   display: flex;
   gap: 8px;
   align-items: baseline;
   margin-bottom: 4px;
 }
+.message-row.own .message-meta {
+  flex-direction: row-reverse;
+  justify-content: flex-start;
+}
 .message-meta strong { font-size: 14px; }
 .message-meta span { color: var(--text-muted); font-size: 12px; }
 .message-content {
+  max-width: 100%;
   color: var(--text-soft);
   line-height: 1.58;
   white-space: pre-wrap;
   word-break: break-word;
+}
+.message-row.own .message-content {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid rgba(46, 168, 97, .32);
+  border-radius: 8px 8px 2px 8px;
+  background: rgba(46, 168, 97, .18);
+  color: #effff4;
+  text-align: left;
 }
 .message-content.ai { color: #dfe8ff; }
 .message-content.task { color: #c9f2d7; }
@@ -1333,6 +1367,9 @@ button { cursor: pointer; }
   position: relative;
   padding-right: 54px;
   white-space: normal;
+}
+.message-row.own .message-content.markdown-body {
+  padding-right: 62px;
 }
 .markdown-rendered {
   display: grid;
@@ -1436,6 +1473,11 @@ button { cursor: pointer; }
   color: var(--text-soft);
   white-space: normal;
   word-break: normal;
+}
+.message-row.own .message-content.project-share-wrap {
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 .project-share-card {
   width: 100%;

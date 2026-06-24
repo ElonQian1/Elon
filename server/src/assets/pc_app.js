@@ -2277,9 +2277,38 @@
     return clean(message.sender_user_id || message.senderUserId || message.sender_id || message.senderId || message.user_id || message.userId);
   }
 
+  function messageOutgoingState(message) {
+    const value = message && (message.outgoing ?? message.is_outgoing ?? message.isOutgoing);
+    if (value === true || value === 1) return true;
+    if (value === false || value === 0) return false;
+    const text = clean(value).toLowerCase();
+    if (['true', '1', 'yes', 'y'].includes(text)) return true;
+    if (['false', '0', 'no', 'n'].includes(text)) return false;
+    return null;
+  }
+
+  function messageSenderIdentityMatchesUser(message) {
+    if (!state.user) return false;
+    const sender = [
+      message.sender_account, message.senderAccount, message.user_account, message.userAccount,
+      message.sender_name, message.senderName
+    ].map(clean).filter(Boolean);
+    if (!sender.length) return false;
+    const own = [
+      state.user.account, state.user.phone, state.user.email, state.user.nickname,
+      state.user.name, userName(state.user)
+    ].map(clean).filter(Boolean);
+    return sender.some((left) => own.some((right) => sameId(left, right)));
+  }
+
   function isOwnMessage(message) {
     const senderId = senderIdOf(message);
-    return !!message.outgoing || !!(state.user && senderId && sameId(senderId, state.user.id));
+    const outgoing = messageOutgoingState(message);
+    if (outgoing === true) return true;
+    if (senderId && sameId(senderId, SOCIAL_AI_USER_ID)) return false;
+    if (state.user && senderId && sameId(senderId, state.user.id)) return true;
+    if (outgoing === false) return false;
+    return messageSenderIdentityMatchesUser(message);
   }
 
   function avatarForMessage(message, scope) {
@@ -2418,12 +2447,13 @@
       ? devTasks.buildContext(messages, devTaskSnapshots ? devTaskSnapshots.contextExtras() : null)
       : null;
     const messageRows = messages.length ? messages.map((message) => {
+      const own = isOwnMessage(message);
       const role = clean(message.role || message.kind || message.message_kind);
       const fallbackName = role.startsWith('ai_')
         ? '一龙开发Agent'
         : (scope === 'ai' ? '一龙AI' : (scope === 'project' ? '项目成员' : '好友'));
       const name = clean(message.sender_name || message.user_account || message.sender || message.author_name || message.from_name) ||
-        (isOwnMessage(message) ? userName(state.user) : fallbackName);
+        (own ? userName(state.user) : fallbackName);
       const tone = role.includes('assistant') || role.includes('ai') ? 'ai' : (role.includes('task') ? 'task' : '');
       const devTaskHtml = devTaskContext ? devTasks.renderMessage(message, devTaskContext) : '';
       const contentHtml = devTaskHtml || renderMessageContent(message, {
@@ -2431,7 +2461,7 @@
         markdown: !!tone,
         copy: !!tone
       });
-      return `<article class="message-row">
+      return `<article class="message-row ${own ? 'own' : 'other'}">
         ${avatarElement('div', 'message-avatar', avatarForMessage(message, scope), name, '员')}
         <div class="message-body">
           <div class="message-meta"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(formatTime(message.created_at || message.createdAt))}</span></div>

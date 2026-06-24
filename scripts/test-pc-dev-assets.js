@@ -1780,6 +1780,17 @@ function testPcProjectCreateSkipsStorageByDefault() {
   assert.ok(projectCreate.includes('自动选择代码存储（高级）'), 'PC create modal should keep auto storage as an explicit advanced choice');
 }
 
+function testPcMessageAlignment() {
+  const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
+  const pcCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
+  assert.ok(pcApp.includes('messageOutgoingState'), 'PC messages should normalize outgoing state before layout');
+  assert.ok(pcApp.includes('messageSenderIdentityMatchesUser'), 'PC messages should fall back to sender identity matching for own messages');
+  assert.ok(pcApp.includes("message-row ${own ? 'own' : 'other'}"), 'PC message rows should mark own vs other messages');
+  assert.ok(pcCss.includes('.message-row.own'), 'PC CSS should style own message rows separately');
+  assert.ok(pcCss.includes('justify-content: flex-end'), 'own PC messages should align to the right');
+  assert.ok(pcCss.includes('.message-row.own .message-avatar'), 'own PC messages should move the avatar to the right');
+}
+
 function testPcProjectStartGuidance() {
   const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
   const projectCreate = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_create.js'), 'utf8');
@@ -1826,6 +1837,7 @@ function testPcProjectStartGuidance() {
   testDevComposerForcedRoutePreference();
   testLocalAdminTokenWiring();
   testPcProjectCreateSkipsStorageByDefault();
+  testPcMessageAlignment();
   testPcProjectStartGuidance();
 
   console.log('pc-dev-assets tests passed');
