@@ -2,6 +2,11 @@ use std::collections::BTreeMap;
 
 use serde::Serialize;
 
+use super::symbol_index_product::{
+    EmbeddingModelCostSummary, EmbeddingQueueSummary, ProjectIndexProductStatus,
+    RetrievalEvalSetSummary,
+};
+
 const DEFAULT_EMBEDDING_STATUS_LIMIT: usize = 20;
 const MAX_EMBEDDING_STATUS_LIMIT: usize = 100;
 
@@ -28,8 +33,12 @@ pub(crate) struct SymbolEmbeddingStatusResponse {
     pub(crate) db_path: String,
     pub(crate) query: SymbolEmbeddingStatusQueryEcho,
     pub(crate) metadata: BTreeMap<String, String>,
+    pub(crate) project_status: ProjectIndexProductStatus,
     pub(crate) totals: SymbolEmbeddingTotals,
     pub(crate) models: Vec<SymbolEmbeddingModelSummary>,
+    pub(crate) queue: EmbeddingQueueSummary,
+    pub(crate) costs: Vec<EmbeddingModelCostSummary>,
+    pub(crate) eval_set: RetrievalEvalSetSummary,
     pub(crate) missing_chunks: Vec<SymbolEmbeddingMissingChunk>,
 }
 

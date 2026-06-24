@@ -1284,3 +1284,63 @@ Context Packer 是 repo map、符号索引和 RAG 真正落到 AI 编程体验�
 如果没有 Context Packer，系统可能会把一堆相关但混乱的代码直接塞给 AI，导致上下文重复、token 浪费、重点不清晰。  
 有了 Context Packer，AI 看到的是经过压缩、排序和组织后的任务上下文，更容易准确理解代码并完成修改。
 ```
+
+---
+
+# 2026-06-24：RAG / embedding 产品化落地约定
+
+本轮已经把远程 embedding 的“能跑”补成可观测、可评测、可追责的产品层。实现位置集中在 `server/src/context_compiler`：
+
+- `symbol_index_product.rs`：产品控制面 schema 和记录函数。
+- `symbol_index_embeddings.rs`：embedding status 查询时同步返回项目索引状态、队列、成本、评测集摘要。
+- `symbol_index_vector.rs`：向量 backfill 记录 job、模型、token、估算成本、远程失败原因。
+- `symbol_index_eval_runs.rs`：`eval-batch` 自动沉淀真实任务检索评测集。
+
+## 项目索引状态
+
+`/api/admin/context/symbol-index/embedding-status` 返回 `projectStatus`，状态只允许四类：
+
+| status | 含义 |
+|---|---|
+| `unindexed` | 当前没有 chunk，说明还没跑 context compiler 或没有可索引内容。 |
+| `indexed` | chunk 和当前 embedding 模型均可用。 |
+| `embedding_missing` | 有 chunk，但部分 chunk 缺少当前模型 embedding。 |
+| `needs_rebuild` | 有 embedding，但 content hash 已和当前 chunk 不一致，需要重建。 |
+
+这个状态面向产品和 Agent 决策：AI 不应该盲目认为“能查”；它应先看状态，遇到 `embedding_missing` 或 `needs_rebuild` 时主动回填或降级到 symbol/full-text/graph 检索。
+
+## 后台索引队列
+
+当前 backfill 仍是同步执行，但每次调用都会写入 `embedding_index_jobs`：
+
+- `running / succeeded / failed` 状态；
+- `trace_id`、`model`、`limit_count`、`force`；
+- `scanned_count`、`upserted_count`、`skipped_count`；
+- `failure_reason`、`created_at`、`started_at`、`finished_at`。
+
+这是一层最小可用的后台队列契约。后续如果要做真正异步 worker，不需要重定义产品口径，只要从这张表扩展 `queued -> running -> succeeded/failed` 消费流程即可。
+
+## embedding 成本和模型记录
+
+每个写入的 embedding 会记录到 `embedding_usage_events`：
+
+- `model` 和 `provider`；
+- chunk 级 `input_token_count`；
+- `estimated_cost_micro_usd`；
+- `job_id` 和 `chunk_id`。
+
+估算成本用于产品观测，不作为计费事实来源。当前按模型名粗估：`text-embedding-3-small` 约 20 micro USD / 1K tokens，`text-embedding-3-large` 约 130 micro USD / 1K tokens，其它远程模型按 100 micro USD / 1K tokens，`local-hash-v1` 为 0。
+
+## 远程 embedding 失败原因
+
+远程模型解析、provider 配置缺失、HTTP 调用失败、响应解析失败都会记录到 `remote_embedding_failures`。状态接口会带出最近失败原因，避免产品层只看到“没 embedding”，却不知道是 API key、网络、限流还是服务端返回异常。
+
+## 真实任务检索评测集
+
+`/api/admin/context/symbol-index/eval-batch` 记录 run 时，会同步把每个 case 写入 `retrieval_eval_cases`：
+
+- `query`、`must_include_json`；
+- 来源固定为 `real_task`；
+- 最近一次 `run_id`、`recall_at_k`、缺失 requirement 数量。
+
+这让评测不再停留在临时 JSON。后续调 ranker、vector 策略、graph 扩展时，应先积累真实任务 case，再用 `eval-runs`、`eval-compare` 和 `retrieval-learning` 看召回质量、噪声率、测试上下文覆盖率和 token 成本。

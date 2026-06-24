@@ -10,6 +10,7 @@ use super::{
     symbol_index::{SymbolEdge, SymbolIndex, SymbolRecord},
     symbol_index_chunks::{create_chunk_schema, insert_symbol_chunks},
     symbol_index_embeddings::create_embedding_schema,
+    symbol_index_product::create_product_schema,
 };
 
 pub(crate) const SYMBOL_INDEX_DB_FILE: &str = "symbol_index.sqlite";
@@ -111,7 +112,8 @@ fn create_schema(conn: &Connection) -> rusqlite::Result<()> {
     )?;
     create_chunk_schema(conn)?;
     create_retrieval_runs_schema(conn)?;
-    create_embedding_schema(conn)
+    create_embedding_schema(conn)?;
+    create_product_schema(conn)
 }
 
 pub(crate) fn create_retrieval_runs_schema(conn: &Connection) -> rusqlite::Result<()> {

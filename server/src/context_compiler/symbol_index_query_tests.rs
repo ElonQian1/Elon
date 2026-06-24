@@ -939,9 +939,12 @@ fn vector_backfill_searches_embedded_chunks_and_updates_status() {
     )
     .unwrap();
     assert_eq!(backfill.model, LOCAL_HASH_VECTOR_MODEL);
+    assert!(!backfill.job_id.is_empty());
     assert_eq!(backfill.dim, 256);
     assert!(backfill.upserted_count >= 5);
     assert_eq!(backfill.skipped_count, 0);
+    assert!(backfill.input_token_count > 0);
+    assert_eq!(backfill.estimated_cost_micro_usd, 0);
 
     let status = load_symbol_embedding_status_db(
         &db,
@@ -955,6 +958,14 @@ fn vector_backfill_searches_embedded_chunks_and_updates_status() {
     assert_eq!(status.totals.embedded_count, status.totals.chunk_count);
     assert_eq!(status.totals.missing_count, 0);
     assert_eq!(status.totals.stale_count, 0);
+    assert_eq!(status.project_status.status, "indexed");
+    assert_eq!(status.queue.succeeded, 1);
+    assert_eq!(status.costs.len(), 1);
+    assert_eq!(status.costs[0].model, LOCAL_HASH_VECTOR_MODEL);
+    assert_eq!(
+        status.costs[0].input_token_count,
+        backfill.input_token_count
+    );
 
     let search = search_symbol_vectors_db(
         &db,
@@ -985,6 +996,7 @@ fn vector_backfill_searches_embedded_chunks_and_updates_status() {
     .unwrap();
     assert_eq!(second.upserted_count, 0);
     assert_eq!(second.skipped_count, second.scanned_count);
+    assert_eq!(second.input_token_count, 0);
 
     fs::remove_dir_all(dir).unwrap();
 }
@@ -1253,6 +1265,24 @@ fn eval_batch_aggregates_cases_and_records_retrieval_run() {
         .selected_chunks
         .to_string()
         .contains("context_pack_tests.rs"));
+
+    let status = load_symbol_embedding_status_db(
+        &db,
+        &SymbolEmbeddingStatus {
+            model: Some(LOCAL_HASH_VECTOR_MODEL.to_string()),
+            limit: 10,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    assert_eq!(status.eval_set.case_count, 2);
+    assert!(status
+        .eval_set
+        .latest_cases
+        .iter()
+        .any(|case| case.id == "context-pack"
+            && case.source == "real_task"
+            && case.last_run_id.as_deref() == Some(response.run_id.as_str())));
 
     drop(conn);
     fs::remove_dir_all(dir).unwrap();

@@ -79,11 +79,14 @@ pub(crate) struct SymbolVectorBackfillResponse {
     pub(crate) db_path: String,
     pub(crate) query: SymbolVectorBackfillQueryEcho,
     pub(crate) metadata: BTreeMap<String, String>,
+    pub(crate) job_id: String,
     pub(crate) model: String,
     pub(crate) dim: usize,
     pub(crate) scanned_count: usize,
     pub(crate) upserted_count: usize,
     pub(crate) skipped_count: usize,
+    pub(crate) input_token_count: usize,
+    pub(crate) estimated_cost_micro_usd: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]

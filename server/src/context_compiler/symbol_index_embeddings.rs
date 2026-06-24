@@ -1,13 +1,17 @@
 use std::path::Path;
 
 use anyhow::{Context, Result};
-use rusqlite::{params, Connection, OpenFlags};
+use rusqlite::{params, Connection};
 
 use super::{
     symbol_index::normalize_path,
     symbol_index_embedding_types::{
         SymbolEmbeddingMissingChunk, SymbolEmbeddingModelSummary, SymbolEmbeddingStatusQuery,
         SymbolEmbeddingStatusQueryEcho, SymbolEmbeddingStatusResponse, SymbolEmbeddingTotals,
+    },
+    symbol_index_product::{
+        load_embedding_model_costs, load_embedding_queue_summary, load_retrieval_eval_set_summary,
+        upsert_project_index_status,
     },
     symbol_index_query::{find_symbol_index_db, load_metadata},
 };
@@ -102,10 +106,20 @@ pub(crate) fn load_symbol_embedding_status_db(
     db_path: &Path,
     query: &SymbolEmbeddingStatusQuery,
 ) -> Result<SymbolEmbeddingStatusResponse> {
-    let conn = Connection::open_with_flags(db_path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+    let conn = Connection::open(db_path)
         .with_context(|| format!("打开符号索引数据库失败: {}", db_path.display()))?;
     let metadata = load_metadata(&conn)?;
     let has_embeddings_table = table_exists(&conn, "embeddings")?;
+    let totals = load_embedding_totals(&conn, query.model.as_deref(), has_embeddings_table)?;
+    let project_status = upsert_project_index_status(
+        &conn,
+        query.trace_id.as_deref(),
+        query.model.as_deref(),
+        totals.chunk_count,
+        totals.embedded_count,
+        totals.missing_count,
+        totals.stale_count,
+    )?;
 
     Ok(SymbolEmbeddingStatusResponse {
         db_path: db_path.to_string_lossy().replace('\\', "/"),
@@ -115,8 +129,12 @@ pub(crate) fn load_symbol_embedding_status_db(
             limit: query.limit(),
         },
         metadata,
-        totals: load_embedding_totals(&conn, query.model.as_deref(), has_embeddings_table)?,
+        project_status,
+        totals,
         models: load_model_summaries(&conn, has_embeddings_table)?,
+        queue: load_embedding_queue_summary(&conn, query.limit())?,
+        costs: load_embedding_model_costs(&conn)?,
+        eval_set: load_retrieval_eval_set_summary(&conn, query.limit())?,
         missing_chunks: load_missing_chunks(&conn, query, has_embeddings_table)?,
     })
 }

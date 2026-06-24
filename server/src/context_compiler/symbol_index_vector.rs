@@ -2,13 +2,20 @@ use std::{cmp::Ordering, collections::HashMap, path::Path};
 
 use anyhow::{bail, Context, Result};
 use rusqlite::{params, Connection, OpenFlags};
+use uuid::Uuid;
 
 use super::{
     symbol_index::normalize_path,
     symbol_index_embedding_provider::{
-        embedding_terms, resolve_embedding_provider, vector_norm, SymbolEmbeddingProviderContext,
+        embedding_terms, is_remote_embedding_model, resolve_embedding_provider, vector_norm,
+        SymbolEmbeddingProviderContext,
     },
     symbol_index_embeddings::create_embedding_schema,
+    symbol_index_product::{
+        estimated_embedding_cost_micro_usd, finish_embedding_job, record_embedding_usage,
+        record_remote_embedding_failure, start_embedding_job, EmbeddingJobFinish,
+        EmbeddingJobStart, EmbeddingUsageRecord,
+    },
     symbol_index_query::{find_symbol_index_db, load_metadata},
     symbol_index_vector_types::{
         SymbolVectorBackfillQuery, SymbolVectorBackfillQueryEcho, SymbolVectorBackfillResponse,
@@ -28,6 +35,7 @@ struct ChunkForEmbedding {
     content: String,
     summary: Option<String>,
     hash: String,
+    token_count: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -91,21 +99,91 @@ pub(crate) fn backfill_symbol_vectors_db(
     create_embedding_schema(&conn)?;
     let metadata = load_metadata(&conn)?;
     let model = query.model();
-    let provider = resolve_embedding_provider(&model, provider_context)?;
+    let job_id = Uuid::new_v4().to_string();
+    start_embedding_job(
+        &conn,
+        &EmbeddingJobStart {
+            id: job_id.clone(),
+            trace_id: query.trace_id.clone(),
+            model: model.clone(),
+            limit: query.limit(),
+            force: query.force,
+        },
+    )?;
+    let provider = match resolve_embedding_provider(&model, provider_context) {
+        Ok(provider) => provider,
+        Err(error) => {
+            let reason = error.to_string();
+            if is_remote_embedding_model(&model) {
+                let _ = record_remote_embedding_failure(
+                    &conn,
+                    Some(&job_id),
+                    query.trace_id.as_deref(),
+                    &model,
+                    None,
+                    &reason,
+                );
+            }
+            let _ = finish_embedding_job(
+                &conn,
+                &job_id,
+                &EmbeddingJobFinish {
+                    scanned_count: 0,
+                    upserted_count: 0,
+                    skipped_count: 0,
+                    input_token_count: 0,
+                    estimated_cost_micro_usd: 0,
+                    failure_reason: Some(reason.clone()),
+                },
+            );
+            return Err(error);
+        }
+    };
     let existing = load_existing_hashes(&conn, &model)?;
     let chunks = load_chunks_for_embedding(&conn, query.limit())?;
 
     let mut upserted = 0;
     let mut skipped = 0;
     let mut dim = provider.dim();
+    let mut input_token_count = 0;
+    let mut estimated_cost_micro_usd = 0;
     for chunk in &chunks {
         let current = existing.get(chunk.id.as_str());
         if !query.force && current.is_some_and(|hash| hash == &chunk.hash) {
             skipped += 1;
             continue;
         }
-        let vector = provider.embed_chunk(&chunk.content, chunk.summary.as_deref())?;
+        let vector = match provider.embed_chunk(&chunk.content, chunk.summary.as_deref()) {
+            Ok(vector) => vector,
+            Err(error) => {
+                let reason = error.to_string();
+                if is_remote_embedding_model(&model) {
+                    let _ = record_remote_embedding_failure(
+                        &conn,
+                        Some(&job_id),
+                        query.trace_id.as_deref(),
+                        &model,
+                        Some(&chunk.id),
+                        &reason,
+                    );
+                }
+                let _ = finish_embedding_job(
+                    &conn,
+                    &job_id,
+                    &EmbeddingJobFinish {
+                        scanned_count: chunks.len(),
+                        upserted_count: upserted,
+                        skipped_count: skipped,
+                        input_token_count,
+                        estimated_cost_micro_usd,
+                        failure_reason: Some(reason.clone()),
+                    },
+                );
+                return Err(error);
+            }
+        };
         dim = vector.len();
+        let cost = estimated_embedding_cost_micro_usd(&model, chunk.token_count);
         conn.execute(
             r#"
             INSERT OR REPLACE INTO embeddings(chunk_id, model, dim, vector, content_hash, created_at)
@@ -119,8 +197,32 @@ pub(crate) fn backfill_symbol_vectors_db(
                 chunk.hash.as_str(),
             ],
         )?;
+        record_embedding_usage(
+            &conn,
+            &EmbeddingUsageRecord {
+                job_id: &job_id,
+                chunk_id: &chunk.id,
+                model: provider.model(),
+                token_count: chunk.token_count,
+                estimated_cost_micro_usd: cost,
+            },
+        )?;
+        input_token_count += chunk.token_count;
+        estimated_cost_micro_usd += cost;
         upserted += 1;
     }
+    finish_embedding_job(
+        &conn,
+        &job_id,
+        &EmbeddingJobFinish {
+            scanned_count: chunks.len(),
+            upserted_count: upserted,
+            skipped_count: skipped,
+            input_token_count,
+            estimated_cost_micro_usd,
+            failure_reason: None,
+        },
+    )?;
 
     Ok(SymbolVectorBackfillResponse {
         db_path: db_path.to_string_lossy().replace('\\', "/"),
@@ -131,11 +233,14 @@ pub(crate) fn backfill_symbol_vectors_db(
             force: query.force,
         },
         metadata,
+        job_id,
         model,
         dim,
         scanned_count: chunks.len(),
         upserted_count: upserted,
         skipped_count: skipped,
+        input_token_count,
+        estimated_cost_micro_usd,
     })
 }
 
@@ -207,7 +312,7 @@ fn load_existing_hashes(conn: &Connection, model: &str) -> Result<HashMap<String
 fn load_chunks_for_embedding(conn: &Connection, limit: usize) -> Result<Vec<ChunkForEmbedding>> {
     let mut stmt = conn.prepare(
         r#"
-        SELECT id, content, summary, hash
+        SELECT id, content, summary, hash, token_count
         FROM chunks
         ORDER BY CASE chunk_type WHEN 'symbol' THEN 0 WHEN 'module' THEN 1 ELSE 2 END,
             file_path, start_line
@@ -220,6 +325,7 @@ fn load_chunks_for_embedding(conn: &Connection, limit: usize) -> Result<Vec<Chun
             content: row.get(1)?,
             summary: row.get(2)?,
             hash: row.get(3)?,
+            token_count: to_usize(row.get::<_, i64>(4)?),
         })
     })?;
     collect_rows(rows)

@@ -20,6 +20,7 @@ use super::{
         SymbolRetrievalRunHistoryQueryEcho, SymbolRetrievalRunLookupQuery,
         SymbolRetrievalRunSummary, SymbolRetrievalRunsResponse,
     },
+    symbol_index_product::{create_product_schema, record_real_task_eval_case},
     symbol_index_query::find_symbol_index_db,
     symbol_index_store::create_retrieval_runs_schema,
 };
@@ -337,6 +338,7 @@ fn record_retrieval_run(
     let conn = Connection::open(&db_path)
         .with_context(|| format!("打开符号索引数据库失败: {}", db_path.display()))?;
     create_retrieval_runs_schema(&conn)?;
+    create_product_schema(&conn)?;
 
     let selected_chunks_json = serde_json::to_string(&response.cases)?;
     let scores_json = serde_json::to_string(&RetrievalRunScores {
@@ -362,8 +364,37 @@ fn record_retrieval_run(
             unix_timestamp(),
         ],
     )?;
+    record_retrieval_eval_cases(&conn, query, response)?;
 
     Ok(db_path.to_string_lossy().replace('\\', "/"))
+}
+
+fn record_retrieval_eval_cases(
+    conn: &Connection,
+    query: &SymbolRetrievalEvalBatchQuery,
+    response: &SymbolRetrievalEvalBatchResponse,
+) -> Result<()> {
+    for (case_query, case_response) in query.cases.iter().zip(response.cases.iter()) {
+        let Some(result) = case_response.result.as_ref() else {
+            continue;
+        };
+        let must_include_json = serde_json::to_string(&case_query.query.must_include)?;
+        record_real_task_eval_case(
+            conn,
+            case_query
+                .query
+                .trace_id
+                .as_deref()
+                .or(query.trace_id.as_deref()),
+            &response.run_id,
+            &case_query.id,
+            case_query.query.text.as_deref().unwrap_or_default(),
+            &must_include_json,
+            Some(result.metrics.recall_at_k),
+            Some(result.missing_requirements.len()),
+        )?;
+    }
+    Ok(())
 }
 
 fn batch_query_text(query: &SymbolRetrievalEvalBatchQuery) -> String {
