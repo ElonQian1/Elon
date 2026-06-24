@@ -260,6 +260,7 @@ impl ProjectAgentRunRecoveryEntry {
     }
 }
 
+#[cfg(test)]
 fn recent_task_resume_views(
     records: Vec<TaskJournalRecord>,
     active_task_ids: &BTreeSet<String>,
@@ -305,6 +306,7 @@ impl From<ActiveCliPromptView> for ProjectAgentRunControl {
     }
 }
 
+#[cfg(test)]
 fn project_task_resume_view(record: TaskJournalRecord) -> ProjectAgentRunTaskResume {
     project_task_resume_view_with_approvals(record, None)
 }
