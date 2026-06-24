@@ -28,7 +28,8 @@ private val homeListClockFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale
 private val homeListMonthDayFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
 private val homeListYearMonthDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
 private val homeListWeekdays = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-private const val PROJECT_MARKER_VISUAL_OFFSET_DP = 4
+private const val HOME_LIST_PREVIEW_COLOR = "#606060"
+private const val PROJECT_MARKER_VISUAL_OFFSET_DP = 12
 
 private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): String {
     if (timestampMs <= 0L) return ""
@@ -110,7 +111,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = friend.lastMessage ?: friend.phone ?: friend.account
-            setTextColor(Color.parseColor(if (friend.unreadCount > 0) "#A8A8A8" else "#A8A8A8"))
+            setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
             textSize = 13f
         })
         row.addView(middle)
@@ -162,7 +163,7 @@ internal class MainHomeRows(
             includeFontPadding = false
             maxLines = 1
             text = group.lastMessage ?: "${group.memberCount} 位成员"
-            setTextColor(Color.parseColor(if (group.unreadCount > 0) "#A8A8A8" else "#A8A8A8"))
+            setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
             textSize = 13f
         })
         row.addView(middle)

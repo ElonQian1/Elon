@@ -1,6 +1,6 @@
 # APP UI 设计规范
 
-最后更新：2026-06-16
+最后更新：2026-06-24
 
 本文件替代旧版“APP 颜色规范”，作为一龙 APP 的完整 UI 设计规范。文件名保留历史路径，方便现有 AI 路由、脚本和说明继续定位；内容以本版为准。任何 APP 页面、主题、颜色、按钮、卡片、列表、底部导航、弹窗、状态标签或项目空间 UI 调整，都必须先遵守本文件；除非任务本身是更新本规范。
 
@@ -41,6 +41,7 @@
 | 主操作按钮 / 菜单 / 封面占位 | `color.surface.inverse` | `elon_surface_inverse` | `--surface-inverse` | `#FFFFFF` | 图 1 封面、图 2 按钮、图 3 菜单 |
 | 一级 Tab / 广场卡片标题 / 状态文字 | `color.text.primary` | `elon_text_primary` | `--ink` | `#D9D9D9` | 图 1/2 大标题、图 2 卡片标题 |
 | 我的项目列表项标题 | `color.text.list.title` | `elon_text_list_title` | `--ink-list-title` | `#FFFFFF` | 图 1 “项目名称” |
+| 好友页列表摘要 | `color.text.list.preview` | `elon_text_list_preview` | `--ink-list-preview` | `#606060` | 微信会话列表摘要采样 |
 | 详情页居中标题 | `color.text.detail.title` | `elon_text_detail_title` | `--ink-detail-title` | `#F4F5FB` | 图 3 顶部“魔王” |
 | 正文元信息 | `color.text.secondary` | `elon_text_secondary` | `--ink-muted` | `#B8B8B8` | 图 2 创建者、简介 |
 | 搜索占位 / 空状态 / 公告正文 | `color.text.placeholder` | `elon_text_placeholder` | `--ink-placeholder` | `#AFAFAF` | 图 2 搜索占位、图 3 空状态 |
@@ -89,7 +90,8 @@ APP 字体尺寸以当前 **好友页面** 和 **我的页面** 的实际 UI 为
 文字颜色规则：
 
 - 主标题、好友会话标题、我的页功能入口使用 `color.text.primary`。
-- 好友会话摘要、我的页账号、签名、版本号使用 `color.text.secondary`、`color.text.placeholder` 或 `color.text.quiet`。
+- 好友页列表的会话摘要和项目摘要使用 `color.text.list.preview`，用于和好友名称/项目名称拉开层级。
+- 我的页账号、签名、版本号使用 `color.text.secondary`、`color.text.placeholder` 或 `color.text.quiet`。
 - 白色按钮内文字使用 `color.text.inverse`，可沿用 `font.page.title` 并加粗。
 - 禁止用绿色表达普通标题或普通链接，绿色只表达状态或少数明确状态入口。
 
@@ -294,6 +296,7 @@ Web 变量建议：
 - `--bg-plaza` 对应 `color.bg.plaza`。
 - `--bg-chrome` 对应 `color.bg.chrome`。
 - `--bg-canvas` 对应 `color.bg.canvas`。
+- `--ink-list-preview` 对应 `color.text.list.preview`。
 - `--panel` 对应 `color.surface.card`。
 - `--panel-header` 对应 `color.surface.header`。
 - `--segment-selected` 对应 `color.surface.segment.selected`。
