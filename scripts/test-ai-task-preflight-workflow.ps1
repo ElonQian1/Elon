@@ -59,6 +59,19 @@ function Assert-DocumentContains {
     Assert-Contains -Text $docContent -Expected $Snippet -Message "Workflow documentation is missing the required preflight/worktree rule in $RelativePath."
 }
 
+function Assert-DocumentDoesNotContain {
+    param(
+        [string]$RelativePath,
+        [string]$Snippet
+    )
+
+    $docPath = Join-Path $repoRoot $RelativePath
+    $docContent = Get-Content -Raw -LiteralPath $docPath
+    if ($docContent.Contains($Snippet)) {
+        throw "Workflow documentation still contains obsolete preflight/worktree guidance in $RelativePath. Forbidden: $Snippet"
+    }
+}
+
 Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
 Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WORKTREE_CREATED=true"
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "WORKTREE_PATH"
@@ -71,6 +84,14 @@ Assert-DocumentContains -RelativePath ".github\agents\elon-implementer.agent.md"
 Assert-DocumentContains -RelativePath ".github\agents\elon-planner.agent.md" -Snippet "ai-task-preflight"
 Assert-DocumentContains -RelativePath ".github\agents\elon-reviewer.agent.md" -Snippet "release API"
 Assert-DocumentContains -RelativePath ".github\skills\cloud-apk-dev\SKILL.md" -Snippet "WORKTREE_CREATED=true"
+$parallelPublishDiscussionDoc = Join-Path "docs" ([string]::Concat([char]0x5e76, [char]0x884c, [char]0x53d1, [char]0x5e03, [char]0x8ba8, [char]0x8bba, ".md"))
+Assert-DocumentContains -RelativePath $parallelPublishDiscussionDoc -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
+Assert-DocumentContains -RelativePath $parallelPublishDiscussionDoc -Snippet "WORKTREE_PATH"
+Assert-DocumentContains -RelativePath $parallelPublishDiscussionDoc -Snippet "scripts\cleanup-task-worktrees.ps1"
+Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "git fetch origin main"
+Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "Stop-Process"
+Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "bb64a-session"
+Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "bb64a-deploy"
 
 $tempBase = [System.IO.Path]::GetTempPath()
 $testRoot = Join-Path $tempBase ("elon-preflight-workflow-test-" + [Guid]::NewGuid().ToString("N"))
