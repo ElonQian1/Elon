@@ -87,21 +87,8 @@ internal class MainHomeRows(
         })
         row.addView(middle)
 
-        friend.lastMessageAt?.let { time ->
-            row.addView(TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    gravity = Gravity.TOP
-                    marginStart = dp(8)
-                    topMargin = dp(18)
-                }
-                includeFontPadding = false
-                text = timeFormatter.format(Date(time))
-                setTextColor(Color.parseColor("#A8A8A8"))
-                textSize = 12f
-            })
+        createHomeRowTrailing(friend.lastMessageAt, showProjectMarker)?.let { trailing ->
+            row.addView(trailing)
         }
         return row
     }
@@ -152,23 +139,50 @@ internal class MainHomeRows(
         })
         row.addView(middle)
 
-        (group.lastMessageAt ?: group.createdAt)?.let { time ->
-            row.addView(TextView(activity).apply {
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    gravity = Gravity.TOP
-                    marginStart = dp(8)
-                    topMargin = dp(18)
-                }
-                includeFontPadding = false
-                text = timeFormatter.format(Date(time))
-                setTextColor(Color.parseColor("#A8A8A8"))
-                textSize = 12f
-            })
+        createHomeRowTrailing(group.lastMessageAt ?: group.createdAt, showProjectMarker)?.let { trailing ->
+            row.addView(trailing)
         }
         return row
+    }
+
+    private fun createHomeRowTrailing(time: Long?, showProjectMarker: Boolean): View? {
+        if (time == null && !showProjectMarker) return null
+
+        return LinearLayout(activity).apply {
+            val columnWidth = if (showProjectMarker) dp(36) else LinearLayout.LayoutParams.WRAP_CONTENT
+            layoutParams = LinearLayout.LayoutParams(
+                columnWidth,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            ).apply {
+                marginStart = dp(8)
+            }
+            gravity = Gravity.CENTER_HORIZONTAL
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(18), 0, 0)
+
+            time?.let { value ->
+                addView(TextView(activity).apply {
+                    includeFontPadding = false
+                    text = timeFormatter.format(Date(value))
+                    setTextColor(Color.parseColor("#A8A8A8"))
+                    textSize = 12f
+                })
+            }
+
+            if (showProjectMarker) {
+                addView(createProjectMarkerIcon(), LinearLayout.LayoutParams(dp(36), dp(36)).apply {
+                    topMargin = if (time == null) 0 else dp(6)
+                })
+            }
+        }
+    }
+
+    private fun createProjectMarkerIcon(): ImageView {
+        return ImageView(activity).apply {
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            setImageResource(R.drawable.ic_home_project_marker)
+        }
     }
 
     private fun createHomeChatTitle(title: String): TextView {

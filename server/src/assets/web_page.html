@@ -330,10 +330,25 @@
       margin-top: 4px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    .conversation-item .trailing {
+      flex: 0 0 auto;
+      min-width: 36px;
+      align-self: stretch;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 16px;
+    }
     .conversation-item .time {
       font-size: 12px; color: var(--ink-soft);
-      align-self: flex-start; margin-top: 16px;
-      flex-shrink: 0; padding-left: 6px;
+      flex-shrink: 0;
+    }
+    .conversation-item .project-marker {
+      width: 36px;
+      height: 36px;
+      margin-top: 6px;
+      object-fit: contain;
+      pointer-events: none;
     }
     .conversation-item .item-delete {
       display: none;
@@ -3015,8 +3030,60 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const count = Number(group && (group.member_count || group.memberCount || 0));
     return (group && (group.last_message || group.lastMessage)) || (count > 0 ? count + ' 位成员' : '群聊');
   }
+  function projectHomeConversationCount(project) {
+    if (Array.isArray(project && project.conversations)) return project.conversations.length || 1;
+    return Number(project && (project.conversation_count || project.conversationCount || project.chat_count || 1)) || 1;
+  }
+  function projectHomeIsJoint(project) {
+    const role = String((project && project.role) || '').trim().toLowerCase();
+    const memberCount = Number(project && (project.member_count || project.memberCount || 0)) || 0;
+    const publicValue = project && (project.is_public || project.isPublic);
+    const isPublic = publicValue === true || publicValue === 1 || publicValue === '1' ||
+      String(publicValue || '').toLowerCase() === 'true';
+    return Boolean(
+      project && (
+        project.isJointProject ||
+        project.is_joint_project ||
+        project.collaborationProjectId ||
+        project.collaboration_project_id ||
+        (role && role !== 'owner') ||
+        isPublic ||
+        memberCount > 1
+      )
+    );
+  }
+  function projectHomeSubtitle(project) {
+    const intro = String(project && (
+      project.project_description ||
+      project.projectDescription ||
+      project.description ||
+      project.subtitle ||
+      ''
+    )).trim();
+    if (intro) return intro;
+    if (projectHomeIsJoint(project)) {
+      const count = Number(project && (project.member_count || project.memberCount || 0)) || 1;
+      return count + ' 位成员';
+    }
+    return '个人开发项目 · ' + projectHomeConversationCount(project) + ' 个会话';
+  }
+  function contactTitle(item) {
+    const data = item.data || {};
+    if (item.kind === 'friend') return friendDisplayName(data);
+    if (item.kind === 'group') return groupDisplayName(data);
+    return projectTitleOf(data);
+  }
+  function contactSubtitle(item) {
+    const data = item.data || {};
+    if (item.kind === 'friend') return friendSubtitle(data);
+    if (item.kind === 'group') return groupSubtitle(data);
+    return projectHomeSubtitle(data);
+  }
   function contactSortTime(item) {
     const data = item.data || {};
+    if (item.kind === 'project') {
+      return parseServerTime(data.updated_at || data.updatedAt || data.updated_at_ms || data.created_at || data.createdAt);
+    }
     return parseServerTime(data.last_message_at || data.lastMessageAt || data.created_at || data.createdAt);
   }
   function contactMatches(item, query) {
@@ -3029,6 +3096,17 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         data.phone,
         data.last_message,
         data.lastMessage
+      ].some((value) => normalizeSearch(value).includes(query));
+    }
+    if (item.kind === 'project') {
+      return [
+        projectTitleOf(data),
+        projectHomeSubtitle(data),
+        data.project_origin_label,
+        data.projectOriginLabel,
+        data.owner_account,
+        data.ownerAccount,
+        data.id
       ].some((value) => normalizeSearch(value).includes(query));
     }
     return [
@@ -3434,32 +3512,73 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return outer;
   }
 
+  function createProjectAvatarElement(project) {
+    const avatar = document.createElement('span');
+    avatar.className = 'brand';
+    const src = projectIconUrlOf(project);
+    if (src) {
+      const img = document.createElement('img');
+      img.src = src;
+      img.alt = '';
+      avatar.appendChild(img);
+    } else {
+      avatar.textContent = avatarInitial(projectTitleOf(project), '项');
+    }
+    return avatar;
+  }
+
+  function createContactTrailing(item) {
+    const timeText = formatListTimeMs(contactSortTime(item));
+    if (!timeText && item.kind !== 'project') return null;
+
+    const trailing = document.createElement('span');
+    trailing.className = 'trailing';
+    if (timeText) {
+      const time = document.createElement('span');
+      time.className = 'time';
+      time.textContent = timeText;
+      trailing.appendChild(time);
+    }
+    if (item.kind === 'project') {
+      const marker = document.createElement('img');
+      marker.className = 'project-marker';
+      marker.src = 'data:image/png;base64,__HOME_PROJECT_MARKER_PNG_B64__';
+      marker.alt = '';
+      marker.setAttribute('aria-hidden', 'true');
+      trailing.appendChild(marker);
+    }
+    return trailing;
+  }
+
   function createContactRow(item) {
     const row = document.createElement('button');
     row.type = 'button';
-    row.className = 'conversation-item';
+    row.className = 'conversation-item' + (item.kind === 'project' ? ' project' : '');
     const data = item.data;
-    row.appendChild(item.kind === 'friend'
-      ? createFriendAvatarElement(data)
-      : createGroupAvatarElement(data));
+    if (item.kind === 'friend') {
+      row.appendChild(createFriendAvatarElement(data));
+    } else if (item.kind === 'group') {
+      row.appendChild(createGroupAvatarElement(data));
+    } else {
+      row.appendChild(createProjectAvatarElement(data));
+    }
     const text = document.createElement('span');
     text.className = 'text';
     const title = document.createElement('span');
     title.className = 'title';
-    title.textContent = item.kind === 'friend' ? friendDisplayName(data) : groupDisplayName(data);
+    title.textContent = contactTitle(item);
     const sub = document.createElement('span');
     sub.className = 'sub';
-    sub.textContent = item.kind === 'friend' ? friendSubtitle(data) : groupSubtitle(data);
+    sub.textContent = contactSubtitle(item);
     text.appendChild(title);
     text.appendChild(sub);
     row.appendChild(text);
-    const time = document.createElement('span');
-    time.className = 'time';
-    time.textContent = formatListTimeMs(contactSortTime(item));
-    row.appendChild(time);
+    const trailing = createContactTrailing(item);
+    if (trailing) row.appendChild(trailing);
     row.addEventListener('click', () => {
       if (item.kind === 'friend') openFriendChat(data);
-      else openGroupChat(data);
+      else if (item.kind === 'group') openGroupChat(data);
+      else selectProject(data);
     });
     return row;
   }
@@ -3468,15 +3587,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const query = normalizeSearch(searchQuery);
     const allItems = groups.map((group) => ({ kind: 'group', data: group }))
       .concat(friends.map((friend) => ({ kind: 'friend', data: friend })))
+      .concat(projects.map((project) => ({ kind: 'project', data: project })))
       .filter((item) => contactMatches(item, query))
       .sort((a, b) => (contactSortTime(b) - contactSortTime(a)) || String(
-        a.kind === 'friend' ? friendDisplayName(a.data) : groupDisplayName(a.data)
+        contactTitle(a)
       ).localeCompare(String(
-        b.kind === 'friend' ? friendDisplayName(b.data) : groupDisplayName(b.data)
+        contactTitle(b)
       ), 'zh-Hans-CN'));
     if (!allItems.length) {
       conversationList.innerHTML = searchQuery
-        ? '<div class="empty-tip">没有匹配的好友或群聊</div>'
+        ? '<div class="empty-tip">没有匹配的好友、群聊或项目</div>'
         : '<div class="empty-tip">还没有好友<br/>点击右上角 ＋ 添加一位好友'
           + '<br/><button id="emptyAddFriendBtn">添加好友</button></div>';
       if (!searchQuery) {
