@@ -382,11 +382,13 @@ function Invoke-Fb2ContextPackSampleSetValidation {
     }
 
     $sampleSetFailures = $script:Failed - $startedFailures
+    $summaryComplete = ($sampleSetFailures -eq 0 -and $missing.Count -eq 0 -and $secretLike.Count -eq 0)
     $summary = [ordered]@{
         schema = "fb2.main_project.context_pack_sample_set_validation.v1"
         generated_at = (Get-Date).ToUniversalTime().ToString("o")
+        success = $summaryComplete
         samples_dir = [string]$Directory
-        complete = ($sampleSetFailures -eq 0 -and $missing.Count -eq 0 -and $secretLike.Count -eq 0)
+        complete = $summaryComplete
         scenario_count = @($results).Count
         passed_count = @($results | Where-Object { [bool]$_["passed"] }).Count
         failed_count = @($results | Where-Object { -not [bool]$_["passed"] }).Count
@@ -470,6 +472,7 @@ function Invoke-Fb2ContextPackValidatorSelfTest {
         $sampleSetFailures = $script:Failed - $beforeSampleSet
         $sampleSetSummary = Get-Content -Raw -LiteralPath $sampleSummaryPath | ConvertFrom-Json
         Assert-True ($sampleSetFailures -eq 0) "self-test sample set validation has no case failures" "case_failures=$sampleSetFailures"
+        Assert-True ([bool]$sampleSetSummary.success) "self-test sample set summary success" "success=$($sampleSetSummary.success)"
         Assert-True ([bool]$sampleSetSummary.complete) "self-test sample set summary complete" "complete=$($sampleSetSummary.complete)"
         Assert-True ($sampleSetSummary.scenario_count -eq 4) "self-test sample set scenario count" "count=$($sampleSetSummary.scenario_count)"
     } finally {

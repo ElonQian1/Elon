@@ -804,6 +804,7 @@ function Invoke-Fb2StatusSelfTest {
         if (-not [bool]$snapshot.latest_context_pack_sample_request.complete) { $failed++ }
         if ($snapshot.latest_context_pack_sample_request.scenario_count -ne 4) { $failed++ }
         if (-not [bool]$snapshot.latest_context_pack_sample_set.complete) { $failed++ }
+        if (-not [bool]$snapshot.latest_context_pack_sample_set.success) { $failed++ }
         if ($snapshot.latest_context_pack_sample_set.passed_count -ne 4) { $failed++ }
         if ($snapshot.latest_context_pack_sample_set.path -notmatch "fb2-repo-context-pack-samples-validation") { $failed++ }
         if (@($snapshot.latest_context_pack_sample_set.audit_ids) -notcontains "audit-fb2repo-today") { $failed++ }

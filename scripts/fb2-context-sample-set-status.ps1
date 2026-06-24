@@ -42,6 +42,7 @@ function Get-Fb2ContextSampleSetState {
         return [ordered]@{
             path = [string]$Path
             exists = $false
+            success = $false
             complete = $false
             schema = ""
             samples_dir = ""
@@ -98,10 +99,15 @@ function Get-Fb2ContextSampleSetState {
         $missing += "schema"
     }
 
+    $summaryComplete = ([bool](Get-Fb2ContextSampleSetProperty $summary "complete" $false) -and $missing.Count -eq 0)
+    $successRaw = Get-Fb2ContextSampleSetProperty $summary "success" $null
+    $summarySuccess = if ($null -eq $successRaw) { $summaryComplete } else { [bool]$successRaw }
+
     [ordered]@{
         path = [string]$Path
         exists = $true
-        complete = ([bool](Get-Fb2ContextSampleSetProperty $summary "complete" $false) -and $missing.Count -eq 0)
+        success = ($summarySuccess -and $missing.Count -eq 0)
+        complete = $summaryComplete
         schema = [string](Get-Fb2ContextSampleSetProperty $summary "schema" "")
         samples_dir = [string](Get-Fb2ContextSampleSetProperty $summary "samples_dir" "")
         scenario_count = [int](Get-Fb2ContextSampleSetProperty $summary "scenario_count" 0)
