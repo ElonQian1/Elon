@@ -487,8 +487,8 @@ class AIAutonomousEngine(
                     ActionResult(true, null)
                 }
                 "back" -> {
-                    service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
-                    ActionResult(true, null)
+                    val performed = service.performGlobalAction(AccessibilityService.GLOBAL_ACTION_BACK)
+                    ActionResult(performed, if (performed) null else "返回键执行失败")
                 }
                 else -> ActionResult(false, "未知动作类型: ${action.type}")
             }
@@ -564,7 +564,7 @@ class AIAutonomousEngine(
                 .addStroke(GestureDescription.StrokeDescription(path, 0, 300))
                 .build()
             
-            service.dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
+            val dispatched = service.dispatchGesture(gesture, object : AccessibilityService.GestureResultCallback() {
                 override fun onCompleted(gestureDescription: GestureDescription?) {
                     cont.resume(ActionResult(true, null)) {}
                 }
@@ -572,6 +572,10 @@ class AIAutonomousEngine(
                     cont.resume(ActionResult(false, "滑动被取消")) {}
                 }
             }, null)
+
+            if (!dispatched) {
+                cont.resume(ActionResult(false, "dispatchGesture 返回 false")) {}
+            }
         }
     }
     
