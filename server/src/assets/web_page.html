@@ -48,8 +48,8 @@
       --badge-info-ink: #8DDC9B;
       --badge-neutral-bg: #1A1A1A;
       --badge-neutral-ink: #D9D9D9;
-      --nav-bg: #151515;
-      --nav-active-bg: #151515;
+      --nav-bg: #212121;
+      --nav-active-bg: #212121;
       --popup-panel-bg: #242424;
       --bubble-user: #FFFFFF;
       --bubble-user-ink: #000000;
@@ -64,7 +64,7 @@
       --bubble-error-ink: #c62828;
       --tab-icon: #D6D6D6;
       --tab-active: #D6D6D6;
-      --bottom-menu-height: 52px;
+      --bottom-menu-height: 84px;
     }
     * { box-sizing: border-box; }
     * {
@@ -120,7 +120,7 @@
       padding: 0 4px;
     }
     .app.project-tabs-visible .toolbar {
-      height: 50px;
+      height: 62px;
     }
     .toolbar h1 {
       flex: 1;
@@ -191,11 +191,17 @@
       margin-right: 12px;
       padding: 12px;
       border-radius: 999px;
-      background: transparent;
+      background: #212121;
+      border: 1px solid #4D4D4D;
       color: #D3D3D3;
       box-shadow: none;
     }
-    #addBtn:hover { background: transparent; color: #D3D3D3; }
+    #addBtn:hover { background: #212121; color: #D3D3D3; }
+    .app.project-tabs-visible #addBtn {
+      width: 56px;
+      height: 56px;
+      padding: 16px;
+    }
     #searchBtn {
       width: 46px;
       flex-basis: 46px;
@@ -1596,6 +1602,7 @@
       background: var(--secondary-btn);
       color: var(--link);
       cursor: pointer;
+      font-weight: 600;
     }
     .agent-step-action.primary {
       height: 48px;
@@ -1647,7 +1654,7 @@
     /* ===== 输入栏 ===== */
     .input-bar {
       grid-area: input;
-      background: var(--panel);
+      background: var(--nav-bg);
       display: none;
       min-height: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom));
       padding: 8px 10px;
@@ -1662,7 +1669,7 @@
       min-width: 0;
       background: var(--input-pill-bg);
       border: 1px solid var(--input-pill-bg);
-      border-radius: 6px;
+      border-radius: 21px;
       color: var(--ink-strong);
       padding: 8px 14px;
       font-size: 15px;
@@ -1679,7 +1686,7 @@
       border: 0;
       color: var(--ink);
       font-size: 13px;
-      border-radius: 6px;
+      border-radius: 21px;
       cursor: pointer;
     }
     .input-bar .model-btn:hover { background: #2A2A2A; }
@@ -1689,7 +1696,7 @@
       border: 0;
       color: var(--brand-ink);
       font-size: 15px;
-      border-radius: 6px;
+      border-radius: 21px;
       cursor: pointer;
     }
     .input-bar .send-btn:hover { background: var(--brand-hover); }
