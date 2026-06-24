@@ -11,20 +11,27 @@
         container.textContent = '刷新本机助手后显示每个操作是否可用。';
         return;
       }
-      container.innerHTML = `<div class="settings-client-actions">${actions.map((action, index) => {
-        const normalized = normalizeAction(action);
+      const displayActions = actions
+        .map((action, originalIndex) => ({ action: normalizeAction(action), originalIndex }))
+        .sort((left, right) => Number(right.action.recommended) - Number(left.action.recommended) || left.originalIndex - right.originalIndex);
+      container.innerHTML = `<div class="settings-client-actions">${displayActions.map(({ action: normalized }, index) => {
         actionCache[index] = normalized;
         const status = normalized.enabled ? '可用' : disabledReason(normalized);
+        const title = `${normalized.recommended ? '建议 · ' : ''}${normalized.label} · ${status}`;
+        const description = normalized.recommended && normalized.recommendation
+          ? normalized.recommendation
+          : normalized.description;
         const classes = [
           'settings-client-action',
           normalized.enabled ? 'is-enabled' : 'is-disabled',
+          normalized.recommended ? 'is-recommended' : '',
           normalized.tone === 'danger' ? 'is-danger' : '',
           normalized.tone === 'primary' ? 'is-primary' : ''
         ].filter(Boolean).join(' ');
         const disabled = normalized.enabled ? '' : ' disabled';
         return `<button class="${classes}" type="button" data-maintenance-action-index="${index}" title="${escapeHtml(normalized.description)}"${disabled}>
-          <strong>${escapeHtml(normalized.label)} · ${escapeHtml(status)}</strong>
-          <span>${escapeHtml(normalized.description)}</span>
+          <strong>${escapeHtml(title)}</strong>
+          <span>${escapeHtml(description)}</span>
         </button>`;
       }).join('')}</div>`;
       container.querySelectorAll('[data-maintenance-action-index]').forEach((button) => {
@@ -43,6 +50,8 @@
         label: clean(action && action.label) || clean(action && action.id) || '维护操作',
         description: clean(action && action.description) || '本机助手未返回说明。',
         enabled: !!action && action.enabled !== false,
+        recommended: !!(action && action.recommended),
+        recommendation: clean(action && action.recommendation),
         tone: clean(action && action.tone),
         confirmation: clean(action && action.confirmation)
       };

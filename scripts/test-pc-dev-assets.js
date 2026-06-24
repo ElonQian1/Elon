@@ -1377,6 +1377,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcClientMaintenanceJs.includes('/api/client-maintenance/open'), 'PC client maintenance module should open maintenance targets through local node');
   assert.ok(pcClientMaintenanceJs.includes('openTarget'), 'PC client maintenance module should keep target opening contract-driven');
   assert.ok(pcClientMaintenanceJs.includes('disabledReason'), 'PC client maintenance module should explain disabled maintenance actions');
+  assert.ok(pcClientMaintenanceJs.includes('is-recommended'), 'PC client maintenance module should highlight the recommended action');
+  assert.ok(pcClientMaintenanceJs.includes('Number(right.action.recommended)'), 'PC client maintenance module should sort the recommended action first');
   assert.ok(pcClientMaintenanceJs.includes('export_diagnostics'), 'PC client maintenance module should expose diagnostics export as an action');
   assert.ok(pcClientMaintenanceJs.includes('/api/client-maintenance/repair'), 'PC client maintenance module should repair the Windows client through local node');
   assert.ok(pcApp.includes('settingsClientActions'), 'PC settings should render local maintenance action availability');
@@ -1390,6 +1392,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('客户端已是最新'), 'PC settings should compare installed and latest client package versions');
   assert.ok(pcApp.includes('clientStartMenuLine'), 'PC settings should summarize Windows start menu maintenance entry health');
   assert.ok(pcApp.includes('clientRecommendedActionsLine'), 'PC settings should summarize recommended Windows client maintenance actions');
+  assert.ok(pcApp.includes('clientPrimaryMaintenanceActionLine'), 'PC settings should summarize the primary Windows client maintenance action');
+  assert.ok(pcApp.includes('primary_maintenance_action'), 'PC settings should read the primary Windows client maintenance action');
   assert.ok(pcApp.includes('recommended_actions'), 'PC settings should read recommended client maintenance actions from local node');
   assert.ok(pcApp.includes('建议'), 'PC settings should show a user-facing maintenance recommendation');
   assert.ok(pcApp.includes('missing_start_menu_entry_count'), 'PC settings should display missing start menu maintenance entries');
@@ -1459,6 +1463,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppCss.includes('.settings-client-actions'), 'PC app CSS should style maintenance action availability cards');
   assert.ok(pcAppCss.includes('.settings-client-actions-placeholder'), 'PC app CSS should style maintenance action loading text');
   assert.ok(pcAppCss.includes('.settings-client-action.is-disabled'), 'PC app CSS should distinguish unavailable maintenance actions');
+  assert.ok(pcAppCss.includes('.settings-client-action.is-recommended'), 'PC app CSS should distinguish the recommended maintenance action');
   assert.ok(pcAppCss.includes('.settings-client-action.is-danger'), 'PC app CSS should distinguish destructive maintenance actions');
   assert.ok(pcAppCss.includes('.rail-avatar::before'), 'PC rail should render a Discord-like active indicator');
   assert.ok(pcAppCss.includes('.rail-avatar:focus-visible'), 'PC rail should have a keyboard focus state');
@@ -1487,6 +1492,8 @@ function testLocalAdminTokenWiring() {
   const clientMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_maintenance.rs'), 'utf8');
   assert.ok(clientMaintenance.includes('maintenance_recent_events'), 'client maintenance status should expose recent maintenance events');
   assert.ok(clientMaintenance.includes('recent_maintenance_events'), 'client maintenance status should read recent maintenance log lines');
+  assert.ok(clientMaintenance.includes('primary_maintenance_action'), 'client maintenance status should expose the primary maintenance action');
+  assert.ok(clientMaintenance.includes('primary_action_recommendation'), 'client maintenance status should compute a primary maintenance recommendation');
   assert.ok(clientMaintenance.includes('repair_handler'), 'client maintenance should expose a repair handler');
   assert.ok(clientMaintenance.includes('repair_client'), 'client maintenance should publish a repair action');
   const clientInstallStatus = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_install_status.rs'), 'utf8');

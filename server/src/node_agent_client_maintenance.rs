@@ -156,10 +156,12 @@ fn with_install_status(mut payload: Value) -> Value {
                 }
             }
         }
+        let actions = maintenance_actions(&install);
         object.insert(
-            "maintenance_actions".to_string(),
-            maintenance_actions(&install),
+            "primary_maintenance_action".to_string(),
+            primary_maintenance_action(&actions),
         );
+        object.insert("maintenance_actions".to_string(), actions);
     }
     payload
 }
@@ -193,7 +195,7 @@ fn maintenance_actions(install: &Value) -> Value {
     };
     let can_use_installed_client = supported && installed;
 
-    Value::Array(vec![
+    let mut actions = vec![
         action(
             "open_install_dir",
             "open_target",
@@ -308,7 +310,73 @@ fn maintenance_actions(install: &Value) -> Value {
             "danger",
             Some("确认卸载一龙 PC 节点客户端？卸载会退出本机节点并清理安装目录。"),
         ),
-    ])
+    ];
+    let recommendation =
+        primary_action_recommendation(supported, installed, layout_status, product_status);
+    for action in &mut actions {
+        if action.get("id").and_then(Value::as_str) == Some(recommendation.action_id) {
+            if let Some(object) = action.as_object_mut() {
+                object.insert("recommended".to_string(), Value::Bool(true));
+                object.insert(
+                    "recommendation".to_string(),
+                    Value::String(recommendation.reason.to_string()),
+                );
+            }
+            break;
+        }
+    }
+    Value::Array(actions)
+}
+
+fn primary_maintenance_action(actions: &Value) -> Value {
+    actions
+        .as_array()
+        .and_then(|items| {
+            items
+                .iter()
+                .find(|action| action.get("recommended").and_then(Value::as_bool) == Some(true))
+        })
+        .cloned()
+        .unwrap_or(Value::Null)
+}
+
+struct MaintenanceRecommendation {
+    action_id: &'static str,
+    reason: &'static str,
+}
+
+fn primary_action_recommendation(
+    supported: bool,
+    installed: bool,
+    layout_status: &str,
+    product_status: &str,
+) -> MaintenanceRecommendation {
+    if !supported {
+        return MaintenanceRecommendation {
+            action_id: "repair_client",
+            reason: "当前平台不支持 Windows 客户端维护；请在安装了 Win 客户端的电脑上操作。",
+        };
+    }
+    if matches!(
+        product_status,
+        "needs_repair" | "repair_recommended" | "cleanup_recommended"
+    ) || !matches!(layout_status, "clean" | "unknown")
+    {
+        return MaintenanceRecommendation {
+            action_id: "repair_client",
+            reason: "检测到客户端入口、开始菜单或安装目录需要收敛，建议先修复客户端入口。",
+        };
+    }
+    if installed {
+        return MaintenanceRecommendation {
+            action_id: "check_update",
+            reason: "客户端布局正常，建议检查是否有新的完整客户端包。",
+        };
+    }
+    MaintenanceRecommendation {
+        action_id: "repair_client",
+        reason: "未检测到完整安装，建议先修复客户端入口。",
+    }
 }
 
 fn action(
@@ -679,9 +747,10 @@ enum ClientAction {
 #[cfg(test)]
 mod tests {
     use super::{
-        install_dir_from_local_app_data, maintenance_target, recent_maintenance_events,
-        status_payload, truncate_chars,
+        install_dir_from_local_app_data, maintenance_actions, maintenance_target,
+        primary_maintenance_action, recent_maintenance_events, status_payload, truncate_chars,
     };
+    use serde_json::json;
     use std::{fs, path::PathBuf};
 
     #[test]
@@ -788,6 +857,16 @@ mod tests {
                     && action["confirmation"].as_str().is_some()
             }));
         assert!(status["product_status"]["summary"].as_str().is_some());
+        assert!(status["primary_maintenance_action"]["id"]
+            .as_str()
+            .is_some());
+        assert_eq!(
+            status["primary_maintenance_action"]["recommended"].as_bool(),
+            Some(true)
+        );
+        assert!(status["primary_maintenance_action"]["recommendation"]
+            .as_str()
+            .is_some());
         assert_eq!(
             status["product_status"]["primary_entry_name"].as_str(),
             Some(crate::node_client_launcher::CLIENT_EXE_NAME)
@@ -851,6 +930,51 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn maintenance_actions_mark_repair_as_primary_when_layout_needs_cleanup() {
+        let actions = maintenance_actions(&json!({
+            "supported": true,
+            "installed": true,
+            "layout_status": "legacy_files_present",
+            "product_status": { "status": "cleanup_recommended" }
+        }));
+        let primary = primary_maintenance_action(&actions);
+
+        assert_eq!(primary["id"].as_str(), Some("repair_client"));
+        assert_eq!(primary["recommended"].as_bool(), Some(true));
+        assert!(primary["recommendation"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("修复客户端入口"));
+        assert_eq!(
+            actions
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|action| action["recommended"].as_bool() == Some(true))
+                .count(),
+            1
+        );
+    }
+
+    #[test]
+    fn maintenance_actions_mark_update_as_primary_when_client_is_ready() {
+        let actions = maintenance_actions(&json!({
+            "supported": true,
+            "installed": true,
+            "layout_status": "clean",
+            "product_status": { "status": "ready" }
+        }));
+        let primary = primary_maintenance_action(&actions);
+
+        assert_eq!(primary["id"].as_str(), Some("check_update"));
+        assert_eq!(primary["recommended"].as_bool(), Some(true));
+        assert!(primary["recommendation"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("检查"));
     }
 
     #[test]

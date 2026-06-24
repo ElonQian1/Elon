@@ -2547,6 +2547,13 @@ button { cursor: pointer; }
 .settings-client-action.is-primary strong {
   color: #dbe4ff;
 }
+.settings-client-action.is-recommended {
+  border-color: rgba(57, 178, 108, .5);
+  background: rgba(57, 178, 108, .12);
+}
+.settings-client-action.is-recommended strong {
+  color: #dff6e8;
+}
 .settings-client-action.is-danger strong {
   color: #ffdede;
 }

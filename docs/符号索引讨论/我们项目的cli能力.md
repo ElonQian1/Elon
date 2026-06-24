@@ -20,6 +20,8 @@ Route C 远程模型能力已经有服务端预算审计和运营后台报告：
 
 Win 节点 `/api/status` 会返回 `runtime_policy`，结构化暴露 full_access 的真实边界：Route A full_access 只适用于本机已安装 CLI 且需要本机项目授权；Route B/C 即使 full_access，也不会绕过工作区路径检查、命令白名单、工具审批或高危 `git push` 拦截。PC 页面和后续运营面板可以直接读取 `runtime_policy.fullAccess`、`runtime_policy.routeBC.highRiskGitPushDenied` 和 `full_access_grant_count` 做可视化，不再只靠文档记忆。
 
+Win 客户端维护入口已经集中到 PC 设置页和本机 `/api/client-maintenance`：状态接口会返回安装目录、运行日志、启动器日志、任务 journal、诊断目录、完整维护动作列表和唯一 `primary_maintenance_action`。PC 设置页会把首要建议动作排在维护按钮第一位，例如安装布局异常时优先“修复客户端入口”，布局正常时优先“检查更新”；卸载仍保留确认文案，诊断导出继续输出脱敏 JSON。
+
 这还不是完整 Codex 桌面版 parity。后续仍建议补：跨节点重启后可继续审批的审批状态落库；原 CLI TTY 仍是有限连续性，真正重新 attach 还需要后续 PTY/ConPTY 会话层。
 
 ---

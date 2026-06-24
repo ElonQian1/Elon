@@ -2785,6 +2785,7 @@
     const layoutStatus = clean(data.layout_status || install.layout_status);
     const startMenuLine = clientStartMenuLine(product, startMenu);
     const recommendedLine = clientRecommendedActionsLine(product);
+    const primaryMaintenanceLine = clientPrimaryMaintenanceActionLine(data.primary_maintenance_action);
     const installed = data.supported === false
       ? '当前平台不支持 Win 客户端维护'
       : data.installed
@@ -2804,6 +2805,7 @@
       clean(data.task_journal_dir) && `任务记录 ${clean(data.task_journal_dir)}`,
       clean(data.config_dir) && `配置 ${clean(data.config_dir)}`,
       recentMaintenance && `最近维护 ${recentMaintenance}`,
+      primaryMaintenanceLine && `首要建议 ${primaryMaintenanceLine}`,
       recommendedLine && `建议 ${recommendedLine}`,
       startMenuLine && `开始菜单 ${startMenuLine}`
     ].filter(Boolean);
@@ -2917,6 +2919,14 @@
       ? product.recommended_actions.map(clean).filter(Boolean)
       : [];
     return actions.slice(0, 3).join(' / ');
+  }
+
+  function clientPrimaryMaintenanceActionLine(action) {
+    if (!action || typeof action !== 'object') return '';
+    const label = clean(action.label);
+    const reason = clean(action.recommendation);
+    const enabled = action.enabled === false ? '当前不可用' : '可点击';
+    return [label, enabled, reason].filter(Boolean).join(' · ');
   }
 
   function clientStartMenuStatusLabel(status) {
