@@ -224,7 +224,12 @@
     .page.active { display: flex; }
 
     /* ===== 会话页 ===== */
-    .conversation-list { flex: 0 0 auto; }
+    .conversation-list {
+      flex: 0 0 auto;
+      transition: transform 180ms cubic-bezier(.2,.7,.2,1);
+      will-change: transform;
+    }
+    .conversation-list.pulling { transition: none; }
     .conversation-filter-pull {
       position: absolute;
       top: 8px;
@@ -237,7 +242,7 @@
       z-index: 28;
       transition: opacity 160ms ease, transform 160ms ease;
       --pull-filter-color: var(--pull-filter-project);
-      --pull-filter-offset: 113.1;
+      --pull-filter-offset: 100;
     }
     .conversation-filter-pull.visible {
       opacity: 1;
@@ -250,12 +255,20 @@
       animation: conversation-pull-spin 900ms linear infinite;
     }
     .pull-shell { fill: #212121; stroke: #4D4D4D; stroke-width: 2; }
+    .pull-base {
+      fill: none;
+      stroke: #4D4D4D;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      transform-origin: 21px 21px;
+      transform: rotate(-90deg);
+    }
     .pull-progress {
       fill: none;
       stroke: var(--pull-filter-color);
       stroke-width: 3.2;
       stroke-linecap: round;
-      stroke-dasharray: 113.1;
+      stroke-dasharray: 100;
       stroke-dashoffset: var(--pull-filter-offset);
       transform-origin: 21px 21px;
       transform: rotate(-90deg);
@@ -2037,7 +2050,8 @@
     <div id="conversationFilterPull" class="conversation-filter-pull" aria-hidden="true">
       <svg viewBox="0 0 42 42" focusable="false" aria-hidden="true">
         <circle class="pull-shell" cx="21" cy="21" r="19" />
-        <circle class="pull-progress" cx="21" cy="21" r="18" />
+        <circle class="pull-base" cx="21" cy="21" r="12.5" pathLength="100" />
+        <circle class="pull-progress" cx="21" cy="21" r="12.5" pathLength="100" />
       </svg>
     </div>
 
@@ -3726,23 +3740,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   const contactPullState = {
     active: false,
+    startedAtTop: false,
+    rejected: false,
     startX: 0,
     startY: 0,
     progress: 0,
-    maxDistance: 0,
     readySince: 0,
     lastAppliedAt: 0,
     holdTriggered: false,
     holdTimer: null
   };
 
-  const CONTACT_PULL_ACTIVATE = 22;
-  const CONTACT_PULL_TRIGGER = 96;
-  const CONTACT_PULL_DECISIVE_EXTRA = 18;
-  const CONTACT_PULL_MAX = 154;
-  const CONTACT_PULL_STABLE_MS = 140;
+  const CONTACT_PULL_ACTIVATE = 30;
+  const CONTACT_PULL_TRIGGER = 124;
+  const CONTACT_PULL_MAX = 176;
   const CONTACT_PULL_COOLDOWN_MS = 650;
-  const CONTACT_PULL_RESET_PROGRESS = 0.72;
 
   function isContactPullEnabled() {
     return currentTab === 'chatPage'
@@ -3756,29 +3768,30 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   function updateConversationPullIndicator(distance) {
     const capped = Math.max(0, Math.min(distance, CONTACT_PULL_MAX));
-    contactPullState.maxDistance = Math.max(contactPullState.maxDistance, capped);
     const progress = Math.max(0, Math.min(capped / CONTACT_PULL_TRIGGER, 1));
     const targetMode = nextContactFilterMode();
     contactPullState.progress = progress;
     conversationFilterPull.classList.add('visible');
-    conversationFilterPull.style.setProperty('--pull-filter-offset', (113.1 * (1 - progress)).toFixed(2));
+    conversationList.classList.add('pulling');
+    conversationFilterPull.style.setProperty('--pull-filter-offset', (100 * (1 - progress)).toFixed(2));
     conversationFilterPull.style.setProperty('--pull-filter-color', contactFilterColor(targetMode));
     conversationFilterPull.style.setProperty('--pull-offset', Math.min(capped * 0.34, 34).toFixed(1) + 'px');
     conversationFilterPull.style.setProperty('--pull-scale', (0.86 + 0.14 * progress).toFixed(3));
+    conversationList.style.transform = `translateY(${Math.min(capped * 0.22, 28).toFixed(1)}px)`;
     if (progress >= 1 && !contactPullState.holdTimer && !contactPullState.holdTriggered) {
       if (!contactPullState.readySince) contactPullState.readySince = Date.now();
       contactPullState.holdTimer = window.setTimeout(() => {
         if (!contactPullState.active || contactPullState.progress < 1 || !contactPullState.readySince) return;
         contactPullState.holdTriggered = true;
+        contactPullState.holdTimer = null;
         contactPullState.lastAppliedAt = Date.now();
         conversationFilterPull.classList.add('flash');
         window.setTimeout(() => conversationFilterPull.classList.remove('flash'), 640);
         setContactFilterMode('all');
       }, 1000);
-    } else if (progress < CONTACT_PULL_RESET_PROGRESS) {
+    } else if (progress < 1) {
       contactPullState.readySince = 0;
       clearConversationPullHold();
-      contactPullState.holdTriggered = false;
     }
   }
 
@@ -3791,25 +3804,26 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   function hideConversationPullIndicator() {
     conversationFilterPull.classList.remove('visible');
-    conversationFilterPull.style.setProperty('--pull-filter-offset', '113.1');
+    conversationFilterPull.style.setProperty('--pull-filter-offset', '100');
     conversationFilterPull.style.setProperty('--pull-offset', '0px');
     conversationFilterPull.style.setProperty('--pull-scale', '0.86');
+    conversationList.classList.remove('pulling');
+    conversationList.style.transform = 'translateY(0px)';
   }
 
   function resetContactPullState() {
     contactPullState.active = false;
+    contactPullState.startedAtTop = false;
+    contactPullState.rejected = false;
     contactPullState.progress = 0;
-    contactPullState.maxDistance = 0;
     contactPullState.readySince = 0;
     contactPullState.holdTriggered = false;
     clearConversationPullHold();
   }
 
-  function isStableContactPullRelease() {
+  function isContactPullReleaseReady() {
     if (contactPullState.holdTriggered || contactPullState.progress < 1 || !contactPullState.readySince) return false;
-    const steadyEnough = Date.now() - contactPullState.readySince >= CONTACT_PULL_STABLE_MS;
-    const clearlyPastThreshold = contactPullState.maxDistance >= CONTACT_PULL_TRIGGER + CONTACT_PULL_DECISIVE_EXTRA;
-    return steadyEnough || clearlyPastThreshold;
+    return true;
   }
 
   function installContactPullFilterGesture() {
@@ -3819,8 +3833,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       contactPullState.startX = touch.clientX;
       contactPullState.startY = touch.clientY;
       contactPullState.active = false;
+      contactPullState.startedAtTop = true;
+      contactPullState.rejected = false;
       contactPullState.progress = 0;
-      contactPullState.maxDistance = 0;
       contactPullState.readySince = 0;
       contactPullState.holdTriggered = false;
       clearConversationPullHold();
@@ -3828,11 +3843,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
     chatPage.addEventListener('touchmove', (event) => {
       if (!event.touches.length) return;
+      if (!contactPullState.startedAtTop || contactPullState.rejected) return;
       const touch = event.touches[0];
       const dy = touch.clientY - contactPullState.startY;
       const dx = Math.abs(touch.clientX - contactPullState.startX);
       if (!contactPullState.active) {
-        if (!isContactPullEnabled() || dy < CONTACT_PULL_ACTIVATE || dy < dx * 1.6) return;
+        if (dy < -8 || (dx > CONTACT_PULL_ACTIVATE && dy < dx * 1.8)) {
+          contactPullState.rejected = true;
+          return;
+        }
+        if (!isContactPullEnabled() || dy < CONTACT_PULL_ACTIVATE || dy < dx * 1.8) return;
         contactPullState.active = true;
       }
       if (!contactPullState.active) return;
@@ -3845,7 +3865,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         resetContactPullState();
         return;
       }
-      if (isStableContactPullRelease()) {
+      if (isContactPullReleaseReady()) {
         contactPullState.lastAppliedAt = Date.now();
         setContactFilterMode(nextContactFilterMode());
       }

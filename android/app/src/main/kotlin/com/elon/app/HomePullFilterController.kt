@@ -38,10 +38,10 @@ internal class HomePullFilterController(
     private val applyMode: (HomeListFilterMode) -> Unit
 ) {
     private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
-    private val activationDistance = maxOf(touchSlop * 1.7f, dp(22).toFloat())
-    private val triggerDistance = dp(96).toFloat()
-    private val decisiveDistance = triggerDistance + dp(18)
-    private val maxPullDistance = dp(154).toFloat()
+    private val activationDistance = maxOf(touchSlop * 2.2f, dp(30).toFloat())
+    private val triggerDistance = dp(124).toFloat()
+    private val maxPullDistance = dp(176).toFloat()
+    private val maxContentStretch = dp(28).toFloat()
     private val indicator = HomePullFilterIndicatorView(activity)
 
     private var scroller: ScrollView? = null
@@ -52,7 +52,8 @@ internal class HomePullFilterController(
     private var longHoldArmed = false
     private var pullProgress = 0f
     private var thresholdReadySince = 0L
-    private var maxGestureDistance = 0f
+    private var startedAtTop = false
+    private var gestureRejected = false
     private var lastModeAppliedAt = 0L
 
     private val longHoldRunnable = Runnable {
@@ -97,19 +98,27 @@ internal class HomePullFilterController(
                 longHoldTriggered = false
                 pullProgress = 0f
                 thresholdReadySince = 0L
-                maxGestureDistance = 0f
+                startedAtTop = scrollView.scrollY <= 0
+                gestureRejected = false
                 cancelLongHold()
                 return false
             }
 
             MotionEvent.ACTION_MOVE -> {
+                if (!startedAtTop || gestureRejected) {
+                    return false
+                }
                 val dy = event.y - downY
                 val dx = abs(event.x - downX)
                 if (!pulling) {
+                    if (dy < -touchSlop || (dx > activationDistance && dy < dx * 1.8f)) {
+                        gestureRejected = true
+                        return false
+                    }
                     if (
                         scrollView.scrollY > 0 ||
                         dy < activationDistance ||
-                        dy < dx * 1.6f ||
+                        dy < dx * 1.8f ||
                         event.pointerCount != 1
                     ) {
                         return false
@@ -154,27 +163,27 @@ internal class HomePullFilterController(
         indicator.scaleX = 0.86f
         indicator.scaleY = 0.86f
         indicator.translationY = 0f
+        binding.conversationPage.animate().cancel()
         indicator.start()
         indicator.update(currentMode().nextPullMode(), 0f)
     }
 
     private fun updatePull(distance: Float, eventTime: Long) {
         val cappedDistance = min(distance, maxPullDistance)
-        maxGestureDistance = maxOf(maxGestureDistance, cappedDistance)
         val nextProgress = (cappedDistance / triggerDistance).coerceIn(0f, 1f)
         pullProgress = nextProgress
         indicator.update(currentMode().nextPullMode(), nextProgress)
         indicator.translationY = min(cappedDistance * 0.34f, dp(34).toFloat())
         indicator.scaleX = 0.86f + 0.14f * nextProgress
         indicator.scaleY = indicator.scaleX
+        binding.conversationPage.translationY = min(cappedDistance * 0.22f, maxContentStretch)
 
         if (nextProgress >= RELEASE_PROGRESS_THRESHOLD) {
             if (thresholdReadySince == 0L) thresholdReadySince = eventTime
             armLongHold()
-        } else if (nextProgress < RELEASE_RESET_PROGRESS) {
+        } else {
             thresholdReadySince = 0L
             cancelLongHold()
-            longHoldTriggered = false
         }
     }
 
@@ -184,9 +193,7 @@ internal class HomePullFilterController(
 
     private fun isStableRelease(eventTime: Long): Boolean {
         if (longHoldTriggered || !isPastReleaseThreshold()) return false
-        val steadyEnough = eventTime - thresholdReadySince >= RELEASE_STABLE_MS
-        val pulledClearlyPastThreshold = maxGestureDistance >= decisiveDistance
-        return steadyEnough || pulledClearlyPastThreshold
+        return eventTime >= thresholdReadySince
     }
 
     private fun armLongHold() {
@@ -213,6 +220,11 @@ internal class HomePullFilterController(
                 indicator.update(currentMode().nextPullMode(), 0f)
             }
             .start()
+
+        binding.conversationPage.animate()
+            .translationY(0f)
+            .setDuration(durationMs)
+            .start()
     }
 
     private fun resetGesture() {
@@ -220,14 +232,13 @@ internal class HomePullFilterController(
         pullProgress = 0f
         longHoldTriggered = false
         thresholdReadySince = 0L
-        maxGestureDistance = 0f
+        startedAtTop = false
+        gestureRejected = false
         cancelLongHold()
     }
 
     private companion object {
         const val RELEASE_PROGRESS_THRESHOLD = 1f
-        const val RELEASE_RESET_PROGRESS = 0.72f
-        const val RELEASE_STABLE_MS = 140L
         const val SWITCH_COOLDOWN_MS = 650L
     }
 }
@@ -318,7 +329,7 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
         super.onDraw(canvas)
         val cx = width / 2f
         val cy = height / 2f
-        val radius = min(width, height) / 2f - 3.5f * density
+        val radius = (min(width, height) / 2f - 8.5f * density).coerceAtLeast(8f * density)
         ringRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
 
         canvas.drawCircle(cx, cy, min(width, height) / 2f - density, shellPaint)
