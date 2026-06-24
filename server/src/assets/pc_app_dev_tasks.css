@@ -349,6 +349,44 @@
   overflow-wrap: anywhere;
 }
 
+.agent-run-approval {
+  display: grid;
+  gap: 3px;
+  padding: 6px 7px;
+  border: 1px solid rgba(255, 255, 255, .07);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, .035);
+}
+
+.agent-run-approval span {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.agent-run-approval em {
+  color: var(--text-muted);
+  font-size: 12px;
+  font-style: normal;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.agent-run-approval.active {
+  border-color: rgba(35, 165, 90, .42);
+  background: rgba(35, 165, 90, .1);
+}
+
+.agent-run-approval.warning {
+  border-color: rgba(240, 178, 50, .38);
+  background: rgba(240, 178, 50, .09);
+}
+
+.agent-run-approval.failed {
+  border-color: rgba(237, 66, 69, .36);
+  background: rgba(237, 66, 69, .09);
+}
+
 .agent-run-status {
   justify-self: start;
   padding: 2px 6px;

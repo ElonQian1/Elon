@@ -889,7 +889,13 @@ async function testAgentRunsPanelLoadsProjectRuns() {
             can_resume_codex_session: true,
             next_action: 'continue_from_snapshot',
             strategy: { kind: 'snapshot_continue', label: '基于快照继续' },
-            reason: '本机 journal 显示任务未终态，但当前节点已没有运行句柄'
+            reason: '本机 journal 显示任务未终态，但当前节点已没有运行句柄',
+            tool_approval_recovery: {
+              status: 'lost_after_restart',
+              can_approve_now: false,
+              pending_after_restart_action: 'continue_from_snapshot',
+              reason: '节点重启或任务进程脱离后，内存中的审批 waiter 已丢失；历史审批卡必须失效，只能基于快照开启新任务。'
+            }
           }
         }],
         runs: [{
@@ -927,6 +933,8 @@ async function testAgentRunsPanelLoadsProjectRuns() {
   assert.ok(html.includes('data-agent-run-action="cancel"'), 'live control should expose stop action');
   assert.ok(html.includes('data-agent-run-action="continue"'), 'detached local task should expose continue action');
   assert.ok(html.includes('基于快照继续'), 'detached local task should explain snapshot continuation');
+  assert.ok(html.includes('审批已失效'), 'agent runs recovery card should show lost approval waiter state');
+  assert.ok(html.includes('历史审批卡必须失效'), 'agent runs recovery card should show the tool approval recovery reason');
   assert.ok(!html.includes('prompt'), 'agent runs panel should not render prompt text');
 
   agentRuns.bindActions({
@@ -957,6 +965,8 @@ async function testAgentRunsPanelLoadsProjectRuns() {
   assert.ok(drafted.includes('现场状态：detached / local_journal'), 'continue draft should include attach source');
   assert.ok(drafted.includes('本机 journal 事件可回放'), 'continue draft should tell the next agent to replay local journal events');
   assert.ok(drafted.includes('原 CLI 终端不可重接'), 'continue draft should keep tty limitation explicit');
+  assert.ok(drafted.includes('工具审批恢复：审批已失效'), 'continue draft should include tool approval recovery status');
+  assert.ok(drafted.includes('历史审批卡必须失效'), 'continue draft should include tool approval recovery reason');
   assert.ok(drafted.includes('不要假装已经接管原来的 CLI 窗口'), 'continue draft should forbid pretending the old TTY is attached');
   assert.ok(!drafted.includes('session-uuid'), 'continue draft should not leak raw codex session ids');
   await cancelHandler();
@@ -1431,6 +1441,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(agentRunsJs.includes('activeControls'), 'agent runs panel should render live local control handles');
   assert.ok(agentRunsJs.includes('recentTasks'), 'agent runs panel should render recent local task resume contracts');
   assert.ok(agentRunsJs.includes('recoveryEntry'), 'agent runs panel should normalize the top-level recovery entry');
+  assert.ok(agentRunsJs.includes('toolApprovalRecoveryView'), 'agent runs panel should render tool approval recovery state');
   assert.ok(agentRunsJs.includes('原 CLI 终端不可重接'), 'agent runs continuation draft should keep tty limitation explicit');
 
   const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
@@ -1494,6 +1505,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(devTasksCss.includes('.agent-run-stop'), 'PC dev task CSS should style the local agent stop action');
   assert.ok(devTasksCss.includes('.agent-run-continue'), 'PC dev task CSS should style the local agent continue action');
   assert.ok(devTasksCss.includes('.agent-run-recovery'), 'PC dev task CSS should distinguish the recommended recovery entry');
+  assert.ok(devTasksCss.includes('.agent-run-approval'), 'PC dev task CSS should style approval recovery state');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');

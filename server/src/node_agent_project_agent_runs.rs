@@ -665,6 +665,8 @@ mod tests {
         assert_eq!(view.status, "cancel_requested");
         let serialized = serde_json::to_string(&view).unwrap();
         assert!(serialized.contains("continue_from_snapshot"));
+        assert!(serialized.contains("tool_approval_recovery"));
+        assert!(serialized.contains("lost_after_restart"));
         assert!(serialized.contains("本机 journal"));
         assert!(!serialized.contains("secret prompt"));
         assert!(!serialized.contains("sk-live-secret"));

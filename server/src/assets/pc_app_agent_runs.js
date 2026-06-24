@@ -215,6 +215,7 @@
       const draftTask = canContinue ? recoveryTaskForDraft(entry, context) : null;
       const draft = draftTask ? continuationDraft(draftTask, context) : '';
       if (canContinue && taskId && draft) continuationDrafts.set(taskId, draft);
+      const approval = toolApprovalRecoveryView(draftTask || taskById(context, taskId));
       const meta = [
         cliName,
         route,
@@ -228,6 +229,7 @@
           <strong>${escapeHtml(shortRunId(taskId || kind || cliName))}</strong>
           <small>${escapeHtml(meta || recoveryKindLabel(kind))}</small>
           ${reason ? `<p>${escapeHtml(reason)}</p>` : ''}
+          ${approval ? toolApprovalRecoveryHtml(approval) : ''}
         </div>
         ${canContinue ? `<button class="agent-run-continue" type="button" data-agent-run-action="continue" data-task-id="${escapeHtml(taskId)}">继续</button>` : ''}
         ${!canContinue && canCancel ? `<button class="agent-run-stop" type="button" data-agent-run-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>` : ''}
@@ -245,6 +247,7 @@
       const canContinue = taskCanContinue(task);
       const draft = continuationDraft(task, context);
       if (canContinue && taskId && draft) continuationDrafts.set(taskId, draft);
+      const approval = toolApprovalRecoveryView(task);
       const meta = [
         cliName,
         route,
@@ -257,6 +260,7 @@
           <strong>${escapeHtml(shortRunId(taskId || cliName))}</strong>
           <small>${escapeHtml(meta || '本机任务快照')}</small>
           ${resumeHint(resume) ? `<p>${escapeHtml(resumeHint(resume))}</p>` : ''}
+          ${approval ? toolApprovalRecoveryHtml(approval) : ''}
         </div>
         ${canContinue ? `<button class="agent-run-continue" type="button" data-agent-run-action="continue" data-task-id="${escapeHtml(taskId)}">继续</button>` : ''}
       </article>`;
@@ -368,9 +372,7 @@
 
     function recoveryTaskForDraft(entry, context) {
       const taskId = recoveryEntryTaskId(entry);
-      const recent = Array.isArray(context && context.recentTasks)
-        ? context.recentTasks.find((task) => taskResumeId(task) === taskId)
-        : null;
+      const recent = taskById(context, taskId);
       if (recent) return recent;
       return {
         task_id: taskId,
@@ -404,6 +406,7 @@
       const resume = task && task.resume ? task.resume : null;
       const strategy = clean(resume && resume.strategy && resume.strategy.label);
       const reason = clean(resume && (resume.reason || (resume.strategy && resume.strategy.reason)));
+      const approval = toolApprovalRecoveryView(task);
       const canCodex = resumeFlag(resume, 'can_resume_codex_session', 'canResumeCodexSession');
       const canReplay = resumeFlag(resume, 'can_replay_journal_events', 'canReplayJournalEvents');
       const cannotStream = resumeFlag(resume, 'can_stream_live_output', 'canStreamLiveOutput') === false;
@@ -427,7 +430,8 @@
         attachStatus || attachSource ? `现场状态：${[attachStatus, attachSource].filter(Boolean).join(' / ')}` : '',
         canReplay ? '本机 journal 事件可回放' : '',
         canCodex ? '本机 Codex session 已记录，节点会优先自动续接；不要让用户手动粘贴 session id。' : '',
-        cannotStream ? '原 CLI 终端不可重接' : ''
+        cannotStream ? '原 CLI 终端不可重接' : '',
+        approval ? `工具审批恢复：${approval.label}${approval.detail ? `；${approval.detail}` : ''}` : ''
       ].filter(Boolean);
       return [
         '继续处理这个本机 Agent 任务。',
@@ -444,6 +448,55 @@
       if (typeof resume[snakeKey] === 'boolean') return resume[snakeKey];
       if (typeof resume[camelKey] === 'boolean') return resume[camelKey];
       return undefined;
+    }
+
+    function taskById(context, taskId) {
+      const target = clean(taskId);
+      if (!target || !Array.isArray(context && context.recentTasks)) return null;
+      return context.recentTasks.find((task) => taskResumeId(task) === target) || null;
+    }
+
+    function toolApprovalRecoveryView(task) {
+      const resume = task && task.resume ? task.resume : null;
+      const recovery = resume && (resume.tool_approval_recovery || resume.toolApprovalRecovery);
+      if (!recovery || typeof recovery !== 'object') return null;
+      const status = clean(recovery.status).toLowerCase();
+      const activeIds = Array.isArray(recovery.active_approval_ids || recovery.activeApprovalIds)
+        ? (recovery.active_approval_ids || recovery.activeApprovalIds).map(clean).filter(Boolean)
+        : [];
+      const label = toolApprovalRecoveryLabel(status, activeIds.length);
+      const reason = clean(recovery.reason);
+      const action = clean(recovery.pending_after_restart_action || recovery.pendingAfterRestartAction);
+      return {
+        status,
+        label,
+        detail: reason || action,
+        tone: toolApprovalRecoveryTone(status)
+      };
+    }
+
+    function toolApprovalRecoveryLabel(status, activeCount) {
+      if (status === 'active_waiter') return activeCount > 0 ? `审批可继续（${activeCount}）` : '审批可继续';
+      if (status === 'no_active_waiter') return '审批仅回放';
+      if (status === 'lost_after_restart') return '审批已失效';
+      if (status === 'closed_by_terminal_task') return '审批已关闭';
+      if (status === 'unavailable') return '审批状态不可用';
+      return '审批状态';
+    }
+
+    function toolApprovalRecoveryTone(status) {
+      if (status === 'active_waiter') return 'active';
+      if (status === 'no_active_waiter') return 'warning';
+      if (status === 'lost_after_restart' || status === 'closed_by_terminal_task') return 'failed';
+      return 'muted';
+    }
+
+    function toolApprovalRecoveryHtml(approval) {
+      if (!approval) return '';
+      return `<div class="agent-run-approval ${escapeHtml(approval.tone)}">
+        <span>${escapeHtml(approval.label)}</span>
+        ${approval.detail ? `<em>${escapeHtml(approval.detail)}</em>` : ''}
+      </div>`;
     }
 
     function resumeHint(resume) {
