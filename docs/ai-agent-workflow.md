@@ -17,7 +17,7 @@
 
 1. 每次进入项目先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。如果脚本创建了 worktree，必须切到 `WORKTREE_PATH` 后再观察目录结构和修改文件。脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录；如果是 `BLOCKED_CREATE_WORKTREE_FIRST`，当前目录不能继续改。
 2. 如果存在 `AGENTS.md`、`CODEX.md` 或 `README.md`，先读轻量入口；`.github/instructions/*.md` 和 `docs/` 只在当前任务需要时读取。
-3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建的任务 worktree 开始。当前任务自己的提交完成后第一时间 push；只有 push 被 non-fast-forward 拒绝时才 rebase。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
+3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建的任务 worktree 开始。当前任务自己的提交完成后第一时间 `git push origin HEAD:main`；只有 push 被 non-fast-forward 拒绝时才 rebase。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
 6. 如果任务在隔离 worktree 完成并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不要 stage、stash、删除或移动原主工作区的未跟踪文件，遇到同名路径冲突就报告。
@@ -31,7 +31,7 @@
 1. 服务器以 `project_id + conversation_id` 为单位分配会话执行权：不同项目可以并行，同一项目的不同会话也可以并行编码。
 2. 进入开发流程后，后端为每个 APK 会话创建或复用独立 Git worktree 和 `ai/session/...` 分支；Codex CLI 只在该会话 worktree 内修改、验证、提交并推送当前分支。主工作区的 `main` 只负责跟随最新 `origin/main`，不得被业务会话长期占用。
 3. 同一会话内仍然串行执行，避免一个会话的连续上下文和分支被两个任务同时修改。
-4. merge 到项目主工作区、Android 版本号递增、APK 发布、服务器部署、数据库任务状态落库必须串行；如果项目不能创建 worktree，退回项目级共享工作区串行执行。
+4. 推送到远端主线、Android 版本 claim、APK 发布、服务器部署、数据库任务状态落库必须串行；如果项目不能创建 worktree，退回项目级共享工作区串行执行。
 5. 一龙自项目与普通 GitHub / `local_path` 项目遵守同一套规则，不允许隐藏特殊流程。
 
 ---

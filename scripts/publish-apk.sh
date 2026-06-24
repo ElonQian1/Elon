@@ -629,7 +629,7 @@ restore_gradle
 
 SHA_FULL="$BUILD_BASE_SHA"
 SHA_SHORT="${SHA_FULL:0:7}"
-echo -e "${GREEN}   本次发布对应源 SHA: ${SHA_SHORT} (无新增 release commit)${NC}"
+echo -e "${GREEN}   本次发布对应源 SHA: ${SHA_SHORT} (无新增版本号提交)${NC}"
 
 # ═══════════════════════════════════════════════════════════════
 # Step 5: 上传前检查（防慢构建覆盖）
@@ -840,7 +840,7 @@ echo ""
 echo -e "${CYAN}${SEP}${NC}"
 echo -e "${GREEN}✅ 发布完成！${NC}"
 echo -e "   版本: v${NEW_NAME} (build ${NEW_CODE}) — 服务器分配，未写入 git"
-echo -e "   SHA:  ${SHA_SHORT} (源代码 commit，无新增 release commit)"
+echo -e "   SHA:  ${SHA_SHORT} (源代码提交，无新增版本号提交)"
 echo -e "   下载: $SERVER_URL/app/ElonSpeed-latest.apk"
 print_publish_status "published"
 echo -e "${CYAN}${SEP}${NC}"

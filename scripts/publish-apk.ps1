@@ -698,7 +698,7 @@ function Assert-ApkStillCurrentBeforeUpload {
     $deployedSha = Get-DeployedApkSha
 
     if ($deployedSha -and (Test-GitAncestor $ReleaseSha $deployedSha)) {
-        Write-Host "⏭️  服务器已部署包含本 release commit 的更新 APK：$((Format-ShortSha $deployedSha))" -ForegroundColor Cyan
+        Write-Host "⏭️  服务器已部署包含本源代码提交的更新 APK：$((Format-ShortSha $deployedSha))" -ForegroundColor Cyan
         Complete-Release -Success:$false -ErrorMessage "superseded by deployed apk $deployedSha"
         Write-ApkPublishStatus -ApkReleaseStatus "published" -Message "APK 已由更新主线发布，当前代码已包含在线上 APK。"
         exit 0
@@ -796,7 +796,7 @@ SHA_FILE="$APP_DIR/.apk-deployed-sha"
         }
         ssh -o ProxyCommand=none $ServerHost "rm -f '$apkStage' '$jsonStage'" | Out-Null
         Complete-Release -Success:$false -ErrorMessage "cas mismatch in apk deploy"
-        Write-Host "⏭️  APK 上传 CAS 失败：服务器部署状态已变化，且未确认包含本 release commit。本次 staging 不覆盖；代码已合并，发布交给最新主线。" -ForegroundColor Cyan
+        Write-Host "⏭️  APK 上传 CAS 失败：服务器部署状态已变化，且未确认包含本源代码提交。本次 staging 不覆盖；代码已合并，发布交给最新主线。" -ForegroundColor Cyan
         Write-ApkPublishStatus -ApkReleaseStatus "superseded_by_newer_main" -Message "代码已合并，发布交给最新主线。"
         exit 0
     }
@@ -952,11 +952,11 @@ Assert-ApkManifestVersion -ApkPath $apk.FullName -ExpectedVersionCode $newCode -
 Write-Host "🧹 还原 build.gradle 到 git 兜底版本（v$oldName / build $oldCode）..." -ForegroundColor Cyan
 Restore-GradleVersionFile
 
-# 本次发布的 git SHA 直接采用基础 commit（没有新的 release commit）。
+# 本次发布的 git SHA 直接采用基础源代码提交（不会新增版本号提交）。
 # version.json 的 gitSha = 本次实际编译用的源代码 SHA。
 $shaFull = $BuildBaseSha
 $sha = $shaFull.Substring(0,7)
-Write-Host "   本次发布对应源 SHA: $sha (无新增 release commit)" -ForegroundColor Green
+Write-Host "   本次发布对应源 SHA: $sha (无新增版本号提交)" -ForegroundColor Green
 
 Assert-ApkStillCurrentBeforeUpload -ReleaseSha $shaFull
 $serverShaBeforeUpload = Get-DeployedApkSha
@@ -1088,7 +1088,7 @@ Write-Host ""
 Write-Host ("=" * 60) -ForegroundColor Cyan
 Write-Host "✅ 发布完成！" -ForegroundColor Green
 Write-Host "   版本: v$versionName (build $newCode) — 服务器分配，未写入 git" -ForegroundColor White
-Write-Host "   SHA:  $sha (源代码 commit，无新增 release commit)" -ForegroundColor White
+Write-Host "   SHA:  $sha (源代码提交，无新增版本号提交)" -ForegroundColor White
 Write-Host "   下载: $downloadUrl" -ForegroundColor White
 Write-ApkPublishStatus -ApkReleaseStatus "published"
 Write-Host ("=" * 60) -ForegroundColor Cyan

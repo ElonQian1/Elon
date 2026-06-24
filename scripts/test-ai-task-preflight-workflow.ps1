@@ -76,6 +76,32 @@ function Assert-DocumentDoesNotContain {
     }
 }
 
+function Assert-WorkflowFileDoesNotContain {
+    param(
+        [string]$RelativePath,
+        [string]$Snippet,
+        [string]$Reason
+    )
+
+    $docPath = Join-Path $repoRoot $RelativePath
+    $docContent = Get-Content -Raw -LiteralPath $docPath
+    if ($docContent.Contains($Snippet)) {
+        throw "Workflow file contains obsolete release guidance in $RelativePath. Forbidden: $Snippet. $Reason"
+    }
+}
+
+function Assert-WorkflowFileContains {
+    param(
+        [string]$RelativePath,
+        [string]$Snippet,
+        [string]$Reason
+    )
+
+    $docPath = Join-Path $repoRoot $RelativePath
+    $docContent = Get-Content -Raw -LiteralPath $docPath
+    Assert-Contains -Text $docContent -Expected $Snippet -Message "Workflow file is missing required release guidance in $RelativePath. $Reason"
+}
+
 Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
 Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "EDIT_ROOT"
 Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet "WORKTREE_CREATED=true"
@@ -101,6 +127,41 @@ Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snipp
 Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "Stop-Process"
 Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "bb64a-session"
 Assert-DocumentDoesNotContain -RelativePath $parallelPublishDiscussionDoc -Snippet "bb64a-deploy"
+
+$releaseWorkflowFiles = @(
+    "AGENTS.md",
+    ".github\copilot-instructions.md",
+    ".github\instructions\git-deploy-workflow.instructions.md",
+    ".github\prompts\elon-dev-task.prompt.md",
+    ".github\prompts\elon-apk-release.prompt.md",
+    ".github\skills\cloud-apk-dev\SKILL.md",
+    "docs\ai-agent-workflow.md",
+    $parallelPublishDiscussionDoc,
+    "scripts\publish-apk.ps1",
+    "scripts\publish-apk.sh",
+    "scripts\publish-server.ps1",
+    "scripts\publish-server.sh"
+)
+
+foreach ($releaseWorkflowFile in $releaseWorkflowFiles) {
+    Assert-WorkflowFileDoesNotContain -RelativePath $releaseWorkflowFile -Snippet "git push origin master" -Reason "The project primary branch is main, and task worktrees must push current HEAD explicitly."
+    Assert-WorkflowFileDoesNotContain -RelativePath $releaseWorkflowFile -Snippet "HEAD:master" -Reason "The project primary branch is main."
+    Assert-WorkflowFileDoesNotContain -RelativePath $releaseWorkflowFile -Snippet "git push origin main" -Reason "Task worktrees are on codex/* branches; use git push origin HEAD:main so the current commit is pushed."
+}
+
+Assert-WorkflowFileContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "git push origin HEAD:main" -Reason "The current worktree commit must be pushed to origin/main explicitly."
+Assert-WorkflowFileContains -RelativePath ".github\copilot-instructions.md" -Snippet "git push origin HEAD:main" -Reason "The global instruction must not depend on the local branch name."
+Assert-WorkflowFileContains -RelativePath $parallelPublishDiscussionDoc -Snippet "git push origin HEAD:main" -Reason "Parallel workflow docs must show worktree-safe pushes."
+Assert-WorkflowFileContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "git push origin HEAD:main" -Reason "The long-form workflow must show worktree-safe pushes."
+Assert-WorkflowFileContains -RelativePath ".github\prompts\elon-apk-release.prompt.md" -Snippet "release-only commit" -Reason "APK release prompts must explicitly reject release-only version commits."
+Assert-WorkflowFileContains -RelativePath "scripts\publish-apk.ps1" -Snippet "Restore-GradleVersionFile" -Reason "APK publishing must restore claimed versions out of git."
+Assert-WorkflowFileContains -RelativePath "scripts\publish-apk.sh" -Snippet "restore_gradle" -Reason "APK publishing must restore claimed versions out of git."
+Assert-WorkflowFileDoesNotContain -RelativePath "scripts\publish-apk.ps1" -Snippet "release commit" -Reason "APK script logs should say source commit and no version commit, not imply a generated release commit."
+Assert-WorkflowFileDoesNotContain -RelativePath "scripts\publish-apk.sh" -Snippet "release commit" -Reason "APK script logs should say source commit and no version commit, not imply a generated release commit."
+Assert-WorkflowFileDoesNotContain -RelativePath "scripts\publish-apk.ps1" -Snippet "git commit -m" -Reason "APK publishing must not create release-only version commits."
+Assert-WorkflowFileDoesNotContain -RelativePath "scripts\publish-apk.sh" -Snippet "git commit -m" -Reason "APK publishing must not create release-only version commits."
+Assert-WorkflowFileDoesNotContain -RelativePath "scripts\publish-apk.ps1" -Snippet "git add " -Reason "APK publishing must not stage build.gradle version changes."
+Assert-WorkflowFileDoesNotContain -RelativePath "scripts\publish-apk.sh" -Snippet "git add " -Reason "APK publishing must not stage build.gradle version changes."
 
 $tempBase = [System.IO.Path]::GetTempPath()
 $testRoot = Join-Path $tempBase ("elon-preflight-workflow-test-" + [Guid]::NewGuid().ToString("N"))

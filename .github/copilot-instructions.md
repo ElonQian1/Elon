@@ -30,7 +30,7 @@
 涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算发布完成；默认分成两层完成定义。并行任务里，代码进入远端主线是本代理的硬完成；发布脚本只负责发布“运行脚本时的最新 main”，如果构建期间被后续提交或服务器版本超越，按脚本提示汇报“代码已合并，发布交由后续最新 main”，不要反复 rebase 重跑。
 
 1. **代码同步完成**
-   - 业务代码已 `commit` 并 `push origin main`
+   - 业务代码已 `commit` 并 `git push origin HEAD:main` 进入 `origin/main`
    - 若用户明确要求“先同步代码”“先合并远端”“发布稍后再说”或“不要求这次发布成功”，到这里即可收尾
    - 可用：
      ```powershell
@@ -85,7 +85,7 @@
 ## 🚀 部署速查（服务端改动后必看）
 
 ```
-改后端代码 → git add（只加 .rs 业务文件）→ git commit → git push origin main → check-task-complete -Kind CodePushed → 运行 scripts/publish-server.ps1（脚本自动 claim 版本号 → 编译 → 部署 → finish；被后续 main 超越则停止追车）→ 校验 /api/server/version
+改后端代码 → git add（只加 .rs 业务文件）→ git commit → git push origin HEAD:main → check-task-complete -Kind CodePushed → 运行 scripts/publish-server.ps1（脚本自动 claim 版本号 → 编译 → 部署 → finish；被后续 main 超越则停止追车）→ 校验 /api/server/version
 ```
 
 | 项目 | 值 |

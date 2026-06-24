@@ -16,7 +16,7 @@ applyTo: "**"
 修改代码
   → git add（仅自己的文件）
   → git commit -m "type(scope): 描述"
-  → git push origin main
+  → git push origin HEAD:main
   → check-task-complete -Kind CodePushed
   → 临时工作树构建 / 部署（需要发布时；被更新 main 超越则停止追车）
   → 验证（明确负责发布时）
@@ -168,13 +168,13 @@ git fetch origin
 git rebase origin/main
 
 # 2a. 无冲突 → 直接推送
-git push origin main
+git push origin HEAD:main
 
 # 2b. 有冲突 → 逐文件解决后继续
 # 解决冲突（编辑文件，保留正确内容）
 git add <冲突文件>
 git rebase --continue
-git push origin main
+git push origin HEAD:main
 ```
 
 **rebase 冲突解决原则**：
@@ -263,7 +263,7 @@ bash scripts/format-rust.sh --apply --files server/src/main.rs
 ## 🦀 后端部署（Rust → Linux 服务器）
 
 ```powershell
-git add server/src/<file>.rs; git commit -m "fix(server): 描述"; git push origin main
+git add server/src/<file>.rs; git commit -m "fix(server): 描述"; git push origin HEAD:main
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
 .\scripts\publish-server.ps1   # claim → 编译 → 部署 → finish（内部原理见脚本注释）
 curl --noproxy '*' http://43.139.149.158:8080/api/server/version
@@ -280,7 +280,7 @@ curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 ### APK 发布两步式工作流（v0.3.69+ 新流程：版本号不进 git）
 
 ```
-[第1步：提交业务代码]   git add 业务文件 → commit → push origin main
+[第1步：提交业务代码]   git add 业务文件 → commit → git push origin HEAD:main
         ↓
 [第1.5步：代码完成检查] check-task-complete.ps1 -Kind CodePushed
         ↓
@@ -297,7 +297,7 @@ curl --noproxy '*' http://43.139.149.158:8080/api/server/version
 # 第1步：先提交业务代码
 git add android/app/src/main/...   # 只加业务文件，不加 build.gradle
 git commit -m "feat(android): 描述"
-git push origin main               # 脚本基于远端 HEAD，必须先 push
+git push origin HEAD:main          # 脚本基于远端 HEAD，必须先 push
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
 
 # 第2步：运行发布脚本（明确负责 APK 发布时）
