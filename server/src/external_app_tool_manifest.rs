@@ -9,7 +9,7 @@ use crate::{
         fb2_base_url, fb2_context_token, timeout_secs, FB2_APP_ID, FB2_CONTEXT_HEADER,
     },
     external_app_context_response::compact_error,
-    external_app_context_tool_execution::FB2_ALLOWED_TOOLS,
+    external_app_context_tool_execution::{BB64A_ALLOWED_TOOLS, FB2_ALLOWED_TOOLS},
     external_app_http_client::fb2_direct_client,
     types::AppState,
 };
@@ -20,6 +20,7 @@ const MAX_TOOL_IDS: usize = 32;
 pub(crate) async fn public_live_tool_manifest(_state: &Arc<AppState>, app_id: &str) -> Value {
     match app_id {
         FB2_APP_ID => fetch_fb2_tool_manifest().await,
+        "bb64a" => bb64a_static_tool_manifest(),
         _ => json!({
             "app_id": app_id,
             "schema": "external_app.live_tool_manifest.v1",
@@ -28,6 +29,30 @@ pub(crate) async fn public_live_tool_manifest(_state: &Arc<AppState>, app_id: &s
             "warnings": ["unknown_external_app_tool_manifest"]
         }),
     }
+}
+
+fn bb64a_static_tool_manifest() -> Value {
+    json!({
+        "app_id": "bb64a",
+        "schema": "external_app.live_tool_manifest.v1",
+        "status": "ready",
+        "source": "bb64a:local-windows-mcp",
+        "tool_count": BB64A_ALLOWED_TOOLS.len(),
+        "tool_ids": BB64A_ALLOWED_TOOLS,
+        "truncated": false,
+        "context_pack_version": "bb64a-windows-diagnostic-pack-v1",
+        "has_usage_policy": true,
+        "has_tool_selection_policy": true,
+        "main_project_tool_execution_policy": {
+            "schema": "external_app.live_tool_execution_policy.v1",
+            "chat_auto_executable_tool_ids": BB64A_ALLOWED_TOOLS,
+            "manifest_only_tool_ids": [],
+            "main_project_allowed_missing_tool_ids": [],
+            "coverage_status": "ready",
+            "rule": "BB64A tools are executed by the user's local Windows client MCP or node agent. Dangerous runtime tools are intentionally discoverable in the first version."
+        },
+        "secret_values_exposed": false
+    })
 }
 
 async fn fetch_fb2_tool_manifest() -> Value {
@@ -246,5 +271,22 @@ mod tests {
             .unwrap()
             .contains(&json!("get_match_detail")));
         assert_eq!(policy["coverage_status"], "degraded");
+    }
+
+    #[test]
+    fn bb64a_static_manifest_exposes_local_mcp_tools() {
+        let manifest = bb64a_static_tool_manifest();
+        assert_eq!(manifest["status"], "ready");
+        assert_eq!(manifest["source"], "bb64a:local-windows-mcp");
+        assert!(manifest["tool_ids"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("bb64a_doctor")));
+        assert!(
+            manifest["main_project_tool_execution_policy"]["chat_auto_executable_tool_ids"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("close_all_proxies"))
+        );
     }
 }

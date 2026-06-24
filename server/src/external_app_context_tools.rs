@@ -13,6 +13,17 @@ const RECOMMENDED_FB2_TOOLS: &[&str] = &[
     "get_context_audit",
     "context_audit_summary",
 ];
+const RECOMMENDED_BB64A_TOOLS: &[&str] = &[
+    "bb64a_doctor",
+    "get_status",
+    "detect_conflicts",
+    "test_google",
+    "get_process_tcp",
+    "get_logs_filtered",
+    "force_close_proxy",
+    "close_all_proxies",
+    "auto_select_best",
+];
 
 pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
     match app_id {
@@ -52,6 +63,35 @@ pub(crate) fn public_tool_contract_guidance(app_id: &str) -> Option<Value> {
                 "用户订单工具必须限制为 current_user_only。",
                 "群友观点必须返回 message_id，比赛和订单必须返回 source id。",
                 "审计工具只返回上下文来源和指标元数据，不返回完整订单、聊天正文或赔率明细。"
+            ]
+        })),
+        "bb64a" => Some(json!({
+            "app_id": "bb64a",
+            "schema": "bb64a.tools.v1",
+            "execution_status": "local_mcp_supported",
+            "recommended_tool_ids": RECOMMENDED_BB64A_TOOLS,
+            "recommended_tools": recommended_bb64a_tool_contract(),
+            "required_context_fields": [
+                "context_pack",
+                "context_pack_version",
+                "generated_at",
+                "local_mcp",
+                "diagnostic_snapshot",
+                "tool_contract",
+                "privacy",
+                "metrics"
+            ],
+            "recommended_env": [
+                "ELON_EXTERNAL_APP_BB64A_TOKEN",
+                "ELON_EXTERNAL_APP_BB64A_LOCAL_MCP_URL",
+                "ELON_EXTERNAL_APP_BB64A_TOOL_EXECUTION_ENABLED"
+            ],
+            "notes": [
+                "BB64A first version uses the Windows client's local MCP endpoint, normally http://127.0.0.1:17899/mcp.",
+                "bb64a_doctor is the default first call because it aggregates status, conflicts, OS network snapshot, logs and proxy tests.",
+                "Dangerous runtime tools are intentionally preserved for fast repair workflows; the client UI or local node agent should record user consent and audit events.",
+                "Do not upload raw subscription URLs unless the user explicitly enables include_sensitive_subscriptions=true.",
+                "If multiple users report the same environment pattern, create a sanitized source-node task instead of patching code on the end user's PC."
             ]
         })),
         _ => None,
@@ -197,6 +237,59 @@ fn recommended_fb2_tool_contract() -> Value {
     ])
 }
 
+fn recommended_bb64a_tool_contract() -> Value {
+    json!([
+        {
+            "name": "bb64a_doctor",
+            "description": "Collect one AI-facing Windows diagnostic snapshot from the local ElonSpeed debug server.",
+            "permission": "local_runtime_diagnostic",
+            "when_to_use": "Use first for Windows client support, connection failures, mode switching, proxy conflicts and routing problems."
+        },
+        {
+            "name": "get_status",
+            "description": "Read current proxy status, run mode, ports, current node and elevation state.",
+            "permission": "local_runtime_read",
+            "when_to_use": "Use to confirm whether the client is running and which node/mode is active."
+        },
+        {
+            "name": "detect_conflicts",
+            "description": "Detect local proxy/process/system-proxy conflicts.",
+            "permission": "local_runtime_read",
+            "when_to_use": "Use when connection fails, ports are occupied or another proxy may be interfering."
+        },
+        {
+            "name": "test_google",
+            "description": "Test Google through the current proxy.",
+            "permission": "local_network_probe",
+            "when_to_use": "Use after a node is connected or after a repair action."
+        },
+        {
+            "name": "get_process_tcp",
+            "description": "Inspect process-to-TCP mapping for per-app routing diagnostics.",
+            "permission": "local_runtime_read_sensitive",
+            "when_to_use": "Use when only one application cannot connect or traffic is routed unexpectedly."
+        },
+        {
+            "name": "force_close_proxy",
+            "description": "Force close a conflicting proxy process by pid.",
+            "permission": "dangerous_local_runtime_control",
+            "when_to_use": "Use after detect_conflicts identifies the exact pid and the user wants aggressive repair."
+        },
+        {
+            "name": "close_all_proxies",
+            "description": "Force close all detected proxy clients and reclaim the system proxy.",
+            "permission": "dangerous_local_runtime_control",
+            "when_to_use": "Use when the user explicitly wants one-click cleanup of conflicting proxy software."
+        },
+        {
+            "name": "auto_select_best",
+            "description": "Benchmark candidates and connect to the best node.",
+            "permission": "local_runtime_control",
+            "when_to_use": "Use when the user only wants the fastest usable node."
+        }
+    ])
+}
+
 fn project_tool_contract(contract: &Value) -> Value {
     let mut tools = extract_tools(contract);
     let truncated = tools.len() > MAX_TOOL_ENTRIES;
@@ -330,5 +423,21 @@ mod tests {
             .unwrap()
             .contains(&json!("citation_sources")));
         assert!(public_tool_contract_guidance("unknown").is_none());
+    }
+
+    #[test]
+    fn exposes_public_bb64a_guidance() {
+        let guidance = public_tool_contract_guidance("bb64a").unwrap();
+        assert_eq!(guidance["schema"], "bb64a.tools.v1");
+        assert!(guidance["recommended_tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["name"] == "bb64a_doctor"));
+        assert!(guidance["recommended_tools"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|tool| tool["permission"] == "dangerous_local_runtime_control"));
     }
 }

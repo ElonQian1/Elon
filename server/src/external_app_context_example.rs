@@ -37,6 +37,31 @@ pub(crate) fn public_context_pack_example(app_id: &str) -> Option<Value> {
                 "metrics"
             ]
         })),
+        "bb64a" => Some(json!({
+            "endpoint": "POST /api/main-project/context/pack",
+            "auth_header": "X-BB64A-AI-CENTER-TOKEN",
+            "query_example": {
+                "external_user_id": "bb64a-user-id",
+                "device_id": "windows-device-id",
+                "topic_hint": "Cannot connect after switching to FullTakeover mode",
+                "local_mcp_endpoint": "http://127.0.0.1:17899/mcp",
+                "diagnostic_tool": "bb64a_doctor"
+            },
+            "response_shape": {
+                "success": true,
+                "data": bb64a_context_pack_example_data()
+            },
+            "minimum_required_fields": [
+                "context_pack_version",
+                "generated_at",
+                "context_pack",
+                "local_mcp",
+                "diagnostic_snapshot",
+                "tool_contract",
+                "privacy",
+                "metrics"
+            ]
+        })),
         _ => None,
     }
 }
@@ -125,6 +150,67 @@ fn fb2_context_pack_example_data() -> Value {
     })
 }
 
+fn bb64a_context_pack_example_data() -> Value {
+    json!({
+        "context_pack_version": "bb64a-windows-diagnostic-pack-v1",
+        "generated_at": "2026-06-24T12:00:00+08:00",
+        "context_audit_id": "bb64a-doctor-00000000-0000-0000-0000-000000000000",
+        "context_pack": "<bb64a_context_pack version=\"1.0\" project=\"bb64a\">\n\n## User Problem\n\n- User reports that ElonSpeed Windows cannot access Google after enabling FullTakeover mode.\n\n## Runtime Snapshot\n\n- proxy_running=true\n- run_mode=FullTakeover\n- http_port=17891\n- socks5_port=17890\n- system_proxy=127.0.0.1:17891\n\n## Diagnostic Evidence\n\n- bb64a_doctor should provide status, system proxy, conflict detector, process TCP, OS commands and log tail.\n- Dangerous runtime controls are available and intentionally retained for first-version troubleshooting.\n\n## Privacy Boundary\n\n- Do not upload raw subscription URLs unless include_sensitive_subscriptions=true is explicitly approved by the user.\n- Redact access tokens, subscription secrets and unrelated local files before creating product bug reports.\n\n</bb64a_context_pack>",
+        "local_mcp": {
+            "transport": "streamable_http",
+            "default_endpoint": "http://127.0.0.1:17899/mcp",
+            "doctor_tool": "bb64a_doctor",
+            "http_doctor_endpoint": "http://127.0.0.1:17899/debug/doctor"
+        },
+        "diagnostic_snapshot": {
+            "schema": "bb64a.doctor.v1",
+            "expected_source": "ElonSpeed Windows local MCP",
+            "required_sections": [
+                "status",
+                "config",
+                "system_proxy",
+                "conflicts",
+                "network_diagnostic",
+                "process_tcp",
+                "os_commands",
+                "logs"
+            ]
+        },
+        "tool_contract": {
+            "schema": "bb64a.tools.v1",
+            "tools": [
+                {
+                    "name": "bb64a_doctor",
+                    "description": "Collect one AI-facing Windows diagnostic snapshot from the local ElonSpeed debug server.",
+                    "permission": "local_runtime_diagnostic",
+                    "when_to_use": "Use first for almost every Windows client support question."
+                },
+                {
+                    "name": "force_close_proxy",
+                    "description": "Force-close a proxy process by pid when the user allows aggressive repair.",
+                    "permission": "dangerous_local_runtime_control",
+                    "when_to_use": "Use after detect_conflicts identifies a blocking process."
+                }
+            ]
+        },
+        "privacy": {
+            "raw_subscription_urls_default": "excluded",
+            "raw_logs_default": "tail_only",
+            "dangerous_operations_preserved": true,
+            "user_consent_required_by_client_ui": true
+        },
+        "metrics": {
+            "diagnostic_latency_ms": 500,
+            "snapshot_chars": 4096,
+            "source_counts": [
+                {"source_type": "local_mcp_tool", "count": 1},
+                {"source_type": "local_os_command", "count": 4}
+            ]
+        },
+        "usage_policy": default_usage_policy()
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,5 +244,19 @@ mod tests {
             "ok"
         );
         assert!(public_context_pack_example("unknown").is_none());
+    }
+
+    #[test]
+    fn exposes_bb64a_context_pack_example() {
+        let example = public_context_pack_example("bb64a").unwrap();
+        assert_eq!(example["auth_header"], "X-BB64A-AI-CENTER-TOKEN");
+        assert_eq!(
+            example["response_shape"]["data"]["local_mcp"]["doctor_tool"],
+            "bb64a_doctor"
+        );
+        assert!(example["minimum_required_fields"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("diagnostic_snapshot")));
     }
 }

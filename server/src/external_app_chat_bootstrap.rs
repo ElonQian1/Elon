@@ -71,8 +71,8 @@ pub async fn get_chat_bootstrap(
             "externalGroups": app.default_groups,
         },
         "voice": voice_contract(),
-        "aiReply": ai_reply_contract(),
-        "billing": billing_contract(),
+        "aiReply": ai_reply_contract(app.id),
+        "billing": billing_contract(app.id),
         "experience": experience_contract()
     }))
     .into_response()
@@ -207,7 +207,66 @@ fn voice_contract() -> Value {
     })
 }
 
-fn ai_reply_contract() -> Value {
+fn ai_reply_contract(app_id: &str) -> Value {
+    if app_id == "bb64a" {
+        return json!({
+            "schema": "external_app.ai_reply.v1",
+            "app_id": "bb64a",
+            "owner": "main_project",
+            "billableUnit": "ai_reply_generation",
+            "quotaGate": "before_model_call",
+            "freePreparationSteps": ["local_mcp_discovery", "bb64a_doctor", "context_budgeting"],
+            "triggers": [
+                {
+                    "name": "windows_client_help_panel",
+                    "entry": "User asks a question inside ElonSpeed Windows",
+                    "endpoint": "/api/me/groups/{groupId}/messages",
+                    "topicHintSource": "latest user support question",
+                    "contextSource": "BB64A local MCP bb64a_doctor snapshot"
+                },
+                {
+                    "name": "source_node_bugfix",
+                    "entry": "Sanitized repeated diagnostics indicate product bug",
+                    "endpoint": "main-project source-node task pipeline",
+                    "topicHintSource": "support bundle plus source repository context",
+                    "contextSource": "BB64A diagnostic context pack and source-code node"
+                }
+            ],
+            "externalContext": {
+                "contractEndpoint": "/api/external/apps/bb64a/context-contract",
+                "primarySource": "bb64a:local-mcp/bb64a_doctor",
+                "fallbackSource": "bb64a:/debug/status",
+                "queryFields": [
+                    "external_user_id",
+                    "device_id",
+                    "topic_hint",
+                    "local_mcp_endpoint",
+                    "include_os_snapshot",
+                    "include_sensitive_subscriptions"
+                ],
+                "promptMetadata": [
+                    "usage_policy",
+                    "context_quality",
+                    "external_metrics",
+                    "context_audit_id",
+                    "tool_contract",
+                    "executed_external_app_tools"
+                ]
+            },
+            "answerRules": [
+                "Distinguish local user configuration problems from likely BB64A product bugs.",
+                "Prefer bb64a_doctor before suggesting repair actions.",
+                "Dangerous runtime tools are available for fast repair workflows; describe the intended local effect before using them.",
+                "Do not expose raw subscription URLs, tokens or unrelated local file contents in source-node bug reports."
+            ],
+            "failureBehavior": {
+                "contextUnavailable": "Ask the user to keep ElonSpeed Windows open and enable the local AI troubleshooting panel.",
+                "localMcpUnavailable": "Fall back to ordinary support guidance and explain that local diagnostics are unavailable.",
+                "sourceNodeUnavailable": "Diagnose locally and defer product-code repair until source-node capacity is available."
+            }
+        });
+    }
+
     json!({
         "schema": "external_app.ai_reply.v1",
         "owner": "main_project",
@@ -311,14 +370,14 @@ fn experience_contract() -> Value {
     })
 }
 
-fn billing_contract() -> Value {
+fn billing_contract(app_id: &str) -> Value {
     json!({
         "balanceEndpoint": "/api/me/balance",
         "billingEventsEndpoint": "/api/me/billing",
         "usageStatsEndpointTemplate": "/api/user/{userId}/usage/stats",
         "trialCredit": {
             "grantedBy": "POST /api/external/apps/{app_id}/accounts/session",
-            "configKey": "external_app_fb2_trial_credit_fen",
+            "configKey": format!("external_app_{app_id}_trial_credit_fen"),
             "appliesTo": ["ai_reply_generation", "social_ai", "match_analysis_text", "order_analysis_text"],
             "doesNotApplyTo": ["android_system_asr", "cloud_asr_fallback", "tts", "context_fetch"]
         },
@@ -373,7 +432,7 @@ mod tests {
 
     #[test]
     fn ai_reply_contract_declares_context_and_billing_boundary() {
-        let ai_reply = ai_reply_contract();
+        let ai_reply = ai_reply_contract("fb2");
 
         assert_eq!(ai_reply["schema"], "external_app.ai_reply.v1");
         assert_eq!(ai_reply["billableUnit"], "ai_reply_generation");
@@ -397,6 +456,22 @@ mod tests {
     }
 
     #[test]
+    fn bb64a_ai_reply_contract_uses_local_mcp_doctor() {
+        let ai_reply = ai_reply_contract("bb64a");
+
+        assert_eq!(ai_reply["app_id"], "bb64a");
+        assert_eq!(
+            ai_reply["externalContext"]["primarySource"],
+            "bb64a:local-mcp/bb64a_doctor"
+        );
+        assert!(ai_reply["answerRules"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|rule| rule.as_str().unwrap_or("").contains("Dangerous")));
+    }
+
+    #[test]
     fn experience_contract_keeps_voice_free_and_ai_billable() {
         let experience = experience_contract();
 
@@ -408,7 +483,7 @@ mod tests {
 
     #[test]
     fn billing_contract_separates_voice_from_ai_reply_quota() {
-        let billing = billing_contract();
+        let billing = billing_contract("fb2");
 
         assert_eq!(billing["balanceEndpoint"], "/api/me/balance");
         assert_eq!(billing["gates"]["beforeAsr"], "never_check_ai_balance");

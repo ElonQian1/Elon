@@ -114,3 +114,17 @@ fn external_app_authorization_code_is_single_use() {
     let second = store.exchange_external_app_authorization_code("fb2", &code.code);
     assert!(second.is_err());
 }
+
+#[test]
+fn bb64a_external_app_is_registered_for_windows_ai_link() {
+    let app = external_app_by_id("bb64a").expect("bb64a app should exist");
+    assert_eq!(app.display_name, "ElonSpeed");
+    assert!(app.capabilities.contains(&"local_mcp"));
+    assert!(app.capabilities.contains(&"dangerous_runtime_tools"));
+
+    let seeds = group_seeds(app);
+    assert_eq!(seeds.len(), 3);
+    assert!(seeds
+        .iter()
+        .any(|group| group.group_id == "ext_bb64a_support" && group.auto_join));
+}

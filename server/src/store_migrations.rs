@@ -94,6 +94,11 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (64, "Route C 服务器模型每日预算调用审计", migration_v64),
     (65, "Route C 服务器模型用户日预算索引", migration_v65),
     (66, "Route C 服务器模型调用完成态审计", migration_v66),
+    (
+        67,
+        "BB64A external app AI reply trial credit config",
+        migration_v67,
+    ),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2252,6 +2257,15 @@ fn migration_v66(conn: &Connection) -> Result<()> {
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_route_c_budget_outcome_time
           ON route_c_runtime_budget_events(outcome, created_at DESC)",
+        [],
+    )?;
+    Ok(())
+}
+
+fn migration_v67(conn: &Connection) -> Result<()> {
+    conn.execute(
+        "INSERT OR IGNORE INTO billing_config (key, value, updated_at)
+         VALUES ('external_app_bb64a_trial_credit_fen', '100', datetime('now'))",
         [],
     )?;
     Ok(())

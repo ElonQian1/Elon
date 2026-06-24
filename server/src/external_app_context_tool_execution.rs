@@ -22,6 +22,30 @@ pub(crate) const FB2_ALLOWED_TOOLS: &[&str] = &[
     "context_audit_summary",
 ];
 
+pub(crate) const BB64A_ALLOWED_TOOLS: &[&str] = &[
+    "bb64a_doctor",
+    "get_status",
+    "get_config",
+    "get_system_proxy_status",
+    "detect_conflicts",
+    "test_google",
+    "test_tcp",
+    "test_http_proxy",
+    "test_socks5_proxy",
+    "get_process_tcp",
+    "get_logs",
+    "get_logs_filtered",
+    "force_close_proxy",
+    "close_all_proxies",
+    "set_system_proxy",
+    "disable_system_proxy",
+    "set_proxy_mode",
+    "proxy_yield",
+    "proxy_reclaim",
+    "auto_select_best",
+    "exit_app",
+];
+
 pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
     match app_id {
         "fb2" => Some(json!({
@@ -124,6 +148,49 @@ pub(crate) fn public_tool_execution_guidance(app_id: &str) -> Option<Value> {
                 "返回被截断时必须设置 metrics.truncated=true，并提示可继续按 id 查详情。"
             ]
         })),
+        "bb64a" => Some(json!({
+            "app_id": "bb64a",
+            "schema": "bb64a.tool_execution.v1",
+            "execution_status": "local_mcp_ready",
+            "transport": {
+                "kind": "local_mcp_via_pc_node_agent",
+                "default_mcp_url": "http://127.0.0.1:17899/mcp",
+                "doctor_http_url": "http://127.0.0.1:17899/debug/doctor",
+                "note": "The cloud server cannot call a user's loopback address directly. Execution must be relayed by the installed local CLI/node agent or by Codex on the same PC."
+            },
+            "allowed_tools": BB64A_ALLOWED_TOOLS,
+            "request_shape": {
+                "request_id": "string, main-project generated id for tracing and retry dedupe",
+                "tool_name": "one of allowed_tools",
+                "external_user_id": "bb64a user id when available",
+                "device_id": "Windows device id or node-agent id when available",
+                "arguments": "MCP tool arguments",
+                "reason": "short natural-language reason why AI needs the tool",
+                "dangerous": "boolean; true for local runtime control tools such as force_close_proxy or close_all_proxies"
+            },
+            "response_shape": {
+                "success": "boolean",
+                "schema": "bb64a.doctor.v1 for bb64a_doctor snapshots",
+                "data": "tool-specific object",
+                "error": "string when success=false",
+                "generated_at": "ISO-8601 timestamp or generated_at_unix_ms",
+                "source_ids": ["local_mcp_endpoint", "device_id", "context_audit_id"],
+                "visibility": "current_device_only | sanitized_support_bundle | source_node_bugfix"
+            },
+            "permission_rules": [
+                "Read-only diagnostic tools may run after the user opens the AI troubleshooting panel.",
+                "Dangerous runtime tools are intentionally allowed in the first version and must remain discoverable.",
+                "The client or local node agent should record user consent and audit metadata before dangerous local changes.",
+                "Raw subscription URLs, access tokens and unrelated local file contents must not be uploaded unless the user explicitly enables the sensitive diagnostic option.",
+                "Source-code fixes run on BB64A source nodes, not on the end user's PC."
+            ],
+            "result_grounding_rules": [
+                "bb64a_doctor output is the primary grounded support bundle.",
+                "Use get_status and detect_conflicts as live follow-up checks after any repair action.",
+                "Only treat a product bug as likely when multiple diagnostics or logs point at the BB64A runtime rather than local configuration.",
+                "When escalating to source-node repair, include sanitized environment traits and exact tool outputs, not private tokens."
+            ]
+        })),
         _ => None,
     }
 }
@@ -175,5 +242,19 @@ mod tests {
     #[test]
     fn unknown_app_has_no_tool_execution_contract() {
         assert!(public_tool_execution_guidance("unknown").is_none());
+    }
+
+    #[test]
+    fn exposes_bb64a_tool_execution_contract() {
+        let contract = public_tool_execution_guidance("bb64a").unwrap();
+        assert_eq!(contract["schema"], "bb64a.tool_execution.v1");
+        assert!(contract["allowed_tools"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("bb64a_doctor")));
+        assert!(contract["allowed_tools"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("close_all_proxies")));
     }
 }
