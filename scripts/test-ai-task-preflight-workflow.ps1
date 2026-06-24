@@ -44,9 +44,9 @@ $preflightSh = Join-Path $repoRoot "scripts\ai-task-preflight.sh"
 $preflightContent = Get-Content -Raw -LiteralPath $preflightScript
 $preflightShContent = Get-Content -Raw -LiteralPath $preflightSh
 
-$expectedPsNeedsWorktree = '$needsWorktree = $CreateWorktree -or $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline'
-Assert-Contains $preflightContent $expectedPsNeedsWorktree "PowerShell preflight must honor explicit -CreateWorktree."
-Assert-Contains $preflightShContent 'create_worktree" -eq 1' "Shell preflight must honor explicit --create-worktree."
+$expectedPsNeedsWorktree = '$needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline'
+Assert-Contains $preflightContent $expectedPsNeedsWorktree "PowerShell preflight must not treat -CreateWorktree alone as a need for another worktree."
+Assert-Contains $preflightShContent 'if [[ "$always_create_worktree" -eq 1 || "$dirty" -eq 1 || "$behind" -gt 0 || "$branch" == "main" ]]; then' "Shell preflight must not treat --create-worktree alone as a need for another worktree."
 
 function Assert-DocumentContains {
     param(
@@ -129,8 +129,13 @@ try {
     Assert-Contains $outputText "DIRTY=False" "Fixture worktree should be clean."
     Assert-Contains $outputText "AHEAD=0" "Fixture should not be ahead of origin/main."
     Assert-Contains $outputText "BEHIND=0" "Fixture should not be behind origin/main."
-    Assert-Contains $outputText "WORKTREE_CREATED=true" "Explicit -CreateWorktree must create a new worktree even from a clean non-main worktree."
-    Assert-Contains $outputText "WORKTREE_PATH=$createdWorktreeParent" "Created worktree should stay inside the test parent directory."
+    Assert-Contains $outputText "WORKTREE_CREATED=false" "Clean current non-main worktree must not create another worktree just because -CreateWorktree was passed."
+    Assert-Contains $outputText "NEXT=Workspace is already isolated and current enough for direct edits." "Clean current non-main worktree should remain usable."
+
+    $createdChildren = @(Get-ChildItem -LiteralPath $createdWorktreeParent -Force)
+    if ($createdChildren.Count -ne 0) {
+        throw "Clean current non-main worktree unexpectedly created nested worktree entries under $createdWorktreeParent."
+    }
 
     Write-Host "PASS ai-task-preflight workflow guard"
 } finally {

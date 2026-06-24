@@ -204,7 +204,7 @@ if ($isDirty) {
 }
 
 $isMainBaseline = $branch -eq "main"
-$needsWorktree = $CreateWorktree -or $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline
+$needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline
 $createdWorktree = $false
 $createdWorktreePath = ""
 if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {

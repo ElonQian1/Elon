@@ -170,7 +170,7 @@ if [[ "$dirty" -eq 1 ]]; then
 fi
 
 needs_worktree=0
-if [[ "$create_worktree" -eq 1 || "$always_create_worktree" -eq 1 || "$dirty" -eq 1 || "$behind" -gt 0 || "$branch" == "main" ]]; then
+if [[ "$always_create_worktree" -eq 1 || "$dirty" -eq 1 || "$behind" -gt 0 || "$branch" == "main" ]]; then
   needs_worktree=1
 fi
 
