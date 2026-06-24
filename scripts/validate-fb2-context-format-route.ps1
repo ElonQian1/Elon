@@ -79,6 +79,8 @@ function New-Fb2ContextFormatRouteValidation {
         symbol_index_reference = "docs\符号索引讨论\项目理解与讨论.md"
         plan = "docs\fb2-ai-center\PLAN.md"
         contracts = "docs\fb2-ai-center\contracts.md"
+        readme = "docs\fb2-ai-center\README.md"
+        handoff = "docs\fb2-ai-center\handoff.md"
         data_tools = "docs\fb2-ai-center\data-tools.md"
         test_plan = "docs\fb2-ai-center\test-plan.md"
         projection = "server\src\external_app_context_projection.rs"
@@ -116,6 +118,18 @@ function New-Fb2ContextFormatRouteValidation {
         "contracts expose fb2_context_pack and mcp boundary" `
         (Test-Fb2FormatAllTokens $texts.contracts @("<fb2_context_pack>", "XML-wrapped Markdown", "MCP/RAG 不是当前完成条件", "citation_sources")) `
         $files.contracts
+
+    Add-Fb2FormatCheck $checks `
+        "readme records cross-project p4-lite coordination boundary" `
+        (Test-Fb2FormatAllTokens $texts.readme @("fb2_context_retrieval_trace_v1", "fb2_p4_lite_candidate_retrieval_v1", "match_context_index", "answer_time_refresh_allowed=false", "maintenance_rest")) `
+        $files.readme `
+        "Main-project handoff must distinguish read-only evidence from fb2 maintenance refresh jobs."
+
+    Add-Fb2FormatCheck $checks `
+        "handoff records current fb2 repository coordination evidence" `
+        (Test-Fb2FormatAllTokens $texts.handoff @("7b712780", "fb2_context_retrieval_trace_v1", "fb2_p4_lite_candidate_retrieval_v1", "answer-time", "refresh")) `
+        $files.handoff `
+        "Handoff must record the current fb2 side progress and answer-time refresh boundary."
 
     Add-Fb2FormatCheck $checks `
         "data-tools define domain route and retrieval evidence" `
@@ -177,6 +191,7 @@ function New-Fb2ContextFormatRouteValidation {
             no_business_data_copy_to_main_project = $true
             required_evidence_shape = "fb2.retrieval_evidence_item.v1"
             required_query_intent = "fb2.context_query_intent.v1"
+            latest_fb2_coordination = "read_context_retrieval_trace_and_p4_lite_reports_but_do_not_run_maintenance_refresh_during_answer_generation"
         }
         note = "Guards the fb2 AI Center context-format route derived from repo-map and symbol-index guidance: clean XML-wrapped Markdown for model-readable business projection, compact JSON metadata for machines, REST Context Pack first, MCP/RAG only as later wrappers."
     }
@@ -223,12 +238,15 @@ rest_context_pack_plus_tool_manifest_plus_tools_execute fb2_context_pack retriev
 index_guides_rest_context_pack_and_tool_manifest project_to_xml_wrapped_markdown_context_pack retrieval_evidence_output_shape stores_fb2_business_data_in_main_project
 fb2.context_query_intent.v1 topic_hint requested_indexes permission_scope retrieval_evidence_items_reference_query_intent
 domainDataBlueprint.context_format
+fb2_context_retrieval_trace_v1 fb2_p4_lite_candidate_retrieval_v1 match_context_index answer_time_refresh_allowed=false maintenance_rest 7b712780 answer-time refresh
 "@
     foreach ($relativePath in @(
             "docs\repo map模块问题\repo map格式建议.md",
             "docs\符号索引讨论\项目理解与讨论.md",
             "docs\fb2-ai-center\PLAN.md",
             "docs\fb2-ai-center\contracts.md",
+            "docs\fb2-ai-center\README.md",
+            "docs\fb2-ai-center\handoff.md",
             "docs\fb2-ai-center\data-tools.md",
             "docs\fb2-ai-center\test-plan.md",
             "server\src\external_app_context_projection.rs",

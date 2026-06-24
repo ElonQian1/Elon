@@ -11,6 +11,15 @@
 - fb2 不应该复制主项目内部聊天页代码。Android 原生侧优先接 `android/chat-voice-kit`，H5/WebView 侧按 `ChatVoiceInteractionContract` 还原。
 - 当前非语音 live 数据预检可由主项目 token bridge 证明，但 bridge 证据必须同时证明 no-write、direct-no-proxy、service token 不进 argv/output、fb2 密码不进子进程 argv。旧 bridge 结果如果缺少 `fb2_password_passed_to_child_argv=false`，`status-refresh-current.json.protected_live_preflight_satisfied` 会保持 `false`，下一步是用当前进程环境变量 `FB2_VISIBLE_SMOKE_PASSWORD` 重跑 no-write bridge；ASR/TTS 仍按用户暂停状态等待恢复。
 - 访问主项目/fb2 项目资源默认不走代理；状态脚本应清空常见 proxy 环境变量、设置 `NO_PROXY/no_proxy=*`，并在 PowerShell HTTP 请求使用 `-NoProxy`。
+- 2026-06-24 子项目最新协作状态：fb2 `origin/main` 已推进到 `7b712780 fix(ai-context): require explicit match index refresh`，近期提交在做 `fb2_context_retrieval_trace_v1`、`fb2_p4_lite_candidate_retrieval_v1`、P4-lite 候选召回守门、公开比赛 `match_context_index` 显式小窗口刷新和质量/观点记忆证据。主项目本阶段只消费 Context Pack、tool manifest 和 read-only tools；`answer_time_refresh_allowed=false`、`maintenance_rest` refresh 工具不得放进普通回答链路。
+
+## 双项目协作方式
+
+- 主项目仓库 `D:\rust\active-projects\elon cli` 只负责 AI Center 公共能力：chat-bootstrap、context-contract、Context Pack 拉取、tool manifest 读取、工具执行审计、prompt 注入、answer policy、billing policy、反馈质量和验收脚本。
+- fb2 仓库 `D:\rust\active-projects\fb2` 只负责业务事实源：比赛、赔率、本人订单、平台匿名摘要、群文本观点、观点记忆、赛后复盘、质量反馈、P4-lite 候选索引和维护刷新脚本。
+- 两边可以由同一个 Codex 会话分别修改，但必须分别遵守各自 `AGENTS.md`、各自 worktree、各自提交/发布脚本；不要在主项目 worktree 里直接改 fb2，也不要把 fb2 业务表结构硬编码进主项目。
+- 跨会话沟通以仓库证据为准：先看 `origin/main`、`docs/FB2_MAIN_PROJECT_AI_CONTEXT.md`、`docs/MAIN_PROJECT_CONTEXT_PACK_CONTRACT.md`、`docs/AI_CONTEXT_24X7_OPERATIONS.md`、`docs/fb2-ai-center/README.md`、`PROGRESS.md` 和工具 manifest；只有契约或 owner 边界不一致时，再给子会话发送明确清单。
+- 主项目对 fb2 最新 P4-lite 能力的处理规则：可以读取 `fb2_context_retrieval_trace_v1` 和 `fb2_p4_lite_candidate_retrieval_v1` 报告来解释“为什么 AI 没拿到某条比赛/订单/群观点”；不得把 `match_context_index`、odds snapshot、opinion memory refresh 等维护作业放进用户回答时自动执行。
 
 ## 已有主项目能力
 
