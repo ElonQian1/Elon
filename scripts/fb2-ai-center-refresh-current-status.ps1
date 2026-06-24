@@ -70,6 +70,46 @@ function Read-Fb2RefreshJson {
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
+function Resolve-Fb2RefreshTokenBridgeResultPath {
+    param(
+        [string]$CanonicalPath,
+        [string]$FallbackPath
+    )
+
+    $canonicalExists = (-not [string]::IsNullOrWhiteSpace($CanonicalPath) -and (Test-Path -LiteralPath $CanonicalPath))
+    $fallbackExists = (-not [string]::IsNullOrWhiteSpace($FallbackPath) -and (Test-Path -LiteralPath $FallbackPath))
+
+    if ($canonicalExists -and $fallbackExists) {
+        $canonical = Read-Fb2RefreshJson -Path $CanonicalPath
+        $fallback = Read-Fb2RefreshJson -Path $FallbackPath
+        $canonicalGenerated = ConvertTo-Fb2RefreshDate -Value (Get-Fb2RefreshProperty $canonical "generated_at_utc" $null)
+        $fallbackGenerated = ConvertTo-Fb2RefreshDate -Value (Get-Fb2RefreshProperty $fallback "generated_at_utc" $null)
+        if ($null -ne $fallbackGenerated -and ($null -eq $canonicalGenerated -or $fallbackGenerated -gt $canonicalGenerated)) {
+            return [ordered]@{
+                path = $FallbackPath
+                source = "custom_output_path_fallback"
+            }
+        }
+    }
+
+    if ($canonicalExists) {
+        return [ordered]@{
+            path = $CanonicalPath
+            source = "canonical_token_bridge_result"
+        }
+    }
+    if ($fallbackExists) {
+        return [ordered]@{
+            path = $FallbackPath
+            source = "custom_output_path_fallback"
+        }
+    }
+    return [ordered]@{
+        path = $CanonicalPath
+        source = "missing_canonical_token_bridge_result"
+    }
+}
+
 function ConvertTo-Fb2RefreshDate {
     param([object]$Value)
 
@@ -171,6 +211,7 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
     param(
         [string]$ResultPath,
         [string]$SummaryPath,
+        [string]$ResultSource = "canonical_token_bridge_result",
         [double]$MaxAgeMinutes = 120
     )
 
@@ -182,6 +223,7 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
             exists = $false
             success = $false
             result_path = $ResultPath
+            result_source = $ResultSource
             summary_path = $SummaryPath
             summary_exists = [bool]$summaryExists
             preflight_exit_code = $null
@@ -213,6 +255,7 @@ function New-Fb2RefreshTokenBridgeLivePreflight {
         exists = $true
         success = [bool](Get-Fb2RefreshProperty $result "success" $false)
         result_path = $ResultPath
+        result_source = $ResultSource
         summary_path = $SummaryPath
         summary_exists = [bool]$summaryExists
         preflight_exit_code = Get-Fb2RefreshProperty $result "preflight_exit_code" $null
@@ -903,6 +946,48 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (@($summary.evidence_freshness.artifacts).Count -gt 0) "evidence freshness artifacts"
         Assert-Fb2RefreshSelfTest ([string]$summary.token_bridge_live_preflight.schema -eq "fb2.main_project.token_bridge_live_preflight.v1") "token bridge live preflight schema"
         Assert-Fb2RefreshSelfTest (-not [bool]$summary.token_bridge_live_preflight.exists) "selftest token bridge absent"
+        $fallbackCanonicalPath = Join-Path $output "token-bridge-data-only-preflight-current.json"
+        $fallbackSummaryPath = Join-Path $output "token-bridge-data-only-preflight-summary-current.json"
+        $fallbackResultPath = Join-Path $output "token-bridge-current.json"
+        Set-Content -LiteralPath $fallbackSummaryPath -Value '{"success":true}' -Encoding UTF8
+        $staleCanonicalResult = [ordered]@{
+            success = $true
+            generated_at_utc = ([DateTimeOffset]::UtcNow.AddHours(-3)).ToString("o")
+            preflight_exit_code = 0
+            current_state_exit_code = 0
+            summary_path = $fallbackSummaryPath
+            token_passed_as_argument = $false
+            fb2_password_passed_to_child_argv = $false
+            token_written_to_output = $false
+            writes_visible_group_messages = $false
+            current_state_after_tokenless = $true
+            project_network_proxy_policy = "direct_no_proxy"
+        }
+        Set-Content -LiteralPath $fallbackCanonicalPath -Value ($staleCanonicalResult | ConvertTo-Json -Depth 5) -Encoding UTF8
+        $fallbackResult = [ordered]@{
+            success = $true
+            generated_at_utc = ([DateTimeOffset]::UtcNow).ToString("o")
+            preflight_exit_code = 0
+            current_state_exit_code = 0
+            summary_path = $fallbackSummaryPath
+            token_passed_as_argument = $false
+            fb2_password_passed_to_child_argv = $false
+            token_written_to_output = $false
+            writes_visible_group_messages = $false
+            current_state_after_tokenless = $true
+            project_network_proxy_policy = "direct_no_proxy"
+        }
+        Set-Content -LiteralPath $fallbackResultPath -Value ($fallbackResult | ConvertTo-Json -Depth 5) -Encoding UTF8
+        $fallbackChoice = Resolve-Fb2RefreshTokenBridgeResultPath `
+            -CanonicalPath $fallbackCanonicalPath `
+            -FallbackPath $fallbackResultPath
+        $fallbackPreflight = New-Fb2RefreshTokenBridgeLivePreflight `
+            -ResultPath ([string]$fallbackChoice.path) `
+            -SummaryPath $fallbackSummaryPath `
+            -ResultSource ([string]$fallbackChoice.source)
+        Assert-Fb2RefreshSelfTest ([string]$fallbackChoice.source -eq "custom_output_path_fallback") "token bridge custom output fallback selected"
+        Assert-Fb2RefreshSelfTest ([string]$fallbackPreflight.result_source -eq "custom_output_path_fallback") "token bridge custom output fallback recorded"
+        Assert-Fb2RefreshSelfTest (Test-Fb2RefreshProtectedLivePreflightSatisfied -TokenBridgeLivePreflight $fallbackPreflight) "token bridge custom output fallback satisfies preflight"
         $generatedArtifacts = @($summary.evidence_freshness.artifacts | Where-Object { @("status_refresh", "handoff_prompt") -contains [string]$_.name })
         Assert-Fb2RefreshSelfTest (@($generatedArtifacts).Count -eq 2) "generated artifacts present"
         foreach ($artifact in $generatedArtifacts) {
@@ -1051,9 +1136,14 @@ $files = [ordered]@{
     token_bridge_live_preflight = Join-Path $OutputDir "token-bridge-data-only-preflight-current.json"
     token_bridge_live_preflight_summary = Join-Path $OutputDir "token-bridge-data-only-preflight-summary-current.json"
 }
+$tokenBridgeResultPathChoice = Resolve-Fb2RefreshTokenBridgeResultPath `
+    -CanonicalPath ([string]$files.token_bridge_live_preflight) `
+    -FallbackPath (Join-Path $OutputDir "token-bridge-current.json")
+$files.token_bridge_live_preflight = [string]$tokenBridgeResultPathChoice.path
 $tokenBridgeLivePreflight = New-Fb2RefreshTokenBridgeLivePreflight `
     -ResultPath ([string]$files.token_bridge_live_preflight) `
-    -SummaryPath ([string]$files.token_bridge_live_preflight_summary)
+    -SummaryPath ([string]$files.token_bridge_live_preflight_summary) `
+    -ResultSource ([string]$tokenBridgeResultPathChoice.source)
 $protectedLivePreflightSatisfied = Test-Fb2RefreshProtectedLivePreflightSatisfied -TokenBridgeLivePreflight $tokenBridgeLivePreflight
 $effectiveNextMinimumAction = Resolve-Fb2RefreshNextMinimumAction `
     -GoalAudit $goalAudit `

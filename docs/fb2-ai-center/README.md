@@ -10,6 +10,7 @@
 - ASR、TTS、Context Pack 拉取免费；只有 AI 生成回复内容消耗 token/额度。
 - fb2 不应该复制主项目内部聊天页代码。Android 原生侧优先接 `android/chat-voice-kit`，H5/WebView 侧按 `ChatVoiceInteractionContract` 还原。
 - 当前非语音 live 数据预检可由主项目 token bridge 证明，但 bridge 证据必须同时证明 no-write、direct-no-proxy、service token 不进 argv/output、fb2 密码不进子进程 argv。旧 bridge 结果如果缺少 `fb2_password_passed_to_child_argv=false`，`status-refresh-current.json.protected_live_preflight_satisfied` 会保持 `false`，下一步是用当前进程环境变量 `FB2_VISIBLE_SMOKE_PASSWORD` 重跑 no-write bridge；加 `-RunCurrentStateAfter` 时，bridge 会先刷新 authenticated contract smoke canonical summary，再清掉 service token 跑 tokenless current-state。ASR/TTS 仍按用户暂停状态等待恢复。
+- 状态刷新会优先使用最新的 bridge 结果：canonical `token-bridge-data-only-preflight-current.json` 可直接识别；如果本轮手动指定了 `-OutputPath target\fb2-ai-center\token-bridge-current.json`，且它比 canonical 结果更新，refresh/current-state 会把它作为 `custom_output_path_fallback` 识别，避免同一份 no-write live 预检成功但交接状态误报仍缺 token。
 - 访问主项目/fb2 项目资源默认不走代理；状态脚本应清空常见 proxy 环境变量、设置 `NO_PROXY/no_proxy=*`，并在 PowerShell HTTP 请求使用 `-NoProxy`。
 - fb2 live Context Pack 样本如果带 `opinion_result_review_summary`，主项目样本校验必须把它归为 `quality_history_source_kinds`，而不是 `business_source_kinds`。它只能作为历史观点复盘/质量学习证据，不能被当成比赛、赔率、订单、平台摘要或群友观点事实。
 - `latest_context_answer_readiness` 也必须继承这套分类：`present_source_kinds` 是完整来源列表，`business_source_kinds` 才能用于判断四类核心问题事实是否足够，`quality_history_source_kinds` 只用于历史复盘/质量学习说明。
