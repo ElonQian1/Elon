@@ -285,19 +285,25 @@ fn route_c_status_allows_selection(status: &Value) -> bool {
         return false;
     }
     if let Some(status) = status.get("status").and_then(Value::as_str) {
-        if matches!(
-            status,
-            "disabled"
-                | "missing_agent"
-                | "admission_limited"
-                | "budget_exhausted"
-                | "user_budget_exhausted"
-                | "limited"
-                | "unavailable"
-                | "http_error"
-        ) {
+        if route_c_status_is_blocking(status) {
             return false;
         }
+    }
+    if blocking_reasons_present(status) {
+        return false;
+    }
+    if nested_bool(status, &["policy", "enabled"]) == Some(false)
+        || nested_bool(status, &["agentPolicy", "ready"]) == Some(false)
+        || nested_bool(status, &["agent_policy", "ready"]) == Some(false)
+    {
+        return false;
+    }
+    if nested_status_is_blocking(status, &["agentPolicy"])
+        || nested_status_is_blocking(status, &["agent_policy"])
+        || nested_status_is_blocking(status, &["admissionAvailability"])
+        || nested_status_is_blocking(status, &["admission_availability"])
+    {
+        return false;
     }
     if nested_bool(status, &["admissionAvailability", "ready"]) == Some(false)
         || nested_bool(status, &["admission_availability", "ready"]) == Some(false)
@@ -320,6 +326,48 @@ fn route_c_status_allows_selection(status: &Value) -> bool {
         }
     }
     true
+}
+
+fn route_c_status_is_blocking(status: &str) -> bool {
+    matches!(
+        status.trim().to_ascii_lowercase().as_str(),
+        "disabled"
+            | "blocked"
+            | "missing_agent"
+            | "admission_limited"
+            | "limited"
+            | "rate_limited"
+            | "budget_exhausted"
+            | "platform_budget_exhausted"
+            | "user_budget_exhausted"
+            | "agent_policy_blocked"
+            | "no_server_api_key_agent"
+            | "unsupported_agent_usage_mode"
+            | "unavailable"
+            | "http_error"
+    )
+}
+
+fn blocking_reasons_present(status: &Value) -> bool {
+    status
+        .get("blockingReasons")
+        .or_else(|| status.get("blocking_reasons"))
+        .and_then(Value::as_array)
+        .is_some_and(|reasons| !reasons.is_empty())
+}
+
+fn nested_status_is_blocking(value: &Value, path: &[&str]) -> bool {
+    nested_string(value, path, "status")
+        .or_else(|| nested_string(value, path, "reason"))
+        .is_some_and(route_c_status_is_blocking)
+}
+
+fn nested_string<'a>(value: &'a Value, path: &[&str], leaf: &str) -> Option<&'a str> {
+    let mut current = value;
+    for key in path {
+        current = current.get(*key)?;
+    }
+    current.get(leaf)?.as_str()
 }
 
 fn nested_bool(value: &Value, path: &[&str]) -> Option<bool> {
@@ -448,6 +496,53 @@ mod tests {
     }
 
     #[test]
+    fn auto_route_skips_route_c_when_blocking_reasons_are_reported() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: false,
+            server_runtime_ready: true,
+            server_runtime_status: Some(json!({
+                "ready": true,
+                "status": "ready",
+                "blockingReasons": [{
+                    "code": "platform_budget_exhausted",
+                    "scope": "budget",
+                    "message": "Route C 今日平台预算已用完"
+                }]
+            })),
+            ..Default::default()
+        };
+
+        assert!(!route_c_runtime_ready(Some(&runtime)));
+        assert_eq!(
+            choose_cli_for_runtime(&[], Some(&runtime), "codex".to_string(), None).unwrap(),
+            "codex"
+        );
+    }
+
+    #[test]
+    fn auto_route_skips_route_c_when_agent_policy_blocks_selection() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: false,
+            server_runtime_ready: true,
+            server_runtime_status: Some(json!({
+                "ready": true,
+                "status": "ready",
+                "agentPolicy": {
+                    "ready": false,
+                    "reason": "no_server_api_key_agent"
+                }
+            })),
+            ..Default::default()
+        };
+
+        assert!(!route_c_runtime_ready(Some(&runtime)));
+        assert_eq!(
+            choose_cli_for_runtime(&[], Some(&runtime), "codex".to_string(), None).unwrap(),
+            "codex"
+        );
+    }
+
+    #[test]
     fn auto_route_skips_detected_route_a_when_profile_probe_failed() {
         let runtime = NodeDevRuntimeProfile {
             route_a_ready: false,
@@ -530,6 +625,33 @@ mod tests {
             Some(PcRuntimeRoutePreference::RouteC),
         )
         .expect_err("route C should not bypass cloud admission protection");
+        assert!(err.contains("Route C"));
+        assert!(err.contains("限流"));
+        assert!(err.contains("预算"));
+    }
+
+    #[test]
+    fn forced_route_c_does_not_bypass_blocking_reasons() {
+        let runtime = NodeDevRuntimeProfile {
+            server_runtime_ready: true,
+            server_runtime_status: Some(json!({
+                "ready": true,
+                "status": "ready",
+                "blocking_reasons": [{
+                    "code": "agent_policy_blocked",
+                    "scope": "agent_policy"
+                }]
+            })),
+            ..Default::default()
+        };
+
+        let err = choose_cli_for_runtime(
+            &[],
+            Some(&runtime),
+            "codex".to_string(),
+            Some(PcRuntimeRoutePreference::RouteC),
+        )
+        .expect_err("route C should not bypass cloud blocking reasons");
         assert!(err.contains("Route C"));
         assert!(err.contains("限流"));
         assert!(err.contains("预算"));

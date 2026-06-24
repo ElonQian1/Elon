@@ -66,6 +66,18 @@ Invoke-Step "Static Route C runtime guard contract" {
         -Needle "auto_route_skips_route_c_when_budget_is_exhausted" `
         -Message "Route C runtime choice must test budget-exhausted fallback"
     Assert-FileContains `
+        -Path $RuntimeChoiceModule `
+        -Needle "blocking_reasons" `
+        -Message "Route C runtime choice must reject cloud blocking reasons before selecting server-runtime"
+    Assert-FileContains `
+        -Path $RuntimeChoiceModule `
+        -Needle "auto_route_skips_route_c_when_blocking_reasons_are_reported" `
+        -Message "Route C runtime choice must test blockingReasons fallback"
+    Assert-FileContains `
+        -Path $RuntimeChoiceModule `
+        -Needle "auto_route_skips_route_c_when_agent_policy_blocks_selection" `
+        -Message "Route C runtime choice must test agent policy fallback"
+    Assert-FileContains `
         -Path $RouteCStatusModule `
         -Needle "admissionAvailability" `
         -Message "Route C node cloud status must preserve admission availability"
