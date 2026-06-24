@@ -15,6 +15,7 @@ const ROUTE_B_SUPPORTED_TOOLS: &[&str] = &[
     "git_status",
     "git_diff",
     "git_log",
+    "git_show",
     "write_file",
     "apply_patch",
     "run_command",
@@ -29,6 +30,7 @@ const ROUTE_B_READ_ONLY_TOOLS: &[&str] = &[
     "git_status",
     "git_diff",
     "git_log",
+    "git_show",
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -335,9 +337,11 @@ mod tests {
         assert!(contract.supported_tools.contains(&"git_status".to_string()));
         assert!(contract.supported_tools.contains(&"git_diff".to_string()));
         assert!(contract.supported_tools.contains(&"git_log".to_string()));
+        assert!(contract.supported_tools.contains(&"git_show".to_string()));
         assert!(contract.read_only_tools.contains(&"git_status".to_string()));
         assert!(contract.read_only_tools.contains(&"git_diff".to_string()));
         assert!(contract.read_only_tools.contains(&"git_log".to_string()));
+        assert!(contract.read_only_tools.contains(&"git_show".to_string()));
         assert!(contract
             .supported_tools
             .contains(&"apply_patch".to_string()));

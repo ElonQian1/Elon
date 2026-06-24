@@ -546,7 +546,10 @@
       const approvals = arrayStrings(contract.approval_required_tools || contract.approvalRequiredTools);
       const readOnly = arrayStrings(contract.read_only_tools || contract.readOnlyTools);
       const limitations = arrayStrings(contract.limitations);
-      const core = ['search_files', 'file_info', 'read_file_range', 'apply_patch', 'run_command']
+      const core = [
+        'search_files', 'file_info', 'read_file_range', 'git_status', 'git_diff', 'git_show',
+        'apply_patch', 'run_command'
+      ]
         .filter((tool) => supported.includes(tool));
       target.innerHTML = `
         <div class="node-contract-head">

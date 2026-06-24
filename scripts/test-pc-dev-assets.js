@@ -1004,7 +1004,11 @@ function testProjectReadinessChecklist() {
       device_name: 'PC',
       dev_runtime: {
         local_tool_contract: {
-          supported_tools: ['list_dir', 'search_files', 'file_info', 'read_file', 'read_file_range', 'write_file', 'apply_patch', 'run_command'],
+          supported_tools: [
+            'list_dir', 'search_files', 'file_info', 'read_file', 'read_file_range',
+            'git_status', 'git_diff', 'git_log', 'git_show',
+            'write_file', 'apply_patch', 'run_command'
+          ],
           approval_required_tools: ['write_file', 'apply_patch', 'run_command']
         }
       }
@@ -1027,6 +1031,7 @@ function testProjectReadinessChecklist() {
   assert.ok(readyHtml.includes('file_info'), 'readiness should expose Route B/C file info tool contract');
   assert.ok(readyHtml.includes('read_file'), 'readiness should expose Route B/C file read tool contract');
   assert.ok(readyHtml.includes('read_file_range'), 'readiness should expose Route B/C file-range tool contract');
+  assert.ok(readyHtml.includes('git_show'), 'readiness should expose Route B/C git revision inspection tool contract');
   assert.ok(readyHtml.includes('write_file'), 'readiness should expose Route B/C write tool contract');
   assert.ok(readyHtml.includes('apply_patch'), 'readiness should expose Route B/C patch tool contract');
   assert.ok(readyHtml.includes('run_command'), 'readiness should expose Route B/C command tool contract');
@@ -1614,7 +1619,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(nativeNodeAdmin.includes('open_launcher_logs'), 'PC node panel should expose launcher logs action');
   assert.ok(nativeNodeAdmin.includes('loadLatestClientPackageVersion'), 'PC node panel should fetch latest client package metadata');
   assert.ok(nativeNodeAdmin.includes('clientUpdateLine'), 'PC node panel should compare installed and latest client versions');
-  assert.ok(nativeNodeAdmin.includes("'search_files', 'file_info', 'read_file_range', 'apply_patch', 'run_command'"), 'PC node panel should show search and file-info tools as core Route B capabilities');
+  assert.ok(nativeNodeAdmin.includes("'git_show'"), 'PC node panel should show git revision inspection as a core Route B capability');
 
   const doctor = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_doctor.js'), 'utf8');
   assert.ok(doctor.includes('localNodeApi(path, options || {})'), 'doctor project should reuse the protected local node API');

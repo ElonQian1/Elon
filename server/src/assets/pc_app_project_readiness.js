@@ -405,7 +405,10 @@
       const contract = localToolContract(node);
       const supported = arrayStrings(contract.supported_tools || contract.supportedTools);
       if (!supported.length) return '未上报';
-      const readTools = ['search_files', 'list_dir', 'file_info', 'read_file', 'read_file_range']
+      const readTools = [
+        'search_files', 'list_dir', 'file_info', 'read_file', 'read_file_range',
+        'git_status', 'git_diff', 'git_log', 'git_show'
+      ]
         .filter((tool) => supported.includes(tool));
       const approvals = arrayStrings(contract.approval_required_tools || contract.approvalRequiredTools);
       const writeTools = ['write_file', 'apply_patch', 'run_command']
