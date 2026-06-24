@@ -12,6 +12,7 @@ param(
     [string]$ExternalUserId = "6fe5aa17-0403-427a-8e91-7f414beca35d",
     [string]$GroupId = "official",
     [string]$SummaryPath = "",
+    [string]$ContractSmokeSummaryPath = "",
     [string]$OutputPath = "",
     [int]$RequestTimeoutSec = 60,
     [int]$PollTimeoutSec = 120,
@@ -137,6 +138,28 @@ function New-Fb2TokenBridgePreflightArguments {
     @($args)
 }
 
+function New-Fb2TokenBridgeContractSmokeArguments {
+    param(
+        [string]$ScriptPath,
+        [string]$Username,
+        [string]$ExternalUser,
+        [string]$Summary
+    )
+
+    $args = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $ScriptPath,
+            "-Fb2Username", $Username,
+            "-ExternalUserId", $ExternalUser,
+            "-SummaryPath", $Summary
+        )) {
+        [void]$args.Add([string]$item)
+    }
+    @($args)
+}
+
 function Test-Fb2TokenBridgeCommandSecretSafe {
     param([string[]]$CommandArgs)
 
@@ -176,6 +199,7 @@ function New-Fb2TokenBridgeRunResult {
     param(
         [bool]$Success,
         [object]$PreflightExitCode,
+        [object]$ContractSmokeExitCode,
         [object]$CurrentStateExitCode,
         [string]$Note
     )
@@ -192,6 +216,9 @@ function New-Fb2TokenBridgeRunResult {
         run_data_only_preflight = [bool]$RunDataOnlyPreflight
         run_current_state_after = [bool]$RunCurrentStateAfter
         preflight_exit_code = $PreflightExitCode
+        contract_smoke_exit_code = $ContractSmokeExitCode
+        contract_smoke_summary_path = $ContractSmokeSummaryPath
+        contract_smoke_refreshed = ($null -ne $ContractSmokeExitCode)
         current_state_exit_code = $CurrentStateExitCode
         summary_path = $SummaryPath
         token_passed_as_argument = $false
@@ -219,6 +246,11 @@ function Invoke-Fb2TokenBridgeSelfTest {
         -FeedbackTimeout 60
 
     $checks = [System.Collections.ArrayList]::new()
+    $fakeContractArgs = New-Fb2TokenBridgeContractSmokeArguments `
+        -ScriptPath (Join-Path $root "scripts\smoke-fb2-ai-center.ps1") `
+        -Username "123qwe" `
+        -ExternalUser "6fe5aa17-0403-427a-8e91-7f414beca35d" `
+        -Summary (Join-Path $root "target\fb2-ai-center\contract-smoke-summary-current.json")
     [void]$checks.Add([ordered]@{
         name = "preflight command does not pass service token as argv"
         passed = (Test-Fb2TokenBridgeCommandSecretSafe -CommandArgs $fakeArgs)
@@ -234,6 +266,14 @@ function Invoke-Fb2TokenBridgeSelfTest {
     [void]$checks.Add([ordered]@{
         name = "preflight command keeps target user"
         passed = ((@($fakeArgs) -contains "-ExternalUserId") -and ((@($fakeArgs) -join " ") -match "6fe5aa17-0403-427a-8e91-7f414beca35d"))
+    })
+    [void]$checks.Add([ordered]@{
+        name = "contract smoke command does not pass token or password as argv"
+        passed = (Test-Fb2TokenBridgeCommandSecretSafe -CommandArgs $fakeContractArgs)
+    })
+    [void]$checks.Add([ordered]@{
+        name = "contract smoke command refreshes canonical summary"
+        passed = ((@($fakeContractArgs) -contains "-SummaryPath") -and ((@($fakeContractArgs) -join " ") -match "contract-smoke-summary-current\.json"))
     })
     [void]$checks.Add([ordered]@{
         name = "remote ssh disables proxy hops"
@@ -292,6 +332,11 @@ if ([string]::IsNullOrWhiteSpace($SummaryPath)) {
 } else {
     $SummaryPath = Resolve-Fb2TokenBridgePath -Path $SummaryPath -Root $root
 }
+if ([string]::IsNullOrWhiteSpace($ContractSmokeSummaryPath)) {
+    $ContractSmokeSummaryPath = Join-Path $root "target\fb2-ai-center\contract-smoke-summary-current.json"
+} else {
+    $ContractSmokeSummaryPath = Resolve-Fb2TokenBridgePath -Path $ContractSmokeSummaryPath -Root $root
+}
 
 $envSnapshots = @(
     (Save-Fb2TokenBridgeEnvironmentValue -Name "FB2_API_BASE"),
@@ -311,6 +356,7 @@ $envSnapshots = @(
 
 $sharedSecret = $null
 $preflightExitCode = $null
+$contractSmokeExitCode = $null
 $currentStateExitCode = $null
 try {
     $sharedSecret = Get-Fb2TokenBridgeRemoteSharedSecret `
@@ -353,11 +399,27 @@ try {
     }
 
     if ($RunCurrentStateAfter) {
+        $contractSmokeArgs = New-Fb2TokenBridgeContractSmokeArguments `
+            -ScriptPath (Join-Path $root "scripts\smoke-fb2-ai-center.ps1") `
+            -Username $Fb2Username `
+            -ExternalUser $ExternalUserId `
+            -Summary $ContractSmokeSummaryPath
+
+        if (-not (Test-Fb2TokenBridgeCommandSecretSafe -CommandArgs $contractSmokeArgs)) {
+            throw "Internal safety check failed: contract smoke argv contains service token or fb2 password material."
+        }
+        & pwsh @contractSmokeArgs
+        $contractSmokeExitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+        if ($contractSmokeExitCode -ne 0) {
+            throw "Authenticated contract smoke failed with exit code $contractSmokeExitCode."
+        }
+
         $preCurrentStateResult = New-Fb2TokenBridgeRunResult `
             -Success $true `
             -PreflightExitCode $preflightExitCode `
+            -ContractSmokeExitCode $contractSmokeExitCode `
             -CurrentStateExitCode $null `
-            -Note "Preflight succeeded; current-state validation is about to run tokenless against this fresh no-write bridge evidence."
+            -Note "Preflight and authenticated contract smoke succeeded; current-state validation is about to run tokenless against this fresh no-write bridge evidence."
         Write-Fb2TokenBridgeResult -Result $preCurrentStateResult -Path $OutputPath | Out-Null
 
         # Current-state validation is a handoff gate: prove the token bridge did not
@@ -373,6 +435,7 @@ try {
     $result = New-Fb2TokenBridgeRunResult `
         -Success $true `
         -PreflightExitCode $preflightExitCode `
+        -ContractSmokeExitCode $contractSmokeExitCode `
         -CurrentStateExitCode $currentStateExitCode `
         -Note "Remote fb2 service token was read into process env only and restored after child scripts."
     Write-Fb2TokenBridgeResult -Result $result -Path $OutputPath | Out-Null
