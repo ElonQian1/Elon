@@ -1791,6 +1791,14 @@ function testPcMessageAlignment() {
   assert.ok(pcCss.includes('.message-row.own .message-avatar'), 'own PC messages should move the avatar to the right');
 }
 
+function testPcTopbarEntryLabels() {
+  const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
+  assert.ok(pcAppHtml.includes('>打开旧版</button>'), 'topbar legacy web entry should explain that it opens the old interface');
+  assert.ok(pcAppHtml.includes('>电脑连接</button>'), 'topbar local node entry should be framed as computer connection status');
+  assert.ok(pcAppHtml.includes('查看这台电脑的连接和运行状态'), 'local node topbar entry should include an explanatory accessible label');
+  assert.ok(!pcAppHtml.includes('id="openLocalNodeBtn" type="button">本机助手</button>'), 'topbar should avoid the internal local-helper label');
+}
+
 function testPcProjectStartGuidance() {
   const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
   const projectCreate = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_create.js'), 'utf8');
@@ -1838,6 +1846,7 @@ function testPcProjectStartGuidance() {
   testLocalAdminTokenWiring();
   testPcProjectCreateSkipsStorageByDefault();
   testPcMessageAlignment();
+  testPcTopbarEntryLabels();
   testPcProjectStartGuidance();
 
   console.log('pc-dev-assets tests passed');
