@@ -1410,6 +1410,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(projectPickerRs.includes('next_action'), 'local project inspect should expose a next registration action');
   assert.ok(projectPickerRs.includes('LocalProjectDevProfilePayload'), 'local project inspect should include a dev profile payload');
   assert.ok(projectProfileNodeRs.includes('@tauri-apps/cli'), 'local project profile should detect Tauri desktop projects');
+  assert.ok(projectProfileNodeRs.includes('Electron 桌面应用'), 'local project profile should detect Electron desktop projects');
   assert.ok(projectProfileRs.includes('wails.json'), 'local project profile should detect Wails desktop projects');
   assert.ok(pcApp.includes('project.agent_runtime'), 'project registration should display local Agent Runtime freshness');
   assert.ok(pcApp.includes('Agent Runtime'), 'project registration should label Agent Runtime freshness in settings');

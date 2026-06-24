@@ -217,6 +217,7 @@ fn apply_framework_fallback(
             ));
         }
     }
+    apply_electron_fallback(manager, package, run_command, build_command);
 }
 
 fn apply_workspace_framework_fallback(
@@ -247,6 +248,7 @@ fn apply_workspace_framework_fallback(
             ));
         }
     }
+    apply_workspace_electron_fallback(manager, module, package, run_command, build_command);
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -284,6 +286,60 @@ fn detect_framework(package: &PackageJsonInfo) -> Option<NodeFramework> {
             dev_args: &["dev", "--host", "127.0.0.1"],
             build_args: &["build"],
         });
+    }
+    None
+}
+
+fn apply_electron_fallback(
+    manager: &str,
+    package: &PackageJsonInfo,
+    run_command: &mut Option<String>,
+    build_command: &mut Option<String>,
+) {
+    if !has_dependency(package, "electron") {
+        return;
+    }
+    if run_command.is_none() {
+        *run_command = Some(package_exec_command(manager, "electron", &["."]));
+    }
+    if build_command.is_none() {
+        *build_command = electron_build_command(package)
+            .map(|(binary, args)| package_exec_command(manager, binary, args));
+    }
+}
+
+fn apply_workspace_electron_fallback(
+    manager: &str,
+    module: &str,
+    package: &PackageJsonInfo,
+    run_command: &mut Option<String>,
+    build_command: &mut Option<String>,
+) {
+    if !has_dependency(package, "electron") {
+        return;
+    }
+    if run_command.is_none() {
+        *run_command = Some(workspace_package_exec_command(
+            manager,
+            module,
+            "electron",
+            &["."],
+        ));
+    }
+    if build_command.is_none() {
+        *build_command = electron_build_command(package)
+            .map(|(binary, args)| workspace_package_exec_command(manager, module, binary, args));
+    }
+}
+
+fn electron_build_command(
+    package: &PackageJsonInfo,
+) -> Option<(&'static str, &'static [&'static str])> {
+    if has_dependency(package, "@electron-forge/cli") {
+        return Some(("electron-forge", &["make"]));
+    }
+    if has_dependency(package, "electron-builder") {
+        return Some(("electron-builder", &[]));
     }
     None
 }
@@ -335,5 +391,74 @@ fn workspace_package_exec_command(
         "bun" => format!("bun --cwd {module} x {binary} {arg_text}"),
         _ if arg_text.is_empty() => format!("npm --prefix {module} exec {binary}"),
         _ => format!("npm --prefix {module} exec {binary} -- {arg_text}"),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{detect_node_project_profile, detect_node_workspace_module};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_project(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!(
+            "elon-node-project-profile-{label}-{}-{}",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    #[test]
+    fn detects_electron_desktop_commands_without_scripts() {
+        let dir = temp_project("electron-root");
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"devDependencies":{"electron":"^31.0.0","electron-builder":"^24.0.0"}}"#,
+        )
+        .unwrap();
+
+        let profile = detect_node_project_profile(&dir).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Electron 桌面应用"));
+        assert_eq!(
+            profile.run_command.as_deref(),
+            Some("npm exec electron -- .")
+        );
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("npm exec electron-builder")
+        );
+    }
+
+    #[test]
+    fn detects_workspace_electron_commands_without_scripts() {
+        let dir = temp_project("electron-workspace");
+        let app = dir.join("app");
+        std::fs::create_dir_all(&app).unwrap();
+        std::fs::write(app.join("pnpm-lock.yaml"), "").unwrap();
+        std::fs::write(
+            app.join("package.json"),
+            r#"{"devDependencies":{"electron":"^31.0.0","@electron-forge/cli":"^7.0.0"}}"#,
+        )
+        .unwrap();
+
+        let module = detect_node_workspace_module("app", &app).unwrap();
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(module.project_type.as_deref(), Some("Electron 桌面应用"));
+        assert_eq!(
+            module.run_command.as_deref(),
+            Some("pnpm --dir app exec electron .")
+        );
+        assert_eq!(
+            module.build_command.as_deref(),
+            Some("pnpm --dir app exec electron-forge make")
+        );
     }
 }
