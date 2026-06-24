@@ -58,6 +58,36 @@ struct LocalProjectRegistrationReadiness {
     missing_fields: Vec<String>,
     warnings: Vec<String>,
     autofill_fields: Vec<String>,
+    next_action: LocalProjectRegistrationNextAction,
+    register_payload: LocalProjectRegisterPayload,
+}
+
+#[derive(Debug, Serialize)]
+struct LocalProjectRegistrationNextAction {
+    kind: String,
+    label: String,
+    detail: String,
+}
+
+#[derive(Debug, Serialize)]
+struct LocalProjectRegisterPayload {
+    name: String,
+    workspace_path: String,
+    description: Option<String>,
+    repo_url: Option<String>,
+    branch: Option<String>,
+    dev_profile: Option<LocalProjectDevProfilePayload>,
+}
+
+#[derive(Debug, Serialize)]
+struct LocalProjectDevProfilePayload {
+    project_type: Option<String>,
+    package_manager: Option<String>,
+    run_command: Option<String>,
+    test_command: Option<String>,
+    build_command: Option<String>,
+    detected_files: Vec<String>,
+    source: &'static str,
 }
 
 pub(crate) async fn pick_local_project_folder() -> (StatusCode, Json<serde_json::Value>) {
@@ -235,6 +265,8 @@ fn local_project_registration_readiness(
         "needs_review" => "已自动识别关键字段，但建议确认提示项后再注册。".to_string(),
         _ => format!("还缺少 {}，暂不能注册。", missing_fields.join("、")),
     };
+    let next_action = local_project_registration_next_action(&status, &missing_fields, &warnings);
+    let register_payload = local_project_register_payload(project);
 
     LocalProjectRegistrationReadiness {
         can_register,
@@ -243,7 +275,72 @@ fn local_project_registration_readiness(
         missing_fields,
         warnings,
         autofill_fields,
+        next_action,
+        register_payload,
     }
+}
+
+fn local_project_registration_next_action(
+    status: &str,
+    missing_fields: &[String],
+    warnings: &[String],
+) -> LocalProjectRegistrationNextAction {
+    match status {
+        "ready" => LocalProjectRegistrationNextAction {
+            kind: "auto_register".to_string(),
+            label: "直接注册".to_string(),
+            detail: "选择目录后已自动填好关键字段，可以直接绑定到本 PC 节点。".to_string(),
+        },
+        "needs_review" => LocalProjectRegistrationNextAction {
+            kind: "review_then_register".to_string(),
+            label: "确认后注册".to_string(),
+            detail: warnings.first().cloned().unwrap_or_else(|| {
+                "已自动填好关键字段，建议确认提示项后再绑定到本 PC 节点。".to_string()
+            }),
+        },
+        _ => LocalProjectRegistrationNextAction {
+            kind: "complete_missing_fields".to_string(),
+            label: "补齐字段".to_string(),
+            detail: format!(
+                "还缺少 {}，补齐后才能绑定到本 PC 节点。",
+                if missing_fields.is_empty() {
+                    "必要信息".to_string()
+                } else {
+                    missing_fields.join("、")
+                }
+            ),
+        },
+    }
+}
+
+fn local_project_register_payload(project: &LocalProjectInfo) -> LocalProjectRegisterPayload {
+    let dev_profile = has_dev_profile(project).then(|| LocalProjectDevProfilePayload {
+        project_type: project.project_type.clone(),
+        package_manager: project.package_manager.clone(),
+        run_command: project.run_command.clone(),
+        test_command: project.test_command.clone(),
+        build_command: project.build_command.clone(),
+        detected_files: project.detected_files.clone(),
+        source: "node_agent_project_picker",
+    });
+
+    LocalProjectRegisterPayload {
+        name: project.name.clone(),
+        workspace_path: project.workspace_path.clone(),
+        description: project.description.clone(),
+        repo_url: project.repo_url.clone(),
+        branch: project.branch.clone(),
+        dev_profile,
+    }
+}
+
+fn has_dev_profile(project: &LocalProjectInfo) -> bool {
+    project.project_type.is_some()
+        || project.package_manager.is_some()
+        || project.run_command.is_some()
+        || project.test_command.is_some()
+        || project.build_command.is_some()
+        || !project.detected_files.is_empty()
 }
 
 #[derive(Debug)]
@@ -815,6 +912,21 @@ mod tests {
         assert!(readiness
             .autofill_fields
             .contains(&"Agent Runtime".to_string()));
+        assert_eq!(readiness.next_action.kind, "auto_register");
+        assert_eq!(readiness.register_payload.name, "demo");
+        assert_eq!(
+            readiness.register_payload.repo_url.as_deref(),
+            Some("https://example.com/demo.git")
+        );
+        assert_eq!(readiness.register_payload.branch.as_deref(), Some("main"));
+        assert_eq!(
+            readiness
+                .register_payload
+                .dev_profile
+                .as_ref()
+                .and_then(|profile| profile.build_command.as_deref()),
+            Some("cargo build")
+        );
     }
 
     #[test]
@@ -828,6 +940,7 @@ mod tests {
         project.run_command = None;
         project.test_command = None;
         project.build_command = None;
+        project.detected_files.clear();
         project.agent_runtime = AgentRuntimeFreshness {
             status: "missing".to_string(),
             summary: "项目缺少 scripts\\elon-agent.ps1，Route B/C 自研运行时需要重新生成项目脚本。"
@@ -863,6 +976,26 @@ mod tests {
             .iter()
             .any(|warning| warning.contains("elon-agent.ps1")));
         assert!(!readiness.autofill_fields.contains(&"Git 远端".to_string()));
+        assert_eq!(readiness.next_action.kind, "review_then_register");
+        assert!(readiness.next_action.detail.contains("未检测到 Git 工作区"));
+        assert!(readiness.register_payload.repo_url.is_none());
+        assert!(readiness.register_payload.dev_profile.is_none());
+    }
+
+    #[test]
+    fn registration_readiness_blocks_missing_required_payload_fields() {
+        let mut project = local_project();
+        project.name = " ".to_string();
+        project.workspace_path = " ".to_string();
+        let inspect = inspect_status();
+
+        let readiness = local_project_registration_readiness(&project, &inspect);
+
+        assert!(!readiness.can_register);
+        assert_eq!(readiness.status, "blocked");
+        assert_eq!(readiness.next_action.kind, "complete_missing_fields");
+        assert!(readiness.next_action.detail.contains("项目目录"));
+        assert!(readiness.next_action.detail.contains("项目名称"));
     }
 
     #[test]

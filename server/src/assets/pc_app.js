@@ -3025,13 +3025,15 @@
     const project = (payload && payload.project) || {};
     const inspect = (payload && payload.inspect) || {};
     const registration = (payload && payload.registration) || {};
+    const registerPayload = registration.register_payload || {};
+    const nextAction = registration.next_action || {};
     const previousPath = clean(state.localProjectInfo && state.localProjectInfo.path);
-    const path = clean(project.workspace_path || inspect.workspace_path);
+    const path = clean(registerPayload.workspace_path || project.workspace_path || inspect.workspace_path);
     const pathChanged = path && path !== previousPath;
-    const name = clean(project.name);
-    const repo = clean(project.repo_url || inspect.git_remote_origin);
-    const branch = clean(project.branch || inspect.git_branch);
-    const desc = clean(project.description);
+    const name = clean(registerPayload.name || project.name);
+    const repo = clean(registerPayload.repo_url || project.repo_url || inspect.git_remote_origin);
+    const branch = clean(registerPayload.branch || project.branch || inspect.git_branch);
+    const desc = clean(registerPayload.description || project.description);
     const identitySource = clean(project.identity_source);
     const canRegister = registration.can_register !== false;
     const missingFields = Array.isArray(registration.missing_fields)
@@ -3051,21 +3053,24 @@
     const detectedFiles = Array.isArray(project.detected_files)
       ? project.detected_files.map(clean).filter(Boolean)
       : [];
+    const payloadDevProfile = registerPayload.dev_profile || {};
     const devProfile = {
-      project_type: clean(project.project_type) || null,
-      package_manager: clean(project.package_manager) || null,
-      run_command: clean(project.run_command) || null,
-      test_command: clean(project.test_command) || null,
-      build_command: clean(project.build_command) || null,
-      detected_files: detectedFiles,
+      project_type: clean(payloadDevProfile.project_type || project.project_type) || null,
+      package_manager: clean(payloadDevProfile.package_manager || project.package_manager) || null,
+      run_command: clean(payloadDevProfile.run_command || project.run_command) || null,
+      test_command: clean(payloadDevProfile.test_command || project.test_command) || null,
+      build_command: clean(payloadDevProfile.build_command || project.build_command) || null,
+      detected_files: Array.isArray(payloadDevProfile.detected_files)
+        ? payloadDevProfile.detected_files.map(clean).filter(Boolean)
+        : detectedFiles,
       source: 'node_agent_project_picker'
     };
     const hasDevProfile = Boolean(
       devProfile.project_type || devProfile.package_manager || devProfile.run_command ||
-      devProfile.test_command || devProfile.build_command || detectedFiles.length
+      devProfile.test_command || devProfile.build_command || devProfile.detected_files.length
     );
     state.localProjectInfo = path
-      ? { path, name, repo, branch, canRegister, missingFields, devProfile: hasDevProfile ? devProfile : null }
+      ? { path, name, repo, branch, canRegister, missingFields, registerPayload, devProfile: hasDevProfile ? devProfile : null }
       : null;
     const git = inspect.is_git_worktree || project.is_git_worktree
       ? [branch || 'HEAD', clean(project.git_head || inspect.git_head), (project.has_uncommitted_changes || inspect.has_uncommitted_changes) ? '有未提交改动' : '干净']
@@ -3078,7 +3083,7 @@
       clean(project.test_command) && `测试 ${clean(project.test_command)}`,
       clean(project.build_command) && `构建 ${clean(project.build_command)}`
     ].filter(Boolean).join(' / ');
-    const detected = detectedFiles.slice(0, 4).join('、');
+    const detected = (devProfile.detected_files || detectedFiles).slice(0, 4).join('、');
     const agentRuntime = (project && project.agent_runtime) || {};
     const agentRuntimeStatus = clean(agentRuntime.status);
     const agentRuntimeSummary = clean(agentRuntime.summary);
@@ -3090,11 +3095,16 @@
     }
     const summary = clean(registration.summary) || (canRegister ? '已读取目录信息，可以注册。' : '目录信息不足，暂不能注册。');
     const statusTone = !canRegister ? 'error' : warnings.length ? 'warning' : 'ok';
+    const nextActionLine = [
+      clean(nextAction.label),
+      clean(nextAction.detail)
+    ].filter(Boolean).join('：');
     const registerPreview = projectRegistrationPreviewLine();
     const rows = [
       registerPreview && ['将注册', registerPreview, canRegister ? 'ok' : 'warning', 'is-register-preview'],
       ['目录', path],
       ['状态', summary, statusTone],
+      nextActionLine && ['下一步', nextActionLine, !canRegister ? 'error' : warnings.length ? 'warning' : 'ok'],
       ['Git', git],
       identitySource && ['来源', identitySource],
       profile && ['类型', profile],
@@ -3112,6 +3122,7 @@
   }
 
   function projectRegistrationPreviewLine() {
+    const payload = (state.localProjectInfo && state.localProjectInfo.registerPayload) || {};
     const name = clean(els.settingsProjectName && els.settingsProjectName.value);
     const path = clean(els.settingsProjectPath && els.settingsProjectPath.value);
     const repo = clean(els.settingsProjectRepo && els.settingsProjectRepo.value);
@@ -3128,8 +3139,8 @@
       ? `Git ${repo}${branch ? ` @ ${branch}` : ''}`
       : (branch ? `分支 ${branch}` : '');
     return [
-      name && `项目 ${name}`,
-      gitLine || (path && '本地目录'),
+      (name || clean(payload.name)) && `项目 ${name || clean(payload.name)}`,
+      gitLine || ((path || clean(payload.workspace_path)) && '本地目录'),
       `权限 ${modeLabel}`,
       commands.length && `命令 ${commands.slice(0, 2).join(' / ')}`
     ].filter(Boolean).join(' · ');
@@ -3287,7 +3298,8 @@
   }
 
   async function registerLocalProject() {
-    const path = clean(els.settingsProjectPath.value);
+    const registerPayload = (state.localProjectInfo && state.localProjectInfo.registerPayload) || {};
+    const path = clean(els.settingsProjectPath.value) || clean(registerPayload.workspace_path);
     if (!path) {
       setSettingsResult('请选择项目目录。', 'error');
       return;
@@ -3300,7 +3312,7 @@
       setSettingsBusy(els.registerProjectBtn, false);
       return;
     }
-    const name = clean(els.settingsProjectName.value);
+    const name = clean(els.settingsProjectName.value) || clean(registerPayload.name);
     if (!name) {
       setSettingsResult('目录已读取，但没有识别到项目名称，请手动填写。', 'error');
       setSettingsBusy(els.registerProjectBtn, false);
@@ -3312,6 +3324,7 @@
       setSettingsBusy(els.registerProjectBtn, false);
       return;
     }
+    const devProfile = (state.localProjectInfo && (state.localProjectInfo.devProfile || registerPayload.dev_profile)) || null;
     const runtimeMode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
     if (runtimeMode === 'full_access') {
       const ok = window.confirm(`确认给项目「${name}」开启本机完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；这次确认会写入这台电脑的本机授权记录。`);
@@ -3329,10 +3342,10 @@
         body: JSON.stringify({
           name,
           workspace_path: path,
-          description: clean(els.settingsProjectDesc.value) || null,
-          repo_url: clean(els.settingsProjectRepo.value) || null,
-          branch: clean(els.settingsProjectBranch.value) || null,
-          dev_profile: (state.localProjectInfo && state.localProjectInfo.devProfile) || null
+          description: clean(els.settingsProjectDesc.value) || clean(registerPayload.description) || null,
+          repo_url: clean(els.settingsProjectRepo.value) || clean(registerPayload.repo_url) || null,
+          branch: clean(els.settingsProjectBranch.value) || clean(registerPayload.branch) || null,
+          dev_profile: devProfile
         })
       });
       const project = (data.cloud && data.cloud.project) || {};

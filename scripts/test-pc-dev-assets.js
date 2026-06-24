@@ -1382,6 +1382,9 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes("registration.can_register === false) return 'error'"), 'blocked project registration inspection should show an error result');
   assert.ok(pcApp.includes('registration.warnings') && pcApp.includes("? 'note' : 'ok'"), 'review-needed project registration inspection should show a note result');
   assert.ok(pcApp.includes('autofill_fields'), 'project registration should display auto-filled fields');
+  assert.ok(pcApp.includes('registration.register_payload'), 'project registration should consume the server-computed register payload');
+  assert.ok(pcApp.includes('registration.next_action'), 'project registration should display the server-computed next action');
+  assert.ok(pcApp.includes('registerPayload.dev_profile'), 'project registration should submit the auto-detected dev profile payload');
   assert.ok(pcApp.includes('目录信息不足'), 'project registration should block submission when required fields are missing');
   const manifestIdentityRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_manifest_identity.rs'), 'utf8');
   assert.ok(manifestIdentityRs.includes('settings.gradle.kts'), 'local project identity should inspect Gradle Kotlin settings files');
@@ -1389,6 +1392,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(manifestIdentityRs.includes('rootProject.name'), 'local project identity should derive Android/Gradle project names');
   const projectProfileNodeRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_profile_node.rs'), 'utf8');
   const projectProfileRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_profile.rs'), 'utf8');
+  const projectPickerRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_picker.rs'), 'utf8');
+  assert.ok(projectPickerRs.includes('register_payload'), 'local project inspect should expose a registration payload');
+  assert.ok(projectPickerRs.includes('next_action'), 'local project inspect should expose a next registration action');
+  assert.ok(projectPickerRs.includes('LocalProjectDevProfilePayload'), 'local project inspect should include a dev profile payload');
   assert.ok(projectProfileNodeRs.includes('@tauri-apps/cli'), 'local project profile should detect Tauri desktop projects');
   assert.ok(projectProfileRs.includes('wails.json'), 'local project profile should detect Wails desktop projects');
   assert.ok(pcApp.includes('project.agent_runtime'), 'project registration should display local Agent Runtime freshness');
