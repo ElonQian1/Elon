@@ -3,8 +3,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   min-height: 44px;
   padding: 8px 16px;
+  overflow: hidden;
   border-top: 1px solid rgba(255, 255, 255, .06);
   background: #202329;
   color: var(--text-soft);
@@ -68,7 +70,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
+  min-width: 0;
+  justify-content: flex-end;
 }
 
 .dev-route-segment {
@@ -185,5 +189,21 @@
   .dev-route-segment {
     flex: 1 1 100%;
     justify-content: flex-end;
+  }
+}
+
+@media (max-width: 1280px) {
+  .dev-composer-bar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .dev-composer-main,
+  .dev-composer-actions {
+    flex: 1 1 100%;
+  }
+
+  .dev-composer-actions {
+    flex-wrap: wrap;
   }
 }
