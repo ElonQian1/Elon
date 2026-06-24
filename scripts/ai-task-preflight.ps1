@@ -8,6 +8,12 @@
 
 $ErrorActionPreference = "Stop"
 
+$directNetworkScript = Join-Path $PSScriptRoot "direct-network.ps1"
+if (Test-Path -LiteralPath $directNetworkScript) {
+    . $directNetworkScript
+    Set-ElonProjectDirectNetwork
+}
+
 function GitOutput {
     param([string[]]$GitArgs)
     $output = & git @GitArgs 2>&1
@@ -15,6 +21,93 @@ function GitOutput {
         throw "git $($GitArgs -join ' ') failed: $output"
     }
     return ($output -join "`n").Trim()
+}
+
+function GitOutputInPath {
+    param(
+        [string]$Path,
+        [string[]]$GitArgs
+    )
+    $output = & git -C $Path @GitArgs 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "git -C `"$Path`" $($GitArgs -join ' ') failed: $output"
+    }
+    return ($output -join "`n").Trim()
+}
+
+function Get-GitWorktreeEntries {
+    $entries = @()
+    $current = @{}
+    foreach ($line in (& git worktree list --porcelain)) {
+        if ($line -eq "") {
+            if ($current.Count -gt 0) {
+                $entries += [pscustomobject]$current
+                $current = @{}
+            }
+            continue
+        }
+
+        $kv = $line -split " ", 2
+        switch ($kv[0]) {
+            "worktree" { $current["Path"] = $kv[1] }
+            "HEAD"     { $current["Head"] = $kv[1] }
+            "branch"   { $current["Branch"] = ($kv[1] -replace "^refs/heads/","") }
+            "bare"     { $current["Bare"] = $true }
+            "detached" { $current["Detached"] = $true }
+        }
+    }
+    if ($current.Count -gt 0) { $entries += [pscustomobject]$current }
+    return $entries
+}
+
+function Sync-LocalMainBaseline {
+    param([bool]$HasOrigin)
+
+    if (-not $HasOrigin) {
+        Write-Host "MAIN_BASELINE_SYNC=skipped_no_origin"
+        return
+    }
+
+    & git rev-parse --verify origin/main *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "MAIN_BASELINE_SYNC=skipped_no_origin_main"
+        return
+    }
+
+    & git worktree prune *> $null
+
+    $mainWorktree = Get-GitWorktreeEntries |
+        Where-Object { $_.Branch -eq "main" -and $_.Path } |
+        Select-Object -First 1
+
+    if ($mainWorktree) {
+        $mainPath = [string]$mainWorktree.Path
+        $gitMarker = Join-Path $mainPath ".git"
+        if (Test-Path -LiteralPath $gitMarker) {
+            $status = (& git -C $mainPath status --porcelain=v1 --untracked-files=normal)
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "MAIN_BASELINE_SYNC=blocked_status_failed:$mainPath"
+                return
+            }
+            if (-not [string]::IsNullOrWhiteSpace(($status -join "`n"))) {
+                Write-Host "MAIN_BASELINE_SYNC=blocked_dirty:$mainPath"
+                return
+            }
+
+            GitOutputInPath -Path $mainPath -GitArgs @("merge", "--ff-only", "origin/main") | Out-Null
+            Write-Host "MAIN_BASELINE_SYNC=synced_worktree:$mainPath"
+            return
+        }
+    }
+
+    & git show-ref --verify --quiet refs/heads/main
+    if ($LASTEXITCODE -eq 0) {
+        GitOutput @("branch", "--force", "main", "origin/main") | Out-Null
+        Write-Host "MAIN_BASELINE_SYNC=synced_ref"
+    } else {
+        GitOutput @("branch", "main", "origin/main") | Out-Null
+        Write-Host "MAIN_BASELINE_SYNC=created_ref"
+    }
 }
 
 function Get-GitFetchFailureHint {
@@ -76,7 +169,11 @@ $originUrl = (& git remote get-url origin 2>$null)
 $hasOrigin = $LASTEXITCODE -eq 0 -and -not [string]::IsNullOrWhiteSpace($originUrl)
 
 if ($hasOrigin) {
+    if (Get-Command Set-ElonProjectDirectGitSsh -ErrorAction SilentlyContinue) {
+        Set-ElonProjectDirectGitSsh
+    }
     Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin")
+    Sync-LocalMainBaseline -HasOrigin $true
 }
 
 $statusShort = (& git status --short)
@@ -106,22 +203,26 @@ if ($isDirty) {
     $statusShort | ForEach-Object { Write-Host "  $_" }
 }
 
-$needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0)
+$isMainBaseline = $branch -eq "main"
+$needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline
 $createdWorktree = $false
+$createdWorktreePath = ""
 if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     if (-not $hasOrigin) {
         throw "Cannot create isolated worktree: origin remote is missing"
     }
 
     $stamp = Get-Date -Format "yyyyMMdd-HHmmss"
+    $shortGuid = ((New-Guid).Guid -replace "-", "").Substring(0, 8)
+    $uniqueSuffix = "$PID-$shortGuid"
     $safePrefix = $BranchPrefix.TrimEnd("/")
-    $newBranch = "$safePrefix-$stamp"
+    $newBranch = "$safePrefix-$stamp-$uniqueSuffix"
     $parent = if ([string]::IsNullOrWhiteSpace($WorktreeParent)) {
         Split-Path -Parent $repoRoot
     } else {
         $WorktreeParent
     }
-    $leaf = "$(Split-Path -Leaf $repoRoot)-task-$stamp"
+    $leaf = "$(Split-Path -Leaf $repoRoot)-task-$stamp-$uniqueSuffix"
     $worktreePath = Join-Path $parent $leaf
 
     & git worktree add -b $newBranch $worktreePath origin/main
@@ -132,14 +233,16 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     Write-Host "WORKTREE_CREATED=true"
     Write-Host "WORKTREE_BRANCH=$newBranch"
     Write-Host "WORKTREE_PATH=$worktreePath"
+    Write-Host "WORKTREE_BASE=$(git rev-parse --short origin/main)"
     Write-Host "NEXT=cd `"$worktreePath`""
     $createdWorktree = $true
+    $createdWorktreePath = $worktreePath
 } elseif ($needsWorktree) {
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Run powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree before editing."
 } else {
     Write-Host "WORKTREE_CREATED=false"
-    Write-Host "NEXT=Workspace is clean and current enough for direct edits."
+    Write-Host "NEXT=Workspace is already isolated and current enough for direct edits."
 }
 
 # ─────────────────────────────────────────────────────────────
@@ -147,13 +250,15 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
 # 仅删除满足"已合并到 origin/main + 无未提交内容 + 不是当前 worktree"的，
 # 有未提交改动的会被自动保留。要禁用：-SkipAutoCleanup
 # ─────────────────────────────────────────────────────────────
-if ($createdWorktree -and -not $SkipAutoCleanup) {
-    Write-Host "AUTO_CLEANUP=skipped_after_worktree_create"
-} elseif (-not $SkipAutoCleanup) {
+if (-not $SkipAutoCleanup) {
     $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
     if (Test-Path -LiteralPath $cleanupScript) {
         try {
-            $cleanupOut = & powershell -NoProfile -ExecutionPolicy Bypass -File $cleanupScript -Apply 2>&1
+            $cleanupArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $cleanupScript, "-Apply")
+            if ($createdWorktree -and -not [string]::IsNullOrWhiteSpace($createdWorktreePath)) {
+                $cleanupArgs += @("-ExcludePath", $createdWorktreePath)
+            }
+            $cleanupOut = & powershell @cleanupArgs 2>&1
             $removedLine = $cleanupOut | Select-String -Pattern "^完成：清理" | Select-Object -Last 1
             if ($removedLine) {
                 Write-Host "AUTO_CLEANUP=$($removedLine.Line.Trim())"

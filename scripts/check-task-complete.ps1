@@ -96,6 +96,68 @@ function Invoke-GitFetchWithRetry {
     Stop-Check "无法确认远端 main 状态：git $($GitArgs -join ' ') 连续失败 $Attempts 次。$finalHint 原始输出：$lastOutput"
 }
 
+function Get-GitWorktreeEntries {
+    $entries = @()
+    $current = @{}
+    foreach ($line in (& git worktree list --porcelain)) {
+        if ($line -eq "") {
+            if ($current.Count -gt 0) {
+                $entries += [pscustomobject]$current
+                $current = @{}
+            }
+            continue
+        }
+        $kv = $line -split " ", 2
+        switch ($kv[0]) {
+            "worktree" { $current["Path"] = $kv[1] }
+            "HEAD"     { $current["Head"] = $kv[1] }
+            "branch"   { $current["Branch"] = ($kv[1] -replace "^refs/heads/","") }
+            "bare"     { $current["Bare"] = $true }
+            "detached" { $current["Detached"] = $true }
+        }
+    }
+    if ($current.Count -gt 0) {
+        $entries += [pscustomobject]$current
+    }
+    return $entries
+}
+
+function Sync-MainWorktreeIfClean {
+    & git rev-parse --verify origin/main *> $null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  MAIN_BASELINE_SYNC=skipped_no_origin_main"
+        return
+    }
+
+    & git worktree prune *> $null
+    $mainWorktree = Get-GitWorktreeEntries |
+        Where-Object { $_.Branch -eq "main" -and $_.Path } |
+        Select-Object -First 1
+    if (-not $mainWorktree) {
+        Write-Host "  MAIN_BASELINE_SYNC=skipped_no_main_worktree"
+        return
+    }
+
+    $status = (& git -C $mainWorktree.Path status --porcelain=v1 --untracked-files=normal)
+    if (-not [string]::IsNullOrWhiteSpace(($status -join "`n"))) {
+        Write-Host "  MAIN_BASELINE_SYNC=blocked_dirty:$($mainWorktree.Path)"
+        return
+    }
+
+    $before = (& git -C $mainWorktree.Path rev-parse --short HEAD).Trim()
+    $mergeOutput = & git -C $mainWorktree.Path merge --ff-only origin/main 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "  MAIN_BASELINE_SYNC=failed:$($mergeOutput -join ' ')" -ForegroundColor Yellow
+        return
+    }
+    $after = (& git -C $mainWorktree.Path rev-parse --short HEAD).Trim()
+    if ($before -eq $after) {
+        Write-Host "  MAIN_BASELINE_SYNC=already_current:$after"
+    } else {
+        Write-Host "  MAIN_BASELINE_SYNC=fast_forwarded:$before->$after"
+    }
+}
+
 Set-Location $RepoRoot
 
 if (-not $SkipGitStatus) {
@@ -108,6 +170,7 @@ if (-not $SkipGitStatus) {
 }
 
 Invoke-GitFetchWithRetry -GitArgs @("fetch", "origin", "main")
+Sync-MainWorktreeIfClean
 
 $head = (git rev-parse HEAD).Trim()
 $originMain = (git rev-parse origin/main).Trim()

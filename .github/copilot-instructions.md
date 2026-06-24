@@ -64,10 +64,11 @@
 - **APK 签名密钥不得泄露**，相关操作只走自动化脚本
 - **每个用户的修改是隔离的**，不能让一个用户的操作影响其他用户
 - **代码变更记录用户身份**，commit 信息中包含用户标识
-- **任务开始先跑机器预检**：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本创建 worktree 时必须切过去执行
+- **任务开始先跑机器预检**：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。只要输出 `WORKTREE_CREATED=true`，必须切过去执行
+- **主工作区只做 main 基线**：`main` checkout 是共享同步基线，不作为业务编辑区。多个本地 AI 并行时，各自只能在预检脚本创建的 `codex/task-*` worktree 中修改、验证、提交和推送，避免互相占用 `main`
 - **有未提交改动时先判断归属**：属于本任务可 stash/rebase/pop；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
 - **隔离 worktree 推送后同步主工作区**：回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不 stage、不 stash、不删除/移动未跟踪文件，遇到同名路径冲突就报告
-- **任务完成后清理 worktree**：push 并同步主工作区后，运行 `powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply`（Linux：`bash scripts/cleanup-task-worktrees.sh --apply`）回收已合并的 task worktree。脚本只删"已合并到 origin/main + 工作树干净"的，绝对安全；带未提交改动的会被自动保留
+- **任务完成后清理 worktree**：push 并同步主工作区后，运行 `powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply`（Linux：`bash scripts/cleanup-task-worktrees.sh --apply`）回收已合并的 AI worktree（含 `*-task-*` 与 `codex/*` 分支 worktree）。脚本只删"已合并到 origin/main + 工作树干净"的，绝对安全；带未提交改动的会被自动保留
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
 - **长期主义模块化**：新建源文件 ≤500 行，超 800 行必须拆分，入口文件只做组装。详见 `.github/instructions/modular-architecture.instructions.md`
 - **APP 颜色规范**：任何 APK/APP UI、主题、按钮、卡片、底部导航、状态胶囊或配色调整，必须先读取并遵守 `docs/APP 颜色规范.md`；只有用户明确要求更新颜色规范时，才修改该文件。

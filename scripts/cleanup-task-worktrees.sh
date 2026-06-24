@@ -14,17 +14,23 @@ APPLY=0
 FORCE=0
 KEEP_LAST=0
 DELETE_REMOTE=0
+EXCLUDE_PATHS=()
 
-for arg in "$@"; do
-  case "$arg" in
-    --apply) APPLY=1 ;;
-    --force) FORCE=1 ;;
-    --delete-remote) DELETE_REMOTE=1 ;;
-    --keep-last=*) KEEP_LAST="${arg#*=}" ;;
-    --keep-last) shift; KEEP_LAST="${1:-0}" ;;
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --apply) APPLY=1; shift ;;
+    --force) FORCE=1; shift ;;
+    --delete-remote) DELETE_REMOTE=1; shift ;;
+    --keep-last=*) KEEP_LAST="${1#*=}"; shift ;;
+    --keep-last) KEEP_LAST="${2:-0}"; shift 2 ;;
+    --exclude-path) EXCLUDE_PATHS+=("${2:?missing value for --exclude-path}"); shift 2 ;;
     -h|--help)
       sed -n '1,15p' "$0"
       exit 0
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      exit 2
       ;;
   esac
 done
@@ -33,6 +39,15 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 repo_leaf="$(basename "$repo_root")"
 current_wt="$(pwd -P)"
+declare -A exclude_set
+for exclude_path in "${EXCLUDE_PATHS[@]}"; do
+  if [[ -n "$exclude_path" ]]; then
+    exclude_set["${exclude_path%/}"]=1
+    if resolved_parent="$(cd "$(dirname "$exclude_path")" 2>/dev/null && pwd -P)"; then
+      exclude_set["$resolved_parent/$(basename "$exclude_path")"]=1
+    fi
+  fi
+done
 
 git_fetch_hint() {
   local output="${1:-}"
@@ -70,14 +85,14 @@ git_fetch_with_retry() {
 
 git_fetch_with_retry >/dev/null
 
-# 解析 worktree（仅采集任务命名）
+# 解析 worktree（采集任务命名和 codex/* 分支）
 mapfile -t lines < <(git worktree list --porcelain)
 declare -a wt_paths wt_branches
 path=""; branch=""
 flush() {
   if [[ -n "$path" ]]; then
     leaf="$(basename "$path")"
-    if [[ "$leaf" =~ ^${repo_leaf}-task-[0-9]{8}-[0-9]{6}(-task-[0-9]{8}-[0-9]{6})?$ ]]; then
+    if [[ "$leaf" =~ ^${repo_leaf}-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?(-task-[0-9]{8}-[0-9]{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?)?$ || "$branch" == codex/* ]]; then
       wt_paths+=("$path"); wt_branches+=("$branch")
     fi
   fi
@@ -114,6 +129,7 @@ for i in "${!wt_paths[@]}"; do
 
   [[ "${wt%/}" == "${current_wt%/}" ]] && reasons+=("当前正在使用")
   [[ -n "${keep_set[$wt]:-}" ]] && reasons+=("在 --keep-last 保留范围内")
+  [[ -n "${exclude_set[$wt]:-}" ]] && reasons+=("在 --exclude-path 保护范围内")
 
   if [[ ! -d "$wt" ]]; then
     reasons+=("目录已不存在（可 prune）")
@@ -174,7 +190,11 @@ for i in "${!to_remove_paths[@]}"; do
   echo "removing $wt"
   if git worktree remove --force "$wt"; then
     if [[ -n "$br" ]]; then
-      git branch -D "$br" || true
+      if [[ "$FORCE" -eq 1 ]]; then
+        git branch -D "$br" || true
+      else
+        git branch -d "$br" || true
+      fi
       [[ "$DELETE_REMOTE" -eq 1 ]] && git push origin --delete "$br" || true
     fi
     removed=$((removed+1))

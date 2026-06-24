@@ -6,7 +6,7 @@
 # -KeepLast N：保留最近 N 个 task worktree（按时间戳倒序）。
 #
 # 安全规则（默认所有条件都必须满足才会删除）：
-#   1. worktree 路径形如 "<repo>-task-*" 或 "<repo>-task-*-task-*"
+#   1. worktree 路径形如 "<repo>-task-*"，或当前分支形如 "codex/*"
 #   2. 工作树没有未提交 / 未跟踪文件
 #   3. 当前所在分支已经合并进 origin/main（即没有未推送或未合并的工作）
 #   4. 不是当前正在使用的 worktree
@@ -19,7 +19,8 @@ param(
     [switch]$Apply,
     [switch]$Force,
     [int]$KeepLast = 0,
-    [switch]$DeleteRemoteBranches
+    [switch]$DeleteRemoteBranches,
+    [string[]]$ExcludePath = @()
 )
 
 $ErrorActionPreference = "Stop"
@@ -85,6 +86,16 @@ Set-Location -LiteralPath $repoRoot
 
 $repoLeaf = Split-Path -Leaf $repoRoot
 $currentWorktree = (Resolve-Path -LiteralPath ".").Path.TrimEnd('\','/')
+$excludeSet = @{}
+foreach ($path in $ExcludePath) {
+    if ([string]::IsNullOrWhiteSpace($path)) { continue }
+    $fullPath = if ([System.IO.Path]::IsPathRooted($path)) {
+        [System.IO.Path]::GetFullPath($path)
+    } else {
+        [System.IO.Path]::GetFullPath((Join-Path $repoRoot $path))
+    }
+    $excludeSet[$fullPath.TrimEnd('\','/')] = $true
+}
 
 # 同步远端，确保 origin/main 是最新的
 Invoke-GitFetchWithRetry
@@ -108,10 +119,16 @@ foreach ($line in (& git worktree list --porcelain)) {
 }
 if ($current.Count -gt 0) { $entries += [pscustomobject]$current }
 
-# 只保留任务 worktree（按命名约定）
-$pattern = "^$([regex]::Escape($repoLeaf))-task-\d{8}-\d{6}(-task-\d{8}-\d{6})?$"
+# 只保留 AI 任务 worktree。
+# 早期脚本只按 "<repo>-task-*" 目录名识别，导致 elon-win-client-*、
+# elon-routeb-* 这类功能命名的 codex worktree 无法被自动回收。
+$taskStampPattern = "\d{8}-\d{6}(-[A-Za-z0-9]+(-[A-Fa-f0-9]+)?)?"
+$pattern = "^$([regex]::Escape($repoLeaf))-task-$taskStampPattern(-task-$taskStampPattern)?$"
 $taskWorktrees = $entries | Where-Object {
-    $_.Path -and (Split-Path -Leaf $_.Path) -match $pattern
+    $_.Path -and (
+        ((Split-Path -Leaf $_.Path) -match $pattern) -or
+        ($_.Branch -and $_.Branch -like "codex/*")
+    )
 } | Sort-Object Path
 
 if ($KeepLast -gt 0 -and $taskWorktrees.Count -gt $KeepLast) {
@@ -130,6 +147,7 @@ foreach ($wt in $taskWorktrees) {
     $normalized = $wt.Path.TrimEnd('\','/')
     if ($normalized -ieq $currentWorktree) { $reasons += "当前正在使用" }
     if ($keepSet.ContainsKey($wt.Path))    { $reasons += "在 -KeepLast 保留范围内" }
+    if ($excludeSet.ContainsKey($normalized)) { $reasons += "在 -ExcludePath 保护范围内" }
 
     if (-not (Test-Path -LiteralPath $wt.Path)) {
         $reasons += "目录已不存在（可 prune）"
@@ -200,7 +218,8 @@ foreach ($wt in $toRemove) {
         if ($LASTEXITCODE -ne 0) { throw "worktree remove failed" }
 
         if ($wt.Branch) {
-            & git branch -D $wt.Branch 2>&1 | ForEach-Object { Write-Host "  $_" }
+            $deleteFlag = if ($Force) { "-D" } else { "-d" }
+            & git branch $deleteFlag $wt.Branch 2>&1 | ForEach-Object { Write-Host "  $_" }
             if ($DeleteRemoteBranches) {
                 & git push origin --delete $wt.Branch 2>&1 | ForEach-Object { Write-Host "  $_" }
             }
