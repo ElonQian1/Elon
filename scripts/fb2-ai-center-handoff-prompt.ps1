@@ -183,8 +183,8 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 计划能力 / 非生产边界"
-    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | dry_run_status | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
-    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|"
+    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | source_enumerator | dry_run_status | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
+    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|---|"
     foreach ($capability in $plannedCapabilities) {
         $capId = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'id' '') 80
         $capStatus = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'status' '') 120
@@ -192,6 +192,9 @@ function New-Fb2HandoffPrompt {
         $capReportVersion = [string](Get-Fb2PromptProperty $capability 'report_version' '')
         $capEmbeddingDryRunReportVersion = [string](Get-Fb2PromptProperty $capability 'embedding_build_dry_run_report_version' '')
         $capContract = Format-Fb2PromptCell (($capContractVersion, $capReportVersion, $capEmbeddingDryRunReportVersion | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 180
+        $capSourceEnumeratorReportVersion = [string](Get-Fb2PromptProperty $capability 'source_enumerator_report_version' '')
+        $capSourceEnumeratorStatus = [string](Get-Fb2PromptProperty $capability 'source_enumerator_status' '')
+        $capSourceEnumerator = Format-Fb2PromptCell (($capSourceEnumeratorReportVersion, $capSourceEnumeratorStatus | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 140
         $capDryRunStatusValue = [string](Get-Fb2PromptProperty $capability 'dry_run_status' '')
         $capDryRunStatusCell = Format-Fb2PromptCell $capDryRunStatusValue 80
         $capProduction = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'production_grounding' '') 40
@@ -199,10 +202,20 @@ function New-Fb2HandoffPrompt {
         $capAnswerTime = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'answer_time_vector_candidates_enabled' '') 40
         $capNextRaw = [string](Get-Fb2PromptProperty $capability 'next_action' '')
         if (-not [string]::IsNullOrWhiteSpace($capDryRunStatusValue)) {
-            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
+            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
         }
         $capNext = Format-Fb2PromptCell $capNextRaw 260
-        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capDryRunStatusCell | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
+        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capDryRunStatusCell | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
+    }
+    $p4SourceSafety = @($plannedCapabilities | Where-Object {
+            [string](Get-Fb2PromptProperty $_ 'source_enumerator_report_version' '') -eq 'fb2_p4_source_enumerator_v1'
+        } | Select-Object -First 1)
+    if (@($p4SourceSafety).Count -gt 0) {
+        Add-Fb2PromptLine -Lines $lines -Text ("- p4_source_enumerator_safety: writes_public_group_messages={0}; ready_to_write_embeddings={1}; writes_feedback_or_adoption={2}; writes_opinion_index_rows={3};" -f `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'writes_public_group_messages' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'ready_to_write_embeddings' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'writes_feedback_or_adoption' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'writes_opinion_index_rows' $false))
     }
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## fb2 导出样本"
@@ -347,10 +360,14 @@ function Invoke-Fb2PromptSelfTest {
                     id = "p4_vector"
                     report_version = "fb2_p4_vector_readiness_plan_v1"
                     contract_version = "fb2_p4_vector_contract_v1"
+                    source_enumerator_report_version = "fb2_p4_source_enumerator_v1"
+                    source_enumerator_status = "source_specific_no_write_sample_available"
                     embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                     status = "contract_design_committed_embedding_not_started"
                     dry_run_status = "dry_run_available_no_writes"
                     writes_vector_store = $false
+                    writes_public_group_messages = $false
+                    ready_to_write_embeddings = $false
                     candidate_rows_require_live_hydration = $true
                     blocks_data_goal = $false
                     production_grounding = $false
@@ -417,10 +434,14 @@ function Invoke-Fb2PromptSelfTest {
                         id = "p4_vector"
                         report_version = "fb2_p4_vector_readiness_plan_v1"
                         contract_version = "fb2_p4_vector_contract_v1"
+                        source_enumerator_report_version = "fb2_p4_source_enumerator_v1"
+                        source_enumerator_status = "source_specific_no_write_sample_available"
                         embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                         status = "contract_design_committed_embedding_not_started"
                         dry_run_status = "dry_run_available_no_writes"
                         writes_vector_store = $false
+                        writes_public_group_messages = $false
+                        ready_to_write_embeddings = $false
                         candidate_rows_require_live_hydration = $true
                         blocks_data_goal = $false
                         production_grounding = $false
@@ -448,10 +469,14 @@ function Invoke-Fb2PromptSelfTest {
                         id = "p4_vector"
                         report_version = "fb2_p4_vector_readiness_plan_v1"
                         contract_version = "fb2_p4_vector_contract_v1"
+                        source_enumerator_report_version = "fb2_p4_source_enumerator_v1"
+                        source_enumerator_status = "source_specific_no_write_sample_available"
                         embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                         status = "contract_design_committed_embedding_not_started"
                         dry_run_status = "dry_run_available_no_writes"
                         writes_vector_store = $false
+                        writes_public_group_messages = $false
+                        ready_to_write_embeddings = $false
                         candidate_rows_require_live_hydration = $true
                         blocks_data_goal = $false
                         production_grounding = $false
@@ -495,11 +520,15 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "计划能力 / 非生产边界") "planned capability section"
         Assert-Fb2PromptSelfTest ($content -match "fb2_p4_vector_contract_v1") "planned vector contract"
         Assert-Fb2PromptSelfTest ($content -match "fb2_p4_vector_readiness_plan_v1") "planned vector report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_source_enumerator_v1") "planned source enumerator report"
+        Assert-Fb2PromptSelfTest ($content -match "source_specific_no_write_sample_available") "planned source enumerator status"
         Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_build_dry_run_v1") "planned embedding dry-run report"
         Assert-Fb2PromptSelfTest ($content -match "contract_design_committed_embedding_not_started") "planned vector status"
         Assert-Fb2PromptSelfTest ($content -match "production_grounding") "planned vector production boundary"
         Assert-Fb2PromptSelfTest ($content -match "blocks_data_goal") "planned vector non-blocking boundary"
         Assert-Fb2PromptSelfTest ($content -match "answer_time_vector_candidates_enabled") "planned vector answer-time disabled boundary"
+        Assert-Fb2PromptSelfTest ($content -match "writes_public_group_messages") "planned source enumerator no public group write boundary"
+        Assert-Fb2PromptSelfTest ($content -match "ready_to_write_embeddings") "planned source enumerator no embedding write boundary"
         Assert-Fb2PromptSelfTest ($content -match "fb2 导出样本") "exported sample section"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_context_pack") "exported sample row"
         Assert-Fb2PromptSelfTest ($content -match "\|\s*scenario\s*\|\s*audit\s*\|\s*sources\s*\|\s*business\s*\|\s*quality_history\s*\|\s*sha256\s*\|") "exported sample table classifies sources"

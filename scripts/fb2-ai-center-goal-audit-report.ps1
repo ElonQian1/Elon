@@ -241,9 +241,13 @@ function New-Fb2GoalAuditPlannedCapabilities {
             contract_version = "fb2_p4_vector_contract_v1"
             contract_status = "contract_design_committed"
             status = "contract_design_committed_embedding_not_started"
+            source_enumerator_report_version = "fb2_p4_source_enumerator_v1"
+            source_enumerator_status = "source_specific_no_write_sample_available"
+            source_enumerator_checked_count = "reported_by_fb2_source_enumerator_runtime"
+            source_enumerator_known_chunk_count = "reported_by_fb2_source_enumerator_runtime"
             embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
             dry_run_status = "dry_run_available_no_writes"
-            source_ref = "fb2 b2493cbc / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_embedding_build_dry_run.ps1"
+            source_ref = "fb2 d0967bb5 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1"
             gap_type = "planned_non_blocking"
             blocks_data_goal = $false
             production_grounding = $false
@@ -251,8 +255,12 @@ function New-Fb2GoalAuditPlannedCapabilities {
             dry_run = $true
             writes_embedding_rows = $false
             writes_vector_store = $false
+            writes_public_group_messages = $false
+            writes_feedback_or_adoption = $false
+            writes_opinion_index_rows = $false
             refresh_operations_used = $false
             does_not_enable_vector = $true
+            ready_to_write_embeddings = $false
             ready_to_build_embedding_store = $false
             ready_to_enable_answer_time_vector_candidates = $false
             answer_time_vector_candidates_enabled = $false
@@ -263,7 +271,7 @@ function New-Fb2GoalAuditPlannedCapabilities {
             requires_secret = $false
             requires_visible_group_write = $false
             command = ""
-            next_action = "Keep Context Pack and structured tools as production grounding; fb2 dry-run is only a no-write estimate before source-specific enumerators, embedding writes, shadow eval, hydration, and explicit answer-time readthrough gates."
+            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator and embedding dry-run are only no-write planning evidence before full chunk manifests, embedding writes, shadow eval, hydration, and explicit answer-time readthrough gates."
         }
     )
 }
@@ -702,12 +710,20 @@ function Invoke-Fb2GoalAuditSelfTest {
     if (-not [bool]$planned[0].does_not_enable_vector) { $failed++ }
     if ([string]$planned[0].contract_version -ne "fb2_p4_vector_contract_v1") { $failed++ }
     if ([string]$planned[0].report_version -ne "fb2_p4_vector_readiness_plan_v1") { $failed++ }
+    if ([string]$planned[0].source_enumerator_report_version -ne "fb2_p4_source_enumerator_v1") { $failed++ }
+    if ([string]$planned[0].source_enumerator_status -ne "source_specific_no_write_sample_available") { $failed++ }
+    if ([string]$planned[0].source_enumerator_checked_count -ne "reported_by_fb2_source_enumerator_runtime") { $failed++ }
+    if ([string]$planned[0].source_enumerator_known_chunk_count -ne "reported_by_fb2_source_enumerator_runtime") { $failed++ }
     if ([string]$planned[0].embedding_build_dry_run_report_version -ne "fb2_p4_embedding_build_dry_run_v1") { $failed++ }
     if ([string]$planned[0].dry_run_status -ne "dry_run_available_no_writes") { $failed++ }
     if (-not [bool]$planned[0].read_only) { $failed++ }
     if (-not [bool]$planned[0].dry_run) { $failed++ }
     if ([bool]$planned[0].writes_vector_store) { $failed++ }
+    if ([bool]$planned[0].writes_public_group_messages) { $failed++ }
+    if ([bool]$planned[0].writes_feedback_or_adoption) { $failed++ }
+    if ([bool]$planned[0].writes_opinion_index_rows) { $failed++ }
     if ([bool]$planned[0].refresh_operations_used) { $failed++ }
+    if ([bool]$planned[0].ready_to_write_embeddings) { $failed++ }
     if (-not [bool]$planned[0].candidate_rows_require_live_hydration) { $failed++ }
     if ([bool]$planned[0].vector_rows_are_model_input) { $failed++ }
     if ([bool]$planned[0].ready_to_build_embedding_store) { $failed++ }

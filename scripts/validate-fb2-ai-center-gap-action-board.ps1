@@ -147,6 +147,10 @@ function New-Fb2GapValidation {
         $p4 = $plannedP4Vector[0]
         Add-Fb2GapCheck $checks "planned p4 vector contract version" ([string](Get-Fb2GapProperty $p4 "contract_version" "") -eq "fb2_p4_vector_contract_v1")
         Add-Fb2GapCheck $checks "planned p4 vector report version" ([string](Get-Fb2GapProperty $p4 "report_version" "") -eq "fb2_p4_vector_readiness_plan_v1")
+        Add-Fb2GapCheck $checks "planned p4 source enumerator report version" ([string](Get-Fb2GapProperty $p4 "source_enumerator_report_version" "") -eq "fb2_p4_source_enumerator_v1")
+        Add-Fb2GapCheck $checks "planned p4 source enumerator status" ([string](Get-Fb2GapProperty $p4 "source_enumerator_status" "") -eq "source_specific_no_write_sample_available")
+        Add-Fb2GapCheck $checks "planned p4 source enumerator checked count delegated" ([string](Get-Fb2GapProperty $p4 "source_enumerator_checked_count" "") -eq "reported_by_fb2_source_enumerator_runtime")
+        Add-Fb2GapCheck $checks "planned p4 source enumerator known chunk count delegated" ([string](Get-Fb2GapProperty $p4 "source_enumerator_known_chunk_count" "") -eq "reported_by_fb2_source_enumerator_runtime")
         Add-Fb2GapCheck $checks "planned p4 embedding dry-run report version" ([string](Get-Fb2GapProperty $p4 "embedding_build_dry_run_report_version" "") -eq "fb2_p4_embedding_build_dry_run_v1")
         Add-Fb2GapCheck $checks "planned p4 embedding dry-run no-write status" ([string](Get-Fb2GapProperty $p4 "dry_run_status" "") -eq "dry_run_available_no_writes")
         Add-Fb2GapCheck $checks "planned p4 vector not production grounding" (-not [bool](Get-Fb2GapProperty $p4 "production_grounding" $true))
@@ -155,12 +159,17 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "planned p4 embedding dry-run flag" ([bool](Get-Fb2GapProperty $p4 "dry_run" $false))
         Add-Fb2GapCheck $checks "planned p4 embedding rows not written" (-not [bool](Get-Fb2GapProperty $p4 "writes_embedding_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 vector store not written" (-not [bool](Get-Fb2GapProperty $p4 "writes_vector_store" $true))
+        Add-Fb2GapCheck $checks "planned p4 source enumerator writes no public group messages" (-not [bool](Get-Fb2GapProperty $p4 "writes_public_group_messages" $true))
+        Add-Fb2GapCheck $checks "planned p4 source enumerator writes no feedback or adoption" (-not [bool](Get-Fb2GapProperty $p4 "writes_feedback_or_adoption" $true))
+        Add-Fb2GapCheck $checks "planned p4 source enumerator writes no opinion index rows" (-not [bool](Get-Fb2GapProperty $p4 "writes_opinion_index_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 refresh not used" (-not [bool](Get-Fb2GapProperty $p4 "refresh_operations_used" $true))
         Add-Fb2GapCheck $checks "planned p4 vector does not enable vector" ([bool](Get-Fb2GapProperty $p4 "does_not_enable_vector" $false))
+        Add-Fb2GapCheck $checks "planned p4 not ready to write embeddings" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_write_embeddings" $true))
         Add-Fb2GapCheck $checks "planned p4 vector no secret required" (-not [bool](Get-Fb2GapProperty $p4 "requires_secret" $true))
         Add-Fb2GapCheck $checks "planned p4 vector no visible write" (-not [bool](Get-Fb2GapProperty $p4 "requires_visible_group_write" $true))
         Add-Fb2GapCheck $checks "planned p4 vector no command" ([string]::IsNullOrWhiteSpace([string](Get-Fb2GapProperty $p4 "command" "")))
         Add-Fb2GapCheck $checks "planned p4 vector answer-time disabled" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_enable_answer_time_vector_candidates" $true))
+        Add-Fb2GapCheck $checks "planned p4 answer-time candidates disabled" (-not [bool](Get-Fb2GapProperty $p4 "answer_time_vector_candidates_enabled" $true))
         Add-Fb2GapCheck $checks "planned p4 candidates require live hydration" ([bool](Get-Fb2GapProperty $p4 "candidate_rows_require_live_hydration" $false))
         Add-Fb2GapCheck $checks "planned p4 vector rows are not model input" (-not [bool](Get-Fb2GapProperty $p4 "vector_rows_are_model_input" $true))
     }
@@ -487,6 +496,10 @@ function Invoke-Fb2GapSelfTest {
                         id = "p4_vector"
                         report_version = "fb2_p4_vector_readiness_plan_v1"
                         contract_version = "fb2_p4_vector_contract_v1"
+                        source_enumerator_report_version = "fb2_p4_source_enumerator_v1"
+                        source_enumerator_status = "source_specific_no_write_sample_available"
+                        source_enumerator_checked_count = "reported_by_fb2_source_enumerator_runtime"
+                        source_enumerator_known_chunk_count = "reported_by_fb2_source_enumerator_runtime"
                         embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
                         dry_run_status = "dry_run_available_no_writes"
                         status = "contract_design_committed_embedding_not_started"
@@ -496,9 +509,14 @@ function Invoke-Fb2GapSelfTest {
                         dry_run = $true
                         writes_embedding_rows = $false
                         writes_vector_store = $false
+                        writes_public_group_messages = $false
+                        writes_feedback_or_adoption = $false
+                        writes_opinion_index_rows = $false
                         refresh_operations_used = $false
                         does_not_enable_vector = $true
+                        ready_to_write_embeddings = $false
                         ready_to_enable_answer_time_vector_candidates = $false
+                        answer_time_vector_candidates_enabled = $false
                         candidate_rows_require_live_hydration = $true
                         vector_rows_are_model_input = $false
                         requires_secret = $false
