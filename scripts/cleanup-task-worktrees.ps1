@@ -81,11 +81,24 @@ function Invoke-GitFetchWithRetry {
     throw "git fetch origin failed after $Attempts attempts. $finalHint 原始输出：$lastOutput"
 }
 
+function Normalize-WorktreePath {
+    param([string]$Path)
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return ""
+    }
+    try {
+        return ([System.IO.Path]::GetFullPath($Path).TrimEnd('\','/') -replace '\\','/')
+    } catch {
+        return ($Path.TrimEnd('\','/') -replace '\\','/')
+    }
+}
+
 $repoRoot = GitOutput @("rev-parse", "--show-toplevel")
 Set-Location -LiteralPath $repoRoot
 
 $repoLeaf = Split-Path -Leaf $repoRoot
-$currentWorktree = (Resolve-Path -LiteralPath ".").Path.TrimEnd('\','/')
+$currentWorktree = Normalize-WorktreePath (Resolve-Path -LiteralPath ".").Path
 $excludeSet = @{}
 foreach ($path in $ExcludePath) {
     if ([string]::IsNullOrWhiteSpace($path)) { continue }
@@ -94,7 +107,7 @@ foreach ($path in $ExcludePath) {
     } else {
         [System.IO.Path]::GetFullPath((Join-Path $repoRoot $path))
     }
-    $excludeSet[$fullPath.TrimEnd('\','/')] = $true
+    $excludeSet[(Normalize-WorktreePath $fullPath)] = $true
 }
 
 # 同步远端，确保 origin/main 是最新的
@@ -144,7 +157,7 @@ $kept = @()
 foreach ($wt in $taskWorktrees) {
     $reasons = @()
 
-    $normalized = $wt.Path.TrimEnd('\','/')
+    $normalized = Normalize-WorktreePath $wt.Path
     if ($normalized -ieq $currentWorktree) { $reasons += "当前正在使用" }
     if ($keepSet.ContainsKey($wt.Path))    { $reasons += "在 -KeepLast 保留范围内" }
     if ($excludeSet.ContainsKey($normalized)) { $reasons += "在 -ExcludePath 保护范围内" }
