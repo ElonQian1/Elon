@@ -215,7 +215,7 @@ function New-Fb2HandoffPrompt {
         $capAnswerTime = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'answer_time_vector_candidates_enabled' '') 40
         $capNextRaw = [string](Get-Fb2PromptProperty $capability 'next_action' '')
         if (-not [string]::IsNullOrWhiteSpace($capDryRunStatusValue)) {
-            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); persists_transaction_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_transaction_rows' $false)); persists_fixture_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_fixture_rows' $false)); executes_migration_ddl=$([bool](Get-Fb2PromptProperty $capability 'executes_migration_ddl' $false)); provider_secret_required_now=$([bool](Get-Fb2PromptProperty $capability 'provider_secret_required_now' $false)); provider_secret_printed=$([bool](Get-Fb2PromptProperty $capability 'provider_secret_printed' $false)); embedding_text_is_sanitized=$([bool](Get-Fb2PromptProperty $capability 'embedding_text_is_sanitized' $false)); content_hash_computed=$([bool](Get-Fb2PromptProperty $capability 'content_hash_computed' $false)); calls_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'calls_embedding_provider' $false)); provider_model_id_selected=$([bool](Get-Fb2PromptProperty $capability 'provider_model_id_selected' $false)); vector_dimension_locked=$([bool](Get-Fb2PromptProperty $capability 'vector_dimension_locked' $false)); ready_to_call_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'ready_to_call_embedding_provider' $false)); ready_to_execute_embedding_transaction=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_embedding_transaction' $false)); ready_to_execute_migrations=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_migrations' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
+            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); persists_transaction_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_transaction_rows' $false)); persists_fixture_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_fixture_rows' $false)); executes_migration_ddl=$([bool](Get-Fb2PromptProperty $capability 'executes_migration_ddl' $false)); provider_secret_required_now=$([bool](Get-Fb2PromptProperty $capability 'provider_secret_required_now' $false)); provider_secret_printed=$([bool](Get-Fb2PromptProperty $capability 'provider_secret_printed' $false)); embedding_text_is_sanitized=$([bool](Get-Fb2PromptProperty $capability 'embedding_text_is_sanitized' $false)); content_hash_computed=$([bool](Get-Fb2PromptProperty $capability 'content_hash_computed' $false)); calls_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'calls_embedding_provider' $false)); provider_model_id_selected=$([bool](Get-Fb2PromptProperty $capability 'provider_model_id_selected' $false)); vector_dimension_locked=$([bool](Get-Fb2PromptProperty $capability 'vector_dimension_locked' $false)); ready_to_call_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'ready_to_call_embedding_provider' $false)); ready_to_execute_embedding_transaction=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_embedding_transaction' $false)); ready_to_execute_migrations=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_migrations' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false)); business_data_requirements_traceable=$([bool](Get-Fb2PromptProperty $capability 'business_data_requirements_traceable' $false)); full_original_goal_complete=$([bool](Get-Fb2PromptProperty $capability 'full_original_goal_complete' $false)); final_completion_blocker=$([string](Get-Fb2PromptProperty $capability 'final_completion_blocker' '')); p4_phase_approvals_all_false=$([bool](Get-Fb2PromptProperty $capability 'p4_phase_approvals_all_false' $false)); p4_approval_granted=$([bool](Get-Fb2PromptProperty $capability 'p4_approval_granted' $false)); p4_executable_now=$([bool](Get-Fb2PromptProperty $capability 'p4_executable_now' $false));".Trim()
         }
         $capNext = Format-Fb2PromptCell $capNextRaw 260
         Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capChunkManifest | $capDryRunStatusCell | $capTransactionPreflight | $capTextFixture | $capProviderPlan | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
@@ -261,6 +261,23 @@ function New-Fb2HandoffPrompt {
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'ready_to_execute_migrations' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'provider_model_id_selected' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'vector_dimension_locked' $false))
+        Add-Fb2PromptLine -Lines $lines -Text ("- p4_runtime_approval_gate: traceability={0}; answer_handoff={1}; phase_matrix={2}; disabled_skeleton={3}; provider_write_shape={4}; disabled_adapter_write_store={5}; runtime_approval={6}; migration_approval={7}; post_migration_verification={8}; business_status={9}; business_data_requirements_traceable={10}; full_original_goal_complete={11}; final_completion_blocker={12}; p4_phase_approvals_all_false={13}; p4_approval_granted={14}; p4_executable_now={15};" -f `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'requirement_traceability_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'answer_handoff_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'p4_blocker_phase_matrix_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'disabled_embedding_skeleton_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'provider_write_implementation_shape_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'disabled_adapter_write_store_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'runtime_approval_checklist_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'migration_approval_packet_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'post_migration_verification_plan_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'business_context_status' ''), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'business_data_requirements_traceable' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'full_original_goal_complete' $false), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'final_completion_blocker' ''), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'p4_phase_approvals_all_false' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'p4_approval_granted' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'p4_executable_now' $false))
     }
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## fb2 导出样本"
@@ -431,6 +448,22 @@ function Invoke-Fb2PromptSelfTest {
                     embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
                     embedding_provider_planned_table_count = 4
                     embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
+                    disabled_embedding_skeleton_report_version = "fb2_p4_disabled_embedding_skeleton_v1"
+                    provider_write_implementation_shape_report_version = "fb2_p4_provider_write_implementation_shape_v1"
+                    disabled_adapter_write_store_report_version = "fb2_p4_disabled_adapter_write_store_v1"
+                    runtime_approval_checklist_report_version = "fb2_p4_runtime_approval_checklist_v1"
+                    migration_approval_packet_report_version = "fb2_p4_migration_approval_packet_v1"
+                    post_migration_verification_plan_report_version = "fb2_p4_post_migration_verification_plan_v1"
+                    requirement_traceability_report_version = "fb2_ai_context_requirement_traceability_v1"
+                    answer_handoff_report_version = "main_project_answer_handoff_markdown"
+                    p4_blocker_phase_matrix_version = "p4_blocker_phase_matrix"
+                    p4_phase_approvals_all_false = $true
+                    business_context_status = "business_context_requirements_traceable_final_goal_still_open"
+                    business_data_requirements_traceable = $true
+                    full_original_goal_complete = $false
+                    final_completion_blocker = "p4_vector_rag_planned_not_approved_or_enabled"
+                    p4_approval_granted = $false
+                    p4_executable_now = $false
                     writes_chunk_manifest_file = $false
                     persists_manifest_rows = $false
                     persists_transaction_rows = $false
@@ -545,6 +578,22 @@ function Invoke-Fb2PromptSelfTest {
                         embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
                         embedding_provider_planned_table_count = 4
                         embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
+                        disabled_embedding_skeleton_report_version = "fb2_p4_disabled_embedding_skeleton_v1"
+                        provider_write_implementation_shape_report_version = "fb2_p4_provider_write_implementation_shape_v1"
+                        disabled_adapter_write_store_report_version = "fb2_p4_disabled_adapter_write_store_v1"
+                        runtime_approval_checklist_report_version = "fb2_p4_runtime_approval_checklist_v1"
+                        migration_approval_packet_report_version = "fb2_p4_migration_approval_packet_v1"
+                        post_migration_verification_plan_report_version = "fb2_p4_post_migration_verification_plan_v1"
+                        requirement_traceability_report_version = "fb2_ai_context_requirement_traceability_v1"
+                        answer_handoff_report_version = "main_project_answer_handoff_markdown"
+                        p4_blocker_phase_matrix_version = "p4_blocker_phase_matrix"
+                        p4_phase_approvals_all_false = $true
+                        business_context_status = "business_context_requirements_traceable_final_goal_still_open"
+                        business_data_requirements_traceable = $true
+                        full_original_goal_complete = $false
+                        final_completion_blocker = "p4_vector_rag_planned_not_approved_or_enabled"
+                        p4_approval_granted = $false
+                        p4_executable_now = $false
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
                         persists_transaction_rows = $false
@@ -620,6 +669,22 @@ function Invoke-Fb2PromptSelfTest {
                         embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
                         embedding_provider_planned_table_count = 4
                         embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
+                        disabled_embedding_skeleton_report_version = "fb2_p4_disabled_embedding_skeleton_v1"
+                        provider_write_implementation_shape_report_version = "fb2_p4_provider_write_implementation_shape_v1"
+                        disabled_adapter_write_store_report_version = "fb2_p4_disabled_adapter_write_store_v1"
+                        runtime_approval_checklist_report_version = "fb2_p4_runtime_approval_checklist_v1"
+                        migration_approval_packet_report_version = "fb2_p4_migration_approval_packet_v1"
+                        post_migration_verification_plan_report_version = "fb2_p4_post_migration_verification_plan_v1"
+                        requirement_traceability_report_version = "fb2_ai_context_requirement_traceability_v1"
+                        answer_handoff_report_version = "main_project_answer_handoff_markdown"
+                        p4_blocker_phase_matrix_version = "p4_blocker_phase_matrix"
+                        p4_phase_approvals_all_false = $true
+                        business_context_status = "business_context_requirements_traceable_final_goal_still_open"
+                        business_data_requirements_traceable = $true
+                        full_original_goal_complete = $false
+                        final_completion_blocker = "p4_vector_rag_planned_not_approved_or_enabled"
+                        p4_approval_granted = $false
+                        p4_executable_now = $false
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
                         persists_transaction_rows = $false
@@ -721,6 +786,22 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "ready_to_execute_migrations") "planned migrations not executable boundary"
         Assert-Fb2PromptSelfTest ($content -match "provider_model_id_selected") "planned provider model id not selected boundary"
         Assert-Fb2PromptSelfTest ($content -match "vector_dimension_locked") "planned vector dimension not locked boundary"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_disabled_embedding_skeleton_v1") "planned disabled embedding skeleton report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_provider_write_implementation_shape_v1") "planned provider write implementation shape report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_disabled_adapter_write_store_v1") "planned disabled adapter write store report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_runtime_approval_checklist_v1") "planned runtime approval checklist report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_migration_approval_packet_v1") "planned migration approval packet report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_post_migration_verification_plan_v1") "planned post-migration verification plan report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_ai_context_requirement_traceability_v1") "planned requirement traceability report"
+        Assert-Fb2PromptSelfTest ($content -match "main_project_answer_handoff_markdown") "planned answer handoff report"
+        Assert-Fb2PromptSelfTest ($content -match "p4_blocker_phase_matrix") "planned p4 blocker phase matrix"
+        Assert-Fb2PromptSelfTest ($content -match "p4_phase_approvals_all_false") "planned p4 phase approvals all false"
+        Assert-Fb2PromptSelfTest ($content -match "business_context_requirements_traceable_final_goal_still_open") "planned business context final goal still open"
+        Assert-Fb2PromptSelfTest ($content -match "business_data_requirements_traceable") "planned business data requirements traceable"
+        Assert-Fb2PromptSelfTest ($content -match "full_original_goal_complete") "planned full original goal incomplete"
+        Assert-Fb2PromptSelfTest ($content -match "p4_vector_rag_planned_not_approved_or_enabled") "planned p4 vector rag blocker"
+        Assert-Fb2PromptSelfTest ($content -match "p4_approval_granted") "planned p4 approval not granted"
+        Assert-Fb2PromptSelfTest ($content -match "p4_executable_now") "planned p4 not executable now"
         Assert-Fb2PromptSelfTest ($content -match "fb2 导出样本") "exported sample section"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_context_pack") "exported sample row"
         Assert-Fb2PromptSelfTest ($content -match "\|\s*scenario\s*\|\s*audit\s*\|\s*sources\s*\|\s*business\s*\|\s*quality_history\s*\|\s*sha256\s*\|") "exported sample table classifies sources"

@@ -274,7 +274,23 @@ function New-Fb2GoalAuditPlannedCapabilities {
             embedding_provider_planned_table_count = 4
             embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
             embedding_provider_blocking_reasons = "reported_by_fb2_embedding_provider_migration_plan_runtime"
-            source_ref = "fb2 73a40385 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_chunk_manifest.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1 / scripts/report_main_project_p4_embedding_transaction_preflight.ps1 / scripts/report_main_project_p4_embedding_text_fixture.ps1 / scripts/report_main_project_p4_embedding_provider_migration_plan.ps1"
+            disabled_embedding_skeleton_report_version = "fb2_p4_disabled_embedding_skeleton_v1"
+            provider_write_implementation_shape_report_version = "fb2_p4_provider_write_implementation_shape_v1"
+            disabled_adapter_write_store_report_version = "fb2_p4_disabled_adapter_write_store_v1"
+            runtime_approval_checklist_report_version = "fb2_p4_runtime_approval_checklist_v1"
+            migration_approval_packet_report_version = "fb2_p4_migration_approval_packet_v1"
+            post_migration_verification_plan_report_version = "fb2_p4_post_migration_verification_plan_v1"
+            requirement_traceability_report_version = "fb2_ai_context_requirement_traceability_v1"
+            answer_handoff_report_version = "main_project_answer_handoff_markdown"
+            p4_blocker_phase_matrix_version = "p4_blocker_phase_matrix"
+            p4_phase_approvals_all_false = $true
+            business_context_status = "business_context_requirements_traceable_final_goal_still_open"
+            business_data_requirements_traceable = $true
+            full_original_goal_complete = $false
+            final_completion_blocker = "p4_vector_rag_planned_not_approved_or_enabled"
+            p4_approval_granted = $false
+            p4_executable_now = $false
+            source_ref = "fb2 bfed1cc8 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_chunk_manifest.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1 / scripts/report_main_project_p4_embedding_transaction_preflight.ps1 / scripts/report_main_project_p4_embedding_text_fixture.ps1 / scripts/report_main_project_p4_embedding_provider_migration_plan.ps1 / scripts/report_main_project_ai_context_requirement_traceability.ps1"
             gap_type = "planned_non_blocking"
             blocks_data_goal = $false
             production_grounding = $false
@@ -317,7 +333,7 @@ function New-Fb2GoalAuditPlannedCapabilities {
             requires_secret = $false
             requires_visible_group_write = $false
             command = ""
-            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator, chunk manifest, embedding dry-run, transaction preflight, sanitized embedding text fixture, and provider migration plan are only no-write planning evidence before provider/model selection, vector dimension lock, migrations, shadow eval, hydration, and explicit answer-time readthrough gates."
+            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator, chunk manifest, embedding dry-run, transaction preflight, sanitized embedding text fixture, provider migration plan, disabled runtime skeleton, traceability report, answer handoff, and phase matrix are only no-write planning evidence before phase-specific approval, provider/model selection, vector dimension lock, migrations, shadow eval, hydration, explicit answer-time readthrough gates, and deploy."
         }
     )
 }
@@ -789,6 +805,22 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ([int]$planned[0].embedding_provider_planned_table_count -ne 4) { $failed++ }
     if ([string]$planned[0].embedding_write_execution_plan_version -ne "fb2_p4_embedding_write_execution_plan_v1") { $failed++ }
     if ([string]$planned[0].embedding_provider_blocking_reasons -ne "reported_by_fb2_embedding_provider_migration_plan_runtime") { $failed++ }
+    if ([string]$planned[0].disabled_embedding_skeleton_report_version -ne "fb2_p4_disabled_embedding_skeleton_v1") { $failed++ }
+    if ([string]$planned[0].provider_write_implementation_shape_report_version -ne "fb2_p4_provider_write_implementation_shape_v1") { $failed++ }
+    if ([string]$planned[0].disabled_adapter_write_store_report_version -ne "fb2_p4_disabled_adapter_write_store_v1") { $failed++ }
+    if ([string]$planned[0].runtime_approval_checklist_report_version -ne "fb2_p4_runtime_approval_checklist_v1") { $failed++ }
+    if ([string]$planned[0].migration_approval_packet_report_version -ne "fb2_p4_migration_approval_packet_v1") { $failed++ }
+    if ([string]$planned[0].post_migration_verification_plan_report_version -ne "fb2_p4_post_migration_verification_plan_v1") { $failed++ }
+    if ([string]$planned[0].requirement_traceability_report_version -ne "fb2_ai_context_requirement_traceability_v1") { $failed++ }
+    if ([string]$planned[0].answer_handoff_report_version -ne "main_project_answer_handoff_markdown") { $failed++ }
+    if ([string]$planned[0].p4_blocker_phase_matrix_version -ne "p4_blocker_phase_matrix") { $failed++ }
+    if (-not [bool]$planned[0].p4_phase_approvals_all_false) { $failed++ }
+    if ([string]$planned[0].business_context_status -ne "business_context_requirements_traceable_final_goal_still_open") { $failed++ }
+    if (-not [bool]$planned[0].business_data_requirements_traceable) { $failed++ }
+    if ([bool]$planned[0].full_original_goal_complete) { $failed++ }
+    if ([string]$planned[0].final_completion_blocker -ne "p4_vector_rag_planned_not_approved_or_enabled") { $failed++ }
+    if ([bool]$planned[0].p4_approval_granted) { $failed++ }
+    if ([bool]$planned[0].p4_executable_now) { $failed++ }
     if (-not [bool]$planned[0].read_only) { $failed++ }
     if (-not [bool]$planned[0].dry_run) { $failed++ }
     if ([bool]$planned[0].writes_chunk_manifest_file) { $failed++ }

@@ -234,6 +234,22 @@ function New-Fb2MatrixValidation {
         Add-Fb2MatrixCheck $checks "planned p4 vector migration plan version" ([string](Get-Fb2MatrixProperty $p4 "embedding_vector_migration_plan_version" "") -eq "fb2_p4_vector_migration_plan_v1")
         Add-Fb2MatrixCheck $checks "planned p4 vector migration table count" ([int](Get-Fb2MatrixProperty $p4 "embedding_provider_planned_table_count" 0) -eq 4)
         Add-Fb2MatrixCheck $checks "planned p4 embedding write execution plan version" ([string](Get-Fb2MatrixProperty $p4 "embedding_write_execution_plan_version" "") -eq "fb2_p4_embedding_write_execution_plan_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 disabled embedding skeleton report version" ([string](Get-Fb2MatrixProperty $p4 "disabled_embedding_skeleton_report_version" "") -eq "fb2_p4_disabled_embedding_skeleton_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 provider write implementation shape report version" ([string](Get-Fb2MatrixProperty $p4 "provider_write_implementation_shape_report_version" "") -eq "fb2_p4_provider_write_implementation_shape_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 disabled adapter write-store report version" ([string](Get-Fb2MatrixProperty $p4 "disabled_adapter_write_store_report_version" "") -eq "fb2_p4_disabled_adapter_write_store_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 runtime approval checklist report version" ([string](Get-Fb2MatrixProperty $p4 "runtime_approval_checklist_report_version" "") -eq "fb2_p4_runtime_approval_checklist_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 migration approval packet report version" ([string](Get-Fb2MatrixProperty $p4 "migration_approval_packet_report_version" "") -eq "fb2_p4_migration_approval_packet_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 post-migration verification plan report version" ([string](Get-Fb2MatrixProperty $p4 "post_migration_verification_plan_report_version" "") -eq "fb2_p4_post_migration_verification_plan_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 requirement traceability report version" ([string](Get-Fb2MatrixProperty $p4 "requirement_traceability_report_version" "") -eq "fb2_ai_context_requirement_traceability_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 answer handoff report version" ([string](Get-Fb2MatrixProperty $p4 "answer_handoff_report_version" "") -eq "main_project_answer_handoff_markdown")
+        Add-Fb2MatrixCheck $checks "planned p4 blocker phase matrix version" ([string](Get-Fb2MatrixProperty $p4 "p4_blocker_phase_matrix_version" "") -eq "p4_blocker_phase_matrix")
+        Add-Fb2MatrixCheck $checks "planned p4 phase approvals all false" ([bool](Get-Fb2MatrixProperty $p4 "p4_phase_approvals_all_false" $false))
+        Add-Fb2MatrixCheck $checks "planned p4 business context status" ([string](Get-Fb2MatrixProperty $p4 "business_context_status" "") -eq "business_context_requirements_traceable_final_goal_still_open")
+        Add-Fb2MatrixCheck $checks "planned p4 business data requirements traceable" ([bool](Get-Fb2MatrixProperty $p4 "business_data_requirements_traceable" $false))
+        Add-Fb2MatrixCheck $checks "planned p4 full original goal not complete" (-not [bool](Get-Fb2MatrixProperty $p4 "full_original_goal_complete" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 final completion blocker" ([string](Get-Fb2MatrixProperty $p4 "final_completion_blocker" "") -eq "p4_vector_rag_planned_not_approved_or_enabled")
+        Add-Fb2MatrixCheck $checks "planned p4 approval not granted" (-not [bool](Get-Fb2MatrixProperty $p4 "p4_approval_granted" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 not executable now" (-not [bool](Get-Fb2MatrixProperty $p4 "p4_executable_now" $true))
         Add-Fb2MatrixCheck $checks "planned p4 vector status" ([string](Get-Fb2MatrixProperty $p4 "status" "") -eq "contract_design_committed_embedding_not_started")
         Add-Fb2MatrixCheck $checks "planned p4 vector non-blocking" (-not [bool](Get-Fb2MatrixProperty $p4 "blocks_data_goal" $true))
         Add-Fb2MatrixCheck $checks "planned p4 vector not production grounding" (-not [bool](Get-Fb2MatrixProperty $p4 "production_grounding" $true))
@@ -506,6 +522,22 @@ function New-Fb2MatrixFixtureRefresh {
                     embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
                     embedding_provider_planned_table_count = 4
                     embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
+                    disabled_embedding_skeleton_report_version = "fb2_p4_disabled_embedding_skeleton_v1"
+                    provider_write_implementation_shape_report_version = "fb2_p4_provider_write_implementation_shape_v1"
+                    disabled_adapter_write_store_report_version = "fb2_p4_disabled_adapter_write_store_v1"
+                    runtime_approval_checklist_report_version = "fb2_p4_runtime_approval_checklist_v1"
+                    migration_approval_packet_report_version = "fb2_p4_migration_approval_packet_v1"
+                    post_migration_verification_plan_report_version = "fb2_p4_post_migration_verification_plan_v1"
+                    requirement_traceability_report_version = "fb2_ai_context_requirement_traceability_v1"
+                    answer_handoff_report_version = "main_project_answer_handoff_markdown"
+                    p4_blocker_phase_matrix_version = "p4_blocker_phase_matrix"
+                    p4_phase_approvals_all_false = $true
+                    business_context_status = "business_context_requirements_traceable_final_goal_still_open"
+                    business_data_requirements_traceable = $true
+                    full_original_goal_complete = $false
+                    final_completion_blocker = "p4_vector_rag_planned_not_approved_or_enabled"
+                    p4_approval_granted = $false
+                    p4_executable_now = $false
                     status = "contract_design_committed_embedding_not_started"
                     blocks_data_goal = $false
                     production_grounding = $false

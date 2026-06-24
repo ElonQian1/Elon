@@ -130,6 +130,22 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "planned provider selection visible" ($Content -match 'not_selected_no_provider_calls')
     Add-Fb2PromptValidationCheck $checks "planned vector migration plan visible" ($Content -match 'fb2_p4_vector_migration_plan_v1')
     Add-Fb2PromptValidationCheck $checks "planned embedding write execution plan visible" ($Content -match 'fb2_p4_embedding_write_execution_plan_v1')
+    Add-Fb2PromptValidationCheck $checks "planned disabled embedding skeleton report visible" ($Content -match 'fb2_p4_disabled_embedding_skeleton_v1')
+    Add-Fb2PromptValidationCheck $checks "planned provider write implementation shape report visible" ($Content -match 'fb2_p4_provider_write_implementation_shape_v1')
+    Add-Fb2PromptValidationCheck $checks "planned disabled adapter write-store report visible" ($Content -match 'fb2_p4_disabled_adapter_write_store_v1')
+    Add-Fb2PromptValidationCheck $checks "planned runtime approval checklist report visible" ($Content -match 'fb2_p4_runtime_approval_checklist_v1')
+    Add-Fb2PromptValidationCheck $checks "planned migration approval packet report visible" ($Content -match 'fb2_p4_migration_approval_packet_v1')
+    Add-Fb2PromptValidationCheck $checks "planned post-migration verification plan report visible" ($Content -match 'fb2_p4_post_migration_verification_plan_v1')
+    Add-Fb2PromptValidationCheck $checks "planned requirement traceability report visible" ($Content -match 'fb2_ai_context_requirement_traceability_v1')
+    Add-Fb2PromptValidationCheck $checks "planned answer handoff report visible" ($Content -match 'main_project_answer_handoff_markdown')
+    Add-Fb2PromptValidationCheck $checks "planned p4 blocker phase matrix visible" ($Content -match 'p4_blocker_phase_matrix')
+    Add-Fb2PromptValidationCheck $checks "planned p4 phase approvals all false visible" ($Content -match 'p4_phase_approvals_all_false')
+    Add-Fb2PromptValidationCheck $checks "planned business context still open visible" ($Content -match 'business_context_requirements_traceable_final_goal_still_open')
+    Add-Fb2PromptValidationCheck $checks "planned business data traceable visible" ($Content -match 'business_data_requirements_traceable')
+    Add-Fb2PromptValidationCheck $checks "planned full original goal incomplete visible" ($Content -match 'full_original_goal_complete')
+    Add-Fb2PromptValidationCheck $checks "planned final p4 blocker visible" ($Content -match 'p4_vector_rag_planned_not_approved_or_enabled')
+    Add-Fb2PromptValidationCheck $checks "planned p4 approval not granted visible" ($Content -match 'p4_approval_granted')
+    Add-Fb2PromptValidationCheck $checks "planned p4 not executable visible" ($Content -match 'p4_executable_now')
     Add-Fb2PromptValidationCheck $checks "planned vector status visible" ($Content -match 'contract_design_committed_embedding_not_started')
     Add-Fb2PromptValidationCheck $checks "planned vector production boundary visible" ($Content -match 'production_grounding')
     Add-Fb2PromptValidationCheck $checks "planned vector non-blocking boundary visible" ($Content -match 'blocks_data_goal')
@@ -327,6 +343,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - p4_embedding_transaction_preflight_safety: persists_transaction_rows=False; creates_or_migrates_tables=False; calls_embedding_provider=False; ready_to_execute_embedding_transaction=False; writes_embedding_rows=False; writes_vector_store=False;
 - p4_embedding_text_fixture_safety: embedding_text_included=True; embedding_text_is_sanitized=True; content_hash_computed=True; persists_fixture_rows=False; calls_embedding_provider=False; answer_time_vector_candidates_enabled=False;
 - p4_embedding_provider_migration_safety: provider_plan=fb2_p4_embedding_provider_migration_plan_v1; provider_selection_state=not_selected_no_provider_calls; migration_plan=fb2_p4_vector_migration_plan_v1; execution_plan=fb2_p4_embedding_write_execution_plan_v1; provider_secret_required_now=False; provider_secret_printed=False; executes_migration_ddl=False; ready_to_call_embedding_provider=False; ready_to_execute_migrations=False; provider_model_id_selected=False; vector_dimension_locked=False;
+- p4_runtime_approval_gate: traceability=fb2_ai_context_requirement_traceability_v1; answer_handoff=main_project_answer_handoff_markdown; phase_matrix=p4_blocker_phase_matrix; disabled_skeleton=fb2_p4_disabled_embedding_skeleton_v1; provider_write_shape=fb2_p4_provider_write_implementation_shape_v1; disabled_adapter_write_store=fb2_p4_disabled_adapter_write_store_v1; runtime_approval=fb2_p4_runtime_approval_checklist_v1; migration_approval=fb2_p4_migration_approval_packet_v1; post_migration_verification=fb2_p4_post_migration_verification_plan_v1; business_status=business_context_requirements_traceable_final_goal_still_open; business_data_requirements_traceable=True; full_original_goal_complete=False; final_completion_blocker=p4_vector_rag_planned_not_approved_or_enabled; p4_phase_approvals_all_false=True; p4_approval_granted=False; p4_executable_now=False;
 
 ## fb2 导出样本
 - attempted: `True` / complete: `True` / passed: `4` / failed: `0`
