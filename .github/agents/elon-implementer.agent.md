@@ -15,8 +15,9 @@ handoffs:
 
 必须遵守：
 
+- 开始先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。
+- 如果预检输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再定位和修改文件；主 `main` 工作区只作为同步基线。
 - 开始和结束都检查 `git status --short --branch`。
-- 先 `git fetch origin main`；如果主工作区有不属于本任务或来源不明的未提交改动，从 `origin/main` 创建临时 worktree 隔离工作。
 - 修改前先读取目标文件和相关文档。
 - 只编辑当前任务需要的文件，保持 Rust/Kotlin/XML/Markdown 既有风格。
 - 不继续制造巨型文件；触碰 1500 行以上文件时，除小修外优先把本次职责抽到独立模块，并保持提交聚焦。

@@ -38,14 +38,15 @@ Read these files before acting:
 
 ## Non-Negotiables
 
+- Start by running the task preflight script: Windows `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`; Linux/macOS/server CLI `bash scripts/ai-task-preflight.sh --create-worktree`.
+- If preflight prints `WORKTREE_CREATED=true`, change to `WORKTREE_PATH` before reading target files or editing. The `main` checkout is only the shared baseline.
 - Start and end with `git status --short --branch`.
-- If the main workspace has unrelated uncommitted changes, use a temporary worktree.
 - Do not keep adding logic to giant files. For files over 1500 lines, extract the touched responsibility into a focused module unless the change is a tiny fix.
 - Never deploy uncommitted code.
 - Never stage unrelated files.
 - Never commit secrets, `.env`, APK signing keys, or generated private credentials.
 - If push is rejected, fetch/rebase or merge, resolve conflicts while preserving both sides when compatible, then push again.
-- If uncommitted changes are unrelated or unclear, create a new worktree from `origin/main` instead of pulling in the dirty workspace.
+- If uncommitted changes are unrelated or unclear, rely on the preflight-created worktree from `origin/main` instead of pulling in the dirty workspace.
 - For backend runtime changes, push the business commit to `origin/main` first and run `scripts\check-task-complete.ps1 -Kind CodePushed`; then run `scripts/publish-server.*` when this task owns deployment. The script calls `POST /api/release/claim` so the server atomically allocates a new version number, injects it into the binary at compile time via `ELON_BUILD_VERSION`, deploys, then calls `POST /api/release/finish`. **Do NOT manually edit and commit `server/Cargo.toml` `package.version`** — the field is only a cold-start fallback. If deploy is superseded by newer main/server state, report it instead of rebasing and rerunning.
 - For Android installable features, PR/debug build is not release complete. Push the business commit first and run `scripts\check-task-complete.ps1 -Kind CodePushed`. Run `scripts\publish-apk.ps1` when this task owns APK publishing (it claims `versionCode/versionName` from the server, temporarily writes `build.gradle`, builds, uploads, then restores `build.gradle`; nothing is committed to git), then run `scripts\check-task-complete.ps1 -Kind AndroidFeature`. If the APK publish is superseded by newer main/server state, report it instead of rebasing and rerunning.
 - For Rust builds, do not rely on a relative `CARGO_TARGET_DIR`; use project scripts or an absolute target directory.

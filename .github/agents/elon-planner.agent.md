@@ -7,7 +7,7 @@ disable-model-invocation: false
 handoffs:
   - label: 开始实现
     agent: elon-implementer
-    prompt: 按上面的计划开始实现。先检查 Git 状态，保护并发改动，只提交本任务相关文件。
+    prompt: 按上面的计划开始实现。先运行 ai-task-preflight 预检脚本，按 WORKTREE_PATH 切到隔离工作区，只提交本任务相关文件。
     send: false
   - label: 做提交前审查
     agent: elon-reviewer
@@ -24,5 +24,5 @@ handoffs:
 - 输出计划前要说明任务类型、影响模块、目标文件、验证命令、Git/部署注意事项。
 - 计划涉及巨型文件时，必须优先给出模块边界和拆分顺序，不要把新功能继续堆进入口文件。
 - 不直接编辑文件，不运行会改变状态的命令。
-- 如果需求涉及部署或 APK 发布，计划必须包含后端/APK 版本号、提交、push、临时 worktree、验证和回滚点。
+- 如果需求涉及部署或 APK 发布，计划必须包含 ai-task-preflight 预检、WORKTREE_PATH 隔离工作区、后端/APK 版本号、提交、push、验证和回滚点。
 - 计划要能交给 `elon-implementer` 直接执行。

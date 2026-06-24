@@ -15,7 +15,7 @@ argument-hint: "<发布原因或用户需求>"
 
 发布要求：
 
-1. 先 `git fetch origin main` 并确认 Git 状态；保护所有不属于本任务的未提交改动，来源不明时从 `origin/main` 新建 worktree。
+1. 先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。如果输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再发布；不要在主 `main` 工作区直接发布或改文件。
 2. 使用 `scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"`，不要手工拼接版本号、签名和上传步骤。
 3. 发布脚本必须从当前 `origin/main` claim 服务器版本号、构建 release APK、上传 APK/version.json 并做服务器校验；版本号不进 git，也不生成 release-only commit。
 4. 发布后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature`。若脚本提示构建期间被更新的 `origin/main` 或服务器 APK 超越，汇报“发布交由后续最新 main”，不要为了当前代理发布成功继续 rebase 重跑。

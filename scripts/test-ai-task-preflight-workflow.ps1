@@ -64,6 +64,13 @@ Assert-DocumentContains -RelativePath ".github\copilot-instructions.md" -Snippet
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "WORKTREE_PATH"
 Assert-DocumentContains -RelativePath ".github\instructions\git-deploy-workflow.instructions.md" -Snippet "nested worktree"
 Assert-DocumentContains -RelativePath "docs\ai-agent-workflow.md" -Snippet "origin/main"
+Assert-DocumentContains -RelativePath "AI_TASK_TEMPLATE.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
+Assert-DocumentContains -RelativePath ".github\prompts\elon-dev-task.prompt.md" -Snippet "WORKTREE_PATH"
+Assert-DocumentContains -RelativePath ".github\prompts\elon-apk-release.prompt.md" -Snippet "WORKTREE_PATH"
+Assert-DocumentContains -RelativePath ".github\agents\elon-implementer.agent.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
+Assert-DocumentContains -RelativePath ".github\agents\elon-planner.agent.md" -Snippet "ai-task-preflight"
+Assert-DocumentContains -RelativePath ".github\agents\elon-reviewer.agent.md" -Snippet "release API"
+Assert-DocumentContains -RelativePath ".github\skills\cloud-apk-dev\SKILL.md" -Snippet "WORKTREE_CREATED=true"
 
 $tempBase = [System.IO.Path]::GetTempPath()
 $testRoot = Join-Path $tempBase ("elon-preflight-workflow-test-" + [Guid]::NewGuid().ToString("N"))

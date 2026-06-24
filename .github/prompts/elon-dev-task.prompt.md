@@ -17,8 +17,8 @@ argument-hint: "<用户需求或任务描述>"
 
 执行要求：
 
-1. 先运行 `git status --short --branch`，判断主工作区是否有并发改动。
-2. 先 `git fetch origin main`；如有不属于本任务或来源不明的未提交改动，使用从 `origin/main` 创建的独立 worktree。
+1. 先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`。脚本会同步 `main` 基线并创建/复用安全工作区。
+2. 如果预检输出 `WORKTREE_CREATED=true`，必须切到 `WORKTREE_PATH` 后再定位和修改文件；不要在主 `main` 工作区直接编辑业务文件。
 3. 定位并阅读目标文件，不要盲改。
 4. 避免继续向巨型文件追加逻辑；触碰 1500 行以上文件时，除小修外优先抽出本次职责模块。
 5. 只做当前任务需要的最小修改。
