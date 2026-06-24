@@ -811,6 +811,66 @@ function testDevTasksRequiresActiveApprovalHandle() {
   assert.ok(activeApprovalHtml.includes('data-approval-id="tap_live"'), 'approval button should keep the active approval id');
 }
 
+function testDevTasksUsesApprovalStateNextAction() {
+  const sandbox = loadAsset('server/src/assets/pc_app_dev_tasks.js');
+  const devTasks = sandbox.window.ElonPcDevTasks.create({
+    clean,
+    escapeHtml,
+    markdown: { renderMessage: (content) => `<div>${escapeHtml(content)}</div>` },
+    refreshActiveChannel: () => {},
+    approveTool: async () => {},
+    cancelTask: () => {}
+  });
+  const messages = [
+    { kind: 'ai_task', task_id: 'tsk_state_action', content: '发起 AI 开发任务：审批状态恢复' },
+    {
+      kind: 'ai_progress',
+      task_id: 'tsk_state_action',
+      content: JSON.stringify({
+        type: 'tool_approval_required',
+        tool: 'apply_patch',
+        approval_id: 'tap_state',
+        status: 'pending'
+      })
+    }
+  ];
+  const snapshots = new Map([[
+    'tsk_state_action',
+    {
+      task: { id: 'tsk_state_action', status: 'running' },
+      attach: { status: 'detached', live: false, source: 'local_journal' },
+      resume: {
+        status: 'detached',
+        can_reconnect: false,
+        can_cancel: false,
+        can_stream_live_output: false,
+        can_replay_journal_events: true,
+        next_action: 'continue_from_snapshot',
+        strategy: { kind: 'snapshot_continue', label: '基于快照继续' }
+      },
+      approval_state: {
+        approvals: [{
+          approval_id: 'tap_state',
+          tool: 'apply_patch',
+          status: 'unavailable',
+          actionable: false,
+          tone: 'failed',
+          label: '已失效',
+          meta: '本机没有活动审批等待器',
+          next_action: 'continue_from_snapshot',
+          requires_new_task: true
+        }]
+      }
+    }
+  ]]);
+  const context = devTasks.buildContext(messages, { snapshots });
+  const approvalHtml = devTasks.renderMessage(messages[1], context);
+
+  assert.ok(approvalHtml.includes('apply_patch 已失效'), 'approval card should use the persisted approval state label');
+  assert.ok(approvalHtml.includes('需基于快照新开任务'), 'approval card should expose the structured snapshot continuation action');
+  assert.ok(!approvalHtml.includes('data-decision="approve"'), 'unavailable approval state must not expose approval buttons');
+}
+
 async function testAgentRunsPanelLoadsProjectRuns() {
   let scheduled = null;
   let rendered = 0;
@@ -1674,6 +1734,7 @@ function testPcProjectStartGuidance() {
   testDevTasksUsesLocalJournalAttachLabel();
   testDevTasksUsesResumeContractForSnapshotContinue();
   testDevTasksRequiresActiveApprovalHandle();
+  testDevTasksUsesApprovalStateNextAction();
   testDevTasksToolTimeline();
   await testDevTasksToolApprovalButtons();
   await testTaskSnapshotsPollsSnapshotEndpoint();

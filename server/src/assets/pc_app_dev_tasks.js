@@ -493,13 +493,17 @@
     function approvalSnapshotCardState(item) {
       const status = clean(item && item.status).toLowerCase();
       const actionable = item && item.actionable === true;
+      const nextAction = clean(item && (item.next_action || item.nextAction));
+      const requiresNewTask = item && (item.requires_new_task === true || item.requiresNewTask === true);
       if (actionable) {
         return {
           status: 'pending',
           tool: clean(item.tool),
           tone: clean(item.tone) || 'approval',
           label: clean(item.label) || '等待确认',
-          meta: clean(item.meta) || '可在本机继续审批'
+          meta: approvalStateMetaWithNextAction(clean(item.meta) || '可在本机继续审批', nextAction, requiresNewTask),
+          nextAction,
+          requiresNewTask
         };
       }
       if (!status) return null;
@@ -508,8 +512,18 @@
         tool: clean(item.tool),
         tone: clean(item.tone) || approvalStateTone(status),
         label: clean(item.label) || approvalStateLabel(status),
-        meta: clean(item.meta) || approvalStateMeta(status)
+        meta: approvalStateMetaWithNextAction(clean(item.meta) || approvalStateMeta(status), nextAction, requiresNewTask),
+        nextAction,
+        requiresNewTask
       };
+    }
+
+    function approvalStateMetaWithNextAction(meta, nextAction, requiresNewTask) {
+      const parts = [clean(meta)].filter(Boolean);
+      const action = clean(nextAction).toLowerCase();
+      if (requiresNewTask && action === 'continue_from_snapshot') parts.push('需基于快照新开任务');
+      else if (action === 'approve_or_deny') parts.push('可继续批准或拒绝');
+      return Array.from(new Set(parts)).join('；');
     }
 
     function approvalStateTone(status) {

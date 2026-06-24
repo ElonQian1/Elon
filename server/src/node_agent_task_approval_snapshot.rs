@@ -35,6 +35,8 @@ pub(crate) struct TaskApprovalStateItem {
     pub status: &'static str,
     pub decision: Option<String>,
     pub actionable: bool,
+    pub next_action: &'static str,
+    pub requires_new_task: bool,
     pub label: &'static str,
     pub tone: &'static str,
     pub meta: &'static str,
@@ -212,31 +214,90 @@ fn state_item(
     status: &'static str,
     actionable: bool,
 ) -> TaskApprovalStateItem {
-    let (label, tone, meta) = state_labels(status);
+    let policy = state_policy(status);
     TaskApprovalStateItem {
         approval_id: approval.approval_id.clone(),
         tool: approval.tool.clone(),
         status,
         decision: approval.decision.clone(),
         actionable,
-        label,
-        tone,
-        meta,
+        next_action: policy.next_action,
+        requires_new_task: policy.requires_new_task,
+        label: policy.label,
+        tone: policy.tone,
+        meta: policy.meta,
         required_seq: approval.required_seq,
         decision_seq: approval.decision_seq,
     }
 }
 
-fn state_labels(status: &str) -> (&'static str, &'static str, &'static str) {
+#[derive(Debug, Clone, Copy)]
+struct ApprovalStatePolicy {
+    label: &'static str,
+    tone: &'static str,
+    meta: &'static str,
+    next_action: &'static str,
+    requires_new_task: bool,
+}
+
+fn state_policy(status: &str) -> ApprovalStatePolicy {
     match status {
-        "actionable" => ("等待确认", "approval", "可在本机继续审批"),
-        "approved" => ("已批准", "done", "继续执行工具"),
-        "denied" => ("已拒绝", "canceled", "工具不会执行"),
-        "expired" => ("已过期", "canceled", "审批已过期"),
-        "canceled" => ("已取消", "canceled", "任务已停止"),
-        "closed" => ("已关闭", "canceled", "任务已结束，审批已关闭"),
-        "processed" => ("已处理", "done", "审批已处理"),
-        _ => ("已失效", "failed", "本机没有活动审批等待器"),
+        "actionable" => ApprovalStatePolicy {
+            label: "等待确认",
+            tone: "approval",
+            meta: "可在本机继续审批",
+            next_action: "approve_or_deny",
+            requires_new_task: false,
+        },
+        "approved" => ApprovalStatePolicy {
+            label: "已批准",
+            tone: "done",
+            meta: "继续执行工具",
+            next_action: "none",
+            requires_new_task: false,
+        },
+        "denied" => ApprovalStatePolicy {
+            label: "已拒绝",
+            tone: "canceled",
+            meta: "工具不会执行",
+            next_action: "none",
+            requires_new_task: false,
+        },
+        "expired" => ApprovalStatePolicy {
+            label: "已过期",
+            tone: "canceled",
+            meta: "审批已过期",
+            next_action: "continue_from_snapshot",
+            requires_new_task: true,
+        },
+        "canceled" => ApprovalStatePolicy {
+            label: "已取消",
+            tone: "canceled",
+            meta: "任务已停止",
+            next_action: "none",
+            requires_new_task: false,
+        },
+        "closed" => ApprovalStatePolicy {
+            label: "已关闭",
+            tone: "canceled",
+            meta: "任务已结束，审批已关闭",
+            next_action: "none",
+            requires_new_task: false,
+        },
+        "processed" => ApprovalStatePolicy {
+            label: "已处理",
+            tone: "done",
+            meta: "审批已处理",
+            next_action: "none",
+            requires_new_task: false,
+        },
+        _ => ApprovalStatePolicy {
+            label: "已失效",
+            tone: "failed",
+            meta: "本机没有活动审批等待器",
+            next_action: "continue_from_snapshot",
+            requires_new_task: true,
+        },
     }
 }
 
@@ -365,6 +426,8 @@ mod tests {
         assert_eq!(state.actionable_count, 1);
         assert_eq!(state.approvals[0].status, "actionable");
         assert!(state.approvals[0].actionable);
+        assert_eq!(state.approvals[0].next_action, "approve_or_deny");
+        assert!(!state.approvals[0].requires_new_task);
     }
 
     #[test]
@@ -385,6 +448,8 @@ mod tests {
         assert_eq!(state.unavailable_count, 1);
         assert_eq!(state.approvals[0].status, "unavailable");
         assert!(!state.approvals[0].actionable);
+        assert_eq!(state.approvals[0].next_action, "continue_from_snapshot");
+        assert!(state.approvals[0].requires_new_task);
     }
 
     #[test]
@@ -443,6 +508,8 @@ mod tests {
         assert_eq!(state.approvals[0].status, "closed");
         assert_eq!(state.approvals[0].label, "已关闭");
         assert_eq!(state.approvals[0].meta, "任务已结束，审批已关闭");
+        assert_eq!(state.approvals[0].next_action, "none");
+        assert!(!state.approvals[0].requires_new_task);
         assert!(!state.approvals[0].actionable);
     }
 }
