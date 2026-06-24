@@ -734,10 +734,10 @@ function Invoke-Fb2StatusSelfTest {
             missing = @()
             secret_like_scenarios = @()
             scenarios = @(
-                [ordered]@{ scenario = "today_matches_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-today"; citation_source_count = 23; source_kinds = @("match", "odds", "context_audit", "group_message"); context_pack_sha256 = "fb2abc" },
-                [ordered]@{ scenario = "my_ticket_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-ticket"; citation_source_count = 43; source_kinds = @("match", "odds", "user_order", "ticket", "context_audit", "group_message"); context_pack_sha256 = "fb2def" },
-                [ordered]@{ scenario = "platform_order_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-platform"; citation_source_count = 24; source_kinds = @("platform_order_summary", "context_audit", "match", "odds"); context_pack_sha256 = "fb2ghi" },
-                [ordered]@{ scenario = "group_opinion_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-opinion"; citation_source_count = 24; source_kinds = @("group_message", "opinion_memory", "context_audit", "match", "odds"); context_pack_sha256 = "fb2jkl" }
+                [ordered]@{ scenario = "today_matches_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-today"; citation_source_count = 23; source_kinds = @("match", "odds", "context_audit", "group_message", "opinion_result_review_summary"); context_pack_sha256 = "fb2abc" },
+                [ordered]@{ scenario = "my_ticket_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-ticket"; citation_source_count = 43; source_kinds = @("match", "odds", "user_order", "ticket", "context_audit", "group_message", "opinion_result_review_summary"); context_pack_sha256 = "fb2def" },
+                [ordered]@{ scenario = "platform_order_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-platform"; citation_source_count = 24; source_kinds = @("platform_order_summary", "context_audit", "match", "odds", "opinion_result_review_summary"); context_pack_sha256 = "fb2ghi" },
+                [ordered]@{ scenario = "group_opinion_context_pack"; passed = $true; context_audit_id = "audit-fb2repo-opinion"; citation_source_count = 24; source_kinds = @("group_message", "opinion_memory", "context_audit", "match", "odds", "opinion_result_review_summary"); context_pack_sha256 = "fb2jkl" }
             )
         } | ConvertTo-Json -Depth 8 | Set-Content -Path (Join-Path $tmp "fb2-repo-context-pack-samples-validation-current.json") -Encoding UTF8
         @(
@@ -812,6 +812,11 @@ function Invoke-Fb2StatusSelfTest {
         if ($snapshot.latest_context_answer_readiness.passed_count -ne 4) { $failed++ }
         $todayReadiness = @($snapshot.latest_context_answer_readiness.scenarios | Where-Object { $_.id -eq "today_matches_analysis" })[0]
         if ($todayReadiness.context_audit_id -ne "audit-fb2repo-today") { $failed++ }
+        if (@($todayReadiness.present_source_kinds) -notcontains "opinion_result_review_summary") { $failed++ }
+        if (@($todayReadiness.quality_history_source_kinds) -notcontains "opinion_result_review_summary") { $failed++ }
+        if (@($todayReadiness.business_source_kinds) -contains "opinion_result_review_summary") { $failed++ }
+        if (@($snapshot.latest_context_answer_readiness.quality_history_source_kinds) -notcontains "opinion_result_review_summary") { $failed++ }
+        if (@($snapshot.latest_context_answer_readiness.business_source_kinds) -contains "opinion_result_review_summary") { $failed++ }
         if ($snapshot.latest_user_scenario_audit.schema -ne "fb2.main_project.user_scenario_audit.v1") { $failed++ }
         if (-not [bool]$snapshot.latest_user_scenario_audit.complete) { $failed++ }
         if ($snapshot.latest_user_scenario_audit.scenario_count -ne 7) { $failed++ }

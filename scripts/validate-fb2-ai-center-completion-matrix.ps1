@@ -299,6 +299,18 @@ function New-Fb2MatrixValidation {
                 (@($selectedScenario).Count -gt 0 -and [string](Get-Fb2MatrixProperty $selectedScenario[0] "context_audit_id" "") -eq $auditId)
             Add-Fb2MatrixCheck $checks "answer readiness audit matches exported $answerId" `
                 (@($answerScenario).Count -gt 0 -and [string](Get-Fb2MatrixProperty $answerScenario[0] "context_audit_id" "") -eq $auditId -and [string](Get-Fb2MatrixProperty $answerScenario[0] "context_pack_sha256" "") -eq $sha)
+            if (@($answerScenario).Count -gt 0) {
+                $answerBusinessKinds = @((Get-Fb2MatrixProperty $answerScenario[0] "business_source_kinds" @()) | ForEach-Object { [string]$_ })
+                $answerQualityKinds = @((Get-Fb2MatrixProperty $answerScenario[0] "quality_history_source_kinds" @()) | ForEach-Object { [string]$_ })
+                Add-Fb2MatrixCheck $checks "answer readiness excludes review summary as business $answerId" `
+                    ($answerBusinessKinds -notcontains "opinion_result_review_summary") `
+                    ($answerBusinessKinds -join ",")
+                if (@((Get-Fb2MatrixProperty $answerScenario[0] "present_source_kinds" @()) | Where-Object { [string]$_ -eq "opinion_result_review_summary" }).Count -gt 0) {
+                    Add-Fb2MatrixCheck $checks "answer readiness classifies review summary as quality history $answerId" `
+                        ($answerQualityKinds -contains "opinion_result_review_summary") `
+                        ($answerQualityKinds -join ",")
+                }
+            }
             Add-Fb2MatrixCheck $checks "completion matrix evidence matches exported $answerId" `
                 ((-not [string]::IsNullOrWhiteSpace($auditId)) -and $evidence.Contains($auditId) -and ([string]::IsNullOrWhiteSpace($sha) -or $evidence.Contains($sha)))
         }

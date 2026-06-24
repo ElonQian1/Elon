@@ -57,6 +57,25 @@ function Get-Fb2ContextAnswerReadinessProperty {
     return $property.Value
 }
 
+function Get-Fb2ContextAnswerReadinessQualityHistoryKinds {
+    @(
+        "feedback",
+        "opinion_adoption",
+        "opinion_result_review_summary"
+    )
+}
+
+function Split-Fb2ContextAnswerReadinessSourceKinds {
+    param([string[]]$SourceKinds)
+
+    $qualityKinds = @(Get-Fb2ContextAnswerReadinessQualityHistoryKinds)
+    $uniqueKinds = @($SourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    [ordered]@{
+        business = @($uniqueKinds | Where-Object { $qualityKinds -notcontains [string]$_ })
+        quality_history = @($uniqueKinds | Where-Object { $qualityKinds -contains [string]$_ })
+    }
+}
+
 function Find-Fb2ContextAnswerSampleScenario {
     param(
         [object]$SampleSetState,
@@ -77,14 +96,30 @@ function Get-Fb2ContextAnswerReadinessState {
     $sampleSetComplete = [bool](Get-Fb2ContextAnswerReadinessProperty $SampleSetState "complete" $false)
     $scenarioResults = @()
     $missing = @()
+    $allSourceKinds = @()
+    $allBusinessSourceKinds = @()
+    $allQualityHistorySourceKinds = @()
 
     foreach ($spec in Get-Fb2ContextAnswerScenarioSpec) {
         $sampleScenarioId = [string]$spec["sample_scenario"]
         $sampleScenario = Find-Fb2ContextAnswerSampleScenario -SampleSetState $SampleSetState -ScenarioId $sampleScenarioId
-        $sourceKinds = @((Get-Fb2ContextAnswerReadinessProperty $sampleScenario "source_kinds" @()) | ForEach-Object { [string]$_ })
+        $sourceKinds = @((Get-Fb2ContextAnswerReadinessProperty $sampleScenario "source_kinds" @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        $splitKinds = Split-Fb2ContextAnswerReadinessSourceKinds -SourceKinds $sourceKinds
+        $businessSourceKinds = @((Get-Fb2ContextAnswerReadinessProperty $sampleScenario "business_source_kinds" @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        if ($businessSourceKinds.Count -eq 0) {
+            $businessSourceKinds = @($splitKinds["business"])
+        }
+        $qualityHistorySourceKinds = @((Get-Fb2ContextAnswerReadinessProperty $sampleScenario "quality_history_source_kinds" @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        if ($qualityHistorySourceKinds.Count -eq 0) {
+            $qualityHistorySourceKinds = @($splitKinds["quality_history"])
+        }
+        $allSourceKinds += $sourceKinds
+        $allBusinessSourceKinds += $businessSourceKinds
+        $allQualityHistorySourceKinds += $qualityHistorySourceKinds
+
         $missingSourceKinds = @()
         foreach ($requiredKind in @($spec["required_source_kinds"])) {
-            if ($sourceKinds -notcontains $requiredKind) {
+            if ($businessSourceKinds -notcontains $requiredKind) {
                 $missingSourceKinds += $requiredKind
             }
         }
@@ -106,6 +141,8 @@ function Get-Fb2ContextAnswerReadinessState {
             complete = $scenarioPassed
             required_source_kinds = @($spec["required_source_kinds"])
             present_source_kinds = @($sourceKinds)
+            business_source_kinds = @($businessSourceKinds)
+            quality_history_source_kinds = @($qualityHistorySourceKinds)
             missing_source_kinds = @($missingSourceKinds)
             required_answer_layers = @($spec["required_answer_layers"])
             forbidden_outputs = @($spec["forbidden_outputs"])
@@ -122,6 +159,9 @@ function Get-Fb2ContextAnswerReadinessState {
         scenario_count = @($scenarioResults).Count
         passed_count = @($scenarioResults | Where-Object { [bool]$_["complete"] }).Count
         failed_count = @($scenarioResults | Where-Object { -not [bool]$_["complete"] }).Count
+        source_kinds = @($allSourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        business_source_kinds = @($allBusinessSourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        quality_history_source_kinds = @($allQualityHistorySourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
         scenarios = @($scenarioResults)
         missing = @($missing)
         note = "offline_source_coverage_only_requires_live_model_feedback_with_FB2_AI_CENTER_TOKEN_for_final_acceptance"
