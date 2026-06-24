@@ -162,6 +162,12 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "planned p4 embedding transaction planned entries delegated" ([string](Get-Fb2GapProperty $p4 "embedding_transaction_preflight_planned_entry_count" "") -eq "reported_by_fb2_embedding_transaction_preflight_runtime")
         Add-Fb2GapCheck $checks "planned p4 embedding transaction skipped sources delegated" ([string](Get-Fb2GapProperty $p4 "embedding_transaction_preflight_skipped_source_count" "") -eq "reported_by_fb2_embedding_transaction_preflight_runtime")
         Add-Fb2GapCheck $checks "planned p4 embedding transaction blocking reasons delegated" ([string](Get-Fb2GapProperty $p4 "embedding_transaction_preflight_blocking_reasons" "") -eq "reported_by_fb2_embedding_transaction_preflight_runtime")
+        Add-Fb2GapCheck $checks "planned p4 embedding text fixture report version" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_report_version" "") -eq "fb2_p4_embedding_text_fixture_v1")
+        Add-Fb2GapCheck $checks "planned p4 embedding text fixture no-write status" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_status" "") -eq "embedding_text_fixture_materialized_no_writes")
+        Add-Fb2GapCheck $checks "planned p4 embedding text fixture materialized count delegated" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_materialized_count" "") -eq "reported_by_fb2_embedding_text_fixture_runtime")
+        Add-Fb2GapCheck $checks "planned p4 embedding text fixture missing source count delegated" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_missing_source_count" "") -eq "reported_by_fb2_embedding_text_fixture_runtime")
+        Add-Fb2GapCheck $checks "planned p4 embedding text fixture hash algorithm" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_content_hash_algorithm" "") -eq "sha256_utf8_normalized_text_v1")
+        Add-Fb2GapCheck $checks "planned p4 embedding text fixture sanitization policy" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_sanitization_policy" "") -eq "fb2_p4_embedding_text_sanitization_v1")
         Add-Fb2GapCheck $checks "planned p4 vector not production grounding" (-not [bool](Get-Fb2GapProperty $p4 "production_grounding" $true))
         Add-Fb2GapCheck $checks "planned p4 vector non-blocking" (-not [bool](Get-Fb2GapProperty $p4 "blocks_data_goal" $true))
         Add-Fb2GapCheck $checks "planned p4 embedding dry-run is read-only" ([bool](Get-Fb2GapProperty $p4 "read_only" $false))
@@ -178,7 +184,10 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "planned p4 source enumerator writes no opinion index rows" (-not [bool](Get-Fb2GapProperty $p4 "writes_opinion_index_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 refresh not used" (-not [bool](Get-Fb2GapProperty $p4 "refresh_operations_used" $true))
         Add-Fb2GapCheck $checks "planned p4 source payload not included" (-not [bool](Get-Fb2GapProperty $p4 "source_payload_included" $true))
-        Add-Fb2GapCheck $checks "planned p4 embedding text not included" (-not [bool](Get-Fb2GapProperty $p4 "embedding_text_included" $true))
+        Add-Fb2GapCheck $checks "planned p4 sanitized embedding text fixture included" ([bool](Get-Fb2GapProperty $p4 "embedding_text_included" $false))
+        Add-Fb2GapCheck $checks "planned p4 embedding text is sanitized" ([bool](Get-Fb2GapProperty $p4 "embedding_text_is_sanitized" $false))
+        Add-Fb2GapCheck $checks "planned p4 content hash computed" ([bool](Get-Fb2GapProperty $p4 "content_hash_computed" $false))
+        Add-Fb2GapCheck $checks "planned p4 fixture rows not persisted" (-not [bool](Get-Fb2GapProperty $p4 "persists_fixture_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 vector does not enable vector" ([bool](Get-Fb2GapProperty $p4 "does_not_enable_vector" $false))
         Add-Fb2GapCheck $checks "planned p4 embedding transaction not executable" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_execute_embedding_transaction" $true))
         Add-Fb2GapCheck $checks "planned p4 not ready to write embeddings" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_write_embeddings" $true))
@@ -529,6 +538,12 @@ function Invoke-Fb2GapSelfTest {
                         embedding_transaction_preflight_planned_entry_count = "reported_by_fb2_embedding_transaction_preflight_runtime"
                         embedding_transaction_preflight_skipped_source_count = "reported_by_fb2_embedding_transaction_preflight_runtime"
                         embedding_transaction_preflight_blocking_reasons = "reported_by_fb2_embedding_transaction_preflight_runtime"
+                        embedding_text_fixture_report_version = "fb2_p4_embedding_text_fixture_v1"
+                        embedding_text_fixture_status = "embedding_text_fixture_materialized_no_writes"
+                        embedding_text_fixture_materialized_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                        embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                        embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
+                        embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
                         status = "contract_design_committed_embedding_not_started"
                         blocks_data_goal = $false
                         production_grounding = $false
@@ -546,7 +561,10 @@ function Invoke-Fb2GapSelfTest {
                         writes_opinion_index_rows = $false
                         refresh_operations_used = $false
                         source_payload_included = $false
-                        embedding_text_included = $false
+                        embedding_text_included = $true
+                        embedding_text_is_sanitized = $true
+                        content_hash_computed = $true
+                        persists_fixture_rows = $false
                         does_not_enable_vector = $true
                         ready_to_execute_embedding_transaction = $false
                         ready_to_write_embeddings = $false

@@ -183,8 +183,8 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 计划能力 / 非生产边界"
-    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
-    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|---|---|---|"
+    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | text_fixture | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
+    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|---|---|---|---|"
     foreach ($capability in $plannedCapabilities) {
         $capId = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'id' '') 80
         $capStatus = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'status' '') 120
@@ -203,15 +203,18 @@ function New-Fb2HandoffPrompt {
         $capTransactionPreflightReportVersion = [string](Get-Fb2PromptProperty $capability 'embedding_transaction_preflight_report_version' '')
         $capTransactionPreflightStatus = [string](Get-Fb2PromptProperty $capability 'embedding_transaction_preflight_status' '')
         $capTransactionPreflight = Format-Fb2PromptCell (($capTransactionPreflightReportVersion, $capTransactionPreflightStatus | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 160
+        $capTextFixtureReportVersion = [string](Get-Fb2PromptProperty $capability 'embedding_text_fixture_report_version' '')
+        $capTextFixtureStatus = [string](Get-Fb2PromptProperty $capability 'embedding_text_fixture_status' '')
+        $capTextFixture = Format-Fb2PromptCell (($capTextFixtureReportVersion, $capTextFixtureStatus | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 160
         $capProduction = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'production_grounding' '') 40
         $capBlocks = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'blocks_data_goal' '') 40
         $capAnswerTime = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'answer_time_vector_candidates_enabled' '') 40
         $capNextRaw = [string](Get-Fb2PromptProperty $capability 'next_action' '')
         if (-not [string]::IsNullOrWhiteSpace($capDryRunStatusValue)) {
-            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); persists_transaction_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_transaction_rows' $false)); calls_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'calls_embedding_provider' $false)); ready_to_execute_embedding_transaction=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_embedding_transaction' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
+            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); persists_transaction_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_transaction_rows' $false)); persists_fixture_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_fixture_rows' $false)); embedding_text_is_sanitized=$([bool](Get-Fb2PromptProperty $capability 'embedding_text_is_sanitized' $false)); content_hash_computed=$([bool](Get-Fb2PromptProperty $capability 'content_hash_computed' $false)); calls_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'calls_embedding_provider' $false)); ready_to_execute_embedding_transaction=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_embedding_transaction' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
         }
         $capNext = Format-Fb2PromptCell $capNextRaw 260
-        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capChunkManifest | $capDryRunStatusCell | $capTransactionPreflight | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
+        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capChunkManifest | $capDryRunStatusCell | $capTransactionPreflight | $capTextFixture | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
     }
     $p4SourceSafety = @($plannedCapabilities | Where-Object {
             [string](Get-Fb2PromptProperty $_ 'source_enumerator_report_version' '') -eq 'fb2_p4_source_enumerator_v1'
@@ -235,6 +238,13 @@ function New-Fb2HandoffPrompt {
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'ready_to_execute_embedding_transaction' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'writes_embedding_rows' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'writes_vector_store' $false))
+        Add-Fb2PromptLine -Lines $lines -Text ("- p4_embedding_text_fixture_safety: embedding_text_included={0}; embedding_text_is_sanitized={1}; content_hash_computed={2}; persists_fixture_rows={3}; calls_embedding_provider={4}; answer_time_vector_candidates_enabled={5};" -f `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'embedding_text_included' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'embedding_text_is_sanitized' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'content_hash_computed' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'persists_fixture_rows' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'calls_embedding_provider' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'answer_time_vector_candidates_enabled' $false))
     }
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## fb2 导出样本"
@@ -388,13 +398,22 @@ function Invoke-Fb2PromptSelfTest {
                     dry_run_status = "dry_run_available_no_writes"
                     embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
                     embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
+                    embedding_text_fixture_report_version = "fb2_p4_embedding_text_fixture_v1"
+                    embedding_text_fixture_status = "embedding_text_fixture_materialized_no_writes"
+                    embedding_text_fixture_materialized_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                    embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                    embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
+                    embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
                     writes_chunk_manifest_file = $false
                     persists_manifest_rows = $false
                     persists_transaction_rows = $false
+                    persists_fixture_rows = $false
                     creates_or_migrates_tables = $false
                     calls_embedding_provider = $false
                     source_payload_included = $false
-                    embedding_text_included = $false
+                    embedding_text_included = $true
+                    embedding_text_is_sanitized = $true
+                    content_hash_computed = $true
                     writes_vector_store = $false
                     writes_public_group_messages = $false
                     ready_to_execute_embedding_transaction = $false
@@ -475,13 +494,22 @@ function Invoke-Fb2PromptSelfTest {
                         dry_run_status = "dry_run_available_no_writes"
                         embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
                         embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
+                        embedding_text_fixture_report_version = "fb2_p4_embedding_text_fixture_v1"
+                        embedding_text_fixture_status = "embedding_text_fixture_materialized_no_writes"
+                        embedding_text_fixture_materialized_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                        embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                        embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
+                        embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
                         persists_transaction_rows = $false
+                        persists_fixture_rows = $false
                         creates_or_migrates_tables = $false
                         calls_embedding_provider = $false
                         source_payload_included = $false
-                        embedding_text_included = $false
+                        embedding_text_included = $true
+                        embedding_text_is_sanitized = $true
+                        content_hash_computed = $true
                         writes_vector_store = $false
                         writes_public_group_messages = $false
                         ready_to_execute_embedding_transaction = $false
@@ -523,13 +551,22 @@ function Invoke-Fb2PromptSelfTest {
                         dry_run_status = "dry_run_available_no_writes"
                         embedding_transaction_preflight_report_version = "fb2_p4_embedding_transaction_preflight_v1"
                         embedding_transaction_preflight_status = "transaction_preflight_available_no_writes"
+                        embedding_text_fixture_report_version = "fb2_p4_embedding_text_fixture_v1"
+                        embedding_text_fixture_status = "embedding_text_fixture_materialized_no_writes"
+                        embedding_text_fixture_materialized_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                        embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
+                        embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
+                        embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
                         persists_transaction_rows = $false
+                        persists_fixture_rows = $false
                         creates_or_migrates_tables = $false
                         calls_embedding_provider = $false
                         source_payload_included = $false
-                        embedding_text_included = $false
+                        embedding_text_included = $true
+                        embedding_text_is_sanitized = $true
+                        content_hash_computed = $true
                         writes_vector_store = $false
                         writes_public_group_messages = $false
                         ready_to_execute_embedding_transaction = $false
