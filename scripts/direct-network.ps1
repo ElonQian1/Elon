@@ -19,7 +19,7 @@ function Set-ElonProjectDirectGitSsh {
     if ($originUrl -match "github\.com[:/]") {
         [System.Environment]::SetEnvironmentVariable(
             "GIT_SSH_COMMAND",
-            "ssh -o ProxyCommand=none -o ProxyJump=none -o HostName=ssh.github.com -p 443",
+            "ssh -o ProxyCommand=none -o ProxyJump=none -o HostName=ssh.github.com -p 443 -o StrictHostKeyChecking=accept-new",
             "Process"
         )
     }
