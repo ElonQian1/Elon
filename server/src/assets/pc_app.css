@@ -2388,32 +2388,26 @@ button { cursor: pointer; }
 .settings-permission-field {
   max-width: 360px;
 }
-.settings-warning {
+.settings-account-note {
   min-height: 64px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 14px;
-  align-items: center;
-  border: 1px solid #e16f6f;
+  border: 1px solid rgba(119, 133, 158, .34);
   border-radius: 8px;
-  background: rgba(223, 92, 92, .16);
+  background: rgba(55, 66, 86, .28);
   padding: 12px 14px;
   margin-bottom: 22px;
 }
-.settings-warning strong,
-.settings-warning span {
+.settings-account-note strong,
+.settings-account-note span {
   display: block;
 }
-.settings-warning strong {
-  color: #ffdede;
+.settings-account-note strong {
+  color: var(--text);
   font-size: 15px;
 }
-.settings-warning span {
-  color: #ffd7d7;
+.settings-account-note span {
+  color: var(--text-muted);
   font-size: 12px;
-}
-.settings-warning .text-button {
-  grid-row: 1 / span 2;
+  margin-top: 5px;
 }
 .settings-info-list {
   display: grid;
@@ -2711,7 +2705,7 @@ button { cursor: pointer; }
   .settings-onboarding-actions .text-button {
     flex: 1 1 140px;
   }
-  .settings-warning,
+  .settings-account-note,
   .settings-info-row {
     grid-template-columns: 1fr;
   }

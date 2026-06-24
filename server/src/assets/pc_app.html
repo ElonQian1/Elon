@@ -90,8 +90,8 @@
         </div>
         <button class="account-menu-row" id="profileCenterBtn" type="button" role="menuitem">
           <span>
-            <strong>个人中心</strong>
-            <small>头像、账号、额度和更多设置</small>
+            <strong>账户设置</strong>
+            <small>账号信息和登录状态</small>
           </span>
         </button>
         <button class="account-menu-row" id="pcSettingsMenuBtn" type="button" role="menuitem">
@@ -183,10 +183,9 @@
         <div class="settings-body">
           <section class="settings-panel active" id="settingsAccountPanel" data-settings-panel="account">
             <h2>账号信息</h2>
-            <div class="settings-warning" id="settingsUnverifiedBox">
-              <strong>未认证账号</strong>
-              <span>请添加电子邮件地址和密码验证您的账号，以防止账号丢失。</span>
-              <button class="text-button" id="settingsVerifyBtn" type="button">验证您的账号</button>
+            <div class="settings-account-note">
+              <strong>当前账号已在 PC 工作台登录</strong>
+              <span>账号资料和安全能力会在 PC 端逐步完善，这里不再跳转到 APP 网页。</span>
             </div>
             <div class="settings-info-list">
               <div class="settings-info-row">
@@ -194,14 +193,12 @@
                   <span>用户名</span>
                   <strong id="settingsDisplayName">未登录</strong>
                 </div>
-                <button class="text-button" id="settingsEditProfileBtn" type="button">打开个人中心</button>
               </div>
               <div class="settings-info-row">
                 <div>
                   <span>账号</span>
                   <strong id="settingsAccountValue">请先登录</strong>
                 </div>
-                <button class="text-button" id="settingsLoginBtn" type="button">登录 / 注册</button>
               </div>
               <div class="settings-info-row">
                 <div>

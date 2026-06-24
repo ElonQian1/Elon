@@ -71,7 +71,6 @@
     settingsPlaceholderText: $('settingsPlaceholderText'), settingsSubtitle: $('settingsSubtitle'),
     settingsUserAvatar: $('settingsUserAvatar'), settingsUserName: $('settingsUserName'), settingsUserMeta: $('settingsUserMeta'),
     settingsDisplayName: $('settingsDisplayName'), settingsAccountValue: $('settingsAccountValue'), settingsUserId: $('settingsUserId'),
-    settingsVerifyBtn: $('settingsVerifyBtn'), settingsEditProfileBtn: $('settingsEditProfileBtn'), settingsLoginBtn: $('settingsLoginBtn'),
     settingsSecurityBtn: $('settingsSecurityBtn'), settingsDevicesBtn: $('settingsDevicesBtn'), settingsLogoutBtn: $('settingsLogoutBtn'),
     settingsClientStatus: $('settingsClientStatus'), settingsClientPaths: $('settingsClientPaths'),
     settingsClientActions: $('settingsClientActions'),
@@ -388,6 +387,12 @@
     return clean(user && (user.nickname || user.phone || user.email || user.account || user.id)) || '未登录';
   }
 
+  function shortUserId(value) {
+    const raw = clean(value).replace(/^usr[_-]?/i, '');
+    const compact = raw.replace(/[^a-z0-9]/gi, '').toUpperCase();
+    return compact ? `U${compact.slice(0, 6)}` : '--';
+  }
+
   function socialAiFriend() {
     return state.friends.find((friend) => sameId(friend && friend.id, SOCIAL_AI_USER_ID)) || null;
   }
@@ -400,7 +405,7 @@
     const account = clean(user && (user.account || user.phone || user.email));
     const id = clean(user && user.id);
     if (account && account !== userName(user)) return `账号：${account}`;
-    if (id) return `用户 ID：${id}`;
+    if (id) return `用户 ID：${shortUserId(id)}`;
     return state.token ? '在线' : '需要登录';
   }
 
@@ -570,7 +575,11 @@
     if (els.settingsUserMeta) els.settingsUserMeta.textContent = meta;
     if (els.settingsDisplayName) els.settingsDisplayName.textContent = name;
     if (els.settingsAccountValue) els.settingsAccountValue.textContent = userAccountValue(state.user);
-    if (els.settingsUserId) els.settingsUserId.textContent = clean(state.user && state.user.id) || '--';
+    if (els.settingsUserId) {
+      const fullUserId = clean(state.user && state.user.id);
+      els.settingsUserId.textContent = shortUserId(fullUserId);
+      els.settingsUserId.title = fullUserId || '';
+    }
     if (els.settingsUserAvatar) {
       els.settingsUserAvatar.classList.toggle('fallback', !avatar);
       els.settingsUserAvatar.innerHTML = avatarContents(avatar, name, '龙');
@@ -1266,11 +1275,6 @@
     setAccountMenu(els.accountMenu && els.accountMenu.hidden);
   }
 
-  function openProfileCenter() {
-    setAccountMenu(false);
-    window.open('/web?tab=profile', '_blank');
-  }
-
   async function init() {
     bindEvents();
     if (!state.token) {
@@ -1313,12 +1317,6 @@
     document.querySelectorAll('[data-settings-section]').forEach((button) => {
       button.addEventListener('click', () => setSettingsSection(button.dataset.settingsSection));
     });
-    els.settingsVerifyBtn.addEventListener('click', () => {
-      if (state.token) openProfileCenter();
-      else openAuthModal('register');
-    });
-    els.settingsEditProfileBtn.addEventListener('click', openProfileCenter);
-    els.settingsLoginBtn.addEventListener('click', () => openAuthModal('login'));
     els.settingsSecurityBtn.addEventListener('click', () => setSettingsSection('security'));
     els.settingsDevicesBtn.addEventListener('click', () => setSettingsSection('devices'));
     els.settingsLogoutBtn.addEventListener('click', logout);
