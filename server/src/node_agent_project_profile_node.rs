@@ -11,6 +11,7 @@ const BUILD_SCRIPT_NAMES: &[&str] = &["build", "compile", "dist"];
 
 #[derive(Debug)]
 pub(crate) struct NodeWorkspaceModule {
+    pub(crate) project_type: Option<String>,
     pub(crate) manager: String,
     pub(crate) run_command: Option<String>,
     pub(crate) test_command: Option<String>,
@@ -77,6 +78,10 @@ pub(crate) fn detect_node_workspace_module(
         );
     }
     Some(NodeWorkspaceModule {
+        project_type: package
+            .as_ref()
+            .and_then(detect_node_desktop_project_type)
+            .map(ToOwned::to_owned),
         manager,
         run_command,
         test_command,
@@ -109,6 +114,9 @@ fn apply_package_json_scripts(profile: &mut ProjectProfile, package_json: &Path)
     let Some(package) = read_package_json_info(package_json) else {
         return;
     };
+    if let Some(label) = detect_node_desktop_project_type(&package) {
+        profile.project_type = Some(label.to_string());
+    }
     let manager = profile.package_manager.as_deref().unwrap_or("npm");
     profile.run_command = package
         .scripts
@@ -249,6 +257,13 @@ struct NodeFramework {
 }
 
 fn detect_framework(package: &PackageJsonInfo) -> Option<NodeFramework> {
+    if has_dependency(package, "@tauri-apps/cli") || has_dependency(package, "@tauri-apps/api") {
+        return Some(NodeFramework {
+            binary: "tauri",
+            dev_args: &["dev"],
+            build_args: &["build"],
+        });
+    }
     if has_dependency(package, "vite") {
         return Some(NodeFramework {
             binary: "vite",
@@ -269,6 +284,16 @@ fn detect_framework(package: &PackageJsonInfo) -> Option<NodeFramework> {
             dev_args: &["dev", "--host", "127.0.0.1"],
             build_args: &["build"],
         });
+    }
+    None
+}
+
+fn detect_node_desktop_project_type(package: &PackageJsonInfo) -> Option<&'static str> {
+    if has_dependency(package, "@tauri-apps/cli") || has_dependency(package, "@tauri-apps/api") {
+        return Some("Tauri 桌面应用");
+    }
+    if has_dependency(package, "electron") {
+        return Some("Electron 桌面应用");
     }
     None
 }

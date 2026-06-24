@@ -1361,6 +1361,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(manifestIdentityRs.includes('settings.gradle.kts'), 'local project identity should inspect Gradle Kotlin settings files');
   assert.ok(manifestIdentityRs.includes('settings.gradle'), 'local project identity should inspect Gradle settings files');
   assert.ok(manifestIdentityRs.includes('rootProject.name'), 'local project identity should derive Android/Gradle project names');
+  const projectProfileNodeRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_profile_node.rs'), 'utf8');
+  const projectProfileRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_profile.rs'), 'utf8');
+  assert.ok(projectProfileNodeRs.includes('@tauri-apps/cli'), 'local project profile should detect Tauri desktop projects');
+  assert.ok(projectProfileRs.includes('wails.json'), 'local project profile should detect Wails desktop projects');
   assert.ok(pcApp.includes('project.agent_runtime'), 'project registration should display local Agent Runtime freshness');
   assert.ok(pcApp.includes('Agent Runtime'), 'project registration should label Agent Runtime freshness in settings');
   const pcNodeAdminJsForMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node_admin.js'), 'utf8');

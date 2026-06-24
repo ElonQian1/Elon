@@ -56,6 +56,10 @@ pub(crate) fn detect_project_profile(path: &Path) -> ProjectProfile {
         return profile;
     }
 
+    if go_mod.exists() && path.join("wails.json").exists() {
+        return wails_project_profile(path);
+    }
+
     if go_mod.exists() {
         return go_project_profile(path);
     }
@@ -106,7 +110,13 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
 
         if let Some(detected_node) = detect_node_workspace_module(module, &module_path) {
             push_unique(&mut detected_files, format!("{module}/package.json"));
-            push_unique(&mut project_types, "Node.js".to_string());
+            push_unique(
+                &mut project_types,
+                detected_node
+                    .project_type
+                    .clone()
+                    .unwrap_or_else(|| "Node.js".to_string()),
+            );
             push_unique(&mut package_managers, detected_node.manager.clone());
             if node_module.is_none() {
                 node_module = Some(detected_node);
@@ -134,10 +144,16 @@ fn shallow_workspace_project_profile(path: &Path) -> Option<ProjectProfile> {
         let go_mod = module_path.join("go.mod");
         if go_mod.is_file() {
             push_unique(&mut detected_files, format!("{module}/go.mod"));
-            push_unique(&mut project_types, "Go".to_string());
-            push_unique(&mut package_managers, "go".to_string());
-            if go_module.is_none() {
-                go_module = Some(module.to_string());
+            if module_path.join("wails.json").is_file() {
+                push_unique(&mut detected_files, format!("{module}/wails.json"));
+                push_unique(&mut project_types, "Wails 桌面应用".to_string());
+                push_unique(&mut package_managers, "wails".to_string());
+            } else {
+                push_unique(&mut project_types, "Go".to_string());
+                push_unique(&mut package_managers, "go".to_string());
+                if go_module.is_none() {
+                    go_module = Some(module.to_string());
+                }
             }
         }
 
@@ -265,6 +281,21 @@ fn go_project_profile(path: &Path) -> ProjectProfile {
         run_command: Some("go run .".to_string()),
         test_command: Some("go test ./...".to_string()),
         build_command: Some("go build ./...".to_string()),
+        detected_files,
+    }
+}
+
+fn wails_project_profile(path: &Path) -> ProjectProfile {
+    let mut detected_files = vec!["wails.json".to_string(), "go.mod".to_string()];
+    if path.join("go.sum").exists() {
+        detected_files.push("go.sum".to_string());
+    }
+    ProjectProfile {
+        project_type: Some("Wails 桌面应用".to_string()),
+        package_manager: Some("wails".to_string()),
+        run_command: Some("wails dev".to_string()),
+        test_command: Some("go test ./...".to_string()),
+        build_command: Some("wails build".to_string()),
         detected_files,
     }
 }
@@ -429,6 +460,28 @@ mod tests {
     }
 
     #[test]
+    fn detects_tauri_desktop_project_without_scripts() {
+        let dir = temp_project("node-tauri-fallback");
+        std::fs::write(dir.join("pnpm-lock.yaml"), "").unwrap();
+        std::fs::write(
+            dir.join("package.json"),
+            r#"{"devDependencies":{"@tauri-apps/cli":"^2.0.0","vite":"^5.0.0"}}"#,
+        )
+        .unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Tauri 桌面应用"));
+        assert_eq!(profile.package_manager.as_deref(), Some("pnpm"));
+        assert_eq!(profile.run_command.as_deref(), Some("pnpm exec tauri dev"));
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("pnpm exec tauri build")
+        );
+    }
+
+    #[test]
     fn detects_gradle_projects() {
         let dir = temp_project("gradle");
         std::fs::write(dir.join("build.gradle.kts"), "plugins {}\n").unwrap();
@@ -460,6 +513,24 @@ mod tests {
         assert_eq!(profile.build_command.as_deref(), Some("go build ./..."));
         assert!(profile.detected_files.contains(&"go.mod".to_string()));
         assert!(profile.detected_files.contains(&"go.sum".to_string()));
+    }
+
+    #[test]
+    fn detects_wails_desktop_project_commands() {
+        let dir = temp_project("wails");
+        std::fs::write(dir.join("go.mod"), "module github.com/example/desktop\n").unwrap();
+        std::fs::write(dir.join("wails.json"), r#"{"name":"Desktop"}"#).unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Wails 桌面应用"));
+        assert_eq!(profile.package_manager.as_deref(), Some("wails"));
+        assert_eq!(profile.run_command.as_deref(), Some("wails dev"));
+        assert_eq!(profile.test_command.as_deref(), Some("go test ./..."));
+        assert_eq!(profile.build_command.as_deref(), Some("wails build"));
+        assert!(profile.detected_files.contains(&"wails.json".to_string()));
+        assert!(profile.detected_files.contains(&"go.mod".to_string()));
     }
 
     #[test]
@@ -589,6 +660,29 @@ mod tests {
     }
 
     #[test]
+    fn detects_shallow_wails_workspace_without_guessing_subdir_commands() {
+        let dir = temp_project("workspace-wails");
+        std::fs::create_dir_all(dir.join("app")).unwrap();
+        std::fs::write(
+            dir.join("app").join("go.mod"),
+            "module github.com/example/desktop\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("app").join("wails.json"), r#"{"name":"Desktop"}"#).unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Wails 桌面应用"));
+        assert_eq!(profile.package_manager.as_deref(), Some("wails"));
+        assert!(profile.run_command.is_none());
+        assert!(profile.build_command.is_none());
+        assert!(profile
+            .detected_files
+            .contains(&"app/wails.json".to_string()));
+    }
+
+    #[test]
     fn detects_shallow_python_workspace_from_repo_root() {
         let dir = temp_project("workspace-python");
         std::fs::create_dir_all(dir.join("backend")).unwrap();
@@ -683,6 +777,32 @@ mod tests {
         assert_eq!(
             profile.build_command.as_deref(),
             Some("pnpm --dir web exec vite build")
+        );
+    }
+
+    #[test]
+    fn detects_shallow_tauri_workspace_from_repo_root() {
+        let dir = temp_project("workspace-tauri");
+        std::fs::create_dir_all(dir.join("app")).unwrap();
+        std::fs::write(dir.join("app").join("pnpm-lock.yaml"), "").unwrap();
+        std::fs::write(
+            dir.join("app").join("package.json"),
+            r#"{"devDependencies":{"@tauri-apps/cli":"^2.0.0","vite":"^5.0.0"}}"#,
+        )
+        .unwrap();
+
+        let profile = detect_project_profile(&dir);
+        let _ = std::fs::remove_dir_all(&dir);
+
+        assert_eq!(profile.project_type.as_deref(), Some("Tauri 桌面应用"));
+        assert_eq!(profile.package_manager.as_deref(), Some("pnpm"));
+        assert_eq!(
+            profile.run_command.as_deref(),
+            Some("pnpm --dir app exec tauri dev")
+        );
+        assert_eq!(
+            profile.build_command.as_deref(),
+            Some("pnpm --dir app exec tauri build")
         );
     }
 }
