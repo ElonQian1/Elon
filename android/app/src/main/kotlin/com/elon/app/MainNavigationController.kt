@@ -66,6 +66,8 @@ internal class MainNavigationController(
 
     private var pageTransitionRunning = false
     private var chatReturnTarget = ChatReturnTarget.FRIENDS
+    private var projectPageReturnTarget = ChatReturnTarget.PROJECTS
+    private var nextProjectChatReturnTarget: ChatReturnTarget? = null
     private var projectSpaceTitle = "项目空间"
     private var exitConfirmDialog: AlertDialog? = null
 
@@ -87,6 +89,25 @@ internal class MainNavigationController(
         binding.projectSpaceAiMenu.setOnClickListener { openProjectSpaceAiConversation() }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         selectBottomTab(binding.tabChat, animate = false)
+    }
+
+    fun captureProjectEntryReturnTarget() {
+        val target = currentProjectEntryReturnTarget()
+        val resolvedTarget = if (
+            target == ChatReturnTarget.FRIENDS &&
+            suspendSocialChatForProjectReturn()
+        ) {
+            ChatReturnTarget.SOCIAL_CHAT
+        } else {
+            target
+        }
+        projectPageReturnTarget = resolvedTarget
+        nextProjectChatReturnTarget = when (resolvedTarget) {
+            ChatReturnTarget.FRIENDS,
+            ChatReturnTarget.SOCIAL_CHAT -> resolvedTarget
+            ChatReturnTarget.PROJECTS,
+            ChatReturnTarget.PROJECT_SPACE -> null
+        }
     }
 
     private fun showMainTabs() {
@@ -305,6 +326,7 @@ internal class MainNavigationController(
     fun showProjectPlaza() {
         if (pageTransitionRunning) return
         clearMessageSelection()
+        resetProjectReturnTargets()
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
         loadMarketplace()
@@ -364,6 +386,7 @@ internal class MainNavigationController(
                 ChatReturnTarget.PROJECTS -> showProjectHome(animate = true)
                 ChatReturnTarget.SOCIAL_CHAT -> {
                     onProjectChannelClosed()
+                    resetProjectReturnTargets()
                     if (!restoreSocialChatForProjectReturn(true)) {
                         showConversationHome(animate = true)
                     }
@@ -377,7 +400,17 @@ internal class MainNavigationController(
             return
         }
         if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
-            showProjectHome(animate = true)
+            when (projectPageReturnTarget) {
+                ChatReturnTarget.FRIENDS -> showConversationHome(animate = true)
+                ChatReturnTarget.SOCIAL_CHAT -> {
+                    resetProjectReturnTargets()
+                    if (!restoreSocialChatForProjectReturn(true)) {
+                        showConversationHome(animate = true)
+                    }
+                }
+                ChatReturnTarget.PROJECTS,
+                ChatReturnTarget.PROJECT_SPACE -> showProjectHome(animate = true)
+            }
             return
         }
         if (binding.marketplacePage.visibility == View.VISIBLE) {
@@ -393,6 +426,7 @@ internal class MainNavigationController(
 
     fun showConversationHome(animate: Boolean = false) {
         clearMessageSelection()
+        resetProjectReturnTargets()
         onFriendChatClosed()
         if (animate && binding.chatPage.visibility == View.VISIBLE) {
             actionPopupProvider()?.dismiss()
@@ -510,8 +544,13 @@ internal class MainNavigationController(
     fun showProjectChat(animate: Boolean = false) {
         if (pageTransitionRunning) return
         clearMessageSelection()
-        onFriendChatClosed()
-        chatReturnTarget = ChatReturnTarget.PROJECTS
+        val returnTarget = consumeNextProjectChatReturnTarget(ChatReturnTarget.PROJECTS)
+        if (returnTarget == ChatReturnTarget.SOCIAL_CHAT) {
+            onProjectChannelClosed()
+        } else {
+            onFriendChatClosed()
+        }
+        chatReturnTarget = returnTarget
         val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
@@ -594,7 +633,7 @@ internal class MainNavigationController(
     fun showProjectPersonalChat(title: String, animate: Boolean = false) {
         if (pageTransitionRunning) return
         clearMessageSelection()
-        val returnTarget = projectPersonalChatReturnTarget()
+        val returnTarget = consumeNextProjectChatReturnTarget(projectPersonalChatReturnTarget())
         chatReturnTarget = if (
             returnTarget == ChatReturnTarget.FRIENDS &&
             suspendSocialChatForProjectReturn()
@@ -646,10 +685,35 @@ internal class MainNavigationController(
     private fun projectPersonalChatReturnTarget(): ChatReturnTarget {
         if (binding.chatPage.visibility == View.VISIBLE) return chatReturnTarget
         if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
-            return ChatReturnTarget.PROJECT_SPACE
+            return when (projectPageReturnTarget) {
+                ChatReturnTarget.FRIENDS,
+                ChatReturnTarget.SOCIAL_CHAT -> projectPageReturnTarget
+                ChatReturnTarget.PROJECTS,
+                ChatReturnTarget.PROJECT_SPACE -> ChatReturnTarget.PROJECT_SPACE
+            }
         }
         if (binding.conversationPage.visibility == View.VISIBLE) return ChatReturnTarget.FRIENDS
         return ChatReturnTarget.PROJECTS
+    }
+
+    private fun currentProjectEntryReturnTarget(): ChatReturnTarget {
+        if (binding.chatPage.visibility == View.VISIBLE) return chatReturnTarget
+        if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
+            return projectPageReturnTarget
+        }
+        if (binding.conversationPage.visibility == View.VISIBLE) return ChatReturnTarget.FRIENDS
+        return ChatReturnTarget.PROJECTS
+    }
+
+    private fun consumeNextProjectChatReturnTarget(defaultTarget: ChatReturnTarget): ChatReturnTarget {
+        val target = nextProjectChatReturnTarget ?: defaultTarget
+        nextProjectChatReturnTarget = null
+        return target
+    }
+
+    private fun resetProjectReturnTargets() {
+        projectPageReturnTarget = ChatReturnTarget.PROJECTS
+        nextProjectChatReturnTarget = null
     }
 
     fun showProjectManagement(animate: Boolean = false) {

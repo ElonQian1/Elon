@@ -20,7 +20,8 @@ internal class MainChatProjectShareActions(
     private val deleteActiveChatMessage: (ChatMessage, () -> Unit) -> Unit,
     private val sendMessage: () -> Unit,
     private val isLoggedIn: () -> Boolean,
-    private val tokenProvider: () -> String?
+    private val tokenProvider: () -> String?,
+    private val captureProjectEntryReturnTarget: () -> Unit = {}
 ) {
     fun sendToCurrentChat(share: ChatProjectShare) {
         if (share.source == "local") {
@@ -43,12 +44,14 @@ internal class MainChatProjectShareActions(
                 saveProjects()
                 renderProjectList()
             }
+            captureProjectEntryReturnTarget()
             activateAndOpen(existingIndex, share)
             return
         }
         if (share.source == "local") {
             val index = ensureProjectExists(share)
             Toast.makeText(activity, "已加入「${share.name}」", Toast.LENGTH_SHORT).show()
+            captureProjectEntryReturnTarget()
             activateAndOpenLocal(index)
             return
         }
@@ -70,6 +73,7 @@ internal class MainChatProjectShareActions(
                     .onSuccess {
                         val index = ensureProjectExists(share)
                         Toast.makeText(activity, "已加入「${share.name}」", Toast.LENGTH_SHORT).show()
+                        captureProjectEntryReturnTarget()
                         activateAndOpenProjectSpace(index)
                     }
                     .onFailure { error ->

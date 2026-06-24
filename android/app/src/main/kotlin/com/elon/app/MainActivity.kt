@@ -710,6 +710,7 @@ class MainActivity : AppCompatActivity() {
                 openProjectSpaceForProject(index, true)
             },
             openRecentConversation = { projectIndex, conversationIndex ->
+                navigationController.captureProjectEntryReturnTarget()
                 conversationOpenActions.openProjectSpaceConversation(projectIndex, conversationIndex)
             },
             openProjectManagement = { openProjectSpaceForProject(s.activeProjectIndex, true) },
@@ -989,6 +990,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun openProjectSpaceForProject(index: Int, animate: Boolean) {
         if (index !in s.projects.indices) return
+        navigationController.captureProjectEntryReturnTarget()
         s.activeProjectIndex = index
         projectStateActions.saveProjects()
         openProjectSpaceForProject(s.projects[index], animate)
@@ -1227,7 +1229,8 @@ class MainActivity : AppCompatActivity() {
             },
             sendMessage = { inputActions.sendMessageActions.sendMessage() },
             isLoggedIn = { AuthManager.isLoggedIn(this) },
-            tokenProvider = { activeToken() }
+            tokenProvider = { activeToken() },
+            captureProjectEntryReturnTarget = { navigationController.captureProjectEntryReturnTarget() }
         )
     }
 
