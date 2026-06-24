@@ -232,6 +232,42 @@ function Read-Fb2GoalAuditStatus {
     Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json
 }
 
+function New-Fb2GoalAuditPlannedCapabilities {
+    @(
+        [ordered]@{
+            id = "p4_vector"
+            title = "fb2 P4 vector candidate contract is designed but not production grounding"
+            report_version = "fb2_p4_vector_readiness_plan_v1"
+            contract_version = "fb2_p4_vector_contract_v1"
+            contract_status = "contract_design_committed"
+            status = "contract_design_committed_embedding_not_started"
+            embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
+            dry_run_status = "dry_run_available_no_writes"
+            source_ref = "fb2 b2493cbc / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_embedding_build_dry_run.ps1"
+            gap_type = "planned_non_blocking"
+            blocks_data_goal = $false
+            production_grounding = $false
+            read_only = $true
+            dry_run = $true
+            writes_embedding_rows = $false
+            writes_vector_store = $false
+            refresh_operations_used = $false
+            does_not_enable_vector = $true
+            ready_to_build_embedding_store = $false
+            ready_to_enable_answer_time_vector_candidates = $false
+            answer_time_vector_candidates_enabled = $false
+            candidate_rows_require_live_hydration = $true
+            vector_rows_are_model_input = $false
+            planned_query_tool = "fb2.search_vector_candidates"
+            planned_query_implemented = $false
+            requires_secret = $false
+            requires_visible_group_write = $false
+            command = ""
+            next_action = "Keep Context Pack and structured tools as production grounding; fb2 dry-run is only a no-write estimate before source-specific enumerators, embedding writes, shadow eval, hydration, and explicit answer-time readthrough gates."
+        }
+    )
+}
+
 function New-Fb2GoalAuditReport {
     param(
         [object]$Status,
@@ -427,6 +463,7 @@ function New-Fb2GoalAuditReport {
     $missingNonVoice = @($nonVoiceItems | Where-Object { -not [bool]$_.complete })
     $dataGoalComplete = ($missingNonVoice.Count -eq 0)
     $fullFinalComplete = ($dataGoalComplete -and $voiceEvidencePresent -and $fullFinalSummaryComplete)
+    $plannedCapabilities = New-Fb2GoalAuditPlannedCapabilities
 
     [ordered]@{
         schema = "fb2.main_project.goal_audit_report.v1"
@@ -439,6 +476,7 @@ function New-Fb2GoalAuditReport {
         non_voice_ready = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $goal "non_voice_ready")
         full_final_ready = Test-Fb2GoalAuditTruthy (Get-Fb2GoalAuditProperty $goal "full_final_ready")
         requirements = @($items)
+        planned_capabilities = @($plannedCapabilities)
         missing_non_voice_requirements = @($missingNonVoice | ForEach-Object { $_.id })
         deferred_requirements = @($items | Where-Object { [bool]$_.deferred } | ForEach-Object { $_.id })
         evidence_summary = [ordered]@{
@@ -495,6 +533,14 @@ function ConvertTo-Fb2GoalAuditMarkdown {
     [void]$lines.Add("|---|---|---|")
     foreach ($item in @($Report.requirements)) {
         [void]$lines.Add("| $($item.id) | $($item.status) | $($item.evidence) |")
+    }
+    [void]$lines.Add("")
+    [void]$lines.Add("## Planned Capabilities")
+    [void]$lines.Add("")
+    [void]$lines.Add("| id | status | contract | production_grounding | blocks_data_goal | next_action |")
+    [void]$lines.Add("|---|---|---|---|---|---|")
+    foreach ($capability in @($Report.planned_capabilities)) {
+        [void]$lines.Add("| $($capability.id) | $($capability.status) | $($capability.contract_version) | $($capability.production_grounding) | $($capability.blocks_data_goal) | $($capability.next_action) |")
     }
     [void]$lines.Add("")
     [void]$lines.Add("## Evidence Summary")
@@ -648,6 +694,24 @@ function Invoke-Fb2GoalAuditSelfTest {
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "domain_context_index_contract")) { $failed++ }
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "retrieval_evidence_item_contract")) { $failed++ }
     if (-not (@($report.requirements | ForEach-Object { $_.id }) -contains "context_query_intent_contract")) { $failed++ }
+    $planned = @($report.planned_capabilities | Where-Object { [string]$_.id -eq "p4_vector" })
+    if (@($planned).Count -ne 1) { $failed++ }
+    if (@($report.requirements | Where-Object { [string]$_.id -eq "p4_vector" }).Count -ne 0) { $failed++ }
+    if ([bool]$planned[0].blocks_data_goal) { $failed++ }
+    if ([bool]$planned[0].production_grounding) { $failed++ }
+    if (-not [bool]$planned[0].does_not_enable_vector) { $failed++ }
+    if ([string]$planned[0].contract_version -ne "fb2_p4_vector_contract_v1") { $failed++ }
+    if ([string]$planned[0].report_version -ne "fb2_p4_vector_readiness_plan_v1") { $failed++ }
+    if ([string]$planned[0].embedding_build_dry_run_report_version -ne "fb2_p4_embedding_build_dry_run_v1") { $failed++ }
+    if ([string]$planned[0].dry_run_status -ne "dry_run_available_no_writes") { $failed++ }
+    if (-not [bool]$planned[0].read_only) { $failed++ }
+    if (-not [bool]$planned[0].dry_run) { $failed++ }
+    if ([bool]$planned[0].writes_vector_store) { $failed++ }
+    if ([bool]$planned[0].refresh_operations_used) { $failed++ }
+    if (-not [bool]$planned[0].candidate_rows_require_live_hydration) { $failed++ }
+    if ([bool]$planned[0].vector_rows_are_model_input) { $failed++ }
+    if ([bool]$planned[0].ready_to_build_embedding_store) { $failed++ }
+    if ([bool]$planned[0].ready_to_enable_answer_time_vector_candidates) { $failed++ }
 
     $badScenario = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $badScenario.latest_user_scenario_audit.scenarios[1].complete = $false

@@ -172,6 +172,7 @@ function New-Fb2MatrixValidation {
     $gates = Get-Fb2MatrixProperty $matrix "gates"
     $groups = Get-Fb2MatrixProperty $matrix "groups"
     $requirements = @(Get-Fb2MatrixProperty $matrix "requirements" @())
+    $plannedCapabilities = @(Get-Fb2MatrixProperty $matrix "planned_capabilities" @())
 
     $requiredIds = @(
         "context_pack_contract",
@@ -195,6 +196,29 @@ function New-Fb2MatrixValidation {
     Add-Fb2MatrixCheck $checks "matrix schema" ([string](Get-Fb2MatrixProperty $matrix "schema" "") -eq "fb2.main_project.completion_matrix.v1")
     Add-Fb2MatrixCheck $checks "requirement count matches declared total" ([int](Get-Fb2MatrixProperty $totals "total" 0) -eq @($requirements).Count) ("declared=$([int](Get-Fb2MatrixProperty $totals 'total' 0)) actual=$(@($requirements).Count)")
     Add-Fb2MatrixCheck $checks "expected requirement count" (@($requirements).Count -eq @($requiredIds).Count) ("expected=$(@($requiredIds).Count) actual=$(@($requirements).Count)")
+    $plannedP4Vector = @($plannedCapabilities | Where-Object { [string](Get-Fb2MatrixProperty $_ "id" "") -eq "p4_vector" } | Select-Object -First 1)
+    Add-Fb2MatrixCheck $checks "has planned p4 vector capability" (@($plannedP4Vector).Count -eq 1)
+    if (@($plannedP4Vector).Count -gt 0) {
+        $p4 = $plannedP4Vector[0]
+        Add-Fb2MatrixCheck $checks "planned p4 vector report version" ([string](Get-Fb2MatrixProperty $p4 "report_version" "") -eq "fb2_p4_vector_readiness_plan_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 vector contract version" ([string](Get-Fb2MatrixProperty $p4 "contract_version" "") -eq "fb2_p4_vector_contract_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 embedding dry-run report version" ([string](Get-Fb2MatrixProperty $p4 "embedding_build_dry_run_report_version" "") -eq "fb2_p4_embedding_build_dry_run_v1")
+        Add-Fb2MatrixCheck $checks "planned p4 embedding dry-run no-write status" ([string](Get-Fb2MatrixProperty $p4 "dry_run_status" "") -eq "dry_run_available_no_writes")
+        Add-Fb2MatrixCheck $checks "planned p4 vector status" ([string](Get-Fb2MatrixProperty $p4 "status" "") -eq "contract_design_committed_embedding_not_started")
+        Add-Fb2MatrixCheck $checks "planned p4 vector non-blocking" (-not [bool](Get-Fb2MatrixProperty $p4 "blocks_data_goal" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 vector not production grounding" (-not [bool](Get-Fb2MatrixProperty $p4 "production_grounding" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 embedding dry-run is read-only" ([bool](Get-Fb2MatrixProperty $p4 "read_only" $false))
+        Add-Fb2MatrixCheck $checks "planned p4 embedding dry-run flag" ([bool](Get-Fb2MatrixProperty $p4 "dry_run" $false))
+        Add-Fb2MatrixCheck $checks "planned p4 embedding rows not written" (-not [bool](Get-Fb2MatrixProperty $p4 "writes_embedding_rows" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 vector store not written" (-not [bool](Get-Fb2MatrixProperty $p4 "writes_vector_store" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 refresh not used" (-not [bool](Get-Fb2MatrixProperty $p4 "refresh_operations_used" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 vector does not enable vector" ([bool](Get-Fb2MatrixProperty $p4 "does_not_enable_vector" $false))
+        Add-Fb2MatrixCheck $checks "planned p4 vector embedding not ready" (-not [bool](Get-Fb2MatrixProperty $p4 "ready_to_build_embedding_store" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 vector answer-time disabled" (-not [bool](Get-Fb2MatrixProperty $p4 "ready_to_enable_answer_time_vector_candidates" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 candidates require live hydration" ([bool](Get-Fb2MatrixProperty $p4 "candidate_rows_require_live_hydration" $false))
+        Add-Fb2MatrixCheck $checks "planned p4 vector rows are not model input" (-not [bool](Get-Fb2MatrixProperty $p4 "vector_rows_are_model_input" $true))
+        Add-Fb2MatrixCheck $checks "planned p4 vector query not implemented" (-not [bool](Get-Fb2MatrixProperty $p4 "planned_query_implemented" $true))
+    }
 
     $ids = @($requirements | ForEach-Object { [string]$_.id })
     $duplicateIds = @($ids | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name })
@@ -391,6 +415,29 @@ function New-Fb2MatrixFixtureRefresh {
                 other = 0
             }
             requirements = $requirements
+            planned_capabilities = @(
+                [ordered]@{
+                    id = "p4_vector"
+                    report_version = "fb2_p4_vector_readiness_plan_v1"
+                    contract_version = "fb2_p4_vector_contract_v1"
+                    embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
+                    dry_run_status = "dry_run_available_no_writes"
+                    status = "contract_design_committed_embedding_not_started"
+                    blocks_data_goal = $false
+                    production_grounding = $false
+                    read_only = $true
+                    dry_run = $true
+                    writes_embedding_rows = $false
+                    writes_vector_store = $false
+                    refresh_operations_used = $false
+                    does_not_enable_vector = $true
+                    ready_to_build_embedding_store = $false
+                    ready_to_enable_answer_time_vector_candidates = $false
+                    candidate_rows_require_live_hydration = $true
+                    vector_rows_are_model_input = $false
+                    planned_query_implemented = $false
+                }
+            )
         }
         full_final_completion_evidence = [ordered]@{
             exists = $false

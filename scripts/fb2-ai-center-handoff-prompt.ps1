@@ -139,6 +139,13 @@ function New-Fb2HandoffPrompt {
     $gapBoard = Get-Fb2PromptProperty $Refresh "gap_action_board"
     $gapActions = @(Get-Fb2PromptProperty $gapBoard "actions" @())
     $requirements = @(Get-Fb2PromptProperty $matrix "requirements" @())
+    $plannedCapabilities = @(Get-Fb2PromptProperty $Refresh "planned_capabilities" @())
+    if (@($plannedCapabilities).Count -eq 0) {
+        $plannedCapabilities = @(Get-Fb2PromptProperty $matrix "planned_capabilities" @())
+    }
+    if (@($plannedCapabilities).Count -eq 0) {
+        $plannedCapabilities = @(Get-Fb2PromptProperty $gapBoard "planned_capabilities" @())
+    }
     $exportedSamples = Get-Fb2PromptProperty $Refresh "exported_context_pack_sample_set_validation"
     $exportedSampleScenarios = @(Get-Fb2PromptProperty $exportedSamples "scenarios" @())
     $serverDeploy = Get-Fb2PromptProperty $Refresh "server_deploy_status"
@@ -174,6 +181,29 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- main_project: `{0}`' -f [string]$ownerActions.main_project)
     Add-Fb2PromptLine -Lines $lines -Text ('- fb2_project: `{0}`' -f [string]$ownerActions.fb2_project)
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
+    Add-Fb2PromptLine -Lines $lines -Text ""
+    Add-Fb2PromptLine -Lines $lines -Text "## 计划能力 / 非生产边界"
+    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | dry_run_status | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
+    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|"
+    foreach ($capability in $plannedCapabilities) {
+        $capId = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'id' '') 80
+        $capStatus = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'status' '') 120
+        $capContractVersion = [string](Get-Fb2PromptProperty $capability 'contract_version' '')
+        $capReportVersion = [string](Get-Fb2PromptProperty $capability 'report_version' '')
+        $capEmbeddingDryRunReportVersion = [string](Get-Fb2PromptProperty $capability 'embedding_build_dry_run_report_version' '')
+        $capContract = Format-Fb2PromptCell (($capContractVersion, $capReportVersion, $capEmbeddingDryRunReportVersion | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 180
+        $capDryRunStatusValue = [string](Get-Fb2PromptProperty $capability 'dry_run_status' '')
+        $capDryRunStatusCell = Format-Fb2PromptCell $capDryRunStatusValue 80
+        $capProduction = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'production_grounding' '') 40
+        $capBlocks = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'blocks_data_goal' '') 40
+        $capAnswerTime = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'answer_time_vector_candidates_enabled' '') 40
+        $capNextRaw = [string](Get-Fb2PromptProperty $capability 'next_action' '')
+        if (-not [string]::IsNullOrWhiteSpace($capDryRunStatusValue)) {
+            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
+        }
+        $capNext = Format-Fb2PromptCell $capNextRaw 260
+        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capDryRunStatusCell | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
+    }
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## fb2 导出样本"
     Add-Fb2PromptLine -Lines $lines -Text ('- attempted: `{0}` / complete: `{1}` / passed: `{2}` / failed: `{3}`' -f [bool](Get-Fb2PromptProperty $exportedSamples 'attempted' $false), [bool](Get-Fb2PromptProperty $exportedSamples 'complete' $false), [int](Get-Fb2PromptProperty $exportedSamples 'passed_count' 0), [int](Get-Fb2PromptProperty $exportedSamples 'failed_count' 0))
@@ -312,6 +342,22 @@ function Invoke-Fb2PromptSelfTest {
                 safe_to_continue_without_secret = @("status_refresh_selftest")
                 requires_secret = @("live_context_pack_permission_quality_refresh")
             }
+            planned_capabilities = @(
+                [ordered]@{
+                    id = "p4_vector"
+                    report_version = "fb2_p4_vector_readiness_plan_v1"
+                    contract_version = "fb2_p4_vector_contract_v1"
+                    embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
+                    status = "contract_design_committed_embedding_not_started"
+                    dry_run_status = "dry_run_available_no_writes"
+                    writes_vector_store = $false
+                    candidate_rows_require_live_hydration = $true
+                    blocks_data_goal = $false
+                    production_grounding = $false
+                    answer_time_vector_candidates_enabled = $false
+                    next_action = "Keep Context Pack and structured tools as production grounding."
+                }
+            )
             exported_context_pack_sample_set_validation = [ordered]@{
                 attempted = $true
                 complete = $true
@@ -366,6 +412,22 @@ function Invoke-Fb2PromptSelfTest {
                     [ordered]@{ id = "today_matches_analysis"; group = "user_scenarios"; owner = "shared"; title = "today"; status = "complete"; complete = $true; deferred = $false; evidence = "sample"; missing = "" },
                     [ordered]@{ id = "voice_final_evidence"; group = "voice_deferred_by_user"; owner = "paused_by_user"; title = "voice"; status = "deferred"; complete = $false; deferred = $true; evidence = ""; missing = "ASR/TTS is intentionally deferred by user" }
                 )
+                planned_capabilities = @(
+                    [ordered]@{
+                        id = "p4_vector"
+                        report_version = "fb2_p4_vector_readiness_plan_v1"
+                        contract_version = "fb2_p4_vector_contract_v1"
+                        embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
+                        status = "contract_design_committed_embedding_not_started"
+                        dry_run_status = "dry_run_available_no_writes"
+                        writes_vector_store = $false
+                        candidate_rows_require_live_hydration = $true
+                        blocks_data_goal = $false
+                        production_grounding = $false
+                        answer_time_vector_candidates_enabled = $false
+                        next_action = "Keep Context Pack and structured tools as production grounding."
+                    }
+                )
             }
             evidence_freshness = [ordered]@{
                 schema = "fb2.main_project.evidence_freshness.v1"
@@ -381,6 +443,22 @@ function Invoke-Fb2PromptSelfTest {
             gap_action_board = [ordered]@{
                 schema = "fb2.main_project.gap_action_board.v1"
                 action_count = 2
+                planned_capabilities = @(
+                    [ordered]@{
+                        id = "p4_vector"
+                        report_version = "fb2_p4_vector_readiness_plan_v1"
+                        contract_version = "fb2_p4_vector_contract_v1"
+                        embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
+                        status = "contract_design_committed_embedding_not_started"
+                        dry_run_status = "dry_run_available_no_writes"
+                        writes_vector_store = $false
+                        candidate_rows_require_live_hydration = $true
+                        blocks_data_goal = $false
+                        production_grounding = $false
+                        answer_time_vector_candidates_enabled = $false
+                        next_action = "Keep Context Pack and structured tools as production grounding."
+                    }
+                )
                 actions = @(
                     [ordered]@{
                         id = "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh"
@@ -414,6 +492,14 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.evidence_freshness.v1") "freshness schema"
         Assert-Fb2PromptSelfTest ($content -match "缺口行动板") "gap action section"
         Assert-Fb2PromptSelfTest ($content -match "fb2.main_project.gap_action_board.v1") "gap action schema"
+        Assert-Fb2PromptSelfTest ($content -match "计划能力 / 非生产边界") "planned capability section"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_vector_contract_v1") "planned vector contract"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_vector_readiness_plan_v1") "planned vector report"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_build_dry_run_v1") "planned embedding dry-run report"
+        Assert-Fb2PromptSelfTest ($content -match "contract_design_committed_embedding_not_started") "planned vector status"
+        Assert-Fb2PromptSelfTest ($content -match "production_grounding") "planned vector production boundary"
+        Assert-Fb2PromptSelfTest ($content -match "blocks_data_goal") "planned vector non-blocking boundary"
+        Assert-Fb2PromptSelfTest ($content -match "answer_time_vector_candidates_enabled") "planned vector answer-time disabled boundary"
         Assert-Fb2PromptSelfTest ($content -match "fb2 导出样本") "exported sample section"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_context_pack") "exported sample row"
         Assert-Fb2PromptSelfTest ($content -match "\|\s*scenario\s*\|\s*audit\s*\|\s*sources\s*\|\s*business\s*\|\s*quality_history\s*\|\s*sha256\s*\|") "exported sample table classifies sources"

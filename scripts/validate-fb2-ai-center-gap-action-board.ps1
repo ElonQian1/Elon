@@ -130,6 +130,7 @@ function New-Fb2GapValidation {
     $ownerNextActions = Get-Fb2GapProperty $Refresh "owner_next_actions"
     $nextCommands = Get-Fb2GapProperty $Refresh "next_commands"
     $actions = @(Get-Fb2GapProperty $board "actions" @())
+    $plannedCapabilities = @(Get-Fb2GapProperty $board "planned_capabilities" @())
     $protectedLivePreflightSatisfied = (
         [bool](Get-Fb2GapProperty $Refresh "protected_live_preflight_satisfied" $false) -or
         [bool](Get-Fb2GapProperty $blocking "protected_live_preflight_satisfied" $false) -or
@@ -140,6 +141,29 @@ function New-Fb2GapValidation {
     Add-Fb2GapCheck $checks "gap board schema" ([string](Get-Fb2GapProperty $board "schema" "") -eq "fb2.main_project.gap_action_board.v1")
     Add-Fb2GapCheck $checks "action count matches" ([int](Get-Fb2GapProperty $board "action_count" 0) -eq @($actions).Count) ("declared=$([int](Get-Fb2GapProperty $board 'action_count' 0)) actual=$(@($actions).Count)")
     Add-Fb2GapCheck $checks "has actions" (@($actions).Count -gt 0)
+    $plannedP4Vector = @($plannedCapabilities | Where-Object { [string](Get-Fb2GapProperty $_ "id" "") -eq "p4_vector" } | Select-Object -First 1)
+    Add-Fb2GapCheck $checks "has planned p4 vector capability" (@($plannedP4Vector).Count -eq 1)
+    if (@($plannedP4Vector).Count -gt 0) {
+        $p4 = $plannedP4Vector[0]
+        Add-Fb2GapCheck $checks "planned p4 vector contract version" ([string](Get-Fb2GapProperty $p4 "contract_version" "") -eq "fb2_p4_vector_contract_v1")
+        Add-Fb2GapCheck $checks "planned p4 vector report version" ([string](Get-Fb2GapProperty $p4 "report_version" "") -eq "fb2_p4_vector_readiness_plan_v1")
+        Add-Fb2GapCheck $checks "planned p4 embedding dry-run report version" ([string](Get-Fb2GapProperty $p4 "embedding_build_dry_run_report_version" "") -eq "fb2_p4_embedding_build_dry_run_v1")
+        Add-Fb2GapCheck $checks "planned p4 embedding dry-run no-write status" ([string](Get-Fb2GapProperty $p4 "dry_run_status" "") -eq "dry_run_available_no_writes")
+        Add-Fb2GapCheck $checks "planned p4 vector not production grounding" (-not [bool](Get-Fb2GapProperty $p4 "production_grounding" $true))
+        Add-Fb2GapCheck $checks "planned p4 vector non-blocking" (-not [bool](Get-Fb2GapProperty $p4 "blocks_data_goal" $true))
+        Add-Fb2GapCheck $checks "planned p4 embedding dry-run is read-only" ([bool](Get-Fb2GapProperty $p4 "read_only" $false))
+        Add-Fb2GapCheck $checks "planned p4 embedding dry-run flag" ([bool](Get-Fb2GapProperty $p4 "dry_run" $false))
+        Add-Fb2GapCheck $checks "planned p4 embedding rows not written" (-not [bool](Get-Fb2GapProperty $p4 "writes_embedding_rows" $true))
+        Add-Fb2GapCheck $checks "planned p4 vector store not written" (-not [bool](Get-Fb2GapProperty $p4 "writes_vector_store" $true))
+        Add-Fb2GapCheck $checks "planned p4 refresh not used" (-not [bool](Get-Fb2GapProperty $p4 "refresh_operations_used" $true))
+        Add-Fb2GapCheck $checks "planned p4 vector does not enable vector" ([bool](Get-Fb2GapProperty $p4 "does_not_enable_vector" $false))
+        Add-Fb2GapCheck $checks "planned p4 vector no secret required" (-not [bool](Get-Fb2GapProperty $p4 "requires_secret" $true))
+        Add-Fb2GapCheck $checks "planned p4 vector no visible write" (-not [bool](Get-Fb2GapProperty $p4 "requires_visible_group_write" $true))
+        Add-Fb2GapCheck $checks "planned p4 vector no command" ([string]::IsNullOrWhiteSpace([string](Get-Fb2GapProperty $p4 "command" "")))
+        Add-Fb2GapCheck $checks "planned p4 vector answer-time disabled" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_enable_answer_time_vector_candidates" $true))
+        Add-Fb2GapCheck $checks "planned p4 candidates require live hydration" ([bool](Get-Fb2GapProperty $p4 "candidate_rows_require_live_hydration" $false))
+        Add-Fb2GapCheck $checks "planned p4 vector rows are not model input" (-not [bool](Get-Fb2GapProperty $p4 "vector_rows_are_model_input" $true))
+    }
 
     Add-Fb2GapCheck $checks "blocking state present" ($null -ne $blocking)
     if ($null -ne $blocking) {
@@ -458,6 +482,30 @@ function Invoke-Fb2GapSelfTest {
                 schema = "fb2.main_project.gap_action_board.v1"
                 next_minimum_action = "set_FB2_AI_CENTER_TOKEN_then_run_DataOnlyAcceptance_PreflightOnly"
                 action_count = 3
+                planned_capabilities = @(
+                    [ordered]@{
+                        id = "p4_vector"
+                        report_version = "fb2_p4_vector_readiness_plan_v1"
+                        contract_version = "fb2_p4_vector_contract_v1"
+                        embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
+                        dry_run_status = "dry_run_available_no_writes"
+                        status = "contract_design_committed_embedding_not_started"
+                        blocks_data_goal = $false
+                        production_grounding = $false
+                        read_only = $true
+                        dry_run = $true
+                        writes_embedding_rows = $false
+                        writes_vector_store = $false
+                        refresh_operations_used = $false
+                        does_not_enable_vector = $true
+                        ready_to_enable_answer_time_vector_candidates = $false
+                        candidate_rows_require_live_hydration = $true
+                        vector_rows_are_model_input = $false
+                        requires_secret = $false
+                        requires_visible_group_write = $false
+                        command = ""
+                    }
+                )
                 actions = @(
                     [ordered]@{
                         id = "FB2_AI_CENTER_TOKEN_live_permission_quality_refresh"

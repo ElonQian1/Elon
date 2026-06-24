@@ -492,6 +492,7 @@ function New-Fb2RefreshCompletionMatrix {
     )
 
     $requirements = @($GoalAudit.requirements)
+    $plannedCapabilities = @((Get-Fb2RefreshProperty $GoalAudit "planned_capabilities" @()))
     $items = @(
         foreach ($requirement in $requirements) {
             $id = [string]$requirement.id
@@ -543,6 +544,7 @@ function New-Fb2RefreshCompletionMatrix {
             other = @($items | Where-Object { $_.group -eq "other" }).Count
         }
         requirements = $items
+        planned_capabilities = @($plannedCapabilities)
     }
 }
 
@@ -722,6 +724,7 @@ function New-Fb2RefreshGapActionBoard {
     }
     $deferred = @($GoalAudit.deferred_requirements) + @($Status.goal_gap_audit.deferred_by_user)
     $deferred = @($deferred | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    $plannedCapabilities = @((Get-Fb2RefreshProperty $CompletionMatrix "planned_capabilities" @()))
 
     $actions = [System.Collections.ArrayList]::new()
     if ($NextMinimumAction -eq "rerun_token_bridge_with_FB2_VISIBLE_SMOKE_PASSWORD_env_then_refresh_status") {
@@ -834,6 +837,7 @@ function New-Fb2RefreshGapActionBoard {
         protected_live_preflight_satisfied = $ProtectedLivePreflightSatisfied
         action_count = @($actions).Count
         actions = @($actions)
+        planned_capabilities = @($plannedCapabilities)
     }
 }
 
@@ -934,6 +938,24 @@ function Invoke-Fb2RefreshSelfTest {
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_commands.data_only_preflight_via_fb2_server_token_bridge)) "data-only token bridge preflight command"
         Assert-Fb2RefreshSelfTest ([string]$summary.completion_matrix.schema -eq "fb2.main_project.completion_matrix.v1") "completion matrix schema"
         Assert-Fb2RefreshSelfTest (@($summary.completion_matrix.requirements).Count -gt 0) "completion matrix requirements"
+        $plannedCapability = @($summary.planned_capabilities | Where-Object { [string]$_.id -eq "p4_vector" })
+        $matrixPlannedCapability = @($summary.completion_matrix.planned_capabilities | Where-Object { [string]$_.id -eq "p4_vector" })
+        Assert-Fb2RefreshSelfTest (@($plannedCapability).Count -eq 1) "top-level planned p4 vector capability"
+        Assert-Fb2RefreshSelfTest (@($matrixPlannedCapability).Count -eq 1) "completion matrix planned p4 vector capability"
+        Assert-Fb2RefreshSelfTest ([int]$summary.planned_capability_count -eq @($summary.planned_capabilities).Count) "planned capability count"
+        Assert-Fb2RefreshSelfTest ([string]$plannedCapability[0].contract_version -eq "fb2_p4_vector_contract_v1") "planned p4 vector contract"
+        Assert-Fb2RefreshSelfTest ([string]$plannedCapability[0].embedding_build_dry_run_report_version -eq "fb2_p4_embedding_build_dry_run_v1") "planned p4 embedding dry-run report"
+        Assert-Fb2RefreshSelfTest ([string]$plannedCapability[0].dry_run_status -eq "dry_run_available_no_writes") "planned p4 embedding dry-run status"
+        Assert-Fb2RefreshSelfTest (-not [bool]$plannedCapability[0].production_grounding) "planned p4 vector not production grounding"
+        Assert-Fb2RefreshSelfTest (-not [bool]$plannedCapability[0].blocks_data_goal) "planned p4 vector not blocking data goal"
+        Assert-Fb2RefreshSelfTest ([bool]$plannedCapability[0].read_only) "planned p4 embedding dry-run read-only"
+        Assert-Fb2RefreshSelfTest ([bool]$plannedCapability[0].dry_run) "planned p4 embedding dry-run flag"
+        Assert-Fb2RefreshSelfTest (-not [bool]$plannedCapability[0].writes_embedding_rows) "planned p4 embedding rows not written"
+        Assert-Fb2RefreshSelfTest (-not [bool]$plannedCapability[0].writes_vector_store) "planned p4 vector store not written"
+        Assert-Fb2RefreshSelfTest (-not [bool]$plannedCapability[0].refresh_operations_used) "planned p4 refresh not used"
+        Assert-Fb2RefreshSelfTest (-not [bool]$plannedCapability[0].ready_to_enable_answer_time_vector_candidates) "planned p4 vector answer-time disabled"
+        Assert-Fb2RefreshSelfTest ([bool]$plannedCapability[0].candidate_rows_require_live_hydration) "planned p4 candidates require live hydration"
+        Assert-Fb2RefreshSelfTest (-not [bool]$plannedCapability[0].vector_rows_are_model_input) "planned p4 vector rows are not model input"
         Assert-Fb2RefreshSelfTest ([int]$summary.completion_total -eq [int]$summary.completion_matrix.totals.total) "top-level completion total"
         Assert-Fb2RefreshSelfTest ([int]$summary.completion_complete -eq [int]$summary.completion_matrix.totals.complete) "top-level completion complete"
         Assert-Fb2RefreshSelfTest ([int]$summary.completion_deferred -eq [int]$summary.completion_matrix.totals.deferred) "top-level completion deferred"
@@ -997,6 +1019,8 @@ function Invoke-Fb2RefreshSelfTest {
         }
         Assert-Fb2RefreshSelfTest ([string]$summary.gap_action_board.schema -eq "fb2.main_project.gap_action_board.v1") "gap action board schema"
         Assert-Fb2RefreshSelfTest (@($summary.gap_action_board.actions).Count -gt 0) "gap action board actions"
+        $gapPlannedCapability = @($summary.gap_action_board.planned_capabilities | Where-Object { [string]$_.id -eq "p4_vector" })
+        Assert-Fb2RefreshSelfTest (@($gapPlannedCapability).Count -eq 1) "gap action board planned p4 vector capability"
         Assert-Fb2RefreshSelfTest (-not [string]::IsNullOrWhiteSpace([string]$summary.next_minimum_action)) "next action"
         "== SelfTest Summary =="
         "failed=0"
@@ -1204,6 +1228,8 @@ $refreshSummary = [pscustomobject]@{
     completion_complete = [int](Get-Fb2RefreshProperty $completionTotals "complete" 0)
     completion_deferred = [int](Get-Fb2RefreshProperty $completionTotals "deferred" 0)
     completion_incomplete = [int](Get-Fb2RefreshProperty $completionTotals "incomplete" 0)
+    planned_capability_count = @($completionMatrix.planned_capabilities).Count
+    planned_capabilities = @($completionMatrix.planned_capabilities)
     next_minimum_action = $effectiveNextMinimumAction
     owner_next_actions = $ownerNextActions
     blocking_state = $blockingState

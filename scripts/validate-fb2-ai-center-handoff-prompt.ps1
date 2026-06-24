@@ -80,6 +80,7 @@ function New-Fb2PromptValidation {
     foreach ($section in @(
             "## 当前闸门",
             "## Owner 下一步",
+            "## 计划能力 / 非生产边界",
             "## fb2 导出样本",
             "## 可执行命令",
             "## 阻塞与边界",
@@ -111,6 +112,14 @@ function New-Fb2PromptValidation {
     }
     Add-Fb2PromptValidationCheck $checks "review summary is not shown as exported sample business source" (@($reviewSummaryBusinessCells).Count -eq 0) (@($reviewSummaryBusinessCells) -join "`n")
     Add-Fb2PromptValidationCheck $checks "review summary is shown as exported sample quality history source" (@($reviewSummaryMissingQualityCells).Count -eq 0) (@($reviewSummaryMissingQualityCells) -join "`n")
+    Add-Fb2PromptValidationCheck $checks "planned vector contract visible" ($Content -match 'fb2_p4_vector_contract_v1')
+    Add-Fb2PromptValidationCheck $checks "planned vector report visible" ($Content -match 'fb2_p4_vector_readiness_plan_v1')
+    Add-Fb2PromptValidationCheck $checks "planned embedding dry-run report visible" ($Content -match 'fb2_p4_embedding_build_dry_run_v1')
+    Add-Fb2PromptValidationCheck $checks "planned vector status visible" ($Content -match 'contract_design_committed_embedding_not_started')
+    Add-Fb2PromptValidationCheck $checks "planned vector production boundary visible" ($Content -match 'production_grounding')
+    Add-Fb2PromptValidationCheck $checks "planned vector non-blocking boundary visible" ($Content -match 'blocks_data_goal')
+    Add-Fb2PromptValidationCheck $checks "planned vector answer-time boundary visible" ($Content -match 'answer_time_vector_candidates_enabled')
+    Add-Fb2PromptValidationCheck $checks "planned embedding dry-run no-write boundary visible" ($Content -match 'dry_run_available_no_writes|writes_vector_store=false|candidate_rows_require_live_hydration')
 
     foreach ($field in @(
             "data_goal_complete",
@@ -275,6 +284,11 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - main_project: `keep_contract_and_status_regressions_green_until_FB2_AI_CENTER_TOKEN_is_available`
 - fb2_project: `provide_FB2_AI_CENTER_TOKEN_or_export_equivalent_live_Context_Pack_permission_quality_evidence`
 - shared: `run_DataOnlyAcceptance_PreflightOnly_with_token_then_refresh_status_refresh_current_json`
+
+## 计划能力 / 非生产边界
+| id | status | contract | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |
+|---|---|---|---|---|---|---|
+| p4_vector | contract_design_committed_embedding_not_started | fb2_p4_vector_contract_v1 / fb2_p4_vector_readiness_plan_v1 / fb2_p4_embedding_build_dry_run_v1 | False | False | False | dry_run_available_no_writes; writes_vector_store=false; candidate_rows_require_live_hydration=true. |
 
 ## fb2 导出样本
 - attempted: `True` / complete: `True` / passed: `4` / failed: `0`

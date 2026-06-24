@@ -127,9 +127,9 @@ function New-Fb2ContextFormatRouteValidation {
 
     Add-Fb2FormatCheck $checks `
         "readme records p4 vector readiness as planned only" `
-        (Test-Fb2FormatAllTokens $texts.readme @("d93287e9", "fb2_p4_vector_readiness_plan_v1", "writes_embedding_rows=false", "does_not_enable_vector=true", "ready_to_build_embedding_store=false", "ready_to_enable_answer_time_vector_candidates=false", "生产 grounding")) `
+        (Test-Fb2FormatAllTokens $texts.readme @("b2493cbc", "fb2_p4_vector_readiness_plan_v1", "fb2_p4_vector_contract_v1", "fb2_p4_embedding_build_dry_run_v1", "contract_design_committed_embedding_not_started", "dry_run_available_no_writes", "production_grounding=false", "answer_time_vector_candidates_enabled=false", "writes_embedding_rows=false", "writes_vector_store=false", "refresh_operations_used=false", "candidate_rows_require_live_hydration=true", "vector_rows_are_model_input=false", "does_not_enable_vector=true", "ready_to_build_embedding_store=false", "ready_to_enable_answer_time_vector_candidates=false", "生产 grounding")) `
         $files.readme `
-        "Main-project handoff must treat fb2 P4 vector readiness as a read-only plan, not production grounding."
+        "Main-project handoff must treat fb2 P4 vector readiness and contract design as planned-only, not production grounding."
 
     Add-Fb2FormatCheck $checks `
         "handoff records current fb2 repository coordination evidence" `
@@ -139,9 +139,9 @@ function New-Fb2ContextFormatRouteValidation {
 
     Add-Fb2FormatCheck $checks `
         "handoff records fb2 p4 vector planned boundary" `
-        (Test-Fb2FormatAllTokens $texts.handoff @("d93287e9", "fb2_p4_vector_readiness_plan_v1", "p4_vector_readiness_status=planned", "writes_embedding_rows=false", "does_not_enable_vector=true", "ready_to_build_embedding_store=false", "ready_to_enable_answer_time_vector_candidates=false", "answer-time grounding")) `
+        (Test-Fb2FormatAllTokens $texts.handoff @("b2493cbc", "fb2_p4_vector_readiness_plan_v1", "fb2_p4_vector_contract_v1", "fb2_p4_embedding_build_dry_run_v1", "contract_design_committed_embedding_not_started", "dry_run_available_no_writes", "p4_vector_readiness_status=planned", "production_grounding=false", "blocks_data_goal=false", "answer_time_vector_candidates_enabled=false", "writes_embedding_rows=false", "writes_vector_store=false", "refresh_operations_used=false", "candidate_rows_require_live_hydration=true", "vector_rows_are_model_input=false", "does_not_enable_vector=true", "ready_to_build_embedding_store=false", "ready_to_enable_answer_time_vector_candidates=false", "answer-time grounding")) `
         $files.handoff `
-        "Handoff must record that fb2 P4 vector readiness is planned and not answer-time grounding."
+        "Handoff must record that fb2 P4 vector readiness/contract design is planned and not answer-time grounding."
 
     Add-Fb2FormatCheck $checks `
         "data-tools define domain route and retrieval evidence" `
@@ -155,9 +155,9 @@ function New-Fb2ContextFormatRouteValidation {
 
     Add-Fb2FormatCheck $checks `
         "test-plan keeps p4 vector plan non-production" `
-        (Test-Fb2FormatAllTokens $texts.test_plan @("fb2_p4_vector_readiness_plan_v1", "只读计划报告", "不是生产 grounding", "writes_embedding_rows=false", "does_not_enable_vector=true", "ready_to_build_embedding_store=false", "ready_to_enable_answer_time_vector_candidates=false")) `
+        (Test-Fb2FormatAllTokens $texts.test_plan @("fb2_p4_vector_readiness_plan_v1", "fb2_p4_vector_contract_v1", "fb2_p4_embedding_build_dry_run_v1", "只读计划/契约设计/no-write dry-run", "不是生产 grounding", "production_grounding=false", "blocks_data_goal=false", "answer_time_vector_candidates_enabled=false", "implemented=false", "dry_run_available_no_writes", "writes_embedding_rows=false", "writes_vector_store=false", "refresh_operations_used=false", "candidate_rows_require_live_hydration=true", "vector_rows_are_model_input=false", "does_not_enable_vector=true", "ready_to_build_embedding_store=false", "ready_to_enable_answer_time_vector_candidates=false")) `
         $files.test_plan `
-        "P4 vector readiness must stay a planned report until fb2 implements source allowlist, chunk schema, permission filters, embedding build, shadow eval, and answer-time readthrough."
+        "P4 vector readiness/contract design must stay planned until fb2 implements embedding build, hydration, shadow eval, and answer-time readthrough."
 
     Add-Fb2FormatCheck $checks `
         "projection contract keeps AI-facing payload structured" `
@@ -257,7 +257,7 @@ index_guides_rest_context_pack_and_tool_manifest project_to_xml_wrapped_markdown
 fb2.context_query_intent.v1 topic_hint requested_indexes permission_scope retrieval_evidence_items_reference_query_intent
 domainDataBlueprint.context_format
 fb2_context_retrieval_trace_v1 fb2_p4_lite_candidate_retrieval_v1 match_context_index answer_time_refresh_allowed=false maintenance_rest 1b0cdc2b 01972c2d fbe2c857 opinion_result_review_surface ready_quality_threshold_passed final gate topic answer-time refresh
-d93287e9 165e50f2 d4efde21 fb2_p4_vector_readiness_plan_v1 p4_vector_readiness_status=planned 只读计划报告 不是生产 grounding writes_embedding_rows=false does_not_enable_vector=true ready_to_build_embedding_store=false ready_to_enable_answer_time_vector_candidates=false answer-time grounding 生产 grounding source allowlist chunk schema permission filter SQL offline embedding build shadow eval answer-time readthrough
+b2493cbc e6caccac d93287e9 165e50f2 d4efde21 fb2_p4_vector_readiness_plan_v1 fb2_p4_vector_contract_v1 fb2_p4_embedding_build_dry_run_v1 contract_design_committed_embedding_not_started dry_run_available_no_writes p4_vector_readiness_status=planned 只读计划/契约设计/no-write dry-run 只读计划报告 不是生产 grounding production_grounding=false blocks_data_goal=false answer_time_vector_candidates_enabled=false implemented=false writes_embedding_rows=false writes_vector_store=false refresh_operations_used=false candidate_rows_require_live_hydration=true vector_rows_are_model_input=false does_not_enable_vector=true ready_to_build_embedding_store=false ready_to_enable_answer_time_vector_candidates=false answer-time grounding 生产 grounding source allowlist chunk schema permission filter SQL offline embedding build hydration shadow eval answer-time readthrough source_dry_runs permission_partitions known_estimated_chunk_count unknown_estimate_source_count
 "@
     foreach ($relativePath in @(
             "docs\repo map模块问题\repo map格式建议.md",
