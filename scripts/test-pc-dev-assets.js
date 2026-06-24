@@ -1619,6 +1619,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(nativeNodeAdmin.includes('open_launcher_logs'), 'PC node panel should expose launcher logs action');
   assert.ok(nativeNodeAdmin.includes('loadLatestClientPackageVersion'), 'PC node panel should fetch latest client package metadata');
   assert.ok(nativeNodeAdmin.includes('clientUpdateLine'), 'PC node panel should compare installed and latest client versions');
+  assert.ok(nativeNodeAdmin.includes('clientUpdateActionState'), 'PC node panel should adapt the update action to local and latest versions');
+  assert.ok(nativeNodeAdmin.includes('更新客户端'), 'PC node panel should label the action as update when a newer client exists');
+  assert.ok(nativeNodeAdmin.includes('重新检查更新'), 'PC node panel should label the action as recheck when the client is current');
+  assert.ok(nativeNodeAdmin.includes('下载并安装最新 Win 客户端包'), 'PC node panel should explain what the update action does');
   assert.ok(nativeNodeAdmin.includes("'git_show'"), 'PC node panel should show git revision inspection as a core Route B capability');
 
   const doctor = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_doctor.js'), 'utf8');

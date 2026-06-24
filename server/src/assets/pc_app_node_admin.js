@@ -375,7 +375,7 @@
       if (!panel) return;
       if (!data) {
         panel.innerHTML = row('状态', '未读取');
-        renderClientActions(null);
+        renderClientActions(null, latestClientPackage);
         return;
       }
       const install = data.install || {};
@@ -413,13 +413,13 @@
         row('任务记录', clean(data.task_journal_dir) || '未上报'),
         row('诊断目录', clean(data.diagnostics_dir) || '未上报')
       ].join('');
-      renderClientActions(data);
+      renderClientActions(data, latestClientPackage);
     }
 
-    function renderClientActions(data) {
+    function renderClientActions(data, latest) {
       const actionsEl = $('#nodeClientActions');
       if (!actionsEl) return;
-      const actions = clientActions(data);
+      const actions = clientActions(data, latest);
       actionsEl.innerHTML = actions.map((action) => {
         const id = clientActionButtonId(action.id || action.kind || action.label);
         const disabled = action.enabled === false ? ' disabled' : '';
@@ -431,10 +431,9 @@
       }).join('');
     }
 
-    function clientActions(data) {
+    function clientActions(data, latest) {
       const actions = data && Array.isArray(data.maintenance_actions) ? data.maintenance_actions : [];
-      if (actions.length) return actions;
-      return [
+      const fallbackActions = [
         { id: 'open_install_dir', kind: 'open_target', target: 'install_dir', label: '安装目录', enabled: true },
         { id: 'open_client_logs', kind: 'open_target', target: 'logs', label: '运行日志', enabled: true },
         { id: 'open_launcher_logs', kind: 'open_target', target: 'launcher_logs', label: '启动器日志', enabled: true },
@@ -445,6 +444,32 @@
         { id: 'check_update', kind: 'update', label: '检查更新', tone: 'primary', enabled: true },
         { id: 'uninstall_client', kind: 'uninstall', label: '卸载', tone: 'danger', enabled: true }
       ];
+      return withClientUpdateActionState(actions.length ? actions : fallbackActions, data, latest);
+    }
+
+    function withClientUpdateActionState(actions, local, latest) {
+      return actions.map((action) => {
+        if (clean(action.kind) !== 'update') return action;
+        return Object.assign({}, action, clientUpdateActionState(local, latest));
+      });
+    }
+
+    function clientUpdateActionState(local, latest) {
+      const installedSha = clean(local && (local.installed_git_sha || local.install && local.install.installed_git_sha));
+      const remoteSha = clean(latest && (latest.gitSha || latest.git_sha));
+      if (latest && latest.error) {
+        return { label: '检查更新', tone: '', description: '暂时无法读取线上 Win 客户端版本，可稍后重试。' };
+      }
+      if (!remoteSha) {
+        return { label: '检查更新', tone: 'primary', description: '正在读取线上 Win 客户端版本。' };
+      }
+      if (installedSha && installedSha === remoteSha) {
+        return { label: '重新检查更新', tone: '', description: '当前客户端已是最新版本。' };
+      }
+      if (installedSha) {
+        return { label: '更新客户端', tone: 'primary', description: '下载并安装最新 Win 客户端包。' };
+      }
+      return { label: '检查更新', tone: 'primary', description: '读取线上版本并修复客户端安装。' };
     }
 
     function clientActionButtonId(value) {
