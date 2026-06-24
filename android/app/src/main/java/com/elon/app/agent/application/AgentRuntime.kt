@@ -8,6 +8,7 @@ import com.elon.app.agent.domain.tool.ToolRegistry
 import com.elon.app.agent.infrastructure.network.FailureReportService
 import kotlinx.coroutines.*
 import android.util.Log
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -34,6 +35,8 @@ class AgentRuntime(
     private var errorCount = 0
     
     private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private var pendingDecision: AIDecision? = null
+    private var lastErrorMessage: String? = null
     
     /**
      * 开始执行目标
@@ -43,6 +46,8 @@ class AgentRuntime(
         state = AgentRunState.THINKING
         stepCount = 0
         errorCount = 0
+        pendingDecision = null
+        lastErrorMessage = null
         var success = false
         var message = "目标执行已停止"
         
@@ -60,6 +65,7 @@ class AgentRuntime(
             if (System.currentTimeMillis() - startTime > goal.timeoutSeconds * 1000) {
                 Log.w("AgentRuntime", "目标执行超时")
                 message = "目标执行超时（${goal.timeoutSeconds} 秒）"
+                lastErrorMessage = message
                 state = AgentRunState.STOPPED
                 break
             }
@@ -68,6 +74,7 @@ class AgentRuntime(
             if (stepCount >= goal.maxSteps) {
                 Log.w("AgentRuntime", "达到最大步数限制")
                 message = "达到最大步数限制（${goal.maxSteps} 步）"
+                lastErrorMessage = message
                 state = AgentRunState.STOPPED
                 break
             }
@@ -104,7 +111,7 @@ class AgentRuntime(
         return AgentExecutionResult(
             success = success,
             stepsExecuted = stepCount,
-            message = message,
+            message = if (success) message else lastErrorMessage ?: message,
             finalState = state,
             errorCount = errorCount
         )
@@ -135,22 +142,26 @@ class AgentRuntime(
                 state = AgentRunState.STOPPED
                 return true
             } else if (decision.action != null) {
+                pendingDecision = decision
                 memory.addShortTerm(MemoryEntry(
                     timestamp = System.currentTimeMillis(),
                     type = MemoryType.THOUGHT,
                     content = "AI 决定: ${decision.thought} | 动作: ${decision.action.name}"
                 ))
                 state = AgentRunState.EXECUTING
+            } else {
+                handleExecutionFailure(lastErrorMessage ?: "AI 未给出可执行动作")
             }
             
         } catch (e: Exception) {
             Log.e("AgentRuntime", "思考阶段出错", e)
             errorCount++
+            lastErrorMessage = "AI 调用失败: ${e.message}"
             
             // 上报 AI 错误
             reportFailureAsync(
                 errorType = FailureReportService.ErrorTypes.AI_ERROR,
-                reason = "AI 调用失败: ${e.message}",
+                reason = lastErrorMessage ?: "AI 调用失败",
                 exception = e
             )
             
@@ -167,8 +178,53 @@ class AgentRuntime(
      * 执行阶段：调用工具执行动作
      */
     private suspend fun handleExecuting() {
-        // 实现省略，见下一个文件
-        state = AgentRunState.OBSERVING
+        val decision = pendingDecision
+        pendingDecision = null
+        val tool = decision?.action
+        if (decision == null || tool == null) {
+            handleExecutionFailure("没有待执行动作")
+            return
+        }
+
+        memory.addShortTerm(MemoryEntry(
+            timestamp = System.currentTimeMillis(),
+            type = MemoryType.ACTION,
+            content = "执行工具: ${tool.name} params=${decision.params}"
+        ))
+
+        try {
+            val result = tool.execute(decision.params)
+            memory.addShortTerm(MemoryEntry(
+                timestamp = System.currentTimeMillis(),
+                type = MemoryType.RESULT,
+                content = "工具 ${tool.name} 执行结果: success=${result.success}, message=${result.message}"
+            ))
+            if (result.success) {
+                lastErrorMessage = null
+                state = AgentRunState.OBSERVING
+            } else {
+                handleExecutionFailure("工具 ${tool.name} 执行失败: ${result.message}")
+            }
+        } catch (e: Exception) {
+            Log.e("AgentRuntime", "工具执行异常: ${tool.name}", e)
+            handleExecutionFailure("工具 ${tool.name} 执行异常: ${e.message}", e)
+        }
+    }
+
+    private fun handleExecutionFailure(reason: String, exception: Throwable? = null) {
+        errorCount++
+        lastErrorMessage = reason
+        memory.addShortTerm(MemoryEntry(
+            timestamp = System.currentTimeMillis(),
+            type = MemoryType.RESULT,
+            content = reason
+        ))
+        reportFailureAsync(
+            errorType = FailureReportService.ErrorTypes.TOOL_ERROR,
+            reason = reason,
+            exception = exception
+        )
+        state = if (errorCount >= 3) AgentRunState.STOPPED else AgentRunState.RECOVERING
     }
     
     /**
@@ -197,6 +253,8 @@ class AgentRuntime(
             
         } catch (e: Exception) {
             Log.e("AgentRuntime", "观察阶段出错", e)
+            errorCount++
+            lastErrorMessage = "观察阶段出错: ${e.message}"
             state = AgentRunState.RECOVERING
         }
         return false
@@ -207,7 +265,6 @@ class AgentRuntime(
      */
     private suspend fun handleRecovering() {
         delay(1000)
-        errorCount++
         if (errorCount < 3) {
             state = AgentRunState.THINKING
         } else {
@@ -315,12 +372,76 @@ class AgentRuntime(
     }
     
     private fun parseAIResponse(response: String): AIDecision {
-        // 简化解析，实际需要用 Gson
-        return AIDecision(
-            thought = "思考中...",
-            action = null,
-            isComplete = false
-        )
+        return try {
+            val json = JSONObject(extractJsonObject(response))
+            val thought = json.optString("thought", "AI 未提供思考说明")
+            val isComplete = json.optBoolean("is_complete", json.optBoolean("isComplete", false))
+            val actionName = extractActionName(json)
+            val params = json.optJSONObject("params")?.toMap()
+                ?: json.optJSONObject("action")?.optJSONObject("params")?.toMap()
+                ?: emptyMap()
+            val tool = actionName?.let { toolRegistry.get(it) }
+            if (!isComplete && actionName != null && tool == null) {
+                lastErrorMessage = "AI 请求了未注册工具: $actionName"
+            }
+            AIDecision(
+                thought = thought,
+                action = tool,
+                params = params,
+                isComplete = isComplete
+            )
+        } catch (e: Exception) {
+            Log.e("AgentRuntime", "解析 AI 响应失败: $response", e)
+            lastErrorMessage = "解析 AI 响应失败: ${e.message}"
+            AIDecision(
+                thought = "解析 AI 响应失败",
+                action = null,
+                isComplete = false
+            )
+        }
+    }
+
+    private fun extractJsonObject(response: String): String {
+        val cleaned = response
+            .replace("```json", "")
+            .replace("```", "")
+            .trim()
+        val start = cleaned.indexOf('{')
+        val end = cleaned.lastIndexOf('}')
+        require(start >= 0 && end >= start) { "AI 响应中没有 JSON 对象" }
+        return cleaned.substring(start, end + 1)
+    }
+
+    private fun extractActionName(json: JSONObject): String? {
+        val rawAction = json.opt("action") ?: return null
+        return when (rawAction) {
+            is String -> rawAction.trim().takeIf { it.isNotEmpty() }
+            is JSONObject -> {
+                rawAction.optString("name").takeIf { it.isNotBlank() }
+                    ?: rawAction.optString("tool").takeIf { it.isNotBlank() }
+                    ?: rawAction.optString("type").takeIf { it.isNotBlank() }
+            }
+            else -> null
+        }
+    }
+
+    private fun JSONObject.toMap(): Map<String, Any> {
+        val result = mutableMapOf<String, Any>()
+        val keys = keys()
+        while (keys.hasNext()) {
+            val key = keys.next()
+            result[key] = normalizeJsonValue(get(key))
+        }
+        return result
+    }
+
+    private fun normalizeJsonValue(value: Any?): Any {
+        return when (value) {
+            null, JSONObject.NULL -> ""
+            is JSONObject -> value.toMap()
+            is JSONArray -> (0 until value.length()).map { index -> normalizeJsonValue(value.get(index)) }
+            else -> value
+        }
     }
     
     private fun checkGoalCompletion(screen: UINode): Boolean {

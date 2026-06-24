@@ -49,6 +49,7 @@ object FailureReportService {
         const val APP_NOT_FOUND = "app_not_found"            // 目标应用未安装
         const val CRASH = "crash"                            // 崩溃
         const val AI_ERROR = "ai_error"                      // AI 生成脚本失败
+        const val TOOL_ERROR = "tool_error"                  // 工具执行失败
         const val UNKNOWN = "unknown"                        // 未知错误
     }
     
