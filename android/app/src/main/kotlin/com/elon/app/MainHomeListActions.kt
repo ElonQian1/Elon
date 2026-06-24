@@ -48,6 +48,8 @@ internal class MainHomeListActions(
     private var friendSearchQuery = ""
     private var shouldFocusFriendSearch = false
     private var animateFriendSearchEnter = false
+    private var homeListFilterMode = HomeListFilterMode.All
+    private var pullFilterController: HomePullFilterController? = null
     private var personalProjectsExpanded = false
     private var jointProjectsExpanded = false
     private var plazaBannerProjects: List<StoreProject> = emptyList()
@@ -58,6 +60,18 @@ internal class MainHomeListActions(
 
     init {
         binding.ensureConversationPageScrollable()
+        pullFilterController = HomePullFilterController(
+            activity = activity,
+            binding = binding,
+            dp = dp,
+            isEnabled = {
+                binding.conversationPage.visibility == View.VISIBLE &&
+                    binding.chatPage.visibility != View.VISIBLE &&
+                    !friendSearchActive
+            },
+            currentMode = { homeListFilterMode },
+            applyMode = ::applyHomeListFilterMode
+        ).also { it.attach() }
     }
 
     fun showFriendLocalSearch() {
@@ -66,6 +80,7 @@ internal class MainHomeListActions(
         friendSearchQuery = ""
         shouldFocusFriendSearch = true
         animateFriendSearchEnter = true
+        homeListFilterMode = HomeListFilterMode.All
         renderConversationList()
         binding.scrollConversationPageToTop()
     }
@@ -96,13 +111,17 @@ internal class MainHomeListActions(
             renderFriendSearchResults()
             return
         }
-        val chatItems = buildHomeChatItems()
+        val chatItems = filterHomeChatItemsForMode(buildHomeChatItems())
         if (chatItems.isEmpty()) {
-            binding.conversationPage.addView(
-                homeRows().createFriendPlaceholder(AuthManager.isLoggedIn(activity)) {
-                    showAddFriendDialog()
-                }
-            )
+            if (homeListFilterMode == HomeListFilterMode.All) {
+                binding.conversationPage.addView(
+                    homeRows().createFriendPlaceholder(AuthManager.isLoggedIn(activity)) {
+                        showAddFriendDialog()
+                    }
+                )
+            } else {
+                binding.conversationPage.addView(createHomeFilterEmptyRow())
+            }
             return
         }
         renderHomeChatItems(chatItems)
@@ -113,7 +132,7 @@ internal class MainHomeListActions(
         while (binding.conversationPage.childCount > resultStartIndex) {
             binding.conversationPage.removeViewAt(resultStartIndex)
         }
-        val allChatItems = buildHomeChatItems()
+        val allChatItems = filterHomeChatItemsForMode(buildHomeChatItems())
         val chatItems = filterHomeChatItems(allChatItems)
         if (chatItems.isEmpty()) {
             if (friendSearchActive) {
@@ -178,6 +197,41 @@ internal class MainHomeListActions(
         friendSearchQuery = ""
         shouldFocusFriendSearch = false
         animateFriendSearchEnter = false
+    }
+
+    private fun applyHomeListFilterMode(mode: HomeListFilterMode) {
+        if (homeListFilterMode != mode) {
+            homeListFilterMode = mode
+            renderConversationList()
+        }
+        binding.scrollConversationPageToTop()
+    }
+
+    private fun filterHomeChatItemsForMode(items: List<HomeChatItem>): List<HomeChatItem> {
+        return when (homeListFilterMode) {
+            HomeListFilterMode.All -> items
+            HomeListFilterMode.Projects -> items.filterIsInstance<HomeChatItem.ProjectItem>()
+            HomeListFilterMode.Friends -> items.filter { item ->
+                item is HomeChatItem.FriendItem || item is HomeChatItem.GroupItem
+            }
+        }
+    }
+
+    private fun createHomeFilterEmptyRow(): View {
+        return TextView(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(92)
+            )
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor("#777777"))
+            textSize = 14f
+            text = when (homeListFilterMode) {
+                HomeListFilterMode.Projects -> "\u6682\u65e0\u9879\u76ee"
+                HomeListFilterMode.Friends -> "\u6682\u65e0\u597d\u53cb\u6216\u7fa4\u804a"
+                HomeListFilterMode.All -> ""
+            }
+        }
     }
 
     private fun hideFriendSearchKeyboard() {

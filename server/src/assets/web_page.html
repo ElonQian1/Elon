@@ -34,6 +34,9 @@
       --brand-ink: #000000;
       --accent: #58BE6A;
       --link: #58BE6A;
+      --pull-filter-project: #F2C94C;
+      --pull-filter-friend: #58BE6A;
+      --pull-filter-light: #FFFFFF;
       --secondary-btn: #1A1A1A;
       --secondary-btn-ink: #D9D9D9;
       --input-pill-bg: #272727;
@@ -222,6 +225,61 @@
 
     /* ===== 会话页 ===== */
     .conversation-list { flex: 0 0 auto; }
+    .conversation-filter-pull {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      width: 42px;
+      height: 42px;
+      transform: translate(-50%, -4px) scale(0.86);
+      opacity: 0;
+      pointer-events: none;
+      z-index: 28;
+      transition: opacity 160ms ease, transform 160ms ease;
+      --pull-filter-color: var(--pull-filter-project);
+      --pull-filter-offset: 113.1;
+    }
+    .conversation-filter-pull.visible {
+      opacity: 1;
+      transform: translate(-50%, var(--pull-offset, 0px)) scale(var(--pull-scale, 1));
+    }
+    .conversation-filter-pull svg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      animation: conversation-pull-spin 900ms linear infinite;
+    }
+    .pull-shell { fill: #212121; stroke: #4D4D4D; stroke-width: 2; }
+    .pull-progress {
+      fill: none;
+      stroke: var(--pull-filter-color);
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-dasharray: 113.1;
+      stroke-dashoffset: var(--pull-filter-offset);
+      transform-origin: 21px 21px;
+      transform: rotate(-90deg);
+      transition: stroke 140ms ease, stroke-dashoffset 80ms linear;
+    }
+    .pull-refresh {
+      fill: none;
+      stroke: var(--pull-filter-color);
+      stroke-width: 1.8;
+      stroke-linecap: round;
+      opacity: 0.86;
+      transition: stroke 140ms ease;
+    }
+    .conversation-filter-pull.flash .pull-progress,
+    .conversation-filter-pull.flash .pull-refresh {
+      animation: conversation-pull-flash 620ms ease;
+    }
+    @keyframes conversation-pull-spin {
+      to { transform: rotate(360deg); }
+    }
+    @keyframes conversation-pull-flash {
+      0%, 100% { stroke: var(--pull-filter-color); filter: none; }
+      45% { stroke: var(--pull-filter-light); filter: drop-shadow(0 0 8px rgba(255,255,255,0.88)); }
+    }
     .search-bar { flex: 0 0 auto; padding: 8px 14px; background: var(--panel-2); }
     .search-bar input { width: 100%; background: var(--bg-hint,var(--panel-2)); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
     .search-bar input::placeholder { color: var(--ink-soft); }
@@ -1985,6 +2043,16 @@
   </header>
 
   <section class="content">
+    <div id="conversationFilterPull" class="conversation-filter-pull" aria-hidden="true">
+      <svg viewBox="0 0 42 42" focusable="false" aria-hidden="true">
+        <circle class="pull-shell" cx="21" cy="21" r="19" />
+        <circle class="pull-progress" cx="21" cy="21" r="18" />
+        <path class="pull-refresh" d="M13.5 20.5a7.6 7.6 0 0 1 12.7-4.9" />
+        <path class="pull-refresh" d="M28.5 21.5a7.6 7.6 0 0 1-12.7 4.9" />
+        <circle class="pull-refresh" cx="27.8" cy="16.4" r="1.2" />
+        <circle class="pull-refresh" cx="14.2" cy="25.6" r="1.2" />
+      </svg>
+    </div>
 
     <!-- 聊天首页：好友/群聊列表（默认）/ 进入项目后切到项目聊天视图 -->
     <div id="chatPage" class="page active">
@@ -2622,6 +2690,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectSpaceAiMenuBtn = $('projectSpaceAiMenuBtn');
 
   const conversationList = $('conversationList');
+  const conversationFilterPull = $('conversationFilterPull');
   const projectPage = $('projectPage');
   const projectRefreshBtn = $('projectRefreshBtn');
   const chatView = $('chatView');
@@ -2898,6 +2967,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let progressLog = [];
   let pendingVisibilityProject = null;
   let searchQuery = '';
+  let contactFilterMode = 'all';
   let selectedAgent = '';
   let agentOptions = [];
   let agentSelectionInitialized = false;
@@ -3601,11 +3671,39 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return row;
   }
 
+  function nextContactFilterMode() {
+    if (contactFilterMode === 'projects') return 'friends';
+    return 'projects';
+  }
+
+  function contactFilterColor(targetMode) {
+    return targetMode === 'friends'
+      ? 'var(--pull-filter-friend)'
+      : 'var(--pull-filter-project)';
+  }
+
+  function filterContactHomeItems(items) {
+    if (contactFilterMode === 'projects') {
+      return items.filter((item) => item.kind === 'project');
+    }
+    if (contactFilterMode === 'friends') {
+      return items.filter((item) => item.kind === 'friend' || item.kind === 'group');
+    }
+    return items;
+  }
+
+  function setContactFilterMode(mode) {
+    contactFilterMode = mode;
+    renderConversationList();
+    chatPage.scrollTop = 0;
+  }
+
   function renderConversationList() {
     const query = normalizeSearch(searchQuery);
-    const allItems = groups.map((group) => ({ kind: 'group', data: group }))
+    const baseItems = groups.map((group) => ({ kind: 'group', data: group }))
       .concat(friends.map((friend) => ({ kind: 'friend', data: friend })))
-      .concat(projects.map((project) => ({ kind: 'project', data: project })))
+      .concat(projects.map((project) => ({ kind: 'project', data: project })));
+    const allItems = filterContactHomeItems(baseItems)
       .filter((item) => contactMatches(item, query))
       .sort((a, b) => (contactSortTime(b) - contactSortTime(a)) || String(
         contactTitle(a)
@@ -3613,6 +3711,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         contactTitle(b)
       ), 'zh-Hans-CN'));
     if (!allItems.length) {
+      if (!searchQuery && contactFilterMode === 'projects') {
+        conversationList.innerHTML = '<div class="empty-tip">\u6682\u65e0\u9879\u76ee</div>';
+        updateChatTabBadge();
+        return;
+      }
+      if (!searchQuery && contactFilterMode === 'friends') {
+        conversationList.innerHTML = '<div class="empty-tip">\u6682\u65e0\u597d\u53cb\u6216\u7fa4\u804a</div>';
+        updateChatTabBadge();
+        return;
+      }
       conversationList.innerHTML = searchQuery
         ? '<div class="empty-tip">没有匹配的好友、群聊或项目</div>'
         : '<div class="empty-tip">还没有好友<br/>点击右上角 ＋ 添加一位好友'
@@ -3628,6 +3736,113 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     allItems.forEach((item) => conversationList.appendChild(createContactRow(item)));
     updateChatTabBadge();
   }
+
+  const contactPullState = {
+    active: false,
+    startX: 0,
+    startY: 0,
+    progress: 0,
+    holdTriggered: false,
+    holdTimer: null
+  };
+
+  function isContactPullEnabled() {
+    return currentTab === 'chatPage'
+      && conversationList
+      && !conversationList.classList.contains('hidden')
+      && chatView.classList.contains('hidden')
+      && searchBar.classList.contains('hidden')
+      && chatPage.scrollTop <= 0;
+  }
+
+  function updateConversationPullIndicator(distance) {
+    const trigger = 64;
+    const capped = Math.max(0, Math.min(distance, 112));
+    const progress = Math.max(0, Math.min(capped / trigger, 1));
+    const targetMode = nextContactFilterMode();
+    contactPullState.progress = progress;
+    conversationFilterPull.classList.add('visible');
+    conversationFilterPull.style.setProperty('--pull-filter-offset', (113.1 * (1 - progress)).toFixed(2));
+    conversationFilterPull.style.setProperty('--pull-filter-color', contactFilterColor(targetMode));
+    conversationFilterPull.style.setProperty('--pull-offset', Math.min(capped * 0.34, 34).toFixed(1) + 'px');
+    conversationFilterPull.style.setProperty('--pull-scale', (0.86 + 0.14 * progress).toFixed(3));
+    if (progress >= 1 && !contactPullState.holdTimer && !contactPullState.holdTriggered) {
+      contactPullState.holdTimer = window.setTimeout(() => {
+        if (!contactPullState.active || contactPullState.progress < 1) return;
+        contactPullState.holdTriggered = true;
+        conversationFilterPull.classList.add('flash');
+        window.setTimeout(() => conversationFilterPull.classList.remove('flash'), 640);
+        setContactFilterMode('all');
+      }, 1000);
+    } else if (progress < 1) {
+      clearConversationPullHold();
+      contactPullState.holdTriggered = false;
+    }
+  }
+
+  function clearConversationPullHold() {
+    if (contactPullState.holdTimer) {
+      window.clearTimeout(contactPullState.holdTimer);
+      contactPullState.holdTimer = null;
+    }
+  }
+
+  function hideConversationPullIndicator() {
+    conversationFilterPull.classList.remove('visible');
+    conversationFilterPull.style.setProperty('--pull-filter-offset', '113.1');
+    conversationFilterPull.style.setProperty('--pull-offset', '0px');
+    conversationFilterPull.style.setProperty('--pull-scale', '0.86');
+  }
+
+  function resetContactPullState() {
+    contactPullState.active = false;
+    contactPullState.progress = 0;
+    contactPullState.holdTriggered = false;
+    clearConversationPullHold();
+  }
+
+  function installContactPullFilterGesture() {
+    chatPage.addEventListener('touchstart', (event) => {
+      if (!isContactPullEnabled() || !event.touches.length) return;
+      const touch = event.touches[0];
+      contactPullState.startX = touch.clientX;
+      contactPullState.startY = touch.clientY;
+      contactPullState.active = false;
+      contactPullState.progress = 0;
+      contactPullState.holdTriggered = false;
+      clearConversationPullHold();
+    }, { passive: true });
+
+    chatPage.addEventListener('touchmove', (event) => {
+      if (!event.touches.length) return;
+      const touch = event.touches[0];
+      const dy = touch.clientY - contactPullState.startY;
+      const dx = Math.abs(touch.clientX - contactPullState.startX);
+      if (!contactPullState.active) {
+        if (!isContactPullEnabled() || dy <= 8 || dy < dx * 1.2) return;
+        contactPullState.active = true;
+      }
+      if (!contactPullState.active) return;
+      event.preventDefault();
+      updateConversationPullIndicator(dy - 8);
+    }, { passive: false });
+
+    const finish = () => {
+      if (!contactPullState.active) {
+        resetContactPullState();
+        return;
+      }
+      if (contactPullState.progress >= 1 && !contactPullState.holdTriggered) {
+        setContactFilterMode(nextContactFilterMode());
+      }
+      hideConversationPullIndicator();
+      resetContactPullState();
+    };
+    chatPage.addEventListener('touchend', finish, { passive: true });
+    chatPage.addEventListener('touchcancel', finish, { passive: true });
+  }
+
+  installContactPullFilterGesture();
 
   function renderProjectHomePage() {
     if (window.ElonProjectHome && typeof window.ElonProjectHome.render === 'function') {
@@ -6591,6 +6806,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const nowHidden = searchBar.classList.toggle('hidden');
     if (!nowHidden) {
       searchQuery = '';
+      contactFilterMode = 'all';
       searchInput.value = '';
       renderConversationList();
       searchInput.focus();

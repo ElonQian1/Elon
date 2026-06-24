@@ -35,6 +35,7 @@
 
     <color name="elon_accent_primary">#58BE6A</color>
     <color name="elon_link_primary">#58BE6A</color>
+    <color name="elon_status_project">#F2C94C</color>
     <color name="elon_badge_info_bg">#16251A</color>
     <color name="elon_badge_info_text">#8DDC9B</color>
     <color name="elon_badge_neutral_bg">#1A1A1A</color>
