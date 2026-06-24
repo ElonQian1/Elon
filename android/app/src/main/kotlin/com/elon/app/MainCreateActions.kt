@@ -6,6 +6,7 @@ import android.view.View
 import android.view.inputmethod.EditorInfo
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.update.AppUpdateManager
 import com.elon.app.update.PeerSeederManager
@@ -108,6 +109,7 @@ internal class MainCreateActions(
     private fun setupProjectPullRefresh() {
         binding.projectPage.setColorSchemeResources(R.color.elon_button_primary_bg)
         binding.projectPage.setProgressBackgroundColorSchemeResource(R.color.elon_surface_card)
+        binding.projectPage.tryDisableArrowhead()
         binding.projectPage.setOnRefreshListener {
             if (!AuthManager.isLoggedIn(activity)) {
                 binding.projectPage.isRefreshing = false
@@ -122,6 +124,21 @@ internal class MainCreateActions(
                     Toast.LENGTH_SHORT
                 ).show()
             }
+        }
+    }
+
+    private fun SwipeRefreshLayout.tryDisableArrowhead() {
+        runCatching {
+            val progressField = SwipeRefreshLayout::class.java.getDeclaredField("mProgress")
+            progressField.isAccessible = true
+            val progressDrawable = progressField.get(this) ?: return
+            val setArrowEnabled = progressDrawable.javaClass.getDeclaredMethod(
+                "setArrowEnabled",
+                java.lang.Boolean.TYPE
+            )
+            setArrowEnabled.isAccessible = true
+            setArrowEnabled.invoke(progressDrawable, false)
+            invalidate()
         }
     }
 

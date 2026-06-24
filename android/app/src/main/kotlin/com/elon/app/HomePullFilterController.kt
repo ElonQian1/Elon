@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
+import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
@@ -37,8 +38,10 @@ internal class HomePullFilterController(
     private val applyMode: (HomeListFilterMode) -> Unit
 ) {
     private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
-    private val triggerDistance = dp(62).toFloat()
-    private val maxPullDistance = dp(112).toFloat()
+    private val activationDistance = maxOf(touchSlop * 1.7f, dp(22).toFloat())
+    private val triggerDistance = dp(96).toFloat()
+    private val decisiveDistance = triggerDistance + dp(18)
+    private val maxPullDistance = dp(154).toFloat()
     private val indicator = HomePullFilterIndicatorView(activity)
 
     private var scroller: ScrollView? = null
@@ -48,13 +51,17 @@ internal class HomePullFilterController(
     private var longHoldTriggered = false
     private var longHoldArmed = false
     private var pullProgress = 0f
+    private var thresholdReadySince = 0L
+    private var maxGestureDistance = 0f
+    private var lastModeAppliedAt = 0L
 
     private val longHoldRunnable = Runnable {
-        if (!pulling || pullProgress < 1f) return@Runnable
+        if (!pulling || !isPastReleaseThreshold()) return@Runnable
         longHoldTriggered = true
         longHoldArmed = false
         indicator.flashWhite()
         applyMode(HomeListFilterMode.All)
+        lastModeAppliedAt = SystemClock.uptimeMillis()
     }
 
     fun attach() {
@@ -77,7 +84,7 @@ internal class HomePullFilterController(
 
     private fun handleTouch(event: MotionEvent): Boolean {
         val scrollView = scroller ?: return false
-        if (!isEnabled()) {
+        if (!isGestureEnabled()) {
             resetGesture()
             return false
         }
@@ -89,6 +96,8 @@ internal class HomePullFilterController(
                 pulling = false
                 longHoldTriggered = false
                 pullProgress = 0f
+                thresholdReadySince = 0L
+                maxGestureDistance = 0f
                 cancelLongHold()
                 return false
             }
@@ -97,13 +106,20 @@ internal class HomePullFilterController(
                 val dy = event.y - downY
                 val dx = abs(event.x - downX)
                 if (!pulling) {
-                    if (scrollView.scrollY > 0 || dy <= touchSlop || dy < dx * 1.2f) return false
+                    if (
+                        scrollView.scrollY > 0 ||
+                        dy < activationDistance ||
+                        dy < dx * 1.6f ||
+                        event.pointerCount != 1
+                    ) {
+                        return false
+                    }
                     pulling = true
                     longHoldTriggered = false
                     scrollView.parent?.requestDisallowInterceptTouchEvent(true)
                     showIndicator()
                 }
-                updatePull((dy - touchSlop).coerceAtLeast(0f))
+                updatePull((dy - activationDistance).coerceAtLeast(0f), event.eventTime)
                 return true
             }
 
@@ -113,11 +129,11 @@ internal class HomePullFilterController(
                     return false
                 }
                 val shouldSwitch = event.actionMasked == MotionEvent.ACTION_UP &&
-                    pullProgress >= 1f &&
-                    !longHoldTriggered
+                    isStableRelease(event.eventTime)
                 if (shouldSwitch) {
                     indicator.pulseComplete()
                     applyMode(currentMode().nextPullMode())
+                    lastModeAppliedAt = event.eventTime
                 }
                 hideIndicator(if (longHoldTriggered) 220L else 160L)
                 resetGesture()
@@ -125,6 +141,10 @@ internal class HomePullFilterController(
             }
         }
         return false
+    }
+
+    private fun isGestureEnabled(): Boolean {
+        return isEnabled() && (pulling || SystemClock.uptimeMillis() - lastModeAppliedAt >= SWITCH_COOLDOWN_MS)
     }
 
     private fun showIndicator() {
@@ -138,8 +158,9 @@ internal class HomePullFilterController(
         indicator.update(currentMode().nextPullMode(), 0f)
     }
 
-    private fun updatePull(distance: Float) {
+    private fun updatePull(distance: Float, eventTime: Long) {
         val cappedDistance = min(distance, maxPullDistance)
+        maxGestureDistance = maxOf(maxGestureDistance, cappedDistance)
         val nextProgress = (cappedDistance / triggerDistance).coerceIn(0f, 1f)
         pullProgress = nextProgress
         indicator.update(currentMode().nextPullMode(), nextProgress)
@@ -147,12 +168,25 @@ internal class HomePullFilterController(
         indicator.scaleX = 0.86f + 0.14f * nextProgress
         indicator.scaleY = indicator.scaleX
 
-        if (nextProgress >= 1f) {
+        if (nextProgress >= RELEASE_PROGRESS_THRESHOLD) {
+            if (thresholdReadySince == 0L) thresholdReadySince = eventTime
             armLongHold()
-        } else {
+        } else if (nextProgress < RELEASE_RESET_PROGRESS) {
+            thresholdReadySince = 0L
             cancelLongHold()
             longHoldTriggered = false
         }
+    }
+
+    private fun isPastReleaseThreshold(): Boolean {
+        return thresholdReadySince > 0L && pullProgress >= RELEASE_PROGRESS_THRESHOLD
+    }
+
+    private fun isStableRelease(eventTime: Long): Boolean {
+        if (longHoldTriggered || !isPastReleaseThreshold()) return false
+        val steadyEnough = eventTime - thresholdReadySince >= RELEASE_STABLE_MS
+        val pulledClearlyPastThreshold = maxGestureDistance >= decisiveDistance
+        return steadyEnough || pulledClearlyPastThreshold
     }
 
     private fun armLongHold() {
@@ -185,14 +219,22 @@ internal class HomePullFilterController(
         pulling = false
         pullProgress = 0f
         longHoldTriggered = false
+        thresholdReadySince = 0L
+        maxGestureDistance = 0f
         cancelLongHold()
+    }
+
+    private companion object {
+        const val RELEASE_PROGRESS_THRESHOLD = 1f
+        const val RELEASE_RESET_PROGRESS = 0.72f
+        const val RELEASE_STABLE_MS = 140L
+        const val SWITCH_COOLDOWN_MS = 650L
     }
 }
 
 private class HomePullFilterIndicatorView(context: android.content.Context) : View(context) {
     private val density = resources.displayMetrics.density
     private val ringRect = RectF()
-    private val iconRect = RectF()
     private val shellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.parseColor("#212121")
         style = Paint.Style.FILL
@@ -207,11 +249,6 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
         strokeWidth = 2.8f * density
-    }
-    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-        strokeWidth = 1.8f * density
     }
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         style = Paint.Style.STROKE
@@ -283,7 +320,6 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
         val cy = height / 2f
         val radius = min(width, height) / 2f - 3.5f * density
         ringRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
-        iconRect.set(cx - 8.6f * density, cy - 8.6f * density, cx + 8.6f * density, cy + 8.6f * density)
 
         canvas.drawCircle(cx, cy, min(width, height) / 2f - density, shellPaint)
         canvas.drawArc(ringRect, -90f, 360f, false, basePaint)
@@ -293,23 +329,12 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
             else -> Color.parseColor("#F2C94C")
         }
         progressPaint.color = blend(targetColor, Color.WHITE, whiteFlash)
-        iconPaint.color = progressPaint.color
         val start = -90f + spin * 360f
         canvas.drawArc(ringRect, start, 360f * progress, false, progressPaint)
         if (whiteFlash > 0f) {
             glowPaint.alpha = (whiteFlash * 210).toInt().coerceIn(0, 255)
             canvas.drawArc(ringRect, start + 18f, 84f, false, glowPaint)
         }
-
-        canvas.save()
-        canvas.rotate(spin * 360f, cx, cy)
-        iconPaint.alpha = 180
-        canvas.drawArc(iconRect, -38f, 126f, false, iconPaint)
-        canvas.drawArc(iconRect, 142f, 126f, false, iconPaint)
-        iconPaint.alpha = 255
-        canvas.drawCircle(cx + 8.4f * density, cy - 2.4f * density, 1.45f * density, iconPaint)
-        canvas.drawCircle(cx - 8.4f * density, cy + 2.4f * density, 1.45f * density, iconPaint)
-        canvas.restore()
     }
 
     private fun blend(from: Int, to: Int, ratio: Float): Int {
