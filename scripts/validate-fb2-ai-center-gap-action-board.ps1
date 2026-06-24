@@ -164,6 +164,7 @@ function New-Fb2GapValidation {
         foreach ($item in @(
                 "public_contract_regression",
                 "status_refresh_selftest",
+                "context_format_route_regression",
                 "offline_context_pack_sample_validation",
                 "handoff_documentation",
                 "token_bridge_live_preflight_regression"
@@ -236,6 +237,7 @@ function New-Fb2GapValidation {
             "validate_current_state",
             "validate_public_contract_status",
             "validate_server_deploy_status",
+            "validate_context_format_route",
             "validate_read_only_direct_read",
             "validate_gap_action_board",
             "validate_evidence_freshness",
@@ -284,6 +286,12 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "next command public contract validates public status" (
             $publicContractCommand -match "fb2-public-contract-status\.ps1" -and
             $publicContractCommand -match "public-contract-status-current\.json"
+        )
+
+        $contextFormatCommand = [string](Get-Fb2GapProperty $nextCommands "validate_context_format_route" "")
+        Add-Fb2GapCheck $checks "next command context format validates route" (
+            $contextFormatCommand -match "validate-fb2-context-format-route\.ps1" -and
+            $contextFormatCommand -match "context-format-route-validation-current\.json"
         )
 
         $visiblePolicyCommand = [string](Get-Fb2GapProperty $nextCommands "validate_visible_answer_policy" "")
@@ -407,6 +415,7 @@ function Invoke-Fb2GapSelfTest {
                 safe_to_continue_without_secret = @(
                     "public_contract_regression",
                     "status_refresh_selftest",
+                    "context_format_route_regression",
                     "offline_context_pack_sample_validation",
                     "handoff_documentation",
                     "token_bridge_live_preflight_regression"
@@ -430,6 +439,7 @@ function Invoke-Fb2GapSelfTest {
                 validate_current_state = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1"
                 validate_public_contract_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-public-contract-status.ps1 -OutputPath target\fb2-ai-center\public-contract-status-current.json"
                 validate_server_deploy_status = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-main-server-deploy-status.ps1"
+                validate_context_format_route = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-format-route.ps1 -OutputPath target\fb2-ai-center\context-format-route-validation-current.json"
                 validate_read_only_direct_read = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json"
                 validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
                 validate_evidence_freshness = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1"

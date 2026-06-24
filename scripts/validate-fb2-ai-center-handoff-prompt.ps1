@@ -133,6 +133,7 @@ function New-Fb2PromptValidation {
         "validate_public_contract_status",
         "validate_server_deploy_status",
         "validate_project_direct_network_policy",
+        "validate_context_format_route",
         "validate_read_only_direct_read",
         "validate_gap_action_board",
         "validate_evidence_freshness",
@@ -160,6 +161,7 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "context projection log validator present" ($Content -match 'validate_context_projection_log.+validate-fb2-context-projection-log\.ps1')
     Add-Fb2PromptValidationCheck $checks "user scenario audit validator present" ($Content -match 'validate_user_scenario_audit.+validate-fb2-user-scenario-audit\.ps1')
     Add-Fb2PromptValidationCheck $checks "public contract status validator present" ($Content -match 'validate_public_contract_status.+fb2-public-contract-status\.ps1')
+    Add-Fb2PromptValidationCheck $checks "context format route validator present" ($Content -match 'validate_context_format_route.+validate-fb2-context-format-route\.ps1')
     Add-Fb2PromptValidationCheck $checks "live preflight request validator present" ($Content -match 'validate_live_preflight_request.+validate-fb2-live-preflight-request\.ps1')
     Add-Fb2PromptValidationCheck $checks "tokenless continuation validator present" ($Content -match 'validate_tokenless_continuation.+validate-fb2-tokenless-continuation\.ps1')
     Add-Fb2PromptValidationCheck $checks "evidence privacy validator present" ($Content -match 'validate_evidence_privacy.+validate-fb2-evidence-privacy\.ps1')
@@ -172,6 +174,7 @@ function New-Fb2PromptValidation {
     $requiredSafeWithoutSecret = @(
         "public_contract_regression",
         "status_refresh_selftest",
+        "context_format_route_regression",
         "offline_context_pack_sample_validation",
         "handoff_documentation"
     )
@@ -264,6 +267,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - `validate_public_contract_status`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\fb2-public-contract-status.ps1 -OutputPath target\fb2-ai-center\public-contract-status-current.json`
 - `validate_server_deploy_status`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-main-server-deploy-status.ps1`
 - `validate_project_direct_network_policy`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-project-direct-network-policy.ps1 -OutputPath target\fb2-ai-center\project-direct-network-policy-validation-current.json`
+- `validate_context_format_route`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-format-route.ps1 -OutputPath target\fb2-ai-center\context-format-route-validation-current.json`
 - `validate_read_only_direct_read`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-visible-readonly-summary.ps1 -SummaryPath target\fb2-ai-center\read-only-direct-read-current.json`
 - `validate_gap_action_board`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1`
 - `validate_evidence_freshness`: `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-evidence-freshness.ps1`
@@ -281,7 +285,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 ## 阻塞与边界
 - external_secret: `FB2_AI_CENTER_TOKEN`
 - blocked_by_external_secret: `True`
-- safe_to_continue_without_secret: `public_contract_regression, status_refresh_selftest, offline_context_pack_sample_validation, handoff_documentation`
+- safe_to_continue_without_secret: `public_contract_regression, status_refresh_selftest, context_format_route_regression, offline_context_pack_sample_validation, handoff_documentation`
 - requires_secret: `live_context_pack_permission_quality_refresh, current_user_order_live_verification, platform_order_summary_live_verification, feedback_quality_live_refresh`
 
 ## 缺口行动板
@@ -305,7 +309,7 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 '@
     $badScript = $good + "`nAdd-Fb2PromptLine -Lines `$lines"
     $badSecret = $good -replace '<FB2_AI_CENTER_TOKEN>', 'real-secret-token-1234567890'
-    $badBoundary = $good -replace 'public_contract_regression, status_refresh_selftest, offline_context_pack_sample_validation, handoff_documentation', 'public_contract_regression, status_refresh_selftest'
+    $badBoundary = $good -replace 'public_contract_regression, status_refresh_selftest, context_format_route_regression, offline_context_pack_sample_validation, handoff_documentation', 'public_contract_regression, status_refresh_selftest'
 
     $failed = 0
     $goodResult = New-Fb2PromptValidation -Content $good -SourcePath "selftest-good.md"

@@ -196,6 +196,7 @@ function New-Fb2TokenlessContinuationValidation {
     Add-Fb2TokenlessCheck $checks "safe without secret list complete" (Test-Fb2TokenlessContainsAll -Values $safeWithoutSecret -Required @(
             "public_contract_regression",
             "status_refresh_selftest",
+            "context_format_route_regression",
             "offline_context_pack_sample_validation",
             "handoff_documentation",
             "token_bridge_live_preflight_regression"
@@ -215,6 +216,7 @@ function New-Fb2TokenlessContinuationValidation {
         "validate_user_scenario_audit",
         "validate_current_state",
         "validate_project_direct_network_policy",
+        "validate_context_format_route",
         "validate_gap_action_board",
         "validate_evidence_privacy",
         "validate_handoff_prompt",
@@ -241,6 +243,12 @@ function New-Fb2TokenlessContinuationValidation {
     Add-Fb2TokenlessCheck $checks "context projection validator command targets log evidence" (
         $projectionLogCommand -match "validate-fb2-context-projection-log\.ps1" -and
         $projectionLogCommand -match "context-projection-log-validation-current\.json"
+    )
+
+    $contextFormatCommand = [string](Get-Fb2TokenlessProperty $commands "validate_context_format_route" "")
+    Add-Fb2TokenlessCheck $checks "context format route validator command targets route evidence" (
+        $contextFormatCommand -match "validate-fb2-context-format-route\.ps1" -and
+        $contextFormatCommand -match "context-format-route-validation-current\.json"
     )
 
     $userScenarioCommand = [string](Get-Fb2TokenlessProperty $commands "validate_user_scenario_audit" "")
@@ -345,6 +353,7 @@ function New-Fb2TokenlessFixture {
         @(
             "public_contract_regression",
             "status_refresh_selftest",
+            "context_format_route_regression",
             "offline_context_pack_sample_validation",
             "handoff_documentation",
             "token_bridge_live_preflight_regression"
@@ -399,6 +408,7 @@ function New-Fb2TokenlessFixture {
             validate_user_scenario_audit = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-user-scenario-audit.ps1 -StatusPath target\fb2-ai-center\status-current.json -OutputPath target\fb2-ai-center\user-scenario-audit-validation-current.json"
             validate_current_state = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-current-state.ps1"
             validate_project_direct_network_policy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-project-direct-network-policy.ps1 -OutputPath target\fb2-ai-center\project-direct-network-policy-validation-current.json"
+            validate_context_format_route = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-format-route.ps1 -OutputPath target\fb2-ai-center\context-format-route-validation-current.json"
             validate_gap_action_board = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-gap-action-board.ps1"
             validate_evidence_privacy = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-evidence-privacy.ps1"
             validate_handoff_prompt = "pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-ai-center-handoff-prompt.ps1"
