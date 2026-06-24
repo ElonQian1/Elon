@@ -170,6 +170,62 @@ function Test-Fb2QualityZero {
     return ($null -ne $Value -and [double]$Value -eq 0)
 }
 
+function Test-Fb2QualityDirectReadLine {
+    param([object]$Line)
+
+    $text = [string]$Line
+    if ([string]::IsNullOrWhiteSpace($text)) {
+        return $false
+    }
+    return (
+        $text -match '\b(text_len|body_len)=\d+\b' -and
+        $text -match '\btext_sha256=[0-9a-f]{64}\b'
+    )
+}
+
+function Test-Fb2QualityLegacyDirectReadEvidence {
+    param([object]$Summary)
+
+    $evidence = Get-Fb2QualityProperty $Summary "visible_direct_read_evidence"
+    if ($null -eq $evidence) {
+        return $false
+    }
+    foreach ($key in @(
+            "baseline_messages",
+            "visible_mention_seed",
+            "visible_mention_reply",
+            "selected_message_seed",
+            "selected_message_reply",
+            "summary_post"
+        )) {
+        if (-not (Test-Fb2QualityDirectReadLine -Line (Get-Fb2QualityProperty $evidence $key ""))) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function Get-Fb2QualityVisibleDirectReadState {
+    param([object]$Summary)
+
+    if ([bool](Get-Fb2QualityProperty $Summary "visible_direct_read_complete" $false)) {
+        return [pscustomobject][ordered]@{
+            complete = $true
+            mode = "current_visible_direct_read_complete_gate"
+        }
+    }
+    if (Test-Fb2QualityLegacyDirectReadEvidence -Summary $Summary) {
+        return [pscustomobject][ordered]@{
+            complete = $true
+            mode = "legacy_visible_direct_read_evidence_object"
+        }
+    }
+    return [pscustomobject][ordered]@{
+        complete = $false
+        mode = "missing_visible_direct_read_evidence"
+    }
+}
+
 function New-Fb2QualityTrendValidation {
     param(
         [object]$Summary,
@@ -192,12 +248,13 @@ function New-Fb2QualityTrendValidation {
     $nonSyntheticAdoptionCount = Get-Fb2QualityMetricNumber -Evidence $evidence -Name "quality_non_synthetic_adoption_count"
     $nonSyntheticMemoryRefs = Get-Fb2QualityMetricNumber -Evidence $evidence -Name "quality_non_synthetic_memory_refs"
     $largeContextPackRate = Get-Fb2QualityLogMetric -LogPath $logPath -MetricName "quality large_context_pack_rate"
+    $visibleDirectReadState = Get-Fb2QualityVisibleDirectReadState -Summary $Summary
 
     Add-Fb2QualityCheck $checks "summary success" ([bool](Get-Fb2QualityProperty $Summary "success" $false))
     Add-Fb2QualityCheck $checks "data-only voice deferred" ([string](Get-Fb2QualityProperty $Summary "voice_status" "") -eq "deferred_by_user")
     Add-Fb2QualityCheck $checks "visible chat passed" ([int](Get-Fb2QualityProperty $Summary "visible_chat_exit_code" -1) -eq 0)
     Add-Fb2QualityCheck $checks "final acceptance data-only passed" ([int](Get-Fb2QualityProperty $Summary "final_acceptance_exit_code" -1) -eq 0)
-    Add-Fb2QualityCheck $checks "visible direct read complete" ([bool](Get-Fb2QualityProperty $Summary "visible_direct_read_complete" $false))
+    Add-Fb2QualityCheck $checks "visible direct read complete" ([bool]$visibleDirectReadState.complete) ([string]$visibleDirectReadState.mode)
     Add-Fb2QualityCheck $checks "feedback coverage complete" ([bool](Get-Fb2QualityProperty $coverage "complete" $false))
     Add-Fb2QualityCheck $checks "feedback coverage observed all required" ([int](Get-Fb2QualityProperty $coverage "observed_count" 0) -ge [int](Get-Fb2QualityProperty $coverage "required_count" 3))
     Add-Fb2QualityCheck $checks "feedback evidence count" (@($feedbackEvidence).Count -ge [int](Get-Fb2QualityProperty $coverage "required_count" 3)) "count=$(@($feedbackEvidence).Count)"
@@ -233,6 +290,7 @@ function New-Fb2QualityTrendValidation {
             non_synthetic_memory_refs = $nonSyntheticMemoryRefs
             large_context_pack_rate = $largeContextPackRate.value
             max_large_context_pack_rate = $MaxLargeContextPackRate
+            visible_direct_read_mode = [string]$visibleDirectReadState.mode
         }
         note = "Validates the latest non-voice fb2 AI Center quality trend from local acceptance artifacts: feedback coverage, source matching, missing/wrong context, opinion adoption, and large Context Pack rate. It does not read secrets or write group messages."
     }
@@ -257,6 +315,14 @@ function New-Fb2QualityFixtureSummary {
         final_acceptance_exit_code = 0
         final_acceptance_log_path = $LogPath
         visible_direct_read_complete = $true
+        visible_direct_read_evidence = [pscustomobject][ordered]@{
+            baseline_messages = "group=ext_fb2_official count=80 sample_message=gai_sample text_len=292 text_sha256=$('a' * 64)"
+            visible_mention_seed = "group=ext_fb2_official message=gmsg_seed text_len=83 text_sha256=$('b' * 64)"
+            visible_mention_reply = "group=ext_fb2_official message=gai_reply text_len=448 text_sha256=$('c' * 64)"
+            selected_message_seed = "group=ext_fb2_official message=gmsg_selected text_len=71 text_sha256=$('d' * 64)"
+            selected_message_reply = "group=ext_fb2_official message=gai_selected_reply text_len=292 text_sha256=$('e' * 64)"
+            summary_post = "group=ext_fb2_official post=gsp_summary status=ready text_len=2291 text_sha256=$('f' * 64)"
+        }
         feedback_evidence = @(
             [pscustomobject]@{ scenario = "visible @EL fb2 feedback"; feedback_id = "fb1" },
             [pscustomobject]@{ scenario = "selected-message AI回复 fb2 feedback"; feedback_id = "fb2" },
@@ -296,6 +362,12 @@ function Invoke-Fb2QualitySelfTest {
         $failed = 0
         if (-not [bool]$goodResult.success) {
             $goodResult | ConvertTo-Json -Depth 8
+            $failed++
+        }
+        $legacyDirectRead = New-Fb2QualityFixtureSummary -LogPath $goodLog
+        $legacyDirectRead.PSObject.Properties.Remove("visible_direct_read_complete")
+        $legacyResult = New-Fb2QualityTrendValidation -Summary $legacyDirectRead -SourcePath "selftest-legacy-direct-read.json" -RepoRoot $tempRoot
+        if (-not [bool]$legacyResult.success -or [string]$legacyResult.metrics.visible_direct_read_mode -ne "legacy_visible_direct_read_evidence_object") {
             $failed++
         }
 
