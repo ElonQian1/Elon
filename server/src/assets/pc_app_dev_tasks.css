@@ -315,6 +315,11 @@
   border-color: rgba(88, 101, 242, .38);
 }
 
+.agent-run-recovery {
+  background: #242938;
+  border-color: rgba(88, 101, 242, .5);
+}
+
 .agent-run-item.done {
   border-color: rgba(35, 165, 90, .42);
 }

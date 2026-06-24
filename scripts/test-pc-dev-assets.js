@@ -835,6 +835,20 @@ async function testAgentRunsPanelLoadsProjectRuns() {
       return {
         ok: true,
         log_dir: 'D:/demo/.elon/agent-runs',
+        recovery_entry: {
+          kind: 'snapshot_resume',
+          task_id: 'req-detached',
+          cli_name: 'server-runtime',
+          route: 'route_c_server_runtime',
+          cwd: 'D:/demo',
+          runtime_permission: 'project_write',
+          status: 'detached',
+          recommended_action: 'continue_from_snapshot',
+          reason: '本机 journal 显示任务未终态，但当前节点已没有运行句柄',
+          can_cancel: false,
+          can_continue: true,
+          updated_at_ms: 200
+        },
         active_controls: [{
           task_id: 'req-live',
           run_handle_id: 'req-live',
@@ -892,6 +906,7 @@ async function testAgentRunsPanelLoadsProjectRuns() {
   assert.ok(html.includes('完成'), 'agent runs panel should render completion status');
   assert.ok(html.includes('api-runtime'), 'agent runs panel should render runtime mode');
   assert.ok(html.includes('read_file'), 'agent runs panel should render tool names');
+  assert.ok(html.includes('推荐恢复'), 'agent runs panel should render the top-level recovery entry');
   assert.ok(html.includes('route_c_server_runtime'), 'agent runs panel should render active control route');
   assert.ok(html.includes('data-agent-run-action="cancel"'), 'live control should expose stop action');
   assert.ok(html.includes('data-agent-run-action="continue"'), 'detached local task should expose continue action');
@@ -1348,22 +1363,23 @@ function testLocalAdminTokenWiring() {
   assert.ok(manifestIdentityRs.includes('rootProject.name'), 'local project identity should derive Android/Gradle project names');
   assert.ok(pcApp.includes('project.agent_runtime'), 'project registration should display local Agent Runtime freshness');
   assert.ok(pcApp.includes('Agent Runtime'), 'project registration should label Agent Runtime freshness in settings');
-  assert.ok(pcApp.includes('/api/client-maintenance/diagnostics/export'), 'PC app should export client diagnostics through local node');
-  assert.ok(pcApp.includes('exportClientDiagnosticsBtn'), 'PC app should wire the diagnostics export button');
-  assert.ok(pcApp.includes('/api/client-maintenance/repair'), 'PC app should repair the Windows client through local node');
-  assert.ok(pcApp.includes('repairClientBtn'), 'PC app should wire the client repair button');
+  const pcNodeAdminJsForMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node_admin.js'), 'utf8');
+  assert.ok(pcNodeAdminJsForMaintenance.includes('/api/client-maintenance/diagnostics/export'), 'PC node admin module should export client diagnostics through local node');
+  assert.ok(pcNodeAdminJsForMaintenance.includes('exportClientDiagnostics'), 'PC node admin module should wire the diagnostics export action');
+  assert.ok(pcNodeAdminJsForMaintenance.includes('/api/client-maintenance/repair'), 'PC node admin module should repair the Windows client through local node');
+  assert.ok(pcNodeAdminJsForMaintenance.includes('repairClient'), 'PC node admin module should wire the client repair action');
   assert.ok(pcApp.includes('elon-node://repair'), 'PC app should fall back to the Windows repair protocol');
-  assert.ok(pcApp.includes('openClientTaskJournalBtn'), 'PC settings should keep task journal separate from runtime logs');
-  assert.ok(pcApp.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs separately');
+  const pcClientMaintenanceJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_client_maintenance.js'), 'utf8');
+  assert.ok(pcClientMaintenanceJs.includes('/api/client-maintenance/open'), 'PC client maintenance module should open maintenance targets through local node');
+  assert.ok(pcClientMaintenanceJs.includes('openTarget'), 'PC client maintenance module should keep target opening contract-driven');
+  assert.ok(pcClientMaintenanceJs.includes('disabledReason'), 'PC client maintenance module should explain disabled maintenance actions');
+  assert.ok(pcClientMaintenanceJs.includes('export_diagnostics'), 'PC client maintenance module should expose diagnostics export as an action');
+  assert.ok(pcClientMaintenanceJs.includes('/api/client-maintenance/repair'), 'PC client maintenance module should repair the Windows client through local node');
   assert.ok(pcApp.includes('settingsClientActions'), 'PC settings should render local maintenance action availability');
   assert.ok(pcApp.includes('renderClientMaintenanceActions'), 'PC app should render maintenance_actions from local node');
   assert.ok(pcApp.includes('maintenance_recent_events'), 'PC app should read recent client maintenance events');
   assert.ok(pcApp.includes('clientMaintenanceEventsLine'), 'PC app should summarize recent client maintenance events');
   assert.ok(pcApp.includes('最近维护'), 'PC settings should show the latest maintenance event inline');
-  assert.ok(pcApp.includes('disabledMaintenanceActionReason'), 'PC app should explain disabled maintenance actions');
-  assert.ok(pcApp.includes("openClientMaintenanceTarget('logs'"), 'PC settings should open the runtime logs target');
-  assert.ok(pcApp.includes("openClientMaintenanceTarget('launcher_logs'"), 'PC settings should open launcher logs target');
-  assert.ok(pcApp.includes("openClientMaintenanceTarget('task_journal'"), 'PC settings should still open task journal explicitly');
   assert.ok(pcApp.includes('logs_dir'), 'PC settings should display the client runtime logs directory');
   assert.ok(pcApp.includes('launcher_logs_dir'), 'PC settings should display the client launcher logs directory');
   assert.ok(pcApp.includes('clientPackageLatest'), 'PC settings should keep latest Windows client package metadata');
@@ -1390,6 +1406,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(agentRunsJs.includes('/api/task-journal/'), 'agent runs panel should call the local task journal cancel API');
   assert.ok(agentRunsJs.includes('activeControls'), 'agent runs panel should render live local control handles');
   assert.ok(agentRunsJs.includes('recentTasks'), 'agent runs panel should render recent local task resume contracts');
+  assert.ok(agentRunsJs.includes('recoveryEntry'), 'agent runs panel should normalize the top-level recovery entry');
   assert.ok(agentRunsJs.includes('原 CLI 终端不可重接'), 'agent runs continuation draft should keep tty limitation explicit');
 
   const pcAppNode = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node.js'), 'utf8');
@@ -1425,13 +1442,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(readinessJs.includes('重复防抖'), 'project readiness should label Route C duplicate request debounce');
 
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
-  assert.ok(pcAppHtml.includes('exportClientDiagnosticsBtn'), 'PC settings should expose diagnostics export entry');
-  assert.ok(pcAppHtml.includes('openClientTaskJournalBtn'), 'PC settings should expose task journal as its own button');
-  assert.ok(pcAppHtml.includes('openClientLauncherLogsBtn'), 'PC settings should expose launcher logs as its own button');
   assert.ok(pcAppHtml.includes('settingsClientActions'), 'PC settings should expose maintenance action availability status');
-  assert.ok(pcAppHtml.includes('打开运行日志'), 'PC settings should expose runtime logs as a user-facing action');
-  assert.ok(pcAppHtml.includes('打开启动器日志'), 'PC settings should expose launcher logs as a user-facing action');
-  assert.ok(pcAppHtml.includes('修复客户端入口'), 'PC settings should expose a direct client repair action');
+  assert.ok(pcAppHtml.includes('可用维护操作'), 'PC settings should group client maintenance actions in one contract-driven area');
+  assert.ok(pcAppHtml.includes('刷新本机助手后显示每个操作是否可用'), 'PC settings should explain that maintenance actions come from the local node');
+  assert.ok(pcAppHtml.includes('修复会重建主程序'), 'PC settings should explain repair/update/uninstall effects');
   assert.ok(pcAppHtml.includes('/assets/pc_app_agent_runs.js'), 'PC page should load the local agent runs module');
 
   const pcAppCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.css'), 'utf8');
@@ -1454,6 +1468,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(devTasksCss.includes('.agent-run-tools'), 'PC dev task CSS should style local agent run tool pills');
   assert.ok(devTasksCss.includes('.agent-run-stop'), 'PC dev task CSS should style the local agent stop action');
   assert.ok(devTasksCss.includes('.agent-run-continue'), 'PC dev task CSS should style the local agent continue action');
+  assert.ok(devTasksCss.includes('.agent-run-recovery'), 'PC dev task CSS should distinguish the recommended recovery entry');
 
   const nodeAgentMain = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_main.rs'), 'utf8');
   assert.ok(nodeAgentMain.includes('node_agent_task_journal_api::routes()'), 'task journal API should be mounted behind local admin guard');
@@ -1463,6 +1478,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAgentMain.includes('/api/project-agent-runs'), 'node agent should mount local project agent run logs API');
   assert.ok(nodeAgentMain.includes('active_cli_prompt_views_for_workspace'), 'node agent should expose live control handles by workspace');
   assert.ok(nodeAgentMain.includes('task_journal_records_for_workspace'), 'node agent should expose task journal resume records by workspace');
+  const projectAgentRuns = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_project_agent_runs.rs'), 'utf8');
+  assert.ok(projectAgentRuns.includes('recovery_entry'), 'project agent runs API should expose a top-level recovery entry');
   const clientMaintenance = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_client_maintenance.rs'), 'utf8');
   assert.ok(clientMaintenance.includes('maintenance_recent_events'), 'client maintenance status should expose recent maintenance events');
   assert.ok(clientMaintenance.includes('recent_maintenance_events'), 'client maintenance status should read recent maintenance log lines');
@@ -1506,10 +1523,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(nodeAdmin.includes('修复客户端入口'), 'standalone node admin page should expose a repair action');
   assert.ok(nodeAdmin.includes('recommended_actions'), 'standalone node admin page should read recommended maintenance actions');
   assert.ok(nodeAdmin.includes('missing_start_menu_entry_count'), 'standalone node admin page should show missing start menu entry counts');
-  assert.ok(nodeAdmin.includes("openMaintenanceTarget('logs'"), 'standalone node admin page should open runtime logs');
-  assert.ok(nodeAdmin.includes("openMaintenanceTarget('launcher_logs'"), 'standalone node admin page should open launcher logs');
-  assert.ok(nodeAdmin.includes("openMaintenanceTarget('task_journal'"), 'standalone node admin page should keep task journal separate');
-  assert.ok(nodeAdmin.includes('diagnostics_dir'), 'standalone node admin page should expose diagnostics directory target');
+  assert.ok(nodeAdmin.includes('renderClientMaintenanceActions'), 'standalone node admin page should render contract-driven maintenance actions');
+  assert.ok(nodeAdmin.includes("kind === 'open_target'"), 'standalone node admin page should handle open_target maintenance actions');
+  assert.ok(nodeAdmin.includes('openMaintenanceTarget(target'), 'standalone node admin page should open maintenance targets by action target');
+  assert.ok(nodeAdmin.includes('clientMaintActions'), 'standalone node admin page should expose a dynamic maintenance action container');
 
   const nativeNodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_node_admin.js'), 'utf8');
   assert.ok(nativeNodeAdmin.includes('nodeApiRuntimeModel'), 'PC node panel should expose Route B model input');

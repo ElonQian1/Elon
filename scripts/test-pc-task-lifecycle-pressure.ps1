@@ -69,6 +69,14 @@ Invoke-Step "Static pressure-test contract" {
         -Path $ProjectAgentRunsModule `
         -Needle "stress_agent_run_summary_reads_long_run_to_terminal_status" `
         -Message "Long agent-run lifecycle summary pressure test is missing"
+    Assert-FileContains `
+        -Path $ProjectAgentRunsModule `
+        -Needle "recovery_entry" `
+        -Message "Project agent runs API must expose a top-level recovery entry"
+    Assert-FileContains `
+        -Path $ProjectAgentRunsModule `
+        -Needle "recovery_entry_points_to_snapshot_continue_without_secrets" `
+        -Message "Project agent runs recovery-entry secrecy/resume test is missing"
     Write-Host "Static pressure-test contract passed."
 }
 

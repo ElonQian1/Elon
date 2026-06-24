@@ -8,7 +8,7 @@
 
 Route B/C 的本机工具能力已经包含 `list_dir`、`search_files`、`file_info`、`read_file`、`read_file_range`、只读 `git_status` / `git_diff` / `git_log` / `git_show`、`write_file`、`apply_patch`、`run_command`。其中 `git_status`、`git_diff`、`git_log`、`git_show` 是项目内只读 Git 检查工具，不消耗命令审批；`write_file`、`apply_patch`、`run_command` 在非只读模式下会先向 PC 网页端发出工具审批卡，用户批准后才会真正执行；拒绝、超时或任务取消都不会执行该工具。`write_file` 审批会展示整文件替换 diff，并在敏感路径、旧/新内容命中敏感字段、过大 diff、二进制内容或非 UTF-8 旧文件时 fail-closed；用户批准后还会复查旧文件 hash，防止审批后文件被外部进程改动。`apply_patch` 复用现有 unified diff 安全检查，继续拒绝 `.git`、大小写变体 `.GIT`、绝对路径、`..`、越界路径和非 unified diff。
 
-PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要和尾部事件，方便后续做任务恢复、压力测试和 PC UI 进度展示。
+PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要、尾部事件、活跃控制句柄、最近可续任务和顶层 `recovery_entry`，方便 PC UI 直接展示“推荐恢复”入口、做任务恢复和压力测试。
 
 任务生命周期压力测试已经覆盖 Route A/B/C 终态、取消、并发 journal 写入、分页回放、节点重启后丢失控制句柄、等待工具审批时节点重启、终态任务清理遗留审批 waiter、过期 Codex session 清理和超大工具事件截断；其中“等待审批时重启”的契约是：前端仍可从 journal 回放审批卡历史，但不能继续审批已经丢失的内存 waiter，只能基于快照开启新任务。任务正常结束、失败或取消进入统一收尾时，会按 req_id 清空仍残留的本机工具审批；本机 task journal API 在刷新终态任务时也会把历史 pending 审批标成“已关闭/任务已结束”，避免 PC UI 继续显示可误解的失效审批按钮。
 
@@ -20,7 +20,7 @@ Route C 远程模型能力已经有服务端预算审计和运营后台报告：
 
 Win 节点 `/api/status` 会返回 `runtime_policy`，结构化暴露 full_access 的真实边界：Route A full_access 只适用于本机已安装 CLI 且需要本机项目授权；Route B/C 即使 full_access，也不会绕过工作区路径检查、命令白名单、工具审批或高危 `git push` 拦截。PC 页面和后续运营面板可以直接读取 `runtime_policy.fullAccess`、`runtime_policy.routeBC.highRiskGitPushDenied` 和 `full_access_grant_count` 做可视化，不再只靠文档记忆。
 
-这还不是完整 Codex 桌面版 parity。后续仍建议补：跨节点重启后可继续审批的审批状态落库、任务恢复入口。
+这还不是完整 Codex 桌面版 parity。后续仍建议补：跨节点重启后可继续审批的审批状态落库；原 CLI TTY 仍是有限连续性，真正重新 attach 还需要后续 PTY/ConPTY 会话层。
 
 ---
 

@@ -236,12 +236,24 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
 }
 
 impl TaskResumeContract {
+    pub(crate) fn status(&self) -> &'static str {
+        self.status
+    }
+
     pub(crate) fn can_approve_tools(&self) -> bool {
         self.can_approve_tools
     }
 
     pub(crate) fn active_approval_ids(&self) -> &[String] {
         &self.active_approval_ids
+    }
+
+    pub(crate) fn next_action(&self) -> &'static str {
+        self.next_action
+    }
+
+    pub(crate) fn reason(&self) -> &'static str {
+        self.reason
     }
 }
 

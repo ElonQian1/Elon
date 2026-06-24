@@ -41,9 +41,26 @@ struct ProjectAgentRunsResponse {
     ok: bool,
     workspace_path: String,
     log_dir: String,
+    recovery_entry: Option<ProjectAgentRunRecoveryEntry>,
     active_controls: Vec<ProjectAgentRunControl>,
     recent_tasks: Vec<ProjectAgentRunTaskResume>,
     runs: Vec<ProjectAgentRunSummary>,
+}
+
+#[derive(Debug, Serialize)]
+struct ProjectAgentRunRecoveryEntry {
+    kind: String,
+    task_id: String,
+    cli_name: String,
+    route: Option<String>,
+    cwd: Option<String>,
+    runtime_permission: Option<String>,
+    status: String,
+    recommended_action: String,
+    reason: String,
+    can_cancel: bool,
+    can_continue: bool,
+    updated_at_ms: Option<u128>,
 }
 
 #[derive(Debug, Serialize)]
@@ -129,6 +146,8 @@ pub(crate) async fn list_handler(
                 .collect();
             response.recent_tasks =
                 recent_task_resume_views(journal_records, &active_task_ids, RECENT_TASKS_LIMIT);
+            response.recovery_entry =
+                recovery_entry_from(&response.active_controls, &response.recent_tasks);
             (StatusCode::OK, Json(json!(response))).into_response()
         }
         Err(error) => (
@@ -169,10 +188,65 @@ fn list_project_agent_runs(req: &ProjectAgentRunsReq) -> Result<ProjectAgentRuns
         ok: true,
         workspace_path: workspace.to_string_lossy().to_string(),
         log_dir: log_dir.to_string_lossy().to_string(),
+        recovery_entry: None,
         active_controls: Vec::new(),
         recent_tasks: Vec::new(),
         runs,
     })
+}
+
+fn recovery_entry_from(
+    active_controls: &[ProjectAgentRunControl],
+    recent_tasks: &[ProjectAgentRunTaskResume],
+) -> Option<ProjectAgentRunRecoveryEntry> {
+    active_controls
+        .iter()
+        .find(|control| !control.task_id.trim().is_empty())
+        .map(ProjectAgentRunRecoveryEntry::from_active_control)
+        .or_else(|| {
+            recent_tasks
+                .iter()
+                .find(|task| !task.task_id.trim().is_empty())
+                .map(ProjectAgentRunRecoveryEntry::from_recent_task)
+        })
+}
+
+impl ProjectAgentRunRecoveryEntry {
+    fn from_active_control(control: &ProjectAgentRunControl) -> Self {
+        Self {
+            kind: "active_control".to_string(),
+            task_id: control.task_id.clone(),
+            cli_name: control.cli_name.clone(),
+            route: Some(control.route.clone()),
+            cwd: control.cwd.clone(),
+            runtime_permission: control.runtime_permission.clone(),
+            status: "running".to_string(),
+            recommended_action: "wait_or_cancel".to_string(),
+            reason: "当前本机节点仍持有运行控制句柄，PC 端应优先展示继续观察或停止入口。"
+                .to_string(),
+            can_cancel: control.can_cancel,
+            can_continue: false,
+            updated_at_ms: Some(control.last_heartbeat_ms),
+        }
+    }
+
+    fn from_recent_task(task: &ProjectAgentRunTaskResume) -> Self {
+        let recommended_action = task.resume.next_action().to_string();
+        Self {
+            kind: "snapshot_resume".to_string(),
+            task_id: task.task_id.clone(),
+            cli_name: task.cli_name.clone(),
+            route: task.route.clone(),
+            cwd: task.cwd.clone(),
+            runtime_permission: task.runtime_permission.clone(),
+            status: task.resume.status().to_string(),
+            can_cancel: false,
+            can_continue: recommended_action == "continue_from_snapshot",
+            recommended_action,
+            reason: task.resume.reason().to_string(),
+            updated_at_ms: Some(task.updated_at_ms),
+        }
+    }
 }
 
 fn recent_task_resume_views(
@@ -464,6 +538,7 @@ mod tests {
         assert!(response.ok);
         assert!(response.active_controls.is_empty());
         assert!(response.recent_tasks.is_empty());
+        assert!(response.recovery_entry.is_none());
         assert_eq!(response.runs.len(), 1);
         let run = &response.runs[0];
         assert_eq!(run.run_id, "run-1");
@@ -624,6 +699,54 @@ mod tests {
             let resume = serde_json::to_value(&view.resume).expect("resume should serialize");
             resume["next_action"] == "continue_from_snapshot" && resume["can_cancel"] == false
         }));
+    }
+
+    #[test]
+    fn recovery_entry_prefers_live_control_handle() {
+        let control = ProjectAgentRunControl {
+            task_id: "req-live".to_string(),
+            run_handle_id: "req-live".to_string(),
+            cli_name: "server-runtime".to_string(),
+            route: "route_c_server_runtime".to_string(),
+            cwd: Some("D:/demo".to_string()),
+            runtime_permission: Some("project_write".to_string()),
+            started_at_ms: 100,
+            last_heartbeat_ms: 200,
+            control_lease_expires_at_ms: 47_000,
+            os_pid: Some(1234),
+            can_cancel: true,
+        };
+        let recent = project_task_resume_view(task_record("req-detached", 190));
+
+        let entry = recovery_entry_from(&[control], &[recent]).expect("entry should exist");
+
+        assert_eq!(entry.kind, "active_control");
+        assert_eq!(entry.task_id, "req-live");
+        assert_eq!(entry.status, "running");
+        assert_eq!(entry.recommended_action, "wait_or_cancel");
+        assert!(entry.can_cancel);
+        assert!(!entry.can_continue);
+    }
+
+    #[test]
+    fn recovery_entry_points_to_snapshot_continue_without_secrets() {
+        let mut record = task_record("req-detached", 900);
+        record.codex_session_id = Some("session-secret-uuid".to_string());
+        record.codex_session_scope_key = Some("scope-secret".to_string());
+        let recent = project_task_resume_view(record);
+
+        let entry = recovery_entry_from(&[], &[recent]).expect("entry should exist");
+        let serialized = serde_json::to_string(&entry).unwrap();
+
+        assert_eq!(entry.kind, "snapshot_resume");
+        assert_eq!(entry.task_id, "req-detached");
+        assert_eq!(entry.status, "terminal");
+        assert_eq!(entry.recommended_action, "continue_from_snapshot");
+        assert!(!entry.can_cancel);
+        assert!(entry.can_continue);
+        assert!(serialized.contains("本机进程已经结束"));
+        assert!(!serialized.contains("session-secret-uuid"));
+        assert!(!serialized.contains("scope-secret"));
     }
 
     fn temp_dir(label: &str) -> PathBuf {

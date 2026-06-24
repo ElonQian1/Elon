@@ -41,20 +41,27 @@
         return sectionShell('本机 Agent 运行', statusLine(cached.error, 'failed'), refreshButton());
       }
       continuationDrafts.clear();
+      const recoveryEntry = cached.recoveryEntry || null;
       const controls = Array.isArray(cached.activeControls) ? cached.activeControls : [];
       const recentTasks = Array.isArray(cached.recentTasks) ? cached.recentTasks : [];
       const runs = Array.isArray(cached.runs) ? cached.runs : [];
-      if (!controls.length && !recentTasks.length && !runs.length) {
+      if (!recoveryEntry && !controls.length && !recentTasks.length && !runs.length) {
         return sectionShell('本机 Agent 运行', statusLine('暂无本机运行记录', 'muted'), refreshButton());
       }
-      const controlItems = controls.map(renderControl).join('');
+      const recoveryTaskId = recoveryEntryTaskId(recoveryEntry);
+      const recoveryItem = recoveryEntry ? renderRecoveryEntry(recoveryEntry, cached) : '';
+      const controlItems = controls
+        .filter((control) => controlTaskId(control) !== recoveryTaskId)
+        .map(renderControl)
+        .join('');
       const taskItems = recentTasks
+        .filter((task) => taskResumeId(task) !== recoveryTaskId)
         .slice(0, controls.length ? 2 : 3)
         .map((task) => renderRecentTask(task, cached))
         .join('');
       const runLimit = controls.length || recentTasks.length ? 2 : 4;
       const runItems = runs.slice(0, runLimit).map(renderRun).join('');
-      const items = `${controlItems}${taskItems}${runItems}`;
+      const items = `${recoveryItem}${controlItems}${taskItems}${runItems}`;
       return sectionShell('本机 Agent 运行', items, refreshButton());
     }
 
@@ -141,6 +148,7 @@
     function normalizeResponse(data) {
       return {
         runs: Array.isArray(data && data.runs) ? data.runs : [],
+        recoveryEntry: normalizeRecoveryEntry(data && (data.recovery_entry || data.recoveryEntry)),
         activeControls: Array.isArray(data && (data.active_controls || data.activeControls))
           ? (data.active_controls || data.activeControls)
           : [],
@@ -151,6 +159,13 @@
         workspacePath: clean(data && (data.workspace_path || data.workspacePath)),
         loadedAt: Date.now()
       };
+    }
+
+    function normalizeRecoveryEntry(entry) {
+      if (!entry || typeof entry !== 'object') return null;
+      const taskId = recoveryEntryTaskId(entry);
+      if (!taskId) return null;
+      return entry;
     }
 
     async function cancelTask(taskId, messages, scope) {
@@ -182,6 +197,40 @@
           <small>${escapeHtml(meta || '本机控制句柄')}</small>
         </div>
         ${canCancel ? `<button class="agent-run-stop" type="button" data-agent-run-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>` : ''}
+      </article>`;
+    }
+
+    function renderRecoveryEntry(entry, context) {
+      const taskId = recoveryEntryTaskId(entry);
+      const action = clean(entry && (entry.recommended_action || entry.recommendedAction)).toLowerCase();
+      const status = statusMeta(entry && (entry.status || (action === 'wait_or_cancel' ? 'running' : '')));
+      const kind = clean(entry && entry.kind);
+      const cliName = clean(entry && (entry.cli_name || entry.cliName)) || 'agent';
+      const route = clean(entry && entry.route);
+      const permission = clean(entry && (entry.runtime_permission || entry.runtimePermission));
+      const updated = clean(entry && (entry.updated_at || entry.updatedAt || entry.updated_at_ms || entry.updatedAtMs));
+      const reason = clean(entry && entry.reason);
+      const canCancel = taskId && (entry.can_cancel === true || entry.canCancel === true);
+      const canContinue = taskId && (entry.can_continue === true || entry.canContinue === true || action === 'continue_from_snapshot');
+      const draftTask = canContinue ? recoveryTaskForDraft(entry, context) : null;
+      const draft = draftTask ? continuationDraft(draftTask, context) : '';
+      if (canContinue && taskId && draft) continuationDrafts.set(taskId, draft);
+      const meta = [
+        cliName,
+        route,
+        permission,
+        recoveryActionLabel(action, kind),
+        updated
+      ].filter(Boolean).join(' · ');
+      return `<article class="agent-run-item ${escapeHtml(status.tone)} agent-run-control agent-run-recovery">
+        <div class="agent-run-main">
+          <span class="agent-run-status">推荐恢复</span>
+          <strong>${escapeHtml(shortRunId(taskId || kind || cliName))}</strong>
+          <small>${escapeHtml(meta || recoveryKindLabel(kind))}</small>
+          ${reason ? `<p>${escapeHtml(reason)}</p>` : ''}
+        </div>
+        ${canContinue ? `<button class="agent-run-continue" type="button" data-agent-run-action="continue" data-task-id="${escapeHtml(taskId)}">继续</button>` : ''}
+        ${!canContinue && canCancel ? `<button class="agent-run-stop" type="button" data-agent-run-action="cancel" data-task-id="${escapeHtml(taskId)}">停止</button>` : ''}
       </article>`;
     }
 
@@ -260,6 +309,8 @@
     function shouldPoll(cached) {
       if (!cached || cached.error) return true;
       if ((cached.activeControls || []).length) return true;
+      const recovery = cached.recoveryEntry || null;
+      if (recovery && clean(recovery.status).toLowerCase() === 'running') return true;
       if ((cached.recentTasks || []).some((task) => clean(task && task.status).toLowerCase() === 'running')) return true;
       return (cached.runs || []).some((run) => clean(run && run.status).toLowerCase() === 'running');
     }
@@ -297,6 +348,48 @@
 
     function taskResumeId(task) {
       return clean(task && (task.task_id || task.taskId || task.req_id || task.reqId));
+    }
+
+    function recoveryEntryTaskId(entry) {
+      return clean(entry && (entry.task_id || entry.taskId || entry.req_id || entry.reqId));
+    }
+
+    function recoveryKindLabel(kind) {
+      if (kind === 'active_control') return '本机控制句柄';
+      if (kind === 'snapshot_resume') return '本机任务快照';
+      return '本机恢复入口';
+    }
+
+    function recoveryActionLabel(action, kind) {
+      if (action === 'continue_from_snapshot') return '基于快照继续';
+      if (action === 'wait_or_cancel') return '等待或停止';
+      return recoveryKindLabel(kind);
+    }
+
+    function recoveryTaskForDraft(entry, context) {
+      const taskId = recoveryEntryTaskId(entry);
+      const recent = Array.isArray(context && context.recentTasks)
+        ? context.recentTasks.find((task) => taskResumeId(task) === taskId)
+        : null;
+      if (recent) return recent;
+      return {
+        task_id: taskId,
+        cli_name: entry && (entry.cli_name || entry.cliName),
+        route: entry && entry.route,
+        cwd: entry && entry.cwd,
+        runtime_permission: entry && (entry.runtime_permission || entry.runtimePermission),
+        status: entry && entry.status,
+        updated_at_ms: entry && (entry.updated_at_ms || entry.updatedAtMs),
+        attach: { status: 'detached', source: 'local_journal' },
+        resume: {
+          status: entry && entry.status,
+          can_replay_journal_events: true,
+          can_stream_live_output: false,
+          next_action: entry && (entry.recommended_action || entry.recommendedAction),
+          reason: entry && entry.reason,
+          strategy: { kind: 'snapshot_continue', label: '基于快照继续' }
+        }
+      };
     }
 
     function taskCanContinue(task) {
