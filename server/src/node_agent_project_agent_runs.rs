@@ -15,9 +15,11 @@ use std::{
 
 use crate::{
     node_agent_active_task::ActiveCliPromptView,
+    node_agent_task_approval_snapshot::TaskApprovalJournalSnapshot,
     node_agent_task_journal::TaskJournalRecord,
     node_agent_task_resume::{
-        task_attach_state, task_resume_contract, TaskAttachState, TaskResumeContract,
+        task_attach_state, task_resume_contract, task_resume_contract_with_journal_approvals,
+        TaskAttachState, TaskResumeContract,
     },
     NodeRuntime,
 };
@@ -144,8 +146,17 @@ pub(crate) async fn list_handler(
                 .into_iter()
                 .take(RECENT_TASK_CANDIDATE_LIMIT)
                 .collect();
-            response.recent_tasks =
-                recent_task_resume_views(journal_records, &active_task_ids, RECENT_TASKS_LIMIT);
+            response.recent_tasks = recent_task_resume_views_with_journal_approvals(
+                journal_records,
+                &active_task_ids,
+                RECENT_TASKS_LIMIT,
+                |task_id| {
+                    runtime
+                        .task_journal_snapshot(task_id, 0, 1)
+                        .ok()
+                        .map(|snapshot| snapshot.approvals)
+                },
+            );
             response.recovery_entry =
                 recovery_entry_from(&response.active_controls, &response.recent_tasks);
             (StatusCode::OK, Json(json!(response))).into_response()
@@ -254,13 +265,25 @@ fn recent_task_resume_views(
     active_task_ids: &BTreeSet<String>,
     limit: usize,
 ) -> Vec<ProjectAgentRunTaskResume> {
+    recent_task_resume_views_with_journal_approvals(records, active_task_ids, limit, |_| None)
+}
+
+fn recent_task_resume_views_with_journal_approvals(
+    records: Vec<TaskJournalRecord>,
+    active_task_ids: &BTreeSet<String>,
+    limit: usize,
+    mut approvals_for_task: impl FnMut(&str) -> Option<TaskApprovalJournalSnapshot>,
+) -> Vec<ProjectAgentRunTaskResume> {
     let mut seen = BTreeSet::new();
     records
         .into_iter()
         .filter(|record| !active_task_ids.contains(&record.req_id))
         .filter(|record| seen.insert(record.req_id.clone()))
         .take(limit)
-        .map(project_task_resume_view)
+        .map(|record| {
+            let approvals = approvals_for_task(&record.req_id);
+            project_task_resume_view_with_approvals(record, approvals.as_ref())
+        })
         .collect()
 }
 
@@ -283,8 +306,17 @@ impl From<ActiveCliPromptView> for ProjectAgentRunControl {
 }
 
 fn project_task_resume_view(record: TaskJournalRecord) -> ProjectAgentRunTaskResume {
+    project_task_resume_view_with_approvals(record, None)
+}
+
+fn project_task_resume_view_with_approvals(
+    record: TaskJournalRecord,
+    approvals: Option<&TaskApprovalJournalSnapshot>,
+) -> ProjectAgentRunTaskResume {
     let attach = task_attach_state(Some(&record), None);
-    let resume = task_resume_contract(&attach);
+    let resume = approvals
+        .map(|approvals| task_resume_contract_with_journal_approvals(&attach, approvals))
+        .unwrap_or_else(|| task_resume_contract(&attach));
     ProjectAgentRunTaskResume {
         task_id: record.req_id,
         cli_name: record.cli_name,
@@ -507,6 +539,7 @@ fn json_string(value: &Value, key: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
@@ -670,6 +703,58 @@ mod tests {
         assert!(serialized.contains("本机 journal"));
         assert!(!serialized.contains("secret prompt"));
         assert!(!serialized.contains("sk-live-secret"));
+    }
+
+    #[test]
+    fn task_resume_view_includes_journal_pending_approvals_without_enabling_clicks() {
+        let mut approval_tracker =
+            crate::node_agent_task_approval_snapshot::TaskApprovalJournalTracker::default();
+        approval_tracker.observe_event(
+            1,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_restart_pending",
+                "tool": "write_file"
+            }),
+        );
+        let approvals = approval_tracker.finish();
+        let view = project_task_resume_view_with_approvals(
+            TaskJournalRecord {
+                req_id: "req-detached-approval".to_string(),
+                cli_name: "server-runtime".to_string(),
+                route: Some("route_c_server_runtime".to_string()),
+                run_handle_id: Some("req-detached-approval".to_string()),
+                cwd: Some("D:/demo".to_string()),
+                runtime_permission: Some("project_write".to_string()),
+                os_pid: Some(42),
+                process_started_at_ms: Some(100),
+                codex_session_id: None,
+                codex_session_scope_key: None,
+                codex_session_updated_at_ms: None,
+                status: "running".to_string(),
+                started_at_ms: 100,
+                updated_at_ms: 200,
+                cancel_requested_at_ms: None,
+            },
+            Some(&approvals),
+        );
+        let resume = serde_json::to_value(&view.resume).unwrap();
+
+        assert_eq!(resume["status"], "detached");
+        assert_eq!(resume["can_approve_tools"], false);
+        assert_eq!(resume["active_approval_ids"], json!([]));
+        assert_eq!(
+            resume["tool_approval_recovery"]["journal_pending_approval_ids"],
+            json!(["tap_restart_pending"])
+        );
+        assert_eq!(
+            resume["tool_approval_recovery"]["journal_pending_count"],
+            json!(1)
+        );
+        assert_eq!(
+            resume["tool_approval_recovery"]["pending_after_restart_action"],
+            "continue_from_snapshot"
+        );
     }
 
     #[test]

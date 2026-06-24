@@ -15,7 +15,8 @@ use crate::{
     node_agent_task_approval_snapshot::TaskApprovalStateSnapshot,
     node_agent_task_journal::{TaskJournalEventView, TaskJournalRecord},
     node_agent_task_resume::{
-        task_attach_state, task_resume_contract, TaskAttachState, TaskResumeContract,
+        task_attach_state, task_resume_contract_with_journal_approvals, TaskAttachState,
+        TaskResumeContract,
     },
     NodeRuntime,
 };
@@ -97,7 +98,7 @@ async fn get_task_journal(
         Ok(snapshot) => {
             // 本地 API 只暴露进程恢复所需的最小字段；prompt/API key 从未写入 journal。
             let attach = task_attach_state(snapshot.record.as_ref(), active);
-            let resume = task_resume_contract(&attach);
+            let resume = task_resume_contract_with_journal_approvals(&attach, &snapshot.approvals);
             let task_status = snapshot
                 .record
                 .as_ref()

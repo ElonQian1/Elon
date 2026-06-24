@@ -3,7 +3,9 @@ use crate::{
     node_agent_active_task_registry::ActiveCliPromptRegistry,
     node_agent_codex_session::clear_stale_session,
     node_agent_task_journal::{TaskJournal, TaskJournalRecord, TaskJournalStart},
-    node_agent_task_resume::{task_attach_state, task_resume_contract},
+    node_agent_task_resume::{
+        task_attach_state, task_resume_contract, task_resume_contract_with_journal_approvals,
+    },
     node_agent_tool_approval::{ToolApprovalDecision, ToolApprovalState},
 };
 use serde_json::{json, Value};
@@ -649,7 +651,8 @@ async fn stress_restart_waiting_approvals_fall_back_to_snapshot_continue() {
         let record = registry_after_restart
             .get(&req_id)
             .expect("waiting-approval record should survive restart");
-        let resume = task_resume_contract(&task_attach_state(Some(record), None));
+        let attach = task_attach_state(Some(record), None);
+        let resume = task_resume_contract(&attach);
         let resume_json = serde_json::to_value(resume).expect("detached resume should serialize");
 
         assert_eq!(resume_json["status"], "detached");
@@ -673,6 +676,19 @@ async fn stress_restart_waiting_approvals_fall_back_to_snapshot_continue() {
             .expect("waiting approval snapshot should replay after restart");
         assert_eq!(snapshot.approvals.pending_count, 1);
         assert_eq!(snapshot.approvals.approvals[0].approval_id, approval_id);
+        let resume_with_journal =
+            task_resume_contract_with_journal_approvals(&attach, &snapshot.approvals);
+        let resume_with_journal_json =
+            serde_json::to_value(resume_with_journal).expect("journal resume should serialize");
+        assert_eq!(
+            resume_with_journal_json["tool_approval_recovery"]["journal_pending_approval_ids"],
+            json!([approval_id])
+        );
+        assert_eq!(
+            resume_with_journal_json["tool_approval_recovery"]["journal_pending_count"],
+            json!(1)
+        );
+        assert_eq!(resume_with_journal_json["can_approve_tools"], false);
         let approval_state =
             snapshot
                 .approvals

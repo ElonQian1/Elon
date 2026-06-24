@@ -128,6 +128,14 @@ impl TaskApprovalJournalTracker {
 }
 
 impl TaskApprovalJournalSnapshot {
+    pub(crate) fn pending_approval_ids(&self) -> Vec<String> {
+        self.approvals
+            .iter()
+            .filter(|approval| approval.status == "pending")
+            .map(|approval| approval.approval_id.clone())
+            .collect()
+    }
+
     pub(crate) fn resolve_runtime_state_for_task_status(
         &self,
         active_approval_ids: &[String],
@@ -377,6 +385,41 @@ mod tests {
         assert_eq!(state.unavailable_count, 1);
         assert_eq!(state.approvals[0].status, "unavailable");
         assert!(!state.approvals[0].actionable);
+    }
+
+    #[test]
+    fn pending_approval_ids_only_include_undecided_items() {
+        let mut tracker = TaskApprovalJournalTracker::default();
+        tracker.observe_event(
+            1,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_pending",
+                "tool": "run_command"
+            }),
+        );
+        tracker.observe_event(
+            2,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_approved",
+                "tool": "write_file"
+            }),
+        );
+        tracker.observe_event(
+            3,
+            &json!({
+                "type": "tool_approval_decision",
+                "approval_id": "tap_approved",
+                "decision": "approve"
+            }),
+        );
+
+        let snapshot = tracker.finish();
+
+        assert_eq!(snapshot.pending_approval_ids(), vec!["tap_pending"]);
+        assert_eq!(snapshot.pending_count, 1);
+        assert_eq!(snapshot.decided_count, 1);
     }
 
     #[test]

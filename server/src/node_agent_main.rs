@@ -2560,6 +2560,15 @@ impl NodeRuntime {
             .latest_records_for_workspace(workspace, limit)
     }
 
+    pub(crate) fn task_journal_snapshot(
+        &self,
+        task_id: &str,
+        since: usize,
+        limit: usize,
+    ) -> anyhow::Result<node_agent_task_journal::TaskJournalSnapshot> {
+        self.task_journal.snapshot(task_id, since, limit)
+    }
+
     async fn set_cli_prompt_os_pid(&self, req_id: &str, pid: Option<u32>) {
         self.active_cli_prompts.set_os_pid(req_id, pid).await;
     }

@@ -3,7 +3,9 @@
 use serde::Serialize;
 
 use crate::{
-    node_agent_active_task::ActiveCliPromptView, node_agent_task_journal::TaskJournalRecord,
+    node_agent_active_task::ActiveCliPromptView,
+    node_agent_task_approval_snapshot::TaskApprovalJournalSnapshot,
+    node_agent_task_journal::TaskJournalRecord,
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -54,6 +56,8 @@ struct TaskResumeToolApprovalRecovery {
     status: &'static str,
     can_approve_now: bool,
     active_approval_ids: Vec<String>,
+    journal_pending_approval_ids: Vec<String>,
+    journal_pending_count: usize,
     replay_source: &'static str,
     pending_after_restart_action: &'static str,
     reason: &'static str,
@@ -138,10 +142,27 @@ pub(crate) fn task_attach_state(
 }
 
 pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContract {
+    task_resume_contract_with_journal_pending(attach, Vec::new())
+}
+
+pub(crate) fn task_resume_contract_with_journal_approvals(
+    attach: &TaskAttachState,
+    approvals: &TaskApprovalJournalSnapshot,
+) -> TaskResumeContract {
+    task_resume_contract_with_journal_pending(attach, approvals.pending_approval_ids())
+}
+
+fn task_resume_contract_with_journal_pending(
+    attach: &TaskAttachState,
+    journal_pending_approval_ids: Vec<String>,
+) -> TaskResumeContract {
     let active_approval_ids = active_approval_ids(attach);
     let can_approve_tools = !active_approval_ids.is_empty();
-    let tool_approval_recovery =
-        tool_approval_recovery_status(attach.status, active_approval_ids.clone());
+    let tool_approval_recovery = tool_approval_recovery_status(
+        attach.status,
+        active_approval_ids.clone(),
+        journal_pending_approval_ids,
+    );
     let run_handle = resume_run_handle(attach);
     let codex_session = attach.codex_session.clone();
     let can_resume_codex_session = codex_session.is_some();
@@ -293,12 +314,16 @@ fn tty_reattach_status() -> TaskResumeTtyReattach {
 fn tool_approval_recovery_status(
     attach_status: &'static str,
     active_approval_ids: Vec<String>,
+    journal_pending_approval_ids: Vec<String>,
 ) -> TaskResumeToolApprovalRecovery {
+    let journal_pending_count = journal_pending_approval_ids.len();
     match attach_status {
         "live" if !active_approval_ids.is_empty() => TaskResumeToolApprovalRecovery {
             status: "active_waiter",
             can_approve_now: true,
             active_approval_ids,
+            journal_pending_approval_ids,
+            journal_pending_count,
             replay_source: "local_journal_and_memory_waiter",
             pending_after_restart_action: "approve_or_deny_current_waiter",
             reason:
@@ -309,6 +334,8 @@ fn tool_approval_recovery_status(
             status: "no_active_waiter",
             can_approve_now: false,
             active_approval_ids: Vec::new(),
+            journal_pending_approval_ids,
+            journal_pending_count,
             replay_source: "local_journal",
             pending_after_restart_action: "wait_refresh_or_continue_from_snapshot",
             reason:
@@ -322,6 +349,8 @@ fn tool_approval_recovery_status(
             status: "lost_after_restart",
             can_approve_now: false,
             active_approval_ids: Vec::new(),
+            journal_pending_approval_ids,
+            journal_pending_count,
             replay_source: "local_journal",
             pending_after_restart_action: "continue_from_snapshot",
             reason:
@@ -335,6 +364,8 @@ fn tool_approval_recovery_status(
             status: "closed_by_terminal_task",
             can_approve_now: false,
             active_approval_ids: Vec::new(),
+            journal_pending_approval_ids,
+            journal_pending_count,
             replay_source: "local_journal",
             pending_after_restart_action: "none",
             reason: "任务已进入终态，所有未处理工具审批都应显示为已关闭或已失效。",
@@ -344,6 +375,8 @@ fn tool_approval_recovery_status(
             status: "unavailable",
             can_approve_now: false,
             active_approval_ids: Vec::new(),
+            journal_pending_approval_ids,
+            journal_pending_count,
             replay_source: "cloud_snapshot_only",
             pending_after_restart_action: "refresh_snapshot",
             reason: "当前 PC 节点没有本机 journal 现场，不能判断或继续任何工具审批。",
@@ -409,11 +442,16 @@ fn resume_run_handle(attach: &TaskAttachState) -> Option<TaskResumeRunHandle> {
 
 #[cfg(test)]
 mod tests {
-    use super::{task_attach_state, task_resume_contract};
+    use super::{
+        task_attach_state, task_resume_contract, task_resume_contract_with_journal_approvals,
+    };
     use crate::{
-        node_agent_active_task::ActiveCliPromptView, node_agent_task_journal::TaskJournalRecord,
+        node_agent_active_task::ActiveCliPromptView,
+        node_agent_task_approval_snapshot::TaskApprovalJournalTracker,
+        node_agent_task_journal::TaskJournalRecord,
         node_agent_tool_approval::PendingToolApprovalView,
     };
+    use serde_json::json;
 
     fn record(status: &str) -> TaskJournalRecord {
         TaskJournalRecord {
@@ -480,6 +518,7 @@ mod tests {
         assert_eq!(resume.active_approval_ids, vec!["tap_1_1"]);
         assert_eq!(resume.tool_approval_recovery.status, "active_waiter");
         assert!(resume.tool_approval_recovery.can_approve_now);
+        assert_eq!(resume.tool_approval_recovery.journal_pending_count, 0);
         assert_eq!(
             resume.tool_approval_recovery.active_approval_ids,
             vec!["tap_1_1"]
@@ -511,6 +550,7 @@ mod tests {
         assert!(resume.active_approval_ids.is_empty());
         assert_eq!(resume.tool_approval_recovery.status, "lost_after_restart");
         assert!(!resume.tool_approval_recovery.can_approve_now);
+        assert_eq!(resume.tool_approval_recovery.journal_pending_count, 0);
         assert_eq!(
             resume.tool_approval_recovery.pending_after_restart_action,
             "continue_from_snapshot"
@@ -525,6 +565,38 @@ mod tests {
         assert_eq!(
             resume.tty_reattach.fallback,
             "journal_replay_snapshot_continue_and_codex_session_resume"
+        );
+    }
+
+    #[test]
+    fn detached_contract_exposes_journal_pending_approval_ids_without_claiming_approval() {
+        let mut tracker = TaskApprovalJournalTracker::default();
+        tracker.observe_event(
+            1,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_restart_1",
+                "tool": "write_file"
+            }),
+        );
+        let approvals = tracker.finish();
+        let running = record("running");
+        let attach = task_attach_state(Some(&running), None);
+        let resume = task_resume_contract_with_journal_approvals(&attach, &approvals);
+
+        assert_eq!(resume.status, "detached");
+        assert!(!resume.can_approve_tools);
+        assert!(resume.active_approval_ids.is_empty());
+        assert_eq!(resume.tool_approval_recovery.status, "lost_after_restart");
+        assert!(!resume.tool_approval_recovery.can_approve_now);
+        assert_eq!(
+            resume.tool_approval_recovery.journal_pending_approval_ids,
+            vec!["tap_restart_1"]
+        );
+        assert_eq!(resume.tool_approval_recovery.journal_pending_count, 1);
+        assert_eq!(
+            resume.tool_approval_recovery.pending_after_restart_action,
+            "continue_from_snapshot"
         );
     }
 

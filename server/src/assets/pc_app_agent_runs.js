@@ -464,7 +464,11 @@
       const activeIds = Array.isArray(recovery.active_approval_ids || recovery.activeApprovalIds)
         ? (recovery.active_approval_ids || recovery.activeApprovalIds).map(clean).filter(Boolean)
         : [];
-      const label = toolApprovalRecoveryLabel(status, activeIds.length);
+      const journalPendingIds = Array.isArray(recovery.journal_pending_approval_ids || recovery.journalPendingApprovalIds)
+        ? (recovery.journal_pending_approval_ids || recovery.journalPendingApprovalIds).map(clean).filter(Boolean)
+        : [];
+      const journalPendingCount = Number(recovery.journal_pending_count ?? recovery.journalPendingCount ?? journalPendingIds.length) || 0;
+      const label = toolApprovalRecoveryLabel(status, activeIds.length, journalPendingCount);
       const reason = clean(recovery.reason);
       const action = clean(recovery.pending_after_restart_action || recovery.pendingAfterRestartAction);
       return {
@@ -475,10 +479,10 @@
       };
     }
 
-    function toolApprovalRecoveryLabel(status, activeCount) {
+    function toolApprovalRecoveryLabel(status, activeCount, journalPendingCount) {
       if (status === 'active_waiter') return activeCount > 0 ? `审批可继续（${activeCount}）` : '审批可继续';
       if (status === 'no_active_waiter') return '审批仅回放';
-      if (status === 'lost_after_restart') return '审批已失效';
+      if (status === 'lost_after_restart') return journalPendingCount > 0 ? `审批已失效（${journalPendingCount}）` : '审批已失效';
       if (status === 'closed_by_terminal_task') return '审批已关闭';
       if (status === 'unavailable') return '审批状态不可用';
       return '审批状态';

@@ -662,19 +662,32 @@
 
     function taskSnapshotContinueApprovalState(task) {
       const recovery = toolApprovalRecovery(task);
-      const meta = clean(recovery && recovery.reason) || '原 CLI 终端不可重接，请基于快照继续';
+      const meta = `${clean(recovery && recovery.reason) || '原 CLI 终端不可重接，请基于快照继续'}${toolApprovalPendingSuffix(recovery)}`;
       return { status: 'detached', tone: 'failed', label: '已失效', meta };
     }
 
     function taskApprovalUnavailableState(task) {
       const recovery = toolApprovalRecovery(task);
-      const meta = clean(recovery && recovery.reason) || '本机没有活动审批等待器';
+      const meta = `${clean(recovery && recovery.reason) || '本机没有活动审批等待器'}${toolApprovalPendingSuffix(recovery)}`;
       return { status: 'unavailable', tone: 'failed', label: '已失效', meta };
     }
 
     function toolApprovalRecovery(task) {
       const resume = task && task.resume ? task.resume : null;
       return resume && (resume.tool_approval_recovery || resume.toolApprovalRecovery) || null;
+    }
+
+    function toolApprovalPendingCount(recovery) {
+      if (!recovery) return 0;
+      const ids = Array.isArray(recovery.journal_pending_approval_ids || recovery.journalPendingApprovalIds)
+        ? (recovery.journal_pending_approval_ids || recovery.journalPendingApprovalIds).map(clean).filter(Boolean)
+        : [];
+      return Number(recovery.journal_pending_count ?? recovery.journalPendingCount ?? ids.length) || 0;
+    }
+
+    function toolApprovalPendingSuffix(recovery) {
+      const count = toolApprovalPendingCount(recovery);
+      return count > 0 ? `；journal 记录 ${count} 个历史待审批，当前不可继续点击` : '';
     }
 
     function approvalIsActionable(task, approvalId) {
@@ -788,7 +801,11 @@
       const tty = resume.can_stream_live_output === false
         ? '原 CLI 终端不可重接；请基于日志、快照或 Codex session 继续。'
         : '';
-      return [label, reason, codex, tty].filter(Boolean).join('：');
+      const recovery = resume.tool_approval_recovery || resume.toolApprovalRecovery;
+      const approval = toolApprovalPendingCount(recovery) > 0
+        ? '上次有历史待审批工具请求，但当前节点没有可点击的审批 waiter，请基于快照继续。'
+        : '';
+      return [label, reason, codex, tty, approval].filter(Boolean).join('：');
     }
 
     function compactForDraft(value, limit) {
