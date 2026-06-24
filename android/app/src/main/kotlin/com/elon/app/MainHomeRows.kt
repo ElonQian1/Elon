@@ -28,7 +28,7 @@ private val homeListClockFormatter = DateTimeFormatter.ofPattern("HH:mm", Locale
 private val homeListMonthDayFormatter = DateTimeFormatter.ofPattern("M月d日", Locale.CHINA)
 private val homeListYearMonthDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
 private val homeListWeekdays = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
-private const val PROJECT_MARKER_VISUAL_OFFSET_DP = -4
+private const val PROJECT_MARKER_VISUAL_OFFSET_DP = 4
 
 private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): String {
     if (timestampMs <= 0L) return ""
