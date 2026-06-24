@@ -185,22 +185,21 @@ git push origin main
 
 ## 🔀 多 AI 并发规则
 
-| `git status` 结果 | 做法 |
+| 当前位置 / 状态 | 做法 |
 |---|---|
-| 干净（无改动） | ✅ 主工作区直接改代码 |
-| 只有本 AI 自己改的文件 | ✅ 主工作区继续，提交时只 add 自己的文件 |
-| 有**其他 AI 未提交**的改动 | ⚠️ 必须用独立工作树，不得在主工作区改代码 |
+| 当前在 `main`，即使干净 | 先运行预检脚本，进入新建的 `WORKTREE_PATH`，不要直接编辑 `main` |
+| 当前在本任务 worktree，且干净不落后 | 可以继续当前任务 |
+| 当前在本任务 worktree，但落后远端 | 完成本任务提交后 push；push 被拒绝时再 rebase 到 `origin/main` |
+| 当前 worktree 有其他 AI / 其他任务 / 来源不明改动 | 不回退、不覆盖；重新从 `origin/main` 创建独立 worktree |
 
-### 有其他 AI 未提交改动时：独立工作树隔离
+### 独立工作树隔离
 
 ```powershell
-# 1. 基于 origin/main 创建本会话专属工作树
-$id = Get-Random -Maximum 9999
-git fetch origin main
-git worktree add ..\Elon-session-$id -b codex/session-$id origin/main
+# 1. 让脚本同步 main 基线，并从最新 origin/main 创建本会话专属工作树
+powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree
 
-# 2. 在会话工作树中改代码
-Set-Location ..\Elon-session-$id
+# 2. 按脚本输出进入 WORKTREE_PATH 后再改代码
+Set-Location "<WORKTREE_PATH>"
 # ... 修改文件 ...
 git add <自己的文件>
 git commit -m "feat(scope): 描述"
@@ -210,8 +209,8 @@ git push origin HEAD:main
 # 若 push 被拒绝：git fetch origin; git rebase origin/main; 解决冲突后重推
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed
 
-# 4. 清理会话工作树
-git worktree remove ..\Elon-session-$id --force
+# 4. 清理已合并且干净的历史 AI worktree
+powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply
 ```
 
 ---
