@@ -341,18 +341,21 @@
       padding-top: 14px;
     }
     .conversation-item .time {
-      font-size: 12px; color: var(--ink-soft);
+      font-size: 12px; color: var(--ink-list-preview);
       flex-shrink: 0;
       text-align: right;
       white-space: nowrap;
     }
     .conversation-item .project-marker {
+      display: block;
       width: 42px;
       height: 42px;
       margin-top: 2px;
-      object-fit: contain;
       pointer-events: none;
       transform: translateX(12px);
+      background: var(--ink-list-preview);
+      -webkit-mask: var(--project-marker-url) center / contain no-repeat;
+      mask: var(--project-marker-url) center / contain no-repeat;
     }
     .conversation-item .item-delete {
       display: none;
@@ -3556,10 +3559,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       trailing.appendChild(time);
     }
     if (item.kind === 'project') {
-      const marker = document.createElement('img');
+      const marker = document.createElement('span');
       marker.className = 'project-marker';
-      marker.src = 'data:image/png;base64,__HOME_PROJECT_MARKER_PNG_B64__';
-      marker.alt = '';
+      marker.style.setProperty('--project-marker-url', 'url("data:image/png;base64,__HOME_PROJECT_MARKER_PNG_B64__")');
       marker.setAttribute('aria-hidden', 'true');
       trailing.appendChild(marker);
     }

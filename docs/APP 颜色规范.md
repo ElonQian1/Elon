@@ -41,7 +41,7 @@
 | 主操作按钮 / 菜单 / 封面占位 | `color.surface.inverse` | `elon_surface_inverse` | `--surface-inverse` | `#FFFFFF` | 图 1 封面、图 2 按钮、图 3 菜单 |
 | 一级 Tab / 广场卡片标题 / 状态文字 | `color.text.primary` | `elon_text_primary` | `--ink` | `#D9D9D9` | 图 1/2 大标题、图 2 卡片标题 |
 | 我的项目列表项标题 | `color.text.list.title` | `elon_text_list_title` | `--ink-list-title` | `#FFFFFF` | 图 1 “项目名称” |
-| 好友页列表摘要 | `color.text.list.preview` | `elon_text_list_preview` | `--ink-list-preview` | `#606060` | 微信会话列表摘要采样 |
+| 好友页列表摘要 / 时间 / 项目标识 | `color.text.list.preview` | `elon_text_list_preview` | `--ink-list-preview` | `#606060` | 微信会话列表摘要采样 |
 | 详情页居中标题 | `color.text.detail.title` | `elon_text_detail_title` | `--ink-detail-title` | `#F4F5FB` | 图 3 顶部“魔王” |
 | 正文元信息 | `color.text.secondary` | `elon_text_secondary` | `--ink-muted` | `#B8B8B8` | 图 2 创建者、简介 |
 | 搜索占位 / 空状态 / 公告正文 | `color.text.placeholder` | `elon_text_placeholder` | `--ink-placeholder` | `#AFAFAF` | 图 2 搜索占位、图 3 空状态 |
@@ -90,7 +90,7 @@ APP 字体尺寸以当前 **好友页面** 和 **我的页面** 的实际 UI 为
 文字颜色规则：
 
 - 主标题、好友会话标题、我的页功能入口使用 `color.text.primary`。
-- 好友页列表的会话摘要和项目摘要使用 `color.text.list.preview`，用于和好友名称/项目名称拉开层级。
+- 好友页列表的会话摘要、项目摘要、右侧时间和项目标识使用 `color.text.list.preview`，用于和好友名称/项目名称拉开层级。
 - 我的页账号、签名、版本号使用 `color.text.secondary`、`color.text.placeholder` 或 `color.text.quiet`。
 - 白色按钮内文字使用 `color.text.inverse`，可沿用 `font.page.title` 并加粗。
 - 禁止用绿色表达普通标题或普通链接，绿色只表达状态或少数明确状态入口。

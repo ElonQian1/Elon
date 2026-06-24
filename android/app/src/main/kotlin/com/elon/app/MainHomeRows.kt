@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.animation.ValueAnimator
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
@@ -199,7 +200,7 @@ internal class MainHomeRows(
                     )
                     includeFontPadding = false
                     text = formatHomeListTime(value)
-                    setTextColor(Color.parseColor("#A8A8A8"))
+                    setTextColor(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
                     textSize = 12f
                 })
             }
@@ -218,6 +219,7 @@ internal class MainHomeRows(
             scaleType = ImageView.ScaleType.FIT_CENTER
             translationX = dp(PROJECT_MARKER_VISUAL_OFFSET_DP).toFloat()
             setImageResource(R.drawable.ic_home_project_marker)
+            imageTintList = ColorStateList.valueOf(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
         }
     }
 
