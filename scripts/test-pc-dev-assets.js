@@ -1519,6 +1519,10 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcApp.includes('projectRegistrationPreviewLine'), 'project registration should summarize the exact auto-filled registration payload');
   assert.ok(pcApp.includes('workbenchRegistrationProjectId'), 'project setup should remember the active project being rebound');
   assert.ok(pcApp.includes('project_id: targetProjectId || null'), 'local project registration should explicitly rebind the active project id');
+  assert.ok(pcApp.includes('activeProjectFolderPickController'), 'folder picker should keep a cancellable request controller');
+  assert.ok(pcApp.includes('取消等待'), 'folder picker should let users stop waiting instead of getting stuck');
+  assert.ok(pcApp.includes('revealManualProjectPathInput'), 'folder picker should reveal the manual project path fallback');
+  assert.ok(pcApp.includes('signal: controller.signal'), 'folder picker should pass the abort signal to the local helper request');
   assert.ok(pcApp.includes('is-register-preview'), 'project registration preview should be refreshable without re-inspecting the folder');
   assert.ok(pcApp.includes("mode === 'full_access' ? '完全访问' : '项目内读写'"), 'project registration preview should surface full-access mode before submit');
   assert.ok(pcApp.includes('registration.can_register'), 'project registration should read readiness from local inspect');
@@ -1541,6 +1545,7 @@ function testLocalAdminTokenWiring() {
   assert.ok(projectPickerRs.includes('register_payload'), 'local project inspect should expose a registration payload');
   assert.ok(projectPickerRs.includes('next_action'), 'local project inspect should expose a next registration action');
   assert.ok(projectPickerRs.includes('LocalProjectDevProfilePayload'), 'local project inspect should include a dev profile payload');
+  assert.ok(projectPickerRs.includes('$owner.TopMost = $true'), 'Windows folder picker should try to appear above the browser');
   assert.ok(projectProfileRs.includes('workspace_module_candidates'), 'local project profile should reuse workspace module discovery');
   assert.ok(workspaceModulesRs.includes('packages') && workspaceModulesRs.includes('apps'), 'workspace module discovery should inspect common monorepo roots');
   assert.ok(projectProfileNodeRs.includes('@tauri-apps/cli'), 'local project profile should detect Tauri desktop projects');

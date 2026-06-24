@@ -787,8 +787,22 @@ Add-Type -AssemblyName System.Windows.Forms
 $dialog = New-Object System.Windows.Forms.FolderBrowserDialog
 $dialog.Description = '选择要绑定到一龙 PC 节点的项目目录'
 $dialog.ShowNewFolderButton = $false
-if ($dialog.ShowDialog() -eq [System.Windows.Forms.DialogResult]::OK) {
-  Write-Output $dialog.SelectedPath
+$owner = New-Object System.Windows.Forms.Form
+$owner.StartPosition = 'CenterScreen'
+$owner.Width = 1
+$owner.Height = 1
+$owner.ShowInTaskbar = $false
+$owner.TopMost = $true
+$owner.Opacity = 0
+try {
+  $owner.Show()
+  $owner.Activate()
+  $result = $dialog.ShowDialog($owner)
+  if ($result -eq [System.Windows.Forms.DialogResult]::OK) {
+    Write-Output $dialog.SelectedPath
+  }
+} finally {
+  $owner.Dispose()
 }
 "#;
     let output = Command::new("powershell")

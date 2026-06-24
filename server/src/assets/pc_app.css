@@ -2436,6 +2436,13 @@ button { cursor: pointer; }
 .settings-project-bind .send-button {
   width: 100%;
 }
+.settings-project-bind .send-button.is-cancel-action {
+  background: #5b3a40;
+  color: #ffe1e6;
+}
+.settings-project-bind .send-button.is-cancel-action:hover {
+  background: #6a444b;
+}
 .settings-advanced {
   margin: 14px 0 0;
   border: 1px solid #30323a;

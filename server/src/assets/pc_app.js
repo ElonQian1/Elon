@@ -43,6 +43,8 @@
     { key: 'popular', label: '最热门', sort: 'members' }
   ];
   let pcAuthMode = 'login';
+  let activeProjectFolderPickController = null;
+  let projectFolderPickHintTimer = 0;
 
   const els = {
     pcShell: $('pcShell'), authClaimBanner: $('authClaimBanner'), authClaimBtn: $('authClaimBtn'),
@@ -220,10 +222,26 @@
   }
 
   async function localNodeFetch(path, request) {
+    const fetchRequest = Object.assign({}, request || {});
+    const timeoutMs = Number(fetchRequest.timeoutMs || 0);
+    delete fetchRequest.timeoutMs;
+    let timeoutTimer = 0;
+    if (timeoutMs > 0 && !fetchRequest.signal) {
+      const controller = new AbortController();
+      fetchRequest.signal = controller.signal;
+      timeoutTimer = window.setTimeout(() => controller.abort(), timeoutMs);
+    }
     try {
-      return await fetch(nodeAdminEndpoint(path), request);
+      return await fetch(nodeAdminEndpoint(path), fetchRequest);
     } catch (error) {
+      if (error && error.name === 'AbortError') {
+        const aborted = new Error('已停止等待本机助手返回。');
+        aborted.name = 'AbortError';
+        throw aborted;
+      }
       throw new Error(`无法连接本机助手 ${state.nodeAdminUrl}，请确认一龙 Win 端正在运行并已更新。`);
+    } finally {
+      if (timeoutTimer) window.clearTimeout(timeoutTimer);
     }
   }
 
@@ -2714,6 +2732,7 @@
   }
 
   function closeSettings() {
+    cancelLocalProjectFolderPick();
     els.settingsBackdrop.hidden = true;
   }
 
@@ -2734,6 +2753,42 @@
       button.textContent = button.dataset.label || button.textContent;
       delete button.dataset.label;
     }
+  }
+
+  function setProjectFolderPickBusy(busy) {
+    const button = els.chooseProjectFolderBtn;
+    if (!button) return;
+    if (busy) {
+      if (!button.dataset.label) button.dataset.label = button.textContent;
+      button.disabled = false;
+      button.textContent = '取消等待';
+      button.classList.add('is-cancel-action');
+      return;
+    }
+    button.disabled = false;
+    button.textContent = button.dataset.label || button.textContent;
+    delete button.dataset.label;
+    button.classList.remove('is-cancel-action');
+    updateWorkbenchOnboarding();
+  }
+
+  function revealManualProjectPathInput(focusInput) {
+    const details = document.querySelector('.settings-troubleshoot-details');
+    if (details) details.open = true;
+    if (focusInput && els.settingsProjectPath) {
+      els.settingsProjectPath.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      window.setTimeout(() => els.settingsProjectPath.focus(), 120);
+    }
+  }
+
+  function cancelLocalProjectFolderPick() {
+    if (activeProjectFolderPickController) activeProjectFolderPickController.abort();
+  }
+
+  function clearProjectFolderPickHint() {
+    if (!projectFolderPickHintTimer) return;
+    window.clearTimeout(projectFolderPickHintTimer);
+    projectFolderPickHintTimer = 0;
   }
 
   function setSetupStepState(element, stateName) {
@@ -3255,6 +3310,10 @@
   }
 
   async function chooseLocalProjectFolder(options) {
+    if (activeProjectFolderPickController) {
+      cancelLocalProjectFolderPick();
+      return;
+    }
     if (!state.clientMaintenance) {
       if (state.localNodeLaunchAttempted) {
         openNodeSetupFromSettings();
@@ -3264,10 +3323,18 @@
       return;
     }
     const autoRegister = !!(options && options.autoRegister);
-    setSettingsResult('正在打开本机文件夹选择器…');
-    setSettingsBusy(els.chooseProjectFolderBtn, true, '选择中…');
+    const controller = new AbortController();
+    activeProjectFolderPickController = controller;
+    clearProjectFolderPickHint();
+    setSettingsResult('正在打开本机文件夹选择器… 如果没有看到弹窗，请看任务栏或按 Alt+Tab；也可以点击“取消等待”后手动填写项目目录。', 'note');
+    setProjectFolderPickBusy(true);
+    projectFolderPickHintTimer = window.setTimeout(() => {
+      if (activeProjectFolderPickController !== controller) return;
+      revealManualProjectPathInput(false);
+      setSettingsResult('还没有收到文件夹选择结果。我已展开手动路径输入框；如果系统弹窗在后台，可以先选目录，或者点击“取消等待”后直接填写路径。', 'note');
+    }, 6000);
     try {
-      const data = await localNodeApi('/api/project-folder/pick', { method: 'POST' });
+      const data = await localNodeApi('/api/project-folder/pick', { method: 'POST', signal: controller.signal });
       if (data.cancelled) {
         setSettingsResult('已取消选择。');
         return;
@@ -3287,9 +3354,17 @@
         projectRegistrationResultKind(data)
       );
     } catch (error) {
-      setSettingsResult(escapeHtml(error.message || error), 'error');
+      if (error && error.name === 'AbortError') {
+        revealManualProjectPathInput(true);
+        setSettingsResult('已停止等待文件夹选择器。请在“项目目录”里填写本机路径，例如 D:\\my-app，然后点击“重新读取目录信息”。', 'note');
+      } else {
+        revealManualProjectPathInput(true);
+        setSettingsResult(`${escapeHtml(error.message || error)}。你也可以手动填写项目目录后重试。`, 'error');
+      }
     } finally {
-      setSettingsBusy(els.chooseProjectFolderBtn, false);
+      if (activeProjectFolderPickController === controller) activeProjectFolderPickController = null;
+      clearProjectFolderPickHint();
+      setProjectFolderPickBusy(false);
     }
   }
 
