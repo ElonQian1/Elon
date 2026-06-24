@@ -1,0 +1,287 @@
+#requires -Version 7.0
+
+param(
+    [string]$RepoRoot = "",
+    [string]$OutputPath = "",
+    [switch]$SelfTest
+)
+
+$ErrorActionPreference = "Stop"
+
+function Get-Fb2FormatRepoRoot {
+    Split-Path -Parent $PSScriptRoot
+}
+
+function Resolve-Fb2FormatPath {
+    param(
+        [string]$Path,
+        [string]$Root
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return ""
+    }
+    if ([System.IO.Path]::IsPathRooted($Path)) {
+        return $Path
+    }
+    return (Join-Path $Root $Path)
+}
+
+function Read-Fb2FormatFile {
+    param(
+        [string]$Root,
+        [string]$RelativePath
+    )
+
+    $path = Join-Path $Root $RelativePath
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "Required file not found: $path"
+    }
+    Get-Content -LiteralPath $path -Raw
+}
+
+function Add-Fb2FormatCheck {
+    param(
+        [System.Collections.ArrayList]$Checks,
+        [string]$Name,
+        [bool]$Passed,
+        [string]$File = "",
+        [string]$Details = ""
+    )
+
+    [void]$Checks.Add([ordered]@{
+        name = $Name
+        passed = $Passed
+        file = $File
+        details = $Details
+    })
+}
+
+function Test-Fb2FormatAllTokens {
+    param(
+        [string]$Text,
+        [string[]]$Tokens
+    )
+
+    foreach ($token in $Tokens) {
+        if (-not $Text.Contains($token)) {
+            return $false
+        }
+    }
+    return $true
+}
+
+function New-Fb2ContextFormatRouteValidation {
+    param([string]$Root)
+
+    $files = [ordered]@{
+        repo_map_reference = "docs\repo map模块问题\repo map格式建议.md"
+        symbol_index_reference = "docs\符号索引讨论\项目理解与讨论.md"
+        plan = "docs\fb2-ai-center\PLAN.md"
+        contracts = "docs\fb2-ai-center\contracts.md"
+        data_tools = "docs\fb2-ai-center\data-tools.md"
+        test_plan = "docs\fb2-ai-center\test-plan.md"
+        projection = "server\src\external_app_context_projection.rs"
+        pack_template = "server\src\external_app_context_pack_template.rs"
+        index_contract = "server\src\external_app_context_index_contract.rs"
+        query_intent = "server\src\external_app_context_query_intent.rs"
+        public_status = "scripts\fb2-public-contract-status.ps1"
+        smoke = "scripts\smoke-fb2-ai-center.ps1"
+    }
+    $texts = [ordered]@{}
+    foreach ($entry in $files.GetEnumerator()) {
+        $texts[$entry.Key] = Read-Fb2FormatFile -Root $Root -RelativePath $entry.Value
+    }
+
+    $checks = [System.Collections.ArrayList]::new()
+
+    Add-Fb2FormatCheck $checks `
+        "repo-map reference prefers markdown plus XML/JSON boundaries" `
+        (Test-Fb2FormatAllTokens $texts.repo_map_reference @("Markdown", "XML", "JSON")) `
+        $files.repo_map_reference `
+        "Reference guidance must keep model input clean and structured."
+
+    Add-Fb2FormatCheck $checks `
+        "symbol-index reference discourages full RAG first" `
+        (Test-Fb2FormatAllTokens $texts.symbol_index_reference @("不要一开始", "repo map", "测试")) `
+        $files.symbol_index_reference `
+        "Reference guidance must keep first phase layered and testable."
+
+    Add-Fb2FormatCheck $checks `
+        "plan fixes first phase delivery route" `
+        (Test-Fb2FormatAllTokens $texts.plan @("XML-wrapped Markdown Context Pack", "REST Context Pack", "tool manifest", "MCP/RAG")) `
+        $files.plan
+
+    Add-Fb2FormatCheck $checks `
+        "contracts expose fb2_context_pack and mcp boundary" `
+        (Test-Fb2FormatAllTokens $texts.contracts @("<fb2_context_pack>", "XML-wrapped Markdown", "MCP/RAG 不是当前完成条件", "citation_sources")) `
+        $files.contracts
+
+    Add-Fb2FormatCheck $checks `
+        "data-tools define domain route and retrieval evidence" `
+        (Test-Fb2FormatAllTokens $texts.data_tools @("XML-wrapped Markdown Context Pack", "JSON metadata", "tool manifest/tools/execute", "fb2.retrieval_evidence_item.v1", "context_query_intent.v1")) `
+        $files.data_tools
+
+    Add-Fb2FormatCheck $checks `
+        "test-plan gates route fields" `
+        (Test-Fb2FormatAllTokens $texts.test_plan @("domain_data_blueprint_contract", "context_pack_template_contract", "context_query_intent_contract", "MCP 是后续包装层")) `
+        $files.test_plan
+
+    Add-Fb2FormatCheck $checks `
+        "projection contract keeps AI-facing payload structured" `
+        (Test-Fb2FormatAllTokens $texts.projection @("XML-wrapped Markdown", "xml_wrapped_markdown_context_pack_with_json_metadata", "future_wrapper_not_first_phase_fact_source", "full_database_dump", "raw_embedding_dump")) `
+        $files.projection
+
+    Add-Fb2FormatCheck $checks `
+        "pack template fixes body wrapper and sections" `
+        (Test-Fb2FormatAllTokens $texts.pack_template @("rest_context_pack_plus_tool_manifest_plus_tools_execute", "future_wrapper_not_first_phase_fact_source", "fb2_context_pack", "retrieval_evidence_item_shape", "minimal_markdown_template")) `
+        $files.pack_template
+
+    Add-Fb2FormatCheck $checks `
+        "index contract maps internal retrieval to audited projection" `
+        (Test-Fb2FormatAllTokens $texts.index_contract @("index_guides_rest_context_pack_and_tool_manifest", "future_wrapper_not_first_phase_fact_source", "project_to_xml_wrapped_markdown_context_pack", "retrieval_evidence_output_shape", "stores_fb2_business_data_in_main_project")) `
+        $files.index_contract
+
+    foreach ($indexId in @("match_index", "odds_snapshot_index", "current_user_ticket_index", "platform_order_risk_index", "group_opinion_index", "opinion_memory_index", "context_audit_index", "feedback_quality_index")) {
+        Add-Fb2FormatCheck $checks "index contract includes $indexId" ($texts.index_contract.Contains($indexId)) $files.index_contract
+    }
+
+    Add-Fb2FormatCheck $checks `
+        "query intent carries topic and permission shape" `
+        (Test-Fb2FormatAllTokens $texts.query_intent @("fb2.context_query_intent.v1", "topic_hint", "requested_indexes", "permission_scope", "retrieval_evidence_items_reference_query_intent")) `
+        $files.query_intent
+
+    Add-Fb2FormatCheck $checks `
+        "public status validates route contract" `
+        (Test-Fb2FormatAllTokens $texts.public_status @("context_pack_template_contract", "domain_data_blueprint_contract", "domain_context_index_contract", "context_query_intent_contract", "retrieval_evidence_item.v1")) `
+        $files.public_status
+
+    Add-Fb2FormatCheck $checks `
+        "smoke test asserts context format and route" `
+        (Test-Fb2FormatAllTokens $texts.smoke @("domainDataBlueprint.context_format", "xml_wrapped_markdown_context_pack_with_json_metadata", "rest_context_pack_plus_tool_manifest_plus_tools_execute", "future_wrapper_not_first_phase_fact_source")) `
+        $files.smoke
+
+    $failed = @($checks | Where-Object { -not [bool]$_.passed })
+    [ordered]@{
+        schema = "fb2.main_project.context_format_route_validation.v1"
+        success = (@($failed).Count -eq 0)
+        check_count = @($checks).Count
+        failed_count = @($failed).Count
+        failed = @($failed)
+        checks = @($checks)
+        route_summary = [ordered]@{
+            ai_facing_body = "xml_wrapped_markdown_context_pack"
+            machine_metadata = "json_metadata"
+            first_phase_delivery = "rest_context_pack_plus_tool_manifest_plus_tools_execute"
+            mcp_status = "future_wrapper_not_first_phase_fact_source"
+            no_business_data_copy_to_main_project = $true
+            required_evidence_shape = "fb2.retrieval_evidence_item.v1"
+            required_query_intent = "fb2.context_query_intent.v1"
+        }
+        note = "Guards the fb2 AI Center context-format route derived from repo-map and symbol-index guidance: clean XML-wrapped Markdown for model-readable business projection, compact JSON metadata for machines, REST Context Pack first, MCP/RAG only as later wrappers."
+    }
+}
+
+function Write-Fb2ContextFormatRouteValidation {
+    param(
+        [object]$Result,
+        [string]$Path
+    )
+
+    $json = $Result | ConvertTo-Json -Depth 10
+    if (-not [string]::IsNullOrWhiteSpace($Path)) {
+        $parent = Split-Path -Parent $Path
+        if (-not [string]::IsNullOrWhiteSpace($parent)) {
+            New-Item -ItemType Directory -Force -Path $parent | Out-Null
+        }
+        Set-Content -LiteralPath $Path -Value $json -Encoding UTF8
+    }
+    $json
+}
+
+function Set-Fb2FormatFixtureFile {
+    param(
+        [string]$Root,
+        [string]$RelativePath,
+        [string]$Content
+    )
+
+    $path = Join-Path $Root $RelativePath
+    $parent = Split-Path -Parent $path
+    New-Item -ItemType Directory -Force -Path $parent | Out-Null
+    Set-Content -LiteralPath $path -Value $Content -Encoding UTF8
+}
+
+function New-Fb2FormatFixtureRoot {
+    $root = Join-Path ([System.IO.Path]::GetTempPath()) ("fb2-format-route-selftest-" + [guid]::NewGuid().ToString("N"))
+    $common = @"
+Markdown XML JSON repo map 测试 不要一开始 XML-wrapped Markdown Context Pack REST Context Pack tool manifest MCP/RAG
+<fb2_context_pack> citation_sources MCP/RAG 不是当前完成条件 JSON metadata tool manifest/tools/execute fb2.retrieval_evidence_item.v1 context_query_intent.v1
+domain_data_blueprint_contract context_pack_template_contract domain_context_index_contract context_query_intent_contract MCP 是后续包装层
+xml_wrapped_markdown_context_pack_with_json_metadata future_wrapper_not_first_phase_fact_source full_database_dump raw_embedding_dump
+rest_context_pack_plus_tool_manifest_plus_tools_execute fb2_context_pack retrieval_evidence_item_shape minimal_markdown_template
+index_guides_rest_context_pack_and_tool_manifest project_to_xml_wrapped_markdown_context_pack retrieval_evidence_output_shape stores_fb2_business_data_in_main_project
+fb2.context_query_intent.v1 topic_hint requested_indexes permission_scope retrieval_evidence_items_reference_query_intent
+domainDataBlueprint.context_format
+"@
+    foreach ($relativePath in @(
+            "docs\repo map模块问题\repo map格式建议.md",
+            "docs\符号索引讨论\项目理解与讨论.md",
+            "docs\fb2-ai-center\PLAN.md",
+            "docs\fb2-ai-center\contracts.md",
+            "docs\fb2-ai-center\data-tools.md",
+            "docs\fb2-ai-center\test-plan.md",
+            "server\src\external_app_context_projection.rs",
+            "server\src\external_app_context_pack_template.rs",
+            "server\src\external_app_context_index_contract.rs",
+            "server\src\external_app_context_query_intent.rs",
+            "scripts\fb2-public-contract-status.ps1",
+            "scripts\smoke-fb2-ai-center.ps1"
+        )) {
+        Set-Fb2FormatFixtureFile -Root $root -RelativePath $relativePath -Content $common
+    }
+    $indexes = "match_index odds_snapshot_index current_user_ticket_index platform_order_risk_index group_opinion_index opinion_memory_index context_audit_index feedback_quality_index"
+    Add-Content -LiteralPath (Join-Path $root "server\src\external_app_context_index_contract.rs") -Value $indexes -Encoding UTF8
+    return $root
+}
+
+function Invoke-Fb2ContextFormatRouteSelfTest {
+    $root = New-Fb2FormatFixtureRoot
+    try {
+        $failed = 0
+        $good = New-Fb2ContextFormatRouteValidation -Root $root
+        if (-not [bool]$good.success) {
+            $good | ConvertTo-Json -Depth 8
+            $failed++
+        }
+
+        Set-Content -LiteralPath (Join-Path $root "docs\fb2-ai-center\contracts.md") -Value "missing route" -Encoding UTF8
+        $bad = New-Fb2ContextFormatRouteValidation -Root $root
+        if ([bool]$bad.success) {
+            $failed++
+        }
+
+        Write-Output "== SelfTest Summary =="
+        Write-Output "failed=$failed"
+        if ($failed -gt 0) {
+            exit 1
+        }
+    } finally {
+        if (Test-Path -LiteralPath $root) {
+            Remove-Item -LiteralPath $root -Recurse -Force
+        }
+    }
+}
+
+if ($SelfTest) {
+    Invoke-Fb2ContextFormatRouteSelfTest
+    exit 0
+}
+
+$root = if ([string]::IsNullOrWhiteSpace($RepoRoot)) { Get-Fb2FormatRepoRoot } else { Resolve-Fb2FormatPath -Path $RepoRoot -Root (Get-Fb2FormatRepoRoot) }
+$output = if ([string]::IsNullOrWhiteSpace($OutputPath)) { Join-Path $root "target\fb2-ai-center\context-format-route-validation-current.json" } else { Resolve-Fb2FormatPath -Path $OutputPath -Root $root }
+$result = New-Fb2ContextFormatRouteValidation -Root $root
+Write-Fb2ContextFormatRouteValidation -Result $result -Path $output | Out-Host
+if (-not [bool]$result.success) {
+    exit 1
+}

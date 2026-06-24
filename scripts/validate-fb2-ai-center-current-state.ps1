@@ -280,6 +280,13 @@ function New-Fb2CurrentStateValidation {
         -Arguments @("-OutputPath", $directNetworkPolicyValidationPath) `
         -ExpectedOutputPath $directNetworkPolicyValidationPath))
 
+    $contextFormatRouteValidationPath = Join-Path $targetDir "context-format-route-validation-current.json"
+    [void]$steps.Add((Invoke-Fb2CurrentPwsh `
+        -Name "validate_context_format_route" `
+        -ScriptPath (Join-Path $PSScriptRoot "validate-fb2-context-format-route.ps1") `
+        -Arguments @("-OutputPath", $contextFormatRouteValidationPath) `
+        -ExpectedOutputPath $contextFormatRouteValidationPath))
+
     $refreshForOptionalSteps = Read-Fb2CurrentJsonOrNull -Path $RefreshPath
     $exportedSampleState = Get-Fb2CurrentProperty $refreshForOptionalSteps "exported_context_pack_sample_set_validation"
     if ($null -ne $exportedSampleState) {
@@ -548,6 +555,7 @@ function Invoke-Fb2CurrentStateSelfTest {
         [ordered]@{ name = "public_contract_status"; script = "fb2-public-contract-status.ps1" },
         [ordered]@{ name = "server_deploy_status"; script = "validate-fb2-main-server-deploy-status.ps1" },
         [ordered]@{ name = "project_direct_network_policy"; script = "validate-project-direct-network-policy.ps1" },
+        [ordered]@{ name = "context_format_route"; script = "validate-fb2-context-format-route.ps1" },
         [ordered]@{ name = "visible_readonly_summary"; script = "validate-fb2-visible-readonly-summary.ps1" },
         [ordered]@{ name = "visible_answer_policy"; script = "validate-fb2-visible-answer-policy.ps1" },
         [ordered]@{ name = "context_pack_budget"; script = "validate-fb2-context-pack-budget.ps1" },
