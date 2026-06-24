@@ -34,6 +34,25 @@ function Get-Fb2ContextSampleSetProperty {
     return $property.Value
 }
 
+function Get-Fb2ContextSampleSetQualityHistoryKinds {
+    @(
+        "feedback",
+        "opinion_adoption",
+        "opinion_result_review_summary"
+    )
+}
+
+function Split-Fb2ContextSampleSetSourceKinds {
+    param([string[]]$SourceKinds)
+
+    $qualityKinds = @(Get-Fb2ContextSampleSetQualityHistoryKinds)
+    $uniqueKinds = @($SourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    [ordered]@{
+        business = @($uniqueKinds | Where-Object { $qualityKinds -notcontains [string]$_ })
+        quality_history = @($uniqueKinds | Where-Object { $qualityKinds -contains [string]$_ })
+    }
+}
+
 function Get-Fb2ContextSampleSetState {
     param([string]$Path)
 
@@ -72,12 +91,23 @@ function Get-Fb2ContextSampleSetState {
         }
         $scenarioSourceKinds = @((Get-Fb2ContextSampleSetProperty $scenario "source_kinds" @()) | ForEach-Object { [string]$_ })
         $sourceKinds += $scenarioSourceKinds
+        $scenarioSplitKinds = Split-Fb2ContextSampleSetSourceKinds -SourceKinds $scenarioSourceKinds
+        $scenarioBusinessKinds = @((Get-Fb2ContextSampleSetProperty $scenario "business_source_kinds" @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        if ($scenarioBusinessKinds.Count -eq 0) {
+            $scenarioBusinessKinds = @($scenarioSplitKinds["business"])
+        }
+        $scenarioQualityKinds = @((Get-Fb2ContextSampleSetProperty $scenario "quality_history_source_kinds" @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        if ($scenarioQualityKinds.Count -eq 0) {
+            $scenarioQualityKinds = @($scenarioSplitKinds["quality_history"])
+        }
         $scenarioStates += [ordered]@{
             scenario = $id
             passed = [bool](Get-Fb2ContextSampleSetProperty $scenario "passed" $false)
             context_audit_id = $auditId
             citation_source_count = [int](Get-Fb2ContextSampleSetProperty $scenario "citation_source_count" 0)
             source_kinds = @($scenarioSourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+            business_source_kinds = @($scenarioBusinessKinds)
+            quality_history_source_kinds = @($scenarioQualityKinds)
             context_pack_chars = [int](Get-Fb2ContextSampleSetProperty $scenario "context_pack_chars" 0)
             context_pack_sha256 = [string](Get-Fb2ContextSampleSetProperty $scenario "context_pack_sha256" "")
         }
@@ -102,6 +132,15 @@ function Get-Fb2ContextSampleSetState {
     $summaryComplete = ([bool](Get-Fb2ContextSampleSetProperty $summary "complete" $false) -and $missing.Count -eq 0)
     $successRaw = Get-Fb2ContextSampleSetProperty $summary "success" $null
     $summarySuccess = if ($null -eq $successRaw) { $summaryComplete } else { [bool]$successRaw }
+    $splitSourceKinds = Split-Fb2ContextSampleSetSourceKinds -SourceKinds $sourceKinds
+    $businessSourceKinds = @((Get-Fb2ContextSampleSetProperty $summary "business_source_kinds" @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    if ($businessSourceKinds.Count -eq 0) {
+        $businessSourceKinds = @($splitSourceKinds["business"])
+    }
+    $qualityHistorySourceKinds = @((Get-Fb2ContextSampleSetProperty $summary "quality_history_source_kinds" @()) | ForEach-Object { [string]$_ } | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    if ($qualityHistorySourceKinds.Count -eq 0) {
+        $qualityHistorySourceKinds = @($splitSourceKinds["quality_history"])
+    }
 
     [ordered]@{
         path = [string]$Path
@@ -116,6 +155,8 @@ function Get-Fb2ContextSampleSetState {
         scenario_ids = @($scenarioIds)
         audit_ids = @($auditIds | Select-Object -Unique)
         source_kinds = @($sourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        business_source_kinds = @($businessSourceKinds)
+        quality_history_source_kinds = @($qualityHistorySourceKinds)
         scenarios = @($scenarioStates)
         missing = @($missing)
         secret_like_scenarios = @((Get-Fb2ContextSampleSetProperty $summary "secret_like_scenarios" @()))

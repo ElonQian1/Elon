@@ -11,6 +11,7 @@
 - fb2 不应该复制主项目内部聊天页代码。Android 原生侧优先接 `android/chat-voice-kit`，H5/WebView 侧按 `ChatVoiceInteractionContract` 还原。
 - 当前非语音 live 数据预检可由主项目 token bridge 证明，但 bridge 证据必须同时证明 no-write、direct-no-proxy、service token 不进 argv/output、fb2 密码不进子进程 argv。旧 bridge 结果如果缺少 `fb2_password_passed_to_child_argv=false`，`status-refresh-current.json.protected_live_preflight_satisfied` 会保持 `false`，下一步是用当前进程环境变量 `FB2_VISIBLE_SMOKE_PASSWORD` 重跑 no-write bridge；加 `-RunCurrentStateAfter` 时，bridge 会先刷新 authenticated contract smoke canonical summary，再清掉 service token 跑 tokenless current-state。ASR/TTS 仍按用户暂停状态等待恢复。
 - 访问主项目/fb2 项目资源默认不走代理；状态脚本应清空常见 proxy 环境变量、设置 `NO_PROXY/no_proxy=*`，并在 PowerShell HTTP 请求使用 `-NoProxy`。
+- fb2 live Context Pack 样本如果带 `opinion_result_review_summary`，主项目样本校验必须把它归为 `quality_history_source_kinds`，而不是 `business_source_kinds`。它只能作为历史观点复盘/质量学习证据，不能被当成比赛、赔率、订单、平台摘要或群友观点事实。
 - 2026-06-24 子项目最新协作状态：fb2 `origin/main` 已推进到 `1b0cdc2b fix(ai-context): align final gate topic`。最新三个关键 checkpoint 是 `01972c2d feat(ai-context): add 123qwe public review quality drill`、`fbe2c857 test(ai-context): cover match index dry run`、`1b0cdc2b fix(ai-context): align final gate topic`：公开群 `123qwe` 复盘质量 drill 已让 `opinion_result_review_surface=ready_quality_threshold_passed`，公开比赛 `match_context_index` 维护刷新有 dry-run 自测防退化，最终验收默认 topic 已对齐真实中文业务问题“今天比赛怎么看”。主项目本阶段只消费 Context Pack、tool manifest、read-only tools、retrieval trace、P4-lite/report 和复盘质量 summary；`answer_time_refresh_allowed=false`、`maintenance_rest` refresh 工具不得放进普通回答链路。
 
 ## 双项目协作方式
@@ -106,7 +107,7 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\smoke-fb2-ai-center.ps1 -R
 
 状态快照还会输出 `latest_context_pack_sample_request`。当主项目没有 `FB2_AI_CENTER_TOKEN` 时，如果该字段 `complete=true`，说明可以让 fb2 子会话按 `context-pack-sample-request-current.json` 导出 live Context Pack 样本；如果该字段缺失或不完整，先运行 `validate-fb2-context-pack.ps1 -PrintExportRequest` 生成请求。
 
-fb2 子会话导出样本后，用 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json` 一次性校验四类样本。输出 summary 只保留场景、audit id、source kinds、citation source 数量、Context Pack 长度和 sha256，不保存订单或群聊正文；状态快照会读取 `latest_context_pack_sample_set`，用于判断样本是否已经离线通过。
+fb2 子会话导出样本后，用 `pwsh -NoProfile -ExecutionPolicy Bypass -File scripts\validate-fb2-context-pack.ps1 -ValidateSampleSet -SamplesDir target\fb2-ai-center\samples -OutputPath target\fb2-ai-center\context-pack-samples-validation-current.json` 一次性校验四类样本。输出 summary 只保留场景、audit id、source kinds、citation source 数量、Context Pack 长度和 sha256，不保存订单或群聊正文；状态快照会读取 `latest_context_pack_sample_set`，用于判断样本是否已经离线通过。summary 还会把 source kinds 拆成 `business_source_kinds` 和 `quality_history_source_kinds`：`opinion_result_review_summary` 必须只出现在后者，用来证明历史复盘质量信号可引用但不污染比赛/订单等业务事实。
 
 状态快照还会从样本集推导 `latest_context_answer_readiness`。该字段按四类真实用户问题检查必需来源覆盖：今日比赛需要 `match/odds/context_audit`，我的票需要 `user_order/ticket/context_audit`，平台订单风险需要 `platform_order_summary/context_audit`，群观点需要 `group_message/opinion_memory/context_audit`。它只证明样本能支撑回答输入，不代表模型已生成回复；最终仍要用 live token 跑权限、质量和 feedback 验证。
 

@@ -167,12 +167,22 @@ function Test-Fb2CurrentExportedSampleState {
             $citationCount = [int](Get-Fb2CurrentProperty $scenario "citation_source_count" 0)
             $sha = [string](Get-Fb2CurrentProperty $scenario "context_pack_sha256" "")
             $sourceKinds = @(Get-Fb2CurrentProperty $scenario "source_kinds" @())
+            $businessSourceKinds = @(Get-Fb2CurrentProperty $scenario "business_source_kinds" @())
+            $qualityHistorySourceKinds = @(Get-Fb2CurrentProperty $scenario "quality_history_source_kinds" @())
             $containsSecret = [bool](Get-Fb2CurrentProperty $scenario "contains_secret_like_text" $true)
             if (-not [bool](Get-Fb2CurrentProperty $scenario "passed" $false)) {
                 return $false
             }
             if ([string]::IsNullOrWhiteSpace($auditId) -or $citationCount -le 0 -or $sourceKinds.Count -eq 0 -or $sha -notmatch "^[0-9a-f]{64}$" -or $containsSecret) {
                 return $false
+            }
+            if ($sourceKinds -contains "opinion_result_review_summary") {
+                if ($qualityHistorySourceKinds -notcontains "opinion_result_review_summary") {
+                    return $false
+                }
+                if ($businessSourceKinds -contains "opinion_result_review_summary") {
+                    return $false
+                }
             }
         }
         return $true
@@ -634,13 +644,18 @@ function Invoke-Fb2CurrentStateSelfTest {
             skipped_reason = ""
             complete = $true
             scenarios = @(
-                [pscustomobject]@{ scenario = "today_matches_context_pack"; passed = $true; context_audit_id = "audit-today"; citation_source_count = 3; source_kinds = @("match", "odds", "context_audit"); context_pack_sha256 = ("a" * 64); contains_secret_like_text = $false },
-                [pscustomobject]@{ scenario = "my_ticket_context_pack"; passed = $true; context_audit_id = "audit-ticket"; citation_source_count = 3; source_kinds = @("user_order", "ticket", "context_audit"); context_pack_sha256 = ("b" * 64); contains_secret_like_text = $false },
-                [pscustomobject]@{ scenario = "platform_order_context_pack"; passed = $true; context_audit_id = "audit-platform"; citation_source_count = 2; source_kinds = @("platform_order_summary", "context_audit"); context_pack_sha256 = ("c" * 64); contains_secret_like_text = $false },
-                [pscustomobject]@{ scenario = "group_opinion_context_pack"; passed = $true; context_audit_id = "audit-opinion"; citation_source_count = 3; source_kinds = @("group_message", "opinion_memory", "context_audit"); context_pack_sha256 = ("d" * 64); contains_secret_like_text = $false }
+                [pscustomobject]@{ scenario = "today_matches_context_pack"; passed = $true; context_audit_id = "audit-today"; citation_source_count = 4; source_kinds = @("match", "odds", "context_audit", "opinion_result_review_summary"); business_source_kinds = @("match", "odds", "context_audit"); quality_history_source_kinds = @("opinion_result_review_summary"); context_pack_sha256 = ("a" * 64); contains_secret_like_text = $false },
+                [pscustomobject]@{ scenario = "my_ticket_context_pack"; passed = $true; context_audit_id = "audit-ticket"; citation_source_count = 4; source_kinds = @("user_order", "ticket", "context_audit", "opinion_result_review_summary"); business_source_kinds = @("user_order", "ticket", "context_audit"); quality_history_source_kinds = @("opinion_result_review_summary"); context_pack_sha256 = ("b" * 64); contains_secret_like_text = $false },
+                [pscustomobject]@{ scenario = "platform_order_context_pack"; passed = $true; context_audit_id = "audit-platform"; citation_source_count = 3; source_kinds = @("platform_order_summary", "context_audit", "opinion_result_review_summary"); business_source_kinds = @("platform_order_summary", "context_audit"); quality_history_source_kinds = @("opinion_result_review_summary"); context_pack_sha256 = ("c" * 64); contains_secret_like_text = $false },
+                [pscustomobject]@{ scenario = "group_opinion_context_pack"; passed = $true; context_audit_id = "audit-opinion"; citation_source_count = 4; source_kinds = @("group_message", "opinion_memory", "context_audit", "opinion_result_review_summary"); business_source_kinds = @("group_message", "opinion_memory", "context_audit"); quality_history_source_kinds = @("opinion_result_review_summary"); context_pack_sha256 = ("d" * 64); contains_secret_like_text = $false }
             )
         }
         if (-not (Test-Fb2CurrentExportedSampleState -State $goodExportedSamples)) {
+            $failed++
+        }
+        $badReviewKindSamples = $goodExportedSamples | ConvertTo-Json -Depth 8 | ConvertFrom-Json
+        $badReviewKindSamples.scenarios[0].business_source_kinds = @("match", "odds", "context_audit", "opinion_result_review_summary")
+        if (Test-Fb2CurrentExportedSampleState -State $badReviewKindSamples) {
             $failed++
         }
         $secretExportedSamples = $goodExportedSamples | ConvertTo-Json -Depth 8 | ConvertFrom-Json

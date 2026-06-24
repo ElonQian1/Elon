@@ -100,6 +100,25 @@ function Get-Fb2ContextPackSampleSetSpecs {
     )
 }
 
+function Get-Fb2ContextPackQualityHistoryKinds {
+    @(
+        "feedback",
+        "opinion_adoption",
+        "opinion_result_review_summary"
+    )
+}
+
+function Split-Fb2ContextPackSourceKinds {
+    param([string[]]$SourceKinds)
+
+    $qualityKinds = @(Get-Fb2ContextPackQualityHistoryKinds)
+    $uniqueKinds = @($SourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+    [ordered]@{
+        business = @($uniqueKinds | Where-Object { $qualityKinds -notcontains [string]$_ })
+        quality_history = @($uniqueKinds | Where-Object { $qualityKinds -contains [string]$_ })
+    }
+}
+
 function Normalize-Fb2ContextPackInput {
     param([object]$Payload)
 
@@ -175,13 +194,17 @@ function Get-Fb2ContextPackSampleInfo {
     }
 
     $contextPack = Get-Fb2ContextProjectionText -Data $data
+    $sourceKinds = @(Get-Fb2CitationSourceKinds -Data $data)
+    $splitKinds = Split-Fb2ContextPackSourceKinds -SourceKinds $sourceKinds
     [ordered]@{
         scenario = $ScenarioName
         path = [string]$Path
         exists = $true
         context_audit_id = [string]$data.context_audit_id
         citation_source_count = @($data.citation_sources | Where-Object { $_ }).Count
-        source_kinds = @(Get-Fb2CitationSourceKinds -Data $data)
+        source_kinds = @($sourceKinds)
+        business_source_kinds = @($splitKinds["business"])
+        quality_history_source_kinds = @($splitKinds["quality_history"])
         context_pack_chars = $contextPack.Length
         context_pack_sha256 = Get-Fb2ContextPackTextSha256 $contextPack
         contains_secret_like_text = Test-Fb2ContextPackSampleSecretLikeText $raw
@@ -347,6 +370,9 @@ function Invoke-Fb2ContextPackSampleSetValidation {
     $results = @()
     $missing = @()
     $secretLike = @()
+    $allSourceKinds = @()
+    $allBusinessSourceKinds = @()
+    $allQualityHistoryKinds = @()
     $startedFailures = $script:Failed
 
     foreach ($spec in Get-Fb2ContextPackSampleSetSpecs) {
@@ -365,6 +391,9 @@ function Invoke-Fb2ContextPackSampleSetValidation {
             Write-CheckFail "sample set secret-like text: $id" "sample may contain token-like text"
             $caseFailures += 1
         }
+        $allSourceKinds += @($info["source_kinds"])
+        $allBusinessSourceKinds += @($info["business_source_kinds"])
+        $allQualityHistoryKinds += @($info["quality_history_source_kinds"])
 
         $results += [ordered]@{
             scenario = $id
@@ -375,6 +404,8 @@ function Invoke-Fb2ContextPackSampleSetValidation {
             context_audit_id = [string]$info["context_audit_id"]
             citation_source_count = [int]$info["citation_source_count"]
             source_kinds = @($info["source_kinds"])
+            business_source_kinds = @($info["business_source_kinds"])
+            quality_history_source_kinds = @($info["quality_history_source_kinds"])
             context_pack_chars = [int]$info["context_pack_chars"]
             context_pack_sha256 = [string]$info["context_pack_sha256"]
             contains_secret_like_text = [bool]$info["contains_secret_like_text"]
@@ -392,6 +423,9 @@ function Invoke-Fb2ContextPackSampleSetValidation {
         scenario_count = @($results).Count
         passed_count = @($results | Where-Object { [bool]$_["passed"] }).Count
         failed_count = @($results | Where-Object { -not [bool]$_["passed"] }).Count
+        source_kinds = @($allSourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        business_source_kinds = @($allBusinessSourceKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
+        quality_history_source_kinds = @($allQualityHistoryKinds | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) } | Select-Object -Unique)
         missing = @($missing)
         secret_like_scenarios = @($secretLike)
         scenarios = @($results)
@@ -463,6 +497,11 @@ function Invoke-Fb2ContextPackValidatorSelfTest {
                 data = New-Fb2ContextProjectionSelfTestData
             }
             $sample.data.context_audit_id = "audit-$($spec["id"])"
+            $sample.data.citation_sources += [pscustomobject]@{
+                kind = "opinion_result_review_summary"
+                id = "opinion_result_review_summary:official"
+                label = "观点复盘摘要"
+            }
             $samplePath = Join-Path $sampleDir "$($spec["id"]).json"
             $sample | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath $samplePath -Encoding UTF8
         }
@@ -475,6 +514,8 @@ function Invoke-Fb2ContextPackValidatorSelfTest {
         Assert-True ([bool]$sampleSetSummary.success) "self-test sample set summary success" "success=$($sampleSetSummary.success)"
         Assert-True ([bool]$sampleSetSummary.complete) "self-test sample set summary complete" "complete=$($sampleSetSummary.complete)"
         Assert-True ($sampleSetSummary.scenario_count -eq 4) "self-test sample set scenario count" "count=$($sampleSetSummary.scenario_count)"
+        Assert-ContainsValue -Values @($sampleSetSummary.quality_history_source_kinds) -Expected "opinion_result_review_summary" -Name "self-test sample set classifies review summary as quality history"
+        Assert-True (@($sampleSetSummary.business_source_kinds) -notcontains "opinion_result_review_summary") "self-test review summary is not a business source kind" (@($sampleSetSummary.business_source_kinds) -join ";")
     } finally {
         Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
     }
