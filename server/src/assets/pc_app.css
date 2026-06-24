@@ -552,6 +552,20 @@ button { cursor: pointer; }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.channel-item .channel-time {
+  flex: 0 0 48px;
+  align-self: flex-start;
+  margin-top: 1px;
+  text-align: right;
+  color: #8f96a3;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+}
+.channel-item:hover .channel-time,
+.channel-item.active .channel-time {
+  color: #b8bfca;
+}
 .ai-sidebar-spacer {
   height: 8px;
 }

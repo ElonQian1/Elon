@@ -934,10 +934,13 @@
     const conversationItems = conversations.map((conversation) => {
       const title = aiConversationTitle(conversation);
       const sub = aiConversationPreview(conversation);
+      const timeValue = conversationTimeValue(conversation);
+      const time = relativeTimeLabel(timeValue);
       const active = state.activeKind === 'ai' && sameId(conversation.id, state.activeAiConversationId);
-      return `<button class="channel-item ${active ? 'active' : ''}" type="button" data-ai-chat-conversation-id="${escapeHtml(conversation.id)}">
+      return `<button class="channel-item ai-history-item ${active ? 'active' : ''}" type="button" data-ai-chat-conversation-id="${escapeHtml(conversation.id)}">
         <span class="glyph">聊</span>
         <span class="main"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(sub)}</span></span>
+        ${time ? `<span class="channel-time" title="${escapeHtml(formatTime(timeValue))}">${escapeHtml(time)}</span>` : ''}
       </button>`;
     }).join('');
     const sections = [
