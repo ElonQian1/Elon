@@ -149,7 +149,7 @@ internal class MainHomeRows(
         if (time == null && !showProjectMarker) return null
 
         return LinearLayout(activity).apply {
-            val columnWidth = if (showProjectMarker) dp(36) else LinearLayout.LayoutParams.WRAP_CONTENT
+            val columnWidth = if (showProjectMarker) dp(44) else LinearLayout.LayoutParams.WRAP_CONTENT
             layoutParams = LinearLayout.LayoutParams(
                 columnWidth,
                 LinearLayout.LayoutParams.MATCH_PARENT
@@ -158,7 +158,7 @@ internal class MainHomeRows(
             }
             gravity = Gravity.CENTER_HORIZONTAL
             orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(18), 0, 0)
+            setPadding(0, dp(14), 0, 0)
 
             time?.let { value ->
                 addView(TextView(activity).apply {
@@ -170,8 +170,8 @@ internal class MainHomeRows(
             }
 
             if (showProjectMarker) {
-                addView(createProjectMarkerIcon(), LinearLayout.LayoutParams(dp(36), dp(36)).apply {
-                    topMargin = if (time == null) 0 else dp(6)
+                addView(createProjectMarkerIcon(), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                    topMargin = if (time == null) 0 else dp(2)
                 })
             }
         }
