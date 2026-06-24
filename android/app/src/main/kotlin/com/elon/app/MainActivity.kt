@@ -888,7 +888,10 @@ class MainActivity : AppCompatActivity() {
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showProjectPlaza = { navigationController.showProjectPlaza() },
-            openFriendPageProject = { index -> conversationOpenActions.openProject(index) },
+            openFriendPageProject = { index ->
+                navigationController.captureProjectEntryReturnTarget()
+                conversationOpenActions.openProject(index)
+            },
             openProject = { index -> openProjectSpaceForProject(index, true) },
             openProjectConversations = { index -> openProjectConversationsForProject(index, true) },
             showProjectActions = { index, anchor -> projectActions.showProjectActions(index, anchor) },
