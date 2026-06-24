@@ -98,9 +98,15 @@ async fn get_task_journal(
             // 本地 API 只暴露进程恢复所需的最小字段；prompt/API key 从未写入 journal。
             let attach = task_attach_state(snapshot.record.as_ref(), active);
             let resume = task_resume_contract(&attach);
-            let approval_state = snapshot
-                .approvals
-                .resolve_runtime_state(resume.active_approval_ids(), resume.can_approve_tools());
+            let task_status = snapshot
+                .record
+                .as_ref()
+                .map(|record| record.status.as_str());
+            let approval_state = snapshot.approvals.resolve_runtime_state_for_task_status(
+                resume.active_approval_ids(),
+                resume.can_approve_tools(),
+                task_status,
+            );
             Json(LocalTaskJournalResponse {
                 ok: true,
                 task_id: snapshot.task_id,

@@ -128,16 +128,18 @@ impl TaskApprovalJournalTracker {
 }
 
 impl TaskApprovalJournalSnapshot {
-    pub(crate) fn resolve_runtime_state(
+    pub(crate) fn resolve_runtime_state_for_task_status(
         &self,
         active_approval_ids: &[String],
         can_approve_tools: bool,
+        task_status: Option<&str>,
     ) -> TaskApprovalStateSnapshot {
         let active: BTreeSet<&str> = active_approval_ids.iter().map(String::as_str).collect();
+        let task_terminal = task_status.is_some_and(task_status_is_terminal);
         let approvals: Vec<_> = self
             .approvals
             .iter()
-            .map(|approval| approval.resolve(&active, can_approve_tools))
+            .map(|approval| approval.resolve(&active, can_approve_tools, task_terminal))
             .collect();
         let actionable_count = approvals.iter().filter(|item| item.actionable).count();
         let decided_count = approvals
@@ -151,7 +153,7 @@ impl TaskApprovalJournalSnapshot {
             .count();
         let unavailable_count = approvals
             .iter()
-            .filter(|item| matches!(item.status, "unavailable" | "expired"))
+            .filter(|item| matches!(item.status, "unavailable" | "expired" | "closed"))
             .count();
         TaskApprovalStateSnapshot {
             total_count: approvals.len(),
@@ -168,12 +170,16 @@ impl TaskApprovalJournalItem {
         &self,
         active_approval_ids: &BTreeSet<&str>,
         can_approve_tools: bool,
+        task_terminal: bool,
     ) -> TaskApprovalStateItem {
         if self.status != "pending" {
             return state_item(self, self.status, false);
         }
         if can_approve_tools && active_approval_ids.contains(self.approval_id.as_str()) {
             return state_item(self, "actionable", true);
+        }
+        if task_terminal {
+            return state_item(self, "closed", false);
         }
         state_item(self, "unavailable", false)
     }
@@ -220,9 +226,17 @@ fn state_labels(status: &str) -> (&'static str, &'static str, &'static str) {
         "denied" => ("已拒绝", "canceled", "工具不会执行"),
         "expired" => ("已过期", "canceled", "审批已过期"),
         "canceled" => ("已取消", "canceled", "任务已停止"),
+        "closed" => ("已关闭", "canceled", "任务已结束，审批已关闭"),
         "processed" => ("已处理", "done", "审批已处理"),
         _ => ("已失效", "failed", "本机没有活动审批等待器"),
     }
+}
+
+fn task_status_is_terminal(status: &str) -> bool {
+    matches!(
+        status.trim().to_ascii_lowercase().as_str(),
+        "finished" | "done" | "failed" | "canceled" | "cancelled" | "interrupted"
+    )
 }
 
 fn decision_status(decision: Option<&str>) -> &'static str {
@@ -335,9 +349,11 @@ mod tests {
             }),
         );
 
-        let state = tracker
-            .finish()
-            .resolve_runtime_state(&["tap_1_1".to_string()], true);
+        let state = tracker.finish().resolve_runtime_state_for_task_status(
+            &["tap_1_1".to_string()],
+            true,
+            None,
+        );
         assert_eq!(state.actionable_count, 1);
         assert_eq!(state.approvals[0].status, "actionable");
         assert!(state.approvals[0].actionable);
@@ -355,9 +371,35 @@ mod tests {
             }),
         );
 
-        let state = tracker.finish().resolve_runtime_state(&[], false);
+        let state = tracker
+            .finish()
+            .resolve_runtime_state_for_task_status(&[], false, None);
         assert_eq!(state.unavailable_count, 1);
         assert_eq!(state.approvals[0].status, "unavailable");
+        assert!(!state.approvals[0].actionable);
+    }
+
+    #[test]
+    fn pending_approval_resolves_to_closed_when_task_is_terminal() {
+        let mut tracker = TaskApprovalJournalTracker::default();
+        tracker.observe_event(
+            1,
+            &json!({
+                "type": "tool_approval_required",
+                "approval_id": "tap_1_1",
+                "tool": "apply_patch"
+            }),
+        );
+
+        let state =
+            tracker
+                .finish()
+                .resolve_runtime_state_for_task_status(&[], false, Some("failed"));
+        assert_eq!(state.decided_count, 0);
+        assert_eq!(state.unavailable_count, 1);
+        assert_eq!(state.approvals[0].status, "closed");
+        assert_eq!(state.approvals[0].label, "已关闭");
+        assert_eq!(state.approvals[0].meta, "任务已结束，审批已关闭");
         assert!(!state.approvals[0].actionable);
     }
 }

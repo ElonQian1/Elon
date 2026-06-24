@@ -10,7 +10,7 @@ Route B/C 的本机工具能力已经包含 `list_dir`、`search_files`、`file_
 
 PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要和尾部事件，方便后续做任务恢复、压力测试和 PC UI 进度展示。
 
-任务生命周期压力测试已经覆盖 Route A/B/C 终态、取消、并发 journal 写入、分页回放、节点重启后丢失控制句柄、等待工具审批时节点重启、终态任务清理遗留审批 waiter、过期 Codex session 清理和超大工具事件截断；其中“等待审批时重启”的契约是：前端仍可从 journal 回放审批卡历史，但不能继续审批已经丢失的内存 waiter，只能基于快照开启新任务。任务正常结束、失败或取消进入统一收尾时，会按 req_id 清空仍残留的本机工具审批，避免 PC UI 继续显示已失效的审批按钮。
+任务生命周期压力测试已经覆盖 Route A/B/C 终态、取消、并发 journal 写入、分页回放、节点重启后丢失控制句柄、等待工具审批时节点重启、终态任务清理遗留审批 waiter、过期 Codex session 清理和超大工具事件截断；其中“等待审批时重启”的契约是：前端仍可从 journal 回放审批卡历史，但不能继续审批已经丢失的内存 waiter，只能基于快照开启新任务。任务正常结束、失败或取消进入统一收尾时，会按 req_id 清空仍残留的本机工具审批；本机 task journal API 在刷新终态任务时也会把历史 pending 审批标成“已关闭/任务已结束”，避免 PC UI 继续显示可误解的失效审批按钮。
 
 CLI TTY 接管方案当前明确走“有限连续性”契约：不重新接管已经打开的原 CLI 终端 TTY；本机状态接口会结构化暴露 `not_supported`、`resume_order`、`recommended_next_actions` 和 `future_work`，前端优先提示运行句柄、journal 回放、Codex session 自动续接或云端快照新任务四种继续路径。真正接管原 TTY 仍需要后续 PTY/ConPTY 会话层、会话 id 持久化和前端 attach 授权协议。
 
@@ -18,7 +18,7 @@ Win 客户端“注册本地项目”流程会自动读取常见项目清单来�
 
 Route C 远程模型能力已经有服务端预算审计和运营后台报告：记录 admitted / success / provider_error / output_rejected 等结果，不保存 prompt 或完整输出；运营报告会显示 pending 调用、超过阈值仍未完成的 stale pending 调用和对应审计事件，方便发现服务器模型调用卡住或 provider 异常。`/api/agent/runtime/status` 会返回结构化 `blockingReasons`，把运维开关、agent 策略、server_api_key-only、平台预算、个人额度、限流等不可用原因统一给 Win 节点和 PC UI。Win 节点读取服务器 Route C 状态时会 fail-closed：如果 `policy.enabled=false`、`admissionAvailability.ready=false`、用户/平台预算耗尽、频率限制、`agentPolicy` 明确不可用，或 `blockingReasons` 非空，即使顶层 `ready=true` 也不会把 Route C 显示成可用。
 
-这还不是完整 Codex 桌面版 parity。后续仍建议补：审批状态落库、刷新后的精确终态恢复、任务恢复、full_access 高危策略的运营后台可视化。
+这还不是完整 Codex 桌面版 parity。后续仍建议补：跨节点重启后可继续审批的审批状态落库、任务恢复入口、full_access 高危策略的运营后台可视化。
 
 ---
 

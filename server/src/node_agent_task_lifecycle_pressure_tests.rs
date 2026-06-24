@@ -673,7 +673,10 @@ async fn stress_restart_waiting_approvals_fall_back_to_snapshot_continue() {
             .expect("waiting approval snapshot should replay after restart");
         assert_eq!(snapshot.approvals.pending_count, 1);
         assert_eq!(snapshot.approvals.approvals[0].approval_id, approval_id);
-        let approval_state = snapshot.approvals.resolve_runtime_state(&[], false);
+        let approval_state =
+            snapshot
+                .approvals
+                .resolve_runtime_state_for_task_status(&[], false, None);
         assert_eq!(approval_state.actionable_count, 0);
         assert_eq!(approval_state.unavailable_count, 1);
         assert_eq!(approval_state.approvals[0].status, "unavailable");
