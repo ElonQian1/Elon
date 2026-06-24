@@ -183,8 +183,8 @@ function New-Fb2HandoffPrompt {
     Add-Fb2PromptLine -Lines $lines -Text ('- shared: `{0}`' -f [string]$ownerActions.shared)
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## 计划能力 / 非生产边界"
-    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | text_fixture | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
-    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|---|---|---|---|"
+    Add-Fb2PromptLine -Lines $lines -Text "| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | text_fixture | provider_plan | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |"
+    Add-Fb2PromptLine -Lines $lines -Text "|---|---|---|---|---|---|---|---|---|---|---|---|---|"
     foreach ($capability in $plannedCapabilities) {
         $capId = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'id' '') 80
         $capStatus = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'status' '') 120
@@ -206,15 +206,19 @@ function New-Fb2HandoffPrompt {
         $capTextFixtureReportVersion = [string](Get-Fb2PromptProperty $capability 'embedding_text_fixture_report_version' '')
         $capTextFixtureStatus = [string](Get-Fb2PromptProperty $capability 'embedding_text_fixture_status' '')
         $capTextFixture = Format-Fb2PromptCell (($capTextFixtureReportVersion, $capTextFixtureStatus | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 160
+        $capProviderPlanReportVersion = [string](Get-Fb2PromptProperty $capability 'embedding_provider_migration_plan_report_version' '')
+        $capProviderPlanStatus = [string](Get-Fb2PromptProperty $capability 'embedding_provider_migration_plan_status' '')
+        $capProviderPlanPolicy = [string](Get-Fb2PromptProperty $capability 'embedding_provider_policy_version' '')
+        $capProviderPlan = Format-Fb2PromptCell (($capProviderPlanReportVersion, $capProviderPlanStatus, $capProviderPlanPolicy | Where-Object { -not [string]::IsNullOrWhiteSpace([string]$_) }) -join ' / ') 180
         $capProduction = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'production_grounding' '') 40
         $capBlocks = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'blocks_data_goal' '') 40
         $capAnswerTime = Format-Fb2PromptCell (Get-Fb2PromptProperty $capability 'answer_time_vector_candidates_enabled' '') 40
         $capNextRaw = [string](Get-Fb2PromptProperty $capability 'next_action' '')
         if (-not [string]::IsNullOrWhiteSpace($capDryRunStatusValue)) {
-            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); persists_transaction_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_transaction_rows' $false)); persists_fixture_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_fixture_rows' $false)); embedding_text_is_sanitized=$([bool](Get-Fb2PromptProperty $capability 'embedding_text_is_sanitized' $false)); content_hash_computed=$([bool](Get-Fb2PromptProperty $capability 'content_hash_computed' $false)); calls_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'calls_embedding_provider' $false)); ready_to_execute_embedding_transaction=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_embedding_transaction' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
+            $capNextRaw = "$capNextRaw writes_vector_store=$([bool](Get-Fb2PromptProperty $capability 'writes_vector_store' $false)); writes_public_group_messages=$([bool](Get-Fb2PromptProperty $capability 'writes_public_group_messages' $false)); writes_chunk_manifest_file=$([bool](Get-Fb2PromptProperty $capability 'writes_chunk_manifest_file' $false)); persists_manifest_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_manifest_rows' $false)); persists_transaction_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_transaction_rows' $false)); persists_fixture_rows=$([bool](Get-Fb2PromptProperty $capability 'persists_fixture_rows' $false)); executes_migration_ddl=$([bool](Get-Fb2PromptProperty $capability 'executes_migration_ddl' $false)); provider_secret_required_now=$([bool](Get-Fb2PromptProperty $capability 'provider_secret_required_now' $false)); provider_secret_printed=$([bool](Get-Fb2PromptProperty $capability 'provider_secret_printed' $false)); embedding_text_is_sanitized=$([bool](Get-Fb2PromptProperty $capability 'embedding_text_is_sanitized' $false)); content_hash_computed=$([bool](Get-Fb2PromptProperty $capability 'content_hash_computed' $false)); calls_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'calls_embedding_provider' $false)); provider_model_id_selected=$([bool](Get-Fb2PromptProperty $capability 'provider_model_id_selected' $false)); vector_dimension_locked=$([bool](Get-Fb2PromptProperty $capability 'vector_dimension_locked' $false)); ready_to_call_embedding_provider=$([bool](Get-Fb2PromptProperty $capability 'ready_to_call_embedding_provider' $false)); ready_to_execute_embedding_transaction=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_embedding_transaction' $false)); ready_to_execute_migrations=$([bool](Get-Fb2PromptProperty $capability 'ready_to_execute_migrations' $false)); ready_to_write_embeddings=$([bool](Get-Fb2PromptProperty $capability 'ready_to_write_embeddings' $false)); candidate_rows_require_live_hydration=$([bool](Get-Fb2PromptProperty $capability 'candidate_rows_require_live_hydration' $false));".Trim()
         }
         $capNext = Format-Fb2PromptCell $capNextRaw 260
-        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capChunkManifest | $capDryRunStatusCell | $capTransactionPreflight | $capTextFixture | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
+        Add-Fb2PromptLine -Lines $lines -Text "| $capId | $capStatus | $capContract | $capSourceEnumerator | $capChunkManifest | $capDryRunStatusCell | $capTransactionPreflight | $capTextFixture | $capProviderPlan | $capProduction | $capBlocks | $capAnswerTime | $capNext |"
     }
     $p4SourceSafety = @($plannedCapabilities | Where-Object {
             [string](Get-Fb2PromptProperty $_ 'source_enumerator_report_version' '') -eq 'fb2_p4_source_enumerator_v1'
@@ -245,6 +249,18 @@ function New-Fb2HandoffPrompt {
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'persists_fixture_rows' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'calls_embedding_provider' $false), `
                 [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'answer_time_vector_candidates_enabled' $false))
+        Add-Fb2PromptLine -Lines $lines -Text ("- p4_embedding_provider_migration_safety: provider_plan={0}; provider_selection_state={1}; migration_plan={2}; execution_plan={3}; provider_secret_required_now={4}; provider_secret_printed={5}; executes_migration_ddl={6}; ready_to_call_embedding_provider={7}; ready_to_execute_migrations={8}; provider_model_id_selected={9}; vector_dimension_locked={10};" -f `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'embedding_provider_migration_plan_report_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'embedding_provider_selection_state' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'embedding_vector_migration_plan_version' ''), `
+                [string](Get-Fb2PromptProperty $p4SourceSafety[0] 'embedding_write_execution_plan_version' ''), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'provider_secret_required_now' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'provider_secret_printed' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'executes_migration_ddl' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'ready_to_call_embedding_provider' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'ready_to_execute_migrations' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'provider_model_id_selected' $false), `
+                [bool](Get-Fb2PromptProperty $p4SourceSafety[0] 'vector_dimension_locked' $false))
     }
     Add-Fb2PromptLine -Lines $lines -Text ""
     Add-Fb2PromptLine -Lines $lines -Text "## fb2 导出样本"
@@ -404,19 +420,37 @@ function Invoke-Fb2PromptSelfTest {
                     embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
                     embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
                     embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
+                    embedding_provider_migration_plan_report_version = "fb2_p4_embedding_provider_migration_plan_v1"
+                    embedding_provider_migration_plan_status = "provider_migration_plan_available_no_writes"
+                    embedding_provider_policy_version = "fb2_p4_embedding_provider_policy_v1"
+                    embedding_provider_selection_state = "not_selected_no_provider_calls"
+                    embedding_provider_model_alias = "fb2-context-embedding-planned"
+                    embedding_provider_model_id_source = "deployment_config_required_before_write"
+                    embedding_provider_dimension_source = "provider_metadata_or_static_config_required_before_migration"
+                    embedding_provider_dimension_locked_before_table_migration = $true
+                    embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
+                    embedding_provider_planned_table_count = 4
+                    embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
                     writes_chunk_manifest_file = $false
                     persists_manifest_rows = $false
                     persists_transaction_rows = $false
                     persists_fixture_rows = $false
                     creates_or_migrates_tables = $false
+                    executes_migration_ddl = $false
                     calls_embedding_provider = $false
+                    provider_secret_required_now = $false
+                    provider_secret_printed = $false
                     source_payload_included = $false
                     embedding_text_included = $true
                     embedding_text_is_sanitized = $true
                     content_hash_computed = $true
                     writes_vector_store = $false
                     writes_public_group_messages = $false
+                    provider_model_id_selected = $false
+                    vector_dimension_locked = $false
+                    ready_to_call_embedding_provider = $false
                     ready_to_execute_embedding_transaction = $false
+                    ready_to_execute_migrations = $false
                     ready_to_write_embeddings = $false
                     ready_for_shadow_eval = $false
                     candidate_rows_require_live_hydration = $true
@@ -500,19 +534,37 @@ function Invoke-Fb2PromptSelfTest {
                         embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
                         embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
                         embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
+                        embedding_provider_migration_plan_report_version = "fb2_p4_embedding_provider_migration_plan_v1"
+                        embedding_provider_migration_plan_status = "provider_migration_plan_available_no_writes"
+                        embedding_provider_policy_version = "fb2_p4_embedding_provider_policy_v1"
+                        embedding_provider_selection_state = "not_selected_no_provider_calls"
+                        embedding_provider_model_alias = "fb2-context-embedding-planned"
+                        embedding_provider_model_id_source = "deployment_config_required_before_write"
+                        embedding_provider_dimension_source = "provider_metadata_or_static_config_required_before_migration"
+                        embedding_provider_dimension_locked_before_table_migration = $true
+                        embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
+                        embedding_provider_planned_table_count = 4
+                        embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
                         persists_transaction_rows = $false
                         persists_fixture_rows = $false
                         creates_or_migrates_tables = $false
+                        executes_migration_ddl = $false
                         calls_embedding_provider = $false
+                        provider_secret_required_now = $false
+                        provider_secret_printed = $false
                         source_payload_included = $false
                         embedding_text_included = $true
                         embedding_text_is_sanitized = $true
                         content_hash_computed = $true
                         writes_vector_store = $false
                         writes_public_group_messages = $false
+                        provider_model_id_selected = $false
+                        vector_dimension_locked = $false
+                        ready_to_call_embedding_provider = $false
                         ready_to_execute_embedding_transaction = $false
+                        ready_to_execute_migrations = $false
                         ready_to_write_embeddings = $false
                         ready_for_shadow_eval = $false
                         candidate_rows_require_live_hydration = $true
@@ -557,19 +609,37 @@ function Invoke-Fb2PromptSelfTest {
                         embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
                         embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
                         embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
+                        embedding_provider_migration_plan_report_version = "fb2_p4_embedding_provider_migration_plan_v1"
+                        embedding_provider_migration_plan_status = "provider_migration_plan_available_no_writes"
+                        embedding_provider_policy_version = "fb2_p4_embedding_provider_policy_v1"
+                        embedding_provider_selection_state = "not_selected_no_provider_calls"
+                        embedding_provider_model_alias = "fb2-context-embedding-planned"
+                        embedding_provider_model_id_source = "deployment_config_required_before_write"
+                        embedding_provider_dimension_source = "provider_metadata_or_static_config_required_before_migration"
+                        embedding_provider_dimension_locked_before_table_migration = $true
+                        embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
+                        embedding_provider_planned_table_count = 4
+                        embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
                         writes_chunk_manifest_file = $false
                         persists_manifest_rows = $false
                         persists_transaction_rows = $false
                         persists_fixture_rows = $false
                         creates_or_migrates_tables = $false
+                        executes_migration_ddl = $false
                         calls_embedding_provider = $false
+                        provider_secret_required_now = $false
+                        provider_secret_printed = $false
                         source_payload_included = $false
                         embedding_text_included = $true
                         embedding_text_is_sanitized = $true
                         content_hash_computed = $true
                         writes_vector_store = $false
                         writes_public_group_messages = $false
+                        provider_model_id_selected = $false
+                        vector_dimension_locked = $false
+                        ready_to_call_embedding_provider = $false
                         ready_to_execute_embedding_transaction = $false
+                        ready_to_execute_migrations = $false
                         ready_to_write_embeddings = $false
                         ready_for_shadow_eval = $false
                         candidate_rows_require_live_hydration = $true
@@ -622,6 +692,15 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_build_dry_run_v1") "planned embedding dry-run report"
         Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_transaction_preflight_v1") "planned embedding transaction preflight report"
         Assert-Fb2PromptSelfTest ($content -match "transaction_preflight_available_no_writes") "planned embedding transaction preflight status"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_text_fixture_v1") "planned embedding text fixture report"
+        Assert-Fb2PromptSelfTest ($content -match "embedding_text_fixture_materialized_no_writes") "planned embedding text fixture status"
+        Assert-Fb2PromptSelfTest ($content -match "provider_plan") "planned provider plan column"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_provider_migration_plan_v1") "planned embedding provider migration report"
+        Assert-Fb2PromptSelfTest ($content -match "provider_migration_plan_available_no_writes") "planned embedding provider migration status"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_provider_policy_v1") "planned embedding provider policy"
+        Assert-Fb2PromptSelfTest ($content -match "not_selected_no_provider_calls") "planned embedding provider not selected"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_vector_migration_plan_v1") "planned vector migration plan"
+        Assert-Fb2PromptSelfTest ($content -match "fb2_p4_embedding_write_execution_plan_v1") "planned embedding write execution plan"
         Assert-Fb2PromptSelfTest ($content -match "contract_design_committed_embedding_not_started") "planned vector status"
         Assert-Fb2PromptSelfTest ($content -match "production_grounding") "planned vector production boundary"
         Assert-Fb2PromptSelfTest ($content -match "blocks_data_goal") "planned vector non-blocking boundary"
@@ -635,6 +714,13 @@ function Invoke-Fb2PromptSelfTest {
         Assert-Fb2PromptSelfTest ($content -match "persists_transaction_rows") "planned embedding transaction no row persistence boundary"
         Assert-Fb2PromptSelfTest ($content -match "calls_embedding_provider") "planned embedding transaction no provider call boundary"
         Assert-Fb2PromptSelfTest ($content -match "ready_to_execute_embedding_transaction") "planned embedding transaction not executable boundary"
+        Assert-Fb2PromptSelfTest ($content -match "provider_secret_required_now") "planned provider secret not required boundary"
+        Assert-Fb2PromptSelfTest ($content -match "provider_secret_printed") "planned provider secret not printed boundary"
+        Assert-Fb2PromptSelfTest ($content -match "executes_migration_ddl") "planned provider migration no ddl execution boundary"
+        Assert-Fb2PromptSelfTest ($content -match "ready_to_call_embedding_provider") "planned provider not callable boundary"
+        Assert-Fb2PromptSelfTest ($content -match "ready_to_execute_migrations") "planned migrations not executable boundary"
+        Assert-Fb2PromptSelfTest ($content -match "provider_model_id_selected") "planned provider model id not selected boundary"
+        Assert-Fb2PromptSelfTest ($content -match "vector_dimension_locked") "planned vector dimension not locked boundary"
         Assert-Fb2PromptSelfTest ($content -match "fb2 导出样本") "exported sample section"
         Assert-Fb2PromptSelfTest ($content -match "today_matches_context_pack") "exported sample row"
         Assert-Fb2PromptSelfTest ($content -match "\|\s*scenario\s*\|\s*audit\s*\|\s*sources\s*\|\s*business\s*\|\s*quality_history\s*\|\s*sha256\s*\|") "exported sample table classifies sources"

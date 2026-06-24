@@ -168,6 +168,17 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "planned p4 embedding text fixture missing source count delegated" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_missing_source_count" "") -eq "reported_by_fb2_embedding_text_fixture_runtime")
         Add-Fb2GapCheck $checks "planned p4 embedding text fixture hash algorithm" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_content_hash_algorithm" "") -eq "sha256_utf8_normalized_text_v1")
         Add-Fb2GapCheck $checks "planned p4 embedding text fixture sanitization policy" ([string](Get-Fb2GapProperty $p4 "embedding_text_fixture_sanitization_policy" "") -eq "fb2_p4_embedding_text_sanitization_v1")
+        Add-Fb2GapCheck $checks "planned p4 provider migration report version" ([string](Get-Fb2GapProperty $p4 "embedding_provider_migration_plan_report_version" "") -eq "fb2_p4_embedding_provider_migration_plan_v1")
+        Add-Fb2GapCheck $checks "planned p4 provider migration no-write status" ([string](Get-Fb2GapProperty $p4 "embedding_provider_migration_plan_status" "") -eq "provider_migration_plan_available_no_writes")
+        Add-Fb2GapCheck $checks "planned p4 provider policy version" ([string](Get-Fb2GapProperty $p4 "embedding_provider_policy_version" "") -eq "fb2_p4_embedding_provider_policy_v1")
+        Add-Fb2GapCheck $checks "planned p4 provider selection not selected" ([string](Get-Fb2GapProperty $p4 "embedding_provider_selection_state" "") -eq "not_selected_no_provider_calls")
+        Add-Fb2GapCheck $checks "planned p4 provider model alias" ([string](Get-Fb2GapProperty $p4 "embedding_provider_model_alias" "") -eq "fb2-context-embedding-planned")
+        Add-Fb2GapCheck $checks "planned p4 provider model id source" ([string](Get-Fb2GapProperty $p4 "embedding_provider_model_id_source" "") -eq "deployment_config_required_before_write")
+        Add-Fb2GapCheck $checks "planned p4 provider dimension source" ([string](Get-Fb2GapProperty $p4 "embedding_provider_dimension_source" "") -eq "provider_metadata_or_static_config_required_before_migration")
+        Add-Fb2GapCheck $checks "planned p4 provider dimension must be locked before migration" ([bool](Get-Fb2GapProperty $p4 "embedding_provider_dimension_locked_before_table_migration" $false))
+        Add-Fb2GapCheck $checks "planned p4 vector migration plan version" ([string](Get-Fb2GapProperty $p4 "embedding_vector_migration_plan_version" "") -eq "fb2_p4_vector_migration_plan_v1")
+        Add-Fb2GapCheck $checks "planned p4 vector migration table count" ([int](Get-Fb2GapProperty $p4 "embedding_provider_planned_table_count" 0) -eq 4)
+        Add-Fb2GapCheck $checks "planned p4 embedding write execution plan version" ([string](Get-Fb2GapProperty $p4 "embedding_write_execution_plan_version" "") -eq "fb2_p4_embedding_write_execution_plan_v1")
         Add-Fb2GapCheck $checks "planned p4 vector not production grounding" (-not [bool](Get-Fb2GapProperty $p4 "production_grounding" $true))
         Add-Fb2GapCheck $checks "planned p4 vector non-blocking" (-not [bool](Get-Fb2GapProperty $p4 "blocks_data_goal" $true))
         Add-Fb2GapCheck $checks "planned p4 embedding dry-run is read-only" ([bool](Get-Fb2GapProperty $p4 "read_only" $false))
@@ -176,7 +187,10 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "planned p4 manifest rows not persisted" (-not [bool](Get-Fb2GapProperty $p4 "persists_manifest_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 transaction rows not persisted" (-not [bool](Get-Fb2GapProperty $p4 "persists_transaction_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 tables not created or migrated" (-not [bool](Get-Fb2GapProperty $p4 "creates_or_migrates_tables" $true))
+        Add-Fb2GapCheck $checks "planned p4 migration ddl not executed" (-not [bool](Get-Fb2GapProperty $p4 "executes_migration_ddl" $true))
         Add-Fb2GapCheck $checks "planned p4 embedding provider not called" (-not [bool](Get-Fb2GapProperty $p4 "calls_embedding_provider" $true))
+        Add-Fb2GapCheck $checks "planned p4 provider secret not required now" (-not [bool](Get-Fb2GapProperty $p4 "provider_secret_required_now" $true))
+        Add-Fb2GapCheck $checks "planned p4 provider secret not printed" (-not [bool](Get-Fb2GapProperty $p4 "provider_secret_printed" $true))
         Add-Fb2GapCheck $checks "planned p4 embedding rows not written" (-not [bool](Get-Fb2GapProperty $p4 "writes_embedding_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 vector store not written" (-not [bool](Get-Fb2GapProperty $p4 "writes_vector_store" $true))
         Add-Fb2GapCheck $checks "planned p4 source enumerator writes no public group messages" (-not [bool](Get-Fb2GapProperty $p4 "writes_public_group_messages" $true))
@@ -189,7 +203,11 @@ function New-Fb2GapValidation {
         Add-Fb2GapCheck $checks "planned p4 content hash computed" ([bool](Get-Fb2GapProperty $p4 "content_hash_computed" $false))
         Add-Fb2GapCheck $checks "planned p4 fixture rows not persisted" (-not [bool](Get-Fb2GapProperty $p4 "persists_fixture_rows" $true))
         Add-Fb2GapCheck $checks "planned p4 vector does not enable vector" ([bool](Get-Fb2GapProperty $p4 "does_not_enable_vector" $false))
+        Add-Fb2GapCheck $checks "planned p4 provider model id not selected" (-not [bool](Get-Fb2GapProperty $p4 "provider_model_id_selected" $true))
+        Add-Fb2GapCheck $checks "planned p4 vector dimension not locked" (-not [bool](Get-Fb2GapProperty $p4 "vector_dimension_locked" $true))
+        Add-Fb2GapCheck $checks "planned p4 provider not callable yet" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_call_embedding_provider" $true))
         Add-Fb2GapCheck $checks "planned p4 embedding transaction not executable" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_execute_embedding_transaction" $true))
+        Add-Fb2GapCheck $checks "planned p4 migrations not executable" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_execute_migrations" $true))
         Add-Fb2GapCheck $checks "planned p4 not ready to write embeddings" (-not [bool](Get-Fb2GapProperty $p4 "ready_to_write_embeddings" $true))
         Add-Fb2GapCheck $checks "planned p4 vector no secret required" (-not [bool](Get-Fb2GapProperty $p4 "requires_secret" $true))
         Add-Fb2GapCheck $checks "planned p4 vector no visible write" (-not [bool](Get-Fb2GapProperty $p4 "requires_visible_group_write" $true))
@@ -544,6 +562,17 @@ function Invoke-Fb2GapSelfTest {
                         embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
                         embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
                         embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
+                        embedding_provider_migration_plan_report_version = "fb2_p4_embedding_provider_migration_plan_v1"
+                        embedding_provider_migration_plan_status = "provider_migration_plan_available_no_writes"
+                        embedding_provider_policy_version = "fb2_p4_embedding_provider_policy_v1"
+                        embedding_provider_selection_state = "not_selected_no_provider_calls"
+                        embedding_provider_model_alias = "fb2-context-embedding-planned"
+                        embedding_provider_model_id_source = "deployment_config_required_before_write"
+                        embedding_provider_dimension_source = "provider_metadata_or_static_config_required_before_migration"
+                        embedding_provider_dimension_locked_before_table_migration = $true
+                        embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
+                        embedding_provider_planned_table_count = 4
+                        embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
                         status = "contract_design_committed_embedding_not_started"
                         blocks_data_goal = $false
                         production_grounding = $false
@@ -553,7 +582,10 @@ function Invoke-Fb2GapSelfTest {
                         persists_manifest_rows = $false
                         persists_transaction_rows = $false
                         creates_or_migrates_tables = $false
+                        executes_migration_ddl = $false
                         calls_embedding_provider = $false
+                        provider_secret_required_now = $false
+                        provider_secret_printed = $false
                         writes_embedding_rows = $false
                         writes_vector_store = $false
                         writes_public_group_messages = $false
@@ -566,7 +598,11 @@ function Invoke-Fb2GapSelfTest {
                         content_hash_computed = $true
                         persists_fixture_rows = $false
                         does_not_enable_vector = $true
+                        provider_model_id_selected = $false
+                        vector_dimension_locked = $false
+                        ready_to_call_embedding_provider = $false
                         ready_to_execute_embedding_transaction = $false
+                        ready_to_execute_migrations = $false
                         ready_to_write_embeddings = $false
                         ready_to_enable_answer_time_vector_candidates = $false
                         ready_for_shadow_eval = $false

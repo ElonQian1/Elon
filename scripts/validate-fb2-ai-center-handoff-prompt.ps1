@@ -123,6 +123,13 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "planned embedding transaction preflight status visible" ($Content -match 'transaction_preflight_available_no_writes')
     Add-Fb2PromptValidationCheck $checks "planned embedding text fixture report visible" ($Content -match 'fb2_p4_embedding_text_fixture_v1')
     Add-Fb2PromptValidationCheck $checks "planned embedding text fixture status visible" ($Content -match 'embedding_text_fixture_materialized_no_writes')
+    Add-Fb2PromptValidationCheck $checks "planned provider plan column visible" ($Content -match 'provider_plan')
+    Add-Fb2PromptValidationCheck $checks "planned provider migration report visible" ($Content -match 'fb2_p4_embedding_provider_migration_plan_v1')
+    Add-Fb2PromptValidationCheck $checks "planned provider migration status visible" ($Content -match 'provider_migration_plan_available_no_writes')
+    Add-Fb2PromptValidationCheck $checks "planned provider policy visible" ($Content -match 'fb2_p4_embedding_provider_policy_v1')
+    Add-Fb2PromptValidationCheck $checks "planned provider selection visible" ($Content -match 'not_selected_no_provider_calls')
+    Add-Fb2PromptValidationCheck $checks "planned vector migration plan visible" ($Content -match 'fb2_p4_vector_migration_plan_v1')
+    Add-Fb2PromptValidationCheck $checks "planned embedding write execution plan visible" ($Content -match 'fb2_p4_embedding_write_execution_plan_v1')
     Add-Fb2PromptValidationCheck $checks "planned vector status visible" ($Content -match 'contract_design_committed_embedding_not_started')
     Add-Fb2PromptValidationCheck $checks "planned vector production boundary visible" ($Content -match 'production_grounding')
     Add-Fb2PromptValidationCheck $checks "planned vector non-blocking boundary visible" ($Content -match 'blocks_data_goal')
@@ -140,6 +147,13 @@ function New-Fb2PromptValidation {
     Add-Fb2PromptValidationCheck $checks "planned embedding text fixture sanitized boundary visible" ($Content -match 'embedding_text_is_sanitized')
     Add-Fb2PromptValidationCheck $checks "planned embedding text fixture hash boundary visible" ($Content -match 'content_hash_computed')
     Add-Fb2PromptValidationCheck $checks "planned embedding text fixture no row persistence boundary visible" ($Content -match 'persists_fixture_rows')
+    Add-Fb2PromptValidationCheck $checks "planned provider secret boundary visible" ($Content -match 'provider_secret_required_now')
+    Add-Fb2PromptValidationCheck $checks "planned provider secret print boundary visible" ($Content -match 'provider_secret_printed')
+    Add-Fb2PromptValidationCheck $checks "planned provider migration ddl boundary visible" ($Content -match 'executes_migration_ddl')
+    Add-Fb2PromptValidationCheck $checks "planned provider callable boundary visible" ($Content -match 'ready_to_call_embedding_provider')
+    Add-Fb2PromptValidationCheck $checks "planned migrations executable boundary visible" ($Content -match 'ready_to_execute_migrations')
+    Add-Fb2PromptValidationCheck $checks "planned provider model id boundary visible" ($Content -match 'provider_model_id_selected')
+    Add-Fb2PromptValidationCheck $checks "planned vector dimension boundary visible" ($Content -match 'vector_dimension_locked')
 
     foreach ($field in @(
             "data_goal_complete",
@@ -306,12 +320,13 @@ schema: `fb2.main_project.status_refresh.v1` / matrix: `fb2.main_project.complet
 - shared: `run_DataOnlyAcceptance_PreflightOnly_with_token_then_refresh_status_refresh_current_json`
 
 ## 计划能力 / 非生产边界
-| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | text_fixture | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |
-|---|---|---|---|---|---|---|---|---|---|---|---|
-| p4_vector | contract_design_committed_embedding_not_started | fb2_p4_vector_contract_v1 / fb2_p4_vector_readiness_plan_v1 / fb2_p4_embedding_build_dry_run_v1 | fb2_p4_source_enumerator_v1 / source_specific_no_write_sample_available | fb2_p4_chunk_manifest_v1 / id_only_no_write_manifest_available | dry_run_available_no_writes | fb2_p4_embedding_transaction_preflight_v1 / transaction_preflight_available_no_writes | fb2_p4_embedding_text_fixture_v1 / embedding_text_fixture_materialized_no_writes | False | False | False | writes_vector_store=false; writes_public_group_messages=false; writes_chunk_manifest_file=false; persists_manifest_rows=false; persists_transaction_rows=false; persists_fixture_rows=false; embedding_text_is_sanitized=true; content_hash_computed=true; calls_embedding_provider=false; ready_to_execute_embedding_transaction=false; ready_to_write_embeddings=false; candidate_rows_require_live_hydration=true. |
+| id | status | contract | source_enumerator | chunk_manifest | dry_run_status | transaction_preflight | text_fixture | provider_plan | production_grounding | blocks_data_goal | answer_time_vector_candidates_enabled | next |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| p4_vector | contract_design_committed_embedding_not_started | fb2_p4_vector_contract_v1 / fb2_p4_vector_readiness_plan_v1 / fb2_p4_embedding_build_dry_run_v1 | fb2_p4_source_enumerator_v1 / source_specific_no_write_sample_available | fb2_p4_chunk_manifest_v1 / id_only_no_write_manifest_available | dry_run_available_no_writes | fb2_p4_embedding_transaction_preflight_v1 / transaction_preflight_available_no_writes | fb2_p4_embedding_text_fixture_v1 / embedding_text_fixture_materialized_no_writes | fb2_p4_embedding_provider_migration_plan_v1 / provider_migration_plan_available_no_writes / fb2_p4_embedding_provider_policy_v1 | False | False | False | writes_vector_store=false; writes_public_group_messages=false; writes_chunk_manifest_file=false; persists_manifest_rows=false; persists_transaction_rows=false; persists_fixture_rows=false; executes_migration_ddl=false; provider_secret_required_now=false; provider_secret_printed=false; embedding_text_is_sanitized=true; content_hash_computed=true; calls_embedding_provider=false; not_selected_no_provider_calls; fb2_p4_vector_migration_plan_v1; fb2_p4_embedding_write_execution_plan_v1; provider_model_id_selected=false; vector_dimension_locked=false; ready_to_call_embedding_provider=false; ready_to_execute_embedding_transaction=false; ready_to_execute_migrations=false; ready_to_write_embeddings=false; candidate_rows_require_live_hydration=true. |
 - p4_chunk_manifest_safety: writes_chunk_manifest_file=False; persists_manifest_rows=False; source_payload_included=False; embedding_text_included=False; ready_for_shadow_eval=False;
 - p4_embedding_transaction_preflight_safety: persists_transaction_rows=False; creates_or_migrates_tables=False; calls_embedding_provider=False; ready_to_execute_embedding_transaction=False; writes_embedding_rows=False; writes_vector_store=False;
 - p4_embedding_text_fixture_safety: embedding_text_included=True; embedding_text_is_sanitized=True; content_hash_computed=True; persists_fixture_rows=False; calls_embedding_provider=False; answer_time_vector_candidates_enabled=False;
+- p4_embedding_provider_migration_safety: provider_plan=fb2_p4_embedding_provider_migration_plan_v1; provider_selection_state=not_selected_no_provider_calls; migration_plan=fb2_p4_vector_migration_plan_v1; execution_plan=fb2_p4_embedding_write_execution_plan_v1; provider_secret_required_now=False; provider_secret_printed=False; executes_migration_ddl=False; ready_to_call_embedding_provider=False; ready_to_execute_migrations=False; provider_model_id_selected=False; vector_dimension_locked=False;
 
 ## fb2 导出样本
 - attempted: `True` / complete: `True` / passed: `4` / failed: `0`

@@ -262,7 +262,19 @@ function New-Fb2GoalAuditPlannedCapabilities {
             embedding_text_fixture_missing_source_count = "reported_by_fb2_embedding_text_fixture_runtime"
             embedding_text_fixture_content_hash_algorithm = "sha256_utf8_normalized_text_v1"
             embedding_text_fixture_sanitization_policy = "fb2_p4_embedding_text_sanitization_v1"
-            source_ref = "fb2 92bd93c1 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_chunk_manifest.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1 / scripts/report_main_project_p4_embedding_transaction_preflight.ps1 / scripts/report_main_project_p4_embedding_text_fixture.ps1"
+            embedding_provider_migration_plan_report_version = "fb2_p4_embedding_provider_migration_plan_v1"
+            embedding_provider_migration_plan_status = "provider_migration_plan_available_no_writes"
+            embedding_provider_policy_version = "fb2_p4_embedding_provider_policy_v1"
+            embedding_provider_selection_state = "not_selected_no_provider_calls"
+            embedding_provider_model_alias = "fb2-context-embedding-planned"
+            embedding_provider_model_id_source = "deployment_config_required_before_write"
+            embedding_provider_dimension_source = "provider_metadata_or_static_config_required_before_migration"
+            embedding_provider_dimension_locked_before_table_migration = $true
+            embedding_vector_migration_plan_version = "fb2_p4_vector_migration_plan_v1"
+            embedding_provider_planned_table_count = 4
+            embedding_write_execution_plan_version = "fb2_p4_embedding_write_execution_plan_v1"
+            embedding_provider_blocking_reasons = "reported_by_fb2_embedding_provider_migration_plan_runtime"
+            source_ref = "fb2 73a40385 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_chunk_manifest.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1 / scripts/report_main_project_p4_embedding_transaction_preflight.ps1 / scripts/report_main_project_p4_embedding_text_fixture.ps1 / scripts/report_main_project_p4_embedding_provider_migration_plan.ps1"
             gap_type = "planned_non_blocking"
             blocks_data_goal = $false
             production_grounding = $false
@@ -272,7 +284,10 @@ function New-Fb2GoalAuditPlannedCapabilities {
             persists_manifest_rows = $false
             persists_transaction_rows = $false
             creates_or_migrates_tables = $false
+            executes_migration_ddl = $false
             calls_embedding_provider = $false
+            provider_secret_required_now = $false
+            provider_secret_printed = $false
             writes_embedding_rows = $false
             writes_vector_store = $false
             writes_public_group_messages = $false
@@ -285,7 +300,11 @@ function New-Fb2GoalAuditPlannedCapabilities {
             content_hash_computed = $true
             persists_fixture_rows = $false
             does_not_enable_vector = $true
+            provider_model_id_selected = $false
+            vector_dimension_locked = $false
+            ready_to_call_embedding_provider = $false
             ready_to_execute_embedding_transaction = $false
+            ready_to_execute_migrations = $false
             ready_to_write_embeddings = $false
             ready_to_build_embedding_store = $false
             ready_to_enable_answer_time_vector_candidates = $false
@@ -298,7 +317,7 @@ function New-Fb2GoalAuditPlannedCapabilities {
             requires_secret = $false
             requires_visible_group_write = $false
             command = ""
-            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator, chunk manifest, embedding dry-run, transaction preflight, and sanitized embedding text fixture are only no-write planning evidence before provider/model policy, migrations, shadow eval, hydration, and explicit answer-time readthrough gates."
+            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator, chunk manifest, embedding dry-run, transaction preflight, sanitized embedding text fixture, and provider migration plan are only no-write planning evidence before provider/model selection, vector dimension lock, migrations, shadow eval, hydration, and explicit answer-time readthrough gates."
         }
     )
 }
@@ -758,13 +777,28 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ([string]$planned[0].embedding_text_fixture_missing_source_count -ne "reported_by_fb2_embedding_text_fixture_runtime") { $failed++ }
     if ([string]$planned[0].embedding_text_fixture_content_hash_algorithm -ne "sha256_utf8_normalized_text_v1") { $failed++ }
     if ([string]$planned[0].embedding_text_fixture_sanitization_policy -ne "fb2_p4_embedding_text_sanitization_v1") { $failed++ }
+    if ([string]$planned[0].embedding_provider_migration_plan_report_version -ne "fb2_p4_embedding_provider_migration_plan_v1") { $failed++ }
+    if ([string]$planned[0].embedding_provider_migration_plan_status -ne "provider_migration_plan_available_no_writes") { $failed++ }
+    if ([string]$planned[0].embedding_provider_policy_version -ne "fb2_p4_embedding_provider_policy_v1") { $failed++ }
+    if ([string]$planned[0].embedding_provider_selection_state -ne "not_selected_no_provider_calls") { $failed++ }
+    if ([string]$planned[0].embedding_provider_model_alias -ne "fb2-context-embedding-planned") { $failed++ }
+    if ([string]$planned[0].embedding_provider_model_id_source -ne "deployment_config_required_before_write") { $failed++ }
+    if ([string]$planned[0].embedding_provider_dimension_source -ne "provider_metadata_or_static_config_required_before_migration") { $failed++ }
+    if (-not [bool]$planned[0].embedding_provider_dimension_locked_before_table_migration) { $failed++ }
+    if ([string]$planned[0].embedding_vector_migration_plan_version -ne "fb2_p4_vector_migration_plan_v1") { $failed++ }
+    if ([int]$planned[0].embedding_provider_planned_table_count -ne 4) { $failed++ }
+    if ([string]$planned[0].embedding_write_execution_plan_version -ne "fb2_p4_embedding_write_execution_plan_v1") { $failed++ }
+    if ([string]$planned[0].embedding_provider_blocking_reasons -ne "reported_by_fb2_embedding_provider_migration_plan_runtime") { $failed++ }
     if (-not [bool]$planned[0].read_only) { $failed++ }
     if (-not [bool]$planned[0].dry_run) { $failed++ }
     if ([bool]$planned[0].writes_chunk_manifest_file) { $failed++ }
     if ([bool]$planned[0].persists_manifest_rows) { $failed++ }
     if ([bool]$planned[0].persists_transaction_rows) { $failed++ }
     if ([bool]$planned[0].creates_or_migrates_tables) { $failed++ }
+    if ([bool]$planned[0].executes_migration_ddl) { $failed++ }
     if ([bool]$planned[0].calls_embedding_provider) { $failed++ }
+    if ([bool]$planned[0].provider_secret_required_now) { $failed++ }
+    if ([bool]$planned[0].provider_secret_printed) { $failed++ }
     if ([bool]$planned[0].writes_vector_store) { $failed++ }
     if ([bool]$planned[0].writes_public_group_messages) { $failed++ }
     if ([bool]$planned[0].writes_feedback_or_adoption) { $failed++ }
@@ -775,7 +809,11 @@ function Invoke-Fb2GoalAuditSelfTest {
     if (-not [bool]$planned[0].embedding_text_is_sanitized) { $failed++ }
     if (-not [bool]$planned[0].content_hash_computed) { $failed++ }
     if ([bool]$planned[0].persists_fixture_rows) { $failed++ }
+    if ([bool]$planned[0].provider_model_id_selected) { $failed++ }
+    if ([bool]$planned[0].vector_dimension_locked) { $failed++ }
+    if ([bool]$planned[0].ready_to_call_embedding_provider) { $failed++ }
     if ([bool]$planned[0].ready_to_execute_embedding_transaction) { $failed++ }
+    if ([bool]$planned[0].ready_to_execute_migrations) { $failed++ }
     if ([bool]$planned[0].ready_to_write_embeddings) { $failed++ }
     if (-not [bool]$planned[0].candidate_rows_require_live_hydration) { $failed++ }
     if ([bool]$planned[0].vector_rows_are_model_input) { $failed++ }
