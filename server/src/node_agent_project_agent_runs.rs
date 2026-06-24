@@ -15,6 +15,7 @@ use std::{
 
 use crate::{
     node_agent_active_task::ActiveCliPromptView,
+    node_agent_project_agent_recovery::{recovery_entry_from, ProjectAgentRunRecoveryEntry},
     node_agent_task_approval_snapshot::TaskApprovalJournalSnapshot,
     node_agent_task_journal::TaskJournalRecord,
     node_agent_task_resume::{
@@ -50,49 +51,33 @@ struct ProjectAgentRunsResponse {
 }
 
 #[derive(Debug, Serialize)]
-struct ProjectAgentRunRecoveryEntry {
-    kind: String,
-    task_id: String,
-    cli_name: String,
-    route: Option<String>,
-    cwd: Option<String>,
-    runtime_permission: Option<String>,
-    status: String,
-    recommended_action: String,
-    reason: String,
-    can_cancel: bool,
-    can_continue: bool,
-    updated_at_ms: Option<u128>,
+pub(crate) struct ProjectAgentRunControl {
+    pub(crate) task_id: String,
+    pub(crate) run_handle_id: String,
+    pub(crate) cli_name: String,
+    pub(crate) route: String,
+    pub(crate) cwd: Option<String>,
+    pub(crate) runtime_permission: Option<String>,
+    pub(crate) started_at_ms: u128,
+    pub(crate) last_heartbeat_ms: u128,
+    pub(crate) control_lease_expires_at_ms: u128,
+    pub(crate) os_pid: Option<u32>,
+    pub(crate) can_cancel: bool,
 }
 
 #[derive(Debug, Serialize)]
-struct ProjectAgentRunControl {
-    task_id: String,
-    run_handle_id: String,
-    cli_name: String,
-    route: String,
-    cwd: Option<String>,
-    runtime_permission: Option<String>,
-    started_at_ms: u128,
-    last_heartbeat_ms: u128,
-    control_lease_expires_at_ms: u128,
-    os_pid: Option<u32>,
-    can_cancel: bool,
-}
-
-#[derive(Debug, Serialize)]
-struct ProjectAgentRunTaskResume {
-    task_id: String,
-    cli_name: String,
-    route: Option<String>,
-    cwd: Option<String>,
-    runtime_permission: Option<String>,
-    status: String,
-    started_at_ms: u128,
-    updated_at_ms: u128,
-    cancel_requested_at_ms: Option<u128>,
-    attach: TaskAttachState,
-    resume: TaskResumeContract,
+pub(crate) struct ProjectAgentRunTaskResume {
+    pub(crate) task_id: String,
+    pub(crate) cli_name: String,
+    pub(crate) route: Option<String>,
+    pub(crate) cwd: Option<String>,
+    pub(crate) runtime_permission: Option<String>,
+    pub(crate) status: String,
+    pub(crate) started_at_ms: u128,
+    pub(crate) updated_at_ms: u128,
+    pub(crate) cancel_requested_at_ms: Option<u128>,
+    pub(crate) attach: TaskAttachState,
+    pub(crate) resume: TaskResumeContract,
 }
 
 #[derive(Debug, Serialize)]
@@ -204,60 +189,6 @@ fn list_project_agent_runs(req: &ProjectAgentRunsReq) -> Result<ProjectAgentRuns
         recent_tasks: Vec::new(),
         runs,
     })
-}
-
-fn recovery_entry_from(
-    active_controls: &[ProjectAgentRunControl],
-    recent_tasks: &[ProjectAgentRunTaskResume],
-) -> Option<ProjectAgentRunRecoveryEntry> {
-    active_controls
-        .iter()
-        .find(|control| !control.task_id.trim().is_empty())
-        .map(ProjectAgentRunRecoveryEntry::from_active_control)
-        .or_else(|| {
-            recent_tasks
-                .iter()
-                .find(|task| !task.task_id.trim().is_empty())
-                .map(ProjectAgentRunRecoveryEntry::from_recent_task)
-        })
-}
-
-impl ProjectAgentRunRecoveryEntry {
-    fn from_active_control(control: &ProjectAgentRunControl) -> Self {
-        Self {
-            kind: "active_control".to_string(),
-            task_id: control.task_id.clone(),
-            cli_name: control.cli_name.clone(),
-            route: Some(control.route.clone()),
-            cwd: control.cwd.clone(),
-            runtime_permission: control.runtime_permission.clone(),
-            status: "running".to_string(),
-            recommended_action: "wait_or_cancel".to_string(),
-            reason: "当前本机节点仍持有运行控制句柄，PC 端应优先展示继续观察或停止入口。"
-                .to_string(),
-            can_cancel: control.can_cancel,
-            can_continue: false,
-            updated_at_ms: Some(control.last_heartbeat_ms),
-        }
-    }
-
-    fn from_recent_task(task: &ProjectAgentRunTaskResume) -> Self {
-        let recommended_action = task.resume.next_action().to_string();
-        Self {
-            kind: "snapshot_resume".to_string(),
-            task_id: task.task_id.clone(),
-            cli_name: task.cli_name.clone(),
-            route: task.route.clone(),
-            cwd: task.cwd.clone(),
-            runtime_permission: task.runtime_permission.clone(),
-            status: task.resume.status().to_string(),
-            can_cancel: false,
-            can_continue: recommended_action == "continue_from_snapshot",
-            recommended_action,
-            reason: task.resume.reason().to_string(),
-            updated_at_ms: Some(task.updated_at_ms),
-        }
-    }
 }
 
 #[cfg(test)]
@@ -813,6 +744,9 @@ mod tests {
         assert_eq!(entry.task_id, "req-live");
         assert_eq!(entry.status, "running");
         assert_eq!(entry.recommended_action, "wait_or_cancel");
+        assert!(!entry.tty_reconnect.supported);
+        assert_eq!(entry.tty_reconnect.user_label, "原 CLI 终端不可重接");
+        assert_eq!(entry.tty_reconnect.fallback_action, "wait_or_cancel");
         assert!(entry.can_cancel);
         assert!(!entry.can_continue);
     }
@@ -831,6 +765,12 @@ mod tests {
         assert_eq!(entry.task_id, "req-detached");
         assert_eq!(entry.status, "terminal");
         assert_eq!(entry.recommended_action, "continue_from_snapshot");
+        assert!(!entry.tty_reconnect.supported);
+        assert_eq!(entry.tty_reconnect.user_label, "原 CLI 终端不可重接");
+        assert_eq!(
+            entry.tty_reconnect.fallback_action,
+            "continue_from_snapshot"
+        );
         assert!(!entry.can_cancel);
         assert!(entry.can_continue);
         assert!(serialized.contains("本机进程已经结束"));

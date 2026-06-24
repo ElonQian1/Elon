@@ -210,6 +210,7 @@
       const permission = clean(entry && (entry.runtime_permission || entry.runtimePermission));
       const updated = clean(entry && (entry.updated_at || entry.updatedAt || entry.updated_at_ms || entry.updatedAtMs));
       const reason = clean(entry && entry.reason);
+      const ttyReconnect = ttyReconnectView(entry);
       const canCancel = taskId && (entry.can_cancel === true || entry.canCancel === true);
       const canContinue = taskId && (entry.can_continue === true || entry.canContinue === true || action === 'continue_from_snapshot');
       const draftTask = canContinue ? recoveryTaskForDraft(entry, context) : null;
@@ -221,6 +222,7 @@
         route,
         permission,
         recoveryActionLabel(action, kind),
+        ttyReconnect && ttyReconnect.label,
         updated
       ].filter(Boolean).join(' · ');
       return `<article class="agent-run-item ${escapeHtml(status.tone)} agent-run-control agent-run-recovery">
@@ -229,6 +231,7 @@
           <strong>${escapeHtml(shortRunId(taskId || kind || cliName))}</strong>
           <small>${escapeHtml(meta || recoveryKindLabel(kind))}</small>
           ${reason ? `<p>${escapeHtml(reason)}</p>` : ''}
+          ${ttyReconnect ? `<div class="agent-run-approval muted"><span>${escapeHtml(ttyReconnect.label || '原 CLI 终端不可重接')}</span>${ttyReconnect.reason ? `<em>${escapeHtml(ttyReconnect.reason)}</em>` : ''}</div>` : ''}
           ${approval ? toolApprovalRecoveryHtml(approval) : ''}
         </div>
         ${canContinue ? `<button class="agent-run-continue" type="button" data-agent-run-action="continue" data-task-id="${escapeHtml(taskId)}">继续</button>` : ''}
@@ -370,10 +373,32 @@
       return recoveryKindLabel(kind);
     }
 
+    function ttyReconnectView(source) {
+      const raw = source && (source.tty_reconnect || source.ttyReconnect);
+      if (!raw || typeof raw !== 'object') return null;
+      const supported = raw.supported === true ? true : (raw.supported === false ? false : undefined);
+      const label = clean(raw.user_label || raw.userLabel) || (supported === false ? '原 CLI 终端不可重接' : '');
+      const reason = clean(raw.reason);
+      const fallbackAction = clean(raw.fallback_action || raw.fallbackAction);
+      if (!label && !reason && supported === undefined && !fallbackAction) return null;
+      return { supported, label, reason, fallbackAction };
+    }
+
     function recoveryTaskForDraft(entry, context) {
       const taskId = recoveryEntryTaskId(entry);
       const recent = taskById(context, taskId);
-      if (recent) return recent;
+      const ttyReconnect = entry && (entry.tty_reconnect || entry.ttyReconnect);
+      if (recent) {
+        if (!ttyReconnect) return recent;
+        return Object.assign({}, recent, {
+          tty_reconnect: recent.tty_reconnect || recent.ttyReconnect || ttyReconnect,
+          resume: Object.assign({}, recent.resume || {}, {
+            tty_reconnect: recent.resume && (recent.resume.tty_reconnect || recent.resume.ttyReconnect)
+              ? (recent.resume.tty_reconnect || recent.resume.ttyReconnect)
+              : ttyReconnect
+          })
+        });
+      }
       return {
         task_id: taskId,
         cli_name: entry && (entry.cli_name || entry.cliName),
@@ -387,6 +412,7 @@
           status: entry && entry.status,
           can_replay_journal_events: true,
           can_stream_live_output: false,
+          tty_reconnect: ttyReconnect,
           next_action: entry && (entry.recommended_action || entry.recommendedAction),
           reason: entry && entry.reason,
           strategy: { kind: 'snapshot_continue', label: '基于快照继续' }
@@ -410,6 +436,10 @@
       const canCodex = resumeFlag(resume, 'can_resume_codex_session', 'canResumeCodexSession');
       const canReplay = resumeFlag(resume, 'can_replay_journal_events', 'canReplayJournalEvents');
       const cannotStream = resumeFlag(resume, 'can_stream_live_output', 'canStreamLiveOutput') === false;
+      const ttyReconnect = ttyReconnectView(task) || ttyReconnectView(resume);
+      const ttyLine = ttyReconnect && ttyReconnect.supported === false
+        ? `${ttyReconnect.label || '原 CLI 终端不可重接'}${ttyReconnect.reason ? `：${ttyReconnect.reason}` : ''}`
+        : (cannotStream ? '原 CLI 终端不可重接' : '');
       const cwd = clean(task && (task.cwd || task.workspace_path || task.workspacePath))
         || clean(context && context.workspacePath);
       const logDir = clean(context && context.logDir);
@@ -430,7 +460,7 @@
         attachStatus || attachSource ? `现场状态：${[attachStatus, attachSource].filter(Boolean).join(' / ')}` : '',
         canReplay ? '本机 journal 事件可回放' : '',
         canCodex ? '本机 Codex session 已记录，节点会优先自动续接；不要让用户手动粘贴 session id。' : '',
-        cannotStream ? '原 CLI 终端不可重接' : '',
+        ttyLine,
         approval ? `工具审批恢复：${approval.label}${approval.detail ? `；${approval.detail}` : ''}` : ''
       ].filter(Boolean);
       return [

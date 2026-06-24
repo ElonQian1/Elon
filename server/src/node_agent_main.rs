@@ -63,6 +63,7 @@ mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
 mod node_agent_local_admin;
+mod node_agent_project_agent_recovery;
 mod node_agent_project_agent_runs;
 mod node_agent_project_manifest_identity;
 mod node_agent_project_picker;
