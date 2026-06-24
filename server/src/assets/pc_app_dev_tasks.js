@@ -311,9 +311,9 @@
       const snapshotContinue = taskNeedsSnapshotContinue(task);
       let closedState = recoveredState && recoveredState.status !== 'pending'
         ? recoveredState
-        : (snapshotContinue ? taskSnapshotContinueApprovalState() : (taskIsTerminal(task) ? taskTerminalApprovalState(task) : null));
+        : (snapshotContinue ? taskSnapshotContinueApprovalState(task) : (taskIsTerminal(task) ? taskTerminalApprovalState(task) : null));
       if (!closedState && approvalId && !approvalIsActionable(task, approvalId)) {
-        closedState = taskApprovalUnavailableState();
+        closedState = taskApprovalUnavailableState(task);
       }
       return cardHtml({
         tone: closedState ? closedState.tone : 'approval',
@@ -660,12 +660,21 @@
       return { status: 'done', tone: 'done', label: '已失效', meta: '任务已结束' };
     }
 
-    function taskSnapshotContinueApprovalState() {
-      return { status: 'detached', tone: 'failed', label: '已失效', meta: '原 CLI 终端不可重接，请基于快照继续' };
+    function taskSnapshotContinueApprovalState(task) {
+      const recovery = toolApprovalRecovery(task);
+      const meta = clean(recovery && recovery.reason) || '原 CLI 终端不可重接，请基于快照继续';
+      return { status: 'detached', tone: 'failed', label: '已失效', meta };
     }
 
-    function taskApprovalUnavailableState() {
-      return { status: 'unavailable', tone: 'failed', label: '已失效', meta: '本机没有活动审批等待器' };
+    function taskApprovalUnavailableState(task) {
+      const recovery = toolApprovalRecovery(task);
+      const meta = clean(recovery && recovery.reason) || '本机没有活动审批等待器';
+      return { status: 'unavailable', tone: 'failed', label: '已失效', meta };
+    }
+
+    function toolApprovalRecovery(task) {
+      const resume = task && task.resume ? task.resume : null;
+      return resume && (resume.tool_approval_recovery || resume.toolApprovalRecovery) || null;
     }
 
     function approvalIsActionable(task, approvalId) {

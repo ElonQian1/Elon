@@ -27,6 +27,7 @@ pub(crate) struct TaskResumeContract {
     can_replay_journal_events: bool,
     can_approve_tools: bool,
     active_approval_ids: Vec<String>,
+    tool_approval_recovery: TaskResumeToolApprovalRecovery,
     can_resume_codex_session: bool,
     codex_session: Option<TaskResumeCodexSession>,
     continue_mode: &'static str,
@@ -44,6 +45,17 @@ struct TaskResumeTtyReattach {
     supported: bool,
     mode: &'static str,
     fallback: &'static str,
+    reason: &'static str,
+    required_future_work: Vec<&'static str>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct TaskResumeToolApprovalRecovery {
+    status: &'static str,
+    can_approve_now: bool,
+    active_approval_ids: Vec<String>,
+    replay_source: &'static str,
+    pending_after_restart_action: &'static str,
     reason: &'static str,
     required_future_work: Vec<&'static str>,
 }
@@ -128,6 +140,8 @@ pub(crate) fn task_attach_state(
 pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContract {
     let active_approval_ids = active_approval_ids(attach);
     let can_approve_tools = !active_approval_ids.is_empty();
+    let tool_approval_recovery =
+        tool_approval_recovery_status(attach.status, active_approval_ids.clone());
     let run_handle = resume_run_handle(attach);
     let codex_session = attach.codex_session.clone();
     let can_resume_codex_session = codex_session.is_some();
@@ -140,6 +154,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: true,
             can_approve_tools,
             active_approval_ids,
+            tool_approval_recovery,
             can_resume_codex_session,
             codex_session,
             continue_mode: attach.continue_mode,
@@ -165,6 +180,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: true,
             can_approve_tools: false,
             active_approval_ids: Vec::new(),
+            tool_approval_recovery,
             can_resume_codex_session,
             codex_session,
             continue_mode: attach.continue_mode,
@@ -190,6 +206,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: true,
             can_approve_tools: false,
             active_approval_ids: Vec::new(),
+            tool_approval_recovery,
             can_resume_codex_session,
             codex_session,
             continue_mode: attach.continue_mode,
@@ -215,6 +232,7 @@ pub(crate) fn task_resume_contract(attach: &TaskAttachState) -> TaskResumeContra
             can_replay_journal_events: false,
             can_approve_tools: false,
             active_approval_ids: Vec::new(),
+            tool_approval_recovery,
             can_resume_codex_session: false,
             codex_session: None,
             continue_mode: "snapshot_continue",
@@ -269,6 +287,68 @@ fn tty_reattach_status() -> TaskResumeTtyReattach {
             "把 PTY 会话 id、生命周期和安全授权写入本机 journal。",
             "在前端接入 attach 协议前，继续使用 journal 回放和快照续跑。",
         ],
+    }
+}
+
+fn tool_approval_recovery_status(
+    attach_status: &'static str,
+    active_approval_ids: Vec<String>,
+) -> TaskResumeToolApprovalRecovery {
+    match attach_status {
+        "live" if !active_approval_ids.is_empty() => TaskResumeToolApprovalRecovery {
+            status: "active_waiter",
+            can_approve_now: true,
+            active_approval_ids,
+            replay_source: "local_journal_and_memory_waiter",
+            pending_after_restart_action: "approve_or_deny_current_waiter",
+            reason:
+                "当前节点进程仍持有工具审批 waiter，PC 端可以继续批准或拒绝这些审批。",
+            required_future_work: Vec::new(),
+        },
+        "live" => TaskResumeToolApprovalRecovery {
+            status: "no_active_waiter",
+            can_approve_now: false,
+            active_approval_ids: Vec::new(),
+            replay_source: "local_journal",
+            pending_after_restart_action: "wait_refresh_or_continue_from_snapshot",
+            reason:
+                "本机任务仍有运行句柄，但当前没有活动工具审批 waiter；历史审批卡只能回放，不能继续点击。",
+            required_future_work: vec![
+                "将工具审批 waiter 状态写入可恢复本机存储。",
+                "恢复时校验任务进程、文件 hash 和审批请求仍然一致。",
+            ],
+        },
+        "detached" => TaskResumeToolApprovalRecovery {
+            status: "lost_after_restart",
+            can_approve_now: false,
+            active_approval_ids: Vec::new(),
+            replay_source: "local_journal",
+            pending_after_restart_action: "continue_from_snapshot",
+            reason:
+                "节点重启或任务进程脱离后，内存中的审批 waiter 已丢失；历史审批卡必须失效，只能基于快照开启新任务。",
+            required_future_work: vec![
+                "落库审批请求、审批到期时间和文件安全指纹。",
+                "恢复审批前重新校验工作区状态和工具请求仍可安全执行。",
+            ],
+        },
+        "terminal" => TaskResumeToolApprovalRecovery {
+            status: "closed_by_terminal_task",
+            can_approve_now: false,
+            active_approval_ids: Vec::new(),
+            replay_source: "local_journal",
+            pending_after_restart_action: "none",
+            reason: "任务已进入终态，所有未处理工具审批都应显示为已关闭或已失效。",
+            required_future_work: Vec::new(),
+        },
+        _ => TaskResumeToolApprovalRecovery {
+            status: "unavailable",
+            can_approve_now: false,
+            active_approval_ids: Vec::new(),
+            replay_source: "cloud_snapshot_only",
+            pending_after_restart_action: "refresh_snapshot",
+            reason: "当前 PC 节点没有本机 journal 现场，不能判断或继续任何工具审批。",
+            required_future_work: Vec::new(),
+        },
     }
 }
 
@@ -398,6 +478,12 @@ mod tests {
         assert!(!resume.can_resume_codex_session);
         assert!(resume.codex_session.is_none());
         assert_eq!(resume.active_approval_ids, vec!["tap_1_1"]);
+        assert_eq!(resume.tool_approval_recovery.status, "active_waiter");
+        assert!(resume.tool_approval_recovery.can_approve_now);
+        assert_eq!(
+            resume.tool_approval_recovery.active_approval_ids,
+            vec!["tap_1_1"]
+        );
         assert_eq!(
             resume
                 .run_handle
@@ -423,6 +509,16 @@ mod tests {
         assert!(!resume.can_cancel);
         assert!(!resume.can_approve_tools);
         assert!(resume.active_approval_ids.is_empty());
+        assert_eq!(resume.tool_approval_recovery.status, "lost_after_restart");
+        assert!(!resume.tool_approval_recovery.can_approve_now);
+        assert_eq!(
+            resume.tool_approval_recovery.pending_after_restart_action,
+            "continue_from_snapshot"
+        );
+        assert!(resume
+            .tool_approval_recovery
+            .reason
+            .contains("历史审批卡必须失效"));
         assert_eq!(resume.next_action, "continue_from_snapshot");
         assert_eq!(resume.strategy.kind, "snapshot_continue");
         assert!(resume.strategy.requires_new_task);
@@ -442,6 +538,7 @@ mod tests {
         assert!(!resume.can_reconnect);
         assert!(!resume.can_cancel);
         assert!(!resume.can_approve_tools);
+        assert_eq!(resume.tool_approval_recovery.status, "lost_after_restart");
         assert_eq!(resume.next_action, "continue_from_snapshot");
         assert!(resume
             .limitations
@@ -500,9 +597,14 @@ mod tests {
 
         assert_eq!(terminal.status, "terminal");
         assert_eq!(terminal.next_action, "continue_from_snapshot");
+        assert_eq!(
+            terminal.tool_approval_recovery.status,
+            "closed_by_terminal_task"
+        );
         assert_eq!(missing.status, "missing");
         assert_eq!(missing.strategy.kind, "cloud_snapshot_only");
         assert!(!missing.strategy.uses_local_journal);
         assert_eq!(missing.tty_reattach.status, "not_supported");
+        assert_eq!(missing.tool_approval_recovery.status, "unavailable");
     }
 }

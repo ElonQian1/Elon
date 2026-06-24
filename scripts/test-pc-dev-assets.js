@@ -703,7 +703,12 @@ function testDevTasksUsesResumeContractForSnapshotContinue() {
         can_stream_live_output: false,
         can_replay_journal_events: true,
         next_action: 'continue_from_snapshot',
-        strategy: { kind: 'snapshot_continue', label: '基于快照继续' }
+        strategy: { kind: 'snapshot_continue', label: '基于快照继续' },
+        tool_approval_recovery: {
+          status: 'lost_after_restart',
+          can_approve_now: false,
+          reason: '节点重启或任务进程脱离后，内存中的审批 waiter 已丢失；历史审批卡必须失效，只能基于快照开启新任务。'
+        }
       }
     }
   ]]);
@@ -718,6 +723,7 @@ function testDevTasksUsesResumeContractForSnapshotContinue() {
   assert.ok(taskHtml.includes('原 CLI 终端不可重接'), 'detached task should explain CLI terminal reattach limitation');
   assert.ok(taskHtml.includes('data-dev-task-action="continue"'), 'detached task should offer continue action');
   assert.ok(!taskHtml.includes('data-dev-task-action="cancel"'), 'detached task should not offer stop action');
+  assert.ok(approvalHtml.includes('历史审批卡必须失效'), 'detached stale approval should use resume recovery reason');
   assert.ok(!approvalHtml.includes('data-decision="approve"'), 'detached task should close stale approval buttons');
 }
 
@@ -759,7 +765,12 @@ function testDevTasksRequiresActiveApprovalHandle() {
         can_replay_journal_events: true,
         next_action: 'wait_or_cancel',
         run_handle: { id: 'req-live', route: 'route_c_server_runtime', os_pid: 4321 },
-        strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
+        strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' },
+        tool_approval_recovery: {
+          status: 'no_active_waiter',
+          can_approve_now: false,
+          reason: '本机任务仍有运行句柄，但当前没有活动工具审批 waiter；历史审批卡只能回放，不能继续点击。'
+        }
       }
     }
   ]]);
@@ -767,7 +778,7 @@ function testDevTasksRequiresActiveApprovalHandle() {
   const taskHtml = devTasks.renderMessage(messages[0], staleContext);
   const staleApprovalHtml = devTasks.renderMessage(messages[1], staleContext);
   assert.ok(taskHtml.includes('PID 4321'), 'live task card should expose the run handle pid');
-  assert.ok(staleApprovalHtml.includes('本机没有活动审批等待器'), 'live task without waiter should explain stale approval');
+  assert.ok(staleApprovalHtml.includes('历史审批卡只能回放'), 'live task without waiter should use resume recovery reason');
   assert.ok(!staleApprovalHtml.includes('data-decision="approve"'), 'live task without waiter must not expose approval buttons');
 
   const activeSnapshots = new Map([[
@@ -785,7 +796,12 @@ function testDevTasksRequiresActiveApprovalHandle() {
         can_replay_journal_events: true,
         next_action: 'wait_or_cancel',
         run_handle: { id: 'req-live', route: 'route_c_server_runtime' },
-        strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' }
+        strategy: { kind: 'control_handle_reconnect', label: '重连本机控制句柄' },
+        tool_approval_recovery: {
+          status: 'active_waiter',
+          can_approve_now: true,
+          active_approval_ids: ['tap_live']
+        }
       }
     }
   ]]);
@@ -1520,6 +1536,9 @@ function testLocalAdminTokenWiring() {
   const taskLifecyclePressureScript = fs.readFileSync(path.join(repoRoot, 'scripts/test-pc-task-lifecycle-pressure.ps1'), 'utf8');
   assert.ok(taskLifecyclePressureScript.includes('node_agent_task_lifecycle_pressure_tests'), 'PC task lifecycle pressure gate should run pressure tests');
   assert.ok(taskLifecyclePressureScript.includes('node_agent_task_journal'), 'PC task lifecycle pressure gate should cover task journal tests');
+  const taskResumeRs = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_task_resume.rs'), 'utf8');
+  assert.ok(taskResumeRs.includes('tool_approval_recovery'), 'task resume contract should expose tool approval recovery state');
+  assert.ok(taskResumeRs.includes('lost_after_restart'), 'task resume contract should distinguish approval waiters lost after restart');
 
   const nodeAdmin = fs.readFileSync(path.join(repoRoot, 'server/src/node_agent_admin.html'), 'utf8');
   assert.ok(nodeAdmin.includes('X-Elon-Local-Admin-Token'), 'standalone node admin page should send local admin token header');

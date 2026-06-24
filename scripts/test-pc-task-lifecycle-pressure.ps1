@@ -58,6 +58,14 @@ Invoke-Step "Static pressure-test contract" {
         -Needle "no_original_cli_tty_reattach" `
         -Message "Task resume contract must keep original CLI TTY reattach limitation structured"
     Assert-FileContains `
+        -Path (Join-Path $RepoRoot "server\src\node_agent_task_resume.rs") `
+        -Needle "tool_approval_recovery" `
+        -Message "Task resume contract must expose tool approval recovery state"
+    Assert-FileContains `
+        -Path (Join-Path $RepoRoot "server\src\node_agent_task_resume.rs") `
+        -Needle "lost_after_restart" `
+        -Message "Task resume contract must distinguish approval waiters lost after restart"
+    Assert-FileContains `
         -Path $PressureModule `
         -Needle "stress_active_registry_rejects_duplicate_handles_and_cleans_up" `
         -Message "Active registry duplicate-handle pressure test is missing"

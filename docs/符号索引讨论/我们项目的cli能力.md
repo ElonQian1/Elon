@@ -10,7 +10,7 @@ Route B/C 的本机工具能力已经包含 `list_dir`、`search_files`、`file_
 
 PC Dev Runtime 生成的项目级 `scripts\elon-agent.ps1` 已为 Route B/C 增加 `.elon\agent-runs\*.jsonl` 生命周期日志：记录运行开始、模型轮次、工具名称和目标、结果大小、完成或失败状态；不记录完整文件内容、工具输出、prompt 或 API key。Win 节点本地受保护接口 `/api/project-agent-runs` 可以按 `workspace_path` 读取这些日志摘要、尾部事件、活跃控制句柄、最近可续任务和顶层 `recovery_entry`，方便 PC UI 直接展示“推荐恢复”入口、做任务恢复和压力测试。
 
-任务生命周期压力测试已经覆盖 Route A/B/C 终态、取消、并发 journal 写入、分页回放、节点重启后丢失控制句柄、等待工具审批时节点重启、终态任务清理遗留审批 waiter、过期 Codex session 清理和超大工具事件截断；其中“等待审批时重启”的契约是：前端仍可从 journal 回放审批卡历史，但不能继续审批已经丢失的内存 waiter，只能基于快照开启新任务。任务正常结束、失败或取消进入统一收尾时，会按 req_id 清空仍残留的本机工具审批；本机 task journal API 在刷新终态任务时也会把历史 pending 审批标成“已关闭/任务已结束”，避免 PC UI 继续显示可误解的失效审批按钮。
+任务生命周期压力测试已经覆盖 Route A/B/C 终态、取消、并发 journal 写入、分页回放、节点重启后丢失控制句柄、等待工具审批时节点重启、终态任务清理遗留审批 waiter、过期 Codex session 清理和超大工具事件截断；其中“等待审批时重启”的契约是：前端仍可从 journal 回放审批卡历史，但不能继续审批已经丢失的内存 waiter，只能基于快照开启新任务。恢复契约会结构化暴露 `tool_approval_recovery`，状态包含 `active_waiter`、`no_active_waiter`、`lost_after_restart`、`closed_by_terminal_task`、`unavailable`，PC UI 会优先使用该字段解释历史审批为什么可点、失效或只能基于快照继续。任务正常结束、失败或取消进入统一收尾时，会按 req_id 清空仍残留的本机工具审批；本机 task journal API 在刷新终态任务时也会把历史 pending 审批标成“已关闭/任务已结束”，避免 PC UI 继续显示可误解的失效审批按钮。
 
 CLI TTY 接管方案当前明确走“有限连续性”契约：不重新接管已经打开的原 CLI 终端 TTY；本机状态接口会结构化暴露 `not_supported`、`resume_order`、`recommended_next_actions` 和 `future_work`，前端优先提示运行句柄、journal 回放、Codex session 自动续接或云端快照新任务四种继续路径。真正接管原 TTY 仍需要后续 PTY/ConPTY 会话层、会话 id 持久化和前端 attach 授权协议。
 
@@ -1067,6 +1067,7 @@ Win 客户端的 Route C 状态会区分平台预算耗尽、个人额度耗尽�
 read_only / project_write / full_access 权限字段
 Route B/C 本机工具白名单
 Route B/C 工具调用时间线
+Route B/C 任务恢复契约会暴露 tool_approval_recovery，用 active_waiter / no_active_waiter / lost_after_restart / closed_by_terminal_task / unavailable 区分当前可审批、历史回放和重启后失效审批
 Route C 平台日预算 + 用户日预算 + 重复请求防抖 + agent 选择保护 + server_api_key-only 硬门槛 + 结构化 blockingReasons
 Win 客户端维护面板展示安装状态、开始菜单健康、日志入口、修复客户端入口、更新/卸载动作和下一步建议
 客户端维护按钮已经改成后端 `maintenance_actions` 契约驱动；PC 设置页和节点注册页都会按 `kind/target/enabled/tone/confirmation` 生成可点击的日志、诊断、配置、修复、更新和卸载动作，避免前端硬编码按钮和后端能力漂移
@@ -1080,7 +1081,7 @@ Route B/C 即使开启 full_access，也不会放宽本机 run_command 命令白
 
 ```text
 跨节点重启后可继续审批的审批状态落库
-PC UI 任务恢复入口
+PC UI 任务恢复入口继续产品化
 原 CLI TTY 接管仍仅支持有限连续性，不支持重新 attach 原 TTY
 ```
 
