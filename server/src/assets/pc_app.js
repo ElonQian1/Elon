@@ -31,7 +31,8 @@
     clientMaintenance: null,
     clientPackageLatest: null,
     localProjectInfo: null,
-    localNodeLaunchAttempted: false
+    localNodeLaunchAttempted: false,
+    workbenchRegistrationProjectId: ''
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
   const PLAZA_FILTERS = [
@@ -120,7 +121,7 @@
   const projectLanding = window.ElonPcProjectLanding.create({
     state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
     channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode,
-    api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject
+    api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject, openSettings
   });
   models = window.ElonPcModels.create({ state, els, clean, escapeHtml, api });
   projectCreate = window.ElonPcProjectCreate.create({
@@ -2648,8 +2649,8 @@
       els.settingsSubtitle.textContent = '账号信息、登录状态和安全设置';
     } else if (selected === 'workbench') {
       els.settingsWorkbenchPanel.classList.add('active');
-      $('settingsTitle').textContent = '导入电脑代码';
-      els.settingsSubtitle.textContent = '只在导入本机已有代码时需要';
+      $('settingsTitle').textContent = '本机开发设置';
+      els.settingsSubtitle.textContent = '连接这台电脑、绑定账号并选择项目目录';
     } else if (selected === 'notifications') {
       els.settingsNotificationsPanel.classList.add('active');
       $('settingsTitle').textContent = '通知';
@@ -2667,18 +2668,23 @@
   function openSettings(section, options) {
     const targetSection = section || 'workbench';
     const autoPickAndRegister = !!(options && options.autoPickAndRegister);
+    const workbenchProjectId = clean(options && options.projectId);
     setAccountMenu(false);
     renderUser();
     setSettingsSection(targetSection);
     els.settingsBackdrop.hidden = false;
     setSettingsResult('');
     if (targetSection === 'workbench') {
+      state.workbenchRegistrationProjectId = workbenchProjectId;
       if (els.settingsRuntimePermission) {
         els.settingsRuntimePermission.value = 'project_write';
         syncSettingsRuntimePermissionHint();
       }
+      applyWorkbenchProjectContext();
       updateWorkbenchOnboarding();
       refreshClientMaintenance(false);
+    } else {
+      state.workbenchRegistrationProjectId = '';
     }
     setTimeout(() => {
       if (targetSection !== 'workbench') return;
@@ -2688,6 +2694,23 @@
       }
       els.chooseProjectFolderBtn.focus();
     }, 0);
+  }
+
+  function applyWorkbenchProjectContext() {
+    const project = state.workbenchRegistrationProjectId
+      ? projectById(state.workbenchRegistrationProjectId)
+      : null;
+    if (!project) return;
+    if (els.settingsProjectName) els.settingsProjectName.value = titleOf(project);
+    if (els.settingsProjectDesc && !clean(els.settingsProjectDesc.value)) {
+      els.settingsProjectDesc.value = clean(project.description || project.project_description || project.projectDescription);
+    }
+    if (els.settingsProjectRepo && !clean(els.settingsProjectRepo.value)) {
+      els.settingsProjectRepo.value = clean(project.repo_url || project.repoUrl);
+    }
+    if (els.settingsProjectBranch && !clean(els.settingsProjectBranch.value)) {
+      els.settingsProjectBranch.value = clean(project.branch);
+    }
   }
 
   function closeSettings() {
@@ -3302,6 +3325,8 @@
 
   async function registerLocalProject() {
     const registerPayload = (state.localProjectInfo && state.localProjectInfo.registerPayload) || {};
+    const targetProjectId = clean(state.workbenchRegistrationProjectId);
+    const targetProject = targetProjectId ? projectById(targetProjectId) : null;
     const path = clean(els.settingsProjectPath.value) || clean(registerPayload.workspace_path);
     if (!path) {
       setSettingsResult('请选择项目目录。', 'error');
@@ -3315,7 +3340,7 @@
       setSettingsBusy(els.registerProjectBtn, false);
       return;
     }
-    const name = clean(els.settingsProjectName.value) || clean(registerPayload.name);
+    const name = clean(els.settingsProjectName.value) || clean(registerPayload.name) || (targetProject ? titleOf(targetProject) : '');
     if (!name) {
       setSettingsResult('目录已读取，但没有识别到项目名称，请手动填写。', 'error');
       setSettingsBusy(els.registerProjectBtn, false);
@@ -3343,6 +3368,7 @@
       const data = await localNodeApi('/api/register-project', {
         method: 'POST',
         body: JSON.stringify({
+          project_id: targetProjectId || null,
           name,
           workspace_path: path,
           description: clean(els.settingsProjectDesc.value) || clean(registerPayload.description) || null,

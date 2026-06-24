@@ -1254,6 +1254,9 @@ function testProjectLandingShellContract() {
 
   const landingJs = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.js'), 'utf8');
   assert.ok(landingJs.includes('project-landing-start'), 'project home should expose guided next-step actions');
+  assert.ok(landingJs.includes('project-landing-setup'), 'project home should expose setup guidance before development actions');
+  assert.ok(landingJs.includes('data-project-setup-action'), 'project setup guidance should provide one-click setup actions');
+  assert.ok(landingJs.includes('项目绑定在另一台电脑或旧路径'), 'project setup guidance should explain stale PC bindings plainly');
   assert.ok(landingJs.includes('project-landing-download-groups'), 'project home should expose delivery downloads');
   assert.ok(landingJs.includes('data-workbench-channel-id'), 'project home should jump into key channels');
   assert.ok(landingJs.includes('data-sync-landing'), 'project owners should be able to sync landing data');
@@ -1261,7 +1264,72 @@ function testProjectLandingShellContract() {
 
   const landingCss = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_project_landing.css'), 'utf8');
   assert.ok(landingCss.includes('.project-landing-start'), 'project landing CSS should style guided next steps');
+  assert.ok(landingCss.includes('.project-landing-setup-step.active'), 'project landing CSS should highlight the active setup step');
   assert.ok(landingCss.includes('@media (max-width: 640px)'), 'project landing should keep a mobile responsive layout');
+}
+
+async function testProjectLandingSetupRebindsActiveProject() {
+  const sandbox = loadAsset('server/src/assets/pc_project_landing.js');
+  let html = '';
+  let setupClick = null;
+  let openedSettings = null;
+  const messageList = {
+    classList: { add() {}, remove() {} },
+    querySelector: () => null,
+    querySelectorAll(selector) {
+      if (selector === '[data-project-setup-action]') {
+        return [{
+          dataset: { projectSetupAction: 'workspace' },
+          addEventListener: (_event, callback) => { setupClick = callback; }
+        }];
+      }
+      return [];
+    },
+    set innerHTML(value) { html = value; },
+    get innerHTML() { return html; }
+  };
+  const landing = sandbox.window.ElonPcProjectLanding.create({
+    state: {
+      activeProjectId: 'prj-old',
+      projects: [{
+        id: 'prj-old',
+        name: '旧项目',
+        role: 'owner',
+        node_id: 'node-old',
+        workspace_path: 'C:/Users/Old/Elon/workspaces/prj-old/repo'
+      }],
+      nodes: [{ node_id: 'node-new', online: true, allowed_clis: ['codex'] }],
+      projectSpace: { channels: [{ id: 'ch-dev', kind: 'ai_development' }] }
+    },
+    els: { messageList },
+    clean,
+    escapeHtml,
+    firstChar: (value) => clean(value)[0] || '项',
+    formatTime: (value) => value,
+    titleOf: (project) => project.name,
+    iconUrlOf: () => '',
+    channelName: (channel) => channel.id,
+    channelGlyph: () => 'AI',
+    selectProjectChannel: () => {},
+    setHeader: () => {},
+    setComposer: () => {},
+    setNodeMode: () => {},
+    api: async () => ({}),
+    localNodeApi: async () => ({}),
+    ensureLocalNodeLogin: async () => ({}),
+    loadBaseData: async () => {},
+    selectProject: async () => {},
+    openSettings: (section, options) => { openedSettings = { section, options }; }
+  });
+
+  landing.render();
+  assert.ok(html.includes('项目还没绑定到这台电脑'), 'stale project binding should show a rebind explanation');
+  assert.ok(html.includes('换到这台电脑'), 'stale project binding should make the rebind action explicit');
+  assert.ok(setupClick, 'setup action should be bound');
+  await setupClick();
+  assert.strictEqual(openedSettings && openedSettings.section, 'workbench', 'setup action should open workbench settings');
+  assert.strictEqual(openedSettings && openedSettings.options && openedSettings.options.autoPickAndRegister, true, 'setup action should auto-pick and register');
+  assert.strictEqual(openedSettings && openedSettings.options && openedSettings.options.projectId, 'prj-old', 'setup action should carry the active project id');
 }
 
 function testDevComposerRouteLabels() {
@@ -1449,6 +1517,8 @@ function testLocalAdminTokenWiring() {
   assert.ok(pcAppNormalized.includes("projectEmptyRegisterBtn');\n    if (emptyRegisterBtn) emptyRegisterBtn.addEventListener('click', () => openSettings('workbench', { autoPickAndRegister: true }))"), 'empty project page registration entry should open picker and auto-register');
   assert.ok(pcApp.includes('settings-project-meta-row'), 'project inspection metadata should render as structured rows');
   assert.ok(pcApp.includes('projectRegistrationPreviewLine'), 'project registration should summarize the exact auto-filled registration payload');
+  assert.ok(pcApp.includes('workbenchRegistrationProjectId'), 'project setup should remember the active project being rebound');
+  assert.ok(pcApp.includes('project_id: targetProjectId || null'), 'local project registration should explicitly rebind the active project id');
   assert.ok(pcApp.includes('is-register-preview'), 'project registration preview should be refreshable without re-inspecting the folder');
   assert.ok(pcApp.includes("mode === 'full_access' ? '完全访问' : '项目内读写'"), 'project registration preview should surface full-access mode before submit');
   assert.ok(pcApp.includes('registration.can_register'), 'project registration should read readiness from local inspect');
@@ -1710,6 +1780,7 @@ function testPcProjectStartGuidance() {
   const projectCreate = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app_project_create.js'), 'utf8');
   assert.ok(projectCreate.includes("preferredChannelKind: 'ai_development'"), 'new project should open the development entry');
   assert.ok(pcApp.includes('开始做应用'), 'project sidebar should expose a plain start entry');
+  assert.ok(pcApp.includes('本机开发设置'), 'workbench settings should be framed as setup for local development');
   assert.ok(pcApp.includes('生成安装包'), 'project sidebar should expose package generation as the delivery entry');
   assert.ok(pcApp.includes('安装使用'), 'project sidebar should expose install/download as the usage entry');
   assert.ok(pcApp.includes('输入你想做的应用或要修改的功能'), 'development composer should use a direct project prompt');
@@ -1743,6 +1814,7 @@ function testPcProjectStartGuidance() {
   await testAgentRunsPanelLoadsProjectRuns();
   testProjectReadinessChecklist();
   testProjectLandingShellContract();
+  await testProjectLandingSetupRebindsActiveProject();
   testDevComposerRouteLabels();
   testDevComposerSkipsFailedRouteAProbe();
   testDevComposerFallsBackFromUnavailableStoredRoute();

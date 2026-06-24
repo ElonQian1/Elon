@@ -17,7 +17,7 @@
     const {
       state, els, clean, escapeHtml, firstChar, formatTime, titleOf, iconUrlOf,
       channelName, channelGlyph, selectProjectChannel, setHeader, setComposer, setNodeMode,
-      api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject
+      api, localNodeApi, ensureLocalNodeLogin, loadBaseData, selectProject, openSettings
     } = ctx;
 
     function projectOf() {
@@ -417,6 +417,8 @@
     }
 
     function workbenchActionsHtml(downloads) {
+      const setup = projectSetupInfo(projectOf());
+      if (setup && !setup.ready) return projectSetupHtml(setup);
       const devChannel = channelByKind('ai_development');
       const buildChannel = channelByKind('builds');
       const hasDownload = downloads.some((item) => ACTIVE_STATUSES.has(item.status) && item.url);
@@ -475,6 +477,172 @@
         </div>
         <div class="project-landing-start-steps">${steps.map(startStepHtml).join('')}</div>
       </section>`;
+    }
+
+    function projectSetupInfo(project) {
+      if (!project) return null;
+      const devChannel = channelByKind('ai_development');
+      const buildChannel = channelByKind('builds');
+      const nodeId = projectField(project, 'node_id', 'nodeId') ||
+        projectField(project, 'agent_id', 'agentId');
+      const workspace = projectField(project, 'workspace_path', 'workspacePath');
+      const node = nodeId ? findNode(nodeId) : null;
+      const onlineNodes = (state.nodes || []).filter((item) => item && item.online);
+      const hasOnlineNode = onlineNodes.length > 0;
+      const nodeOnline = !!(node && node.online);
+      const workspaceReady = !!(workspace && nodeId && nodeOnline);
+      const route = routeInfo(node);
+      const canConfigure = canConfigureProject(project);
+      const hasCurrentNodeButUnavailable = !!(nodeId && !nodeOnline);
+      const steps = [
+        {
+          key: 'helper',
+          title: '连接这台电脑',
+          detail: hasOnlineNode ? '本机助手已在线' : '安装或启动一龙 PC 助手',
+          done: hasOnlineNode,
+          active: !hasOnlineNode
+        },
+        {
+          key: 'account',
+          title: '绑定当前账号',
+          detail: hasOnlineNode ? '账号节点已连接云端' : '连接后自动绑定网页登录账号',
+          done: hasOnlineNode,
+          active: hasOnlineNode && !workspaceReady
+        },
+        {
+          key: 'workspace',
+          title: '选择项目目录',
+          detail: workspaceReady
+            ? compactPath(workspace)
+            : (hasCurrentNodeButUnavailable ? '项目绑定在另一台电脑或旧路径' : '给项目选择一个本机工作区'),
+          done: workspaceReady,
+          active: hasOnlineNode && !workspaceReady
+        },
+        {
+          key: 'runtime',
+          title: '确认可开发',
+          detail: route.ready ? route.label : '检查 Codex 或备用运行方式',
+          done: workspaceReady && route.ready,
+          active: workspaceReady && !route.ready
+        }
+      ];
+      const ready = workspaceReady && route.ready && !!devChannel;
+      let action = {
+        key: 'connect',
+        label: '连接这台电脑',
+        detail: '会自动尝试启动本机助手；如果未安装，会进入安装入口。',
+        title: '先连接这台电脑',
+        disabled: !canConfigure
+      };
+      if (hasOnlineNode && !workspaceReady) {
+        action = {
+          key: 'workspace',
+          label: hasCurrentNodeButUnavailable ? '换到这台电脑' : '选择/创建项目目录',
+          detail: hasCurrentNodeButUnavailable
+            ? '当前项目绑在不可用节点上，重新选择本机目录后会自动换绑。'
+            : '选择本机文件夹后，一龙会自动读取项目信息并注册。',
+          title: hasCurrentNodeButUnavailable ? '项目还没绑定到这台电脑' : '给项目选择一个目录',
+          disabled: !canConfigure
+        };
+      } else if (workspaceReady && !route.ready) {
+        action = {
+          key: 'runtime',
+          label: '检查开发环境',
+          detail: '本机目录已就绪，还需要确认 Codex 或备用运行方式可用。',
+          title: '还差开发运行环境',
+          disabled: !canConfigure
+        };
+      } else if (workspaceReady && route.ready && !devChannel) {
+        action = {
+          key: buildChannel ? 'build' : 'refresh',
+          label: buildChannel ? '查看打包频道' : '刷新项目',
+          detail: buildChannel ? '没有 AI 开发频道，可以先查看打包和交付进度。' : '项目频道可能还在初始化。',
+          title: '项目频道还没准备好',
+          disabled: false
+        };
+      }
+      if (!canConfigure && !ready) {
+        action.title = '等待项目管理员完成设置';
+        action.detail = '你当前不是项目管理员，不能替项目绑定本机目录。';
+        action.label = '查看项目资料';
+      }
+      return { ready, steps, action, devChannel, buildChannel, route, workspace, nodeId };
+    }
+
+    function projectSetupHtml(setup) {
+      const disabled = setup.action.disabled ? 'disabled aria-disabled="true"' : '';
+      return `<section class="project-landing-setup" aria-label="开始前设置">
+        <div class="project-landing-setup-main">
+          <div class="project-landing-setup-copy">
+            <span>开始前先完成</span>
+            <h2>${escapeHtml(setup.action.title)}</h2>
+            <p>${escapeHtml(setup.action.detail)}</p>
+          </div>
+          <button class="project-landing-setup-action" type="button" data-project-setup-action="${escapeHtml(setup.action.key)}" ${disabled}>
+            <strong>${escapeHtml(setup.action.label)}</strong>
+            <small>${escapeHtml(setup.action.disabled ? '需要项目管理员操作' : '自动处理当前步骤')}</small>
+          </button>
+        </div>
+        <div class="project-landing-setup-steps">
+          ${setup.steps.map(setupStepHtml).join('')}
+        </div>
+      </section>`;
+    }
+
+    function setupStepHtml(step, index) {
+      const stateClass = step.done ? 'done' : (step.active ? 'active' : 'pending');
+      const mark = step.done ? '✓' : String(index + 1);
+      return `<div class="project-landing-setup-step ${stateClass}">
+        <span>${escapeHtml(mark)}</span>
+        <div>
+          <strong>${escapeHtml(step.title)}</strong>
+          <small>${escapeHtml(step.detail)}</small>
+        </div>
+      </div>`;
+    }
+
+    function canConfigureProject(project) {
+      const role = clean(project && (project.role || project.member_role || project.memberRole)).toLowerCase();
+      return ['owner', 'admin', 'editor', 'developer', 'maintainer'].includes(role);
+    }
+
+    function findNode(nodeId) {
+      if (!nodeId) return null;
+      return (state.nodes || []).find((node) => {
+        return String(node.node_id || '') === String(nodeId) || String(node.agent_id || '') === String(nodeId);
+      }) || null;
+    }
+
+    function routeInfo(node) {
+      if (!node || !node.online) return { ready: false, label: '本机节点未在线' };
+      const clis = (node.allowed_clis || []).map((item) => clean(item).toLowerCase()).filter(Boolean);
+      const routeA = ['codex', 'copilot', 'claude', 'gemini'].find((cli) => clis.includes(cli));
+      if (routeA && routeAProbeReady(node)) return { ready: true, label: `${routeA} 可用` };
+      if (routeFlagReady(node, 'api_runtime_ready', 'apiRuntimeReady')) return { ready: true, label: '本机 API Runtime 可用' };
+      if (routeFlagReady(node, 'server_runtime_ready', 'serverRuntimeReady')) return { ready: true, label: '服务器模型备用通道可用' };
+      if (routeA) return { ready: false, label: `${routeA} 还未通过检查` };
+      return { ready: false, label: '没有检测到可用开发运行时' };
+    }
+
+    function routeAProbeReady(node) {
+      if (Object.prototype.hasOwnProperty.call(node, 'route_a_ready')) return node.route_a_ready === true;
+      if (Object.prototype.hasOwnProperty.call(node, 'routeAReady')) return node.routeAReady === true;
+      return true;
+    }
+
+    function routeFlagReady(node, snakeName, camelName) {
+      if (!node) return false;
+      if (Object.prototype.hasOwnProperty.call(node, snakeName)) return node[snakeName] === true;
+      if (Object.prototype.hasOwnProperty.call(node, camelName)) return node[camelName] === true;
+      return false;
+    }
+
+    function compactPath(path) {
+      const text = clean(path).replace(/\\/g, '/');
+      if (text.length <= 42) return text;
+      const parts = text.split('/').filter(Boolean);
+      if (parts.length <= 3) return `...${text.slice(-39)}`;
+      return `${parts[0]}/.../${parts.slice(-2).join('/')}`;
     }
 
     function workbenchChannelAction(label, sub, channel, tone) {
@@ -792,6 +960,9 @@
       els.messageList.querySelectorAll('[data-workbench-channel-id]').forEach((button) => {
         button.addEventListener('click', () => selectProjectChannel(button.dataset.workbenchChannelId));
       });
+      els.messageList.querySelectorAll('[data-project-setup-action]').forEach((button) => {
+        button.addEventListener('click', () => handleSetupAction(button.dataset.projectSetupAction));
+      });
       els.messageList.querySelectorAll('[data-scroll-downloads]').forEach((button) => {
         button.addEventListener('click', () => {
           const target = els.messageList.querySelector('.project-landing-download-groups');
@@ -819,6 +990,26 @@
       els.messageList.querySelectorAll('[data-rotate-landing-token]').forEach((button) => {
         button.addEventListener('click', () => rotateLandingToken(button));
       });
+    }
+
+    async function handleSetupAction(action) {
+      const project = projectOf();
+      if (!project) return;
+      if (action === 'build') {
+        const buildChannel = channelByKind('builds');
+        if (buildChannel) selectProjectChannel(buildChannel.id);
+        return;
+      }
+      if (action === 'refresh') {
+        if (loadBaseData) await loadBaseData();
+        if (selectProject && project.id) await selectProject(project.id);
+        return;
+      }
+      if (action === 'runtime') {
+        if (openSettings) openSettings('workbench', { projectId: project.id });
+        return;
+      }
+      if (openSettings) openSettings('workbench', { autoPickAndRegister: true, projectId: project.id });
     }
 
     return { render };
