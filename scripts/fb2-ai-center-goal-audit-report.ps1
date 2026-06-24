@@ -245,24 +245,33 @@ function New-Fb2GoalAuditPlannedCapabilities {
             source_enumerator_status = "source_specific_no_write_sample_available"
             source_enumerator_checked_count = "reported_by_fb2_source_enumerator_runtime"
             source_enumerator_known_chunk_count = "reported_by_fb2_source_enumerator_runtime"
+            chunk_manifest_report_version = "fb2_p4_chunk_manifest_v1"
+            chunk_manifest_status = "id_only_no_write_manifest_available"
+            chunk_manifest_materialized_entry_count = "reported_by_fb2_chunk_manifest_runtime"
+            chunk_manifest_current_scope_complete = "reported_by_fb2_chunk_manifest_runtime"
             embedding_build_dry_run_report_version = "fb2_p4_embedding_build_dry_run_v1"
             dry_run_status = "dry_run_available_no_writes"
-            source_ref = "fb2 d0967bb5 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1"
+            source_ref = "fb2 9aa581e1 / docs/fb2-ai-center/p4-vector-contract.json / scripts/report_main_project_p4_source_enumerator.ps1 / scripts/report_main_project_p4_chunk_manifest.ps1 / scripts/report_main_project_p4_embedding_build_dry_run.ps1"
             gap_type = "planned_non_blocking"
             blocks_data_goal = $false
             production_grounding = $false
             read_only = $true
             dry_run = $true
+            writes_chunk_manifest_file = $false
+            persists_manifest_rows = $false
             writes_embedding_rows = $false
             writes_vector_store = $false
             writes_public_group_messages = $false
             writes_feedback_or_adoption = $false
             writes_opinion_index_rows = $false
             refresh_operations_used = $false
+            source_payload_included = $false
+            embedding_text_included = $false
             does_not_enable_vector = $true
             ready_to_write_embeddings = $false
             ready_to_build_embedding_store = $false
             ready_to_enable_answer_time_vector_candidates = $false
+            ready_for_shadow_eval = $false
             answer_time_vector_candidates_enabled = $false
             candidate_rows_require_live_hydration = $true
             vector_rows_are_model_input = $false
@@ -271,7 +280,7 @@ function New-Fb2GoalAuditPlannedCapabilities {
             requires_secret = $false
             requires_visible_group_write = $false
             command = ""
-            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator and embedding dry-run are only no-write planning evidence before full chunk manifests, embedding writes, shadow eval, hydration, and explicit answer-time readthrough gates."
+            next_action = "Keep Context Pack and structured tools as production grounding; fb2 source enumerator, chunk manifest, and embedding dry-run are only no-write planning evidence before idempotent embedding write transaction design, sanitized embedding text materialization, shadow eval, hydration, and explicit answer-time readthrough gates."
         }
     )
 }
@@ -714,20 +723,29 @@ function Invoke-Fb2GoalAuditSelfTest {
     if ([string]$planned[0].source_enumerator_status -ne "source_specific_no_write_sample_available") { $failed++ }
     if ([string]$planned[0].source_enumerator_checked_count -ne "reported_by_fb2_source_enumerator_runtime") { $failed++ }
     if ([string]$planned[0].source_enumerator_known_chunk_count -ne "reported_by_fb2_source_enumerator_runtime") { $failed++ }
+    if ([string]$planned[0].chunk_manifest_report_version -ne "fb2_p4_chunk_manifest_v1") { $failed++ }
+    if ([string]$planned[0].chunk_manifest_status -ne "id_only_no_write_manifest_available") { $failed++ }
+    if ([string]$planned[0].chunk_manifest_materialized_entry_count -ne "reported_by_fb2_chunk_manifest_runtime") { $failed++ }
+    if ([string]$planned[0].chunk_manifest_current_scope_complete -ne "reported_by_fb2_chunk_manifest_runtime") { $failed++ }
     if ([string]$planned[0].embedding_build_dry_run_report_version -ne "fb2_p4_embedding_build_dry_run_v1") { $failed++ }
     if ([string]$planned[0].dry_run_status -ne "dry_run_available_no_writes") { $failed++ }
     if (-not [bool]$planned[0].read_only) { $failed++ }
     if (-not [bool]$planned[0].dry_run) { $failed++ }
+    if ([bool]$planned[0].writes_chunk_manifest_file) { $failed++ }
+    if ([bool]$planned[0].persists_manifest_rows) { $failed++ }
     if ([bool]$planned[0].writes_vector_store) { $failed++ }
     if ([bool]$planned[0].writes_public_group_messages) { $failed++ }
     if ([bool]$planned[0].writes_feedback_or_adoption) { $failed++ }
     if ([bool]$planned[0].writes_opinion_index_rows) { $failed++ }
     if ([bool]$planned[0].refresh_operations_used) { $failed++ }
+    if ([bool]$planned[0].source_payload_included) { $failed++ }
+    if ([bool]$planned[0].embedding_text_included) { $failed++ }
     if ([bool]$planned[0].ready_to_write_embeddings) { $failed++ }
     if (-not [bool]$planned[0].candidate_rows_require_live_hydration) { $failed++ }
     if ([bool]$planned[0].vector_rows_are_model_input) { $failed++ }
     if ([bool]$planned[0].ready_to_build_embedding_store) { $failed++ }
     if ([bool]$planned[0].ready_to_enable_answer_time_vector_candidates) { $failed++ }
+    if ([bool]$planned[0].ready_for_shadow_eval) { $failed++ }
 
     $badScenario = $status | ConvertTo-Json -Depth 12 | ConvertFrom-Json
     $badScenario.latest_user_scenario_audit.scenarios[1].complete = $false
