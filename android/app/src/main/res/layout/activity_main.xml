@@ -972,7 +972,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="match_parent"
                     android:layout_weight="0"
-                    android:drawableTop="@drawable/ic_tab_chat_refined"
+                    android:drawableTop="@drawable/ic_tab_chat_custom"
                     android:text="好友" />
 
                 <TextView
@@ -994,13 +994,13 @@
             <TextView
                 android:id="@+id/tabProject"
                 style="@style/MainTabText"
-                android:drawableTop="@drawable/ic_tab_project_refined"
+                android:drawableTop="@drawable/ic_tab_project_custom"
                 android:text="项目" />
 
             <TextView
                 android:id="@+id/tabProfile"
                 style="@style/MainTabText"
-                android:drawableTop="@drawable/ic_tab_profile_user"
+                android:drawableTop="@drawable/ic_tab_profile_custom"
                 android:text="我的" />
 
             <TextView
