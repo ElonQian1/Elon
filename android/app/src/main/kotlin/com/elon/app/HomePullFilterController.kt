@@ -38,9 +38,10 @@ internal class HomePullFilterController(
     private val applyMode: (HomeListFilterMode) -> Unit
 ) {
     private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
-    private val activationDistance = maxOf(touchSlop * 1.4f, dp(22).toFloat())
-    private val triggerDistance = dp(92).toFloat()
-    private val maxPullDistance = dp(176).toFloat()
+    private val activationDistance = maxOf(touchSlop * 1.1f, dp(14).toFloat())
+    private val triggerDistance = dp(68).toFloat()
+    private val decisiveDistance = triggerDistance + dp(8)
+    private val maxPullDistance = dp(132).toFloat()
     private val maxContentStretch = dp(28).toFloat()
     private val indicator = HomePullFilterIndicatorView(activity)
 
@@ -52,6 +53,7 @@ internal class HomePullFilterController(
     private var longHoldArmed = false
     private var pullProgress = 0f
     private var thresholdReadySince = 0L
+    private var maxGestureDistance = 0f
     private var startedAtTop = false
     private var gestureRejected = false
     private var lastModeAppliedAt = 0L
@@ -69,7 +71,11 @@ internal class HomePullFilterController(
         val scrollView = binding.conversationPage.parent as? ScrollView ?: return
         scroller = scrollView
         installIndicator()
-        scrollView.setOnTouchListener { _, event -> handleTouch(event) }
+        if (scrollView is HomeConversationScrollView) {
+            scrollView.pullTouchHandler = ::handleTouch
+        } else {
+            scrollView.setOnTouchListener { _, event -> handleTouch(event) }
+        }
     }
 
     private fun installIndicator() {
@@ -98,6 +104,7 @@ internal class HomePullFilterController(
                 longHoldTriggered = false
                 pullProgress = 0f
                 thresholdReadySince = 0L
+                maxGestureDistance = 0f
                 startedAtTop = !scrollView.canScrollVertically(-1)
                 gestureRejected = false
                 cancelLongHold()
@@ -170,6 +177,7 @@ internal class HomePullFilterController(
 
     private fun updatePull(distance: Float, eventTime: Long) {
         val cappedDistance = min(distance, maxPullDistance)
+        maxGestureDistance = maxOf(maxGestureDistance, cappedDistance)
         val nextProgress = (cappedDistance / triggerDistance).coerceIn(0f, 1f)
         pullProgress = nextProgress
         indicator.update(currentMode().nextPullMode(), nextProgress)
@@ -181,19 +189,20 @@ internal class HomePullFilterController(
         if (nextProgress >= RELEASE_PROGRESS_THRESHOLD) {
             if (thresholdReadySince == 0L) thresholdReadySince = eventTime
             armLongHold()
-        } else {
+        } else if (nextProgress < RELEASE_RESET_PROGRESS) {
             thresholdReadySince = 0L
             cancelLongHold()
         }
     }
 
     private fun isPastReleaseThreshold(): Boolean {
-        return thresholdReadySince > 0L && pullProgress >= RELEASE_PROGRESS_THRESHOLD
+        return thresholdReadySince > 0L && pullProgress >= RELEASE_RESET_PROGRESS
     }
 
     private fun isStableRelease(eventTime: Long): Boolean {
         if (longHoldTriggered || !isPastReleaseThreshold()) return false
-        return eventTime >= thresholdReadySince
+        return eventTime - thresholdReadySince >= RELEASE_STABLE_MS ||
+            maxGestureDistance >= decisiveDistance
     }
 
     private fun armLongHold() {
@@ -232,6 +241,7 @@ internal class HomePullFilterController(
         pullProgress = 0f
         longHoldTriggered = false
         thresholdReadySince = 0L
+        maxGestureDistance = 0f
         startedAtTop = false
         gestureRejected = false
         cancelLongHold()
@@ -239,9 +249,11 @@ internal class HomePullFilterController(
 
     private companion object {
         const val RELEASE_PROGRESS_THRESHOLD = 1f
-        const val SWITCH_COOLDOWN_MS = 650L
+        const val RELEASE_RESET_PROGRESS = 0.55f
+        const val RELEASE_STABLE_MS = 40L
+        const val SWITCH_COOLDOWN_MS = 0L
         const val HORIZONTAL_REJECT_RATIO = 1.35f
-        const val VERTICAL_ACTIVATION_RATIO = 1.05f
+        const val VERTICAL_ACTIVATION_RATIO = 0.7f
     }
 }
 
