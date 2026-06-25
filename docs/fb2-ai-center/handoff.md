@@ -2,7 +2,20 @@
 
 ## 当前快照
 
-日期：2026-06-24
+日期：2026-06-25
+
+### 2026-06-25 最新快照
+
+- 主项目 `origin/main=17af1a86 (v0.3.844)` 与 fb2 `origin/main=644be811` 主链都同步且无未提交改动。
+- `scripts/run-fb2-ai-center-token-bridge.ps1 -RunDataOnlyPreflight -RunCurrentStateAfter` 已通过，生成
+  `target\fb2-ai-center\token-bridge-data-only-preflight-summary-current.json`（`mode=data_only_preflight`，`success=true`）。
+- 当前 `completion` 仍为 `data_goal_complete=true / full_final_complete=false / voice_deferred_by_user=true`（唯一差口是语音最终验收）。
+- 非语音链路当前可复现的成功事实：
+  - `/api/main-project/context/pack` + `/context/feedback*` + `/context/quality-summary` + `/context/permission-summary` 均通过；
+  - `group_id=ext_fb2_official` 可只读直读群聊消息，`direct_read_complete=true`；
+  - `@EL`、`AI回复`、总结帖场景均有验证路径与 `fb2` feedback 可回查（当前仍为 data-only 预检阶段）；
+  - 质量债务 `quality_unmatched_cited_sources=13`、`quality_wrong_context_count=8` 在 historical debt 为 observation 允许范围内（仅历史样本），本轮 `quality_missing_context_count=0`。
+- ASR/TTS 本轮暂缓：`voice_status=deferred_by_user`，`voice_device_evidence` 尚未补齐真实 final-ready 证据；继续推进请按 `keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses`。
 
 ## 2026-06-22 线上验证快照
 
