@@ -519,6 +519,22 @@ button { cursor: pointer; }
 }
 .channel-item:hover,
 .channel-item.active { background: #303138; color: var(--text); }
+.channel-item.project-group-toggle {
+  color: var(--text);
+  font-weight: 800;
+}
+.channel-item.project-center-child {
+  width: calc(100% - 16px);
+  margin-left: 16px;
+  padding-left: 8px;
+}
+.project-center-empty {
+  margin: 4px 8px 8px 40px;
+  max-width: none;
+  text-align: left;
+  font-size: 12px;
+  line-height: 1.5;
+}
 .channel-item.ai-primary {
   min-height: 42px;
   background: rgba(60, 111, 162, .13);

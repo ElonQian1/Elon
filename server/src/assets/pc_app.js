@@ -24,6 +24,7 @@
     activeVoiceChannel: 'studio',
     activePeer: null, projectSpace: null,
     aiProjectConversations: { userId: '', items: {}, errors: {}, loadingIds: {}, expandedIds: {}, drafts: {} },
+    projectCenterGroups: { mine: true, plaza: false },
     plaza: { loaded: false, loading: false, projects: [], query: '', filterKey: 'all', busyId: '', error: '' },
     nodeAdminUrl: safeNodeAdminUrl(),
     localAdminToken: '',
@@ -776,8 +777,7 @@
     const query = filterText();
     if (state.activeKind === 'ai' || state.activeKind === 'store' || state.activeKind === 'tasks' || state.activeKind === 'project-conversation') return renderAiSidebar(query);
     if (state.activeKind === 'friends') return renderFriendChannels(query);
-    if (state.activeKind === 'projects') return renderProjectHomeChannels(query);
-    if (state.activeKind === 'project-plaza') return renderProjectPlazaChannels(query);
+    if (state.activeKind === 'projects' || state.activeKind === 'project-plaza') return renderProjectCenterChannels(query);
     if (state.activeKind === 'apk') return renderApkChannels();
     if (state.activeKind === 'doctor') return doctor.renderChannels(channelButton);
     if (state.activeKind === 'node') return node.renderChannels(channelButton);
@@ -1134,13 +1134,24 @@
     return Number.isFinite(count) && count > 0 ? count : 1;
   }
 
-  function renderProjectHomeChannels(query) {
+  function renderProjectGroupToggle(group, title, sub, expanded) {
+    return `<button class="channel-item project-group-toggle" type="button" data-project-center-group="${escapeHtml(group)}">
+      <span class="glyph">${expanded ? 'v' : '>'}</span>
+      <span class="main"><strong>${escapeHtml(title)}</strong><span>${escapeHtml(sub)}</span></span>
+    </button>`;
+  }
+
+  function renderProjectCenterChannels(query) {
+    const groups = state.projectCenterGroups || { mine: true, plaza: false };
+    const mineExpanded = !!groups.mine || !!query;
+    const plazaExpanded = !!groups.plaza || !!query;
     const projects = state.projects.filter((project) => titleOf(project).toLowerCase().includes(query));
-    els.channelList.innerHTML = [
-      '<div class="channel-section">项目中心</div>',
-      '<button class="channel-item" type="button" data-project-home-action="overview"><span class="glyph">项</span><span class="main"><strong>我的项目</strong><span>查看项目列表</span></span></button>',
-      '<button class="channel-item" type="button" data-project-home-action="plaza"><span class="glyph">广</span><span class="main"><strong>项目广场</strong><span>发现公开项目</span></span></button>',
-      '<div class="channel-section">项目列表</div>',
+    const joinedIds = new Set(state.projects.map((project) => project && project.id).filter(Boolean));
+    const joined = state.plaza.projects
+      .filter((project) => joinedIds.has(project.id) && titleOf(project).toLowerCase().includes(query))
+      .slice(0, 20);
+    const mineChildren = mineExpanded ? [
+      `<button class="channel-item project-center-child ${state.activeKind === 'projects' && !state.activeProjectId ? 'active' : ''}" type="button" data-project-center-child="overview"><span class="glyph">首</span><span class="main"><strong>项目概览</strong><span>新建、导入和管理项目</span></span></button>`,
       state.token
         ? (projects.map((project) => channelButton({
           id: project.id,
@@ -1150,31 +1161,14 @@
           glyph: '项',
           title: titleOf(project),
           sub: `${projectRoleLabel(project)} · ${projectMemberCount(project)} 位成员`,
+          nested: true,
           active: state.activeProjectId && sameId(project.id, state.activeProjectId)
-        })).join('') || '<div class="empty-state">暂无项目</div>')
-        : '<div class="empty-state">登录后显示我的项目</div>'
-    ].join('');
-    els.channelList.querySelectorAll('[data-project-home-action]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        if (btn.dataset.projectHomeAction === 'plaza') selectProjectPlaza();
-        else renderProjectHomeSurface();
-      });
-    });
-    els.channelList.querySelectorAll('[data-peer-kind="project-entry"]').forEach((btn) => {
-      btn.addEventListener('click', () => selectProject(btn.dataset.itemId));
-    });
-  }
-
-  function renderProjectPlazaChannels(query) {
-    const joinedIds = new Set(state.projects.map((project) => project && project.id).filter(Boolean));
-    const joined = state.plaza.projects
-      .filter((project) => joinedIds.has(project.id) && titleOf(project).toLowerCase().includes(query))
-      .slice(0, 20);
-    els.channelList.innerHTML = [
-      '<div class="channel-section">项目广场</div>',
-      '<button class="channel-item active" type="button" data-plaza-channel="all"><span class="glyph">广</span><span class="main"><strong>全部公开项目</strong><span>搜索、加入和下载 APK</span></span></button>',
-      '<button class="channel-item" type="button" data-plaza-channel="mine"><span class="glyph">已</span><span class="main"><strong>已加入</strong><span>我已加入的公开项目</span></span></button>',
-      '<div class="channel-section">已加入</div>',
+        })).join('') || '<div class="empty-state project-center-empty">暂无项目</div>')
+        : '<div class="empty-state project-center-empty">登录后显示我的项目</div>'
+    ].join('') : '';
+    const plazaChildren = plazaExpanded ? [
+      `<button class="channel-item project-center-child ${state.activeKind === 'project-plaza' && state.plaza.filterKey !== 'joined' ? 'active' : ''}" type="button" data-project-plaza-child="all"><span class="glyph">全</span><span class="main"><strong>全部公开项目</strong><span>搜索、加入和下载 APK</span></span></button>`,
+      `<button class="channel-item project-center-child ${state.activeKind === 'project-plaza' && state.plaza.filterKey === 'joined' ? 'active' : ''}" type="button" data-project-plaza-child="joined"><span class="glyph">已</span><span class="main"><strong>已加入</strong><span>我已加入的公开项目</span></span></button>`,
       state.token
         ? (joined.map((project) => channelButton({
           id: project.id,
@@ -1184,13 +1178,32 @@
           glyph: '项',
           title: titleOf(project),
           sub: `${projectMemberCount(project)} 位成员`,
+          nested: true,
           active: false
-        })).join('') || '<div class="empty-state">暂无已加入项目</div>')
-        : '<div class="empty-state">登录后查看已加入项目</div>'
+        })).join('') || '<div class="empty-state project-center-empty">暂无已加入项目</div>')
+        : '<div class="empty-state project-center-empty">登录后查看已加入项目</div>'
+    ].join('') : '';
+    els.channelList.innerHTML = [
+      '<div class="channel-section">项目中心</div>',
+      renderProjectGroupToggle('mine', '我的项目', '展开项目列表', mineExpanded),
+      mineChildren,
+      renderProjectGroupToggle('plaza', '项目广场', '展开公开项目入口', plazaExpanded),
+      plazaChildren
     ].join('');
-    els.channelList.querySelectorAll('[data-plaza-channel]').forEach((btn) => {
+    els.channelList.querySelectorAll('[data-project-center-group]').forEach((btn) => {
       btn.addEventListener('click', () => {
-        state.plaza.filterKey = btn.dataset.plazaChannel === 'mine' ? 'joined' : 'all';
+        const group = btn.dataset.projectCenterGroup;
+        state.projectCenterGroups[group] = !state.projectCenterGroups[group];
+        renderProjectCenterChannels(filterText());
+      });
+    });
+    els.channelList.querySelectorAll('[data-project-center-child]').forEach((btn) => {
+      btn.addEventListener('click', selectProjectsHome);
+    });
+    els.channelList.querySelectorAll('[data-project-plaza-child]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        state.plaza.filterKey = btn.dataset.projectPlazaChild === 'joined' ? 'joined' : 'all';
+        selectProjectPlaza();
         loadProjectPlaza(true);
       });
     });
@@ -1294,7 +1307,7 @@
     const glyph = item.avatar || item.avatarFallback
       ? avatarElement('span', 'glyph channel-avatar', item.avatar, item.avatarFallback || item.title || item.glyph || '#', item.glyph || '#')
       : `<span class="glyph">${escapeHtml(item.glyph || '#')}</span>`;
-    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${item.active ? 'active' : ''}" type="button" ${attrs}>
+    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${item.nested ? 'project-center-child' : ''} ${item.active ? 'active' : ''}" type="button" ${attrs}>
       ${glyph}
       <span class="main"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.sub || '')}</span></span>
       ${typeof item.online === 'boolean' ? `<i class="presence-dot ${item.online ? 'online' : ''}"></i>` : ''}
@@ -1615,6 +1628,7 @@
     state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
+    state.projectCenterGroups.mine = true;
     setAuthClaimBanner(!state.token);
     setRails('projects');
     els.workspaceName.textContent = '项目中心';
@@ -1623,7 +1637,7 @@
     setHeader('项', '项目中心', '查看我的项目和项目广场');
     setComposer(false, '选择项目后开始输入', false);
     setNodeMode(false);
-    renderProjectHomeChannels(filterText());
+    renderProjectCenterChannels(filterText());
     renderMembers('项目成员', []);
     renderProjectHomeSurface();
   }
@@ -1716,6 +1730,7 @@
     state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
+    state.projectCenterGroups.plaza = true;
     setAuthClaimBanner(!state.token);
     setRails('project-plaza');
     els.workspaceName.textContent = '项目广场';
@@ -1725,7 +1740,7 @@
     setComposer(false, '加入项目后可输入消息', false);
     setNodeMode(false);
     renderMembers('项目广场', []);
-    renderProjectPlazaChannels(filterText());
+    renderProjectCenterChannels(filterText());
     renderProjectPlazaSurface();
     if (!state.plaza.loaded && !state.plaza.loading) loadProjectPlaza(false);
   }
@@ -1764,7 +1779,7 @@
       state.plaza.error = error.message || '加载失败';
     } finally {
       state.plaza.loading = false;
-      renderProjectPlazaChannels(filterText());
+      renderProjectCenterChannels(filterText());
       renderProjectPlazaSurface();
     }
   }
@@ -1885,7 +1900,7 @@
     } finally {
       state.plaza.busyId = '';
       if (state.activeKind === 'project-plaza') {
-        renderProjectPlazaChannels(filterText());
+        renderProjectCenterChannels(filterText());
         renderProjectPlazaSurface();
       }
     }
