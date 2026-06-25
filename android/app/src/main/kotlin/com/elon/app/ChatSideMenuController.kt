@@ -2,6 +2,8 @@ package com.elon.app
 
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
+import android.animation.ArgbEvaluator
+import android.animation.ValueAnimator
 import android.app.AlertDialog
 import android.content.Context
 import android.content.Intent
@@ -59,7 +61,9 @@ internal class ChatSideMenuController(
     private lateinit var settingsBubble: FrameLayout
     private lateinit var accountNameText: TextView
     private lateinit var accountAccountText: TextView
-    private lateinit var handleToggleStatusText: TextView
+    private lateinit var handleToggleSwitchTrack: FrameLayout
+    private lateinit var handleToggleKnob: View
+    private lateinit var handleToggleKnobBackground: GradientDrawable
     private lateinit var usageDropdown: SideMenuUsageDropdown
     private lateinit var aiMenuView: ChatAiSideMenuView
     private lateinit var projectMenuView: ChatProjectSideMenuView
@@ -81,6 +85,8 @@ internal class ChatSideMenuController(
     private var handleDragging = false
     private var handleMovedBeyondTapSlop = false
     private var sideMenuHandleEnabled = true
+    private var handleToggleKnobColor = Color.WHITE
+    private var handleToggleColorAnimator: ValueAnimator? = null
 
     val isOpen: Boolean
         get() = isSetup && overlay.visibility == View.VISIBLE && !isAnimating
@@ -669,18 +675,37 @@ internal class ChatSideMenuController(
                 setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
                 textSize = 17f
             }
-            handleToggleStatusText = TextView(activity).apply {
+            handleToggleSwitchTrack = FrameLayout(activity).apply {
                 layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.MATCH_PARENT
+                    dp(30),
+                    dp(16)
                 )
-                gravity = Gravity.CENTER_VERTICAL or Gravity.END
-                includeFontPadding = false
-                setTextColor(Color.parseColor("#9A9A9A"))
-                textSize = 15f
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dp(8).toFloat()
+                    setColor(Color.parseColor("#343434"))
+                    setStroke(dp(1), Color.parseColor("#A8A8A8"))
+                }
+                isClickable = false
+                clipChildren = false
+                clipToPadding = false
+                handleToggleKnobBackground = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(handleToggleKnobColor)
+                }
+                handleToggleKnob = View(activity).apply {
+                    background = handleToggleKnobBackground
+                }
+                addView(
+                    handleToggleKnob,
+                    FrameLayout.LayoutParams(dp(8), dp(8)).apply {
+                        gravity = Gravity.START or Gravity.CENTER_VERTICAL
+                        leftMargin = dp(4)
+                    }
+                )
             }
             addView(titleText)
-            addView(handleToggleStatusText)
+            addView(handleToggleSwitchTrack)
             updateSideMenuHandleToggleText()
             setOnClickListener { toggleSideMenuHandleAvailability() }
         }
@@ -691,13 +716,46 @@ internal class ChatSideMenuController(
         sideMenuHandlePrefs.edit()
             .putBoolean(SIDE_MENU_HANDLE_VISIBLE_KEY, sideMenuHandleEnabled)
             .apply()
-        updateSideMenuHandleToggleText()
+        updateSideMenuHandleToggleText(animated = true)
         applySideMenuHandleAvailability(animated = true)
     }
 
-    private fun updateSideMenuHandleToggleText() {
-        if (!::handleToggleStatusText.isInitialized) return
-        handleToggleStatusText.text = if (sideMenuHandleEnabled) "打开" else "隐藏"
+    private fun updateSideMenuHandleToggleText(animated: Boolean = false) {
+        if (!::handleToggleKnob.isInitialized || !::handleToggleSwitchTrack.isInitialized) return
+        val targetTranslation = if (sideMenuHandleEnabled) 0f else dp(14).toFloat()
+        val targetColor = if (sideMenuHandleEnabled) {
+            Color.WHITE
+        } else {
+            Color.parseColor("#E62129")
+        }
+        handleToggleSwitchTrack.contentDescription =
+            if (sideMenuHandleEnabled) "悬浮按钮已打开" else "悬浮按钮已隐藏"
+        handleToggleKnob.animate().cancel()
+        handleToggleColorAnimator?.cancel()
+        if (!animated) {
+            handleToggleKnob.translationX = targetTranslation
+            handleToggleKnobColor = targetColor
+            handleToggleKnobBackground.setColor(targetColor)
+            return
+        }
+        handleToggleKnob.animate()
+            .translationX(targetTranslation)
+            .setDuration(170L)
+            .setInterpolator(interpolator)
+            .start()
+        handleToggleColorAnimator = ValueAnimator.ofObject(
+            ArgbEvaluator(),
+            handleToggleKnobColor,
+            targetColor
+        ).apply {
+            duration = 170L
+            interpolator = this@ChatSideMenuController.interpolator
+            addUpdateListener { animator ->
+                handleToggleKnobColor = animator.animatedValue as Int
+                handleToggleKnobBackground.setColor(handleToggleKnobColor)
+            }
+            start()
+        }
     }
 
     private fun applySideMenuHandleAvailability(animated: Boolean) {

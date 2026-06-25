@@ -1639,6 +1639,31 @@
     .profile-row:first-of-type { margin-top: 10px; }
     .profile-row:hover { background: var(--panel-3); }
     .profile-row .arrow { color: var(--ink-faint); font-size: 18px; }
+    .chat-handle-switch {
+      width: 30px;
+      height: 16px;
+      border: 1px solid #A8A8A8;
+      border-radius: 999px;
+      background: #343434;
+      position: relative;
+      flex: 0 0 auto;
+      box-sizing: border-box;
+    }
+    .chat-handle-switch::after {
+      content: "";
+      position: absolute;
+      left: 4px;
+      top: 3px;
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: #FFFFFF;
+      transition: transform 170ms cubic-bezier(.2,.7,.2,1), background 170ms cubic-bezier(.2,.7,.2,1);
+    }
+    .chat-handle-switch.hidden-state::after {
+      transform: translateX(14px);
+      background: #E62129;
+    }
     .profile-row.danger { color: #d97a7a; }
     .profile-version {
       text-align: center;
@@ -2492,7 +2517,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         <span>AI 回复语音</span><span class="arrow">APK 中切换</span>
       </button>
       <button class="profile-row" id="chatHandleToggleRow">
-        <span>悬浮按钮</span><span class="arrow" id="chatHandleToggleState">打开</span>
+        <span>悬浮按钮</span><span class="chat-handle-switch" id="chatHandleToggleSwitch" aria-hidden="true"></span>
       </button>
       <button class="profile-row" id="nodeMarketRow">
         <span>PC 节点大厅</span><span class="arrow">›</span>
@@ -2983,7 +3008,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const ttsVoiceMask = $('ttsVoiceMask');
   const ttsVoiceCloseBtn = $('ttsVoiceCloseBtn');
   const chatHandleToggleRow = $('chatHandleToggleRow');
-  const chatHandleToggleState = $('chatHandleToggleState');
+  const chatHandleToggleSwitch = $('chatHandleToggleSwitch');
   const agentAutomationRow = $('agentAutomationRow');
   const agentOpenSettingsBtn = $('agentOpenSettingsBtn');
   const sharePromotionRow = $('sharePromotionRow');
@@ -3169,8 +3194,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       inputBar.classList.contains('active');
   }
   function updateChatSideMenuHandleToggleText() {
-    if (chatHandleToggleState) {
-      chatHandleToggleState.textContent = chatSideMenuHandleEnabled ? '打开' : '隐藏';
+    if (chatHandleToggleSwitch) {
+      chatHandleToggleSwitch.classList.toggle('hidden-state', !chatSideMenuHandleEnabled);
+      chatHandleToggleSwitch.setAttribute(
+        'aria-label',
+        chatSideMenuHandleEnabled ? '悬浮按钮已打开' : '悬浮按钮已隐藏'
+      );
     }
   }
   function hideWebChatSideMenuHandle() {
