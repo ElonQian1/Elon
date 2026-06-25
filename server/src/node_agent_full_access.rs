@@ -177,13 +177,13 @@ pub(crate) fn runtime_policy_summary() -> serde_json::Value {
         "fullAccess": {
             "routeAInstalledCliOnly": true,
             "routeARequiresLocalProjectGrant": true,
-            "routeBCDoesNotBypassSafety": true,
             "routeBCFullAccessEffect": "keeps_workspace_path_checks_command_allowlist_and_tool_approvals",
+            "routeBCDangerFullAccessEffect": "danger_full_access_allows_absolute_paths_arbitrary_shell_and_skips_tool_approvals",
         },
         "routeBC": {
-            "workspaceBoundary": "workspace_relative_no_git_no_symlink_escape",
+            "workspaceBoundary": "workspace_relative_no_git_no_symlink_escape_or_danger_full_access_absolute",
             "approvalRequiredTools": ROUTE_BC_APPROVAL_REQUIRED_TOOLS,
-            "commandPolicy": "structured_project_command_allowlist",
+            "commandPolicy": "structured_project_command_allowlist_or_danger_full_access_shell",
             "highRiskGitPushDenied": ROUTE_BC_HIGH_RISK_GIT_PUSH_DENIED,
         },
         "operatorVisibility": {
@@ -364,6 +364,10 @@ mod tests {
         assert_eq!(
             summary["fullAccess"]["routeBCFullAccessEffect"],
             "keeps_workspace_path_checks_command_allowlist_and_tool_approvals"
+        );
+        assert_eq!(
+            summary["fullAccess"]["routeBCDangerFullAccessEffect"],
+            "danger_full_access_allows_absolute_paths_arbitrary_shell_and_skips_tool_approvals"
         );
         assert_eq!(
             summary["operatorVisibility"]["policyField"],

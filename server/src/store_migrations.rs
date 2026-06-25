@@ -99,6 +99,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
         "BB64A external app AI reply trial credit config",
         migration_v67,
     ),
+    (68, "项目级 AI danger_full_access 权限", migration_v68),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2271,6 +2272,39 @@ fn migration_v67(conn: &Connection) -> Result<()> {
     Ok(())
 }
 
+fn migration_v68(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_runtime_permissions_v68 (
+          project_id TEXT PRIMARY KEY,
+          mode       TEXT NOT NULL DEFAULT 'project_write'
+                     CHECK (mode IN ('project_write', 'full_access', 'danger_full_access')),
+          updated_by TEXT,
+          updated_at TEXT,
+          expires_at TEXT,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (updated_by) REFERENCES users(id)
+        );
+
+        INSERT OR REPLACE INTO project_runtime_permissions_v68
+          (project_id, mode, updated_by, updated_at, expires_at)
+        SELECT project_id,
+               CASE
+                 WHEN mode IN ('project_write', 'full_access', 'danger_full_access') THEN mode
+                 ELSE 'project_write'
+               END,
+               updated_by,
+               updated_at,
+               expires_at
+          FROM project_runtime_permissions;
+
+        DROP TABLE project_runtime_permissions;
+        ALTER TABLE project_runtime_permissions_v68 RENAME TO project_runtime_permissions;
+        "#,
+    )?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2626,6 +2660,43 @@ mod tests {
             )
             .expect("index should be queryable");
         assert_eq!(exists, 1);
+    }
+
+    #[test]
+    fn migration_v68_allows_danger_full_access_runtime_permission() {
+        let conn = Connection::open_in_memory().expect("in-memory db should open");
+        migration_v1(&conn).expect("base schema should apply");
+        migration_v52(&conn).expect("runtime permission table should apply");
+        conn.execute(
+            "INSERT INTO users (id, phone, email, password_hash, nickname, role, status, created_at, updated_at)
+             VALUES ('usr_danger', NULL, 'danger@example.invalid', 'hash', 'Danger', 'user', 'active', 'now', 'now')",
+            [],
+        )
+        .expect("user should insert");
+        insert_project(&conn, "prj_danger", "Danger", "usr_danger");
+
+        let before = conn.execute(
+            "INSERT INTO project_runtime_permissions (project_id, mode, updated_by, updated_at)
+             VALUES ('prj_danger', 'danger_full_access', 'usr_danger', 'now')",
+            [],
+        );
+        assert!(before.is_err());
+
+        migration_v68(&conn).expect("danger permission migration should apply");
+        conn.execute(
+            "INSERT INTO project_runtime_permissions (project_id, mode, updated_by, updated_at)
+             VALUES ('prj_danger', 'danger_full_access', 'usr_danger', 'now')",
+            [],
+        )
+        .expect("danger permission should insert after v68");
+        let mode: String = conn
+            .query_row(
+                "SELECT mode FROM project_runtime_permissions WHERE project_id = 'prj_danger'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("mode should read");
+        assert_eq!(mode, "danger_full_access");
     }
 
     fn insert_project(conn: &Connection, id: &str, name: &str, created_by: &str) {

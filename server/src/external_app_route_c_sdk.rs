@@ -34,6 +34,14 @@ const MAX_TOOL_MANIFEST_CHARS: usize = 12_000;
 const MAX_OUTPUT_TOKENS: usize = 1_000;
 const DEFAULT_MAX_ACTIONS: usize = 3;
 const HARD_MAX_ACTIONS: usize = 5;
+const PROJECT_AI_SCHEMA: &str = "elon.project_ai_sdk.mvp.v0";
+const PROJECT_AI_SUPPORTED_ROUTES: [&str; 3] = ["route_a", "route_b", "route_c"];
+const PROJECT_AI_REMOTE_SOURCE_TOOLS: [&str; 3] = [
+    "remote_source_search",
+    "remote_source_read_file",
+    "remote_source_ask",
+];
+const PROJECT_AI_FEEDBACK_TOOLS: [&str; 1] = ["create_feedback_post"];
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -53,6 +61,10 @@ pub(crate) struct ExternalAppRouteCChatRequest {
     tool_results: Vec<Value>,
     #[serde(default)]
     sdk: Value,
+    #[serde(default, alias = "runtime_permission")]
+    runtime_permission: Option<String>,
+    #[serde(default, alias = "runtime_route")]
+    runtime_route: Option<String>,
     #[serde(default)]
     agent: Option<String>,
     #[serde(default, alias = "max_actions")]
@@ -84,6 +96,37 @@ struct RouteCModelOutput {
     actions: Vec<RouteCAction>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RuntimeRoute {
+    RouteA,
+    RouteB,
+    RouteC,
+}
+
+impl RuntimeRoute {
+    fn as_str(self) -> &'static str {
+        match self {
+            RuntimeRoute::RouteA => "route_a",
+            RuntimeRoute::RouteB => "route_b",
+            RuntimeRoute::RouteC => "route_c",
+        }
+    }
+
+    fn prompt_rule(self) -> &'static str {
+        match self {
+            RuntimeRoute::RouteA => {
+                "当前是 Route A：用户本机已有 Codex/Copilot/Claude 等 CLI 接管子项目，模型和工具主要在用户电脑侧；一龙 SDK 负责提供统一工具协议、远程源码查询和反馈帖子契约。"
+            }
+            RuntimeRoute::RouteB => {
+                "当前是 Route B：用户在本机配置自己的 API key，模型调用由用户侧完成，本机工具仍走一龙 SDK；一龙 SDK 负责统一工具协议、远程源码查询和反馈帖子契约。"
+            }
+            RuntimeRoute::RouteC => {
+                "当前是 Route C：模型调用走一龙服务器，本地文件、命令、诊断和业务工具由用户设备上的 SDK 执行。"
+            }
+        }
+    }
+}
+
 pub(crate) async fn route_c_chat_handler(
     State(state): State<Arc<AppState>>,
     Path(app_id): Path<String>,
@@ -107,11 +150,21 @@ pub(crate) async fn route_c_chat_handler(
     }
 
     let allowed_tools = allowed_tool_names(app.id, &req.tool_manifest, &req.local_context);
+    let danger_full_access = request_danger_full_access(&req);
+    let runtime_route = request_runtime_route(&req);
     let max_actions = req
         .max_actions
         .unwrap_or(DEFAULT_MAX_ACTIONS)
         .clamp(1, HARD_MAX_ACTIONS);
-    let messages = build_messages(app.id, &message, &req, &allowed_tools, max_actions);
+    let messages = build_messages(
+        app.id,
+        &message,
+        &req,
+        &allowed_tools,
+        max_actions,
+        danger_full_access,
+        runtime_route,
+    );
 
     let (raw_model_output, agent_used, model_used, agent_fallback) =
         match call_route_c_model(&state, req.agent.as_deref(), &messages).await {
@@ -144,6 +197,8 @@ pub(crate) async fn route_c_chat_handler(
         message_chars = message.chars().count(),
         tool_count = allowed_tools.len(),
         action_count = model_output.actions.len(),
+        danger_full_access = danger_full_access,
+        runtime_route = runtime_route.as_str(),
         agent = %agent_used,
         model = %model_used,
         "external app Route C SDK chat completed"
@@ -160,11 +215,22 @@ pub(crate) async fn route_c_chat_handler(
         "agent_used": agent_used,
         "model_used": model_used,
         "agent_fallback": agent_fallback,
+        "project_ai": {
+            "schema": PROJECT_AI_SCHEMA,
+            "runtime_route": runtime_route.as_str(),
+            "supported_routes": PROJECT_AI_SUPPORTED_ROUTES,
+            "local_execution": "external_app_sdk",
+            "remote_source_tools": PROJECT_AI_REMOTE_SOURCE_TOOLS,
+            "feedback_tools": PROJECT_AI_FEEDBACK_TOOLS,
+            "note": "MVP 阶段只定义通用工具协议；工具实际执行仍由子项目 SDK/provider 在用户本机或项目节点完成。"
+        },
         "route_c": {
             "mode": "server_model_local_tools",
+            "runtime_route": runtime_route.as_str(),
             "local_execution": "external_app_sdk",
             "approval": "client_managed_mvp_disabled",
-            "tool_filter": "manifest_allowlist"
+            "tool_filter": "manifest_allowlist",
+            "runtime_permission": if danger_full_access { "danger_full_access" } else { "client_managed_tools" }
         },
         "sdk": {
             "version": "0.1.0",
@@ -195,16 +261,118 @@ fn env_flag(name: &str) -> bool {
         .unwrap_or(false)
 }
 
+fn request_danger_full_access(req: &ExternalAppRouteCChatRequest) -> bool {
+    req.runtime_permission
+        .as_deref()
+        .is_some_and(|value| value.trim() == "danger_full_access")
+        || value_declares_danger_full_access(&req.sdk)
+        || value_declares_danger_full_access(&req.tool_manifest)
+        || value_declares_danger_full_access(&req.local_context)
+}
+
+fn value_declares_danger_full_access(value: &Value) -> bool {
+    match value {
+        Value::Array(items) => items.iter().any(value_declares_danger_full_access),
+        Value::Object(object) => {
+            for (key, child) in object {
+                let key = key.as_str();
+                if matches!(
+                    key,
+                    "runtime_permission" | "runtimePermission" | "permission"
+                ) && child
+                    .as_str()
+                    .is_some_and(|value| value == "danger_full_access")
+                {
+                    return true;
+                }
+                if key == "dangerous" && child.as_bool() == Some(true) {
+                    return true;
+                }
+                if value_declares_danger_full_access(child) {
+                    return true;
+                }
+            }
+            false
+        }
+        _ => false,
+    }
+}
+
+fn request_runtime_route(req: &ExternalAppRouteCChatRequest) -> RuntimeRoute {
+    req.runtime_route
+        .as_deref()
+        .and_then(parse_runtime_route)
+        .or_else(|| value_runtime_route(&req.sdk))
+        .or_else(|| value_runtime_route(&req.client))
+        .or_else(|| value_runtime_route(&req.local_context))
+        .unwrap_or(RuntimeRoute::RouteC)
+}
+
+fn value_runtime_route(value: &Value) -> Option<RuntimeRoute> {
+    match value {
+        Value::String(text) => parse_runtime_route(text),
+        Value::Array(items) => items.iter().find_map(value_runtime_route),
+        Value::Object(object) => {
+            for key in [
+                "runtime_route",
+                "runtimeRoute",
+                "route",
+                "route_id",
+                "routeId",
+                "project_ai_route",
+                "projectAiRoute",
+            ] {
+                if let Some(route) = object
+                    .get(key)
+                    .and_then(Value::as_str)
+                    .and_then(parse_runtime_route)
+                {
+                    return Some(route);
+                }
+            }
+            object.values().find_map(value_runtime_route)
+        }
+        _ => None,
+    }
+}
+
+fn parse_runtime_route(raw: &str) -> Option<RuntimeRoute> {
+    let normalized = raw
+        .trim()
+        .to_ascii_lowercase()
+        .replace('-', "_")
+        .replace(' ', "_");
+    match normalized.as_str() {
+        "a" | "route_a" | "local_cli" | "local_ai_cli" | "codex_cli" | "copilot_cli"
+        | "claude_cli" => Some(RuntimeRoute::RouteA),
+        "b" | "route_b" | "byok" | "bring_your_own_key" | "local_api_key" | "user_api_key" => {
+            Some(RuntimeRoute::RouteB)
+        }
+        "c" | "route_c" | "elon_server" | "server_model" | "server_model_local_tools" => {
+            Some(RuntimeRoute::RouteC)
+        }
+        _ => None,
+    }
+}
+
 fn build_messages(
     app_id: &str,
     user_message: &str,
     req: &ExternalAppRouteCChatRequest,
     allowed_tools: &BTreeSet<String>,
     max_actions: usize,
+    danger_full_access: bool,
+    runtime_route: RuntimeRoute,
 ) -> Vec<Value> {
     let mut messages = vec![json!({
         "role": "system",
-        "content": system_prompt(app_id, allowed_tools, max_actions)
+        "content": system_prompt(
+            app_id,
+            allowed_tools,
+            max_actions,
+            danger_full_access,
+            runtime_route
+        )
     })];
     messages.extend(
         req.history
@@ -214,12 +382,18 @@ fn build_messages(
     );
     messages.push(json!({
         "role": "user",
-        "content": build_user_prompt(app_id, user_message, req)
+        "content": build_user_prompt(app_id, user_message, req, runtime_route)
     }));
     messages
 }
 
-fn system_prompt(app_id: &str, allowed_tools: &BTreeSet<String>, max_actions: usize) -> String {
+fn system_prompt(
+    app_id: &str,
+    allowed_tools: &BTreeSet<String>,
+    max_actions: usize,
+    danger_full_access: bool,
+    runtime_route: RuntimeRoute,
+) -> String {
     let app_rule = if app_id == "bb64a" {
         "这是 ElonSpeed / BB64A 代理软件的用户支持场景。优先判断本机配置、节点/订阅、Windows 代理/TUN/路由和产品 bug 的区别。不要输出订阅 URL、token、节点密码或无关本地文件内容。"
     } else {
@@ -233,15 +407,25 @@ fn system_prompt(app_id: &str, allowed_tools: &BTreeSet<String>, max_actions: us
             allowed_tools.iter().cloned().collect::<Vec<_>>().join(", ")
         )
     };
+    let permission_rule = if danger_full_access {
+        "当前 SDK 声明 runtime_permission=danger_full_access。若 manifest 提供 run_command/read_file/write_file/list_dir，你可以请求用户本机完整命令行与文件读写：run_command 可使用 {\"command\":\"...\",\"shell\":\"cmd|powershell|pwsh|bash|sh\",\"cwd\":\"...\"}，也可使用 {\"program\":\"cmd\",\"args\":[\"/C\",\"...\"]}；路径可以是绝对路径。"
+    } else {
+        "当前 SDK 未声明 danger_full_access。只能按 manifest 暴露的业务工具做本地诊断，不要假设可以执行任意命令或读写任意文件。"
+    };
     format!(
-        "你是一龙 Route C SDK 服务端模型。模型调用在一龙服务器，本地文件、命令、诊断和业务工具由用户设备上的 SDK 执行。\n\
+        "你是一龙 Project AI SDK 协调模型，兼容 Route A / Route B / Route C 三种接入。\n\
+         {route_rule}\n\
          {app_rule}\n\
          {tool_list}\n\
+         {permission_rule}\n\
+         远程源码节点协作：如果本机诊断结果指向产品源码、功能设计或适配缺口，并且 manifest 暴露 remote_source_search、remote_source_read_file 或 remote_source_ask，应先调用这些远程源码工具补充项目源码细节，再判断是不是源码问题。\n\
+         需求频道反馈：如果源码结果确认或高度疑似是产品 bug/功能缺口，并且 manifest 暴露 create_feedback_post，请请求该工具创建需求频道帖子；args 至少包含 title、user_problem、local_evidence、source_findings、issue_type、suggested_next_step。\n\
          你不能声称已经执行尚未收到结果的工具。收到 tool_results 后，必须先基于结果继续判断。\n\
          如果需要本地工具，最多返回 {max_actions} 个 actions；如果不需要工具，actions 必须为空。\n\
          只输出一个 JSON 对象，不要 Markdown，不要代码块。格式：\n\
          {{\"reply\":\"给用户看的中文回复\",\"done\":true,\"actions\":[{{\"tool\":\"工具名\",\"args\":{{}},\"reason\":\"为什么需要这个工具\"}}]}}\n\
-         done=false 表示 SDK 应先执行 actions 后再次请求；done=true 表示本轮可以直接展示最终回复。"
+         done=false 表示 SDK 应先执行 actions 后再次请求；done=true 表示本轮可以直接展示最终回复。",
+        route_rule = runtime_route.prompt_rule()
     )
 }
 
@@ -249,6 +433,7 @@ fn build_user_prompt(
     app_id: &str,
     user_message: &str,
     req: &ExternalAppRouteCChatRequest,
+    runtime_route: RuntimeRoute,
 ) -> String {
     let client_json = compact_json(&req.client, MAX_JSON_CONTEXT_CHARS / 5);
     let context_json = compact_json(&req.local_context, MAX_JSON_CONTEXT_CHARS);
@@ -264,15 +449,24 @@ fn build_user_prompt(
         MAX_JSON_CONTEXT_CHARS,
     );
     let sdk_json = compact_json(&req.sdk, MAX_JSON_CONTEXT_CHARS / 8);
+    let runtime_permission = req
+        .runtime_permission
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("client_managed_tools");
     format!(
         "app_id: {app_id}\n\n\
+         runtime_route：\n{runtime_route}\n\n\
          用户问题：\n{user_message}\n\n\
+         runtime_permission：\n{runtime_permission}\n\n\
          客户端信息：\n{client_json}\n\n\
          SDK 信息：\n{sdk_json}\n\n\
          本地上下文：\n{context_json}\n\n\
          本地工具 manifest：\n{manifest_json}\n\n\
          已执行工具结果 tool_results：\n{tool_results_json}\n\n\
-         请按 Route C JSON 格式返回下一步。"
+         请按 Project AI SDK JSON 格式返回下一步。",
+        runtime_route = runtime_route.as_str()
     )
 }
 
@@ -567,6 +761,12 @@ fn collect_tool_names(value: &Value, names: &mut BTreeSet<String>) {
                 "toolsAvailable",
                 "chat_auto_executable_tool_ids",
                 "chatAutoExecutableToolIds",
+                "project_ai_tools",
+                "projectAiTools",
+                "remote_source_tools",
+                "remoteSourceTools",
+                "feedback_tools",
+                "feedbackTools",
             ] {
                 if let Some(child) = object.get(key) {
                     collect_tool_names(child, names);
@@ -709,5 +909,99 @@ mod tests {
         assert!(allowed.contains("alpha_tool"));
         assert!(allowed.contains("beta_tool"));
         assert!(allowed.contains("gamma.tool"));
+    }
+
+    #[test]
+    fn detects_danger_full_access_from_sdk_request() {
+        let req = ExternalAppRouteCChatRequest {
+            conversation_id: None,
+            message: "诊断网络".to_string(),
+            history: Vec::new(),
+            client: Value::Null,
+            local_context: Value::Null,
+            tool_manifest: json!({
+                "tools": [
+                    {"name": "run_command", "permission": "danger_full_access", "dangerous": true}
+                ]
+            }),
+            tool_results: Vec::new(),
+            sdk: Value::Null,
+            runtime_permission: None,
+            runtime_route: None,
+            agent: None,
+            max_actions: None,
+        };
+
+        assert!(request_danger_full_access(&req));
+    }
+
+    #[test]
+    fn danger_full_access_prompt_explains_local_cli_shape() {
+        let allowed = BTreeSet::from(["run_command".to_string(), "read_file".to_string()]);
+        let prompt = system_prompt("bb64a", &allowed, 3, true, RuntimeRoute::RouteC);
+
+        assert!(prompt.contains("runtime_permission=danger_full_access"));
+        assert!(prompt.contains("\"shell\":\"cmd|powershell|pwsh|bash|sh\""));
+        assert!(prompt.contains("\"program\":\"cmd\""));
+    }
+
+    #[test]
+    fn parses_project_ai_runtime_routes() {
+        assert_eq!(parse_runtime_route("Route A"), Some(RuntimeRoute::RouteA));
+        assert_eq!(parse_runtime_route("byok"), Some(RuntimeRoute::RouteB));
+        assert_eq!(
+            parse_runtime_route("server-model"),
+            Some(RuntimeRoute::RouteC)
+        );
+    }
+
+    #[test]
+    fn detects_runtime_route_from_sdk_request() {
+        let req = ExternalAppRouteCChatRequest {
+            conversation_id: None,
+            message: "诊断网络".to_string(),
+            history: Vec::new(),
+            client: Value::Null,
+            local_context: Value::Null,
+            tool_manifest: Value::Null,
+            tool_results: Vec::new(),
+            sdk: json!({"runtimeRoute": "local-api-key"}),
+            runtime_permission: None,
+            runtime_route: None,
+            agent: None,
+            max_actions: None,
+        };
+
+        assert_eq!(request_runtime_route(&req), RuntimeRoute::RouteB);
+    }
+
+    #[test]
+    fn project_ai_prompt_explains_routes_remote_source_and_feedback() {
+        let allowed = BTreeSet::from([
+            "run_command".to_string(),
+            "remote_source_ask".to_string(),
+            "create_feedback_post".to_string(),
+        ]);
+        let prompt = system_prompt("bb64a", &allowed, 3, true, RuntimeRoute::RouteA);
+
+        assert!(prompt.contains("Route A / Route B / Route C"));
+        assert!(prompt.contains("remote_source_ask"));
+        assert!(prompt.contains("create_feedback_post"));
+        assert!(prompt.contains("需求频道"));
+    }
+
+    #[test]
+    fn collects_project_ai_remote_source_and_feedback_tool_groups() {
+        let allowed = allowed_tool_names(
+            "custom",
+            &json!({
+                "remote_source_tools": ["remote-source-ask"],
+                "feedbackTools": [{"name": "create_feedback_post"}]
+            }),
+            &Value::Null,
+        );
+
+        assert!(allowed.contains("remote_source_ask"));
+        assert!(allowed.contains("create_feedback_post"));
     }
 }

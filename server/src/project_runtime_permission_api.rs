@@ -10,8 +10,8 @@ use std::sync::Arc;
 use crate::{
     project_auth::{auth_from_headers, can_manage_project_members, json_error},
     store::{
-        normalize_project_runtime_permission, PROJECT_RUNTIME_PERMISSION_FULL_ACCESS,
-        PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE,
+        normalize_project_runtime_permission, PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS,
+        PROJECT_RUNTIME_PERMISSION_FULL_ACCESS, PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE,
     },
     types::AppState,
 };
@@ -21,6 +21,8 @@ pub struct RuntimePermissionRequest {
     pub mode: String,
     #[serde(default, alias = "confirmFullAccess")]
     pub confirm_full_access: bool,
+    #[serde(default, alias = "confirmDangerFullAccess")]
+    pub confirm_danger_full_access: bool,
 }
 
 /// GET /api/projects/:id/runtime-permission
@@ -51,7 +53,8 @@ pub async fn get_runtime_permission(
         "can_manage": can_manage_project_members(&access.role),
         "allowed_modes": [
             PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE,
-            PROJECT_RUNTIME_PERMISSION_FULL_ACCESS
+            PROJECT_RUNTIME_PERMISSION_FULL_ACCESS,
+            PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS
         ],
     }))
     .into_response()
@@ -82,13 +85,21 @@ pub async fn update_runtime_permission(
     let Some(mode) = normalize_project_runtime_permission(&req.mode) else {
         return json_error(
             StatusCode::BAD_REQUEST,
-            "mode 必须为 project_write 或 full_access",
+            "mode 必须为 project_write、full_access 或 danger_full_access",
         );
     };
     if mode == PROJECT_RUNTIME_PERMISSION_FULL_ACCESS && !req.confirm_full_access {
         return json_error(
             StatusCode::BAD_REQUEST,
             "开启完全访问前必须显式确认 full_access 授权",
+        );
+    }
+    if mode == PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS
+        && !(req.confirm_full_access || req.confirm_danger_full_access)
+    {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "开启完整本机命令行前必须显式确认 danger_full_access 授权",
         );
     }
 

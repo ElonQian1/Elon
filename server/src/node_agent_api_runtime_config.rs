@@ -108,15 +108,21 @@ pub(crate) fn tool_contract() -> ApiRuntimeToolContract {
         supported_tools: strings(ROUTE_B_SUPPORTED_TOOLS),
         read_only_tools: strings(ROUTE_B_READ_ONLY_TOOLS),
         approval_required_tools: strings(ROUTE_B_APPROVAL_REQUIRED_TOOLS),
-        path_policy: "workspace_relative_no_git_no_symlink_escape".to_string(),
-        command_policy: "structured_project_command_allowlist".to_string(),
-        approval_policy: "write_file_apply_patch_run_command_require_user_approval".to_string(),
+        path_policy: "workspace_relative_no_git_no_symlink_escape_or_danger_full_access_absolute"
+            .to_string(),
+        command_policy: "structured_project_command_allowlist_or_danger_full_access_shell"
+            .to_string(),
+        approval_policy:
+            "write_file_apply_patch_run_command_require_user_approval_except_danger_full_access"
+                .to_string(),
         audit_policy: "tool_events_redact_content_and_secrets".to_string(),
         recovery_policy: "task_journal_replay_without_original_tty_reattach".to_string(),
         limitations: vec![
             "不能重新接管原 CLI TTY；任务恢复依赖 journal replay".to_string(),
-            "文件访问默认限制在项目工作区内，不允许 .git 或符号链接逃逸".to_string(),
-            "命令执行走结构化白名单，不是任意 shell".to_string(),
+            "文件访问默认限制在项目工作区内；danger_full_access 可访问绝对路径和工作区外路径"
+                .to_string(),
+            "命令执行默认走结构化白名单；danger_full_access 可执行任意 cmd/powershell/pwsh 命令"
+                .to_string(),
             "Route B 仍不是完整 Codex Desktop 级别 IDE runtime".to_string(),
         ],
     }
@@ -354,10 +360,10 @@ mod tests {
         assert!(contract
             .approval_required_tools
             .contains(&"apply_patch".to_string()));
-        assert_eq!(
-            contract.command_policy,
-            "structured_project_command_allowlist"
-        );
+        assert!(contract
+            .command_policy
+            .contains("structured_project_command_allowlist"));
+        assert!(contract.command_policy.contains("danger_full_access"));
         assert!(contract
             .recovery_policy
             .contains("without_original_tty_reattach"));

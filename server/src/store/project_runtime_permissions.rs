@@ -51,8 +51,9 @@ impl Store {
     ) -> Result<ProjectRuntimePermission> {
         let project_id = project_id.trim();
         let user_id = user_id.trim();
-        let mode = normalize_project_runtime_permission(mode)
-            .ok_or_else(|| anyhow!("mode 必须为 project_write 或 full_access"))?;
+        let mode = normalize_project_runtime_permission(mode).ok_or_else(|| {
+            anyhow!("mode 必须为 project_write、full_access 或 danger_full_access")
+        })?;
         if project_id.is_empty() || user_id.is_empty() {
             anyhow::bail!("project_id 和 user_id 不能为空");
         }

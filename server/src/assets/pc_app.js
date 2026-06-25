@@ -3372,7 +3372,7 @@
     const repo = clean(els.settingsProjectRepo && els.settingsProjectRepo.value);
     const branch = clean(els.settingsProjectBranch && els.settingsProjectBranch.value);
     const mode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
-    const modeLabel = mode === 'full_access' ? '完全访问' : '项目内读写';
+    const modeLabel = runtimePermissionLabel(mode);
     const devProfile = (state.localProjectInfo && state.localProjectInfo.devProfile) || {};
     const commands = [
       clean(devProfile.run_command) && `运行 ${clean(devProfile.run_command)}`,
@@ -3437,15 +3437,24 @@
   }
 
   function normalizeRuntimePermission(value) {
-    return clean(value) === 'full_access' ? 'full_access' : 'project_write';
+    const mode = clean(value);
+    if (mode === 'danger_full_access') return 'danger_full_access';
+    return mode === 'full_access' ? 'full_access' : 'project_write';
+  }
+
+  function runtimePermissionLabel(mode) {
+    if (mode === 'danger_full_access') return '完整本机命令行';
+    return mode === 'full_access' ? '完全访问' : '项目内读写';
   }
 
   function syncSettingsRuntimePermissionHint() {
     if (!els.settingsRuntimePermissionHint || !els.settingsRuntimePermission) return;
     const mode = normalizeRuntimePermission(els.settingsRuntimePermission.value);
-    els.settingsRuntimePermissionHint.textContent = mode === 'full_access'
-      ? 'Route A 的 Codex/Copilot 需要本机确认后才会绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
-      : 'AI 只能读写当前项目目录，并运行开发相关命令。';
+    els.settingsRuntimePermissionHint.textContent = mode === 'danger_full_access'
+      ? 'Route A/B/C 都允许 AI 使用完整本机命令行、绝对路径文件读写和 cmd/powershell 排障。'
+      : (mode === 'full_access'
+        ? 'Route A 的 Codex/Copilot 需要本机确认后才会绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
+        : 'AI 只能读写当前项目目录，并运行开发相关命令。');
   }
 
   async function saveProjectRuntimePermission(project, requestedMode) {
@@ -3454,7 +3463,11 @@
     const mode = normalizeRuntimePermission(requestedMode);
     const data = await api(`/api/projects/${encodeURIComponent(projectId)}/runtime-permission`, {
       method: 'PATCH',
-      body: JSON.stringify({ mode, confirmFullAccess: mode === 'full_access' })
+      body: JSON.stringify({
+        mode,
+        confirmFullAccess: mode === 'full_access' || mode === 'danger_full_access',
+        confirmDangerFullAccess: mode === 'danger_full_access'
+      })
     });
     project.runtime_permission = data.mode || mode;
   }
@@ -3592,10 +3605,13 @@
     }
     const devProfile = (state.localProjectInfo && (state.localProjectInfo.devProfile || registerPayload.dev_profile)) || null;
     const runtimeMode = normalizeRuntimePermission(els.settingsRuntimePermission && els.settingsRuntimePermission.value);
-    if (runtimeMode === 'full_access') {
-      const ok = window.confirm(`确认给项目「${name}」开启本机完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；这次确认会写入这台电脑的本机授权记录。`);
+    if (runtimeMode === 'full_access' || runtimeMode === 'danger_full_access') {
+      const dangerText = runtimeMode === 'danger_full_access'
+        ? 'Route A/B/C 都可能运行任意 cmd/powershell 命令，并读写项目目录外的本机文件和系统设置；这次确认会写入这台电脑的本机授权记录。'
+        : 'Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；这次确认会写入这台电脑的本机授权记录。';
+      const ok = window.confirm(`确认给项目「${name}」开启${runtimePermissionLabel(runtimeMode)}？${dangerText}`);
       if (!ok) {
-        setSettingsResult('已取消完全访问授权，项目尚未注册。');
+        setSettingsResult('已取消授权，项目尚未注册。');
         setSettingsBusy(els.registerProjectBtn, false);
         return;
       }
@@ -3617,11 +3633,11 @@
       });
       const project = (data.cloud && data.cloud.project) || {};
       const reused = data.cloud && data.cloud.reused_existing;
-      if (runtimeMode === 'full_access') {
+      if (runtimeMode === 'full_access' || runtimeMode === 'danger_full_access') {
         await grantLocalProjectFullAccess(project, path);
       }
       await saveProjectRuntimePermission(project, runtimeMode);
-      setSettingsResult(`${reused ? '已复用现有项目' : '注册成功'}：${escapeHtml(project.name || name)}${project.id ? ` · ${escapeHtml(project.id)}` : ''}${runtimeMode === 'full_access' ? ' · 本机完全访问已授权' : ''}`);
+      setSettingsResult(`${reused ? '已复用现有项目' : '注册成功'}：${escapeHtml(project.name || name)}${project.id ? ` · ${escapeHtml(project.id)}` : ''}${runtimeMode === 'project_write' ? '' : ` · ${runtimePermissionLabel(runtimeMode)}已授权`}`);
       await loadBaseData();
       if (project.id) {
         closeSettings();

@@ -9,7 +9,7 @@
       if (!canUseDeveloperReadiness(project)) return '';
       const info = buildReadiness(project);
       const permission = runtimePermission(project);
-      const permissionTone = permission === 'full_access' ? 'warn' : 'ok';
+      const permissionTone = permission === 'project_write' ? 'ok' : 'warn';
       const devAction = info.devChannel
         ? `<button class="dev-readiness-action primary" type="button" data-dev-readiness-action="development-channel" data-channel-id="${escapeHtml(info.devChannel.id)}">开发频道</button>`
         : '';
@@ -50,6 +50,7 @@
               <select data-dev-readiness-permission="${escapeHtml(project.id || '')}">
                 <option value="project_write" ${permission === 'project_write' ? 'selected' : ''}>仅项目内写入</option>
                 <option value="full_access" ${permission === 'full_access' ? 'selected' : ''}>完全访问</option>
+                <option value="danger_full_access" ${permission === 'danger_full_access' ? 'selected' : ''}>完整本机命令行</option>
               </select>
             </label>
             <div class="dev-readiness-actions">
@@ -97,8 +98,11 @@
       const previous = runtimePermission(project);
       const next = normalizePermission(select.value);
       if (!projectId || next === previous) return;
-      if (next === 'full_access') {
-        const ok = window.confirm(`确认给项目「${projectTitle(project)}」开启完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。`);
+      if (next === 'full_access' || next === 'danger_full_access') {
+        const dangerText = next === 'danger_full_access'
+          ? 'Route A/B/C 都可能运行任意 cmd/powershell 命令，并读写项目目录外的本机文件和系统设置。'
+          : 'Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。';
+        const ok = window.confirm(`确认给项目「${projectTitle(project)}」开启${permissionLabel(next)}？${dangerText}`);
         if (!ok) {
           select.value = previous;
           return;
@@ -108,7 +112,11 @@
       try {
         const data = await api(`/api/projects/${encodeURIComponent(projectId)}/runtime-permission`, {
           method: 'PATCH',
-          body: JSON.stringify({ mode: next, confirmFullAccess: next === 'full_access' })
+          body: JSON.stringify({
+            mode: next,
+            confirmFullAccess: next === 'full_access' || next === 'danger_full_access',
+            confirmDangerFullAccess: next === 'danger_full_access'
+          })
         });
         project.runtime_permission = data.mode || next;
         await selectProject(projectId);
@@ -244,10 +252,10 @@
           key: 'permission',
           ok: true,
           optional: true,
-          tone: input.permission === 'full_access' ? 'warn' : 'ok',
+          tone: input.permission === 'project_write' ? 'ok' : 'warn',
           label: '执行权限',
-          detail: input.permission === 'full_access' ? 'Route A 全权限；B/C 保留白名单' : '限制在项目目录内写入',
-          action: input.permission === 'full_access' ? 'Route B/C 仍保留本机白名单；build/test 会执行项目代码' : '需要跨目录操作时再开启完全访问'
+          detail: permissionDetail(input.permission),
+          action: permissionAction(input.permission)
         }
       ];
     }
@@ -454,7 +462,24 @@
     }
 
     function normalizePermission(value) {
-      return clean(value) === 'full_access' ? 'full_access' : 'project_write';
+      const mode = clean(value);
+      if (mode === 'danger_full_access') return 'danger_full_access';
+      return mode === 'full_access' ? 'full_access' : 'project_write';
+    }
+
+    function permissionLabel(permission) {
+      if (permission === 'danger_full_access') return '完整本机命令行';
+      return permission === 'full_access' ? '完全访问' : '仅项目内写入';
+    }
+
+    function permissionDetail(permission) {
+      if (permission === 'danger_full_access') return 'Route A/B/C 完整本机命令行';
+      return permission === 'full_access' ? 'Route A 全权限；B/C 保留白名单' : '限制在项目目录内写入';
+    }
+
+    function permissionAction(permission) {
+      if (permission === 'danger_full_access') return 'AI 可运行 cmd/powershell 并读写绝对路径';
+      return permission === 'full_access' ? 'Route B/C 仍保留本机白名单；build/test 会执行项目代码' : '需要跨目录操作时再开启完全访问';
     }
 
     function projectTitle(project) {

@@ -11,11 +11,15 @@ use crate::project_ws_protocol::ProjectAttachmentRef;
 
 pub const PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE: &str = "project_write";
 pub const PROJECT_RUNTIME_PERMISSION_FULL_ACCESS: &str = "full_access";
+pub const PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS: &str = "danger_full_access";
 
 pub fn normalize_project_runtime_permission(value: &str) -> Option<&'static str> {
     match value.trim() {
         PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE => Some(PROJECT_RUNTIME_PERMISSION_PROJECT_WRITE),
         PROJECT_RUNTIME_PERMISSION_FULL_ACCESS => Some(PROJECT_RUNTIME_PERMISSION_FULL_ACCESS),
+        PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS => {
+            Some(PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS)
+        }
         _ => None,
     }
 }
@@ -25,7 +29,12 @@ pub fn default_project_runtime_permission() -> String {
 }
 
 pub fn project_runtime_permission_allows_full_access(value: &str) -> bool {
-    normalize_project_runtime_permission(value) == Some(PROJECT_RUNTIME_PERMISSION_FULL_ACCESS)
+    matches!(
+        normalize_project_runtime_permission(value),
+        Some(
+            PROJECT_RUNTIME_PERMISSION_FULL_ACCESS | PROJECT_RUNTIME_PERMISSION_DANGER_FULL_ACCESS
+        )
+    )
 }
 
 // ── 用户 ─────────────────────────────────────────────────────────────────────

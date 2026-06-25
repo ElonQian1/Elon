@@ -33,6 +33,7 @@ pub(crate) enum RuntimeToolMode {
     ReadOnly,
     ProjectWrite,
     FullAccess,
+    DangerFullAccess,
 }
 
 impl RuntimeToolMode {
@@ -40,12 +41,17 @@ impl RuntimeToolMode {
         match runtime_permission.map(str::trim) {
             Some("project_write") => Self::ProjectWrite,
             Some("full_access") => Self::FullAccess,
+            Some("danger_full_access") => Self::DangerFullAccess,
             _ => Self::ReadOnly,
         }
     }
 
     pub(crate) fn read_only(self) -> bool {
         self == Self::ReadOnly
+    }
+
+    pub(crate) fn danger_full_access(self) -> bool {
+        self == Self::DangerFullAccess
     }
 }
 
@@ -68,6 +74,10 @@ impl ToolGuard {
 
     pub(crate) fn read_only(&self) -> bool {
         self.mode.read_only()
+    }
+
+    pub(crate) fn danger_full_access(&self) -> bool {
+        self.mode.danger_full_access()
     }
 
     pub(crate) async fn invoke_action(&mut self, action: &Value) -> String {
@@ -447,23 +457,14 @@ impl ToolGuard {
     }
 
     async fn run_command(&self, request: &RuntimeCommandRequest) -> Result<String> {
+        let danger_full_access = self.danger_full_access();
         let mut child_command = if let Some(command) = request.legacy_command.as_deref() {
-            if !command_allowed(command) {
+            if !danger_full_access && !command_allowed(command) {
                 bail!("run_command denied by policy: {command}");
             }
-            // 旧版模型只会返回 command 字符串。为了兼容旧输出仍保留 PowerShell
-            // 执行路径，但新的提示词会优先要求 program + args，避免 shell 解析歧义。
-            let mut command_runner = Command::new("powershell");
-            command_runner.args([
-                "-NoProfile",
-                "-ExecutionPolicy",
-                "Bypass",
-                "-Command",
-                command,
-            ]);
-            command_runner
+            shell_command_runner(request.shell.as_deref(), command)?
         } else {
-            if !structured_command_allowed(&request.program, &request.args) {
+            if !danger_full_access && !structured_command_allowed(&request.program, &request.args) {
                 bail!(
                     "run_command denied by policy: {}",
                     request.display_command()
@@ -473,7 +474,8 @@ impl ToolGuard {
             command_runner.args(&request.args);
             command_runner
         };
-        child_command.current_dir(&self.workspace);
+        let cwd = self.resolve_command_cwd(request.cwd.as_deref())?;
+        child_command.current_dir(cwd);
         hide_command_window(&mut child_command);
         let output = tokio::time::timeout(Duration::from_secs(300), child_command.output())
             .await
@@ -492,6 +494,9 @@ impl ToolGuard {
         if raw.is_empty() {
             bail!("path cannot be empty");
         }
+        if self.danger_full_access() {
+            return self.resolve_unrestricted_path(raw);
+        }
         let candidate = Path::new(raw);
         if candidate.is_absolute() {
             bail!("absolute paths are not allowed: {raw}");
@@ -503,6 +508,26 @@ impl ToolGuard {
         }
         self.reject_unsafe_existing_ancestors(&full, raw)?;
         Ok(full)
+    }
+
+    fn resolve_command_cwd(&self, cwd: Option<&str>) -> Result<PathBuf> {
+        let Some(raw) = cwd.map(str::trim).filter(|value| !value.is_empty()) else {
+            return Ok(self.workspace.clone());
+        };
+        if self.danger_full_access() {
+            return self.resolve_unrestricted_path(raw);
+        }
+        self.resolve_safe_path(raw)
+    }
+
+    fn resolve_unrestricted_path(&self, raw: &str) -> Result<PathBuf> {
+        let candidate = Path::new(raw);
+        let full = if candidate.is_absolute() {
+            candidate.to_path_buf()
+        } else {
+            self.workspace.join(candidate)
+        };
+        normalize_path(full)
     }
 
     fn reject_unsafe_existing_ancestors(&self, full: &Path, raw: &str) -> Result<()> {
@@ -641,10 +666,14 @@ struct RuntimeCommandRequest {
     program: String,
     args: Vec<String>,
     legacy_command: Option<String>,
+    shell: Option<String>,
+    cwd: Option<String>,
 }
 
 impl RuntimeCommandRequest {
     fn from_action(action: &Value) -> Result<Self> {
+        let shell = optional_trimmed_string(action, "shell")?;
+        let cwd = optional_trimmed_string(action, "cwd")?;
         if let Some(program) = action
             .get("program")
             .and_then(Value::as_str)
@@ -671,6 +700,8 @@ impl RuntimeCommandRequest {
                 program: program.to_string(),
                 args,
                 legacy_command: None,
+                shell,
+                cwd,
             });
         }
 
@@ -679,6 +710,8 @@ impl RuntimeCommandRequest {
             program: String::new(),
             args: Vec::new(),
             legacy_command: Some(command),
+            shell,
+            cwd,
         })
     }
 
@@ -693,12 +726,84 @@ impl RuntimeCommandRequest {
     }
 }
 
+fn shell_command_runner(shell: Option<&str>, command: &str) -> Result<Command> {
+    let shell = shell
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(default_shell());
+    let normalized = shell.to_ascii_lowercase();
+    let mut command_runner = match normalized.as_str() {
+        "cmd" | "cmd.exe" => {
+            let mut runner = Command::new("cmd");
+            runner.args(["/C", command]);
+            runner
+        }
+        "powershell" | "powershell.exe" => {
+            let mut runner = Command::new("powershell");
+            runner.args([
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                command,
+            ]);
+            runner
+        }
+        "pwsh" | "pwsh.exe" => {
+            let mut runner = Command::new("pwsh");
+            runner.args(["-NoProfile", "-Command", command]);
+            runner
+        }
+        "sh" => {
+            let mut runner = Command::new("sh");
+            runner.args(["-lc", command]);
+            runner
+        }
+        "bash" => {
+            let mut runner = Command::new("bash");
+            runner.args(["-lc", command]);
+            runner
+        }
+        _ => bail!("unsupported shell for run_command: {shell}"),
+    };
+    hide_command_window(&mut command_runner);
+    Ok(command_runner)
+}
+
+#[cfg(windows)]
+fn default_shell() -> &'static str {
+    "powershell"
+}
+
+#[cfg(not(windows))]
+fn default_shell() -> &'static str {
+    "sh"
+}
+
 fn required_str<'a>(action: &'a Value, key: &str) -> Result<&'a str> {
     action
         .get(key)
         .and_then(Value::as_str)
         .filter(|value| !value.trim().is_empty())
         .ok_or_else(|| anyhow!("{key} is required"))
+}
+
+fn optional_trimmed_string(action: &Value, key: &str) -> Result<Option<String>> {
+    let Some(value) = action.get(key) else {
+        return Ok(None);
+    };
+    if value.is_null() {
+        return Ok(None);
+    }
+    let Some(text) = value.as_str() else {
+        bail!("{key} must be a string");
+    };
+    let clean = text.trim();
+    if clean.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(clean.to_string()))
+    }
 }
 
 fn optional_positive_usize(action: &Value, key: &str) -> Result<Option<usize>> {
@@ -1193,6 +1298,10 @@ mod tests {
             RuntimeToolMode::from_runtime_permission(Some("full_access")),
             RuntimeToolMode::FullAccess
         );
+        assert_eq!(
+            RuntimeToolMode::from_runtime_permission(Some("danger_full_access")),
+            RuntimeToolMode::DangerFullAccess
+        );
     }
 
     #[test]
@@ -1202,7 +1311,69 @@ mod tests {
         assert!(ToolGuard::new(workspace.clone(), Some("")).read_only());
         assert!(ToolGuard::new(workspace.clone(), Some("unexpected")).read_only());
         assert!(!ToolGuard::new(workspace.clone(), Some("project_write")).read_only());
-        assert!(!ToolGuard::new(workspace, Some("full_access")).read_only());
+        assert!(!ToolGuard::new(workspace.clone(), Some("full_access")).read_only());
+        assert!(!ToolGuard::new(workspace, Some("danger_full_access")).read_only());
+    }
+
+    #[tokio::test]
+    async fn danger_full_access_runs_arbitrary_command() {
+        let temp = temp_test_dir("danger_full_access_runs_arbitrary_command");
+        let mut guarded = ToolGuard::new(temp.clone(), Some("project_write"));
+        let blocked = guarded
+            .invoke_action(&json!({
+                "tool": "run_command",
+                "program": "cmd",
+                "args": ["/C", "echo route-c-danger"]
+            }))
+            .await;
+        assert!(blocked.contains("run_command denied by policy"));
+
+        let mut danger = ToolGuard::new(temp, Some("danger_full_access"));
+        #[cfg(windows)]
+        let action = json!({
+            "tool": "run_command",
+            "program": "cmd",
+            "args": ["/C", "echo route-c-danger"],
+            "cwd": "."
+        });
+        #[cfg(not(windows))]
+        let action = json!({
+            "tool": "run_command",
+            "program": "sh",
+            "args": ["-lc", "echo route-c-danger"],
+            "cwd": "."
+        });
+
+        let result = danger.invoke_action(&action).await;
+
+        assert!(result.contains("exit=0"));
+        assert!(result.contains("route-c-danger"));
+    }
+
+    #[tokio::test]
+    async fn danger_full_access_reads_and_writes_absolute_paths() {
+        let workspace = temp_test_dir("danger_full_access_reads_workspace");
+        let outside_dir = temp_test_dir("danger_full_access_outside");
+        let outside_file = outside_dir.join("note.txt");
+        let outside_path = outside_file.to_string_lossy().to_string();
+        let mut danger = ToolGuard::new(workspace, Some("danger_full_access"));
+
+        let write = danger
+            .invoke_action(&json!({
+                "tool": "write_file",
+                "path": outside_path,
+                "content": "outside ok\n"
+            }))
+            .await;
+        assert!(write.contains("write_file ok"));
+
+        let read = danger
+            .invoke_action(&json!({
+                "tool": "read_file",
+                "path": outside_file.to_string_lossy().to_string()
+            }))
+            .await;
+        assert_eq!(read, "outside ok\n");
     }
 
     #[tokio::test]
@@ -1736,5 +1907,16 @@ mod tests {
         assert!(guard.resolve_safe_path(".Git/config").is_err());
         assert!(guard.resolve_safe_path("src/.git/config").is_err());
         assert!(guard.resolve_safe_path("src/../main.rs").is_err());
+    }
+
+    #[test]
+    fn danger_full_access_path_guard_allows_absolute_and_parent_paths() {
+        let workspace = temp_test_dir("danger_full_access_path_workspace");
+        let outside = temp_test_dir("danger_full_access_path_outside").join("secret.txt");
+        let guard = ToolGuard::new(workspace, Some("danger_full_access"));
+
+        assert!(guard.resolve_safe_path(&outside.to_string_lossy()).is_ok());
+        assert!(guard.resolve_safe_path("../outside.txt").is_ok());
+        assert!(guard.resolve_safe_path(".Git/config").is_ok());
     }
 }

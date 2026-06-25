@@ -115,8 +115,13 @@ fn local_tool_contract() -> NodeDevRuntimeToolContract {
             "apply_patch".to_string(),
             "run_command".to_string(),
         ],
-        path_policy: Some("workspace_relative_no_git_no_symlink_escape".to_string()),
-        command_policy: Some("structured_project_command_allowlist".to_string()),
+        path_policy: Some(
+            "workspace_relative_no_git_no_symlink_escape_or_danger_full_access_absolute"
+                .to_string(),
+        ),
+        command_policy: Some(
+            "structured_project_command_allowlist_or_danger_full_access_shell".to_string(),
+        ),
         audit_policy: Some("tool_events_redact_content_and_secrets".to_string()),
         recovery_policy: Some("task_journal_replay_without_original_tty_reattach".to_string()),
     }

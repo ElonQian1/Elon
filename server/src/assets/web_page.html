@@ -2755,6 +2755,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <select id="projectRuntimePermissionMode">
         <option value="project_write">项目目录写入</option>
         <option value="full_access">完全访问</option>
+        <option value="danger_full_access">完整本机命令行</option>
       </select>
       <p id="projectRuntimePermissionHint" style="color:var(--ink-soft);font-size:12px;line-height:1.55;margin:6px 0 0"></p>
     </div>
@@ -7393,15 +7394,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   function normalizeProjectRuntimePermission(value) {
+    if (value === 'danger_full_access') return 'danger_full_access';
     return value === 'full_access' ? 'full_access' : 'project_write';
   }
 
   function syncProjectRuntimePermissionHint() {
     const mode = normalizeProjectRuntimePermission(projectRuntimePermissionMode.value);
-    projectRuntimePermissionHint.textContent = mode === 'full_access'
-      ? 'Route A 的 Codex/Copilot 可按授权绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
-      : '默认限制在项目工作区内读写，适合普通开发项目。';
-    projectRuntimePermissionHint.style.color = mode === 'full_access' ? '#b45309' : 'var(--ink-soft)';
+    projectRuntimePermissionHint.textContent = mode === 'danger_full_access'
+      ? 'Route A/B/C 都允许 AI 使用完整本机命令行、绝对路径文件读写和 cmd/powershell 排障。'
+      : (mode === 'full_access'
+        ? 'Route A 的 Codex/Copilot 可按授权绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
+        : '默认限制在项目工作区内读写，适合普通开发项目。');
+    projectRuntimePermissionHint.style.color = mode === 'project_write' ? 'var(--ink-soft)' : '#b45309';
   }
 
   async function loadProjectRuntimePermission(project) {
@@ -7459,8 +7463,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const isPublic = projectVisibilityMode.value === 'public';
     const joinMode = isPublic ? projectVisibilityJoinMode.value : 'invite';
     const runtimeMode = normalizeProjectRuntimePermission(projectRuntimePermissionMode.value);
-    if (runtimeMode === 'full_access') {
-      const ok = window.confirm('确认给项目「' + projectNameOf(pendingVisibilityProject) + '」开启完全访问？Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。');
+    if (runtimeMode === 'full_access' || runtimeMode === 'danger_full_access') {
+      const label = runtimeMode === 'danger_full_access' ? '完整本机命令行' : '完全访问';
+      const detail = runtimeMode === 'danger_full_access'
+        ? 'Route A/B/C 都可能运行任意 cmd/powershell 命令，并读写项目目录外的本机文件和系统设置。'
+        : 'Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。';
+      const ok = window.confirm('确认给项目「' + projectNameOf(pendingVisibilityProject) + '」开启' + label + '？' + detail);
       if (!ok) {
         saveProjectVisibilityBtn.disabled = false;
         return;
@@ -7469,7 +7477,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     try {
       const runtimeRes = await api('/api/projects/' + encodeURIComponent(pendingVisibilityProject.id) + '/runtime-permission', {
         method: 'PATCH',
-        body: JSON.stringify({ mode: runtimeMode, confirmFullAccess: runtimeMode === 'full_access' })
+        body: JSON.stringify({
+          mode: runtimeMode,
+          confirmFullAccess: runtimeMode === 'full_access' || runtimeMode === 'danger_full_access',
+          confirmDangerFullAccess: runtimeMode === 'danger_full_access'
+        })
       });
       const runtimeData = await runtimeRes.json().catch(() => ({}));
       if (!runtimeRes.ok) throw new Error(runtimeData.error || ('HTTP ' + runtimeRes.status));

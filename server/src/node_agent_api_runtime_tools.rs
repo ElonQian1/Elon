@@ -277,7 +277,7 @@ fn tool_definitions() -> Value {
         ),
         function_tool(
             "run_command",
-            "Run an allowed project Git/build/test command. Requires user approval when command execution is enabled.",
+            "Run a local command. Normal modes allow only project Git/build/test commands; danger_full_access allows arbitrary local commands.",
             json!({
                 "type": "object",
                 "properties": {
@@ -285,11 +285,14 @@ fn tool_definitions() -> Value {
                     "args": {
                         "type": "array",
                         "items": { "type": "string" },
-                        "description": "Program arguments, without shell metacharacters."
+                        "description": "Program arguments. In normal modes these must avoid shell metacharacters; in danger_full_access they are passed directly."
                     },
+                    "command": { "type": "string", "description": "Optional shell command string for danger_full_access or legacy clients." },
+                    "shell": { "type": "string", "enum": ["cmd", "powershell", "pwsh", "sh", "bash"], "description": "Shell used with command. Defaults to powershell on Windows and sh elsewhere." },
+                    "cwd": { "type": "string", "description": "Optional working directory. Normal modes require a project-relative path; danger_full_access also allows absolute paths." },
                     "reason": { "type": "string", "description": "Short reason for running the command." }
                 },
-                "required": ["program", "args", "reason"],
+                "required": ["reason"],
                 "additionalProperties": false
             })
         )

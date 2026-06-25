@@ -20,7 +20,7 @@ pub(crate) enum ApprovalOutcome {
 }
 
 pub(crate) fn requires_tool_approval(guard: &ToolGuard, action: &Value) -> bool {
-    if guard.read_only() {
+    if guard.read_only() || guard.danger_full_access() {
         return false;
     }
     let tool = action
@@ -69,4 +69,27 @@ pub(crate) async fn wait_for_tool_approval(
     };
     waiter.cleanup().await;
     outcome
+}
+
+#[cfg(test)]
+mod tests {
+    use super::requires_tool_approval;
+    use crate::node_agent_tool_guard::ToolGuard;
+    use serde_json::json;
+    use std::path::PathBuf;
+
+    #[test]
+    fn danger_full_access_skips_builtin_tool_approval() {
+        let workspace = PathBuf::from("C:/repo/demo");
+        let project_write = ToolGuard::new(workspace.clone(), Some("project_write"));
+        let danger = ToolGuard::new(workspace, Some("danger_full_access"));
+        let action = json!({
+            "tool": "run_command",
+            "program": "cmd",
+            "args": ["/C", "echo ok"]
+        });
+
+        assert!(requires_tool_approval(&project_write, &action));
+        assert!(!requires_tool_approval(&danger, &action));
+    }
 }

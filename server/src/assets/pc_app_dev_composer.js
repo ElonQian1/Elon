@@ -101,14 +101,17 @@
       const nodeId = clean(project.node_id || project.nodeId || project.agent_id || project.agentId);
       const node = findNode(nodeId);
       const route = routeInfo(node, routePreference);
+      const elevatedPermission = permission === 'full_access' || permission === 'danger_full_access';
       return {
-        tone: route.ready ? (permission === 'full_access' ? 'full-access' : 'ready') : 'warning',
+        tone: route.ready ? (elevatedPermission ? 'full-access' : 'ready') : 'warning',
         routeLabel: route.label,
         routeOptions: route.options,
         requestRoute: route.requestRoute,
-        permissionLabel: permission === 'full_access' ? '完全访问（本机确认）' : '仅项目内写入',
+        permissionLabel: permission === 'danger_full_access'
+          ? '完整本机命令行'
+          : (permission === 'full_access' ? '完全访问（本机确认）' : '仅项目内写入'),
         workspace: clean(project.workspace_path || project.workspacePath) || '未绑定本机目录',
-        settingsLabel: permission === 'full_access' ? '权限' : '设置'
+        settingsLabel: elevatedPermission ? '权限' : '设置'
       };
     }
 
@@ -241,9 +244,9 @@
     }
 
     function runtimePermission(project) {
-      return clean(project.runtime_permission || project.runtimePermission) === 'full_access'
-        ? 'full_access'
-        : 'project_write';
+      const permission = clean(project.runtime_permission || project.runtimePermission);
+      if (permission === 'danger_full_access') return 'danger_full_access';
+      return permission === 'full_access' ? 'full_access' : 'project_write';
     }
 
     function compactPath(path) {

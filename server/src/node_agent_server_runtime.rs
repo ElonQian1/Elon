@@ -261,7 +261,7 @@ where
         initial_model,
     } = options;
     let mut messages = vec![
-        json!({"role": "system", "content": system_prompt(label, guard.read_only())}),
+        json!({"role": "system", "content": system_prompt(label, guard.read_only(), guard.danger_full_access())}),
         json!({"role": "user", "content": prompt}),
     ];
 
@@ -894,7 +894,7 @@ fn resolve_workspace(cwd: Option<&str>) -> Result<PathBuf> {
     Ok(full)
 }
 
-fn system_prompt(label: &str, read_only: bool) -> String {
+fn system_prompt(label: &str, read_only: bool, danger_full_access: bool) -> String {
     let runtime_identity = match label {
         "api-runtime" => "Route B local API runtime",
         "server-runtime" => "Route C server runtime",
@@ -919,22 +919,25 @@ Schema:
     {"tool": "git_show", "revision": "HEAD", "path": "src/main.rs", "stat": true},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
     {"tool": "apply_patch", "patch": "unified diff", "check_only": false},
-    {"tool": "run_command", "program": "cargo", "args": ["test"], "reason": "verify project tests"}
+    {"tool": "run_command", "program": "cargo", "args": ["test"], "reason": "verify project tests"},
+    {"tool": "run_command", "command": "ipconfig /all", "shell": "cmd", "cwd": "C:/", "reason": "diagnose Windows network"}
   ]
 }
 
 Rules:
-- Paths must be relative to the current project workspace.
+- In project_write/full_access mode, paths must be relative to the current project workspace.
+- In danger_full_access mode, absolute paths and paths outside the project workspace are allowed.
 - Prefer read-only actions first.
 - Use search_files before broad file reads when you need to locate symbols, filenames, TODOs, errors, or related code.
 - Use file_info before reading unknown files, binary-looking files, or directories.
 - Use read_file_range instead of read_file for large files when you only need one section.
 - Use git_status, git_diff, git_log, and git_show for read-only git inspection; do not spend run_command approvals on status/diff/log/show.
-- Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
+- In project_write/full_access mode, do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for intentional edits to existing project files.
 - Use write_file only when replacing a full file or creating a small new project file.
-- Use run_command only for project build, format, lint, or test commands.
+- In project_write/full_access mode, use run_command only for project build, format, lint, or test commands.
 - Prefer structured run_command with program and args. The legacy command string field exists only for older clients.
+- In danger_full_access mode, run_command may use either program/args or command/shell/cwd for arbitrary cmd, powershell, pwsh, bash, or sh commands on the user's PC.
 - If your API supports native tool/function calls, use those tool calls for actions. Otherwise return the actions array in JSON.
 - Set done=true when no further tool action is needed.
 "#
@@ -942,6 +945,10 @@ Rules:
     if read_only {
         prompt.push_str(
             "\nCurrent mode is read-only planning. Do not request write_file, apply_patch, or run_command. You may still use git_status, git_diff, git_log, and git_show.\n",
+        );
+    } else if danger_full_access {
+        prompt.push_str(
+            "\nCurrent mode is danger_full_access. The user has intentionally enabled full local command line and filesystem control for this project runtime. You may request arbitrary cmd/powershell/pwsh commands, set cwd, and read/write absolute local paths when needed to solve the user's task. Do not claim a command or file action has completed until its tool result is present.\n",
         );
     }
     prompt
@@ -1393,8 +1400,9 @@ mod tests {
 
     #[test]
     fn system_prompt_matches_runtime_route_identity() {
-        let route_b = system_prompt("api-runtime", false);
-        let route_c = system_prompt("server-runtime", true);
+        let route_b = system_prompt("api-runtime", false, false);
+        let route_c = system_prompt("server-runtime", true, false);
+        let danger = system_prompt("server-runtime", false, true);
 
         assert!(route_b.contains("Route B local API runtime"));
         assert!(route_b.contains("\"tool\": \"git_status\""));
@@ -1407,6 +1415,9 @@ mod tests {
         assert!(route_c.contains("read-only planning"));
         assert!(route_c.contains("Do not request write_file, apply_patch, or run_command"));
         assert!(route_c.contains("You may still use git_status, git_diff, git_log, and git_show"));
+        assert!(danger.contains("danger_full_access"));
+        assert!(danger.contains("arbitrary cmd/powershell/pwsh commands"));
+        assert!(danger.contains("\"shell\": \"cmd\""));
     }
 
     #[test]

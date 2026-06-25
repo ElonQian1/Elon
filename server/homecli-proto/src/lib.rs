@@ -86,7 +86,8 @@ pub struct NodeDevRuntimeProfile {
     pub server_runtime_status: Option<serde_json::Value>,
     /// Route B/C share this local tool contract. Model calls may happen on the
     /// PC or on the server, but file writes, patches, commands, approvals, and
-    /// workspace limits are enforced by the PC node.
+    /// workspace limits are enforced by the PC node unless the project runtime
+    /// permission is explicitly `danger_full_access`.
     #[serde(default)]
     pub local_tool_contract: NodeDevRuntimeToolContract,
     #[serde(default)]
