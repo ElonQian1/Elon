@@ -164,10 +164,12 @@ internal class ChatAiSideMenuView(
     }
 
     private fun addProjectSpaceEntry() {
-        projectDirectoryGroup.addView(menuEntryRow("项目空间") {
-            requestClose(true)
-            postDelayed({ openProjectSpace() }, PROJECT_OPEN_DELAY_MS)
-        })
+        projectDirectoryGroup.addView(
+            menuEntryRow("项目空间", R.drawable.ic_side_menu_project_space) {
+                requestClose(true)
+                postDelayed({ openProjectSpace() }, PROJECT_OPEN_DELAY_MS)
+            }
+        )
     }
 
     private fun updateChatSectionGap() {
@@ -230,7 +232,11 @@ internal class ChatAiSideMenuView(
         }
     }
 
-    private fun menuEntryRow(title: String, onClick: () -> Unit): TextView {
+    private fun menuEntryRow(
+        title: String,
+        trailingIconResId: Int? = null,
+        onClick: () -> Unit
+    ): TextView {
         return menuText(title).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -239,6 +245,11 @@ internal class ChatAiSideMenuView(
                 topMargin = dp(2)
             }
             setTextColor(Color.parseColor("#D6D6D6"))
+            trailingIconResId?.let { iconResId ->
+                setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, iconResId, 0)
+                compoundDrawablePadding = dp(16)
+                compoundDrawableTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
+            }
             isClickable = true
             foreground = selectableForeground()
             contentDescription = title
