@@ -38,11 +38,11 @@ internal class HomePullFilterController(
     private val applyMode: (HomeListFilterMode) -> Unit
 ) {
     private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
-    private val activationDistance = maxOf(touchSlop * 1.1f, dp(14).toFloat())
-    private val triggerDistance = dp(68).toFloat()
-    private val decisiveDistance = triggerDistance + dp(8)
-    private val maxPullDistance = dp(132).toFloat()
-    private val maxContentStretch = dp(28).toFloat()
+    private val activationDistance = maxOf(touchSlop * 1.6f, dp(24).toFloat())
+    private val triggerDistance = dp(104).toFloat()
+    private val decisiveDistance = triggerDistance + dp(18)
+    private val maxPullDistance = dp(176).toFloat()
+    private val maxContentStretch = dp(32).toFloat()
     private val indicator = HomePullFilterIndicatorView(activity)
 
     private var scroller: ScrollView? = null
@@ -249,8 +249,8 @@ internal class HomePullFilterController(
 
     private companion object {
         const val RELEASE_PROGRESS_THRESHOLD = 1f
-        const val RELEASE_RESET_PROGRESS = 0.55f
-        const val RELEASE_STABLE_MS = 40L
+        const val RELEASE_RESET_PROGRESS = 0.68f
+        const val RELEASE_STABLE_MS = 80L
         const val SWITCH_COOLDOWN_MS = 0L
         const val HORIZONTAL_REJECT_RATIO = 1.35f
         const val VERTICAL_ACTIVATION_RATIO = 0.7f
