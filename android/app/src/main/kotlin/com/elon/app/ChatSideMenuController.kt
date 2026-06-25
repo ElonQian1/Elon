@@ -96,6 +96,13 @@ internal class ChatSideMenuController(
         isSetup = true
         overlayHost = activity.window.decorView as ViewGroup
         sideMenuHandleEnabled = sideMenuHandlePrefs.getBoolean(SIDE_MENU_HANDLE_VISIBLE_KEY, true)
+        if (!sideMenuHandlePrefs.getBoolean(SIDE_MENU_HANDLE_DEFAULT_VISIBLE_MIGRATION_KEY, false)) {
+            sideMenuHandleEnabled = true
+            sideMenuHandlePrefs.edit()
+                .putBoolean(SIDE_MENU_HANDLE_VISIBLE_KEY, true)
+                .putBoolean(SIDE_MENU_HANDLE_DEFAULT_VISIBLE_MIGRATION_KEY, true)
+                .apply()
+        }
 
         overlay = FrameLayout(activity).apply {
             visibility = View.GONE
@@ -824,7 +831,7 @@ internal class ChatSideMenuController(
     private fun revealSideMenuHandle(animated: Boolean) {
         val handle = binding.chatSideMenuHandleButton
         handle.animate().cancel()
-        if (!sideMenuHandleEnabled || binding.chatPage.visibility != View.VISIBLE) {
+        if (!sideMenuHandleEnabled) {
             handle.visibility = View.GONE
             handle.translationX = 0f
             return
@@ -832,7 +839,7 @@ internal class ChatSideMenuController(
         handle.visibility = View.VISIBLE
         handle.alpha = 1f
         handle.animate().setListener(null)
-        if (!animated) {
+        if (binding.chatPage.visibility != View.VISIBLE || !animated) {
             handle.translationX = 0f
             return
         }
@@ -958,5 +965,6 @@ internal class ChatSideMenuController(
         private const val SETTINGS_DOCK_HEIGHT_DP = 88
         private const val SIDE_MENU_HANDLE_PREFS = "chat_side_menu_handle"
         private const val SIDE_MENU_HANDLE_VISIBLE_KEY = "visible"
+        private const val SIDE_MENU_HANDLE_DEFAULT_VISIBLE_MIGRATION_KEY = "default_visible_20260625"
     }
 }
