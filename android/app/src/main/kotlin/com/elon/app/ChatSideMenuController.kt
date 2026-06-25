@@ -15,6 +15,7 @@ import android.view.Gravity
 import android.view.DragEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.view.ViewGroup
 import android.view.animation.PathInterpolator
 import android.widget.FrameLayout
@@ -24,6 +25,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import kotlin.math.abs
 import kotlin.math.min
+import kotlin.math.roundToInt
 
 internal class ChatSideMenuController(
     private val activity: AppCompatActivity,
@@ -67,6 +69,10 @@ internal class ChatSideMenuController(
     private var startRawY = 0f
     private var startInsideContent = false
     private var startOutsidePanel = false
+    private val handleTouchSlop by lazy { ViewConfiguration.get(activity).scaledTouchSlop }
+    private var handleStartRawY = 0f
+    private var handleStartBottomMargin = 0
+    private var handleDragging = false
 
     val isOpen: Boolean
         get() = isSetup && overlay.visibility == View.VISIBLE && !isAnimating
@@ -109,6 +115,7 @@ internal class ChatSideMenuController(
         binding.chatSideMenuHandleButton.apply {
             bringToFront()
             setOnClickListener { openFromHandle() }
+            setOnTouchListener { view, event -> handleSideMenuHandleTouch(view, event) }
         }
         overlay.post { applyPanelWidth() }
     }
@@ -150,6 +157,62 @@ internal class ChatSideMenuController(
     fun openFromHandle() {
         if (!isSetup || binding.chatPage.visibility != View.VISIBLE) return
         show()
+    }
+
+    private fun handleSideMenuHandleTouch(view: View, event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                handleStartRawY = event.rawY
+                handleStartBottomMargin =
+                    (view.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin ?: 0
+                handleDragging = false
+                view.isPressed = true
+                view.parent?.requestDisallowInterceptTouchEvent(true)
+                return true
+            }
+
+            MotionEvent.ACTION_MOVE -> {
+                val deltaY = event.rawY - handleStartRawY
+                if (!handleDragging && abs(deltaY) > handleTouchSlop) {
+                    handleDragging = true
+                }
+                if (handleDragging) {
+                    updateSideMenuHandleBottomMargin(
+                        view,
+                        handleStartBottomMargin - deltaY.roundToInt()
+                    )
+                }
+                return true
+            }
+
+            MotionEvent.ACTION_UP -> {
+                view.isPressed = false
+                view.parent?.requestDisallowInterceptTouchEvent(false)
+                view.performClick()
+                return true
+            }
+
+            MotionEvent.ACTION_CANCEL -> {
+                handleDragging = false
+                view.isPressed = false
+                view.parent?.requestDisallowInterceptTouchEvent(false)
+                return true
+            }
+        }
+        return true
+    }
+
+    private fun updateSideMenuHandleBottomMargin(view: View, requestedBottomMargin: Int) {
+        val params = view.layoutParams as? FrameLayout.LayoutParams ?: return
+        val parentHeight = (view.parent as? View)?.height ?: 0
+        val fallbackHeight = dp(56)
+        val viewHeight = view.height.takeIf { it > 0 }
+            ?: params.height.takeIf { it > 0 }
+            ?: fallbackHeight
+        val minBottom = dp(16)
+        val maxBottom = (parentHeight - viewHeight - dp(16)).coerceAtLeast(minBottom)
+        params.bottomMargin = requestedBottomMargin.coerceIn(minBottom, maxBottom)
+        view.layoutParams = params
     }
 
     fun handleDispatchTouchEvent(event: MotionEvent): Boolean {

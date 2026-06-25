@@ -537,15 +537,21 @@
       background: transparent;
       padding: 0;
       cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: flex-start;
+      touch-action: none;
+      user-select: none;
       overflow: hidden;
       z-index: 24;
       -webkit-tap-highlight-color: transparent;
     }
     .chat-side-menu-handle img {
       display: block;
-      width: 100%;
-      height: 100%;
+      width: 40px;
+      height: 56px;
       object-fit: fill;
+      pointer-events: none;
     }
     .web-chat-side-menu-mask {
       position: fixed;
@@ -3162,6 +3168,62 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     webChatSideMenuMask.classList.add('active');
     webChatSideMenuMask.setAttribute('aria-hidden', 'false');
   }
+  function installChatSideMenuHandleDrag() {
+    if (!chatSideMenuHandle) return;
+    if (!window.PointerEvent) {
+      chatSideMenuHandle.addEventListener('click', openWebChatSideMenu);
+      return;
+    }
+    const handleDragState = {
+      active: false,
+      pointerId: null,
+      startY: 0,
+      startBottom: 124,
+      dragging: false
+    };
+    const readHandleBottom = () => {
+      const raw = parseFloat(getComputedStyle(chatSideMenuHandle).bottom);
+      return Number.isFinite(raw) ? raw : 124;
+    };
+    const clampHandleBottom = (value) => {
+      const parent = chatSideMenuHandle.parentElement;
+      const parentHeight = parent ? parent.clientHeight : 0;
+      const maxBottom = Math.max(16, parentHeight - chatSideMenuHandle.offsetHeight - 16);
+      return Math.min(Math.max(value, 16), maxBottom);
+    };
+    const finishHandleDrag = (event, shouldOpen) => {
+      if (!handleDragState.active || event.pointerId !== handleDragState.pointerId) return;
+      handleDragState.active = false;
+      handleDragState.pointerId = null;
+      try {
+        chatSideMenuHandle.releasePointerCapture(event.pointerId);
+      } catch (_) {
+      }
+      if (shouldOpen) openWebChatSideMenu();
+    };
+    chatSideMenuHandle.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      handleDragState.active = true;
+      handleDragState.pointerId = event.pointerId;
+      handleDragState.startY = event.clientY;
+      handleDragState.startBottom = readHandleBottom();
+      handleDragState.dragging = false;
+      chatSideMenuHandle.setPointerCapture(event.pointerId);
+    });
+    chatSideMenuHandle.addEventListener('pointermove', (event) => {
+      if (!handleDragState.active || event.pointerId !== handleDragState.pointerId) return;
+      const deltaY = event.clientY - handleDragState.startY;
+      if (!handleDragState.dragging && Math.abs(deltaY) > 4) {
+        handleDragState.dragging = true;
+      }
+      if (handleDragState.dragging) {
+        chatSideMenuHandle.style.bottom =
+          clampHandleBottom(handleDragState.startBottom - deltaY) + 'px';
+      }
+    });
+    chatSideMenuHandle.addEventListener('pointerup', (event) => finishHandleDrag(event, true));
+    chatSideMenuHandle.addEventListener('pointercancel', (event) => finishHandleDrag(event, false));
+  }
   function updateSendButtonState() {
     sendBtn.disabled = !!busy || !isAnyChatActive();
   }
@@ -3509,7 +3571,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   if (projectHomeTopTab) projectHomeTopTab.addEventListener('click', showProjectHomeTab);
   if (projectPlazaTopTab) projectPlazaTopTab.addEventListener('click', showProjectPlazaTab);
-  if (chatSideMenuHandle) chatSideMenuHandle.addEventListener('click', openWebChatSideMenu);
+  installChatSideMenuHandleDrag();
   if (webChatSideMenuClose) webChatSideMenuClose.addEventListener('click', closeWebChatSideMenu);
   if (webChatSideMenuMask) {
     webChatSideMenuMask.addEventListener('click', (event) => {
