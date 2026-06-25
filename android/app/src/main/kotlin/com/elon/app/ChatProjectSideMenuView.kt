@@ -3,6 +3,7 @@ package com.elon.app
 import android.animation.ValueAnimator
 import android.content.ClipData
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -14,6 +15,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
@@ -110,7 +112,7 @@ internal class ChatProjectSideMenuView(
     private fun addRecentConversations() {
         val topGap = if (!personalProjectsExpanded && !jointProjectsExpanded) 132 else 28
         content.addView(space(topGap))
-        content.addView(sectionHeader("最近会话", recentConversationsExpanded) {
+        content.addView(sectionHeader("最近会话", recentConversationsExpanded, showFolderIcon = false) {
             recentConversationsExpanded = !recentConversationsExpanded
             render()
         })
@@ -129,6 +131,7 @@ internal class ChatProjectSideMenuView(
     private fun sectionHeader(
         title: String,
         expanded: Boolean,
+        showFolderIcon: Boolean = true,
         onClick: () -> Unit
     ): LinearLayout {
         return LinearLayout(context).apply {
@@ -145,9 +148,33 @@ internal class ChatProjectSideMenuView(
             contentDescription = if (expanded) "收起$title" else "展开$title"
             addView(menuText(title).apply {
                 setTextColor(Color.parseColor("#D6D6D6"))
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                )
             })
+            if (showFolderIcon) {
+                addView(sectionFolderIcon(expanded))
+            }
             setOnClickListener { onClick() }
+        }
+    }
+
+    private fun sectionFolderIcon(expanded: Boolean): ImageView {
+        return ImageView(context).apply {
+            setImageResource(
+                if (expanded) {
+                    R.drawable.ic_side_menu_folder_open
+                } else {
+                    R.drawable.ic_side_menu_folder_closed
+                }
+            )
+            imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                leftMargin = dp(16)
+            }
         }
     }
 

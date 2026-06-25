@@ -200,11 +200,33 @@ internal class ChatAiSideMenuView(
             contentDescription = if (expanded) "收起$title" else "展开$title"
             addView(
                 menuText(title).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    )
                     setTextColor(Color.parseColor("#D6D6D6"))
                 }
             )
+            addView(sectionFolderIcon(expanded))
             setOnClickListener { onClick() }
+        }
+    }
+
+    private fun sectionFolderIcon(expanded: Boolean): ImageView {
+        return ImageView(context).apply {
+            setImageResource(
+                if (expanded) {
+                    R.drawable.ic_side_menu_folder_open
+                } else {
+                    R.drawable.ic_side_menu_folder_closed
+                }
+            )
+            imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                leftMargin = dp(16)
+            }
         }
     }
 
