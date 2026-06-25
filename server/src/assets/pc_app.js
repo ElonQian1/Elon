@@ -1415,6 +1415,7 @@
     els.projectsRail.addEventListener('click', selectProjectsHome);
     els.projectPlazaRail.addEventListener('click', selectProjectPlaza);
     els.doctorRail.addEventListener('click', doctor.selectDoctor);
+    els.nodeRail.addEventListener('click', node.selectNode);
     els.voiceRail.addEventListener('click', () => selectVoiceProject());
     els.authClaimBtn.addEventListener('click', () => openAuthModal('register'));
     pcAuthTabs().forEach((button) => button.addEventListener('click', () => setPcAuthMode(button.dataset.pcAuthMode)));
@@ -1423,10 +1424,10 @@
     document.addEventListener('pointerdown', keepAuthModalOpenOnOutsideClick, true);
     document.addEventListener('click', keepAuthModalOpenOnOutsideClick, true);
     projectCreate.bindEvents();
-    [els.aiRail, els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.voiceRail, els.apkRail].forEach(attachRailTooltip);
+    [els.aiRail, els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
-    els.apkRail.addEventListener('click', selectApkDownload);
-    $('openLegacyWebBtn').addEventListener('click', node.selectNode);
+    $('openLegacyWebBtn').addEventListener('click', selectApkDownload);
+    $('openLocalNodeBtn').addEventListener('click', node.selectNode);
     els.userProfileBtn.addEventListener('click', toggleAccountMenu);
     els.userSettingsBtn.addEventListener('click', () => openSettings('account'));
     els.profileCenterBtn.addEventListener('click', () => openSettings('account'));
