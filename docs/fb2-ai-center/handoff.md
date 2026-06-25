@@ -17,6 +17,13 @@
   - 质量债务 `quality_unmatched_cited_sources=13`、`quality_wrong_context_count=8` 在 historical debt 为 observation 允许范围内（仅历史样本），本轮 `quality_missing_context_count=0`。
 - ASR/TTS 本轮暂缓：`voice_status=deferred_by_user`，`voice_device_evidence` 尚未补齐真实 final-ready 证据；继续推进请按 `keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses`。
 
+### 2026-06-25 连续推进（本轮）
+
+- 读取 `FB2_MAIN_PROJECT_SHARED_SECRET` 后，已执行带 token 的无写群 data-only 前置验收与可见群可见验收：
+  - `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -PreflightOnly` 成功：`target\fb2-ai-center\data-only-acceptance-20260625T201219Z.json`。
+  - `smoke-fb2-final-acceptance.ps1 -DataOnlyAcceptance -AllowVisibleMessages` 成功：`target\fb2-ai-center\data-only-acceptance-20260625T201231Z.json`，含 `@EL`、`AI回复`、总结帖三条链路均已回读写验证，并有 3 条反馈样本。
+- 非语音验收链路继续保持绿：`full_final_complete=false` 仅因语音入口 `voice_final_evidence` deferred，`next_minimum_action=keep_non_voice_regression_green_resume_ASR_TTS_only_when_user_unpauses`。
+
 ## 2026-06-22 线上验证快照
 
 - 2026-06-24 19:35 最新双项目协作口径：只读确认 fb2 仓库 `origin/main=bfed1cc8 docs(ai-context): add p4 blocker phase handoff`，这是当前最新 AI Center/P4 checkpoint；`73a40385 feat(ai-context): add p4 provider migration plan` 已是历史 provider/migration no-write plan。fb2 新增 `fb2_p4_disabled_embedding_skeleton_v1`、`fb2_p4_provider_write_implementation_shape_v1`、`fb2_p4_disabled_adapter_write_store_v1`、`fb2_p4_runtime_approval_checklist_v1`、`fb2_p4_migration_approval_packet_v1`、`fb2_p4_post_migration_verification_plan_v1`、`fb2_ai_context_requirement_traceability_v1`、`main_project_answer_handoff_markdown`、`p4_blocker_phase_matrix`、`p4_phase_approvals_all_false`，结论是业务数据需求已经可追踪并可进入 live validation，格式为 XML-wrapped Markdown Context Pack + scoped JSON tools，MCP 只是可选包装；但 `full_original_goal_complete=false`，当前终局 blocker 是 `p4_vector_rag_planned_not_approved_or_enabled`。主项目必须继续显示 `business_context_requirements_traceable_final_goal_still_open`、`business_data_requirements_traceable=true`、`approval_granted=false`、`executable_now=false`；这些证据只能进入 `planned_capabilities`、completion matrix、gap action board、handoff prompt、README/PLAN/test-plan 和 `validate-fb2-context-format-route.ps1`，不能关闭 final completion，不能进入 answer-time grounding，也不能替代 Context Pack / tool manifest / read-only tools 的生产事实源。
