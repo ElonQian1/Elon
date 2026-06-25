@@ -14,6 +14,7 @@ param(
     [string]$SummaryPath = "",
     [string]$ContractSmokeSummaryPath = "",
     [string]$OutputPath = "",
+    [string]$SharedSecret = "",
     [int]$RequestTimeoutSec = 60,
     [int]$PollTimeoutSec = 120,
     [int]$FeedbackPollTimeoutSec = 60,
@@ -195,12 +196,45 @@ function Write-Fb2TokenBridgeResult {
     $Result
 }
 
+function Resolve-Fb2TokenBridgeSharedSecret {
+    param([string]$ExplicitSecret)
+
+    if (-not [string]::IsNullOrWhiteSpace($ExplicitSecret)) {
+        return [ordered]@{
+            Value = $ExplicitSecret
+            Source = "parameter"
+        }
+    }
+
+    $envNames = @(
+        "FB2_MAIN_PROJECT_SHARED_SECRET",
+        "FB2_AI_CENTER_TOKEN"
+    )
+    foreach ($envName in @("Process", "Machine", "User")) {
+        foreach ($secretName in $envNames) {
+            $envValue = [System.Environment]::GetEnvironmentVariable($secretName, $envName)
+            if (-not [string]::IsNullOrWhiteSpace($envValue)) {
+                return [ordered]@{
+                    Value = [string]$envValue
+                    Source = "$secretName-$envName"
+                }
+            }
+        }
+    }
+
+    return [ordered]@{
+        Value = ""
+        Source = "remote_ssh"
+    }
+}
+
 function New-Fb2TokenBridgeRunResult {
     param(
         [bool]$Success,
         [object]$PreflightExitCode,
         [object]$ContractSmokeExitCode,
         [object]$CurrentStateExitCode,
+        [string]$SharedSecretSource,
         [string]$Note
     )
 
@@ -224,6 +258,7 @@ function New-Fb2TokenBridgeRunResult {
         token_passed_as_argument = $false
         fb2_password_passed_to_child_argv = $false
         token_written_to_output = $false
+        shared_secret_source = $SharedSecretSource
         current_state_after_tokenless = [bool]$RunCurrentStateAfter
         project_network_proxy_policy = "direct_no_proxy"
         writes_visible_group_messages = $false
@@ -359,12 +394,18 @@ $preflightExitCode = $null
 $contractSmokeExitCode = $null
 $currentStateExitCode = $null
 try {
-    $sharedSecret = Get-Fb2TokenBridgeRemoteSharedSecret `
-        -HostName $ServerHost `
-        -Port $ServerPort `
-        -User $ServerUser `
-        -KeyPath $SshKey `
-        -EnvPath $ServerEnvPath
+    $resolvedSharedSecret = Resolve-Fb2TokenBridgeSharedSecret -ExplicitSecret $SharedSecret
+    $sharedSecretSource = $resolvedSharedSecret["Source"]
+    $sharedSecret = $resolvedSharedSecret["Value"]
+    if (-not $sharedSecret) {
+        $sharedSecret = Get-Fb2TokenBridgeRemoteSharedSecret `
+            -HostName $ServerHost `
+            -Port $ServerPort `
+            -User $ServerUser `
+            -KeyPath $SshKey `
+            -EnvPath $ServerEnvPath
+        $sharedSecretSource = "remote_ssh"
+    }
 
     [System.Environment]::SetEnvironmentVariable("FB2_API_BASE", $Fb2Base.TrimEnd("/"), "Process")
     [System.Environment]::SetEnvironmentVariable("FB2_AI_CENTER_TOKEN", $sharedSecret, "Process")
@@ -419,6 +460,7 @@ try {
             -PreflightExitCode $preflightExitCode `
             -ContractSmokeExitCode $contractSmokeExitCode `
             -CurrentStateExitCode $null `
+            -SharedSecretSource $sharedSecretSource `
             -Note "Preflight and authenticated contract smoke succeeded; current-state validation is about to run tokenless against this fresh no-write bridge evidence."
         Write-Fb2TokenBridgeResult -Result $preCurrentStateResult -Path $OutputPath | Out-Null
 
@@ -437,7 +479,8 @@ try {
         -PreflightExitCode $preflightExitCode `
         -ContractSmokeExitCode $contractSmokeExitCode `
         -CurrentStateExitCode $currentStateExitCode `
-        -Note "Remote fb2 service token was read into process env only and restored after child scripts."
+        -SharedSecretSource $sharedSecretSource `
+        -Note "FB2 service token was loaded into process env only and restored after child scripts."
     Write-Fb2TokenBridgeResult -Result $result -Path $OutputPath | Out-Null
     $result | ConvertTo-Json -Depth 10
 } finally {
