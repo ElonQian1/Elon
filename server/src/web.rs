@@ -42,6 +42,7 @@ const PC_APP_PROJECT_READINESS_JS: &str = include_str!("assets/pc_app_project_re
 const PC_APP_DOCTOR_JS: &str = include_str!("assets/pc_app_doctor.js");
 const PC_PROJECT_LANDING_JS: &str = include_str!("assets/pc_project_landing.js");
 const VOICE_TTS_SDK_JS: &str = include_str!("assets/voice_tts_sdk.js");
+const ELON_ROUTE_C_SDK_JS: &str = include_str!("assets/elon_route_c_sdk.js");
 const PC_VOICE_PROJECT_JS: &str = include_str!("assets/pc_voice_project.js");
 const PC_APP_NOTIFICATIONS_JS: &str = include_str!("assets/pc_app_notifications.js");
 const PC_APP_MODELS_JS: &str = include_str!("assets/pc_app_models.js");
@@ -382,6 +383,19 @@ pub async fn voice_tts_sdk_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         VOICE_TTS_SDK_JS,
+    )
+}
+
+pub async fn elon_route_c_sdk_js() -> impl IntoResponse {
+    (
+        [
+            (
+                header::CONTENT_TYPE,
+                "application/javascript; charset=utf-8",
+            ),
+            (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
+        ],
+        ELON_ROUTE_C_SDK_JS,
     )
 }
 
