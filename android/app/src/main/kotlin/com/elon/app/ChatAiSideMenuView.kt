@@ -306,10 +306,10 @@ internal class ChatAiSideMenuView(
             )
             addView(
                 ImageButton(context).apply {
-                    setImageResource(R.drawable.ic_add_circle_simple)
+                    setImageResource(R.drawable.ic_side_menu_new_chat)
                     imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
                     background = null
-                    scaleType = ImageView.ScaleType.CENTER
+                    scaleType = ImageView.ScaleType.FIT_CENTER
                     contentDescription = "新建会话"
                     isClickable = true
                     foreground = selectableForeground()
