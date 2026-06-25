@@ -4,6 +4,7 @@
     <color name="elon_bg_canvas">#000000</color>
     <color name="elon_bg_plaza">#000000</color>
     <color name="elon_bg_chrome">#000000</color>
+    <color name="elon_side_menu_bg">#0D0D0D</color>
     <color name="elon_surface_card">#1A1A1A</color>
     <color name="elon_surface_header">#1F2023</color>
     <color name="elon_surface_search">#272727</color>

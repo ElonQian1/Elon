@@ -6,12 +6,8 @@ import android.app.AlertDialog
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.ColorFilter
-import android.graphics.LinearGradient
 import android.graphics.Paint
 import android.graphics.Path
-import android.graphics.PixelFormat
-import android.graphics.Shader
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
@@ -93,7 +89,9 @@ internal class ChatSideMenuController(
         }
 
         panel = FrameLayout(activity).apply {
-            background = SmoothSideMenuBackgroundDrawable()
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.elon_side_menu_bg))
+            }
             clipChildren = false
             clipToPadding = false
             elevation = dp(8).toFloat()
@@ -643,52 +641,6 @@ internal class ChatSideMenuController(
             }
             canvas.drawPath(path, paint)
         }
-    }
-
-    private class SmoothSideMenuBackgroundDrawable : Drawable() {
-        private val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            isDither = true
-            style = Paint.Style.FILL
-        }
-        private var shaderWidth = -1
-
-        override fun draw(canvas: Canvas) {
-            val currentBounds = bounds
-            if (currentBounds.width() <= 0 || currentBounds.height() <= 0) return
-            if (shaderWidth != currentBounds.width()) {
-                shaderWidth = currentBounds.width()
-                paint.shader = LinearGradient(
-                    0f,
-                    0f,
-                    currentBounds.width().toFloat(),
-                    0f,
-                    intArrayOf(
-                        Color.parseColor("#1B2025"),
-                        Color.parseColor("#191D21"),
-                        Color.parseColor("#171A1D"),
-                        Color.parseColor("#141719"),
-                        Color.parseColor("#111213"),
-                        Color.parseColor("#101010")
-                    ),
-                    floatArrayOf(0f, 0.18f, 0.38f, 0.62f, 0.84f, 1f),
-                    Shader.TileMode.CLAMP
-                )
-            }
-            canvas.drawRect(currentBounds, paint)
-        }
-
-        override fun setAlpha(alpha: Int) {
-            paint.alpha = alpha
-            invalidateSelf()
-        }
-
-        override fun setColorFilter(colorFilter: ColorFilter?) {
-            paint.colorFilter = colorFilter
-            invalidateSelf()
-        }
-
-        @Deprecated("Deprecated in Java")
-        override fun getOpacity(): Int = PixelFormat.OPAQUE
     }
 
     private companion object {
