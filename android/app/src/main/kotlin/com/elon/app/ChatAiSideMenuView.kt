@@ -216,14 +216,18 @@ internal class ChatAiSideMenuView(
     }
 
     private fun sectionFolderIcon(expanded: Boolean): ImageView {
+        return sideMenuIcon(
+            if (expanded) {
+                R.drawable.ic_side_menu_folder_open
+            } else {
+                R.drawable.ic_side_menu_folder_closed
+            }
+        )
+    }
+
+    private fun sideMenuIcon(iconResId: Int): ImageView {
         return ImageView(context).apply {
-            setImageResource(
-                if (expanded) {
-                    R.drawable.ic_side_menu_folder_open
-                } else {
-                    R.drawable.ic_side_menu_folder_closed
-                }
-            )
+            setImageResource(iconResId)
             imageTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
             scaleType = ImageView.ScaleType.FIT_CENTER
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
@@ -237,23 +241,31 @@ internal class ChatAiSideMenuView(
         title: String,
         trailingIconResId: Int? = null,
         onClick: () -> Unit
-    ): TextView {
-        return menuText(title).apply {
+    ): LinearLayout {
+        return LinearLayout(context).apply {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(46)
             ).apply {
                 topMargin = dp(2)
             }
-            setTextColor(Color.parseColor("#D6D6D6"))
-            trailingIconResId?.let { iconResId ->
-                setCompoundDrawablesRelativeWithIntrinsicBounds(0, 0, iconResId, 0)
-                compoundDrawablePadding = dp(16)
-                compoundDrawableTintList = ColorStateList.valueOf(Color.parseColor("#D6D6D6"))
-            }
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
             isClickable = true
             foreground = selectableForeground()
             contentDescription = title
+            addView(
+                menuText(title).apply {
+                    layoutParams = LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.MATCH_PARENT
+                    )
+                    setTextColor(Color.parseColor("#D6D6D6"))
+                }
+            )
+            trailingIconResId?.let { iconResId ->
+                addView(sideMenuIcon(iconResId))
+            }
             setOnClickListener { onClick() }
         }
     }
