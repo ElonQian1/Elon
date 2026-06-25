@@ -21,6 +21,9 @@ const TAB_PROFILE_PNG_B64: &str = include_str!("assets/ic_tab_profile_user.b64")
 const HOME_PROJECT_MARKER_PNG_B64: &str = include_str!("assets/ic_home_project_marker.b64");
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
+const PLAZA_ENTER_SPACE_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_enter_space.png");
+const PLAZA_SHARE_PROJECT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_share_project.png");
+const PLAZA_DOWNLOAD_APK_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_download_apk.png");
 const POPUP_NEW_PROJECT_PNG_B64: &str = include_str!("assets/ic_popup_new_project.b64");
 const CHAT_SIDE_MENU_HANDLE_PNG_B64: &str = include_str!("assets/ic_chat_side_menu_handle.b64");
 const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
@@ -199,6 +202,28 @@ pub async fn project_plaza_js() -> impl IntoResponse {
             (header::CACHE_CONTROL, "no-store, no-cache, must-revalidate"),
         ],
         PROJECT_PLAZA_JS,
+    )
+}
+
+pub async fn project_plaza_enter_space_icon() -> impl IntoResponse {
+    plaza_icon_response(PLAZA_ENTER_SPACE_ICON_PNG)
+}
+
+pub async fn project_plaza_share_project_icon() -> impl IntoResponse {
+    plaza_icon_response(PLAZA_SHARE_PROJECT_ICON_PNG)
+}
+
+pub async fn project_plaza_download_apk_icon() -> impl IntoResponse {
+    plaza_icon_response(PLAZA_DOWNLOAD_APK_ICON_PNG)
+}
+
+fn plaza_icon_response(bytes: &'static [u8]) -> impl IntoResponse {
+    (
+        [
+            (header::CONTENT_TYPE, "image/png"),
+            (header::CACHE_CONTROL, "public, max-age=86400"),
+        ],
+        bytes,
     )
 }
 

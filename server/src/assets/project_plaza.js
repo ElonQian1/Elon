@@ -284,7 +284,8 @@
           </div>
           <span class="project-plaza-time">时间</span>
           <div class="project-plaza-actions">
-            <button class="project-plaza-btn" type="button" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}">${escapeHtml(actionLabel)}</button>
+            <button class="project-plaza-btn" type="button" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}">${escapeHtml(actionLabel)}</button>
+            <button class="project-plaza-btn" type="button" data-plaza-action="share" data-id="${escapeHtml(project.id)}" aria-label="分享项目" title="分享项目">分享项目</button>
             <button class="project-plaza-btn" type="button" data-plaza-action="download" data-id="${escapeHtml(project.id)}" aria-disabled="${apkUrl ? 'false' : 'true'}">下载APK</button>
           </div>
         </div>
@@ -360,6 +361,42 @@
     else window.alert('项目已加入，但当前页面暂时无法打开，请刷新后重试');
   }
 
+  function projectShareText(project) {
+    const identity = projectIdentity(project);
+    const lines = [
+      '一龙项目：' + identity.title,
+      '创建者：' + (cleanText(project.owner_account) || '未知'),
+      '成员：' + Number(project.member_count || 0),
+      '加入方式：' + approvalLabel(project.join_mode)
+    ];
+    const desc = identity.subtitle || cleanText(project.description);
+    if (desc) lines.push('简介：' + desc);
+    const apkUrl = String(project.latest_apk_url || project.last_apk_url || '').trim();
+    if (apkUrl) lines.push('APK：' + apkUrl);
+    return lines.join('\n');
+  }
+
+  async function shareProject(id) {
+    const project = state.projects.find((p) => p.id === id);
+    if (!project) return;
+    const text = projectShareText(project);
+    const title = projectIdentity(project).title;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text });
+        return;
+      }
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(text);
+        window.alert('项目分享内容已复制');
+        return;
+      }
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+    window.prompt('复制项目分享内容', text);
+  }
+
   function downloadProjectApk(id) {
     const project = state.projects.find((p) => p.id === id);
     const url = project && String(project.latest_apk_url || project.last_apk_url || '').trim();
@@ -399,6 +436,8 @@
       applyToJoin(id);
     } else if (action === 'open') {
       openJoinedProject(id);
+    } else if (action === 'share') {
+      shareProject(id);
     } else if (action === 'download') {
       downloadProjectApk(id);
     }

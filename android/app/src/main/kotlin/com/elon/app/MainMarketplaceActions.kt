@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
@@ -283,146 +284,135 @@ internal class MainMarketplaceActions(
             container.addView(centerMessage("暂无匹配项目", COLOR_TEXT_SECONDARY))
             return
         }
-        projects.forEachIndexed { index, project ->
-            container.addView(buildProjectCard(project, index))
+        projects.chunked(2).forEachIndexed { rowIndex, rowProjects ->
+            container.addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                isBaselineAligned = false
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    marginStart = dp(CARD_SIDE_MARGIN_DP)
+                    marginEnd = dp(CARD_SIDE_MARGIN_DP)
+                    topMargin = dp(if (rowIndex == 0) FIRST_CARD_TOP_MARGIN_DP else CARD_GAP_DP)
+                }
+                rowProjects.forEachIndexed { columnIndex, project ->
+                    addView(buildProjectCard(project), LinearLayout.LayoutParams(
+                        0,
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        1f
+                    ).apply {
+                        if (columnIndex == 0) marginEnd = dp(CARD_GRID_GAP_DP)
+                    })
+                }
+                if (rowProjects.size == 1) {
+                    addView(View(activity), LinearLayout.LayoutParams(0, 1, 1f))
+                }
+            })
         }
     }
 
-    private fun buildProjectCard(project: StoreProject, index: Int): LinearLayout {
-        val alreadyJoined = isProjectJoined(project)
-        val joinBtn = actionButton(projectEntryActionLabel(project, alreadyJoined)).apply {
-            setOnClickListener {
-                if (alreadyJoined) openJoinedProject(project) else tryJoinProject(project, this)
-            }
-        }
+    private fun buildProjectCard(project: StoreProject): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             background = rect(COLOR_CARD_BODY, CARD_RADIUS_DP)
             clipToOutline = true
-            layoutParams = LinearLayout.LayoutParams(
+            addView(createCardContent(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                marginStart = dp(CARD_SIDE_MARGIN_DP)
-                marginEnd = dp(CARD_SIDE_MARGIN_DP)
-                topMargin = dp(if (index == 0) FIRST_CARD_TOP_MARGIN_DP else CARD_GAP_DP)
-            }
-            addView(createCardHeader(project), LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(CARD_HEADER_HEIGHT_DP)
+                dp(CARD_CONTENT_HEIGHT_DP)
             ))
-            addView(createCardBody(project, joinBtn), LinearLayout.LayoutParams(
+            addView(createCardActionBar(project), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(CARD_BODY_HEIGHT_DP)
+                dp(CARD_ACTION_BAR_HEIGHT_DP)
             ))
         }
     }
 
-    private fun createCardHeader(project: StoreProject): View {
+    private fun createCardContent(project: StoreProject): View {
         val identity = identityFor(project)
         return LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(24), 0, dp(24), 0)
-            background = topRoundedRect(COLOR_CARD_HEADER, CARD_RADIUS_DP)
+            orientation = LinearLayout.VERTICAL
+            background = rect(COLOR_CARD_HEADER, 0)
+            setPadding(dp(CARD_CONTENT_SIDE_PADDING_DP), dp(16), dp(CARD_CONTENT_SIDE_PADDING_DP), 0)
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = identity.title
+                gravity = Gravity.CENTER
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_PAGE_TITLE_SP)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_CARD_TITLE_SP)
                 setTypeface(typeface, Typeface.BOLD)
-            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-            addView(statusLabel(joinApprovalLabel(project.joinMode), approvalDotColor(project.joinMode)))
-            addView(statusLabel(apkStatusLabel(project), apkDotColor(project)))
-        }
-    }
-
-    private fun createCardBody(project: StoreProject, joinBtn: TextView): View {
-        return FrameLayout(activity).apply {
-            background = rect(COLOR_CARD_BODY, 0)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
 
             addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.VERTICAL
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(THUMB_SIZE_DP), dp(THUMB_SIZE_DP)).apply {
+                    marginEnd = dp(14)
+                })
                 addView(LinearLayout(activity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    gravity = Gravity.CENTER_VERTICAL
-                    addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(THUMB_SIZE_DP), dp(THUMB_SIZE_DP)).apply {
-                        marginEnd = dp(14)
-                    })
-                    addView(LinearLayout(activity).apply {
-                        orientation = LinearLayout.VERTICAL
-                        addProjectDetailText("创建者：${project.ownerAccount.ifBlank { "未知" }}")
-                        addProjectDetailText("成员：${project.memberCount.coerceAtLeast(0)}")
-                    }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                }, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    rightMargin = dp(INFO_ROW_RIGHT_MARGIN_DP)
-                })
-                addView(View(activity).apply {
-                    setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
-                }, LinearLayout.LayoutParams(dp(DIVIDER_WIDTH_DP), dp(1)).apply {
-                    topMargin = dp(12)
-                })
-                addView(TextView(activity).apply {
-                    includeFontPadding = false
-                    text = "简介：${project.description?.trim()?.takeIf { it.isNotBlank() } ?: "暂无简介"}"
-                    maxLines = 2
-                    ellipsize = TextUtils.TruncateAt.END
-                    setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                    setLineSpacing(dp(2).toFloat(), 1.0f)
-                }, LinearLayout.LayoutParams(dp(DESC_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT).apply {
-                    topMargin = dp(10)
-                })
-            }, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
+                    orientation = LinearLayout.VERTICAL
+                    addProjectDetailText("创建者：${project.ownerAccount.ifBlank { "未知" }}")
+                    addProjectDetailText("成员：${project.memberCount.coerceAtLeast(0)}")
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                leftMargin = dp(24)
-                rightMargin = dp(CARD_MAIN_RIGHT_MARGIN_DP)
-                topMargin = dp(CARD_BODY_CONTENT_TOP_DP)
+                topMargin = dp(22)
+            })
+
+            addView(View(activity).apply {
+                setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(1)
+            ).apply {
+                topMargin = dp(12)
             })
 
             addView(TextView(activity).apply {
                 includeFontPadding = false
-                text = "时间"
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_META_SP)
-            }, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.END or Gravity.TOP
+                text = "简介：${identity.subtitle ?: project.description?.trim()?.takeIf { it.isNotBlank() } ?: "暂无简介"}"
+                maxLines = 2
+                ellipsize = TextUtils.TruncateAt.END
+                setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_LIST_SECONDARY_SP)
+                setLineSpacing(dp(2).toFloat(), 1.0f)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                rightMargin = dp(24)
-                topMargin = dp(CARD_TIME_TOP_DP)
+                topMargin = dp(10)
             })
+        }
+    }
 
-            addView(LinearLayout(activity).apply {
-                orientation = LinearLayout.HORIZONTAL
-                gravity = Gravity.END or Gravity.CENTER_VERTICAL
-                addView(joinBtn, LinearLayout.LayoutParams(dp(ACTION_BUTTON_WIDTH_DP), dp(ACTION_BUTTON_HEIGHT_DP)).apply {
-                    marginEnd = dp(ACTION_BUTTON_GAP_DP)
-                })
-                addView(actionButton(projectPlazaApkActionLabel(project)).apply {
-                    val hasApk = !project.latestApkUrl.isNullOrBlank()
-                    val hasInstalledApp = isProjectAppInstalled(activity, project.id, project.name)
-                    isEnabled = hasApk || hasInstalledApp
-                    alpha = if (isEnabled) 1f else 0.55f
-                    setOnClickListener { tryInstallProject(project, this, joinBtn) }
-                }, LinearLayout.LayoutParams(dp(ACTION_BUTTON_WIDTH_DP), dp(ACTION_BUTTON_HEIGHT_DP)))
-            }, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                Gravity.BOTTOM
-            ).apply {
-                leftMargin = dp(24)
-                rightMargin = dp(24)
-                bottomMargin = dp(ACTION_BUTTON_BOTTOM_DP)
-            })
+    private fun createCardActionBar(project: StoreProject): View {
+        val alreadyJoined = isProjectJoined(project)
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.END or Gravity.CENTER_VERTICAL
+            background = rect(COLOR_CARD_BODY, 0)
+            setPadding(0, 0, dp(10), 0)
+            val entryAction = iconActionButton(
+                iconRes = R.drawable.ic_plaza_enter_space,
+                description = projectEntryActionLabel(project, alreadyJoined)
+            ) { tryEnterProject(project, it) }
+            addView(entryAction, iconActionParams())
+            addView(iconActionButton(
+                iconRes = R.drawable.ic_plaza_share_project,
+                description = "分享项目"
+            ) { shareProject(project) }, iconActionParams())
+            addView(iconActionButton(
+                iconRes = R.drawable.ic_plaza_download_apk,
+                description = "下载APK",
+                enabled = !project.latestApkUrl.isNullOrBlank()
+            ) { tryInstallProjectFromIcon(project, it, entryAction) }, iconActionParams())
         }
     }
 
@@ -471,47 +461,44 @@ internal class MainMarketplaceActions(
         }
     }
 
-    private fun statusLabel(text: String, dotColor: String): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                marginStart = dp(18)
-            }
-            addView(TextView(activity).apply {
-                includeFontPadding = false
-                this.text = text
-                setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_STATUS_SP)
-            })
-            addView(View(activity).apply {
-                background = rect(dotColor, 999)
-            }, LinearLayout.LayoutParams(dp(6), dp(6)).apply {
-                marginStart = dp(6)
-            })
-        }
-    }
-
-    private fun actionButton(text: String): TextView {
-        return TextView(activity).apply {
-            this.text = text
-            includeFontPadding = false
-            gravity = Gravity.CENTER
-            setTextColor(Color.parseColor(COLOR_BUTTON_TEXT))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_LIST_SECONDARY_SP)
-            setTypeface(typeface, Typeface.BOLD)
-            background = rect(COLOR_BUTTON_BG, 999)
-            isClickable = true
+    private fun iconActionButton(
+        iconRes: Int,
+        description: String,
+        enabled: Boolean = true,
+        onClick: (View) -> Unit
+    ): FrameLayout {
+        return FrameLayout(activity).apply {
+            contentDescription = description
+            isEnabled = enabled
+            isClickable = enabled
+            alpha = if (enabled) 1f else DISABLED_ACTION_ALPHA
             foreground = selectableForeground()
-            maxLines = 1
-            ellipsize = TextUtils.TruncateAt.END
+            setOnClickListener { if (isEnabled) onClick(this) }
+            addView(ImageView(activity).apply {
+                setImageResource(iconRes)
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = null
+            }, FrameLayout.LayoutParams(dp(ACTION_ICON_SIZE_DP), dp(ACTION_ICON_SIZE_DP), Gravity.CENTER))
         }
     }
 
-    private fun tryJoinProject(project: StoreProject, joinBtn: TextView) {
+    private fun iconActionParams(): LinearLayout.LayoutParams {
+        return LinearLayout.LayoutParams(dp(ACTION_ICON_TOUCH_DP), dp(ACTION_ICON_TOUCH_DP)).apply {
+            marginStart = dp(ACTION_ICON_GAP_DP)
+        }
+    }
+
+    private fun setIconButtonBusy(button: View, busy: Boolean) {
+        button.isEnabled = !busy
+        button.isClickable = !busy
+        button.alpha = if (busy) DISABLED_ACTION_ALPHA else 1f
+    }
+
+    private fun tryEnterProject(project: StoreProject, actionBtn: View) {
+        if (isProjectJoined(project)) {
+            openJoinedProject(project)
+            return
+        }
         if (!AuthManager.isLoggedIn(activity)) {
             Toast.makeText(activity, "请先登录后加入项目", Toast.LENGTH_SHORT).show()
             return
@@ -521,53 +508,48 @@ internal class MainMarketplaceActions(
             return
         }
         if (normalizeProjectJoinMode(project.joinMode) == PROJECT_JOIN_MODE_APPROVAL) {
-            tryRequestJoinProject(project, joinBtn, token)
+            tryRequestJoinProjectFromIcon(project, actionBtn, token)
             return
         }
-        joinBtn.isEnabled = false
-        joinBtn.text = "加入中..."
+
+        setIconButtonBusy(actionBtn, true)
         thread(name = "join-project") {
             val result = runCatching { joinStoreProject(http, serverUrl, project.id, token) }
             activity.runOnUiThread {
                 result
                     .onSuccess {
                         joinedIds.add(project.id)
-                        markProjectJoined(project, joinBtn)
+                        markProjectJoined(project, actionBtn)
                         Toast.makeText(activity, projectJoinSuccessToast(project.joinMode), Toast.LENGTH_SHORT).show()
+                        openJoinedProject(project)
                     }
                     .onFailure {
-                        joinBtn.isEnabled = true
-                        joinBtn.text = projectEntryActionLabel(project, false)
+                        setIconButtonBusy(actionBtn, false)
                         Toast.makeText(activity, it.message ?: "加入失败", Toast.LENGTH_SHORT).show()
                     }
             }
         }
     }
 
-    private fun tryRequestJoinProject(project: StoreProject, joinBtn: TextView, token: String) {
-        joinBtn.isEnabled = false
-        joinBtn.text = "申请中..."
+    private fun tryRequestJoinProjectFromIcon(project: StoreProject, actionBtn: View, token: String) {
+        setIconButtonBusy(actionBtn, true)
         thread(name = "request-join-project") {
             val result = runCatching { requestJoinStoreProject(http, serverUrl, project.id, token) }
             activity.runOnUiThread {
                 result
                     .onSuccess {
-                        joinBtn.text = "已申请"
+                        actionBtn.alpha = DISABLED_ACTION_ALPHA
                         Toast.makeText(activity, "申请已提交，等待项目管理员审核", Toast.LENGTH_SHORT).show()
                     }
                     .onFailure {
-                        joinBtn.isEnabled = true
-                        joinBtn.text = projectEntryActionLabel(project, false)
+                        setIconButtonBusy(actionBtn, false)
                         Toast.makeText(activity, it.message ?: "申请失败", Toast.LENGTH_SHORT).show()
                     }
             }
         }
     }
 
-    private fun tryInstallProject(project: StoreProject, installBtn: TextView, joinBtn: TextView?) {
-        if (openInstalledProjectApp(activity, project.id, project.name)) {
-            return
-        }
+    private fun tryInstallProjectFromIcon(project: StoreProject, installBtn: View, joinBtn: View?) {
         if (!isAndroidApkInstallSupported()) {
             Toast.makeText(activity, "当前设备不是 Android，无法直接安装 APK", Toast.LENGTH_SHORT).show()
             return
@@ -584,16 +566,14 @@ internal class MainMarketplaceActions(
         }
 
         val shouldJoin = !isProjectJoined(project)
-        installBtn.isEnabled = false
-        installBtn.text = if (shouldJoin) "加入中..." else "准备安装..."
+        setIconButtonBusy(installBtn, true)
         thread(name = "install-store-project") {
             val result = runCatching {
                 if (shouldJoin) joinStoreProject(http, serverUrl, project.id, token)
                 apkUrl
             }
             activity.runOnUiThread {
-                installBtn.isEnabled = true
-                installBtn.text = projectPlazaApkActionLabel(project)
+                setIconButtonBusy(installBtn, false)
                 result
                     .onSuccess { url ->
                         if (shouldJoin) {
@@ -609,13 +589,35 @@ internal class MainMarketplaceActions(
         }
     }
 
+    private fun shareProject(project: StoreProject) {
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_TEXT, projectShareText(project))
+        }
+        activity.startActivity(Intent.createChooser(intent, "分享项目"))
+    }
+
+    private fun projectShareText(project: StoreProject): String {
+        val identity = identityFor(project)
+        val lines = mutableListOf(
+            "一龙项目：${identity.title}",
+            "创建者：${project.ownerAccount.ifBlank { "未知" }}",
+            "成员：${project.memberCount.coerceAtLeast(0)}",
+            "加入方式：${projectJoinModeSummary(project.joinMode)}"
+        )
+        val description = identity.subtitle ?: project.description?.trim()?.takeIf { it.isNotBlank() }
+        if (!description.isNullOrBlank()) lines += "简介：$description"
+        project.latestApkUrl?.trim()?.takeIf { it.isNotBlank() }?.let { lines += "APK：$it" }
+        return lines.joinToString("\n")
+    }
+
     private fun isProjectJoined(project: StoreProject): Boolean {
         return !project.viewerRole.isNullOrBlank() || joinedIds.contains(project.id)
     }
 
-    private fun markProjectJoined(project: StoreProject, joinBtn: TextView) {
-        joinBtn.text = projectEntryActionLabel(project, true)
-        joinBtn.isEnabled = true
+    private fun markProjectJoined(project: StoreProject, joinBtn: View) {
+        joinBtn.contentDescription = projectEntryActionLabel(project, true)
+        setIconButtonBusy(joinBtn, false)
         joinBtn.setOnClickListener { openJoinedProject(project) }
     }
 
@@ -670,38 +672,12 @@ internal class MainMarketplaceActions(
         return value in 'A'..'Z' || value in 'a'..'z'
     }
 
-    private fun joinApprovalLabel(joinMode: String): String {
-        return if (normalizeProjectJoinMode(joinMode) == PROJECT_JOIN_MODE_APPROVAL) "需审批" else "无需审批"
-    }
-
-    private fun approvalDotColor(joinMode: String): String {
-        return if (normalizeProjectJoinMode(joinMode) == PROJECT_JOIN_MODE_APPROVAL) COLOR_STATUS_DANGER else COLOR_STATUS_SUCCESS
-    }
-
-    private fun apkDotColor(project: StoreProject): String {
-        return if (project.latestApkUrl.isNullOrBlank() &&
-            !isProjectAppInstalled(activity, project.id, project.name)
-        ) COLOR_TEXT_TERTIARY else COLOR_STATUS_SUCCESS
-    }
-
-    private fun apkStatusLabel(project: StoreProject): String {
-        return when {
-            isProjectAppInstalled(activity, project.id, project.name) -> "已安装"
-            project.latestApkUrl.isNullOrBlank() -> "暂无APK"
-            else -> "可安装"
-        }
-    }
-
     private fun projectEntryActionLabel(project: StoreProject, alreadyJoined: Boolean): String {
         return if (alreadyJoined || normalizeProjectJoinMode(project.joinMode) != PROJECT_JOIN_MODE_APPROVAL) {
             "进入空间"
         } else {
             "申请加入"
         }
-    }
-
-    private fun projectPlazaApkActionLabel(project: StoreProject): String {
-        return if (isProjectAppInstalled(activity, project.id, project.name)) "打开应用" else "下载APK"
     }
 
     private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {
@@ -720,15 +696,6 @@ internal class MainMarketplaceActions(
         }
     }
 
-    private fun topRoundedRect(color: String, radiusDp: Int): GradientDrawable {
-        val radius = dp(radiusDp).toFloat()
-        return GradientDrawable().apply {
-            shape = GradientDrawable.RECTANGLE
-            setColor(Color.parseColor(color))
-            cornerRadii = floatArrayOf(radius, radius, radius, radius, 0f, 0f, 0f, 0f)
-        }
-    }
-
     private fun filterChipWidthPx(): Int = designPx(SEGMENT_WIDTH_PX)
 
     private fun filterChipHeightPx(): Int = designPx(SEGMENT_HEIGHT_PX)
@@ -740,7 +707,6 @@ internal class MainMarketplaceActions(
 
     private companion object {
         const val FILTER_ALL = "all"
-        const val COLOR_APP_BG = "#000000"
         const val COLOR_CARD_HEADER = "#1F2023"
         const val COLOR_CARD_BODY = "#1A1A1A"
         const val COLOR_SEARCH_BG = "#272727"
@@ -751,15 +717,10 @@ internal class MainMarketplaceActions(
         const val COLOR_TEXT_TERTIARY = "#777777"
         const val COLOR_DIVIDER = "#6D6E6F"
         const val COLOR_THUMB_BG = "#FFFFFF"
-        const val COLOR_BUTTON_BG = "#FFFFFF"
-        const val COLOR_BUTTON_TEXT = "#000000"
-        const val COLOR_STATUS_SUCCESS = "#58BE6A"
-        const val COLOR_STATUS_DANGER = "#E62129"
         const val FONT_AVATAR_SP = 24f
         const val FONT_PAGE_TITLE_SP = 16f
-        const val FONT_STATUS_SP = 14f
         const val FONT_LIST_SECONDARY_SP = 13f
-        const val FONT_META_SP = 12f
+        const val FONT_CARD_TITLE_SP = 18f
         const val SEARCH_HEIGHT_DP = 48
         const val SEARCH_RADIUS_DP = 24
         const val SEARCH_SIDE_MARGIN_DP = 20
@@ -770,20 +731,16 @@ internal class MainMarketplaceActions(
         const val FILTER_ITEM_GAP_DP = 14
         const val CARD_RADIUS_DP = 18
         const val CARD_SIDE_MARGIN_DP = 10
-        const val CARD_HEADER_HEIGHT_DP = 52
-        const val CARD_BODY_HEIGHT_DP = 176
+        const val CARD_CONTENT_HEIGHT_DP = 184
+        const val CARD_ACTION_BAR_HEIGHT_DP = 56
+        const val CARD_GRID_GAP_DP = 10
+        const val CARD_CONTENT_SIDE_PADDING_DP = 18
         const val FIRST_CARD_TOP_MARGIN_DP = 18
         const val CARD_GAP_DP = 14
         const val THUMB_SIZE_DP = 40
-        const val DIVIDER_WIDTH_DP = 252
-        const val DESC_WIDTH_DP = 260
-        const val CARD_BODY_CONTENT_TOP_DP = 12
-        const val CARD_TIME_TOP_DP = 32
-        const val CARD_MAIN_RIGHT_MARGIN_DP = 24
-        const val INFO_ROW_RIGHT_MARGIN_DP = 96
-        const val ACTION_BUTTON_WIDTH_DP = 68
-        const val ACTION_BUTTON_HEIGHT_DP = 32
-        const val ACTION_BUTTON_GAP_DP = 10
-        const val ACTION_BUTTON_BOTTOM_DP = 8
+        const val ACTION_ICON_TOUCH_DP = 48
+        const val ACTION_ICON_SIZE_DP = 34
+        const val ACTION_ICON_GAP_DP = 0
+        const val DISABLED_ACTION_ALPHA = 0.45f
     }
 }

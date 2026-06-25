@@ -100,11 +100,16 @@
 
 .project-plaza-results {
   margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 10px;
+  padding: 0 10px;
+  box-sizing: border-box;
 }
 
 .project-plaza-card {
-  width: calc(100% - 20px);
-  margin: 0 10px 14px;
+  width: 100%;
+  margin: 0;
   border: 0;
   border-radius: 18px;
   overflow: hidden;
@@ -116,12 +121,11 @@
 
 .project-plaza-card-head {
   height: 52px;
-  padding: 0 24px;
+  padding: 0 18px;
   background: #1f2023;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  display: flex;
+  justify-content: center;
   align-items: center;
-  gap: 18px;
   box-sizing: border-box;
 }
 
@@ -131,12 +135,14 @@
   font-size: 16px;
   font-weight: 800;
   line-height: 1.1;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .project-plaza-status {
+  display: none;
   color: #d9d9d9;
   font-size: 14px;
   line-height: 1;
@@ -156,15 +162,15 @@
 
 .project-plaza-card-body {
   position: relative;
-  height: 176px;
-  background: #1a1a1a;
+  height: 188px;
+  background: #1f2023;
   box-sizing: border-box;
 }
 
 .project-plaza-card-main {
   position: absolute;
-  left: 24px;
-  right: 24px;
+  left: 18px;
+  right: 18px;
   top: 12px;
 }
 
@@ -172,7 +178,6 @@
   display: flex;
   align-items: center;
   min-width: 0;
-  padding-right: 96px;
   box-sizing: border-box;
 }
 
@@ -221,7 +226,7 @@
 
 .project-plaza-divider {
   display: block;
-  width: 252px;
+  width: 100%;
   max-width: 100%;
   height: 1px;
   margin-top: 12px;
@@ -230,7 +235,7 @@
 
 .project-plaza-desc {
   display: -webkit-box;
-  width: 260px;
+  width: 100%;
   max-width: 100%;
   margin-top: 10px;
   color: #b8b8b8;
@@ -242,6 +247,7 @@
 }
 
 .project-plaza-time {
+  display: none;
   position: absolute;
   right: 24px;
   top: 32px;
@@ -253,29 +259,50 @@
 
 .project-plaza-actions {
   position: absolute;
-  left: 24px;
-  right: 24px;
-  bottom: 8px;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 56px;
+  padding-right: 10px;
   display: flex;
   justify-content: flex-end;
   align-items: center;
-  gap: 10px;
+  gap: 0;
+  background: #1a1a1a;
+  box-sizing: border-box;
 }
 
 .project-plaza-btn {
-  width: 68px;
-  height: 32px;
+  width: 48px;
+  height: 48px;
   border: 0;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #000000;
-  font-size: 13px;
-  line-height: 32px;
-  font-weight: 800;
+  border-radius: 10px;
+  background-color: transparent;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 34px 34px;
+  color: transparent;
+  font-size: 0;
+  line-height: 0;
+  font-weight: 400;
   text-align: center;
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
+}
+
+.project-plaza-btn[data-plaza-action="open"],
+.project-plaza-btn[data-plaza-action="join"],
+.project-plaza-btn[data-plaza-action="apply"] {
+  background-image: url("/assets/ic_plaza_enter_space.png");
+}
+
+.project-plaza-btn[data-plaza-action="share"] {
+  background-image: url("/assets/ic_plaza_share_project.png");
+}
+
+.project-plaza-btn[data-plaza-action="download"] {
+  background-image: url("/assets/ic_plaza_download_apk.png");
 }
 
 .project-plaza-btn[aria-disabled="true"] {
@@ -285,6 +312,7 @@
 
 .project-plaza-empty,
 .project-plaza-error {
+  grid-column: 1 / -1;
   padding: 58px 20px;
   color: #777777;
   text-align: center;
@@ -298,23 +326,21 @@
 
 @media (max-width: 390px) {
   .project-plaza-card-head {
-    padding: 0 20px;
-    gap: 14px;
-  }
-
-  .project-plaza-status {
-    font-size: 14px;
+    padding: 0 16px;
   }
 
   .project-plaza-card-main {
-    right: 24px;
+    left: 16px;
+    right: 16px;
   }
 
-  .project-plaza-actions {
-    gap: 10px;
+  .project-plaza-details {
+    padding-left: 12px;
+    font-size: 12px;
   }
 
   .project-plaza-btn {
-    width: 66px;
+    width: 44px;
+    background-size: 32px 32px;
   }
 }
