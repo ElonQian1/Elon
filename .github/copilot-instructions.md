@@ -27,7 +27,7 @@
 **绝不能**在改动 elon 自身代码后用 `assembleDebug` 或跳过签名脚本直接运行 `./gradlew assembleRelease`。
 ### Android 任务完成定义
 
-涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算发布完成；默认分成两层完成定义。并行任务里，代码进入远端主线是本代理的硬完成；发布脚本只负责发布“运行脚本时的最新 main”，如果构建期间被后续提交或服务器版本超越，按脚本提示汇报“代码已合并，发布交由后续最新 main”，不要反复 rebase 重跑。
+涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算发布完成；默认分成两层完成定义。用户当前偏好：改动 elon APK/APP 后，代码同步完成后继续发布 APK，除非用户明确说只同步代码、暂不发布或发布稍后再说。并行任务里，代码进入远端主线是本代理的硬完成；发布脚本只负责发布“运行脚本时的最新 main”，如果构建期间被后续提交或服务器版本超越，按脚本提示汇报“代码已合并，发布交由后续最新 main”，不要反复 rebase 重跑。
 
 1. **代码同步完成**
    - 业务代码已 `commit` 并 `git push origin HEAD:main` 进入 `origin/main`
@@ -38,7 +38,7 @@
      ```
 
 2. **APK 发布完成**
-   - 只有当用户明确要求“给我可安装 APK / 下载链接 / 立即发布到线上”时，才把发布成功作为完成定义
+   - 改动 elon APK/APP 的用户可见能力时默认继续发布 APK；只有用户明确要求“先同步代码”“发布稍后再说”或“不要求这次发布成功”时才跳过
    - 这时运行：
      ```powershell
      scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
@@ -76,7 +76,7 @@
 - **APP 颜色规范**：任何 APK/APP UI、主题、按钮、卡片、底部导航、状态胶囊或配色调整，必须先读取并遵守 `docs/APP 颜色规范.md`；只有用户明确要求更新颜色规范时，才修改该文件。
 - **APK UI ↔ 网页 UI 同步**：改动 APK 任何 layout XML、Toolbar、Tab、气泡、颜色主题时，必须在同一 commit 同步更新 `server/src/assets/web_page.html`。对照规则见 `.github/instructions/apk-web-ui-sync.instructions.md`
 - **后端运行代码变更**：先 commit + push 到 `origin/main`，再运行 `.\scripts\publish-server.ps1`；脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`。版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。并行任务若发布被后续 main 或服务器版本超越，汇报代码已推送和发布被最新主线接管，不要重复 rebase 重跑。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
-- **Android 新功能默认先同步代码到远端主线**；只有用户明确要求交付安装包、下载链接或线上 APK 时，才把发布成功作为完成定义
+- **Android 新功能默认先同步代码到远端主线，再继续发布 APK**；只有用户明确要求只同步代码、暂不发布或发布稍后再说时，才不把发布成功作为完成定义
 - **新建文件必须显式 `git add`**：`git add server/src/main.rs` 不会自动包含同目录新建的 `.rs` 文件；提交前必须检查 `git status --short | Select-String "^\?\?"` 确认无遗漏——遗漏新文件会导致其他开发者编译失败
 - **Rust 格式化必须带 crate edition**：不要在仓库根裸跑 `rustfmt` 或无 manifest 的 `cargo fmt`；全量检查用 `powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1`（Linux：`bash scripts/format-rust.sh`），全量写入用 `-Apply` / `--apply`。增量格式化指定文件用 `scripts\format-rust.ps1 -Apply -Files <file...>`（Linux：`bash scripts/format-rust.sh --apply --files <file...>`）。脚本会逐个 `Cargo.toml` 或按文件所属 crate 读取显式 `edition`。
 
