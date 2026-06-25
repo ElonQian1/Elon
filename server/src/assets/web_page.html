@@ -531,7 +531,7 @@
       left: 0;
       bottom: 124px;
       width: 48px;
-      height: 68px;
+      height: 64px;
       border: 0;
       border-radius: 0 10px 10px 0;
       background: transparent;
@@ -543,24 +543,34 @@
       touch-action: none;
       user-select: none;
       overflow: hidden;
+      transition: transform 170ms cubic-bezier(.2,.7,.2,1);
+      will-change: transform;
       z-index: 24;
       -webkit-tap-highlight-color: transparent;
     }
+    .chat-side-menu-handle.retracted {
+      transform: translateX(-48px);
+    }
     .chat-side-menu-handle img {
       display: block;
-      width: 40px;
-      height: 56px;
+      width: 34px;
+      height: 50px;
       object-fit: fill;
       pointer-events: none;
     }
     .web-chat-side-menu-mask {
       position: fixed;
       inset: 0;
-      display: none;
       background: rgba(0,0,0,0.42);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 240ms cubic-bezier(.2,.7,.2,1);
       z-index: 80;
     }
-    .web-chat-side-menu-mask.active { display: block; }
+    .web-chat-side-menu-mask.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
     .web-chat-side-menu {
       width: min(304px, calc(100vw - 64px));
       height: 100%;
@@ -2481,6 +2491,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       <button class="profile-row" id="ttsVoiceRow">
         <span>AI 回复语音</span><span class="arrow">APK 中切换</span>
       </button>
+      <button class="profile-row" id="chatHandleToggleRow">
+        <span>悬浮按钮</span><span class="arrow" id="chatHandleToggleState">打开</span>
+      </button>
       <button class="profile-row" id="nodeMarketRow">
         <span>PC 节点大厅</span><span class="arrow">›</span>
       </button>
@@ -2969,6 +2982,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const ttsVoiceRow = $('ttsVoiceRow');
   const ttsVoiceMask = $('ttsVoiceMask');
   const ttsVoiceCloseBtn = $('ttsVoiceCloseBtn');
+  const chatHandleToggleRow = $('chatHandleToggleRow');
+  const chatHandleToggleState = $('chatHandleToggleState');
   const agentAutomationRow = $('agentAutomationRow');
   const agentOpenSettingsBtn = $('agentOpenSettingsBtn');
   const sharePromotionRow = $('sharePromotionRow');
@@ -3006,6 +3021,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const webSideMenuDocsBtn = $('webSideMenuDocsBtn');
   const webSideMenuGitBtn = $('webSideMenuGitBtn');
   const webSideMenuContinueBtn = $('webSideMenuContinueBtn');
+  const CHAT_SIDE_MENU_HANDLE_VISIBLE_KEY = 'elon_chat_side_menu_handle_visible';
+  let chatSideMenuHandleEnabled =
+    localStorage.getItem(CHAT_SIDE_MENU_HANDLE_VISIBLE_KEY) !== 'hidden';
 
   const tabs = document.querySelectorAll('.tab');
   const pages = document.querySelectorAll('.page');
@@ -3142,10 +3160,69 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function isAnyChatActive() {
     return !!currentProject || isContactChatActive();
   }
+  function isChatSideMenuHandleContextActive() {
+    return currentTab === 'chatPage' &&
+      isAnyChatActive() &&
+      chatView &&
+      !chatView.classList.contains('hidden') &&
+      inputBar &&
+      inputBar.classList.contains('active');
+  }
+  function updateChatSideMenuHandleToggleText() {
+    if (chatHandleToggleState) {
+      chatHandleToggleState.textContent = chatSideMenuHandleEnabled ? '打开' : '隐藏';
+    }
+  }
+  function hideWebChatSideMenuHandle() {
+    if (!chatSideMenuHandle) return;
+    chatSideMenuHandle.classList.add('hidden');
+    chatSideMenuHandle.classList.remove('retracted');
+  }
+  function retractWebChatSideMenuHandle() {
+    if (!chatSideMenuHandle || !chatSideMenuHandleEnabled || !isChatSideMenuHandleContextActive()) return;
+    chatSideMenuHandle.classList.remove('hidden');
+    requestAnimationFrame(() => chatSideMenuHandle.classList.add('retracted'));
+  }
+  function revealWebChatSideMenuHandle(animated) {
+    if (!chatSideMenuHandle) return;
+    updateChatSideMenuHandleToggleText();
+    if (!chatSideMenuHandleEnabled || !isChatSideMenuHandleContextActive()) {
+      hideWebChatSideMenuHandle();
+      return;
+    }
+    chatSideMenuHandle.classList.remove('hidden');
+    if (animated) {
+      chatSideMenuHandle.classList.add('retracted');
+      requestAnimationFrame(() => chatSideMenuHandle.classList.remove('retracted'));
+    } else {
+      chatSideMenuHandle.classList.remove('retracted');
+    }
+  }
+  function syncChatSideMenuHandleVisibility(animated) {
+    updateChatSideMenuHandleToggleText();
+    if (webChatSideMenuMask && webChatSideMenuMask.classList.contains('active')) {
+      retractWebChatSideMenuHandle();
+      return;
+    }
+    revealWebChatSideMenuHandle(!!animated);
+  }
+  function setChatSideMenuHandleEnabled(enabled) {
+    chatSideMenuHandleEnabled = !!enabled;
+    localStorage.setItem(
+      CHAT_SIDE_MENU_HANDLE_VISIBLE_KEY,
+      chatSideMenuHandleEnabled ? 'visible' : 'hidden'
+    );
+    syncChatSideMenuHandleVisibility(true);
+  }
   function closeWebChatSideMenu() {
     if (!webChatSideMenuMask) return;
     webChatSideMenuMask.classList.remove('active');
     webChatSideMenuMask.setAttribute('aria-hidden', 'true');
+    window.setTimeout(() => {
+      if (!webChatSideMenuMask.classList.contains('active')) {
+        revealWebChatSideMenuHandle(true);
+      }
+    }, 250);
   }
   function syncWebChatSideMenu() {
     const hasProject = !!(currentProject && currentProject.id);
@@ -3165,21 +3242,26 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function openWebChatSideMenu() {
     if (!isAnyChatActive() || !webChatSideMenuMask) return;
     syncWebChatSideMenu();
+    retractWebChatSideMenuHandle();
     webChatSideMenuMask.classList.add('active');
     webChatSideMenuMask.setAttribute('aria-hidden', 'false');
   }
   function installChatSideMenuHandleDrag() {
     if (!chatSideMenuHandle) return;
     if (!window.PointerEvent) {
-      chatSideMenuHandle.addEventListener('click', openWebChatSideMenu);
+      chatSideMenuHandle.addEventListener('click', () => {
+        if (chatSideMenuHandleEnabled) openWebChatSideMenu();
+      });
       return;
     }
     const handleDragState = {
       active: false,
       pointerId: null,
+      startX: 0,
       startY: 0,
       startBottom: 124,
-      dragging: false
+      dragging: false,
+      moved: false
     };
     const readHandleBottom = () => {
       const raw = parseFloat(getComputedStyle(chatSideMenuHandle).bottom);
@@ -3199,21 +3281,30 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         chatSideMenuHandle.releasePointerCapture(event.pointerId);
       } catch (_) {
       }
-      if (shouldOpen) openWebChatSideMenu();
+      if (shouldOpen && !handleDragState.moved) openWebChatSideMenu();
     };
     chatSideMenuHandle.addEventListener('pointerdown', (event) => {
       event.preventDefault();
       handleDragState.active = true;
       handleDragState.pointerId = event.pointerId;
+      handleDragState.startX = event.clientX;
       handleDragState.startY = event.clientY;
       handleDragState.startBottom = readHandleBottom();
       handleDragState.dragging = false;
+      handleDragState.moved = false;
       chatSideMenuHandle.setPointerCapture(event.pointerId);
     });
     chatSideMenuHandle.addEventListener('pointermove', (event) => {
       if (!handleDragState.active || event.pointerId !== handleDragState.pointerId) return;
+      const deltaX = event.clientX - handleDragState.startX;
       const deltaY = event.clientY - handleDragState.startY;
-      if (!handleDragState.dragging && Math.abs(deltaY) > 4) {
+      if (Math.abs(deltaX) > 4 || Math.abs(deltaY) > 4) {
+        handleDragState.moved = true;
+      }
+      if (!handleDragState.dragging &&
+        Math.abs(deltaY) > 4 &&
+        Math.abs(deltaY) >= Math.abs(deltaX)
+      ) {
         handleDragState.dragging = true;
       }
       if (handleDragState.dragging) {
@@ -3643,7 +3734,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     // 输入栏：聊天页进入项目/好友/群聊后显示
     inputBar.classList.toggle('active', inChat);
-    if (chatSideMenuHandle) chatSideMenuHandle.classList.toggle('hidden', !inChat);
+    if (inChat) {
+      syncChatSideMenuHandleVisibility(false);
+    } else {
+      hideWebChatSideMenuHandle();
+    }
     if (!inChat) closeWebChatSideMenu();
     messageInput.placeholder = isContactChatActive() ? '发消息' : '描述你想开发的 App 功能';
     modelBtn.style.display = inGroupChat ? 'none' : '';
@@ -3703,7 +3798,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
-    if (chatSideMenuHandle) chatSideMenuHandle.classList.add('hidden');
+    hideWebChatSideMenuHandle();
     closeWebChatSideMenu();
     backBtn.style.display = 'none';
     voiceCallBtn.style.display = 'none';
@@ -3747,6 +3842,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   ttsVoiceMask.addEventListener('click', (e) => {
     if (e.target === ttsVoiceMask) ttsVoiceMask.classList.remove('active');
   });
+  if (chatHandleToggleRow) {
+    chatHandleToggleRow.addEventListener('click', () => {
+      setChatSideMenuHandleEnabled(!chatSideMenuHandleEnabled);
+    });
+    updateChatSideMenuHandleToggleText();
+  }
   nativeOnlyCloseBtn.addEventListener('click', () => nativeOnlyMask.classList.remove('active'));
   nativeOnlyMask.addEventListener('click', (e) => {
     if (e.target === nativeOnlyMask) nativeOnlyMask.classList.remove('active');
@@ -4153,7 +4254,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     progressLog = [];
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
-    if (chatSideMenuHandle) chatSideMenuHandle.classList.remove('hidden');
+    syncChatSideMenuHandleVisibility(false);
     chatList.innerHTML = '';
     lastChatTimelineMs = 0;
     appendBubble('progress', '已进入项目「' + (project.name || '') + '」，可以开始描述需求。');
@@ -4203,7 +4304,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
-    if (chatSideMenuHandle) chatSideMenuHandle.classList.add('hidden');
+    hideWebChatSideMenuHandle();
     closeWebChatSideMenu();
     backBtn.style.display = 'none';
     voiceCallBtn.style.display = 'none';
@@ -4227,7 +4328,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.remove('hidden');
     stageHint.classList.add('hidden');
     inputBar.classList.add('active');
-    if (chatSideMenuHandle) chatSideMenuHandle.classList.remove('hidden');
+    syncChatSideMenuHandleVisibility(false);
     backBtn.style.display = '';
     addBtn.style.display = 'none';
     searchBtn.style.display = 'none';

@@ -3,6 +3,7 @@ package com.elon.app
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.app.AlertDialog
+import android.content.Context
 import android.content.Intent
 import android.graphics.Canvas
 import android.graphics.Color
@@ -58,6 +59,7 @@ internal class ChatSideMenuController(
     private lateinit var settingsBubble: FrameLayout
     private lateinit var accountNameText: TextView
     private lateinit var accountAccountText: TextView
+    private lateinit var handleToggleStatusText: TextView
     private lateinit var usageDropdown: SideMenuUsageDropdown
     private lateinit var aiMenuView: ChatAiSideMenuView
     private lateinit var projectMenuView: ChatProjectSideMenuView
@@ -69,10 +71,16 @@ internal class ChatSideMenuController(
     private var startRawY = 0f
     private var startInsideContent = false
     private var startOutsidePanel = false
+    private val sideMenuHandlePrefs by lazy {
+        activity.getSharedPreferences(SIDE_MENU_HANDLE_PREFS, Context.MODE_PRIVATE)
+    }
     private val handleTouchSlop by lazy { ViewConfiguration.get(activity).scaledTouchSlop }
+    private var handleStartRawX = 0f
     private var handleStartRawY = 0f
     private var handleStartBottomMargin = 0
     private var handleDragging = false
+    private var handleMovedBeyondTapSlop = false
+    private var sideMenuHandleEnabled = true
 
     val isOpen: Boolean
         get() = isSetup && overlay.visibility == View.VISIBLE && !isAnimating
@@ -81,6 +89,7 @@ internal class ChatSideMenuController(
         if (isSetup) return
         isSetup = true
         overlayHost = activity.window.decorView as ViewGroup
+        sideMenuHandleEnabled = sideMenuHandlePrefs.getBoolean(SIDE_MENU_HANDLE_VISIBLE_KEY, true)
 
         overlay = FrameLayout(activity).apply {
             visibility = View.GONE
@@ -117,6 +126,7 @@ internal class ChatSideMenuController(
             setOnClickListener { openFromHandle() }
             setOnTouchListener { view, event -> handleSideMenuHandleTouch(view, event) }
         }
+        applySideMenuHandleAvailability(animated = false)
         overlay.post { applyPanelWidth() }
     }
 
@@ -129,6 +139,7 @@ internal class ChatSideMenuController(
             overlay.alpha = 0f
             panel.translationX = closedTranslation()
             isAnimating = false
+            revealSideMenuHandle(animated = false)
             return
         }
         isAnimating = true
@@ -149,31 +160,41 @@ internal class ChatSideMenuController(
                     panel.translationX = closedTranslation()
                     isAnimating = false
                     overlay.animate().setListener(null)
+                    revealSideMenuHandle(animated = true)
                 }
             })
             .start()
     }
 
     fun openFromHandle() {
-        if (!isSetup || binding.chatPage.visibility != View.VISIBLE) return
+        if (!isSetup || !sideMenuHandleEnabled || binding.chatPage.visibility != View.VISIBLE) return
         show()
     }
 
     private fun handleSideMenuHandleTouch(view: View, event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
+                handleStartRawX = event.rawX
                 handleStartRawY = event.rawY
                 handleStartBottomMargin =
                     (view.layoutParams as? FrameLayout.LayoutParams)?.bottomMargin ?: 0
                 handleDragging = false
+                handleMovedBeyondTapSlop = false
                 view.isPressed = true
                 view.parent?.requestDisallowInterceptTouchEvent(true)
                 return true
             }
 
             MotionEvent.ACTION_MOVE -> {
+                val deltaX = event.rawX - handleStartRawX
                 val deltaY = event.rawY - handleStartRawY
-                if (!handleDragging && abs(deltaY) > handleTouchSlop) {
+                if (abs(deltaX) > handleTouchSlop || abs(deltaY) > handleTouchSlop) {
+                    handleMovedBeyondTapSlop = true
+                }
+                if (!handleDragging &&
+                    abs(deltaY) > handleTouchSlop &&
+                    abs(deltaY) >= abs(deltaX)
+                ) {
                     handleDragging = true
                 }
                 if (handleDragging) {
@@ -186,14 +207,18 @@ internal class ChatSideMenuController(
             }
 
             MotionEvent.ACTION_UP -> {
+                val shouldOpen = !handleMovedBeyondTapSlop
+                handleDragging = false
+                handleMovedBeyondTapSlop = false
                 view.isPressed = false
                 view.parent?.requestDisallowInterceptTouchEvent(false)
-                view.performClick()
+                if (shouldOpen) view.performClick()
                 return true
             }
 
             MotionEvent.ACTION_CANCEL -> {
                 handleDragging = false
+                handleMovedBeyondTapSlop = false
                 view.isPressed = false
                 view.parent?.requestDisallowInterceptTouchEvent(false)
                 return true
@@ -294,6 +319,7 @@ internal class ChatSideMenuController(
         applyContentMode()
         hideSettingsBubble(animate = false)
         applyPanelWidth()
+        retractSideMenuHandle(animated = true)
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
         overlay.alpha = 0f
@@ -483,6 +509,7 @@ internal class ChatSideMenuController(
         usageDropdown = SideMenuUsageDropdown(activity, dp, selectableForeground)
         panelBody.addView(usageDropdown.rowView)
         panelBody.addView(usageDropdown.detailsView)
+        panelBody.addView(sideMenuHandleToggleRow())
         panelBody.addView(settingsRow("退出登录") { confirmLogout() })
         return bubble
     }
@@ -518,6 +545,7 @@ internal class ChatSideMenuController(
     private fun showSettingsBubble() {
         updateSettingsBubbleBounds()
         updateAccountSummary()
+        updateSideMenuHandleToggleText()
         settingsBubble.visibility = View.VISIBLE
         settingsBubble.animate().cancel()
         settingsBubble.alpha = 0f
@@ -620,6 +648,142 @@ internal class ChatSideMenuController(
                 action()
             }
         }
+    }
+
+    private fun sideMenuHandleToggleRow(): LinearLayout {
+        return LinearLayout(activity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(38)
+            )
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(22), 0, dp(22), 0)
+            isClickable = true
+            foreground = selectableForeground()
+            val titleText = TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f)
+                gravity = Gravity.CENTER_VERTICAL or Gravity.START
+                includeFontPadding = false
+                text = "悬浮按钮"
+                setTextColor(Color.parseColor(WECHAT_POPUP_TEXT_COLOR))
+                textSize = 17f
+            }
+            handleToggleStatusText = TextView(activity).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.MATCH_PARENT
+                )
+                gravity = Gravity.CENTER_VERTICAL or Gravity.END
+                includeFontPadding = false
+                setTextColor(Color.parseColor("#9A9A9A"))
+                textSize = 15f
+            }
+            addView(titleText)
+            addView(handleToggleStatusText)
+            updateSideMenuHandleToggleText()
+            setOnClickListener { toggleSideMenuHandleAvailability() }
+        }
+    }
+
+    private fun toggleSideMenuHandleAvailability() {
+        sideMenuHandleEnabled = !sideMenuHandleEnabled
+        sideMenuHandlePrefs.edit()
+            .putBoolean(SIDE_MENU_HANDLE_VISIBLE_KEY, sideMenuHandleEnabled)
+            .apply()
+        updateSideMenuHandleToggleText()
+        applySideMenuHandleAvailability(animated = true)
+    }
+
+    private fun updateSideMenuHandleToggleText() {
+        if (!::handleToggleStatusText.isInitialized) return
+        handleToggleStatusText.text = if (sideMenuHandleEnabled) "打开" else "隐藏"
+    }
+
+    private fun applySideMenuHandleAvailability(animated: Boolean) {
+        if (!sideMenuHandleEnabled) {
+            hideSideMenuHandle(animated)
+            return
+        }
+        if (overlay.visibility == View.VISIBLE) {
+            retractSideMenuHandle(animated = false)
+        } else {
+            revealSideMenuHandle(animated)
+        }
+    }
+
+    private fun sideMenuHandleTravel(): Float {
+        return (binding.chatSideMenuHandleButton.width.takeIf { it > 0 } ?: dp(48)).toFloat()
+    }
+
+    private fun hideSideMenuHandle(animated: Boolean) {
+        val handle = binding.chatSideMenuHandleButton
+        handle.animate().cancel()
+        val finish = {
+            handle.visibility = View.GONE
+            handle.translationX = 0f
+            handle.animate().setListener(null)
+        }
+        if (!animated || handle.visibility != View.VISIBLE) {
+            finish()
+            return
+        }
+        handle.animate()
+            .translationX(-sideMenuHandleTravel())
+            .setDuration(130L)
+            .setInterpolator(interpolator)
+            .setListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    finish()
+                }
+            })
+            .start()
+    }
+
+    private fun retractSideMenuHandle(animated: Boolean) {
+        val handle = binding.chatSideMenuHandleButton
+        handle.animate().cancel()
+        if (!sideMenuHandleEnabled) {
+            handle.visibility = View.GONE
+            handle.translationX = 0f
+            return
+        }
+        handle.visibility = View.VISIBLE
+        handle.alpha = 1f
+        handle.animate().setListener(null)
+        val target = -sideMenuHandleTravel()
+        if (!animated) {
+            handle.translationX = target
+            return
+        }
+        handle.animate()
+            .translationX(target)
+            .setDuration(130L)
+            .setInterpolator(interpolator)
+            .start()
+    }
+
+    private fun revealSideMenuHandle(animated: Boolean) {
+        val handle = binding.chatSideMenuHandleButton
+        handle.animate().cancel()
+        if (!sideMenuHandleEnabled || binding.chatPage.visibility != View.VISIBLE) {
+            handle.visibility = View.GONE
+            handle.translationX = 0f
+            return
+        }
+        handle.visibility = View.VISIBLE
+        handle.alpha = 1f
+        handle.animate().setListener(null)
+        if (!animated) {
+            handle.translationX = 0f
+            return
+        }
+        handle.translationX = -sideMenuHandleTravel()
+        handle.animate()
+            .translationX(0f)
+            .setDuration(170L)
+            .setInterpolator(interpolator)
+            .start()
     }
 
     private fun menuText(title: String): TextView {
@@ -734,5 +898,7 @@ internal class ChatSideMenuController(
     private companion object {
         private const val DURATION_MS = 260L
         private const val SETTINGS_DOCK_HEIGHT_DP = 88
+        private const val SIDE_MENU_HANDLE_PREFS = "chat_side_menu_handle"
+        private const val SIDE_MENU_HANDLE_VISIBLE_KEY = "visible"
     }
 }

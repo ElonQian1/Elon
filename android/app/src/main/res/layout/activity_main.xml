@@ -402,7 +402,7 @@
                 <ImageButton
                     android:id="@+id/chatSideMenuHandleButton"
                     android:layout_width="48dp"
-                    android:layout_height="68dp"
+                    android:layout_height="64dp"
                     android:layout_gravity="start|bottom"
                     android:layout_marginBottom="124dp"
                     android:background="@android:color/transparent"
@@ -410,9 +410,9 @@
                     android:elevation="12dp"
                     android:foreground="?attr/selectableItemBackgroundBorderless"
                     android:paddingStart="0dp"
-                    android:paddingTop="6dp"
-                    android:paddingEnd="8dp"
-                    android:paddingBottom="6dp"
+                    android:paddingTop="7dp"
+                    android:paddingEnd="14dp"
+                    android:paddingBottom="7dp"
                     android:scaleType="fitXY"
                     android:src="@drawable/ic_chat_side_menu_handle" />
             </FrameLayout>
