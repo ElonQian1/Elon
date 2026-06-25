@@ -761,13 +761,6 @@ button { cursor: pointer; }
   width: 30px;
   height: 30px;
 }
-.user-actions .logout-inline {
-  width: auto;
-  min-width: 42px;
-  padding: 0 7px;
-  font-size: 12px;
-  font-weight: 800;
-}
 .account-menu {
   position: absolute;
   left: 8px;

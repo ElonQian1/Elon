@@ -1337,7 +1337,6 @@
       });
       syncSettingsRuntimePermissionHint();
     }
-    $('logoutBtn').addEventListener('click', logout);
     els.sidebarSearch.addEventListener('input', renderChannels);
     els.composer.addEventListener('submit', (event) => {
       event.preventDefault();
