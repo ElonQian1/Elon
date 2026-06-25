@@ -43,6 +43,7 @@
     { key: 'popular', label: '最热门', sort: 'members' }
   ];
   let pcAuthMode = 'login';
+  let inlineAuthMode = 'login';
   let activeProjectFolderPickController = null;
   let projectFolderPickHintTimer = 0;
 
@@ -511,36 +512,131 @@
       .finally(() => clearTimeout(timer));
   }
 
+  async function runPcAuth(mode, values) {
+    const authMode = mode === 'register' ? 'register' : 'login';
+    const account = clean(values.account);
+    const password = values.password || '';
+    if (!account) throw new Error('请输入账号');
+    if (!password) throw new Error('请输入密码');
+    if (authMode === 'register' && password.length < 6) throw new Error('密码至少 6 位');
+    const payload = { account, password, device_name: 'pc-web' };
+    if (authMode === 'register') payload.nickname = clean(values.nickname);
+    const res = await authFetchWithTimeout(authMode === 'register' ? '/api/auth/register' : '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }, 15000);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || (authMode === 'register' ? '注册失败' : '登录失败'));
+    if (!data.token) throw new Error('登录态返回异常，请重试');
+    saveToken(data.token);
+    state.user = data.user || null;
+    await refreshActive();
+    closeAuthModal();
+  }
+
   async function submitPcAuth(event) {
     event.preventDefault();
     setPcAuthBusy(true);
     setPcAuthError('');
     try {
-      const account = clean(els.pcAuthAccountInput.value);
-      const password = els.pcAuthPasswordInput.value || '';
-      if (!account) throw new Error('请输入账号');
-      if (!password) throw new Error('请输入密码');
-      if (pcAuthMode === 'register' && password.length < 6) throw new Error('密码至少 6 位');
-      const payload = { account, password, device_name: 'pc-web' };
-      if (pcAuthMode === 'register') payload.nickname = clean(els.pcAuthNicknameInput.value);
-      const res = await authFetchWithTimeout(pcAuthMode === 'register' ? '/api/auth/register' : '/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      }, 15000);
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || (pcAuthMode === 'register' ? '注册失败' : '登录失败'));
-      if (!data.token) throw new Error('登录态返回异常，请重试');
-      saveToken(data.token);
-      state.user = data.user || null;
-      await refreshActive();
-      closeAuthModal();
+      await runPcAuth(pcAuthMode, {
+        account: els.pcAuthAccountInput.value,
+        password: els.pcAuthPasswordInput.value,
+        nickname: els.pcAuthNicknameInput.value
+      });
     } catch (error) {
       const message = error && error.name === 'AbortError' ? '请求超时，请检查网络后重试' : (error && error.message) || '网络错误';
       setPcAuthError(message);
     } finally {
       setPcAuthBusy(false);
     }
+  }
+
+  function inlineAuthEls() {
+    const form = $('inlineAuthForm');
+    if (!form) return {};
+    return {
+      form,
+      accountInput: $('inlineAuthAccountInput'),
+      nicknameField: $('inlineAuthNicknameField'),
+      nicknameInput: $('inlineAuthNicknameInput'),
+      passwordInput: $('inlineAuthPasswordInput'),
+      error: $('inlineAuthError'),
+      submitBtn: $('inlineAuthSubmitBtn'),
+      tabs: Array.from(form.querySelectorAll('[data-inline-auth-mode]'))
+    };
+  }
+
+  function setInlineAuthError(message) {
+    const auth = inlineAuthEls();
+    if (!auth.error) return;
+    auth.error.textContent = message || '';
+    auth.error.classList.toggle('show', !!message);
+  }
+
+  function updateInlineAuthSubmitLabel(busy) {
+    const auth = inlineAuthEls();
+    if (!auth.submitBtn) return;
+    if (busy) {
+      auth.submitBtn.textContent = inlineAuthMode === 'register' ? '创建中…' : '登录中…';
+      return;
+    }
+    auth.submitBtn.textContent = inlineAuthMode === 'register' ? '创建账号' : '登录';
+  }
+
+  function setInlineAuthBusy(busy) {
+    const auth = inlineAuthEls();
+    if (!auth.submitBtn) return;
+    auth.submitBtn.disabled = !!busy;
+    updateInlineAuthSubmitLabel(!!busy);
+  }
+
+  function setInlineAuthMode(mode) {
+    inlineAuthMode = mode === 'register' ? 'register' : 'login';
+    const auth = inlineAuthEls();
+    const isRegister = inlineAuthMode === 'register';
+    auth.tabs?.forEach((button) => {
+      button.classList.toggle('active', button.dataset.inlineAuthMode === inlineAuthMode);
+    });
+    if (auth.nicknameField) auth.nicknameField.hidden = !isRegister;
+    if (auth.passwordInput) {
+      auth.passwordInput.autocomplete = isRegister ? 'new-password' : 'current-password';
+      auth.passwordInput.placeholder = isRegister ? '至少 6 位' : '输入登录密码';
+    }
+    setInlineAuthError('');
+    updateInlineAuthSubmitLabel(false);
+  }
+
+  async function submitInlineAuth(event) {
+    event.preventDefault();
+    const auth = inlineAuthEls();
+    setInlineAuthBusy(true);
+    setInlineAuthError('');
+    try {
+      await runPcAuth(inlineAuthMode, {
+        account: auth.accountInput?.value || '',
+        password: auth.passwordInput?.value || '',
+        nickname: auth.nicknameInput?.value || ''
+      });
+    } catch (error) {
+      const message = error && error.name === 'AbortError' ? '请求超时，请检查网络后重试' : (error && error.message) || '网络错误';
+      setInlineAuthError(message);
+    } finally {
+      setInlineAuthBusy(false);
+    }
+  }
+
+  function bindInlineAuthForm() {
+    const auth = inlineAuthEls();
+    if (!auth.form) return;
+    auth.tabs.forEach((button) => button.addEventListener('click', () => setInlineAuthMode(button.dataset.inlineAuthMode)));
+    auth.form.addEventListener('submit', submitInlineAuth);
+    setInlineAuthMode('login');
+    setTimeout(() => {
+      const nextAuth = inlineAuthEls();
+      if (nextAuth.accountInput) nextAuth.accountInput.focus();
+    }, 0);
   }
 
   function setRails(kind) {
@@ -1481,10 +1577,29 @@
     setNodeMode(false);
     els.messageList.innerHTML = `<div class="empty-state">
       <strong>登录后使用一龙AI、项目和 PC 工作台</strong>
-      <p>PC 工作台读取账号登录态。点击下方按钮登录或注册后，即可进入一龙AI工作区。</p>
-      <button class="text-button" type="button" id="loginWeb">登录或注册账号</button>
+      <p>PC 工作台读取账号登录态。输入账号和密码后，即可进入一龙AI工作区。</p>
+      <form class="inline-auth-card" id="inlineAuthForm">
+        <div class="inline-auth-tabs" role="tablist" aria-label="账号入口">
+          <button class="inline-auth-tab active" type="button" data-inline-auth-mode="login">登录</button>
+          <button class="inline-auth-tab" type="button" data-inline-auth-mode="register">注册</button>
+        </div>
+        <label class="inline-auth-field">
+          <span>账号</span>
+          <input id="inlineAuthAccountInput" autocomplete="username" placeholder="手机号、邮箱或账号 ID" />
+        </label>
+        <label class="inline-auth-field" id="inlineAuthNicknameField" hidden>
+          <span>昵称</span>
+          <input id="inlineAuthNicknameInput" autocomplete="nickname" placeholder="工作台展示名" />
+        </label>
+        <label class="inline-auth-field">
+          <span>密码</span>
+          <input id="inlineAuthPasswordInput" type="password" autocomplete="current-password" placeholder="输入登录密码" />
+        </label>
+        <div class="inline-auth-error" id="inlineAuthError" aria-live="polite"></div>
+        <button class="inline-auth-submit" type="submit" id="inlineAuthSubmitBtn">登录</button>
+      </form>
     </div>`;
-    $('loginWeb').addEventListener('click', () => openAuthModal('login'));
+    bindInlineAuthForm();
   }
 
   function selectProjectsHome() {
