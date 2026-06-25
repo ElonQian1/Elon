@@ -22,6 +22,7 @@ const HOME_PROJECT_MARKER_PNG_B64: &str = include_str!("assets/ic_home_project_m
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
 const POPUP_NEW_PROJECT_PNG_B64: &str = include_str!("assets/ic_popup_new_project.b64");
+const CHAT_SIDE_MENU_HANDLE_PNG_B64: &str = include_str!("assets/ic_chat_side_menu_handle.b64");
 const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
 const PROJECT_PLAZA_JS: &str = include_str!("assets/project_plaza.js");
 const PROJECT_HOME_CSS: &str = include_str!("assets/project_home.css");
@@ -116,6 +117,10 @@ fn build_html() -> String {
         .replace(
             "__POPUP_NEW_PROJECT_PNG_B64__",
             POPUP_NEW_PROJECT_PNG_B64.trim(),
+        )
+        .replace(
+            "__CHAT_SIDE_MENU_HANDLE_PNG_B64__",
+            CHAT_SIDE_MENU_HANDLE_PNG_B64.trim(),
         )
 }
 

@@ -106,6 +106,10 @@ internal class ChatSideMenuController(
         )
 
         buildPanelContent()
+        binding.chatSideMenuHandleButton.apply {
+            bringToFront()
+            setOnClickListener { openFromHandle() }
+        }
         overlay.post { applyPanelWidth() }
     }
 
@@ -141,6 +145,11 @@ internal class ChatSideMenuController(
                 }
             })
             .start()
+    }
+
+    fun openFromHandle() {
+        if (!isSetup || binding.chatPage.visibility != View.VISIBLE) return
+        show()
     }
 
     fun handleDispatchTouchEvent(event: MotionEvent): Boolean {

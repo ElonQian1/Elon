@@ -462,7 +462,7 @@
     }
 
     /* ===== 聊天视图 ===== */
-    .chat-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+    .chat-view { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
     .stage-hint {
       flex: 0 0 auto;
       min-height: 42px;
@@ -525,6 +525,90 @@
       gap: 10px;
       /* iOS 惯性滚动 */
       -webkit-overflow-scrolling: touch;
+    }
+    .chat-side-menu-handle {
+      position: absolute;
+      left: 0;
+      bottom: 124px;
+      width: 48px;
+      height: 68px;
+      border: 0;
+      border-radius: 0 10px 10px 0;
+      background: transparent;
+      padding: 0;
+      cursor: pointer;
+      overflow: hidden;
+      z-index: 24;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .chat-side-menu-handle img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+    }
+    .web-chat-side-menu-mask {
+      position: fixed;
+      inset: 0;
+      display: none;
+      background: rgba(0,0,0,0.42);
+      z-index: 80;
+    }
+    .web-chat-side-menu-mask.active { display: block; }
+    .web-chat-side-menu {
+      width: min(304px, calc(100vw - 64px));
+      height: 100%;
+      background: var(--side-menu-bg);
+      transform: translateX(-100%);
+      transition: transform 240ms cubic-bezier(.2,.7,.2,1);
+      padding: calc(env(safe-area-inset-top) + 32px) 22px calc(env(safe-area-inset-bottom) + 22px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .web-chat-side-menu-mask.active .web-chat-side-menu { transform: translateX(0); }
+    .web-chat-side-menu-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+    }
+    .web-chat-side-menu h2 {
+      margin: 0;
+      color: var(--ink);
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .web-chat-side-menu-close {
+      width: 40px;
+      height: 40px;
+      border: 0;
+      border-radius: 20px;
+      background: transparent;
+      color: var(--ink-soft);
+      font-size: 24px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .web-chat-side-menu-action {
+      min-height: 44px;
+      border: 0;
+      border-radius: 8px;
+      background: var(--panel);
+      color: var(--ink);
+      padding: 0 16px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .web-chat-side-menu-action:disabled {
+      opacity: 0.42;
+      cursor: not-allowed;
+    }
+    .web-chat-side-menu-note {
+      margin: 6px 0 0;
+      color: var(--ink-faint);
+      font-size: 12px;
+      line-height: 1.65;
     }
     .chat-message-block { display: flex; flex-direction: column; gap: 5px; }
     .chat-timeline-label {
@@ -2090,6 +2174,9 @@
           <span id="groupSummaryAction" class="summary-action">查看</span>
         </button>
         <div class="chat-list" id="chatList"></div>
+        <button id="chatSideMenuHandle" class="chat-side-menu-handle hidden" type="button" aria-label="展开侧面工具栏">
+          <img src="data:image/png;base64,__CHAT_SIDE_MENU_HANDLE_PNG_B64__" alt="" aria-hidden="true" />
+        </button>
       </div>
     </div>
 
@@ -2410,6 +2497,20 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </div>
 
   </section>
+
+  <div id="webChatSideMenuMask" class="web-chat-side-menu-mask" aria-hidden="true">
+    <aside class="web-chat-side-menu" role="dialog" aria-label="侧面工具栏">
+      <div class="web-chat-side-menu-head">
+        <h2 id="webChatSideMenuTitle">侧面工具栏</h2>
+        <button class="web-chat-side-menu-close" id="webChatSideMenuClose" type="button" aria-label="关闭侧面工具栏">×</button>
+      </div>
+      <button class="web-chat-side-menu-action" id="webSideMenuProgressBtn" type="button">进度记录</button>
+      <button class="web-chat-side-menu-action" id="webSideMenuDocsBtn" type="button">项目文档</button>
+      <button class="web-chat-side-menu-action" id="webSideMenuGitBtn" type="button">Git 仓库</button>
+      <button class="web-chat-side-menu-action" id="webSideMenuContinueBtn" type="button">继续输入</button>
+      <p class="web-chat-side-menu-note" id="webChatSideMenuNote">网页版同步显示基础项目入口；完整拖拽和原生侧栏体验请使用 APK。</p>
+    </aside>
+  </div>
 
   <form id="inputBar" class="input-bar">
     <textarea id="messageInput" placeholder="描述你想开发的 App 功能" rows="1"></textarea>
@@ -2890,6 +2991,15 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const messageInput = $('messageInput');
   const sendBtn = $('sendBtn');
   const modelBtn = $('modelBtn');
+  const chatSideMenuHandle = $('chatSideMenuHandle');
+  const webChatSideMenuMask = $('webChatSideMenuMask');
+  const webChatSideMenuClose = $('webChatSideMenuClose');
+  const webChatSideMenuTitle = $('webChatSideMenuTitle');
+  const webChatSideMenuNote = $('webChatSideMenuNote');
+  const webSideMenuProgressBtn = $('webSideMenuProgressBtn');
+  const webSideMenuDocsBtn = $('webSideMenuDocsBtn');
+  const webSideMenuGitBtn = $('webSideMenuGitBtn');
+  const webSideMenuContinueBtn = $('webSideMenuContinueBtn');
 
   const tabs = document.querySelectorAll('.tab');
   const pages = document.querySelectorAll('.page');
@@ -3025,6 +3135,32 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function isAnyChatActive() {
     return !!currentProject || isContactChatActive();
+  }
+  function closeWebChatSideMenu() {
+    if (!webChatSideMenuMask) return;
+    webChatSideMenuMask.classList.remove('active');
+    webChatSideMenuMask.setAttribute('aria-hidden', 'true');
+  }
+  function syncWebChatSideMenu() {
+    const hasProject = !!(currentProject && currentProject.id);
+    if (webChatSideMenuTitle) {
+      webChatSideMenuTitle.textContent = hasProject ? projectNameOf(currentProject) : '侧面工具栏';
+    }
+    if (webChatSideMenuNote) {
+      webChatSideMenuNote.textContent = hasProject
+        ? '网页版同步显示项目记录、文档和 Git 入口；完整拖拽侧栏体验请使用 APK。'
+        : '当前是好友或群聊会话。APK 侧栏支持拖拽分享项目，网页版暂显示基础入口。';
+    }
+    [webSideMenuProgressBtn, webSideMenuDocsBtn, webSideMenuGitBtn].forEach((button) => {
+      if (button) button.disabled = !hasProject;
+    });
+    if (webSideMenuContinueBtn) webSideMenuContinueBtn.disabled = !isAnyChatActive();
+  }
+  function openWebChatSideMenu() {
+    if (!isAnyChatActive() || !webChatSideMenuMask) return;
+    syncWebChatSideMenu();
+    webChatSideMenuMask.classList.add('active');
+    webChatSideMenuMask.setAttribute('aria-hidden', 'false');
   }
   function updateSendButtonState() {
     sendBtn.disabled = !!busy || !isAnyChatActive();
@@ -3373,6 +3509,37 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   if (projectHomeTopTab) projectHomeTopTab.addEventListener('click', showProjectHomeTab);
   if (projectPlazaTopTab) projectPlazaTopTab.addEventListener('click', showProjectPlazaTab);
+  if (chatSideMenuHandle) chatSideMenuHandle.addEventListener('click', openWebChatSideMenu);
+  if (webChatSideMenuClose) webChatSideMenuClose.addEventListener('click', closeWebChatSideMenu);
+  if (webChatSideMenuMask) {
+    webChatSideMenuMask.addEventListener('click', (event) => {
+      if (event.target === webChatSideMenuMask) closeWebChatSideMenu();
+    });
+  }
+  if (webSideMenuProgressBtn) {
+    webSideMenuProgressBtn.addEventListener('click', () => {
+      closeWebChatSideMenu();
+      openProjectProgressDialog(currentProject);
+    });
+  }
+  if (webSideMenuDocsBtn) {
+    webSideMenuDocsBtn.addEventListener('click', () => {
+      closeWebChatSideMenu();
+      openProjectDocumentDialog(currentProject);
+    });
+  }
+  if (webSideMenuGitBtn) {
+    webSideMenuGitBtn.addEventListener('click', () => {
+      closeWebChatSideMenu();
+      openProjectGitDialog(currentProject);
+    });
+  }
+  if (webSideMenuContinueBtn) {
+    webSideMenuContinueBtn.addEventListener('click', () => {
+      closeWebChatSideMenu();
+      messageInput.focus();
+    });
+  }
 
   // ====== Tab 切换 ======
   function switchTab(tabId) {
@@ -3414,6 +3581,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     // 输入栏：聊天页进入项目/好友/群聊后显示
     inputBar.classList.toggle('active', inChat);
+    if (chatSideMenuHandle) chatSideMenuHandle.classList.toggle('hidden', !inChat);
+    if (!inChat) closeWebChatSideMenu();
     messageInput.placeholder = isContactChatActive() ? '发消息' : '描述你想开发的 App 功能';
     modelBtn.style.display = inGroupChat ? 'none' : '';
     stageHint.classList.toggle('hidden', !inProjectChat);
@@ -3472,6 +3641,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
+    if (chatSideMenuHandle) chatSideMenuHandle.classList.add('hidden');
+    closeWebChatSideMenu();
     backBtn.style.display = 'none';
     voiceCallBtn.style.display = 'none';
     moreBtn.style.display = 'none';
@@ -3920,6 +4091,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     progressLog = [];
     conversationList.classList.add('hidden');
     chatView.classList.remove('hidden');
+    if (chatSideMenuHandle) chatSideMenuHandle.classList.remove('hidden');
     chatList.innerHTML = '';
     lastChatTimelineMs = 0;
     appendBubble('progress', '已进入项目「' + (project.name || '') + '」，可以开始描述需求。');
@@ -3969,6 +4141,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.add('hidden');
     conversationList.classList.remove('hidden');
     inputBar.classList.remove('active');
+    if (chatSideMenuHandle) chatSideMenuHandle.classList.add('hidden');
+    closeWebChatSideMenu();
     backBtn.style.display = 'none';
     voiceCallBtn.style.display = 'none';
     moreBtn.style.display = 'none';
@@ -3991,6 +4165,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     chatView.classList.remove('hidden');
     stageHint.classList.add('hidden');
     inputBar.classList.add('active');
+    if (chatSideMenuHandle) chatSideMenuHandle.classList.remove('hidden');
     backBtn.style.display = '';
     addBtn.style.display = 'none';
     searchBtn.style.display = 'none';
