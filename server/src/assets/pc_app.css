@@ -110,6 +110,9 @@ button { cursor: pointer; }
   transition: border-radius .14s ease, background .14s ease;
   flex: 0 0 auto;
 }
+.server-rail .rail-avatar[hidden] {
+  display: none;
+}
 .rail-avatar::before {
   content: "";
   position: absolute;
