@@ -280,6 +280,7 @@ internal class ChatSideMenuController(
             isConversationWorking = isConversationWorking,
             showCreateConversationDialog = showCreateConversationDialog,
             requestClose = { animate -> close(animate) },
+            bottomReservedHeightDp = SETTINGS_DOCK_HEIGHT_DP,
             dp = dp,
             selectableForeground = selectableForeground
         )
@@ -310,7 +311,7 @@ internal class ChatSideMenuController(
                 FrameLayout.LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                bottomMargin = dp(78)
+                bottomMargin = dp(SETTINGS_DOCK_HEIGHT_DP)
             }
         )
         projectMenuView.visibility = View.GONE
@@ -321,12 +322,27 @@ internal class ChatSideMenuController(
             setPadding(0, 0, dp(8), 0)
             setOnClickListener { toggleSettingsBubble() }
         }
+        val settingsDock = FrameLayout(activity).apply {
+            isClickable = true
+            background = GradientDrawable().apply {
+                setColor(activity.getColor(R.color.elon_side_menu_bg))
+            }
+            addView(
+                settingsLabel,
+                FrameLayout.LayoutParams(dp(110), dp(40)).apply {
+                    gravity = Gravity.BOTTOM or Gravity.START
+                    leftMargin = dp(32)
+                    bottomMargin = dp(18)
+                }
+            )
+        }
         panel.addView(
-            settingsLabel,
-            FrameLayout.LayoutParams(dp(110), dp(40)).apply {
+            settingsDock,
+            FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(SETTINGS_DOCK_HEIGHT_DP)
+            ).apply {
                 gravity = Gravity.BOTTOM or Gravity.START
-                leftMargin = dp(32)
-                bottomMargin = dp(18)
             }
         )
 
@@ -645,5 +661,6 @@ internal class ChatSideMenuController(
 
     private companion object {
         private const val DURATION_MS = 260L
+        private const val SETTINGS_DOCK_HEIGHT_DP = 88
     }
 }

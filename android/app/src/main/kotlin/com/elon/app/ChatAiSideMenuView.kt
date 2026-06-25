@@ -33,6 +33,7 @@ internal class ChatAiSideMenuView(
     private val isConversationWorking: (Int) -> Boolean,
     private val showCreateConversationDialog: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
+    private val bottomReservedHeightDp: Int,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) : FrameLayout(context) {
@@ -92,7 +93,7 @@ internal class ChatAiSideMenuView(
                 LayoutParams.MATCH_PARENT
             ).apply {
                 gravity = Gravity.TOP or Gravity.START
-                bottomMargin = dp(78)
+                bottomMargin = dp(bottomReservedHeightDp)
             }
         )
         menuContent.addView(projectDirectoryGroup)
