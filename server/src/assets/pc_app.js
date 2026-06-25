@@ -639,6 +639,33 @@
     }, 0);
   }
 
+  function inlineAuthStateMarkup(title, description) {
+    return `<div class="empty-state">
+      <strong>${escapeHtml(title)}</strong>
+      <p>${escapeHtml(description)}</p>
+      <form class="inline-auth-card" id="inlineAuthForm">
+        <div class="inline-auth-tabs" role="tablist" aria-label="账号入口">
+          <button class="inline-auth-tab active" type="button" data-inline-auth-mode="login">登录</button>
+          <button class="inline-auth-tab" type="button" data-inline-auth-mode="register">注册</button>
+        </div>
+        <label class="inline-auth-field">
+          <span>账号</span>
+          <input id="inlineAuthAccountInput" autocomplete="username" placeholder="手机号、邮箱或账号 ID" />
+        </label>
+        <label class="inline-auth-field" id="inlineAuthNicknameField" hidden>
+          <span>昵称</span>
+          <input id="inlineAuthNicknameInput" autocomplete="nickname" placeholder="工作台展示名" />
+        </label>
+        <label class="inline-auth-field">
+          <span>密码</span>
+          <input id="inlineAuthPasswordInput" type="password" autocomplete="current-password" placeholder="输入登录密码" />
+        </label>
+        <div class="inline-auth-error" id="inlineAuthError" aria-live="polite"></div>
+        <button class="inline-auth-submit" type="submit" id="inlineAuthSubmitBtn">登录</button>
+      </form>
+    </div>`;
+  }
+
   function setRails(kind) {
     els.aiRail.classList.toggle('active', kind === 'ai' || kind === 'store' || kind === 'tasks' || kind === 'project-conversation');
     els.friendsRail.classList.toggle('active', kind === 'friends');
@@ -1575,30 +1602,10 @@
     renderAiSidebar(filterText());
     els.memberList.innerHTML = '';
     setNodeMode(false);
-    els.messageList.innerHTML = `<div class="empty-state">
-      <strong>登录后使用一龙AI、项目和 PC 工作台</strong>
-      <p>PC 工作台读取账号登录态。输入账号和密码后，即可进入一龙AI工作区。</p>
-      <form class="inline-auth-card" id="inlineAuthForm">
-        <div class="inline-auth-tabs" role="tablist" aria-label="账号入口">
-          <button class="inline-auth-tab active" type="button" data-inline-auth-mode="login">登录</button>
-          <button class="inline-auth-tab" type="button" data-inline-auth-mode="register">注册</button>
-        </div>
-        <label class="inline-auth-field">
-          <span>账号</span>
-          <input id="inlineAuthAccountInput" autocomplete="username" placeholder="手机号、邮箱或账号 ID" />
-        </label>
-        <label class="inline-auth-field" id="inlineAuthNicknameField" hidden>
-          <span>昵称</span>
-          <input id="inlineAuthNicknameInput" autocomplete="nickname" placeholder="工作台展示名" />
-        </label>
-        <label class="inline-auth-field">
-          <span>密码</span>
-          <input id="inlineAuthPasswordInput" type="password" autocomplete="current-password" placeholder="输入登录密码" />
-        </label>
-        <div class="inline-auth-error" id="inlineAuthError" aria-live="polite"></div>
-        <button class="inline-auth-submit" type="submit" id="inlineAuthSubmitBtn">登录</button>
-      </form>
-    </div>`;
+    els.messageList.innerHTML = inlineAuthStateMarkup(
+      '登录后使用一龙AI、项目和 PC 工作台',
+      'PC 工作台读取账号登录态。输入账号和密码后，即可进入一龙AI工作区。'
+    );
     bindInlineAuthForm();
   }
 
@@ -2091,13 +2098,11 @@
       state.activeAiConversationId = '';
       state.activeAiConversationTitle = '';
       renderChannels();
-      els.messageList.innerHTML = `<div class="empty-state">
-        <strong>登录后使用一龙AI</strong>
-        <p>登录后可直接提问，普通聊天历史会显示在左侧。</p>
-        <button class="text-button" type="button" id="aiLoginBtn">登录或注册账号</button>
-      </div>`;
-      const aiLoginBtn = $('aiLoginBtn');
-      if (aiLoginBtn) aiLoginBtn.addEventListener('click', () => openAuthModal('login'));
+      els.messageList.innerHTML = inlineAuthStateMarkup(
+        '登录后使用一龙AI',
+        '登录后可直接提问，普通聊天历史会显示在左侧。输入账号和密码后，即可进入一龙AI工作区。'
+      );
+      bindInlineAuthForm();
       return;
     }
     let conversations = state.aiConversations;
