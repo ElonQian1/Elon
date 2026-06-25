@@ -26,7 +26,7 @@ internal enum class HomeListFilterMode {
 internal fun HomeListFilterMode.nextPullMode(): HomeListFilterMode = when (this) {
     HomeListFilterMode.All -> HomeListFilterMode.Projects
     HomeListFilterMode.Projects -> HomeListFilterMode.Friends
-    HomeListFilterMode.Friends -> HomeListFilterMode.Projects
+    HomeListFilterMode.Friends -> HomeListFilterMode.All
 }
 
 internal class HomePullFilterController(
@@ -38,8 +38,8 @@ internal class HomePullFilterController(
     private val applyMode: (HomeListFilterMode) -> Unit
 ) {
     private val touchSlop = ViewConfiguration.get(activity).scaledTouchSlop
-    private val activationDistance = maxOf(touchSlop * 2.2f, dp(30).toFloat())
-    private val triggerDistance = dp(124).toFloat()
+    private val activationDistance = maxOf(touchSlop * 1.4f, dp(22).toFloat())
+    private val triggerDistance = dp(92).toFloat()
     private val maxPullDistance = dp(176).toFloat()
     private val maxContentStretch = dp(28).toFloat()
     private val indicator = HomePullFilterIndicatorView(activity)
@@ -98,7 +98,7 @@ internal class HomePullFilterController(
                 longHoldTriggered = false
                 pullProgress = 0f
                 thresholdReadySince = 0L
-                startedAtTop = scrollView.scrollY <= 0
+                startedAtTop = !scrollView.canScrollVertically(-1)
                 gestureRejected = false
                 cancelLongHold()
                 return false
@@ -111,14 +111,14 @@ internal class HomePullFilterController(
                 val dy = event.y - downY
                 val dx = abs(event.x - downX)
                 if (!pulling) {
-                    if (dy < -touchSlop || (dx > activationDistance && dy < dx * 1.8f)) {
+                    if (dy < -touchSlop || (dx > activationDistance && dx > abs(dy) * HORIZONTAL_REJECT_RATIO)) {
                         gestureRejected = true
                         return false
                     }
                     if (
-                        scrollView.scrollY > 0 ||
+                        scrollView.canScrollVertically(-1) ||
                         dy < activationDistance ||
-                        dy < dx * 1.8f ||
+                        dy < dx * VERTICAL_ACTIVATION_RATIO ||
                         event.pointerCount != 1
                     ) {
                         return false
@@ -240,6 +240,8 @@ internal class HomePullFilterController(
     private companion object {
         const val RELEASE_PROGRESS_THRESHOLD = 1f
         const val SWITCH_COOLDOWN_MS = 650L
+        const val HORIZONTAL_REJECT_RATIO = 1.35f
+        const val VERTICAL_ACTIVATION_RATIO = 1.05f
     }
 }
 
