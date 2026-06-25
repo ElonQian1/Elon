@@ -669,8 +669,8 @@
   function setRails(kind) {
     els.aiRail.classList.toggle('active', kind === 'ai' || kind === 'store' || kind === 'tasks' || kind === 'project-conversation');
     els.friendsRail.classList.toggle('active', kind === 'friends');
-    els.projectsRail.classList.toggle('active', kind === 'projects');
-    els.projectPlazaRail.classList.toggle('active', kind === 'project-plaza');
+    els.projectsRail.classList.toggle('active', kind === 'projects' || kind === 'project-plaza');
+    els.projectPlazaRail.classList.toggle('active', false);
     els.doctorRail.classList.toggle('active', kind === 'doctor');
     els.nodeRail.classList.toggle('active', kind === 'node');
     els.voiceRail.classList.toggle('active', kind === 'voice');
@@ -1137,7 +1137,7 @@
   function renderProjectHomeChannels(query) {
     const projects = state.projects.filter((project) => titleOf(project).toLowerCase().includes(query));
     els.channelList.innerHTML = [
-      '<div class="channel-section">项目</div>',
+      '<div class="channel-section">项目中心</div>',
       '<button class="channel-item" type="button" data-project-home-action="overview"><span class="glyph">项</span><span class="main"><strong>我的项目</strong><span>查看项目列表</span></span></button>',
       '<button class="channel-item" type="button" data-project-home-action="plaza"><span class="glyph">广</span><span class="main"><strong>项目广场</strong><span>发现公开项目</span></span></button>',
       '<div class="channel-section">项目列表</div>',
@@ -1413,7 +1413,6 @@
     els.aiRail.addEventListener('click', () => selectAiAssistant(true));
     els.friendsRail.addEventListener('click', selectFriends);
     els.projectsRail.addEventListener('click', selectProjectsHome);
-    els.projectPlazaRail.addEventListener('click', selectProjectPlaza);
     els.doctorRail.addEventListener('click', doctor.selectDoctor);
     els.nodeRail.addEventListener('click', node.selectNode);
     els.voiceRail.addEventListener('click', () => selectVoiceProject());
@@ -1424,7 +1423,7 @@
     document.addEventListener('pointerdown', keepAuthModalOpenOnOutsideClick, true);
     document.addEventListener('click', keepAuthModalOpenOnOutsideClick, true);
     projectCreate.bindEvents();
-    [els.aiRail, els.friendsRail, els.projectsRail, els.projectPlazaRail, els.doctorRail, els.nodeRail, els.voiceRail].forEach(attachRailTooltip);
+    [els.aiRail, els.friendsRail, els.projectsRail, els.doctorRail, els.nodeRail, els.voiceRail].forEach(attachRailTooltip);
     $('refreshBtn').addEventListener('click', refreshActive);
     $('openLegacyWebBtn').addEventListener('click', selectApkDownload);
     $('openLocalNodeBtn').addEventListener('click', node.selectNode);
@@ -1618,10 +1617,10 @@
     state.projectSpace = null;
     setAuthClaimBanner(!state.token);
     setRails('projects');
-    els.workspaceName.textContent = '项目 / 我的项目';
+    els.workspaceName.textContent = '项目中心';
     els.workspaceMeta.textContent = state.token ? `${state.projects.length} 个项目` : '需要登录';
     setSidebarPlaceholder('搜索项目');
-    setHeader('项', '项目 / 我的项目', '查看你加入和创建的项目');
+    setHeader('项', '项目中心', '查看我的项目和项目广场');
     setComposer(false, '选择项目后开始输入', false);
     setNodeMode(false);
     renderProjectHomeChannels(filterText());
@@ -1630,7 +1629,7 @@
   }
 
   function renderProjectHomeSurface() {
-    setHeader('项', '项目 / 我的项目', '查看你加入和创建的项目');
+    setHeader('项', '项目中心', '查看我的项目和项目广场');
     setComposer(false, '选择项目后开始输入', false);
     setNodeMode(false);
     const projects = state.projects.slice().sort((a, b) => String(b.updated_at || b.updatedAt || '').localeCompare(String(a.updated_at || a.updatedAt || '')));
