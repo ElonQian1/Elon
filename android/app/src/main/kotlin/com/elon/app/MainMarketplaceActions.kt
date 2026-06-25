@@ -371,8 +371,20 @@ internal class MainMarketplaceActions(
                 topMargin = dp(CARD_INFO_TOP_MARGIN_DP)
             })
 
-            addView(View(activity).apply {
-                setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.HORIZONTAL
+                addView(View(activity).apply {
+                    setBackgroundColor(Color.parseColor(COLOR_DIVIDER))
+                }, LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    CARD_DIVIDER_LINE_WEIGHT
+                ))
+                addView(View(activity), LinearLayout.LayoutParams(
+                    0,
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    1f - CARD_DIVIDER_LINE_WEIGHT
+                ))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(1)
@@ -726,8 +738,8 @@ internal class MainMarketplaceActions(
         const val FONT_PAGE_TITLE_SP = 16f
         const val FONT_LIST_SECONDARY_SP = 13f
         const val FONT_CARD_TITLE_SP = 20f
-        const val FONT_CARD_META_SP = 15f
-        const val FONT_CARD_DESC_SP = 14f
+        const val FONT_CARD_META_SP = 16f
+        const val FONT_CARD_DESC_SP = 15f
         const val SEARCH_HEIGHT_DP = 48
         const val SEARCH_RADIUS_DP = 24
         const val SEARCH_SIDE_MARGIN_DP = 20
@@ -743,14 +755,15 @@ internal class MainMarketplaceActions(
         const val CARD_GRID_GAP_DP = 10
         const val CARD_CONTENT_SIDE_PADDING_DP = 18
         const val CARD_CONTENT_TOP_PADDING_DP = 18
-        const val CARD_INFO_TOP_MARGIN_DP = 20
+        const val CARD_INFO_TOP_MARGIN_DP = 16
         const val CARD_THUMB_TEXT_GAP_DP = 14
-        const val CARD_DETAIL_LINE_GAP_DP = 6
-        const val CARD_DIVIDER_TOP_MARGIN_DP = 16
-        const val CARD_DESC_TOP_MARGIN_DP = 12
+        const val CARD_DETAIL_LINE_GAP_DP = 8
+        const val CARD_DIVIDER_TOP_MARGIN_DP = 14
+        const val CARD_DESC_TOP_MARGIN_DP = 10
+        const val CARD_DIVIDER_LINE_WEIGHT = 0.78f
         const val FIRST_CARD_TOP_MARGIN_DP = 18
         const val CARD_GAP_DP = 14
-        const val THUMB_SIZE_DP = 40
+        const val THUMB_SIZE_DP = 48
         const val ACTION_ICON_TOUCH_DP = 48
         const val ACTION_ICON_SIZE_DP = 34
         const val ACTION_ICON_GAP_DP = 0
