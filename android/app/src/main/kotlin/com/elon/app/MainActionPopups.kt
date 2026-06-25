@@ -35,7 +35,7 @@ internal class MainActionPopups(
     fun showHomeActionPopup(anchor: View, tab: TextView) {
         val actions = if (tab == binding.tabProject) {
             listOf(
-                TopAction("新建项目", R.drawable.ic_popup_project) { showCreateProjectDialog() },
+                TopAction("新建项目", R.drawable.ic_popup_new_project) { showCreateProjectDialog() },
                 TopAction("发现项目", R.drawable.ic_popup_project) { showStoreDialog() },
                 TopAction("项目记录", R.drawable.ic_popup_history) { showProjectRecordDialog() },
                 TopAction("Git 仓库", R.drawable.ic_popup_settings) { showGitProjectDialog() },
@@ -46,7 +46,7 @@ internal class MainActionPopups(
             listOf(
                 TopAction("发起群聊", R.drawable.ic_popup_group) { showCreateGroupDialog() },
                 TopAction("添加好友", R.drawable.ic_popup_add_friend) { showAddFriendDialog() },
-                TopAction("新建项目", R.drawable.ic_popup_project) { showCreateProjectDialog() },
+                TopAction("新建项目", R.drawable.ic_popup_new_project) { showCreateProjectDialog() },
                 TopAction("继续开发", R.drawable.ic_popup_plan) { sendQuickCommand("请继续完成上一次未完成的开发任务，并告诉我当前进度。") },
                 TopAction("AI 设置", R.drawable.ic_popup_settings) { openSettings() }
             )
