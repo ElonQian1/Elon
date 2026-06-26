@@ -148,12 +148,36 @@ export function ModelPickerPopover({ anchorRef, onClose }: Props) {
 }
 
 /** 触发模型选择器的按钮，嵌入侧边栏或工具栏 */
-export function ModelPickerButton() {
+export function ModelPickerButton({ compact }: { compact?: boolean }) {
   const label = useModelStore((s) => s.label)
   const [open, setOpen] = useState(false)
   const btnRef = useRef<HTMLButtonElement>(null)
 
   const shortLabel = shortButtonLabel(label)
+
+  if (compact) {
+    return (
+      <>
+        <button
+          ref={btnRef}
+          style={{
+            width: 48, height: 48, borderRadius: '50%',
+            background: '#1e2026', border: '1px solid #3b3e46',
+            color: '#c5c8d0', fontSize: 11, fontWeight: 700,
+            cursor: 'pointer', transition: 'background 0.14s',
+            display: 'grid', placeItems: 'center', lineHeight: 1.2,
+            textAlign: 'center', padding: '2px',
+          }}
+          title={`AI 模型：${label || '服务器默认'}`}
+          onClick={() => setOpen((v) => !v)}
+          type="button"
+        >
+          {shortLabel.length > 5 ? shortLabel.slice(0, 5) : shortLabel}
+        </button>
+        {open && <ModelPickerPopover anchorRef={btnRef} onClose={() => setOpen(false)} />}
+      </>
+    )
+  }
 
   return (
     <>

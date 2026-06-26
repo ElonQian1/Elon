@@ -1,0 +1,90 @@
+/* 对应旧 server-rail — 72px 竖向图标轨 */
+
+.rail {
+  grid-column: 1;
+  width: 72px;
+  height: 100vh;
+  background: var(--rail);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 8px;
+  overflow-y: auto;
+  border-right: 1px solid #0b0c0e;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+
+.rail::-webkit-scrollbar { width: 0; }
+
+.avatar {
+  width: 48px;
+  height: 48px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--item-color, #27292f);
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  position: relative;
+  transition: border-radius .14s ease, background .14s ease;
+  flex-shrink: 0;
+}
+
+/* 左侧指示条 */
+.avatar::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 4px;
+  height: 0;
+  border-radius: 0 999px 999px 0;
+  background: #f2f3f5;
+  transform: translateY(-50%);
+  transition: height .14s ease;
+}
+
+.avatar:hover::before { height: 20px; }
+.active::before       { height: 36px; }
+
+.avatar:hover,
+.active {
+  border-radius: 16px;
+  background: var(--item-hover, var(--green));
+}
+
+.icon {
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+}
+
+.divider {
+  width: 32px;
+  height: 1px;
+  background: var(--line-soft);
+  flex-shrink: 0;
+}
+
+.modelWrap {
+  width: 48px;
+  display: flex;
+  justify-content: center;
+}
+
+.spacer { flex: 1; }
+
+.userAvatar {
+  background: #27292f;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.userAvatar:hover {
+  background: var(--red);
+  border-radius: 16px;
+  color: #fff;
+}
