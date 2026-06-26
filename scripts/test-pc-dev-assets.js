@@ -1805,6 +1805,8 @@ function testPcMobileEntryStaysInline() {
   assert.ok(pcApp.includes("const APK_DOWNLOAD_URL = '/app/ElonSpeed-latest.apk'"), 'mobile entry should use the direct APK download URL');
   assert.ok(pcApp.includes('id="apkCopyUrlBtn"'), 'mobile entry should expose in-page copy/download controls');
   assert.ok(pcApp.includes('copyApkDownloadUrl(apkUrl)'), 'mobile entry should copy the download URL in place');
+  assert.ok(pcApp.includes('打开移动网页版（iOS）'), 'mobile web buttons should mark the iOS-oriented entry');
+  assert.ok(pcApp.includes('iOS / PWA 入口'), 'mobile web sidebar should explain the iOS/PWA purpose');
   assert.ok(!pcApp.includes("window.open('/download'"), 'mobile entry should not jump to the standalone download page');
 }
 

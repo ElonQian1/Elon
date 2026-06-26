@@ -1959,7 +1959,7 @@
           <span class="pc-feature-glyph">下</span>
           <span>
             <strong>打开移动端</strong>
-            <p>下载手机端，或打开移动网页版。</p>
+            <p>下载 Android APK，或打开 iOS / PWA 网页版。</p>
           </span>
         </button>
       </div>
@@ -2030,7 +2030,7 @@
     els.channelList.innerHTML = [
       '<div class="channel-section">移动端</div>',
       `<button class="channel-item ${activeChannel === 'download' ? 'active' : ''}" type="button" data-apk-channel="download"><span class="glyph">下</span><span class="main"><strong>下载与分享</strong><span>安装手机端</span></span></button>`,
-      `<button class="channel-item ${activeChannel === 'web' ? 'active' : ''}" type="button" data-apk-channel="web"><span class="glyph">网</span><span class="main"><strong>移动网页版</strong><span>浏览器入口</span></span></button>`
+      `<button class="channel-item ${activeChannel === 'web' ? 'active' : ''}" type="button" data-apk-channel="web"><span class="glyph">网</span><span class="main"><strong>移动网页版（iOS）</strong><span>iOS / PWA 入口</span></span></button>`
     ].join('');
     els.channelList.querySelectorAll('[data-apk-channel]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -2054,7 +2054,7 @@
     setAuthClaimBanner(!state.token);
     setRails('apk');
     els.workspaceName.textContent = '移动端';
-    els.workspaceMeta.textContent = '手机端下载和移动网页版';
+    els.workspaceMeta.textContent = '手机端下载和移动网页版（iOS）';
     setSidebarPlaceholder('搜索移动端入口');
     renderApkChannels();
     renderMembers('移动端', []);
@@ -2065,14 +2065,14 @@
     const apkUrl = absoluteUrl(APK_DOWNLOAD_URL);
     const pageUrl = absoluteUrl(APK_DOWNLOAD_PAGE_URL);
     const promoText = `我正在用「一龙」云端 APK 开发平台，手机里直接提需求，云端帮你改代码、打包并生成安装包。\n\n下载地址：${apkUrl}`;
-    setHeader('端', '打开移动端', '安装手机端或打开移动网页版');
+    setHeader('端', '打开移动端', '安装手机端或打开移动网页版（iOS）');
     setComposer(false, '登录后可输入消息', false);
     setNodeMode(false);
     els.messageList.innerHTML = `<section class="pc-project-view">
       <div class="pc-project-hero">
         <div>
           <h2>打开移动端</h2>
-          <p>下载 APK、复制手机安装地址，或直接打开移动网页版。</p>
+          <p>下载 Android APK、复制手机安装地址，或直接打开面向 iOS / PWA 的移动网页版。</p>
         </div>
         <button class="text-button" type="button" id="apkCopyUrlBtn">复制下载地址</button>
       </div>
@@ -2087,7 +2087,7 @@
           <div class="pc-apk-url" id="apkUrlText">${escapeHtml(apkUrl)}</div>
           <div class="pc-apk-actions">
             <a class="primary" id="apkDownloadBtn" href="${escapeHtml(APK_DOWNLOAD_URL)}" download>下载最新 APK</a>
-            <button type="button" id="apkWebBtn">打开移动网页版</button>
+            <button type="button" id="apkWebBtn">打开移动网页版（iOS）</button>
             ${state.token ? '' : '<button type="button" id="apkLoginBtn">登录或注册</button>'}
           </div>
           <div class="pc-apk-share-panel">
@@ -2112,16 +2112,16 @@
   }
 
   function renderMobileWebSurface() {
-    setHeader('网', '移动网页版', '在浏览器中使用移动端入口');
+    setHeader('网', '移动网页版（iOS）', '在浏览器中使用 iOS / PWA 入口');
     setComposer(false, '登录后可输入消息', false);
     setNodeMode(false);
     els.messageList.innerHTML = `<section class="pc-project-view">
       <div class="pc-project-hero">
         <div>
-          <h2>移动网页版</h2>
-          <p>需要在浏览器里快速登录、同步账号或体验手机端界面时，从这里打开。</p>
+          <h2>移动网页版（iOS）</h2>
+          <p>主要服务 iOS / PWA 场景，需要在浏览器里快速登录、同步账号或体验手机端界面时，从这里打开。</p>
         </div>
-        <button class="text-button" type="button" id="openMobileWebPageBtn">打开移动网页版</button>
+        <button class="text-button" type="button" id="openMobileWebPageBtn">打开移动网页版（iOS）</button>
       </div>
       <div class="pc-apk-panel">
         <div class="pc-apk-device">
@@ -2129,10 +2129,10 @@
         </div>
         <div class="pc-apk-copy">
           <strong>浏览器入口</strong>
-          <p>移动网页版会在新标签中打开；下载 APK 和分享安装地址仍保留在“下载与分享”频道里。</p>
+          <p>移动网页版（iOS）会在新标签中打开；下载 APK 和分享安装地址仍保留在“下载与分享”频道里。</p>
           <div class="pc-apk-url">${escapeHtml(absoluteUrl('/web'))}</div>
           <div class="pc-apk-actions">
-            <button class="primary" type="button" id="mobileWebOpenBtn">打开移动网页版</button>
+            <button class="primary" type="button" id="mobileWebOpenBtn">打开移动网页版（iOS）</button>
             <button type="button" id="mobileBackToDownloadBtn">回到下载与分享</button>
           </div>
         </div>
