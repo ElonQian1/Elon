@@ -41,7 +41,10 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         window.statusBarColor = Color.TRANSPARENT
-        window.navigationBarColor = Color.BLACK
+        window.navigationBarColor = Color.TRANSPARENT
+        window.decorView.systemUiVisibility = window.decorView.systemUiVisibility
+            .or(View.SYSTEM_UI_FLAG_LAYOUT_STABLE)
+            .or(View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION)
         val sourcePath = intent.getStringExtra(EXTRA_INPUT_PATH).orEmpty()
         val bitmap = decodeBitmap(sourcePath)
         if (bitmap == null) {
@@ -63,46 +66,11 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         setContentView(FrameLayout(this).apply {
             setBackgroundColor(Color.BLACK)
             addView(canvasView)
-            addView(topBar())
             addView(createBottomToolPanel())
             addView(createCollapsedToolButton())
         })
         selectTool(ChatImageEditTool.BRUSH)
         refreshUndoRedo()
-    }
-
-    private fun topBar(): View {
-        return LinearLayout(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(88),
-                Gravity.TOP
-            )
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(32), dp(20), dp(30), 0)
-
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(76), dp(44))
-                gravity = Gravity.CENTER_VERTICAL or Gravity.START
-                includeFontPadding = false
-                text = "取消"
-                setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 16f
-                setOnClickListener { finish() }
-            })
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(82), dp(40))
-                background = roundedRect("#FFFFFF", dp(20))
-                gravity = Gravity.CENTER
-                includeFontPadding = false
-                text = "完成"
-                setTextColor(Color.BLACK)
-                textSize = 16f
-                setOnClickListener { finishWithEditedImage() }
-            })
-        }
     }
 
     private fun createBottomToolPanel(): View {
@@ -114,9 +82,44 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 Gravity.BOTTOM
             )
             background = roundedTopRect("#1A1A1A", dp(32))
+            addView(topActionRow())
             addView(toolBar())
             addView(colorPalette())
             addView(collapseButton())
+        }
+    }
+
+    private fun topActionRow(): View {
+        return LinearLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                dp(36),
+                Gravity.TOP or Gravity.START
+            ).apply {
+                leftMargin = dp(24)
+                topMargin = dp(18)
+            }
+            gravity = Gravity.CENTER_VERTICAL
+            orientation = LinearLayout.HORIZONTAL
+
+            addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(52), LinearLayout.LayoutParams.MATCH_PARENT)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                text = "取消"
+                setTextColor(Color.parseColor("#D9D9D9"))
+                textSize = 16f
+                setOnClickListener { finish() }
+            })
+            addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(52), LinearLayout.LayoutParams.MATCH_PARENT)
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                text = "完成"
+                setTextColor(Color.parseColor("#D9D9D9"))
+                textSize = 16f
+                setOnClickListener { finishWithEditedImage() }
+            })
         }
     }
 
@@ -127,7 +130,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 dp(58),
                 Gravity.TOP or Gravity.CENTER_HORIZONTAL
             ).apply {
-                topMargin = dp(18)
+                topMargin = dp(42)
             }
             gravity = Gravity.CENTER
             orientation = LinearLayout.HORIZONTAL
@@ -165,7 +168,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 dp(64),
                 Gravity.BOTTOM
             ).apply {
-                bottomMargin = dp(30)
+                bottomMargin = dp(8)
             }
 
             undoButton = iconButton(R.drawable.ic_chat_image_tool_undo, "撤销", padding = 0).apply {
@@ -220,7 +223,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         description: String,
         onClick: () -> Unit
     ) {
-        val button = iconButton(iconRes, description).apply {
+        val button = iconButton(iconRes, description, tintWhite = tool != ChatImageEditTool.BRUSH).apply {
             layoutParams = LinearLayout.LayoutParams(dp(48), dp(58))
             setOnClickListener { onClick() }
         }
@@ -248,7 +251,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
     private fun collapseButton(): View {
         return iconButton(R.drawable.ic_chat_image_tool_collapse_down, "Collapse toolbar", padding = 8).apply {
             layoutParams = FrameLayout.LayoutParams(dp(56), dp(56), Gravity.TOP or Gravity.END).apply {
-                topMargin = dp(19)
+                topMargin = dp(43)
                 rightMargin = dp(18)
             }
             setOnClickListener { collapseBottomTools() }
@@ -477,7 +480,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         const val EXTRA_OUTPUT_WIDTH = "chat_image_edit_output_width"
         const val EXTRA_OUTPUT_HEIGHT = "chat_image_edit_output_height"
         private const val MAX_EDITOR_PIXELS = 4_000_000
-        private const val BOTTOM_TOOL_PANEL_HEIGHT_DP = 142
+        private const val BOTTOM_TOOL_PANEL_HEIGHT_DP = 156
 
         fun createIntent(context: Context, path: String, displayName: String): Intent {
             return Intent(context, ChatImageEditActivity::class.java).apply {
