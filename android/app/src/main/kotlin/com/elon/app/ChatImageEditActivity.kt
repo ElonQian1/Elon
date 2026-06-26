@@ -13,6 +13,7 @@ import android.os.Bundle
 import android.view.Gravity
 import android.view.View
 import android.view.Window
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.EditText
 import android.widget.FrameLayout
 import android.widget.ImageButton
@@ -30,7 +31,11 @@ internal class ChatImageEditActivity : AppCompatActivity() {
     private lateinit var canvasView: ChatImageEditCanvasView
     private lateinit var undoButton: ImageButton
     private lateinit var redoButton: ImageButton
+    private lateinit var bottomToolPanel: FrameLayout
+    private lateinit var collapsedToolButton: ImageButton
     private val toolButtons = mutableMapOf<ChatImageEditTool, ImageButton>()
+    private var bottomToolsCollapsed = false
+    private var bottomToolsAnimating = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,8 +64,8 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             setBackgroundColor(Color.BLACK)
             addView(canvasView)
             addView(topBar())
-            addView(toolBar())
-            addView(colorPalette())
+            addView(createBottomToolPanel())
+            addView(createCollapsedToolButton())
         })
         selectTool(ChatImageEditTool.BRUSH)
         refreshUndoRedo()
@@ -100,14 +105,29 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         }
     }
 
+    private fun createBottomToolPanel(): View {
+        return FrameLayout(this).apply {
+            bottomToolPanel = this
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                dp(162),
+                Gravity.BOTTOM
+            )
+            background = roundedTopRect("#1A1A1A", dp(32))
+            addView(toolBar())
+            addView(colorPalette())
+            addView(collapseButton())
+        }
+    }
+
     private fun toolBar(): View {
         return LinearLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
-                dp(64),
-                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+                dp(58),
+                Gravity.TOP or Gravity.CENTER_HORIZONTAL
             ).apply {
-                bottomMargin = dp(76)
+                topMargin = dp(18)
             }
             gravity = Gravity.CENTER
             orientation = LinearLayout.HORIZONTAL
@@ -142,13 +162,15 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         return FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(94),
+                dp(64),
                 Gravity.BOTTOM
-            )
+            ).apply {
+                bottomMargin = dp(14)
+            }
 
             undoButton = iconButton(R.drawable.ic_chat_image_tool_undo, "撤销", padding = 0).apply {
                 layoutParams = FrameLayout.LayoutParams(dp(64), dp(64), Gravity.START or Gravity.CENTER_VERTICAL).apply {
-                    leftMargin = dp(12)
+                    leftMargin = dp(14)
                 }
                 setOnClickListener {
                     if (canvasView.undo()) refreshUndoRedo()
@@ -156,7 +178,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             }
             redoButton = iconButton(R.drawable.ic_chat_image_tool_redo, "重做", padding = 0).apply {
                 layoutParams = FrameLayout.LayoutParams(dp(64), dp(64), Gravity.END or Gravity.CENTER_VERTICAL).apply {
-                    rightMargin = dp(12)
+                    rightMargin = dp(14)
                 }
                 setOnClickListener {
                     if (canvasView.redo()) refreshUndoRedo()
@@ -199,9 +221,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         onClick: () -> Unit
     ) {
         val button = iconButton(iconRes, description).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(54), dp(58)).apply {
-                marginEnd = if (tool == ChatImageEditTool.MOSAIC) 0 else dp(14)
-            }
+            layoutParams = LinearLayout.LayoutParams(dp(48), dp(58))
             setOnClickListener { onClick() }
         }
         toolButtons[tool] = button
@@ -223,6 +243,82 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         if (::redoButton.isInitialized) {
             redoButton.alpha = if (canvasView.canRedo()) 1f else 0.72f
         }
+    }
+
+    private fun collapseButton(): View {
+        return iconButton(R.drawable.ic_chat_image_tool_collapse_down, "Collapse toolbar", padding = 8).apply {
+            layoutParams = FrameLayout.LayoutParams(dp(56), dp(56), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(19)
+                rightMargin = dp(18)
+            }
+            setOnClickListener { collapseBottomTools() }
+        }
+    }
+
+    private fun createCollapsedToolButton(): View {
+        return iconButton(R.drawable.ic_chat_image_tool_expand, "Expand toolbar", padding = 0, tintWhite = false).apply {
+            collapsedToolButton = this
+            layoutParams = FrameLayout.LayoutParams(dp(68), dp(48), Gravity.BOTTOM or Gravity.END).apply {
+                rightMargin = dp(18)
+                bottomMargin = dp(14)
+            }
+            visibility = View.INVISIBLE
+            alpha = 0f
+            setOnClickListener { expandBottomTools() }
+        }
+    }
+
+    private fun collapseBottomTools() {
+        if (bottomToolsCollapsed || bottomToolsAnimating) return
+        bottomToolsAnimating = true
+        bottomToolPanel.animate().cancel()
+        collapsedToolButton.animate().cancel()
+        val panelHeight = bottomToolPanel.height.takeIf { it > 0 } ?: dp(162)
+        bottomToolPanel.animate()
+            .translationY(panelHeight.toFloat())
+            .setDuration(220L)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .withEndAction {
+                bottomToolPanel.visibility = View.INVISIBLE
+                bottomToolPanel.translationY = panelHeight.toFloat()
+                bottomToolsCollapsed = true
+                bottomToolsAnimating = false
+                showCollapsedToolButton()
+            }
+            .start()
+    }
+
+    private fun showCollapsedToolButton() {
+        collapsedToolButton.visibility = View.VISIBLE
+        collapsedToolButton.alpha = 0f
+        collapsedToolButton.translationY = dp(18).toFloat()
+        collapsedToolButton.animate()
+            .alpha(1f)
+            .translationY(0f)
+            .setDuration(160L)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .start()
+    }
+
+    private fun expandBottomTools() {
+        if (!bottomToolsCollapsed || bottomToolsAnimating) return
+        bottomToolsAnimating = true
+        collapsedToolButton.animate().cancel()
+        collapsedToolButton.visibility = View.INVISIBLE
+        collapsedToolButton.alpha = 0f
+        val panelHeight = bottomToolPanel.height.takeIf { it > 0 } ?: dp(162)
+        bottomToolPanel.visibility = View.VISIBLE
+        bottomToolPanel.alpha = 1f
+        bottomToolPanel.translationY = panelHeight.toFloat()
+        bottomToolPanel.animate()
+            .translationY(0f)
+            .setDuration(220L)
+            .setInterpolator(AccelerateDecelerateInterpolator())
+            .withEndAction {
+                bottomToolsCollapsed = false
+                bottomToolsAnimating = false
+            }
+            .start()
     }
 
     private fun showTextDialog() {
@@ -322,12 +418,21 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         )
     }
 
-    private fun iconButton(iconRes: Int, description: String, padding: Int = 8): ImageButton {
+    private fun iconButton(
+        iconRes: Int,
+        description: String,
+        padding: Int = 8,
+        tintWhite: Boolean = true
+    ): ImageButton {
         return ImageButton(this).apply {
             contentDescription = description
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(iconRes)
-            setColorFilter(Color.WHITE)
+            if (tintWhite) {
+                setColorFilter(Color.WHITE)
+            } else {
+                clearColorFilter()
+            }
             scaleType = ImageView.ScaleType.CENTER_INSIDE
             setPadding(dp(padding), dp(padding), dp(padding), dp(padding))
             isClickable = true
@@ -337,6 +442,19 @@ internal class ChatImageEditActivity : AppCompatActivity() {
     private fun roundedRect(color: String, radius: Int): GradientDrawable {
         return GradientDrawable().apply {
             cornerRadius = radius.toFloat()
+            setColor(Color.parseColor(color))
+        }
+    }
+
+    private fun roundedTopRect(color: String, radius: Int): GradientDrawable {
+        val corner = radius.toFloat()
+        return GradientDrawable().apply {
+            cornerRadii = floatArrayOf(
+                corner, corner,
+                corner, corner,
+                0f, 0f,
+                0f, 0f
+            )
             setColor(Color.parseColor(color))
         }
     }
