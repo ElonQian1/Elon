@@ -65,15 +65,15 @@ class AddFriendActivity : AppCompatActivity() {
             setBackgroundColor(Color.BLACK)
             addView(topBar(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(74)
+                dp(50)
             ))
             addView(searchBar(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(56)
+                dp(44)
             ).apply {
                 leftMargin = dp(16)
                 rightMargin = dp(16)
-                topMargin = dp(10)
+                topMargin = dp(8)
             })
             addView(ScrollView(this@AddFriendActivity).apply {
                 overScrollMode = View.OVER_SCROLL_NEVER
@@ -92,21 +92,21 @@ class AddFriendActivity : AppCompatActivity() {
                 text = "‹"
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                textSize = 42f
+                textSize = 27f
                 setTextColor(Color.parseColor("#D9D9D9"))
                 isClickable = true
                 isFocusable = true
                 foreground = selectableForeground()
                 contentDescription = "返回"
                 setOnClickListener { finish() }
-            }, FrameLayout.LayoutParams(dp(56), FrameLayout.LayoutParams.MATCH_PARENT).apply {
+            }, FrameLayout.LayoutParams(dp(50), FrameLayout.LayoutParams.MATCH_PARENT).apply {
                 gravity = Gravity.START or Gravity.CENTER_VERTICAL
             })
             addView(TextView(this@AddFriendActivity).apply {
                 text = "添加朋友"
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                textSize = 20f
+                textSize = 16f
                 setTextColor(Color.parseColor("#D9D9D9"))
             }, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
@@ -120,7 +120,7 @@ class AddFriendActivity : AppCompatActivity() {
         searchInput = EditText(this).apply {
             hint = "搜索账号/手机"
             setSingleLine(true)
-            textSize = 18f
+            textSize = 16f
             imeOptions = EditorInfo.IME_ACTION_SEARCH
             setTextColor(Color.parseColor("#D9D9D9"))
             setHintTextColor(Color.parseColor("#777777"))
@@ -147,13 +147,13 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = roundedRect("#272727", 28)
-            setPadding(dp(20), 0, dp(20), 0)
+            background = roundedRect("#272727", 22)
+            setPadding(dp(16), 0, dp(16), 0)
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_search_simple)
                 imageTintList = ColorStateList.valueOf(Color.parseColor("#777777"))
                 contentDescription = null
-            }, LinearLayout.LayoutParams(dp(28), dp(28)))
+            }, LinearLayout.LayoutParams(dp(24), dp(24)))
             addView(searchInput, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         }
     }
@@ -161,11 +161,11 @@ class AddFriendActivity : AppCompatActivity() {
     private fun pageBody(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(52), dp(16), dp(44))
+            setPadding(dp(16), dp(40), dp(16), dp(44))
             addView(TextView(this@AddFriendActivity).apply {
                 text = "推荐"
                 includeFontPadding = false
-                textSize = 22f
+                textSize = 16f
                 setTextColor(Color.parseColor("#D9D9D9"))
             })
             recommendationList = LinearLayout(this@AddFriendActivity).apply {
@@ -175,7 +175,7 @@ class AddFriendActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(34)
+                topMargin = dp(22)
             })
             resultText = TextView(this@AddFriendActivity).apply {
                 text = "正在加载推荐好友..."
@@ -189,9 +189,9 @@ class AddFriendActivity : AppCompatActivity() {
             ).apply {
                 topMargin = dp(6)
             })
-            addView(scanButton(), LinearLayout.LayoutParams(dp(128), dp(52)).apply {
+            addView(scanButton(), LinearLayout.LayoutParams(dp(112), dp(44)).apply {
                 gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(62)
+                topMargin = dp(48)
             })
             addView(qrCard(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -207,9 +207,9 @@ class AddFriendActivity : AppCompatActivity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(86)
+            minimumHeight = dp(76)
         }
-        row.addView(avatarView(item), LinearLayout.LayoutParams(dp(56), dp(56)))
+        row.addView(avatarView(item), LinearLayout.LayoutParams(dp(44), dp(44)))
         row.addView(LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_VERTICAL
@@ -217,34 +217,34 @@ class AddFriendActivity : AppCompatActivity() {
                 text = item.name
                 includeFontPadding = false
                 maxLines = 1
-                textSize = 20f
+                textSize = 16f
                 setTextColor(Color.parseColor("#D9D9D9"))
             })
             addView(TextView(this@AddFriendActivity).apply {
                 text = item.account
                 includeFontPadding = false
                 maxLines = 1
-                textSize = 16f
+                textSize = 13f
                 setTextColor(Color.parseColor("#777777"))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(10)
+                topMargin = dp(4)
             })
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
-            leftMargin = dp(18)
-            rightMargin = dp(12)
+            leftMargin = dp(12)
+            rightMargin = dp(10)
         })
         if (item.mutualFriendCount > 0) {
             row.addView(mutualFriendView(item.mutualFriendCount), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                rightMargin = dp(12)
+                rightMargin = dp(10)
             })
         }
-        row.addView(addButton(item), LinearLayout.LayoutParams(dp(72), dp(44)))
+        row.addView(addButton(item), LinearLayout.LayoutParams(dp(64), dp(36)))
         return row
     }
 
@@ -265,17 +265,17 @@ class AddFriendActivity : AppCompatActivity() {
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_add_friend_mutual)
                 contentDescription = null
-            }, LinearLayout.LayoutParams(dp(34), dp(26)))
+            }, LinearLayout.LayoutParams(dp(24), dp(18)))
             addView(TextView(this@AddFriendActivity).apply {
                 text = "${count}名共同好友"
                 includeFontPadding = false
-                textSize = 14f
+                textSize = 12f
                 setTextColor(Color.parseColor("#777777"))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                leftMargin = dp(6)
+                leftMargin = dp(4)
             })
         }
     }
@@ -290,7 +290,7 @@ class AddFriendActivity : AppCompatActivity() {
             isEnabled = !item.alreadyFriend
             alpha = if (item.alreadyFriend) 0.48f else 1f
             setTextColor(Color.BLACK)
-            background = roundedRect("#D9D9D9", 22)
+            background = roundedRect("#D9D9D9", 18)
             isClickable = !item.alreadyFriend
             isFocusable = !item.alreadyFriend
             foreground = selectableForeground()
@@ -302,11 +302,11 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = roundedRect("#D9D9D9", 26)
+            background = roundedRect("#D9D9D9", 22)
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_add_friend_scan)
                 contentDescription = null
-            }, LinearLayout.LayoutParams(dp(30), dp(30)))
+            }, LinearLayout.LayoutParams(dp(24), dp(24)))
             addView(TextView(this@AddFriendActivity).apply {
                 text = "扫一扫"
                 includeFontPadding = false
@@ -317,7 +317,7 @@ class AddFriendActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                leftMargin = dp(10)
+                leftMargin = dp(8)
             })
         }
     }
@@ -385,7 +385,7 @@ class AddFriendActivity : AppCompatActivity() {
         items.forEach { item ->
             recommendationList.addView(recommendationRow(item), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(86)
+                dp(76)
             ))
         }
         resultText.setTextColor(Color.parseColor("#777777"))

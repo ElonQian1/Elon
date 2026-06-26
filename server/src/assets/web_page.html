@@ -1991,15 +1991,15 @@
       display: flex;
       flex-direction: column;
       min-height: 100vh;
-      padding: max(18px, env(safe-area-inset-top)) 48px 44px;
+      padding: max(0px, env(safe-area-inset-top)) 16px 44px;
       width: min(100vw, 490px);
     }
     .add-friend-topbar {
       align-items: center;
       display: flex;
-      height: 74px;
+      height: 50px;
       justify-content: center;
-      margin: 0 -48px;
+      margin: 0 -16px;
       position: relative;
     }
     .add-friend-back {
@@ -2009,43 +2009,43 @@
       color: var(--ink);
       cursor: pointer;
       display: flex;
-      font-size: 46px;
-      height: 74px;
+      font-size: 30px;
+      height: 50px;
       justify-content: center;
       left: 0;
       line-height: 1;
       padding: 0;
       position: absolute;
       top: 0;
-      width: 72px;
+      width: 50px;
     }
     .add-friend-title {
       color: var(--ink);
-      font-size: 20px;
+      font-size: 16px;
       font-weight: 400;
       margin: 0;
     }
     .add-friend-search {
       align-items: center;
       background: var(--input-pill-bg);
-      border-radius: 28px;
+      border-radius: 22px;
       display: flex;
-      gap: 18px;
-      height: 56px;
-      margin-top: 10px;
-      padding: 0 20px 0 28px;
+      gap: 10px;
+      height: 44px;
+      margin-top: 8px;
+      padding: 0 16px;
     }
     .add-friend-search svg {
       color: var(--ink-faint);
       flex: 0 0 auto;
-      height: 28px;
-      width: 28px;
+      height: 24px;
+      width: 24px;
     }
     .add-friend-search input {
       background: transparent;
       border: 0;
       color: var(--ink);
-      font-size: 18px;
+      font-size: 16px;
       height: 100%;
       min-width: 0;
       outline: 0;
@@ -2055,14 +2055,14 @@
     .add-friend-scroll {
       flex: 1;
       overflow: auto;
-      padding-top: 52px;
+      padding-top: 40px;
     }
     .add-friend-section-title {
       color: var(--ink);
-      font-size: 22px;
+      font-size: 16px;
       font-weight: 400;
       line-height: 1;
-      margin: 0 0 34px;
+      margin: 0 0 22px;
     }
     .add-friend-recommendations {
       display: flex;
@@ -2071,15 +2071,15 @@
     .add-friend-row {
       align-items: center;
       display: grid;
-      grid-template-columns: 60px minmax(0, 1fr) auto;
-      min-height: 86px;
+      grid-template-columns: 44px minmax(0, 1fr) auto;
+      min-height: 76px;
     }
     .add-friend-avatar {
       background: #D9D9D9;
       border-radius: 6px;
-      height: 60px;
+      height: 44px;
       overflow: hidden;
-      width: 60px;
+      width: 44px;
     }
     .add-friend-avatar img {
       display: block;
@@ -2089,12 +2089,12 @@
     }
     .add-friend-info {
       min-width: 0;
-      padding-left: 34px;
-      padding-right: 12px;
+      padding-left: 12px;
+      padding-right: 10px;
     }
     .add-friend-name {
       color: var(--ink);
-      font-size: 20px;
+      font-size: 16px;
       line-height: 1;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -2102,9 +2102,9 @@
     }
     .add-friend-account {
       color: var(--ink-faint);
-      font-size: 16px;
+      font-size: 13px;
       line-height: 1;
-      margin-top: 10px;
+      margin-top: 4px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -2112,31 +2112,31 @@
     .add-friend-side {
       align-items: center;
       display: flex;
-      gap: 16px;
+      gap: 10px;
     }
     .add-friend-mutual {
       align-items: center;
       color: var(--ink-faint);
       display: flex;
-      font-size: 14px;
-      gap: 6px;
+      font-size: 12px;
+      gap: 4px;
       white-space: nowrap;
     }
     .add-friend-mutual svg {
       color: #D9D9D9;
-      height: 24px;
-      width: 34px;
+      height: 18px;
+      width: 24px;
     }
     .add-friend-add-btn {
       background: #D9D9D9;
       border: 0;
-      border-radius: 22px;
+      border-radius: 18px;
       color: #000000;
       cursor: pointer;
       font-size: 16px;
       font-weight: 700;
-      height: 44px;
-      width: 94px;
+      height: 36px;
+      width: 64px;
     }
     .add-friend-add-btn:disabled {
       cursor: default;
@@ -2151,20 +2151,20 @@
     .add-friend-scan-pill {
       align-items: center;
       background: #D9D9D9;
-      border-radius: 26px;
+      border-radius: 22px;
       color: #000000;
       display: flex;
       font-size: 16px;
       font-weight: 700;
-      gap: 10px;
-      height: 52px;
+      gap: 8px;
+      height: 44px;
       justify-content: center;
-      margin: 62px auto 0;
-      width: 128px;
+      margin: 48px auto 0;
+      width: 112px;
     }
     .add-friend-scan-pill svg {
-      height: 30px;
-      width: 30px;
+      height: 24px;
+      width: 24px;
     }
     .add-friend-qr {
       background: #FFFFFF;
@@ -2181,22 +2181,22 @@
     }
     @media (max-width: 420px) {
       .add-friend-page {
-        padding-left: 28px;
-        padding-right: 28px;
+        padding-left: 16px;
+        padding-right: 16px;
       }
       .add-friend-topbar {
-        margin-left: -28px;
-        margin-right: -28px;
+        margin-left: -16px;
+        margin-right: -16px;
       }
       .add-friend-row {
-        grid-template-columns: 56px minmax(0, 1fr) auto;
+        grid-template-columns: 44px minmax(0, 1fr) auto;
       }
       .add-friend-avatar {
-        height: 56px;
-        width: 56px;
+        height: 44px;
+        width: 44px;
       }
       .add-friend-info {
-        padding-left: 22px;
+        padding-left: 12px;
       }
       .add-friend-mutual {
         display: none;
