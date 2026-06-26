@@ -33,6 +33,10 @@
 | 领域 | 入口 |
 |---|---|
 | Web 项目页 | `server/src/assets/web_page.html` |
+| PC 工作台旧静态入口 | `server/src/assets/pc_app.html`、`server/src/assets/pc_app.js`、`server/src/assets/pc_app.css`、`server/src/assets/pc_*.js`、`server/src/assets/pc_*.css` |
+| PC 工作台新前端迁移目标 | `pc-frontend/`（建立后承接 `/pc-next` 和后续 `/pc`） |
+| PC 静态资源服务端托管 | `server/src/web.rs`、`server/src/router.rs` |
+| PC 前端迁移规则 | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md` |
 | 项目广场/项目主页脚本 | `server/src/assets/project_*.js` |
 | 节点管理本地页 | `server/src/node_agent_admin.html` |
 

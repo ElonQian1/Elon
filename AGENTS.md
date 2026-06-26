@@ -22,6 +22,7 @@
 | PowerShell 版本、`powershell`/`pwsh` 选择、PS5 设备兼容 | `docs/powershell-version-policy.md` |
 | 模块化、拆文件、治理巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和任务相关源码 |
+| PC 工作台、`/pc` 页面、前端框架迁移、React/Vite/TypeScript | `.github/instructions/pc-frontend-migration.instructions.md`、`docs/pc-frontend-migration.md`、`AI_INDEX.md` |
 | 完整开发流程或任务卡住 | `docs/ai-agent-workflow.md` |
 | Android APK 发布 | `.github/instructions/git-deploy-workflow.instructions.md` 的 APK 部署章节 |
 | Gradle 下载或 Android 首次编译环境异常 | `docs/android-setup.md` |
