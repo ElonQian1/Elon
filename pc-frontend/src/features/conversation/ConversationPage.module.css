@@ -381,6 +381,14 @@
 /* AI 消息 — 淡蓝色 */
 .messageContent.aiContent { color: #dfe8ff; }
 
+/* Markdown 消息：去掉 pre-wrap，交给 MarkdownContent 组件处理 */
+.messageContent.markdownMsg {
+  white-space: normal;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
 /* Dev task card 包装 */
 .devTaskWrap { width: 100%; }
 

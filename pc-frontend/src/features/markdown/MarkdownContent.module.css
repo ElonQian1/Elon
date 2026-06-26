@@ -1,0 +1,169 @@
+/* 对应旧 pc_app.css .markdown-rendered 全套样式 */
+
+.root {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+/* ── 段落 ── */
+.root p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ── 标题 ── */
+.root h1,
+.root h2 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--text);
+  line-height: 1.3;
+}
+.root h3,
+.root h4 {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text);
+  line-height: 1.35;
+}
+.root h5,
+.root h6 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text);
+}
+
+/* ── 列表 ── */
+.root ul,
+.root ol {
+  margin: 0;
+  padding-left: 20px;
+}
+.root li {
+  line-height: 1.6;
+}
+.root li + li {
+  margin-top: 4px;
+}
+
+/* ── 引用块 ── */
+.root blockquote {
+  margin: 0;
+  border-left: 3px solid #4d7c93;
+  padding-left: 10px;
+  color: var(--text-muted);
+  line-height: 1.6;
+}
+
+/* ── 水平线 ── */
+.root hr {
+  border: none;
+  border-top: 1px solid var(--line-soft);
+  margin: 4px 0;
+}
+
+/* ── 行内代码 ── */
+.inlineCode {
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 5px;
+  padding: 1px 5px;
+  background: #1a1d23;
+  color: #eef1f6;
+  font-family: Consolas, 'SFMono-Regular', monospace;
+  font-size: .92em;
+}
+
+/* ── 代码块 ── */
+.codeBlock {
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 8px;
+  background: #15181d;
+  overflow: hidden;
+}
+
+.codeLang {
+  padding: 4px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: rgba(255, 255, 255, .03);
+}
+
+.pre {
+  margin: 0;
+  padding: 11px 12px;
+  overflow-x: auto;
+  font-family: Consolas, 'SFMono-Regular', monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #e8ecf2;
+  white-space: pre;
+}
+
+.pre code {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font-size: inherit;
+  color: inherit;
+}
+
+.copyBtn {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  height: 24px;
+  min-width: 42px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, .08);
+  border-radius: 6px;
+  background: #2b2e36;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: color .1s, border-color .1s;
+  z-index: 1;
+}
+.copyBtn:hover {
+  color: var(--text);
+  border-color: rgba(255, 255, 255, .18);
+}
+
+/* ── 链接 ── */
+.link {
+  color: #8ad7ff;
+  text-decoration: none;
+  cursor: pointer;
+}
+.link:hover { text-decoration: underline; }
+
+/* ── 表格 ── */
+.tableWrap {
+  max-width: min(780px, 100%);
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.th,
+.td {
+  border: 1px solid rgba(255, 255, 255, .09);
+  padding: 7px 8px;
+  text-align: left;
+  vertical-align: top;
+}
+.th {
+  background: rgba(255, 255, 255, .05);
+  color: var(--text);
+  font-weight: 700;
+}

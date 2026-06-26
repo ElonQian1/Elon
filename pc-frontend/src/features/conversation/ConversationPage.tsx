@@ -6,6 +6,7 @@ import { ModelPickerPopover } from '../models/ModelPicker'
 import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
+import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime, clean } from '../../lib/utils'
 import { shortButtonLabel } from '../models/modelUtils'
 import type { Message } from './types'
@@ -364,6 +365,9 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
   const time = message.created_at ? formatTime(message.created_at) : ''
   const displayName = isUser ? (user?.nickname ?? user?.account ?? '我') : 'AI'
 
+  // AI 消息：检测是否含 Markdown 特征，有则渲染 Markdown
+  const hasMarkdown = isAi && /[#*`\[\]>|]/.test(content)
+
   return (
     <div className={[styles.messageRow, isUser ? styles.ownRow : ''].join(' ')}>
       <div className={styles.messageAvatar}>
@@ -376,9 +380,15 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
           <strong>{displayName}</strong>
           {time && <span>{time}</span>}
         </div>
-        <div className={[styles.messageContent, isAi ? styles.aiContent : ''].join(' ')}>
-          {content}
-        </div>
+        {hasMarkdown ? (
+          <div className={[styles.messageContent, styles.aiContent, styles.markdownMsg].join(' ')}>
+            <MarkdownContent content={content} copy />
+          </div>
+        ) : (
+          <div className={[styles.messageContent, isAi ? styles.aiContent : ''].join(' ')}>
+            {content}
+          </div>
+        )}
       </div>
     </div>
   )
