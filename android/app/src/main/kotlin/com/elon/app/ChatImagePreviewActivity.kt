@@ -71,8 +71,8 @@ internal class ChatImagePreviewActivity : AppCompatActivity() {
                     FrameLayout.LayoutParams.MATCH_PARENT,
                     FrameLayout.LayoutParams.MATCH_PARENT
                 ).apply {
-                    topMargin = dp(96)
-                    bottomMargin = dp(136)
+                    topMargin = dp(PREVIEW_IMAGE_TOP_MARGIN_DP)
+                    bottomMargin = dp(PREVIEW_IMAGE_BOTTOM_MARGIN_DP)
                 }
                 adjustViewBounds = true
                 scaleType = ImageView.ScaleType.FIT_CENTER
@@ -89,28 +89,28 @@ internal class ChatImagePreviewActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(96),
+                dp(TOP_BAR_HEIGHT_DP),
                 Gravity.TOP
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(24), dp(28), dp(22), 0)
+            setPadding(dp(24), 0, dp(20), 0)
             addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(0, dp(52), 1f)
+                layoutParams = LinearLayout.LayoutParams(0, dp(PRIMARY_CONTROL_HEIGHT_DP), 1f)
                 gravity = Gravity.CENTER_VERTICAL or Gravity.START
                 includeFontPadding = false
                 text = "预览"
-                setTextColor(Color.WHITE)
-                textSize = 24f
+                setTextColor(getColor(R.color.elon_text_primary))
+                textSize = 16f
             })
             addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(136), dp(56))
-                background = roundedRect("#58BE6A", dp(28))
+                layoutParams = LinearLayout.LayoutParams(dp(112), dp(PRIMARY_CONTROL_HEIGHT_DP))
+                background = roundedRect(getColor(R.color.elon_button_primary_bg), dp(24))
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "添加 (1)"
-                setTextColor(Color.WHITE)
-                textSize = 20f
+                setTextColor(getColor(R.color.elon_button_primary_text))
+                textSize = 16f
                 setOnClickListener { finishWithImage() }
             })
         }
@@ -120,16 +120,20 @@ internal class ChatImagePreviewActivity : AppCompatActivity() {
         return FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(136),
+                dp(BOTTOM_TRAY_HEIGHT_DP),
                 Gravity.BOTTOM
             )
-            setPadding(dp(24), dp(8), dp(24), dp(24))
+            setPadding(dp(24), 0, dp(24), dp(20))
             val thumbWrap = FrameLayout(context).apply {
-                layoutParams = FrameLayout.LayoutParams(dp(116), dp(104), Gravity.START or Gravity.BOTTOM)
+                layoutParams = FrameLayout.LayoutParams(dp(112), dp(96), Gravity.START or Gravity.BOTTOM)
             }
             thumbImage = ImageView(context).apply {
-                layoutParams = FrameLayout.LayoutParams(dp(76), dp(76), Gravity.BOTTOM or Gravity.START)
-                background = roundedRect("#1A1A1A", dp(8))
+                layoutParams = FrameLayout.LayoutParams(
+                    dp(THUMB_SIZE_DP),
+                    dp(THUMB_SIZE_DP),
+                    Gravity.BOTTOM or Gravity.START
+                )
+                background = roundedRect(getColor(R.color.elon_surface_card), dp(6))
                 clipToOutline = true
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 contentDescription = "已选图片"
@@ -143,13 +147,11 @@ internal class ChatImagePreviewActivity : AppCompatActivity() {
 
     private fun editButton(): ImageButton {
         return ImageButton(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(88), dp(42), Gravity.TOP or Gravity.START).apply {
-                leftMargin = dp(-2)
-            }
+            layoutParams = FrameLayout.LayoutParams(dp(64), dp(48), Gravity.TOP or Gravity.START)
             background = ColorDrawable(Color.TRANSPARENT)
             contentDescription = "编辑图片"
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            setPadding(0, 0, 0, 0)
+            scaleType = ImageView.ScaleType.FIT_START
+            setPadding(0, 0, dp(12), dp(8))
             setImageResource(R.drawable.ic_chat_image_edit_marker)
             setOnClickListener { openEditor() }
         }
@@ -157,16 +159,16 @@ internal class ChatImagePreviewActivity : AppCompatActivity() {
 
     private fun closeButton(): TextView {
         return TextView(this).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(32), dp(32), Gravity.TOP or Gravity.END).apply {
-                topMargin = dp(30)
-                rightMargin = dp(20)
+            layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.START).apply {
+                leftMargin = dp(52)
+                topMargin = dp(22)
             }
-            background = roundedOval("#CC000000")
+            background = ColorDrawable(Color.TRANSPARENT)
             gravity = Gravity.CENTER
             includeFontPadding = false
             text = "×"
-            setTextColor(Color.WHITE)
-            textSize = 25f
+            setTextColor(getColor(R.color.elon_text_primary))
+            textSize = 22f
             contentDescription = "取消这张图片"
             setOnClickListener {
                 setResult(Activity.RESULT_CANCELED)
@@ -243,17 +245,10 @@ internal class ChatImagePreviewActivity : AppCompatActivity() {
         )
     }
 
-    private fun roundedRect(color: String, radius: Int): GradientDrawable {
+    private fun roundedRect(color: Int, radius: Int): GradientDrawable {
         return GradientDrawable().apply {
             cornerRadius = radius.toFloat()
-            setColor(Color.parseColor(color))
-        }
-    }
-
-    private fun roundedOval(color: String): GradientDrawable {
-        return GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.parseColor(color))
+            setColor(color)
         }
     }
 
@@ -268,6 +263,12 @@ internal class ChatImagePreviewActivity : AppCompatActivity() {
         const val EXTRA_OUTPUT_NAME = "chat_image_preview_output_name"
         const val EXTRA_OUTPUT_WIDTH = "chat_image_preview_output_width"
         const val EXTRA_OUTPUT_HEIGHT = "chat_image_preview_output_height"
+        private const val TOP_BAR_HEIGHT_DP = 64
+        private const val PRIMARY_CONTROL_HEIGHT_DP = 48
+        private const val PREVIEW_IMAGE_TOP_MARGIN_DP = 88
+        private const val PREVIEW_IMAGE_BOTTOM_MARGIN_DP = 124
+        private const val BOTTOM_TRAY_HEIGHT_DP = 116
+        private const val THUMB_SIZE_DP = 64
 
         fun createIntent(context: Context, path: String, displayName: String): Intent {
             return Intent(context, ChatImagePreviewActivity::class.java).apply {
