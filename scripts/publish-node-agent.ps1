@@ -57,6 +57,31 @@ function Write-Utf8NoBom {
     [System.IO.File]::WriteAllText($Path, $Content, $utf8NoBom)
 }
 
+function Resolve-NodeAgentTargetDir {
+    $candidates = @()
+    if ($env:ELON_NODE_AGENT_TARGET_DIR) {
+        $candidates += $env:ELON_NODE_AGENT_TARGET_DIR
+    }
+    if ($env:LOCALAPPDATA) {
+        $candidates += (Join-Path $env:LOCALAPPDATA "Elon\build-target\elon-node-agent")
+    }
+    if ($env:PUBLIC) {
+        $candidates += (Join-Path $env:PUBLIC "Elon\build-target\elon-node-agent")
+    }
+
+    foreach ($candidate in $candidates) {
+        if ([string]::IsNullOrWhiteSpace($candidate)) { continue }
+        $fullPath = [System.IO.Path]::GetFullPath($candidate)
+        if ($fullPath -match "\s") { continue }
+        New-Item -ItemType Directory -Force -Path $fullPath | Out-Null
+        return $fullPath
+    }
+
+    throw "无法解析无空格的 PC 节点 target 目录；请设置 ELON_NODE_AGENT_TARGET_DIR 为无空格路径。"
+}
+
+$env:CARGO_TARGET_DIR = Resolve-NodeAgentTargetDir
+
 # 解析真实 target 目录（可能被全局 .cargo/config.toml 的 target-dir 重定向到共享目录）
 $ServerDir = Join-Path $PSScriptRoot "..\server"
 Push-Location $ServerDir
