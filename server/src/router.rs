@@ -376,6 +376,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_membership::list_members).post(project_membership::add_member),
         )
         .route(
+            "/api/projects/:id/member-audit",
+            get(project_membership::list_member_audit),
+        )
+        .route(
             "/api/projects/:id/visibility",
             axum::routing::patch(project_membership::update_visibility),
         )

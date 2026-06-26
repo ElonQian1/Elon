@@ -158,7 +158,8 @@ pub async fn review_join_request(
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
 
-    let result = match req.action.as_str() {
+    let review_action = req.action.trim();
+    let result = match review_action {
         "approve" => state
             .store
             .approve_join_request(&req_id, &project_id, &user.id),
@@ -170,6 +171,27 @@ pub async fn review_join_request(
 
     match result {
         Ok(record) => {
+            let action = if review_action == "approve" {
+                "approve_join"
+            } else {
+                "reject_join"
+            };
+            let new_role = if review_action == "approve" {
+                Some("member")
+            } else {
+                None
+            };
+            if let Err(err) = state.store.record_project_member_audit(
+                &project_id,
+                Some(&user.id),
+                Some(&record.user_id),
+                action,
+                None,
+                new_role,
+                Some(&record.id),
+            ) {
+                tracing::warn!(?err, project_id = %project_id, "记录加入申请审计日志失败");
+            }
             // 通知申请人
             join_request_events::publish_review_result(
                 &record.user_id,

@@ -2197,6 +2197,71 @@ button { cursor: pointer; }
 .member-admin-request-actions .text-button {
   width: 100%;
 }
+.member-admin-audit {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+.member-admin-audit-refresh {
+  justify-self: end;
+  height: 24px;
+  border: 0;
+  border-radius: 5px;
+  background: #30333b;
+  color: #aeb4bf;
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+.member-admin-audit-refresh:hover {
+  background: #383c45;
+  color: var(--text);
+}
+.member-admin-audit-entry {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  padding: 8px;
+  border-radius: 7px;
+  background: rgba(0,0,0,.13);
+}
+.member-admin-audit-dot {
+  width: 7px;
+  height: 7px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: #6fbf8a;
+  box-shadow: 0 0 0 3px rgba(111, 191, 138, .12);
+}
+.member-admin-audit-copy {
+  min-width: 0;
+}
+.member-admin-audit-copy strong,
+.member-admin-audit-copy span,
+.member-admin-audit-copy em {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-admin-audit-copy strong {
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.member-admin-audit-copy span {
+  margin-top: 2px;
+  color: #aeb4bf;
+  font-size: 10px;
+}
+.member-admin-audit-copy em {
+  margin-top: 2px;
+  color: #777e8b;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
 .member-search {
   position: sticky;
   top: 0;

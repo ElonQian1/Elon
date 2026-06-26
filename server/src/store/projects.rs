@@ -467,6 +467,38 @@ impl Store {
         project_member_entry(&conn, project_id, &target_user_id)
     }
 
+    pub fn find_active_user_id_by_account(&self, account: &str) -> Result<String> {
+        let account = normalize_account(account)?;
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT id
+             FROM users
+             WHERE status = 'active'
+               AND (phone = ?1 OR email = ?1 OR id = ?1 OR nickname = ?1)
+             ORDER BY CASE WHEN phone = ?1 OR email = ?1 OR id = ?1 THEN 0 ELSE 1 END
+             LIMIT 1",
+            params![account],
+            |row| row.get(0),
+        )
+        .optional()?
+        .ok_or_else(|| anyhow!("目标账号不存在或未激活"))
+    }
+
+    pub fn project_member_role(
+        &self,
+        project_id: &str,
+        target_user_id: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.conn()?;
+        conn.query_row(
+            "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+            params![project_id, target_user_id],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
     /// 修改成员角色（仅 admin/editor/member/observer 之间互转；不可改 owner，不可改自己）
     pub fn update_member_role(
         &self,

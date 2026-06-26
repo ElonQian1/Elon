@@ -490,6 +490,22 @@ pub struct ProjectMemberEntry {
     pub is_online: bool,
 }
 
+/// 项目成员管理审计条目（邀请、审批、改角色、移除等）。
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMemberAuditEntry {
+    pub id: String,
+    pub project_id: String,
+    pub actor_user_id: Option<String>,
+    pub actor_account: Option<String>,
+    pub target_user_id: Option<String>,
+    pub target_account: Option<String>,
+    pub action: String,
+    pub old_role: Option<String>,
+    pub new_role: Option<String>,
+    pub note: Option<String>,
+    pub created_at: String,
+}
+
 // ── 项目空间 / 频道 ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

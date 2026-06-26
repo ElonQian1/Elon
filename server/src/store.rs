@@ -44,6 +44,7 @@ mod project_execution_sessions;
 mod project_identities;
 mod project_landing_snapshots;
 mod project_landing_upload_tokens;
+mod project_member_audit;
 mod project_member_conversations;
 mod project_runtime_permissions;
 mod project_space;

@@ -100,6 +100,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
         migration_v67,
     ),
     (68, "项目级 AI danger_full_access 权限", migration_v68),
+    (69, "项目成员管理审计日志", migration_v69),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2300,6 +2301,34 @@ fn migration_v68(conn: &Connection) -> Result<()> {
 
         DROP TABLE project_runtime_permissions;
         ALTER TABLE project_runtime_permissions_v68 RENAME TO project_runtime_permissions;
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v69(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_member_audit (
+          id             TEXT PRIMARY KEY,
+          project_id     TEXT NOT NULL,
+          actor_user_id  TEXT,
+          target_user_id TEXT,
+          action         TEXT NOT NULL,
+          old_role       TEXT,
+          new_role       TEXT,
+          note           TEXT,
+          created_at     TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (actor_user_id) REFERENCES users(id),
+          FOREIGN KEY (target_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_member_audit_project_time
+          ON project_member_audit(project_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_project_member_audit_target_time
+          ON project_member_audit(target_user_id, created_at DESC);
         "#,
     )?;
     Ok(())

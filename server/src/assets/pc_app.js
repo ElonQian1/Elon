@@ -38,7 +38,7 @@
     workbenchRegistrationProjectId: '',
     memberPanel: { title: '成员', members: [], options: {}, search: '' },
     memberCollapsed: {},
-    memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
+    memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, auditEntries: [], auditLoaded: false, auditLoading: false, auditExpanded: false, busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
     memberProfile: null,
     presenceSocket: null,
     presenceReconnectTimer: 0,
@@ -2690,6 +2690,10 @@
         loaded: false,
         loading: false,
         expanded: false,
+        auditEntries: [],
+        auditLoaded: false,
+        auditLoading: false,
+        auditExpanded: false,
         busy: '',
         inviteAccount: '',
         inviteRole: 'member',
@@ -2710,6 +2714,7 @@
       return `<option value="${escapeHtml(role.key)}" ${selected}>${escapeHtml(role.label)}</option>`;
     }).join('');
     const requestsHtml = admin.expanded ? renderProjectJoinRequests(projectId, admin) : '';
+    const auditHtml = admin.auditExpanded ? renderProjectMemberAudit(projectId, admin) : '';
     const statusHtml = admin.status
       ? `<div class="member-admin-status ${admin.tone ? `is-${escapeHtml(admin.tone)}` : ''}">${escapeHtml(admin.status)}</div>`
       : '';
@@ -2733,6 +2738,11 @@
         <small>${admin.loading ? '加载中' : `${pendingCount} 待处理`}</small>
       </button>
       ${requestsHtml}
+      <button class="member-admin-toggle ${admin.auditExpanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-audit">
+        <span>管理日志</span>
+        <small>${admin.auditLoading ? '加载中' : (admin.auditLoaded ? `${admin.auditEntries.length} 条` : '最近记录')}</small>
+      </button>
+      ${auditHtml}
       ${statusHtml}
     </section>`;
   }
@@ -2762,6 +2772,61 @@
         </div>
       </article>`;
     }).join('')}</div>`;
+  }
+
+  function renderProjectMemberAudit(projectId, admin) {
+    if (admin.auditLoading) return '<div class="member-admin-empty">加载管理日志中…</div>';
+    if (!admin.auditLoaded) return '<div class="member-admin-empty">展开后会加载最近管理动作</div>';
+    const entries = Array.isArray(admin.auditEntries) ? admin.auditEntries : [];
+    if (!entries.length) return '<div class="member-admin-empty">暂无成员管理日志</div>';
+    return `<div class="member-admin-audit">
+      <button class="member-admin-audit-refresh" type="button" data-member-admin-action="refresh-audit">刷新日志</button>
+      ${entries.map((entry) => {
+        const createdAt = entry.created_at || entry.createdAt;
+        const age = relativeTimeLabel(createdAt);
+        const ageLabel = age && age !== '刚刚' ? `${age}前` : (age || '刚刚');
+        const action = projectMemberAuditActionLabel(entry);
+        const detail = projectMemberAuditDetail(entry);
+        return `<article class="member-admin-audit-entry">
+          <div class="member-admin-audit-dot"></div>
+          <div class="member-admin-audit-copy">
+            <strong>${escapeHtml(action)}</strong>
+            ${detail ? `<span>${escapeHtml(detail)}</span>` : ''}
+            <em>${escapeHtml(ageLabel)}</em>
+          </div>
+        </article>`;
+      }).join('')}
+    </div>`;
+  }
+
+  function projectMemberAuditActionLabel(entry) {
+    const action = clean(entry && entry.action).toLowerCase();
+    const actor = clean(entry && (entry.actor_account || entry.actorAccount || entry.actor_user_id || entry.actorUserId)) || '系统';
+    const target = clean(entry && (entry.target_account || entry.targetAccount || entry.target_user_id || entry.targetUserId)) || '成员';
+    const oldRole = memberRoleLabel(entry && (entry.old_role || entry.oldRole));
+    const newRole = memberRoleLabel(entry && (entry.new_role || entry.newRole));
+    if (action === 'invite_member') return `${actor} 邀请 ${target}${newRole ? ` 为${newRole}` : ''}`;
+    if (action === 'update_role') {
+      if (oldRole && newRole) return `${actor} 将 ${target} 从${oldRole}改为${newRole}`;
+      if (newRole) return `${actor} 将 ${target} 设为${newRole}`;
+      return `${actor} 更新了 ${target} 的角色`;
+    }
+    if (action === 'remove_member') return `${actor} 移除了 ${target}`;
+    if (action === 'approve_join') return `${actor} 批准 ${target} 加入`;
+    if (action === 'reject_join') return `${actor} 拒绝 ${target} 的加入申请`;
+    if (action === 'join_project') return `${target} 加入了项目`;
+    if (action === 'leave_project') return `${target} 退出了项目`;
+    return `${actor} 更新了成员`;
+  }
+
+  function projectMemberAuditDetail(entry) {
+    const note = clean(entry && entry.note);
+    const oldRole = memberRoleLabel(entry && (entry.old_role || entry.oldRole));
+    const newRole = memberRoleLabel(entry && (entry.new_role || entry.newRole));
+    if (oldRole && newRole && oldRole !== newRole) return `${oldRole} → ${newRole}`;
+    if (newRole) return newRole;
+    if (oldRole) return `原角色：${oldRole}`;
+    return note && note.startsWith('jr') ? '加入申请审批' : '';
   }
 
   function bindRenderedMemberPanelPrefix() {
@@ -3182,6 +3247,22 @@
       loadProjectJoinRequests(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '刷新申请失败', 'error'));
       return;
     }
+    if (action === 'toggle-audit') {
+      const admin = memberAdminState(projectId);
+      admin.auditExpanded = !admin.auditExpanded;
+      admin.status = '';
+      rerenderMemberPanelForProject(projectId);
+      if (admin.auditExpanded && !admin.auditLoaded && !admin.auditLoading) {
+        loadProjectMemberAudit(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '加载日志失败', 'error'));
+      }
+      return;
+    }
+    if (action === 'refresh-audit') {
+      const admin = memberAdminState(projectId);
+      admin.auditExpanded = true;
+      loadProjectMemberAudit(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '刷新日志失败', 'error'));
+      return;
+    }
     if (action === 'approve-request' || action === 'reject-request') {
       const requestId = clean(button.dataset.requestId);
       const reviewAction = action === 'approve-request' ? 'approve' : 'reject';
@@ -3206,6 +3287,36 @@
     admin.busy = busy || '';
     admin.loading = false;
     rerenderMemberPanelForProject(projectId);
+  }
+
+  async function loadProjectMemberAudit(projectId, options) {
+    const silent = !!(options && options.silent);
+    const admin = memberAdminState(projectId);
+    admin.auditLoading = true;
+    admin.status = '';
+    if (!silent) admin.auditExpanded = true;
+    rerenderMemberPanelForProject(projectId);
+    const data = await api(`/api/projects/${encodeURIComponent(projectId)}/member-audit?limit=30`, { cache: 'no-store' });
+    admin.auditEntries = Array.isArray(data.entries) ? data.entries : [];
+    admin.auditLoaded = true;
+    admin.auditLoading = false;
+    rerenderMemberPanelForProject(projectId);
+  }
+
+  function refreshMemberAuditAfterMutation(projectId) {
+    const id = clean(projectId);
+    if (!id) return;
+    const admin = memberAdminState(id);
+    if (admin.auditExpanded) {
+      loadProjectMemberAudit(id, { silent: true }).catch(() => {
+        admin.auditLoading = false;
+        admin.auditLoaded = false;
+        rerenderMemberPanelForProject(id);
+      });
+      return;
+    }
+    admin.auditLoaded = false;
+    admin.auditEntries = [];
   }
 
   async function loadProjectJoinRequests(projectId, options) {
@@ -3264,6 +3375,7 @@
     admin.status = member ? `已邀请 ${memberNameOf(member)}` : '成员已邀请';
     admin.tone = 'ok';
     rerenderMemberPanelForProject(projectId);
+    refreshMemberAuditAfterMutation(projectId);
   }
 
   async function reviewProjectJoinRequest(projectId, requestId, action) {
@@ -3282,6 +3394,7 @@
     admin.loaded = true;
     admin.status = action === 'approve' ? '已批准加入申请' : '已拒绝加入申请';
     admin.tone = 'ok';
+    refreshMemberAuditAfterMutation(projectId);
     if (action === 'approve') {
       await refreshProjectMembersPanel(projectId);
       return;
@@ -3550,6 +3663,7 @@
     });
     patchMemberInProjectLists(member.__id, { role: targetRole, sub: memberRoleLabel(targetRole) || '项目成员' });
     renderMemberPanelView();
+    refreshMemberAuditAfterMutation(management.projectId);
     const latest = renderedMemberById(member.__id) || Object.assign({}, member, {
       role: targetRole,
       __roleKey: targetRole,
@@ -3572,6 +3686,7 @@
     removeMemberFromProjectLists(member.__id);
     closeMemberProfile();
     renderMemberPanelView();
+    refreshMemberAuditAfterMutation(management.projectId);
   }
 
   function renderedMemberById(userId) {

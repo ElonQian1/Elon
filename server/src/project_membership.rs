@@ -5,13 +5,14 @@
 ///   DELETE /api/projects/:id/leave                         退出已加入的项目（owner 不可退出）
 ///   GET    /api/projects/:id/members                       列出项目所有成员（公开项目无需成员身份）
 ///   POST   /api/projects/:id/members                       管理员邀请/添加成员
+///   GET    /api/projects/:id/member-audit                  owner/admin 查看成员管理日志
 ///   PATCH  /api/projects/:id/visibility                    设置公开/私有（仅 owner/admin）
 ///   PATCH  /api/projects/:id/icon                          修改项目 APK 图标（仅 owner）
 ///   PATCH  /api/projects/:id/brand                         修改项目展示别名与 logo（仅 owner）
 ///   PATCH  /api/projects/:id/members/:user_id              改成员角色（仅 owner/admin，不可改 owner/自己）
 ///   DELETE /api/projects/:id/members/:user_id              踢出成员（仅 owner/admin，不可踢 owner/自己）
 use axum::{
-    extract::{Path, State},
+    extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     Json,
@@ -53,6 +54,12 @@ pub struct AddMemberRequest {
     pub account: String,
     /// 缺省为 member；支持 admin/editor/member/observer/viewer
     pub role: Option<String>,
+}
+
+#[derive(Deserialize)]
+pub struct ListMemberAuditQuery {
+    /// 返回最近多少条，默认 30，最大 100。
+    pub limit: Option<i64>,
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -180,6 +187,40 @@ pub async fn list_members(
     }
 }
 
+/// GET /api/projects/:id/member-audit — owner/admin 查看成员管理日志
+pub async fn list_member_audit(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Query(q): Query<ListMemberAuditQuery>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let access = match state.store.get_project_access(&user.id, &project_id) {
+        Ok(a) => a,
+        Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
+    };
+    if !can_manage_project_members(&access.role) {
+        return json_error(
+            StatusCode::FORBIDDEN,
+            "只有项目 owner 或管理员才可查看成员日志",
+        );
+    }
+
+    let limit = q.limit.unwrap_or(30).clamp(1, 100);
+    match state.store.list_project_member_audit(&project_id, limit) {
+        Ok(entries) => Json(serde_json::json!({
+            "entries": entries,
+            "total": entries.len(),
+            "project_id": project_id,
+        }))
+        .into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
 /// POST /api/projects/:id/members — 管理员邀请/添加已注册成员
 pub async fn add_member(
     State(state): State<Arc<AppState>>,
@@ -199,17 +240,45 @@ pub async fn add_member(
         return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可邀请成员");
     }
 
-    match state.store.add_project_member_by_account(
-        &project_id,
-        req.account.trim(),
-        req.role.as_deref().unwrap_or("member").trim(),
-    ) {
-        Ok(member) => Json(serde_json::json!({
-            "ok": true,
-            "project_id": project_id,
-            "member": member,
-        }))
-        .into_response(),
+    let account = req.account.trim().to_string();
+    let role = req.role.as_deref().unwrap_or("member").trim().to_string();
+    let audit_target_user_id = state.store.find_active_user_id_by_account(&account).ok();
+    let audit_old_role = audit_target_user_id.as_deref().and_then(|target_user_id| {
+        state
+            .store
+            .project_member_role(&project_id, target_user_id)
+            .ok()
+            .flatten()
+    });
+
+    match state
+        .store
+        .add_project_member_by_account(&project_id, &account, &role)
+    {
+        Ok(member) => {
+            let action = if audit_old_role.is_some() {
+                "update_role"
+            } else {
+                "invite_member"
+            };
+            if let Err(err) = state.store.record_project_member_audit(
+                &project_id,
+                Some(&user.id),
+                Some(&member.user_id),
+                action,
+                audit_old_role.as_deref(),
+                Some(&member.role),
+                None,
+            ) {
+                tracing::warn!(?err, project_id = %project_id, "记录成员邀请审计日志失败");
+            }
+            Json(serde_json::json!({
+                "ok": true,
+                "project_id": project_id,
+                "member": member,
+            }))
+            .into_response()
+        }
         Err(e) => {
             let msg = e.to_string();
             let status = if msg.contains("不存在") || msg.contains("账号") {
@@ -559,17 +628,41 @@ pub async fn update_member_role(
     if target_user_id == user.id {
         return json_error(StatusCode::BAD_REQUEST, "不能修改自己的角色");
     }
+    let old_role = state
+        .store
+        .project_member_role(&project_id, &target_user_id)
+        .ok()
+        .flatten();
     match state
         .store
         .update_member_role(&project_id, &target_user_id, req.role.trim())
     {
-        Ok(()) => Json(serde_json::json!({
-            "ok": true,
-            "project_id": project_id,
-            "user_id": target_user_id,
-            "role": req.role,
-        }))
-        .into_response(),
+        Ok(()) => {
+            let new_role = state
+                .store
+                .project_member_role(&project_id, &target_user_id)
+                .ok()
+                .flatten()
+                .unwrap_or_else(|| req.role.trim().to_string());
+            if let Err(err) = state.store.record_project_member_audit(
+                &project_id,
+                Some(&user.id),
+                Some(&target_user_id),
+                "update_role",
+                old_role.as_deref(),
+                Some(&new_role),
+                None,
+            ) {
+                tracing::warn!(?err, project_id = %project_id, "记录成员角色审计日志失败");
+            }
+            Json(serde_json::json!({
+                "ok": true,
+                "project_id": project_id,
+                "user_id": target_user_id,
+                "role": new_role,
+            }))
+            .into_response()
+        }
         Err(e) => {
             let msg = e.to_string();
             let status = if msg.contains("不是该项目成员") {
@@ -607,12 +700,30 @@ pub async fn remove_member(
             "不能移除自己；如要退出请使用 leave 接口",
         );
     }
+    let old_role = state
+        .store
+        .project_member_role(&project_id, &target_user_id)
+        .ok()
+        .flatten();
     match state.store.remove_member(&project_id, &target_user_id) {
-        Ok(()) => Json(serde_json::json!({
-            "ok": true,
-            "message": "成员已移除",
-        }))
-        .into_response(),
+        Ok(()) => {
+            if let Err(err) = state.store.record_project_member_audit(
+                &project_id,
+                Some(&user.id),
+                Some(&target_user_id),
+                "remove_member",
+                old_role.as_deref(),
+                None,
+                None,
+            ) {
+                tracing::warn!(?err, project_id = %project_id, "记录成员移除审计日志失败");
+            }
+            Json(serde_json::json!({
+                "ok": true,
+                "message": "成员已移除",
+            }))
+            .into_response()
+        }
         Err(e) => {
             let msg = e.to_string();
             let status = if msg.contains("不是该项目成员") {
