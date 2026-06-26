@@ -784,11 +784,20 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
         Write-Host "3.5⃣  构建 PC 前端（npm run build）..." -ForegroundColor Yellow
         Push-Location $PcFrontendDir
         try {
-            # 如果没有 node_modules 先安装依赖
-            if (-not (Test-Path (Join-Path $PcFrontendDir "node_modules"))) {
-                Write-Host "   📦 安装前端依赖（npm ci）..." -ForegroundColor Gray
+            $lockFile     = Join-Path $PcFrontendDir "package-lock.json"
+            $nmDir        = Join-Path $PcFrontendDir "node_modules"
+            $nmInstalled  = Join-Path $nmDir ".npm-installed-sha"
+            # 用 package-lock.json 内容 hash 判断是否需要重新安装
+            $lockHash = if (Test-Path $lockFile) {
+                (Get-FileHash $lockFile -Algorithm MD5).Hash
+            } else { '' }
+            $prevHash = if (Test-Path $nmInstalled) { Get-Content $nmInstalled -Raw } else { '' }
+            $needInstall = (-not (Test-Path $nmDir)) -or ($lockHash -ne $prevHash.Trim())
+            if ($needInstall) {
+                Write-Host "   📦 安装/更新前端依赖（npm ci）..." -ForegroundColor Gray
                 cmd /c "npm ci" 2>&1 | Write-Host
                 if ($LASTEXITCODE -ne 0) { throw "npm ci 失败，exit=$LASTEXITCODE" }
+                $lockHash | Set-Content $nmInstalled -NoNewline
             }
             cmd /c "npm run build" 2>&1 | Write-Host
             if ($LASTEXITCODE -ne 0) { throw "npm run build 失败，exit=$LASTEXITCODE" }
