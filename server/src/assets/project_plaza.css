@@ -140,7 +140,7 @@
   flex: 1 1 auto;
   min-width: 0;
   margin-left: 10px;
-  margin-right: 6px;
+  margin-right: 4px;
 }
 
 .project-plaza-thumb {
@@ -181,19 +181,19 @@
   flex: none;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   box-sizing: border-box;
 }
 
 .project-plaza-btn {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   border: 0;
   border-radius: 10px;
   background-color: transparent;
   background-position: center;
   background-repeat: no-repeat;
-  background-size: 34px 34px;
+  background-size: 30px 30px;
   color: transparent;
   font-size: 0;
   line-height: 0;
@@ -358,8 +358,8 @@
   }
 
   .project-plaza-btn {
-    width: 44px;
-    background-size: 32px 32px;
+    width: 40px;
+    background-size: 30px 30px;
   }
 
   .project-plaza-stat span {

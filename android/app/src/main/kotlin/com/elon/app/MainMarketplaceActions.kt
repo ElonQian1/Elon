@@ -838,7 +838,7 @@ internal class MainMarketplaceActions(
         const val FIRST_CARD_TOP_MARGIN_DP = 36
         const val CARD_GAP_DP = 34
         const val CARD_THUMB_TEXT_GAP_DP = 10
-        const val CARD_TITLE_ACTION_GAP_DP = 6
+        const val CARD_TITLE_ACTION_GAP_DP = 4
         const val HEADER_META_TOP_MARGIN_DP = 4
         const val STATS_TOP_MARGIN_DP = 12
         const val STATS_ROW_HEIGHT_DP = 58
@@ -848,9 +848,9 @@ internal class MainMarketplaceActions(
         const val THUMB_SIZE_DP = 44
         const val THUMB_RADIUS_DP = 5
         const val MEMBER_STAT_ICON_DP = 28
-        const val ACTION_ICON_TOUCH_DP = 48
-        const val ACTION_ICON_SIZE_DP = 34
-        const val ACTION_ICON_GAP_DP = 6
+        const val ACTION_ICON_TOUCH_DP = 40
+        const val ACTION_ICON_SIZE_DP = 30
+        const val ACTION_ICON_GAP_DP = 2
         const val DESC_COLLAPSE_CHAR_LIMIT = 46
         const val DESC_COLLAPSED_LINES = 2
         const val DISABLED_ACTION_ALPHA = 0.45f
