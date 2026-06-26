@@ -1,10 +1,24 @@
 ---
-applyTo: "server/src/assets/pc_*.{html,css,js},server/src/assets/pc*.{html,css,js},pc-frontend/**/*,server/src/web.rs,server/src/router.rs,scripts/publish-server.*"
+applyTo: "pc-frontend/**/*,server/src/web.rs,server/src/router.rs,scripts/publish-server.*"
 ---
 
-# PC 工作台前端渐进迁移规则
+# PC 工作台前端规则（收尾期 / 新功能期）
 
-> 本文件约束 `/pc` PC 工作台从原生静态 HTML/CSS/JS 逐步迁移到新前端工程的过程。目标是让新框架承接复杂能力，同时让旧 `pc_*` 静态资产持续缩减到零。
+> **当前状态（2026-06-26）：迁移已完成。**
+> - `/pc` 指向 `pc-frontend/`（Vite + React + TypeScript），由 `$DATA_DIR/pc-next-dist/` 服务。
+> - 所有旧 `server/src/assets/pc_*.{html,js,css}` 文件**已删除**，禁止重新创建。
+> - 所有旧 `pc_app_*` Rust 处理器函数**已删除**，禁止重新添加。
+> - **新 PC 功能只能进入 `pc-frontend/src/features/`**，不允许写回旧 HTML/JS 模式。
+
+## ⛔ 不允许的操作（给所有 AI 代理的硬规则）
+
+1. **禁止在 `server/src/assets/` 下新建任何 `pc_*.{html,js,css}` 文件**
+2. **禁止在 `server/src/web.rs` 里重新添加 `pc_app_*` 系列函数**
+3. **禁止在 `server/src/router.rs` 里重新注册 `/assets/pc_*` 路由**
+4. **禁止把 PC 业务逻辑写成内嵌的字符串 HTML**
+
+---
+
 
 ## 迁移方向
 
