@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.animation.ValueAnimator
+import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -9,7 +10,6 @@ import android.os.SystemClock
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
-import android.view.animation.LinearInterpolator
 import android.widget.FrameLayout
 import android.widget.ScrollView
 import androidx.appcompat.app.AppCompatActivity
@@ -258,59 +258,47 @@ internal class HomePullFilterController(
 }
 
 private class HomePullFilterIndicatorView(context: android.content.Context) : View(context) {
-    private val density = resources.displayMetrics.density
+    private val iconBitmap = BitmapFactory.decodeResource(resources, R.drawable.ic_home_pull_filter)
+    private val iconBounds = RectF()
     private val ringRect = RectF()
-    private val shellPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#212121")
-        style = Paint.Style.FILL
+    private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        isFilterBitmap = true
+        isDither = true
     }
     private val basePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#4D4D4D")
+        color = Color.parseColor("#D0D2D4")
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        strokeWidth = 2.3f * density
     }
     private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        strokeWidth = 2.8f * density
     }
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
         style = Paint.Style.STROKE
         strokeCap = Paint.Cap.ROUND
-        strokeWidth = 4.2f * density
-        color = Color.WHITE
     }
 
-    private var targetMode = HomeListFilterMode.Projects
     private var progress = 0f
-    private var spin = 0f
     private var whiteFlash = 0f
     private var flashAnimator: ValueAnimator? = null
-    private val spinner = ValueAnimator.ofFloat(0f, 1f).apply {
-        duration = 900L
-        repeatCount = ValueAnimator.INFINITE
-        repeatMode = ValueAnimator.RESTART
-        interpolator = LinearInterpolator()
-        addUpdateListener {
-            spin = it.animatedFraction
-            invalidate()
-        }
-    }
 
-    fun start() {
-        if (!spinner.isRunning) spinner.start()
-    }
+    fun start() = Unit
 
     fun stop() {
-        spinner.cancel()
         flashAnimator?.cancel()
         whiteFlash = 0f
-        spin = 0f
+        invalidate()
     }
 
     fun update(mode: HomeListFilterMode, value: Float) {
-        targetMode = mode
+        contentDescription = when (mode) {
+            HomeListFilterMode.All -> "下拉切换到全部"
+            HomeListFilterMode.Projects -> "下拉切换到项目"
+            HomeListFilterMode.Friends -> "下拉切换到好友"
+        }
         progress = value.coerceIn(0f, 1f)
         invalidate()
     }
@@ -343,31 +331,32 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
         super.onDraw(canvas)
         val cx = width / 2f
         val cy = height / 2f
-        val radius = (min(width, height) / 2f - 8.5f * density).coerceAtLeast(8f * density)
+        val size = min(width, height).toFloat()
+        val left = (width - size) / 2f
+        val top = (height - size) / 2f
+        iconBounds.set(left, top, left + size, top + size)
+        canvas.drawBitmap(iconBitmap, null, iconBounds, iconPaint)
+
+        val radius = (size * RING_RADIUS_RATIO).coerceAtLeast(1f)
+        val ringStroke = (size * RING_STROKE_RATIO).coerceAtLeast(1f)
         ringRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
+        basePaint.strokeWidth = ringStroke
+        progressPaint.strokeWidth = ringStroke
+        glowPaint.strokeWidth = ringStroke * 1.42f
 
-        canvas.drawCircle(cx, cy, min(width, height) / 2f - density, shellPaint)
-        canvas.drawArc(ringRect, -90f, 360f, false, basePaint)
-
-        val targetColor = when (targetMode) {
-            HomeListFilterMode.Friends -> Color.parseColor("#58BE6A")
-            else -> Color.parseColor("#F2C94C")
+        canvas.drawArc(ringRect, PROGRESS_START_ANGLE, 360f, false, basePaint)
+        if (progress > 0.001f) {
+            canvas.drawArc(ringRect, PROGRESS_START_ANGLE, 360f * progress, false, progressPaint)
         }
-        progressPaint.color = blend(targetColor, Color.WHITE, whiteFlash)
-        val start = -90f + spin * 360f
-        canvas.drawArc(ringRect, start, 360f * progress, false, progressPaint)
         if (whiteFlash > 0f) {
-            glowPaint.alpha = (whiteFlash * 210).toInt().coerceIn(0, 255)
-            canvas.drawArc(ringRect, start + 18f, 84f, false, glowPaint)
+            glowPaint.alpha = (whiteFlash * 180).toInt().coerceIn(0, 255)
+            canvas.drawArc(ringRect, PROGRESS_START_ANGLE, 360f, false, glowPaint)
         }
     }
 
-    private fun blend(from: Int, to: Int, ratio: Float): Int {
-        val t = ratio.coerceIn(0f, 1f)
-        return Color.rgb(
-            (Color.red(from) + (Color.red(to) - Color.red(from)) * t).toInt(),
-            (Color.green(from) + (Color.green(to) - Color.green(from)) * t).toInt(),
-            (Color.blue(from) + (Color.blue(to) - Color.blue(from)) * t).toInt()
-        )
+    private companion object {
+        const val PROGRESS_START_ANGLE = -90f
+        const val RING_RADIUS_RATIO = 0.234f
+        const val RING_STROKE_RATIO = 0.132f
     }
 }

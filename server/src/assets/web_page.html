@@ -256,48 +256,48 @@
       pointer-events: none;
       z-index: 28;
       transition: opacity 160ms ease, transform 160ms ease;
-      --pull-filter-color: var(--pull-filter-project);
       --pull-filter-offset: 100;
     }
     .conversation-filter-pull.visible {
       opacity: 1;
       transform: translate(-50%, var(--pull-offset, 0px)) scale(var(--pull-scale, 1));
     }
-    .conversation-filter-pull svg {
+    .pull-icon,
+    .pull-progress-layer {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
       display: block;
-      animation: conversation-pull-spin 900ms linear infinite;
     }
-    .pull-shell { fill: #212121; stroke: #4D4D4D; stroke-width: 2; }
+    .pull-icon {
+      object-fit: contain;
+    }
     .pull-base {
       fill: none;
-      stroke: #4D4D4D;
-      stroke-width: 2.4;
+      stroke: #D0D2D4;
+      stroke-width: 5.5;
       stroke-linecap: round;
       transform-origin: 21px 21px;
       transform: rotate(-90deg);
     }
     .pull-progress {
       fill: none;
-      stroke: var(--pull-filter-color);
-      stroke-width: 3.2;
+      stroke: var(--pull-filter-light);
+      stroke-width: 5.5;
       stroke-linecap: round;
       stroke-dasharray: 100;
       stroke-dashoffset: var(--pull-filter-offset);
       transform-origin: 21px 21px;
       transform: rotate(-90deg);
-      transition: stroke 140ms ease, stroke-dashoffset 80ms linear;
+      transition: stroke-dashoffset 80ms linear;
     }
     .conversation-filter-pull.flash .pull-progress {
       animation: conversation-pull-flash 620ms ease;
     }
-    @keyframes conversation-pull-spin {
-      to { transform: rotate(360deg); }
-    }
     @keyframes conversation-pull-flash {
-      0%, 100% { stroke: var(--pull-filter-color); filter: none; }
-      45% { stroke: var(--pull-filter-light); filter: drop-shadow(0 0 8px rgba(255,255,255,0.88)); }
+      0%, 100% { filter: none; }
+      45% { filter: drop-shadow(0 0 8px rgba(255,255,255,0.88)); }
     }
     .search-bar { flex: 0 0 auto; padding: 8px 14px; background: var(--panel-2); }
     .search-bar input { width: 100%; background: var(--bg-hint,var(--panel-2)); border: 1px solid var(--line); border-radius: 20px; padding: 7px 14px; color: var(--ink); font-size: 14px; outline: none; box-sizing: border-box; }
@@ -2412,10 +2412,10 @@
 
   <section class="content">
     <div id="conversationFilterPull" class="conversation-filter-pull" aria-hidden="true">
-      <svg viewBox="0 0 42 42" focusable="false" aria-hidden="true">
-        <circle class="pull-shell" cx="21" cy="21" r="19" />
-        <circle class="pull-base" cx="21" cy="21" r="12.5" pathLength="100" />
-        <circle class="pull-progress" cx="21" cy="21" r="12.5" pathLength="100" />
+      <img class="pull-icon" src="data:image/png;base64,__HOME_PULL_FILTER_PNG_B64__" alt="" aria-hidden="true" />
+      <svg class="pull-progress-layer" viewBox="0 0 42 42" focusable="false" aria-hidden="true">
+        <circle class="pull-base" cx="21" cy="21" r="9.8" pathLength="100" />
+        <circle class="pull-progress" cx="21" cy="21" r="9.8" pathLength="100" />
       </svg>
     </div>
 
@@ -4295,12 +4295,6 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return 'projects';
   }
 
-  function contactFilterColor(targetMode) {
-    return targetMode === 'friends'
-      ? 'var(--pull-filter-friend)'
-      : 'var(--pull-filter-project)';
-  }
-
   function contactFilterTitle() {
     if (contactFilterMode === 'projects') return '项目';
     if (contactFilterMode === 'friends') return '好友';
@@ -4396,12 +4390,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function updateConversationPullIndicator(distance) {
     const capped = Math.max(0, Math.min(distance, CONTACT_PULL_MAX));
     const progress = Math.max(0, Math.min(capped / CONTACT_PULL_TRIGGER, 1));
-    const targetMode = nextContactFilterMode();
     contactPullState.progress = progress;
     conversationFilterPull.classList.add('visible');
     conversationList.classList.add('pulling');
     conversationFilterPull.style.setProperty('--pull-filter-offset', (100 * (1 - progress)).toFixed(2));
-    conversationFilterPull.style.setProperty('--pull-filter-color', contactFilterColor(targetMode));
     conversationFilterPull.style.setProperty('--pull-offset', Math.min(capped * 0.34, 34).toFixed(1) + 'px');
     conversationFilterPull.style.setProperty('--pull-scale', (0.86 + 0.14 * progress).toFixed(3));
     conversationList.style.transform = `translateY(${Math.min(capped * 0.22, 28).toFixed(1)}px)`;
