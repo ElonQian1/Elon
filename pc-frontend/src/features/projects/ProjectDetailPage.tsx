@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useProjectStore } from '../conversation/useProjectStore'
+import ProjectReadinessCard from './ProjectReadinessCard'
 import type { ProjectMember } from '../conversation/types'
 import styles from './ProjectDetailPage.module.css'
 
@@ -102,7 +103,23 @@ export default function ProjectDetailPage() {
       <div className={styles.content}>
         {tab === 'overview' && <OverviewTab project={project} space={space} />}
         {tab === 'members' && <MembersTab members={memberList} onRefresh={loadMembers} projectId={id ?? ''} />}
-        {tab === 'workspace' && <WorkspaceTab health={health} loading={healthLoading} onRefresh={loadHealth} />}
+        {tab === 'workspace' && (
+          <WorkspaceTab
+            health={health}
+            loading={healthLoading}
+            onRefresh={loadHealth}
+            channels={space?.channels ?? []}
+            onOpenChannel={(channelId) => {
+              // 跳回主页并激活该频道
+              navigate('/')
+              setTimeout(() => {
+                if (id) useProjectStore.getState().selectProject(id).then(() => {
+                  useProjectStore.getState().selectChannel(channelId)
+                })
+              }, 100)
+            }}
+          />
+        )}
       </div>
     </div>
   )
@@ -245,10 +262,12 @@ function MembersTab({ members, onRefresh, projectId }: { members: ProjectMember[
   )
 }
 
-function WorkspaceTab({ health, loading, onRefresh }: {
+function WorkspaceTab({ health, loading, channels, onRefresh, onOpenChannel }: {
   health: WorkspaceHealth | null
   loading: boolean
+  channels: { id: string; name: string; kind?: string }[]
   onRefresh: () => void
+  onOpenChannel: (channelId: string) => void
 }) {
   if (loading) return <div className={styles.loading}>检查工作区状态…</div>
   if (!health) return (
@@ -259,7 +278,6 @@ function WorkspaceTab({ health, loading, onRefresh }: {
   )
 
   const rows: [string, string][] = [
-    ['工作区目录', health.workspace_exists ? '存在' : '不存在'],
     ['Git 初始化', health.git_initialized ? '已初始化' : '未初始化'],
     ['Git 远端', health.git_remote ?? '未配置'],
     ['节点在线', health.node_online ? '在线' : '离线'],
@@ -272,8 +290,17 @@ function WorkspaceTab({ health, loading, onRefresh }: {
 
   return (
     <div>
+      {/* P2.3：开发就绪进度卡片 */}
+      <ProjectReadinessCard
+        health={health}
+        loading={false}
+        channels={channels}
+        onRefresh={onRefresh}
+        onOpenChannel={onOpenChannel}
+      />
+
       <div className={styles.tabToolbar}>
-        <span className={styles.tabCount}>工作区健康状态</span>
+        <span className={styles.tabCount}>工作区详情</span>
         <button className={styles.textBtn} onClick={onRefresh} type="button">刷新</button>
       </div>
       <div className={styles.overviewGrid}>

@@ -1,0 +1,137 @@
+.card {
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: #202126;
+  overflow: hidden;
+  max-width: 560px;
+  margin-bottom: 16px;
+}
+
+.card.ok   { border-color: rgba(46, 168, 97, .35); }
+.card.warn { border-color: rgba(216, 165, 53, .35); }
+.card.bad  { border-color: rgba(223, 92, 92, .35); }
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: 14px 16px 10px;
+}
+.eyebrow {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  margin-bottom: 4px;
+}
+.title { font-size: 16px; color: var(--text); }
+.refreshBtn {
+  width: 30px; height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  transition: color .1s;
+  flex-shrink: 0;
+}
+.refreshBtn:hover { color: var(--text); }
+
+/* 进度条 */
+.progressBar {
+  height: 3px;
+  background: rgba(255, 255, 255, .06);
+  margin: 0 16px 12px;
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progressFill {
+  height: 100%;
+  background: var(--green);
+  border-radius: inherit;
+  transition: width .4s ease;
+}
+
+/* 检查清单 */
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 16px 10px;
+}
+.checkItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 13px;
+}
+.checkOk  { color: var(--text-soft); }
+.checkFail { color: var(--text-muted); }
+.checkItem:hover { background: rgba(255,255,255,.04); }
+.checkIcon {
+  width: 18px;
+  text-align: center;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+.checkOk .checkIcon  { color: var(--green); }
+.checkFail .checkIcon { color: var(--text-muted); }
+.checkLabel { font-weight: 600; flex-shrink: 0; }
+.checkHint {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 下一步 */
+.nextStep {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line-soft);
+  background: rgba(255,255,255,.02);
+}
+.nextLabel { font-size: 11px; color: var(--text-muted); font-weight: 800; text-transform: uppercase; }
+.nextText  { font-size: 13px; color: var(--text); }
+
+/* 动作按钮 */
+.actions {
+  display: flex;
+  gap: 8px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line-soft);
+}
+.actionPrimary {
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--green);
+  color: white;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .1s;
+}
+.actionPrimary:hover { background: var(--accent-hover); }
+
+/* 问题列表 */
+.issues {
+  padding: 10px 16px;
+  border-top: 1px solid rgba(223, 92, 92, .2);
+  background: rgba(223, 92, 92, .06);
+  font-size: 12px;
+  color: #ffd7d7;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.loading { padding: 12px; color: var(--text-muted); font-size: 13px; }
