@@ -122,10 +122,10 @@ export default function DoctorPage() {
               )}
               {messages.map((m) => (
                 <div key={m.id} className={[styles.msgRow, styles[m.role]].join(' ')}>
-                  <div className={styles.avatar}>{m.role === 'user' ? (user?.display_name?.[0] ?? '你') : '医'}</div>
+                  <div className={styles.avatar}>{m.role === 'user' ? (user?.nickname ?? user?.account)?.[0] ?? '你' : '医'}</div>
                   <div className={styles.msgBody}>
                     <div className={styles.msgMeta}>
-                      <strong>{m.role === 'user' ? (user?.display_name ?? '你') : '电脑医生'}</strong>
+                      <strong>{m.role === 'user' ? (user?.nickname ?? user?.account ?? '你') : '电脑医生'}</strong>
                       <span>{m.time}</span>
                     </div>
                     <pre className={[styles.msgContent, styles[m.kind] ?? ''].join(' ')}>{m.content}</pre>

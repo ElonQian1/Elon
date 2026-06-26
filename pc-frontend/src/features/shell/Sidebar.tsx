@@ -48,7 +48,7 @@ export default function Sidebar() {
         <ModelPickerButton />
       {user && (
           <div className={styles.userRow}>
-            <span className={styles.userName}>{user.display_name ?? user.username}</span>
+            <span className={styles.userName}>{user.nickname ?? user.account}</span>
             <button className={styles.logoutBtn} onClick={logout} title="退出登录">
               ↩
             </button>

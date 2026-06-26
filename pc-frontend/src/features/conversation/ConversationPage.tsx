@@ -192,7 +192,7 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
   message: Message
   isDevChannel: boolean
   taskContext: ReturnType<typeof buildContext>
-  user: { display_name?: string; username?: string } | null
+  user: { nickname?: string; account?: string } | null
   onCancel: (taskId: string) => Promise<void>
   onApprove: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
 }) {
@@ -216,12 +216,12 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
   const isUser = kind === 'user' || kind === 'human'
   const content = clean(message.content ?? message.text ?? '')
   const time = message.created_at ? formatTime(message.created_at) : ''
-  const displayName = isUser ? (user?.display_name ?? user?.username ?? '我') : 'AI'
+  const displayName = isUser ? (user?.nickname ?? user?.account ?? '我') : 'AI'
 
   return (
     <div className={[styles.msgRow, isUser ? styles.userMsg : styles.aiMsg].join(' ')}>
       <div className={styles.msgAvatar}>
-        {isUser ? (user?.display_name?.[0]?.toUpperCase() ?? '我') : 'AI'}
+        {isUser ? ((user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '我') : 'AI'}
       </div>
       <div className={styles.msgBody}>
         <div className={styles.msgMeta}>

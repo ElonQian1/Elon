@@ -4,8 +4,8 @@ import { api } from '../api/client'
 
 interface User {
   id: string
-  username: string
-  display_name?: string
+  account: string
+  nickname?: string
 }
 
 interface AuthState {
@@ -25,7 +25,7 @@ export const useAuthStore = create<AuthState>()(
       login: async (username, password) => {
         const res = await api.post<{ token: string; user: User }>(
           '/api/auth/login',
-          { username, password },
+          { account: username, password },
         )
         set({ token: res.token, user: res.user })
       },
