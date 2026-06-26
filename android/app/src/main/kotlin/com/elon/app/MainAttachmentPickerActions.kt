@@ -14,7 +14,7 @@ internal class MainAttachmentPickerActions(
     private val activity: AppCompatActivity,
     private val activeConversation: () -> AppConversation,
     private val attachPickedFile: (String, Uri, String?) -> Unit,
-    private val previewPickedImages: (String, List<Uri>, List<String?>) -> Unit
+    private val attachPickedImages: (String, List<Uri>, List<String?>) -> Unit
 ) {
     private lateinit var cameraAttachmentLauncher: ActivityResultLauncher<Uri>
     private lateinit var photoAttachmentLauncher: ActivityResultLauncher<PickVisualMediaRequest>
@@ -29,7 +29,7 @@ internal class MainAttachmentPickerActions(
             pendingCameraUri = null
             pendingCameraName = null
             if (success && uri != null) {
-                previewPickedImages("相机照片", listOf(uri), listOf(name))
+                attachPickedImages("相机照片", listOf(uri), listOf(name))
             } else {
                 Toast.makeText(activity, "已取消拍摄", Toast.LENGTH_SHORT).show()
             }
@@ -38,7 +38,7 @@ internal class MainAttachmentPickerActions(
             ActivityResultContracts.PickMultipleVisualMedia(MAX_PENDING_ATTACHMENTS)
         ) { uris ->
             if (uris.isNotEmpty()) {
-                previewPickedImages("相册图片", uris, emptyList())
+                attachPickedImages("相册图片", uris, emptyList())
             } else {
                 Toast.makeText(activity, "已取消选择相册", Toast.LENGTH_SHORT).show()
             }
