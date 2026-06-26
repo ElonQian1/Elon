@@ -12,7 +12,6 @@ import android.graphics.RectF
 import android.util.AttributeSet
 import android.view.MotionEvent
 import android.view.View
-import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.min
 
@@ -215,21 +214,21 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 activeShapeStart = point
-                activeShapeRect = squareRectFrom(point, point)
+                activeShapeRect = shapeRectFrom(point, point)
                 lastBitmapPoint = point
                 parent?.requestDisallowInterceptTouchEvent(true)
             }
             MotionEvent.ACTION_MOVE -> {
                 val start = activeShapeStart ?: return
-                activeShapeRect = squareRectFrom(start, point)
+                activeShapeRect = shapeRectFrom(start, point)
                 lastBitmapPoint = point
                 invalidate()
             }
             MotionEvent.ACTION_UP,
             MotionEvent.ACTION_CANCEL -> {
                 val start = activeShapeStart
-                val rect = if (start == null) null else squareRectFrom(start, point)
-                if (event.actionMasked == MotionEvent.ACTION_UP && rect != null && rect.width() >= minShapeSize()) {
+                val rect = if (start == null) null else shapeRectFrom(start, point)
+                if (event.actionMasked == MotionEvent.ACTION_UP && rect != null && isShapeLargeEnough(rect)) {
                     operations.add(
                         ChatImageEditOp.Shape(
                             bounds = RectF(rect),
@@ -268,7 +267,7 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
             )
         }
         activeShapeRect?.let { rect ->
-            if (rect.width() >= minShapeSize()) {
+            if (isShapeLargeEnough(rect)) {
                 drawOperation(
                     canvas,
                     ChatImageEditOp.Shape(
@@ -356,22 +355,12 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
         return values[Matrix.MSCALE_X]
     }
 
-    private fun squareRectFrom(start: PointF, end: PointF): RectF {
-        val bitmap = baseBitmap ?: return RectF(start.x, start.y, start.x, start.y)
-        val dx = end.x - start.x
-        val dy = end.y - start.y
-        val dirX = if (dx < 0f) -1f else 1f
-        val dirY = if (dy < 0f) -1f else 1f
-        val maxX = if (dirX > 0f) bitmap.width - start.x else start.x
-        val maxY = if (dirY > 0f) bitmap.height - start.y else start.y
-        val side = min(max(abs(dx), abs(dy)), min(maxX, maxY)).coerceAtLeast(0f)
-        val right = start.x + side * dirX
-        val bottom = start.y + side * dirY
+    private fun shapeRectFrom(start: PointF, end: PointF): RectF {
         return RectF(
-            min(start.x, right),
-            min(start.y, bottom),
-            max(start.x, right),
-            max(start.y, bottom)
+            min(start.x, end.x),
+            min(start.y, end.y),
+            max(start.x, end.x),
+            max(start.y, end.y)
         )
     }
 
@@ -389,6 +378,11 @@ internal class ChatImageEditCanvasView @JvmOverloads constructor(
 
     private fun minShapeSize(): Float {
         return dp(12) / matrixScale().coerceAtLeast(0.01f)
+    }
+
+    private fun isShapeLargeEnough(rect: RectF): Boolean {
+        val minSize = minShapeSize()
+        return rect.width() >= minSize && rect.height() >= minSize
     }
 
     private fun findLabelAt(point: PointF): ChatImageEditOp.Label? {
