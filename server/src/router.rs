@@ -8,7 +8,7 @@ use axum::{
 use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
-use tower_http::services::ServeFile;
+use tower_http::services::{ServeDir, ServeFile};
 
 use crate::types::AppState;
 use crate::{
@@ -59,10 +59,17 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     let app_dir = state.data_dir.join("app");
     let latest_apk = app_dir.join("ElonSpeed-latest.apk");
 
+    // PC 新前端 dist 目录（由发布脚本构建并上传后填充）
+    // 准备期：目录不存在时 /pc-next/* 自动返回 404
+    let pc_next_dist = state.data_dir.join("pc-next-dist");
+    let pc_next_svc = ServeDir::new(&pc_next_dist)
+        .not_found_service(ServeFile::new(pc_next_dist.join("index.html")));
+
     Router::new()
         .route("/", get(web::web_page))
         .route("/web", get(web::web_page))
         .route("/pc", get(web::pc_app_page))
+        .nest_service("/pc-next", pc_next_svc)
         .route("/manifest.json", get(web::pwa_manifest))
         .route("/sw.js", get(web::service_worker))
         .route("/assets/project_plaza.css", get(web::project_plaza_css))

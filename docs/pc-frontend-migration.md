@@ -30,11 +30,20 @@ server/src/
 
 迁移完成后，`/pc` 指向新前端；旧 `server/src/assets/pc_*.html/js/css` 删除或只保留短期 `/pc-legacy`，最终归零。
 
+## 当前阶段：✅ 准备期完成（2026-06-26）
+
+- `pc-frontend/` 工程已创建：Vite 5 + React 18 + TypeScript 5 + React Router 6 + Zustand
+- `/pc-next` 路由已添加：`server/src/router.rs` 通过 `ServeDir` 托管 `$DATA_DIR/pc-next-dist/`
+- SPA 路由通过 `not_found_service → index.html` fallback 支持
+- 开发代理已配置：`vite.config.ts` 将 `/api` 代理到 `localhost:8080`
+- 构建产物：`npm run build` → `pc-frontend/dist/`（已验证通过）
+- **待完成**：`scripts/publish-server.ps1` 添加前端构建+上传步骤
+
 ## 路由策略
 
 | 阶段 | `/pc` | `/pc-next` | `/pc-legacy` |
 |---|---|---|---|
-| 准备期 | 旧原生 PC | 新前端实验入口 | 无 |
+| **准备期** ✅ | 旧原生 PC | 新前端（ServeDir 从 `$DATA_DIR/pc-next-dist/` 服务） | 无 |
 | 并行期 | 旧原生 PC | 新前端主要迁移入口 | 无 |
 | 切换期 | 新前端 | 新前端同源或重定向 | 旧原生 PC |
 | 收尾期 | 新前端 | 可重定向到 `/pc` | 删除 |
