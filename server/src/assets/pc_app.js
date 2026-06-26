@@ -388,7 +388,58 @@
   }
 
   function userName(user) {
-    return clean(user && (user.nickname || user.phone || user.email || user.account || user.id)) || '未登录';
+    return clean(user && (
+      user.name || user.display_name || user.displayName || user.nickname ||
+      user.phone || user.email || user.account || user.user_account ||
+      user.userAccount || user.id || user.user_id || user.userId
+    )) || '未登录';
+  }
+
+  function memberIdOf(member) {
+    return clean(member && (
+      member.user_id || member.userId || member.member_user_id || member.memberUserId ||
+      member.id || member.account || member.user_account || member.userAccount
+    ));
+  }
+
+  function memberNameOf(member) {
+    return clean(member && (
+      member.name || member.display_name || member.displayName || member.nickname ||
+      member.account || member.user_account || member.userAccount ||
+      member.phone || member.email || member.id || member.user_id || member.userId
+    )) || '成员';
+  }
+
+  function memberRoleKey(member) {
+    return clean(member && (member.role || member.member_role || member.memberRole)).toLowerCase();
+  }
+
+  function memberRoleLabel(member) {
+    const role = typeof member === 'string' ? clean(member).toLowerCase() : memberRoleKey(member);
+    if (!role) return '';
+    if (role === 'owner') return '拥有者';
+    if (role === 'admin') return '管理员';
+    if (role === 'editor' || role === 'developer' || role === 'maintainer') return '协作者';
+    if (role === 'member') return '成员';
+    if (role === 'observer' || role === 'viewer') return '只读成员';
+    return role;
+  }
+
+  function friendById(id) {
+    const memberId = clean(id);
+    if (!memberId) return null;
+    return state.friends.find((friend) => sameId(friend && friend.id, memberId)) || null;
+  }
+
+  function memberPresence(member) {
+    const explicit = entityPresenceClass(member);
+    if (explicit) return explicit;
+    const id = memberIdOf(member);
+    if (id && sameId(id, currentUserId())) return 'online';
+    const friend = friendById(id);
+    if (friend && friend.is_online === true) return 'online';
+    if (friend && friend.is_online === false) return 'offline';
+    return '';
   }
 
   function shortUserId(value) {
@@ -1615,7 +1666,7 @@
     setHeader('AI', '需要登录', '先登录网页版，再回到 PC 工作台');
     setComposer(false, '登录后可输入消息', false);
     renderAiSidebar(filterText());
-    els.memberList.innerHTML = '';
+    renderMembers('成员', [], { emptyText: '登录后显示成员' });
     setNodeMode(false);
     els.messageList.innerHTML = inlineAuthStateMarkup(
       '登录后使用一龙AI、项目和 PC 工作台',
@@ -2297,6 +2348,58 @@
     await selectProjectConversation(project.id, draft.id, { focusComposer: true, draftOnly: true });
   }
 
+  function renderDirectMembers(friend) {
+    const members = [
+      Object.assign({}, friend, {
+        name: userName(friend),
+        sub: friend && friend.is_online ? '在线' : '离线'
+      })
+    ];
+    if (state.user && currentUserId()) {
+      members.unshift(Object.assign({}, state.user, {
+        id: currentUserId(),
+        name: userName(state.user),
+        sub: '我',
+        is_online: true
+      }));
+    }
+    renderMembers('私聊成员', members, {
+      groupBy: 'presence',
+      emptyText: '暂无成员'
+    });
+  }
+
+  function renderFriendGroupMembers(group) {
+    const preview = Array.isArray(group && group.members) ? group.members : [];
+    const members = preview.map((member) => {
+      const id = memberIdOf(member);
+      const friend = friendById(id);
+      const isSelf = id && sameId(id, currentUserId());
+      const onlineKnown = isSelf || (friend && friend.is_online === true);
+      const offlineKnown = friend && friend.is_online === false;
+      return Object.assign({}, member, {
+        name: memberNameOf(member),
+        sub: onlineKnown ? '在线' : '群成员',
+        is_online: onlineKnown ? true : (offlineKnown ? false : undefined)
+      });
+    });
+    if (state.user && currentUserId() && !members.some((member) => sameId(memberIdOf(member), currentUserId()))) {
+      members.unshift(Object.assign({}, state.user, {
+        id: currentUserId(),
+        name: userName(state.user),
+        sub: '我',
+        is_online: true
+      }));
+    }
+    const total = Math.max(Number(group && (group.member_count || group.memberCount || group.members_count || group.membersCount) || 0), members.length);
+    renderMembers('群成员', members, {
+      groupBy: 'presence',
+      totalCount: total,
+      emptyText: '暂无群成员',
+      overflowText: total > members.length ? `还有 ${total - members.length} 位成员未在预览中显示` : ''
+    });
+  }
+
   function selectFriends() {
     state.activeKind = 'friends';
     state.activeProjectId = '';
@@ -2312,7 +2415,10 @@
     els.workspaceMeta.textContent = `${socialFriends().length} 位好友 · ${state.groups.length} 个群聊`;
     setSidebarPlaceholder('搜索好友或群聊');
     renderChannels();
-    renderMembers('好友在线', socialFriends().map((f) => Object.assign({}, f, { name: userName(f), sub: f.is_online ? '在线' : '离线' })));
+    renderMembers('好友在线', socialFriends().map((f) => Object.assign({}, f, { name: userName(f), sub: f.is_online ? '在线' : '离线' })), {
+      groupBy: 'presence',
+      emptyText: '暂无好友'
+    });
     if (state.activePeer) selectPeer(state.activePeer.kind, state.activePeer.id);
     else {
       setHeader('友', '好友列表', '选择左侧好友或群聊开始对话');
@@ -2339,6 +2445,8 @@
     setHeader(kind === 'group' ? '群' : '@', title, kind === 'group' ? '群聊频道' : (item.is_online ? '在线好友' : '离线好友'));
     setComposer(true, `发送给 ${title}`, false);
     setNodeMode(false);
+    if (kind === 'group') renderFriendGroupMembers(item);
+    else renderDirectMembers(item);
     els.messageList.innerHTML = '<div class="empty-state">加载消息中…</div>';
     try {
       const path = kind === 'group'
@@ -2380,6 +2488,22 @@
     return window.ElonVoiceProject.renderMain(voiceContext());
   }
 
+  function renderProjectMembers(title, members, options) {
+    const rows = (Array.isArray(members) ? members : []).map((member) => {
+      const id = memberIdOf(member);
+      return Object.assign({}, member, {
+        id: id || member.id,
+        name: memberNameOf(member),
+        sub: memberRoleLabel(member) || '项目成员',
+        is_online: id && sameId(id, currentUserId()) ? true : undefined
+      });
+    });
+    renderMembers(title || '项目成员', rows, Object.assign({
+      groupBy: 'role',
+      emptyText: '暂无项目成员'
+    }, options || {}));
+  }
+
   async function selectProject(projectId, options) {
     const project = state.projects.find((p) => String(p.id) === String(projectId));
     if (!project) return;
@@ -2401,10 +2525,7 @@
     try {
       state.projectSpace = await api(`/api/projects/${encodeURIComponent(projectId)}/space`);
       const members = state.projectSpace.members || [];
-      renderMembers('项目成员', members.map((m) => Object.assign({}, m, {
-        name: userName(m),
-        sub: m.role || m.member_role || 'member'
-      })), {
+      renderProjectMembers('项目成员', members, {
         prefixHtml: projectReadiness.renderMemberPanel(projectById(projectId) || project)
       });
       projectReadiness.bindMemberPanel(projectById(projectId) || project);
@@ -2448,7 +2569,9 @@
     renderChannels();
     rememberAiProject(projectId);
     if (isDraft || (options && options.draftOnly)) {
-      renderMembers('项目会话', [{ name: userName(state.user), sub: titleOf(project) }]);
+      renderMembers('项目会话', [{ name: userName(state.user), sub: titleOf(project), is_online: true }], {
+        groupBy: 'none'
+      });
       els.messageList.innerHTML = `<div class="empty-state">
         <strong>新项目对话</strong>
         <p>发送第一条消息后，它会正式保存到「${escapeHtml(titleOf(project))}」下面。</p>
@@ -2461,13 +2584,12 @@
       try {
         state.projectSpace = await api(`/api/projects/${encodeURIComponent(projectId)}/space`);
         const members = state.projectSpace.members || [];
-        renderMembers('项目成员', members.map((m) => Object.assign({}, m, {
-          name: userName(m),
-          sub: m.role || m.member_role || 'member'
-        })));
+        renderProjectMembers('项目成员', members);
       } catch (_) {
         state.projectSpace = null;
-        renderMembers('项目会话', [{ name: userName(state.user), sub: '当前账号' }]);
+        renderMembers('项目会话', [{ name: userName(state.user), sub: '当前账号', is_online: true }], {
+          groupBy: 'none'
+        });
       }
       const data = await api(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}/conversations/${encodeURIComponent(cleanConversationId)}/messages?limit=120`, { cache: 'no-store' });
       renderMessages(data.messages || [], 'project');
@@ -2517,19 +2639,120 @@
   }
 
   function renderMembers(title, members, options) {
-    const memberCount = Array.isArray(members) ? members.length : 0;
-    els.memberPanelTitle.textContent = memberCount ? `${title} (${memberCount})` : title;
+    const opts = options || {};
+    const normalized = (Array.isArray(members) ? members : []).map((member) => {
+      const id = memberIdOf(member);
+      const roleLabel = memberRoleLabel(member);
+      const presence = memberPresence(member);
+      const explicitSub = clean(member && (
+        member.sub || member.subtitle || member.status_text || member.statusText ||
+        member.activity || member.note
+      ));
+      return Object.assign({}, member, {
+        __id: id,
+        __name: memberNameOf(member),
+        __presence: presence,
+        __roleKey: memberRoleKey(member),
+        __roleLabel: roleLabel,
+        __sub: explicitSub || roleLabel || (presence === 'online' ? '在线' : (presence === 'offline' ? '离线' : '成员'))
+      });
+    });
+    const memberCount = normalized.length;
+    const totalCount = Math.max(Number(opts.totalCount || opts.total || 0), memberCount);
+    const meta = totalCount ? `${totalCount} 位` : '';
+    els.memberPanelTitle.innerHTML = `<span>${escapeHtml(title || '成员')}</span>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}`;
     const prefix = options && options.prefixHtml ? options.prefixHtml : '';
-    const rows = (members || []).map((member) => {
-      const name = clean(member.name || member.nickname || member.account || member.user_account || member.phone || member.email) || '成员';
-      const sub = clean(member.sub || member.role || member.status || member.id) || '';
-      const presence = entityPresenceClass(member);
-      return `<div class="member-row ${presence ? `is-${escapeHtml(presence)}` : ''}" title="${escapeHtml(name)}">
-        ${avatarElement('div', `member-avatar ${presence}`, avatarUrlOf(member), name, '员')}
-        <div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(sub)}</span></div>
-      </div>`;
-    }).join('') || '<div class="empty-state">暂无成员</div>';
-    els.memberList.innerHTML = prefix + rows;
+    const groupBy = memberGroupMode(normalized, opts.groupBy);
+    const groups = memberGroups(normalized, groupBy);
+    const rows = groups.map((group) => {
+      const groupRows = group.members.map((member) => {
+        const presence = member.__presence;
+        const role = member.__roleLabel;
+        return `<div class="member-row ${presence ? `is-${escapeHtml(presence)}` : ''}" title="${escapeHtml(member.__name)}">
+          ${avatarElement('div', `member-avatar ${presence}`, avatarUrlOf(member), member.__name, '员')}
+          <div class="member-copy">
+            <div class="member-line">
+              <strong>${escapeHtml(member.__name)}</strong>
+              ${role && groupBy !== 'role' ? `<em class="member-role-pill">${escapeHtml(role)}</em>` : ''}
+            </div>
+            <span class="member-sub">${escapeHtml(member.__sub)}</span>
+          </div>
+        </div>`;
+      }).join('');
+      const heading = group.label
+        ? `<div class="member-section-heading"><span>${escapeHtml(group.label)}</span><small>${group.members.length}</small></div>`
+        : '';
+      return `<section class="member-section">${heading}${groupRows}</section>`;
+    }).join('');
+    const empty = `<div class="member-empty">${escapeHtml(opts.emptyText || '暂无成员')}</div>`;
+    const overflow = clean(opts.overflowText)
+      ? `<div class="member-overflow">${escapeHtml(opts.overflowText)}</div>`
+      : '';
+    els.memberList.innerHTML = prefix + (rows || empty) + overflow;
+  }
+
+  function memberGroupMode(members, requested) {
+    const mode = clean(requested).toLowerCase();
+    if (['none', 'presence', 'role'].includes(mode)) return mode;
+    if (members.some((member) => member.__roleKey)) return 'role';
+    if (members.some((member) => member.__presence)) return 'presence';
+    return 'none';
+  }
+
+  function memberGroups(members, mode) {
+    if (mode === 'none') return [{ label: '', members }];
+    if (mode === 'role') {
+      const labels = {
+        owner: '拥有者',
+        admin: '管理员',
+        editor: '协作者',
+        developer: '协作者',
+        maintainer: '协作者',
+        member: '成员',
+        observer: '只读成员',
+        viewer: '只读成员'
+      };
+      const order = ['owner', 'admin', 'editor', 'developer', 'maintainer', 'member', 'observer', 'viewer'];
+      return groupedMembers(members, (member) => memberRoleGroupKey(member.__roleKey), (key) => labels[key] || memberRoleLabel(key) || '成员', order);
+    }
+    return groupedMembers(members, (member) => member.__presence || 'unknown', (key) => {
+      if (key === 'online') return '在线';
+      if (key === 'offline') return '离线';
+      return '成员';
+    }, ['online', 'unknown', 'offline']);
+  }
+
+  function memberRoleGroupKey(role) {
+    const key = clean(role).toLowerCase();
+    if (key === 'developer' || key === 'maintainer') return 'editor';
+    if (key === 'viewer') return 'observer';
+    return key || 'member';
+  }
+
+  function groupedMembers(members, keyOf, labelOf, order) {
+    const buckets = new Map();
+    members.forEach((member) => {
+      const key = keyOf(member);
+      if (!buckets.has(key)) buckets.set(key, []);
+      buckets.get(key).push(member);
+    });
+    return Array.from(buckets.keys())
+      .sort((left, right) => {
+        const leftIndex = order.indexOf(left);
+        const rightIndex = order.indexOf(right);
+        if (leftIndex !== -1 || rightIndex !== -1) {
+          return (leftIndex === -1 ? 99 : leftIndex) - (rightIndex === -1 ? 99 : rightIndex);
+        }
+        return String(labelOf(left)).localeCompare(String(labelOf(right)));
+      })
+      .map((key) => ({
+        label: labelOf(key),
+        members: buckets.get(key).slice().sort((left, right) => {
+          const presenceDelta = (right.__presence === 'online' ? 1 : 0) - (left.__presence === 'online' ? 1 : 0);
+          if (presenceDelta) return presenceDelta;
+          return left.__name.localeCompare(right.__name);
+        })
+      }));
   }
 
   function senderIdOf(message) {
