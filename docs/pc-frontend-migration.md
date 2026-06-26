@@ -30,7 +30,97 @@ server/src/
 
 迁移完成后，`/pc` 指向新前端；旧 `server/src/assets/pc_*.html/js/css` 删除或只保留短期 `/pc-legacy`，最终归零。
 
-## 当前阶段：✅ 收尾期完成（2026-06-26）
+## 分阶段迁移计划（长远路线图）
+
+> 每阶段完成后更新下方状态表。单次 AI 任务只迁移一个明确模块。
+
+### 阶段 P1 — 对话核心补全（当前优先）
+
+目标：让 `/pc` 的消息体验与旧版对齐。
+
+| 任务 | 优先级 | 模块/文件 | 状态 |
+|---|---|---|---|
+| Markdown 渲染（代码块/表格/列表） | 🔴 高 | `src/features/markdown/` | ⬜ 未开始 |
+| 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ⬜ 未开始 |
+| 消息流式输出（AI 打字效果） | 🟡 中 | `src/features/conversation/` | ⬜ 未开始 |
+| 消息附件上传（图片/文件） | 🟡 中 | `src/features/conversation/AttachmentUpload.tsx` | ⬜ 未开始 |
+| 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | ⬜ 未开始 |
+
+### 阶段 P2 — 项目管理
+
+目标：项目详情、成员、设置可以在新前端操作。
+
+| 任务 | 优先级 | 模块/文件 | 状态 |
+|---|---|---|---|
+| 项目详情页（概览/设置/成员 Tab）| 🔴 高 | `src/features/projects/ProjectDetailPage.tsx` | ⬜ 未开始 |
+| 成员列表 + 邀请 + 移除 | 🟡 中 | `src/features/projects/MemberPanel.tsx` | ⬜ 未开始 |
+| 项目任务进度面板 | 🟡 中 | `src/features/projects/ProjectReadiness.tsx` | ⬜ 未开始 |
+| 项目工作区设置（Git/Node） | 🟢 低 | `src/features/projects/WorkspaceSettings.tsx` | ⬜ 未开始 |
+| 频道管理（新建/改名/删除）| 🟢 低 | `src/features/projects/ChannelSettings.tsx` | ⬜ 未开始 |
+
+### 阶段 P3 — 个人 AI 对话
+
+目标：旧版 "一龙AI" 频道 → 个人 AI 会话管理。
+
+| 任务 | 优先级 | 模块/文件 | 状态 |
+|---|---|---|---|
+| 个人 AI 会话列表（`/api/me/ai/conversations`）| 🔴 高 | `src/features/ai/AiConversationList.tsx` | ⬜ 未开始 |
+| AI 会话消息页 | 🔴 高 | `src/features/ai/AiChatPage.tsx` | ⬜ 未开始 |
+| 会话历史分页加载 | 🟡 中 | `src/features/ai/` | ⬜ 未开始 |
+
+### 阶段 P4 — 好友 & 社交
+
+| 任务 | 优先级 | 模块/文件 | 状态 |
+|---|---|---|---|
+| 好友列表 + 在线状态 | 🟡 中 | `src/features/friends/FriendList.tsx` | ⬜ 未开始 |
+| 好友私聊消息 | 🟡 中 | `src/features/friends/FriendChat.tsx` | ⬜ 未开始 |
+| 添加好友 / 扫码 | 🟢 低 | `src/features/friends/AddFriend.tsx` | ⬜ 未开始 |
+
+### 阶段 P5 — 项目广场 & 发现
+
+| 任务 | 优先级 | 模块/文件 | 状态 |
+|---|---|---|---|
+| 项目广场列表（过滤/搜索）| 🟡 中 | `src/features/plaza/PlazaPage.tsx` | ⬜ 未开始 |
+| 加入/申请加入项目 | 🟡 中 | `src/features/plaza/` | ⬜ 未开始 |
+| 项目卡片分享 | 🟢 低 | `src/features/plaza/ProjectCard.tsx` | ⬜ 未开始 |
+
+### 阶段 P6 — 账号 & 设置
+
+| 任务 | 优先级 | 模块/文件 | 状态 |
+|---|---|---|---|
+| 账号信息 + 修改密码 | 🟡 中 | `src/features/account/AccountPage.tsx` | ⬜ 未开始 |
+| 绑定手机/邮箱 | 🟢 低 | `src/features/account/` | ⬜ 未开始 |
+| 积分/余额查看 | 🟢 低 | `src/features/billing/BillingPage.tsx` | ⬜ 未开始 |
+
+### 阶段 P7 — 移动端适配 & 收尾
+
+| 任务 | 优先级 | 说明 | 状态 |
+|---|---|---|---|
+| 移动端响应式（< 780px）| 🟡 中 | 面板折叠、滑动抽屉 | ⬜ 未开始 |
+| 键盘快捷键（Esc 关弹窗等）| 🟢 低 | 体验细节 | ⬜ 未开始 |
+| PWA 离线壳 | 🟢 低 | service worker | ⬜ 未开始 |
+
+---
+
+## 执行原则
+
+1. **每次只做一个任务**：单次 AI 对话只迁移上表中一个模块，完成后更新状态为 ✅
+2. **先 P1，再 P2**：对话核心不完整时不开始项目管理
+3. **有 API 先看路由**：开始前先查 `server/src/router.rs` 确认 API 端点
+4. **实时推送复用**：WebSocket 逻辑统一放 `src/features/conversation/useChannelSocket.ts`，各页面引用
+5. **Markdown 统一**：渲染逻辑放 `src/features/markdown/`，不在各页面各自实现
+
+---
+
+## 下一步行动
+
+**P1.1：Markdown 渲染** — 这是当前最高优先级，AI 回复纯文本严重影响体验。
+实现计划：
+- 安装 `marked` 或 `marked-react`
+- 创建 `src/features/markdown/MarkdownContent.tsx`
+- 在 `ConversationPage` 的 MessageItem 中集成
+
+说"开始P1.1"即可直接实施。
 
 - **全部 11 个旧 `pc_*` 模块迁移完成，27 个旧资产文件已删除**
 - `/pc` 现在直接指向新 Vite + React + TypeScript 前端（ServeDir from `$DATA_DIR/pc-next-dist/`）
