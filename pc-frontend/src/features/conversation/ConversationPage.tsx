@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
+import { AttachmentButton, AttachmentChip, attachmentsToMarkdown } from './AttachmentButton'
+import type { UploadedAttachment } from './AttachmentButton'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import { ModelPickerPopover } from '../models/ModelPicker'
@@ -28,7 +30,8 @@ export default function ConversationPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [channelSearch, setChannelSearch] = useState('')
-  const [showNewMsg, setShowNewMsg] = useState(false)   // P1.3：新消息提示
+  const [showNewMsg, setShowNewMsg] = useState(false)
+  const [attachments, setAttachments] = useState<UploadedAttachment[]>([])   // P1.4   // P1.3：新消息提示
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
@@ -93,9 +96,14 @@ export default function ConversationPage() {
     if (!text || sendingMessage) return
     setInput('')
     setSendError('')
+    setAttachments([])   // P1.4：发送后清空附件
     if (textareaRef.current) { textareaRef.current.style.height = '46px' }
     try {
-      await sendMessage(text, selectedAgent || null)
+      // P1.4：附件转为 markdown 追加到消息末尾
+      const fullContent = attachments.length > 0
+        ? text + attachmentsToMarkdown(attachments)
+        : text
+      await sendMessage(fullContent, selectedAgent || null)
     } catch (err) {
       setSendError((err as { message?: string }).message ?? '发送失败')
     }
@@ -315,6 +323,18 @@ export default function ConversationPage() {
         {/* 输入框（composer）*/}
         {activeChannelId && (
           <form onSubmit={handleSend}>
+            {/* P1.4：附件预览条 */}
+            {attachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, padding: '6px 16px 0' }}>
+                {attachments.map((att) => (
+                  <AttachmentChip
+                    key={att.attachment_id}
+                    attachment={att}
+                    onRemove={() => setAttachments((prev) => prev.filter((a) => a.attachment_id !== att.attachment_id))}
+                  />
+                ))}
+              </div>
+            )}
             <div className={styles.composer}>
               {/* 模型选择按钮 */}
               <button
@@ -343,11 +363,20 @@ export default function ConversationPage() {
                 rows={1}
               />
 
+              {/* P1.4：附件按钮 */}
+              {activeProjectId && (
+                <AttachmentButton
+                  projectId={activeProjectId}
+                  disabled={sendingMessage}
+                  onAttached={(att) => setAttachments((prev) => [...prev, att])}
+                />
+              )}
+
               {/* 发送按钮 */}
               <button
                 className={styles.sendBtn}
                 type="submit"
-                disabled={!input.trim() || sendingMessage}
+                disabled={(!input.trim() && attachments.length === 0) || sendingMessage}
               >
                 {sendingMessage ? '…' : '发送'}
               </button>

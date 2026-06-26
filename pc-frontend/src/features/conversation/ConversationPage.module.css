@@ -457,10 +457,10 @@
 }
 .newMsgBtn:hover { background: #343741; color: var(--text); }
 
-/* 输入框区（composer）3 列：42px | 1fr | 68px */
+/* 输入框区（composer）4 列：42px | 1fr | 42px | 68px */
 .composer {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 68px;
+  grid-template-columns: 42px minmax(0, 1fr) 42px 68px;
   gap: 10px;
   align-items: end;
   min-height: 72px;
