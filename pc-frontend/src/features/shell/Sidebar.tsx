@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth'
+import { ModelPickerButton } from '../models/ModelPicker'
 import styles from './Sidebar.module.css'
 
 interface NavItem {
@@ -47,7 +48,8 @@ export default function Sidebar() {
       </ul>
 
       <div className={styles.footer}>
-        {user && (
+        <ModelPickerButton />
+      {user && (
           <div className={styles.userRow}>
             <span className={styles.userName}>{user.display_name ?? user.username}</span>
             <button className={styles.logoutBtn} onClick={logout} title="退出登录">
