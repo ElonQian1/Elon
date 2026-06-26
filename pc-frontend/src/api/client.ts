@@ -1,10 +1,11 @@
 /** 对 /api/* 的最小封装：自动带 token、统一错误格式 */
 
-function getToken(): string | null {
+export function getAuthToken(): string | null {
   try {
     const raw = localStorage.getItem('elon_auth')
     if (!raw) return null
-    return (JSON.parse(raw) as { token?: string }).token ?? null
+    const parsed = JSON.parse(raw) as { token?: string; state?: { token?: string } }
+    return parsed.token ?? parsed.state?.token ?? null
   } catch {
     return null
   }
@@ -16,7 +17,7 @@ export interface ApiError {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getToken()
+  const token = getAuthToken()
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

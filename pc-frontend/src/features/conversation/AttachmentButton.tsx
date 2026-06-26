@@ -9,6 +9,7 @@
  */
 import { useRef, useState } from 'react'
 import styles from './AttachmentButton.module.css'
+import { getAuthToken } from '../../api/client'
 
 export interface UploadedAttachment {
   attachment_id: string
@@ -52,13 +53,12 @@ export function AttachmentButton({ projectId, disabled, onAttached }: Props) {
         + `&mime_type=${encodeURIComponent(mime)}`
         + `&kind=${encodeURIComponent(kind)}`
       const arrayBuffer = await file.arrayBuffer()
+      const token = getAuthToken()
       const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': mime,
-          ...(localStorage.getItem('elon_auth')
-            ? { Authorization: `Bearer ${JSON.parse(localStorage.getItem('elon_auth')!).token ?? ''}` }
-            : {}),
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
         body: arrayBuffer,
       })

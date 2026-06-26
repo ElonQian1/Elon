@@ -825,8 +825,44 @@ function Export-PcLegacyDist {
     $html = $html.Replace("__BRAND_PNG_B64__", $brandB64)
     $html = $html.Replace('"/assets/', '"/pc-legacy/assets/')
     $html = $html.Replace("'/assets/", "'/pc-legacy/assets/")
+    $legacyMobileButton = '<button class="text-button" id="openLegacyWebBtn" type="button" title="打开移动端入口，包含手机端下载和移动网页版（iOS）" aria-label="打开移动端入口，包含手机端下载和移动网页版（iOS）">打开移动端</button>'
+    $openNewLink = '<a class="text-button pc-legacy-new-link" id="pcLegacyOpenNewBtn" href="/pc" title="打开新版 PC 工作台" aria-label="打开新版 PC 工作台" style="display:inline-flex;align-items:center;">打开新版</a>'
+    if (-not $html.Contains($legacyMobileButton)) {
+        throw "旧版 PC HTML 中未找到打开移动端按钮，无法注入打开新版入口"
+    }
+    $html = $html.Replace($legacyMobileButton, "$legacyMobileButton`n          $openNewLink")
+    $legacySwitchScriptTag = '    <script src="/pc-legacy/assets/pc_legacy_switch.js"></script>'
+    if (-not $html.Contains("</body>")) {
+        throw "旧版 PC HTML 中未找到 </body>，无法注入新版切换脚本"
+    }
+    $html = $html.Replace("</body>", "$legacySwitchScriptTag`n  </body>")
+
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    $legacySwitchJs = @'
+(function () {
+  function legacyToken() {
+    return localStorage.getItem('lodex_token') || localStorage.getItem('elon_token') || '';
+  }
+
+  function bridgeToken() {
+    var token = legacyToken();
+    if (!token) return;
+    try {
+      localStorage.setItem('elon_auth', JSON.stringify({
+        state: { token: token, user: null },
+        version: 0
+      }));
+    } catch (_) {
+      // Keep normal navigation even when localStorage is unavailable.
+    }
+  }
+
+  var btn = document.getElementById('pcLegacyOpenNewBtn');
+  if (btn) btn.addEventListener('click', bridgeToken);
+})();
+'@
     [System.IO.File]::WriteAllText((Join-Path $OutDir "index.html"), $html, $utf8NoBom)
+    [System.IO.File]::WriteAllText((Join-Path $assetsDir "pc_legacy_switch.js"), $legacySwitchJs, $utf8NoBom)
 
     return $OutDir
 }

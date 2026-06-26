@@ -126,6 +126,7 @@ server/src/
 - `/pc` 现在直接指向新 Vite + React + TypeScript 前端（ServeDir from `$DATA_DIR/pc-next-dist/`）
 - `/pc-next` 保留为向后兼容别名（同样指向新前端）
 - `/pc-legacy` 指向发布脚本从 `d1f89950`（`e7b4a35b` 引入新框架前的父提交）导出的旧版静态对照快照
+- 发布脚本会在旧版“打开移动端”旁注入“打开新版”，并把旧版 token 桥接到新版 `elon_auth`
 - `server/src/web.rs`：所有 `PC_*` 常量和 `pc_app_*` 处理器已删除
 - `server/src/router.rs`：所有旧 `/assets/pc_*` 路由已删除
 - 前端 Vite base 已改为 `/pc/`，React Router basename 已改为 `/pc`

@@ -733,9 +733,41 @@ brand = brand_file.read_text(encoding="utf-8").strip() if brand_file.exists() el
 html = html.replace("__BRAND_PNG_B64__", brand)
 html = html.replace('"/assets/', '"/pc-legacy/assets/')
 html = html.replace("'/assets/", "'/pc-legacy/assets/")
+legacy_mobile_button = '<button class="text-button" id="openLegacyWebBtn" type="button" title="打开移动端入口，包含手机端下载和移动网页版（iOS）" aria-label="打开移动端入口，包含手机端下载和移动网页版（iOS）">打开移动端</button>'
+open_new_link = '<a class="text-button pc-legacy-new-link" id="pcLegacyOpenNewBtn" href="/pc" title="打开新版 PC 工作台" aria-label="打开新版 PC 工作台" style="display:inline-flex;align-items:center;">打开新版</a>'
+if legacy_mobile_button not in html:
+    raise SystemExit("旧版 PC HTML 中未找到打开移动端按钮，无法注入打开新版入口")
+html = html.replace(legacy_mobile_button, legacy_mobile_button + "\n          " + open_new_link)
+legacy_switch_script_tag = '    <script src="/pc-legacy/assets/pc_legacy_switch.js"></script>'
+if "</body>" not in html:
+    raise SystemExit("旧版 PC HTML 中未找到 </body>，无法注入新版切换脚本")
+html = html.replace("</body>", legacy_switch_script_tag + "\n  </body>")
 target.write_text(html, encoding="utf-8")
 source.unlink(missing_ok=True)
 PY
+  cat > "$assets_dir/pc_legacy_switch.js" <<'JS'
+(function () {
+  function legacyToken() {
+    return localStorage.getItem('lodex_token') || localStorage.getItem('elon_token') || '';
+  }
+
+  function bridgeToken() {
+    var token = legacyToken();
+    if (!token) return;
+    try {
+      localStorage.setItem('elon_auth', JSON.stringify({
+        state: { token: token, user: null },
+        version: 0
+      }));
+    } catch (_) {
+      // Keep normal navigation even when localStorage is unavailable.
+    }
+  }
+
+  var btn = document.getElementById('pcLegacyOpenNewBtn');
+  if (btn) btn.addEventListener('click', bridgeToken);
+})();
+JS
 }
 
 if [ -f "$PC_FRONTEND_DIR/package.json" ]; then
