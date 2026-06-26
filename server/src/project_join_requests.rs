@@ -16,7 +16,8 @@ use std::sync::Arc;
 
 use crate::{
     join_request_events,
-    project_auth::{auth_from_headers, can_manage_project_members, json_error},
+    project_auth::{auth_from_headers, json_error},
+    store::PERMISSION_INVITE_MEMBERS,
     types::AppState,
 };
 
@@ -62,10 +63,16 @@ pub async fn request_join(
         Ok(record) => {
             // 查询项目 owner/admin，推送通知
             if let Ok(members) = state.store.list_project_members(&project_id) {
-                for manager in members
-                    .iter()
-                    .filter(|m| can_manage_project_members(&m.role))
-                {
+                for manager in members.iter().filter(|m| {
+                    state
+                        .store
+                        .project_role_has_permission(
+                            &project_id,
+                            &m.role,
+                            PERMISSION_INVITE_MEMBERS,
+                        )
+                        .unwrap_or(false)
+                }) {
                     join_request_events::publish_new_request(
                         &manager.user_id,
                         &record.id,
@@ -110,15 +117,14 @@ pub async fn list_join_requests(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    // 仅 owner/admin 可查看申请列表
+    // 仅有邀请/审批权限的角色可查看申请列表
     match state.store.get_project_access(&user.id, &project_id) {
-        Ok(access) if can_manage_project_members(&access.role) => {}
-        Ok(_) => {
-            return json_error(
-                StatusCode::FORBIDDEN,
-                "只有项目 owner 或管理员才可管理加入申请",
-            )
-        }
+        Ok(access)
+            if state
+                .store
+                .project_role_has_permission(&project_id, &access.role, PERMISSION_INVITE_MEMBERS)
+                .unwrap_or(false) => {}
+        Ok(_) => return json_error(StatusCode::FORBIDDEN, "当前角色无权管理加入申请"),
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
 
@@ -146,15 +152,14 @@ pub async fn review_join_request(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
 
-    // 仅 owner/admin 可审批
+    // 仅有邀请/审批权限的角色可审批
     match state.store.get_project_access(&user.id, &project_id) {
-        Ok(access) if can_manage_project_members(&access.role) => {}
-        Ok(_) => {
-            return json_error(
-                StatusCode::FORBIDDEN,
-                "只有项目 owner 或管理员才可审批加入申请",
-            )
-        }
+        Ok(access)
+            if state
+                .store
+                .project_role_has_permission(&project_id, &access.role, PERMISSION_INVITE_MEMBERS)
+                .unwrap_or(false) => {}
+        Ok(_) => return json_error(StatusCode::FORBIDDEN, "当前角色无权审批加入申请"),
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
     }
 

@@ -531,6 +531,19 @@ pub struct ProjectMemberModerationEntry {
     pub is_banned: bool,
 }
 
+/// 项目角色定义。内置角色由代码生成，自定义角色来自 project_roles 表。
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectRoleEntry {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub color: Option<String>,
+    pub position: i64,
+    pub permissions: Vec<String>,
+    pub builtin: bool,
+    pub member_count: i64,
+}
+
 // ── 项目空间 / 频道 ───────────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, Serialize)]

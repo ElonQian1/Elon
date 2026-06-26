@@ -10,6 +10,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
+use super::project_roles::normalize_project_member_role_for_project;
 use super::{
     is_system_project_source_type, normalize_account, now, project_branding, ProjectDeletionTarget,
     ProjectMemberEntry, PublicProjectItem, Store,
@@ -442,8 +443,8 @@ impl Store {
         role: &str,
     ) -> Result<ProjectMemberEntry> {
         let account = normalize_account(account)?;
-        let role_db = normalize_project_member_role(role)?;
         let conn = self.conn()?;
+        let role_db = normalize_project_member_role_for_project(&conn, project_id, role)?;
         ensure_project_not_system(&conn, project_id, "系统归档项目不能添加成员")?;
         let now_str = now();
         let target_user_id: String = conn
@@ -532,8 +533,8 @@ impl Store {
         target_user_id: &str,
         new_role: &str,
     ) -> Result<()> {
-        let role_db = normalize_project_member_role(new_role)?;
         let conn = self.conn()?;
+        let role_db = normalize_project_member_role_for_project(&conn, project_id, new_role)?;
         ensure_project_not_system(&conn, project_id, "系统归档项目不能修改成员角色")?;
         let current_role: Option<String> = conn
             .query_row(
@@ -596,8 +597,13 @@ impl Store {
              LEFT JOIN users u ON u.id = pm.user_id
              LEFT JOIN project_member_restrictions r
                ON r.project_id = pm.project_id AND r.user_id = pm.user_id
+             LEFT JOIN project_roles pr
+               ON pr.project_id = pm.project_id AND pr.id = pm.role
              WHERE pm.project_id = ?1
-             ORDER BY CASE pm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 WHEN 'member' THEN 3 WHEN 'observer' THEN 4 ELSE 5 END, pm.created_at",
+             ORDER BY
+               CASE pm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 WHEN 'member' THEN 3 WHEN 'observer' THEN 4 ELSE 5 END,
+               COALESCE(pr.position, 0) DESC,
+               pm.created_at",
         )?;
         let rows = stmt
             .query_map(params![project_id, now], |row| {
@@ -832,19 +838,13 @@ impl Store {
             "DELETE FROM project_members WHERE project_id = ?1",
             params![project_id],
         )?;
+        tx.execute(
+            "DELETE FROM project_roles WHERE project_id = ?1",
+            params![project_id],
+        )?;
         tx.execute("DELETE FROM projects WHERE id = ?1", params![project_id])?;
         tx.commit()?;
         Ok(())
-    }
-}
-
-fn normalize_project_member_role(role: &str) -> Result<&'static str> {
-    match role.trim() {
-        "admin" => Ok("admin"),
-        "editor" => Ok("editor"),
-        "member" => Ok("member"),
-        "observer" | "viewer" => Ok("observer"),
-        _ => anyhow::bail!("role 必须为 admin / editor / member / observer / viewer"),
     }
 }
 

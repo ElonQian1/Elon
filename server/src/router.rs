@@ -380,6 +380,15 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(project_membership::list_member_audit),
         )
         .route(
+            "/api/projects/:id/roles",
+            get(project_membership::list_project_roles).post(project_membership::create_project_role),
+        )
+        .route(
+            "/api/projects/:id/roles/:role_id",
+            axum::routing::patch(project_membership::update_project_role)
+                .delete(project_membership::delete_project_role),
+        )
+        .route(
             "/api/projects/:id/visibility",
             axum::routing::patch(project_membership::update_visibility),
         )

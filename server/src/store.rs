@@ -47,6 +47,7 @@ mod project_landing_upload_tokens;
 mod project_member_audit;
 mod project_member_conversations;
 mod project_member_moderation;
+mod project_roles;
 mod project_runtime_permissions;
 mod project_space;
 mod project_storage;
@@ -88,6 +89,10 @@ pub use node_payouts::CreateNodePayout;
 pub use project_dev_profiles::ProjectDevProfile;
 pub use project_execution_sessions::{
     ProjectExecutionSession, ProjectExecutionSessionFinish, ProjectExecutionSessionStart,
+};
+pub use project_roles::{
+    PERMISSION_INVITE_MEMBERS, PERMISSION_MANAGE_MEMBERS, PERMISSION_MANAGE_PROJECT_SETTINGS,
+    PERMISSION_MANAGE_ROLES, PERMISSION_MODERATE_MEMBERS, PERMISSION_VIEW_AUDIT_LOG,
 };
 pub use project_workspace_health_snapshots::ProjectWorkspaceHealthSnapshotWrite;
 pub(crate) use social_ai_messages::{

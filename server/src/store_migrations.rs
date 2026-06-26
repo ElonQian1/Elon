@@ -102,6 +102,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (68, "项目级 AI danger_full_access 权限", migration_v68),
     (69, "项目成员管理审计日志", migration_v69),
     (70, "项目成员禁言与封禁状态", migration_v70),
+    (71, "项目自定义角色与成员权限矩阵", migration_v71),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2358,6 +2359,31 @@ fn migration_v70(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_member_restrictions_user
           ON project_member_restrictions(user_id, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v71(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_roles (
+          id               TEXT PRIMARY KEY,
+          project_id       TEXT NOT NULL,
+          name             TEXT NOT NULL,
+          color            TEXT,
+          position         INTEGER NOT NULL DEFAULT 30,
+          permissions_json TEXT NOT NULL DEFAULT '[]',
+          created_by       TEXT,
+          created_at       TEXT NOT NULL,
+          updated_at       TEXT NOT NULL,
+          UNIQUE(project_id, name),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_roles_project_position
+          ON project_roles(project_id, position DESC, created_at);
         "#,
     )?;
     Ok(())

@@ -38,6 +38,7 @@
     workbenchRegistrationProjectId: '',
     memberPanel: { title: '成员', members: [], options: {}, search: '' },
     memberCollapsed: {},
+    projectRoles: {},
     memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, auditEntries: [], auditLoaded: false, auditLoading: false, auditExpanded: false, busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
     memberProfile: null,
     presenceSocket: null,
@@ -57,6 +58,16 @@
     { key: 'editor', label: '协作者' },
     { key: 'member', label: '成员' },
     { key: 'observer', label: '只读成员' }
+  ];
+  const PROJECT_ROLE_PERMISSION_OPTIONS = [
+    { key: 'view_members', label: '查看成员' },
+    { key: 'send_messages', label: '发送消息' },
+    { key: 'invite_members', label: '邀请成员' },
+    { key: 'manage_members', label: '管理成员' },
+    { key: 'moderate_members', label: '禁言/封禁' },
+    { key: 'view_audit_log', label: '查看日志' },
+    { key: 'manage_roles', label: '管理角色' },
+    { key: 'manage_project_settings', label: '项目设置' }
   ];
   let pcAuthMode = 'login';
   let inlineAuthMode = 'login';
@@ -410,6 +421,12 @@
     )) || '未登录';
   }
 
+  function cssEscape(value) {
+    const text = clean(value);
+    if (window.CSS && typeof window.CSS.escape === 'function') return window.CSS.escape(text);
+    return text.replace(/["\\\]\[]/g, '\\$&');
+  }
+
   function memberIdOf(member) {
     return clean(member && (
       member.user_id || member.userId || member.member_user_id || member.memberUserId ||
@@ -432,6 +449,11 @@
   function memberRoleLabel(member) {
     const role = typeof member === 'string' ? clean(member).toLowerCase() : memberRoleKey(member);
     if (!role) return '';
+    const projectId = member && typeof member === 'object'
+      ? clean(member.project_id || member.projectId || memberPanelProjectId() || state.activeProjectId)
+      : clean(memberPanelProjectId() || state.activeProjectId);
+    const custom = projectRoleDefinition(projectId, role);
+    if (custom && custom.name) return custom.name;
     if (role === 'owner') return '拥有者';
     if (role === 'admin') return '管理员';
     if (role === 'editor' || role === 'developer' || role === 'maintainer') return '协作者';
@@ -489,6 +511,9 @@
 
   function memberRoleLevel(role) {
     const key = clean(role).toLowerCase();
+    const projectId = clean(memberPanelProjectId() || state.activeProjectId);
+    const custom = projectRoleDefinition(projectId, key);
+    if (custom) return Number(custom.position || 0) || 0;
     if (key === 'owner') return 100;
     if (key === 'admin') return 80;
     if (key === 'editor' || key === 'developer' || key === 'maintainer') return 60;
@@ -498,8 +523,7 @@
   }
 
   function memberRoleCanManage(managerRole, targetRole) {
-    return memberRoleLevel(managerRole) >= memberRoleLevel('admin') &&
-      memberRoleLevel(targetRole) < memberRoleLevel(managerRole);
+    return memberRoleLevel(managerRole) > 0 && memberRoleLevel(targetRole) < memberRoleLevel(managerRole);
   }
 
   function memberRoleCanAssign(managerRole, targetRole) {
@@ -511,9 +535,93 @@
     return clean(project.role || project.member_role || project.memberRole || project.viewer_role || project.viewerRole).toLowerCase();
   }
 
-  function canManageActiveProjectMembers() {
+  function projectRoleState(projectId) {
+    const id = clean(projectId || state.activeProjectId);
+    if (!id) return { roles: [], permissions: PROJECT_ROLE_PERMISSION_OPTIONS, loaded: false, loading: false };
+    if (!state.projectRoles[id]) {
+      state.projectRoles[id] = { roles: [], permissions: PROJECT_ROLE_PERMISSION_OPTIONS, loaded: false, loading: false, error: '' };
+    }
+    return state.projectRoles[id];
+  }
+
+  function projectRoleDefinition(projectId, role) {
+    const key = clean(role).toLowerCase();
+    if (!key) return null;
+    const catalog = projectRoleState(projectId);
+    return (catalog.roles || []).find((item) => clean(item.id).toLowerCase() === key) || null;
+  }
+
+  function projectRoleHasPermission(projectId, role, permission) {
+    const key = clean(role).toLowerCase();
+    const perm = clean(permission);
+    if (!key || !perm) return false;
+    if (key === 'owner') return true;
+    const custom = projectRoleDefinition(projectId, key);
+    if (custom) return Array.isArray(custom.permissions) && custom.permissions.includes(perm);
+    const builtins = {
+      admin: ['view_members', 'send_messages', 'invite_members', 'manage_members', 'moderate_members', 'view_audit_log', 'manage_roles', 'manage_project_settings'],
+      editor: ['view_members', 'send_messages'],
+      developer: ['view_members', 'send_messages'],
+      maintainer: ['view_members', 'send_messages'],
+      member: ['view_members', 'send_messages'],
+      observer: ['view_members'],
+      viewer: ['view_members']
+    };
+    return (builtins[key] || []).includes(perm);
+  }
+
+  function projectRolePermissionOptions(projectId) {
+    const catalog = projectRoleState(projectId);
+    return Array.isArray(catalog.permissions) && catalog.permissions.length
+      ? catalog.permissions
+      : PROJECT_ROLE_PERMISSION_OPTIONS;
+  }
+
+  function projectRolePermissionLabel(projectId, permission) {
+    const item = projectRolePermissionOptions(projectId).find((option) => clean(option.key) === clean(permission));
+    return item ? item.label : permission;
+  }
+
+  function projectAssignableRoleOptions(projectId) {
+    const catalog = projectRoleState(projectId);
+    const loadedRoles = Array.isArray(catalog.roles) && catalog.roles.length
+      ? catalog.roles
+      : PROJECT_MEMBER_ROLE_OPTIONS.map((role) => ({
+          id: role.key,
+          name: role.label,
+          position: memberRoleLevel(role.key),
+          builtin: true,
+          permissions: []
+        }));
+    return loadedRoles
+      .filter((role) => clean(role.id) !== 'owner')
+      .map((role) => ({
+        key: clean(role.id),
+        label: clean(role.name) || memberRoleLabel(clean(role.id)),
+        position: Number(role.position || memberRoleLevel(role.id)) || 0,
+        builtin: !!role.builtin,
+        memberCount: Number(role.member_count || role.memberCount || 0) || 0,
+        permissions: Array.isArray(role.permissions) ? role.permissions : []
+      }))
+      .sort((left, right) => right.position - left.position || left.label.localeCompare(right.label));
+  }
+
+  function canUseActiveProjectMemberAdmin() {
+    const projectId = clean(state.activeProjectId || memberPanelProjectId());
     const role = activeProjectRole();
-    return role === 'owner' || role === 'admin';
+    return ['invite_members', 'manage_members', 'moderate_members', 'view_audit_log', 'manage_roles']
+      .some((permission) => projectRoleHasPermission(projectId, role, permission));
+  }
+
+  function canManageActiveProjectRoles() {
+    const projectId = clean(state.activeProjectId || memberPanelProjectId());
+    return projectRoleHasPermission(projectId, activeProjectRole(), 'manage_roles');
+  }
+
+  function canManageActiveProjectMembers() {
+    const projectId = clean(state.activeProjectId || memberPanelProjectId());
+    const role = activeProjectRole();
+    return projectRoleHasPermission(projectId, role, 'manage_members');
   }
 
   function memberPanelProjectId() {
@@ -2711,6 +2819,9 @@
   }
 
   function renderProjectMembers(title, members, options) {
+    const project = projectById(state.activeProjectId) || ((state.projectSpace && state.projectSpace.project) || {});
+    const projectId = clean(project && project.id) || state.activeProjectId;
+    if (projectId) maybeLoadProjectRoles(projectId);
     const rows = (Array.isArray(members) ? members : []).map((member) => {
       const id = memberIdOf(member);
       return Object.assign({}, member, {
@@ -2720,7 +2831,6 @@
         is_online: id && sameId(id, currentUserId()) ? true : member.is_online
       });
     });
-    const project = projectById(state.activeProjectId) || ((state.projectSpace && state.projectSpace.project) || {});
     const defaults = {
       groupBy: 'role',
       emptyText: '暂无项目成员',
@@ -2747,6 +2857,7 @@
         auditLoaded: false,
         auditLoading: false,
         auditExpanded: false,
+        rolesExpanded: false,
         busy: '',
         inviteAccount: '',
         inviteRole: 'member',
@@ -2759,16 +2870,23 @@
 
   function renderProjectMemberAdminPanel(project) {
     const projectId = clean(project && project.id) || state.activeProjectId;
-    if (!projectId || !canManageActiveProjectMembers()) return '';
+    if (!projectId || !canUseActiveProjectMemberAdmin()) return '';
     const admin = memberAdminState(projectId);
+    const currentRole = activeProjectRole();
+    const canInvite = projectRoleHasPermission(projectId, currentRole, 'invite_members');
+    const canViewAudit = projectRoleHasPermission(projectId, currentRole, 'view_audit_log') || projectRoleHasPermission(projectId, currentRole, 'manage_members');
+    const canUseRoles = canManageActiveProjectRoles() || projectRoleState(projectId).loaded;
     const pendingCount = Array.isArray(admin.requests) ? admin.requests.filter((request) => clean(request.status) === 'pending').length : 0;
-    const roleOptions = PROJECT_MEMBER_ROLE_OPTIONS.map((role) => {
+    const roleOptions = projectAssignableRoleOptions(projectId).map((role) => {
       const selected = role.key === (admin.inviteRole || 'member') ? 'selected' : '';
       const disabled = memberRoleCanAssign(activeProjectRole(), role.key) ? '' : 'disabled';
       return `<option value="${escapeHtml(role.key)}" ${selected} ${disabled}>${escapeHtml(role.label)}</option>`;
     }).join('');
     const requestsHtml = admin.expanded ? renderProjectJoinRequests(projectId, admin) : '';
     const auditHtml = admin.auditExpanded ? renderProjectMemberAudit(projectId, admin) : '';
+    const rolesHtml = admin.rolesExpanded ? renderProjectRoleAdmin(projectId, admin) : '';
+    const catalog = projectRoleState(projectId);
+    const customCount = (catalog.roles || []).filter((role) => !role.builtin).length;
     const statusHtml = admin.status
       ? `<div class="member-admin-status ${admin.tone ? `is-${escapeHtml(admin.tone)}` : ''}">${escapeHtml(admin.status)}</div>`
       : '';
@@ -2776,27 +2894,32 @@
       <div class="member-admin-head">
         <div>
           <strong>成员管理</strong>
-          <span>${escapeHtml(memberRoleLabel(activeProjectRole()) || '管理员')}</span>
+          <span>${escapeHtml(memberRoleLabel(currentRole) || '管理员')}</span>
         </div>
-        <button class="member-admin-refresh" type="button" data-member-admin-action="refresh-requests" title="刷新申请">刷新</button>
+        ${canInvite ? '<button class="member-admin-refresh" type="button" data-member-admin-action="refresh-requests" title="刷新申请">刷新</button>' : ''}
       </div>
-      <form class="member-admin-invite" data-member-admin-form="invite">
+      ${canInvite ? `<form class="member-admin-invite" data-member-admin-form="invite">
         <input data-member-admin-invite-account value="${escapeHtml(admin.inviteAccount || '')}" placeholder="手机号 / 邮箱 / 用户 ID" autocomplete="off" />
         <div class="member-admin-invite-row">
           <select data-member-admin-invite-role>${roleOptions}</select>
           <button class="text-button" type="submit" ${admin.busy === 'invite' ? 'disabled' : ''}>邀请</button>
         </div>
-      </form>
-      <button class="member-admin-toggle ${admin.expanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-requests">
+      </form>` : ''}
+      ${canInvite ? `<button class="member-admin-toggle ${admin.expanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-requests">
         <span>加入申请</span>
         <small>${admin.loading ? '加载中' : `${pendingCount} 待处理`}</small>
       </button>
-      ${requestsHtml}
-      <button class="member-admin-toggle ${admin.auditExpanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-audit">
+      ${requestsHtml}` : ''}
+      ${canViewAudit ? `<button class="member-admin-toggle ${admin.auditExpanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-audit">
         <span>管理日志</span>
         <small>${admin.auditLoading ? '加载中' : (admin.auditLoaded ? `${admin.auditEntries.length} 条` : '最近记录')}</small>
       </button>
-      ${auditHtml}
+      ${auditHtml}` : ''}
+      ${canUseRoles ? `<button class="member-admin-toggle ${admin.rolesExpanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-roles">
+        <span>角色权限</span>
+        <small>${catalog.loading ? '加载中' : `${customCount} 自定义`}</small>
+      </button>
+      ${rolesHtml}` : ''}
       ${statusHtml}
     </section>`;
   }
@@ -2850,6 +2973,79 @@
           </div>
         </article>`;
       }).join('')}
+    </div>`;
+  }
+
+  function renderProjectRoleAdmin(projectId, admin) {
+    const catalog = projectRoleState(projectId);
+    if (catalog.loading && !catalog.loaded) return '<div class="member-admin-empty">加载角色权限中…</div>';
+    if (catalog.error) return `<div class="member-admin-empty">${escapeHtml(catalog.error)}</div>`;
+    const permissions = projectRolePermissionOptions(projectId);
+    const canManageRoles = canManageActiveProjectRoles();
+    const managerRole = activeProjectRole();
+    const draftPermissionKeys = ['view_members', 'send_messages'];
+    const createHtml = canManageRoles
+      ? `<form class="member-role-create" data-member-admin-form="create-role">
+          <div class="member-role-create-row">
+            <input data-role-create-name placeholder="新角色名称" maxlength="32" autocomplete="off" />
+            <input data-role-create-color placeholder="#43b581" maxlength="7" autocomplete="off" />
+          </div>
+          <div class="member-role-create-row">
+            <input data-role-create-position type="number" min="1" max="${Math.max(1, memberRoleLevel(managerRole) - 1)}" value="30" />
+            <button class="text-button" type="submit" ${admin.busy === 'role:create' ? 'disabled' : ''}>创建角色</button>
+          </div>
+          <div class="member-role-permissions">
+            ${permissions.map((permission) => {
+              const key = clean(permission.key);
+              const checked = draftPermissionKeys.includes(key) ? 'checked' : '';
+              return `<label><input type="checkbox" data-role-create-permission value="${escapeHtml(key)}" ${checked} />${escapeHtml(permission.label || key)}</label>`;
+            }).join('')}
+          </div>
+        </form>`
+      : '<div class="member-admin-empty">当前角色只能查看角色权限，不能编辑。</div>';
+    const roles = Array.isArray(catalog.roles) ? catalog.roles : [];
+    const roleRows = roles.map((role) => {
+      const id = clean(role.id);
+      const builtin = !!role.builtin;
+      const busySave = admin.busy === `role:save:${id}`;
+      const busyDelete = admin.busy === `role:delete:${id}`;
+      const canEdit = canManageRoles && !builtin && memberRoleCanManage(managerRole, id);
+      const color = clean(role.color) || '#747f8d';
+      const rolePermissions = Array.isArray(role.permissions) ? role.permissions : [];
+      const permissionHtml = permissions.map((permission) => {
+        const key = clean(permission.key);
+        const checked = rolePermissions.includes(key) ? 'checked' : '';
+        const disabled = canEdit ? '' : 'disabled';
+        return `<label><input type="checkbox" data-role-permission="${escapeHtml(id)}" value="${escapeHtml(key)}" ${checked} ${disabled} />${escapeHtml(permission.label || key)}</label>`;
+      }).join('');
+      const compactPerms = rolePermissions.length
+        ? rolePermissions.map((permission) => projectRolePermissionLabel(projectId, permission)).join(' / ')
+        : '无额外权限';
+      return `<article class="member-role-card ${builtin ? 'is-builtin' : ''}" data-role-card="${escapeHtml(id)}">
+        <div class="member-role-card-head">
+          <span class="member-role-swatch" style="background:${escapeHtml(color)}"></span>
+          <div>
+            <strong>${escapeHtml(role.name || memberRoleLabel(id) || id)}</strong>
+            <em>${builtin ? '内置角色' : `${Number(role.member_count || role.memberCount || 0)} 位成员`}</em>
+          </div>
+        </div>
+        ${canEdit
+          ? `<div class="member-role-edit-grid">
+              <input data-role-name value="${escapeHtml(role.name || '')}" maxlength="32" />
+              <input data-role-color value="${escapeHtml(color)}" maxlength="7" />
+              <input data-role-position type="number" min="1" max="${Math.max(1, memberRoleLevel(managerRole) - 1)}" value="${escapeHtml(String(role.position || 30))}" />
+            </div>
+            <div class="member-role-permissions">${permissionHtml}</div>
+            <div class="member-role-actions">
+              <button class="text-button" type="button" data-member-admin-action="save-role-definition" data-role-id="${escapeHtml(id)}" ${busySave ? 'disabled' : ''}>保存</button>
+              <button class="text-button danger" type="button" data-member-admin-action="delete-role-definition" data-role-id="${escapeHtml(id)}" ${busyDelete ? 'disabled' : ''}>删除</button>
+            </div>`
+          : `<p>${escapeHtml(compactPerms)}</p>`}
+      </article>`;
+    }).join('');
+    return `<div class="member-role-admin">
+      ${createHtml}
+      <div class="member-role-list">${roleRows || '<div class="member-admin-empty">暂无角色</div>'}</div>
     </div>`;
   }
 
@@ -3268,6 +3464,10 @@
     if (!projectId) return;
     if (form.dataset.memberAdminForm === 'invite') {
       inviteProjectMemberFromPanel(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '邀请失败', 'error'));
+      return;
+    }
+    if (form.dataset.memberAdminForm === 'create-role') {
+      createProjectRoleFromPanel(projectId, form).catch((error) => setMemberAdminStatus(projectId, error.message || '创建角色失败', 'error'));
     }
   }
 
@@ -3335,6 +3535,26 @@
       loadProjectMemberAudit(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '刷新日志失败', 'error'));
       return;
     }
+    if (action === 'toggle-roles') {
+      const admin = memberAdminState(projectId);
+      admin.rolesExpanded = !admin.rolesExpanded;
+      admin.status = '';
+      rerenderMemberPanelForProject(projectId);
+      if (admin.rolesExpanded) {
+        loadProjectRoles(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '加载角色失败', 'error'));
+      }
+      return;
+    }
+    if (action === 'save-role-definition') {
+      const roleId = clean(button.dataset.roleId);
+      updateProjectRoleFromPanel(projectId, roleId).catch((error) => setMemberAdminStatus(projectId, error.message || '保存角色失败', 'error'));
+      return;
+    }
+    if (action === 'delete-role-definition') {
+      const roleId = clean(button.dataset.roleId);
+      deleteProjectRoleFromPanel(projectId, roleId).catch((error) => setMemberAdminStatus(projectId, error.message || '删除角色失败', 'error'));
+      return;
+    }
     if (action === 'approve-request' || action === 'reject-request') {
       const requestId = clean(button.dataset.requestId);
       const reviewAction = action === 'approve-request' ? 'approve' : 'reject';
@@ -3359,6 +3579,132 @@
     admin.busy = busy || '';
     admin.loading = false;
     rerenderMemberPanelForProject(projectId);
+  }
+
+  async function loadProjectRoles(projectId, options) {
+    const silent = !!(options && options.silent);
+    const catalog = projectRoleState(projectId);
+    catalog.loading = true;
+    catalog.error = '';
+    if (!silent) rerenderMemberPanelForProject(projectId);
+    const data = await api(`/api/projects/${encodeURIComponent(projectId)}/roles`, { cache: 'no-store' });
+    catalog.roles = Array.isArray(data.roles) ? data.roles : [];
+    catalog.permissions = Array.isArray(data.permissions) && data.permissions.length
+      ? data.permissions
+      : PROJECT_ROLE_PERMISSION_OPTIONS;
+    catalog.loaded = true;
+    catalog.loading = false;
+    catalog.error = '';
+    rerenderMemberPanelForProject(projectId);
+  }
+
+  function maybeLoadProjectRoles(projectId) {
+    const id = clean(projectId);
+    if (!id || !state.token) return;
+    const catalog = projectRoleState(id);
+    if (catalog.loaded || catalog.loading) return;
+    loadProjectRoles(id, { silent: true }).catch((error) => {
+      catalog.loading = false;
+      catalog.loaded = true;
+      catalog.error = error.message || '';
+      rerenderMemberPanelForProject(id);
+    });
+  }
+
+  function checkedRolePermissions(container, selector) {
+    return Array.from(container.querySelectorAll(selector))
+      .filter((input) => input.checked)
+      .map((input) => clean(input.value))
+      .filter(Boolean);
+  }
+
+  async function createProjectRoleFromPanel(projectId, form) {
+    if (!canManageActiveProjectRoles()) {
+      setMemberAdminStatus(projectId, '当前角色无权管理项目角色', 'error');
+      return;
+    }
+    const name = clean((form.querySelector('[data-role-create-name]') || {}).value);
+    const color = clean((form.querySelector('[data-role-create-color]') || {}).value);
+    const position = Number((form.querySelector('[data-role-create-position]') || {}).value || 30) || 30;
+    const permissions = checkedRolePermissions(form, '[data-role-create-permission]');
+    if (!name) {
+      setMemberAdminStatus(projectId, '请输入角色名称', 'error');
+      return;
+    }
+    if (position >= memberRoleLevel(activeProjectRole())) {
+      setMemberAdminStatus(projectId, '新角色层级必须低于当前角色', 'error');
+      return;
+    }
+    const admin = memberAdminState(projectId);
+    admin.busy = 'role:create';
+    admin.status = '正在创建角色…';
+    admin.tone = '';
+    rerenderMemberPanelForProject(projectId);
+    await api(`/api/projects/${encodeURIComponent(projectId)}/roles`, {
+      method: 'POST',
+      body: JSON.stringify({ name, color: color || null, position, permissions })
+    });
+    admin.busy = '';
+    admin.status = '角色已创建';
+    admin.tone = 'ok';
+    await loadProjectRoles(projectId, { silent: true });
+    renderMemberPanelView();
+    refreshMemberAuditAfterMutation(projectId);
+  }
+
+  async function updateProjectRoleFromPanel(projectId, roleId) {
+    if (!roleId || !canManageActiveProjectRoles()) return;
+    const card = els.memberList.querySelector(`[data-role-card="${cssEscape(roleId)}"]`);
+    if (!card) return;
+    const name = clean((card.querySelector('[data-role-name]') || {}).value);
+    const color = clean((card.querySelector('[data-role-color]') || {}).value);
+    const position = Number((card.querySelector('[data-role-position]') || {}).value || 30) || 30;
+    const permissions = checkedRolePermissions(card, `[data-role-permission="${cssEscape(roleId)}"]`);
+    if (!name) {
+      setMemberAdminStatus(projectId, '请输入角色名称', 'error');
+      return;
+    }
+    if (position >= memberRoleLevel(activeProjectRole())) {
+      setMemberAdminStatus(projectId, '角色层级必须低于当前角色', 'error');
+      return;
+    }
+    const admin = memberAdminState(projectId);
+    admin.busy = `role:save:${roleId}`;
+    admin.status = '正在保存角色…';
+    admin.tone = '';
+    rerenderMemberPanelForProject(projectId);
+    await api(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(roleId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ name, color: color || '', position, permissions })
+    });
+    admin.busy = '';
+    admin.status = '角色已保存';
+    admin.tone = 'ok';
+    await loadProjectRoles(projectId, { silent: true });
+    renderMemberPanelView();
+    refreshMemberAuditAfterMutation(projectId);
+  }
+
+  async function deleteProjectRoleFromPanel(projectId, roleId) {
+    if (!roleId || !canManageActiveProjectRoles()) return;
+    const role = projectRoleDefinition(projectId, roleId);
+    const name = role && role.name ? role.name : roleId;
+    const ok = window.confirm(`确认删除角色「${name}」？删除前需要先把使用该角色的成员调整到其他角色。`);
+    if (!ok) return;
+    const admin = memberAdminState(projectId);
+    admin.busy = `role:delete:${roleId}`;
+    admin.status = '正在删除角色…';
+    admin.tone = '';
+    rerenderMemberPanelForProject(projectId);
+    await api(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(roleId)}`, {
+      method: 'DELETE'
+    });
+    admin.busy = '';
+    admin.status = '角色已删除';
+    admin.tone = 'ok';
+    await loadProjectRoles(projectId, { silent: true });
+    renderMemberPanelView();
+    refreshMemberAuditAfterMutation(projectId);
   }
 
   async function loadProjectMemberAudit(projectId, options) {
@@ -3408,7 +3754,7 @@
   }
 
   function maybeLoadProjectJoinRequests(projectId) {
-    if (!projectId || !canManageActiveProjectMembers()) return;
+    if (!projectId || !projectRoleHasPermission(projectId, activeProjectRole(), 'invite_members')) return;
     const admin = memberAdminState(projectId);
     if (admin.loaded || admin.loading) return;
     loadProjectJoinRequests(projectId, { silent: true }).catch(() => {
@@ -3532,15 +3878,18 @@
     const isSelf = sameId(member.__id, currentUserId());
     const targetRole = member.__roleGroup || member.__roleKey;
     const targetIsOwner = targetRole === 'owner';
-    const canManage = canManageActiveProjectMembers();
-    const canManageTarget = canManage && !isSelf && memberRoleCanManage(managerRole, targetRole);
+    const canManageMembers = projectRoleHasPermission(projectId, managerRole, 'manage_members');
+    const canModerateMembers = projectRoleHasPermission(projectId, managerRole, 'moderate_members');
+    const canUseAdmin = canUseActiveProjectMemberAdmin();
+    const canManageTarget = canManageMembers && !isSelf && memberRoleCanManage(managerRole, targetRole);
+    const canModerateTarget = canModerateMembers && !isSelf && memberRoleCanManage(managerRole, targetRole);
     let note = '';
-    if (!canManage) note = '只有项目拥有者和管理员可以管理成员';
+    if (!canManageMembers && !canModerateMembers) note = '当前角色无权管理该成员';
     else if (isSelf) note = '不能在这里管理自己的角色或移除自己';
     else if (targetIsOwner) note = '项目拥有者不能在这里被修改或移除';
-    else if (!canManageTarget) note = '不能管理同级或更高角色成员';
+    else if ((canManageMembers || canModerateMembers) && !memberRoleCanManage(managerRole, targetRole)) note = '不能管理同级或更高角色成员';
     return {
-      show: canManage || isSelf || targetIsOwner,
+      show: canUseAdmin || isSelf || targetIsOwner,
       projectId,
       managerRole,
       managerLabel,
@@ -3548,7 +3897,7 @@
       canManageTarget,
       canChangeRole: canManageTarget,
       canRemove: canManageTarget,
-      canModerate: canManageTarget,
+      canModerate: canModerateTarget,
       note
     };
   }
@@ -3580,12 +3929,13 @@
         <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
       </div>`).join('');
     const currentRoleKey = member.__roleGroup || member.__roleKey;
-    const hasEditableRole = PROJECT_MEMBER_ROLE_OPTIONS.some((role) => role.key === currentRoleKey);
+    const assignableRoles = projectAssignableRoleOptions(projectManagement.projectId);
+    const hasEditableRole = assignableRoles.some((role) => role.key === currentRoleKey);
     const currentRoleOption = currentRoleKey && !hasEditableRole
       ? `<option value="${escapeHtml(currentRoleKey)}" selected>${escapeHtml(memberRoleLabel(currentRoleKey) || currentRoleKey)}</option>`
       : '';
-    const roleOptions = currentRoleOption + PROJECT_MEMBER_ROLE_OPTIONS.map((role) => {
-      const selected = role.key === member.__roleGroup ? 'selected' : '';
+    const roleOptions = currentRoleOption + assignableRoles.map((role) => {
+      const selected = role.key === currentRoleKey ? 'selected' : '';
       const disabled = memberRoleCanAssign(projectManagement.managerRole, role.key) ? '' : 'disabled';
       return `<option value="${escapeHtml(role.key)}" ${selected} ${disabled}>${escapeHtml(role.label)}</option>`;
     }).join('');
