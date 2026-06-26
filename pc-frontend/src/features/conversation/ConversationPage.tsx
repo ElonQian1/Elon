@@ -448,23 +448,38 @@ export default function ConversationPage() {
       <aside className={styles.memberPanel}>
         <div className={styles.memberTitle}>
           <span>成员{spaceMembers.length > 0 ? ` — ${spaceMembers.length}` : ''}</span>
+          {activeProjectId && (
+            <button
+              className={styles.memberInviteBtn}
+              type="button"
+              title="邀请成员"
+              onClick={() => navigate(`/projects/${activeProjectId}`)}
+            >
+              + 邀请
+            </button>
+          )}
         </div>
         <div className={styles.memberList}>
+          {/* 搜索框 */}
+          {spaceMembers.length > 0 && (
+            <MemberSearch members={spaceMembers} />
+          )}
           {spaceMembers.length === 0 && user && (
             /* 未加载到成员时 fallback 显示自己 */
             <>
               <div className={styles.memberSection}>在线 · 1</div>
               <div className={styles.memberItem}>
-                <div className={styles.memberAvatar}>
+                <div className={[styles.memberAvatar, styles.memberAvatarOnline].join(' ')}>
                   {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? '?'}
                 </div>
-                <span className={styles.memberName}>{user.nickname ?? user.account}</span>
-                <span className={styles.presenceDot} />
+                <div className={styles.memberCopy}>
+                  <div className={styles.memberLine}>
+                    <strong className={styles.memberItemName}>{user.nickname ?? user.account}</strong>
+                  </div>
+                  <span className={styles.memberSub}>在线</span>
+                </div>
               </div>
             </>
-          )}
-          {spaceMembers.length > 0 && (
-            <MemberGroups members={spaceMembers} />
           )}
         </div>
       </aside>
@@ -546,11 +561,45 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
   )
 }
 
+/* ── 成员搜索 + 分组列表 ── */
+function MemberSearch({ members }: { members: import('./types').ProjectMember[] }) {
+  const [query, setQuery] = useState('')
+  const q = query.trim().toLowerCase()
+  const filtered = q
+    ? members.filter(m => (m.account ?? m.user_id).toLowerCase().includes(q))
+    : members
+  return (
+    <>
+      <div className={styles.memberSearch}>
+        <input
+          className={styles.memberSearchInput}
+          value={query}
+          onChange={e => setQuery(e.target.value)}
+          placeholder="搜索成员"
+          autoComplete="off"
+        />
+        {query && (
+          <button className={styles.memberSearchClear} type="button" onClick={() => setQuery('')}>×</button>
+        )}
+      </div>
+      <MemberGroups members={filtered} />
+    </>
+  )
+}
+
 /* ── 成员分组列表：按角色展示项目成员 ── */
 function MemberGroups({ members }: { members: import('./types').ProjectMember[] }) {
   const ROLE_LABELS: Record<string, string> = {
     admin: '管理员', owner: '管理员',
     collaborator: '协作者', editor: '协作者',
+  }
+  const ROLE_CSS: Record<string, string> = {
+    admin: styles.memberRolePillAdmin, owner: styles.memberRolePillOwner,
+    collaborator: styles.memberRolePillEditor, editor: styles.memberRolePillEditor,
+  }
+  const AVATAR_CSS: Record<string, string> = {
+    admin: styles.memberAvatarAdmin, owner: styles.memberAvatarOwner,
+    collaborator: styles.memberAvatarEditor, editor: styles.memberAvatarEditor,
   }
   const groups: [string, import('./types').ProjectMember[]][] = [
     ['管理员', members.filter(m => ['admin','owner'].includes((m.role ?? '').toLowerCase()))],
@@ -562,15 +611,27 @@ function MemberGroups({ members }: { members: import('./types').ProjectMember[] 
       {groups.filter(([, list]) => list.length > 0).map(([label, list]) => (
         <div key={label}>
           <div className={styles.memberSection}>{label} · {list.length}</div>
-          {list.map(m => (
-            <div key={m.user_id} className={styles.memberItem}>
-              <div className={styles.memberAvatar}>
-                {(m.account ?? m.user_id)[0].toUpperCase()}
+          {list.map(m => {
+            const roleKey = (m.role ?? '').toLowerCase()
+            const roleLabel = ROLE_LABELS[roleKey]
+            const avatarCls = [styles.memberAvatar, AVATAR_CSS[roleKey] ?? '', m.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline].filter(Boolean).join(' ')
+            const name = m.account ?? m.user_id
+            const sub = m.is_online ? '在线' : (roleLabel ?? '成员')
+            return (
+              <div key={m.user_id} className={styles.memberItem}>
+                <div className={avatarCls}>{name[0].toUpperCase()}</div>
+                <div className={styles.memberCopy}>
+                  <div className={styles.memberLine}>
+                    <strong className={styles.memberItemName}>{name}</strong>
+                    {roleLabel && (
+                      <em className={[styles.memberRolePill, ROLE_CSS[roleKey] ?? ''].join(' ')}>{roleLabel}</em>
+                    )}
+                  </div>
+                  <span className={styles.memberSub}>{sub}</span>
+                </div>
               </div>
-              <span className={styles.memberName}>{m.account ?? m.user_id}</span>
-              {m.is_online && <span className={styles.presenceDot} />}
-            </div>
-          ))}
+            )
+          })}
         </div>
       ))}
     </>
