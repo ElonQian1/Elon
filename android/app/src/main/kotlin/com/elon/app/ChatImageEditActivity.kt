@@ -165,7 +165,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 dp(64),
                 Gravity.BOTTOM
             ).apply {
-                bottomMargin = dp(14)
+                bottomMargin = dp(20)
             }
 
             undoButton = iconButton(R.drawable.ic_chat_image_tool_undo, "撤销", padding = 0).apply {
@@ -260,7 +260,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             collapsedToolButton = this
             layoutParams = FrameLayout.LayoutParams(dp(68), dp(48), Gravity.BOTTOM or Gravity.END).apply {
                 rightMargin = dp(18)
-                bottomMargin = dp(14)
+                bottomMargin = 0
             }
             visibility = View.INVISIBLE
             alpha = 0f
