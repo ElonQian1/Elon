@@ -13,7 +13,6 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/', icon: '💬', label: '对话' },
   { to: '/projects', icon: '📦', label: '项目' },
   { to: '/dev-tasks', icon: '🛠️', label: 'AI 开发' },
-  { to: '/models', icon: '🧠', label: '模型' },
   { to: '/voice', icon: '🎙️', label: '声音' },
   { to: '/doctor', icon: '🩺', label: '电脑医生' },
   { to: '/node', icon: '🖥️', label: '本机节点' },

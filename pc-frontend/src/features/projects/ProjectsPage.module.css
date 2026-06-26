@@ -1,0 +1,28 @@
+.page {
+  padding: 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.header h2 { font-size: 20px; font-weight: 700; }
+
+.createBtn {
+  padding: 8px 18px;
+  background: var(--accent);
+  border-radius: var(--radius-sm);
+  color: #101010;
+  font-weight: 600;
+  font-size: 13px;
+  transition: background var(--transition);
+}
+
+.createBtn:hover { background: var(--accent-hover); }
+
+.hint { color: var(--text-muted); font-size: 13px; }
