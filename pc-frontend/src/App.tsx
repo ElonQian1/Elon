@@ -6,6 +6,7 @@ import ProjectsPage from './features/projects/ProjectsPage'
 import ProjectDetailPage from './features/projects/ProjectDetailPage'
 import AiChatPage from './features/ai/AiChatPage'
 import FriendsPage from './features/friends/FriendsPage'
+import PlazaPage from './features/plaza/PlazaPage'
 import DoctorPage from './features/doctor/DoctorPage'
 import VoicePage from './features/voice/VoicePage'
 import NodePage from './features/node/NodePage'
@@ -34,6 +35,7 @@ export default function App() {
         <Route index element={<ConversationPage />} />
         <Route path="ai" element={<AiChatPage />} />
         <Route path="friends" element={<FriendsPage />} />
+        <Route path="plaza" element={<PlazaPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="dev-tasks" element={<DevTasksPage />} />
