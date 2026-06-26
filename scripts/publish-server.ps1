@@ -768,6 +768,65 @@ if ($SkipUpload) {
 }
 
 # ─────────────────────────────────────────────────────────────
+# 3.5  构建 PC 前端并上传到服务器
+# ─────────────────────────────────────────────────────────────
+$PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
+$PcDistDir     = Join-Path $PcFrontendDir "dist"
+$RemoteDataDir = "/opt/elon/data"
+$RemotePcDist  = "$RemoteDataDir/pc-next-dist"
+
+if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
+    if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
+        Write-Host "3.5⃣  ⚠️  npm 不在 PATH，跳过前端构建（/pc 将使用现有 dist 或返回 404）" -ForegroundColor Yellow
+    } elseif ($SkipBuild -and (Test-Path (Join-Path $PcDistDir "index.html"))) {
+        Write-Host "3.5⃣  ⏩ 跳过前端构建（-SkipBuild），使用已有 dist" -ForegroundColor Yellow
+    } else {
+        Write-Host "3.5⃣  构建 PC 前端（npm run build）..." -ForegroundColor Yellow
+        Push-Location $PcFrontendDir
+        try {
+            # 如果没有 node_modules 先安装依赖
+            if (-not (Test-Path (Join-Path $PcFrontendDir "node_modules"))) {
+                Write-Host "   📦 安装前端依赖（npm ci）..." -ForegroundColor Gray
+                cmd /c "npm ci" 2>&1 | Write-Host
+                if ($LASTEXITCODE -ne 0) { throw "npm ci 失败，exit=$LASTEXITCODE" }
+            }
+            cmd /c "npm run build" 2>&1 | Write-Host
+            if ($LASTEXITCODE -ne 0) { throw "npm run build 失败，exit=$LASTEXITCODE" }
+            Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
+        } catch {
+            Write-Host "   ⚠️  前端构建失败（不中止部署）: $_" -ForegroundColor Yellow
+            $PcDistDir = $null   # 跳过上传
+        } finally {
+            Pop-Location
+        }
+    }
+
+    if ($PcDistDir -and -not $SkipUpload -and (Test-Path (Join-Path $PcDistDir "index.html"))) {
+        Write-Host "3.5⃣  上传前端 dist 到服务器 $RemotePcDist ..." -ForegroundColor Yellow
+        $stagingPcDist = "$RemoteDataDir/pc-next-dist-staging-$Sha"
+        # 创建 staging 目录并上传
+        ssh @SshOpts $Server "mkdir -p $stagingPcDist" 2>&1 | Out-Null
+        # scp -r 上传整个 dist/
+        scp @SshOpts -r "$PcDistDir/." "${Server}:${stagingPcDist}"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "   ⚠️  前端上传失败（不中止后端部署）" -ForegroundColor Yellow
+        } else {
+            # 原子替换
+            $swapScript = "rm -rf '$RemotePcDist' && mv '$stagingPcDist' '$RemotePcDist'"
+            ssh @SshOpts $Server $swapScript 2>&1 | Out-Null
+            if ($LASTEXITCODE -eq 0) {
+                Write-Host "   ✅ 前端 dist 上传并替换完成 → $RemotePcDist" -ForegroundColor Green
+            } else {
+                ssh @SshOpts $Server "rm -rf '$stagingPcDist'" 2>&1 | Out-Null
+                Write-Host "   ⚠️  前端目录替换失败（staging 已清理）" -ForegroundColor Yellow
+            }
+        }
+    }
+} else {
+    Write-Host "3.5⃣  ℹ️  pc-frontend/ 不存在，跳过前端构建" -ForegroundColor DarkGray
+}
+
+# ─────────────────────────────────────────────────────────────
 # 4. 上传到服务器（staging 路径用 SHA 命名，避免并发部署互相覆盖）
 # ─────────────────────────────────────────────────────────────
 Write-Host "4⃣  上传 binary 到服务器..." -ForegroundColor Yellow
