@@ -487,6 +487,25 @@
     return '';
   }
 
+  function memberRoleLevel(role) {
+    const key = clean(role).toLowerCase();
+    if (key === 'owner') return 100;
+    if (key === 'admin') return 80;
+    if (key === 'editor' || key === 'developer' || key === 'maintainer') return 60;
+    if (key === 'member') return 40;
+    if (key === 'observer' || key === 'viewer') return 20;
+    return 0;
+  }
+
+  function memberRoleCanManage(managerRole, targetRole) {
+    return memberRoleLevel(managerRole) >= memberRoleLevel('admin') &&
+      memberRoleLevel(targetRole) < memberRoleLevel(managerRole);
+  }
+
+  function memberRoleCanAssign(managerRole, targetRole) {
+    return memberRoleLevel(targetRole) < memberRoleLevel(managerRole);
+  }
+
   function activeProjectRole() {
     const project = projectById(state.activeProjectId) || ((state.projectSpace && state.projectSpace.project) || {});
     return clean(project.role || project.member_role || project.memberRole || project.viewer_role || project.viewerRole).toLowerCase();
@@ -2745,7 +2764,8 @@
     const pendingCount = Array.isArray(admin.requests) ? admin.requests.filter((request) => clean(request.status) === 'pending').length : 0;
     const roleOptions = PROJECT_MEMBER_ROLE_OPTIONS.map((role) => {
       const selected = role.key === (admin.inviteRole || 'member') ? 'selected' : '';
-      return `<option value="${escapeHtml(role.key)}" ${selected}>${escapeHtml(role.label)}</option>`;
+      const disabled = memberRoleCanAssign(activeProjectRole(), role.key) ? '' : 'disabled';
+      return `<option value="${escapeHtml(role.key)}" ${selected} ${disabled}>${escapeHtml(role.label)}</option>`;
     }).join('');
     const requestsHtml = admin.expanded ? renderProjectJoinRequests(projectId, admin) : '';
     const auditHtml = admin.auditExpanded ? renderProjectMemberAudit(projectId, admin) : '';
@@ -3410,6 +3430,10 @@
       setMemberAdminStatus(projectId, '请输入成员手机号、邮箱或用户 ID', 'error');
       return;
     }
+    if (!memberRoleCanAssign(activeProjectRole(), role)) {
+      setMemberAdminStatus(projectId, '当前角色不能分配同级或更高角色', 'error');
+      return;
+    }
     admin.inviteAccount = account;
     admin.inviteRole = role;
     admin.busy = 'invite';
@@ -3506,20 +3530,25 @@
     const managerRole = activeProjectRole();
     const managerLabel = memberRoleLabel(managerRole) || '项目成员';
     const isSelf = sameId(member.__id, currentUserId());
-    const targetIsOwner = member.__roleGroup === 'owner';
+    const targetRole = member.__roleGroup || member.__roleKey;
+    const targetIsOwner = targetRole === 'owner';
     const canManage = canManageActiveProjectMembers();
+    const canManageTarget = canManage && !isSelf && memberRoleCanManage(managerRole, targetRole);
     let note = '';
     if (!canManage) note = '只有项目拥有者和管理员可以管理成员';
     else if (isSelf) note = '不能在这里管理自己的角色或移除自己';
     else if (targetIsOwner) note = '项目拥有者不能在这里被修改或移除';
+    else if (!canManageTarget) note = '不能管理同级或更高角色成员';
     return {
       show: canManage || isSelf || targetIsOwner,
       projectId,
       managerRole,
       managerLabel,
-      canChangeRole: canManage && !isSelf && !targetIsOwner,
-      canRemove: canManage && !isSelf && !targetIsOwner,
-      canModerate: canManage && !isSelf && !targetIsOwner,
+      targetRole,
+      canManageTarget,
+      canChangeRole: canManageTarget,
+      canRemove: canManageTarget,
+      canModerate: canManageTarget,
       note
     };
   }
@@ -3557,7 +3586,8 @@
       : '';
     const roleOptions = currentRoleOption + PROJECT_MEMBER_ROLE_OPTIONS.map((role) => {
       const selected = role.key === member.__roleGroup ? 'selected' : '';
-      return `<option value="${escapeHtml(role.key)}" ${selected}>${escapeHtml(role.label)}</option>`;
+      const disabled = memberRoleCanAssign(projectManagement.managerRole, role.key) ? '' : 'disabled';
+      return `<option value="${escapeHtml(role.key)}" ${selected} ${disabled}>${escapeHtml(role.label)}</option>`;
     }).join('');
     const moderationHtml = projectManagement.canModerate
       ? `<div class="member-moderation-actions">
@@ -3742,6 +3772,10 @@
     const management = memberProjectManagement(member);
     const targetRole = clean(role).toLowerCase();
     if (!management.canChangeRole || !targetRole) return;
+    if (!memberRoleCanAssign(management.managerRole, targetRole)) {
+      setMemberProfileStatus('当前角色不能分配同级或更高角色', 'error');
+      return;
+    }
     setMemberProfileStatus('正在更新角色…', '', true);
     await api(`/api/projects/${encodeURIComponent(management.projectId)}/members/${encodeURIComponent(member.__id)}`, {
       method: 'PATCH',

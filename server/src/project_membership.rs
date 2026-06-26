@@ -260,6 +260,14 @@ pub async fn add_member(
             .ok()
             .flatten()
     });
+    if let Err(message) = ensure_role_management_allowed(
+        &access.role,
+        audit_old_role.as_deref(),
+        Some(&role),
+        "邀请或调整成员角色",
+    ) {
+        return json_error(StatusCode::FORBIDDEN, message);
+    }
 
     match state
         .store
@@ -495,6 +503,45 @@ fn can_update_project_brand(role: &str) -> bool {
     can_update_project_icon(role)
 }
 
+fn ensure_role_management_allowed(
+    manager_role: &str,
+    target_role: Option<&str>,
+    new_role: Option<&str>,
+    action_label: &str,
+) -> Result<(), String> {
+    let manager_level = project_member_role_level(Some(manager_role));
+    if manager_level < project_member_role_level(Some("admin")) {
+        return Err("只有项目 owner 或管理员才可管理成员".into());
+    }
+    if let Some(target_role) = target_role {
+        let target_level = project_member_role_level(Some(target_role));
+        if target_level >= manager_level {
+            return Err(format!("当前角色不能{}同级或更高角色成员", action_label));
+        }
+    }
+    if let Some(new_role) = new_role {
+        let new_level = project_member_role_level(Some(new_role));
+        if new_level >= manager_level {
+            return Err(format!(
+                "当前角色不能分配同级或更高角色（{}）",
+                new_role.trim()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn project_member_role_level(role: Option<&str>) -> i32 {
+    match role.map(str::trim).unwrap_or_default() {
+        "owner" => 100,
+        "admin" => 80,
+        "editor" | "developer" | "maintainer" => 60,
+        "member" => 40,
+        "observer" | "viewer" => 20,
+        _ => 0,
+    }
+}
+
 fn project_brand_field<'a>(
     obj: &'a Map<String, Value>,
     snake_case: &str,
@@ -568,7 +615,7 @@ fn clean_project_icon_data_url(
 mod tests {
     use super::{
         can_update_project_brand, can_update_project_icon, clean_project_display_name_update,
-        clean_project_icon_data_url_update,
+        clean_project_icon_data_url_update, ensure_role_management_allowed,
     };
     use serde_json::{json, Value};
 
@@ -612,6 +659,21 @@ mod tests {
             Some(None)
         );
     }
+
+    #[test]
+    fn role_hierarchy_blocks_same_or_higher_management() {
+        assert!(
+            ensure_role_management_allowed("owner", Some("admin"), Some("editor"), "修改").is_ok()
+        );
+        assert!(
+            ensure_role_management_allowed("admin", Some("editor"), Some("member"), "修改").is_ok()
+        );
+        assert!(ensure_role_management_allowed("admin", Some("admin"), None, "移除").is_err());
+        assert!(
+            ensure_role_management_allowed("admin", Some("editor"), Some("admin"), "修改").is_err()
+        );
+        assert!(ensure_role_management_allowed("editor", Some("member"), None, "移除").is_err());
+    }
 }
 
 /// PATCH /api/projects/:id/members/:user_id — 修改成员角色（仅 owner/admin）
@@ -643,6 +705,14 @@ pub async fn update_member_role(
         .project_member_role(&project_id, &target_user_id)
         .ok()
         .flatten();
+    if let Err(message) = ensure_role_management_allowed(
+        &access.role,
+        old_role.as_deref(),
+        Some(req.role.trim()),
+        "修改成员角色",
+    ) {
+        return json_error(StatusCode::FORBIDDEN, message);
+    }
     match state
         .store
         .update_member_role(&project_id, &target_user_id, req.role.trim())
@@ -715,6 +785,11 @@ pub async fn remove_member(
         .project_member_role(&project_id, &target_user_id)
         .ok()
         .flatten();
+    if let Err(message) =
+        ensure_role_management_allowed(&access.role, old_role.as_deref(), None, "移除成员")
+    {
+        return json_error(StatusCode::FORBIDDEN, message);
+    }
     match state.store.remove_member(&project_id, &target_user_id) {
         Ok(()) => {
             if let Err(err) = state.store.record_project_member_audit(
@@ -768,6 +843,16 @@ pub async fn update_member_moderation(
     }
     if target_user_id == user.id {
         return json_error(StatusCode::BAD_REQUEST, "不能限制自己");
+    }
+    let target_role = state
+        .store
+        .project_member_role(&project_id, &target_user_id)
+        .ok()
+        .flatten();
+    if let Err(message) =
+        ensure_role_management_allowed(&access.role, target_role.as_deref(), None, "限制成员")
+    {
+        return json_error(StatusCode::FORBIDDEN, message);
     }
 
     let action = req.action.trim().to_string();
