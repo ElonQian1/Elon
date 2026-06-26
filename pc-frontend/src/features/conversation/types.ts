@@ -60,8 +60,48 @@ export interface ProjectMember {
   roles?: ProjectRoleRef[]
   joined_at?: string
   is_online?: boolean
+  presence_status?: 'online' | 'idle' | 'dnd' | 'invisible' | 'offline' | string
+  custom_status?: string | null
+  activity?: string | null
+  muted_until?: string | null
+  banned_at?: string | null
+  banned_until?: string | null
   is_muted?: boolean
   is_banned?: boolean
+}
+
+export interface UserPresenceSettings {
+  user_id: string
+  status: 'online' | 'idle' | 'dnd' | 'invisible' | string
+  custom_status?: string | null
+  activity?: string | null
+  updated_at?: string
+}
+
+export interface ProjectInviteLink {
+  id: string
+  project_id: string
+  code: string
+  role: string
+  max_uses?: number | null
+  use_count: number
+  expires_at?: string | null
+  temporary?: boolean
+  revoked_at?: string | null
+  created_by?: string
+  created_at?: string
+  updated_at?: string
+}
+
+export interface ProjectInvitePreview {
+  project_id: string
+  project_name: string
+  display_name?: string | null
+  role: string
+  max_uses?: number | null
+  use_count?: number
+  expires_at?: string | null
+  temporary?: boolean
 }
 
 export interface ProjectRole {
@@ -143,4 +183,16 @@ export interface ChannelMessagesResponse {
 export interface ProjectRolesResponse {
   roles?: ProjectRole[]
   permissions?: PermissionOption[]
+}
+
+export interface ProjectInviteLinksResponse {
+  invites?: ProjectInviteLink[]
+}
+
+export interface ProjectInviteResponse {
+  invite?: ProjectInviteLink
+}
+
+export interface ProjectInvitePreviewResponse {
+  invite?: ProjectInvitePreview
 }

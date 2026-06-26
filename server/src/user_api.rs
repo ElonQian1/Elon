@@ -27,6 +27,51 @@ use crate::user_agent_probe::{
 use crate::user_agent_readiness::build_user_agent_rag_readiness;
 use crate::user_agent_secrets::user_byok_api_enabled;
 
+#[derive(Deserialize)]
+pub struct UpdateMyPresenceRequest {
+    pub status: Option<String>,
+    pub custom_status: Option<String>,
+    pub activity: Option<String>,
+}
+
+/// GET /api/me/presence — 当前用户展示在线状态
+pub async fn get_my_presence(State(state): State<Arc<AppState>>, headers: HeaderMap) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(err) => return json_error(StatusCode::UNAUTHORIZED, err.to_string()),
+    };
+    match state.store.user_presence_settings(&user.id) {
+        Ok(presence) => Json(presence).into_response(),
+        Err(err) => json_error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    }
+}
+
+/// PATCH /api/me/presence — 设置在线/离开/勿扰/隐身与自定义展示文案
+pub async fn update_my_presence(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Json(req): Json<UpdateMyPresenceRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(err) => return json_error(StatusCode::UNAUTHORIZED, err.to_string()),
+    };
+    let current = match state.store.user_presence_settings(&user.id) {
+        Ok(presence) => presence,
+        Err(err) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, err.to_string()),
+    };
+    let status = req.status.as_deref().unwrap_or(&current.status);
+    match state.store.set_user_presence_settings(
+        &user.id,
+        status,
+        req.custom_status.as_deref(),
+        req.activity.as_deref(),
+    ) {
+        Ok(presence) => Json(presence).into_response(),
+        Err(err) => json_error(StatusCode::BAD_REQUEST, err.to_string()),
+    }
+}
+
 /// 获取用户的 AI 代理配置（同时返回可选的全局代理列表）
 pub async fn get_user_agent(
     State(state): State<Arc<AppState>>,

@@ -189,6 +189,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             "/api/me/profile",
             axum::routing::patch(project_api::update_profile),
         )
+        .route(
+            "/api/me/presence",
+            get(user_api::get_my_presence).patch(user_api::update_my_presence),
+        )
         .route("/api/me/archive", get(user_archive_api::get_user_archive))
         .route("/api/me/workspaces", get(user_archive_api::get_user_archive))
         // ── 用户记忆 API ────────────────────────────────────────────────────────
@@ -334,6 +338,23 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:id/members",
             get(project_membership::list_members).post(project_membership::add_member),
+        )
+        .route(
+            "/api/projects/:id/invite-links",
+            get(project_membership::list_project_invite_links)
+                .post(project_membership::create_project_invite_link),
+        )
+        .route(
+            "/api/projects/:id/invite-links/:code",
+            delete(project_membership::revoke_project_invite_link),
+        )
+        .route(
+            "/api/project-invites/:code",
+            get(project_membership::get_project_invite_preview),
+        )
+        .route(
+            "/api/project-invites/:code/join",
+            post(project_membership::join_project_by_invite_link),
         )
         .route(
             "/api/projects/:id/member-audit",

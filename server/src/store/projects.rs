@@ -643,11 +643,15 @@ impl Store {
                     r.banned_at,
                     r.banned_until,
                     CASE WHEN r.muted_until IS NOT NULL AND r.muted_until > ?2 THEN 1 ELSE 0 END AS is_muted,
-                    CASE WHEN r.banned_at IS NOT NULL AND (r.banned_until IS NULL OR r.banned_until > ?2) THEN 1 ELSE 0 END AS is_banned
+                    CASE WHEN r.banned_at IS NOT NULL AND (r.banned_until IS NULL OR r.banned_until > ?2) THEN 1 ELSE 0 END AS is_banned,
+                    COALESCE(ps.status, 'online') AS presence_status,
+                    ps.custom_status,
+                    ps.activity
              FROM project_members pm
              LEFT JOIN users u ON u.id = pm.user_id
              LEFT JOIN project_member_restrictions r
                ON r.project_id = pm.project_id AND r.user_id = pm.user_id
+             LEFT JOIN user_presence_settings ps ON ps.user_id = pm.user_id
              LEFT JOIN project_roles pr
                ON pr.project_id = pm.project_id AND pr.id = pm.role
              WHERE pm.project_id = ?1
@@ -666,6 +670,9 @@ impl Store {
                     roles: Vec::new(),
                     joined_at: row.get(4)?,
                     is_online: false,
+                    presence_status: row.get(10)?,
+                    custom_status: row.get(11)?,
+                    activity: row.get(12)?,
                     muted_until: row.get(5)?,
                     banned_at: row.get(6)?,
                     banned_until: row.get(7)?,
@@ -927,6 +934,10 @@ impl Store {
             params![project_id],
         )?;
         tx.execute(
+            "DELETE FROM project_invite_links WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
             "DELETE FROM project_member_roles WHERE project_id = ?1",
             params![project_id],
         )?;
@@ -960,12 +971,16 @@ fn project_member_entry(
                 r.banned_at,
                 r.banned_until,
                 CASE WHEN r.muted_until IS NOT NULL AND r.muted_until > ?3 THEN 1 ELSE 0 END AS is_muted,
-                CASE WHEN r.banned_at IS NOT NULL AND (r.banned_until IS NULL OR r.banned_until > ?3) THEN 1 ELSE 0 END AS is_banned
-         FROM project_members pm
-         LEFT JOIN users u ON u.id = pm.user_id
-         LEFT JOIN project_member_restrictions r
-           ON r.project_id = pm.project_id AND r.user_id = pm.user_id
-        WHERE pm.project_id = ?1 AND pm.user_id = ?2",
+                CASE WHEN r.banned_at IS NOT NULL AND (r.banned_until IS NULL OR r.banned_until > ?3) THEN 1 ELSE 0 END AS is_banned,
+                COALESCE(ps.status, 'online') AS presence_status,
+                ps.custom_status,
+                ps.activity
+           FROM project_members pm
+           LEFT JOIN users u ON u.id = pm.user_id
+           LEFT JOIN project_member_restrictions r
+             ON r.project_id = pm.project_id AND r.user_id = pm.user_id
+           LEFT JOIN user_presence_settings ps ON ps.user_id = pm.user_id
+           WHERE pm.project_id = ?1 AND pm.user_id = ?2",
         params![project_id, user_id, now],
         |row| {
             Ok(ProjectMemberEntry {
@@ -976,6 +991,9 @@ fn project_member_entry(
                 roles: Vec::new(),
                 joined_at: row.get(4)?,
                 is_online: false,
+                presence_status: row.get(10)?,
+                custom_status: row.get(11)?,
+                activity: row.get(12)?,
                 muted_until: row.get(5)?,
                 banned_at: row.get(6)?,
                 banned_until: row.get(7)?,

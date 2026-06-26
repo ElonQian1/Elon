@@ -491,6 +491,9 @@ pub struct ProjectMemberEntry {
     pub roles: Vec<ProjectMemberRoleRef>,
     pub joined_at: String,
     pub is_online: bool,
+    pub presence_status: String,
+    pub custom_status: Option<String>,
+    pub activity: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub muted_until: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -542,6 +545,43 @@ pub struct ProjectMemberModerationEntry {
     pub updated_at: String,
     pub is_muted: bool,
     pub is_banned: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct UserPresenceSettings {
+    pub user_id: String,
+    pub status: String,
+    pub custom_status: Option<String>,
+    pub activity: Option<String>,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectInviteLink {
+    pub id: String,
+    pub project_id: String,
+    pub code: String,
+    pub role: String,
+    pub max_uses: Option<i64>,
+    pub use_count: i64,
+    pub expires_at: Option<String>,
+    pub temporary: bool,
+    pub revoked_at: Option<String>,
+    pub created_by: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectInvitePreview {
+    pub project_id: String,
+    pub project_name: String,
+    pub display_name: Option<String>,
+    pub role: String,
+    pub max_uses: Option<i64>,
+    pub use_count: i64,
+    pub expires_at: Option<String>,
+    pub temporary: bool,
 }
 
 /// 项目角色定义。内置角色由代码生成，自定义角色来自 project_roles 表。

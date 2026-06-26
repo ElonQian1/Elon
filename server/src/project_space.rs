@@ -733,7 +733,7 @@ async fn project_space_response(
     {
         let online = state.online_users.read().await;
         for member in &mut members {
-            member.is_online = online.contains_key(&member.user_id);
+            apply_project_member_presence(member, online.contains_key(&member.user_id));
         }
     }
     Json(serde_json::json!({
@@ -745,6 +745,20 @@ async fn project_space_response(
         "latest_apk_url": latest_project_apk_url(&state, &access),
     }))
     .into_response()
+}
+
+fn apply_project_member_presence(member: &mut crate::store::ProjectMemberEntry, connected: bool) {
+    let configured = member.presence_status.trim().to_ascii_lowercase();
+    if !connected || configured == "invisible" {
+        member.is_online = false;
+        member.presence_status = "offline".to_string();
+        return;
+    }
+    member.is_online = true;
+    member.presence_status = match configured.as_str() {
+        "idle" | "dnd" | "online" => configured,
+        _ => "online".to_string(),
+    };
 }
 
 pub async fn list_user_project_channel_messages(

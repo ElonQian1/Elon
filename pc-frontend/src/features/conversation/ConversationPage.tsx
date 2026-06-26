@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
@@ -10,10 +10,27 @@ import { ModelPickerPopover } from '../models/ModelPicker'
 import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
+import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime, clean } from '../../lib/utils'
 import { shortButtonLabel } from '../models/modelUtils'
-import type { Message } from './types'
+import type {
+  Channel,
+  ChannelCategory,
+  ChannelPermissionResponse,
+  Message,
+  PermissionOption,
+  PermissionOverride,
+  ProjectInviteLink,
+  ProjectInviteLinksResponse,
+  ProjectInvitePreview,
+  ProjectInvitePreviewResponse,
+  ProjectInviteResponse,
+  ProjectMember,
+  ProjectRole,
+  ProjectRolesResponse,
+  UserPresenceSettings,
+} from './types'
 import styles from './ConversationPage.module.css'
 
 export default function ConversationPage() {
@@ -21,9 +38,9 @@ export default function ConversationPage() {
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const {
-    projects, projectsLoaded, activeProjectId, channels, activeChannelId,
+    projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
     messages, messagesLoading, sendingMessage,
-    loadProjects, selectProject, selectChannel, sendMessage, cancelTask, approveTool,
+    loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
@@ -31,6 +48,13 @@ export default function ConversationPage() {
   const [sendError, setSendError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
+  const [showPermissions, setShowPermissions] = useState(false)
+  const [showPresence, setShowPresence] = useState(false)
+  const [showInvites, setShowInvites] = useState(false)
+  const [showModeration, setShowModeration] = useState(false)
+  const [inviteCode, setInviteCode] = useState('')
+  const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
+  const [inviteStatus, setInviteStatus] = useState('')
   const [channelSearch, setChannelSearch] = useState('')
   const [showNewMsg, setShowNewMsg] = useState(false)
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([])   // P1.4   // P1.3：新消息提示
@@ -40,6 +64,23 @@ export default function ConversationPage() {
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const code = clean(params.get('invite') ?? '')
+    if (!code) return
+    setInviteCode(code)
+    setInviteStatus('读取邀请中…')
+    api.get<ProjectInvitePreviewResponse>(`/api/project-invites/${encodeURIComponent(code)}`)
+      .then((data) => {
+        setInvitePreview(data.invite ?? null)
+        setInviteStatus('')
+      })
+      .catch((err: { message?: string }) => {
+        setInvitePreview(null)
+        setInviteStatus(err.message ?? '邀请链接不可用')
+      })
+  }, [])
 
   // P1.3：智能滚动——只有用户在底部时才自动跟随；否则显示"新消息"按钮
   useEffect(() => {
@@ -118,9 +159,32 @@ export default function ConversationPage() {
     }
   }
 
+  async function acceptInvite() {
+    if (!inviteCode) return
+    setInviteStatus('加入中…')
+    try {
+      const data = await api.post<{ project_id?: string; invite?: ProjectInvitePreview }>(
+        `/api/project-invites/${encodeURIComponent(inviteCode)}/join`,
+        {},
+      )
+      const projectId = data.project_id ?? data.invite?.project_id
+      setInviteStatus('已加入')
+      setInvitePreview(null)
+      setInviteCode('')
+      const url = new URL(window.location.href)
+      url.searchParams.delete('invite')
+      window.history.replaceState({}, '', url.toString())
+      await loadProjects()
+      if (projectId) await selectProject(projectId)
+    } catch (err) {
+      setInviteStatus((err as { message?: string }).message ?? '加入失败')
+    }
+  }
+
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const activeChannel = channels.find((c) => c.id === activeChannelId)
   const isDevChannel = activeChannel?.kind === 'ai_development'
+  const canManagePermissions = channels.some(channelCanManage)
   // taskContext 和 hasRunningTask 已在上方 P1.3 代码块中定义
 
   const filteredChannels = channelSearch
@@ -128,7 +192,7 @@ export default function ConversationPage() {
     : channels
 
   // 成员列表：从 project space 读取
-  const spaceMembers = useProjectStore((s) => s.members)
+  const spaceMembers = members
 
   // 消息分组：判断某条消息是否与上一条来自同一发送者
   function isGrouped(idx: number): boolean {
@@ -509,24 +573,20 @@ export default function ConversationPage() {
       <aside className={styles.memberPanel}>
         <div className={styles.memberTitle}>
           <span>成员{spaceMembers.length > 0 ? ` — ${spaceMembers.length}` : ''}</span>
-          {activeProjectId && (
-            <button
-              className={styles.memberInviteBtn}
-              type="button"
-              title="邀请成员"
-              onClick={() => navigate(`/projects/${activeProjectId}`)}
-            >
-              + 邀请
-            </button>
-          )}
+          <div className={styles.memberActions}>
+            <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
+            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
+            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowModeration(true)}>管理</button>}
+            {activeProjectId && activeChannelId && canManagePermissions && (
+              <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPermissions(true)}>权限</button>
+            )}
+          </div>
         </div>
         <div className={styles.memberList}>
-          {/* 搜索框 */}
           {spaceMembers.length > 0 && (
             <MemberSearch members={spaceMembers} />
           )}
           {spaceMembers.length === 0 && user && (
-            /* 未加载到成员时 fallback 显示自己 */
             <>
               <div className={styles.memberSection}>在线 · 1</div>
               <div className={styles.memberItem}>
@@ -545,6 +605,21 @@ export default function ConversationPage() {
         </div>
       </aside>
 
+      {(invitePreview || inviteStatus) && inviteCode && (
+        <div className={styles.inviteBanner}>
+          <div>
+            <strong>{invitePreview ? inviteTitle(invitePreview) : '邀请链接'}</strong>
+            <span>{inviteStatus || `将以 ${roleLabel(invitePreview?.role ?? 'member')} 身份加入`}</span>
+          </div>
+          <button className={styles.primaryBtn} onClick={acceptInvite} disabled={!invitePreview || inviteStatus === '加入中…'}>加入</button>
+          <button className={styles.drawerCloseBtn} onClick={() => {
+            setInvitePreview(null)
+            setInviteStatus('')
+            setInviteCode('')
+          }}>关闭</button>
+        </div>
+      )}
+
       {/* 模型选择弹窗 */}
       {showModelPicker && (
         <ModelPickerPopover anchorRef={modelBtnRef} onClose={() => setShowModelPicker(false)} />
@@ -562,8 +637,740 @@ export default function ConversationPage() {
           }}
         />
       )}
+
+      {showPresence && (
+        <PresenceDrawer onClose={() => setShowPresence(false)} onSaved={reloadProjectSpace} />
+      )}
+      {showInvites && activeProjectId && (
+        <InviteDrawer projectId={activeProjectId} onClose={() => setShowInvites(false)} />
+      )}
+      {showModeration && activeProjectId && (
+        <ModerationDrawer projectId={activeProjectId} members={members} onClose={() => setShowModeration(false)} onSaved={reloadProjectSpace} />
+      )}
+      {showPermissions && activeProjectId && activeChannelId && (
+        <PermissionDrawer
+          projectId={activeProjectId}
+          activeChannelId={activeChannelId}
+          channels={channels}
+          categories={categories}
+          members={members}
+          onClose={() => setShowPermissions(false)}
+          onSaved={reloadProjectSpace}
+        />
+      )}
     </div>
   )
+}
+
+const CHANNEL_PERMISSION_OPTIONS: PermissionOption[] = [
+  { key: 'view_channel', label: '查看频道' },
+  { key: 'send_messages', label: '发送消息' },
+  { key: 'start_ai_tasks', label: '发起 AI 任务' },
+  { key: 'manage_channel', label: '管理频道权限' },
+]
+
+function channelCanManage(channel: Channel) {
+  const permissions = channel.permissions ?? {}
+  return !!(permissions.can_manage || permissions.canManage)
+}
+
+function filterMembers(members: ProjectMember[], query: string) {
+  const needle = clean(query).toLowerCase()
+  if (!needle) return members
+  return members.filter((member) => {
+    const haystack = [
+      member.account,
+      member.user_id,
+      member.role,
+      member.custom_status,
+      member.activity,
+      ...(member.roles ?? []).map((role) => role.name || role.id),
+    ].join(' ').toLowerCase()
+    return haystack.includes(needle)
+  })
+}
+
+function memberInitial(member: ProjectMember) {
+  return clean(member.account ?? member.user_id).slice(0, 1).toUpperCase() || '员'
+}
+
+function memberSubtitle(member: ProjectMember) {
+  if (member.is_banned) return '已封禁'
+  if (member.is_muted) return `禁言至 ${formatDateTime(member.muted_until)}`
+  const activity = clean(member.activity ?? '')
+  const customStatus = clean(member.custom_status ?? '')
+  if (activity) return activity
+  if (customStatus) return customStatus
+  return memberRoleSummary(member)
+}
+
+function memberPresenceStatus(member: ProjectMember) {
+  const status = clean(member.presence_status ?? '').toLowerCase()
+  if (!member.is_online || status === 'offline' || status === 'invisible') return 'offline'
+  if (status === 'idle' || status === 'dnd') return status
+  return 'online'
+}
+
+function presenceLabel(status: string) {
+  const labels: Record<string, string> = {
+    online: '在线',
+    idle: '离开',
+    dnd: '勿扰',
+    invisible: '隐身',
+    offline: '离线',
+  }
+  return labels[status] ?? status
+}
+
+function inviteTitle(invite: ProjectInvitePreview) {
+  return invite.display_name || invite.project_name || '项目邀请'
+}
+
+function formatDateTime(value?: string | null) {
+  if (!value) return '无限期'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+function memberRoleSummary(member: ProjectMember) {
+  const roles = member.roles ?? []
+  if (roles.length) return roles.map((role) => role.name || role.id).join(' / ')
+  return roleLabel(member.role ?? 'member')
+}
+
+function roleLabel(role: string) {
+  const labels: Record<string, string> = {
+    owner: '拥有者',
+    admin: '管理员',
+    editor: '协作者',
+    developer: '开发者',
+    maintainer: '维护者',
+    member: '成员',
+    observer: '只读成员',
+  }
+  return labels[role] ?? role
+}
+
+const PRESENCE_OPTIONS = [
+  { value: 'online', label: '在线' },
+  { value: 'idle', label: '离开' },
+  { value: 'dnd', label: '勿扰' },
+  { value: 'invisible', label: '隐身' },
+]
+
+function PresenceDrawer({
+  onClose,
+  onSaved,
+}: {
+  onClose: () => void
+  onSaved: () => Promise<void>
+}) {
+  const [status, setStatus] = useState('online')
+  const [customStatus, setCustomStatus] = useState('')
+  const [activity, setActivity] = useState('')
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    setMessage('读取中…')
+    api.get<UserPresenceSettings>('/api/me/presence')
+      .then((data) => {
+        setStatus(data.status || 'online')
+        setCustomStatus(data.custom_status ?? '')
+        setActivity(data.activity ?? '')
+        setMessage('')
+      })
+      .catch((err: { message?: string }) => setMessage(err.message ?? '状态读取失败'))
+  }, [])
+
+  async function save() {
+    setSaving(true)
+    setMessage('保存中…')
+    try {
+      const data = await api.patch<UserPresenceSettings>('/api/me/presence', {
+        status,
+        custom_status: customStatus,
+        activity,
+      })
+      setStatus(data.status || status)
+      setCustomStatus(data.custom_status ?? '')
+      setActivity(data.activity ?? '')
+      setMessage('已保存')
+      await onSaved()
+    } catch (err) {
+      setMessage((err as { message?: string }).message ?? '保存失败')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className={styles.drawerBackdrop}>
+      <section className={[styles.permissionDrawer, styles.compactDrawer].join(' ')} role="dialog" aria-modal="true">
+        <header className={styles.drawerHeader}>
+          <div>
+            <strong>在线状态</strong>
+            <span>{message}</span>
+          </div>
+          <button className={styles.drawerCloseBtn} onClick={onClose}>关闭</button>
+        </header>
+        <div className={styles.drawerBody}>
+          <label className={styles.field}>
+            <span>展示状态</span>
+            <select value={status} onChange={(event) => setStatus(event.target.value)}>
+              {PRESENCE_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className={styles.field}>
+            <span>自定义状态</span>
+            <input value={customStatus} onChange={(event) => setCustomStatus(event.target.value)} maxLength={80} placeholder="例如：写代码中" />
+          </label>
+          <label className={styles.field}>
+            <span>正在做</span>
+            <input value={activity} onChange={(event) => setActivity(event.target.value)} maxLength={80} placeholder="例如：调试 PC 网页版" />
+          </label>
+          <div className={styles.actionRow}>
+            <button className={styles.primaryBtn} onClick={save} disabled={saving}>保存</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function InviteDrawer({
+  projectId,
+  onClose,
+}: {
+  projectId: string
+  onClose: () => void
+}) {
+  const [invites, setInvites] = useState<ProjectInviteLink[]>([])
+  const [role, setRole] = useState('member')
+  const [expiresInHours, setExpiresInHours] = useState('168')
+  const [maxUses, setMaxUses] = useState('')
+  const [temporary, setTemporary] = useState(false)
+  const [message, setMessage] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function refreshInvites() {
+    setLoading(true)
+    try {
+      const data = await api.get<ProjectInviteLinksResponse>(`/api/projects/${encodeURIComponent(projectId)}/invite-links`)
+      setInvites(data.invites ?? [])
+      setMessage('')
+    } catch (err) {
+      setMessage((err as { message?: string }).message ?? '邀请链接读取失败')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refreshInvites()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId])
+
+  async function createInvite() {
+    setMessage('创建中…')
+    try {
+      const data = await api.post<ProjectInviteResponse>(`/api/projects/${encodeURIComponent(projectId)}/invite-links`, {
+        role,
+        expires_in_hours: numberOrUndefined(expiresInHours),
+        max_uses: numberOrUndefined(maxUses),
+        temporary,
+      })
+      if (data.invite) setInvites((items) => [data.invite as ProjectInviteLink, ...items])
+      setMessage('已创建')
+    } catch (err) {
+      setMessage((err as { message?: string }).message ?? '创建失败')
+    }
+  }
+
+  async function revokeInvite(code: string) {
+    setMessage('撤销中…')
+    try {
+      await api.delete<ProjectInviteResponse>(`/api/projects/${encodeURIComponent(projectId)}/invite-links/${encodeURIComponent(code)}`)
+      await refreshInvites()
+      setMessage('已撤销')
+    } catch (err) {
+      setMessage((err as { message?: string }).message ?? '撤销失败')
+    }
+  }
+
+  async function copyInvite(code: string) {
+    try {
+      await navigator.clipboard.writeText(inviteUrl(code))
+      setMessage('已复制邀请链接')
+    } catch {
+      setMessage(inviteUrl(code))
+    }
+  }
+
+  return (
+    <div className={styles.drawerBackdrop}>
+      <section className={[styles.permissionDrawer, styles.inviteDrawer].join(' ')} role="dialog" aria-modal="true">
+        <header className={styles.drawerHeader}>
+          <div>
+            <strong>邀请链接</strong>
+            <span>{loading ? '同步中…' : message}</span>
+          </div>
+          <button className={styles.drawerCloseBtn} onClick={onClose}>关闭</button>
+        </header>
+        <div className={styles.drawerBody}>
+          <section className={styles.drawerSection}>
+            <div className={styles.formGrid}>
+              <label className={styles.field}>
+                <span>加入角色</span>
+                <input value={role} onChange={(event) => setRole(event.target.value)} placeholder="member" />
+              </label>
+              <label className={styles.field}>
+                <span>有效小时</span>
+                <input value={expiresInHours} onChange={(event) => setExpiresInHours(event.target.value)} inputMode="numeric" placeholder="空为永久" />
+              </label>
+              <label className={styles.field}>
+                <span>最大次数</span>
+                <input value={maxUses} onChange={(event) => setMaxUses(event.target.value)} inputMode="numeric" placeholder="空为不限" />
+              </label>
+              <label className={styles.checkField}>
+                <input type="checkbox" checked={temporary} onChange={(event) => setTemporary(event.target.checked)} />
+                <span>临时邀请</span>
+              </label>
+            </div>
+            <div className={styles.actionRow}>
+              <button className={styles.primaryBtn} onClick={createInvite}>创建链接</button>
+            </div>
+          </section>
+
+          <section className={styles.drawerSection}>
+            <strong className={styles.sectionTitle}>已创建</strong>
+            <div className={styles.inviteList}>
+              {invites.length === 0 && <p className={styles.sideHint}>暂无邀请链接</p>}
+              {invites.map((invite) => (
+                <article key={invite.id} className={styles.inviteRow}>
+                  <div>
+                    <strong>{inviteUrl(invite.code)}</strong>
+                    <span>
+                      {roleLabel(invite.role)} · {invite.use_count}/{invite.max_uses ?? '不限'} · {invite.revoked_at ? '已撤销' : invite.expires_at ? `过期 ${formatDateTime(invite.expires_at)}` : '永久'}
+                    </span>
+                  </div>
+                  <button className={styles.drawerCloseBtn} onClick={() => copyInvite(invite.code)}>复制</button>
+                  <button className={styles.dangerBtn} onClick={() => revokeInvite(invite.code)} disabled={!!invite.revoked_at}>撤销</button>
+                </article>
+              ))}
+            </div>
+          </section>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function ModerationDrawer({
+  projectId,
+  members,
+  onClose,
+  onSaved,
+}: {
+  projectId: string
+  members: ProjectMember[]
+  onClose: () => void
+  onSaved: () => Promise<void>
+}) {
+  const [query, setQuery] = useState('')
+  const [message, setMessage] = useState('')
+  const visibleMembers = useMemo(() => filterMembers(members, query), [members, query])
+
+  async function moderate(member: ProjectMember, action: 'mute' | 'unmute' | 'ban' | 'unban', durationMinutes?: number) {
+    setMessage('提交中…')
+    try {
+      await api.patch(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(member.user_id)}/moderation`, {
+        action,
+        duration_minutes: durationMinutes,
+        note: 'PC 成员管理页操作',
+      })
+      setMessage('已更新')
+      await onSaved()
+    } catch (err) {
+      setMessage((err as { message?: string }).message ?? '操作失败')
+    }
+  }
+
+  return (
+    <div className={styles.drawerBackdrop}>
+      <section className={[styles.permissionDrawer, styles.moderationDrawer].join(' ')} role="dialog" aria-modal="true">
+        <header className={styles.drawerHeader}>
+          <div>
+            <strong>禁言与封禁</strong>
+            <span>{message}</span>
+          </div>
+          <button className={styles.drawerCloseBtn} onClick={onClose}>关闭</button>
+        </header>
+        <div className={styles.drawerBody}>
+          <input className={styles.drawerSearchInput} value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索成员" />
+          <div className={styles.moderationList}>
+            {visibleMembers.map((member) => (
+              <article key={member.user_id} className={styles.moderationRow}>
+                <span className={styles.memberAvatar}>{memberInitial(member)}</span>
+                <div className={styles.moderationInfo}>
+                  <strong>{member.account || member.user_id}</strong>
+                  <span>{memberModerationSummary(member)}</span>
+                </div>
+                <div className={styles.moderationActions}>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate(member, 'mute', 60)}>禁言1小时</button>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate(member, 'mute', 1440)}>禁言1天</button>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate(member, 'unmute')} disabled={!member.is_muted}>解禁言</button>
+                  <button className={styles.dangerBtn} onClick={() => moderate(member, 'ban')}>封禁</button>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate(member, 'unban')} disabled={!member.is_banned}>解封</button>
+                </div>
+              </article>
+            ))}
+            {visibleMembers.length === 0 && <p className={styles.sideHint}>没有匹配成员</p>}
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function memberModerationSummary(member: ProjectMember) {
+  if (member.is_banned) return `已封禁${member.banned_until ? `至 ${formatDateTime(member.banned_until)}` : ''}`
+  if (member.is_muted) return `禁言至 ${formatDateTime(member.muted_until)}`
+  return `${memberRoleSummary(member)} · ${presenceLabel(memberPresenceStatus(member))}`
+}
+
+function numberOrUndefined(value: string) {
+  const trimmed = clean(value)
+  if (!trimmed) return undefined
+  const parsed = Number(trimmed)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : undefined
+}
+
+function inviteUrl(code: string) {
+  const url = new URL('/pc', window.location.origin)
+  url.searchParams.set('invite', code)
+  return url.toString()
+}
+
+function PermissionDrawer({
+  projectId,
+  activeChannelId,
+  channels,
+  categories,
+  members,
+  onClose,
+  onSaved,
+}: {
+  projectId: string
+  activeChannelId: string
+  channels: Channel[]
+  categories: ChannelCategory[]
+  members: ProjectMember[]
+  onClose: () => void
+  onSaved: () => Promise<void>
+}) {
+  const [roles, setRoles] = useState<ProjectRole[]>([])
+  const [permissionOptions, setPermissionOptions] = useState<PermissionOption[]>(CHANNEL_PERMISSION_OPTIONS)
+  const activeChannel = channels.find((channel) => channel.id === activeChannelId) ?? channels[0]
+  const [categoryId, setCategoryId] = useState(activeChannel?.category_id ?? categories[0]?.id ?? '')
+  const [channelId, setChannelId] = useState(activeChannel?.id ?? '')
+  const [categoryRoleOverrides, setCategoryRoleOverrides] = useState<PermissionOverride[]>([])
+  const [categoryMemberOverrides, setCategoryMemberOverrides] = useState<PermissionOverride[]>([])
+  const [channelRoleOverrides, setChannelRoleOverrides] = useState<PermissionOverride[]>([])
+  const [channelMemberOverrides, setChannelMemberOverrides] = useState<PermissionOverride[]>([])
+  const [memberId, setMemberId] = useState(members[0]?.user_id ?? '')
+  const [loading, setLoading] = useState(false)
+  const [status, setStatus] = useState('')
+
+  useEffect(() => {
+    api.get<ProjectRolesResponse>(`/api/projects/${encodeURIComponent(projectId)}/roles`)
+      .then((data) => {
+        setRoles(data.roles ?? [])
+      })
+      .catch((err: { message?: string }) => setStatus(err.message ?? '角色加载失败'))
+  }, [projectId])
+
+  useEffect(() => {
+    if (!categoryId) return
+    setLoading(true)
+    api.get<ChannelPermissionResponse>(`/api/projects/${encodeURIComponent(projectId)}/channel-categories/${encodeURIComponent(categoryId)}/permissions`)
+      .then((data) => {
+        setCategoryRoleOverrides(data.overrides ?? [])
+        setCategoryMemberOverrides(data.member_overrides ?? data.memberOverrides ?? [])
+        if (data.permissions?.length) setPermissionOptions(data.permissions)
+      })
+      .catch((err: { message?: string }) => setStatus(err.message ?? '分类权限加载失败'))
+      .finally(() => setLoading(false))
+  }, [projectId, categoryId])
+
+  useEffect(() => {
+    if (!channelId) return
+    setLoading(true)
+    api.get<ChannelPermissionResponse>(`/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(channelId)}/permissions`)
+      .then((data) => {
+        setChannelRoleOverrides(data.overrides ?? [])
+        setChannelMemberOverrides(data.member_overrides ?? data.memberOverrides ?? [])
+        if (data.permissions?.length) setPermissionOptions(data.permissions)
+      })
+      .catch((err: { message?: string }) => setStatus(err.message ?? '频道权限加载失败'))
+      .finally(() => setLoading(false))
+  }, [projectId, channelId])
+
+  function changeChannel(nextChannelId: string) {
+    const channel = channels.find((item) => item.id === nextChannelId)
+    setChannelId(nextChannelId)
+    if (channel?.category_id) setCategoryId(channel.category_id)
+  }
+
+  async function saveRole(scope: 'category' | 'channel', roleId: string) {
+    const overrides = scope === 'category' ? categoryRoleOverrides : channelRoleOverrides
+    const targetId = scope === 'category' ? categoryId : channelId
+    if (!targetId) return
+    const override = findOverride(overrides, roleId, 'role')
+    await savePermissions(scope, targetId, { role_id: roleId, allow: override.allow ?? [], deny: override.deny ?? [] })
+  }
+
+  async function saveMember(scope: 'category' | 'channel') {
+    if (!memberId) return
+    const overrides = scope === 'category' ? categoryMemberOverrides : channelMemberOverrides
+    const targetId = scope === 'category' ? categoryId : channelId
+    if (!targetId) return
+    const override = findOverride(overrides, memberId, 'member')
+    await savePermissions(scope, targetId, { member_id: memberId, allow: override.allow ?? [], deny: override.deny ?? [] })
+  }
+
+  async function savePermissions(scope: 'category' | 'channel', targetId: string, body: unknown) {
+    setStatus('保存中…')
+    const base = scope === 'category'
+      ? `/api/projects/${encodeURIComponent(projectId)}/channel-categories/${encodeURIComponent(targetId)}/permissions`
+      : `/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(targetId)}/permissions`
+    try {
+      const data = await api.patch<ChannelPermissionResponse>(base, body)
+      if (scope === 'category') {
+        setCategoryRoleOverrides(data.overrides ?? [])
+        setCategoryMemberOverrides(data.member_overrides ?? data.memberOverrides ?? [])
+      } else {
+        setChannelRoleOverrides(data.overrides ?? [])
+        setChannelMemberOverrides(data.member_overrides ?? data.memberOverrides ?? [])
+      }
+      setStatus('已保存')
+      await onSaved()
+    } catch (err) {
+      setStatus((err as { message?: string }).message ?? '保存失败')
+    }
+  }
+
+  const selectedMember = members.find((member) => member.user_id === memberId)
+
+  return (
+    <div className={styles.drawerBackdrop}>
+      <section className={styles.permissionDrawer} role="dialog" aria-modal="true">
+        <header className={styles.drawerHeader}>
+          <div>
+            <strong>成员权限</strong>
+            <span>{loading ? '同步中…' : status}</span>
+          </div>
+          <button className={styles.drawerCloseBtn} onClick={onClose}>关闭</button>
+        </header>
+
+        <div className={styles.permissionColumns}>
+          <section className={styles.permissionBlock}>
+            <div className={styles.permissionToolbar}>
+              <strong>分类权限</strong>
+              <select value={categoryId} onChange={(event) => setCategoryId(event.target.value)}>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.name || category.kind || category.id}</option>
+                ))}
+              </select>
+            </div>
+            <PermissionRoleGrid
+              roles={roles}
+              options={permissionOptions}
+              overrides={categoryRoleOverrides}
+              onChange={(roleId, permission, effect) => setCategoryRoleOverrides(updateOverride(categoryRoleOverrides, roleId, 'role', permission, effect))}
+              onSave={(roleId) => saveRole('category', roleId)}
+            />
+            <PermissionMemberGrid
+              member={selectedMember}
+              members={members}
+              memberId={memberId}
+              options={permissionOptions}
+              overrides={categoryMemberOverrides}
+              onMemberChange={setMemberId}
+              onChange={(permission, effect) => setCategoryMemberOverrides(updateOverride(categoryMemberOverrides, memberId, 'member', permission, effect))}
+              onSave={() => saveMember('category')}
+            />
+          </section>
+
+          <section className={styles.permissionBlock}>
+            <div className={styles.permissionToolbar}>
+              <strong>频道覆盖</strong>
+              <select value={channelId} onChange={(event) => changeChannel(event.target.value)}>
+                {channels.map((channel) => (
+                  <option key={channel.id} value={channel.id}>{channel.name}</option>
+                ))}
+              </select>
+            </div>
+            <PermissionRoleGrid
+              roles={roles}
+              options={permissionOptions}
+              overrides={channelRoleOverrides}
+              onChange={(roleId, permission, effect) => setChannelRoleOverrides(updateOverride(channelRoleOverrides, roleId, 'role', permission, effect))}
+              onSave={(roleId) => saveRole('channel', roleId)}
+            />
+            <PermissionMemberGrid
+              member={selectedMember}
+              members={members}
+              memberId={memberId}
+              options={permissionOptions}
+              overrides={channelMemberOverrides}
+              onMemberChange={setMemberId}
+              onChange={(permission, effect) => setChannelMemberOverrides(updateOverride(channelMemberOverrides, memberId, 'member', permission, effect))}
+              onSave={() => saveMember('channel')}
+            />
+          </section>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function PermissionRoleGrid({
+  roles,
+  options,
+  overrides,
+  onChange,
+  onSave,
+}: {
+  roles: ProjectRole[]
+  options: PermissionOption[]
+  overrides: PermissionOverride[]
+  onChange: (roleId: string, permission: string, effect: PermissionEffect) => void
+  onSave: (roleId: string) => void
+}) {
+  return (
+    <div className={styles.permissionCards}>
+      {roles.map((role) => (
+        <article key={role.id} className={styles.permissionCard}>
+          <div className={styles.permissionCardHead}>
+            <span className={styles.roleSwatch} style={{ background: role.color ?? '#747f8d' }} />
+            <strong>{role.name || roleLabel(role.id)}</strong>
+          </div>
+          <PermissionGrid
+            options={options}
+            override={findOverride(overrides, role.id, 'role')}
+            onChange={(permission, effect) => onChange(role.id, permission, effect)}
+          />
+          <button className={styles.savePermissionBtn} onClick={() => onSave(role.id)}>保存</button>
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function PermissionMemberGrid({
+  member,
+  members,
+  memberId,
+  options,
+  overrides,
+  onMemberChange,
+  onChange,
+  onSave,
+}: {
+  member?: ProjectMember
+  members: ProjectMember[]
+  memberId: string
+  options: PermissionOption[]
+  overrides: PermissionOverride[]
+  onMemberChange: (memberId: string) => void
+  onChange: (permission: string, effect: PermissionEffect) => void
+  onSave: () => void
+}) {
+  return (
+    <article className={styles.permissionCard}>
+      <div className={styles.permissionToolbar}>
+        <strong>成员覆盖</strong>
+        <select value={memberId} onChange={(event) => onMemberChange(event.target.value)}>
+          {members.map((item) => (
+            <option key={item.user_id} value={item.user_id}>{item.account || item.user_id}</option>
+          ))}
+        </select>
+      </div>
+      {member && <small className={styles.permissionMemberName}>{memberRoleSummary(member)}</small>}
+      <PermissionGrid
+        options={options}
+        override={findOverride(overrides, memberId, 'member')}
+        onChange={onChange}
+      />
+      <button className={styles.savePermissionBtn} onClick={onSave} disabled={!memberId}>保存</button>
+    </article>
+  )
+}
+
+type PermissionEffect = '' | 'allow' | 'deny'
+
+function PermissionGrid({
+  options,
+  override,
+  onChange,
+}: {
+  options: PermissionOption[]
+  override: PermissionOverride
+  onChange: (permission: string, effect: PermissionEffect) => void
+}) {
+  return (
+    <div className={styles.permissionGrid}>
+      {options.map((option) => (
+        <label key={option.key}>
+          <span>{option.label}</span>
+          <select value={permissionEffect(override, option.key)} onChange={(event) => onChange(option.key, event.target.value as PermissionEffect)}>
+            <option value="">继承</option>
+            <option value="allow">允许</option>
+            <option value="deny">拒绝</option>
+          </select>
+        </label>
+      ))}
+    </div>
+  )
+}
+
+function permissionEffect(override: PermissionOverride, permission: string): PermissionEffect {
+  if ((override.deny ?? []).includes(permission)) return 'deny'
+  if ((override.allow ?? []).includes(permission)) return 'allow'
+  return ''
+}
+
+function findOverride(overrides: PermissionOverride[], targetId: string, kind: 'role' | 'member') {
+  const key = kind === 'role' ? 'role_id' : 'user_id'
+  const altKey = kind === 'role' ? 'roleId' : 'userId'
+  return overrides.find((override) => clean(String(override[key] ?? override[altKey] ?? '')) === targetId) ?? {}
+}
+
+function updateOverride(
+  overrides: PermissionOverride[],
+  targetId: string,
+  kind: 'role' | 'member',
+  permission: string,
+  effect: PermissionEffect,
+) {
+  if (!targetId) return overrides
+  const next = overrides.slice()
+  const index = next.findIndex((override) => clean(String(kind === 'role' ? (override.role_id ?? override.roleId) : (override.user_id ?? override.userId))) === targetId)
+  const current = index >= 0 ? next[index] : (kind === 'role' ? { role_id: targetId } : { user_id: targetId })
+  const allow = new Set(current.allow ?? [])
+  const deny = new Set(current.deny ?? [])
+  allow.delete(permission)
+  deny.delete(permission)
+  if (effect === 'allow') allow.add(permission)
+  if (effect === 'deny') deny.add(permission)
+  const updated = { ...current, allow: Array.from(allow), deny: Array.from(deny) }
+  if (index >= 0) next[index] = updated
+  else next.push(updated)
+  return next
 }
 
 /* ── 单条消息组件 ── */
@@ -622,20 +1429,38 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
   )
 }
 
-/* ── 成员搜索 + 分组列表 ── */
-function MemberSearch({ members }: { members: import('./types').ProjectMember[] }) {
+
+/* ── 成员搜索 + 虚拟分组列表 ── */
+type MemberVirtualRow =
+  | { kind: 'header'; id: string; label: string; count: number }
+  | { kind: 'member'; id: string; member: ProjectMember }
+
+const MEMBER_VIRTUAL_ROW_HEIGHT = 48
+const MEMBER_LIST_OVERSCAN = 6
+const MEMBER_LIST_WINDOW = 28
+
+function MemberSearch({ members }: { members: ProjectMember[] }) {
   const [query, setQuery] = useState('')
+  const [scrollTop, setScrollTop] = useState(0)
   const q = query.trim().toLowerCase()
-  const filtered = q
-    ? members.filter(m => (m.account ?? m.user_id).toLowerCase().includes(q))
-    : members
+  const filtered = useMemo(
+    () => q ? filterVisibleMembers(members, q) : members,
+    [members, q],
+  )
+  const rows = useMemo(() => buildMemberRows(filtered), [filtered])
+  const start = Math.max(0, Math.floor(scrollTop / MEMBER_VIRTUAL_ROW_HEIGHT) - MEMBER_LIST_OVERSCAN)
+  const end = Math.min(rows.length, start + MEMBER_LIST_WINDOW)
+  const visibleRows = rows.slice(start, end)
   return (
     <>
       <div className={styles.memberSearch}>
         <input
           className={styles.memberSearchInput}
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => {
+            setQuery(e.target.value)
+            setScrollTop(0)
+          }}
           placeholder="搜索成员"
           autoComplete="off"
         />
@@ -643,63 +1468,94 @@ function MemberSearch({ members }: { members: import('./types').ProjectMember[] 
           <button className={styles.memberSearchClear} type="button" onClick={() => setQuery('')}>×</button>
         )}
       </div>
-      <MemberGroups members={filtered} />
+      <div className={styles.memberVirtualList} onScroll={event => setScrollTop(event.currentTarget.scrollTop)}>
+        {rows.length === 0 && <div className={styles.memberSection}>没有匹配成员</div>}
+        {rows.length > 0 && (
+          <div className={styles.memberVirtualCanvas} style={{ height: rows.length * MEMBER_VIRTUAL_ROW_HEIGHT }}>
+            <div style={{ transform: `translateY(${start * MEMBER_VIRTUAL_ROW_HEIGHT}px)` }}>
+              {visibleRows.map(row => row.kind === 'header'
+                ? <div key={row.id} className={styles.memberVirtualHeader}><div className={styles.memberSection}>{row.label} · {row.count}</div></div>
+                : <MemberListItem key={row.id} member={row.member} />
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </>
   )
 }
 
-/* ── 成员分组列表：按角色展示项目成员 ── */
-function MemberGroups({ members }: { members: import('./types').ProjectMember[] }) {
-  const ROLE_LABELS: Record<string, string> = {
+function filterVisibleMembers(members: ProjectMember[], query: string) {
+  return members.filter(member => {
+    const haystack = [
+      member.account,
+      member.user_id,
+      member.role,
+      member.custom_status,
+      member.activity,
+      ...(member.roles ?? []).map(role => role.name || role.id),
+    ].join(' ').toLowerCase()
+    return haystack.includes(query)
+  })
+}
+
+function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
+  const roleLabelMap: Record<string, string> = {
+    admin: '管理员',
+    owner: '管理员',
+    collaborator: '协作者',
+    editor: '协作者',
+  }
+  const groups: [string, ProjectMember[]][] = [
+    ['管理员', members.filter(m => ['admin', 'owner'].includes((m.role ?? '').toLowerCase()))],
+    ['协作者', members.filter(m => ['collaborator', 'editor'].includes((m.role ?? '').toLowerCase()))],
+    ['成员', members.filter(m => !roleLabelMap[(m.role ?? '').toLowerCase()])],
+  ]
+  return groups.flatMap(([label, list]) => {
+    if (!list.length) return []
+    return [
+      { kind: 'header' as const, id: `header-${label}`, label, count: list.length },
+      ...list.map(member => ({ kind: 'member' as const, id: member.user_id, member })),
+    ]
+  })
+}
+
+function MemberListItem({ member }: { member: ProjectMember }) {
+  const roleKey = (member.role ?? '').toLowerCase()
+  const roleLabelMap: Record<string, string> = {
     admin: '管理员', owner: '管理员',
     collaborator: '协作者', editor: '协作者',
   }
-  const ROLE_CSS: Record<string, string> = {
+  const roleCss: Record<string, string> = {
     admin: styles.memberRolePillAdmin, owner: styles.memberRolePillOwner,
     collaborator: styles.memberRolePillEditor, editor: styles.memberRolePillEditor,
   }
-  const AVATAR_CSS: Record<string, string> = {
+  const avatarCss: Record<string, string> = {
     admin: styles.memberAvatarAdmin, owner: styles.memberAvatarOwner,
     collaborator: styles.memberAvatarEditor, editor: styles.memberAvatarEditor,
   }
-  const groups: [string, import('./types').ProjectMember[]][] = [
-    ['管理员', members.filter(m => ['admin','owner'].includes((m.role ?? '').toLowerCase()))],
-    ['协作者', members.filter(m => ['collaborator','editor'].includes((m.role ?? '').toLowerCase()))],
-    ['成员', members.filter(m => !ROLE_LABELS[(m.role ?? '').toLowerCase()])],
-  ]
+  const roleBadge = roleLabelMap[roleKey]
+  const name = member.account ?? member.user_id
+  const avatarCls = [
+    styles.memberAvatar,
+    avatarCss[roleKey] ?? '',
+    member.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline,
+  ].filter(Boolean).join(' ')
   return (
-    <>
-      {groups.filter(([, list]) => list.length > 0).map(([label, list]) => (
-        <div key={label}>
-          <div className={styles.memberSection}>{label} · {list.length}</div>
-          {list.map(m => {
-            const roleKey = (m.role ?? '').toLowerCase()
-            const roleLabel = ROLE_LABELS[roleKey]
-            const avatarCls = [styles.memberAvatar, AVATAR_CSS[roleKey] ?? '', m.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline].filter(Boolean).join(' ')
-            const name = m.account ?? m.user_id
-            const sub = m.is_online ? '在线' : (roleLabel ?? '成员')
-            return (
-              <div key={m.user_id} className={styles.memberItem}>
-                <div className={avatarCls}>
-                  {m.avatar_data_url
-                    ? <img src={m.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-                    : name[0].toUpperCase()
-                  }
-                </div>
-                <div className={styles.memberCopy}>
-                  <div className={styles.memberLine}>
-                    <strong className={styles.memberItemName}>{name}</strong>
-                    {roleLabel && (
-                      <em className={[styles.memberRolePill, ROLE_CSS[roleKey] ?? ''].join(' ')}>{roleLabel}</em>
-                    )}
-                  </div>
-                  <span className={styles.memberSub}>{sub}</span>
-                </div>
-              </div>
-            )
-          })}
+    <div className={styles.memberItem}>
+      <div className={avatarCls}>
+        {member.avatar_data_url
+          ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          : name[0].toUpperCase()
+        }
+      </div>
+      <div className={styles.memberCopy}>
+        <div className={styles.memberLine}>
+          <strong className={styles.memberItemName}>{name}</strong>
+          {roleBadge && <em className={[styles.memberRolePill, roleCss[roleKey] ?? ''].join(' ')}>{roleBadge}</em>}
         </div>
-      ))}
-    </>
+        <span className={styles.memberSub}>{memberSubtitle(member)}</span>
+      </div>
+    </div>
   )
 }
