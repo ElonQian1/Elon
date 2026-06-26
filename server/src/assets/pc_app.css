@@ -33,6 +33,21 @@ button, input, textarea {
 }
 button { cursor: pointer; }
 
+.server-rail,
+.channel-list,
+.settings-sidebar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior: contain;
+}
+
+.server-rail::-webkit-scrollbar,
+.channel-list::-webkit-scrollbar,
+.settings-sidebar::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .pc-shell {
   width: 100vw;
   height: 100vh;
