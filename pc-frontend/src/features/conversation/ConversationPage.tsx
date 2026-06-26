@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
 import { AttachmentButton, AttachmentChip, attachmentsToMarkdown } from './AttachmentButton'
@@ -16,7 +17,8 @@ import type { Message } from './types'
 import styles from './ConversationPage.module.css'
 
 export default function ConversationPage() {
-  useChannelAutoRefresh()   // P1.2：实时刷新 + 自适应轮询
+  useChannelAutoRefresh()
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const {
     projects, projectsLoaded, activeProjectId, channels, activeChannelId,
@@ -140,7 +142,18 @@ export default function ConversationPage() {
               <span className={styles.workspaceTitleMeta}>{activeProject.description}</span>
             )}
           </div>
-          <button className={styles.iconBtn} onClick={() => setShowCreate(true)} title="新建项目" type="button">+</button>
+          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+            {activeProjectId && (
+              <button
+                className={styles.iconBtn}
+                onClick={() => navigate(`/projects/${activeProjectId}`)}
+                title="项目设置"
+                type="button"
+                style={{ fontSize: 14 }}
+              >⚙</button>
+            )}
+            <button className={styles.iconBtn} onClick={() => setShowCreate(true)} title="新建项目" type="button">+</button>
+          </div>
         </div>
 
         {/* 搜索栏（48px）*/}

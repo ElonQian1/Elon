@@ -3,6 +3,7 @@ import Shell from './features/shell/Shell'
 import LoginPage from './features/auth/LoginPage'
 import ConversationPage from './features/conversation/ConversationPage'
 import ProjectsPage from './features/projects/ProjectsPage'
+import ProjectDetailPage from './features/projects/ProjectDetailPage'
 import DoctorPage from './features/doctor/DoctorPage'
 import VoicePage from './features/voice/VoicePage'
 import NodePage from './features/node/NodePage'
@@ -30,6 +31,7 @@ export default function App() {
         {/* 首页：项目对话主视图 */}
         <Route index element={<ConversationPage />} />
         <Route path="projects" element={<ProjectsPage />} />
+        <Route path="projects/:id" element={<ProjectDetailPage />} />
         <Route path="dev-tasks" element={<DevTasksPage />} />
         <Route path="voice" element={<VoicePage />} />
         <Route path="doctor" element={<DoctorPage />} />
