@@ -48,7 +48,7 @@ internal class MainInputActions(
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
     private var fullScreenEditorOverlay: FullScreenEditorOverlay? = null
     private var pendingImageEditIndex: Int = -1
-    private var pendingImagePreviewAttachment: PendingAttachment? = null
+    private var pendingImagePreviewAttachments: List<PendingAttachment> = emptyList()
     private val imageEditLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -174,55 +174,88 @@ internal class MainInputActions(
         speechInputActions().showVoiceAttachmentActions(message, attachment)
     }
 
-    private fun previewPickedImage(kind: String, uri: android.net.Uri, fallbackName: String?) {
-        val attachment = pendingAttachmentActions.preparePickedAttachment(kind, uri, fallbackName) ?: return
-        pendingImagePreviewAttachment?.let { runCatching { it.file.delete() } }
-        pendingImagePreviewAttachment = attachment
+    private fun previewPickedImages(kind: String, uris: List<android.net.Uri>, fallbackNames: List<String?>) {
+        val available = MAX_PENDING_ATTACHMENTS - pendingAttachments.size
+        if (available <= 0) {
+            Toast.makeText(activity, "一次最多发送 $MAX_PENDING_ATTACHMENTS 个附件", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val selectedUris = uris.take(available)
+        if (uris.size > available) {
+            Toast.makeText(activity, "最多还能添加 $available 张图片，已保留前 $available 张", Toast.LENGTH_SHORT).show()
+        }
+        val prepared = selectedUris.mapIndexedNotNull { index, uri ->
+            pendingAttachmentActions.preparePickedAttachment(
+                kind = kind,
+                uri = uri,
+                fallbackName = fallbackNames.getOrNull(index),
+                attachmentIndex = pendingAttachments.size + index + 1
+            )
+        }
+        if (prepared.isEmpty()) return
+        pendingImagePreviewAttachments.forEach { attachment -> runCatching { attachment.file.delete() } }
+        pendingImagePreviewAttachments = prepared
         runCatching {
             imagePreviewLauncher.launch(
-                ChatImagePreviewActivity.createIntent(
-                    activity,
-                    attachment.file.absolutePath,
-                    attachment.displayName
-                )
+                ChatImagePreviewActivity.createIntent(activity, prepared)
             )
         }.onFailure {
-            pendingImagePreviewAttachment = null
-            pendingAttachmentActions.addPreparedAttachment(attachment)
+            pendingImagePreviewAttachments = emptyList()
+            pendingAttachmentActions.addPreparedAttachments(prepared)
             Toast.makeText(activity, "预览页打开失败，已直接添加图片", Toast.LENGTH_SHORT).show()
         }
     }
 
     private fun handleImagePreviewResult(resultCode: Int, data: Intent?) {
-        val original = pendingImagePreviewAttachment ?: return
-        pendingImagePreviewAttachment = null
+        val originals = pendingImagePreviewAttachments
+        if (originals.isEmpty()) return
+        pendingImagePreviewAttachments = emptyList()
         if (resultCode != Activity.RESULT_OK || data == null) {
-            runCatching { original.file.delete() }
+            originals.forEach { attachment -> runCatching { attachment.file.delete() } }
             return
         }
-        val outputPath = data.getStringExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_PATH).orEmpty()
-        val outputFile = File(outputPath)
-        if (!outputFile.exists()) {
+        val outputPaths = data.getStringArrayListExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_PATHS)
+            ?: arrayListOf(data.getStringExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_PATH).orEmpty())
+        val outputNames = data.getStringArrayListExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_NAMES).orEmpty()
+        val outputWidths = data.getIntegerArrayListExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_WIDTHS).orEmpty()
+        val outputHeights = data.getIntegerArrayListExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_HEIGHTS).orEmpty()
+        val sourceIndexes = data.getIntegerArrayListExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_SOURCE_INDEXES).orEmpty()
+        val nextAttachments = outputPaths.mapIndexedNotNull { index, outputPath ->
+            val outputFile = File(outputPath)
+            if (!outputFile.exists()) return@mapIndexedNotNull null
+            val sourceIndex = sourceIndexes.getOrNull(index) ?: index
+            val original = originals.getOrNull(sourceIndex)
+            val outputName = outputNames.getOrNull(index)?.takeIf { it.isNotBlank() } ?: outputFile.name
+            val width = outputWidths.getOrNull(index)?.takeIf { it > 0 } ?: original?.imageWidth
+            val height = outputHeights.getOrNull(index)?.takeIf { it > 0 } ?: original?.imageHeight
+            val edited = original == null || outputFile.absolutePath != original.file.absolutePath
+            PendingAttachment(
+                kind = "image",
+                displayLabel = if (edited) "编辑图片" else original?.displayLabel ?: "相册图片",
+                displayName = if (edited) {
+                    original?.let { editedDisplayName(it.displayName) } ?: outputName
+                } else {
+                    original?.displayName ?: outputName
+                },
+                fileName = outputFile.name,
+                mimeType = if (edited) "image/jpeg" else original?.mimeType ?: guessMimeType(outputName),
+                file = outputFile,
+                imageWidth = width,
+                imageHeight = height
+            )
+        }
+        if (nextAttachments.isEmpty()) {
             Toast.makeText(activity, "预览图片已失效，请重新选择", Toast.LENGTH_SHORT).show()
-            runCatching { original.file.delete() }
+            originals.forEach { attachment -> runCatching { attachment.file.delete() } }
             return
         }
-        val outputName = data.getStringExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_NAME)
-            ?: outputFile.name
-        val width = data.getIntExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_WIDTH, 0).takeIf { it > 0 }
-        val height = data.getIntExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_HEIGHT, 0).takeIf { it > 0 }
-        val edited = outputFile.absolutePath != original.file.absolutePath
-        val next = original.copy(
-            displayLabel = if (edited) "编辑图片" else original.displayLabel,
-            displayName = if (edited) editedDisplayName(original.displayName) else original.displayName,
-            fileName = outputName,
-            mimeType = if (edited) "image/jpeg" else original.mimeType,
-            file = outputFile,
-            imageWidth = width ?: original.imageWidth,
-            imageHeight = height ?: original.imageHeight
-        )
-        if (edited) runCatching { original.file.delete() }
-        pendingAttachmentActions.addPreparedAttachment(next)
+        val keptPaths = nextAttachments.map { it.file.absolutePath }.toSet()
+        originals.forEach { original ->
+            if (original.file.absolutePath !in keptPaths) {
+                runCatching { original.file.delete() }
+            }
+        }
+        pendingAttachmentActions.addPreparedAttachments(nextAttachments)
     }
 
     private fun openImageEditor(index: Int) {
@@ -362,8 +395,8 @@ internal class MainInputActions(
             attachPickedFile = { kind, uri, fallbackName ->
                 pendingAttachmentActions.attachPickedFile(kind, uri, fallbackName)
             },
-            previewPickedImage = { kind, uri, fallbackName ->
-                previewPickedImage(kind, uri, fallbackName)
+            previewPickedImages = { kind, uris, fallbackNames ->
+                previewPickedImages(kind, uris, fallbackNames)
             }
         )
     }
