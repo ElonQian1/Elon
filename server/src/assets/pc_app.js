@@ -38,6 +38,7 @@
     workbenchRegistrationProjectId: '',
     memberPanel: { title: '成员', members: [], options: {}, search: '' },
     memberCollapsed: {},
+    memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
     memberProfile: null,
     presenceSocket: null,
     presenceReconnectTimer: 0,
@@ -1585,7 +1586,9 @@
     }
     els.sidebarSearch.addEventListener('input', renderChannels);
     els.memberList.addEventListener('input', handleMemberPanelInput);
+    els.memberList.addEventListener('change', handleMemberPanelChange);
     els.memberList.addEventListener('click', handleMemberPanelClick);
+    els.memberList.addEventListener('submit', handleMemberPanelSubmit);
     els.composer.addEventListener('submit', (event) => {
       event.preventDefault();
       sendCurrentMessage(false);
@@ -2664,11 +2667,108 @@
         is_online: id && sameId(id, currentUserId()) ? true : member.is_online
       });
     });
-    renderMembers(title || '项目成员', rows, Object.assign({
+    const project = projectById(state.activeProjectId) || ((state.projectSpace && state.projectSpace.project) || {});
+    const defaults = {
       groupBy: 'role',
       emptyText: '暂无项目成员',
-      context: `project:${state.activeProjectId || ''}`
-    }, options || {}));
+      context: `project:${state.activeProjectId || ''}`,
+      prefixHtml: renderProjectMemberPanelPrefix(project)
+    };
+    renderMembers(title || '项目成员', rows, Object.assign(defaults, options || {}));
+  }
+
+  function renderProjectMemberPanelPrefix(project) {
+    return `${renderProjectMemberAdminPanel(project)}${projectReadiness.renderMemberPanel(project || {})}`;
+  }
+
+  function memberAdminState(projectId) {
+    const id = clean(projectId || state.activeProjectId);
+    if (state.memberAdmin.projectId !== id) {
+      state.memberAdmin = {
+        projectId: id,
+        requests: [],
+        loaded: false,
+        loading: false,
+        expanded: false,
+        busy: '',
+        inviteAccount: '',
+        inviteRole: 'member',
+        status: '',
+        tone: ''
+      };
+    }
+    return state.memberAdmin;
+  }
+
+  function renderProjectMemberAdminPanel(project) {
+    const projectId = clean(project && project.id) || state.activeProjectId;
+    if (!projectId || !canManageActiveProjectMembers()) return '';
+    const admin = memberAdminState(projectId);
+    const pendingCount = Array.isArray(admin.requests) ? admin.requests.filter((request) => clean(request.status) === 'pending').length : 0;
+    const roleOptions = PROJECT_MEMBER_ROLE_OPTIONS.map((role) => {
+      const selected = role.key === (admin.inviteRole || 'member') ? 'selected' : '';
+      return `<option value="${escapeHtml(role.key)}" ${selected}>${escapeHtml(role.label)}</option>`;
+    }).join('');
+    const requestsHtml = admin.expanded ? renderProjectJoinRequests(projectId, admin) : '';
+    const statusHtml = admin.status
+      ? `<div class="member-admin-status ${admin.tone ? `is-${escapeHtml(admin.tone)}` : ''}">${escapeHtml(admin.status)}</div>`
+      : '';
+    return `<section class="member-admin-panel" data-member-admin-project="${escapeHtml(projectId)}">
+      <div class="member-admin-head">
+        <div>
+          <strong>成员管理</strong>
+          <span>${escapeHtml(memberRoleLabel(activeProjectRole()) || '管理员')}</span>
+        </div>
+        <button class="member-admin-refresh" type="button" data-member-admin-action="refresh-requests" title="刷新申请">刷新</button>
+      </div>
+      <form class="member-admin-invite" data-member-admin-form="invite">
+        <input data-member-admin-invite-account value="${escapeHtml(admin.inviteAccount || '')}" placeholder="手机号 / 邮箱 / 用户 ID" autocomplete="off" />
+        <div class="member-admin-invite-row">
+          <select data-member-admin-invite-role>${roleOptions}</select>
+          <button class="text-button" type="submit" ${admin.busy === 'invite' ? 'disabled' : ''}>邀请</button>
+        </div>
+      </form>
+      <button class="member-admin-toggle ${admin.expanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-requests">
+        <span>加入申请</span>
+        <small>${admin.loading ? '加载中' : `${pendingCount} 待处理`}</small>
+      </button>
+      ${requestsHtml}
+      ${statusHtml}
+    </section>`;
+  }
+
+  function renderProjectJoinRequests(projectId, admin) {
+    if (admin.loading) return '<div class="member-admin-empty">加载申请中…</div>';
+    if (!admin.loaded) return '<div class="member-admin-empty">展开后会加载待审批申请</div>';
+    const requests = (admin.requests || []).filter((request) => clean(request.status) === 'pending');
+    if (!requests.length) return '<div class="member-admin-empty">暂无待审批申请</div>';
+    return `<div class="member-admin-requests">${requests.map((request) => {
+      const id = clean(request.id);
+      const name = clean(request.user_account || request.userAccount || request.user_id || request.userId) || '申请人';
+      const message = clean(request.message) || '未填写申请说明';
+      const busy = admin.busy === `request:${id}`;
+      const age = relativeTimeLabel(request.created_at || request.createdAt);
+      const ageLabel = age && age !== '刚刚' ? `${age}前` : (age || '刚刚');
+      return `<article class="member-admin-request">
+        ${avatarElement('div', 'member-admin-request-avatar', request.user_avatar || request.userAvatar, name, '申')}
+        <div class="member-admin-request-copy">
+          <strong title="${escapeHtml(name)}">${escapeHtml(name)}</strong>
+          <span title="${escapeHtml(message)}">${escapeHtml(message)}</span>
+          <em>${escapeHtml(ageLabel)}</em>
+        </div>
+        <div class="member-admin-request-actions">
+          <button class="text-button" type="button" data-member-admin-action="approve-request" data-request-id="${escapeHtml(id)}" ${busy ? 'disabled' : ''}>同意</button>
+          <button class="text-button danger" type="button" data-member-admin-action="reject-request" data-request-id="${escapeHtml(id)}" ${busy ? 'disabled' : ''}>拒绝</button>
+        </div>
+      </article>`;
+    }).join('')}</div>`;
+  }
+
+  function bindRenderedMemberPanelPrefix() {
+    const projectId = memberPanelProjectId();
+    if (!projectId) return;
+    const project = projectById(projectId) || ((state.projectSpace && state.projectSpace.project) || { id: projectId });
+    projectReadiness.bindMemberPanel(project);
   }
 
   async function selectProject(projectId, options) {
@@ -2693,10 +2793,10 @@
       state.projectSpace = await api(`/api/projects/${encodeURIComponent(projectId)}/space`);
       const members = state.projectSpace.members || [];
       renderProjectMembers('项目成员', members, {
-        prefixHtml: projectReadiness.renderMemberPanel(projectById(projectId) || project)
+        prefixHtml: renderProjectMemberPanelPrefix(projectById(projectId) || project)
       });
-      projectReadiness.bindMemberPanel(projectById(projectId) || project);
       renderChannels();
+      maybeLoadProjectJoinRequests(projectId);
       const preferredKind = clean(options && options.preferredChannelKind).toLowerCase();
       const preferredChannel = preferredKind ? projectSpaceChannelByKind(preferredKind) : null;
       if (preferredChannel) {
@@ -2753,6 +2853,7 @@
         const members = state.projectSpace.members || [];
         renderProjectMembers('项目成员', members);
         renderChannels();
+        maybeLoadProjectJoinRequests(projectId);
       } catch (_) {
         state.projectSpace = null;
         renderMembers('项目会话', [{ name: userName(state.user), sub: '当前账号', is_online: true }], {
@@ -2891,6 +2992,7 @@
       ? `<div class="member-overflow">${escapeHtml(opts.overflowText)}</div>`
       : '';
     els.memberList.innerHTML = prefix + search + (rows || empty) + overflow;
+    bindRenderedMemberPanelPrefix();
     if (renderOptions && renderOptions.focusSearch) {
       const input = $('memberSearchInput');
       if (input) {
@@ -3001,13 +3103,43 @@
   }
 
   function handleMemberPanelInput(event) {
-    if (!event.target || event.target.id !== 'memberSearchInput') return;
+    if (!event.target) return;
+    if (event.target.matches('[data-member-admin-invite-account]')) {
+      const admin = memberAdminState(memberPanelProjectId());
+      admin.inviteAccount = event.target.value || '';
+      return;
+    }
+    if (event.target.id !== 'memberSearchInput') return;
     state.memberPanel.search = event.target.value || '';
     closeMemberProfile();
     renderMemberPanelView({ focusSearch: true });
   }
 
+  function handleMemberPanelChange(event) {
+    if (!event.target) return;
+    if (event.target.matches('[data-member-admin-invite-role]')) {
+      const admin = memberAdminState(memberPanelProjectId());
+      admin.inviteRole = clean(event.target.value) || 'member';
+    }
+  }
+
+  function handleMemberPanelSubmit(event) {
+    const form = event.target && event.target.closest('[data-member-admin-form]');
+    if (!form) return;
+    event.preventDefault();
+    const projectId = memberPanelProjectId();
+    if (!projectId) return;
+    if (form.dataset.memberAdminForm === 'invite') {
+      inviteProjectMemberFromPanel(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '邀请失败', 'error'));
+    }
+  }
+
   function handleMemberPanelClick(event) {
+    const adminButton = event.target.closest('[data-member-admin-action]');
+    if (adminButton) {
+      handleMemberAdminAction(adminButton);
+      return;
+    }
     const action = event.target.closest('[data-member-action]');
     if (action) {
       const name = clean(action.dataset.memberAction);
@@ -3027,6 +3159,159 @@
     if (row) {
       openMemberProfile(row.dataset.memberKey, row);
     }
+  }
+
+  function handleMemberAdminAction(button) {
+    if (button.disabled) return;
+    const projectId = memberPanelProjectId();
+    if (!projectId) return;
+    const action = clean(button.dataset.memberAdminAction);
+    if (action === 'toggle-requests') {
+      const admin = memberAdminState(projectId);
+      admin.expanded = !admin.expanded;
+      admin.status = '';
+      rerenderMemberPanelForProject(projectId);
+      if (admin.expanded && !admin.loaded && !admin.loading) {
+        loadProjectJoinRequests(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '加载申请失败', 'error'));
+      }
+      return;
+    }
+    if (action === 'refresh-requests') {
+      const admin = memberAdminState(projectId);
+      admin.expanded = true;
+      loadProjectJoinRequests(projectId).catch((error) => setMemberAdminStatus(projectId, error.message || '刷新申请失败', 'error'));
+      return;
+    }
+    if (action === 'approve-request' || action === 'reject-request') {
+      const requestId = clean(button.dataset.requestId);
+      const reviewAction = action === 'approve-request' ? 'approve' : 'reject';
+      reviewProjectJoinRequest(projectId, requestId, reviewAction).catch((error) => setMemberAdminStatus(projectId, error.message || '审批失败', 'error'));
+    }
+  }
+
+  function rerenderMemberPanelForProject(projectId) {
+    const id = clean(projectId);
+    if (!id || !state.memberPanel || state.memberPanel.context !== `project:${id}`) return;
+    const project = projectById(id) || ((state.projectSpace && state.projectSpace.project) || { id });
+    state.memberPanel.options = Object.assign({}, state.memberPanel.options || {}, {
+      prefixHtml: renderProjectMemberPanelPrefix(project)
+    });
+    renderMemberPanelView();
+  }
+
+  function setMemberAdminStatus(projectId, message, tone, busy) {
+    const admin = memberAdminState(projectId);
+    admin.status = message || '';
+    admin.tone = tone || '';
+    admin.busy = busy || '';
+    admin.loading = false;
+    rerenderMemberPanelForProject(projectId);
+  }
+
+  async function loadProjectJoinRequests(projectId, options) {
+    const silent = !!(options && options.silent);
+    const admin = memberAdminState(projectId);
+    admin.loading = true;
+    admin.status = '';
+    if (!silent) admin.expanded = true;
+    rerenderMemberPanelForProject(projectId);
+    const data = await api(`/api/projects/${encodeURIComponent(projectId)}/join-requests?pending_only=true`, { cache: 'no-store' });
+    admin.requests = Array.isArray(data.requests) ? data.requests : [];
+    admin.loaded = true;
+    admin.loading = false;
+    admin.status = admin.requests.length || silent ? '' : '暂无待审批申请';
+    admin.tone = admin.requests.length || silent ? '' : 'ok';
+    rerenderMemberPanelForProject(projectId);
+  }
+
+  function maybeLoadProjectJoinRequests(projectId) {
+    if (!projectId || !canManageActiveProjectMembers()) return;
+    const admin = memberAdminState(projectId);
+    if (admin.loaded || admin.loading) return;
+    loadProjectJoinRequests(projectId, { silent: true }).catch(() => {
+      admin.loading = false;
+      admin.loaded = true;
+      admin.status = '';
+      rerenderMemberPanelForProject(projectId);
+    });
+  }
+
+  async function inviteProjectMemberFromPanel(projectId) {
+    const admin = memberAdminState(projectId);
+    const panel = els.memberList.querySelector('[data-member-admin-project]');
+    const input = panel && panel.querySelector('[data-member-admin-invite-account]');
+    const roleSelect = panel && panel.querySelector('[data-member-admin-invite-role]');
+    const account = clean((input && input.value) || admin.inviteAccount);
+    const role = clean((roleSelect && roleSelect.value) || admin.inviteRole || 'member');
+    if (!account) {
+      setMemberAdminStatus(projectId, '请输入成员手机号、邮箱或用户 ID', 'error');
+      return;
+    }
+    admin.inviteAccount = account;
+    admin.inviteRole = role;
+    admin.busy = 'invite';
+    admin.status = '正在邀请成员…';
+    admin.tone = '';
+    rerenderMemberPanelForProject(projectId);
+    const data = await api(`/api/projects/${encodeURIComponent(projectId)}/members`, {
+      method: 'POST',
+      body: JSON.stringify({ account, role })
+    });
+    const member = data.member;
+    if (member) upsertProjectMember(member);
+    admin.inviteAccount = '';
+    admin.busy = '';
+    admin.status = member ? `已邀请 ${memberNameOf(member)}` : '成员已邀请';
+    admin.tone = 'ok';
+    rerenderMemberPanelForProject(projectId);
+  }
+
+  async function reviewProjectJoinRequest(projectId, requestId, action) {
+    if (!requestId) return;
+    const admin = memberAdminState(projectId);
+    admin.busy = `request:${requestId}`;
+    admin.status = action === 'approve' ? '正在批准申请…' : '正在拒绝申请…';
+    admin.tone = '';
+    rerenderMemberPanelForProject(projectId);
+    await api(`/api/projects/${encodeURIComponent(projectId)}/join-requests/${encodeURIComponent(requestId)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ action })
+    });
+    admin.requests = (admin.requests || []).filter((request) => !sameId(request && request.id, requestId));
+    admin.busy = '';
+    admin.loaded = true;
+    admin.status = action === 'approve' ? '已批准加入申请' : '已拒绝加入申请';
+    admin.tone = 'ok';
+    if (action === 'approve') {
+      await refreshProjectMembersPanel(projectId);
+      return;
+    }
+    rerenderMemberPanelForProject(projectId);
+  }
+
+  async function refreshProjectMembersPanel(projectId) {
+    const data = await api(`/api/projects/${encodeURIComponent(projectId)}/members`, { cache: 'no-store' });
+    const members = Array.isArray(data.members) ? data.members : [];
+    if (state.projectSpace) state.projectSpace.members = members;
+    renderProjectMembers('项目成员', members);
+  }
+
+  function upsertProjectMember(member) {
+    const id = memberIdOf(member);
+    if (!id) return;
+    const incoming = Object.assign({}, member);
+    if (memberRoleKey(incoming)) incoming.sub = memberRoleLabel(incoming) || '项目成员';
+    const apply = (list) => {
+      if (!Array.isArray(list)) return;
+      const existing = list.find((item) => sameId(memberIdOf(item), id));
+      if (existing) Object.assign(existing, incoming);
+      else list.push(Object.assign({}, incoming));
+    };
+    if (state.projectSpace) {
+      if (!Array.isArray(state.projectSpace.members)) state.projectSpace.members = [];
+      apply(state.projectSpace.members);
+    }
+    apply(state.memberPanel && state.memberPanel.members);
   }
 
   function memberByKey(key) {
