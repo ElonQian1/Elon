@@ -142,18 +142,9 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     await get().loadMessages(activeProjectId, activeChannelId)
   },
 
-  startPolling: () => {
-    const { pollTimer } = get()
-    if (pollTimer) return
-    const timer = setInterval(() => {
-      const { activeProjectId, activeChannelId, sendingMessage } = get()
-      if (activeProjectId && activeChannelId && !sendingMessage) {
-        get().loadMessages(activeProjectId, activeChannelId).catch(() => {})
-      }
-    }, 5000)
-    set({ pollTimer: timer })
-  },
-
+  // startPolling / stopPolling 保留接口，实际调度已移至 useChannelAutoRefresh
+  // selectChannel 里仍调用它们以便后续扩展
+  startPolling: () => { /* 调度由 useChannelAutoRefresh 自适应管理 */ },
   stopPolling: () => {
     const { pollTimer } = get()
     if (pollTimer) {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { useProjectStore } from './useProjectStore'
+import { useChannelAutoRefresh } from './useChannelAutoRefresh'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import { ModelPickerPopover } from '../models/ModelPicker'
@@ -13,6 +14,7 @@ import type { Message } from './types'
 import styles from './ConversationPage.module.css'
 
 export default function ConversationPage() {
+  useChannelAutoRefresh()   // P1.2：实时刷新 + 自适应轮询
   const user = useAuthStore((s) => s.user)
   const {
     projects, projectsLoaded, activeProjectId, channels, activeChannelId,
