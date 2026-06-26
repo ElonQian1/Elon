@@ -25,6 +25,10 @@ internal data class StoreProject(
     val viewerRole: String? = null,
     val lastTaskStatus: String?,
     val latestApkUrl: String? = null,
+    val installCount: Int? = null,
+    val commentCount: Int? = null,
+    val apkSizeBytes: Long? = null,
+    val apkSizeLabel: String? = null,
     val iconDataUrl: String? = null,
     val role: String = "member",
     val projectOriginType: String? = null,
@@ -512,6 +516,28 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
     latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
         ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
+    installCount = obj.optNullableInt("install_count")
+        ?: obj.optNullableInt("installCount")
+        ?: obj.optNullableInt("download_count")
+        ?: obj.optNullableInt("downloadCount")
+        ?: obj.optNullableInt("downloads"),
+    commentCount = obj.optNullableInt("comment_count")
+        ?: obj.optNullableInt("commentCount")
+        ?: obj.optNullableInt("review_count")
+        ?: obj.optNullableInt("reviewCount")
+        ?: obj.optNullableInt("comments"),
+    apkSizeBytes = obj.optNullableLong("latest_apk_size_bytes")
+        ?: obj.optNullableLong("latestApkSizeBytes")
+        ?: obj.optNullableLong("apk_size_bytes")
+        ?: obj.optNullableLong("apkSizeBytes")
+        ?: obj.optNullableLong("size_bytes")
+        ?: obj.optNullableLong("sizeBytes")
+        ?: obj.optNullableLong("file_size")
+        ?: obj.optNullableLong("fileSize"),
+    apkSizeLabel = obj.optCleanStoreString("apk_size_label")
+        ?: obj.optCleanStoreString("apkSizeLabel")
+        ?: obj.optCleanStoreString("size_label")
+        ?: obj.optCleanStoreString("sizeLabel"),
     iconDataUrl = obj.optProjectIconDataUrl(),
     role = obj.optString("role", "member"),
     projectOriginType = obj.optCleanStoreString("project_origin_type")
@@ -587,6 +613,11 @@ private fun JSONObject.optCleanStoreString(key: String): String? {
 private fun JSONObject.optNullableInt(key: String): Int? {
     if (!has(key) || isNull(key)) return null
     return optInt(key)
+}
+
+private fun JSONObject.optNullableLong(key: String): Long? {
+    if (!has(key) || isNull(key)) return null
+    return optLong(key).takeIf { it > 0L }
 }
 
 /** GET /api/store/joined — 返回当前用户已加入的项目 ID 集合，需要登录 */

@@ -15,6 +15,7 @@
     loading: false,
     projects: [],
     joinedIds: new Set(),
+    expandedDescIds: new Set(),
     busyId: '',
     filterKey: 'all',
     query: '',
@@ -123,6 +124,57 @@
       project.avatar,
       project.logo
     ].find((value) => typeof value === 'string' && value.trim()) || '';
+  }
+
+  function numberField(project, keys, fallback) {
+    for (const key of keys) {
+      if (!Object.prototype.hasOwnProperty.call(project, key)) continue;
+      const value = Number(project[key]);
+      if (Number.isFinite(value) && value >= 0) return value;
+    }
+    return fallback;
+  }
+
+  function textField(project, keys) {
+    for (const key of keys) {
+      const value = cleanText(project[key]);
+      if (value) return value;
+    }
+    return '';
+  }
+
+  function projectMemberCount(project) {
+    return numberField(project, ['member_count', 'memberCount'], 0);
+  }
+
+  function projectInstallCount(project) {
+    return numberField(project, ['install_count', 'installCount', 'download_count', 'downloadCount', 'downloads'], 0);
+  }
+
+  function projectCommentCount(project) {
+    return numberField(project, ['comment_count', 'commentCount', 'review_count', 'reviewCount', 'comments'], 0);
+  }
+
+  function projectApkSize(project) {
+    const label = textField(project, ['apk_size_label', 'apkSizeLabel', 'size_label', 'sizeLabel']);
+    if (label) return label;
+    const bytes = numberField(project, [
+      'latest_apk_size_bytes',
+      'latestApkSizeBytes',
+      'apk_size_bytes',
+      'apkSizeBytes',
+      'size_bytes',
+      'sizeBytes',
+      'file_size',
+      'fileSize'
+    ], 0);
+    return bytes > 0 ? formatBytes(bytes) : '--';
+  }
+
+  function formatBytes(bytes) {
+    const mb = bytes / 1024 / 1024;
+    if (mb < 0.1) return '<0.1MB';
+    return (Math.round(mb * 10) / 10).toFixed(1).replace(/\.0$/, '') + 'MB';
   }
 
   function renderThumb(project, title) {
@@ -255,6 +307,19 @@
     return state.projects.map(renderCard).join('');
   }
 
+  function renderDescription(project, identity) {
+    const desc = identity.subtitle || cleanText(project.description) || '暂无简介';
+    const collapsible = Array.from(desc).length > 46;
+    const expanded = state.expandedDescIds.has(project.id);
+    const shown = collapsible && !expanded
+      ? Array.from(desc).slice(0, 46).join('').trimEnd() + '...'
+      : desc;
+    const toggle = collapsible
+      ? `<button class="project-plaza-more" type="button" data-plaza-action="toggle-desc" data-id="${escapeHtml(project.id)}">${expanded ? '收起' : '更多 »'}</button>`
+      : '';
+    return `<div class="project-plaza-desc ${collapsible && !expanded ? 'is-collapsed' : ''}">应用介绍：${escapeHtml(shown)}${toggle}</div>`;
+  }
+
   function renderCard(project) {
     const identity = projectIdentity(project);
     const joined = state.joinedIds.has(project.id);
@@ -265,30 +330,34 @@
     const actionLabel = busy ? '处理中...' : joinActionLabel(mode, joined);
     return `
       <div class="project-plaza-card" data-id="${escapeHtml(project.id)}">
-        <div class="project-plaza-card-head">
-          <div class="project-plaza-name">${escapeHtml(identity.title)}</div>
-          <div class="project-plaza-status" style="--dot:${mode === 'approval' ? '#E62129' : '#58BE6A'}">${approvalLabel(mode)}</div>
-          <div class="project-plaza-status" style="--dot:${apkUrl ? '#58BE6A' : '#777777'}">${apkUrl ? '可安装' : '暂无APK'}</div>
-        </div>
-        <div class="project-plaza-card-body">
-          <div class="project-plaza-card-main">
-            <div class="project-plaza-info-row">
-              ${renderThumb(project, identity.title)}
-              <div class="project-plaza-details">
-                <span>创建者：${escapeHtml(project.owner_account || '未知')}</span>
-                <span>成员：${escapeHtml(Number(project.member_count || 0))}</span>
-              </div>
-            </div>
-            <span class="project-plaza-divider" aria-hidden="true"></span>
-            <span class="project-plaza-desc">简介：${escapeHtml(identity.subtitle || project.description || '暂无简介')}</span>
+        <div class="project-plaza-card-top">
+          ${renderThumb(project, identity.title)}
+          <div class="project-plaza-title-block">
+            <div class="project-plaza-name">${escapeHtml(identity.title)}</div>
+            <div class="project-plaza-owner">创建者：${escapeHtml(project.owner_account || '未知')}</div>
           </div>
-          <span class="project-plaza-time">时间</span>
           <div class="project-plaza-actions">
             <button class="project-plaza-btn" type="button" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}">${escapeHtml(actionLabel)}</button>
             <button class="project-plaza-btn" type="button" data-plaza-action="share" data-id="${escapeHtml(project.id)}" aria-label="分享项目" title="分享项目">分享项目</button>
             <button class="project-plaza-btn" type="button" data-plaza-action="download" data-id="${escapeHtml(project.id)}" aria-disabled="${apkUrl ? 'false' : 'true'}">下载APK</button>
           </div>
         </div>
+        <div class="project-plaza-stats">
+          <div class="project-plaza-stat project-plaza-stat-member">
+            <span class="project-plaza-member-icon" aria-hidden="true">
+              <svg viewBox="0 0 28 28"><path d="M10,12.3c2.2,0 4,-1.8 4,-4s-1.8,-4 -4,-4 -4,1.8 -4,4 1.8,4 4,4zM10,14.3c-3.1,0 -7,1.6 -7,4.1v1.5c0,0.6 0.4,1 1,1h9.1c-0.1,-0.4 -0.1,-0.8 -0.1,-1.2 0,-1.9 0.9,-3.5 2.4,-4.5 -1.5,-0.6 -3.5,-0.9 -5.4,-0.9zM19.2,13.5c1.8,0 3.3,-1.5 3.3,-3.3s-1.5,-3.3 -3.3,-3.3 -3.3,1.5 -3.3,3.3 1.5,3.3 3.3,3.3zM19.2,15.3c-2.7,0 -5.8,1.4 -5.8,3.7v1.2c0,0.6 0.4,1 1,1H24c0.6,0 1,-0.4 1,-1V19c0,-2.3 -3.1,-3.7 -5.8,-3.7z" /></svg>
+            </span>
+            <span class="project-plaza-stat-label">成员：${escapeHtml(projectMemberCount(project))}</span>
+          </div>
+          <span class="project-plaza-stat-sep" aria-hidden="true"></span>
+          <div class="project-plaza-stat"><strong>${escapeHtml(projectInstallCount(project))}</strong><span>次安装</span></div>
+          <span class="project-plaza-stat-sep" aria-hidden="true"></span>
+          <div class="project-plaza-stat project-plaza-stat-size"><strong>${escapeHtml(projectApkSize(project))}</strong><span>大小</span></div>
+          <span class="project-plaza-stat-sep" aria-hidden="true"></span>
+          <div class="project-plaza-stat"><strong>${escapeHtml(projectCommentCount(project))}</strong><span>评论</span></div>
+        </div>
+        ${renderDescription(project, identity)}
+        <span class="project-plaza-divider" aria-hidden="true"></span>
       </div>
     `;
   }
@@ -430,6 +499,10 @@
     if (action === 'filter') {
       state.filterKey = actionEl.dataset.filter || 'all';
       loadProjects();
+    } else if (action === 'toggle-desc') {
+      if (state.expandedDescIds.has(id)) state.expandedDescIds.delete(id);
+      else state.expandedDescIds.add(id);
+      render();
     } else if (action === 'join') {
       joinProject(id);
     } else if (action === 'apply') {
