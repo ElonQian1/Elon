@@ -1,13 +1,19 @@
 package com.elon.app
 
 import android.graphics.Path
+import android.graphics.RectF
 
 internal enum class ChatImageEditTool {
     BRUSH,
+    CIRCLE,
+    SQUARE,
     TEXT,
-    STICKER,
-    CROP,
     MOSAIC
+}
+
+internal enum class ChatImageEditShape {
+    CIRCLE,
+    SQUARE
 }
 
 internal sealed class ChatImageEditOp {
@@ -23,7 +29,13 @@ internal sealed class ChatImageEditOp {
         var x: Float,
         var y: Float,
         val color: Int,
-        val textSize: Float,
-        val sticker: Boolean
+        val textSize: Float
+    ) : ChatImageEditOp()
+
+    data class Shape(
+        val bounds: RectF,
+        val color: Int,
+        val width: Float,
+        val shape: ChatImageEditShape
     ) : ChatImageEditOp()
 }

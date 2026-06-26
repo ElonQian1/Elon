@@ -12,11 +12,11 @@ import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.View
-import android.view.ViewGroup
 import android.view.Window
 import android.widget.EditText
 import android.widget.FrameLayout
-import android.widget.GridLayout
+import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -28,11 +28,9 @@ import kotlin.math.max
 
 internal class ChatImageEditActivity : AppCompatActivity() {
     private lateinit var canvasView: ChatImageEditCanvasView
-    private lateinit var undoButton: TextView
-    private lateinit var redoButton: TextView
-    private val toolButtons = mutableMapOf<ChatImageEditTool, TextView>()
-    private var selectedTool = ChatImageEditTool.BRUSH
-    private var sourceName = "图片"
+    private lateinit var undoButton: ImageButton
+    private lateinit var redoButton: ImageButton
+    private val toolButtons = mutableMapOf<ChatImageEditTool, ImageButton>()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -40,7 +38,6 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         window.statusBarColor = Color.TRANSPARENT
         window.navigationBarColor = Color.BLACK
         val sourcePath = intent.getStringExtra(EXTRA_INPUT_PATH).orEmpty()
-        sourceName = intent.getStringExtra(EXTRA_DISPLAY_NAME).orEmpty().ifBlank { "图片" }
         val bitmap = decodeBitmap(sourcePath)
         if (bitmap == null) {
             Toast.makeText(this, "图片读取失败", Toast.LENGTH_SHORT).show()
@@ -62,8 +59,8 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             setBackgroundColor(Color.BLACK)
             addView(canvasView)
             addView(topBar())
+            addView(toolBar())
             addView(colorPalette())
-            addView(bottomBar())
         })
         selectTool(ChatImageEditTool.BRUSH)
         refreshUndoRedo()
@@ -73,35 +70,63 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(86),
+                dp(132),
                 Gravity.TOP
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(24), dp(28), dp(24), 0)
+            setPadding(dp(32), dp(44), dp(30), 0)
 
             addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(88), dp(48))
+                layoutParams = LinearLayout.LayoutParams(dp(108), dp(58))
                 gravity = Gravity.CENTER_VERTICAL or Gravity.START
                 includeFontPadding = false
                 text = "取消"
-                setTextColor(Color.WHITE)
-                textSize = 20f
+                setTextColor(Color.parseColor("#D9D9D9"))
+                textSize = 22f
                 setOnClickListener { finish() }
             })
             addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-            undoButton = iconTextButton("↶", "撤销").apply {
-                setOnClickListener {
-                    if (canvasView.undo()) refreshUndoRedo()
-                }
+            addView(TextView(context).apply {
+                layoutParams = LinearLayout.LayoutParams(dp(104), dp(52))
+                background = roundedRect("#D9D9D9", dp(26))
+                gravity = Gravity.CENTER
+                includeFontPadding = false
+                text = "完成"
+                setTextColor(Color.BLACK)
+                textSize = 22f
+                setOnClickListener { finishWithEditedImage() }
+            })
+        }
+    }
+
+    private fun toolBar(): View {
+        return LinearLayout(this).apply {
+            layoutParams = FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                dp(64),
+                Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+            ).apply {
+                bottomMargin = dp(126)
             }
-            redoButton = iconTextButton("↷", "重做").apply {
-                setOnClickListener {
-                    if (canvasView.redo()) refreshUndoRedo()
-                }
+            gravity = Gravity.CENTER
+            orientation = LinearLayout.HORIZONTAL
+
+            addToolButton(this, ChatImageEditTool.BRUSH, R.drawable.ic_chat_image_tool_brush, "画笔") {
+                selectTool(ChatImageEditTool.BRUSH)
             }
-            addView(undoButton)
-            addView(redoButton)
+            addToolButton(this, ChatImageEditTool.CIRCLE, R.drawable.ic_chat_image_tool_circle, "圆形圈选") {
+                selectTool(ChatImageEditTool.CIRCLE)
+            }
+            addToolButton(this, ChatImageEditTool.SQUARE, R.drawable.ic_chat_image_tool_square, "方形圈选") {
+                selectTool(ChatImageEditTool.SQUARE)
+            }
+            addToolButton(this, ChatImageEditTool.TEXT, R.drawable.ic_chat_image_tool_text, "文字") {
+                showTextDialog()
+            }
+            addToolButton(this, ChatImageEditTool.MOSAIC, R.drawable.ic_chat_image_tool_mosaic, "马赛克") {
+                selectTool(ChatImageEditTool.MOSAIC)
+            }
         }
     }
 
@@ -111,88 +136,71 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             Color.BLACK,
             Color.parseColor("#E62129"),
             Color.parseColor("#F2C94C"),
-            Color.parseColor("#58BE6A"),
-            Color.parseColor("#2EA7FF")
+            Color.parseColor("#2EA7FF"),
+            Color.parseColor("#58BE6A")
         )
-        return LinearLayout(this).apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                dp(44),
-                Gravity.BOTTOM or Gravity.START
-            ).apply {
-                leftMargin = dp(18)
-                bottomMargin = dp(92)
-            }
-            gravity = Gravity.CENTER
-            orientation = LinearLayout.HORIZONTAL
-            colors.forEach { color ->
-                addView(View(context).apply {
-                    layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
-                        marginEnd = dp(10)
-                    }
-                    background = GradientDrawable().apply {
-                        shape = GradientDrawable.OVAL
-                        setColor(color)
-                        setStroke(dp(2), Color.parseColor("#CCFFFFFF"))
-                    }
-                    setOnClickListener {
-                        canvasView.setBrushColor(color)
-                    }
-                })
-            }
-        }
-    }
-
-    private fun bottomBar(): View {
-        return LinearLayout(this).apply {
+        return FrameLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(92),
+                dp(94),
                 Gravity.BOTTOM
             )
-            gravity = Gravity.CENTER_VERTICAL
-            orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(22), 0, dp(18), dp(18))
 
-            addToolButton(this, ChatImageEditTool.BRUSH, "✎", "画笔") {
-                selectTool(ChatImageEditTool.BRUSH)
+            undoButton = iconButton(R.drawable.ic_chat_image_tool_undo, "撤销").apply {
+                layoutParams = FrameLayout.LayoutParams(dp(48), dp(56), Gravity.START or Gravity.CENTER_VERTICAL).apply {
+                    leftMargin = dp(18)
+                }
+                setOnClickListener {
+                    if (canvasView.undo()) refreshUndoRedo()
+                }
             }
-            addToolButton(this, ChatImageEditTool.STICKER, "☺", "表情") {
-                showStickerDialog()
+            redoButton = iconButton(R.drawable.ic_chat_image_tool_redo, "重做").apply {
+                layoutParams = FrameLayout.LayoutParams(dp(48), dp(56), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                    rightMargin = dp(18)
+                }
+                setOnClickListener {
+                    if (canvasView.redo()) refreshUndoRedo()
+                }
             }
-            addToolButton(this, ChatImageEditTool.TEXT, "T", "文字") {
-                showTextDialog()
-            }
-            addToolButton(this, ChatImageEditTool.CROP, "⌗", "裁剪") {
-                selectTool(ChatImageEditTool.CROP)
-            }
-            addToolButton(this, ChatImageEditTool.MOSAIC, "▦", "马赛克") {
-                selectTool(ChatImageEditTool.MOSAIC)
-            }
-            addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
-            addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(92), dp(54))
-                background = roundedRect("#58BE6A", dp(10))
+            addView(undoButton)
+            addView(LinearLayout(context).apply {
+                layoutParams = FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    dp(56),
+                    Gravity.CENTER
+                )
                 gravity = Gravity.CENTER
-                includeFontPadding = false
-                text = "完成"
-                setTextColor(Color.WHITE)
-                textSize = 18f
-                setOnClickListener { finishWithEditedImage() }
+                orientation = LinearLayout.HORIZONTAL
+                colors.forEachIndexed { index, color ->
+                    addView(View(context).apply {
+                        layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply {
+                            if (index < colors.lastIndex) marginEnd = dp(12)
+                        }
+                        background = GradientDrawable().apply {
+                            shape = GradientDrawable.OVAL
+                            setColor(color)
+                            setStroke(dp(2), Color.parseColor("#D9D9D9"))
+                        }
+                        setOnClickListener {
+                            canvasView.setBrushColor(color)
+                        }
+                    })
+                }
             })
+            addView(redoButton)
         }
     }
 
     private fun addToolButton(
         row: LinearLayout,
         tool: ChatImageEditTool,
-        icon: String,
+        iconRes: Int,
         description: String,
         onClick: () -> Unit
     ) {
-        val button = iconTextButton(icon, description).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(54)).apply {
-                marginEnd = dp(10)
+        val button = iconButton(iconRes, description).apply {
+            layoutParams = LinearLayout.LayoutParams(dp(54), dp(58)).apply {
+                marginEnd = if (tool == ChatImageEditTool.MOSAIC) 0 else dp(14)
             }
             setOnClickListener { onClick() }
         }
@@ -201,15 +209,10 @@ internal class ChatImageEditActivity : AppCompatActivity() {
     }
 
     private fun selectTool(tool: ChatImageEditTool) {
-        selectedTool = tool
         canvasView.setTool(tool)
-        toolButtons.forEach { (key, button) ->
-            button.alpha = if (key == tool) 1f else 0.68f
-            button.background = if (key == tool) {
-                roundedRect("#303030", dp(8))
-            } else {
-                ColorDrawable(Color.TRANSPARENT)
-            }
+        toolButtons.values.forEach { button ->
+            button.alpha = 1f
+            button.background = ColorDrawable(Color.TRANSPARENT)
         }
     }
 
@@ -246,38 +249,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#B8B8B8"))
     }
 
-    private fun showStickerDialog() {
-        selectTool(ChatImageEditTool.STICKER)
-        val grid = GridLayout(this).apply {
-            columnCount = 4
-            setPadding(dp(12), dp(12), dp(12), dp(4))
-        }
-        val emojis = listOf("😀", "😂", "😍", "👍", "🔥", "🎉", "❤️", "✨")
-        var dialog: AlertDialog? = null
-        emojis.forEach { emoji ->
-            grid.addView(TextView(this).apply {
-                layoutParams = ViewGroup.LayoutParams(dp(58), dp(54))
-                gravity = Gravity.CENTER
-                text = emoji
-                textSize = 30f
-                setOnClickListener {
-                    canvasView.addSticker(emoji)
-                    refreshUndoRedo()
-                    dialog?.dismiss()
-                }
-            })
-        }
-        dialog = AlertDialog.Builder(this)
-            .setTitle("添加表情")
-            .setView(grid)
-            .setNegativeButton("取消", null)
-            .show()
-        dialog.window?.setBackgroundDrawable(ColorDrawable(Color.parseColor("#1A1A1A")))
-        dialog.getButton(AlertDialog.BUTTON_NEGATIVE)?.setTextColor(Color.parseColor("#B8B8B8"))
-    }
-
     private fun finishWithEditedImage() {
-        canvasView.applyCropIfActive()
         val bitmap = runCatching { canvasView.renderEditedBitmap() }.getOrNull()
         if (bitmap == null) {
             Toast.makeText(this, "图片生成失败", Toast.LENGTH_SHORT).show()
@@ -350,15 +322,13 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         )
     }
 
-    private fun iconTextButton(icon: String, description: String): TextView {
-        return TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(dp(48), dp(48))
+    private fun iconButton(iconRes: Int, description: String): ImageButton {
+        return ImageButton(this).apply {
             contentDescription = description
-            gravity = Gravity.CENTER
-            includeFontPadding = false
-            text = icon
-            setTextColor(Color.WHITE)
-            textSize = 30f
+            background = ColorDrawable(Color.TRANSPARENT)
+            setImageResource(iconRes)
+            scaleType = ImageView.ScaleType.CENTER_INSIDE
+            setPadding(dp(8), dp(8), dp(8), dp(8))
             isClickable = true
         }
     }
