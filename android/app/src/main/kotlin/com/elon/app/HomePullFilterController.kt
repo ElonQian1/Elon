@@ -265,11 +265,6 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
         isFilterBitmap = true
         isDither = true
     }
-    private val basePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.parseColor("#D0D2D4")
-        style = Paint.Style.STROKE
-        strokeCap = Paint.Cap.ROUND
-    }
     private val progressPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
         style = Paint.Style.STROKE
@@ -340,11 +335,9 @@ private class HomePullFilterIndicatorView(context: android.content.Context) : Vi
         val radius = (size * RING_RADIUS_RATIO).coerceAtLeast(1f)
         val ringStroke = (size * RING_STROKE_RATIO).coerceAtLeast(1f)
         ringRect.set(cx - radius, cy - radius, cx + radius, cy + radius)
-        basePaint.strokeWidth = ringStroke
         progressPaint.strokeWidth = ringStroke
         glowPaint.strokeWidth = ringStroke * 1.42f
 
-        canvas.drawArc(ringRect, PROGRESS_START_ANGLE, 360f, false, basePaint)
         if (progress > 0.001f) {
             canvas.drawArc(ringRect, PROGRESS_START_ANGLE, 360f * progress, false, progressPaint)
         }
