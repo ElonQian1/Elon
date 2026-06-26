@@ -1,0 +1,25 @@
+.page { padding: 28px; display: flex; flex-direction: column; gap: 16px; }
+
+.hero {
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.hero h2 { font-size: 20px; font-weight: 700; }
+
+.hero p { color: var(--text-muted); font-size: 13px; line-height: 1.7; }
+
+.link {
+  display: inline-block;
+  padding: 8px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  color: var(--text-primary);
+  transition: background var(--transition);
+}
+
+.link:hover { background: var(--bg-hover); border-color: var(--accent); color: var(--accent); }
