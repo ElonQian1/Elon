@@ -6,6 +6,8 @@
     } = ctx;
     const STORAGE_NONE = 'none';
     const STORAGE_AUTO = 'auto';
+    let quickMode = false;
+    let afterCreate = null;
 
     function setBusy(button, busy, label) {
       if (!button) return;
@@ -34,6 +36,42 @@
       const text = clean(message);
       els.pcProjectCreateError.textContent = text;
       els.pcProjectCreateError.classList.toggle('show', !!text);
+    }
+
+    function projectNameLabel() {
+      return els.pcProjectNameInput
+        && els.pcProjectNameInput.closest('.settings-field')
+        && els.pcProjectNameInput.closest('.settings-field').querySelector('span');
+    }
+
+    function setSubmitLabel() {
+      if (!els.pcProjectCreateSubmitBtn) return;
+      delete els.pcProjectCreateSubmitBtn.dataset.label;
+      els.pcProjectCreateSubmitBtn.textContent = quickMode ? '创建项目' : '创建';
+    }
+
+    function applyMode(options) {
+      const mode = clean(options && options.mode).toLowerCase();
+      quickMode = mode === 'quick' || mode === 'ai' || mode === 'chat';
+      afterCreate = typeof (options && options.afterCreate) === 'function'
+        ? options.afterCreate
+        : null;
+      const dialog = els.pcProjectCreateForm;
+      if (dialog) dialog.classList.toggle('quick-mode', quickMode);
+      if (els.pcProjectCreateTitle) els.pcProjectCreateTitle.textContent = quickMode ? '创建项目' : '新建项目';
+      if (els.pcProjectCreateSubtitle) {
+        els.pcProjectCreateSubtitle.textContent = quickMode
+          ? '先从一个轻量项目开始'
+          : '云端 APK 开发项目';
+      }
+      const nameLabel = projectNameLabel();
+      if (nameLabel) nameLabel.textContent = quickMode ? '项目名称' : '项目名';
+      if (els.pcProjectNameInput) {
+        els.pcProjectNameInput.placeholder = quickMode ? '哥哥哈很之旅' : '例如：记账小助手';
+      }
+      if (els.pcProjectCreateChatHint) els.pcProjectCreateChatHint.hidden = !quickMode;
+      if (els.pcProjectCreateCancelBtn) els.pcProjectCreateCancelBtn.hidden = quickMode;
+      setSubmitLabel();
     }
 
     function nodeIdOf(node) {
@@ -121,6 +159,7 @@
     function close() {
       els.pcProjectCreateBackdrop.hidden = true;
       setError('');
+      afterCreate = null;
     }
 
     async function loadNodes() {
@@ -174,10 +213,12 @@
         : '项目会直接创建在所选开发环境上。';
     }
 
-    function open() {
+    function open(options) {
       if (!state.token) return false;
+      applyMode(options || {});
       setError('');
       setBusy(els.pcProjectCreateSubmitBtn, false);
+      setSubmitLabel();
       els.pcProjectNameInput.value = '';
       els.pcProjectDescInput.value = '';
       els.pcProjectTemplateSelect.value = 'android_kotlin';
@@ -239,13 +280,15 @@
           })
         });
         const project = (data && data.project) || {};
+        const onCreated = afterCreate;
         close();
         await loadBaseData();
         if (project.id && !state.projects.some((item) => sameId(item && item.id, project.id))) {
           state.projects.unshift(project);
           renderProjectRail();
         }
-        if (project.id) await selectProject(project.id, {
+        if (onCreated) await onCreated(project);
+        else if (project.id) await selectProject(project.id, {
           preferredChannelKind: 'ai_development',
           focusComposer: true
         });

@@ -372,33 +372,37 @@
       <header class="pc-project-create-header">
         <div>
           <strong id="pcProjectCreateTitle">新建项目</strong>
-          <span>云端 APK 开发项目</span>
+          <span id="pcProjectCreateSubtitle">云端 APK 开发项目</span>
         </div>
         <button class="pc-project-create-close" id="pcProjectCreateCloseBtn" type="button" title="关闭">×</button>
       </header>
       <div class="pc-project-create-body">
-        <label class="settings-field">
+        <label class="settings-field pc-project-name-field">
           <span>项目名</span>
           <input id="pcProjectNameInput" maxlength="40" required placeholder="例如：记账小助手" autocomplete="off" />
         </label>
-        <label class="settings-field">
+        <div class="pc-project-create-chat-hint" id="pcProjectCreateChatHint" hidden>
+          <span aria-hidden="true">i</span>
+          <p>项目功能可将聊天、文件和自定义指令集中保存。先轻量创建，之后可以在项目中心补充开发环境、成员和代码设置。</p>
+        </div>
+        <label class="settings-field pc-project-desc-field">
           <span>一句话描述（可选）</span>
           <textarea id="pcProjectDescInput" rows="3" placeholder="想做什么样的 App？给 AI 一点上下文"></textarea>
         </label>
-        <label class="settings-field">
+        <label class="settings-field pc-project-template-field">
           <span>起步模板</span>
           <select id="pcProjectTemplateSelect">
             <option value="android_kotlin">Android（Kotlin）</option>
             <option value="android_compose">Android（Compose）</option>
           </select>
         </label>
-        <label class="settings-field">
+        <label class="settings-field pc-project-node-field">
           <span>开发环境</span>
           <select id="pcProjectNodeSelect" disabled>
             <option value="">正在加载可用开发环境...</option>
           </select>
         </label>
-        <label class="settings-field">
+        <label class="settings-field pc-project-storage-field">
           <span>代码存储（可选）</span>
           <select id="pcProjectStorageNodeSelect" disabled>
             <option value="none">暂不使用代码存储</option>

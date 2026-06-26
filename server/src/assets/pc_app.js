@@ -93,6 +93,8 @@
     settingsRuntimePermissionHint: $('settingsRuntimePermissionHint'),
     pcProjectCreateBackdrop: $('pcProjectCreateBackdrop'), pcProjectCreateForm: $('pcProjectCreateForm'),
     pcProjectCreateCloseBtn: $('pcProjectCreateCloseBtn'), pcProjectCreateCancelBtn: $('pcProjectCreateCancelBtn'),
+    pcProjectCreateTitle: $('pcProjectCreateTitle'), pcProjectCreateSubtitle: $('pcProjectCreateSubtitle'),
+    pcProjectCreateChatHint: $('pcProjectCreateChatHint'),
     pcProjectNameInput: $('pcProjectNameInput'), pcProjectDescInput: $('pcProjectDescInput'),
     pcProjectTemplateSelect: $('pcProjectTemplateSelect'), pcProjectNodeSelect: $('pcProjectNodeSelect'),
     pcProjectStorageNodeSelect: $('pcProjectStorageNodeSelect'), pcProjectStorageHint: $('pcProjectStorageHint'),
@@ -839,7 +841,8 @@
   }
 
   function aiSidebarButton(item) {
-    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${item.active ? 'active' : ''}" type="button" data-ai-action="${escapeHtml(item.id)}">
+    const extraClass = clean(item.className);
+    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${extraClass ? escapeHtml(extraClass) : ''} ${item.active ? 'active' : ''}" type="button" data-ai-action="${escapeHtml(item.id)}">
       <span class="glyph">${escapeHtml(item.glyph || '#')}</span>
       <span class="main"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.sub || '')}</span></span>
     </button>`;
@@ -1106,6 +1109,21 @@
         sub: state.token ? '默认聊天' : '登录后开启',
         primary: true,
         active: state.activeKind === 'ai' && !state.activeAiConversationId
+      },
+      {
+        id: 'new-project',
+        glyph: '+',
+        title: '新建项目',
+        sub: state.token ? '聊天深入后可直接开发' : '登录后创建',
+        className: 'ai-project-create-action'
+      },
+      {
+        id: 'my-projects',
+        glyph: '项',
+        title: '我的项目',
+        sub: state.token ? '跳转到项目中心' : '登录后查看',
+        className: 'ai-my-projects-action',
+        active: state.activeKind === 'projects'
       }
     ].filter(actionMatches);
     const conversations = state.aiConversations
@@ -1128,22 +1146,54 @@
         ${time ? `<span class="channel-time" title="${escapeHtml(formatTime(timeValue))}">${escapeHtml(time)}</span>` : ''}
       </button>`;
     }).join('');
+    const projects = state.token ? aiSidebarProjects() : [];
+    if (projects.length) ensureAiProjectConversations(projects.slice(0, 12));
+    const projectGroups = projects.map((project) => renderAiProjectGroup(project, query)).filter(Boolean).join('');
     const sections = [
       '<div class="channel-section">一龙AI</div>',
       primaryActions.map(aiSidebarButton).join('') || '<div class="ai-sidebar-muted">没有匹配的功能</div>',
       '<div class="ai-sidebar-spacer"></div>',
       '<div class="channel-section">聊天历史</div>',
-      conversationItems || `<div class="ai-sidebar-muted">${state.token ? '暂无聊天历史' : '登录后显示聊天历史'}</div>`
+      conversationItems || `<div class="ai-sidebar-muted">${state.token ? '暂无聊天历史' : '登录后显示聊天历史'}</div>`,
+      '<div class="ai-sidebar-spacer"></div>',
+      '<div class="channel-section">项目</div>',
+      projectGroups || `<div class="ai-sidebar-muted">${state.token ? '暂无项目，先从上方新建项目开始' : '登录后显示项目'}</div>`
     ];
     els.channelList.innerHTML = sections.join('');
     els.channelList.querySelectorAll('[data-ai-action]').forEach((btn) => {
       btn.addEventListener('click', () => {
         const action = btn.dataset.aiAction;
         if (action === 'new-chat') return startNewAiChat(true);
+        if (action === 'new-project') return openAiProjectCreate();
+        if (action === 'my-projects') return selectProjectsHome();
       });
     });
     els.channelList.querySelectorAll('[data-ai-chat-conversation-id]').forEach((btn) => {
       btn.addEventListener('click', () => selectAiAssistant(true, btn.dataset.aiChatConversationId));
+    });
+    els.channelList.querySelectorAll('[data-ai-project-folder-id]').forEach((btn) => {
+      btn.addEventListener('click', () => selectProject(btn.dataset.aiProjectFolderId, {
+        preferredChannelKind: 'ai_development',
+        focusComposer: true
+      }));
+    });
+    els.channelList.querySelectorAll('[data-ai-project-new-chat-id]').forEach((btn) => {
+      btn.addEventListener('click', () => startProjectConversationFromSidebar(btn.dataset.aiProjectNewChatId));
+    });
+    els.channelList.querySelectorAll('[data-ai-project-id][data-ai-conversation-id]').forEach((btn) => {
+      btn.addEventListener('click', () => selectProjectConversation(
+        btn.dataset.aiProjectId,
+        btn.dataset.aiConversationId,
+        { focusComposer: true }
+      ));
+    });
+    els.channelList.querySelectorAll('[data-ai-project-expand-id]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const projectId = btn.dataset.aiProjectExpandId;
+        const cache = aiConversationCache();
+        cache.expandedIds[projectId] = !cache.expandedIds[projectId];
+        renderAiSidebar(filterText());
+      });
     });
   }
 
@@ -1757,6 +1807,22 @@
     }
     closeSettings();
     projectCreate.open();
+  }
+
+  function openAiProjectCreate() {
+    if (!state.token) {
+      openAuthModal('login');
+      return;
+    }
+    closeSettings();
+    projectCreate.open({
+      mode: 'ai',
+      afterCreate: async (project) => {
+        const projectId = clean(project && project.id);
+        if (projectId) await startProjectConversationFromSidebar(projectId);
+        else await refreshActive();
+      }
+    });
   }
 
   function renderProjectCard(project) {

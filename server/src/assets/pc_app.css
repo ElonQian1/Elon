@@ -559,6 +559,23 @@ button { cursor: pointer; }
 .channel-item.ai-primary:hover {
   background: rgba(87, 142, 199, .28);
 }
+.channel-item.ai-project-create-action {
+  min-height: 44px;
+  background: #e9edf7;
+  color: #111318;
+}
+.channel-item.ai-project-create-action:hover,
+.channel-item.ai-project-create-action.active {
+  background: #f5f7ff;
+  color: #090a0d;
+}
+.channel-item.ai-project-create-action .glyph,
+.channel-item.ai-project-create-action span {
+  color: inherit;
+}
+.channel-item.ai-my-projects-action {
+  color: var(--text);
+}
 .channel-item .glyph {
   width: 22px;
   color: var(--text-muted);
@@ -2257,6 +2274,10 @@ button { cursor: pointer; }
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
 }
+.pc-project-create-dialog.quick-mode {
+  width: min(500px, calc(100vw - 28px));
+  background: #222326;
+}
 .pc-project-create-header {
   min-height: 64px;
   display: flex;
@@ -2298,6 +2319,48 @@ button { cursor: pointer; }
   overflow-y: auto;
   padding: 22px;
 }
+.pc-project-create-dialog.quick-mode .pc-project-create-body {
+  padding: 18px 12px 12px;
+}
+.pc-project-create-dialog.quick-mode .pc-project-desc-field,
+.pc-project-create-dialog.quick-mode .pc-project-template-field,
+.pc-project-create-dialog.quick-mode .pc-project-node-field,
+.pc-project-create-dialog.quick-mode .pc-project-storage-field,
+.pc-project-create-dialog.quick-mode .pc-project-create-hint,
+.pc-project-create-dialog.quick-mode .pc-project-create-advanced {
+  display: none;
+}
+.pc-project-create-chat-hint {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  margin: 16px 0 2px;
+  border-radius: 8px;
+  background: #4a4b4f;
+  color: #eceef3;
+  padding: 14px 14px 14px 12px;
+}
+.pc-project-create-chat-hint[hidden] {
+  display: none;
+}
+.pc-project-create-chat-hint > span {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255,255,255,.45);
+  border-radius: 50%;
+  color: #f3f4f7;
+  font-size: 12px;
+  font-weight: 900;
+}
+.pc-project-create-chat-hint p {
+  margin: 0;
+  color: #eceef3;
+  font-size: 13px;
+  line-height: 1.55;
+}
 .pc-project-create-hint {
   min-height: 18px;
   margin: -4px 0 12px;
@@ -2325,6 +2388,10 @@ button { cursor: pointer; }
   gap: 10px;
   padding: 14px 22px 18px;
   border-top: 1px solid #17181c;
+}
+.pc-project-create-dialog.quick-mode .pc-project-create-actions {
+  padding: 12px 12px 14px;
+  border-top: 0;
 }
 .pc-project-create-actions .text-button,
 .pc-project-create-actions .send-button {
