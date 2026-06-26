@@ -101,7 +101,7 @@ export default function ProjectDetailPage() {
 
       <div className={styles.content}>
         {tab === 'overview' && <OverviewTab project={project} space={space} />}
-        {tab === 'members' && <MembersTab members={memberList} onRefresh={loadMembers} />}
+        {tab === 'members' && <MembersTab members={memberList} onRefresh={loadMembers} projectId={id ?? ''} />}
         {tab === 'workspace' && <WorkspaceTab health={health} loading={healthLoading} onRefresh={loadHealth} />}
       </div>
     </div>
@@ -132,9 +132,87 @@ function OverviewTab({ project, space }: { project: StoreProject; space: StoreSp
   )
 }
 
-function MembersTab({ members, onRefresh }: { members: ProjectMember[]; onRefresh: () => void }) {
+function MembersTab({ members, onRefresh, projectId }: { members: ProjectMember[]; onRefresh: () => void; projectId: string }) {
+  const [inviteAccount, setInviteAccount] = useState('')
+  const [inviteRole, setInviteRole] = useState('member')
+  const [inviting, setInviting] = useState(false)
+  const [inviteError, setInviteError] = useState('')
+  const [inviteSuccess, setInviteSuccess] = useState('')
+  const [removing, setRemoving] = useState<string | null>(null)
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    const account = inviteAccount.trim()
+    if (!account) return
+    setInviting(true)
+    setInviteError('')
+    setInviteSuccess('')
+    try {
+      await api.post(`/api/projects/${encodeURIComponent(projectId)}/members`, {
+        account,
+        role: inviteRole,
+      })
+      setInviteAccount('')
+      setInviteSuccess(`${account} 已邀请`)
+      await onRefresh()
+    } catch (err) {
+      setInviteError((err as { message?: string }).message ?? '邀请失败')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  async function handleRemove(userId: string, account: string) {
+    if (!window.confirm(`确认移除成员 ${account}？`)) return
+    setRemoving(userId)
+    try {
+      await api.delete(`/api/projects/${encodeURIComponent(projectId)}/members/${encodeURIComponent(userId)}`)
+      await onRefresh()
+    } catch (err) {
+      alert((err as { message?: string }).message ?? '移除失败')
+    } finally {
+      setRemoving(null)
+    }
+  }
+
   return (
     <div>
+      {/* 邀请表单 */}
+      <form onSubmit={handleInvite} style={{ marginBottom: 18, display: 'flex', gap: 8, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 180px', minWidth: 160 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>账号（手机号/邮箱）</span>
+          <input
+            value={inviteAccount}
+            onChange={(e) => setInviteAccount(e.target.value)}
+            placeholder="15612345678"
+            style={{ height: 34, border: '1px solid var(--line)', borderRadius: 6, background: '#1a1c21', color: 'var(--text)', padding: '0 10px', outline: 'none', fontSize: 13 }}
+            disabled={inviting}
+          />
+        </label>
+        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, width: 110 }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 700 }}>角色</span>
+          <select
+            value={inviteRole}
+            onChange={(e) => setInviteRole(e.target.value)}
+            style={{ height: 34, border: '1px solid var(--line)', borderRadius: 6, background: '#1a1c21', color: 'var(--text)', padding: '0 8px', fontSize: 13 }}
+          >
+            <option value="member">成员</option>
+            <option value="editor">协作者</option>
+            <option value="admin">管理员</option>
+            <option value="observer">只读</option>
+          </select>
+        </label>
+        <button
+          type="submit"
+          disabled={inviting || !inviteAccount.trim()}
+          style={{ height: 34, padding: '0 16px', background: 'var(--green)', border: 'none', borderRadius: 6, color: 'white', fontWeight: 700, fontSize: 13, cursor: 'pointer', alignSelf: 'flex-end' }}
+        >
+          {inviting ? '邀请中…' : '邀请'}
+        </button>
+      </form>
+      {inviteError && <p style={{ fontSize: 12, color: 'var(--red)', marginBottom: 10 }}>{inviteError}</p>}
+      {inviteSuccess && <p style={{ fontSize: 12, color: '#4caf78', marginBottom: 10 }}>{inviteSuccess}</p>}
+
       <div className={styles.tabToolbar}>
         <span className={styles.tabCount}>{members.length} 位成员</span>
         <button className={styles.textBtn} onClick={onRefresh} type="button">刷新</button>
@@ -145,11 +223,20 @@ function MembersTab({ members, onRefresh }: { members: ProjectMember[]; onRefres
             <div className={styles.memberAvatar}>
               {(m.account ?? m.user_id ?? '?')[0]?.toUpperCase()}
             </div>
-            <div className={styles.memberInfo}>
+            <div className={styles.memberInfo} style={{ flex: 1 }}>
               <strong>{m.account ?? m.user_id ?? '-'}</strong>
               <span>{m.user_id}</span>
               <span className={styles.roleBadge}>{m.role ?? 'member'}</span>
             </div>
+            <button
+              style={{ flexShrink: 0, width: 28, height: 28, borderRadius: '50%', border: 'none', background: 'transparent', color: 'var(--text-muted)', fontSize: 16, cursor: 'pointer' }}
+              title="移除成员"
+              disabled={removing === m.user_id}
+              onClick={() => handleRemove(m.user_id, m.account ?? m.user_id)}
+              type="button"
+            >
+              {removing === m.user_id ? '…' : '×'}
+            </button>
           </div>
         ))}
         {members.length === 0 && <p className={styles.empty}>暂无成员数据</p>}
