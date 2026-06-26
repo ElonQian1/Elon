@@ -39,7 +39,7 @@
     memberPanel: { title: '成员', members: [], options: {}, search: '' },
     memberCollapsed: {},
     projectRoles: {},
-    memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, auditEntries: [], auditLoaded: false, auditLoading: false, auditExpanded: false, rolesExpanded: false, channelPermissionsExpanded: false, channelPermissionChannelId: '', channelPermissionLoadedChannelId: '', channelPermissionLoading: false, channelPermissionOverrides: [], channelPermissionOptions: [], busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
+    memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, auditEntries: [], auditLoaded: false, auditLoading: false, auditExpanded: false, rolesExpanded: false, channelPermissionsExpanded: false, channelPermissionChannelId: '', channelPermissionLoadedChannelId: '', channelPermissionLoading: false, channelPermissionOverrides: [], channelPermissionMemberOverrides: [], channelPermissionMemberId: '', channelPermissionOptions: [], busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
     memberProfile: null,
     presenceSocket: null,
     presenceReconnectTimer: 0,
@@ -2947,6 +2947,8 @@
         channelPermissionLoadedChannelId: '',
         channelPermissionLoading: false,
         channelPermissionOverrides: [],
+        channelPermissionMemberOverrides: [],
+        channelPermissionMemberId: '',
         channelPermissionOptions: [],
         busy: '',
         inviteAccount: '',
@@ -3163,7 +3165,12 @@
       : CHANNEL_PERMISSION_OPTIONS;
     const overrides = Array.isArray(admin.channelPermissionOverrides) ? admin.channelPermissionOverrides : [];
     const overrideByRole = new Map(overrides.map((item) => [clean(item.role_id || item.roleId), item]));
+    const memberOverrides = Array.isArray(admin.channelPermissionMemberOverrides) ? admin.channelPermissionMemberOverrides : [];
+    const overrideByMember = new Map(memberOverrides.map((item) => [clean(item.user_id || item.userId), item]));
     const roles = projectAssignableRoleOptions(projectId);
+    const members = state.projectSpace && Array.isArray(state.projectSpace.members) ? state.projectSpace.members : [];
+    const selectedMemberId = clean(admin.channelPermissionMemberId || (members[0] && memberIdOf(members[0])));
+    if (!admin.channelPermissionMemberId && selectedMemberId) admin.channelPermissionMemberId = selectedMemberId;
     const selectedChannel = channels.find((channel) => sameId(channel.id, selectedId));
     const baseLabel = selectedChannel
       ? [
@@ -3202,13 +3209,60 @@
             <button class="text-button" type="button" data-member-admin-action="save-channel-permission" data-role-id="${escapeHtml(role.key)}" ${admin.busy === `channel-permission:${role.key}` ? 'disabled' : ''}>保存</button>
           </article>`;
         }).join('');
+    const memberOptions = members.map((member) => {
+      const id = memberIdOf(member);
+      if (!id) return '';
+      const selected = sameId(id, selectedMemberId) ? 'selected' : '';
+      return `<option value="${escapeHtml(id)}" ${selected}>${escapeHtml(memberNameOf(member))}</option>`;
+    }).join('');
+    const selectedMember = members.find((member) => sameId(memberIdOf(member), selectedMemberId));
+    const memberOverride = overrideByMember.get(selectedMemberId) || {};
+    const memberAllow = Array.isArray(memberOverride.allow) ? memberOverride.allow : [];
+    const memberDeny = Array.isArray(memberOverride.deny) ? memberOverride.deny : [];
+    const memberCells = options.map((permission) => {
+      const key = clean(permission.key);
+      const value = memberDeny.includes(key) ? 'deny' : (memberAllow.includes(key) ? 'allow' : '');
+      return `<label>
+        <span>${escapeHtml(permission.label || key)}</span>
+        <select data-channel-member-permission-effect="${escapeHtml(selectedMemberId)}" data-channel-permission-key="${escapeHtml(key)}" ${selectedMemberId ? '' : 'disabled'}>
+          <option value="" ${value ? '' : 'selected'}>继承</option>
+          <option value="allow" ${value === 'allow' ? 'selected' : ''}>允许</option>
+          <option value="deny" ${value === 'deny' ? 'selected' : ''}>拒绝</option>
+        </select>
+      </label>`;
+    }).join('');
+    const memberHtml = loading
+      ? ''
+      : `<div class="member-channel-permission-section">
+          <strong>成员覆盖</strong>
+          ${members.length
+            ? `<div class="member-channel-permission-toolbar">
+                <select data-member-admin-channel-permission-member>${memberOptions}</select>
+                <button class="text-button" type="button" data-member-admin-action="save-channel-member-permission" data-member-id="${escapeHtml(selectedMemberId)}" ${!selectedMemberId || admin.busy === `channel-member-permission:${selectedMemberId}` ? 'disabled' : ''}>保存</button>
+              </div>
+              <article class="member-channel-permission-card" data-channel-permission-member="${escapeHtml(selectedMemberId)}">
+                <div class="member-role-card-head">
+                  ${avatarElement('div', 'member-avatar tiny', selectedMember && (selectedMember.avatar_data_url || selectedMember.avatarDataUrl), selectedMember ? memberNameOf(selectedMember) : '成员', '员')}
+                  <div>
+                    <strong>${escapeHtml(selectedMember ? memberNameOf(selectedMember) : '成员')}</strong>
+                    <em>${escapeHtml(selectedMember ? (memberRoleSummary(selectedMember) || '项目成员') : '单独覆盖')}</em>
+                  </div>
+                </div>
+                <div class="member-channel-permission-grid">${memberCells}</div>
+              </article>`
+            : '<div class="member-admin-empty">暂无成员可配置</div>'}
+        </div>`;
     return `<div class="member-channel-permission-admin">
       <div class="member-channel-permission-toolbar">
         <select data-member-admin-channel-permission-channel>${channelOptions}</select>
         <button class="text-button" type="button" data-member-admin-action="refresh-channel-permissions" ${admin.channelPermissionLoading ? 'disabled' : ''}>刷新</button>
       </div>
       ${baseLabel ? `<div class="member-admin-empty">${escapeHtml(baseLabel)}</div>` : ''}
-      <div class="member-role-list">${rows}</div>
+      <div class="member-channel-permission-section">
+        <strong>角色覆盖</strong>
+        <div class="member-role-list">${rows}</div>
+      </div>
+      ${memberHtml}
     </div>`;
   }
 
@@ -3630,8 +3684,17 @@
       admin.channelPermissionChannelId = clean(event.target.value);
       admin.channelPermissionLoadedChannelId = '';
       admin.channelPermissionOverrides = [];
+      admin.channelPermissionMemberOverrides = [];
+      admin.channelPermissionMemberId = '';
       rerenderMemberPanelForProject(projectId);
       loadProjectChannelPermissions(projectId, admin.channelPermissionChannelId).catch((error) => setMemberAdminStatus(projectId, error.message || '加载频道权限失败', 'error'));
+      return;
+    }
+    if (event.target.matches('[data-member-admin-channel-permission-member]')) {
+      const projectId = memberPanelProjectId();
+      const admin = memberAdminState(projectId);
+      admin.channelPermissionMemberId = clean(event.target.value);
+      rerenderMemberPanelForProject(projectId);
     }
   }
 
@@ -3750,6 +3813,11 @@
       saveProjectChannelPermission(projectId, roleId).catch((error) => setMemberAdminStatus(projectId, error.message || '保存频道权限失败', 'error'));
       return;
     }
+    if (action === 'save-channel-member-permission') {
+      const memberId = clean(button.dataset.memberId);
+      saveProjectChannelMemberPermission(projectId, memberId).catch((error) => setMemberAdminStatus(projectId, error.message || '保存成员频道权限失败', 'error'));
+      return;
+    }
     if (action === 'save-role-definition') {
       const roleId = clean(button.dataset.roleId);
       updateProjectRoleFromPanel(projectId, roleId).catch((error) => setMemberAdminStatus(projectId, error.message || '保存角色失败', 'error'));
@@ -3829,6 +3897,9 @@
     try {
       const data = await api(`/api/projects/${encodeURIComponent(id)}/channels/${encodeURIComponent(cleanChannelId)}/permissions`, { cache: 'no-store' });
       admin.channelPermissionOverrides = Array.isArray(data.overrides) ? data.overrides : [];
+      admin.channelPermissionMemberOverrides = Array.isArray(data.member_overrides)
+        ? data.member_overrides
+        : (Array.isArray(data.memberOverrides) ? data.memberOverrides : []);
       admin.channelPermissionOptions = Array.isArray(data.permissions) && data.permissions.length
         ? data.permissions
         : CHANNEL_PERMISSION_OPTIONS;
@@ -3836,6 +3907,7 @@
       const channel = ((state.projectSpace && state.projectSpace.channels) || []).find((item) => sameId(item.id, cleanChannelId));
       if (channel) {
         channel.role_overrides = admin.channelPermissionOverrides;
+        channel.member_overrides = admin.channelPermissionMemberOverrides;
         channel.permissions = data.current_user_permissions || data.currentUserPermissions || channel.permissions;
       }
     } finally {
@@ -3872,6 +3944,9 @@
         body: JSON.stringify({ role_id: cleanRoleId, allow, deny })
       });
       admin.channelPermissionOverrides = Array.isArray(data.overrides) ? data.overrides : [];
+      admin.channelPermissionMemberOverrides = Array.isArray(data.member_overrides)
+        ? data.member_overrides
+        : (Array.isArray(data.memberOverrides) ? data.memberOverrides : []);
       admin.channelPermissionOptions = Array.isArray(data.permissions) && data.permissions.length
         ? data.permissions
         : CHANNEL_PERMISSION_OPTIONS;
@@ -3879,9 +3954,66 @@
       const channel = ((state.projectSpace && state.projectSpace.channels) || []).find((item) => sameId(item.id, channelId));
       if (channel) {
         channel.role_overrides = admin.channelPermissionOverrides;
+        channel.member_overrides = admin.channelPermissionMemberOverrides;
         channel.permissions = data.current_user_permissions || data.currentUserPermissions || channel.permissions;
       }
       admin.status = '频道权限已保存';
+      admin.tone = 'ok';
+      renderChannels();
+      if (state.activeChannelId && sameId(state.activeChannelId, channelId)) {
+        await selectProjectChannel(state.activeChannelId);
+      } else {
+        rerenderMemberPanelForProject(id);
+      }
+    } finally {
+      admin.busy = '';
+      rerenderMemberPanelForProject(id);
+    }
+  }
+
+  async function saveProjectChannelMemberPermission(projectId, memberId) {
+    const id = clean(projectId);
+    const cleanMemberId = clean(memberId);
+    const admin = memberAdminState(id);
+    const channelId = clean(admin.channelPermissionChannelId || state.activeChannelId);
+    if (!id || !channelId || !cleanMemberId) return;
+    const panel = els.memberList.querySelector(`[data-channel-permission-member="${cssEscape(cleanMemberId)}"]`);
+    const allow = [];
+    const deny = [];
+    if (panel) {
+      panel.querySelectorAll(`[data-channel-member-permission-effect="${cssEscape(cleanMemberId)}"]`).forEach((select) => {
+        const key = clean(select.dataset.channelPermissionKey);
+        const value = clean(select.value);
+        if (!key) return;
+        if (value === 'allow') allow.push(key);
+        if (value === 'deny') deny.push(key);
+      });
+    }
+    admin.busy = `channel-member-permission:${cleanMemberId}`;
+    admin.status = '正在保存成员频道权限…';
+    admin.tone = '';
+    rerenderMemberPanelForProject(id);
+    try {
+      const data = await api(`/api/projects/${encodeURIComponent(id)}/channels/${encodeURIComponent(channelId)}/permissions`, {
+        method: 'PATCH',
+        body: JSON.stringify({ member_id: cleanMemberId, allow, deny })
+      });
+      admin.channelPermissionOverrides = Array.isArray(data.overrides) ? data.overrides : [];
+      admin.channelPermissionMemberOverrides = Array.isArray(data.member_overrides)
+        ? data.member_overrides
+        : (Array.isArray(data.memberOverrides) ? data.memberOverrides : []);
+      admin.channelPermissionOptions = Array.isArray(data.permissions) && data.permissions.length
+        ? data.permissions
+        : CHANNEL_PERMISSION_OPTIONS;
+      admin.channelPermissionLoadedChannelId = channelId;
+      admin.channelPermissionMemberId = cleanMemberId;
+      const channel = ((state.projectSpace && state.projectSpace.channels) || []).find((item) => sameId(item.id, channelId));
+      if (channel) {
+        channel.role_overrides = admin.channelPermissionOverrides;
+        channel.member_overrides = admin.channelPermissionMemberOverrides;
+        channel.permissions = data.current_user_permissions || data.currentUserPermissions || channel.permissions;
+      }
+      admin.status = '成员频道权限已保存';
       admin.tone = 'ok';
       renderChannels();
       if (state.activeChannelId && sameId(state.activeChannelId, channelId)) {

@@ -28,8 +28,9 @@ use crate::{
     project_tool_approval_recovery, project_tool_approvals,
     project_ws_protocol::enrich_project_ws_event,
     store::{
-        ProjectAccess, PublicUser, CHANNEL_PERMISSION_MANAGE, CHANNEL_PERMISSION_SEND,
-        CHANNEL_PERMISSION_START_AI, CHANNEL_PERMISSION_VIEW,
+        ProjectAccess, ProjectChannelMemberPermissionOverride,
+        ProjectChannelRolePermissionOverride, PublicUser, CHANNEL_PERMISSION_MANAGE,
+        CHANNEL_PERMISSION_SEND, CHANNEL_PERMISSION_START_AI, CHANNEL_PERMISSION_VIEW,
     },
     tools,
     types::AppState,
@@ -76,6 +77,8 @@ pub struct UpdateProjectDescriptionRequest {
 
 #[derive(Deserialize)]
 pub struct UpdateChannelRolePermissionRequest {
+    pub member_id: Option<String>,
+    #[serde(default)]
     pub role_id: String,
     #[serde(default)]
     pub allow: Vec<String>,
@@ -225,14 +228,22 @@ pub async fn get_channel_permissions(
             Ok(permissions) => permissions,
             Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
         };
-    match state
+    let role_overrides = match state
         .store
         .list_project_channel_role_permission_overrides(&project.id, &channel_id)
     {
-        Ok(overrides) => Json(serde_json::json!({
+        Ok(overrides) => overrides,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    match state
+        .store
+        .list_project_channel_member_permission_overrides(&project.id, &channel_id)
+    {
+        Ok(member_overrides) => Json(serde_json::json!({
             "project_id": project.id,
             "channel_id": channel_id,
-            "overrides": overrides,
+            "overrides": role_overrides,
+            "member_overrides": member_overrides,
             "current_user_permissions": current_user_permissions,
             "permissions": channel_permission_options(),
         }))
@@ -264,6 +275,27 @@ pub async fn update_channel_permissions(
     ) {
         return json_error(StatusCode::FORBIDDEN, "当前角色无权管理该频道权限");
     }
+    let clean_member_id = req.member_id.as_deref().map(str::trim).unwrap_or("");
+    if !clean_member_id.is_empty() {
+        return match state.store.set_project_channel_member_permission_override(
+            &project.id,
+            &channel_id,
+            clean_member_id,
+            &req.allow,
+            &req.deny,
+            Some(&user.id),
+        ) {
+            Ok(member_overrides) => channel_permissions_payload(
+                &state,
+                &project.id,
+                &channel_id,
+                &user.id,
+                Some(member_overrides),
+                None,
+            ),
+            Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        };
+    }
     match state.store.set_project_channel_role_permission_override(
         &project.id,
         &channel_id,
@@ -272,27 +304,63 @@ pub async fn update_channel_permissions(
         &req.deny,
         Some(&user.id),
     ) {
-        Ok(overrides) => {
-            let current_user_permissions = match state.store.project_member_channel_permissions(
-                &project.id,
-                &channel_id,
-                &user.id,
-            ) {
-                Ok(permissions) => permissions,
-                Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
-            };
-            Json(serde_json::json!({
-                "ok": true,
-                "project_id": project.id,
-                "channel_id": channel_id,
-                "overrides": overrides,
-                "current_user_permissions": current_user_permissions,
-                "permissions": channel_permission_options(),
-            }))
-            .into_response()
-        }
+        Ok(overrides) => channel_permissions_payload(
+            &state,
+            &project.id,
+            &channel_id,
+            &user.id,
+            None,
+            Some(overrides),
+        ),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
+}
+
+fn channel_permissions_payload(
+    state: &AppState,
+    project_id: &str,
+    channel_id: &str,
+    user_id: &str,
+    member_overrides: Option<Vec<ProjectChannelMemberPermissionOverride>>,
+    role_overrides: Option<Vec<ProjectChannelRolePermissionOverride>>,
+) -> Response {
+    let role_overrides = match role_overrides {
+        Some(overrides) => overrides,
+        None => match state
+            .store
+            .list_project_channel_role_permission_overrides(project_id, channel_id)
+        {
+            Ok(overrides) => overrides,
+            Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        },
+    };
+    let member_overrides = match member_overrides {
+        Some(overrides) => overrides,
+        None => match state
+            .store
+            .list_project_channel_member_permission_overrides(project_id, channel_id)
+        {
+            Ok(overrides) => overrides,
+            Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        },
+    };
+    let current_user_permissions = match state
+        .store
+        .project_member_channel_permissions(project_id, channel_id, user_id)
+    {
+        Ok(permissions) => permissions,
+        Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    };
+    Json(serde_json::json!({
+        "ok": true,
+        "project_id": project_id,
+        "channel_id": channel_id,
+        "overrides": role_overrides,
+        "member_overrides": member_overrides,
+        "current_user_permissions": current_user_permissions,
+        "permissions": channel_permission_options(),
+    }))
+    .into_response()
 }
 
 async fn project_space_response(

@@ -2439,6 +2439,15 @@ button { cursor: pointer; }
 .member-channel-permission-card > .text-button {
   justify-content: center;
 }
+.member-channel-permission-section {
+  display: grid;
+  gap: 8px;
+}
+.member-channel-permission-section > strong {
+  color: #c6cad3;
+  font-size: 11px;
+  line-height: 1.2;
+}
 .member-search {
   position: sticky;
   top: 0;
@@ -2553,6 +2562,11 @@ button { cursor: pointer; }
   font-weight: 800;
   color: white;
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.05);
+}
+.member-avatar.tiny {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
 }
 .member-avatar.online::after,
 .member-avatar.offline::after {

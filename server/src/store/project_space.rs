@@ -12,9 +12,10 @@ use super::project_roles::{
     project_member_has_permission_locked, project_member_role_refs_locked,
 };
 use super::{
-    new_id, now, project_branding, ProjectChannel, ProjectChannelMessage,
-    ProjectChannelPermissions, ProjectChannelRolePermissionOverride, ProjectSpaceSummary, Store,
-    PERMISSION_MANAGE_PROJECT_SETTINGS, PERMISSION_SEND_MESSAGES, PERMISSION_VIEW_MEMBERS,
+    new_id, now, project_branding, ProjectChannel, ProjectChannelMemberPermissionOverride,
+    ProjectChannelMessage, ProjectChannelPermissions, ProjectChannelRolePermissionOverride,
+    ProjectSpaceSummary, Store, PERMISSION_MANAGE_PROJECT_SETTINGS, PERMISSION_SEND_MESSAGES,
+    PERMISSION_VIEW_MEMBERS,
 };
 
 pub const CHANNEL_PERMISSION_VIEW: &str = "view_channel";
@@ -197,6 +198,7 @@ impl Store {
                         can_manage: false,
                     },
                     role_overrides: Vec::new(),
+                    member_overrides: Vec::new(),
                     last_message: row.get(5)?,
                     last_message_at: row.get(6)?,
                     unread_count: row.get(7)?,
@@ -211,12 +213,20 @@ impl Store {
             if !permissions.can_view {
                 continue;
             }
+            let can_manage_channel = permissions.can_manage;
             channel.permissions = permissions;
-            channel.role_overrides = list_project_channel_role_permission_overrides_locked(
-                &conn,
-                project_id,
-                &channel.id,
-            )?;
+            if can_manage_channel {
+                channel.role_overrides = list_project_channel_role_permission_overrides_locked(
+                    &conn,
+                    project_id,
+                    &channel.id,
+                )?;
+                channel.member_overrides = list_project_channel_member_permission_overrides_locked(
+                    &conn,
+                    project_id,
+                    &channel.id,
+                )?;
+            }
             visible.push(channel);
         }
         Ok(visible)
@@ -298,6 +308,58 @@ impl Store {
             )?;
         }
         list_project_channel_role_permission_overrides_locked(&conn, project_id, channel_id)
+    }
+
+    pub fn list_project_channel_member_permission_overrides(
+        &self,
+        project_id: &str,
+        channel_id: &str,
+    ) -> Result<Vec<ProjectChannelMemberPermissionOverride>> {
+        self.ensure_project_default_channels(project_id)?;
+        let conn = self.conn()?;
+        ensure_project_channel_exists_locked(&conn, project_id, channel_id)?;
+        list_project_channel_member_permission_overrides_locked(&conn, project_id, channel_id)
+    }
+
+    pub fn set_project_channel_member_permission_override(
+        &self,
+        project_id: &str,
+        channel_id: &str,
+        user_id: &str,
+        allow: &[String],
+        deny: &[String],
+        updated_by: Option<&str>,
+    ) -> Result<Vec<ProjectChannelMemberPermissionOverride>> {
+        self.ensure_project_default_channels(project_id)?;
+        let conn = self.conn()?;
+        ensure_project_channel_exists_locked(&conn, project_id, channel_id)?;
+        ensure_project_member_exists_locked(&conn, project_id, user_id)?;
+        let mut allow = clean_channel_permissions(allow);
+        let deny = clean_channel_permissions(deny);
+        allow.retain(|permission| !deny.iter().any(|item| item == permission));
+        let now_str = now();
+        conn.execute(
+            "DELETE FROM project_channel_member_permissions
+             WHERE project_id = ?1 AND channel_id = ?2 AND user_id = ?3",
+            params![project_id, channel_id, user_id],
+        )?;
+        for permission in deny {
+            conn.execute(
+                "INSERT INTO project_channel_member_permissions
+                 (project_id, channel_id, user_id, permission, effect, updated_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, 'deny', ?5, ?6)",
+                params![project_id, channel_id, user_id, permission, updated_by, &now_str],
+            )?;
+        }
+        for permission in allow {
+            conn.execute(
+                "INSERT INTO project_channel_member_permissions
+                 (project_id, channel_id, user_id, permission, effect, updated_by, updated_at)
+                 VALUES (?1, ?2, ?3, ?4, 'allow', ?5, ?6)",
+                params![project_id, channel_id, user_id, permission, updated_by, &now_str],
+            )?;
+        }
+        list_project_channel_member_permission_overrides_locked(&conn, project_id, channel_id)
     }
 
     pub fn list_project_channel_messages(
@@ -642,7 +704,7 @@ fn project_member_channel_permissions_locked(
     )
     .unwrap_or(false);
 
-    let can_view = apply_channel_role_overrides_locked(
+    let can_view_after_roles = apply_channel_role_overrides_locked(
         conn,
         project_id,
         channel_id,
@@ -650,7 +712,15 @@ fn project_member_channel_permissions_locked(
         CHANNEL_PERMISSION_VIEW,
         can_view_base,
     )?;
-    let mut can_send = apply_channel_role_overrides_locked(
+    let can_view = apply_channel_member_overrides_locked(
+        conn,
+        project_id,
+        channel_id,
+        user_id,
+        CHANNEL_PERMISSION_VIEW,
+        can_view_after_roles,
+    )?;
+    let can_send_after_roles = apply_channel_role_overrides_locked(
         conn,
         project_id,
         channel_id,
@@ -658,25 +728,49 @@ fn project_member_channel_permissions_locked(
         CHANNEL_PERMISSION_SEND,
         can_send_base,
     )?;
+    let mut can_send = apply_channel_member_overrides_locked(
+        conn,
+        project_id,
+        channel_id,
+        user_id,
+        CHANNEL_PERMISSION_SEND,
+        can_send_after_roles,
+    )?;
     if channel_kind == "docs" {
         can_send = false;
     }
+    let can_start_ai_after_roles = apply_channel_role_overrides_locked(
+        conn,
+        project_id,
+        channel_id,
+        &role_ids,
+        CHANNEL_PERMISSION_START_AI,
+        can_start_ai_base,
+    )?;
     let can_start_ai = channel_kind == "ai_development"
-        && apply_channel_role_overrides_locked(
+        && apply_channel_member_overrides_locked(
             conn,
             project_id,
             channel_id,
-            &role_ids,
+            user_id,
             CHANNEL_PERMISSION_START_AI,
-            can_start_ai_base,
+            can_start_ai_after_roles,
         )?;
-    let can_manage = apply_channel_role_overrides_locked(
+    let can_manage_after_roles = apply_channel_role_overrides_locked(
         conn,
         project_id,
         channel_id,
         &role_ids,
         CHANNEL_PERMISSION_MANAGE,
         can_manage_base,
+    )?;
+    let can_manage = apply_channel_member_overrides_locked(
+        conn,
+        project_id,
+        channel_id,
+        user_id,
+        CHANNEL_PERMISSION_MANAGE,
+        can_manage_after_roles,
     )?;
     Ok(ProjectChannelPermissions {
         can_view,
@@ -731,6 +825,37 @@ fn apply_channel_role_overrides_locked(
     Ok(base)
 }
 
+fn apply_channel_member_overrides_locked(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+    channel_id: &str,
+    user_id: &str,
+    permission: &str,
+    base: bool,
+) -> Result<bool> {
+    let effects = conn
+        .prepare(
+            "SELECT effect
+               FROM project_channel_member_permissions
+              WHERE project_id = ?1
+                AND channel_id = ?2
+                AND user_id = ?3
+                AND permission = ?4",
+        )?
+        .query_map(
+            params![project_id, channel_id, user_id, permission],
+            |row| row.get::<_, String>(0),
+        )?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    if effects.iter().any(|effect| effect == "deny") {
+        return Ok(false);
+    }
+    if effects.iter().any(|effect| effect == "allow") {
+        return Ok(true);
+    }
+    Ok(base)
+}
+
 fn ensure_project_channel_exists_locked(
     conn: &rusqlite::Connection,
     project_id: &str,
@@ -743,6 +868,24 @@ fn ensure_project_channel_exists_locked(
     )
     .optional()?
     .ok_or_else(|| anyhow!("频道不存在"))
+}
+
+fn ensure_project_member_exists_locked(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+    user_id: &str,
+) -> Result<()> {
+    let exists: Option<i64> = conn
+        .query_row(
+            "SELECT 1 FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+            params![project_id, user_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if exists.is_none() {
+        anyhow::bail!("成员不存在");
+    }
+    Ok(())
 }
 
 fn list_project_channel_role_permission_overrides_locked(
@@ -772,6 +915,48 @@ fn list_project_channel_role_permission_overrides_locked(
             None => {
                 out.push(ProjectChannelRolePermissionOverride {
                     role_id: role_id.clone(),
+                    allow: Vec::new(),
+                    deny: Vec::new(),
+                });
+                out.last_mut().expect("entry should exist")
+            }
+        };
+        if effect == "deny" {
+            entry.deny.push(permission);
+        } else {
+            entry.allow.push(permission);
+        }
+    }
+    Ok(out)
+}
+
+fn list_project_channel_member_permission_overrides_locked(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+    channel_id: &str,
+) -> Result<Vec<ProjectChannelMemberPermissionOverride>> {
+    let mut stmt = conn.prepare(
+        "SELECT user_id, permission, effect
+           FROM project_channel_member_permissions
+          WHERE project_id = ?1 AND channel_id = ?2
+          ORDER BY user_id, permission",
+    )?;
+    let rows = stmt
+        .query_map(params![project_id, channel_id], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+            ))
+        })?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut out: Vec<ProjectChannelMemberPermissionOverride> = Vec::new();
+    for (user_id, permission, effect) in rows {
+        let entry = match out.iter_mut().find(|entry| entry.user_id == user_id) {
+            Some(entry) => entry,
+            None => {
+                out.push(ProjectChannelMemberPermissionOverride {
+                    user_id: user_id.clone(),
                     allow: Vec::new(),
                     deny: Vec::new(),
                 });
@@ -960,6 +1145,80 @@ mod tests {
                 Some(&owner.id),
             )
             .expect("allow override should save");
+        let permissions = store
+            .project_member_channel_permissions(&project.id, &channel.id, &viewer.id)
+            .expect("permissions should reload");
+        assert!(permissions.can_view);
+        assert!(permissions.can_send);
+    }
+
+    #[test]
+    fn channel_member_permission_overrides_can_override_role_denies() {
+        let store = temp_store();
+        let owner = store
+            .create_user(
+                "channel-member-perm-owner@example.com",
+                "secret1",
+                None,
+                None,
+            )
+            .expect("owner should be created");
+        let viewer = store
+            .create_user(
+                "channel-member-perm-viewer@example.com",
+                "secret1",
+                None,
+                None,
+            )
+            .expect("viewer should be created");
+        let project = store
+            .create_project(&owner.id, "Channel Member Permissions", None, None)
+            .expect("project should be created")
+            .project;
+        store
+            .add_project_member_by_account(
+                &project.id,
+                "channel-member-perm-viewer@example.com",
+                "observer",
+            )
+            .expect("viewer should be invited");
+        let channel = store
+            .list_project_space_channels(&owner.id, &project.id)
+            .expect("owner channels should list")
+            .into_iter()
+            .find(|channel| channel.kind == "discussion")
+            .expect("discussion channel should exist");
+
+        store
+            .set_project_channel_role_permission_override(
+                &project.id,
+                &channel.id,
+                "observer",
+                &[],
+                &[CHANNEL_PERMISSION_VIEW.to_string()],
+                Some(&owner.id),
+            )
+            .expect("role deny override should save");
+        assert!(
+            !store
+                .project_member_channel_permissions(&project.id, &channel.id, &viewer.id)
+                .expect("permissions should load")
+                .can_view
+        );
+
+        store
+            .set_project_channel_member_permission_override(
+                &project.id,
+                &channel.id,
+                &viewer.id,
+                &[
+                    CHANNEL_PERMISSION_VIEW.to_string(),
+                    CHANNEL_PERMISSION_SEND.to_string(),
+                ],
+                &[],
+                Some(&owner.id),
+            )
+            .expect("member allow override should save");
         let permissions = store
             .project_member_channel_permissions(&project.id, &channel.id, &viewer.id)
             .expect("permissions should reload");
