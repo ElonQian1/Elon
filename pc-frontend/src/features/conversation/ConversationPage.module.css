@@ -1,6 +1,6 @@
 .layout {
   display: grid;
-  grid-template-columns: 200px 180px minmax(0, 1fr);
+  grid-template-columns: 200px 180px minmax(0, 1fr) 220px;
   height: 100%;
   overflow: hidden;
   background: var(--bg-base);
@@ -8,12 +8,18 @@
 
 /* ── 项目列表侧边栏 ── */
 .projectSidebar,
-.channelSidebar {
+.channelSidebar,
+.memberSidebar {
   display: flex;
   flex-direction: column;
   background: var(--bg-surface);
   border-right: 1px solid var(--border);
   overflow-y: auto;
+}
+
+.memberSidebar {
+  border-right: 0;
+  border-left: 1px solid var(--border);
 }
 
 .sideHeader {
@@ -106,6 +112,19 @@
 }
 
 /* ── 频道列表 ── */
+.channelGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.channelGroupTitle {
+  padding: 12px 12px 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
 .channelBtn {
   display: flex;
   align-items: center;
@@ -123,6 +142,88 @@
 
 .channelIcon { font-size: 13px; width: 18px; text-align: center; flex-shrink: 0; }
 .channelName { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+
+/* ── 成员栏 ── */
+.memberToolBtn {
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.memberToolBtn:hover { color: var(--text-primary); border-color: var(--accent); }
+
+.memberCount {
+  padding: 0 12px 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.memberList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 0 6px 12px;
+}
+
+.memberRow {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) 10px;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+}
+
+.memberRow:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+.memberAvatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.memberInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.memberInfo strong,
+.memberInfo small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memberInfo strong { font-size: 13px; }
+.memberInfo small { font-size: 11px; color: var(--text-muted); }
+
+.memberDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  opacity: 0.45;
+}
+
+.memberOnline {
+  background: var(--accent);
+  opacity: 1;
+}
 
 /* ── 主区域 ── */
 .main {
@@ -303,10 +404,162 @@
   color: var(--danger);
 }
 
+/* ── 权限抽屉 ── */
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.52);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.permissionDrawer {
+  width: min(920px, 92vw);
+  height: 100%;
+  background: var(--bg-surface);
+  border-left: 1px solid var(--border);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.drawerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawerHeader div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.drawerHeader strong { color: var(--text-primary); font-size: 15px; }
+.drawerHeader span { color: var(--text-muted); font-size: 12px; min-height: 16px; }
+
+.drawerCloseBtn,
+.savePermissionBtn {
+  padding: 7px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.drawerCloseBtn:hover,
+.savePermissionBtn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--text-primary);
+}
+
+.permissionColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.permissionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.permissionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.permissionToolbar strong { color: var(--text-primary); font-size: 13px; }
+
+.permissionToolbar select,
+.permissionGrid select {
+  min-width: 0;
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 12px;
+}
+
+.permissionCards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permissionCard {
+  background: var(--bg-base);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.permissionCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.permissionCardHead strong {
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.permissionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.permissionGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.permissionGrid span,
+.permissionMemberName {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.savePermissionBtn {
+  align-self: flex-end;
+}
+
 /* ── 响应式 ── */
 @media (max-width: 1100px) {
   .layout { grid-template-columns: 180px 1fr; }
-  .channelSidebar { display: none; }
+  .channelSidebar,
+  .memberSidebar { display: none; }
 }
 
 @media (max-width: 720px) {

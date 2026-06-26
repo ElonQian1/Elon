@@ -1,12 +1,15 @@
 import { create } from 'zustand'
 import { api } from '../../api/client'
-import type { Project, Channel, Message, ProjectSpace, ProjectListResponse, ChannelMessagesResponse } from './types'
+import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectListResponse, ChannelMessagesResponse } from './types'
 
 interface ProjectState {
   projects: Project[]
   projectsLoaded: boolean
   activeProjectId: string
+  space: ProjectSpace | null
   channels: Channel[]
+  categories: ChannelCategory[]
+  members: ProjectMember[]
   activeChannelId: string
   messages: Message[]
   messagesLoading: boolean
@@ -15,6 +18,7 @@ interface ProjectState {
 
   loadProjects: () => Promise<void>
   selectProject: (id: string) => Promise<void>
+  reloadProjectSpace: () => Promise<void>
   selectChannel: (id: string) => Promise<void>
   loadMessages: (projectId: string, channelId: string) => Promise<void>
   sendMessage: (content: string, agent?: string | null) => Promise<void>
@@ -28,7 +32,10 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   projects: [],
   projectsLoaded: false,
   activeProjectId: '',
+  space: null,
   channels: [],
+  categories: [],
+  members: [],
   activeChannelId: '',
   messages: [],
   messagesLoading: false,
@@ -43,11 +50,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   selectProject: async (id: string) => {
     if (get().activeProjectId === id) return
     get().stopPolling()
-    set({ activeProjectId: id, channels: [], activeChannelId: '', messages: [] })
+    set({ activeProjectId: id, space: null, channels: [], categories: [], members: [], activeChannelId: '', messages: [] })
     try {
       const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(id)}/space`)
       const channels = space.channels ?? []
-      set({ channels })
+      set({ space, channels, categories: space.categories ?? [], members: space.members ?? [] })
       if (channels.length > 0) {
         // 优先选 ai_development 频道，其次选第一个
         const preferred = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
@@ -56,6 +63,21 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     } catch (err) {
       console.warn('Failed to load project space:', err)
     }
+  },
+
+  reloadProjectSpace: async () => {
+    const { activeProjectId, activeChannelId } = get()
+    if (!activeProjectId) return
+    const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(activeProjectId)}/space`)
+    const channels = space.channels ?? []
+    const nextActive = channels.some((c) => c.id === activeChannelId) ? activeChannelId : (channels[0]?.id ?? '')
+    set({
+      space,
+      channels,
+      categories: space.categories ?? [],
+      members: space.members ?? [],
+      activeChannelId: nextActive,
+    })
   },
 
   selectChannel: async (id: string) => {

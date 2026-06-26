@@ -879,7 +879,19 @@ impl Store {
             params![project_id],
         )?;
         tx.execute(
+            "DELETE FROM project_channel_category_role_permissions WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_channel_category_member_permissions WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
             "DELETE FROM project_channels WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_channel_categories WHERE project_id = ?1",
             params![project_id],
         )?;
         tx.execute(

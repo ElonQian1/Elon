@@ -424,6 +424,11 @@ pub fn build_app(state: Arc<AppState>) -> Router {
                 .patch(project_space::update_channel_permissions),
         )
         .route(
+            "/api/projects/:project_id/channel-categories/:category_id/permissions",
+            get(project_space::get_channel_category_permissions)
+                .patch(project_space::update_channel_category_permissions),
+        )
+        .route(
             "/api/projects/:project_id/channels/:channel_id/messages/:message_id/suggestion",
             axum::routing::patch(project_space::mark_suggestion_updated),
         )

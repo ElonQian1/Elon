@@ -574,6 +574,11 @@ pub struct ProjectSpaceSummary {
 pub struct ProjectChannel {
     pub id: String,
     pub project_id: String,
+    pub category_id: Option<String>,
+    pub category_name: Option<String>,
+    pub category_kind: Option<String>,
+    pub category_position: i64,
+    pub permission_sync: bool,
     pub name: String,
     pub kind: String,
     pub position: i64,
@@ -583,6 +588,15 @@ pub struct ProjectChannel {
     pub last_message: Option<String>,
     pub last_message_at: Option<String>,
     pub unread_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectChannelCategory {
+    pub id: String,
+    pub project_id: String,
+    pub name: String,
+    pub kind: String,
+    pub position: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]

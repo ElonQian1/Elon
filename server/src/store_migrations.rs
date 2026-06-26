@@ -106,6 +106,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (72, "项目成员多角色绑定", migration_v72),
     (73, "项目频道角色权限覆盖", migration_v73),
     (74, "项目频道成员权限覆盖", migration_v74),
+    (75, "项目频道分类与分类权限继承", migration_v75),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2461,6 +2462,70 @@ fn migration_v74(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_channel_member_permissions_channel
           ON project_channel_member_permissions(project_id, channel_id, user_id);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v75(conn: &Connection) -> Result<()> {
+    add_column_if_missing(conn, "project_channels", "category_id", "category_id TEXT")?;
+    add_column_if_missing(
+        conn,
+        "project_channels",
+        "permission_sync",
+        "permission_sync INTEGER NOT NULL DEFAULT 1",
+    )?;
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_channel_categories (
+          id         TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          name       TEXT NOT NULL,
+          kind       TEXT NOT NULL,
+          position   INTEGER NOT NULL DEFAULT 0,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          UNIQUE(project_id, kind),
+          FOREIGN KEY (project_id) REFERENCES projects(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_channel_categories_project_position
+          ON project_channel_categories(project_id, position);
+
+        CREATE TABLE IF NOT EXISTS project_channel_category_role_permissions (
+          project_id   TEXT NOT NULL,
+          category_id  TEXT NOT NULL,
+          role_id      TEXT NOT NULL,
+          permission   TEXT NOT NULL,
+          effect       TEXT NOT NULL CHECK (effect IN ('allow', 'deny')),
+          updated_by   TEXT,
+          updated_at   TEXT NOT NULL,
+          PRIMARY KEY (project_id, category_id, role_id, permission),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (category_id) REFERENCES project_channel_categories(id),
+          FOREIGN KEY (updated_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_channel_category_role_permissions_category
+          ON project_channel_category_role_permissions(project_id, category_id, role_id);
+
+        CREATE TABLE IF NOT EXISTS project_channel_category_member_permissions (
+          project_id   TEXT NOT NULL,
+          category_id  TEXT NOT NULL,
+          user_id      TEXT NOT NULL,
+          permission   TEXT NOT NULL,
+          effect       TEXT NOT NULL CHECK (effect IN ('allow', 'deny')),
+          updated_by   TEXT,
+          updated_at   TEXT NOT NULL,
+          PRIMARY KEY (project_id, category_id, user_id, permission),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (category_id) REFERENCES project_channel_categories(id),
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (updated_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_channel_category_member_permissions_category
+          ON project_channel_category_member_permissions(project_id, category_id, user_id);
         "#,
     )?;
     Ok(())
