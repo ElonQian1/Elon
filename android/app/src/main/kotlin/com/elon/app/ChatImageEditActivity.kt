@@ -70,31 +70,31 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(132),
+                dp(88),
                 Gravity.TOP
             )
             gravity = Gravity.CENTER_VERTICAL
             orientation = LinearLayout.HORIZONTAL
-            setPadding(dp(32), dp(44), dp(30), 0)
+            setPadding(dp(32), dp(20), dp(30), 0)
 
             addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(108), dp(58))
+                layoutParams = LinearLayout.LayoutParams(dp(76), dp(44))
                 gravity = Gravity.CENTER_VERTICAL or Gravity.START
                 includeFontPadding = false
                 text = "取消"
                 setTextColor(Color.parseColor("#D9D9D9"))
-                textSize = 22f
+                textSize = 16f
                 setOnClickListener { finish() }
             })
             addView(View(context), LinearLayout.LayoutParams(0, 1, 1f))
             addView(TextView(context).apply {
-                layoutParams = LinearLayout.LayoutParams(dp(104), dp(52))
-                background = roundedRect("#D9D9D9", dp(26))
+                layoutParams = LinearLayout.LayoutParams(dp(82), dp(40))
+                background = roundedRect("#FFFFFF", dp(20))
                 gravity = Gravity.CENTER
                 includeFontPadding = false
                 text = "完成"
                 setTextColor(Color.BLACK)
-                textSize = 22f
+                textSize = 16f
                 setOnClickListener { finishWithEditedImage() }
             })
         }
@@ -107,7 +107,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 dp(64),
                 Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
             ).apply {
-                bottomMargin = dp(126)
+                bottomMargin = dp(76)
             }
             gravity = Gravity.CENTER
             orientation = LinearLayout.HORIZONTAL
@@ -146,17 +146,17 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 Gravity.BOTTOM
             )
 
-            undoButton = iconButton(R.drawable.ic_chat_image_tool_undo, "撤销").apply {
-                layoutParams = FrameLayout.LayoutParams(dp(48), dp(56), Gravity.START or Gravity.CENTER_VERTICAL).apply {
-                    leftMargin = dp(18)
+            undoButton = iconButton(R.drawable.ic_chat_image_tool_undo, "撤销", padding = 0).apply {
+                layoutParams = FrameLayout.LayoutParams(dp(64), dp(64), Gravity.START or Gravity.CENTER_VERTICAL).apply {
+                    leftMargin = dp(12)
                 }
                 setOnClickListener {
                     if (canvasView.undo()) refreshUndoRedo()
                 }
             }
-            redoButton = iconButton(R.drawable.ic_chat_image_tool_redo, "重做").apply {
-                layoutParams = FrameLayout.LayoutParams(dp(48), dp(56), Gravity.END or Gravity.CENTER_VERTICAL).apply {
-                    rightMargin = dp(18)
+            redoButton = iconButton(R.drawable.ic_chat_image_tool_redo, "重做", padding = 0).apply {
+                layoutParams = FrameLayout.LayoutParams(dp(64), dp(64), Gravity.END or Gravity.CENTER_VERTICAL).apply {
+                    rightMargin = dp(12)
                 }
                 setOnClickListener {
                     if (canvasView.redo()) refreshUndoRedo()
@@ -218,10 +218,10 @@ internal class ChatImageEditActivity : AppCompatActivity() {
 
     private fun refreshUndoRedo() {
         if (::undoButton.isInitialized) {
-            undoButton.alpha = if (canvasView.canUndo()) 1f else 0.35f
+            undoButton.alpha = if (canvasView.canUndo()) 1f else 0.72f
         }
         if (::redoButton.isInitialized) {
-            redoButton.alpha = if (canvasView.canRedo()) 1f else 0.35f
+            redoButton.alpha = if (canvasView.canRedo()) 1f else 0.72f
         }
     }
 
@@ -322,13 +322,14 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         )
     }
 
-    private fun iconButton(iconRes: Int, description: String): ImageButton {
+    private fun iconButton(iconRes: Int, description: String, padding: Int = 8): ImageButton {
         return ImageButton(this).apply {
             contentDescription = description
             background = ColorDrawable(Color.TRANSPARENT)
             setImageResource(iconRes)
+            setColorFilter(Color.WHITE)
             scaleType = ImageView.ScaleType.CENTER_INSIDE
-            setPadding(dp(8), dp(8), dp(8), dp(8))
+            setPadding(dp(padding), dp(padding), dp(padding), dp(padding))
             isClickable = true
         }
     }
