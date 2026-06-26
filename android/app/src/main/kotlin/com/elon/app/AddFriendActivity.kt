@@ -3,7 +3,6 @@ package com.elon.app
 import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
-import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
@@ -36,9 +35,7 @@ class AddFriendActivity : AppCompatActivity() {
     private val http = OkHttpClient()
     private val serverUrl get() = ServerUrlManager.getActive(this)
     private val recommendations = mutableListOf<AddFriendRecommendation>()
-    private var qrBitmap: Bitmap? = null
     private lateinit var searchInput: EditText
-    private lateinit var recommendationScroll: ScrollView
     private lateinit var recommendationList: LinearLayout
     private lateinit var resultText: TextView
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -55,11 +52,6 @@ class AddFriendActivity : AppCompatActivity() {
         loadRecommendations()
     }
 
-    override fun onDestroy() {
-        qrBitmap?.recycle()
-        qrBitmap = null
-        super.onDestroy()
-    }
     private fun buildContent(): View {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -72,6 +64,14 @@ class AddFriendActivity : AppCompatActivity() {
                 leftMargin = dp(16)
                 rightMargin = dp(16)
                 topMargin = dp(6)
+            })
+            addView(recommendationHeader(), LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(44)
+            ).apply {
+                leftMargin = dp(16)
+                rightMargin = dp(16)
+                topMargin = dp(32)
             })
             addView(ScrollView(this@AddFriendActivity).apply {
                 overScrollMode = View.OVER_SCROLL_NEVER
@@ -152,27 +152,14 @@ class AddFriendActivity : AppCompatActivity() {
     private fun pageBody(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(36), dp(16), dp(44))
-            addView(TextView(this@AddFriendActivity).apply {
-                text = "推荐"
-                includeFontPadding = false
-                textSize = 16f
-                setTextColor(Color.parseColor("#D9D9D9"))
-            })
+            setPadding(dp(16), dp(16), dp(16), dp(44))
             recommendationList = LinearLayout(this@AddFriendActivity).apply {
                 orientation = LinearLayout.VERTICAL
             }
-            recommendationScroll = ScrollView(this@AddFriendActivity).apply {
-                overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
-                setBackgroundColor(Color.BLACK)
-                addView(recommendationList)
-            }
-            addView(recommendationScroll, LinearLayout.LayoutParams(
+            addView(recommendationList, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                0
-            ).apply {
-                topMargin = dp(22)
-            })
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ))
             resultText = TextView(this@AddFriendActivity).apply {
                 text = "正在加载推荐好友..."
                 minHeight = dp(24)
@@ -185,17 +172,20 @@ class AddFriendActivity : AppCompatActivity() {
             ).apply {
                 topMargin = dp(6)
             })
-            addView(scanButton(), LinearLayout.LayoutParams(dp(112), dp(44)).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(48)
-            })
-            addView(qrCard(), LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.WRAP_CONTENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                gravity = Gravity.CENTER_HORIZONTAL
-                topMargin = dp(36)
-            })
+        }
+    }
+
+    private fun recommendationHeader(): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(TextView(this@AddFriendActivity).apply {
+                text = "推荐"
+                includeFontPadding = false
+                textSize = 16f
+                setTextColor(Color.parseColor("#D9D9D9"))
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            addView(scanButton(), LinearLayout.LayoutParams(dp(88), dp(36)))
         }
     }
 
@@ -298,38 +288,23 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER
-            background = roundedRect("#D9D9D9", 22)
+            background = roundedRect("#000000", 18)
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_add_friend_scan)
-                imageTintList = ColorStateList.valueOf(Color.BLACK)
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(24), dp(24)))
             addView(TextView(this@AddFriendActivity).apply {
                 text = "扫一扫"
                 includeFontPadding = false
-                textSize = 16f
+                textSize = 13f
                 setTypeface(typeface, Typeface.BOLD)
-                setTextColor(Color.BLACK)
+                setTextColor(Color.parseColor("#D9D9D9"))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
                 leftMargin = dp(8)
             })
-        }
-    }
-
-    private fun qrCard(): LinearLayout {
-        val qrSize = (resources.displayMetrics.widthPixels - dp(112)).coerceIn(dp(220), dp(320))
-        qrBitmap = QrCodeBitmap.create(UserProfileStore.personalQrPayload(this), qrSize)
-        return LinearLayout(this).apply {
-            background = roundedRect("#FFFFFF", 12)
-            setPadding(dp(10), dp(10), dp(10), dp(10))
-            addView(ImageView(this@AddFriendActivity).apply {
-                setImageBitmap(qrBitmap)
-                scaleType = ImageView.ScaleType.FIT_CENTER
-                contentDescription = "我的一龙账号二维码"
-            }, LinearLayout.LayoutParams(qrSize, qrSize))
         }
     }
 
@@ -384,10 +359,6 @@ class AddFriendActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(76)
             ))
-        }
-        (recommendationScroll.layoutParams as? LinearLayout.LayoutParams)?.let {
-            it.height = dp(items.size.coerceAtMost(12) * 76)
-            recommendationScroll.layoutParams = it
         }
         resultText.setTextColor(Color.parseColor("#777777"))
         resultText.text = when {

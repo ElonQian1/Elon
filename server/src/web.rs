@@ -24,6 +24,7 @@ const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_docu
 const PLAZA_ENTER_SPACE_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_enter_space.png");
 const PLAZA_SHARE_PROJECT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_share_project.png");
 const PLAZA_DOWNLOAD_APK_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_download_apk.png");
+const ADD_FRIEND_SCAN_ICON_PNG: &[u8] = include_bytes!("assets/ic_add_friend_scan.png");
 const POPUP_NEW_PROJECT_PNG_B64: &str = include_str!("assets/ic_popup_new_project.b64");
 const CHAT_SIDE_MENU_HANDLE_PNG_B64: &str = include_str!("assets/ic_chat_side_menu_handle.b64");
 const PROJECT_PLAZA_CSS: &str = include_str!("assets/project_plaza.css");
@@ -215,6 +216,10 @@ pub async fn project_plaza_share_project_icon() -> impl IntoResponse {
 
 pub async fn project_plaza_download_apk_icon() -> impl IntoResponse {
     plaza_icon_response(PLAZA_DOWNLOAD_APK_ICON_PNG)
+}
+
+pub async fn add_friend_scan_icon() -> impl IntoResponse {
+    plaza_icon_response(ADD_FRIEND_SCAN_ICON_PNG)
 }
 
 fn plaza_icon_response(bytes: &'static [u8]) -> impl IntoResponse {
