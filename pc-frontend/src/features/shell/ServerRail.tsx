@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
 import { ModelPickerButton } from '../models/ModelPicker'
 import styles from './ServerRail.module.css'
@@ -24,8 +25,8 @@ const RAIL_ITEMS: RailItem[] = [
 export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-  const logout = useAuthStore((s) => s.logout)
   const user = useAuthStore((s) => s.user)
+  const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
 
   function isActive(path: string) {
     if (path === '/') return pathname === '/'
@@ -42,6 +43,11 @@ export default function ServerRail() {
             className={[styles.avatar, active ? styles.active : ''].join(' ')}
             style={{ '--item-color': item.color, '--item-hover': item.hoverColor } as React.CSSProperties}
             onClick={() => navigate(item.path)}
+            onMouseEnter={(e) => {
+              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+              setTooltip({ text: item.label, y: rect.top + rect.height / 2 })
+            }}
+            onMouseLeave={() => setTooltip(null)}
             title={item.label}
             type="button"
           >
@@ -52,25 +58,37 @@ export default function ServerRail() {
 
       <div className={styles.divider} />
 
-      {/* 模型选择器（紧凑版） */}
+      {/* 模型选择器（紧凑版）*/}
       <div className={styles.modelWrap}>
         <ModelPickerButton compact />
       </div>
 
       <div className={styles.spacer} />
 
-      {/* 用户头像 + 登出 */}
+      {/* 账号头像 → 点击进账号页 */}
       {user && (
         <button
           className={[styles.avatar, styles.userAvatar].join(' ')}
-          title={`${user.nickname ?? user.account} — 点击退出`}
-          onClick={logout}
+          title={`${user.nickname ?? user.account} — 账号设置`}
+          onMouseEnter={(e) => {
+            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            setTooltip({ text: user.nickname ?? user.account ?? '账号', y: rect.top + rect.height / 2 })
+          }}
+          onMouseLeave={() => setTooltip(null)}
+          onClick={() => navigate('/account')}
           type="button"
         >
           <span className={styles.icon}>
             {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? '?'}
           </span>
         </button>
+      )}
+
+      {/* Tooltip */}
+      {tooltip && (
+        <div className={styles.tooltip} style={{ top: tooltip.y, transform: 'translateY(-50%)' }}>
+          {tooltip.text}
+        </div>
       )}
     </nav>
   )

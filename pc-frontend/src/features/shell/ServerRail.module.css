@@ -84,7 +84,33 @@
 }
 
 .userAvatar:hover {
-  background: var(--red);
+  background: #3c6fa2;
   border-radius: 16px;
   color: #fff;
+}
+
+/* ── Tooltip（hover 时显示在 rail 右侧）── */
+.tooltip {
+  position: fixed;
+  left: 80px;
+  z-index: 200;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: #0b0c0f;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+}
+
+.tooltip::before {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 50%;
+  transform: translateY(-50%) rotate(45deg);
+  width: 10px; height: 10px;
+  background: #0b0c0f;
 }
