@@ -507,6 +507,7 @@ mod tests {
             member_count: 1,
             is_public: false,
             join_mode: "invite".to_string(),
+            runtime_permission: "project_write".to_string(),
             last_task_status: None,
             last_apk_url: None,
             icon_data_url: None,

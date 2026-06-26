@@ -593,6 +593,7 @@ pub struct ProjectSummary {
     pub member_count: i64,
     pub is_public: bool,
     pub join_mode: String,
+    pub runtime_permission: String,
     pub last_task_status: Option<String>,
     pub last_apk_url: Option<String>,
     pub icon_data_url: Option<String>,

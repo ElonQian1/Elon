@@ -116,6 +116,12 @@ impl Store {
                      ORDER BY t.created_at DESC LIMIT 1) AS last_apk_url,
                     p.icon_data_url,
                     p.updated_at,
+                    COALESCE(
+                        (SELECT prp.mode
+                           FROM project_runtime_permissions prp
+                          WHERE prp.project_id = p.id),
+                        'project_write'
+                    ) AS runtime_permission,
                     p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
@@ -125,7 +131,7 @@ impl Store {
                 let mut project = ProjectSummary {
                     id: row.get(0)?,
                     name: row.get(1)?,
-                    display_name: row.get(24)?,
+                    display_name: row.get(25)?,
                     description: row.get(2)?,
                     workspace_key: row.get(3)?,
                     template: row.get(4)?,
@@ -144,6 +150,7 @@ impl Store {
                     member_count: row.get(17)?,
                     is_public: row.get::<_, i64>(18)? != 0,
                     join_mode: row.get(19)?,
+                    runtime_permission: row.get(24)?,
                     last_task_status: row.get(20)?,
                     last_apk_url: row.get(21)?,
                     icon_data_url: row.get(22)?,

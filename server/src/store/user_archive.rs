@@ -2,7 +2,7 @@ use anyhow::Result;
 use rusqlite::params;
 
 use super::{
-    is_system_project_source_type, project_branding,
+    default_project_runtime_permission, is_system_project_source_type, project_branding,
     store_types::{ProjectSummary, UserArchiveProject},
     system_project_key_for_source_type, Store,
 };
@@ -40,6 +40,12 @@ impl Store {
                     COALESCE(u.nickname, u.phone, u.email, p.created_by) AS owner_account,
                     p.created_by AS owner_id,
                     COALESCE(u.role, 'user') AS creator_role,
+                    COALESCE(
+                        (SELECT prp.mode
+                           FROM project_runtime_permissions prp
+                          WHERE prp.project_id = p.id),
+                        'project_write'
+                    ) AS runtime_permission,
                     p.display_name
              FROM projects p
              JOIN project_members pm ON pm.project_id = p.id
@@ -70,7 +76,7 @@ fn archive_project_from_row(
     let mut project = ProjectSummary {
         id: row.get(0)?,
         name: row.get(1)?,
-        display_name: row.get(28)?,
+        display_name: row.get(29)?,
         description: row.get(2)?,
         workspace_key: row.get(3)?,
         template: row.get(4)?,
@@ -89,6 +95,9 @@ fn archive_project_from_row(
         member_count: row.get(17)?,
         is_public: row.get::<_, i64>(18)? != 0,
         join_mode: row.get(19)?,
+        runtime_permission: row
+            .get(28)
+            .unwrap_or_else(|_| default_project_runtime_permission()),
         last_task_status: row.get(20)?,
         last_apk_url: row.get(21)?,
         icon_data_url: row.get(22)?,

@@ -2324,8 +2324,7 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 
 // ── 入口 ─────────────────────────────────────────────────────────────────────
 
-#[tokio::main]
-async fn main() -> Result<()> {
+fn main() -> Result<()> {
     #[cfg(windows)]
     {
         let runtime_mode =
@@ -2335,7 +2334,10 @@ async fn main() -> Result<()> {
         }
     }
 
-    run_agent_runtime().await
+    tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?
+        .block_on(run_agent_runtime())
 }
 
 #[cfg(windows)]
