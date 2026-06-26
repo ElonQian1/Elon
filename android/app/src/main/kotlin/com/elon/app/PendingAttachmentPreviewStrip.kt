@@ -3,6 +3,7 @@ package com.elon.app
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
@@ -10,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.HorizontalScrollView
+import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -18,7 +20,8 @@ import java.io.File
 internal class PendingAttachmentPreviewStrip(
     private val context: Context,
     private val pendingAttachments: MutableList<PendingAttachment>,
-    private val onChanged: () -> Unit
+    private val onChanged: () -> Unit,
+    private val onEditImage: (Int) -> Unit
 ) {
     private val list = LinearLayout(context).apply {
         layoutParams = ViewGroup.LayoutParams(
@@ -61,7 +64,11 @@ internal class PendingAttachmentPreviewStrip(
                 marginEnd = context.dp(8)
             }
         }
-        wrapper.addView(if (attachment.isImage()) createImagePreview(attachment) else createFilePreview(attachment))
+        val isImage = attachment.isImage()
+        wrapper.addView(if (isImage) createImagePreview(attachment) else createFilePreview(attachment))
+        if (isImage) {
+            wrapper.addView(createEditButton(index))
+        }
         wrapper.addView(createRemoveButton(index))
         return wrapper
     }
@@ -93,6 +100,20 @@ internal class PendingAttachmentPreviewStrip(
             setTextColor(Color.parseColor("#D6D6D6"))
             text = attachment.displayName
             textSize = 11f
+        }
+    }
+
+    private fun createEditButton(index: Int): ImageButton {
+        return ImageButton(context).apply {
+            layoutParams = FrameLayout.LayoutParams(context.dp(28), context.dp(28), Gravity.TOP or Gravity.START)
+            background = ColorDrawable(Color.TRANSPARENT)
+            contentDescription = "编辑图片"
+            scaleType = ImageView.ScaleType.CENTER
+            setPadding(context.dp(2), context.dp(2), context.dp(2), context.dp(2))
+            setImageResource(R.drawable.ic_chat_image_edit_marker)
+            setOnClickListener {
+                onEditImage(index)
+            }
         }
     }
 

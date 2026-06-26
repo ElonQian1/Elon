@@ -1790,6 +1790,18 @@
       align-items: flex-end;
     }
     .input-bar.active { display: flex; }
+    .input-bar .image-edit-btn {
+      flex: 0 0 42px; height: 42px;
+      background: transparent;
+      border: 0;
+      color: var(--ink);
+      font-size: 26px;
+      border-radius: 21px;
+      cursor: pointer;
+      line-height: 42px;
+      padding: 0;
+    }
+    .input-bar .image-edit-btn:hover { background: #2A2A2A; }
     .input-bar textarea {
       flex: 1;
       min-width: 0;
@@ -2770,6 +2782,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   </div>
 
   <form id="inputBar" class="input-bar">
+    <button class="image-edit-btn" type="button" id="imageEditBtn" title="图片编辑">✎</button>
     <textarea id="messageInput" placeholder="描述你想开发的 App 功能" rows="1"></textarea>
     <button class="model-btn" type="button" id="modelBtn" title="选择模型">默认</button>
     <button class="send-btn" type="submit" id="sendBtn">发送</button>
@@ -3250,6 +3263,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const logoutRow = $('logoutRow');
 
   const inputBar = $('inputBar');
+  const imageEditBtn = $('imageEditBtn');
   const messageInput = $('messageInput');
   const sendBtn = $('sendBtn');
   const modelBtn = $('modelBtn');
@@ -5890,6 +5904,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     messageInput.style.height = 'auto';
     setBusy(true);
   });
+  if (imageEditBtn) {
+    imageEditBtn.addEventListener('click', () => {
+      showNativeOnly('图片选择和微信式图片编辑请在 Android APK 中使用，网页版已同步入口位置。');
+    });
+  }
   messageInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
       e.preventDefault();

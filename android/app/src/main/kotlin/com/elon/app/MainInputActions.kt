@@ -1,9 +1,13 @@
 package com.elon.app
 
+import android.app.Activity
+import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import com.elon.app.databinding.ActivityMainBinding
 import okhttp3.OkHttpClient
+import java.io.File
 
 internal class MainInputActions(
     private val activity: AppCompatActivity,
@@ -43,6 +47,12 @@ internal class MainInputActions(
     private var speechInputActions: MainSpeechInputActions? = null
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
     private var fullScreenEditorOverlay: FullScreenEditorOverlay? = null
+    private var pendingImageEditIndex: Int = -1
+    private val imageEditLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        handleImageEditResult(result.resultCode, result.data)
+    }
     private val planModeActions by lazy {
         MainPlanModeActions(
             inputEdit = { binding.inputEdit },
@@ -100,10 +110,17 @@ internal class MainInputActions(
 
         inputComposerViews = views
         planModeActions.bind(views.planModeButton)
-        pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(activity, pendingAttachments) {
-            collapsedInputPreviewActions.updateCollapsedInputPreview()
-            updateSendButtonVisual()
-        }
+        pendingAttachmentPreviewStrip = PendingAttachmentPreviewStrip(
+            context = activity,
+            pendingAttachments = pendingAttachments,
+            onChanged = {
+                collapsedInputPreviewActions.updateCollapsedInputPreview()
+                updateSendButtonVisual()
+            },
+            onEditImage = { index ->
+                openImageEditor(index)
+            }
+        )
         binding.inputLayout.addView(requireNotNull(pendingAttachmentPreviewStrip).view, 1)
         voiceModeActions.applyVoiceMode()
         collapsedInputPreviewActions.updateCollapsedInputPreview()
@@ -149,6 +166,53 @@ internal class MainInputActions(
 
     fun showVoiceAttachmentActions(message: ChatMessage, attachment: ChatAttachment) {
         speechInputActions().showVoiceAttachmentActions(message, attachment)
+    }
+
+    private fun openImageEditor(index: Int) {
+        val attachment = pendingAttachments.getOrNull(index) ?: return
+        if (!attachment.isEditableImage()) return
+        pendingImageEditIndex = index
+        runCatching {
+            imageEditLauncher.launch(
+                ChatImageEditActivity.createIntent(
+                    activity,
+                    attachment.file.absolutePath,
+                    attachment.displayName
+                )
+            )
+        }.onFailure {
+            pendingImageEditIndex = -1
+            Toast.makeText(activity, "无法打开图片编辑器", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun handleImageEditResult(resultCode: Int, data: Intent?) {
+        val index = pendingImageEditIndex
+        pendingImageEditIndex = -1
+        if (resultCode != Activity.RESULT_OK || data == null || index < 0) return
+        val old = pendingAttachments.getOrNull(index) ?: return
+        val outputPath = data.getStringExtra(ChatImageEditActivity.EXTRA_OUTPUT_PATH).orEmpty()
+        val outputFile = File(outputPath)
+        if (!outputFile.exists()) {
+            Toast.makeText(activity, "编辑后的图片已失效", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val outputName = data.getStringExtra(ChatImageEditActivity.EXTRA_OUTPUT_NAME)
+            ?: outputFile.name
+        val width = data.getIntExtra(ChatImageEditActivity.EXTRA_OUTPUT_WIDTH, 0).takeIf { it > 0 }
+        val height = data.getIntExtra(ChatImageEditActivity.EXTRA_OUTPUT_HEIGHT, 0).takeIf { it > 0 }
+        pendingAttachments[index] = old.copy(
+            displayLabel = "编辑图片",
+            displayName = editedDisplayName(old.displayName),
+            fileName = outputName,
+            mimeType = "image/jpeg",
+            file = outputFile,
+            imageWidth = width,
+            imageHeight = height
+        )
+        runCatching { old.file.delete() }
+        refreshPendingAttachmentPreview()
+        Toast.makeText(activity, "图片已编辑", Toast.LENGTH_SHORT).show()
     }
 
     private fun sendVoiceAttachment(attachment: PendingAttachment, message: String) {
@@ -483,5 +547,14 @@ internal class MainInputActions(
         val outgoingText = expandShortDevelopmentCommand(visibleText, conversation.messages)
         val target = SendTarget(project.id, project.title, conversation.id, conversation.title)
         attachmentSendActions.retryFailedAttachmentMessage(message, visibleText, outgoingText, target)
+    }
+
+    private fun PendingAttachment.isEditableImage(): Boolean {
+        return kind == "image" || mimeType.startsWith("image/")
+    }
+
+    private fun editedDisplayName(name: String): String {
+        val base = name.substringBeforeLast('.', name).ifBlank { "图片" }
+        return "${base}_edited.jpg"
     }
 }

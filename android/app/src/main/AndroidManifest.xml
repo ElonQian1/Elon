@@ -79,6 +79,12 @@
             android:windowSoftInputMode="adjustNothing" />
 
         <activity
+            android:name=".ChatImageEditActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
             android:name=".LoginActivity"
             android:exported="false"
             android:windowSoftInputMode="adjustResize" />
