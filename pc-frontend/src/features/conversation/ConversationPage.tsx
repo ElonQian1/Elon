@@ -296,6 +296,22 @@ export default function ConversationPage() {
                 刷新
               </button>
             )}
+            <button
+              className={styles.textBtn}
+              type="button"
+              title="分享这台电脑的算力并查看连接状态"
+              onClick={() => navigate('/node')}
+            >
+              分享算力
+            </button>
+            <button
+              className={styles.textBtn}
+              type="button"
+              title="打开移动端入口，包含手机端下载和移动网页版（iOS）"
+              onClick={() => window.open('/app/download', '_blank', 'noopener')}
+            >
+              打开移动端
+            </button>
           </div>
         </header>
 
