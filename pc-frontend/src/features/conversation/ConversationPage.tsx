@@ -312,6 +312,14 @@ export default function ConversationPage() {
             >
               打开移动端
             </button>
+            <button
+              className={styles.textBtn}
+              type="button"
+              title="切换到旧版 PC 工作台"
+              onClick={() => window.open('/pc-legacy', '_blank', 'noopener')}
+            >
+              旧版
+            </button>
           </div>
         </header>
 
