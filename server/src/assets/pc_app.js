@@ -51,6 +51,12 @@
     { key: 'joined', label: '已加入', joinedOnly: true },
     { key: 'popular', label: '最热门', sort: 'members' }
   ];
+  const PROJECT_MEMBER_ROLE_OPTIONS = [
+    { key: 'admin', label: '管理员' },
+    { key: 'editor', label: '协作者' },
+    { key: 'member', label: '成员' },
+    { key: 'observer', label: '只读成员' }
+  ];
   let pcAuthMode = 'login';
   let inlineAuthMode = 'login';
   let activeProjectFolderPickController = null;
@@ -431,6 +437,40 @@
     if (role === 'member') return '成员';
     if (role === 'observer' || role === 'viewer') return '只读成员';
     return role;
+  }
+
+  function memberAccountOf(member) {
+    return clean(member && (
+      member.account || member.user_account || member.userAccount || member.phone || member.email
+    ));
+  }
+
+  function memberJoinedAtOf(member) {
+    return clean(member && (
+      member.joined_at || member.joinedAt || member.friend_since || member.friendSince ||
+      member.created_at || member.createdAt
+    ));
+  }
+
+  function activeProjectRole() {
+    const project = projectById(state.activeProjectId) || ((state.projectSpace && state.projectSpace.project) || {});
+    return clean(project.role || project.member_role || project.memberRole || project.viewer_role || project.viewerRole).toLowerCase();
+  }
+
+  function canManageActiveProjectMembers() {
+    const role = activeProjectRole();
+    return role === 'owner' || role === 'admin';
+  }
+
+  function memberPanelProjectId() {
+    const context = clean(state.memberPanel && state.memberPanel.context);
+    return context.startsWith('project:') ? clean(context.slice('project:'.length)) : '';
+  }
+
+  function profileStatusLabel(presence) {
+    if (presence === 'online') return '在线';
+    if (presence === 'offline') return '离线';
+    return '状态未知';
   }
 
   function friendById(id) {
@@ -2867,6 +2907,7 @@
       member.__sub,
       member.__roleLabel,
       member.__id,
+      memberAccountOf(member),
       member.account,
       member.user_account,
       member.email,
@@ -2997,7 +3038,7 @@
   function openMemberProfile(key, anchor) {
     const member = memberByKey(key);
     if (!member) return;
-    state.memberProfile = { key, member };
+    state.memberProfile = { key, member, anchor };
     renderMemberProfile(member, anchor);
   }
 
@@ -3007,13 +3048,81 @@
     if (existing) existing.remove();
   }
 
-  function renderMemberProfile(member, anchor) {
+  function memberProjectManagement(member) {
+    const projectId = memberPanelProjectId();
+    if (!projectId || !member || !member.__id) {
+      return { show: false };
+    }
+    const managerRole = activeProjectRole();
+    const managerLabel = memberRoleLabel(managerRole) || '项目成员';
+    const isSelf = sameId(member.__id, currentUserId());
+    const targetIsOwner = member.__roleGroup === 'owner';
+    const canManage = canManageActiveProjectMembers();
+    let note = '';
+    if (!canManage) note = '只有项目拥有者和管理员可以管理成员';
+    else if (isSelf) note = '不能在这里管理自己的角色或移除自己';
+    else if (targetIsOwner) note = '项目拥有者不能在这里被修改或移除';
+    return {
+      show: canManage || isSelf || targetIsOwner,
+      projectId,
+      managerRole,
+      managerLabel,
+      canChangeRole: canManage && !isSelf && !targetIsOwner,
+      canRemove: canManage && !isSelf && !targetIsOwner,
+      note
+    };
+  }
+
+  function renderMemberProfile(member, anchor, profileState) {
     closeMemberProfile();
-    state.memberProfile = { key: member.__key, member };
+    const viewState = Object.assign({ status: '', tone: '', busy: false }, profileState || {});
+    state.memberProfile = { key: member.__key, member, anchor, status: viewState.status, tone: viewState.tone, busy: viewState.busy };
     const id = member.__id;
     const presence = member.__presence;
     const roleClass = member.__roleGroup ? `member-role-${escapeHtml(member.__roleGroup)}` : '';
     const canMessage = id && !sameId(id, currentUserId()) && !!friendById(id);
+    const canAddFriend = id && !sameId(id, currentUserId()) && !friendById(id) && !sameId(id, SOCIAL_AI_USER_ID);
+    const account = memberAccountOf(member);
+    const joinedAt = memberJoinedAtOf(member);
+    const projectManagement = memberProjectManagement(member);
+    const disabledAttr = viewState.busy ? 'disabled' : '';
+    const details = [
+      account && ['账号', account],
+      id && ['用户 ID', shortUserId(id)],
+      joinedAt && ['加入时间', formatTime(joinedAt)]
+    ].filter(Boolean).map(([label, value]) => `
+      <div class="member-profile-detail">
+        <span>${escapeHtml(label)}</span>
+        <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
+      </div>`).join('');
+    const currentRoleKey = member.__roleGroup || member.__roleKey;
+    const hasEditableRole = PROJECT_MEMBER_ROLE_OPTIONS.some((role) => role.key === currentRoleKey);
+    const currentRoleOption = currentRoleKey && !hasEditableRole
+      ? `<option value="${escapeHtml(currentRoleKey)}" selected>${escapeHtml(memberRoleLabel(currentRoleKey) || currentRoleKey)}</option>`
+      : '';
+    const roleOptions = currentRoleOption + PROJECT_MEMBER_ROLE_OPTIONS.map((role) => {
+      const selected = role.key === member.__roleGroup ? 'selected' : '';
+      return `<option value="${escapeHtml(role.key)}" ${selected}>${escapeHtml(role.label)}</option>`;
+    }).join('');
+    const managementHtml = projectManagement.show
+      ? `<div class="member-management">
+          <div class="member-management-title">
+            <span>项目成员管理</span>
+            <small>${escapeHtml(projectManagement.managerLabel)}</small>
+          </div>
+          <div class="member-role-control">
+            <select data-profile-role ${projectManagement.canChangeRole && !viewState.busy ? '' : 'disabled'}>
+              ${roleOptions}
+            </select>
+            <button class="text-button" type="button" data-profile-action="save-role" ${projectManagement.canChangeRole ? disabledAttr : 'disabled'}>保存</button>
+          </div>
+          <button class="text-button danger member-remove-button" type="button" data-profile-action="remove-project-member" ${projectManagement.canRemove ? disabledAttr : 'disabled'}>移除成员</button>
+          ${projectManagement.note ? `<p>${escapeHtml(projectManagement.note)}</p>` : ''}
+        </div>`
+      : '';
+    const statusHtml = viewState.status
+      ? `<div class="member-profile-status ${viewState.tone ? `is-${escapeHtml(viewState.tone)}` : ''}">${escapeHtml(viewState.status)}</div>`
+      : '';
     const popover = document.createElement('div');
     popover.id = 'memberPopover';
     popover.className = 'member-popover';
@@ -3027,12 +3136,17 @@
         <span>${escapeHtml(member.__sub || '成员')}</span>
         <div class="member-profile-meta">
           ${member.__roleLabel ? `<em>${escapeHtml(member.__roleLabel)}</em>` : ''}
-          <em>${escapeHtml(presence === 'online' ? '在线' : (presence === 'offline' ? '离线' : '状态未知'))}</em>
+          <em>${escapeHtml(profileStatusLabel(presence))}</em>
           ${id ? `<em>${escapeHtml(shortUserId(id))}</em>` : ''}
         </div>
+        ${details ? `<div class="member-profile-details">${details}</div>` : ''}
         <div class="member-profile-actions">
-          <button class="text-button" type="button" data-profile-action="message" ${canMessage ? '' : 'disabled'}>发消息</button>
+          <button class="text-button" type="button" data-profile-action="message" ${canMessage ? disabledAttr : 'disabled'}>发消息</button>
+          <button class="text-button" type="button" data-profile-action="add-friend" ${canAddFriend ? disabledAttr : 'disabled'}>${friendById(id) ? '已是好友' : '加好友'}</button>
+          <button class="text-button" type="button" data-profile-action="copy-id" ${id ? disabledAttr : 'disabled'}>复制 ID</button>
         </div>
+        ${managementHtml}
+        ${statusHtml}
       </div>`;
     document.body.appendChild(popover);
     positionMemberPopover(popover, anchor);
@@ -3052,18 +3166,157 @@
   function handleMemberProfileClick(event) {
     const button = event.target.closest('[data-profile-action]');
     if (!button) return;
+    if (button.disabled) return;
     const action = clean(button.dataset.profileAction);
     if (action === 'close') {
       closeMemberProfile();
       return;
     }
+    const member = state.memberProfile && state.memberProfile.member;
+    if (!member) return;
     if (action === 'message') {
-      const member = state.memberProfile && state.memberProfile.member;
       const id = member && member.__id;
       if (id && friendById(id)) {
         closeMemberProfile();
         selectPeer('friend', id);
       }
+      return;
+    }
+    if (action === 'add-friend') {
+      addProfileMemberAsFriend(member).catch((error) => setMemberProfileStatus(error.message || '添加好友失败', 'error'));
+      return;
+    }
+    if (action === 'copy-id') {
+      copyProfileMemberId(member).catch((error) => setMemberProfileStatus(error.message || '复制失败', 'error'));
+      return;
+    }
+    if (action === 'save-role') {
+      const popover = $('memberPopover');
+      const roleSelect = popover && popover.querySelector('[data-profile-role]');
+      const role = roleSelect && roleSelect.value;
+      updateProfileMemberRole(member, role).catch((error) => setMemberProfileStatus(error.message || '角色更新失败', 'error'));
+      return;
+    }
+    if (action === 'remove-project-member') {
+      removeProfileProjectMember(member).catch((error) => setMemberProfileStatus(error.message || '移除成员失败', 'error'));
+    }
+  }
+
+  function setMemberProfileStatus(message, tone, busy) {
+    const profile = state.memberProfile;
+    if (!profile || !profile.member) return;
+    renderMemberProfile(profile.member, profile.anchor || null, {
+      status: message,
+      tone,
+      busy: !!busy
+    });
+  }
+
+  async function copyProfileMemberId(member) {
+    const id = member && member.__id;
+    if (!id) return;
+    await copyPlainText(id);
+    setMemberProfileStatus('用户 ID 已复制', 'ok');
+  }
+
+  async function addProfileMemberAsFriend(member) {
+    const id = member && member.__id;
+    const account = memberAccountOf(member);
+    const query = id || account;
+    if (!query) {
+      setMemberProfileStatus('这个成员没有可用于添加好友的账号', 'error');
+      return;
+    }
+    setMemberProfileStatus('正在添加好友…', '', true);
+    const data = await api('/api/me/friends', {
+      method: 'POST',
+      body: JSON.stringify({
+        query,
+        search_type: id ? 'account_id' : 'auto'
+      })
+    });
+    const friend = data.friend;
+    if (friend) {
+      const existing = friendById(friend.id);
+      if (existing) Object.assign(existing, friend);
+      else state.friends.push(friend);
+      updatePresenceInList(state.friends, member.__id, member.__presence === 'online');
+      setBadge(els.friendBadge, socialFriends().filter((f) => f.is_online).length);
+      if (state.activeKind === 'friends') renderChannels();
+      renderMemberPanelView();
+      const latest = renderedMemberById(member.__id) || Object.assign({}, member, friend);
+      renderMemberProfile(latest, null, {
+        status: data.already_friend ? '已经是好友' : '已添加为好友',
+        tone: 'ok'
+      });
+      return;
+    }
+    setMemberProfileStatus('好友已处理', 'ok');
+  }
+
+  async function updateProfileMemberRole(member, role) {
+    const management = memberProjectManagement(member);
+    const targetRole = clean(role).toLowerCase();
+    if (!management.canChangeRole || !targetRole) return;
+    setMemberProfileStatus('正在更新角色…', '', true);
+    await api(`/api/projects/${encodeURIComponent(management.projectId)}/members/${encodeURIComponent(member.__id)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ role: targetRole })
+    });
+    patchMemberInProjectLists(member.__id, { role: targetRole, sub: memberRoleLabel(targetRole) || '项目成员' });
+    renderMemberPanelView();
+    const latest = renderedMemberById(member.__id) || Object.assign({}, member, {
+      role: targetRole,
+      __roleKey: targetRole,
+      __roleGroup: memberRoleGroupKey(targetRole),
+      __roleLabel: memberRoleLabel(targetRole),
+      __sub: memberRoleLabel(targetRole) || '项目成员'
+    });
+    renderMemberProfile(latest, null, { status: '角色已更新', tone: 'ok' });
+  }
+
+  async function removeProfileProjectMember(member) {
+    const management = memberProjectManagement(member);
+    if (!management.canRemove) return;
+    const ok = window.confirm(`确认从项目中移除「${member.__name}」？`);
+    if (!ok) return;
+    setMemberProfileStatus('正在移除成员…', '', true);
+    await api(`/api/projects/${encodeURIComponent(management.projectId)}/members/${encodeURIComponent(member.__id)}`, {
+      method: 'DELETE'
+    });
+    removeMemberFromProjectLists(member.__id);
+    closeMemberProfile();
+    renderMemberPanelView();
+  }
+
+  function renderedMemberById(userId) {
+    const id = clean(userId);
+    const panel = state.memberPanel || {};
+    const members = Array.isArray(panel.renderedMembers) ? panel.renderedMembers : [];
+    return members.find((member) => sameId(member.__id, id)) || null;
+  }
+
+  function patchMemberInProjectLists(userId, patch) {
+    const id = clean(userId);
+    if (!id) return;
+    const apply = (list) => {
+      if (!Array.isArray(list)) return;
+      list.forEach((item) => {
+        if (sameId(memberIdOf(item), id)) Object.assign(item, patch);
+      });
+    };
+    apply(state.projectSpace && state.projectSpace.members);
+    apply(state.memberPanel && state.memberPanel.members);
+  }
+
+  function removeMemberFromProjectLists(userId) {
+    const id = clean(userId);
+    if (!id) return;
+    if (state.projectSpace && Array.isArray(state.projectSpace.members)) {
+      state.projectSpace.members = state.projectSpace.members.filter((member) => !sameId(memberIdOf(member), id));
+    }
+    if (state.memberPanel && Array.isArray(state.memberPanel.members)) {
+      state.memberPanel.members = state.memberPanel.members.filter((member) => !sameId(memberIdOf(member), id));
     }
   }
 

@@ -2328,14 +2328,107 @@ button { cursor: pointer; }
   font-style: normal;
   font-weight: 800;
 }
+.member-profile-details {
+  display: grid;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 10px;
+  border-radius: 7px;
+  background: rgba(0,0,0,.12);
+}
+.member-profile-detail {
+  display: grid;
+  grid-template-columns: 56px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+}
+.member-profile-detail span {
+  color: #7f858f;
+  font-size: 11px;
+  font-weight: 800;
+}
+.member-profile-detail strong {
+  min-width: 0;
+  color: #c4c9d4;
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .member-profile-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 14px;
 }
 .member-profile-actions .text-button:disabled {
   opacity: .45;
   cursor: not-allowed;
+}
+.member-management {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255,255,255,.07);
+}
+.member-management-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 900;
+}
+.member-management-title small {
+  color: #838995;
+  font-size: 11px;
+  font-weight: 800;
+}
+.member-role-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-top: 9px;
+}
+.member-role-control select {
+  min-width: 0;
+  height: 32px;
+  border: 1px solid #353943;
+  border-radius: 6px;
+  background: #191a1f;
+  color: var(--text);
+  padding: 0 8px;
+  outline: none;
+  font-size: 12px;
+}
+.member-role-control select:disabled {
+  color: #767b86;
+  cursor: not-allowed;
+}
+.member-remove-button {
+  width: 100%;
+  justify-content: center;
+  margin-top: 8px;
+}
+.member-management p,
+.member-profile-status {
+  margin: 9px 0 0;
+  color: #9399a5;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.member-profile-status {
+  padding: 8px 9px;
+  border-radius: 6px;
+  background: rgba(255,255,255,.045);
+}
+.member-profile-status.is-ok {
+  color: #9be6bd;
+  background: rgba(45, 185, 105, .12);
+}
+.member-profile-status.is-error {
+  color: #ffb6b6;
+  background: rgba(237, 66, 69, .12);
 }
 .user-dot,
 .channel-item .glyph.channel-avatar,
