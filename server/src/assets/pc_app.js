@@ -2435,7 +2435,9 @@
 
     if (!targetId) {
       setHeader('AI', '一龙AI', '新对话');
-      els.messageList.innerHTML = '<div class="empty-state"><strong>新对话</strong><p>从下方输入第一句话，会自动保存到左侧聊天历史。</p></div>';
+      els.messageList.innerHTML = '<div class="empty-state"><strong>新对话</strong><p>从下方输入第一句话，会自动保存到左侧聊天历史。</p></div>' +
+        renderLocalCliSetupCard(null, 'ai', { force: true });
+      bindLocalCliSetupActions(els.messageList);
       if (focusComposer) setTimeout(() => els.input.focus(), 0);
       return;
     }
@@ -3215,12 +3217,155 @@
     return `<div class="message-content ${escapeHtml(className)}">${escapeHtml(raw)}</div>`;
   }
 
+  function renderLocalCliSetupCard(message, scope, options) {
+    const opts = options || {};
+    const raw = clean(message && (message.content || message.text || message.message));
+    if (!opts.force && !shouldShowLocalCliSetupCard(raw, scope)) return '';
+    const project = activeRuntimeProject();
+    const projectTitle = project ? titleOf(project) : '';
+    const projectLine = project
+      ? `当前项目：${projectTitle}`
+      : '没有选中项目时，会先引导导入这台电脑上的项目目录。';
+    return `<div class="local-cli-card" data-local-cli-card>
+      <div class="local-cli-card-head">
+        <strong>本机开发 CLI</strong>
+        <span>${escapeHtml(projectLine)}</span>
+      </div>
+      <p>网页不能直接读写 Windows 文件；需要这台电脑运行一龙 Win 端，并把本机节点绑定到当前账号后，AI 才能通过项目开发频道执行 cmd / PowerShell / 文件读写。</p>
+      <div class="local-cli-actions">
+        <button type="button" data-local-cli-action="detect">检测 Win 端</button>
+        <button type="button" data-local-cli-action="login">绑定当前账号</button>
+        <button type="button" data-local-cli-action="connect-project">导入项目目录</button>
+        <button class="primary" type="button" data-local-cli-action="danger">开启完整命令行</button>
+      </div>
+      <div class="local-cli-result" data-local-cli-result aria-live="polite"></div>
+    </div>`;
+  }
+
+  function shouldShowLocalCliSetupCard(text, scope) {
+    if (!text) return false;
+    if (!['ai', 'project', 'project-conversation'].includes(scope)) return false;
+    const localIntent = /(本机|电脑|Windows|Win\s*端|cmd|powershell|pwsh|命令行|终端|D盘|C盘|[A-Z]:\\|文件夹|目录|读写|访问|CLI)/i;
+    const refusal = /(无法直接访问|无法查看|不能访问|不能查看|不能执行|没有权限访问)/;
+    return localIntent.test(text) || refusal.test(text);
+  }
+
+  function bindLocalCliSetupActions(root) {
+    if (!root) return;
+    root.querySelectorAll('[data-local-cli-action]').forEach((button) => {
+      button.addEventListener('click', () => handleLocalCliAction(button));
+    });
+  }
+
+  function setLocalCliCardResult(card, message, kind) {
+    const result = card && card.querySelector('[data-local-cli-result]');
+    if (!result) return;
+    result.className = `local-cli-result ${kind || 'ok'}`;
+    result.textContent = message || '';
+  }
+
+  async function handleLocalCliAction(button) {
+    const action = clean(button && button.dataset.localCliAction);
+    const card = button && button.closest('[data-local-cli-card]');
+    if (!action || !card) return;
+    setSettingsBusy(button, true, '处理中...');
+    setLocalCliCardResult(card, '', 'ok');
+    try {
+      if (action === 'detect') {
+        const status = await localNodeApi('/api/status', { cache: 'no-store', timeoutMs: 4000 });
+        await refreshClientMaintenance(false).catch(() => {});
+        setLocalCliCardResult(card, describeLocalNodeStatus(status), localNodeOwnerMatches(status) ? 'ok' : 'note');
+        return;
+      }
+      if (action === 'login') {
+        const status = await ensureLocalNodeLogin();
+        await loadBaseData();
+        setLocalCliCardResult(card, describeLocalNodeStatus(status), 'ok');
+        return;
+      }
+      if (action === 'connect-project') {
+        openSettings('workbench', { autoPickAndRegister: true, runtimePermission: 'project_write' });
+        setLocalCliCardResult(card, '已打开本机项目目录连接流程。选择目录后会自动注册到当前账号。', 'note');
+        return;
+      }
+      if (action === 'danger') {
+        await enableDangerFullAccessFromChat(card);
+      }
+    } catch (error) {
+      setLocalCliCardResult(card, clean(error && error.message || error) || '操作失败', 'error');
+    } finally {
+      setSettingsBusy(button, false);
+    }
+  }
+
+  function describeLocalNodeStatus(status) {
+    const device = clean(status && status.device_name) || '这台电脑';
+    const connected = status && status.connected ? '已连云端' : '未连接云端';
+    if (!status || status.ok === false) return '未检测到一龙 Win 端。请先安装或启动一龙 PC 节点。';
+    if (!status.logged_in) return `${device} 已响应，但还没登录一龙账号。`;
+    if (!localNodeOwnerMatches(status)) {
+      return `${device} 当前绑定账号不是当前网页账号；点击“绑定当前账号”后再继续。`;
+    }
+    return `${device} 已绑定当前账号，${connected}。`;
+  }
+
+  function localNodeOwnerMatches(status) {
+    const owner = clean(status && (status.owner_user_id || status.ownerUserId));
+    const userId = currentUserId();
+    return !!owner && !!userId && sameId(owner, userId);
+  }
+
+  function activeRuntimeProject() {
+    return state.activeProjectId ? projectById(state.activeProjectId) : null;
+  }
+
+  function canManageRuntimeProject(project) {
+    const role = clean(project && (project.role || project.member_role || project.memberRole)).toLowerCase();
+    const ownerId = clean(project && (project.owner_user_id || project.ownerUserId));
+    if (ownerId && sameId(ownerId, currentUserId())) return true;
+    return role === 'owner' || role === 'admin';
+  }
+
+  async function enableDangerFullAccessFromChat(card) {
+    const project = activeRuntimeProject();
+    if (!project) {
+      openSettings('workbench', { autoPickAndRegister: true, runtimePermission: 'danger_full_access' });
+      setLocalCliCardResult(card, '已打开导入项目流程，并预选“完整本机命令行”。选择本机目录后会要求你确认授权。', 'note');
+      return;
+    }
+    if (!canManageRuntimeProject(project)) {
+      throw new Error('只有项目 owner 或管理员可以开启完整本机命令行。');
+    }
+    const workspacePath = clean(project.workspace_path || project.workspacePath);
+    if (!workspacePath) {
+      openSettings('workbench', { projectId: project.id, autoPickAndRegister: true, runtimePermission: 'danger_full_access' });
+      setLocalCliCardResult(card, '这个项目还没有绑定本机目录。已打开目录连接流程，并预选“完整本机命令行”。', 'note');
+      return;
+    }
+    const ok = window.confirm(`确认给项目「${titleOf(project)}」开启完整本机命令行？AI 可能运行任意 cmd / PowerShell 命令，并读写项目目录外的本机文件。`);
+    if (!ok) {
+      setLocalCliCardResult(card, '已取消授权。');
+      return;
+    }
+    await ensureLocalNodeLogin();
+    await grantLocalProjectFullAccess(project, workspacePath);
+    await saveProjectRuntimePermission(project, 'danger_full_access');
+    await loadBaseData();
+    const latest = projectById(project.id) || project;
+    if (state.activeProjectId) await selectProject(latest.id || project.id);
+    setLocalCliCardResult(card, `已给「${titleOf(latest)}」开启完整本机命令行。现在到项目开发频道发起任务，AI 才会实际调用本机 CLI。`, 'ok');
+  }
+
   function emptyMessagesHtml(scope) {
     if (scope === 'project' && state.activeChannelKind === 'ai_development') {
       return '<div class="empty-state"><strong>从这里开始做应用</strong><p>直接输入你想做的 App，或告诉一龙AI要修改什么功能。</p></div>';
     }
     if (scope === 'project' && state.activeChannelKind === 'builds') {
       return '<div class="empty-state"><strong>做完后在这里生成安装包</strong><p>安装包生成后，入口会出现在「安装使用」。</p></div>';
+    }
+    if (scope === 'ai') {
+      return '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>' +
+        renderLocalCliSetupCard(null, scope, { force: true });
     }
     return '<div class="empty-state"><strong>还没有消息</strong><p>从下方输入框发送第一条消息。</p></div>';
   }
@@ -3233,6 +3378,7 @@
     if (!messages.length && !agentRunsHtml) {
       clearDevTaskRefresh();
       els.messageList.innerHTML = emptyMessagesHtml(scope);
+      bindLocalCliSetupActions(els.messageList);
       return;
     }
     const devTaskContext = scope === 'project' && devTasks
@@ -3253,11 +3399,13 @@
         markdown: !!tone,
         copy: !!tone
       });
+      const localCliHtml = !own ? renderLocalCliSetupCard(message, scope) : '';
       return `<article class="message-row ${own ? 'own' : 'other'}">
         ${avatarElement('div', 'message-avatar', avatarForMessage(message, scope), name, '员')}
         <div class="message-body">
           <div class="message-meta"><strong>${escapeHtml(name)}</strong><span>${escapeHtml(formatTime(message.created_at || message.createdAt))}</span></div>
           ${contentHtml}
+          ${localCliHtml}
         </div>
       </article>`;
     }).join('') : emptyMessagesHtml(scope);
@@ -3267,6 +3415,7 @@
     });
     if (devTasks) devTasks.bindActions(els.messageList);
     if (agentRuns) agentRuns.bindActions(els.messageList, messages, scope);
+    bindLocalCliSetupActions(els.messageList);
     if (markdown.bindCopyButtons) markdown.bindCopyButtons(els.messageList);
     scheduleDevTaskRefresh(messages, scope, devTaskContext);
     if (agentRuns) agentRuns.schedule(messages, scope);
@@ -3509,6 +3658,7 @@
     const targetSection = section || 'workbench';
     const autoPickAndRegister = !!(options && options.autoPickAndRegister);
     const workbenchProjectId = clean(options && options.projectId);
+    const requestedRuntimePermission = normalizeRuntimePermission(options && options.runtimePermission);
     setAccountMenu(false);
     renderUser();
     setSettingsSection(targetSection);
@@ -3517,7 +3667,7 @@
     if (targetSection === 'workbench') {
       state.workbenchRegistrationProjectId = workbenchProjectId;
       if (els.settingsRuntimePermission) {
-        els.settingsRuntimePermission.value = 'project_write';
+        els.settingsRuntimePermission.value = requestedRuntimePermission;
         syncSettingsRuntimePermissionHint();
       }
       applyWorkbenchProjectContext();
@@ -4226,11 +4376,20 @@
   async function ensureLocalNodeLogin() {
     if (!state.token) throw new Error('请先登录一龙账号');
     const status = await localNodeApi('/api/status');
-    if (status.logged_in && status.user_token_configured) return status;
-    return localNodeApi('/api/login', {
+    if (status.logged_in && status.user_token_configured && localNodeOwnerMatches(status)) return status;
+    if (status.logged_in && !localNodeOwnerMatches(status)) {
+      const ok = window.confirm('这台电脑当前绑定的本机节点账号不是当前网页账号。是否切换为当前账号？');
+      if (!ok) throw new Error('已取消切换本机节点账号。');
+    }
+    await localNodeApi('/api/login', {
       method: 'POST',
       body: JSON.stringify({ token: state.token })
     });
+    const nextStatus = await localNodeApi('/api/status', { cache: 'no-store' });
+    if (!localNodeOwnerMatches(nextStatus)) {
+      throw new Error('本机节点账号与当前网页账号不一致，已阻止继续操作。');
+    }
+    return nextStatus;
   }
 
   async function registerLocalProject() {

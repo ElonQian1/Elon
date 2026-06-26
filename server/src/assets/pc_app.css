@@ -1685,6 +1685,96 @@ button { cursor: pointer; }
   color: var(--text);
   border-color: rgba(255,255,255,.18);
 }
+.local-cli-card {
+  margin-top: 10px;
+  max-width: min(560px, 100%);
+  border: 1px solid rgba(138, 215, 255, .18);
+  border-radius: 8px;
+  background: #1d2229;
+  padding: 12px;
+  color: var(--text-soft);
+  box-shadow: 0 12px 24px rgba(0,0,0,.16);
+}
+.message-row.own .local-cli-card {
+  display: none;
+}
+.local-cli-card-head {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 8px;
+}
+.local-cli-card-head strong {
+  color: var(--text);
+  font-size: 14px;
+}
+.local-cli-card-head span,
+.local-cli-card p {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.local-cli-card p {
+  margin: 0 0 10px;
+}
+.local-cli-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.local-cli-actions button {
+  min-height: 32px;
+  border: 1px solid rgba(255,255,255,.11);
+  border-radius: 7px;
+  background: #2a2f37;
+  color: var(--text-soft);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+.local-cli-actions button:hover {
+  border-color: rgba(138, 215, 255, .35);
+  color: var(--text);
+}
+.local-cli-actions button.primary {
+  border-color: transparent;
+  background: var(--green);
+  color: white;
+}
+.local-cli-actions button:disabled {
+  opacity: .62;
+  cursor: default;
+}
+.local-cli-result {
+  display: none;
+  margin-top: 10px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: rgba(255,255,255,.04);
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.local-cli-result.ok,
+.local-cli-result.note,
+.local-cli-result.error {
+  display: block;
+}
+.local-cli-result.ok {
+  border-color: rgba(46, 168, 97, .28);
+  background: rgba(46, 168, 97, .11);
+  color: #bdeeca;
+}
+.local-cli-result.note {
+  border-color: rgba(138, 215, 255, .22);
+  background: rgba(138, 215, 255, .08);
+  color: #bfe8fb;
+}
+.local-cli-result.error {
+  border-color: rgba(255, 115, 115, .34);
+  background: rgba(255, 115, 115, .09);
+  color: #ffc5c5;
+}
 .message-content.project-share-wrap {
   width: min(330px, 100%);
   color: var(--text-soft);
