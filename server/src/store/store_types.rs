@@ -577,9 +577,26 @@ pub struct ProjectChannel {
     pub name: String,
     pub kind: String,
     pub position: i64,
+    pub permissions: ProjectChannelPermissions,
+    pub role_overrides: Vec<ProjectChannelRolePermissionOverride>,
     pub last_message: Option<String>,
     pub last_message_at: Option<String>,
     pub unread_count: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectChannelPermissions {
+    pub can_view: bool,
+    pub can_send: bool,
+    pub can_start_ai: bool,
+    pub can_manage: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectChannelRolePermissionOverride {
+    pub role_id: String,
+    pub allow: Vec<String>,
+    pub deny: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize)]

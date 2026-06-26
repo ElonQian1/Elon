@@ -104,6 +104,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (70, "项目成员禁言与封禁状态", migration_v70),
     (71, "项目自定义角色与成员权限矩阵", migration_v71),
     (72, "项目成员多角色绑定", migration_v72),
+    (73, "项目频道角色权限覆盖", migration_v73),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2410,6 +2411,30 @@ fn migration_v72(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_member_roles_user
           ON project_member_roles(user_id, project_id);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v73(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_channel_role_permissions (
+          project_id  TEXT NOT NULL,
+          channel_id  TEXT NOT NULL,
+          role_id     TEXT NOT NULL,
+          permission  TEXT NOT NULL,
+          effect      TEXT NOT NULL CHECK (effect IN ('allow', 'deny')),
+          updated_by  TEXT,
+          updated_at  TEXT NOT NULL,
+          PRIMARY KEY (project_id, channel_id, role_id, permission),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (channel_id) REFERENCES project_channels(id),
+          FOREIGN KEY (updated_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_channel_role_permissions_channel
+          ON project_channel_role_permissions(project_id, channel_id, role_id);
         "#,
     )?;
     Ok(())

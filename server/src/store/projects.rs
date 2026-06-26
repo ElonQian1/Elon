@@ -871,6 +871,10 @@ impl Store {
             params![project_id],
         )?;
         tx.execute(
+            "DELETE FROM project_channel_role_permissions WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
             "DELETE FROM project_channels WHERE project_id = ?1",
             params![project_id],
         )?;

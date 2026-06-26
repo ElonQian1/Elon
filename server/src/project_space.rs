@@ -27,7 +27,10 @@ use crate::{
     project_mobile::ensure_mobile_project,
     project_tool_approval_recovery, project_tool_approvals,
     project_ws_protocol::enrich_project_ws_event,
-    store::{ProjectAccess, PublicUser},
+    store::{
+        ProjectAccess, PublicUser, CHANNEL_PERMISSION_MANAGE, CHANNEL_PERMISSION_SEND,
+        CHANNEL_PERMISSION_START_AI, CHANNEL_PERMISSION_VIEW,
+    },
     tools,
     types::AppState,
 };
@@ -69,6 +72,15 @@ pub struct UpdateMemberConversationVisibilityRequest {
 #[derive(Deserialize)]
 pub struct UpdateProjectDescriptionRequest {
     pub description: String,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateChannelRolePermissionRequest {
+    pub role_id: String,
+    #[serde(default)]
+    pub allow: Vec<String>,
+    #[serde(default)]
+    pub deny: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -179,6 +191,106 @@ fn update_project_description_response(
         .update_project_description(&user_id, &project.id, &req.description)
     {
         Ok(project) => Json(serde_json::json!({ "project": project })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn get_channel_permissions(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, channel_id)): Path<(String, String)>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user.id,
+        CHANNEL_PERMISSION_MANAGE,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权管理该频道权限");
+    }
+    let current_user_permissions =
+        match state
+            .store
+            .project_member_channel_permissions(&project.id, &channel_id, &user.id)
+        {
+            Ok(permissions) => permissions,
+            Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+        };
+    match state
+        .store
+        .list_project_channel_role_permission_overrides(&project.id, &channel_id)
+    {
+        Ok(overrides) => Json(serde_json::json!({
+            "project_id": project.id,
+            "channel_id": channel_id,
+            "overrides": overrides,
+            "current_user_permissions": current_user_permissions,
+            "permissions": channel_permission_options(),
+        }))
+        .into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+pub async fn update_channel_permissions(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, channel_id)): Path<(String, String)>,
+    Json(req): Json<UpdateChannelRolePermissionRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user.id,
+        CHANNEL_PERMISSION_MANAGE,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权管理该频道权限");
+    }
+    match state.store.set_project_channel_role_permission_override(
+        &project.id,
+        &channel_id,
+        &req.role_id,
+        &req.allow,
+        &req.deny,
+        Some(&user.id),
+    ) {
+        Ok(overrides) => {
+            let current_user_permissions = match state.store.project_member_channel_permissions(
+                &project.id,
+                &channel_id,
+                &user.id,
+            ) {
+                Ok(permissions) => permissions,
+                Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
+            };
+            Json(serde_json::json!({
+                "ok": true,
+                "project_id": project.id,
+                "channel_id": channel_id,
+                "overrides": overrides,
+                "current_user_permissions": current_user_permissions,
+                "permissions": channel_permission_options(),
+            }))
+            .into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -390,6 +502,15 @@ async fn list_channel_messages_response(
         Ok(kind) => kind,
         Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
     };
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_VIEW,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权查看该频道");
+    }
     if channel_kind == DOCS_CHANNEL_KIND {
         let messages =
             project_docs_channel::load_project_doc_messages(state, &user_id, &project, &channel_id)
@@ -456,11 +577,26 @@ fn send_channel_message_response(
         Ok(kind) => kind,
         Err(e) => return json_error(StatusCode::NOT_FOUND, e.to_string()),
     };
-    if channel_kind == "announcements" && !can_edit_project_announcement(&project.role) {
-        return json_error(StatusCode::FORBIDDEN, "只有项目创建者可以编辑公告");
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_VIEW,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权查看该频道");
     }
     if channel_kind == DOCS_CHANNEL_KIND {
         return json_error(StatusCode::BAD_REQUEST, "文档频道是固定只读频道，不能发帖");
+    }
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_SEND,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权在该频道发言");
     }
     if let Err(response) = ensure_project_member_can_speak(&state, &project.id, &user_id) {
         return response;
@@ -482,13 +618,6 @@ fn send_channel_message_response(
         Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
-}
-
-fn can_edit_project_announcement(role: &str) -> bool {
-    matches!(
-        role.trim().to_ascii_lowercase().as_str(),
-        "owner" | "creator"
-    )
 }
 
 pub async fn mark_user_project_suggestion_updated(
@@ -533,8 +662,14 @@ fn mark_suggestion_updated_response(
     channel_id: String,
     message_id: String,
 ) -> Response {
-    if !can_mark_suggestion_updated(&project.role) {
-        return json_error(StatusCode::FORBIDDEN, "当前成员角色不能标记建议已更新");
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_MANAGE,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权管理该频道建议");
     }
     match state.store.mark_project_suggestion_updated(
         &user_id,
@@ -581,9 +716,6 @@ pub async fn start_channel_ai_task(
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
-    if !can_start_channel_ai(&project.role) {
-        return json_error(StatusCode::FORBIDDEN, "当前成员角色不能发起项目 AI 开发");
-    }
     start_channel_ai_task_response(state, user.id, project, channel_id, req, false)
 }
 
@@ -638,6 +770,7 @@ pub async fn decide_channel_ai_tool_approval(
     };
     decide_channel_ai_tool_approval_response(
         state,
+        user.id,
         project,
         channel_id,
         task_id,
@@ -660,7 +793,7 @@ pub async fn decide_user_project_channel_ai_tool_approval(
     Query(query): Query<HashMap<String, String>>,
     Json(req): Json<ToolApprovalDecisionRequest>,
 ) -> Response {
-    let (_user, project) = match ensure_user_project_for_space(
+    let (user, project) = match ensure_user_project_for_space(
         &state,
         &headers,
         &user_id,
@@ -672,6 +805,7 @@ pub async fn decide_user_project_channel_ai_tool_approval(
     };
     decide_channel_ai_tool_approval_response(
         state,
+        user.id,
         project,
         channel_id,
         task_id,
@@ -683,13 +817,20 @@ pub async fn decide_user_project_channel_ai_tool_approval(
 
 async fn decide_channel_ai_tool_approval_response(
     state: Arc<AppState>,
+    user_id: String,
     project: ProjectAccess,
     channel_id: String,
     task_id: String,
     approval_id: String,
     decision: String,
 ) -> Response {
-    if !can_start_channel_ai(&project.role) {
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_START_AI,
+    ) {
         return json_error(
             StatusCode::FORBIDDEN,
             "当前成员角色不能审批项目 AI 工具调用",
@@ -805,12 +946,18 @@ fn claim_channel_ai_tool_approval(
 
 fn cancel_channel_ai_task_response(
     state: Arc<AppState>,
-    _user_id: String,
+    user_id: String,
     project: ProjectAccess,
     channel_id: String,
     task_id: String,
 ) -> Response {
-    if !can_start_channel_ai(&project.role) {
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_START_AI,
+    ) {
         return json_error(StatusCode::FORBIDDEN, "当前成员角色不能停止项目 AI 开发");
     }
     let project_id = project.id.clone();
@@ -848,7 +995,22 @@ fn start_channel_ai_task_response(
     req: StartChannelAiTaskRequest,
     use_user_download_route: bool,
 ) -> Response {
-    if !can_start_channel_ai(&project.role) {
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_VIEW,
+    ) {
+        return json_error(StatusCode::FORBIDDEN, "当前角色无权查看该频道");
+    }
+    if !project_member_can_use_channel(
+        &state,
+        &project.id,
+        &channel_id,
+        &user_id,
+        CHANNEL_PERMISSION_START_AI,
+    ) {
         return json_error(StatusCode::FORBIDDEN, "当前成员角色不能发起项目 AI 开发");
     }
     let project_id = project.id.clone();
@@ -1335,6 +1497,7 @@ fn remove_channel_ai_task_control(task_id: &str) {
     }
 }
 
+#[cfg(test)]
 fn can_start_channel_ai(role: &str) -> bool {
     can_edit(role)
 }
@@ -1357,8 +1520,35 @@ fn ensure_project_member_can_speak(
     }
 }
 
-fn can_mark_suggestion_updated(role: &str) -> bool {
-    matches!(role, "owner" | "admin" | "editor" | "member")
+fn project_member_can_use_channel(
+    state: &AppState,
+    project_id: &str,
+    channel_id: &str,
+    user_id: &str,
+    permission: &str,
+) -> bool {
+    let Ok(permissions) = state
+        .store
+        .project_member_channel_permissions(project_id, channel_id, user_id)
+    else {
+        return false;
+    };
+    match permission {
+        CHANNEL_PERMISSION_VIEW => permissions.can_view,
+        CHANNEL_PERMISSION_SEND => permissions.can_send,
+        CHANNEL_PERMISSION_START_AI => permissions.can_start_ai,
+        CHANNEL_PERMISSION_MANAGE => permissions.can_manage,
+        _ => false,
+    }
+}
+
+fn channel_permission_options() -> serde_json::Value {
+    serde_json::json!([
+        { "key": "view_channel", "label": "查看频道" },
+        { "key": "send_messages", "label": "发送消息" },
+        { "key": "start_ai_tasks", "label": "发起 AI 任务" },
+        { "key": "manage_channel", "label": "管理频道权限" }
+    ])
 }
 
 fn latest_project_apk_url(

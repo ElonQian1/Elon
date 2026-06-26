@@ -39,7 +39,7 @@
     memberPanel: { title: '成员', members: [], options: {}, search: '' },
     memberCollapsed: {},
     projectRoles: {},
-    memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, auditEntries: [], auditLoaded: false, auditLoading: false, auditExpanded: false, busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
+    memberAdmin: { projectId: '', requests: [], loaded: false, loading: false, expanded: false, auditEntries: [], auditLoaded: false, auditLoading: false, auditExpanded: false, rolesExpanded: false, channelPermissionsExpanded: false, channelPermissionChannelId: '', channelPermissionLoadedChannelId: '', channelPermissionLoading: false, channelPermissionOverrides: [], channelPermissionOptions: [], busy: '', inviteAccount: '', inviteRole: 'member', status: '', tone: '' },
     memberProfile: null,
     presenceSocket: null,
     presenceReconnectTimer: 0,
@@ -68,6 +68,12 @@
     { key: 'view_audit_log', label: '查看日志' },
     { key: 'manage_roles', label: '管理角色' },
     { key: 'manage_project_settings', label: '项目设置' }
+  ];
+  const CHANNEL_PERMISSION_OPTIONS = [
+    { key: 'view_channel', label: '查看频道' },
+    { key: 'send_messages', label: '发送消息' },
+    { key: 'start_ai_tasks', label: '发起 AI 任务' },
+    { key: 'manage_channel', label: '管理频道权限' }
   ];
   let pcAuthMode = 'login';
   let inlineAuthMode = 'login';
@@ -628,6 +634,30 @@
     return projectRolesHavePermission(projectId, activeProjectRoleKeys(), permission);
   }
 
+  function projectChannelPermissions(channel) {
+    const permissions = channel && (channel.permissions || channel.channel_permissions || channel.channelPermissions);
+    return Object.assign({
+      can_view: true,
+      can_send: channelKind(channel) !== 'docs',
+      can_start_ai: channelKind(channel) === 'ai_development' && activeProjectHasPermission('manage_project_settings'),
+      can_manage: activeProjectHasPermission('manage_project_settings')
+    }, permissions || {});
+  }
+
+  function projectChannelCan(channel, key) {
+    const permissions = projectChannelPermissions(channel);
+    if (key === 'view_channel') return !!(permissions.can_view || permissions.canView);
+    if (key === 'send_messages') return !!(permissions.can_send || permissions.canSend);
+    if (key === 'start_ai_tasks') return !!(permissions.can_start_ai || permissions.canStartAi);
+    if (key === 'manage_channel') return !!(permissions.can_manage || permissions.canManage);
+    return false;
+  }
+
+  function canManageAnyProjectChannel() {
+    const channels = state.projectSpace && Array.isArray(state.projectSpace.channels) ? state.projectSpace.channels : [];
+    return channels.some((channel) => projectChannelCan(channel, 'manage_channel')) || activeProjectHasPermission('manage_project_settings');
+  }
+
   function projectRolePermissionOptions(projectId) {
     const catalog = projectRoleState(projectId);
     return Array.isArray(catalog.permissions) && catalog.permissions.length
@@ -666,8 +696,8 @@
   }
 
   function canUseActiveProjectMemberAdmin() {
-    return ['invite_members', 'manage_members', 'moderate_members', 'view_audit_log', 'manage_roles']
-      .some((permission) => activeProjectHasPermission(permission));
+    return ['invite_members', 'manage_members', 'moderate_members', 'view_audit_log', 'manage_roles', 'manage_project_settings']
+      .some((permission) => activeProjectHasPermission(permission)) || canManageAnyProjectChannel();
   }
 
   function canManageActiveProjectRoles() {
@@ -2912,6 +2942,12 @@
         auditLoading: false,
         auditExpanded: false,
         rolesExpanded: false,
+        channelPermissionsExpanded: false,
+        channelPermissionChannelId: '',
+        channelPermissionLoadedChannelId: '',
+        channelPermissionLoading: false,
+        channelPermissionOverrides: [],
+        channelPermissionOptions: [],
         busy: '',
         inviteAccount: '',
         inviteRole: 'member',
@@ -2930,6 +2966,7 @@
     const canInvite = activeProjectHasPermission('invite_members');
     const canViewAudit = activeProjectHasPermission('view_audit_log') || activeProjectHasPermission('manage_members');
     const canUseRoles = canManageActiveProjectRoles() || projectRoleState(projectId).loaded;
+    const canUseChannelPermissions = canManageAnyProjectChannel();
     const pendingCount = Array.isArray(admin.requests) ? admin.requests.filter((request) => clean(request.status) === 'pending').length : 0;
     const roleOptions = projectAssignableRoleOptions(projectId).map((role) => {
       const selected = role.key === (admin.inviteRole || 'member') ? 'selected' : '';
@@ -2939,6 +2976,7 @@
     const requestsHtml = admin.expanded ? renderProjectJoinRequests(projectId, admin) : '';
     const auditHtml = admin.auditExpanded ? renderProjectMemberAudit(projectId, admin) : '';
     const rolesHtml = admin.rolesExpanded ? renderProjectRoleAdmin(projectId, admin) : '';
+    const channelPermissionsHtml = admin.channelPermissionsExpanded ? renderProjectChannelPermissionAdmin(projectId, admin) : '';
     const catalog = projectRoleState(projectId);
     const customCount = (catalog.roles || []).filter((role) => !role.builtin).length;
     const statusHtml = admin.status
@@ -2974,6 +3012,11 @@
         <small>${catalog.loading ? '加载中' : `${customCount} 自定义`}</small>
       </button>
       ${rolesHtml}` : ''}
+      ${canUseChannelPermissions ? `<button class="member-admin-toggle ${admin.channelPermissionsExpanded ? 'is-open' : ''}" type="button" data-member-admin-action="toggle-channel-permissions">
+        <span>频道权限</span>
+        <small>${admin.channelPermissionLoading ? '加载中' : '角色覆盖'}</small>
+      </button>
+      ${channelPermissionsHtml}` : ''}
       ${statusHtml}
     </section>`;
   }
@@ -3100,6 +3143,72 @@
     return `<div class="member-role-admin">
       ${createHtml}
       <div class="member-role-list">${roleRows || '<div class="member-admin-empty">暂无角色</div>'}</div>
+    </div>`;
+  }
+
+  function renderProjectChannelPermissionAdmin(projectId, admin) {
+    const channels = state.projectSpace && Array.isArray(state.projectSpace.channels) ? state.projectSpace.channels : [];
+    const manageable = channels.filter((channel) => projectChannelCan(channel, 'manage_channel'));
+    const selectedId = clean(admin.channelPermissionChannelId || state.activeChannelId || (manageable[0] && manageable[0].id) || (channels[0] && channels[0].id));
+    if (!admin.channelPermissionChannelId && selectedId) admin.channelPermissionChannelId = selectedId;
+    const channelOptions = (manageable.length ? manageable : channels).map((channel) => {
+      const id = clean(channel.id);
+      const selected = id === selectedId ? 'selected' : '';
+      return `<option value="${escapeHtml(id)}" ${selected}>${escapeHtml(channelTitle(channel))}</option>`;
+    }).join('');
+    if (!selectedId) return '<div class="member-admin-empty">暂无可配置频道</div>';
+    const loading = admin.channelPermissionLoading || admin.channelPermissionLoadedChannelId !== selectedId;
+    const options = Array.isArray(admin.channelPermissionOptions) && admin.channelPermissionOptions.length
+      ? admin.channelPermissionOptions
+      : CHANNEL_PERMISSION_OPTIONS;
+    const overrides = Array.isArray(admin.channelPermissionOverrides) ? admin.channelPermissionOverrides : [];
+    const overrideByRole = new Map(overrides.map((item) => [clean(item.role_id || item.roleId), item]));
+    const roles = projectAssignableRoleOptions(projectId);
+    const selectedChannel = channels.find((channel) => sameId(channel.id, selectedId));
+    const baseLabel = selectedChannel
+      ? [
+          projectChannelCan(selectedChannel, 'view_channel') ? '可见' : '不可见',
+          projectChannelCan(selectedChannel, 'send_messages') ? '可发言' : '不可发言',
+          projectChannelCan(selectedChannel, 'start_ai_tasks') ? '可 AI' : ''
+        ].filter(Boolean).join(' / ')
+      : '';
+    const rows = loading
+      ? '<div class="member-admin-empty">加载频道权限中…</div>'
+      : roles.map((role) => {
+          const override = overrideByRole.get(role.key) || {};
+          const allow = Array.isArray(override.allow) ? override.allow : [];
+          const deny = Array.isArray(override.deny) ? override.deny : [];
+          const cells = options.map((permission) => {
+            const key = clean(permission.key);
+            const value = deny.includes(key) ? 'deny' : (allow.includes(key) ? 'allow' : '');
+            return `<label>
+              <span>${escapeHtml(permission.label || key)}</span>
+              <select data-channel-permission-effect="${escapeHtml(role.key)}" data-channel-permission-key="${escapeHtml(key)}">
+                <option value="" ${value ? '' : 'selected'}>继承</option>
+                <option value="allow" ${value === 'allow' ? 'selected' : ''}>允许</option>
+                <option value="deny" ${value === 'deny' ? 'selected' : ''}>拒绝</option>
+              </select>
+            </label>`;
+          }).join('');
+          return `<article class="member-channel-permission-card" data-channel-permission-role="${escapeHtml(role.key)}">
+            <div class="member-role-card-head">
+              <span class="member-role-swatch" style="background:${escapeHtml(role.color || '#747f8d')}"></span>
+              <div>
+                <strong>${escapeHtml(role.label)}</strong>
+                <em>${role.builtin ? '内置角色' : '自定义角色'}</em>
+              </div>
+            </div>
+            <div class="member-channel-permission-grid">${cells}</div>
+            <button class="text-button" type="button" data-member-admin-action="save-channel-permission" data-role-id="${escapeHtml(role.key)}" ${admin.busy === `channel-permission:${role.key}` ? 'disabled' : ''}>保存</button>
+          </article>`;
+        }).join('');
+    return `<div class="member-channel-permission-admin">
+      <div class="member-channel-permission-toolbar">
+        <select data-member-admin-channel-permission-channel>${channelOptions}</select>
+        <button class="text-button" type="button" data-member-admin-action="refresh-channel-permissions" ${admin.channelPermissionLoading ? 'disabled' : ''}>刷新</button>
+      </div>
+      ${baseLabel ? `<div class="member-admin-empty">${escapeHtml(baseLabel)}</div>` : ''}
+      <div class="member-role-list">${rows}</div>
     </div>`;
   }
 
@@ -3268,12 +3377,14 @@
     state.activeMemberUserId = '';
     renderChannels();
     setHeader(channelGlyph(channel), channelTitle(channel), channelSubtitle(channel));
-    const canWrite = state.activeChannelKind !== 'docs';
+    const canWrite = state.activeChannelKind === 'ai_development'
+      ? projectChannelCan(channel, 'start_ai_tasks')
+      : projectChannelCan(channel, 'send_messages');
     setComposer(
       canWrite,
       canWrite
         ? (state.activeChannelKind === 'ai_development' ? '输入你想做的应用或要修改的功能' : `在 #${channelTitle(channel)} 发送消息`)
-        : '文档频道只读',
+        : (state.activeChannelKind === 'docs' ? '文档频道只读' : '当前角色不能在此频道发言'),
       state.activeChannelKind === 'ai_development'
     );
     setNodeMode(false);
@@ -3511,6 +3622,16 @@
     if (event.target.matches('[data-member-admin-invite-role]')) {
       const admin = memberAdminState(memberPanelProjectId());
       admin.inviteRole = clean(event.target.value) || 'member';
+      return;
+    }
+    if (event.target.matches('[data-member-admin-channel-permission-channel]')) {
+      const projectId = memberPanelProjectId();
+      const admin = memberAdminState(projectId);
+      admin.channelPermissionChannelId = clean(event.target.value);
+      admin.channelPermissionLoadedChannelId = '';
+      admin.channelPermissionOverrides = [];
+      rerenderMemberPanelForProject(projectId);
+      loadProjectChannelPermissions(projectId, admin.channelPermissionChannelId).catch((error) => setMemberAdminStatus(projectId, error.message || '加载频道权限失败', 'error'));
     }
   }
 
@@ -3603,6 +3724,32 @@
       }
       return;
     }
+    if (action === 'toggle-channel-permissions') {
+      const admin = memberAdminState(projectId);
+      admin.channelPermissionsExpanded = !admin.channelPermissionsExpanded;
+      admin.status = '';
+      if (!admin.channelPermissionChannelId) {
+        const channels = (state.projectSpace && state.projectSpace.channels) || [];
+        admin.channelPermissionChannelId = clean(state.activeChannelId) || clean(channels[0] && channels[0].id);
+      }
+      rerenderMemberPanelForProject(projectId);
+      if (admin.channelPermissionsExpanded && admin.channelPermissionChannelId) {
+        loadProjectRoles(projectId, { silent: true }).catch(() => {});
+        loadProjectChannelPermissions(projectId, admin.channelPermissionChannelId).catch((error) => setMemberAdminStatus(projectId, error.message || '加载频道权限失败', 'error'));
+      }
+      return;
+    }
+    if (action === 'refresh-channel-permissions') {
+      const admin = memberAdminState(projectId);
+      const channelId = clean(admin.channelPermissionChannelId || state.activeChannelId);
+      loadProjectChannelPermissions(projectId, channelId).catch((error) => setMemberAdminStatus(projectId, error.message || '刷新频道权限失败', 'error'));
+      return;
+    }
+    if (action === 'save-channel-permission') {
+      const roleId = clean(button.dataset.roleId);
+      saveProjectChannelPermission(projectId, roleId).catch((error) => setMemberAdminStatus(projectId, error.message || '保存频道权限失败', 'error'));
+      return;
+    }
     if (action === 'save-role-definition') {
       const roleId = clean(button.dataset.roleId);
       updateProjectRoleFromPanel(projectId, roleId).catch((error) => setMemberAdminStatus(projectId, error.message || '保存角色失败', 'error'));
@@ -3667,6 +3814,85 @@
       catalog.error = error.message || '';
       rerenderMemberPanelForProject(id);
     });
+  }
+
+  async function loadProjectChannelPermissions(projectId, channelId) {
+    const id = clean(projectId);
+    const cleanChannelId = clean(channelId);
+    if (!id || !cleanChannelId) return;
+    const admin = memberAdminState(id);
+    admin.channelPermissionChannelId = cleanChannelId;
+    admin.channelPermissionLoading = true;
+    admin.status = '';
+    admin.tone = '';
+    rerenderMemberPanelForProject(id);
+    try {
+      const data = await api(`/api/projects/${encodeURIComponent(id)}/channels/${encodeURIComponent(cleanChannelId)}/permissions`, { cache: 'no-store' });
+      admin.channelPermissionOverrides = Array.isArray(data.overrides) ? data.overrides : [];
+      admin.channelPermissionOptions = Array.isArray(data.permissions) && data.permissions.length
+        ? data.permissions
+        : CHANNEL_PERMISSION_OPTIONS;
+      admin.channelPermissionLoadedChannelId = cleanChannelId;
+      const channel = ((state.projectSpace && state.projectSpace.channels) || []).find((item) => sameId(item.id, cleanChannelId));
+      if (channel) {
+        channel.role_overrides = admin.channelPermissionOverrides;
+        channel.permissions = data.current_user_permissions || data.currentUserPermissions || channel.permissions;
+      }
+    } finally {
+      admin.channelPermissionLoading = false;
+      rerenderMemberPanelForProject(id);
+    }
+  }
+
+  async function saveProjectChannelPermission(projectId, roleId) {
+    const id = clean(projectId);
+    const cleanRoleId = clean(roleId);
+    const admin = memberAdminState(id);
+    const channelId = clean(admin.channelPermissionChannelId || state.activeChannelId);
+    if (!id || !channelId || !cleanRoleId) return;
+    const panel = els.memberList.querySelector(`[data-channel-permission-role="${cssEscape(cleanRoleId)}"]`);
+    const allow = [];
+    const deny = [];
+    if (panel) {
+      panel.querySelectorAll(`[data-channel-permission-effect="${cssEscape(cleanRoleId)}"]`).forEach((select) => {
+        const key = clean(select.dataset.channelPermissionKey);
+        const value = clean(select.value);
+        if (!key) return;
+        if (value === 'allow') allow.push(key);
+        if (value === 'deny') deny.push(key);
+      });
+    }
+    admin.busy = `channel-permission:${cleanRoleId}`;
+    admin.status = '正在保存频道权限…';
+    admin.tone = '';
+    rerenderMemberPanelForProject(id);
+    try {
+      const data = await api(`/api/projects/${encodeURIComponent(id)}/channels/${encodeURIComponent(channelId)}/permissions`, {
+        method: 'PATCH',
+        body: JSON.stringify({ role_id: cleanRoleId, allow, deny })
+      });
+      admin.channelPermissionOverrides = Array.isArray(data.overrides) ? data.overrides : [];
+      admin.channelPermissionOptions = Array.isArray(data.permissions) && data.permissions.length
+        ? data.permissions
+        : CHANNEL_PERMISSION_OPTIONS;
+      admin.channelPermissionLoadedChannelId = channelId;
+      const channel = ((state.projectSpace && state.projectSpace.channels) || []).find((item) => sameId(item.id, channelId));
+      if (channel) {
+        channel.role_overrides = admin.channelPermissionOverrides;
+        channel.permissions = data.current_user_permissions || data.currentUserPermissions || channel.permissions;
+      }
+      admin.status = '频道权限已保存';
+      admin.tone = 'ok';
+      renderChannels();
+      if (state.activeChannelId && sameId(state.activeChannelId, channelId)) {
+        await selectProjectChannel(state.activeChannelId);
+      } else {
+        rerenderMemberPanelForProject(id);
+      }
+    } finally {
+      admin.busy = '';
+      rerenderMemberPanelForProject(id);
+    }
   }
 
   function checkedRolePermissions(container, selector) {
