@@ -2692,6 +2692,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::post(node_agent_project_picker::pick_local_project_folder),
             )
             .route(
+                "/api/project-folder/default",
+                axum::routing::post(node_agent_project_picker::prepare_default_project_folder),
+            )
+            .route(
                 "/api/project-folder/inspect",
                 axum::routing::post(node_agent_project_picker::inspect_local_project_folder),
             )

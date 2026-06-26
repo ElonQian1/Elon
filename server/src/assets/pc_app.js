@@ -4045,17 +4045,16 @@
     const projectTitle = project ? titleOf(project) : '';
     const projectLine = project
       ? `当前项目：${projectTitle}`
-      : '没有选中项目时，会先引导导入这台电脑上的项目目录。';
+      : '没有选中项目时，会使用这台电脑的默认项目目录。';
     return `<div class="local-cli-card" data-local-cli-card>
       <div class="local-cli-card-head">
         <strong>本机开发 CLI</strong>
         <span>${escapeHtml(projectLine)}</span>
       </div>
-      <p>网页不能直接读写 Windows 文件；需要这台电脑运行一龙 Win 端，并把本机节点绑定到当前账号后，AI 才能通过项目开发频道执行 cmd / PowerShell / 文件读写。</p>
+      <p>网页不能直接读写 Windows 文件；点击下方按钮会自动把这台电脑绑定到当前账号，并在默认工作区准备项目目录，然后 AI 才能通过项目开发频道执行 cmd / PowerShell / 文件读写。</p>
       <div class="local-cli-actions">
         <button type="button" data-local-cli-action="detect">检测 Win 端</button>
-        <button type="button" data-local-cli-action="login">绑定当前账号</button>
-        <button type="button" data-local-cli-action="connect-project">导入项目目录</button>
+        <button type="button" data-local-cli-action="connect-project">使用默认目录</button>
         <button class="primary" type="button" data-local-cli-action="danger">开启完整命令行</button>
       </div>
       <div class="local-cli-result" data-local-cli-result aria-live="polite"></div>
@@ -4097,19 +4096,12 @@
         setLocalCliCardResult(card, describeLocalNodeStatus(status), localNodeOwnerMatches(status) ? 'ok' : 'note');
         return;
       }
-      if (action === 'login') {
-        const status = await ensureLocalNodeLogin();
-        await loadBaseData();
-        setLocalCliCardResult(card, describeLocalNodeStatus(status), 'ok');
-        return;
-      }
       if (action === 'connect-project') {
-        openSettings('workbench', { autoPickAndRegister: true, runtimePermission: 'project_write' });
-        setLocalCliCardResult(card, '已打开本机项目目录连接流程。选择目录后会自动注册到当前账号。', 'note');
+        await connectDefaultLocalProjectFromChat(card, 'project_write');
         return;
       }
       if (action === 'danger') {
-        await enableDangerFullAccessFromChat(card);
+        await connectDefaultLocalProjectFromChat(card, 'danger_full_access');
       }
     } catch (error) {
       setLocalCliCardResult(card, clean(error && error.message || error) || '操作失败', 'error');
@@ -4124,7 +4116,7 @@
     if (!status || status.ok === false) return '未检测到一龙 Win 端。请先安装或启动一龙 PC 节点。';
     if (!status.logged_in) return `${device} 已响应，但还没登录一龙账号。`;
     if (!localNodeOwnerMatches(status)) {
-      return `${device} 当前绑定账号不是当前网页账号；点击“绑定当前账号”后再继续。`;
+      return `${device} 当前绑定账号不是当前网页账号；继续使用默认目录或完整命令行时会自动切换为当前账号。`;
     }
     return `${device} 已绑定当前账号，${connected}。`;
   }
@@ -4146,34 +4138,125 @@
     return role === 'owner' || role === 'admin';
   }
 
-  async function enableDangerFullAccessFromChat(card) {
-    const project = activeRuntimeProject();
-    if (!project) {
-      openSettings('workbench', { autoPickAndRegister: true, runtimePermission: 'danger_full_access' });
-      setLocalCliCardResult(card, '已打开导入项目流程，并预选“完整本机命令行”。选择本机目录后会要求你确认授权。', 'note');
-      return;
+  function projectWorkspacePath(project) {
+    return clean(project && (project.workspace_path || project.workspacePath));
+  }
+
+  function projectRepoUrl(project) {
+    return clean(project && (project.repo_url || project.repoUrl));
+  }
+
+  function localProjectRegisterPayload(data, fallbackProject) {
+    const registration = (data && data.registration) || {};
+    const payload = registration.register_payload || registration.registerPayload || {};
+    const project = (data && data.project) || {};
+    const inspect = (data && data.inspect) || {};
+    return {
+      name: clean(payload.name || project.name) || (fallbackProject ? titleOf(fallbackProject) : '本机默认项目'),
+      workspace_path: clean(payload.workspace_path || payload.workspacePath || project.workspace_path || project.workspacePath || inspect.workspace_path || inspect.workspacePath),
+      description: clean(payload.description || project.description) || null,
+      repo_url: clean(payload.repo_url || payload.repoUrl || project.repo_url || project.repoUrl || inspect.git_remote_origin || inspect.gitRemoteOrigin) || null,
+      branch: clean(payload.branch || project.branch || inspect.git_branch || inspect.gitBranch) || null,
+      dev_profile: payload.dev_profile || payload.devProfile || project.dev_profile || project.devProfile || null
+    };
+  }
+
+  async function prepareDefaultLocalProjectFolder(project) {
+    await ensureLocalNodeLogin();
+    return localNodeApi('/api/project-folder/default', {
+      method: 'POST',
+      timeoutMs: 30000,
+      body: JSON.stringify({
+        project_id: clean(project && project.id) || null,
+        user_id: currentUserId(),
+        name: project ? titleOf(project) : '本机默认项目',
+        template: clean(project && project.template) || 'blank',
+        repo_url: projectRepoUrl(project) || null,
+        branch: clean(project && project.branch) || null
+      })
+    });
+  }
+
+  async function registerLocalProjectFromInfo(targetProject, info, requestedMode) {
+    const payload = localProjectRegisterPayload(info, targetProject);
+    if (!payload.workspace_path) throw new Error('默认项目目录准备失败：没有返回 workspace_path。请更新一龙 Win 端后重试。');
+    const data = await localNodeApi('/api/register-project', {
+      method: 'POST',
+      body: JSON.stringify({
+        project_id: clean(targetProject && targetProject.id) || null,
+        name: payload.name,
+        workspace_path: payload.workspace_path,
+        description: payload.description,
+        repo_url: payload.repo_url,
+        branch: payload.branch,
+        dev_profile: payload.dev_profile
+      })
+    });
+    const project = (data.cloud && data.cloud.project) || targetProject || {};
+    const mode = normalizeRuntimePermission(requestedMode);
+    if (mode === 'full_access' || mode === 'danger_full_access') {
+      await grantLocalProjectFullAccess(project, payload.workspace_path);
     }
-    if (!canManageRuntimeProject(project)) {
+    await saveProjectRuntimePermission(project, mode);
+    await loadBaseData();
+    return {
+      project: projectById(project.id) || project,
+      path: payload.workspace_path,
+      created: !!(info && info.default_workspace && info.default_workspace.created),
+      reused: !!(data.cloud && data.cloud.reused_existing)
+    };
+  }
+
+  async function connectDefaultLocalProjectFromChat(card, requestedMode) {
+    const mode = normalizeRuntimePermission(requestedMode);
+    const project = activeRuntimeProject();
+    const modeLabel = runtimePermissionLabel(mode);
+    if (project && mode !== 'project_write' && !canManageRuntimeProject(project)) {
       throw new Error('只有项目 owner 或管理员可以开启完整本机命令行。');
     }
-    const workspacePath = clean(project.workspace_path || project.workspacePath);
-    if (!workspacePath) {
-      openSettings('workbench', { projectId: project.id, autoPickAndRegister: true, runtimePermission: 'danger_full_access' });
-      setLocalCliCardResult(card, '这个项目还没有绑定本机目录。已打开目录连接流程，并预选“完整本机命令行”。', 'note');
+
+    const workspacePath = projectWorkspacePath(project);
+    if (workspacePath) {
+      await ensureLocalNodeLogin();
+      if (mode === 'project_write') {
+        setLocalCliCardResult(card, `当前项目已绑定本机目录：${workspacePath}`);
+        return;
+      }
+      const ok = window.confirm(`确认给项目「${titleOf(project)}」开启${modeLabel}？AI 可能运行任意 cmd / PowerShell 命令，并读写项目目录外的本机文件。`);
+      if (!ok) {
+        setLocalCliCardResult(card, '已取消授权。');
+        return;
+      }
+      await grantLocalProjectFullAccess(project, workspacePath);
+      await saveProjectRuntimePermission(project, mode);
+      await loadBaseData();
+      const latest = projectById(project.id) || project;
+      setLocalCliCardResult(card, `已给「${titleOf(latest)}」开启${modeLabel}。现在到项目开发频道发起任务，AI 才会实际调用本机 CLI。`, 'ok');
       return;
     }
-    const ok = window.confirm(`确认给项目「${titleOf(project)}」开启完整本机命令行？AI 可能运行任意 cmd / PowerShell 命令，并读写项目目录外的本机文件。`);
-    if (!ok) {
-      setLocalCliCardResult(card, '已取消授权。');
-      return;
+
+    if (mode !== 'project_write') {
+      const target = project ? `项目「${titleOf(project)}」` : '默认本机项目';
+      const ok = window.confirm(`确认给${target}开启${modeLabel}？系统会在这台电脑的默认工作区自动创建或复用项目目录，并允许 AI 运行任意 cmd / PowerShell 命令。`);
+      if (!ok) {
+        setLocalCliCardResult(card, '已取消授权。');
+        return;
+      }
     }
-    await ensureLocalNodeLogin();
-    await grantLocalProjectFullAccess(project, workspacePath);
-    await saveProjectRuntimePermission(project, 'danger_full_access');
-    await loadBaseData();
-    const latest = projectById(project.id) || project;
-    if (state.activeProjectId) await selectProject(latest.id || project.id);
-    setLocalCliCardResult(card, `已给「${titleOf(latest)}」开启完整本机命令行。现在到项目开发频道发起任务，AI 才会实际调用本机 CLI。`, 'ok');
+    setLocalCliCardResult(card, `正在使用默认项目目录，并自动绑定当前账号…`, 'note');
+    try {
+      const info = await prepareDefaultLocalProjectFolder(project);
+      const registered = await registerLocalProjectFromInfo(project, info, mode);
+      const pathAction = registered.created ? '创建' : '复用';
+      const projectName = titleOf(registered.project);
+      setLocalCliCardResult(card, `已${pathAction}默认目录并绑定「${projectName}」：${registered.path}。${mode === 'project_write' ? '项目内读写已可用。' : `${modeLabel}已授权。`}现在到项目开发频道发起任务，AI 才会实际调用本机 CLI。`, 'ok');
+    } catch (error) {
+      const message = clean(error && error.message || error);
+      if (/not found|404/i.test(message)) {
+        throw new Error('当前一龙 Win 端版本过旧，不支持默认项目目录。请先更新 Win 端后重试。');
+      }
+      throw error;
+    }
   }
 
   function emptyMessagesHtml(scope) {

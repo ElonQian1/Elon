@@ -10,12 +10,22 @@ use crate::{
         detect_manifest_project_identity, detect_shallow_manifest_project_identity,
     },
     node_agent_project_profile::detect_project_profile,
-    project_landing, project_workspace_inspect,
+    pc_workspace_provisioner, project_landing, project_workspace_inspect,
 };
 
 #[derive(Debug, Deserialize)]
 pub(crate) struct InspectLocalProjectReq {
     workspace_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct DefaultLocalProjectReq {
+    project_id: Option<String>,
+    user_id: Option<String>,
+    name: Option<String>,
+    template: Option<String>,
+    repo_url: Option<String>,
+    branch: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -108,6 +118,53 @@ pub(crate) async fn inspect_local_project_folder(
     Json(req): Json<InspectLocalProjectReq>,
 ) -> (StatusCode, Json<serde_json::Value>) {
     project_info_response(req.workspace_path.trim())
+}
+
+pub(crate) async fn prepare_default_project_folder(
+    Json(req): Json<DefaultLocalProjectReq>,
+) -> (StatusCode, Json<serde_json::Value>) {
+    let project_id = clean_project_text(req.project_id.as_deref().unwrap_or(""), 80)
+        .unwrap_or_else(|| "default-local-project".to_string());
+    let user_id = clean_project_text(req.user_id.as_deref().unwrap_or(""), 80)
+        .unwrap_or_else(|| "current-user".to_string());
+    let name = clean_project_text(req.name.as_deref().unwrap_or(""), 120)
+        .unwrap_or_else(|| "本机默认项目".to_string());
+    let template = clean_project_text(req.template.as_deref().unwrap_or(""), 80)
+        .unwrap_or_else(|| "blank".to_string());
+
+    match pc_workspace_provisioner::provision_project_workspace(
+        pc_workspace_provisioner::ProjectWorkspaceRequest {
+            project_id,
+            user_id,
+            name,
+            template,
+            repo_url: clean_project_text(req.repo_url.as_deref().unwrap_or(""), 500),
+            branch: clean_project_text(req.branch.as_deref().unwrap_or(""), 160),
+        },
+    ) {
+        Ok(result) => {
+            let (status, Json(mut value)) = project_info_response(&result.workspace_path);
+            if status.is_success() {
+                if let Some(object) = value.as_object_mut() {
+                    object.insert(
+                        "default_workspace".to_string(),
+                        json!({
+                            "created": result.created,
+                            "workspace_path": result.workspace_path,
+                            "git_head": result.git_head,
+                            "git_remote_origin": result.git_remote_origin,
+                            "git_branch": result.git_branch,
+                        }),
+                    );
+                }
+            }
+            (status, Json(value))
+        }
+        Err(error) => json_error(
+            StatusCode::BAD_REQUEST,
+            format!("准备默认项目目录失败: {error}"),
+        ),
+    }
 }
 
 fn project_info_response(workspace_path: &str) -> (StatusCode, Json<serde_json::Value>) {
