@@ -2,7 +2,7 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 use std::collections::HashSet;
 
-use super::{new_id, now, ProjectRoleEntry, Store};
+use super::{new_id, now, ProjectMemberRoleRef, ProjectRoleEntry, Store};
 
 pub const PERMISSION_VIEW_MEMBERS: &str = "view_members";
 pub const PERMISSION_SEND_MESSAGES: &str = "send_messages";
@@ -173,6 +173,39 @@ impl Store {
         let permissions = custom_role_permissions_locked(&conn, project_id, &role)?;
         Ok(permissions.iter().any(|item| item == permission))
     }
+
+    pub fn project_member_roles(
+        &self,
+        project_id: &str,
+        user_id: &str,
+    ) -> Result<Vec<ProjectMemberRoleRef>> {
+        let conn = self.conn()?;
+        project_member_role_refs_locked(&conn, project_id, user_id)
+    }
+
+    pub fn project_member_effective_role(
+        &self,
+        project_id: &str,
+        user_id: &str,
+    ) -> Result<Option<String>> {
+        let conn = self.conn()?;
+        project_member_effective_role_locked(&conn, project_id, user_id)
+    }
+
+    pub fn project_member_effective_level(&self, project_id: &str, user_id: &str) -> Result<i64> {
+        let conn = self.conn()?;
+        project_member_effective_level_locked(&conn, project_id, user_id)
+    }
+
+    pub fn project_member_has_permission(
+        &self,
+        project_id: &str,
+        user_id: &str,
+        permission: &str,
+    ) -> Result<bool> {
+        let conn = self.conn()?;
+        project_member_has_permission_locked(&conn, project_id, user_id, permission)
+    }
 }
 
 pub(super) fn normalize_project_member_role_for_project(
@@ -188,6 +221,129 @@ pub(super) fn normalize_project_member_role_for_project(
         return Ok(key);
     }
     anyhow::bail!("role 必须为 admin / editor / member / observer / viewer 或项目自定义角色");
+}
+
+pub(super) fn normalize_project_member_roles_for_project(
+    conn: &Connection,
+    project_id: &str,
+    roles: &[String],
+) -> Result<Vec<String>> {
+    let mut seen = HashSet::new();
+    let mut out = Vec::new();
+    for role in roles {
+        let role = role.trim();
+        if role.is_empty() {
+            continue;
+        }
+        let normalized = normalize_project_member_role_for_project(conn, project_id, role)?;
+        if seen.insert(normalized.clone()) {
+            out.push(normalized);
+        }
+    }
+    if out.is_empty() {
+        out.push("member".to_string());
+    }
+    sort_project_role_keys_locked(conn, project_id, &mut out);
+    Ok(out)
+}
+
+pub(super) fn project_member_role_refs_locked(
+    conn: &Connection,
+    project_id: &str,
+    user_id: &str,
+) -> Result<Vec<ProjectMemberRoleRef>> {
+    let keys = project_member_role_keys_locked(conn, project_id, user_id)?;
+    keys.iter()
+        .map(|role| project_member_role_ref_locked(conn, project_id, role))
+        .collect()
+}
+
+pub(super) fn project_member_effective_role_locked(
+    conn: &Connection,
+    project_id: &str,
+    user_id: &str,
+) -> Result<Option<String>> {
+    Ok(project_member_role_keys_locked(conn, project_id, user_id)?
+        .into_iter()
+        .next())
+}
+
+pub(super) fn project_member_effective_level_locked(
+    conn: &Connection,
+    project_id: &str,
+    user_id: &str,
+) -> Result<i64> {
+    let roles = project_member_role_keys_locked(conn, project_id, user_id)?;
+    Ok(roles
+        .first()
+        .map(|role| project_role_level_locked(conn, project_id, role).unwrap_or(0))
+        .unwrap_or(0))
+}
+
+pub(super) fn project_member_has_permission_locked(
+    conn: &Connection,
+    project_id: &str,
+    user_id: &str,
+    permission: &str,
+) -> Result<bool> {
+    let roles = project_member_role_keys_locked(conn, project_id, user_id)?;
+    project_roles_have_permission_locked(conn, project_id, &roles, permission)
+}
+
+pub(super) fn project_roles_have_permission_locked(
+    conn: &Connection,
+    project_id: &str,
+    roles: &[String],
+    permission: &str,
+) -> Result<bool> {
+    let permission = permission.trim();
+    if permission.is_empty() {
+        return Ok(false);
+    }
+    for role in roles {
+        let key = canonical_project_role_key(role);
+        if key == "owner" {
+            return Ok(true);
+        }
+        if let Some(permissions) = builtin_project_role_permissions(&key) {
+            if permissions.iter().any(|item| item == permission) {
+                return Ok(true);
+            }
+            continue;
+        }
+        let permissions = custom_role_permissions_locked(conn, project_id, &key)?;
+        if permissions.iter().any(|item| item == permission) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+pub(super) fn sync_project_member_roles_locked(
+    conn: &Connection,
+    project_id: &str,
+    user_id: &str,
+    roles: &[String],
+    assigned_by: Option<&str>,
+) -> Result<()> {
+    conn.execute(
+        "DELETE FROM project_member_roles WHERE project_id = ?1 AND user_id = ?2",
+        params![project_id, user_id],
+    )?;
+    let now_str = now();
+    for role in roles {
+        let role = canonical_project_role_key(role);
+        if role.is_empty() || role == "owner" {
+            continue;
+        }
+        conn.execute(
+            "INSERT OR IGNORE INTO project_member_roles
+             (project_id, user_id, role_id, assigned_by, assigned_at)
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![project_id, user_id, role, assigned_by, &now_str],
+        )?;
+    }
+    Ok(())
 }
 
 pub(super) fn project_role_level_locked(
@@ -330,6 +486,119 @@ fn project_role_entry_from_row(row: &rusqlite::Row<'_>) -> rusqlite::Result<Proj
     })
 }
 
+fn project_member_role_keys_locked(
+    conn: &Connection,
+    project_id: &str,
+    user_id: &str,
+) -> Result<Vec<String>> {
+    let primary: Option<String> = conn
+        .query_row(
+            "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+            params![project_id, user_id],
+            |row| row.get(0),
+        )
+        .optional()?;
+    let Some(primary) = primary else {
+        return Ok(Vec::new());
+    };
+    let primary = canonical_project_role_key(&primary);
+    if primary == "owner" {
+        return Ok(vec!["owner".to_string()]);
+    }
+
+    let mut seen = HashSet::new();
+    let mut roles = Vec::new();
+    if !primary.is_empty() && seen.insert(primary.clone()) {
+        roles.push(primary);
+    }
+
+    let mut stmt = conn.prepare(
+        "SELECT role_id
+           FROM project_member_roles
+          WHERE project_id = ?1 AND user_id = ?2",
+    )?;
+    let rows = stmt
+        .query_map(params![project_id, user_id], |row| row.get::<_, String>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    for role in rows {
+        let role = canonical_project_role_key(&role);
+        if role.is_empty() || role == "owner" {
+            continue;
+        }
+        if seen.insert(role.clone()) {
+            roles.push(role);
+        }
+    }
+    if roles.is_empty() {
+        roles.push("member".to_string());
+    }
+    sort_project_role_keys_locked(conn, project_id, &mut roles);
+    Ok(roles)
+}
+
+fn project_member_role_ref_locked(
+    conn: &Connection,
+    project_id: &str,
+    role: &str,
+) -> Result<ProjectMemberRoleRef> {
+    let key = canonical_project_role_key(role);
+    if let Some(role_ref) = builtin_project_member_role_ref(project_id, &key) {
+        return Ok(role_ref);
+    }
+    let custom = conn
+        .query_row(
+            "SELECT id, name, color, position
+               FROM project_roles
+              WHERE project_id = ?1 AND id = ?2",
+            params![project_id, key],
+            |row| {
+                Ok(ProjectMemberRoleRef {
+                    id: row.get(0)?,
+                    name: row.get(1)?,
+                    color: row.get(2)?,
+                    position: row.get(3)?,
+                    builtin: false,
+                })
+            },
+        )
+        .optional()?;
+    Ok(custom.unwrap_or_else(|| ProjectMemberRoleRef {
+        id: key.clone(),
+        name: key,
+        color: None,
+        position: 0,
+        builtin: false,
+    }))
+}
+
+fn builtin_project_member_role_ref(project_id: &str, role: &str) -> Option<ProjectMemberRoleRef> {
+    let key = canonical_project_role_key(role);
+    BUILTIN_ROLES
+        .iter()
+        .find(|(id, _, _, _)| *id == key)
+        .map(|(id, name, color, position)| ProjectMemberRoleRef {
+            id: (*id).to_string(),
+            name: (*name).to_string(),
+            color: color.map(str::to_string),
+            position: *position,
+            builtin: true,
+        })
+        .or_else(|| {
+            if key == "owner" {
+                Some(ProjectMemberRoleRef {
+                    id: "owner".to_string(),
+                    name: "拥有者".to_string(),
+                    color: Some("#f0b232".to_string()),
+                    position: 100,
+                    builtin: true,
+                })
+            } else {
+                let _ = project_id;
+                None
+            }
+        })
+}
+
 fn custom_role_exists_locked(conn: &Connection, project_id: &str, role_id: &str) -> Result<bool> {
     let count: i64 = conn.query_row(
         "SELECT COUNT(*) FROM project_roles WHERE project_id = ?1 AND id = ?2",
@@ -369,11 +638,24 @@ fn project_role_member_count_locked(
     role_id: &str,
 ) -> Result<i64> {
     conn.query_row(
-        "SELECT COUNT(*) FROM project_members WHERE project_id = ?1 AND role = ?2",
+        "SELECT COUNT(*)
+           FROM (
+             SELECT user_id FROM project_members WHERE project_id = ?1 AND role = ?2
+             UNION
+             SELECT user_id FROM project_member_roles WHERE project_id = ?1 AND role_id = ?2
+           )",
         params![project_id, role_id],
         |row| row.get(0),
     )
     .map_err(Into::into)
+}
+
+fn sort_project_role_keys_locked(conn: &Connection, project_id: &str, roles: &mut [String]) {
+    roles.sort_by(|left, right| {
+        let left_level = project_role_level_locked(conn, project_id, left).unwrap_or(0);
+        let right_level = project_role_level_locked(conn, project_id, right).unwrap_or(0);
+        right_level.cmp(&left_level).then_with(|| left.cmp(right))
+    });
 }
 
 fn ensure_project_exists(conn: &Connection, project_id: &str) -> Result<()> {
@@ -435,8 +717,18 @@ fn clean_permissions(input: &[String]) -> Vec<String> {
     out
 }
 
-fn normalize_role_key(role: &str) -> String {
+pub(super) fn normalize_role_key(role: &str) -> String {
     role.trim().to_ascii_lowercase()
+}
+
+fn canonical_project_role_key(role: &str) -> String {
+    let key = normalize_role_key(role);
+    if key == "owner" {
+        return key;
+    }
+    normalize_builtin_project_member_role(&key)
+        .unwrap_or(key.as_str())
+        .to_string()
 }
 
 #[cfg(test)]
@@ -480,6 +772,8 @@ mod tests {
             .add_project_member_by_account(&project.id, "role-member@example.com", &role.id)
             .expect("custom role should be assignable");
         assert_eq!(assigned.role, role.id);
+        assert_eq!(assigned.roles.len(), 1);
+        assert_eq!(assigned.roles[0].id, role.id);
         assert_eq!(
             store
                 .get_project_access(&member.id, &project.id)
@@ -510,5 +804,77 @@ mod tests {
             .expect_err("role in use should not delete")
             .to_string()
             .contains("成员"));
+    }
+
+    #[test]
+    fn project_member_roles_stack_permissions_and_effective_role() {
+        let store = temp_store();
+        let owner = store
+            .create_user("multi-role-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let member = store
+            .create_user("multi-role-member@example.com", "secret1", None, None)
+            .expect("member should be created");
+        let project = store
+            .create_project(&owner.id, "Multi Role Project", None, None)
+            .expect("project should be created")
+            .project;
+        store
+            .add_project_member_by_account(&project.id, "multi-role-member@example.com", "member")
+            .expect("member should be invited");
+
+        let permissions = vec![PERMISSION_INVITE_MEMBERS.to_string()];
+        let reviewer = store
+            .create_project_role(
+                &project.id,
+                "审核员",
+                Some("#43b581"),
+                Some(55),
+                Some(&permissions),
+                Some(&owner.id),
+            )
+            .expect("custom reviewer role should be created");
+
+        let roles = vec!["member".to_string(), reviewer.id.clone()];
+        let updated = store
+            .set_project_member_roles(&project.id, &member.id, &roles, Some(&owner.id))
+            .expect("member should accept stacked roles");
+        assert_eq!(updated.role, reviewer.id);
+        assert_eq!(updated.roles[0].id, reviewer.id);
+        assert!(updated.roles.iter().any(|role| role.id == "member"));
+        assert_eq!(
+            store
+                .get_project_access(&member.id, &project.id)
+                .expect("access should load")
+                .role,
+            reviewer.id
+        );
+        assert!(store
+            .project_member_has_permission(&project.id, &member.id, PERMISSION_INVITE_MEMBERS)
+            .expect("custom permission should apply"));
+        assert!(store
+            .project_member_has_permission(&project.id, &member.id, PERMISSION_SEND_MESSAGES)
+            .expect("builtin permission should still apply"));
+
+        let listed_roles = store
+            .list_project_roles(&project.id)
+            .expect("roles should list");
+        let reviewer_entry = listed_roles
+            .iter()
+            .find(|role| role.id == reviewer.id)
+            .expect("reviewer should be listed");
+        assert_eq!(reviewer_entry.member_count, 1);
+        assert!(store
+            .delete_project_role(&project.id, &reviewer.id)
+            .expect_err("assigned role should not delete")
+            .to_string()
+            .contains("成员"));
+
+        store
+            .update_member_role(&project.id, &member.id, "member")
+            .expect("single-role update should clear stacked roles");
+        store
+            .delete_project_role(&project.id, &reviewer.id)
+            .expect("unused custom role should delete");
     }
 }

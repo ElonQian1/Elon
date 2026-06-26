@@ -446,6 +446,25 @@
     return clean(member && (member.role || member.member_role || member.memberRole)).toLowerCase();
   }
 
+  function memberRoleKeys(member) {
+    if (typeof member === 'string') {
+      const key = clean(member).toLowerCase();
+      return key ? [key] : [];
+    }
+    const out = [];
+    const pushRole = (role) => {
+      const key = clean(typeof role === 'string'
+        ? role
+        : role && (role.id || role.key || role.role_id || role.roleId || role.role || role.member_role || role.memberRole)
+      ).toLowerCase();
+      if (key && !out.includes(key)) out.push(key);
+    };
+    const roleList = member && (member.roles || member.member_roles || member.memberRoles);
+    if (Array.isArray(roleList)) roleList.forEach(pushRole);
+    pushRole(memberRoleKey(member));
+    return out.sort((left, right) => memberRoleLevel(right) - memberRoleLevel(left) || left.localeCompare(right));
+  }
+
   function memberRoleLabel(member) {
     const role = typeof member === 'string' ? clean(member).toLowerCase() : memberRoleKey(member);
     if (!role) return '';
@@ -460,6 +479,19 @@
     if (role === 'member') return '成员';
     if (role === 'observer' || role === 'viewer') return '只读成员';
     return role;
+  }
+
+  function memberRoleLabels(member) {
+    return memberRoleKeys(member)
+      .map((role) => memberRoleLabel(role))
+      .filter(Boolean);
+  }
+
+  function memberRoleSummary(member, limit) {
+    const labels = memberRoleLabels(member);
+    const max = Math.max(1, Number(limit || 3) || 3);
+    if (labels.length <= max) return labels.join(' / ');
+    return `${labels.slice(0, max).join(' / ')} +${labels.length - max}`;
   }
 
   function memberAccountOf(member) {
@@ -535,6 +567,22 @@
     return clean(project.role || project.member_role || project.memberRole || project.viewer_role || project.viewerRole).toLowerCase();
   }
 
+  function activeProjectRoleKeys() {
+    const out = [];
+    const push = (role) => {
+      const key = clean(role).toLowerCase();
+      if (key && !out.includes(key)) out.push(key);
+    };
+    const project = projectById(state.activeProjectId) || ((state.projectSpace && state.projectSpace.project) || {});
+    memberRoleKeys(project).forEach(push);
+    const currentId = currentUserId();
+    const members = state.projectSpace && Array.isArray(state.projectSpace.members) ? state.projectSpace.members : [];
+    const currentMember = members.find((member) => sameId(memberIdOf(member), currentId));
+    memberRoleKeys(currentMember).forEach(push);
+    push(activeProjectRole());
+    return out.sort((left, right) => memberRoleLevel(right) - memberRoleLevel(left) || left.localeCompare(right));
+  }
+
   function projectRoleState(projectId) {
     const id = clean(projectId || state.activeProjectId);
     if (!id) return { roles: [], permissions: PROJECT_ROLE_PERMISSION_OPTIONS, loaded: false, loading: false };
@@ -570,6 +618,16 @@
     return (builtins[key] || []).includes(perm);
   }
 
+  function projectRolesHavePermission(projectId, roles, permission) {
+    const list = Array.isArray(roles) ? roles : [roles];
+    return list.some((role) => projectRoleHasPermission(projectId, role, permission));
+  }
+
+  function activeProjectHasPermission(permission) {
+    const projectId = clean(state.activeProjectId || memberPanelProjectId());
+    return projectRolesHavePermission(projectId, activeProjectRoleKeys(), permission);
+  }
+
   function projectRolePermissionOptions(projectId) {
     const catalog = projectRoleState(projectId);
     return Array.isArray(catalog.permissions) && catalog.permissions.length
@@ -598,6 +656,7 @@
       .map((role) => ({
         key: clean(role.id),
         label: clean(role.name) || memberRoleLabel(clean(role.id)),
+        color: clean(role.color),
         position: Number(role.position || memberRoleLevel(role.id)) || 0,
         builtin: !!role.builtin,
         memberCount: Number(role.member_count || role.memberCount || 0) || 0,
@@ -607,21 +666,16 @@
   }
 
   function canUseActiveProjectMemberAdmin() {
-    const projectId = clean(state.activeProjectId || memberPanelProjectId());
-    const role = activeProjectRole();
     return ['invite_members', 'manage_members', 'moderate_members', 'view_audit_log', 'manage_roles']
-      .some((permission) => projectRoleHasPermission(projectId, role, permission));
+      .some((permission) => activeProjectHasPermission(permission));
   }
 
   function canManageActiveProjectRoles() {
-    const projectId = clean(state.activeProjectId || memberPanelProjectId());
-    return projectRoleHasPermission(projectId, activeProjectRole(), 'manage_roles');
+    return activeProjectHasPermission('manage_roles');
   }
 
   function canManageActiveProjectMembers() {
-    const projectId = clean(state.activeProjectId || memberPanelProjectId());
-    const role = activeProjectRole();
-    return projectRoleHasPermission(projectId, role, 'manage_members');
+    return activeProjectHasPermission('manage_members');
   }
 
   function memberPanelProjectId() {
@@ -2873,8 +2927,8 @@
     if (!projectId || !canUseActiveProjectMemberAdmin()) return '';
     const admin = memberAdminState(projectId);
     const currentRole = activeProjectRole();
-    const canInvite = projectRoleHasPermission(projectId, currentRole, 'invite_members');
-    const canViewAudit = projectRoleHasPermission(projectId, currentRole, 'view_audit_log') || projectRoleHasPermission(projectId, currentRole, 'manage_members');
+    const canInvite = activeProjectHasPermission('invite_members');
+    const canViewAudit = activeProjectHasPermission('view_audit_log') || activeProjectHasPermission('manage_members');
     const canUseRoles = canManageActiveProjectRoles() || projectRoleState(projectId).loaded;
     const pendingCount = Array.isArray(admin.requests) ? admin.requests.filter((request) => clean(request.status) === 'pending').length : 0;
     const roleOptions = projectAssignableRoleOptions(projectId).map((role) => {
@@ -3253,7 +3307,9 @@
     const opts = panel.options || {};
     const normalized = (Array.isArray(panel.members) ? panel.members : []).map((member, index) => {
       const id = memberIdOf(member);
-      const roleLabel = memberRoleLabel(member);
+      const roleKeys = memberRoleKeys(member);
+      const roleKey = roleKeys[0] || memberRoleKey(member);
+      const roleLabel = memberRoleSummary(member);
       const presence = memberPresence(member);
       const moderationLabel = memberModerationLabel(member);
       const explicitSub = clean(member && (
@@ -3265,8 +3321,9 @@
         __key: `${id || memberNameOf(member)}:${index}`,
         __name: memberNameOf(member),
         __presence: presence,
-        __roleKey: memberRoleKey(member),
-        __roleGroup: memberRoleGroupKey(memberRoleKey(member)),
+        __roleKeys: roleKeys,
+        __roleKey: roleKey,
+        __roleGroup: memberRoleGroupKey(roleKey),
         __roleLabel: roleLabel,
         __isMuted: memberIsMuted(member),
         __isBanned: memberIsBanned(member),
@@ -3340,6 +3397,7 @@
       member.__name,
       member.__sub,
       member.__roleLabel,
+      Array.isArray(member.__roleKeys) ? member.__roleKeys.join(' ') : '',
       member.__moderationLabel,
       member.__id,
       memberAccountOf(member),
@@ -3754,7 +3812,7 @@
   }
 
   function maybeLoadProjectJoinRequests(projectId) {
-    if (!projectId || !projectRoleHasPermission(projectId, activeProjectRole(), 'invite_members')) return;
+    if (!projectId || !activeProjectHasPermission('invite_members')) return;
     const admin = memberAdminState(projectId);
     if (admin.loaded || admin.loading) return;
     loadProjectJoinRequests(projectId, { silent: true }).catch(() => {
@@ -3835,7 +3893,7 @@
     const id = memberIdOf(member);
     if (!id) return;
     const incoming = Object.assign({}, member);
-    if (memberRoleKey(incoming)) incoming.sub = memberRoleLabel(incoming) || '项目成员';
+    if (memberRoleKeys(incoming).length) incoming.sub = memberRoleSummary(incoming) || '项目成员';
     const apply = (list) => {
       if (!Array.isArray(list)) return;
       const existing = list.find((item) => sameId(memberIdOf(item), id));
@@ -3878,8 +3936,8 @@
     const isSelf = sameId(member.__id, currentUserId());
     const targetRole = member.__roleGroup || member.__roleKey;
     const targetIsOwner = targetRole === 'owner';
-    const canManageMembers = projectRoleHasPermission(projectId, managerRole, 'manage_members');
-    const canModerateMembers = projectRoleHasPermission(projectId, managerRole, 'moderate_members');
+    const canManageMembers = activeProjectHasPermission('manage_members');
+    const canModerateMembers = activeProjectHasPermission('moderate_members');
     const canUseAdmin = canUseActiveProjectMemberAdmin();
     const canManageTarget = canManageMembers && !isSelf && memberRoleCanManage(managerRole, targetRole);
     const canModerateTarget = canModerateMembers && !isSelf && memberRoleCanManage(managerRole, targetRole);
@@ -3928,17 +3986,29 @@
         <span>${escapeHtml(label)}</span>
         <strong title="${escapeHtml(value)}">${escapeHtml(value)}</strong>
       </div>`).join('');
-    const currentRoleKey = member.__roleGroup || member.__roleKey;
+    const currentRoleKeys = Array.isArray(member.__roleKeys) && member.__roleKeys.length ? member.__roleKeys : memberRoleKeys(member);
+    const currentRoleKey = currentRoleKeys[0] || member.__roleGroup || member.__roleKey;
     const assignableRoles = projectAssignableRoleOptions(projectManagement.projectId);
-    const hasEditableRole = assignableRoles.some((role) => role.key === currentRoleKey);
-    const currentRoleOption = currentRoleKey && !hasEditableRole
-      ? `<option value="${escapeHtml(currentRoleKey)}" selected>${escapeHtml(memberRoleLabel(currentRoleKey) || currentRoleKey)}</option>`
-      : '';
-    const roleOptions = currentRoleOption + assignableRoles.map((role) => {
-      const selected = role.key === currentRoleKey ? 'selected' : '';
-      const disabled = memberRoleCanAssign(projectManagement.managerRole, role.key) ? '' : 'disabled';
-      return `<option value="${escapeHtml(role.key)}" ${selected} ${disabled}>${escapeHtml(role.label)}</option>`;
-    }).join('');
+    const assignableKeys = new Set(assignableRoles.map((role) => role.key));
+    const roleChoiceHtml = [
+      ...currentRoleKeys
+        .filter((role) => role && !assignableKeys.has(role))
+        .map((role) => `<label class="member-role-choice is-disabled">
+          <input type="checkbox" data-profile-role-choice value="${escapeHtml(role)}" checked disabled />
+          <span class="member-role-choice-swatch"></span>
+          <strong>${escapeHtml(memberRoleLabel(role) || role)}</strong>
+        </label>`),
+      ...assignableRoles.map((role) => {
+        const checked = currentRoleKeys.includes(role.key) ? 'checked' : '';
+        const disabled = projectManagement.canChangeRole && !viewState.busy && memberRoleCanAssign(projectManagement.managerRole, role.key) ? '' : 'disabled';
+        const color = role.color || '#5865f2';
+        return `<label class="member-role-choice ${disabled ? 'is-disabled' : ''}">
+          <input type="checkbox" data-profile-role-choice value="${escapeHtml(role.key)}" ${checked} ${disabled} />
+          <span class="member-role-choice-swatch" style="background:${escapeHtml(color)}"></span>
+          <strong>${escapeHtml(role.label)}</strong>
+        </label>`;
+      })
+    ].join('');
     const moderationHtml = projectManagement.canModerate
       ? `<div class="member-moderation-actions">
           ${isBanned
@@ -3956,9 +4026,9 @@
             <small>${escapeHtml(projectManagement.managerLabel)}</small>
           </div>
           <div class="member-role-control">
-            <select data-profile-role ${projectManagement.canChangeRole && !viewState.busy ? '' : 'disabled'}>
-              ${roleOptions}
-            </select>
+            <div class="member-role-checks" data-profile-roles>
+              ${roleChoiceHtml || '<span class="member-role-empty">暂无可分配角色</span>'}
+            </div>
             <button class="text-button" type="button" data-profile-action="save-role" ${projectManagement.canChangeRole ? disabledAttr : 'disabled'}>保存</button>
           </div>
           ${moderationHtml}
@@ -4039,9 +4109,10 @@
     }
     if (action === 'save-role') {
       const popover = $('memberPopover');
-      const roleSelect = popover && popover.querySelector('[data-profile-role]');
-      const role = roleSelect && roleSelect.value;
-      updateProfileMemberRole(member, role).catch((error) => setMemberProfileStatus(error.message || '角色更新失败', 'error'));
+      const roles = popover
+        ? Array.from(popover.querySelectorAll('[data-profile-role-choice]:checked')).map((input) => input.value)
+        : [];
+      updateProfileMemberRole(member, roles).catch((error) => setMemberProfileStatus(error.message || '角色更新失败', 'error'));
       return;
     }
     if (action === 'remove-project-member') {
@@ -4118,29 +4189,39 @@
     setMemberProfileStatus('好友已处理', 'ok');
   }
 
-  async function updateProfileMemberRole(member, role) {
+  async function updateProfileMemberRole(member, roleInput) {
     const management = memberProjectManagement(member);
-    const targetRole = clean(role).toLowerCase();
-    if (!management.canChangeRole || !targetRole) return;
-    if (!memberRoleCanAssign(management.managerRole, targetRole)) {
+    const targetRoles = (Array.isArray(roleInput) ? roleInput : [roleInput])
+      .map((role) => clean(role).toLowerCase())
+      .filter(Boolean)
+      .filter((role, index, list) => list.indexOf(role) === index);
+    if (!management.canChangeRole) return;
+    if (!targetRoles.length) {
+      setMemberProfileStatus('至少选择一个角色', 'error');
+      return;
+    }
+    const blockedRole = targetRoles.find((role) => !memberRoleCanAssign(management.managerRole, role));
+    if (blockedRole) {
       setMemberProfileStatus('当前角色不能分配同级或更高角色', 'error');
       return;
     }
     setMemberProfileStatus('正在更新角色…', '', true);
-    await api(`/api/projects/${encodeURIComponent(management.projectId)}/members/${encodeURIComponent(member.__id)}`, {
+    const data = await api(`/api/projects/${encodeURIComponent(management.projectId)}/members/${encodeURIComponent(member.__id)}`, {
       method: 'PATCH',
-      body: JSON.stringify({ role: targetRole })
+      body: JSON.stringify({ roles: targetRoles })
     });
-    patchMemberInProjectLists(member.__id, { role: targetRole, sub: memberRoleLabel(targetRole) || '项目成员' });
+    const updatedMember = data.member || {};
+    const roleRefs = Array.isArray(updatedMember.roles) ? updatedMember.roles : (Array.isArray(data.roles) ? data.roles : targetRoles);
+    const effectiveRole = clean(updatedMember.role || data.role || targetRoles[0]).toLowerCase();
+    const patch = Object.assign({}, updatedMember, {
+      role: effectiveRole,
+      roles: roleRefs
+    });
+    patch.sub = memberRoleSummary(patch) || memberRoleLabel(effectiveRole) || '项目成员';
+    patchMemberInProjectLists(member.__id, patch);
     renderMemberPanelView();
     refreshMemberAuditAfterMutation(management.projectId);
-    const latest = renderedMemberById(member.__id) || Object.assign({}, member, {
-      role: targetRole,
-      __roleKey: targetRole,
-      __roleGroup: memberRoleGroupKey(targetRole),
-      __roleLabel: memberRoleLabel(targetRole),
-      __sub: memberRoleLabel(targetRole) || '项目成员'
-    });
+    const latest = renderedMemberById(member.__id) || Object.assign({}, member, patch);
     renderMemberProfile(latest, null, { status: '角色已更新', tone: 'ok' });
   }
 

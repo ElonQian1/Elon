@@ -103,6 +103,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (69, "项目成员管理审计日志", migration_v69),
     (70, "项目成员禁言与封禁状态", migration_v70),
     (71, "项目自定义角色与成员权限矩阵", migration_v71),
+    (72, "项目成员多角色绑定", migration_v72),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2384,6 +2385,31 @@ fn migration_v71(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_roles_project_position
           ON project_roles(project_id, position DESC, created_at);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v72(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_member_roles (
+          project_id  TEXT NOT NULL,
+          user_id     TEXT NOT NULL,
+          role_id     TEXT NOT NULL,
+          assigned_by TEXT,
+          assigned_at TEXT NOT NULL,
+          PRIMARY KEY (project_id, user_id, role_id),
+          FOREIGN KEY (project_id, user_id) REFERENCES project_members(project_id, user_id),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (assigned_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_member_roles_project_role
+          ON project_member_roles(project_id, role_id);
+
+        CREATE INDEX IF NOT EXISTS idx_project_member_roles_user
+          ON project_member_roles(user_id, project_id);
         "#,
     )?;
     Ok(())

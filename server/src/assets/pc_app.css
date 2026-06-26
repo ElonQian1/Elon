@@ -2799,6 +2799,57 @@ button { cursor: pointer; }
   color: #767b86;
   cursor: not-allowed;
 }
+.member-role-control > .text-button {
+  align-self: start;
+}
+.member-role-checks {
+  min-width: 0;
+  max-height: 142px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  padding: 6px;
+  border: 1px solid #353943;
+  border-radius: 6px;
+  background: #191a1f;
+}
+.member-role-choice {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 14px 10px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  min-height: 24px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+}
+.member-role-choice input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--brand);
+}
+.member-role-choice-swatch {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #5865f2;
+  box-shadow: 0 0 0 2px rgba(255,255,255,.05);
+}
+.member-role-choice strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.member-role-choice.is-disabled {
+  color: #767b86;
+}
+.member-role-empty {
+  color: #767b86;
+  font-size: 12px;
+}
 .member-moderation-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;

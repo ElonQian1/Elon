@@ -10,7 +10,11 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
-use super::project_roles::normalize_project_member_role_for_project;
+use super::project_roles::{
+    normalize_project_member_role_for_project, normalize_project_member_roles_for_project,
+    project_member_effective_role_locked, project_member_role_refs_locked,
+    sync_project_member_roles_locked,
+};
 use super::{
     is_system_project_source_type, normalize_account, now, project_branding, ProjectDeletionTarget,
     ProjectMemberEntry, PublicProjectItem, Store,
@@ -121,7 +125,7 @@ impl Store {
         );
 
         let mut stmt = conn.prepare(&sql)?;
-        let rows = stmt
+        let mut rows = stmt
             .query_map(
                 params![
                     pattern,
@@ -161,6 +165,13 @@ impl Store {
                 },
             )?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(stmt);
+        if let Some(viewer_user_id) = viewer_user_id {
+            for project in &mut rows {
+                project.viewer_role =
+                    project_member_effective_role_locked(&conn, &project.id, viewer_user_id)?;
+            }
+        }
         Ok(rows)
     }
 
@@ -231,8 +242,9 @@ impl Store {
         viewer_user_id: Option<&str>,
     ) -> Result<PublicProjectItem> {
         let conn = self.conn()?;
-        conn.query_row(
-            "SELECT
+        let mut project = conn
+            .query_row(
+                "SELECT
                p.id, p.name, p.description, p.template,
                COALESCE(u.nickname, u.phone, u.email, p.created_by) AS owner_account,
                (SELECT COUNT(*) FROM project_members pm2 WHERE pm2.project_id = p.id),
@@ -260,37 +272,42 @@ impl Store {
                AND p.join_mode != 'invite'
                AND p.status != 'deleted'
                AND p.source_type NOT IN ('agent_balloon', 'chat_memory')",
-            params![project_id, viewer_user_id],
-            |row| {
-                let mut project = PublicProjectItem {
-                    id: row.get(0)?,
-                    name: row.get(1)?,
-                    display_name: row.get(16)?,
-                    description: row.get(2)?,
-                    template: row.get(3)?,
-                    owner_account: row.get(4)?,
-                    member_count: row.get(5)?,
-                    is_public: row.get::<_, i64>(6)? != 0,
-                    join_mode: row.get(7)?,
-                    viewer_role: row.get(17)?,
-                    last_task_status: row.get(8)?,
-                    latest_apk_url: row.get(9)?,
-                    icon_data_url: row.get(10)?,
-                    created_at: row.get(11)?,
-                    updated_at: row.get(12)?,
-                    owner_id: row.get(13).unwrap_or_default(),
-                };
-                let source_type: String = row.get(14)?;
-                let workspace_path: Option<String> = row.get(15)?;
-                project_branding::apply_public_project_branding(
-                    &mut project,
-                    &source_type,
-                    workspace_path.as_deref(),
-                );
-                Ok(project)
-            },
-        )
-        .map_err(|_| anyhow!("项目不存在或未公开"))
+                params![project_id, viewer_user_id],
+                |row| {
+                    let mut project = PublicProjectItem {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        display_name: row.get(16)?,
+                        description: row.get(2)?,
+                        template: row.get(3)?,
+                        owner_account: row.get(4)?,
+                        member_count: row.get(5)?,
+                        is_public: row.get::<_, i64>(6)? != 0,
+                        join_mode: row.get(7)?,
+                        viewer_role: row.get(17)?,
+                        last_task_status: row.get(8)?,
+                        latest_apk_url: row.get(9)?,
+                        icon_data_url: row.get(10)?,
+                        created_at: row.get(11)?,
+                        updated_at: row.get(12)?,
+                        owner_id: row.get(13).unwrap_or_default(),
+                    };
+                    let source_type: String = row.get(14)?;
+                    let workspace_path: Option<String> = row.get(15)?;
+                    project_branding::apply_public_project_branding(
+                        &mut project,
+                        &source_type,
+                        workspace_path.as_deref(),
+                    );
+                    Ok(project)
+                },
+            )
+            .map_err(|_| anyhow!("项目不存在或未公开"))?;
+        if let Some(viewer_user_id) = viewer_user_id {
+            project.viewer_role =
+                project_member_effective_role_locked(&conn, &project.id, viewer_user_id)?;
+        }
+        Ok(project)
     }
 
     // ─── 成员管理 ────────────────────────────────────────────────────────────
@@ -428,7 +445,12 @@ impl Store {
             "owner" => anyhow::bail!("项目 owner 不可退出，请先转让所有权或删除项目"),
             _ => {}
         }
-        self.conn()?.execute(
+        let conn = self.conn()?;
+        conn.execute(
+            "DELETE FROM project_member_roles WHERE project_id = ?1 AND user_id = ?2",
+            params![project_id, user_id],
+        )?;
+        conn.execute(
             "DELETE FROM project_members WHERE project_id = ?1 AND user_id = ?2",
             params![project_id, user_id],
         )?;
@@ -491,6 +513,13 @@ impl Store {
              ON CONFLICT(project_id, user_id) DO UPDATE SET role = excluded.role",
             params![project_id, target_user_id, role_db, &now_str],
         )?;
+        sync_project_member_roles_locked(
+            &conn,
+            project_id,
+            &target_user_id,
+            std::slice::from_ref(&role_db),
+            None,
+        )?;
         project_member_entry(&conn, project_id, &target_user_id)
     }
 
@@ -517,13 +546,7 @@ impl Store {
         target_user_id: &str,
     ) -> Result<Option<String>> {
         let conn = self.conn()?;
-        conn.query_row(
-            "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
-            params![project_id, target_user_id],
-            |row| row.get(0),
-        )
-        .optional()
-        .map_err(Into::into)
+        project_member_effective_role_locked(&conn, project_id, target_user_id)
     }
 
     /// 修改成员角色（仅 admin/editor/member/observer 之间互转；不可改 owner，不可改自己）
@@ -533,9 +556,26 @@ impl Store {
         target_user_id: &str,
         new_role: &str,
     ) -> Result<()> {
+        let roles = vec![new_role.to_string()];
+        self.set_project_member_roles(project_id, target_user_id, &roles, None)
+            .map(|_| ())
+    }
+
+    /// 修改成员持有的所有角色；`project_members.role` 保留最高角色以兼容旧客户端。
+    pub fn set_project_member_roles(
+        &self,
+        project_id: &str,
+        target_user_id: &str,
+        roles: &[String],
+        assigned_by: Option<&str>,
+    ) -> Result<ProjectMemberEntry> {
         let conn = self.conn()?;
-        let role_db = normalize_project_member_role_for_project(&conn, project_id, new_role)?;
         ensure_project_not_system(&conn, project_id, "系统归档项目不能修改成员角色")?;
+        let role_dbs = normalize_project_member_roles_for_project(&conn, project_id, roles)?;
+        let primary_role = role_dbs
+            .first()
+            .cloned()
+            .unwrap_or_else(|| "member".to_string());
         let current_role: Option<String> = conn
             .query_row(
                 "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
@@ -550,9 +590,16 @@ impl Store {
         }
         conn.execute(
             "UPDATE project_members SET role = ?3 WHERE project_id = ?1 AND user_id = ?2",
-            params![project_id, target_user_id, role_db],
+            params![project_id, target_user_id, primary_role],
         )?;
-        Ok(())
+        sync_project_member_roles_locked(
+            &conn,
+            project_id,
+            target_user_id,
+            &role_dbs,
+            assigned_by,
+        )?;
+        project_member_entry(&conn, project_id, target_user_id)
     }
 
     /// 移除成员（owner 不可被移除，需要由 handler 层确保调用者可管理成员）
@@ -571,6 +618,10 @@ impl Store {
             Some("owner") => anyhow::bail!("不能移除项目 owner"),
             _ => {}
         }
+        conn.execute(
+            "DELETE FROM project_member_roles WHERE project_id = ?1 AND user_id = ?2",
+            params![project_id, target_user_id],
+        )?;
         conn.execute(
             "DELETE FROM project_members WHERE project_id = ?1 AND user_id = ?2",
             params![project_id, target_user_id],
@@ -605,13 +656,14 @@ impl Store {
                COALESCE(pr.position, 0) DESC,
                pm.created_at",
         )?;
-        let rows = stmt
+        let mut rows = stmt
             .query_map(params![project_id, now], |row| {
                 Ok(ProjectMemberEntry {
                     user_id: row.get(0)?,
                     account: row.get(1)?,
                     avatar_data_url: row.get(2)?,
                     role: row.get(3)?,
+                    roles: Vec::new(),
                     joined_at: row.get(4)?,
                     is_online: false,
                     muted_until: row.get(5)?,
@@ -622,6 +674,21 @@ impl Store {
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        for member in &mut rows {
+            let roles = project_member_role_refs_locked(&conn, project_id, &member.user_id)?;
+            if let Some(effective) = roles.first() {
+                member.role = effective.id.clone();
+            }
+            member.roles = roles;
+        }
+        rows.sort_by(|left, right| {
+            let left_level = left.roles.first().map(|role| role.position).unwrap_or(0);
+            let right_level = right.roles.first().map(|role| role.position).unwrap_or(0);
+            right_level
+                .cmp(&left_level)
+                .then_with(|| left.joined_at.cmp(&right.joined_at))
+                .then_with(|| left.account.cmp(&right.account))
+        });
         Ok(rows)
     }
 
@@ -653,7 +720,7 @@ impl Store {
                AND p.status != 'deleted'
              ORDER BY p.updated_at DESC",
         )?;
-        let rows = stmt
+        let mut rows = stmt
             .query_map(params![user_id], |row| {
                 let mut project = PublicProjectItem {
                     id: row.get(0)?,
@@ -683,6 +750,11 @@ impl Store {
                 Ok(project)
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(stmt);
+        for project in &mut rows {
+            project.viewer_role =
+                project_member_effective_role_locked(&conn, &project.id, user_id)?;
+        }
         Ok(rows)
     }
 
@@ -835,6 +907,10 @@ impl Store {
             params![project_id],
         )?;
         tx.execute(
+            "DELETE FROM project_member_roles WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
             "DELETE FROM project_members WHERE project_id = ?1",
             params![project_id],
         )?;
@@ -854,7 +930,7 @@ fn project_member_entry(
     user_id: &str,
 ) -> Result<ProjectMemberEntry> {
     let now = now();
-    conn.query_row(
+    let mut entry = conn.query_row(
         "SELECT pm.user_id,
                 COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS account,
                 u.avatar_data_url,
@@ -869,7 +945,7 @@ fn project_member_entry(
          LEFT JOIN users u ON u.id = pm.user_id
          LEFT JOIN project_member_restrictions r
            ON r.project_id = pm.project_id AND r.user_id = pm.user_id
-         WHERE pm.project_id = ?1 AND pm.user_id = ?2",
+        WHERE pm.project_id = ?1 AND pm.user_id = ?2",
         params![project_id, user_id, now],
         |row| {
             Ok(ProjectMemberEntry {
@@ -877,6 +953,7 @@ fn project_member_entry(
                 account: row.get(1)?,
                 avatar_data_url: row.get(2)?,
                 role: row.get(3)?,
+                roles: Vec::new(),
                 joined_at: row.get(4)?,
                 is_online: false,
                 muted_until: row.get(5)?,
@@ -886,8 +963,13 @@ fn project_member_entry(
                 is_banned: row.get::<_, i64>(9)? != 0,
             })
         },
-    )
-    .map_err(Into::into)
+    )?;
+    let roles = project_member_role_refs_locked(conn, project_id, user_id)?;
+    if let Some(effective) = roles.first() {
+        entry.role = effective.id.clone();
+    }
+    entry.roles = roles;
+    Ok(entry)
 }
 
 fn ensure_project_not_system(

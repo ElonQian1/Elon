@@ -66,9 +66,9 @@ pub async fn request_join(
                 for manager in members.iter().filter(|m| {
                     state
                         .store
-                        .project_role_has_permission(
+                        .project_member_has_permission(
                             &project_id,
-                            &m.role,
+                            &m.user_id,
                             PERMISSION_INVITE_MEMBERS,
                         )
                         .unwrap_or(false)
@@ -119,10 +119,10 @@ pub async fn list_join_requests(
 
     // 仅有邀请/审批权限的角色可查看申请列表
     match state.store.get_project_access(&user.id, &project_id) {
-        Ok(access)
+        Ok(_)
             if state
                 .store
-                .project_role_has_permission(&project_id, &access.role, PERMISSION_INVITE_MEMBERS)
+                .project_member_has_permission(&project_id, &user.id, PERMISSION_INVITE_MEMBERS)
                 .unwrap_or(false) => {}
         Ok(_) => return json_error(StatusCode::FORBIDDEN, "当前角色无权管理加入申请"),
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
@@ -154,10 +154,10 @@ pub async fn review_join_request(
 
     // 仅有邀请/审批权限的角色可审批
     match state.store.get_project_access(&user.id, &project_id) {
-        Ok(access)
+        Ok(_)
             if state
                 .store
-                .project_role_has_permission(&project_id, &access.role, PERMISSION_INVITE_MEMBERS)
+                .project_member_has_permission(&project_id, &user.id, PERMISSION_INVITE_MEMBERS)
                 .unwrap_or(false) => {}
         Ok(_) => return json_error(StatusCode::FORBIDDEN, "当前角色无权审批加入申请"),
         Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),

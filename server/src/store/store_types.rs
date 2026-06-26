@@ -486,6 +486,7 @@ pub struct ProjectMemberEntry {
     pub account: String,
     pub avatar_data_url: Option<String>,
     pub role: String, // "owner" | "admin" | "editor" | "member" | "observer"
+    pub roles: Vec<ProjectMemberRoleRef>,
     pub joined_at: String,
     pub is_online: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -496,6 +497,16 @@ pub struct ProjectMemberEntry {
     pub banned_until: Option<String>,
     pub is_muted: bool,
     pub is_banned: bool,
+}
+
+/// 项目成员持有的角色引用。`role` 仍表示最高/有效角色，`roles` 表示全部叠加角色。
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMemberRoleRef {
+    pub id: String,
+    pub name: String,
+    pub color: Option<String>,
+    pub position: i64,
+    pub builtin: bool,
 }
 
 /// 项目成员管理审计条目（邀请、审批、改角色、移除等）。

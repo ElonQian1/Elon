@@ -767,16 +767,20 @@ impl Store {
              ORDER BY p.updated_at DESC",
         )?;
 
-        let projects = stmt
+        let mut projects = stmt
             .query_map(params![user_id], project_summary_from_row)?
             .collect::<rusqlite::Result<Vec<_>>>()?;
+        drop(stmt);
+        for project in &mut projects {
+            apply_effective_project_summary_role(&conn, user_id, project)?;
+        }
 
         Ok(projects)
     }
 
     pub fn get_project_access(&self, user_id: &str, project_id: &str) -> Result<ProjectAccess> {
-        let access = self
-            .conn()?
+        let conn = self.conn()?;
+        let mut access = conn
             .query_row(
                 "SELECT p.id, p.name, p.workspace_key, p.source_type, p.repo_url, p.branch,
                         p.workspace_path, p.node_id,
@@ -815,6 +819,12 @@ impl Store {
             )
             .optional()?
             .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))?;
+        if let Some(effective_role) =
+            project_roles::project_member_effective_role_locked(&conn, project_id, user_id)?
+        {
+            access.role = effective_role;
+        }
+        drop(conn);
         if self.project_member_is_banned(project_id, user_id)? {
             anyhow::bail!("你已被该项目封禁，无法访问项目空间");
         }
@@ -1097,7 +1107,7 @@ fn find_owner_project_by_name(
     user_id: &str,
     name: &str,
 ) -> Result<Option<ProjectSummary>> {
-    Ok(conn
+    let mut project = conn
         .query_row(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
                     p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id,
@@ -1136,7 +1146,11 @@ fn find_owner_project_by_name(
             params![user_id, name],
             project_summary_from_row,
         )
-        .optional()?)
+        .optional()?;
+    if let Some(project) = &mut project {
+        apply_effective_project_summary_role(conn, user_id, project)?;
+    }
+    Ok(project)
 }
 
 fn find_owner_project_by_workspace_path(
@@ -1189,7 +1203,8 @@ fn find_owner_project_by_workspace_path(
     )?;
     let mut rows = stmt.query_map(params![user_id], project_summary_from_row)?;
     while let Some(project) = rows.next() {
-        let project = project?;
+        let mut project = project?;
+        apply_effective_project_summary_role(conn, user_id, &mut project)?;
         if project
             .workspace_path
             .as_deref()
@@ -1212,7 +1227,7 @@ fn find_project_by_id_for_user(
     user_id: &str,
     project_id: &str,
 ) -> Result<Option<ProjectSummary>> {
-    Ok(conn
+    let mut project = conn
         .query_row(
             "SELECT p.id, p.name, p.description, p.workspace_key, p.template,
                     p.source_type, p.repo_url, p.branch, p.workspace_path, p.node_id,
@@ -1250,7 +1265,24 @@ fn find_project_by_id_for_user(
             params![project_id, user_id],
             project_summary_from_row,
         )
-        .optional()?)
+        .optional()?;
+    if let Some(project) = &mut project {
+        apply_effective_project_summary_role(conn, user_id, project)?;
+    }
+    Ok(project)
+}
+
+fn apply_effective_project_summary_role(
+    conn: &Connection,
+    user_id: &str,
+    project: &mut ProjectSummary,
+) -> Result<()> {
+    if let Some(role) =
+        project_roles::project_member_effective_role_locked(conn, &project.id, user_id)?
+    {
+        project.role = role;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
