@@ -110,7 +110,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
             bottomToolPanel = this
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
-                dp(162),
+                dp(BOTTOM_TOOL_PANEL_HEIGHT_DP),
                 Gravity.BOTTOM
             )
             background = roundedTopRect("#1A1A1A", dp(32))
@@ -165,7 +165,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
                 dp(64),
                 Gravity.BOTTOM
             ).apply {
-                bottomMargin = dp(20)
+                bottomMargin = dp(30)
             }
 
             undoButton = iconButton(R.drawable.ic_chat_image_tool_undo, "撤销", padding = 0).apply {
@@ -273,7 +273,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         bottomToolsAnimating = true
         bottomToolPanel.animate().cancel()
         collapsedToolButton.animate().cancel()
-        val panelHeight = bottomToolPanel.height.takeIf { it > 0 } ?: dp(162)
+        val panelHeight = bottomToolPanel.height.takeIf { it > 0 } ?: dp(BOTTOM_TOOL_PANEL_HEIGHT_DP)
         bottomToolPanel.animate()
             .translationY(panelHeight.toFloat())
             .setDuration(220L)
@@ -291,7 +291,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
     private fun showCollapsedToolButton() {
         collapsedToolButton.visibility = View.VISIBLE
         collapsedToolButton.alpha = 0f
-        collapsedToolButton.translationY = dp(18).toFloat()
+        collapsedToolButton.translationY = dp(8).toFloat()
         collapsedToolButton.animate()
             .alpha(1f)
             .translationY(0f)
@@ -306,7 +306,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         collapsedToolButton.animate().cancel()
         collapsedToolButton.visibility = View.INVISIBLE
         collapsedToolButton.alpha = 0f
-        val panelHeight = bottomToolPanel.height.takeIf { it > 0 } ?: dp(162)
+        val panelHeight = bottomToolPanel.height.takeIf { it > 0 } ?: dp(BOTTOM_TOOL_PANEL_HEIGHT_DP)
         bottomToolPanel.visibility = View.VISIBLE
         bottomToolPanel.alpha = 1f
         bottomToolPanel.translationY = panelHeight.toFloat()
@@ -477,6 +477,7 @@ internal class ChatImageEditActivity : AppCompatActivity() {
         const val EXTRA_OUTPUT_WIDTH = "chat_image_edit_output_width"
         const val EXTRA_OUTPUT_HEIGHT = "chat_image_edit_output_height"
         private const val MAX_EDITOR_PIXELS = 4_000_000
+        private const val BOTTOM_TOOL_PANEL_HEIGHT_DP = 142
 
         fun createIntent(context: Context, path: String, displayName: String): Intent {
             return Intent(context, ChatImageEditActivity::class.java).apply {
