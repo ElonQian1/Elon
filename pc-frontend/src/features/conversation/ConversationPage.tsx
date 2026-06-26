@@ -127,6 +127,29 @@ export default function ConversationPage() {
     ? channels.filter((c) => c.name.toLowerCase().includes(channelSearch.toLowerCase()))
     : channels
 
+  // 成员列表：从 project space 读取
+  const spaceMembers = useProjectStore((s) => s.members)
+
+  // 消息分组：判断某条消息是否与上一条来自同一发送者
+  function isGrouped(idx: number): boolean {
+    if (idx === 0) return false
+    const cur  = messages[idx]
+    const prev = messages[idx - 1]
+    const curRole  = clean(cur.kind  ?? cur.role  ?? '').toLowerCase()
+    const prevRole = clean(prev.kind ?? prev.role ?? '').toLowerCase()
+    const curId  = clean(cur.user_id  ?? (cur as Record<string, unknown>).userId  ?? '')
+    const prevId = clean(prev.user_id ?? (prev as Record<string, unknown>).userId ?? '')
+    // DevTask 消息不参与分组
+    if (['ai_task','ai_progress','ai_result'].includes(curRole)) return false
+    if (['ai_task','ai_progress','ai_result'].includes(prevRole)) return false
+    // 同角色（user/assistant）且 uid 一致（或都是 AI 消息）→ 分组
+    if (curRole === prevRole) {
+      if (curRole === 'user' || curRole === 'human') return curId !== '' && curId === prevId
+      return true  // AI 消息连续也分组
+    }
+    return false
+  }
+
   return (
     <div className={styles.layout}>
 
@@ -306,7 +329,7 @@ export default function ConversationPage() {
                 <p>还没有消息，发送第一条吧！</p>
               </div>
             )}
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <MessageItem
                 key={msg.id}
                 message={msg}
@@ -315,6 +338,7 @@ export default function ConversationPage() {
                 user={user}
                 onCancel={cancelTask}
                 onApprove={approveTool}
+                grouped={isGrouped(idx)}
               />
             ))}
             {/* P1.3：AI 打字指示器 */}
@@ -407,10 +431,11 @@ export default function ConversationPage() {
       {/* ══ 成员面板（右 272px）══ */}
       <aside className={styles.memberPanel}>
         <div className={styles.memberTitle}>
-          <span>成员</span>
+          <span>成员{spaceMembers.length > 0 ? ` — ${spaceMembers.length}` : ''}</span>
         </div>
         <div className={styles.memberList}>
-          {user && (
+          {spaceMembers.length === 0 && user && (
+            /* 未加载到成员时 fallback 显示自己 */
             <>
               <div className={styles.memberSection}>在线 · 1</div>
               <div className={styles.memberItem}>
@@ -421,6 +446,9 @@ export default function ConversationPage() {
                 <span className={styles.presenceDot} />
               </div>
             </>
+          )}
+          {spaceMembers.length > 0 && (
+            <MemberGroups members={spaceMembers} />
           )}
         </div>
       </aside>
@@ -447,13 +475,14 @@ export default function ConversationPage() {
 }
 
 /* ── 单条消息组件 ── */
-function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove }: {
+function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove, grouped }: {
   message: Message
   isDevChannel: boolean
   taskContext: ReturnType<typeof buildContext>
   user: { nickname?: string; account?: string } | null
   onCancel: (id: string) => Promise<void>
   onApprove: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
+  grouped?: boolean
 }) {
   const kind = clean(message.kind ?? message.role ?? '').toLowerCase()
 
@@ -476,7 +505,7 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
   const hasMarkdown = isAi && /[#*`\[\]>|]/.test(content)
 
   return (
-    <div className={[styles.messageRow, isUser ? styles.ownRow : ''].join(' ')}>
+    <div className={[styles.messageRow, isUser ? styles.ownRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
       <div className={styles.messageAvatar}>
         {isUser
           ? ((user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '我')
@@ -498,5 +527,36 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
         )}
       </div>
     </div>
+  )
+}
+
+/* ── 成员分组列表：按角色展示项目成员 ── */
+function MemberGroups({ members }: { members: import('./types').ProjectMember[] }) {
+  const ROLE_LABELS: Record<string, string> = {
+    admin: '管理员', owner: '管理员',
+    collaborator: '协作者', editor: '协作者',
+  }
+  const groups: [string, import('./types').ProjectMember[]][] = [
+    ['管理员', members.filter(m => ['admin','owner'].includes((m.role ?? '').toLowerCase()))],
+    ['协作者', members.filter(m => ['collaborator','editor'].includes((m.role ?? '').toLowerCase()))],
+    ['成员', members.filter(m => !ROLE_LABELS[(m.role ?? '').toLowerCase()])],
+  ]
+  return (
+    <>
+      {groups.filter(([, list]) => list.length > 0).map(([label, list]) => (
+        <div key={label}>
+          <div className={styles.memberSection}>{label} · {list.length}</div>
+          {list.map(m => (
+            <div key={m.user_id} className={styles.memberItem}>
+              <div className={styles.memberAvatar}>
+                {(m.account ?? m.user_id)[0].toUpperCase()}
+              </div>
+              <span className={styles.memberName}>{m.account ?? m.user_id}</span>
+              {m.is_online && <span className={styles.presenceDot} />}
+            </div>
+          ))}
+        </div>
+      ))}
+    </>
   )
 }

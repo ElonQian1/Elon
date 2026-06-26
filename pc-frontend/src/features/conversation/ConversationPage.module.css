@@ -589,11 +589,27 @@
 /* ══════════════════════════════════════
    响应式
    ══════════════════════════════════════ */
-@media (max-width: 1100px) {
+@media (max-width: 900px) {
   .layout { grid-template-columns: 304px minmax(0, 1fr); }
   .memberPanel { display: none; }
 }
 @media (max-width: 780px) {
   .layout { grid-template-columns: 1fr; }
   .channelPanel { display: none; }
+}
+
+/* ── 消息分组：连续同一人发送时隐藏头像+元信息 ── */
+.messageRow.grouped {
+  padding-top: 2px;   /* 紧凑间距 */
+}
+.messageRow.grouped .messageAvatar {
+  visibility: hidden; /* 保留占位，但不显示 */
+}
+.messageRow.grouped .messageMeta {
+  display: none;      /* 隐藏名字+时间 */
+}
+/* 禁用状态的输入框 */
+.composerTextarea:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
