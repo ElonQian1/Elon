@@ -101,6 +101,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     ),
     (68, "项目级 AI danger_full_access 权限", migration_v68),
     (69, "项目成员管理审计日志", migration_v69),
+    (70, "项目成员禁言与封禁状态", migration_v70),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2329,6 +2330,34 @@ fn migration_v69(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_member_audit_target_time
           ON project_member_audit(target_user_id, created_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v70(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_member_restrictions (
+          project_id   TEXT NOT NULL,
+          user_id      TEXT NOT NULL,
+          muted_until  TEXT,
+          banned_at    TEXT,
+          banned_until TEXT,
+          note         TEXT,
+          updated_by   TEXT,
+          updated_at   TEXT NOT NULL,
+          PRIMARY KEY (project_id, user_id),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (user_id) REFERENCES users(id),
+          FOREIGN KEY (updated_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_member_restrictions_project
+          ON project_member_restrictions(project_id, updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_project_member_restrictions_user
+          ON project_member_restrictions(user_id, updated_at DESC);
         "#,
     )?;
     Ok(())

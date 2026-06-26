@@ -453,6 +453,40 @@
     ));
   }
 
+  function memberMutedUntilOf(member) {
+    return clean(member && (member.muted_until || member.mutedUntil));
+  }
+
+  function memberBannedAtOf(member) {
+    return clean(member && (member.banned_at || member.bannedAt));
+  }
+
+  function memberBannedUntilOf(member) {
+    return clean(member && (member.banned_until || member.bannedUntil));
+  }
+
+  function memberIsMuted(member) {
+    if (!member) return false;
+    if (member.is_muted || member.isMuted) return true;
+    const until = memberMutedUntilOf(member);
+    return until ? new Date(Number(until) || until).getTime() > Date.now() : false;
+  }
+
+  function memberIsBanned(member) {
+    if (!member) return false;
+    if (member.is_banned || member.isBanned) return true;
+    return !!memberBannedAtOf(member);
+  }
+
+  function memberModerationLabel(member) {
+    if (memberIsBanned(member)) return '已封禁';
+    if (memberIsMuted(member)) {
+      const until = memberMutedUntilOf(member);
+      return until ? `禁言至 ${formatTime(until)}` : '已禁言';
+    }
+    return '';
+  }
+
   function activeProjectRole() {
     const project = projectById(state.activeProjectId) || ((state.projectSpace && state.projectSpace.project) || {});
     return clean(project.role || project.member_role || project.memberRole || project.viewer_role || project.viewerRole).toLowerCase();
@@ -2814,6 +2848,10 @@
     if (action === 'remove_member') return `${actor} 移除了 ${target}`;
     if (action === 'approve_join') return `${actor} 批准 ${target} 加入`;
     if (action === 'reject_join') return `${actor} 拒绝 ${target} 的加入申请`;
+    if (action === 'mute_member') return `${actor} 禁言了 ${target}`;
+    if (action === 'unmute_member') return `${actor} 解除了 ${target} 的禁言`;
+    if (action === 'ban_member') return `${actor} 封禁了 ${target}`;
+    if (action === 'unban_member') return `${actor} 解除了 ${target} 的封禁`;
     if (action === 'join_project') return `${target} 加入了项目`;
     if (action === 'leave_project') return `${target} 退出了项目`;
     return `${actor} 更新了成员`;
@@ -2826,6 +2864,13 @@
     if (oldRole && newRole && oldRole !== newRole) return `${oldRole} → ${newRole}`;
     if (newRole) return newRole;
     if (oldRole) return `原角色：${oldRole}`;
+    if (note.startsWith('muted_until=')) {
+      const until = clean(note.replace(/^muted_until=/, '').split(';')[0]);
+      return until ? `禁言至 ${formatTime(until)}` : '禁言';
+    }
+    if (note === 'ban' || note.startsWith('ban;')) return '禁止访问项目空间';
+    if (note === 'unmute' || note.startsWith('unmute;')) return '恢复发言权限';
+    if (note === 'unban' || note.startsWith('unban;')) return '恢复项目访问';
     return note && note.startsWith('jr') ? '加入申请审批' : '';
   }
 
@@ -2994,6 +3039,7 @@
       const id = memberIdOf(member);
       const roleLabel = memberRoleLabel(member);
       const presence = memberPresence(member);
+      const moderationLabel = memberModerationLabel(member);
       const explicitSub = clean(member && (
         member.sub || member.subtitle || member.status_text || member.statusText ||
         member.activity || member.note
@@ -3006,7 +3052,10 @@
         __roleKey: memberRoleKey(member),
         __roleGroup: memberRoleGroupKey(memberRoleKey(member)),
         __roleLabel: roleLabel,
-        __sub: explicitSub || roleLabel || (presence === 'online' ? '在线' : (presence === 'offline' ? '离线' : '成员'))
+        __isMuted: memberIsMuted(member),
+        __isBanned: memberIsBanned(member),
+        __moderationLabel: moderationLabel,
+        __sub: moderationLabel || explicitSub || roleLabel || (presence === 'online' ? '在线' : (presence === 'offline' ? '离线' : '成员'))
       });
     });
     const query = clean(panel.search).toLowerCase();
@@ -3033,12 +3082,14 @@
         const presence = member.__presence;
         const role = member.__roleLabel;
         const roleClass = member.__roleGroup ? `member-role-${escapeHtml(member.__roleGroup)}` : '';
-        return `<button class="member-row ${presence ? `is-${escapeHtml(presence)}` : ''} ${roleClass}" type="button" data-member-key="${escapeHtml(member.__key)}" title="${escapeHtml(member.__name)}">
+        const moderationClass = member.__isBanned ? 'is-banned' : (member.__isMuted ? 'is-muted' : '');
+        return `<button class="member-row ${presence ? `is-${escapeHtml(presence)}` : ''} ${roleClass} ${moderationClass}" type="button" data-member-key="${escapeHtml(member.__key)}" title="${escapeHtml(member.__name)}">
           ${avatarElement('div', `member-avatar ${presence} ${roleClass}`, avatarUrlOf(member), member.__name, '员')}
           <div class="member-copy">
             <div class="member-line">
               <strong>${escapeHtml(member.__name)}</strong>
               ${role && groupBy !== 'role' ? `<em class="member-role-pill ${roleClass}">${escapeHtml(role)}</em>` : ''}
+              ${member.__moderationLabel ? `<em class="member-role-pill member-role-restricted">${escapeHtml(member.__isBanned ? '封禁' : '禁言')}</em>` : ''}
             </div>
             <span class="member-sub">${escapeHtml(member.__sub)}</span>
           </div>
@@ -3073,6 +3124,7 @@
       member.__name,
       member.__sub,
       member.__roleLabel,
+      member.__moderationLabel,
       member.__id,
       memberAccountOf(member),
       member.account,
@@ -3467,6 +3519,7 @@
       managerLabel,
       canChangeRole: canManage && !isSelf && !targetIsOwner,
       canRemove: canManage && !isSelf && !targetIsOwner,
+      canModerate: canManage && !isSelf && !targetIsOwner,
       note
     };
   }
@@ -3482,12 +3535,16 @@
     const canAddFriend = id && !sameId(id, currentUserId()) && !friendById(id) && !sameId(id, SOCIAL_AI_USER_ID);
     const account = memberAccountOf(member);
     const joinedAt = memberJoinedAtOf(member);
+    const moderationLabel = member.__moderationLabel || memberModerationLabel(member);
+    const isMuted = !!member.__isMuted || memberIsMuted(member);
+    const isBanned = !!member.__isBanned || memberIsBanned(member);
     const projectManagement = memberProjectManagement(member);
     const disabledAttr = viewState.busy ? 'disabled' : '';
     const details = [
       account && ['账号', account],
       id && ['用户 ID', shortUserId(id)],
-      joinedAt && ['加入时间', formatTime(joinedAt)]
+      joinedAt && ['加入时间', formatTime(joinedAt)],
+      moderationLabel && ['限制', moderationLabel]
     ].filter(Boolean).map(([label, value]) => `
       <div class="member-profile-detail">
         <span>${escapeHtml(label)}</span>
@@ -3502,6 +3559,16 @@
       const selected = role.key === member.__roleGroup ? 'selected' : '';
       return `<option value="${escapeHtml(role.key)}" ${selected}>${escapeHtml(role.label)}</option>`;
     }).join('');
+    const moderationHtml = projectManagement.canModerate
+      ? `<div class="member-moderation-actions">
+          ${isBanned
+            ? `<button class="text-button" type="button" data-profile-action="unban-project-member" ${disabledAttr}>解除封禁</button>`
+            : `<button class="text-button" type="button" data-profile-action="mute-project-member" data-duration-minutes="60" ${disabledAttr}>禁言 1 小时</button>
+               <button class="text-button" type="button" data-profile-action="mute-project-member" data-duration-minutes="1440" ${disabledAttr}>禁言 24 小时</button>
+               <button class="text-button danger" type="button" data-profile-action="ban-project-member" ${disabledAttr}>封禁成员</button>`}
+          ${isMuted && !isBanned ? `<button class="text-button" type="button" data-profile-action="unmute-project-member" ${disabledAttr}>解除禁言</button>` : ''}
+        </div>`
+      : '';
     const managementHtml = projectManagement.show
       ? `<div class="member-management">
           <div class="member-management-title">
@@ -3514,6 +3581,7 @@
             </select>
             <button class="text-button" type="button" data-profile-action="save-role" ${projectManagement.canChangeRole ? disabledAttr : 'disabled'}>保存</button>
           </div>
+          ${moderationHtml}
           <button class="text-button danger member-remove-button" type="button" data-profile-action="remove-project-member" ${projectManagement.canRemove ? disabledAttr : 'disabled'}>移除成员</button>
           ${projectManagement.note ? `<p>${escapeHtml(projectManagement.note)}</p>` : ''}
         </div>`
@@ -3535,6 +3603,7 @@
         <div class="member-profile-meta">
           ${member.__roleLabel ? `<em>${escapeHtml(member.__roleLabel)}</em>` : ''}
           <em>${escapeHtml(profileStatusLabel(presence))}</em>
+          ${moderationLabel ? `<em class="member-profile-restricted">${escapeHtml(isBanned ? '已封禁' : '已禁言')}</em>` : ''}
           ${id ? `<em>${escapeHtml(shortUserId(id))}</em>` : ''}
         </div>
         ${details ? `<div class="member-profile-details">${details}</div>` : ''}
@@ -3597,6 +3666,23 @@
     }
     if (action === 'remove-project-member') {
       removeProfileProjectMember(member).catch((error) => setMemberProfileStatus(error.message || '移除成员失败', 'error'));
+      return;
+    }
+    if (action === 'mute-project-member') {
+      const minutes = Number(button.dataset.durationMinutes || 60) || 60;
+      updateProfileMemberModeration(member, 'mute', minutes).catch((error) => setMemberProfileStatus(error.message || '禁言失败', 'error'));
+      return;
+    }
+    if (action === 'unmute-project-member') {
+      updateProfileMemberModeration(member, 'unmute').catch((error) => setMemberProfileStatus(error.message || '解除禁言失败', 'error'));
+      return;
+    }
+    if (action === 'ban-project-member') {
+      updateProfileMemberModeration(member, 'ban').catch((error) => setMemberProfileStatus(error.message || '封禁失败', 'error'));
+      return;
+    }
+    if (action === 'unban-project-member') {
+      updateProfileMemberModeration(member, 'unban').catch((error) => setMemberProfileStatus(error.message || '解除封禁失败', 'error'));
     }
   }
 
@@ -3672,6 +3758,53 @@
       __sub: memberRoleLabel(targetRole) || '项目成员'
     });
     renderMemberProfile(latest, null, { status: '角色已更新', tone: 'ok' });
+  }
+
+  async function updateProfileMemberModeration(member, action, durationMinutes) {
+    const management = memberProjectManagement(member);
+    if (!management.canModerate) return;
+    const cleanAction = clean(action).toLowerCase();
+    if (cleanAction === 'ban') {
+      const ok = window.confirm(`确认封禁「${member.__name}」？封禁后对方将无法进入项目空间。`);
+      if (!ok) return;
+    }
+    const busyText = {
+      mute: '正在禁言成员…',
+      unmute: '正在解除禁言…',
+      ban: '正在封禁成员…',
+      unban: '正在解除封禁…'
+    }[cleanAction] || '正在更新限制…';
+    setMemberProfileStatus(busyText, '', true);
+    const body = { action: cleanAction };
+    if (cleanAction === 'mute') body.duration_minutes = Math.max(1, Number(durationMinutes || 60) || 60);
+    const data = await api(`/api/projects/${encodeURIComponent(management.projectId)}/members/${encodeURIComponent(member.__id)}/moderation`, {
+      method: 'PATCH',
+      body: JSON.stringify(body)
+    });
+    const moderation = data.moderation || {};
+    const patch = {
+      muted_until: moderation.muted_until || moderation.mutedUntil || null,
+      mutedUntil: moderation.muted_until || moderation.mutedUntil || null,
+      banned_at: moderation.banned_at || moderation.bannedAt || null,
+      bannedAt: moderation.banned_at || moderation.bannedAt || null,
+      banned_until: moderation.banned_until || moderation.bannedUntil || null,
+      bannedUntil: moderation.banned_until || moderation.bannedUntil || null,
+      is_muted: !!(moderation.is_muted || moderation.isMuted),
+      isMuted: !!(moderation.is_muted || moderation.isMuted),
+      is_banned: !!(moderation.is_banned || moderation.isBanned),
+      isBanned: !!(moderation.is_banned || moderation.isBanned)
+    };
+    patchMemberInProjectLists(member.__id, patch);
+    renderMemberPanelView();
+    refreshMemberAuditAfterMutation(management.projectId);
+    const latest = renderedMemberById(member.__id) || Object.assign({}, member, patch);
+    const status = {
+      mute: '成员已禁言',
+      unmute: '已解除禁言',
+      ban: '成员已封禁',
+      unban: '已解除封禁'
+    }[cleanAction] || '限制已更新';
+    renderMemberProfile(latest, null, { status, tone: 'ok' });
   }
 
   async function removeProfileProjectMember(member) {

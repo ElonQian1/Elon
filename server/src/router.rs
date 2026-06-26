@@ -401,6 +401,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             axum::routing::patch(project_membership::update_member_role)
                 .delete(project_membership::remove_member),
         )
+        .route(
+            "/api/projects/:id/members/:user_id/moderation",
+            axum::routing::patch(project_membership::update_member_moderation),
+        )
         // ── 加入申请审批 ──────────────────────────────────────────────────
         .route(
             "/api/projects/:id/request-join",

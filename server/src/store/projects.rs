@@ -359,6 +359,19 @@ impl Store {
         if is_public == 0 {
             anyhow::bail!("该项目不对外公开");
         }
+        let banned_count: i64 = conn.query_row(
+            "SELECT COUNT(*)
+             FROM project_member_restrictions
+             WHERE project_id = ?1
+               AND user_id = ?2
+               AND banned_at IS NOT NULL
+               AND (banned_until IS NULL OR banned_until > ?3)",
+            params![project_id, user_id, now()],
+            |row| row.get(0),
+        )?;
+        if banned_count > 0 {
+            anyhow::bail!("你已被该项目封禁，无法加入");
+        }
         let existing_role: Option<String> = conn
             .query_row(
                 "SELECT role FROM project_members WHERE project_id = ?1 AND user_id = ?2",
@@ -432,7 +445,7 @@ impl Store {
         let role_db = normalize_project_member_role(role)?;
         let conn = self.conn()?;
         ensure_project_not_system(&conn, project_id, "系统归档项目不能添加成员")?;
-        let now = now();
+        let now_str = now();
         let target_user_id: String = conn
             .query_row(
                 "SELECT id
@@ -457,12 +470,25 @@ impl Store {
         if current_role.as_deref() == Some("owner") {
             anyhow::bail!("不能修改 owner 的角色");
         }
+        let banned_count: i64 = conn.query_row(
+            "SELECT COUNT(*)
+             FROM project_member_restrictions
+             WHERE project_id = ?1
+               AND user_id = ?2
+               AND banned_at IS NOT NULL
+               AND (banned_until IS NULL OR banned_until > ?3)",
+            params![project_id, target_user_id, &now_str],
+            |row| row.get(0),
+        )?;
+        if banned_count > 0 {
+            anyhow::bail!("目标用户已被封禁，请先解除封禁");
+        }
 
         conn.execute(
             "INSERT INTO project_members (project_id, user_id, role, created_at)
              VALUES (?1, ?2, ?3, ?4)
              ON CONFLICT(project_id, user_id) DO UPDATE SET role = excluded.role",
-            params![project_id, target_user_id, role_db, now],
+            params![project_id, target_user_id, role_db, &now_str],
         )?;
         project_member_entry(&conn, project_id, &target_user_id)
     }
@@ -554,19 +580,27 @@ impl Store {
     /// 列出项目所有成员（公开项目任何人可查；私有项目在 handler 层校验权限）
     pub fn list_project_members(&self, project_id: &str) -> Result<Vec<ProjectMemberEntry>> {
         let conn = self.conn()?;
+        let now = now();
         let mut stmt = conn.prepare(
             "SELECT pm.user_id,
                     COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS account,
                     u.avatar_data_url,
                     pm.role,
-                    pm.created_at
+                    pm.created_at,
+                    r.muted_until,
+                    r.banned_at,
+                    r.banned_until,
+                    CASE WHEN r.muted_until IS NOT NULL AND r.muted_until > ?2 THEN 1 ELSE 0 END AS is_muted,
+                    CASE WHEN r.banned_at IS NOT NULL AND (r.banned_until IS NULL OR r.banned_until > ?2) THEN 1 ELSE 0 END AS is_banned
              FROM project_members pm
              LEFT JOIN users u ON u.id = pm.user_id
+             LEFT JOIN project_member_restrictions r
+               ON r.project_id = pm.project_id AND r.user_id = pm.user_id
              WHERE pm.project_id = ?1
              ORDER BY CASE pm.role WHEN 'owner' THEN 0 WHEN 'admin' THEN 1 WHEN 'editor' THEN 2 WHEN 'member' THEN 3 WHEN 'observer' THEN 4 ELSE 5 END, pm.created_at",
         )?;
         let rows = stmt
-            .query_map(params![project_id], |row| {
+            .query_map(params![project_id, now], |row| {
                 Ok(ProjectMemberEntry {
                     user_id: row.get(0)?,
                     account: row.get(1)?,
@@ -574,6 +608,11 @@ impl Store {
                     role: row.get(3)?,
                     joined_at: row.get(4)?,
                     is_online: false,
+                    muted_until: row.get(5)?,
+                    banned_at: row.get(6)?,
+                    banned_until: row.get(7)?,
+                    is_muted: row.get::<_, i64>(8)? != 0,
+                    is_banned: row.get::<_, i64>(9)? != 0,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -782,6 +821,14 @@ impl Store {
             params![project_id],
         )?;
         tx.execute(
+            "DELETE FROM project_member_restrictions WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_member_audit WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
             "DELETE FROM project_members WHERE project_id = ?1",
             params![project_id],
         )?;
@@ -806,16 +853,24 @@ fn project_member_entry(
     project_id: &str,
     user_id: &str,
 ) -> Result<ProjectMemberEntry> {
+    let now = now();
     conn.query_row(
         "SELECT pm.user_id,
                 COALESCE(u.nickname, u.phone, u.email, pm.user_id) AS account,
                 u.avatar_data_url,
                 pm.role,
-                pm.created_at
+                pm.created_at,
+                r.muted_until,
+                r.banned_at,
+                r.banned_until,
+                CASE WHEN r.muted_until IS NOT NULL AND r.muted_until > ?3 THEN 1 ELSE 0 END AS is_muted,
+                CASE WHEN r.banned_at IS NOT NULL AND (r.banned_until IS NULL OR r.banned_until > ?3) THEN 1 ELSE 0 END AS is_banned
          FROM project_members pm
          LEFT JOIN users u ON u.id = pm.user_id
+         LEFT JOIN project_member_restrictions r
+           ON r.project_id = pm.project_id AND r.user_id = pm.user_id
          WHERE pm.project_id = ?1 AND pm.user_id = ?2",
-        params![project_id, user_id],
+        params![project_id, user_id, now],
         |row| {
             Ok(ProjectMemberEntry {
                 user_id: row.get(0)?,
@@ -824,6 +879,11 @@ fn project_member_entry(
                 role: row.get(3)?,
                 joined_at: row.get(4)?,
                 is_online: false,
+                muted_until: row.get(5)?,
+                banned_at: row.get(6)?,
+                banned_until: row.get(7)?,
+                is_muted: row.get::<_, i64>(8)? != 0,
+                is_banned: row.get::<_, i64>(9)? != 0,
             })
         },
     )
@@ -1009,6 +1069,100 @@ mod tests {
             .get_project_access(&target.id, &project.id)
             .expect("target should keep project access");
         assert_eq!(access.role, "admin");
+    }
+
+    #[test]
+    fn project_member_moderation_blocks_banned_members_and_marks_muted() {
+        let store = temp_store();
+        let owner = store
+            .create_user("moderation-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let target = store
+            .create_user(
+                "moderation-target@example.com",
+                "secret1",
+                Some("被管理成员"),
+                None,
+            )
+            .expect("target should be created");
+        let project = store
+            .create_project(&owner.id, "Moderation Project", None, None)
+            .expect("project should be created")
+            .project;
+
+        store
+            .add_project_member_by_account(&project.id, "moderation-target@example.com", "member")
+            .expect("target should be invited");
+
+        let mute = store
+            .update_project_member_moderation(
+                &project.id,
+                &target.id,
+                &owner.id,
+                "mute",
+                Some(60),
+                None,
+            )
+            .expect("target should be muted");
+        assert!(mute.is_muted);
+        assert!(mute.muted_until.is_some());
+        assert!(store
+            .active_project_member_muted_until(&project.id, &target.id)
+            .expect("mute lookup should work")
+            .is_some());
+        let members = store
+            .list_project_members(&project.id)
+            .expect("members should list");
+        let muted_member = members
+            .iter()
+            .find(|member| member.user_id == target.id)
+            .expect("target should be listed");
+        assert!(muted_member.is_muted);
+
+        let ban = store
+            .update_project_member_moderation(&project.id, &target.id, &owner.id, "ban", None, None)
+            .expect("target should be banned");
+        assert!(ban.is_banned);
+        assert!(store
+            .project_member_is_banned(&project.id, &target.id)
+            .expect("ban lookup should work"));
+        assert!(store
+            .get_project_access(&target.id, &project.id)
+            .expect_err("banned target should not access project")
+            .to_string()
+            .contains("封禁"));
+        assert!(store
+            .add_project_member_by_account(&project.id, "moderation-target@example.com", "member")
+            .expect_err("banned target should not be re-invited")
+            .to_string()
+            .contains("封禁"));
+
+        store
+            .update_project_member_moderation(
+                &project.id,
+                &target.id,
+                &owner.id,
+                "unban",
+                None,
+                None,
+            )
+            .expect("target should be unbanned");
+        assert!(store.get_project_access(&target.id, &project.id).is_ok());
+
+        store
+            .update_project_member_moderation(
+                &project.id,
+                &target.id,
+                &owner.id,
+                "unmute",
+                None,
+                None,
+            )
+            .expect("target should be unmuted");
+        assert!(store
+            .active_project_member_muted_until(&project.id, &target.id)
+            .expect("mute lookup should work")
+            .is_none());
     }
 
     #[test]

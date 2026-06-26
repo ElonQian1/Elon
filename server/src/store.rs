@@ -46,6 +46,7 @@ mod project_landing_snapshots;
 mod project_landing_upload_tokens;
 mod project_member_audit;
 mod project_member_conversations;
+mod project_member_moderation;
 mod project_runtime_permissions;
 mod project_space;
 mod project_storage;
@@ -769,7 +770,8 @@ impl Store {
     }
 
     pub fn get_project_access(&self, user_id: &str, project_id: &str) -> Result<ProjectAccess> {
-        self.conn()?
+        let access = self
+            .conn()?
             .query_row(
                 "SELECT p.id, p.name, p.workspace_key, p.source_type, p.repo_url, p.branch,
                         p.workspace_path, p.node_id,
@@ -807,7 +809,11 @@ impl Store {
                 },
             )
             .optional()?
-            .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))
+            .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))?;
+        if self.project_member_is_banned(project_id, user_id)? {
+            anyhow::bail!("你已被该项目封禁，无法访问项目空间");
+        }
+        Ok(access)
     }
 
     pub fn update_project_git_metadata(

@@ -2409,6 +2409,15 @@ button { cursor: pointer; }
 .member-row.is-offline .member-avatar {
   filter: saturate(.75);
 }
+.member-row.is-muted strong {
+  color: #d9b36d;
+}
+.member-row.is-banned {
+  opacity: .68;
+}
+.member-row.is-banned strong {
+  color: #f29b9b;
+}
 .member-row strong {
   display: block;
   min-width: 0;
@@ -2459,6 +2468,11 @@ button { cursor: pointer; }
 .member-row.member-role-observer strong,
 .member-role-pill.member-role-observer {
   color: #aab0bd;
+}
+.member-role-pill.member-role-restricted {
+  color: #ffb6b6;
+  border-color: rgba(237, 66, 69, .2);
+  background: rgba(237, 66, 69, .1);
 }
 .member-avatar.member-role-owner {
   box-shadow: inset 0 0 0 2px rgba(255, 210, 122, .62);
@@ -2595,6 +2609,10 @@ button { cursor: pointer; }
   font-style: normal;
   font-weight: 800;
 }
+.member-profile-meta .member-profile-restricted {
+  color: #ffb6b6;
+  background: rgba(237, 66, 69, .12);
+}
 .member-profile-details {
   display: grid;
   gap: 7px;
@@ -2671,6 +2689,19 @@ button { cursor: pointer; }
 .member-role-control select:disabled {
   color: #767b86;
   cursor: not-allowed;
+}
+.member-moderation-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.member-moderation-actions .text-button {
+  min-width: 0;
+  justify-content: center;
+}
+.member-moderation-actions .danger {
+  grid-column: 1 / -1;
 }
 .member-remove-button {
   width: 100%;

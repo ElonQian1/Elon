@@ -488,6 +488,14 @@ pub struct ProjectMemberEntry {
     pub role: String, // "owner" | "admin" | "editor" | "member" | "observer"
     pub joined_at: String,
     pub is_online: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub muted_until: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub banned_at: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub banned_until: Option<String>,
+    pub is_muted: bool,
+    pub is_banned: bool,
 }
 
 /// 项目成员管理审计条目（邀请、审批、改角色、移除等）。
@@ -504,6 +512,23 @@ pub struct ProjectMemberAuditEntry {
     pub new_role: Option<String>,
     pub note: Option<String>,
     pub created_at: String,
+}
+
+/// 项目成员限制状态（禁言 / 封禁）。
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMemberModerationEntry {
+    pub project_id: String,
+    pub user_id: String,
+    pub account: Option<String>,
+    pub muted_until: Option<String>,
+    pub banned_at: Option<String>,
+    pub banned_until: Option<String>,
+    pub note: Option<String>,
+    pub updated_by: Option<String>,
+    pub updated_by_account: Option<String>,
+    pub updated_at: String,
+    pub is_muted: bool,
+    pub is_banned: bool,
 }
 
 // ── 项目空间 / 频道 ───────────────────────────────────────────────────────────

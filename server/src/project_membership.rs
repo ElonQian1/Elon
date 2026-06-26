@@ -11,6 +11,7 @@
 ///   PATCH  /api/projects/:id/brand                         修改项目展示别名与 logo（仅 owner）
 ///   PATCH  /api/projects/:id/members/:user_id              改成员角色（仅 owner/admin，不可改 owner/自己）
 ///   DELETE /api/projects/:id/members/:user_id              踢出成员（仅 owner/admin，不可踢 owner/自己）
+///   PATCH  /api/projects/:id/members/:user_id/moderation   禁言/封禁/解除限制（仅 owner/admin）
 use axum::{
     extract::{Path, Query, State},
     http::{HeaderMap, StatusCode},
@@ -60,6 +61,15 @@ pub struct AddMemberRequest {
 pub struct ListMemberAuditQuery {
     /// 返回最近多少条，默认 30，最大 100。
     pub limit: Option<i64>,
+}
+
+#[derive(Deserialize)]
+pub struct UpdateMemberModerationRequest {
+    /// "mute" | "unmute" | "ban" | "unban"
+    pub action: String,
+    /// mute 使用；默认 60 分钟，最大 30 天。
+    pub duration_minutes: Option<i64>,
+    pub note: Option<String>,
 }
 
 // ─── Handlers ─────────────────────────────────────────────────────────────────
@@ -735,5 +745,112 @@ pub async fn remove_member(
             };
             json_error(status, msg)
         }
+    }
+}
+
+/// PATCH /api/projects/:id/members/:user_id/moderation — 禁言/封禁/解除限制
+pub async fn update_member_moderation(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, target_user_id)): Path<(String, String)>,
+    Json(req): Json<UpdateMemberModerationRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(u) => u,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let access = match state.store.get_project_access(&user.id, &project_id) {
+        Ok(a) => a,
+        Err(_) => return json_error(StatusCode::FORBIDDEN, "项目不存在或无权访问"),
+    };
+    if !can_manage_project_members(&access.role) {
+        return json_error(StatusCode::FORBIDDEN, "只有项目 owner 或管理员才可限制成员");
+    }
+    if target_user_id == user.id {
+        return json_error(StatusCode::BAD_REQUEST, "不能限制自己");
+    }
+
+    let action = req.action.trim().to_string();
+    match state.store.update_project_member_moderation(
+        &project_id,
+        &target_user_id,
+        &user.id,
+        &action,
+        req.duration_minutes,
+        req.note.as_deref(),
+    ) {
+        Ok(moderation) => {
+            let audit_action = moderation_audit_action(&action);
+            let audit_note = moderation_audit_note(&action, &moderation, req.note.as_deref());
+            if let Err(err) = state.store.record_project_member_audit(
+                &project_id,
+                Some(&user.id),
+                Some(&target_user_id),
+                audit_action,
+                None,
+                None,
+                audit_note.as_deref(),
+            ) {
+                tracing::warn!(?err, project_id = %project_id, "记录成员限制审计日志失败");
+            }
+            Json(serde_json::json!({
+                "ok": true,
+                "project_id": project_id,
+                "user_id": target_user_id,
+                "moderation": moderation,
+            }))
+            .into_response()
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            let status = if msg.contains("不是该项目成员") || msg.contains("不存在") {
+                StatusCode::NOT_FOUND
+            } else if msg.contains("owner")
+                || msg.contains("不能限制")
+                || msg.contains("action 必须")
+            {
+                StatusCode::BAD_REQUEST
+            } else {
+                StatusCode::INTERNAL_SERVER_ERROR
+            };
+            json_error(status, msg)
+        }
+    }
+}
+
+fn moderation_audit_action(action: &str) -> &'static str {
+    match action.trim() {
+        "mute" => "mute_member",
+        "unmute" => "unmute_member",
+        "ban" => "ban_member",
+        "unban" => "unban_member",
+        _ => "moderate_member",
+    }
+}
+
+fn moderation_audit_note(
+    action: &str,
+    moderation: &crate::store::ProjectMemberModerationEntry,
+    note: Option<&str>,
+) -> Option<String> {
+    let clean_note = note.map(str::trim).filter(|value| !value.is_empty());
+    match action.trim() {
+        "mute" => moderation
+            .muted_until
+            .as_ref()
+            .map(|until| match clean_note {
+                Some(note) => format!("muted_until={until}; {note}"),
+                None => format!("muted_until={until}"),
+            }),
+        "ban" => clean_note
+            .map(|note| format!("ban; {note}"))
+            .or_else(|| Some("ban".into())),
+        "unmute" => clean_note
+            .map(|note| format!("unmute; {note}"))
+            .or_else(|| Some("unmute".into())),
+        "unban" => clean_note
+            .map(|note| format!("unban; {note}"))
+            .or_else(|| Some("unban".into())),
+        _ => clean_note.map(str::to_string),
     }
 }

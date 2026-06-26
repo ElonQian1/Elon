@@ -309,6 +309,9 @@ pub async fn send_member_conversation_message(
     if let Err(e) = project_access(&state, &user.id, &project_id) {
         return json_error(StatusCode::FORBIDDEN, e.to_string());
     }
+    if let Err(response) = ensure_project_member_can_speak(&state, &project_id, &user.id) {
+        return response;
+    }
     match state
         .store
         .insert_project_member_conversation_discussion_message(
@@ -458,6 +461,9 @@ fn send_channel_message_response(
     }
     if channel_kind == DOCS_CHANNEL_KIND {
         return json_error(StatusCode::BAD_REQUEST, "文档频道是固定只读频道，不能发帖");
+    }
+    if let Err(response) = ensure_project_member_can_speak(&state, &project.id, &user_id) {
+        return response;
     }
     let message_kind = if channel_kind == "suggestions" {
         "suggestion"
@@ -846,6 +852,9 @@ fn start_channel_ai_task_response(
         return json_error(StatusCode::FORBIDDEN, "当前成员角色不能发起项目 AI 开发");
     }
     let project_id = project.id.clone();
+    if let Err(response) = ensure_project_member_can_speak(&state, &project_id, &user_id) {
+        return response;
+    }
     let channel_kind = match state
         .store
         .get_project_channel_kind(&project_id, &channel_id)
@@ -984,6 +993,9 @@ fn summarize_channel_selection_response(
     let summary_prompt = req.summary_prompt.trim().to_string();
     if post_content.is_empty() || summary_prompt.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "summary content 不能为空");
+    }
+    if let Err(response) = ensure_project_member_can_speak(&state, &project_id, &user_id) {
+        return response;
     }
     let channel_kind = match state
         .store
@@ -1325,6 +1337,24 @@ fn remove_channel_ai_task_control(task_id: &str) {
 
 fn can_start_channel_ai(role: &str) -> bool {
     can_edit(role)
+}
+
+fn ensure_project_member_can_speak(
+    state: &AppState,
+    project_id: &str,
+    user_id: &str,
+) -> Result<(), Response> {
+    match state
+        .store
+        .active_project_member_muted_until(project_id, user_id)
+    {
+        Ok(Some(until)) => Err(json_error(
+            StatusCode::FORBIDDEN,
+            format!("你已被该项目禁言，禁言截止时间：{until}"),
+        )),
+        Ok(None) => Ok(()),
+        Err(e) => Err(json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string())),
+    }
 }
 
 fn can_mark_suggestion_updated(role: &str) -> bool {

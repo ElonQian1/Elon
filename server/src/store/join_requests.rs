@@ -36,6 +36,19 @@ impl Store {
         if join_mode != "approval" {
             anyhow::bail!("该项目不需要申请，join_mode={join_mode}");
         }
+        let banned_count: i64 = conn.query_row(
+            "SELECT COUNT(*)
+             FROM project_member_restrictions
+             WHERE project_id = ?1
+               AND user_id = ?2
+               AND banned_at IS NOT NULL
+               AND (banned_until IS NULL OR banned_until > ?3)",
+            params![project_id, user_id, now()],
+            |row| row.get(0),
+        )?;
+        if banned_count > 0 {
+            anyhow::bail!("你已被该项目封禁，无法申请加入");
+        }
 
         // 已是成员则直接拒绝
         let already_member: bool = conn
@@ -237,6 +250,19 @@ impl Store {
 
         if status != "pending" {
             anyhow::bail!("申请已处理（当前状态：{status}）");
+        }
+        let banned_count: i64 = conn.query_row(
+            "SELECT COUNT(*)
+             FROM project_member_restrictions
+             WHERE project_id = ?1
+               AND user_id = ?2
+               AND banned_at IS NOT NULL
+               AND (banned_until IS NULL OR banned_until > ?3)",
+            params![project_id, applicant_user_id, &now_str],
+            |row| row.get(0),
+        )?;
+        if banned_count > 0 {
+            anyhow::bail!("申请人已被该项目封禁，请先解除封禁");
         }
 
         // 更新申请状态
