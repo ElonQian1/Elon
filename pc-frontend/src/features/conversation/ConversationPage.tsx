@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { useProjectStore } from './useProjectStore'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
+import { ModelPickerPopover } from '../models/ModelPicker'
 import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import { formatTime, clean } from '../../lib/utils'
+import { shortButtonLabel } from '../models/modelUtils'
 import type { Message } from './types'
 import styles from './ConversationPage.module.css'
 
@@ -17,30 +19,49 @@ export default function ConversationPage() {
     loadProjects, selectProject, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
+  const modelLabel = useModelStore((s) => s.label)
   const [input, setInput] = useState('')
   const [sendError, setSendError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [showModelPicker, setShowModelPicker] = useState(false)
+  const [channelSearch, setChannelSearch] = useState('')
   const feedRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const modelBtnRef = useRef<HTMLButtonElement>(null)
 
-  useEffect(() => {
-    loadProjects()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id])
+  useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
 
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages])
 
-  async function handleSend(e: React.FormEvent) {
+  // textarea 自动撑高
+  const autoResize = useCallback(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = '46px'
+    el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+    el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden'
+  }, [])
+
+  async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault()
     const text = input.trim()
     if (!text || sendingMessage) return
     setInput('')
     setSendError('')
+    if (textareaRef.current) { textareaRef.current.style.height = '46px' }
     try {
       await sendMessage(text, selectedAgent || null)
     } catch (err) {
       setSendError((err as { message?: string }).message ?? '发送失败')
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSend(e)
     }
   }
 
@@ -49,85 +70,173 @@ export default function ConversationPage() {
   const isDevChannel = activeChannel?.kind === 'ai_development'
   const taskContext = buildContext(messages as Parameters<typeof buildContext>[0])
 
+  const filteredChannels = channelSearch
+    ? channels.filter((c) => c.name.toLowerCase().includes(channelSearch.toLowerCase()))
+    : channels
+
   return (
     <div className={styles.layout}>
-      {/* 频道面板（左 304px）*/}
+
+      {/* ══ 频道面板（左 304px）══ */}
       <aside className={styles.channelPanel}>
+        {/* 工作区标题（58px）*/}
         <div className={styles.workspaceTitle}>
-          <strong>{activeProject?.name ?? '选择项目'}</strong>
-          <button className={styles.newProjectBtn} onClick={() => setShowCreate(true)} title="新建项目">+</button>
+          <div style={{ minWidth: 0 }}>
+            <strong className={styles.workspaceTitleText}>
+              {activeProject?.name ?? '选择项目'}
+            </strong>
+            {activeProject?.description && (
+              <span className={styles.workspaceTitleMeta}>{activeProject.description}</span>
+            )}
+          </div>
+          <button className={styles.iconBtn} onClick={() => setShowCreate(true)} title="新建项目" type="button">+</button>
         </div>
-        <div className={styles.projectList}>
-          <div className={styles.sectionLabel}>我的项目</div>
-          {!projectsLoaded && <div className={styles.feedHint}>读取中…</div>}
+
+        {/* 搜索栏（48px）*/}
+        <div className={styles.channelSearch}>
+          <input
+            value={channelSearch}
+            onChange={(e) => setChannelSearch(e.target.value)}
+            placeholder="搜索频道或项目"
+          />
+        </div>
+
+        {/* 频道 + 项目列表（1fr）*/}
+        <div className={styles.channelList}>
+          {/* 我的项目 */}
+          <div className={styles.channelSection}>我的项目</div>
+          {!projectsLoaded && (
+            <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 13 }}>读取中…</div>
+          )}
           {projects.map((p) => (
             <button
               key={p.id}
-              className={[styles.projectBtn, p.id === activeProjectId ? styles.projectActive : ''].join(' ')}
+              className={[styles.channelItem, p.id === activeProjectId ? styles.channelActive : ''].join(' ')}
               onClick={() => selectProject(p.id)}
+              type="button"
             >
-              <span className={styles.projectIcon}>{p.name?.[0]?.toUpperCase() ?? '?'}</span>
-              <span className={styles.projectName}>{p.name}</span>
+              <span className={styles.channelGlyph} style={{ fontSize: 14 }}>
+                {p.id === activeProjectId ? '▶' : '▷'}
+              </span>
+              <span className={styles.channelMain}>
+                <strong>{p.name}</strong>
+                {p.description && <span>{p.description}</span>}
+              </span>
             </button>
           ))}
           {projectsLoaded && projects.length === 0 && (
-            <div className={styles.feedHint} style={{ textAlign: 'left', marginTop: 4 }}>暂无项目</div>
+            <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 12 }}>
+              暂无项目，点击 + 新建
+            </div>
+          )}
+
+          {/* 频道列表（选中项目后显示）*/}
+          {activeProjectId && filteredChannels.length > 0 && (
+            <>
+              <div className={styles.channelSection}>频道</div>
+              {filteredChannels.map((c) => {
+                const isDev = c.kind === 'ai_development'
+                return (
+                  <button
+                    key={c.id}
+                    className={[
+                      styles.channelItem,
+                      isDev ? styles.devChannel : '',
+                      c.id === activeChannelId ? styles.channelActive : '',
+                    ].join(' ')}
+                    onClick={() => selectChannel(c.id)}
+                    type="button"
+                  >
+                    <span className={styles.channelGlyph}>{isDev ? '🛠' : '#'}</span>
+                    <span className={styles.channelMain}>
+                      <strong>{c.name}</strong>
+                      {c.description && <span>{c.description}</span>}
+                    </span>
+                  </button>
+                )
+              })}
+            </>
           )}
         </div>
-        <div className={styles.channelList}>
-          {activeProjectId && <div className={styles.sectionLabel}>频道</div>}
-          {channels.map((c) => (
-            <button
-              key={c.id}
-              className={[styles.channelBtn, c.id === activeChannelId ? styles.channelActive : ''].join(' ')}
-              onClick={() => selectChannel(c.id)}
-            >
-              <span className={styles.channelGlyph}>{c.kind === 'ai_development' ? '🛠' : '#'}</span>
-              <span className={styles.channelName}>{c.name}</span>
-            </button>
-          ))}
-        </div>
+
+        {/* 用户条（64px）*/}
         <div className={styles.userStrip}>
-          <div className={styles.userDot}>
-            {(user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '?'}
-          </div>
-          <div className={styles.userInfo}>
-            <strong>{user?.nickname ?? user?.account ?? '未登录'}</strong>
-            <span>{user?.account}</span>
+          <button className={styles.userProfileBtn} type="button" title="账号">
+            <div className={styles.userDot}>
+              {(user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '?'}
+            </div>
+            <div className={styles.userInfo}>
+              <strong>{user?.nickname ?? user?.account ?? '未登录'}</strong>
+              <span>{user?.account}</span>
+            </div>
+          </button>
+          <div className={styles.userActions}>
+            <button
+              className={styles.iconBtn}
+              onClick={() => useAuthStore.getState().logout()}
+              title="退出登录"
+              type="button"
+            >↩</button>
           </div>
         </div>
       </aside>
 
-      {/* 聊天区（中 1fr）*/}
+      {/* ══ 聊天区（中 1fr）══ */}
       <div className={styles.chatColumn}>
-        <header className={styles.topbar}>
-          <span className={styles.topbarGlyph}>{activeChannel?.kind === 'ai_development' ? '🛠' : '#'}</span>
-          <span className={styles.topbarTitle}>{activeChannel?.name ?? (activeProject?.name ?? '选择项目开始对话')}</span>
-          {activeChannel?.description && <span className={styles.topbarSub}>{activeChannel.description}</span>}
-          {activeChannel && (
-            <span className={styles.topbarKind}>{activeChannel.kind === 'ai_development' ? 'AI 开发' : '频道'}</span>
-          )}
-        </header>
-
-        {!activeChannelId ? (
-          <div className={styles.placeholder}>
-            {!activeProjectId ? (
-              <>
-                <h2>欢迎回来</h2>
-                <p>从左侧选择一个项目，或新建一个</p>
-                <button className={styles.bigCreateBtn} onClick={() => setShowCreate(true)}>+ 新建项目</button>
-              </>
-            ) : (
-              <>
-                <h2>{activeProject?.name}</h2>
-                <p>从左侧频道列表选择一个频道开始对话</p>
-              </>
+        {/* 顶栏（58px）*/}
+        <header className={styles.chatTopbar}>
+          <div className={styles.chatTitle}>
+            <span className={styles.chatTitleGlyph}>
+              {activeChannel?.kind === 'ai_development' ? '🛠' : (activeChannel ? '#' : '💬')}
+            </span>
+            <div>
+              <strong className={styles.chatTitleText}>
+                {activeChannel?.name ?? activeProject?.name ?? '选择项目开始对话'}
+              </strong>
+              {activeChannel?.description && (
+                <span className={styles.chatTitleSub}>{activeChannel.description}</span>
+              )}
+            </div>
+          </div>
+          <div className={styles.topbarActions}>
+            {activeChannelId && (
+              <button className={styles.textBtn} type="button" onClick={() => useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)}>
+                刷新
+              </button>
             )}
           </div>
+        </header>
+
+        {/* 消息列表（1fr）*/}
+        {!activeChannelId ? (
+          <div className={styles.messageList}>
+            <div className={styles.emptyState}>
+              {!activeProjectId ? (
+                <>
+                  <strong>欢迎使用一龙工作台</strong>
+                  <p>从左侧选择一个项目，或新建一个开始开发。</p>
+                  <button className={styles.bigCreateBtn} onClick={() => setShowCreate(true)}>+ 新建项目</button>
+                </>
+              ) : (
+                <>
+                  <strong>{activeProject?.name}</strong>
+                  <p>从左侧频道列表选择一个频道开始对话。</p>
+                </>
+              )}
+            </div>
+          </div>
         ) : (
-          <div className={styles.feed} ref={feedRef}>
-            {messagesLoading && messages.length === 0 && <p className={styles.feedHint}>正在读取消息…</p>}
-            {!messagesLoading && messages.length === 0 && <p className={styles.feedHint}>还没有消息，发送第一条！</p>}
+          <div className={styles.messageList} ref={feedRef}>
+            {messagesLoading && messages.length === 0 && (
+              <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
+                <p>正在读取消息…</p>
+              </div>
+            )}
+            {!messagesLoading && messages.length === 0 && (
+              <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
+                <p>还没有消息，发送第一条吧！</p>
+              </div>
+            )}
             {messages.map((msg) => (
               <MessageItem
                 key={msg.id}
@@ -142,36 +251,78 @@ export default function ConversationPage() {
           </div>
         )}
 
+        {/* 输入框（composer）*/}
         {activeChannelId && (
-          <form className={styles.composer} onSubmit={handleSend}>
-            <div className={styles.composerWrap}>
-              <input
-                className={styles.composerInput}
+          <form onSubmit={handleSend}>
+            <div className={styles.composer}>
+              {/* 模型选择按钮 */}
+              <button
+                ref={modelBtnRef}
+                className={styles.composerModelBtn}
+                type="button"
+                title={`AI 模型：${modelLabel || '服务器默认'}`}
+                onClick={() => setShowModelPicker((v) => !v)}
+              >
+                {shortButtonLabel(modelLabel)}
+              </button>
+
+              {/* Textarea */}
+              <textarea
+                ref={textareaRef}
+                className={styles.composerTextarea}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder={isDevChannel ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求…` : `在 #${activeChannel?.name ?? ''} 发送消息`}
+                onChange={(e) => { setInput(e.target.value); autoResize() }}
+                onKeyDown={handleKeyDown}
+                placeholder={
+                  isDevChannel
+                    ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
+                    : `在 #${activeChannel?.name ?? ''} 发送消息`
+                }
                 disabled={sendingMessage}
+                rows={1}
               />
+
+              {/* 发送按钮 */}
+              <button
+                className={styles.sendBtn}
+                type="submit"
+                disabled={!input.trim() || sendingMessage}
+              >
+                {sendingMessage ? '…' : '发送'}
+              </button>
             </div>
-            <button className={styles.sendBtn} type="submit" disabled={!input.trim() || sendingMessage}>
-              {sendingMessage ? '…' : '发送'}
-            </button>
+            {sendError && <p className={styles.sendError}>{sendError}</p>}
           </form>
         )}
-        {sendError && <p className={styles.sendError}>{sendError}</p>}
       </div>
 
-      {/* 成员面板（右 272px）*/}
+      {/* ══ 成员面板（右 272px）══ */}
       <aside className={styles.memberPanel}>
-        <div className={styles.memberSection}>成员</div>
-        {user && (
-          <div className={styles.memberItem}>
-            <div className={styles.memberDot}>{(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? '?'}</div>
-            <span>{user.nickname ?? user.account}</span>
-          </div>
-        )}
+        <div className={styles.memberTitle}>
+          <span>成员</span>
+        </div>
+        <div className={styles.memberList}>
+          {user && (
+            <>
+              <div className={styles.memberSection}>在线 · 1</div>
+              <div className={styles.memberItem}>
+                <div className={styles.memberAvatar}>
+                  {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? '?'}
+                </div>
+                <span className={styles.memberName}>{user.nickname ?? user.account}</span>
+                <span className={styles.presenceDot} />
+              </div>
+            </>
+          )}
+        </div>
       </aside>
 
+      {/* 模型选择弹窗 */}
+      {showModelPicker && (
+        <ModelPickerPopover anchorRef={modelBtnRef} onClose={() => setShowModelPicker(false)} />
+      )}
+
+      {/* 新建项目弹窗 */}
       {showCreate && (
         <CreateProjectModal
           quickMode
@@ -187,6 +338,7 @@ export default function ConversationPage() {
   )
 }
 
+/* ── 单条消息组件 ── */
 function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove }: {
   message: Message
   isDevChannel: boolean
@@ -196,28 +348,37 @@ function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApp
   onApprove: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
 }) {
   const kind = clean(message.kind ?? message.role ?? '').toLowerCase()
+
+  // Dev 任务消息用 DevTaskCard 渲染
   if (isDevChannel && ['ai_task', 'ai_progress', 'ai_result'].includes(kind)) {
     return (
-      <div className={styles.msgRow}>
+      <div className={[styles.messageRow, styles.devTaskWrap].join(' ')}>
         <DevTaskMessage message={message} context={taskContext} onCancel={onCancel} onApprove={onApprove} />
       </div>
     )
   }
+
   const isUser = kind === 'user' || kind === 'human'
+  const isAi = !isUser
   const content = clean(message.content ?? message.text ?? '')
   const time = message.created_at ? formatTime(message.created_at) : ''
   const displayName = isUser ? (user?.nickname ?? user?.account ?? '我') : 'AI'
+
   return (
-    <div className={styles.msgRow}>
-      <div className={styles.msgAvatar}>
-        {isUser ? ((user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '我') : 'AI'}
+    <div className={[styles.messageRow, isUser ? styles.ownRow : ''].join(' ')}>
+      <div className={styles.messageAvatar}>
+        {isUser
+          ? ((user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '我')
+          : 'AI'}
       </div>
-      <div className={styles.msgBody}>
-        <div className={styles.msgMeta}>
+      <div className={styles.messageBody}>
+        <div className={styles.messageMeta}>
           <strong>{displayName}</strong>
           {time && <span>{time}</span>}
         </div>
-        <div className={styles.msgContent}>{content}</div>
+        <div className={[styles.messageContent, isAi ? styles.aiContent : ''].join(' ')}>
+          {content}
+        </div>
       </div>
     </div>
   )
