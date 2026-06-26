@@ -951,9 +951,26 @@ if (-not $Force) {
     $deployedShaFile = "$RemoteDir/.deployed-sha"
     $serverSha = (ssh @SshOpts $Server "cat $deployedShaFile 2>/dev/null || echo ''").Trim()
     if ($serverSha -and $serverSha -ne $ShaBig) {
+        # 长构建期间 origin/main 可能已经前进；先刷新远端引用，再做祖先判断。
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & git -C $RepoRoot fetch origin main 2>&1 | Out-Null
+        } finally {
+            $ErrorActionPreference = $oldErrorActionPreference
+        }
+
         # 检查服务器的 SHA 是否是我们的祖先（即我们更新）
-        git -C $RepoRoot merge-base --is-ancestor $serverSha $ShaBig 2>$null | Out-Null
-        if ($LASTEXITCODE -ne 0) {
+        $mergeBaseExitCode = 1
+        $oldErrorActionPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            & git -C $RepoRoot merge-base --is-ancestor $serverSha $ShaBig 2>&1 | Out-Null
+            $mergeBaseExitCode = $LASTEXITCODE
+        } finally {
+            $ErrorActionPreference = $oldErrorActionPreference
+        }
+        if ($mergeBaseExitCode -ne 0) {
             # 服务器 SHA 不是我们的祖先 → 服务器已有更新版本，拒绝回退
             ssh @SshOpts $Server "rm -f $stagingPath" 2>$null
             Remove-Worktree

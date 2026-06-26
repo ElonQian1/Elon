@@ -794,6 +794,8 @@ echo -e "${GREEN}   ✅ 上传完成${NC}"
 if [ "$FORCE" -eq 0 ]; then
   SERVER_SHA=$(read_deployed_server_sha)
   if [ -n "$SERVER_SHA" ] && [ "$SERVER_SHA" != "$SHA_BIG" ]; then
+    # 长构建期间 origin/main 可能已经前进；刷新远端引用后再判断，避免误判。
+    git -C "$REPO_ROOT" fetch origin main >/dev/null 2>&1 || true
     # 检查服务器 SHA 是否是我们的祖先（是祖先 = 我们更新）
     if ! git -C "$REPO_ROOT" merge-base --is-ancestor "$SERVER_SHA" "$SHA_BIG" 2>/dev/null; then
       # 服务器已有更新版本，拒绝回退
