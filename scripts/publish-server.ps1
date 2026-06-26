@@ -825,12 +825,17 @@ function Export-PcLegacyDist {
     $html = $html.Replace("__BRAND_PNG_B64__", $brandB64)
     $html = $html.Replace('"/assets/', '"/pc-legacy/assets/')
     $html = $html.Replace("'/assets/", "'/pc-legacy/assets/")
-    $legacyMobileButton = '<button class="text-button" id="openLegacyWebBtn" type="button" title="打开移动端入口，包含手机端下载和移动网页版（iOS）" aria-label="打开移动端入口，包含手机端下载和移动网页版（iOS）">打开移动端</button>'
     $openNewLink = '<a class="text-button pc-legacy-new-link" id="pcLegacyOpenNewBtn" href="/pc" title="打开新版 PC 工作台" aria-label="打开新版 PC 工作台" style="display:inline-flex;align-items:center;">打开新版</a>'
-    if (-not $html.Contains($legacyMobileButton)) {
-        throw "旧版 PC HTML 中未找到打开移动端按钮，无法注入打开新版入口"
+    # 按 ID 查找 topbar-actions 里的第一个 text-button，在其后注入「打开新版」链接
+    # 使用正则替换（比完整文本匹配更健壮，不受编码乱码影响）
+    if ($html -match 'id="openLegacyWebBtn"') {
+        $html = $html -replace '(id="openLegacyWebBtn"[^>]*>[^<]*</button>)', "`$1`n          $openNewLink"
+    } elseif ($html -match '<div class="topbar-actions">') {
+        # fallback：直接在 topbar-actions 开头注入
+        $html = $html -replace '(<div class="topbar-actions">)', "`$1`n          $openNewLink"
+    } else {
+        Write-Host "   ℹ️  旧版 PC HTML 未找到 openLegacyWebBtn，跳过注入打开新版入口"
     }
-    $html = $html.Replace($legacyMobileButton, "$legacyMobileButton`n          $openNewLink")
     $legacySwitchScriptTag = '    <script src="/pc-legacy/assets/pc_legacy_switch.js"></script>'
     if (-not $html.Contains("</body>")) {
         throw "旧版 PC HTML 中未找到 </body>，无法注入新版切换脚本"
