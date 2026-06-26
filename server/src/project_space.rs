@@ -285,14 +285,28 @@ pub async fn update_channel_permissions(
             &req.deny,
             Some(&user.id),
         ) {
-            Ok(member_overrides) => channel_permissions_payload(
-                &state,
-                &project.id,
-                &channel_id,
-                &user.id,
-                Some(member_overrides),
-                None,
-            ),
+            Ok(member_overrides) => {
+                record_channel_permission_audit(
+                    &state,
+                    &project.id,
+                    &channel_id,
+                    &user.id,
+                    Some(clean_member_id),
+                    "update_channel_member_permission",
+                    "member",
+                    clean_member_id,
+                    &req.allow,
+                    &req.deny,
+                );
+                channel_permissions_payload(
+                    &state,
+                    &project.id,
+                    &channel_id,
+                    &user.id,
+                    Some(member_overrides),
+                    None,
+                )
+            }
             Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
         };
     }
@@ -304,14 +318,28 @@ pub async fn update_channel_permissions(
         &req.deny,
         Some(&user.id),
     ) {
-        Ok(overrides) => channel_permissions_payload(
-            &state,
-            &project.id,
-            &channel_id,
-            &user.id,
-            None,
-            Some(overrides),
-        ),
+        Ok(overrides) => {
+            record_channel_permission_audit(
+                &state,
+                &project.id,
+                &channel_id,
+                &user.id,
+                None,
+                "update_channel_role_permission",
+                "role",
+                &req.role_id,
+                &req.allow,
+                &req.deny,
+            );
+            channel_permissions_payload(
+                &state,
+                &project.id,
+                &channel_id,
+                &user.id,
+                None,
+                Some(overrides),
+            )
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -361,6 +389,72 @@ fn channel_permissions_payload(
         "permissions": channel_permission_options(),
     }))
     .into_response()
+}
+
+fn record_channel_permission_audit(
+    state: &AppState,
+    project_id: &str,
+    channel_id: &str,
+    actor_user_id: &str,
+    target_user_id: Option<&str>,
+    action: &str,
+    scope: &str,
+    target: &str,
+    allow: &[String],
+    deny: &[String],
+) {
+    let channel_kind = state
+        .store
+        .get_project_channel_kind(project_id, channel_id)
+        .unwrap_or_default();
+    let note = format!(
+        "channel_id={};channel_kind={};scope={};target={};allow={};deny={}",
+        audit_note_value(channel_id),
+        audit_note_value(&channel_kind),
+        audit_note_value(scope),
+        audit_note_value(target),
+        audit_permission_list(allow),
+        audit_permission_list(deny),
+    );
+    if let Err(err) = state.store.record_project_member_audit(
+        project_id,
+        Some(actor_user_id),
+        target_user_id,
+        action,
+        None,
+        None,
+        Some(&note),
+    ) {
+        tracing::warn!(
+            ?err,
+            project_id = %project_id,
+            channel_id = %channel_id,
+            action = %action,
+            "记录频道权限审计日志失败"
+        );
+    }
+}
+
+fn audit_permission_list(values: &[String]) -> String {
+    values
+        .iter()
+        .map(|value| audit_note_value(value))
+        .filter(|value| !value.is_empty())
+        .collect::<Vec<_>>()
+        .join(",")
+}
+
+fn audit_note_value(value: &str) -> String {
+    value
+        .trim()
+        .chars()
+        .map(|ch| match ch {
+            ';' | '=' | '\n' | '\r' => ' ',
+            _ => ch,
+        })
+        .collect::<String>()
+        .trim()
+        .to_string()
 }
 
 async fn project_space_response(

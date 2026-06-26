@@ -3285,15 +3285,21 @@
     if (action === 'unmute_member') return `${actor} 解除了 ${target} 的禁言`;
     if (action === 'ban_member') return `${actor} 封禁了 ${target}`;
     if (action === 'unban_member') return `${actor} 解除了 ${target} 的封禁`;
+    if (action === 'update_channel_role_permission') return `${actor} 更新了频道角色权限`;
+    if (action === 'update_channel_member_permission') return `${actor} 更新了 ${target} 的频道权限`;
     if (action === 'join_project') return `${target} 加入了项目`;
     if (action === 'leave_project') return `${target} 退出了项目`;
     return `${actor} 更新了成员`;
   }
 
   function projectMemberAuditDetail(entry) {
+    const action = clean(entry && entry.action).toLowerCase();
     const note = clean(entry && entry.note);
     const oldRole = memberRoleLabel(entry && (entry.old_role || entry.oldRole));
     const newRole = memberRoleLabel(entry && (entry.new_role || entry.newRole));
+    if (action === 'update_channel_role_permission' || action === 'update_channel_member_permission') {
+      return channelPermissionAuditDetail(note);
+    }
     if (oldRole && newRole && oldRole !== newRole) return `${oldRole} → ${newRole}`;
     if (newRole) return newRole;
     if (oldRole) return `原角色：${oldRole}`;
@@ -3305,6 +3311,59 @@
     if (note === 'unmute' || note.startsWith('unmute;')) return '恢复发言权限';
     if (note === 'unban' || note.startsWith('unban;')) return '恢复项目访问';
     return note && note.startsWith('jr') ? '加入申请审批' : '';
+  }
+
+  function parseAuditNote(note) {
+    const out = {};
+    clean(note).split(';').forEach((part) => {
+      const index = part.indexOf('=');
+      if (index <= 0) return;
+      const key = clean(part.slice(0, index));
+      if (!key) return;
+      out[key] = clean(part.slice(index + 1));
+    });
+    return out;
+  }
+
+  function auditNoteList(value) {
+    return clean(value).split(',').map((item) => clean(item)).filter(Boolean);
+  }
+
+  function channelPermissionAuditLabel(permission) {
+    const key = clean(permission);
+    const item = CHANNEL_PERMISSION_OPTIONS.find((option) => clean(option.key) === key);
+    return item ? item.label : key;
+  }
+
+  function channelPermissionAuditChannelLabel(fields) {
+    const channelId = clean(fields.channel_id || fields.channelId);
+    const channel = ((state.projectSpace && state.projectSpace.channels) || [])
+      .find((item) => sameId(item.id, channelId));
+    if (channel) return `#${channelTitle(channel)}`;
+    const kind = clean(fields.channel_kind || fields.channelKind);
+    if (kind === 'announcements') return '#公告';
+    if (kind === 'docs') return '#文档';
+    if (kind === 'discussion') return '#讨论';
+    if (kind === 'requirements') return '#需求';
+    if (kind === 'suggestions') return '#意见';
+    if (kind === 'issues') return '#问题反馈';
+    if (kind === 'ai_development') return '#AI开发';
+    if (kind === 'builds') return '#构建发布';
+    return channelId ? `#${channelId.slice(0, 8)}` : '频道';
+  }
+
+  function channelPermissionAuditDetail(note) {
+    const fields = parseAuditNote(note);
+    const scope = clean(fields.scope);
+    const target = clean(fields.target);
+    const allow = auditNoteList(fields.allow).map(channelPermissionAuditLabel);
+    const deny = auditNoteList(fields.deny).map(channelPermissionAuditLabel);
+    const parts = [channelPermissionAuditChannelLabel(fields)];
+    if (scope === 'role' && target) parts.push(`角色：${memberRoleLabel(target) || target}`);
+    if (allow.length) parts.push(`允许：${allow.join(' / ')}`);
+    if (deny.length) parts.push(`拒绝：${deny.join(' / ')}`);
+    if (!allow.length && !deny.length) parts.push('全部继承');
+    return parts.join('；');
   }
 
   function bindRenderedMemberPanelPrefix() {
@@ -3959,6 +4018,7 @@
       }
       admin.status = '频道权限已保存';
       admin.tone = 'ok';
+      refreshMemberAuditAfterMutation(id);
       renderChannels();
       if (state.activeChannelId && sameId(state.activeChannelId, channelId)) {
         await selectProjectChannel(state.activeChannelId);
@@ -4015,6 +4075,7 @@
       }
       admin.status = '成员频道权限已保存';
       admin.tone = 'ok';
+      refreshMemberAuditAfterMutation(id);
       renderChannels();
       if (state.activeChannelId && sameId(state.activeChannelId, channelId)) {
         await selectProjectChannel(state.activeChannelId);
