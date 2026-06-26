@@ -12,7 +12,8 @@ interface RailItem {
 }
 
 const RAIL_ITEMS: RailItem[] = [
-  { path: '/',       emoji: '💬', label: '项目对话',  color: '#243246', hoverColor: '#3c6fa2' },
+  { path: '/ai',     emoji: '🤖', label: '一龙 AI',   color: '#243246', hoverColor: '#3c6fa2' },
+  { path: '/',       emoji: '📦', label: '项目对话',  color: '#2c2e35', hoverColor: '#4f5d71' },
   { path: '/doctor', emoji: '🩺', label: '电脑医生',  color: '#283342', hoverColor: '#315d72' },
   { path: '/node',   emoji: '🖥️', label: '分享算力',  color: '#2c2e35', hoverColor: '#365b44' },
   { path: '/voice',  emoji: '🎙️', label: 'AI 声音',  color: '#2f2a3a', hoverColor: '#7a4f9a' },
