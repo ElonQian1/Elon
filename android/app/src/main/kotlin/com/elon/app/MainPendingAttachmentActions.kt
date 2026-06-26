@@ -14,17 +14,29 @@ internal class MainPendingAttachmentActions(
     private val refreshPendingAttachmentPreview: () -> Unit
 ) {
     fun attachPickedFile(kind: String, uri: Uri, fallbackName: String? = null) {
+        val attachment = preparePickedAttachment(kind, uri, fallbackName) ?: return
+        addPreparedAttachment(attachment)
+    }
+
+    fun preparePickedAttachment(kind: String, uri: Uri, fallbackName: String? = null): PendingAttachment? {
         if (pendingAttachments.size >= MAX_PENDING_ATTACHMENTS) {
             Toast.makeText(activity, "一次最多发送 $MAX_PENDING_ATTACHMENTS 个附件", Toast.LENGTH_SHORT).show()
-            return
+            return null
         }
         val name = fallbackName ?: displayNameForUri(activity, uri) ?: uri.lastPathSegment ?: kind
-        val attachment = runCatching {
+        return runCatching {
             copyAttachmentToCache(activity, kind, uri, name, pendingAttachments.size + 1)
         }.onFailure {
             Toast.makeText(activity, "附件读取失败，请重新选择", Toast.LENGTH_SHORT).show()
-        }.getOrNull() ?: return
+        }.getOrNull()
+    }
 
+    fun addPreparedAttachment(attachment: PendingAttachment) {
+        if (pendingAttachments.size >= MAX_PENDING_ATTACHMENTS) {
+            runCatching { attachment.file.delete() }
+            Toast.makeText(activity, "一次最多发送 $MAX_PENDING_ATTACHMENTS 个附件", Toast.LENGTH_SHORT).show()
+            return
+        }
         pendingAttachments.add(attachment)
         if (isVoiceMode()) {
             setVoiceMode(false)

@@ -48,10 +48,16 @@ internal class MainInputActions(
     private var keyboardInsetsAnimationActions: MainKeyboardInsetsAnimationActions? = null
     private var fullScreenEditorOverlay: FullScreenEditorOverlay? = null
     private var pendingImageEditIndex: Int = -1
+    private var pendingImagePreviewAttachment: PendingAttachment? = null
     private val imageEditLauncher = activity.registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
         handleImageEditResult(result.resultCode, result.data)
+    }
+    private val imagePreviewLauncher = activity.registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        handleImagePreviewResult(result.resultCode, result.data)
     }
     private val planModeActions by lazy {
         MainPlanModeActions(
@@ -166,6 +172,57 @@ internal class MainInputActions(
 
     fun showVoiceAttachmentActions(message: ChatMessage, attachment: ChatAttachment) {
         speechInputActions().showVoiceAttachmentActions(message, attachment)
+    }
+
+    private fun previewPickedImage(kind: String, uri: android.net.Uri, fallbackName: String?) {
+        val attachment = pendingAttachmentActions.preparePickedAttachment(kind, uri, fallbackName) ?: return
+        pendingImagePreviewAttachment?.let { runCatching { it.file.delete() } }
+        pendingImagePreviewAttachment = attachment
+        runCatching {
+            imagePreviewLauncher.launch(
+                ChatImagePreviewActivity.createIntent(
+                    activity,
+                    attachment.file.absolutePath,
+                    attachment.displayName
+                )
+            )
+        }.onFailure {
+            pendingImagePreviewAttachment = null
+            pendingAttachmentActions.addPreparedAttachment(attachment)
+            Toast.makeText(activity, "预览页打开失败，已直接添加图片", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun handleImagePreviewResult(resultCode: Int, data: Intent?) {
+        val original = pendingImagePreviewAttachment ?: return
+        pendingImagePreviewAttachment = null
+        if (resultCode != Activity.RESULT_OK || data == null) {
+            runCatching { original.file.delete() }
+            return
+        }
+        val outputPath = data.getStringExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_PATH).orEmpty()
+        val outputFile = File(outputPath)
+        if (!outputFile.exists()) {
+            Toast.makeText(activity, "预览图片已失效，请重新选择", Toast.LENGTH_SHORT).show()
+            runCatching { original.file.delete() }
+            return
+        }
+        val outputName = data.getStringExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_NAME)
+            ?: outputFile.name
+        val width = data.getIntExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_WIDTH, 0).takeIf { it > 0 }
+        val height = data.getIntExtra(ChatImagePreviewActivity.EXTRA_OUTPUT_HEIGHT, 0).takeIf { it > 0 }
+        val edited = outputFile.absolutePath != original.file.absolutePath
+        val next = original.copy(
+            displayLabel = if (edited) "编辑图片" else original.displayLabel,
+            displayName = if (edited) editedDisplayName(original.displayName) else original.displayName,
+            fileName = outputName,
+            mimeType = if (edited) "image/jpeg" else original.mimeType,
+            file = outputFile,
+            imageWidth = width ?: original.imageWidth,
+            imageHeight = height ?: original.imageHeight
+        )
+        if (edited) runCatching { original.file.delete() }
+        pendingAttachmentActions.addPreparedAttachment(next)
     }
 
     private fun openImageEditor(index: Int) {
@@ -304,6 +361,9 @@ internal class MainInputActions(
             activeConversation = projectStateActions()::activeConversation,
             attachPickedFile = { kind, uri, fallbackName ->
                 pendingAttachmentActions.attachPickedFile(kind, uri, fallbackName)
+            },
+            previewPickedImage = { kind, uri, fallbackName ->
+                previewPickedImage(kind, uri, fallbackName)
             }
         )
     }
