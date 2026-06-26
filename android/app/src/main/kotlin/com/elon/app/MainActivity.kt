@@ -63,6 +63,12 @@ class MainActivity : AppCompatActivity() {
     private val projectPostImagePicker = registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         projectPostImageUploader.handlePickedImage(uri)
     }
+    private val addFriendPageLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK) {
+            friendActions.loadFriends()
+            groupActions.loadGroups()
+        }
+    }
 
     /** 注入 APK 操作回调后再赋值 chatAdapter，统一替代原来的 `setChatAdapter = { chatAdapter = it }`。 */
     private fun setAdapterAndWireApkActions(adapter: ChatAdapter) {
@@ -1277,7 +1283,6 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             http = s.http,
             serverUrl = serverUrl,
-            dp = uiTools::dp,
             setFriends = { list ->
                 s.friends.clear()
                 s.friends.addAll(list)
@@ -1287,6 +1292,9 @@ class MainActivity : AppCompatActivity() {
                     homeListActions.renderConversationList()
                     refreshChatTabBadge()
                 }
+            },
+            openAddFriendPage = {
+                addFriendPageLauncher.launch(Intent(this, AddFriendActivity::class.java))
             }
         )
     }

@@ -276,6 +276,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(friend_api::search_friend_by_phone),
         )
         .route(
+            "/api/me/friends/recommendations",
+            get(friend_api::list_friend_recommendations),
+        )
+        .route(
             "/api/me/project-share-messages/:project_id",
             delete(friend_api::delete_project_share_messages),
         )

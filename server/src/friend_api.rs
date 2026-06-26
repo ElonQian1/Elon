@@ -4,6 +4,7 @@
 //!   GET  /api/me/friends                         → 好友列表
 //!   POST /api/me/friends                         → 通过手机号添加好友
 //!   GET  /api/me/friends/search                  → 按手机号搜索用户
+//!   GET  /api/me/friends/recommendations         → 推荐已注册用户
 //!   GET  /api/me/friends/:friend_id/messages     → 获取与好友的消息记录
 //!   POST /api/me/friends/:friend_id/messages     → 发送消息给好友
 //!   DELETE /api/me/project-share-messages/:project_id → 撤回自己发出的项目卡片
@@ -100,6 +101,23 @@ pub async fn list_friend_groups(
     };
     match state.store.list_friend_groups(&user.id) {
         Ok(groups) => Json(serde_json::json!({ "groups": groups })).into_response(),
+        Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+    }
+}
+
+pub async fn list_friend_recommendations(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    match state.store.list_friend_recommendations(&user.id) {
+        Ok(recommendations) => Json(serde_json::json!({
+            "recommendations": recommendations
+        }))
+        .into_response(),
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }

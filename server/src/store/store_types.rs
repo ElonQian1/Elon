@@ -116,6 +116,17 @@ pub struct FriendSearchResult {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct FriendRecommendation {
+    pub id: String,
+    pub account: String,
+    pub nickname: Option<String>,
+    pub phone: Option<String>,
+    pub avatar_data_url: Option<String>,
+    pub mutual_friend_count: i64,
+    pub already_friend: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct AddFriendResult {
     pub friend: FriendProfile,
     pub already_friend: bool,

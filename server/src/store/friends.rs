@@ -2,8 +2,9 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    normalize_account, now, AddFriendResult, FriendProfile, FriendSearchResult, Store,
-    SOCIAL_AI_FRIEND_ACCOUNT, SOCIAL_AI_FRIEND_NAME, SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
+    normalize_account, now, AddFriendResult, FriendProfile, FriendRecommendation,
+    FriendSearchResult, Store, SOCIAL_AI_FRIEND_ACCOUNT, SOCIAL_AI_FRIEND_NAME,
+    SOCIAL_AI_FRIEND_PREVIEW, SOCIAL_AI_USER_ID,
 };
 
 impl Store {
@@ -82,6 +83,61 @@ impl Store {
             },
             already_friend: inserted == 0,
         })
+    }
+
+    pub fn list_friend_recommendations(&self, user_id: &str) -> Result<Vec<FriendRecommendation>> {
+        let conn = self.conn()?;
+        let mut stmt = conn.prepare(
+            "SELECT u.id,
+                    u.phone,
+                    u.email,
+                    u.nickname,
+                    u.avatar_data_url,
+                    EXISTS(
+                        SELECT 1
+                        FROM user_friends existing
+                        WHERE existing.user_id = ?1
+                          AND existing.friend_user_id = u.id
+                    ) AS already_friend,
+                    (
+                        SELECT COUNT(*)
+                        FROM user_friends mine
+                        JOIN user_friends theirs
+                          ON theirs.friend_user_id = mine.friend_user_id
+                        WHERE mine.user_id = ?1
+                          AND theirs.user_id = u.id
+                          AND mine.friend_user_id != ?1
+                          AND mine.friend_user_id != u.id
+                          AND mine.friend_user_id != ?2
+                    ) AS mutual_friend_count
+             FROM users u
+             WHERE u.status = 'active'
+               AND u.password_hash != 'device-user'
+               AND u.id != ?1
+               AND u.id != ?2
+             ORDER BY already_friend ASC,
+                      mutual_friend_count DESC,
+                      COALESCE(u.nickname, u.email, u.phone, u.id) COLLATE NOCASE ASC,
+                      u.created_at DESC",
+        )?;
+        let recommendations = stmt
+            .query_map(params![user_id, SOCIAL_AI_USER_ID], |row| {
+                let id: String = row.get(0)?;
+                let phone: Option<String> = row.get(1)?;
+                let email: Option<String> = row.get(2)?;
+                let account = phone.clone().or(email).unwrap_or_else(|| id.clone());
+                Ok(FriendRecommendation {
+                    id,
+                    account,
+                    nickname: row.get(3)?,
+                    phone,
+                    avatar_data_url: row.get(4)?,
+                    already_friend: row.get::<_, i64>(5)? != 0,
+                    mutual_friend_count: row.get(6)?,
+                })
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+        Ok(recommendations)
     }
 
     pub fn list_friends(&self, user_id: &str) -> Result<Vec<FriendProfile>> {
@@ -395,4 +451,85 @@ fn looks_like_phone(value: &str) -> bool {
     value
         .chars()
         .all(|ch| ch.is_ascii_digit() || matches!(ch, '+' | ' ' | '-' | '(' | ')'))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_store() -> Store {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time should be valid")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!("elon_friend_recommendations_{suffix}.db"));
+        Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn recommendations_include_registered_users_with_relationship_context() {
+        let store = temp_store();
+        let alice = store
+            .create_user(
+                "alice-recommend@example.com",
+                "password123",
+                Some("Alice"),
+                None,
+            )
+            .expect("alice should be created");
+        let bob = store
+            .create_user(
+                "bob-recommend@example.com",
+                "password123",
+                Some("Bob"),
+                None,
+            )
+            .expect("bob should be created");
+        let carol = store
+            .create_user(
+                "carol-recommend@example.com",
+                "password123",
+                Some("Carol"),
+                None,
+            )
+            .expect("carol should be created");
+        let dave = store
+            .create_user(
+                "dave-recommend@example.com",
+                "password123",
+                Some("Dave"),
+                None,
+            )
+            .expect("dave should be created");
+
+        store
+            .add_friend(&alice.id, Some("account_id"), &bob.id)
+            .expect("alice and bob should be friends");
+        store
+            .add_friend(&bob.id, Some("account_id"), &carol.id)
+            .expect("bob and carol should be friends");
+
+        let recommendations = store
+            .list_friend_recommendations(&alice.id)
+            .expect("recommendations should load");
+        let bob_row = recommendations
+            .iter()
+            .find(|item| item.id == bob.id)
+            .expect("existing friend should still be represented");
+        let carol_row = recommendations
+            .iter()
+            .find(|item| item.id == carol.id)
+            .expect("registered non-friend should be represented");
+        let dave_row = recommendations
+            .iter()
+            .find(|item| item.id == dave.id)
+            .expect("another registered user should be represented");
+
+        assert!(bob_row.already_friend);
+        assert!(!carol_row.already_friend);
+        assert!(!dave_row.already_friend);
+        assert_eq!(carol_row.mutual_friend_count, 1);
+        assert!(!recommendations.iter().any(|item| item.id == alice.id));
+    }
 }

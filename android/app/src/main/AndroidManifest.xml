@@ -107,6 +107,11 @@
             android:name=".PersonalQrCodeActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".AddFriendActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
         <service
             android:name=".TaskWorkService"
             android:exported="false"
