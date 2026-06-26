@@ -250,9 +250,9 @@ internal class ChatImageEditActivity : AppCompatActivity() {
 
     private fun collapseButton(): View {
         return iconButton(R.drawable.ic_chat_image_tool_collapse_down, "Collapse toolbar", padding = 8).apply {
-            layoutParams = FrameLayout.LayoutParams(dp(56), dp(56), Gravity.TOP or Gravity.END).apply {
-                topMargin = dp(43)
-                rightMargin = dp(18)
+            layoutParams = FrameLayout.LayoutParams(dp(48), dp(48), Gravity.TOP or Gravity.END).apply {
+                topMargin = dp(12)
+                rightMargin = dp(24)
             }
             setOnClickListener { collapseBottomTools() }
         }
