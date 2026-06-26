@@ -221,6 +221,7 @@
   display: grid;
   grid-template-rows: 58px minmax(0, 1fr) auto;
   background: #242529;
+  position: relative;   /* 新消息按钮的定位锚 */
 }
 
 /* 顶栏 */
@@ -391,6 +392,70 @@
 
 /* Dev task card 包装 */
 .devTaskWrap { width: 100%; }
+
+/* ── 打字指示器（AI 正在处理）── */
+.typingRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+.typingAvatar {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: #3a3d46;
+  display: grid; place-items: center;
+  font-size: 14px; font-weight: 800;
+  color: white; flex-shrink: 0;
+}
+.typingBubble {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+.typingDots {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+.typingDots span {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text-muted);
+  animation: typingBounce 1.2s ease-in-out infinite;
+}
+.typingDots span:nth-child(2) { animation-delay: .2s; }
+.typingDots span:nth-child(3) { animation-delay: .4s; }
+@keyframes typingBounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: .5; }
+  30%            { transform: translateY(-5px); opacity: 1; }
+}
+
+/* ── 新消息跳转按钮 ── */
+.newMsgBtn {
+  position: absolute;
+  bottom: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  height: 32px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #2b2d33;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0,0,0,.3);
+  z-index: 10;
+  transition: background var(--transition);
+  white-space: nowrap;
+}
+.newMsgBtn:hover { background: #343741; color: var(--text); }
 
 /* 输入框区（composer）3 列：42px | 1fr | 68px */
 .composer {

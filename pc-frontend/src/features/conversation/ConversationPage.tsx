@@ -28,17 +28,57 @@ export default function ConversationPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [channelSearch, setChannelSearch] = useState('')
+  const [showNewMsg, setShowNewMsg] = useState(false)   // P1.3：新消息提示
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
+  const atBottomRef = useRef(true)   // P1.3：用户是否在底部
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
 
+  // P1.3：智能滚动——只有用户在底部时才自动跟随；否则显示"新消息"按钮
   useEffect(() => {
-    if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
+    const el = feedRef.current
+    if (!el) return
+    if (atBottomRef.current) {
+      el.scrollTop = el.scrollHeight
+      setShowNewMsg(false)
+    } else {
+      setShowNewMsg(true)
+    }
   }, [messages])
 
-  // textarea 自动撑高
+  // P1.3：检测用户是否滚到底部
+  function handleFeedScroll() {
+    const el = feedRef.current
+    if (!el) return
+    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    if (atBottomRef.current) setShowNewMsg(false)
+  }
+
+  function scrollToBottom() {
+    const el = feedRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    atBottomRef.current = true
+    setShowNewMsg(false)
+  }
+
+  // P1.3：判断是否有运行中任务（用于打字指示器）
+  const taskContext = buildContext(messages as Parameters<typeof buildContext>[0])
+  const hasRunningTask = (() => {
+    const taskIds = new Set<string>()
+    const doneIds = new Set<string>()
+    for (const m of messages) {
+      const kind = ((m.kind ?? m.role ?? '') as string).toLowerCase()
+      const id = (m.task_id ?? m.taskId ?? '') as string
+      if (!id) continue
+      if (kind === 'ai_task') taskIds.add(id)
+      if (kind === 'ai_result') doneIds.add(id)
+    }
+    for (const id of taskIds) if (!doneIds.has(id)) return true
+    return false
+  })()
   const autoResize = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
@@ -71,7 +111,7 @@ export default function ConversationPage() {
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const activeChannel = channels.find((c) => c.id === activeChannelId)
   const isDevChannel = activeChannel?.kind === 'ai_development'
-  const taskContext = buildContext(messages as Parameters<typeof buildContext>[0])
+  // taskContext 和 hasRunningTask 已在上方 P1.3 代码块中定义
 
   const filteredChannels = channelSearch
     ? channels.filter((c) => c.name.toLowerCase().includes(channelSearch.toLowerCase()))
@@ -229,7 +269,7 @@ export default function ConversationPage() {
             </div>
           </div>
         ) : (
-          <div className={styles.messageList} ref={feedRef}>
+          <div className={styles.messageList} ref={feedRef} onScroll={handleFeedScroll}>
             {messagesLoading && messages.length === 0 && (
               <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
                 <p>正在读取消息…</p>
@@ -251,7 +291,25 @@ export default function ConversationPage() {
                 onApprove={approveTool}
               />
             ))}
+            {/* P1.3：AI 打字指示器 */}
+            {(hasRunningTask || sendingMessage) && (
+              <div className={styles.typingRow}>
+                <div className={styles.typingAvatar}>AI</div>
+                <div className={styles.typingBubble}>
+                  <span>AI 正在处理</span>
+                  <div className={styles.typingDots}>
+                    <span /><span /><span />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
+        )}
+        {/* P1.3：新消息跳转按钮 */}
+        {showNewMsg && activeChannelId && (
+          <button className={styles.newMsgBtn} onClick={scrollToBottom} type="button">
+            ↓ 新消息
+          </button>
         )}
 
         {/* 输入框（composer）*/}

@@ -40,9 +40,9 @@ server/src/
 
 | 任务 | 优先级 | 模块/文件 | 状态 |
 |---|---|---|---|
-| Markdown 渲染（代码块/表格/列表） | 🔴 高 | `src/features/markdown/` | ⬜ 未开始 |
-| 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ⬜ 未开始 |
-| 消息流式输出（AI 打字效果） | 🟡 中 | `src/features/conversation/` | ⬜ 未开始 |
+| Markdown 渲染（代码块/表格/列表/引用/链接） | 🔴 高 | `src/features/markdown/` | ✅ P1.1 完成 |
+| 频道 WebSocket 实时消息推送 | 🔴 高 | `src/features/conversation/useChannelSocket.ts` | ✅ P1.2 完成 |
+| 消息流式输出（AI 打字指示器 + 智能滚动）| 🟡 中 | `src/features/conversation/` | ✅ P1.3 完成 |
 | 消息附件上传（图片/文件） | 🟡 中 | `src/features/conversation/AttachmentUpload.tsx` | ⬜ 未开始 |
 | 任务状态实时更新（task_done 事件） | 🟡 中 | `src/features/dev/` | ⬜ 未开始 |
 
