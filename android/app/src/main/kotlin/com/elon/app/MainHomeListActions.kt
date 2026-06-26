@@ -92,6 +92,10 @@ internal class MainHomeListActions(
         return true
     }
 
+    fun currentConversationHomeTitle(): String {
+        return if (friendSearchActive) "搜索" else homeListFilterMode.titleText()
+    }
+
     fun renderConversationList() {
         val listVisible = binding.conversationPage.visibility == View.VISIBLE &&
             binding.chatPage.visibility != View.VISIBLE
@@ -99,7 +103,7 @@ internal class MainHomeListActions(
             clearFriendSearchState()
         }
         if (listVisible) {
-            binding.topTitleText.text = if (friendSearchActive) "搜索" else "好友"
+            binding.topTitleText.text = currentConversationHomeTitle()
             binding.searchButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
             binding.addButton.visibility = if (friendSearchActive) View.GONE else View.VISIBLE
         }
@@ -473,6 +477,12 @@ internal class MainHomeListActions(
             val members: List<AppGroupMember>?,
             override val sortTime: Long
         ) : HomeChatItem(sortTime)
+    }
+
+    private fun HomeListFilterMode.titleText(): String = when (this) {
+        HomeListFilterMode.Friends -> "好友"
+        HomeListFilterMode.Projects -> "项目"
+        HomeListFilterMode.All -> "全部"
     }
 
     fun renderProjectList() {

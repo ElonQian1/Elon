@@ -3977,6 +3977,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       topTitle.textContent = friendDisplayName(currentFriend);
     } else if (inGroupChat) {
       topTitle.textContent = groupDisplayName(currentGroup);
+    } else if (tabId === 'chatPage') {
+      topTitle.textContent = contactFilterTitle();
     } else {
       topTitle.textContent = t ? t.dataset.title : '';
     }
@@ -4069,7 +4071,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (tabsBar) tabsBar.classList.remove('hidden');
     if (projectSpaceAiMenu) projectSpaceAiMenu.classList.add('hidden');
     stageHint.classList.add('hidden');
-    topTitle.textContent = '好友';
+    topTitle.textContent = contactFilterTitle();
     resetProjectPage();
     renderConversationList();
     renderProjectHomePage();
@@ -4299,6 +4301,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       : 'var(--pull-filter-project)';
   }
 
+  function contactFilterTitle() {
+    if (contactFilterMode === 'projects') return '项目';
+    if (contactFilterMode === 'friends') return '好友';
+    return '全部';
+  }
+
   function filterContactHomeItems(items) {
     if (contactFilterMode === 'projects') {
       return items.filter((item) => item.kind === 'project');
@@ -4316,6 +4324,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
 
   function renderConversationList() {
+    if (currentTab === 'chatPage' && !isAnyChatActive()) {
+      topTitle.textContent = contactFilterTitle();
+    }
     const query = normalizeSearch(searchQuery);
     const baseItems = groups.map((group) => ({ kind: 'group', data: group }))
       .concat(friends.map((friend) => ({ kind: 'friend', data: friend })))
@@ -4577,7 +4588,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     stageHint.classList.add('hidden');
     modelBtn.style.display = '';
     messageInput.placeholder = '描述你想开发的 App 功能';
-    topTitle.textContent = '好友';
+    topTitle.textContent = contactFilterTitle();
     renderConversationList();
     loadSocialChats().catch((e) => console.warn('loadSocialChats failed:', e));
     updateSendButtonState();

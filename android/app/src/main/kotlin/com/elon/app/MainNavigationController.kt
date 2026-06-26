@@ -25,6 +25,7 @@ internal class MainNavigationController(
     private val activeConversationIndexProvider: () -> Int,
     private val compactProjectTitle: () -> String,
     private val renderConversationList: () -> Unit,
+    private val conversationHomeTitle: () -> String,
     private val renderProjectList: () -> Unit,
     private val renderProjectSpace: () -> Unit,
     private val refreshServerVersion: () -> Unit,
@@ -259,7 +260,7 @@ internal class MainNavigationController(
         binding.topTitleText.text = when (tab) {
             binding.tabProject -> "项目广场"
             binding.tabProfile -> "我的"
-            else -> "好友"
+            else -> conversationHomeTitle()
         }
         if (tab != binding.tabChat) {
             renderConversationList()
@@ -833,7 +834,7 @@ internal class MainNavigationController(
             showHomeActionPopup(binding.addButton, binding.tabChat)
         }
         binding.topTitleText.setOnLongClickListener(null)
-        binding.topTitleText.text = "好友"
+        binding.topTitleText.text = conversationHomeTitle()
         refreshFriends()
     }
 

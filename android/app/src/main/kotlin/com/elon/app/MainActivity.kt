@@ -531,6 +531,7 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndexProvider = { projectStateActions.activeConversationIndex },
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             renderConversationList = homeListActions::renderConversationList,
+            conversationHomeTitle = { homeListActions.currentConversationHomeTitle() },
             renderProjectList = homeListActions::renderProjectList,
             renderProjectSpace = { projectSpaceController.renderProjectSpaceLanding() },
             refreshServerVersion = { profileQuickActions.refreshServerVersion() },
