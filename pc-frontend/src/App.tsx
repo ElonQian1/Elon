@@ -1,7 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Shell from './features/shell/Shell'
 import LoginPage from './features/auth/LoginPage'
-import HomePage from './features/home/HomePage'
+import ConversationPage from './features/conversation/ConversationPage'
 import ProjectsPage from './features/projects/ProjectsPage'
 import DoctorPage from './features/doctor/DoctorPage'
 import VoicePage from './features/voice/VoicePage'
@@ -27,7 +27,8 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        <Route index element={<HomePage />} />
+        {/* 首页：项目对话主视图 */}
+        <Route index element={<ConversationPage />} />
         <Route path="projects" element={<ProjectsPage />} />
         <Route path="dev-tasks" element={<DevTasksPage />} />
         <Route path="voice" element={<VoicePage />} />

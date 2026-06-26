@@ -30,14 +30,23 @@ server/src/
 
 迁移完成后，`/pc` 指向新前端；旧 `server/src/assets/pc_*.html/js/css` 删除或只保留短期 `/pc-legacy`，最终归零。
 
-## 当前阶段：✅ 准备期完成（2026-06-26）
+## 当前阶段：✅ 收尾期完成（2026-06-26）
 
-- `pc-frontend/` 工程已创建：Vite 5 + React 18 + TypeScript 5 + React Router 6 + Zustand
-- `/pc-next` 路由已添加：`server/src/router.rs` 通过 `ServeDir` 托管 `$DATA_DIR/pc-next-dist/`
-- SPA 路由通过 `not_found_service → index.html` fallback 支持
-- 开发代理已配置：`vite.config.ts` 将 `/api` 代理到 `localhost:8080`
-- 构建产物：`npm run build` → `pc-frontend/dist/`（已验证通过）
-- **待完成**：`scripts/publish-server.ps1` 添加前端构建+上传步骤
+- **全部 11 个旧 `pc_*` 模块迁移完成，27 个旧资产文件已删除**
+- `/pc` 现在直接指向新 Vite + React + TypeScript 前端（ServeDir from `$DATA_DIR/pc-next-dist/`）
+- `/pc-next` 保留为向后兼容别名（同样指向新前端）
+- `server/src/web.rs`：所有 `PC_*` 常量和 `pc_app_*` 处理器已删除
+- `server/src/router.rs`：所有旧 `/assets/pc_*` 路由已删除
+- 前端 Vite base 已改为 `/pc/`，React Router basename 已改为 `/pc`
+
+## 路由策略（最终状态）
+
+| 路径 | 服务内容 |
+|---|---|
+| `/pc` | 新 React 前端（主路由） |
+| `/pc-next` | 新 React 前端（向后兼容别名） |
+| `/web` | 移动网页版（不变） |
+| `/` | 移动网页版（不变） |
 
 ## 路由策略
 

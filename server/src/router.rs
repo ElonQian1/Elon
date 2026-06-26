@@ -60,15 +60,17 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     let latest_apk = app_dir.join("ElonSpeed-latest.apk");
 
     // PC 新前端 dist 目录（由发布脚本构建并上传后填充）
-    // 准备期：目录不存在时 /pc-next/* 自动返回 404
+    // /pc 是主路由；/pc-next 保留为向后兼容别名
     let pc_next_dist = state.data_dir.join("pc-next-dist");
+    let pc_svc = ServeDir::new(&pc_next_dist)
+        .not_found_service(ServeFile::new(pc_next_dist.join("index.html")));
     let pc_next_svc = ServeDir::new(&pc_next_dist)
         .not_found_service(ServeFile::new(pc_next_dist.join("index.html")));
 
     Router::new()
         .route("/", get(web::web_page))
         .route("/web", get(web::web_page))
-        .route("/pc", get(web::pc_app_page))
+        .nest_service("/pc", pc_svc)
         .nest_service("/pc-next", pc_next_svc)
         .route("/manifest.json", get(web::pwa_manifest))
         .route("/sw.js", get(web::service_worker))
@@ -92,76 +94,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/assets/project_home.css", get(web::project_home_css))
         .route("/assets/project_home.js", get(web::project_home_js))
-        .route("/assets/pc_app.css", get(web::pc_app_css))
-        .route("/assets/pc_app_node.css", get(web::pc_app_node_css))
-        .route(
-            "/assets/pc_app_project_readiness.css",
-            get(web::pc_app_project_readiness_css),
-        )
-        .route("/assets/pc_app_doctor.css", get(web::pc_app_doctor_css))
-        .route(
-            "/assets/pc_project_landing.css",
-            get(web::pc_project_landing_css),
-        )
-        .route("/assets/pc_voice_project.css", get(web::pc_voice_project_css))
-        .route("/assets/pc_app_models.css", get(web::pc_app_models_css))
-        .route(
-            "/assets/pc_app_dev_composer.css",
-            get(web::pc_app_dev_composer_css),
-        )
-        .route(
-            "/assets/pc_app_dev_tasks.css",
-            get(web::pc_app_dev_tasks_css),
-        )
-        .route("/assets/pc_app_utils.js", get(web::pc_app_utils_js))
-        .route("/assets/pc_app_markdown.js", get(web::pc_app_markdown_js))
-        .route("/assets/pc_app_node_admin.js", get(web::pc_app_node_admin_js))
-        .route("/assets/pc_app_node.js", get(web::pc_app_node_js))
-        .route(
-            "/assets/pc_app_project_readiness.js",
-            get(web::pc_app_project_readiness_js),
-        )
-        .route("/assets/pc_app_doctor.js", get(web::pc_app_doctor_js))
-        .route(
-            "/assets/pc_project_landing.js",
-            get(web::pc_project_landing_js),
-        )
         .route("/assets/voice_tts_sdk.js", get(web::voice_tts_sdk_js))
-        .route(
-            "/assets/elon_route_c_sdk.js",
-            get(web::elon_route_c_sdk_js),
-        )
-        .route("/assets/pc_voice_project.js", get(web::pc_voice_project_js))
-        .route(
-            "/assets/pc_app_notifications.js",
-            get(web::pc_app_notifications_js),
-        )
-        .route("/assets/pc_app_models.js", get(web::pc_app_models_js))
-        .route(
-            "/assets/pc_app_project_create.js",
-            get(web::pc_app_project_create_js),
-        )
-        .route(
-            "/assets/pc_app_dev_composer.js",
-            get(web::pc_app_dev_composer_js),
-        )
-        .route(
-            "/assets/pc_app_dev_tasks.js",
-            get(web::pc_app_dev_tasks_js),
-        )
-        .route(
-            "/assets/pc_app_agent_runs.js",
-            get(web::pc_app_agent_runs_js),
-        )
-        .route(
-            "/assets/pc_app_task_snapshots.js",
-            get(web::pc_app_task_snapshots_js),
-        )
-        .route(
-            "/assets/pc_app_client_maintenance.js",
-            get(web::pc_app_client_maintenance_js),
-        )
-        .route("/assets/pc_app.js", get(web::pc_app_js))
+        .route("/assets/elon_route_c_sdk.js", get(web::elon_route_c_sdk_js))
         .route("/health", get(api::health))
         .route("/healthz", get(api::health))
         .route("/readyz", get(api::readyz))

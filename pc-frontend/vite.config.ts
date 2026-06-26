@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react'
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
-  // 所有资产路径以 /pc-next/ 开头，与 Rust 路由的 nest_service("/pc-next") 对应
-  base: '/pc-next/',
+  // /pc 是主路由；/pc-next 保留为向后兼容别名
+  base: '/pc/',
   build: {
     outDir: 'dist',
     sourcemap: false,
