@@ -487,6 +487,7 @@ pub struct ProjectMemberEntry {
     pub avatar_data_url: Option<String>,
     pub role: String, // "owner" | "admin" | "editor" | "member" | "observer"
     pub joined_at: String,
+    pub is_online: bool,
 }
 
 // ── 项目空间 / 频道 ───────────────────────────────────────────────────────────

@@ -541,6 +541,7 @@ impl Store {
                     avatar_data_url: row.get(2)?,
                     role: row.get(3)?,
                     joined_at: row.get(4)?,
+                    is_online: false,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -790,6 +791,7 @@ fn project_member_entry(
                 avatar_data_url: row.get(2)?,
                 role: row.get(3)?,
                 joined_at: row.get(4)?,
+                is_online: false,
             })
         },
     )

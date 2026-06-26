@@ -109,7 +109,7 @@ pub async fn get_user_project_space(
         Ok(pair) => pair,
         Err(response) => return response,
     };
-    project_space_response(state, user, project)
+    project_space_response(state, user, project).await
 }
 
 pub async fn get_project_space(
@@ -125,7 +125,7 @@ pub async fn get_project_space(
         Ok(access) => access,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
-    project_space_response(state, user, access)
+    project_space_response(state, user, access).await
 }
 
 pub async fn update_user_project_description(
@@ -183,7 +183,7 @@ fn update_project_description_response(
     }
 }
 
-fn project_space_response(
+async fn project_space_response(
     state: Arc<AppState>,
     user: PublicUser,
     access: ProjectAccess,
@@ -199,10 +199,16 @@ fn project_space_response(
         Ok(channels) => channels,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
-    let members = match state.store.list_project_members(&access.id) {
+    let mut members = match state.store.list_project_members(&access.id) {
         Ok(members) => members,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
+    {
+        let online = state.online_users.read().await;
+        for member in &mut members {
+            member.is_online = online.contains_key(&member.user_id);
+        }
+    }
     Json(serde_json::json!({
         "project": project,
         "channels": channels,

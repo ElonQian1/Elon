@@ -62,8 +62,7 @@ async fn handle(
 
     // 认证用户上线：注册在线状态并广播给所有已连接用户
     if let Some(ref uid) = authenticated_user_id {
-        state.online_users.write().await.insert(uid.clone());
-        crate::presence_events::publish_online(uid.clone());
+        mark_online(&state, uid).await;
     }
 
     // 连接时若服务器已有更新版本，立即推送一次，无需等待下次广播
@@ -73,8 +72,7 @@ async fn handle(
         if tx.send(Message::Text(event)).await.is_err() {
             // 连接前就断了，直接下线注销
             if let Some(ref uid) = authenticated_user_id {
-                state.online_users.write().await.remove(uid.as_str());
-                crate::presence_events::publish_offline(uid.clone());
+                mark_offline(&state, uid).await;
             }
             return;
         }
@@ -212,7 +210,28 @@ async fn handle(
 
     // 用户断线：注销在线状态
     if let Some(ref uid) = authenticated_user_id {
-        state.online_users.write().await.remove(uid.as_str());
-        crate::presence_events::publish_offline(uid.clone());
+        mark_offline(&state, uid).await;
     }
+}
+
+async fn mark_online(state: &AppState, user_id: &str) {
+    let mut online = state.online_users.write().await;
+    let count = online.entry(user_id.to_string()).or_insert(0);
+    *count += 1;
+    if *count == 1 {
+        crate::presence_events::publish_online(user_id.to_string());
+    }
+}
+
+async fn mark_offline(state: &AppState, user_id: &str) {
+    let mut online = state.online_users.write().await;
+    let Some(count) = online.get_mut(user_id) else {
+        return;
+    };
+    if *count > 1 {
+        *count -= 1;
+        return;
+    }
+    online.remove(user_id);
+    crate::presence_events::publish_offline(user_id.to_string());
 }

@@ -163,12 +163,19 @@ pub async fn list_members(
     }
 
     match state.store.list_project_members(&project_id) {
-        Ok(members) => Json(serde_json::json!({
-            "members": members,
-            "total": members.len(),
-            "project_id": project_id,
-        }))
-        .into_response(),
+        Ok(mut members) => {
+            let online = state.online_users.read().await;
+            for member in &mut members {
+                member.is_online = online.contains_key(&member.user_id);
+            }
+            let total = members.len();
+            Json(serde_json::json!({
+                "members": members,
+                "total": total,
+                "project_id": project_id,
+            }))
+            .into_response()
+        }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }

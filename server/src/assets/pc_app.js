@@ -35,7 +35,13 @@
     clientPackageLatest: null,
     localProjectInfo: null,
     localNodeLaunchAttempted: false,
-    workbenchRegistrationProjectId: ''
+    workbenchRegistrationProjectId: '',
+    memberPanel: { title: '成员', members: [], options: {}, search: '' },
+    memberCollapsed: {},
+    memberProfile: null,
+    presenceSocket: null,
+    presenceReconnectTimer: 0,
+    presenceReconnectDelay: 1200
   };
   const PROJECT_SHARE_MARKER = '【一龙项目卡片】';
   const PLAZA_FILTERS = [
@@ -1577,6 +1583,8 @@
       syncSettingsRuntimePermissionHint();
     }
     els.sidebarSearch.addEventListener('input', renderChannels);
+    els.memberList.addEventListener('input', handleMemberPanelInput);
+    els.memberList.addEventListener('click', handleMemberPanelClick);
     els.composer.addEventListener('submit', (event) => {
       event.preventDefault();
       sendCurrentMessage(false);
@@ -1604,9 +1612,16 @@
         setAccountMenu(false);
         return;
       }
+      if (event.key === 'Escape' && state.memberProfile) {
+        closeMemberProfile();
+        return;
+      }
       if (event.key === 'Escape' && !els.settingsBackdrop.hidden) closeSettings();
     });
     document.addEventListener('click', (event) => {
+      if (state.memberProfile && !event.target.closest('.member-popover') && !event.target.closest('.member-row')) {
+        closeMemberProfile();
+      }
       if (!els.accountMenu || els.accountMenu.hidden) return;
       if (event.target.closest('#accountMenu') || event.target.closest('.user-strip')) return;
       setAccountMenu(false);
@@ -1677,6 +1692,83 @@
     setBadge(els.aiBadge, socialAiFriend() && socialAiFriend().unread_count);
     setBadge(els.friendBadge, socialFriends().filter((f) => f.is_online).length);
     setBadge(els.nodeBadge, state.nodes.filter((n) => n.online).length);
+    connectPresenceSocket();
+  }
+
+  function wsUrl(path) {
+    const scheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${scheme}//${window.location.host}${path}`;
+  }
+
+  function connectPresenceSocket() {
+    if (!state.token || !window.WebSocket) return;
+    if (state.presenceSocket && (
+      state.presenceSocket.readyState === WebSocket.OPEN ||
+      state.presenceSocket.readyState === WebSocket.CONNECTING
+    )) return;
+    clearTimeout(state.presenceReconnectTimer);
+    const socket = new WebSocket(wsUrl(`/ws/app?token=${encodeURIComponent(state.token)}`));
+    state.presenceSocket = socket;
+    socket.addEventListener('open', () => {
+      state.presenceReconnectDelay = 1200;
+    });
+    socket.addEventListener('message', (event) => {
+      let payload = null;
+      try { payload = JSON.parse(event.data); } catch (_) { return; }
+      if (payload && payload.type === 'presence') {
+        applyPresenceUpdate(payload.userId || payload.user_id, payload.isOnline ?? payload.is_online);
+      }
+    });
+    socket.addEventListener('close', () => schedulePresenceReconnect(socket));
+    socket.addEventListener('error', () => {
+      try { socket.close(); } catch (_) {}
+    });
+  }
+
+  function schedulePresenceReconnect(socket) {
+    if (socket && state.presenceSocket !== socket) return;
+    state.presenceSocket = null;
+    clearTimeout(state.presenceReconnectTimer);
+    if (!state.token) return;
+    const delay = state.presenceReconnectDelay || 1200;
+    state.presenceReconnectDelay = Math.min(delay * 1.8, 20000);
+    state.presenceReconnectTimer = setTimeout(connectPresenceSocket, delay);
+  }
+
+  function disconnectPresenceSocket() {
+    clearTimeout(state.presenceReconnectTimer);
+    state.presenceReconnectTimer = 0;
+    state.presenceReconnectDelay = 1200;
+    const socket = state.presenceSocket;
+    state.presenceSocket = null;
+    if (socket) {
+      try { socket.close(); } catch (_) {}
+    }
+  }
+
+  function applyPresenceUpdate(userId, online) {
+    const id = clean(userId);
+    if (!id || typeof online !== 'boolean') return;
+    updatePresenceInList(state.friends, id, online);
+    state.groups.forEach((group) => updatePresenceInList(group && group.members, id, online));
+    if (state.projectSpace && Array.isArray(state.projectSpace.members)) {
+      updatePresenceInList(state.projectSpace.members, id, online);
+    }
+    updatePresenceInList(state.memberPanel && state.memberPanel.members, id, online);
+    setBadge(els.friendBadge, socialFriends().filter((f) => f.is_online).length);
+    if (state.activeKind === 'friends') renderChannels();
+    renderMemberPanelView();
+  }
+
+  function updatePresenceInList(list, userId, online) {
+    if (!Array.isArray(list)) return;
+    list.forEach((item) => {
+      if (sameId(memberIdOf(item), userId)) {
+        item.is_online = online;
+        item.isOnline = online;
+        item.presence = online ? 'online' : 'offline';
+      }
+    });
   }
 
   function valueOf(result) {
@@ -1687,6 +1779,8 @@
   function showLoginState() {
     setAccountMenu(false);
     setAuthClaimBanner(true);
+    disconnectPresenceSocket();
+    closeMemberProfile();
     hideRailTooltip();
     state.user = null;
     state.projects = [];
@@ -2431,7 +2525,8 @@
     }
     renderMembers('私聊成员', members, {
       groupBy: 'presence',
-      emptyText: '暂无成员'
+      emptyText: '暂无成员',
+      context: `direct:${memberIdOf(friend)}`
     });
   }
 
@@ -2462,7 +2557,8 @@
       groupBy: 'presence',
       totalCount: total,
       emptyText: '暂无群成员',
-      overflowText: total > members.length ? `还有 ${total - members.length} 位成员未在预览中显示` : ''
+      overflowText: total > members.length ? `还有 ${total - members.length} 位成员未在预览中显示` : '',
+      context: `group:${clean(group && group.id)}`
     });
   }
 
@@ -2483,7 +2579,8 @@
     renderChannels();
     renderMembers('好友在线', socialFriends().map((f) => Object.assign({}, f, { name: userName(f), sub: f.is_online ? '在线' : '离线' })), {
       groupBy: 'presence',
-      emptyText: '暂无好友'
+      emptyText: '暂无好友',
+      context: 'friends'
     });
     if (state.activePeer) selectPeer(state.activePeer.kind, state.activePeer.id);
     else {
@@ -2561,12 +2658,13 @@
         id: id || member.id,
         name: memberNameOf(member),
         sub: memberRoleLabel(member) || '项目成员',
-        is_online: id && sameId(id, currentUserId()) ? true : undefined
+        is_online: id && sameId(id, currentUserId()) ? true : member.is_online
       });
     });
     renderMembers(title || '项目成员', rows, Object.assign({
       groupBy: 'role',
-      emptyText: '暂无项目成员'
+      emptyText: '暂无项目成员',
+      context: `project:${state.activeProjectId || ''}`
     }, options || {}));
   }
 
@@ -2706,7 +2804,23 @@
 
   function renderMembers(title, members, options) {
     const opts = options || {};
-    const normalized = (Array.isArray(members) ? members : []).map((member) => {
+    const context = clean(opts.context || title || '成员') || '成员';
+    const previous = state.memberPanel || {};
+    state.memberPanel = {
+      title: title || '成员',
+      members: Array.isArray(members) ? members.slice() : [],
+      options: opts,
+      context,
+      search: previous.context === context ? (previous.search || '') : '',
+      renderedMembers: []
+    };
+    renderMemberPanelView();
+  }
+
+  function renderMemberPanelView(renderOptions) {
+    const panel = state.memberPanel || { title: '成员', members: [], options: {}, search: '' };
+    const opts = panel.options || {};
+    const normalized = (Array.isArray(panel.members) ? panel.members : []).map((member, index) => {
       const id = memberIdOf(member);
       const roleLabel = memberRoleLabel(member);
       const presence = memberPresence(member);
@@ -2716,45 +2830,84 @@
       ));
       return Object.assign({}, member, {
         __id: id,
+        __key: `${id || memberNameOf(member)}:${index}`,
         __name: memberNameOf(member),
         __presence: presence,
         __roleKey: memberRoleKey(member),
+        __roleGroup: memberRoleGroupKey(memberRoleKey(member)),
         __roleLabel: roleLabel,
         __sub: explicitSub || roleLabel || (presence === 'online' ? '在线' : (presence === 'offline' ? '离线' : '成员'))
       });
     });
-    const memberCount = normalized.length;
+    const query = clean(panel.search).toLowerCase();
+    const filtered = query
+      ? normalized.filter((member) => memberSearchText(member).includes(query))
+      : normalized;
+    state.memberPanel.renderedMembers = filtered;
+    const memberCount = filtered.length;
     const totalCount = Math.max(Number(opts.totalCount || opts.total || 0), memberCount);
-    const meta = totalCount ? `${totalCount} 位` : '';
-    els.memberPanelTitle.innerHTML = `<span>${escapeHtml(title || '成员')}</span>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}`;
-    const prefix = options && options.prefixHtml ? options.prefixHtml : '';
-    const groupBy = memberGroupMode(normalized, opts.groupBy);
-    const groups = memberGroups(normalized, groupBy);
+    const meta = totalCount ? (query ? `${memberCount}/${totalCount} 位` : `${totalCount} 位`) : '';
+    els.memberPanelTitle.innerHTML = `<span>${escapeHtml(panel.title || '成员')}</span>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}`;
+    const prefix = opts.prefixHtml ? opts.prefixHtml : '';
+    const search = opts.search === false
+      ? ''
+      : `<div class="member-search">
+          <input id="memberSearchInput" value="${escapeHtml(panel.search || '')}" placeholder="${escapeHtml(opts.searchPlaceholder || '搜索成员')}" autocomplete="off" />
+          ${panel.search ? '<button class="member-search-clear" type="button" data-member-action="clear-search" title="清除搜索">×</button>' : ''}
+        </div>`;
+    const groupBy = memberGroupMode(filtered, opts.groupBy);
+    const groups = memberGroups(filtered, groupBy);
     const rows = groups.map((group) => {
+      const collapsed = isMemberGroupCollapsed(group.key);
       const groupRows = group.members.map((member) => {
         const presence = member.__presence;
         const role = member.__roleLabel;
-        return `<div class="member-row ${presence ? `is-${escapeHtml(presence)}` : ''}" title="${escapeHtml(member.__name)}">
-          ${avatarElement('div', `member-avatar ${presence}`, avatarUrlOf(member), member.__name, '员')}
+        const roleClass = member.__roleGroup ? `member-role-${escapeHtml(member.__roleGroup)}` : '';
+        return `<button class="member-row ${presence ? `is-${escapeHtml(presence)}` : ''} ${roleClass}" type="button" data-member-key="${escapeHtml(member.__key)}" title="${escapeHtml(member.__name)}">
+          ${avatarElement('div', `member-avatar ${presence} ${roleClass}`, avatarUrlOf(member), member.__name, '员')}
           <div class="member-copy">
             <div class="member-line">
               <strong>${escapeHtml(member.__name)}</strong>
-              ${role && groupBy !== 'role' ? `<em class="member-role-pill">${escapeHtml(role)}</em>` : ''}
+              ${role && groupBy !== 'role' ? `<em class="member-role-pill ${roleClass}">${escapeHtml(role)}</em>` : ''}
             </div>
             <span class="member-sub">${escapeHtml(member.__sub)}</span>
           </div>
-        </div>`;
+        </button>`;
       }).join('');
       const heading = group.label
-        ? `<div class="member-section-heading"><span>${escapeHtml(group.label)}</span><small>${group.members.length}</small></div>`
+        ? `<button class="member-section-heading ${collapsed ? 'is-collapsed' : ''}" type="button" data-member-group="${escapeHtml(group.key)}">
+            <span>${escapeHtml(group.label)}</span><small>${group.members.length}</small>
+          </button>`
         : '';
-      return `<section class="member-section">${heading}${groupRows}</section>`;
+      return `<section class="member-section">${heading}<div class="member-section-rows" ${collapsed ? 'hidden' : ''}>${groupRows}</div></section>`;
     }).join('');
-    const empty = `<div class="member-empty">${escapeHtml(opts.emptyText || '暂无成员')}</div>`;
+    const emptyText = query ? '没有匹配的成员' : (opts.emptyText || '暂无成员');
+    const empty = `<div class="member-empty">${escapeHtml(emptyText)}</div>`;
     const overflow = clean(opts.overflowText)
       ? `<div class="member-overflow">${escapeHtml(opts.overflowText)}</div>`
       : '';
-    els.memberList.innerHTML = prefix + (rows || empty) + overflow;
+    els.memberList.innerHTML = prefix + search + (rows || empty) + overflow;
+    if (renderOptions && renderOptions.focusSearch) {
+      const input = $('memberSearchInput');
+      if (input) {
+        input.focus();
+        const length = input.value.length;
+        input.setSelectionRange(length, length);
+      }
+    }
+  }
+
+  function memberSearchText(member) {
+    return [
+      member.__name,
+      member.__sub,
+      member.__roleLabel,
+      member.__id,
+      member.account,
+      member.user_account,
+      member.email,
+      member.phone
+    ].map(clean).join(' ').toLowerCase();
   }
 
   function memberGroupMode(members, requested) {
@@ -2766,7 +2919,7 @@
   }
 
   function memberGroups(members, mode) {
-    if (mode === 'none') return [{ label: '', members }];
+    if (mode === 'none') return [{ key: 'all', label: '', members }];
     if (mode === 'role') {
       const labels = {
         owner: '拥有者',
@@ -2812,6 +2965,7 @@
         return String(labelOf(left)).localeCompare(String(labelOf(right)));
       })
       .map((key) => ({
+        key,
         label: labelOf(key),
         members: buckets.get(key).slice().sort((left, right) => {
           const presenceDelta = (right.__presence === 'online' ? 1 : 0) - (left.__presence === 'online' ? 1 : 0);
@@ -2819,6 +2973,134 @@
           return left.__name.localeCompare(right.__name);
         })
       }));
+  }
+
+  function memberCollapseStore() {
+    const context = clean(state.memberPanel && state.memberPanel.context) || '成员';
+    if (!state.memberCollapsed[context]) state.memberCollapsed[context] = {};
+    return state.memberCollapsed[context];
+  }
+
+  function isMemberGroupCollapsed(groupKey) {
+    const key = clean(groupKey);
+    if (!key) return false;
+    return !!memberCollapseStore()[key];
+  }
+
+  function toggleMemberGroup(groupKey) {
+    const key = clean(groupKey);
+    if (!key) return;
+    const store = memberCollapseStore();
+    store[key] = !store[key];
+    renderMemberPanelView();
+  }
+
+  function handleMemberPanelInput(event) {
+    if (!event.target || event.target.id !== 'memberSearchInput') return;
+    state.memberPanel.search = event.target.value || '';
+    closeMemberProfile();
+    renderMemberPanelView({ focusSearch: true });
+  }
+
+  function handleMemberPanelClick(event) {
+    const action = event.target.closest('[data-member-action]');
+    if (action) {
+      const name = clean(action.dataset.memberAction);
+      if (name === 'clear-search') {
+        state.memberPanel.search = '';
+        closeMemberProfile();
+        renderMemberPanelView({ focusSearch: true });
+      }
+      return;
+    }
+    const groupButton = event.target.closest('[data-member-group]');
+    if (groupButton) {
+      toggleMemberGroup(groupButton.dataset.memberGroup);
+      return;
+    }
+    const row = event.target.closest('[data-member-key]');
+    if (row) {
+      openMemberProfile(row.dataset.memberKey, row);
+    }
+  }
+
+  function memberByKey(key) {
+    const panel = state.memberPanel || {};
+    const members = Array.isArray(panel.renderedMembers) ? panel.renderedMembers : [];
+    return members.find((member) => member.__key === key) || null;
+  }
+
+  function openMemberProfile(key, anchor) {
+    const member = memberByKey(key);
+    if (!member) return;
+    state.memberProfile = { key, member };
+    renderMemberProfile(member, anchor);
+  }
+
+  function closeMemberProfile() {
+    state.memberProfile = null;
+    const existing = $('memberPopover');
+    if (existing) existing.remove();
+  }
+
+  function renderMemberProfile(member, anchor) {
+    closeMemberProfile();
+    state.memberProfile = { key: member.__key, member };
+    const id = member.__id;
+    const presence = member.__presence;
+    const roleClass = member.__roleGroup ? `member-role-${escapeHtml(member.__roleGroup)}` : '';
+    const canMessage = id && !sameId(id, currentUserId()) && !!friendById(id);
+    const popover = document.createElement('div');
+    popover.id = 'memberPopover';
+    popover.className = 'member-popover';
+    popover.innerHTML = `
+      <div class="member-popover-head ${roleClass}">
+        ${avatarElement('div', `member-popover-avatar ${presence || ''} ${roleClass}`, avatarUrlOf(member), member.__name, '员')}
+        <button class="member-popover-close" type="button" data-profile-action="close" title="关闭">×</button>
+      </div>
+      <div class="member-popover-body">
+        <strong>${escapeHtml(member.__name)}</strong>
+        <span>${escapeHtml(member.__sub || '成员')}</span>
+        <div class="member-profile-meta">
+          ${member.__roleLabel ? `<em>${escapeHtml(member.__roleLabel)}</em>` : ''}
+          <em>${escapeHtml(presence === 'online' ? '在线' : (presence === 'offline' ? '离线' : '状态未知'))}</em>
+          ${id ? `<em>${escapeHtml(shortUserId(id))}</em>` : ''}
+        </div>
+        <div class="member-profile-actions">
+          <button class="text-button" type="button" data-profile-action="message" ${canMessage ? '' : 'disabled'}>发消息</button>
+        </div>
+      </div>`;
+    document.body.appendChild(popover);
+    positionMemberPopover(popover, anchor);
+    popover.addEventListener('click', handleMemberProfileClick);
+  }
+
+  function positionMemberPopover(popover, anchor) {
+    const rect = anchor && anchor.getBoundingClientRect ? anchor.getBoundingClientRect() : null;
+    const width = 292;
+    const margin = 10;
+    const top = rect ? Math.min(Math.max(rect.top - 12, 12), Math.max(12, window.innerHeight - 260)) : 72;
+    const left = rect ? Math.max(12, rect.left - width - margin) : Math.max(12, window.innerWidth - width - 292);
+    popover.style.left = `${Math.round(left)}px`;
+    popover.style.top = `${Math.round(top)}px`;
+  }
+
+  function handleMemberProfileClick(event) {
+    const button = event.target.closest('[data-profile-action]');
+    if (!button) return;
+    const action = clean(button.dataset.profileAction);
+    if (action === 'close') {
+      closeMemberProfile();
+      return;
+    }
+    if (action === 'message') {
+      const member = state.memberProfile && state.memberProfile.member;
+      const id = member && member.__id;
+      if (id && friendById(id)) {
+        closeMemberProfile();
+        selectPeer('friend', id);
+      }
+    }
   }
 
   function senderIdOf(message) {
@@ -4090,6 +4372,8 @@
   function logout() {
     setAccountMenu(false);
     closeSettings();
+    disconnectPresenceSocket();
+    closeMemberProfile();
     TOKEN_KEYS.forEach((key) => localStorage.removeItem(key));
     saveToken('');
     state.user = null;

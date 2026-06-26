@@ -83,7 +83,7 @@ pub async fn list_friends(State(state): State<Arc<AppState>>, headers: HeaderMap
         Ok(mut friends) => {
             let online = state.online_users.read().await;
             for f in &mut friends {
-                f.is_online = f.id == SOCIAL_AI_USER_ID || online.contains(&f.id);
+                f.is_online = f.id == SOCIAL_AI_USER_ID || online.contains_key(&f.id);
             }
             Json(serde_json::json!({ "friends": friends })).into_response()
         }
