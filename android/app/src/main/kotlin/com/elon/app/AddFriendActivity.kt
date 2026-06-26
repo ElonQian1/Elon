@@ -38,6 +38,7 @@ class AddFriendActivity : AppCompatActivity() {
     private val recommendations = mutableListOf<AddFriendRecommendation>()
     private var qrBitmap: Bitmap? = null
     private lateinit var searchInput: EditText
+    private lateinit var recommendationScroll: ScrollView
     private lateinit var recommendationList: LinearLayout
     private lateinit var resultText: TextView
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -63,26 +64,19 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.BLACK)
-            addView(topBar(), LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(50)
-            ))
+            addView(topBar(), LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(50)))
             addView(searchBar(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(44)
+                dp(40)
             ).apply {
                 leftMargin = dp(16)
                 rightMargin = dp(16)
-                topMargin = dp(8)
+                topMargin = dp(6)
             })
             addView(ScrollView(this@AddFriendActivity).apply {
                 overScrollMode = View.OVER_SCROLL_NEVER
                 addView(pageBody())
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            ))
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
         }
     }
     private fun topBar(): FrameLayout {
@@ -108,10 +102,7 @@ class AddFriendActivity : AppCompatActivity() {
                 includeFontPadding = false
                 textSize = 16f
                 setTextColor(Color.parseColor("#D9D9D9"))
-            }, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            ).apply {
+            }, FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.MATCH_PARENT).apply {
                 gravity = Gravity.CENTER
             })
         }
@@ -127,7 +118,7 @@ class AddFriendActivity : AppCompatActivity() {
             backgroundTintList = ColorStateList.valueOf(Color.TRANSPARENT)
             background = null
             includeFontPadding = false
-            setPadding(dp(10), 0, 0, 0)
+            setPadding(dp(8), 0, 0, 0)
             addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
                 override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
@@ -147,13 +138,13 @@ class AddFriendActivity : AppCompatActivity() {
         return LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            background = roundedRect("#272727", 22)
-            setPadding(dp(16), 0, dp(16), 0)
+            background = roundedRect("#272727", 20)
+            setPadding(dp(14), 0, dp(14), 0)
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_search_simple)
                 imageTintList = ColorStateList.valueOf(Color.parseColor("#777777"))
                 contentDescription = null
-            }, LinearLayout.LayoutParams(dp(24), dp(24)))
+            }, LinearLayout.LayoutParams(dp(22), dp(22)))
             addView(searchInput, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
         }
     }
@@ -161,7 +152,7 @@ class AddFriendActivity : AppCompatActivity() {
     private fun pageBody(): LinearLayout {
         return LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(16), dp(40), dp(16), dp(44))
+            setPadding(dp(16), dp(36), dp(16), dp(44))
             addView(TextView(this@AddFriendActivity).apply {
                 text = "推荐"
                 includeFontPadding = false
@@ -171,9 +162,14 @@ class AddFriendActivity : AppCompatActivity() {
             recommendationList = LinearLayout(this@AddFriendActivity).apply {
                 orientation = LinearLayout.VERTICAL
             }
-            addView(recommendationList, LinearLayout.LayoutParams(
+            recommendationScroll = ScrollView(this@AddFriendActivity).apply {
+                overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+                setBackgroundColor(Color.BLACK)
+                addView(recommendationList)
+            }
+            addView(recommendationScroll, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                0
             ).apply {
                 topMargin = dp(22)
             })
@@ -305,6 +301,7 @@ class AddFriendActivity : AppCompatActivity() {
             background = roundedRect("#D9D9D9", 22)
             addView(ImageView(this@AddFriendActivity).apply {
                 setImageResource(R.drawable.ic_add_friend_scan)
+                imageTintList = ColorStateList.valueOf(Color.BLACK)
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(24), dp(24)))
             addView(TextView(this@AddFriendActivity).apply {
@@ -387,6 +384,10 @@ class AddFriendActivity : AppCompatActivity() {
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(76)
             ))
+        }
+        (recommendationScroll.layoutParams as? LinearLayout.LayoutParams)?.let {
+            it.height = dp(items.size.coerceAtMost(12) * 76)
+            recommendationScroll.layoutParams = it
         }
         resultText.setTextColor(Color.parseColor("#777777"))
         resultText.text = when {

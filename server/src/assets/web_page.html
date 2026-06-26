@@ -2028,18 +2028,18 @@
     .add-friend-search {
       align-items: center;
       background: var(--input-pill-bg);
-      border-radius: 22px;
+      border-radius: 20px;
       display: flex;
-      gap: 10px;
-      height: 44px;
-      margin-top: 8px;
-      padding: 0 16px;
+      gap: 8px;
+      height: 40px;
+      margin-top: 6px;
+      padding: 0 14px;
     }
     .add-friend-search svg {
       color: var(--ink-faint);
       flex: 0 0 auto;
-      height: 24px;
-      width: 24px;
+      height: 22px;
+      width: 22px;
     }
     .add-friend-search input {
       background: transparent;
@@ -2055,7 +2055,7 @@
     .add-friend-scroll {
       flex: 1;
       overflow: auto;
-      padding-top: 40px;
+      padding-top: 36px;
     }
     .add-friend-section-title {
       color: var(--ink);
@@ -2067,6 +2067,13 @@
     .add-friend-recommendations {
       display: flex;
       flex-direction: column;
+    }
+    .add-friend-recommendation-box {
+      background: #000000;
+      max-height: calc(76px * 12);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
     }
     .add-friend-row {
       align-items: center;
@@ -2163,6 +2170,7 @@
       width: 112px;
     }
     .add-friend-scan-pill svg {
+      color: #000000;
       height: 24px;
       width: 24px;
     }
@@ -2876,7 +2884,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </label>
     <div class="add-friend-scroll">
       <h3 class="add-friend-section-title">推荐</h3>
-      <div class="add-friend-recommendations" id="friendRecommendationList"></div>
+      <div class="add-friend-recommendation-box">
+        <div class="add-friend-recommendations" id="friendRecommendationList"></div>
+      </div>
       <div class="add-friend-result" id="addFriendResult"></div>
       <div class="add-friend-scan-pill">
         <svg viewBox="0 0 30 30" aria-hidden="true">
