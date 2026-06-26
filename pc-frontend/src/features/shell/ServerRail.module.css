@@ -30,6 +30,7 @@
   position: relative;
   transition: border-radius .14s ease, background .14s ease;
   flex-shrink: 0;
+  text-decoration: none;
 }
 
 /* 左侧指示条 */
@@ -87,6 +88,19 @@
   background: #3c6fa2;
   border-radius: 16px;
   color: #fff;
+}
+
+.legacyAvatar {
+  background: #2a2d34;
+  color: #d4d7dd;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.legacyAvatar:hover {
+  background: #6b5a33;
+  border-radius: 16px;
+  color: #fff1c6;
 }
 
 /* ── Tooltip（hover 时显示在 rail 右侧）── */

@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth'
 import { ModelPickerButton } from '../models/ModelPicker'
+import { getPcLegacyUrl, rememberPcLegacyToken } from './pcLegacyUrl'
 import styles from './Sidebar.module.css'
 
 interface NavItem {
@@ -18,7 +19,9 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function Sidebar() {
   const user = useAuthStore((s) => s.user)
+  const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
+  const legacyUrl = getPcLegacyUrl()
 
   return (
     <nav className={styles.sidebar}>
@@ -54,7 +57,13 @@ export default function Sidebar() {
             </button>
           </div>
         )}
-        <a className={styles.legacyLink} href="/pc">切换旧版</a>
+        <a
+          className={styles.legacyLink}
+          href={legacyUrl}
+          onClick={() => rememberPcLegacyToken(token)}
+        >
+          切换旧版
+        </a>
       </div>
     </nav>
   )

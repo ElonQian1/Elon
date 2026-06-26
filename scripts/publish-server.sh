@@ -651,6 +651,134 @@ if [ "$SKIP_UPLOAD" -eq 1 ]; then
   exit 0
 fi
 
+# ── 3.5 构建/上传 PC 新版与旧版对照快照 ─────────────────────
+PC_FRONTEND_DIR="$REPO_ROOT/pc-frontend"
+PC_DIST_DIR="$PC_FRONTEND_DIR/dist"
+PC_LEGACY_BASE_COMMIT="d1f89950eb09d1911aae601f7cdedc583101e1d2"
+PC_LEGACY_DIST_DIR="$REPO_ROOT/target/pc-legacy-dist"
+REMOTE_DATA_DIR="/opt/elon/data"
+REMOTE_PC_DIST="$REMOTE_DATA_DIR/pc-next-dist"
+REMOTE_PC_LEGACY_DIST="$REMOTE_DATA_DIR/pc-legacy-dist"
+
+upload_static_dist() {
+  local local_dir="$1"
+  local remote_dir="$2"
+  local label="$3"
+  local staging_dir="${remote_dir}-staging-$SHA"
+
+  if [ -z "$local_dir" ] || [ ! -f "$local_dir/index.html" ]; then
+    echo -e "${YELLOW}3.5⃣  ⚠️  $label 不存在，跳过上传${NC}"
+    return 0
+  fi
+
+  echo -e "${YELLOW}3.5⃣  上传 $label 到 $remote_dir ...${NC}"
+  if [ "$LOCAL_DEPLOY" -eq 1 ]; then
+    rm -rf "$staging_dir"
+    mkdir -p "$staging_dir"
+    cp -a "$local_dir"/. "$staging_dir"/
+    rm -rf "$remote_dir"
+    mv "$staging_dir" "$remote_dir"
+  else
+    # shellcheck disable=SC2086
+    if ! ssh $SSH_OPTS "$SERVER" "mkdir -p '$staging_dir'"; then
+      echo -e "${YELLOW}   ⚠️  $label staging 目录创建失败（不中止后端部署）${NC}"
+      return 0
+    fi
+    if ! scp $SSH_OPTS -r "$local_dir/." "${SERVER}:${staging_dir}"; then
+      # shellcheck disable=SC2086
+      ssh $SSH_OPTS "$SERVER" "rm -rf '$staging_dir'" 2>/dev/null || true
+      echo -e "${YELLOW}   ⚠️  $label 上传失败（不中止后端部署）${NC}"
+      return 0
+    fi
+    if ! ssh $SSH_OPTS "$SERVER" "rm -rf '$remote_dir' && mv '$staging_dir' '$remote_dir'"; then
+      # shellcheck disable=SC2086
+      ssh $SSH_OPTS "$SERVER" "rm -rf '$staging_dir'" 2>/dev/null || true
+      echo -e "${YELLOW}   ⚠️  $label 目录替换失败（staging 已清理）${NC}"
+      return 0
+    fi
+  fi
+  echo -e "${GREEN}   ✅ $label 上传并替换完成 → $remote_dir${NC}"
+}
+
+export_pc_legacy_dist() {
+  local commit="$1"
+  local out_dir="$2"
+  local assets_dir="$out_dir/assets"
+  local asset_path name tmp_html brand_file
+
+  rm -rf "$out_dir"
+  mkdir -p "$assets_dir"
+
+  while IFS= read -r asset_path; do
+    name="$(basename "$asset_path")"
+    [ "$name" = "pc_app.html" ] && continue
+    if [[ "$name" == pc_* || "$name" == "voice_tts_sdk.js" ]]; then
+      git -C "$REPO_ROOT" show "${commit}:${asset_path}" > "$assets_dir/$name"
+    fi
+  done < <(git -C "$REPO_ROOT" ls-tree -r --name-only "$commit" -- server/src/assets)
+
+  tmp_html="$out_dir/.pc_app.html"
+  git -C "$REPO_ROOT" show "${commit}:server/src/assets/pc_app.html" > "$tmp_html"
+  brand_file="$REPO_ROOT/server/src/assets/ic_app_brand.b64"
+  python3 - "$tmp_html" "$brand_file" "$out_dir/index.html" <<'PY'
+from pathlib import Path
+import sys
+
+source = Path(sys.argv[1])
+brand_file = Path(sys.argv[2])
+target = Path(sys.argv[3])
+
+html = source.read_text(encoding="utf-8")
+brand = brand_file.read_text(encoding="utf-8").strip() if brand_file.exists() else ""
+html = html.replace("__BRAND_PNG_B64__", brand)
+html = html.replace('"/assets/', '"/pc-legacy/assets/')
+html = html.replace("'/assets/", "'/pc-legacy/assets/")
+target.write_text(html, encoding="utf-8")
+source.unlink(missing_ok=True)
+PY
+}
+
+if [ -f "$PC_FRONTEND_DIR/package.json" ]; then
+  if ! command -v npm >/dev/null 2>&1; then
+    echo -e "${YELLOW}3.5⃣  ⚠️  npm 不在 PATH，跳过新版 PC 前端构建${NC}"
+    PC_DIST_DIR=""
+  elif [ "$SKIP_BUILD" -eq 1 ] && [ -f "$PC_DIST_DIR/index.html" ]; then
+    echo -e "${YELLOW}3.5⃣  ⏩ 跳过新版 PC 前端构建（--skip-build），使用已有 dist${NC}"
+  elif ! (
+    cd "$PC_FRONTEND_DIR"
+    if [ ! -d node_modules ]; then
+      echo -e "${GRAY}   📦 安装前端依赖（npm ci）...${NC}"
+      npm ci
+    fi
+    npm run build
+  ); then
+    if [ -x "$PC_FRONTEND_DIR/node_modules/.bin/tsc" ] && [ -x "$PC_FRONTEND_DIR/node_modules/.bin/vite" ]; then
+      echo -e "${GRAY}   🔁 npm 构建失败，尝试直接使用 node_modules/.bin/tsc + vite ...${NC}"
+      if ! (
+        cd "$PC_FRONTEND_DIR"
+        node_modules/.bin/tsc --noEmit
+        node_modules/.bin/vite build
+      ); then
+        echo -e "${YELLOW}   ⚠️  新版 PC 前端构建失败（不中止后端部署）${NC}"
+        PC_DIST_DIR=""
+      fi
+    else
+      echo -e "${YELLOW}   ⚠️  新版 PC 前端构建失败（不中止后端部署）${NC}"
+      PC_DIST_DIR=""
+    fi
+  fi
+  upload_static_dist "$PC_DIST_DIR" "$REMOTE_PC_DIST" "新版 PC 前端 dist"
+else
+  echo -e "${GRAY}3.5⃣  ℹ️  pc-frontend/ 不存在，跳过新版 PC 前端构建${NC}"
+fi
+
+echo -e "${YELLOW}3.5⃣  生成旧版 PC 对照快照（${PC_LEGACY_BASE_COMMIT:0:8}）...${NC}"
+if export_pc_legacy_dist "$PC_LEGACY_BASE_COMMIT" "$PC_LEGACY_DIST_DIR"; then
+  upload_static_dist "$PC_LEGACY_DIST_DIR" "$REMOTE_PC_LEGACY_DIST" "旧版 PC 对照快照"
+else
+  echo -e "${YELLOW}   ⚠️  旧版 PC 对照快照生成失败（不中止后端部署）${NC}"
+fi
+
 # ── 4. 上传到服务器（staging 路径含 SHA，避免并发覆盖）────────
 echo -e "${YELLOW}4⃣  上传 binary 到服务器...${NC}"
 STAGING_PATH="/tmp/elon-server-$SHA"

@@ -125,6 +125,7 @@ server/src/
 - **全部 11 个旧 `pc_*` 模块迁移完成，27 个旧资产文件已删除**
 - `/pc` 现在直接指向新 Vite + React + TypeScript 前端（ServeDir from `$DATA_DIR/pc-next-dist/`）
 - `/pc-next` 保留为向后兼容别名（同样指向新前端）
+- `/pc-legacy` 指向发布脚本从 `d1f89950`（`e7b4a35b` 引入新框架前的父提交）导出的旧版静态对照快照
 - `server/src/web.rs`：所有 `PC_*` 常量和 `pc_app_*` 处理器已删除
 - `server/src/router.rs`：所有旧 `/assets/pc_*` 路由已删除
 - 前端 Vite base 已改为 `/pc/`，React Router basename 已改为 `/pc`
@@ -135,6 +136,7 @@ server/src/
 |---|---|
 | `/pc` | 新 React 前端（主路由） |
 | `/pc-next` | 新 React 前端（向后兼容别名） |
+| `/pc-legacy` | 旧原生 PC 静态快照（只读对照，不恢复旧源码） |
 | `/web` | 移动网页版（不变） |
 | `/` | 移动网页版（不变） |
 

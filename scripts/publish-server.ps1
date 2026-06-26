@@ -772,8 +772,109 @@ if ($SkipUpload) {
 # ─────────────────────────────────────────────────────────────
 $PcFrontendDir = Join-Path $RepoRoot "pc-frontend"
 $PcDistDir     = Join-Path $PcFrontendDir "dist"
+$PcLegacyBaseCommit = "d1f89950eb09d1911aae601f7cdedc583101e1d2"
+$PcLegacyDistDir = Join-Path $RepoRoot "target\pc-legacy-dist"
 $RemoteDataDir = "/opt/elon/data"
 $RemotePcDist  = "$RemoteDataDir/pc-next-dist"
+$RemotePcLegacyDist = "$RemoteDataDir/pc-legacy-dist"
+
+function Write-GitTextFile {
+    param(
+        [string]$Commit,
+        [string]$GitPath,
+        [string]$Destination
+    )
+    $content = & git -C $RepoRoot show "${Commit}:$GitPath"
+    if ($LASTEXITCODE -ne 0) {
+        throw "无法从 $Commit 导出 $GitPath"
+    }
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllLines($Destination, [string[]]$content, $utf8NoBom)
+}
+
+function Export-PcLegacyDist {
+    param(
+        [string]$Commit,
+        [string]$OutDir
+    )
+    if (Test-Path $OutDir) {
+        Remove-Item -LiteralPath $OutDir -Recurse -Force
+    }
+    $assetsDir = Join-Path $OutDir "assets"
+    New-Item -ItemType Directory -Force -Path $assetsDir | Out-Null
+
+    $assetPaths = & git -C $RepoRoot ls-tree -r --name-only $Commit -- "server/src/assets"
+    if ($LASTEXITCODE -ne 0) {
+        throw "无法读取旧版 PC 资源列表: $Commit"
+    }
+    foreach ($assetPath in $assetPaths) {
+        $name = Split-Path $assetPath -Leaf
+        if ($name -eq "pc_app.html") { continue }
+        if (($name -like "pc_*") -or ($name -eq "voice_tts_sdk.js")) {
+            Write-GitTextFile -Commit $Commit -GitPath $assetPath -Destination (Join-Path $assetsDir $name)
+        }
+    }
+
+    $htmlLines = & git -C $RepoRoot show "${Commit}:server/src/assets/pc_app.html"
+    if ($LASTEXITCODE -ne 0) {
+        throw "无法导出旧版 PC HTML: $Commit"
+    }
+    $html = [string]::Join("`n", [string[]]$htmlLines)
+    $brandPath = Join-Path $RepoRoot "server/src/assets/ic_app_brand.b64"
+    $brandB64 = if (Test-Path $brandPath) { (Get-Content -LiteralPath $brandPath -Raw).Trim() } else { "" }
+    $html = $html.Replace("__BRAND_PNG_B64__", $brandB64)
+    $html = $html.Replace('"/assets/', '"/pc-legacy/assets/')
+    $html = $html.Replace("'/assets/", "'/pc-legacy/assets/")
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText((Join-Path $OutDir "index.html"), $html, $utf8NoBom)
+
+    return $OutDir
+}
+
+function Publish-StaticDist {
+    param(
+        [string]$LocalDir,
+        [string]$RemoteDir,
+        [string]$Label
+    )
+    if (-not $LocalDir -or -not (Test-Path (Join-Path $LocalDir "index.html"))) {
+        Write-Host "3.5⃣  ⚠️  $Label 不存在，跳过上传" -ForegroundColor Yellow
+        return
+    }
+
+    Write-Host "3.5⃣  上传 $Label 到服务器 $RemoteDir ..." -ForegroundColor Yellow
+    $stagingDist = "$RemoteDir-staging-$Sha"
+    ssh @SshOpts $Server "mkdir -p '$stagingDist'" 2>&1 | Out-Null
+    scp @SshOpts -r "$LocalDir/." "${Server}:${stagingDist}"
+    if ($LASTEXITCODE -ne 0) {
+        ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
+        Write-Host "   ⚠️  $Label 上传失败（不中止后端部署）" -ForegroundColor Yellow
+        return
+    }
+
+    $swapScript = "rm -rf '$RemoteDir' && mv '$stagingDist' '$RemoteDir'"
+    ssh @SshOpts $Server $swapScript 2>&1 | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        Write-Host "   ✅ $Label 上传并替换完成 → $RemoteDir" -ForegroundColor Green
+    } else {
+        ssh @SshOpts $Server "rm -rf '$stagingDist'" 2>&1 | Out-Null
+        Write-Host "   ⚠️  $Label 目录替换失败（staging 已清理）" -ForegroundColor Yellow
+    }
+}
+
+function Invoke-PcFrontendLocalBuild {
+    param([string]$FrontendDir)
+    $tscCmd = Join-Path $FrontendDir "node_modules\.bin\tsc.cmd"
+    $viteCmd = Join-Path $FrontendDir "node_modules\.bin\vite.cmd"
+    if (-not (Test-Path $tscCmd) -or -not (Test-Path $viteCmd)) {
+        throw "本地 node_modules 缺少 tsc/vite"
+    }
+    Write-Host "   🔁 npm 构建失败，尝试直接使用 node_modules/.bin/tsc + vite ..." -ForegroundColor Gray
+    cmd /c "`"$tscCmd`" --noEmit && `"$viteCmd`" build" 2>&1 | Write-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "node_modules/.bin 构建失败，exit=$LASTEXITCODE"
+    }
+}
 
 if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
@@ -803,36 +904,30 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
             if ($LASTEXITCODE -ne 0) { throw "npm run build 失败，exit=$LASTEXITCODE" }
             Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
         } catch {
-            Write-Host "   ⚠️  前端构建失败（不中止部署）: $_" -ForegroundColor Yellow
-            $PcDistDir = $null   # 跳过上传
+            $primaryBuildError = $_
+            try {
+                Invoke-PcFrontendLocalBuild -FrontendDir $PcFrontendDir
+                Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
+            } catch {
+                Write-Host "   ⚠️  前端构建失败（不中止部署）: $primaryBuildError；fallback: $_" -ForegroundColor Yellow
+                $PcDistDir = $null   # 跳过上传
+            }
         } finally {
             Pop-Location
         }
     }
 
-    if ($PcDistDir -and -not $SkipUpload -and (Test-Path (Join-Path $PcDistDir "index.html"))) {
-        Write-Host "3.5⃣  上传前端 dist 到服务器 $RemotePcDist ..." -ForegroundColor Yellow
-        $stagingPcDist = "$RemoteDataDir/pc-next-dist-staging-$Sha"
-        # 创建 staging 目录并上传
-        ssh @SshOpts $Server "mkdir -p $stagingPcDist" 2>&1 | Out-Null
-        # scp -r 上传整个 dist/
-        scp @SshOpts -r "$PcDistDir/." "${Server}:${stagingPcDist}"
-        if ($LASTEXITCODE -ne 0) {
-            Write-Host "   ⚠️  前端上传失败（不中止后端部署）" -ForegroundColor Yellow
-        } else {
-            # 原子替换
-            $swapScript = "rm -rf '$RemotePcDist' && mv '$stagingPcDist' '$RemotePcDist'"
-            ssh @SshOpts $Server $swapScript 2>&1 | Out-Null
-            if ($LASTEXITCODE -eq 0) {
-                Write-Host "   ✅ 前端 dist 上传并替换完成 → $RemotePcDist" -ForegroundColor Green
-            } else {
-                ssh @SshOpts $Server "rm -rf '$stagingPcDist'" 2>&1 | Out-Null
-                Write-Host "   ⚠️  前端目录替换失败（staging 已清理）" -ForegroundColor Yellow
-            }
-        }
-    }
+    Publish-StaticDist -LocalDir $PcDistDir -RemoteDir $RemotePcDist -Label "新版 PC 前端 dist"
 } else {
     Write-Host "3.5⃣  ℹ️  pc-frontend/ 不存在，跳过前端构建" -ForegroundColor DarkGray
+}
+
+try {
+    Write-Host "3.5⃣  生成旧版 PC 对照快照（$($PcLegacyBaseCommit.Substring(0, 8))）..." -ForegroundColor Yellow
+    $PcLegacyDistDir = Export-PcLegacyDist -Commit $PcLegacyBaseCommit -OutDir $PcLegacyDistDir
+    Publish-StaticDist -LocalDir $PcLegacyDistDir -RemoteDir $RemotePcLegacyDist -Label "旧版 PC 对照快照"
+} catch {
+    Write-Host "   ⚠️  旧版 PC 对照快照生成失败（不中止后端部署）: $_" -ForegroundColor Yellow
 }
 
 # ─────────────────────────────────────────────────────────────

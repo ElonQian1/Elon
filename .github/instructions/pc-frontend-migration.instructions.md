@@ -9,6 +9,7 @@ applyTo: "pc-frontend/**/*,server/src/web.rs,server/src/router.rs,scripts/publis
 > - 所有旧 `server/src/assets/pc_*.{html,js,css}` 文件**已删除**，禁止重新创建。
 > - 所有旧 `pc_app_*` Rust 处理器函数**已删除**，禁止重新添加。
 > - **新 PC 功能只能进入 `pc-frontend/src/features/`**，不允许写回旧 HTML/JS 模式。
+> - `/pc-legacy` 只允许作为发布脚本从历史提交 `d1f89950` 导出的静态对照快照，不允许把旧源码重新提交回仓库。
 
 ## ⛔ 不允许的操作（给所有 AI 代理的硬规则）
 
@@ -16,6 +17,8 @@ applyTo: "pc-frontend/**/*,server/src/web.rs,server/src/router.rs,scripts/publis
 2. **禁止在 `server/src/web.rs` 里重新添加 `pc_app_*` 系列函数**
 3. **禁止在 `server/src/router.rs` 里重新注册 `/assets/pc_*` 路由**
 4. **禁止把 PC 业务逻辑写成内嵌的字符串 HTML**
+
+允许的例外：`scripts/publish-server.*` 可从历史提交 `d1f89950` 导出只读静态包到服务器 `$DATA_DIR/pc-legacy-dist/`，供甲方和开发者通过 `/pc-legacy` 与新版 `/pc` 对比；该静态包不得进入 git。
 
 ---
 

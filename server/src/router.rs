@@ -60,18 +60,23 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     let latest_apk = app_dir.join("ElonSpeed-latest.apk");
 
     // PC 新前端 dist 目录（由发布脚本构建并上传后填充）
-    // /pc 是主路由；/pc-next 保留为向后兼容别名
+    // /pc 是主路由；/pc-next 保留为向后兼容别名。
+    // /pc-legacy 是发布脚本从新框架引入前的历史提交导出的只读对照快照。
     let pc_next_dist = state.data_dir.join("pc-next-dist");
+    let pc_legacy_dist = state.data_dir.join("pc-legacy-dist");
     let pc_svc = ServeDir::new(&pc_next_dist)
         .not_found_service(ServeFile::new(pc_next_dist.join("index.html")));
     let pc_next_svc = ServeDir::new(&pc_next_dist)
         .not_found_service(ServeFile::new(pc_next_dist.join("index.html")));
+    let pc_legacy_svc = ServeDir::new(&pc_legacy_dist)
+        .not_found_service(ServeFile::new(pc_legacy_dist.join("index.html")));
 
     Router::new()
         .route("/", get(web::web_page))
         .route("/web", get(web::web_page))
         .nest_service("/pc", pc_svc)
         .nest_service("/pc-next", pc_next_svc)
+        .nest_service("/pc-legacy", pc_legacy_svc)
         .route("/manifest.json", get(web::pwa_manifest))
         .route("/sw.js", get(web::service_worker))
         .route("/assets/project_plaza.css", get(web::project_plaza_css))
