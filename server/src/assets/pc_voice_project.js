@@ -100,7 +100,7 @@
       <div class="voice-hero">
         <section class="voice-panel">
           <h3>ai声音</h3>
-          <p>这里集中管理情绪女声 TTS：云端目录、PC 本机模型 Worker、中继地址、试听和外部 SDK。节点注册管理页只保留节点注册与电脑维护。</p>
+          <p>这里集中管理情绪女声 TTS：云端目录、PC 本机模型 Worker、中继地址、试听和外部 SDK。分享算力页只保留算力分享与电脑维护。</p>
           <div class="voice-action-row">
             <span class="voice-status ${workerOk ? 'ok' : 'bad'}">${workerOk ? '云端可合成' : '云端未配置'}</span>
             <span class="voice-status ${localRunning ? 'ok' : 'warn'}">${localRunning ? '本机 Worker 运行中' : '本机 Worker 未运行'}</span>

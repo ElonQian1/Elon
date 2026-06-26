@@ -25,7 +25,7 @@
       const onlineCount = state.nodes.filter((node) => node.online).length;
       els.channelList.innerHTML = `
         <div class="channel-section">本机</div>
-        ${channelButton({ id: 'local-node', kind: 'node', glyph: 'PC', title: '节点注册', sub: '下载、启动和注册 Win 端', active: !state.activeNodeId })}
+        ${channelButton({ id: 'local-node', kind: 'node', hideGlyph: true, title: '分享算力', sub: '下载、启动和注册 Win 端', active: !state.activeNodeId })}
         <div class="channel-section">我的节点</div>
         ${state.nodes.map((node) => channelButton({
           id: node.node_id || node.agent_id || '',
@@ -59,9 +59,9 @@
       state.activePeer = null;
       state.activeNodeId = '';
       setRails('node');
-      els.workspaceName.textContent = 'PC 节点';
+      els.workspaceName.textContent = '分享算力';
       els.workspaceMeta.textContent = '下载、启动、注册';
-      setHeader('PC', '本机节点', '让这台电脑成为可接收任务的 Win 端节点');
+      setHeader('算', '分享算力', '让这台电脑成为可接收任务的 Win 端节点');
       setComposer(false, '节点管理页中操作', false);
       deps.renderChannels();
       renderNodeMain();
@@ -103,7 +103,7 @@
           <section class="node-setup-hero">
             <div>
               <div class="node-kicker">一龙 Win 端</div>
-              <h2>连接本机 PC 节点</h2>
+              <h2>分享这台电脑算力</h2>
               <p>首次使用需要下载并确认安装；安装后点击“启动 Win 端”，浏览器会拉起本机程序，本页检测到 7799 服务后直接显示原生节点管理面板。</p>
             </div>
             <span class="node-status-chip checking" id="nodeLocalStatus">检测中</span>
@@ -402,7 +402,7 @@
             ${listPanel('工具链', toolchains.length ? toolchains.map(toolchainLine) : ['未上报工具链'])}
           </section>
           <section class="node-actions-panel">
-            <button class="node-action" type="button" id="backToLocalNode">回到节点注册</button>
+            <button class="node-action" type="button" id="backToLocalNode">回到分享算力</button>
           </section>
         </div>`;
       $('backToLocalNode')?.addEventListener('click', selectLocalNode);

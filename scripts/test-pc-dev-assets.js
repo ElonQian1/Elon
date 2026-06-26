@@ -1793,10 +1793,19 @@ function testPcMessageAlignment() {
 
 function testPcTopbarEntryLabels() {
   const pcAppHtml = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.html'), 'utf8');
-  assert.ok(pcAppHtml.includes('>打开旧版</button>'), 'topbar legacy web entry should explain that it opens the old interface');
-  assert.ok(pcAppHtml.includes('>电脑连接</button>'), 'topbar local node entry should be framed as computer connection status');
-  assert.ok(pcAppHtml.includes('查看这台电脑的连接和运行状态'), 'local node topbar entry should include an explanatory accessible label');
+  assert.ok(pcAppHtml.includes('>打开移动端</button>'), 'topbar mobile entry should explain that it opens the mobile endpoint');
+  assert.ok(pcAppHtml.includes('>分享算力</button>'), 'topbar local node entry should be framed as compute sharing');
+  assert.ok(pcAppHtml.includes('分享这台电脑的算力并查看连接状态'), 'local node topbar entry should include an explanatory accessible label');
+  assert.ok(pcAppHtml.includes('id="nodeRail" type="button" data-label="分享算力" aria-label="分享算力" hidden'), 'left rail should not expose a separate local node icon');
   assert.ok(!pcAppHtml.includes('id="openLocalNodeBtn" type="button">本机助手</button>'), 'topbar should avoid the internal local-helper label');
+}
+
+function testPcMobileEntryStaysInline() {
+  const pcApp = fs.readFileSync(path.join(repoRoot, 'server/src/assets/pc_app.js'), 'utf8');
+  assert.ok(pcApp.includes("const APK_DOWNLOAD_URL = '/app/ElonSpeed-latest.apk'"), 'mobile entry should use the direct APK download URL');
+  assert.ok(pcApp.includes('id="apkCopyUrlBtn"'), 'mobile entry should expose in-page copy/download controls');
+  assert.ok(pcApp.includes('copyApkDownloadUrl(apkUrl)'), 'mobile entry should copy the download URL in place');
+  assert.ok(!pcApp.includes("window.open('/download'"), 'mobile entry should not jump to the standalone download page');
 }
 
 function testPcProjectStartGuidance() {
@@ -1847,6 +1856,7 @@ function testPcProjectStartGuidance() {
   testPcProjectCreateSkipsStorageByDefault();
   testPcMessageAlignment();
   testPcTopbarEntryLabels();
+  testPcMobileEntryStaysInline();
   testPcProjectStartGuidance();
 
   console.log('pc-dev-assets tests passed');

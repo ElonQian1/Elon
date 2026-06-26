@@ -550,6 +550,9 @@ button { cursor: pointer; }
   text-align: center;
   flex: 0 0 auto;
 }
+.channel-item.no-glyph {
+  padding-left: 12px;
+}
 .channel-item .main {
   flex: 1;
   min-width: 0;
@@ -1310,6 +1313,18 @@ button { cursor: pointer; }
   border-bottom: 8px solid #dffbe9;
   border-radius: 4px;
 }
+.pc-apk-screen.web::after {
+  width: 58px;
+  height: 40px;
+  top: 72px;
+  border: 0;
+  border-radius: 9px;
+  background:
+    linear-gradient(#dffbe9 0 0) 13px 12px / 32px 4px no-repeat,
+    linear-gradient(#dffbe9 0 0) 13px 23px / 24px 4px no-repeat,
+    rgba(223, 251, 233, .12);
+  transform: translateX(-50%);
+}
 .pc-apk-copy {
   display: grid;
   gap: 12px;
@@ -1320,7 +1335,11 @@ button { cursor: pointer; }
   gap: 10px;
   margin-top: 4px;
 }
-.pc-apk-actions button {
+.pc-apk-actions.compact {
+  margin-top: 8px;
+}
+.pc-apk-actions button,
+.pc-apk-actions a {
   height: 36px;
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -1328,11 +1347,64 @@ button { cursor: pointer; }
   color: var(--text-soft);
   padding: 0 13px;
   font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
 }
-.pc-apk-actions button.primary {
+.pc-apk-actions button.primary,
+.pc-apk-actions a.primary {
   border-color: transparent;
   background: var(--green);
   color: white;
+}
+.pc-apk-status {
+  min-height: 22px;
+  color: #c9f7d8;
+  font-size: 13px;
+  font-weight: 800;
+}
+.pc-apk-url {
+  min-width: 0;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 6px;
+  background: #292b31;
+  color: var(--text-soft);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-all;
+  user-select: all;
+}
+.pc-apk-share-panel {
+  display: grid;
+  gap: 8px;
+  margin-top: 2px;
+}
+.pc-apk-share-panel label {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+.pc-apk-share-panel textarea {
+  width: 100%;
+  min-height: 104px;
+  resize: vertical;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 6px;
+  background: #292b31;
+  color: var(--text);
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+  outline: none;
+}
+.pc-apk-tip {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  word-break: break-all;
 }
 .pc-plaza-toolbar {
   display: grid;

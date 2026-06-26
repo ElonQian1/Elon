@@ -5,6 +5,8 @@
   const TOKEN_KEYS = kit.TOKEN_KEYS || ['lodex_token', 'elon_token'];
   const SOCIAL_AI_USER_ID = 'usr_elon_ai';
   const LOCAL_ADMIN_HEADER_FALLBACK = 'X-Elon-Local-Admin-Token';
+  const APK_DOWNLOAD_URL = '/app/ElonSpeed-latest.apk';
+  const APK_DOWNLOAD_PAGE_URL = '/app/download';
   const CLIENT_PROTOCOL_TARGETS = {
     open: 'elon-node://open',
     logs: 'elon-node://logs',
@@ -1304,10 +1306,12 @@
       : (item.kind === 'doctor-section'
         ? `data-doctor-section="${escapeHtml(item.id)}"`
         : `data-peer-kind="${escapeHtml(item.kind)}" data-item-id="${escapeHtml(item.id)}"`));
-    const glyph = item.avatar || item.avatarFallback
-      ? avatarElement('span', 'glyph channel-avatar', item.avatar, item.avatarFallback || item.title || item.glyph || '#', item.glyph || '#')
-      : `<span class="glyph">${escapeHtml(item.glyph || '#')}</span>`;
-    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${item.nested ? 'project-center-child' : ''} ${item.active ? 'active' : ''}" type="button" ${attrs}>
+    const glyph = item.hideGlyph
+      ? ''
+      : (item.avatar || item.avatarFallback
+        ? avatarElement('span', 'glyph channel-avatar', item.avatar, item.avatarFallback || item.title || item.glyph || '#', item.glyph || '#')
+        : `<span class="glyph">${escapeHtml(item.glyph || '#')}</span>`);
+    return `<button class="channel-item ${item.primary ? 'ai-primary' : ''} ${item.nested ? 'project-center-child' : ''} ${item.hideGlyph ? 'no-glyph' : ''} ${item.active ? 'active' : ''}" type="button" ${attrs}>
       ${glyph}
       <span class="main"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.sub || '')}</span></span>
       ${typeof item.online === 'boolean' ? `<i class="presence-dot ${item.online ? 'online' : ''}"></i>` : ''}
@@ -1925,7 +1929,7 @@
   }
 
   function renderStoreSurface() {
-    setHeader('商', '商店', '项目、APK 和移动端入口');
+    setHeader('商', '商店', '项目和移动端入口');
     setComposer(false, '选择项目或下载入口后开始', false);
     setNodeMode(false);
     els.messageList.innerHTML = `<section class="pc-project-view">
@@ -1954,7 +1958,7 @@
         <button class="pc-feature-card" type="button" data-store-action="apk">
           <span class="pc-feature-glyph">下</span>
           <span>
-            <strong>APK 下载 / 手机端入口</strong>
+            <strong>打开移动端</strong>
             <p>下载手机端，或打开移动网页版。</p>
           </span>
         </button>
@@ -2022,14 +2026,17 @@
   }
 
   function renderApkChannels() {
+    const activeChannel = state.mobileEntryChannel || 'download';
     els.channelList.innerHTML = [
-      '<div class="channel-section">手机端</div>',
-      '<button class="channel-item active" type="button" data-apk-channel="download"><span class="glyph">下</span><span class="main"><strong>APK 下载</strong><span>安装手机端</span></span></button>',
-      '<button class="channel-item" type="button" data-apk-channel="web"><span class="glyph">网</span><span class="main"><strong>移动网页版</strong><span>在浏览器打开</span></span></button>'
+      '<div class="channel-section">移动端</div>',
+      `<button class="channel-item ${activeChannel === 'download' ? 'active' : ''}" type="button" data-apk-channel="download"><span class="glyph">下</span><span class="main"><strong>下载与分享</strong><span>安装手机端</span></span></button>`,
+      `<button class="channel-item ${activeChannel === 'web' ? 'active' : ''}" type="button" data-apk-channel="web"><span class="glyph">网</span><span class="main"><strong>移动网页版</strong><span>浏览器入口</span></span></button>`
     ].join('');
     els.channelList.querySelectorAll('[data-apk-channel]').forEach((button) => {
       button.addEventListener('click', () => {
-        if (button.dataset.apkChannel === 'web') window.open('/web', '_blank', 'noopener');
+        state.mobileEntryChannel = button.dataset.apkChannel === 'web' ? 'web' : 'download';
+        renderApkChannels();
+        if (state.mobileEntryChannel === 'web') renderMobileWebSurface();
         else renderApkDownloadSurface();
       });
     });
@@ -2043,27 +2050,31 @@
     state.activeMemberUserId = '';
     state.activePeer = null;
     state.projectSpace = null;
+    state.mobileEntryChannel = 'download';
     setAuthClaimBanner(!state.token);
     setRails('apk');
-    els.workspaceName.textContent = '手机端';
-    els.workspaceMeta.textContent = 'APK 下载 / 手机端入口';
-    setSidebarPlaceholder('搜索手机端入口');
+    els.workspaceName.textContent = '移动端';
+    els.workspaceMeta.textContent = '手机端下载和移动网页版';
+    setSidebarPlaceholder('搜索移动端入口');
     renderApkChannels();
-    renderMembers('手机端', []);
+    renderMembers('移动端', []);
     renderApkDownloadSurface();
   }
 
   function renderApkDownloadSurface() {
-    setHeader('下', 'APK 下载 / 手机端入口', '安装手机端或打开移动网页版');
+    const apkUrl = absoluteUrl(APK_DOWNLOAD_URL);
+    const pageUrl = absoluteUrl(APK_DOWNLOAD_PAGE_URL);
+    const promoText = `我正在用「一龙」云端 APK 开发平台，手机里直接提需求，云端帮你改代码、打包并生成安装包。\n\n下载地址：${apkUrl}`;
+    setHeader('端', '打开移动端', '安装手机端或打开移动网页版');
     setComposer(false, '登录后可输入消息', false);
     setNodeMode(false);
     els.messageList.innerHTML = `<section class="pc-project-view">
       <div class="pc-project-hero">
         <div>
-          <h2>APK 下载 / 手机端入口</h2>
-          <p>手机端用于安装 APK；移动网页版用于快速登录和同步账号状态。</p>
+          <h2>打开移动端</h2>
+          <p>下载 APK、复制手机安装地址，或直接打开移动网页版。</p>
         </div>
-        <button class="text-button" type="button" id="apkOpenDownloadBtn">打开下载页</button>
+        <button class="text-button" type="button" id="apkCopyUrlBtn">复制下载地址</button>
       </div>
       <div class="pc-apk-panel">
         <div class="pc-apk-device">
@@ -2072,19 +2083,134 @@
         <div class="pc-apk-copy">
           <strong>一龙手机端</strong>
           <p>下载 APK 后可在手机上使用项目、账号和工作台能力；网页版和 APK 数据互通。</p>
+          <div class="pc-apk-status" id="apkVersionStatus" aria-live="polite">正在读取最新版本...</div>
+          <div class="pc-apk-url" id="apkUrlText">${escapeHtml(apkUrl)}</div>
           <div class="pc-apk-actions">
-            <button class="primary" type="button" id="apkDownloadBtn">下载 APK</button>
+            <a class="primary" id="apkDownloadBtn" href="${escapeHtml(APK_DOWNLOAD_URL)}" download>下载最新 APK</a>
             <button type="button" id="apkWebBtn">打开移动网页版</button>
             ${state.token ? '' : '<button type="button" id="apkLoginBtn">登录或注册</button>'}
+          </div>
+          <div class="pc-apk-share-panel">
+            <label for="apkPromoText">分享给手机</label>
+            <textarea id="apkPromoText" readonly>${escapeHtml(promoText)}</textarea>
+            <div class="pc-apk-actions compact">
+              <button type="button" id="apkCopyPromoBtn">复制推广语</button>
+              <button type="button" id="apkShareBtn">系统分享</button>
+            </div>
+            <div class="pc-apk-tip">下载页地址：${escapeHtml(pageUrl)}</div>
           </div>
         </div>
       </div>
     </section>`;
-    $('apkOpenDownloadBtn').addEventListener('click', () => window.open('/download', '_blank', 'noopener'));
-    $('apkDownloadBtn').addEventListener('click', () => window.open('/download', '_blank', 'noopener'));
+    $('apkCopyUrlBtn').addEventListener('click', () => copyApkDownloadUrl(apkUrl));
     $('apkWebBtn').addEventListener('click', () => window.open('/web', '_blank', 'noopener'));
+    $('apkCopyPromoBtn').addEventListener('click', () => copyApkPromoText(promoText));
+    $('apkShareBtn').addEventListener('click', () => shareApkDownload(apkUrl, promoText));
     const apkLoginBtn = $('apkLoginBtn');
     if (apkLoginBtn) apkLoginBtn.addEventListener('click', () => openAuthModal('login'));
+    loadApkVersion();
+  }
+
+  function renderMobileWebSurface() {
+    setHeader('网', '移动网页版', '在浏览器中使用移动端入口');
+    setComposer(false, '登录后可输入消息', false);
+    setNodeMode(false);
+    els.messageList.innerHTML = `<section class="pc-project-view">
+      <div class="pc-project-hero">
+        <div>
+          <h2>移动网页版</h2>
+          <p>需要在浏览器里快速登录、同步账号或体验手机端界面时，从这里打开。</p>
+        </div>
+        <button class="text-button" type="button" id="openMobileWebPageBtn">打开移动网页版</button>
+      </div>
+      <div class="pc-apk-panel">
+        <div class="pc-apk-device">
+          <span class="pc-apk-screen web"></span>
+        </div>
+        <div class="pc-apk-copy">
+          <strong>浏览器入口</strong>
+          <p>移动网页版会在新标签中打开；下载 APK 和分享安装地址仍保留在“下载与分享”频道里。</p>
+          <div class="pc-apk-url">${escapeHtml(absoluteUrl('/web'))}</div>
+          <div class="pc-apk-actions">
+            <button class="primary" type="button" id="mobileWebOpenBtn">打开移动网页版</button>
+            <button type="button" id="mobileBackToDownloadBtn">回到下载与分享</button>
+          </div>
+        </div>
+      </div>
+    </section>`;
+    $('openMobileWebPageBtn').addEventListener('click', () => window.open('/web', '_blank', 'noopener'));
+    $('mobileWebOpenBtn').addEventListener('click', () => window.open('/web', '_blank', 'noopener'));
+    $('mobileBackToDownloadBtn').addEventListener('click', () => {
+      state.mobileEntryChannel = 'download';
+      renderApkChannels();
+      renderApkDownloadSurface();
+    });
+  }
+
+  function absoluteUrl(path) {
+    try {
+      return new URL(path, window.location.href).href;
+    } catch (_) {
+      return path;
+    }
+  }
+
+  async function copyPlainText(text) {
+    if (navigator.clipboard && window.isSecureContext) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const el = document.createElement('textarea');
+    el.value = text;
+    el.style.position = 'fixed';
+    el.style.left = '-9999px';
+    document.body.appendChild(el);
+    el.focus();
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+  }
+
+  function setApkStatus(message) {
+    const status = $('apkVersionStatus');
+    if (status) status.textContent = message;
+  }
+
+  async function copyApkDownloadUrl(apkUrl) {
+    await copyPlainText(apkUrl);
+    setApkStatus('下载地址已复制');
+    window.setTimeout(loadApkVersion, 1400);
+  }
+
+  async function copyApkPromoText(promoText) {
+    await copyPlainText(promoText);
+    setApkStatus('推广语已复制');
+    window.setTimeout(loadApkVersion, 1400);
+  }
+
+  async function shareApkDownload(apkUrl, promoText) {
+    if (navigator.share) {
+      await navigator.share({ title: '一龙 APK 下载', text: promoText, url: apkUrl });
+      return;
+    }
+    await copyPlainText(promoText);
+    setApkStatus('当前浏览器不支持系统分享，已复制推广语');
+    window.setTimeout(loadApkVersion, 1600);
+  }
+
+  async function loadApkVersion() {
+    const status = $('apkVersionStatus');
+    if (!status) return;
+    try {
+      const res = await fetch('/app/version.json', { cache: 'no-store' });
+      const data = await res.json();
+      const version = data.versionName || data.version_name || '?';
+      const code = data.versionCode || data.version_code || '?';
+      const size = data.fileSize ? ` · ${(data.fileSize / 1048576).toFixed(1)} MB` : '';
+      status.textContent = `最新版本：v${version} (build ${code})${size}`;
+    } catch (_) {
+      status.textContent = '最新版本信息暂不可用，下载地址保持固定可用。';
+    }
   }
 
   async function selectAiAssistant(focusComposer, conversationId, forceNew) {
