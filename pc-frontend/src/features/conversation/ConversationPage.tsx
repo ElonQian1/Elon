@@ -225,7 +225,12 @@ export default function ConversationPage() {
 
         {/* 用户条（64px）*/}
         <div className={styles.userStrip}>
-          <button className={styles.userProfileBtn} type="button" title="账号">
+          <button
+            className={styles.userProfileBtn}
+            type="button"
+            title="账号设置"
+            onClick={() => navigate('/account')}
+          >
             <div className={styles.userDot}>
               {(user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '?'}
             </div>
