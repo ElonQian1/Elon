@@ -6,6 +6,7 @@ import { shortButtonLabel } from '../models/modelUtils'
 import { ModelPickerPopover } from '../models/ModelPicker'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime } from '../../lib/utils'
+import NodeStatusBanner from './NodeStatusBanner'
 import styles from './AiChatPage.module.css'
 import { v4 as uuidv4 } from 'uuid'
 
@@ -242,6 +243,8 @@ export default function AiChatPage() {
             if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
           }}
         >
+          {/* 本机节点状态横幅 */}
+          <NodeStatusBanner />
           {messages.length === 0 && !messagesLoading && (
             <div className={styles.welcome}>
               <h2>你好，我是一龙 AI</h2>
