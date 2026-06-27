@@ -1089,7 +1089,26 @@ async fn run_cli_prompt(run: CliPromptRun) {
     let stdout = child.stdout.take().expect("stdout");
     let stderr = child.stderr.take().expect("stderr");
     let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
-    let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+    // stderr 使用字节级读取，以免 Windows 中文系统输出 GBK 编码导致 UTF-8 解析失败
+    let (stderr_tx, mut stderr_rx) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
+    {
+        let stderr_tx = stderr_tx.clone();
+        tokio::spawn(async move {
+            use tokio::io::AsyncBufReadExt;
+            let mut reader = tokio::io::BufReader::new(stderr);
+            let mut buf = Vec::new();
+            loop {
+                buf.clear();
+                match reader.read_until(b'\n', &mut buf).await {
+                    Ok(0) | Err(_) => { let _ = stderr_tx.send(None); break; }
+                    Ok(_) => {
+                        while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) { buf.pop(); }
+                        let _ = stderr_tx.send(Some(String::from_utf8_lossy(&buf).into_owned()));
+                    }
+                }
+            }
+        });
+    }
     let mut stdout_text = String::new();
     let mut stderr_text = String::new();
     let mut stdout_done = false;
@@ -1142,8 +1161,8 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     stdout_done = true;
                 }
             },
-            line = stderr_lines.next_line(), if !stderr_done => match line {
-                Ok(Some(l)) => {
+            opt = stderr_rx.recv(), if !stderr_done => match opt {
+                Some(Some(l)) => {
                     stderr_text.push_str(&l);
                     stderr_text.push('\n');
                     if cli_name == "codex" {
@@ -1157,14 +1176,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                         send_cli_chunk(&out_tx, &task_journal, &req_id, "stderr", &(l + "\n"));
                     }
                 }
-                Ok(None) => { stderr_done = true; }
-                Err(e) => {
-                    let message = format!("stderr 读取错误: {e}");
-                    warn!("{message}");
-                    stderr_text.push_str(&message);
-                    stderr_text.push('\n');
-                    stderr_done = true;
-                }
+                Some(None) | None => { stderr_done = true; }
             },
             changed = cancel_rx.changed() => {
                 if changed.is_ok() && *cancel_rx.borrow() {
@@ -1550,7 +1562,28 @@ async fn run_exec(
     let stdout = child.stdout.take().expect("stdout");
     let stderr = child.stderr.take().expect("stderr");
     let mut stdout_lines = tokio::io::BufReader::new(stdout).lines();
-    let mut stderr_lines = tokio::io::BufReader::new(stderr).lines();
+    // stderr 字节级读取，避免 Windows GBK 编码触发 UTF-8 错误
+    let (stderr_tx2, mut stderr_rx2) = tokio::sync::mpsc::unbounded_channel::<Option<String>>();
+    {
+        let tx = stderr_tx2.clone();
+        let task_id2 = task_id.clone();
+        tokio::spawn(async move {
+            use tokio::io::AsyncBufReadExt;
+            let mut reader = tokio::io::BufReader::new(stderr);
+            let mut buf = Vec::new();
+            loop {
+                buf.clear();
+                match reader.read_until(b'\n', &mut buf).await {
+                    Ok(0) | Err(_) => { let _ = tx.send(None); break; }
+                    Ok(_) => {
+                        while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) { buf.pop(); }
+                        let _ = tx.send(Some(String::from_utf8_lossy(&buf).into_owned()));
+                    }
+                }
+            }
+            drop(task_id2); // 保持 task_id2 活跃直到 stderr 读完
+        });
+    }
     let mut stdout_done = false;
     let mut stderr_done = false;
 
@@ -1561,10 +1594,9 @@ async fn run_exec(
                 Ok(None) => { stdout_done = true; }
                 Err(e) => { warn!("stdout err: {e}"); stdout_done = true; }
             },
-            line = stderr_lines.next_line(), if !stderr_done => match line {
-                Ok(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::TaskStderr { task_id: task_id.clone(), data: l + "\n" })); }
-                Ok(None) => { stderr_done = true; }
-                Err(e) => { warn!("stderr err: {e}"); stderr_done = true; }
+            opt = stderr_rx2.recv(), if !stderr_done => match opt {
+                Some(Some(l)) => { let _ = out_tx.send(ws_text(&AgentToServer::TaskStderr { task_id: task_id.clone(), data: l + "\n" })); }
+                Some(None) | None => { stderr_done = true; }
             },
         }
     }
