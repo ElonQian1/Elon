@@ -107,6 +107,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (73, "项目频道角色权限覆盖", migration_v73),
     (74, "项目频道成员权限覆盖", migration_v74),
     (75, "项目频道分类与分类权限继承", migration_v75),
+    (76, "用户展示在线状态与项目邀请链接", migration_v76),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2526,6 +2527,46 @@ fn migration_v75(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_channel_category_member_permissions_category
           ON project_channel_category_member_permissions(project_id, category_id, user_id);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v76(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS user_presence_settings (
+          user_id       TEXT PRIMARY KEY,
+          status        TEXT NOT NULL DEFAULT 'online'
+                        CHECK (status IN ('online', 'idle', 'dnd', 'invisible')),
+          custom_status TEXT,
+          activity      TEXT,
+          updated_at    TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS project_invite_links (
+          id          TEXT PRIMARY KEY,
+          project_id  TEXT NOT NULL,
+          code        TEXT NOT NULL UNIQUE,
+          role        TEXT NOT NULL DEFAULT 'member',
+          max_uses    INTEGER,
+          use_count   INTEGER NOT NULL DEFAULT 0,
+          expires_at  TEXT,
+          temporary   INTEGER NOT NULL DEFAULT 0,
+          revoked_at  TEXT,
+          created_by  TEXT NOT NULL,
+          created_at  TEXT NOT NULL,
+          updated_at  TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (created_by) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_invite_links_project
+          ON project_invite_links(project_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_project_invite_links_code
+          ON project_invite_links(code);
         "#,
     )?;
     Ok(())

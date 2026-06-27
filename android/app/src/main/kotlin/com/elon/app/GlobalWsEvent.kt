@@ -81,51 +81,86 @@ sealed class GlobalWsEvent {
             val json = JSONObject(text)
             when (json.optString("type")) {
                 "app_update_available" -> AppUpdateAvailable(
-                    versionCode = json.optInt("versionCode", 0),
-                    versionName = json.optString("versionName", ""),
-                    downloadUrl = json.optString("downloadUrl", ""),
+                    versionCode = json.intAny("versionCode", "version_code"),
+                    versionName = json.stringAny("versionName", "version_name"),
+                    downloadUrl = json.stringAny("downloadUrl", "download_url"),
                     changelog = json.optString("changelog", ""),
-                    forceUpdate = json.optBoolean("forceUpdate", false),
+                    forceUpdate = json.booleanAny("forceUpdate", "force_update"),
                 )
                 "friend_message" -> FriendMessage(
-                    fromUserId = json.optString("fromUserId", ""),
-                    toUserId = json.optString("toUserId", ""),
-                    messageId = json.optString("messageId", ""),
-                    content = json.optString("content", ""),
-                    createdAt = json.optString("createdAt", ""),
-                    senderName = json.optString("senderName", "").takeIf { it.isNotBlank() },
+                    fromUserId = json.stringAny("fromUserId", "from_user_id", "senderUserId", "sender_user_id"),
+                    toUserId = json.stringAny("toUserId", "to_user_id", "receiverUserId", "receiver_user_id"),
+                    messageId = json.stringAny("messageId", "message_id", "id"),
+                    content = json.stringAny("content", "message", "text"),
+                    createdAt = json.stringAny("createdAt", "created_at"),
+                    senderName = json.stringAnyOrNull("senderName", "sender_name", "nickname"),
                 )
                 "group_message" -> GroupMessage(
-                    groupId = json.optString("groupId", ""),
-                    fromUserId = json.optString("fromUserId", ""),
-                    messageId = json.optString("messageId", ""),
-                    content = json.optString("content", ""),
-                    createdAt = json.optString("createdAt", ""),
-                    senderName = json.optString("senderName", "").takeIf { it.isNotBlank() },
-                    groupName = json.optString("groupName", "").takeIf { it.isNotBlank() },
+                    groupId = json.stringAny("groupId", "group_id"),
+                    fromUserId = json.stringAny("fromUserId", "from_user_id", "senderUserId", "sender_user_id"),
+                    messageId = json.stringAny("messageId", "message_id", "id"),
+                    content = json.stringAny("content", "message", "text"),
+                    createdAt = json.stringAny("createdAt", "created_at"),
+                    senderName = json.stringAnyOrNull("senderName", "sender_name", "nickname"),
+                    groupName = json.stringAnyOrNull("groupName", "group_name", "name"),
                 )
                 "presence" -> PresenceChange(
-                    userId = json.optString("userId", ""),
+                    userId = json.stringAny("userId", "user_id"),
                     isOnline = json.optBoolean("isOnline", false),
                 )
                 "typing" -> Typing(
-                    fromUserId = json.optString("fromUserId", ""),
+                    fromUserId = json.stringAny("fromUserId", "from_user_id", "senderUserId", "sender_user_id"),
                 )
                 "read_receipt" -> ReadReceipt(
-                    fromUserId = json.optString("fromUserId", ""),
-                    lastReadAt = json.optString("lastReadAt", ""),
+                    fromUserId = json.stringAny("fromUserId", "from_user_id"),
+                    lastReadAt = json.stringAny("lastReadAt", "last_read_at"),
                 )
                 "project_task_done" -> ProjectTaskDone(
-                    projectId = json.optString("projectId", ""),
-                    triggeredByUserId = json.optString("triggeredByUserId", ""),
-                    conversationId = json.optString("conversationId", ""),
+                    projectId = json.stringAny("projectId", "project_id"),
+                    triggeredByUserId = json.stringAny("triggeredByUserId", "triggered_by_user_id", "userId", "user_id"),
+                    conversationId = json.stringAny("conversationId", "conversation_id"),
                     message = json.optString("message", "项目任务已完成"),
-                    apkUrl = json.optString("apkUrl", "").takeIf { it.isNotBlank() },
+                    apkUrl = json.stringAnyOrNull("apkUrl", "apk_url"),
                 )
                 else -> Unknown(text)
             }
         } catch (_: Exception) {
             Unknown(text)
+        }
+
+        private fun JSONObject.stringAny(vararg names: String): String {
+            for (name in names) {
+                val value = optString(name, "").trim()
+                if (value.isNotEmpty()) return value
+            }
+            return ""
+        }
+
+        private fun JSONObject.stringAnyOrNull(vararg names: String): String? {
+            return stringAny(*names).takeIf { it.isNotBlank() }
+        }
+
+        private fun JSONObject.intAny(vararg names: String): Int {
+            for (name in names) {
+                if (!has(name)) continue
+                val value = opt(name)
+                if (value is Number) return value.toInt()
+                val parsed = optString(name, "").toIntOrNull()
+                if (parsed != null) return parsed
+            }
+            return 0
+        }
+
+        private fun JSONObject.booleanAny(vararg names: String): Boolean {
+            for (name in names) {
+                if (!has(name)) continue
+                val value = opt(name)
+                if (value is Boolean) return value
+                val text = optString(name, "").trim()
+                if (text.equals("true", ignoreCase = true)) return true
+                if (text.equals("false", ignoreCase = true)) return false
+            }
+            return false
         }
     }
 }

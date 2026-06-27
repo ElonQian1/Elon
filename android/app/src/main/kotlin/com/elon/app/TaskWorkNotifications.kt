@@ -11,8 +11,11 @@ import android.content.Intent
 import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
+import android.media.AudioManager
 import android.media.RingtoneManager
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -20,10 +23,11 @@ import androidx.core.content.ContextCompat
 import org.json.JSONArray
 import org.json.JSONObject
 
-private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked_v3_chat_sound_badge"
+private const val PREF_NOTIFICATION_PERMISSION_ASKED = "notification_permission_asked_v4_heads_up_alerts"
 private const val PREF_RECENT_TASK_COMPLETION_KEY = "recent_task_completion_key"
 private const val PREF_RECENT_TASK_COMPLETION_AT = "recent_task_completion_at"
 private const val RECENT_TASK_COMPLETION_WINDOW_MS = 2 * 60 * 1000L
+private const val TASK_COMPLETE_FALLBACK_RING_MS = 1500L
 
 internal fun setupTaskCompletionAlerts(activity: Activity, prefs: SharedPreferences, requestCode: Int) {
     ChatMessageNotifications.createChannel(activity)
@@ -59,7 +63,7 @@ internal fun createTaskWorkNotificationChannels(context: Context) {
         NotificationChannel(
             TaskWorkService.TASK_COMPLETE_CHANNEL_ID,
             "任务完成提醒",
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "后台任务或项目会话完成后发出声音并显示桌面角标"
             setShowBadge(true)
@@ -237,20 +241,24 @@ private fun showTaskCompletedNotification(
         .setSmallIcon(R.drawable.ic_notification_task_done)
         .setContentTitle(title)
         .setContentText(text)
+        .setTicker(title)
         .setStyle(NotificationCompat.BigTextStyle().bigText(text))
         .setNumber(count)
         .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
         .setContentIntent(mainActivityPendingIntent(context))
         .setAutoCancel(true)
-        .setOnlyAlertOnce(true)
+        .setOnlyAlertOnce(false)
         .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
         .setSound(soundUri)
+        .setVibrate(longArrayOf(0L, 260L, 120L, 260L))
         .setCategory(NotificationCompat.CATEGORY_STATUS)
-        .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+        .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+        .setPriority(NotificationCompat.PRIORITY_HIGH)
         .build()
     runCatching {
         NotificationManagerCompat.from(context).notify(TaskWorkService.TASK_COMPLETE_NOTIFICATION_ID, notification)
     }
+    playFallbackTaskCompletionSound(context)
 }
 
 private fun mainActivityPendingIntent(context: Context): PendingIntent {
@@ -266,9 +274,31 @@ private fun mainActivityPendingIntent(context: Context): PendingIntent {
 }
 
 private fun canPostNotifications(context: Context): Boolean {
+    if (!NotificationManagerCompat.from(context).areNotificationsEnabled()) return false
     return Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
         ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
         PackageManager.PERMISSION_GRANTED
+}
+
+private fun playFallbackTaskCompletionSound(context: Context) {
+    val appContext = context.applicationContext
+    val audioManager = appContext.getSystemService(AudioManager::class.java) ?: return
+    if (audioManager.ringerMode != AudioManager.RINGER_MODE_NORMAL) return
+    if (audioManager.getStreamVolume(AudioManager.STREAM_NOTIFICATION) <= 0) return
+    val soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION) ?: return
+    val ringtone = runCatching { RingtoneManager.getRingtone(appContext, soundUri) }.getOrNull() ?: return
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+        ringtone.audioAttributes = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+    }
+    runCatching { ringtone.play() }
+    Handler(Looper.getMainLooper()).postDelayed({
+        runCatching {
+            if (ringtone.isPlaying) ringtone.stop()
+        }
+    }, TASK_COMPLETE_FALLBACK_RING_MS)
 }
 
 private fun hasPendingLocalTask(

@@ -42,6 +42,7 @@ mod project_branding;
 mod project_dev_profiles;
 mod project_execution_sessions;
 mod project_identities;
+mod project_invites;
 mod project_landing_snapshots;
 mod project_landing_upload_tokens;
 mod project_member_audit;
@@ -63,6 +64,7 @@ mod tasks;
 mod token_usage;
 mod user_archive;
 mod user_memories;
+mod user_presence;
 mod users;
 
 pub use admin_stats::{

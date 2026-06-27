@@ -845,3 +845,370 @@
   white-space: nowrap;
 }
 
+
+
+/* 成员系统增强：操作按钮 + 大列表虚拟滚动 */
+.memberActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 172px;
+}
+
+.memberVirtualList {
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.memberVirtualCanvas {
+  position: relative;
+  min-height: 1px;
+}
+
+.memberVirtualHeader {
+  height: 48px;
+  display: flex;
+  align-items: flex-end;
+}
+
+
+/* ── 抽屉与邀请浮层 ── */
+.drawerBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(0, 0, 0, 0.52);
+  display: flex;
+  justify-content: flex-end;
+}
+
+.permissionDrawer {
+  width: min(920px, 92vw);
+  height: 100%;
+  background: var(--surface);
+  border-left: 1px solid var(--line-soft);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.compactDrawer {
+  width: min(420px, 92vw);
+}
+
+.inviteDrawer,
+.moderationDrawer {
+  width: min(720px, 92vw);
+}
+
+.drawerHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.drawerHeader div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.drawerHeader strong { color: var(--text); font-size: 15px; }
+.drawerHeader span { color: var(--text-muted); font-size: 12px; min-height: 16px; }
+
+.drawerCloseBtn,
+.savePermissionBtn,
+.primaryBtn,
+.dangerBtn {
+  padding: 7px 12px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-soft);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.drawerCloseBtn:hover,
+.savePermissionBtn:hover:not(:disabled),
+.primaryBtn:hover:not(:disabled),
+.dangerBtn:hover:not(:disabled) {
+  border-color: var(--green);
+  color: var(--text);
+}
+
+.primaryBtn {
+  background: var(--green);
+  border-color: var(--green);
+  color: #fff;
+  font-weight: 700;
+}
+
+.dangerBtn {
+  border-color: rgba(223, 92, 92, 0.55);
+  color: var(--red);
+}
+
+.primaryBtn:disabled,
+.dangerBtn:disabled,
+.drawerCloseBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.drawerBody {
+  min-height: 0;
+  overflow: auto;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.drawerSection {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sectionTitle {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field span,
+.checkField span {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.field input,
+.field select,
+.permissionToolbar select,
+.permissionGrid select {
+  min-width: 0;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.field input:focus,
+.field select:focus,
+.permissionToolbar select:focus,
+.permissionGrid select:focus {
+  border-color: var(--green);
+}
+
+.checkField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+}
+
+.actionRow {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.inviteList,
+.moderationList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.inviteRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+}
+
+.inviteRow div,
+.moderationInfo {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.inviteRow strong,
+.moderationInfo strong {
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.inviteRow span,
+.moderationInfo span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.moderationRow {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px;
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+}
+
+.moderationActions {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.inviteBanner {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  z-index: 45;
+  transform: translateX(-50%);
+  min-width: min(520px, calc(100vw - 28px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
+}
+
+.inviteBanner div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.inviteBanner strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.inviteBanner span {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.permissionColumns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.permissionBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.permissionToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.permissionToolbar strong { color: var(--text); font-size: 13px; }
+
+.permissionCards {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.permissionCard {
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.permissionCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.permissionCardHead strong {
+  color: var(--text);
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleSwatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.permissionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.permissionGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.permissionGrid span,
+.permissionMemberName {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.savePermissionBtn {
+  align-self: flex-end;
+}
