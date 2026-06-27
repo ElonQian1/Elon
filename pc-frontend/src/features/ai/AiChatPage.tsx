@@ -217,7 +217,19 @@ export default function AiChatPage() {
               打开移动端
             </button>
             <button className={styles.topbarBtn} type="button"
-              title="切换到旧版" onClick={() => window.open('/pc-legacy', '_blank', 'noopener')}>
+              title="切换到旧版" onClick={() => {
+                try {
+                  const raw = localStorage.getItem('elon_auth')
+                  if (raw) {
+                    const tok = JSON.parse(raw)?.state?.token
+                    if (tok) {
+                      localStorage.setItem('lodex_token', tok)
+                      localStorage.setItem('elon_token', tok)
+                    }
+                  }
+                } catch {}
+                window.open('/pc-legacy', '_blank', 'noopener')
+              }}>
               旧版
             </button>
           </div>

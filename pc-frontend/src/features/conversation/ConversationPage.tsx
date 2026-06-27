@@ -308,7 +308,14 @@ export default function ConversationPage() {
             </button>
             <button className={styles.textBtn} type="button"
               title="切换到旧版 PC 工作台"
-              onClick={() => window.open('/pc-legacy', '_blank', 'noopener')}>
+              onClick={() => {
+                const tok = useAuthStore.getState().token
+                if (tok) {
+                  localStorage.setItem('lodex_token', tok)
+                  localStorage.setItem('elon_token', tok)
+                }
+                window.open('/pc-legacy', '_blank', 'noopener')
+              }}>
               旧版
             </button>
           </div>
