@@ -385,11 +385,6 @@ internal class MainMarketplaceActions(
                     iconRes = R.drawable.ic_plaza_share_project,
                     description = "分享项目"
                 ) { shareProject(project) }, iconActionParams())
-                addView(iconActionButton(
-                    iconRes = R.drawable.ic_plaza_download_apk,
-                    description = "下载APK",
-                    enabled = !project.latestApkUrl.isNullOrBlank()
-                ) { tryInstallProjectFromIcon(project, it, entryAction) }, iconActionParams())
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(ACTION_ICON_TOUCH_DP)
@@ -445,13 +440,14 @@ internal class MainMarketplaceActions(
                 includeFontPadding = false
                 text = "成员：$count"
                 gravity = Gravity.CENTER
+                translationY = -dp(3).toFloat()
                 setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_STAT_LABEL_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(2)
+                topMargin = 0
             })
         }
     }

@@ -214,10 +214,6 @@
   background-image: url("/assets/ic_plaza_share_project.png");
 }
 
-.project-plaza-btn[data-plaza-action="download"] {
-  background-image: url("/assets/ic_plaza_download_apk.png");
-}
-
 .project-plaza-btn[aria-disabled="true"] {
   opacity: 0.55;
   cursor: not-allowed;
@@ -287,7 +283,8 @@
 }
 
 .project-plaza-stat .project-plaza-stat-label {
-  margin-top: 4px;
+  margin-top: 0;
+  transform: translateY(-3px);
 }
 
 .project-plaza-stat-sep {

@@ -324,7 +324,6 @@
     const identity = projectIdentity(project);
     const joined = state.joinedIds.has(project.id);
     const busy = state.busyId === project.id;
-    const apkUrl = String(project.latest_apk_url || project.last_apk_url || '').trim();
     const mode = normalizeJoinMode(project.join_mode);
     const action = joined ? 'open' : mode === 'approval' ? 'apply' : 'join';
     const actionLabel = busy ? '处理中...' : joinActionLabel(mode, joined);
@@ -339,7 +338,6 @@
           <div class="project-plaza-actions">
             <button class="project-plaza-btn" type="button" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}">${escapeHtml(actionLabel)}</button>
             <button class="project-plaza-btn" type="button" data-plaza-action="share" data-id="${escapeHtml(project.id)}" aria-label="分享项目" title="分享项目">分享项目</button>
-            <button class="project-plaza-btn" type="button" data-plaza-action="download" data-id="${escapeHtml(project.id)}" aria-disabled="${apkUrl ? 'false' : 'true'}">下载APK</button>
           </div>
         </div>
         <div class="project-plaza-stats">
