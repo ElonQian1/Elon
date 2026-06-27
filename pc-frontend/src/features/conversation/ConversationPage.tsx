@@ -153,6 +153,11 @@ export default function ConversationPage() {
       const fullContent = attachments.length > 0
         ? text + attachmentsToMarkdown(attachments)
         : text
+      // 项目首页发送：没有选中频道时，自动选择最佳频道（ai_development > 第一个）
+      if (!activeChannelId && channels.length > 0) {
+        const best = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
+        await selectChannel(best.id)
+      }
       await sendMessage(fullContent, selectedAgent || null)
     } catch (err) {
       setSendError((err as { message?: string }).message ?? '发送失败')
@@ -484,8 +489,8 @@ export default function ConversationPage() {
           </button>
         )}
 
-        {/* 输入框（composer）*/}
-        {activeChannelId && (
+        {/* 输入框（composer）——项目开启时始终可见 */}
+        {activeProjectId && (
           <form onSubmit={handleSend}>
             {/* P1.4：附件预览条 */}
             {attachments.length > 0 && (
@@ -519,11 +524,13 @@ export default function ConversationPage() {
                 onChange={(e) => { setInput(e.target.value); autoResize() }}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  isDevChannel
-                    ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
-                    : `在 #${activeChannel?.name ?? ''} 发送消息`
+                  !activeChannelId
+                    ? `向 ${activeProject?.name ?? '项目'} 发送消息或需求… (Enter 发送)`
+                    : isDevChannel
+                      ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
+                      : `在 #${activeChannel?.name ?? ''} 发送消息`
                 }
-                disabled={sendingMessage}
+                disabled={sendingMessage || (!activeChannelId && channels.length === 0)}
                 rows={1}
               />
 
