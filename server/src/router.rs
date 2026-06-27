@@ -121,6 +121,18 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(web::side_menu_folder_closed_icon),
         )
         .route(
+            "/assets/ic_project_space_post_share.png",
+            get(web::project_space_post_share_icon),
+        )
+        .route(
+            "/assets/ic_project_space_post_comment.png",
+            get(web::project_space_post_comment_icon),
+        )
+        .route(
+            "/assets/ic_project_space_post_like.png",
+            get(web::project_space_post_like_icon),
+        )
+        .route(
             "/assets/ic_add_friend_scan.png",
             get(web::add_friend_scan_icon),
         )

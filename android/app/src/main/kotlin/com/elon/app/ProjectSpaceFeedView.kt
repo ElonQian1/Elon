@@ -389,11 +389,11 @@ internal class ProjectSpaceFeedView(
         val timeText = parseChatMessageCreatedAt(post.message.createdAt)
             ?.let { formatChatTimelineLabel(it) }
             ?: "刚刚"
-        val bodyText = postBodyWithoutImages(postText.body).ifBlank { postText.title }
+        val bodyText = postText.body.ifBlank { postText.title }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24), dp(20), dp(24), dp(15))
-            background = roundedBackground(PROJECT_SPACE_POST_CARD_BG, 15)
+            setPadding(dp(18), dp(18), dp(18), dp(14))
+            background = roundedBackground(PROJECT_SPACE_POST_CARD_BG, 18)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openPost(post.channel, post.message) }
@@ -407,21 +407,22 @@ internal class ProjectSpaceFeedView(
             addView(postHeader(sender, post.message.senderAvatarDataUrl, timeText, projectSpaceTopicLabel(post.channel)))
             addView(TextView(activity).apply {
                 text = postText.title
-                textSize = 16f
+                textSize = 19f
                 setTextColor(Color.parseColor("#D9D9D9"))
+                setTypeface(typeface, Typeface.BOLD)
                 setLineSpacing(dp(4).toFloat(), 1f)
                 maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(22), 0, 0)
+                setPadding(0, dp(20), 0, 0)
             })
             addView(TextView(activity).apply {
                 text = bodyText
-                textSize = 16f
-                setTextColor(Color.parseColor("#8E8E8E"))
+                textSize = 17f
+                setTextColor(Color.parseColor("#A8A8A8"))
                 setLineSpacing(dp(4).toFloat(), 1f)
-                maxLines = 3
+                maxLines = 4
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(12), 0, 0)
+                setPadding(0, dp(10), 0, 0)
             })
             extractProjectPostImageSource(postText.body)?.let { source ->
                 addView(postImagePreview(source))
@@ -434,15 +435,15 @@ internal class ProjectSpaceFeedView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(avatar(sender, avatarDataUrl), LinearLayout.LayoutParams(dp(51), dp(51)).apply {
-                marginEnd = dp(18)
+            addView(avatar(sender, avatarDataUrl), LinearLayout.LayoutParams(dp(48), dp(48)).apply {
+                marginEnd = dp(12)
             })
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
                 gravity = Gravity.CENTER_VERTICAL
                 addView(TextView(activity).apply {
                     text = sender
-                    textSize = 17f
+                    textSize = 18f
                     includeFontPadding = false
                     setTextColor(Color.parseColor("#D9D9D9"))
                     maxLines = 1
@@ -458,16 +459,16 @@ internal class ProjectSpaceFeedView(
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
                 text = topic
-                textSize = 14f
+                textSize = 17f
                 includeFontPadding = false
                 setTextColor(Color.parseColor("#D9D9D9"))
                 gravity = Gravity.CENTER
                 maxLines = 1
-                background = roundedBackground("#000000", 6)
-                setPadding(dp(8), 0, dp(8), 0)
+                background = roundedBackground("#000000", 10)
+                setPadding(dp(14), 0, dp(14), 0)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
-                dp(20)
+                dp(30)
             ))
         }
     }
@@ -478,7 +479,7 @@ internal class ProjectSpaceFeedView(
             return ImageView(activity).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
-                    cornerRadius = dp(26).toFloat()
+                    cornerRadius = dp(24).toFloat()
                     setAntiAlias(true)
                 })
             }
@@ -490,7 +491,7 @@ internal class ProjectSpaceFeedView(
             textSize = 17f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#101010"))
-            background = roundedBackground("#D8D8D8", 26)
+            background = roundedBackground("#D8D8D8", 24)
         }
     }
 
@@ -502,7 +503,7 @@ internal class ProjectSpaceFeedView(
             tag = source
             layoutParams = LinearLayout.LayoutParams(
                 dp(234),
-                dp(111)
+                dp(120)
             ).apply {
                 topMargin = dp(16)
             }
@@ -531,7 +532,7 @@ internal class ProjectSpaceFeedView(
             gravity = Gravity.CENTER_VERTICAL
             setPadding(dp(52), dp(21), dp(52), 0)
             addView(metricButton(
-                iconRes = R.drawable.ic_project_post_share,
+                iconRes = R.drawable.ic_project_space_post_share,
                 value = shareCount.toString(),
                 description = "分享帖子",
                 onClick = { views ->
@@ -543,13 +544,13 @@ internal class ProjectSpaceFeedView(
                 }
             ), metricParams())
             addView(metricButton(
-                iconRes = R.drawable.ic_project_post_chat,
+                iconRes = R.drawable.ic_project_space_post_comment,
                 value = post.replyCount.coerceAtLeast(0).toString(),
                 description = "查看${post.replyCount.coerceAtLeast(0)}条讨论",
                 onClick = { openPost(post.channel, post.message) }
             ), metricParams())
             addView(metricButton(
-                iconRes = if (liked) R.drawable.ic_project_post_like_filled else R.drawable.ic_project_post_like,
+                iconRes = R.drawable.ic_project_space_post_like,
                 value = likeCount.toString(),
                 description = if (liked) "取消点赞" else "点赞",
                 selected = liked,
@@ -558,7 +559,7 @@ internal class ProjectSpaceFeedView(
                     metricPrefs.edit().putBoolean("$key:liked", nextLiked).apply()
                     updateMetricButton(
                         views = views,
-                        iconRes = if (nextLiked) R.drawable.ic_project_post_like_filled else R.drawable.ic_project_post_like,
+                        iconRes = R.drawable.ic_project_space_post_like,
                         value = if (nextLiked) "1" else "0",
                         selected = nextLiked,
                         description = if (nextLiked) "取消点赞" else "点赞"
@@ -623,7 +624,7 @@ internal class ProjectSpaceFeedView(
     }
 
     private fun metricColor(selected: Boolean): Int {
-        return Color.parseColor(if (selected) "#58BE6A" else "#AFAFAF")
+        return Color.parseColor(if (selected) "#58BE6A" else "#A8A8A8")
     }
 
     private fun sharePost(
