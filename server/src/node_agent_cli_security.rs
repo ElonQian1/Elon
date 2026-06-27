@@ -3,7 +3,6 @@
 use anyhow::{anyhow, bail, Result};
 use homecli_proto::CliProjectContext;
 use std::path::PathBuf;
-use uuid::Uuid;
 
 const ROUTE_A_CLIS: &[&str] = &["codex", "copilot", "claude", "gemini"];
 const BUILTIN_CLIS: &[&str] = &["api-runtime", "server-runtime"];
@@ -59,7 +58,10 @@ pub(crate) fn prepare_cli_base_cwd(
     // runtime_permission = "read_only" 表示跳过 worktree 隔离，直接在 base_cwd 执行。
     let context = project_context.unwrap_or_else(|| CliProjectContext {
         project_id: "chat".to_string(),
-        conversation_id: uuid::Uuid::new_v4().to_string(),
+        conversation_id: format!("chat-{}", std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .subsec_nanos()),
         runtime_permission: Some("read_only".to_string()),
     });
 
