@@ -11,6 +11,44 @@
 .content {
   min-width: 0;
   overflow: hidden;
+  display: grid;
+  grid-template-rows: 36px minmax(0, 1fr);
+}
+
+/* 全局按鈕条：始终展示在所有页面右上角 */
+.globalBar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding: 0 12px;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  background: #1a1b1e;
+  flex-shrink: 0;
+}
+.globalActions {
+  display: flex;
+  gap: 4px;
+}
+.globalBtn {
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 5px;
+  background: transparent;
+  color: #8b8e98;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .1s, color .1s;
+  white-space: nowrap;
+}
+.globalBtn:hover {
+  background: rgba(255,255,255,.06);
+  color: #c8ccd4;
+}
+
+.outlet {
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }

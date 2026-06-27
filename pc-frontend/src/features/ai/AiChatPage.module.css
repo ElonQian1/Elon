@@ -1,11 +1,16 @@
-/* 个人 AI 对话页——2 栏布局：会话列表 + 聊天区 */
+/* 个人 AI 对话页——3 栏布局：会话列表 + 聊天区 + 用户栏 */
 
 .layout {
   display: grid;
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr) 240px;
   height: 100%;
   overflow: hidden;
   background: var(--bg-base);
+}
+
+@media (max-width: 960px) {
+  .layout { grid-template-columns: 260px minmax(0, 1fr); }
+  .userPanel { display: none; }
 }
 
 /* ── 会话列表（左栏）── */
@@ -283,6 +288,82 @@
 }
 .sendBtn:hover:not(:disabled) { background: var(--accent-hover); }
 .sendBtn:disabled { background: #30323a; color: #777b86; cursor: not-allowed; }
+
+/* ── 右侧用户栏 ── */
+.userPanel {
+  background: #202126;
+  border-left: 1px solid #191a1d;
+  display: grid;
+  grid-template-rows: 48px minmax(0, 1fr);
+  min-height: 0;
+}
+.userPanelTitle {
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 800;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.userPanelList {
+  overflow-y: auto;
+  padding: 6px 8px 16px;
+  scrollbar-width: thin;
+}
+.userPanelSection {
+  margin: 12px 8px 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.userPanelItem {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 6px;
+  min-height: 44px;
+  transition: background .1s;
+}
+.userPanelItem:hover { background: #2b2e34; }
+.userPanelAvatar {
+  width: 32px; height: 32px;
+  border-radius: 50%;
+  background: #38414a;
+  display: grid; place-items: center;
+  font-size: 12px; font-weight: 800; color: white;
+  position: relative;
+}
+.userPanelAvatarOnline::after,
+.userPanelAvatarOffline::after {
+  content: "";
+  position: absolute;
+  right: -2px; bottom: -2px;
+  width: 11px; height: 11px;
+  border: 3px solid #202126;
+  border-radius: 50%;
+}
+.userPanelAvatarOnline::after  { background: var(--green, #58BE6A); }
+.userPanelAvatarOffline::after { background: #545862; }
+.userPanelCopy { min-width: 0; }
+.userPanelName {
+  display: block;
+  font-size: 13px; font-weight: 600;
+  color: var(--text-soft);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.userPanelSub {
+  display: block;
+  font-size: 11px; color: var(--text-muted);
+  margin-top: 2px;
+}
+.userPanelHint { color: var(--text-muted); font-size: 12px; padding: 12px 8px; }
 .sendError { padding: 0 16px 10px; font-size: 12px; color: var(--red); }
 
 @media (max-width: 780px) {

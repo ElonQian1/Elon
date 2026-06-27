@@ -29,6 +29,13 @@ interface LmChatResponse {
   conversation_id?: string
 }
 
+interface Friend {
+  id: string
+  account: string
+  nickname?: string
+  is_online?: boolean
+}
+
 export default function AiChatPage() {
   const user = useAuthStore((s) => s.user)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
@@ -42,6 +49,7 @@ export default function AiChatPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
+  const [friends, setFriends] = useState<Friend[]>([])
 
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -50,6 +58,9 @@ export default function AiChatPage() {
 
   useEffect(() => {
     loadConversations()
+    api.get<{ friends?: Friend[] }>('/api/me/friends')
+      .then(d => setFriends(d.friends ?? []))
+      .catch(() => {})
   }, [user?.id]) // eslint-disable-line
 
   useEffect(() => {
@@ -268,6 +279,56 @@ export default function AiChatPage() {
         )}
         {error && <p className={styles.sendError}>{error}</p>}
       </div>
+
+      {/* ══ 右侧好友栏 ══ */}
+      <aside className={styles.userPanel}>
+        <div className={styles.userPanelTitle}>
+          <span>用户{friends.length > 0 ? ` — ${friends.length}` : ''}</span>
+        </div>
+        <div className={styles.userPanelList}>
+          {friends.length === 0 && (
+            <p className={styles.userPanelHint}>暂无联系人</p>
+          )}
+          {/* 在线 */}
+          {friends.filter(f => f.is_online).length > 0 && (
+            <>
+              <div className={styles.userPanelSection}>
+                在线 · {friends.filter(f => f.is_online).length}
+              </div>
+              {friends.filter(f => f.is_online).map(f => (
+                <div key={f.id} className={styles.userPanelItem}>
+                  <div className={[styles.userPanelAvatar, styles.userPanelAvatarOnline].join(' ')}>
+                    {(f.nickname ?? f.account)[0].toUpperCase()}
+                  </div>
+                  <div className={styles.userPanelCopy}>
+                    <strong className={styles.userPanelName}>{f.nickname ?? f.account}</strong>
+                    <span className={styles.userPanelSub}>在线</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+          {/* 离线 */}
+          {friends.filter(f => !f.is_online).length > 0 && (
+            <>
+              <div className={styles.userPanelSection}>
+                离线 · {friends.filter(f => !f.is_online).length}
+              </div>
+              {friends.filter(f => !f.is_online).map(f => (
+                <div key={f.id} className={styles.userPanelItem}>
+                  <div className={[styles.userPanelAvatar, styles.userPanelAvatarOffline].join(' ')}>
+                    {(f.nickname ?? f.account)[0].toUpperCase()}
+                  </div>
+                  <div className={styles.userPanelCopy}>
+                    <strong className={styles.userPanelName}>{f.nickname ?? f.account}</strong>
+                    <span className={styles.userPanelSub}>离线</span>
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      </aside>
 
       {showModelPicker && (
         <ModelPickerPopover anchorRef={modelBtnRef} onClose={() => setShowModelPicker(false)} />
