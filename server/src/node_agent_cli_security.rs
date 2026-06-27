@@ -212,6 +212,14 @@ fn canonical_cli_path(path: &str) -> Result<PathBuf> {
     if !full.is_file() {
         bail!("CLI 路径不是文件: {}", full.display());
     }
+    // Windows canonicalize 返回 \\?\ 长路径前缀，但 cmd.exe 不接受该前缀，必须去掉。
+    #[cfg(windows)]
+    {
+        let s = full.to_string_lossy();
+        if let Some(stripped) = s.strip_prefix(r"\\?\") {
+            return Ok(PathBuf::from(stripped));
+        }
+    }
     Ok(full)
 }
 
