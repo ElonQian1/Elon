@@ -542,6 +542,28 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
+.memberTitleCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.memberTitleCopy strong {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memberTitleCopy span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .memberList {
   overflow-y: auto;
   padding: 6px 8px 16px;
@@ -556,13 +578,19 @@
   letter-spacing: 0.04em;
 }
 .memberItem {
+  width: 100%;
+  border: 0;
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   padding: 5px 8px;
   border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   min-height: 44px;
+  cursor: pointer;
   transition: background 0.1s;
 }
 .memberItem:hover { background: #2b2e34; }
@@ -692,6 +720,8 @@
 }
 .memberAvatarOnline::after  { background: var(--green, #58BE6A); }
 .memberAvatarOffline::after { background: #545862; }
+.memberIdle::after { background: #f0b65a; }
+.memberDnd::after { background: #e05252; }
 
 /* 角色头像边框颜色 */
 .memberAvatarOwner  { box-shadow: inset 0 0 0 2px rgba(255,210,122,.62); }
@@ -743,6 +773,82 @@
 .memberRolePillOwner { color: #ffd27a; }
 .memberRolePillAdmin { color: #ff9f9f; }
 .memberRolePillEditor { color: #9fc7ff; }
+
+.memberLoadingRows {
+  display: grid;
+  gap: 8px;
+  padding: 12px 8px;
+}
+.memberLoadingRows span {
+  height: 36px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #26282e, #30323a, #26282e);
+  background-size: 200% 100%;
+  animation: memberPanelPulse 1.3s ease-in-out infinite;
+}
+.memberProfileCard {
+  position: relative;
+  margin: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  background: #25272d;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.memberProfileAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #38414a;
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  position: relative;
+}
+.memberProfileCopy { min-width: 0; }
+.memberProfileCopy strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memberProfileCopy span,
+.memberProfileCopy small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.memberProfileClose {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.memberProfileClose:hover {
+  background: #30323a;
+  color: var(--text);
+}
+@keyframes memberPanelPulse {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
 
 /* ══════════════════════════════════════
    频道面板：返回按钮

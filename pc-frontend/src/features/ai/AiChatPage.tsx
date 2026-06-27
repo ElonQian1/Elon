@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
@@ -59,6 +59,9 @@ export default function AiChatPage() {
   const [friends, setFriends] = useState<Friend[]>([])
   const [totalUserCount, setTotalUserCount] = useState(0)
   const [userQuery, setUserQuery] = useState('')
+  const [usersLoading, setUsersLoading] = useState(true)
+  const [usersError, setUsersError] = useState('')
+  const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
   // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
   const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
   const [onlineNodeName, setOnlineNodeName] = useState<string>('')
@@ -69,13 +72,23 @@ export default function AiChatPage() {
   const atBottomRef = useRef(true)
 
   useEffect(() => {
+    let cancelled = false
     loadConversations()
+    setUsersLoading(true)
+    setUsersError('')
     api.get<{ recommendations?: Friend[]; total_count?: number }>('/api/me/friends/recommendations?limit=50')
       .then(d => {
+        if (cancelled) return
         setFriends(d.recommendations ?? [])
         setTotalUserCount(d.total_count ?? d.recommendations?.length ?? 0)
+        setUsersLoading(false)
       })
-      .catch(() => {})
+      .catch((err: { message?: string }) => {
+        if (cancelled) return
+        setUsersError(err.message ?? '用户加载失败')
+        setUsersLoading(false)
+      })
+    return () => { cancelled = true }
   }, [user?.id]) // eslint-disable-line
 
   // ── 节点状态轮询（每 6s）──────────────────────────────────────────────
@@ -100,11 +113,16 @@ export default function AiChatPage() {
   }, [user?.id]) // eslint-disable-line
 
   // 客户端搜索过滤
-  const filteredFriends = userQuery.trim()
-    ? friends.filter(f =>
-        (f.nickname ?? f.account).toLowerCase().includes(userQuery.toLowerCase())
-      )
-    : friends
+  const filteredFriends = useMemo(() => {
+    const needle = userQuery.trim().toLowerCase()
+    if (!needle) return friends
+    return friends.filter(f =>
+      [f.nickname, f.account, f.id].join(' ').toLowerCase().includes(needle)
+    )
+  }, [friends, userQuery])
+  const onlineFriends = useMemo(() => filteredFriends.filter(f => f.is_online), [filteredFriends])
+  const offlineFriends = useMemo(() => filteredFriends.filter(f => !f.is_online), [filteredFriends])
+  const visibleUserCount = totalUserCount || friends.length
 
   useEffect(() => {
     if (atBottomRef.current && feedRef.current) {
@@ -367,14 +385,20 @@ export default function AiChatPage() {
       {/* ══ 右侧用户栏 ══ */}
       <aside className={styles.userPanel}>
         <div className={styles.userPanelTitle}>
-          <span>用户{friends.length > 0 ? ` — ${friends.length}` : ''}</span>
-          {totalUserCount > friends.length && (
-            <small className={styles.userPanelMore}>共{totalUserCount}位</small>
+          <div className={styles.userPanelTitleCopy}>
+            <strong>全站用户{friends.length > 0 ? ` — ${friends.length}` : ''}</strong>
+            <span>AI 大厅</span>
+          </div>
+          {visibleUserCount > friends.length && (
+            <small className={styles.userPanelMore}>共{visibleUserCount}位</small>
           )}
         </div>
         <div className={styles.userPanelList}>
+          {selectedFriend && (
+            <UserProfileCard friend={selectedFriend} onClose={() => setSelectedFriend(null)} />
+          )}
           {/* 搜索框 */}
-          {friends.length > 0 && (
+          {(friends.length > 0 || userQuery) && (
             <div className={styles.userPanelSearch}>
               <input
                 className={styles.userPanelSearchInput}
@@ -388,20 +412,30 @@ export default function AiChatPage() {
               )}
             </div>
           )}
-          {friends.length === 0 && (
-            <p className={styles.userPanelHint}>暂无用户</p>
+          {usersLoading && (
+            <div className={styles.userPanelSkeleton}>
+              <span />
+              <span />
+              <span />
+            </div>
           )}
-          {filteredFriends.length === 0 && userQuery && (
+          {!usersLoading && usersError && (
+            <p className={styles.userPanelHint}>{usersError}</p>
+          )}
+          {!usersLoading && !usersError && friends.length === 0 && (
+            <p className={styles.userPanelHint}>暂无推荐用户</p>
+          )}
+          {!usersLoading && !usersError && filteredFriends.length === 0 && userQuery && (
             <p className={styles.userPanelHint}>没有匹配的用户</p>
           )}
           {/* 在线 */}
-          {filteredFriends.filter(f => f.is_online).length > 0 && (
+          {!usersLoading && onlineFriends.length > 0 && (
             <>
               <div className={styles.userPanelSection}>
-                在线 · {filteredFriends.filter(f => f.is_online).length}
+                在线 · {onlineFriends.length}
               </div>
-              {filteredFriends.filter(f => f.is_online).map(f => (
-                <div key={f.id} className={styles.userPanelItem}>
+              {onlineFriends.map(f => (
+                <button key={f.id} className={styles.userPanelItem} type="button" onClick={() => setSelectedFriend(f)}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOnline].join(' ')}>
                     {f.avatar_data_url
                       ? <img src={f.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
@@ -412,18 +446,18 @@ export default function AiChatPage() {
                     <strong className={styles.userPanelName}>{f.nickname ?? f.account}</strong>
                     <span className={styles.userPanelSub}>在线</span>
                   </div>
-                </div>
+                </button>
               ))}
             </>
           )}
           {/* 离线 */}
-          {filteredFriends.filter(f => !f.is_online).length > 0 && (
+          {!usersLoading && offlineFriends.length > 0 && (
             <>
               <div className={styles.userPanelSection}>
-                离线 · {filteredFriends.filter(f => !f.is_online).length}
+                离线 · {offlineFriends.length}
               </div>
-              {filteredFriends.filter(f => !f.is_online).map(f => (
-                <div key={f.id} className={styles.userPanelItem}>
+              {offlineFriends.map(f => (
+                <button key={f.id} className={styles.userPanelItem} type="button" onClick={() => setSelectedFriend(f)}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOffline].join(' ')}>
                     {f.avatar_data_url
                       ? <img src={f.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
@@ -434,13 +468,13 @@ export default function AiChatPage() {
                     <strong className={styles.userPanelName}>{f.nickname ?? f.account}</strong>
                     <span className={styles.userPanelSub}>离线</span>
                   </div>
-                </div>
+                </button>
               ))}
             </>
           )}
           {/* 提示条 */}
-          {totalUserCount > friends.length && !userQuery && (
-            <p className={styles.userPanelHint}>已显示 {friends.length} 位，可搜索查找其他用户</p>
+          {!usersLoading && visibleUserCount > friends.length && !userQuery && (
+            <p className={styles.userPanelHint}>已显示 {friends.length} 位</p>
           )}
         </div>
       </aside>
@@ -449,5 +483,25 @@ export default function AiChatPage() {
         <ModelPickerPopover anchorRef={modelBtnRef} onClose={() => setShowModelPicker(false)} />
       )}
     </div>
+  )
+}
+
+function UserProfileCard({ friend, onClose }: { friend: Friend; onClose: () => void }) {
+  const name = friend.nickname ?? friend.account
+  return (
+    <section className={styles.userProfileCard}>
+      <button className={styles.userProfileClose} type="button" onClick={onClose}>×</button>
+      <div className={[styles.userProfileAvatar, friend.is_online ? styles.userPanelAvatarOnline : styles.userPanelAvatarOffline].join(' ')}>
+        {friend.avatar_data_url
+          ? <img src={friend.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          : name[0].toUpperCase()
+        }
+      </div>
+      <div className={styles.userProfileCopy}>
+        <strong>{name}</strong>
+        <span>{friend.is_online ? '在线' : '离线'}</span>
+        <small>{friend.account}</small>
+      </div>
+    </section>
   )
 }

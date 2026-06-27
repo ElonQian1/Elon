@@ -11,6 +11,8 @@ interface ProjectState {
   channels: Channel[]
   categories: ChannelCategory[]
   members: ProjectMember[]
+  spaceLoading: boolean
+  spaceError: string
   activeChannelId: string
   messages: Message[]
   messagesLoading: boolean
@@ -38,6 +40,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   channels: [],
   categories: [],
   members: [],
+  spaceLoading: false,
+  spaceError: '',
   activeChannelId: '',
   messages: [],
   messagesLoading: false,
@@ -52,32 +56,63 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   selectProject: async (id: string) => {
     if (get().activeProjectId === id) return
     get().stopPolling()
-    set({ activeProjectId: id, space: null, landing: null, channels: [], categories: [], members: [], activeChannelId: '', messages: [] })
-    if (!id) return  // 空 id = 返回项目列表，不加载 space
+    set({
+      activeProjectId: id,
+      space: null,
+      landing: null,
+      channels: [],
+      categories: [],
+      members: [],
+      spaceLoading: !!id,
+      spaceError: '',
+      activeChannelId: '',
+      messages: [],
+    })
+    if (!id) {
+      set({ spaceLoading: false })
+      return
+    }  // 空 id = 返回项目列表，不加载 space
     try {
       const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(id)}/space`)
       const channels = space.channels ?? []
-      set({ space, landing: space.landing ?? null, channels, categories: space.categories ?? [], members: space.members ?? [] })
+      set({
+        space,
+        landing: space.landing ?? null,
+        channels,
+        categories: space.categories ?? [],
+        members: space.members ?? [],
+        spaceLoading: false,
+        spaceError: '',
+      })
       // 进入项目后停留在项目首页（landing），由用户手动选择频道。
     } catch (err) {
       console.warn('Failed to load project space:', err)
+      set({ spaceLoading: false, spaceError: (err as { message?: string }).message ?? '项目空间加载失败' })
     }
   },
 
   reloadProjectSpace: async () => {
     const { activeProjectId, activeChannelId } = get()
     if (!activeProjectId) return
-    const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(activeProjectId)}/space`)
-    const channels = space.channels ?? []
-    const nextActive = channels.some((c) => c.id === activeChannelId) ? activeChannelId : (channels[0]?.id ?? '')
-    set({
-      space,
-      landing: space.landing ?? null,
-      channels,
-      categories: space.categories ?? [],
-      members: space.members ?? [],
-      activeChannelId: nextActive,
-    })
+    set({ spaceLoading: true, spaceError: '' })
+    try {
+      const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(activeProjectId)}/space`)
+      const channels = space.channels ?? []
+      const nextActive = channels.some((c) => c.id === activeChannelId) ? activeChannelId : (channels[0]?.id ?? '')
+      set({
+        space,
+        landing: space.landing ?? null,
+        channels,
+        categories: space.categories ?? [],
+        members: space.members ?? [],
+        activeChannelId: nextActive,
+        spaceLoading: false,
+        spaceError: '',
+      })
+    } catch (err) {
+      console.warn('Failed to reload project space:', err)
+      set({ spaceLoading: false, spaceError: (err as { message?: string }).message ?? '项目空间加载失败' })
+    }
   },
 
   selectChannel: async (id: string) => {

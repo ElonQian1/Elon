@@ -40,7 +40,7 @@ export default function ConversationPage() {
   const user = useAuthStore((s) => s.user)
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
-    messages, messagesLoading, sendingMessage, landing,
+    messages, messagesLoading, sendingMessage, landing, spaceLoading, spaceError,
     loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
@@ -53,6 +53,7 @@ export default function ConversationPage() {
   const [showPresence, setShowPresence] = useState(false)
   const [showInvites, setShowInvites] = useState(false)
   const [showModeration, setShowModeration] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [inviteCode, setInviteCode] = useState('')
   const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
   const [inviteStatus, setInviteStatus] = useState('')
@@ -65,6 +66,10 @@ export default function ConversationPage() {
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
+
+  useEffect(() => {
+    setSelectedMember(null)
+  }, [activeProjectId, activeChannelId])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -194,6 +199,9 @@ export default function ConversationPage() {
 
   // 成员列表：从 project space 读取
   const spaceMembers = members
+  const memberPanelTitle = activeChannel ? '频道成员' : activeProjectId ? '项目成员' : '工作台'
+  const memberPanelContext = activeChannel?.name ?? activeProject?.name ?? '我的项目'
+  const memberPanelCount = activeProjectId ? spaceMembers.length : (user ? 1 : 0)
 
   // 消息分组：判断某条消息是否与上一条来自同一发送者
   function isGrouped(idx: number): boolean {
@@ -544,7 +552,10 @@ export default function ConversationPage() {
       {/* ══ 成员面板（右 272px）══ */}
       <aside className={styles.memberPanel}>
         <div className={styles.memberTitle}>
-          <span>成员{spaceMembers.length > 0 ? ` — ${spaceMembers.length}` : ''}</span>
+          <div className={styles.memberTitleCopy}>
+            <strong>{memberPanelTitle}{memberPanelCount > 0 ? ` — ${memberPanelCount}` : ''}</strong>
+            <span>{memberPanelContext}</span>
+          </div>
           <div className={styles.memberActions}>
             <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
@@ -555,12 +566,24 @@ export default function ConversationPage() {
           </div>
         </div>
         <div className={styles.memberList}>
-          {spaceMembers.length > 0 && (
-            <MemberSearch members={spaceMembers} />
+          {selectedMember && (
+            <MemberProfileCard member={selectedMember} onClose={() => setSelectedMember(null)} />
           )}
-          {spaceMembers.length === 0 && user && (
+          {activeProjectId && spaceLoading && spaceMembers.length === 0 && (
+            <MemberLoadingRows />
+          )}
+          {activeProjectId && !spaceLoading && spaceError && (
+            <p className={styles.sideHint}>{spaceError}</p>
+          )}
+          {activeProjectId && spaceMembers.length > 0 && (
+            <MemberSearch members={spaceMembers} onSelect={setSelectedMember} />
+          )}
+          {activeProjectId && !spaceLoading && !spaceError && spaceMembers.length === 0 && (
+            <p className={styles.sideHint}>暂无项目成员</p>
+          )}
+          {!activeProjectId && user && (
             <>
-              <div className={styles.memberSection}>在线 · 1</div>
+              <div className={styles.memberSection}>当前账号</div>
               <div className={styles.memberItem}>
                 <div className={[styles.memberAvatar, styles.memberAvatarOnline].join(' ')}>
                   {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? '?'}
@@ -1411,7 +1434,7 @@ const MEMBER_VIRTUAL_ROW_HEIGHT = 48
 const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
 
-function MemberSearch({ members }: { members: ProjectMember[] }) {
+function MemberSearch({ members, onSelect }: { members: ProjectMember[]; onSelect: (member: ProjectMember) => void }) {
   const [query, setQuery] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
   const q = query.trim().toLowerCase()
@@ -1447,7 +1470,7 @@ function MemberSearch({ members }: { members: ProjectMember[] }) {
             <div style={{ transform: `translateY(${start * MEMBER_VIRTUAL_ROW_HEIGHT}px)` }}>
               {visibleRows.map(row => row.kind === 'header'
                 ? <div key={row.id} className={styles.memberVirtualHeader}><div className={styles.memberSection}>{row.label} · {row.count}</div></div>
-                : <MemberListItem key={row.id} member={row.member} />
+                : <MemberListItem key={row.id} member={row.member} onSelect={onSelect} />
               )}
             </div>
           </div>
@@ -1492,7 +1515,7 @@ function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
   })
 }
 
-function MemberListItem({ member }: { member: ProjectMember }) {
+function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect: (member: ProjectMember) => void }) {
   const roleKey = (member.role ?? '').toLowerCase()
   const roleLabelMap: Record<string, string> = {
     admin: '管理员', owner: '管理员',
@@ -1514,7 +1537,7 @@ function MemberListItem({ member }: { member: ProjectMember }) {
     member.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline,
   ].filter(Boolean).join(' ')
   return (
-    <div className={styles.memberItem}>
+    <button className={styles.memberItem} type="button" onClick={() => onSelect(member)}>
       <div className={avatarCls}>
         {member.avatar_data_url
           ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
@@ -1528,6 +1551,43 @@ function MemberListItem({ member }: { member: ProjectMember }) {
         </div>
         <span className={styles.memberSub}>{memberSubtitle(member)}</span>
       </div>
+    </button>
+  )
+}
+
+function MemberProfileCard({ member, onClose }: { member: ProjectMember; onClose: () => void }) {
+  const status = memberPresenceStatus(member)
+  const name = member.account || member.user_id
+  return (
+    <section className={styles.memberProfileCard}>
+      <button className={styles.memberProfileClose} type="button" onClick={onClose}>×</button>
+      <div className={[
+        styles.memberProfileAvatar,
+        status === 'online' ? styles.memberAvatarOnline : '',
+        status === 'idle' ? styles.memberIdle : '',
+        status === 'dnd' ? styles.memberDnd : '',
+        status === 'offline' ? styles.memberAvatarOffline : '',
+      ].filter(Boolean).join(' ')}>
+        {member.avatar_data_url
+          ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          : memberInitial(member)
+        }
+      </div>
+      <div className={styles.memberProfileCopy}>
+        <strong>{name}</strong>
+        <span>{presenceLabel(status)} · {memberRoleSummary(member)}</span>
+        <small>{memberSubtitle(member)}</small>
+      </div>
+    </section>
+  )
+}
+
+function MemberLoadingRows() {
+  return (
+    <div className={styles.memberLoadingRows}>
+      <span />
+      <span />
+      <span />
     </div>
   )
 }

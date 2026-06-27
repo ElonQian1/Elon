@@ -344,13 +344,30 @@
 .userPanelTitle {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 10px;
   padding: 0 14px;
   color: var(--text-muted);
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.userPanelTitleCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.userPanelTitleCopy strong {
+  color: var(--text-soft);
   font-size: 12px;
   font-weight: 800;
-  border-bottom: 1px solid rgba(255,255,255,.04);
-  text-transform: uppercase;
-  letter-spacing: .04em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.userPanelTitleCopy span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 600;
 }
 .userPanelList {
   overflow-y: auto;
@@ -366,13 +383,19 @@
   letter-spacing: .04em;
 }
 .userPanelItem {
+  width: 100%;
+  border: 0;
   display: grid;
   grid-template-columns: 36px minmax(0, 1fr);
   gap: 10px;
   align-items: center;
   padding: 5px 8px;
   border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
   min-height: 44px;
+  cursor: pointer;
   transition: background .1s;
 }
 .userPanelItem:hover { background: #2b2e34; }
@@ -453,6 +476,82 @@
   text-transform: none;
   letter-spacing: 0;
   margin-left: auto;
+  white-space: nowrap;
+}
+.userPanelSkeleton {
+  display: grid;
+  gap: 8px;
+  padding: 12px 8px;
+}
+.userPanelSkeleton span {
+  height: 36px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #26282e, #30323a, #26282e);
+  background-size: 200% 100%;
+  animation: userPanelPulse 1.3s ease-in-out infinite;
+}
+.userProfileCard {
+  position: relative;
+  margin: 8px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  background: #25272d;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.userProfileAvatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #38414a;
+  color: white;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  font-weight: 800;
+  position: relative;
+}
+.userProfileCopy { min-width: 0; }
+.userProfileCopy strong {
+  display: block;
+  color: var(--text);
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.userProfileCopy span,
+.userProfileCopy small {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  margin-top: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.userProfileClose {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.userProfileClose:hover {
+  background: #30323a;
+  color: var(--text);
+}
+@keyframes userPanelPulse {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
 }
 .sendError { padding: 0 16px 10px; font-size: 12px; color: var(--red); }
 
