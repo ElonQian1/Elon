@@ -166,14 +166,15 @@ pub(crate) fn windows_batch_wrapper(program: &str) -> Option<(&'static str, Vec<
     if !cfg!(windows) || !is_windows_batch_file(program) {
         return None;
     }
-    // cmd 的 /S 需要脚本路径自带引号，避免空格路径被二次解析成新窗口或错误命令。
+    // 不手动加引号——Rust 的 Command::arg() 会在路径含空格时自动加引号。
+    // 手动加引号会被 Rust 再次转义为 \" 导致 cmd.exe 解析失败。
     Some((
         "cmd",
         vec![
             "/D".to_string(),
             "/S".to_string(),
             "/C".to_string(),
-            format!("\"{program}\""),
+            program.to_string(),
         ],
     ))
 }
