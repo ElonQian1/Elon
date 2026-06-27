@@ -11,7 +11,31 @@ import androidx.appcompat.app.AlertDialog
 
 internal object TaskBackgroundKeepAlive {
     private const val PREF_BATTERY_PROMPT_LAST_SHOWN_AT = "task_battery_prompt_last_shown_at"
+    private const val PREF_CHAT_BATTERY_PROMPT_LAST_SHOWN_AT = "chat_battery_prompt_last_shown_at"
     private const val PROMPT_INTERVAL_MS = 7L * 24 * 60 * 60 * 1000
+
+    /**
+     * 登录后首次 onResume 时提示用户关闭聊天通知的电池优化限制。
+     * 每 7 天最多弹一次，已豁免则跳过。
+     */
+    fun maybePromptForChatKeepAlive(activity: Activity, prefs: SharedPreferences) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) return
+        if (activity.isFinishing || activity.isDestroyed) return
+        if (isIgnoringBatteryOptimizations(activity)) return
+
+        val now = System.currentTimeMillis()
+        val lastShown = prefs.getLong(PREF_CHAT_BATTERY_PROMPT_LAST_SHOWN_AT, 0L)
+        if (now - lastShown < PROMPT_INTERVAL_MS) return
+
+        prefs.edit().putLong(PREF_CHAT_BATTERY_PROMPT_LAST_SHOWN_AT, now).apply()
+        DebugTraceStore.record("chat_battery_prompt_shown")
+        AlertDialog.Builder(activity)
+            .setTitle("允许后台收消息")
+            .setMessage("为了让你在微信、桌面等应用时也能及时收到好友消息，请把一龙的耗电管理设置为「无限制」或「允许后台运行」。")
+            .setPositiveButton("去设置") { _, _ -> openBatterySettings(activity) }
+            .setNegativeButton("稍后", null)
+            .show()
+    }
 
     fun maybePromptForDevelopmentTask(
         activity: Activity,

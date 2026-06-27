@@ -316,6 +316,9 @@ class MainActivity : AppCompatActivity() {
         projectSpaceController.resumeIfActive()
         startSocialSummaryPolling()
         syncVisibleChatNotificationState()
+        if (AuthManager.isLoggedIn(this)) {
+            TaskBackgroundKeepAlive.maybePromptForChatKeepAlive(this, prefs)
+        }
         if (::agentPageController.isInitialized) agentPageController.refresh()
     }
 

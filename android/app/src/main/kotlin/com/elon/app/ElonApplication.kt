@@ -65,6 +65,8 @@ class ElonApplication : Application() {
         if (AuthManager.isLoggedIn(this) && ChatBackgroundPrefs.isKeepAliveEnabled(this)) {
             ChatBackgroundService.start(this)
         }
+        // WorkManager 兜底：每 15 分钟确认一次 WS 连接（防止 ROM 静默杀死服务）
+        WsHealthWorker.schedule(this)
     }
 
     companion object {

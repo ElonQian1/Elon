@@ -8,6 +8,10 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.IBinder
 import android.util.Log
@@ -36,9 +40,18 @@ import androidx.core.content.ContextCompat
  */
 class ChatBackgroundService : Service() {
 
+    /** 网络恢复时立刻重连 WS（Doze 唤醒、WiFi 切换等场景）。*/
+    private val networkCallback = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(network: Network) {
+            Log.d(TAG, "网络已恢复，触发 WS 重连")
+            (application as? ElonApplication)?.globalWs?.start(this@ChatBackgroundService)
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         ensureChannel(this)
+        registerNetworkCallback()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -47,14 +60,29 @@ class ChatBackgroundService : Service() {
         runCatching {
             startForeground(NOTIFICATION_ID, buildNotification(this), foregroundServiceTypeOrZero())
         }.onFailure { Log.w(TAG, "startForeground 失败: ${it.message}") }
-        // 启动 WS（应用进程内已有则等价于 no-op，token 变化时会重连）
         runCatching { (application as? ElonApplication)?.globalWs?.start(this) }
         return START_STICKY
     }
 
     override fun onDestroy() {
-        // 不主动 stop globalWs，让前台 Activity 决定连接生命周期
+        unregisterNetworkCallback()
         super.onDestroy()
+    }
+
+    private fun registerNetworkCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        val request = NetworkRequest.Builder()
+            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            .build()
+        runCatching { cm.registerNetworkCallback(request, networkCallback) }
+            .onFailure { Log.w(TAG, "注册 NetworkCallback 失败: ${it.message}") }
+    }
+
+    private fun unregisterNetworkCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
+        val cm = getSystemService(ConnectivityManager::class.java) ?: return
+        runCatching { cm.unregisterNetworkCallback(networkCallback) }
     }
 
     private fun foregroundServiceTypeOrZero(): Int {
