@@ -114,10 +114,16 @@ pub async fn list_friend_recommendations(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     match state.store.list_friend_recommendations(&user.id) {
-        Ok(recommendations) => Json(serde_json::json!({
-            "recommendations": recommendations
-        }))
-        .into_response(),
+        Ok(mut recommendations) => {
+            let online = state.online_users.read().await;
+            for r in &mut recommendations {
+                r.is_online = r.id == SOCIAL_AI_USER_ID || online.contains_key(&r.id);
+            }
+            Json(serde_json::json!({
+                "recommendations": recommendations
+            }))
+            .into_response()
+        }
         Err(e) => json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     }
 }

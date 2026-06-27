@@ -124,6 +124,8 @@ pub struct FriendRecommendation {
     pub avatar_data_url: Option<String>,
     pub mutual_friend_count: i64,
     pub already_friend: bool,
+    /// 当前是否在线（由 API 层在返回前注入，store 层默认 false）
+    pub is_online: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

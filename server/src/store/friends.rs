@@ -134,6 +134,7 @@ impl Store {
                     avatar_data_url: row.get(4)?,
                     already_friend: row.get::<_, i64>(5)? != 0,
                     mutual_friend_count: row.get(6)?,
+                    is_online: false,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;

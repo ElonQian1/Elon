@@ -58,8 +58,8 @@ export default function AiChatPage() {
 
   useEffect(() => {
     loadConversations()
-    api.get<{ friends?: Friend[] }>('/api/me/friends')
-      .then(d => setFriends(d.friends ?? []))
+    api.get<{ recommendations?: Friend[] }>('/api/me/friends/recommendations')
+      .then(d => setFriends(d.recommendations ?? []))
       .catch(() => {})
   }, [user?.id]) // eslint-disable-line
 
