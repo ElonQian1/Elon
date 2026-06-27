@@ -784,7 +784,10 @@ function Write-GitTextFile {
         [string]$GitPath,
         [string]$Destination
     )
+    $savedEnc = [Console]::OutputEncoding
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $content = & git -C $RepoRoot show "${Commit}:$GitPath"
+    [Console]::OutputEncoding = $savedEnc
     if ($LASTEXITCODE -ne 0) {
         throw "无法从 $Commit 导出 $GitPath"
     }
@@ -815,7 +818,10 @@ function Export-PcLegacyDist {
         }
     }
 
+    $savedEnc = [Console]::OutputEncoding
+    [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
     $htmlLines = & git -C $RepoRoot show "${Commit}:server/src/assets/pc_app.html"
+    [Console]::OutputEncoding = $savedEnc
     if ($LASTEXITCODE -ne 0) {
         throw "无法导出旧版 PC HTML: $Commit"
     }
