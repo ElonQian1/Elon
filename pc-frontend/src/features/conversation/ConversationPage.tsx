@@ -296,6 +296,21 @@ export default function ConversationPage() {
                 刷新
               </button>
             )}
+            <button className={styles.textBtn} type="button"
+              title="分享这台电脑的算力并查看连接状态"
+              onClick={() => navigate('/node')}>
+              分享算力
+            </button>
+            <button className={styles.textBtn} type="button"
+              title="打开移动端入口"
+              onClick={() => window.open('/app/download', '_blank', 'noopener')}>
+              打开移动端
+            </button>
+            <button className={styles.textBtn} type="button"
+              title="切换到旧版 PC 工作台"
+              onClick={() => window.open('/pc-legacy', '_blank', 'noopener')}>
+              旧版
+            </button>
           </div>
         </header>
 

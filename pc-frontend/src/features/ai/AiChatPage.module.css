@@ -129,6 +129,19 @@
   font-size: 12px;
   font-weight: 700;
 }
+.topbarBtn {
+  height: 24px;
+  padding: 0 9px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 5px;
+  background: transparent;
+  color: #8b8e98;
+  font-size: 11px;
+  cursor: pointer;
+  transition: background .1s, color .1s;
+  white-space: nowrap;
+}
+.topbarBtn:hover { background: rgba(255,255,255,.06); color: #c8ccd4; }
 
 .feed {
   overflow-y: auto;

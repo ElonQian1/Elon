@@ -208,6 +208,18 @@ export default function AiChatPage() {
           </span>
           <div className={styles.topbarRight}>
             <span className={styles.modelBadge}>{shortButtonLabel(modelLabel)}</span>
+            <button className={styles.topbarBtn} type="button"
+              title="分享这台电脑的算力" onClick={() => { window.location.href = '/pc/node' }}>
+              分享算力
+            </button>
+            <button className={styles.topbarBtn} type="button"
+              title="打开移动端入口" onClick={() => window.open('/app/download', '_blank', 'noopener')}>
+              打开移动端
+            </button>
+            <button className={styles.topbarBtn} type="button"
+              title="切换到旧版" onClick={() => window.open('/pc-legacy', '_blank', 'noopener')}>
+              旧版
+            </button>
           </div>
         </header>
 

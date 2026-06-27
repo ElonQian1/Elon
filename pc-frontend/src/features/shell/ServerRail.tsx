@@ -37,12 +37,13 @@ export default function ServerRail() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
   function isActive(path: string) {
-    if (path === '/') return pathname === '/'
+    if (path === '/') return pathname === '/' && !activeProjectId
     return pathname.startsWith(path)
   }
 
   async function openProject(id: string) {
-    navigate('/')
+    // Discord 式：直接切换项目，停在 / 页面
+    if (pathname !== '/') navigate('/')
     await useProjectStore.getState().selectProject(id)
   }
 
@@ -77,6 +78,7 @@ export default function ServerRail() {
       {/* ── 每个项目的 logo 按钮 ── */}
       {projects.map((p) => {
         const isActiveProject = p.id === activeProjectId && pathname === '/'
+        const iconSrc = p.icon_data_url || p.icon || ''
         return (
           <button
             key={p.id}
@@ -87,8 +89,8 @@ export default function ServerRail() {
             title={p.name}
             type="button"
           >
-            {p.icon
-              ? <img src={p.icon} alt="" className={styles.projectIcon} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+            {iconSrc
+              ? <img src={iconSrc} alt="" className={styles.projectIcon} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
               : <span className={styles.projectFallback}>{p.name[0]?.toUpperCase() ?? '?'}</span>
             }
           </button>

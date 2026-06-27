@@ -5,7 +5,8 @@ export interface Project {
   template?: string
   created_at?: string
   updated_at?: string
-  icon?: string
+  icon?: string           // 已废弃字段，保留兼容
+  icon_data_url?: string  // 服务端实际字段
   member_count?: number
   unread_count?: number
 }
