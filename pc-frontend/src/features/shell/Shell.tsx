@@ -33,7 +33,7 @@ export default function Shell() {
   const user = useAuthStore((s) => s.user)
   const fetchMe = useAuthStore((s) => s.fetchMe)
 
-  // token 存在但 user 为空时（如页面刷新后），自动拉取用户信息
+  // token 存在但 user 为空时（页面刷新后等），自动拉取用户信息
   useEffect(() => {
     if (token && !user) fetchMe().catch(() => {})
   }, [token]) // eslint-disable-line

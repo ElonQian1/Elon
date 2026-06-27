@@ -197,30 +197,6 @@ export default function ConversationPage() {
     ? channels.filter((c) => c.name.toLowerCase().includes(channelSearch.toLowerCase()))
     : channels
 
-  // ── 会话列表：从消息中按 task_id 分组，供第二侧边栏导航 ──
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const sessions = useMemo(() => {
-    const seen = new Map<string, { id: string; title: string; status: string }>()
-    for (const msg of messages) {
-      const tid = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
-      if (!tid || seen.has(tid)) continue
-      seen.set(tid, {
-        id: tid,
-        title: (msg.content ?? '').slice(0, 60).trim() || '新会话',
-        status: String((msg.task_status ?? (msg as Record<string, unknown>).taskStatus) ?? ''),
-      })
-    }
-    return Array.from(seen.values()).reverse() // 最新在前
-  }, [messages])
-
-  function scrollToSession(taskId: string) {
-    setActiveSessionId(taskId)
-    const el = feedRef.current
-    if (!el) return
-    const target = el.querySelector(`[data-task-id="${CSS.escape(taskId)}"]`) as HTMLElement | null
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-
   // 成员列表：从 project space 读取
   const spaceMembers = members
   const memberPanelTitle = activeChannel ? '频道成员' : activeProjectId ? '项目成员' : '工作台'
@@ -297,80 +273,40 @@ export default function ConversationPage() {
           />
         </div>
 
-        {/* 内容区：频道列表 + 会话列表（当频道激活时）*/}
+        {/* 内容区：根据是否有选中项目切换两种视图 */}
         <div className={styles.channelList}>
           {activeProjectId ? (
-            <>
-              {/* ── 频道列表 ── */}
-              <div className={styles.channelsSection}>
-                {filteredChannels.length === 0 ? (
-                  <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>
-                    还没有频道
-                  </div>
-                ) : (
-                  filteredChannels.map((c) => {
-                    const isDev = c.kind === 'ai_development'
-                    return (
-                      <button
-                        key={c.id}
-                        className={[
-                          styles.channelItem,
-                          isDev ? styles.devChannel : '',
-                          c.id === activeChannelId ? styles.channelActive : '',
-                        ].join(' ')}
-                        onClick={() => selectChannel(c.id)}
-                        type="button"
-                      >
-                        <span className={styles.channelGlyph}>{isDev ? '🛠' : '#'}</span>
-                        <span className={styles.channelMain}>
-                          <strong>{c.name}</strong>
-                          {c.description && <span>{c.description}</span>}
-                        </span>
-                      </button>
-                    )
-                  })
-                )}
+            /* —— Discord 式：只显当前项目的频道 —— */
+            filteredChannels.length === 0 ? (
+              <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>
+                还没有频道
               </div>
-              {/* ── 会话列表（频道被选中时显示）── */}
-              {activeChannelId && (
-                <div className={styles.sessionsSection}>
-                  <div className={styles.sessionsHeader}>
-                    <span>会话记录</span>
-                    <button
-                      type="button"
-                      title="新建会话（聚焦输入框）"
-                      onClick={() => { setActiveSessionId(null); setTimeout(() => textareaRef.current?.focus(), 50) }}
-                    >+</button>
-                  </div>
-                  {sessions.length === 0 && !messagesLoading && (
-                    <p style={{ padding: '8px 12px', fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>
-                      发送第一条消息后会话记录会出现在这里
-                    </p>
-                  )}
-                  {sessions.map((s) => (
-                    <button
-                      key={s.id}
-                      className={[styles.sessionItem, s.id === activeSessionId ? styles.sessionActive : ''].join(' ')}
-                      type="button"
-                      onClick={() => scrollToSession(s.id)}
-                    >
-                      <span className={styles.sessionTitle}>{s.title}</span>
-                      {s.status && (
-                        <span className={styles.sessionMeta}>
-                          {s.status === 'done' || s.status === 'completed' ? '已完成'
-                            : s.status === 'running' ? '进行中'
-                            : s.status === 'error' ? '失败'
-                            : s.status}
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </>
+            ) : (
+              filteredChannels.map((c) => {
+                const isDev = c.kind === 'ai_development'
+                return (
+                  <button
+                    key={c.id}
+                    className={[
+                      styles.channelItem,
+                      isDev ? styles.devChannel : '',
+                      c.id === activeChannelId ? styles.channelActive : '',
+                    ].join(' ')}
+                    onClick={() => selectChannel(c.id)}
+                    type="button"
+                  >
+                    <span className={styles.channelGlyph}>{isDev ? '🛠' : '#'}</span>
+                    <span className={styles.channelMain}>
+                      <strong>{c.name}</strong>
+                      {c.description && <span>{c.description}</span>}
+                    </span>
+                  </button>
+                )
+              })
+            )
           ) : (
-            /* ── 项目列表视图 ── */
-            <div className={styles.channelsSection}>
+            /* —— 项目列表视图 —— */
+            <>
               {!projectsLoaded && (
                 <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 13 }}>读取中…</div>
               )}
@@ -401,7 +337,7 @@ export default function ConversationPage() {
                   暂无项目，点击 + 新建
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
 
@@ -514,22 +450,18 @@ export default function ConversationPage() {
                 <p>还没有消息，发送第一条吧！</p>
               </div>
             )}
-            {messages.map((msg, idx) => {
-              const tid = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
-              return (
-                <div key={msg.id} {...(tid ? { 'data-task-id': tid } : {})}>
-                  <MessageItem
-                    message={msg}
-                    isDevChannel={isDevChannel}
-                    taskContext={taskContext}
-                    user={user}
-                    onCancel={cancelTask}
-                    onApprove={approveTool}
-                    grouped={isGrouped(idx)}
-                  />
-                </div>
-              )
-            })}
+            {messages.map((msg, idx) => (
+              <MessageItem
+                key={msg.id}
+                message={msg}
+                isDevChannel={isDevChannel}
+                taskContext={taskContext}
+                user={user}
+                onCancel={cancelTask}
+                onApprove={approveTool}
+                grouped={isGrouped(idx)}
+              />
+            ))}
             {/* P1.3：AI 打字指示器 */}
             {(hasRunningTask || sendingMessage) && (
               <div className={styles.typingRow}>

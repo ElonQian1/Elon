@@ -89,7 +89,7 @@ impl Store {
             "SELECT p.id, p.name, p.description, COALESCE(pm.role, 'visitor') AS role,
                     (SELECT COUNT(*) FROM project_members count_pm WHERE count_pm.project_id = p.id),
                     p.icon_data_url, p.updated_at, p.source_type, p.workspace_path,
-                    p.display_name, p.is_public, p.join_mode
+                    p.display_name
              FROM projects p
              LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
              WHERE p.id = ?1
@@ -106,8 +106,6 @@ impl Store {
                     display_name: row.get(9)?,
                     description: row.get(2)?,
                     role: row.get(3)?,
-                    is_public: row.get::<_, i64>(10)? != 0,
-                    join_mode: row.get(11)?,
                     member_count: row.get(4)?,
                     icon_data_url: row.get(5)?,
                     updated_at: row.get(6)?,

@@ -86,85 +86,9 @@
 /* 频道列表 */
 .channelList {
   min-height: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-/* 频道列表内的频道/项目区（固定高度，可滚动）*/
-.channelsSection {
-  flex-shrink: 0;
   overflow-y: auto;
-  padding: 6px 8px 4px;
+  padding: 6px 8px 12px;
   scrollbar-width: thin;
-  max-height: 260px;
-}
-/* 会话记录区（占剩余空间，可滚动）*/
-.sessionsSection {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  border-top: 1px solid rgba(255,255,255,.05);
-  scrollbar-width: thin;
-}
-.sessionsHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px 4px;
-  font-size: 11px;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: .05em;
-  color: var(--text-muted);
-  position: sticky;
-  top: 0;
-  background: var(--surface);
-  z-index: 1;
-}
-.sessionsHeader button {
-  background: rgba(255,255,255,.08);
-  border: 0;
-  border-radius: 4px;
-  width: 20px;
-  height: 20px;
-  color: var(--text-soft);
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-.sessionsHeader button:hover { background: rgba(255,255,255,.14); }
-.sessionItem {
-  width: calc(100% - 16px);
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 7px 10px;
-  background: transparent;
-  border: 0;
-  border-radius: 6px;
-  text-align: left;
-  cursor: pointer;
-  margin: 1px 8px;
-  transition: background .1s;
-  color: var(--text-soft);
-}
-.sessionItem:hover { background: rgba(255,255,255,.05); }
-.sessionActive { background: rgba(60,111,162,.18) !important; color: var(--text); }
-.sessionTitle {
-  font-size: 12px;
-  font-weight: 500;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  display: block;
-}
-.sessionMeta {
-  font-size: 10px;
-  color: var(--text-muted);
 }
 .channelSection {
   margin: 12px 8px 6px;
