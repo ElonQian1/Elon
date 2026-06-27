@@ -56,11 +56,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(id)}/space`)
       const channels = space.channels ?? []
       set({ space, channels, categories: space.categories ?? [], members: space.members ?? [] })
-      if (channels.length > 0) {
-        // 优先选 ai_development 频道，其次选第一个
-        const preferred = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
-        await get().selectChannel(preferred.id)
-      }
+      // 进入项目后停留在项目首页（landing），由用户手动选择频道。
     } catch (err) {
       console.warn('Failed to load project space:', err)
     }
