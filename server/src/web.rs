@@ -22,6 +22,8 @@ const HOME_PROJECT_MARKER_PNG_B64: &str = include_str!("assets/ic_home_project_m
 const HOME_PULL_FILTER_PNG_B64: &str = include_str!("assets/ic_home_pull_filter.b64");
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
+const SIDE_MENU_FOLDER_CLOSED_ICON_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-xxxhdpi/ic_side_menu_folder_closed.png");
 const PLAZA_ENTER_SPACE_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_enter_space.png");
 const PLAZA_SHARE_PROJECT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_share_project.png");
 const PLAZA_DOWNLOAD_APK_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_download_apk.png");
@@ -179,6 +181,10 @@ pub async fn project_plaza_share_project_icon() -> impl IntoResponse {
 
 pub async fn project_plaza_download_apk_icon() -> impl IntoResponse {
     plaza_icon_response(PLAZA_DOWNLOAD_APK_ICON_PNG)
+}
+
+pub async fn side_menu_folder_closed_icon() -> impl IntoResponse {
+    plaza_icon_response(SIDE_MENU_FOLDER_CLOSED_ICON_PNG)
 }
 
 pub async fn add_friend_scan_icon() -> impl IntoResponse {
