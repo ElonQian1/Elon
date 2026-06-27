@@ -128,3 +128,26 @@
   width: 10px; height: 10px;
   background: #0b0c0f;
 }
+
+/* ── 项目 logo 按钮 ── */
+.projectAvatar {
+  background: #2c2e35;
+  overflow: hidden;
+}
+.projectAvatar:hover,
+.projectAvatar.active {
+  border-radius: 16px;
+}
+.projectIcon {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: inherit;
+  display: block;
+}
+.projectFallback {
+  font-size: 18px;
+  font-weight: 800;
+  color: #c4c8d4;
+  user-select: none;
+}

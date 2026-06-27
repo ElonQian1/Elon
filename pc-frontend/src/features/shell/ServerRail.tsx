@@ -1,6 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
+import { useProjectStore } from '../conversation/useProjectStore'
 import { ModelPickerButton } from '../models/ModelPicker'
 import { getPcLegacyUrl, rememberPcLegacyToken } from './pcLegacyUrl'
 import styles from './ServerRail.module.css'
@@ -31,9 +32,23 @@ export default function ServerRail() {
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
   const legacyUrl = getPcLegacyUrl()
 
+  // 项目列表（从 store 读取，实时响应）
+  const projects = useProjectStore((s) => s.projects)
+  const activeProjectId = useProjectStore((s) => s.activeProjectId)
+
   function isActive(path: string) {
     if (path === '/') return pathname === '/'
     return pathname.startsWith(path)
+  }
+
+  async function openProject(id: string) {
+    navigate('/')
+    await useProjectStore.getState().selectProject(id)
+  }
+
+  function showTip(e: React.MouseEvent<HTMLElement>, text: string) {
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+    setTooltip({ text, y: rect.top + rect.height / 2 })
   }
 
   return (
@@ -46,15 +61,36 @@ export default function ServerRail() {
             className={[styles.avatar, active ? styles.active : ''].join(' ')}
             style={{ '--item-color': item.color, '--item-hover': item.hoverColor } as React.CSSProperties}
             onClick={() => navigate(item.path)}
-            onMouseEnter={(e) => {
-              const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-              setTooltip({ text: item.label, y: rect.top + rect.height / 2 })
-            }}
+            onMouseEnter={(e) => showTip(e, item.label)}
             onMouseLeave={() => setTooltip(null)}
             title={item.label}
             type="button"
           >
             <span className={styles.icon}>{item.emoji}</span>
+          </button>
+        )
+      })}
+
+      {/* ── 项目列表分隔线 ── */}
+      {projects.length > 0 && <div className={styles.divider} />}
+
+      {/* ── 每个项目的 logo 按钮 ── */}
+      {projects.map((p) => {
+        const isActiveProject = p.id === activeProjectId && pathname === '/'
+        return (
+          <button
+            key={p.id}
+            className={[styles.avatar, styles.projectAvatar, isActiveProject ? styles.active : ''].join(' ')}
+            onClick={() => openProject(p.id)}
+            onMouseEnter={(e) => showTip(e, p.name)}
+            onMouseLeave={() => setTooltip(null)}
+            title={p.name}
+            type="button"
+          >
+            {p.icon
+              ? <img src={p.icon} alt="" className={styles.projectIcon} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+              : <span className={styles.projectFallback}>{p.name[0]?.toUpperCase() ?? '?'}</span>
+            }
           </button>
         )
       })}
@@ -69,10 +105,7 @@ export default function ServerRail() {
       <a
         className={[styles.avatar, styles.legacyAvatar].join(' ')}
         href={legacyUrl}
-        onMouseEnter={(e) => {
-          const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-          setTooltip({ text: '切换旧版对照', y: rect.top + rect.height / 2 })
-        }}
+        onMouseEnter={(e) => showTip(e, '切换旧版对照')}
         onMouseLeave={() => setTooltip(null)}
         onClick={() => rememberPcLegacyToken(token)}
         title="切换旧版对照"
@@ -88,10 +121,7 @@ export default function ServerRail() {
         <button
           className={[styles.avatar, styles.userAvatar].join(' ')}
           title={`${user.nickname ?? user.account} — 账号设置`}
-          onMouseEnter={(e) => {
-            const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-            setTooltip({ text: user.nickname ?? user.account ?? '账号', y: rect.top + rect.height / 2 })
-          }}
+          onMouseEnter={(e) => showTip(e, user.nickname ?? user.account ?? '账号')}
           onMouseLeave={() => setTooltip(null)}
           onClick={() => navigate('/account')}
           type="button"
