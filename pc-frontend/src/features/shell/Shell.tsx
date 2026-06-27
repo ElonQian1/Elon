@@ -1,7 +1,9 @@
+import { useEffect } from 'react'
 import { Outlet } from 'react-router-dom'
 import ServerRail from './ServerRail'
 import { useNotifications } from '../notifications/useNotifications'
 import { useNodeAutoConnect } from './useNodeAutoConnect'
+import { useAuthStore } from '../../store/auth'
 import styles from './Shell.module.css'
 
 function NodeConnectBanner() {
@@ -27,6 +29,15 @@ function NodeConnectBanner() {
 
 export default function Shell() {
   useNotifications()
+  const token = useAuthStore((s) => s.token)
+  const user = useAuthStore((s) => s.user)
+  const fetchMe = useAuthStore((s) => s.fetchMe)
+
+  // token 存在但 user 为空时（如页面刷新后），自动拉取用户信息
+  useEffect(() => {
+    if (token && !user) fetchMe().catch(() => {})
+  }, [token]) // eslint-disable-line
+
   return (
     <div className={styles.shell}>
       <ServerRail />
