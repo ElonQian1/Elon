@@ -21,7 +21,7 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.abs
 
-private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v6_loud_badge"
+private const val CHAT_MESSAGE_CHANNEL_ID = "chat_messages_v7_heads_up_loud"
 private const val CHAT_MESSAGE_GROUP_KEY = "com.elon.app.CHAT_MESSAGES"
 private const val MAX_DEDUPED_CHAT_MESSAGES = 160
 private const val FALLBACK_RING_MS = 1600L
@@ -159,8 +159,9 @@ internal object ChatMessageNotifications {
             .setBadgeIconType(NotificationCompat.BADGE_ICON_SMALL)
             .setCategory(NotificationCompat.CATEGORY_MESSAGE)
             .setGroup(CHAT_MESSAGE_GROUP_KEY)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_ALL)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setPriority(NotificationCompat.PRIORITY_MAX)
             .setDefaults(NotificationCompat.DEFAULT_SOUND or NotificationCompat.DEFAULT_VIBRATE)
             .setSound(soundUri)
             .setVibrate(longArrayOf(0L, 220L, 120L, 220L))
