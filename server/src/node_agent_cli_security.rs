@@ -55,14 +55,14 @@ pub(crate) fn prepare_cli_base_cwd(
     project_context: Option<CliProjectContext>,
 ) -> Result<(PathBuf, CliProjectContext)> {
     // 当没有项目上下文时（如 AI 聊天模式），自动合成一个 chat 上下文：
-    // runtime_permission = "read_only" 表示跳过 worktree 隔离，直接在 base_cwd 执行。
+    // runtime_permission = "full_access" 允许 copilot/codex 执行任意命令（无沙盒限制）。
     let context = project_context.unwrap_or_else(|| CliProjectContext {
         project_id: "chat".to_string(),
         conversation_id: format!("chat-{}", std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()
             .subsec_nanos()),
-        runtime_permission: Some("read_only".to_string()),
+        runtime_permission: Some("full_access".to_string()),
     });
 
     // cwd 优先使用传入值；chat 模式下无 cwd 时回退到用户主目录
