@@ -189,8 +189,10 @@ pub async fn node_exec_handler(
 }
 
 /// 从允许的 CLI 列表中选最优的
+/// Codex 优先：它的 --dangerously-bypass-approvals-and-sandbox 专门为无 TTY 场景设计。
+/// Copilot 的 shell 工具需要 TTY，在后台进程中即使有 --allow-all 也会被拒绝。
 fn pick_best_cli(allowed_clis: &[String]) -> String {
-    let priority = ["copilot", "codex", "claude", "gemini"];
+    let priority = ["codex", "claude", "gemini", "copilot"];
     for preferred in priority {
         if allowed_clis
             .iter()
@@ -202,5 +204,5 @@ fn pick_best_cli(allowed_clis: &[String]) -> String {
     allowed_clis
         .first()
         .cloned()
-        .unwrap_or_else(|| "copilot".to_string())
+        .unwrap_or_else(|| "codex".to_string())
 }
