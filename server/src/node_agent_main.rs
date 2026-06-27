@@ -1056,7 +1056,13 @@ async fn run_cli_prompt(run: CliPromptRun) {
     }
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
-        .stdin(std::process::Stdio::null());
+        // copilot 用 --allow-all 时仍会检测 stdin 是否可读；
+        // 用 piped（而非 null）让它认为 stdin 存在但为空流，避免权限拒绝。
+        .stdin(if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
+            std::process::Stdio::piped()
+        } else {
+            std::process::Stdio::null()
+        });
     hide_tokio_command_window(&mut cmd);
 
     let mut child = match cmd.spawn() {
