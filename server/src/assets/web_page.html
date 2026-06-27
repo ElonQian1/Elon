@@ -943,9 +943,9 @@
     }
     .project-space-post-card {
       background: var(--project-space-info-bg);
-      border-radius: 18px;
+      border-radius: 14px;
       margin: 10px 10px 0;
-      padding: 18px 18px 14px;
+      padding: 25px 28px 14px 14px;
       color: var(--ink);
       cursor: pointer;
     }
@@ -955,11 +955,12 @@
     .project-space-post-head {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 5px;
+      margin-left: 9px;
     }
     .project-space-post-avatar {
-      width: 48px;
-      height: 48px;
+      width: 34px;
+      height: 34px;
       border-radius: 50%;
       background: #D8D8D8;
       color: #101010;
@@ -985,63 +986,71 @@
       white-space: nowrap;
     }
     .project-space-post-time {
-      color: #A8A8A8;
+      color: #777777;
       font-size: 13px;
-      margin-top: 9px;
+      margin-top: 8px;
     }
     .project-space-topic {
       color: var(--ink);
       background: #000000;
-      border-radius: 10px;
-      height: 30px;
-      padding: 0 14px;
+      border-radius: 6px;
+      height: 19px;
+      padding: 0 8px;
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      font-size: 17px;
+      font-size: 14px;
       white-space: nowrap;
     }
     .project-space-post-title {
       color: var(--ink);
       font-size: 19px;
       font-weight: 700;
-      line-height: 1.55;
+      line-height: 1.28;
       margin-top: 20px;
-      white-space: pre-wrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
     .project-space-post-body {
-      color: #A8A8A8;
-      font-size: 17px;
-      line-height: 1.55;
-      margin-top: 10px;
-      white-space: pre-wrap;
+      color: #8E8E8E;
+      display: -webkit-box;
+      font-size: 19px;
+      line-height: 1.28;
+      margin-top: 6px;
+      overflow: hidden;
+      white-space: normal;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 3;
     }
     .project-space-post-media {
       width: 234px;
       max-width: 100%;
-      height: 120px;
+      height: 112px;
       object-fit: cover;
       display: block;
       border-radius: 6px;
       background: #22262C;
-      margin-top: 16px;
+      margin-top: 11px;
     }
     .project-space-post-metrics {
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
-      color: #A8A8A8;
-      font-size: 16px;
+      color: #D9D9D9;
+      font-size: 18px;
       line-height: 1;
+      margin-left: -14px;
+      margin-right: -28px;
       text-align: center;
-      padding: 21px 52px 0;
+      padding: 21px 0 0;
     }
     .project-space-post-metric {
       min-height: 34px;
       border: 0;
       border-radius: 8px;
       background: transparent;
-      color: var(--ink-muted);
+      color: inherit;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -1052,13 +1061,13 @@
     }
     .project-space-post-metric img,
     .project-space-post-metric svg {
-      width: 24px;
-      height: 24px;
+      width: 16px;
+      height: 16px;
       flex: none;
     }
     .project-space-post-metric img {
       object-fit: contain;
-      opacity: 0.86;
+      opacity: 1;
     }
     .project-space-post-metric.liked {
       color: var(--accent);
@@ -5442,7 +5451,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const created = message.created_at ? new Date(message.created_at).toLocaleString('zh-CN', {
       month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit'
     }) : '刚刚';
-    const body = post.body || post.title;
+    const body = projectSpacePostBodyWithoutImages(post.body) || post.title;
     const imageSource = extractProjectSpacePostImageSource(post.body);
     const metricKey = projectSpacePostMetricKey(channel, message);
     const shareCount = projectSpacePostMetricNumber(metricKey, 'shares');
