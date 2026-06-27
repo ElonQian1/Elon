@@ -1,12 +1,13 @@
 import { create } from 'zustand'
 import { api } from '../../api/client'
-import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectListResponse, ChannelMessagesResponse } from './types'
+import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse } from './types'
 
 interface ProjectState {
   projects: Project[]
   projectsLoaded: boolean
   activeProjectId: string
   space: ProjectSpace | null
+  landing: ProjectLanding | null
   channels: Channel[]
   categories: ChannelCategory[]
   members: ProjectMember[]
@@ -33,6 +34,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   projectsLoaded: false,
   activeProjectId: '',
   space: null,
+  landing: null,
   channels: [],
   categories: [],
   members: [],
@@ -50,12 +52,12 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   selectProject: async (id: string) => {
     if (get().activeProjectId === id) return
     get().stopPolling()
-    set({ activeProjectId: id, space: null, channels: [], categories: [], members: [], activeChannelId: '', messages: [] })
+    set({ activeProjectId: id, space: null, landing: null, channels: [], categories: [], members: [], activeChannelId: '', messages: [] })
     if (!id) return  // 空 id = 返回项目列表，不加载 space
     try {
       const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(id)}/space`)
       const channels = space.channels ?? []
-      set({ space, channels, categories: space.categories ?? [], members: space.members ?? [] })
+      set({ space, landing: space.landing ?? null, channels, categories: space.categories ?? [], members: space.members ?? [] })
       // 进入项目后停留在项目首页（landing），由用户手动选择频道。
     } catch (err) {
       console.warn('Failed to load project space:', err)
@@ -70,6 +72,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const nextActive = channels.some((c) => c.id === activeChannelId) ? activeChannelId : (channels[0]?.id ?? '')
     set({
       space,
+      landing: space.landing ?? null,
       channels,
       categories: space.categories ?? [],
       members: space.members ?? [],

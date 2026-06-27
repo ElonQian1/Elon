@@ -135,12 +135,52 @@ export interface ChannelPermissionResponse {
   memberOverrides?: PermissionOverride[]
 }
 
+export interface ProjectLandingDownload {
+  platform?: string
+  label?: string
+  short?: string
+  url?: string
+  version?: string
+  size?: string
+  status?: string
+  note?: string
+  variants?: Array<{
+    label?: string
+    arch?: string
+    url?: string
+    version?: string
+    size?: string
+    status?: string
+    note?: string
+  }>
+}
+
+export interface ProjectLandingResource {
+  label?: string
+  url?: string
+}
+
+export interface ProjectLanding {
+  title?: string
+  tagline?: string
+  summary?: string
+  description?: string
+  highlights?: string[]
+  target_users?: string[]
+  downloads?: ProjectLandingDownload[]
+  resources?: ProjectLandingResource[]
+  custom_landing_url?: string
+  web_url?: string
+  source?: { mode?: string; status?: string }
+}
+
 export interface ProjectSpace {
   project?: Project
   categories?: ChannelCategory[]
   channels?: Channel[]
   members?: ProjectMember[]
   my_role?: string
+  landing?: ProjectLanding
 }
 
 export interface Message {

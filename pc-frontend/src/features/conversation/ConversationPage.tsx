@@ -10,6 +10,7 @@ import { ModelPickerPopover } from '../models/ModelPicker'
 import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
+import ProjectLanding from './ProjectLanding'
 import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime, clean } from '../../lib/utils'
@@ -39,7 +40,7 @@ export default function ConversationPage() {
   const user = useAuthStore((s) => s.user)
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
-    messages, messagesLoading, sendingMessage,
+    messages, messagesLoading, sendingMessage, landing,
     loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
@@ -418,44 +419,15 @@ export default function ConversationPage() {
                 <button className={styles.bigCreateBtn} onClick={() => setShowCreate(true)}>+ 新建项目</button>
               </div>
             ) : (
-              /* 项目首页：Discord 式项目 landing */
-              <div className={styles.projectLanding}>
-                <div className={styles.projectLandingHero}>
-                  {(activeProject?.icon_data_url || activeProject?.icon) && (
-                    <img
-                      src={activeProject.icon_data_url || activeProject.icon}
-                      alt=""
-                      className={styles.projectLandingLogo}
-                    />
-                  )}
-                  <div>
-                    <h2 className={styles.projectLandingName}>{activeProject?.name}</h2>
-                    {activeProject?.description && (
-                      <p className={styles.projectLandingDesc}>{activeProject.description}</p>
-                    )}
-                    <p className={styles.projectLandingHint}>
-                      选择左侧的频道开始对话。
-                    </p>
-                  </div>
-                </div>
-                {channels.length > 0 && (
-                  <div className={styles.projectLandingChannels}>
-                    <div className={styles.projectLandingSection}>频道</div>
-                    {channels.map(c => (
-                      <button
-                        key={c.id}
-                        className={styles.projectLandingChannelBtn}
-                        onClick={() => selectChannel(c.id)}
-                        type="button"
-                      >
-                        <span>{c.kind === 'ai_development' ? '🛠️' : '#'}</span>
-                        <strong>{c.name}</strong>
-                        {c.description && <span>{c.description}</span>}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              /* 项目首页：富内容 landing（与旧版 pc_project_landing.js 功能对等）*/
+              activeProject && (
+                <ProjectLanding
+                  project={activeProject}
+                  channels={channels}
+                  landing={landing}
+                  onSelectChannel={selectChannel}
+                />
+              )
             )}
           </div>
         ) : (
