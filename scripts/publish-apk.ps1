@@ -91,19 +91,26 @@ function Invoke-HttpJson {
         [Parameter(Mandatory)] [string]$Url,
         [int]$TimeoutSec = 10
     )
-    $raw = & curl.exe --noproxy '*' -s --max-time $TimeoutSec -w "`n__HTTP_STATUS__:%{http_code}" $Url 2>&1
-    $rawText = ($raw -join "`n")
-    if ($LASTEXITCODE -ne 0) {
-        throw "curl GET 失败 (exit=$LASTEXITCODE): $rawText"
+    # 用临时文件接收 body，避免 PowerShell 捕获外部程序输出时
+    # 以 OEM/GBK 解码 UTF-8 中文导致 JSON 解析失败。
+    $tmpFile = [System.IO.Path]::GetTempFileName()
+    try {
+        $statusRaw = & curl.exe --noproxy '*' -s --max-time $TimeoutSec `
+            -o $tmpFile -w "%{http_code}" $Url 2>&1
+        $status = [int]("$statusRaw".Trim())
+        if ($LASTEXITCODE -ne 0) {
+            throw "curl GET 失败 (exit=$LASTEXITCODE)"
+        }
+        if ($status -lt 200 -or $status -ge 300) {
+            $errBody = Get-Content $tmpFile -Raw -Encoding UTF8
+            throw "HTTP ${status}: $errBody"
+        }
+        $bodyText = Get-Content $tmpFile -Raw -Encoding UTF8
+        if ([string]::IsNullOrWhiteSpace($bodyText)) { return $null }
+        return ($bodyText | ConvertFrom-Json)
+    } finally {
+        Remove-Item $tmpFile -Force -ErrorAction SilentlyContinue
     }
-    $statusLine = ($rawText -split "`n") | Where-Object { $_ -match '^__HTTP_STATUS__:' } | Select-Object -Last 1
-    $bodyText = ($rawText -replace "(?s)\n?__HTTP_STATUS__:\d+\s*$","")
-    $status = if ($statusLine) { [int]($statusLine -replace '^__HTTP_STATUS__:','') } else { 0 }
-    if ($status -lt 200 -or $status -ge 300) {
-        throw "HTTP ${status}: $bodyText"
-    }
-    if ([string]::IsNullOrWhiteSpace($bodyText)) { return $null }
-    return ($bodyText | ConvertFrom-Json)
 }
 
 function Get-ReleaseStatus {
