@@ -35,6 +35,8 @@ pub struct NodeExecResponse {
     pub node_display_name: String,
     pub exit_ok: bool,
     pub error: Option<String>,
+    /// 实际执行任务的 AI 模型名称（如 gpt-5.5）
+    pub model: Option<String>,
 }
 
 /// POST /api/me/node/exec
@@ -150,6 +152,7 @@ pub async fn node_exec_handler(
     let mut output = String::new();
     let mut exit_ok = false;
     let mut exec_error: Option<String> = None;
+    let mut exec_model: Option<String> = None;
 
     loop {
         match timeout(Duration::from_secs(EXEC_TIMEOUT_SECS), rx.recv()).await {
@@ -159,10 +162,12 @@ pub async fn node_exec_handler(
             Ok(Some(AgentToServer::CliDone {
                 exit_ok: ok,
                 error: e,
+                model: m,
                 ..
             })) => {
                 exit_ok = ok;
                 exec_error = e;
+                exec_model = m;
                 break;
             }
             Ok(Some(_)) => { /* 忽略其他消息类型 */ }
@@ -184,6 +189,7 @@ pub async fn node_exec_handler(
         node_display_name: display_name,
         exit_ok,
         error: exec_error,
+        model: exec_model,
     })
     .into_response()
 }

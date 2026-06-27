@@ -26,6 +26,7 @@ interface AiMessage {
   node_exec?: boolean
   node_display_name?: string
   exit_ok?: boolean
+  model?: string
 }
 
 interface LmChatResponse {
@@ -328,6 +329,7 @@ export default function AiChatPage() {
                   <div className={styles.msgMeta}>
                     <strong className={isNode ? styles.nodeLabel : ''}>{nameLabel}</strong>
                     {m.created_at && <span>{formatTime(m.created_at)}</span>}
+                    {isNode && m.model && <span className={styles.modelTag}>{m.model}</span>}
                     {isNode && m.exit_ok === false && <span className={styles.exitFail}>执行失败</span>}
                   </div>
                   {isNode
