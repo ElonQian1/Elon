@@ -35,7 +35,14 @@ export default function Shell() {
 
   // token 存在但 user 为空时（页面刷新后等），自动拉取用户信息
   useEffect(() => {
-    if (token && !user) fetchMe().catch(() => {})
+    if (!token || user) return
+    fetchMe().catch((err: { status?: number }) => {
+      // 401 = token 已失效，直接登出重新登录
+      if (err?.status === 401) {
+        useAuthStore.getState().logout()
+      }
+      // 其他错误（网络异常等）默默剩下，下次订阅变化时再试
+    })
   }, [token]) // eslint-disable-line
 
   return (

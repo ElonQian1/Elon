@@ -38,6 +38,7 @@ export default function ConversationPage() {
   useChannelAutoRefresh()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
+  const token = useAuthStore((s) => s.token)
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
     messages, messagesLoading, sendingMessage, landing, spaceLoading, spaceError,
@@ -353,7 +354,7 @@ export default function ConversationPage() {
               {(user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '?'}
             </div>
             <div className={styles.userInfo}>
-              <strong>{user?.nickname ?? user?.account ?? '未登录'}</strong>
+              <strong>{user?.nickname ?? user?.account ?? (token ? '加载中…' : '未登录')}</strong>
               <span>{user?.account}</span>
             </div>
           </button>
