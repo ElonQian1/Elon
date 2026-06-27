@@ -1207,3 +1207,30 @@ fn download_content_type(download_name: &str) -> &'static str {
         "application/octet-stream"
     }
 }
+
+/// POST /api/admin/nodes/push-update — 广播更新指令给所有在线节点（管理员功能）
+pub async fn push_node_update(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+) -> impl IntoResponse {
+    let presented = headers
+        .get("authorization")
+        .and_then(|v| v.to_str().ok())
+        .and_then(|s| s.strip_prefix("Bearer "))
+        .unwrap_or("");
+    if presented.is_empty() || presented != state.admin_token {
+        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"admin token required"}))).into_response();
+    }
+    let version_file = state.data_dir.join("downloads").join("node-agent-version.json");
+    let version = tokio::fs::read_to_string(&version_file).await
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .and_then(|v| v["version"].as_str().map(str::to_string));
+    let count = state.agent_manager.broadcast_update_client(version.clone(), None).await;
+    Json(serde_json::json!({
+        "ok": true,
+        "broadcast_to": count,
+        "version": version,
+        "message": format!("{count} 个在线节点已收到更新指令"),
+    })).into_response()
+}

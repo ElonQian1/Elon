@@ -276,6 +276,26 @@ impl AgentManager {
             .collect()
     }
 
+    /// 广播 UpdateClient 消息给所有在线节点，触发无感自动更新。
+    /// 返回成功发送的节点数量。
+    pub async fn broadcast_update_client(
+        &self,
+        version: Option<String>,
+        download_url: Option<String>,
+    ) -> usize {
+        let agents = self.agents.read().await;
+        let mut count = 0;
+        for agent in agents.values() {
+            if agent.cmd_tx.send(homecli_proto::ServerToAgent::UpdateClient {
+                version: version.clone(),
+                download_url: download_url.clone(),
+            }).is_ok() {
+                count += 1;
+            }
+        }
+        count
+    }
+
     /// Send an HTTP request through the WS tunnel to the PC's local server.
     /// Returns a single AgentToServer::HttpResponse or HttpError.
     pub async fn dispatch_http(

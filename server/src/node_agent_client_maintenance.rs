@@ -641,6 +641,75 @@ fn open_path(path: &Path, select_file: bool) -> Result<(), String> {
     }
 }
 
+/// 服务端推送 UpdateClient 消息时调用：优先走已安装的更新程序，否则自行下载替换。
+/// 返回 Ok(message) 表示已安排更新，Err(reason) 表示无法自动更新。
+pub(crate) async fn push_update_from_server(
+    cloud_http_url: &str,
+    download_url_override: Option<&str>,
+) -> Result<String, String> {
+    // 先试已安装的更新程序
+    #[cfg(windows)]
+    if spawn_client_action(ClientAction::Update).is_ok() {
+        record_maintenance_event("push_update", true, "via_installer");
+        return Ok("已通过安装程序触发更新，节点将在后台自动替换并重启。".to_string());
+    }
+
+    // 没有安装程序时：直接下载新版 exe，写旁路 bat 脚本替换并重启
+    let url = download_url_override
+        .map(str::to_string)
+        .unwrap_or_else(|| format!("{}/api/node-agent/download/windows", cloud_http_url.trim_end_matches('/')));
+
+    let current_exe = std::env::current_exe()
+        .map_err(|e| format!("无法定位当前 exe: {e}"))?;
+    let download_path = current_exe.with_extension("new.exe");
+    let bat_path = current_exe.with_extension("update.bat");
+
+    // 异步下载
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(120))
+        .build()
+        .unwrap_or_default();
+    let resp = client.get(&url).send().await
+        .map_err(|e| format!("下载新版失败: {e}"))?;
+    if !resp.status().is_success() {
+        return Err(format!("下载服务器返回 {}", resp.status()));
+    }
+    let bytes = resp.bytes().await.map_err(|e| format!("读取下载内容失败: {e}"))?;
+    tokio::fs::write(&download_path, &bytes).await
+        .map_err(|e| format!("写入新版 exe 失败: {e}"))?;
+
+    // 写一个 bat 脚本：等待当前进程退出后替换并重启
+    let cur_str = current_exe.to_string_lossy();
+    let new_str = download_path.to_string_lossy();
+    let bat_content = format!(
+        "@echo off\r\ntimeout /t 2 /nobreak >nul\r\nmove /y \"{new_str}\" \"{cur_str}\"\r\nstart \"\" \"{cur_str}\" --agent-runtime\r\ndel \"%~f0\"\r\n"
+    );
+    tokio::fs::write(&bat_path, bat_content.as_bytes()).await
+        .map_err(|e| format!("写入更新脚本失败: {e}"))?;
+
+    // 启动 bat 然后退出当前进程
+    #[cfg(windows)]
+    {
+        let mut cmd = std::process::Command::new("cmd");
+        cmd.args(["/C", &bat_path.to_string_lossy()])
+            .stdin(std::process::Stdio::null())
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0800_0000 | 0x0000_0200); // CREATE_NO_WINDOW | DETACHED
+        cmd.spawn().map_err(|e| format!("启动更新脚本失败: {e}"))?;
+    }
+
+    record_maintenance_event("push_update", true, "via_download_replace");
+    // 异步退出（让当前响应先发出）
+    tokio::spawn(async {
+        tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+        std::process::exit(0);
+    });
+
+    Ok(format!("已下载新版本并启动替换脚本，节点将在 2 秒后自动重启。下载大小: {} KB", bytes.len() / 1024))
+}
+
 fn spawn_client_action(action: ClientAction) -> Result<(), String> {
     #[cfg(windows)]
     {

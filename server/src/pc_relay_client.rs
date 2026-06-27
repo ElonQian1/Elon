@@ -433,6 +433,9 @@ async fn run_relay_session(
                 };
                 let _ = out_tx.send(Message::Text(serde_json::to_string(&err)?));
             }
+
+            // 更新指令由 node_agent_main 处理；此处静默忽略
+            ServerToAgent::UpdateClient { .. } => {}
         }
     }
 

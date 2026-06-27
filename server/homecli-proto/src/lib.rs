@@ -321,6 +321,16 @@ pub enum ServerToAgent {
         #[serde(default)]
         provider: Option<String>,
     },
+    /// 服务端通知 PC 节点检查并安装新版本（无感自动更新）。
+    /// 节点收到后：已安装版本调用内置更新程序；否则自行下载替换并重启。
+    UpdateClient {
+        /// 可选：新版本号，仅用于日志。
+        #[serde(default)]
+        version: Option<String>,
+        /// 可选：下载 URL（默认用服务端标准下载路径）。
+        #[serde(default)]
+        download_url: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

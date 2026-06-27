@@ -2273,6 +2273,20 @@ async fn run_session(
                                 let _ = tx_c.send(ws_text(&reply));
                             });
                         }
+                        ServerToAgent::UpdateClient { version, download_url } => {
+                            let ver = version.as_deref().unwrap_or("latest");
+                            info!("⬆️  收到云端更新指令，目标版本: {}", ver);
+                            let cloud_http = runtime.cloud_http_url();
+                            tokio::spawn(async move {
+                                match crate::node_agent_client_maintenance::push_update_from_server(
+                                    &cloud_http,
+                                    download_url.as_deref(),
+                                ).await {
+                                    Ok(msg) => info!("✅ 自动更新已启动: {}", msg),
+                                    Err(e) => warn!("⚠️  自动更新失败（需手动更新）: {}", e),
+                                }
+                            });
+                        }
                         _ => {
                             // 其他消息类型暂不处理
                         }
