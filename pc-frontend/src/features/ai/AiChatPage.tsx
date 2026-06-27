@@ -33,6 +33,7 @@ interface Friend {
   id: string
   account: string
   nickname?: string
+  avatar_data_url?: string | null
   is_online?: boolean
 }
 
@@ -355,7 +356,10 @@ export default function AiChatPage() {
               {filteredFriends.filter(f => f.is_online).map(f => (
                 <div key={f.id} className={styles.userPanelItem}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOnline].join(' ')}>
-                    {(f.nickname ?? f.account)[0].toUpperCase()}
+                    {f.avatar_data_url
+                      ? <img src={f.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+                      : (f.nickname ?? f.account)[0].toUpperCase()
+                    }
                   </div>
                   <div className={styles.userPanelCopy}>
                     <strong className={styles.userPanelName}>{f.nickname ?? f.account}</strong>
@@ -374,7 +378,10 @@ export default function AiChatPage() {
               {filteredFriends.filter(f => !f.is_online).map(f => (
                 <div key={f.id} className={styles.userPanelItem}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOffline].join(' ')}>
-                    {(f.nickname ?? f.account)[0].toUpperCase()}
+                    {f.avatar_data_url
+                      ? <img src={f.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+                      : (f.nickname ?? f.account)[0].toUpperCase()
+                    }
                   </div>
                   <div className={styles.userPanelCopy}>
                     <strong className={styles.userPanelName}>{f.nickname ?? f.account}</strong>

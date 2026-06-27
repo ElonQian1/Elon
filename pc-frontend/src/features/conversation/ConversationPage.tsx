@@ -680,7 +680,12 @@ function MemberGroups({ members }: { members: import('./types').ProjectMember[] 
             const sub = m.is_online ? '在线' : (roleLabel ?? '成员')
             return (
               <div key={m.user_id} className={styles.memberItem}>
-                <div className={avatarCls}>{name[0].toUpperCase()}</div>
+                <div className={avatarCls}>
+                  {m.avatar_data_url
+                    ? <img src={m.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+                    : name[0].toUpperCase()
+                  }
+                </div>
                 <div className={styles.memberCopy}>
                   <div className={styles.memberLine}>
                     <strong className={styles.memberItemName}>{name}</strong>
