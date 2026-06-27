@@ -72,14 +72,23 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         header::CACHE_CONTROL,
         HeaderValue::from_static("no-cache, no-store, must-revalidate"),
     );
-    let pc_svc = tower::ServiceBuilder::new()
+    // /pc  — SPA 子路由器：assets 用 ServeDir，其余路径 fallback 到 index.html (200)
+    //        这样强刷 /pc/ai、/pc/friends 等子路径不会返回 404。
+    let pc_assets_svc = tower::ServiceBuilder::new()
         .layer(no_cache.clone())
-        .service(ServeDir::new(&pc_next_dist)
-            .not_found_service(ServeFile::new(pc_next_dist.join("index.html"))));
-    let pc_next_svc = tower::ServiceBuilder::new()
+        .service(ServeDir::new(pc_next_dist.join("assets")));
+    let pc_router = axum::Router::new()
+        .nest_service("/assets", pc_assets_svc)
+        .fallback(web::pc_spa_index)
+        .with_state(Arc::clone(&state));
+    // /pc-next 保持向后兼容（与 /pc 相同）
+    let pc_next_assets_svc = tower::ServiceBuilder::new()
         .layer(no_cache.clone())
-        .service(ServeDir::new(&pc_next_dist)
-            .not_found_service(ServeFile::new(pc_next_dist.join("index.html"))));
+        .service(ServeDir::new(pc_next_dist.join("assets")));
+    let pc_next_router = axum::Router::new()
+        .nest_service("/assets", pc_next_assets_svc)
+        .fallback(web::pc_spa_index)
+        .with_state(Arc::clone(&state));
     let pc_legacy_svc = tower::ServiceBuilder::new()
         .layer(no_cache)
         .service(ServeDir::new(&pc_legacy_dist)
@@ -88,8 +97,8 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(web::web_page))
         .route("/web", get(web::web_page))
-        .nest_service("/pc", pc_svc)
-        .nest_service("/pc-next", pc_next_svc)
+        .nest_service("/pc", pc_router)
+        .nest_service("/pc-next", pc_next_router)
         .nest_service("/pc-legacy", pc_legacy_svc)
         .route("/manifest.json", get(web::pwa_manifest))
         .route("/sw.js", get(web::service_worker))

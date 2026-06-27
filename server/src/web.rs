@@ -249,3 +249,22 @@ pub async fn elon_route_c_sdk_js() -> impl IntoResponse {
         ELON_ROUTE_C_SDK_JS,
     )
 }
+
+/// GET /pc/* — SPA fallback：所有未匹配的路径都返回 index.html（200），让 React Router 接管。
+pub async fn pc_spa_index(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let path = state.data_dir.join("pc-next-dist/index.html");
+    match tokio::fs::read(&path).await {
+        Ok(bytes) => (
+            axum::http::StatusCode::OK,
+            [
+                (header::CONTENT_TYPE, "text/html; charset=utf-8"),
+                (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
+            ],
+            bytes,
+        ).into_response(),
+        Err(_) => (
+            axum::http::StatusCode::SERVICE_UNAVAILABLE,
+            "PC 前端尚未部署，请稍候重试。",
+        ).into_response(),
+    }
+}
