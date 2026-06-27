@@ -2,6 +2,7 @@
 
 use axum::{
     extract::DefaultBodyLimit,
+    http::{header, HeaderValue},
     routing::{delete, get, post},
     Router,
 };
@@ -9,6 +10,7 @@ use std::sync::Arc;
 use tower_http::compression::CompressionLayer;
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
 use tower_http::services::{ServeDir, ServeFile};
+use tower_http::set_header::SetResponseHeaderLayer;
 
 use crate::types::AppState;
 use crate::{
@@ -64,12 +66,24 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     // /pc-legacy 是发布脚本从新框架引入前的历史提交导出的只读对照快照。
     let pc_next_dist = state.data_dir.join("pc-next-dist");
     let pc_legacy_dist = state.data_dir.join("pc-legacy-dist");
-    let pc_svc = ServeDir::new(&pc_next_dist)
-        .not_found_service(ServeFile::new(pc_next_dist.join("index.html")));
-    let pc_next_svc = ServeDir::new(&pc_next_dist)
-        .not_found_service(ServeFile::new(pc_next_dist.join("index.html")));
-    let pc_legacy_svc = ServeDir::new(&pc_legacy_dist)
-        .not_found_service(ServeFile::new(pc_legacy_dist.join("index.html")));
+
+    // HTML 入口：no-cache 确保浏览器每次都拉最新 HTML（JS/CSS 有 hash 可正常缓存）
+    let no_cache = SetResponseHeaderLayer::overriding(
+        header::CACHE_CONTROL,
+        HeaderValue::from_static("no-cache, no-store, must-revalidate"),
+    );
+    let pc_svc = tower::ServiceBuilder::new()
+        .layer(no_cache.clone())
+        .service(ServeDir::new(&pc_next_dist)
+            .not_found_service(ServeFile::new(pc_next_dist.join("index.html"))));
+    let pc_next_svc = tower::ServiceBuilder::new()
+        .layer(no_cache.clone())
+        .service(ServeDir::new(&pc_next_dist)
+            .not_found_service(ServeFile::new(pc_next_dist.join("index.html"))));
+    let pc_legacy_svc = tower::ServiceBuilder::new()
+        .layer(no_cache)
+        .service(ServeDir::new(&pc_legacy_dist)
+            .not_found_service(ServeFile::new(pc_legacy_dist.join("index.html"))));
 
     Router::new()
         .route("/", get(web::web_page))
