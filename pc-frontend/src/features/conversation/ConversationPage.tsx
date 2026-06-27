@@ -157,16 +157,21 @@ export default function ConversationPage() {
       <aside className={styles.channelPanel}>
         {/* 工作区标题（58px）*/}
         <div className={styles.workspaceTitle}>
-          <div style={{ minWidth: 0 }}>
-            <strong className={styles.workspaceTitleText}>
-              {activeProject?.name ?? '选择项目'}
-            </strong>
-            {activeProject?.description && (
-              <span className={styles.workspaceTitleMeta}>{activeProject.description}</span>
-            )}
-          </div>
-          <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-            {activeProjectId && (
+          {activeProjectId ? (
+            /* 项目视图：显项目名，点击返回项目列表 */
+            <>
+              <button
+                className={styles.workspaceBackBtn}
+                onClick={() => useProjectStore.getState().selectProject('')}
+                title="返回项目列表"
+                type="button"
+              >←</button>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <strong className={styles.workspaceTitleText}>{activeProject?.name}</strong>
+                {activeProject?.description && (
+                  <span className={styles.workspaceTitleMeta}>{activeProject.description}</span>
+                )}
+              </div>
               <button
                 className={styles.iconBtn}
                 onClick={() => navigate(`/projects/${activeProjectId}`)}
@@ -174,9 +179,16 @@ export default function ConversationPage() {
                 type="button"
                 style={{ fontSize: 14 }}
               >⚙</button>
-            )}
-            <button className={styles.iconBtn} onClick={() => setShowCreate(true)} title="新建项目" type="button">+</button>
-          </div>
+            </>
+          ) : (
+            /* 项目列表视图：显我的项目标题 */
+            <>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <strong className={styles.workspaceTitleText}>我的项目</strong>
+              </div>
+              <button className={styles.iconBtn} onClick={() => setShowCreate(true)} title="新建项目" type="button">+</button>
+            </>
+          )}
         </div>
 
         {/* 搜索栏（48px）*/}
@@ -184,44 +196,20 @@ export default function ConversationPage() {
           <input
             value={channelSearch}
             onChange={(e) => setChannelSearch(e.target.value)}
-            placeholder="搜索频道或项目"
+            placeholder={activeProjectId ? '搜索频道' : '搜索项目'}
           />
         </div>
 
-        {/* 频道 + 项目列表（1fr）*/}
+        {/* 内容区：根据是否有选中项目切换两种视图 */}
         <div className={styles.channelList}>
-          {/* 我的项目 */}
-          <div className={styles.channelSection}>我的项目</div>
-          {!projectsLoaded && (
-            <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 13 }}>读取中…</div>
-          )}
-          {projects.map((p) => (
-            <button
-              key={p.id}
-              className={[styles.channelItem, p.id === activeProjectId ? styles.channelActive : ''].join(' ')}
-              onClick={() => selectProject(p.id)}
-              type="button"
-            >
-              <span className={styles.channelGlyph} style={{ fontSize: 14 }}>
-                {p.id === activeProjectId ? '▶' : '▷'}
-              </span>
-              <span className={styles.channelMain}>
-                <strong>{p.name}</strong>
-                {p.description && <span>{p.description}</span>}
-              </span>
-            </button>
-          ))}
-          {projectsLoaded && projects.length === 0 && (
-            <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 12 }}>
-              暂无项目，点击 + 新建
-            </div>
-          )}
-
-          {/* 频道列表（选中项目后显示）*/}
-          {activeProjectId && filteredChannels.length > 0 && (
-            <>
-              <div className={styles.channelSection}>频道</div>
-              {filteredChannels.map((c) => {
+          {activeProjectId ? (
+            /* —— Discord 式：只显当前项目的频道 —— */
+            filteredChannels.length === 0 ? (
+              <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>
+                还没有频道
+              </div>
+            ) : (
+              filteredChannels.map((c) => {
                 const isDev = c.kind === 'ai_development'
                 return (
                   <button
@@ -241,7 +229,41 @@ export default function ConversationPage() {
                     </span>
                   </button>
                 )
-              })}
+              })
+            )
+          ) : (
+            /* —— 项目列表视图 —— */
+            <>
+              {!projectsLoaded && (
+                <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 13 }}>读取中…</div>
+              )}
+              {projects
+                .filter(p => !channelSearch || p.name.toLowerCase().includes(channelSearch.toLowerCase()))
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    className={styles.channelItem}
+                    onClick={() => selectProject(p.id)}
+                    type="button"
+                  >
+                    <span className={styles.channelGlyph}>
+                      {p.icon_data_url || p.icon
+                        ? <img src={p.icon_data_url || p.icon} alt="" style={{ width: 20, height: 20, borderRadius: 4, objectFit: 'cover' }} />
+                        : '📦'
+                      }
+                    </span>
+                    <span className={styles.channelMain}>
+                      <strong>{p.name}</strong>
+                      {p.description && <span>{p.description}</span>}
+                    </span>
+                  </button>
+                ))
+              }
+              {projectsLoaded && projects.length === 0 && (
+                <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 12 }}>
+                  暂无项目，点击 + 新建
+                </div>
+              )}
             </>
           )}
         </div>
@@ -324,20 +346,53 @@ export default function ConversationPage() {
         {/* 消息列表（1fr）*/}
         {!activeChannelId ? (
           <div className={styles.messageList}>
-            <div className={styles.emptyState}>
-              {!activeProjectId ? (
-                <>
-                  <strong>欢迎使用一龙工作台</strong>
-                  <p>从左侧选择一个项目，或新建一个开始开发。</p>
-                  <button className={styles.bigCreateBtn} onClick={() => setShowCreate(true)}>+ 新建项目</button>
-                </>
-              ) : (
-                <>
-                  <strong>{activeProject?.name}</strong>
-                  <p>从左侧频道列表选择一个频道开始对话。</p>
-                </>
-              )}
-            </div>
+            {!activeProjectId ? (
+              /* 无项目：全局欢迎页 */
+              <div className={styles.emptyState}>
+                <strong>欢迎使用一龙工作台</strong>
+                <p>从左侧选择一个项目，或新建一个开始开发。</p>
+                <button className={styles.bigCreateBtn} onClick={() => setShowCreate(true)}>+ 新建项目</button>
+              </div>
+            ) : (
+              /* 项目首页：Discord 式项目 landing */
+              <div className={styles.projectLanding}>
+                <div className={styles.projectLandingHero}>
+                  {(activeProject?.icon_data_url || activeProject?.icon) && (
+                    <img
+                      src={activeProject.icon_data_url || activeProject.icon}
+                      alt=""
+                      className={styles.projectLandingLogo}
+                    />
+                  )}
+                  <div>
+                    <h2 className={styles.projectLandingName}>{activeProject?.name}</h2>
+                    {activeProject?.description && (
+                      <p className={styles.projectLandingDesc}>{activeProject.description}</p>
+                    )}
+                    <p className={styles.projectLandingHint}>
+                      选择左侧的频道开始对话。
+                    </p>
+                  </div>
+                </div>
+                {channels.length > 0 && (
+                  <div className={styles.projectLandingChannels}>
+                    <div className={styles.projectLandingSection}>频道</div>
+                    {channels.map(c => (
+                      <button
+                        key={c.id}
+                        className={styles.projectLandingChannelBtn}
+                        onClick={() => selectChannel(c.id)}
+                        type="button"
+                      >
+                        <span>{c.kind === 'ai_development' ? '🛠️' : '#'}</span>
+                        <strong>{c.name}</strong>
+                        {c.description && <span>{c.description}</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div className={styles.messageList} ref={feedRef} onScroll={handleFeedScroll}>

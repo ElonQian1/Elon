@@ -51,6 +51,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     if (get().activeProjectId === id) return
     get().stopPolling()
     set({ activeProjectId: id, space: null, channels: [], categories: [], members: [], activeChannelId: '', messages: [] })
+    if (!id) return  // 空 id = 返回项目列表，不加载 space
     try {
       const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(id)}/space`)
       const channels = space.channels ?? []
