@@ -129,6 +129,10 @@ pub(crate) async fn require_route_a_full_access_grant(
     }
     let context = project_context
         .ok_or_else(|| anyhow!("Route A 完全访问必须携带项目上下文，已拒绝执行。"))?;
+    // AI 聊天模式（project_id = "chat"）不需要本机 grant，直接放行。
+    if context.project_id == "chat" {
+        return Ok(());
+    }
     let cwd = cwd
         .map(str::trim)
         .filter(|value| !value.is_empty())
