@@ -64,10 +64,13 @@ internal class ProjectSpaceFeedView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(38), 0, dp(38), 0)
+            minimumHeight = dp(PROJECT_SPACE_HERO_MIN_HEIGHT_DP)
+            clipToPadding = false
+            clipChildren = false
+            setPadding(dp(38), dp(6), dp(38), dp(6))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                dp(52)
+                LinearLayout.LayoutParams.WRAP_CONTENT
             )
 
             addView(projectIcon(space.project), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
@@ -82,7 +85,7 @@ internal class ProjectSpaceFeedView(
                     textSize = 15f
                     setTextColor(Color.parseColor("#B8B8B8"))
                     setTypeface(typeface, Typeface.NORMAL)
-                    includeFontPadding = false
+                    includeFontPadding = true
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
@@ -90,7 +93,7 @@ internal class ProjectSpaceFeedView(
                     text = "创建者： $ownerName"
                     textSize = 12f
                     setTextColor(Color.parseColor("#777777"))
-                    includeFontPadding = false
+                    includeFontPadding = true
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     setPadding(0, dp(5), 0, 0)
@@ -99,7 +102,7 @@ internal class ProjectSpaceFeedView(
                     text = "成员 ${space.project.memberCount.coerceAtLeast(1)}    帖子 $postCount"
                     textSize = 12f
                     setTextColor(Color.parseColor("#777777"))
-                    includeFontPadding = false
+                    includeFontPadding = true
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                     setPadding(0, dp(4), 0, 0)
@@ -718,6 +721,7 @@ internal class ProjectSpaceFeedView(
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
         const val PROJECT_SPACE_CONTENT_TOP_DP = 32
+        const val PROJECT_SPACE_HERO_MIN_HEIGHT_DP = 72
         const val PROJECT_SPACE_PAGE_BG = "#0D0D0D"
         const val PROJECT_SPACE_POST_CARD_BG = "#222222"
     }

@@ -744,7 +744,7 @@
     }
     .project-space-summary {
       background: var(--project-space-page-bg);
-      padding: 32px 38px 0;
+      padding: 32px 38px 6px;
       display: grid;
       grid-template-columns: minmax(0, 1fr) 68px;
       gap: 18px;
@@ -761,12 +761,13 @@
       align-items: center;
       gap: 18px;
       min-width: 0;
+      min-height: 72px;
     }
     .project-space-icon {
       position: relative;
       flex: none;
-      width: 45px;
-      height: 45px;
+      width: 42px;
+      height: 42px;
       border-radius: 6px;
       background: #FFFFFF;
       color: transparent;
@@ -798,8 +799,8 @@
       margin-top: 5px;
       color: var(--ink-faint);
       font-size: 12px;
-      line-height: 1.35;
-      overflow: hidden;
+      line-height: 1.45;
+      overflow: visible;
       text-overflow: ellipsis;
       white-space: pre-line;
     }
