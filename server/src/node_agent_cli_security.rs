@@ -3,6 +3,7 @@
 use anyhow::{anyhow, bail, Result};
 use homecli_proto::CliProjectContext;
 use std::path::PathBuf;
+use uuid::Uuid;
 
 const ROUTE_A_CLIS: &[&str] = &["codex", "copilot", "claude", "gemini"];
 const BUILTIN_CLIS: &[&str] = &["api-runtime", "server-runtime"];
@@ -54,15 +55,29 @@ pub(crate) fn prepare_cli_base_cwd(
     cwd: Option<String>,
     project_context: Option<CliProjectContext>,
 ) -> Result<(PathBuf, CliProjectContext)> {
-    let context = project_context
-        .ok_or_else(|| anyhow!("PC CLI 执行必须携带项目上下文，已拒绝裸 cwd/默认目录执行。"))?;
-    let cwd = cwd
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
+    // 当没有项目上下文时（如 AI 聊天模式），自动合成一个 chat 上下文：
+    // runtime_permission = "read_only" 表示跳过 worktree 隔离，直接在 base_cwd 执行。
+    let context = project_context.unwrap_or_else(|| CliProjectContext {
+        project_id: "chat".to_string(),
+        conversation_id: uuid::Uuid::new_v4().to_string(),
+        runtime_permission: Some("read_only".to_string()),
+    });
+
+    // cwd 优先使用传入值；chat 模式下无 cwd 时回退到用户主目录
+    let effective_cwd = cwd
+        .map(|v| v.trim().to_string())
+        .filter(|v| !v.is_empty())
+        .or_else(|| {
+            std::env::var("USERPROFILE")
+                .or_else(|_| std::env::var("HOME"))
+                .ok()
+        });
+
+    let cwd_str = effective_cwd
         .ok_or_else(|| anyhow!("PC CLI 执行必须携带项目工作目录。"))?;
-    let path = PathBuf::from(&cwd);
+    let path = PathBuf::from(&cwd_str);
     if !path.is_absolute() {
-        bail!("PC CLI 工作目录必须是绝对路径: {cwd}");
+        bail!("PC CLI 工作目录必须是绝对路径: {cwd_str}");
     }
     let full = std::fs::canonicalize(&path)
         .map_err(|error| anyhow!("PC CLI 工作目录不可用: {} ({error})", path.display()))?;
