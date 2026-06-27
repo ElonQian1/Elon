@@ -187,6 +187,37 @@
 .msgRow:hover { background: rgba(0,0,0,.06); }
 .ownRow { justify-content: flex-end; }
 .ownRow .avatar { order: 2; }
+
+/* ── 本机节点执行输出 ── */
+.nodeAvatar {
+  background: #1a3d5c !important;
+  color: #7ab4e8 !important;
+  border: 1px solid #2a5a8a;
+}
+.nodeLabel { color: #7ab4e8; }
+.exitFail {
+  font-size: 10px;
+  color: #e07a3a;
+  background: rgba(224,122,58,.12);
+  border-radius: 3px;
+  padding: 1px 6px;
+  margin-left: 4px;
+}
+.nodeOutput {
+  font-family: 'Cascadia Code', 'Consolas', 'SF Mono', monospace;
+  font-size: 12.5px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #0d1117;
+  border: 1px solid rgba(255,255,255,.09);
+  border-radius: 6px;
+  padding: 10px 14px;
+  color: #d0d7de;
+  margin: 0;
+  max-height: 480px;
+  overflow-y: auto;
+}
 .ownRow .msgBody { order: 1; align-items: flex-end; max-width: min(680px, 80%); }
 
 .avatar {

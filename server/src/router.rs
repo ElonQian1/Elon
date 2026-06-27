@@ -224,6 +224,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         )
         .route("/api/me/nodes", get(node_api::my_nodes))
         .route("/api/me/nodes/register", post(node_api::register_node))
+        .route("/api/me/node/exec", post(crate::node_exec_api::node_exec_handler))
         .route("/api/me/node-balance", get(node_api::my_node_balance))
         .route("/api/me/node-transactions", get(node_api::my_node_transactions))
         .route(

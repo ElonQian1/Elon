@@ -25,18 +25,28 @@ type Status = 'loading' | 'no_node' | 'offline' | 'online'
 const DOWNLOAD_URL = '/api/node-agent/download/windows'
 const POLL_INTERVAL_MS = 6000
 
-export default function NodeStatusBanner() {
-  const [status, setStatus] = useState<Status>('loading')
-  const [node, setNode] = useState<NodeInfo | null>(null)
+interface Props {
+  // 由父组件（AiChatPage）传入，避免重复轮询
+  onlineNodeId?: string | null
+  onlineNodeName?: string
+}
+
+export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeName: extNodeName }: Props) {
+  // 如果父组件提供了节点状态则直接使用，否则自己轮询
+  const [selfStatus, setSelfStatus] = useState<Status>('loading')
+  const [selfNode, setSelfNode] = useState<NodeInfo | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
+  const isControlled = extNodeId !== undefined
+
   useEffect(() => {
+    if (isControlled) return // 父组件管理状态，不自己轮询
     checkNodes()
     pollRef.current = setInterval(checkNodes, POLL_INTERVAL_MS)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
-  }, []) // eslint-disable-line
+  }, [isControlled]) // eslint-disable-line
 
   async function checkNodes() {
     try {
@@ -44,30 +54,30 @@ export default function NodeStatusBanner() {
       const nodes = data.nodes ?? []
       const online = nodes.find((n) => n.online)
       if (online) {
-        setNode(online)
-        setStatus('online')
+        setSelfNode(online)
+        setSelfStatus('online')
         setExpanded(false)
       } else if (nodes.length > 0) {
-        setNode(nodes[0])
-        setStatus('offline')
+        setSelfNode(nodes[0])
+        setSelfStatus('offline')
       } else {
-        setNode(null)
-        setStatus('no_node')
+        setSelfNode(null)
+        setSelfStatus('no_node')
       }
-    } catch {
-      // 网络错误时保持当前状态
-    }
+    } catch { /* keep current */ }
   }
 
+  // 合并：优先使用父组件传来的状态
+  const status: Status = isControlled ? (extNodeId ? 'online' : selfStatus === 'loading' ? 'no_node' : selfStatus) : selfStatus
+  const nodeDisplayName = isControlled ? (extNodeName ?? '') : (selfNode?.display_name ?? selfNode?.device_name ?? '')
+
   function openDevChannel() {
-    // 跳到项目对话页（用户的 PC 节点项目开发频道）
     window.location.href = '/pc/'
   }
 
-  // 在线且折叠时只显示一行状态 pill
   if (status === 'online' && !expanded) {
     return (
-      <div className={styles.pill} title={`本机 CLI 已就绪：${node?.display_name ?? node?.device_name ?? ''}`}>
+      <div className={styles.pill} title={`本机 CLI 已就绪：${nodeDisplayName}`}>
         <span className={styles.pillDot} />
         <span className={styles.pillText}>本机 CLI 已就绪</span>
         <button className={styles.pillAction} type="button" onClick={openDevChannel}>
@@ -89,7 +99,7 @@ export default function NodeStatusBanner() {
         <span className={[styles.statusDot, status === 'offline' ? styles.dotOffline : styles.dotNone].join(' ')} />
         <strong className={styles.bannerTitle}>
           {status === 'offline'
-            ? `本机节点未运行（${node?.display_name ?? node?.device_name ?? '未知设备'}）`
+            ? `本机节点未运行（${nodeDisplayName}）`
             : '连接你的 Windows 电脑，让 AI 真正帮你干活'}
         </strong>
         {status === 'online' && (
@@ -149,7 +159,7 @@ export default function NodeStatusBanner() {
 
       {status === 'online' && (
         <div className={styles.readyBar}>
-          <span>✓ 节点已连接：{node?.display_name ?? node?.device_name}</span>
+          <span>✓ 节点已连接：{nodeDisplayName}（对话内已可运行本机命令）</span>
           <button className={styles.readyBtn} type="button" onClick={openDevChannel}>
             进入本机开发频道（执行命令行）
           </button>

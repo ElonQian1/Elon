@@ -96,6 +96,7 @@ mod lm_chat;
 mod node_agent_cli_security;
 mod node_api;
 mod node_compute_admin;
+mod node_exec_api;
 mod node_hardware_probe;
 mod node_payout_admin;
 mod node_registry;

@@ -22,6 +22,10 @@ interface AiMessage {
   role: 'user' | 'assistant' | 'system'
   content: string
   created_at?: string
+  // 节点本机执行输出扩展字段
+  node_exec?: boolean
+  node_display_name?: string
+  exit_ok?: boolean
 }
 
 interface LmChatResponse {
@@ -55,6 +59,9 @@ export default function AiChatPage() {
   const [friends, setFriends] = useState<Friend[]>([])
   const [totalUserCount, setTotalUserCount] = useState(0)
   const [userQuery, setUserQuery] = useState('')
+  // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
+  const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
+  const [onlineNodeName, setOnlineNodeName] = useState<string>('')
 
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -69,6 +76,27 @@ export default function AiChatPage() {
         setTotalUserCount(d.total_count ?? d.recommendations?.length ?? 0)
       })
       .catch(() => {})
+  }, [user?.id]) // eslint-disable-line
+
+  // ── 节点状态轮询（每 6s）──────────────────────────────────────────────
+  useEffect(() => {
+    function checkNode() {
+      api.get<{ nodes?: Array<{ node_id: string; online: boolean; ai_cli_ready: boolean; display_name: string; device_name?: string }> }>('/api/me/nodes')
+        .then(d => {
+          const on = (d.nodes ?? []).find(n => n.online && (n.ai_cli_ready || (d.nodes ?? []).some(x => x.online)))
+          if (on) {
+            setOnlineNodeId(on.node_id)
+            setOnlineNodeName(on.display_name || on.device_name || on.node_id.slice(0, 8))
+          } else {
+            setOnlineNodeId(null)
+            setOnlineNodeName('')
+          }
+        })
+        .catch(() => {})
+    }
+    checkNode()
+    const t = setInterval(checkNode, 6000)
+    return () => clearInterval(t)
   }, [user?.id]) // eslint-disable-line
 
   // 客户端搜索过滤
@@ -137,17 +165,34 @@ export default function AiChatPage() {
 
     setSending(true)
     try {
-      const res = await api.post<LmChatResponse>('/api/llm/chat', {
-        messages: [{ role: 'user', content: text }],
-        agent: selectedAgent || null,
-        conversation_id: convId,
-        scope: 'chat_memory',
-      })
-      const reply = res.reply ?? res.content ?? ''
-      const aiMsg: AiMessage = { role: 'assistant', content: reply, created_at: new Date().toISOString() }
-      setMessages((prev) => [...prev, aiMsg])
-      // 刷新会话列表（标题可能从服务端更新）
-      loadConversations()
+      if (onlineNodeId) {
+        // ── 节点在线：直接在用户电脑上执行 ────────────────────────────────
+        const res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
+          '/api/me/node/exec',
+          { prompt: text, node_id: onlineNodeId },
+        )
+        const nodeMsg: AiMessage = {
+          role: 'assistant',
+          content: res.output || (res.error ? `执行失败：${res.error}` : '（无输出）'),
+          created_at: new Date().toISOString(),
+          node_exec: true,
+          node_display_name: res.node_display_name || onlineNodeName,
+          exit_ok: res.exit_ok,
+        }
+        setMessages((prev) => [...prev, nodeMsg])
+      } else {
+        // ── 无节点：走云端 AI 对话 ───────────────────────────────────────
+        const res = await api.post<LmChatResponse>('/api/llm/chat', {
+          messages: [{ role: 'user', content: text }],
+          agent: selectedAgent || null,
+          conversation_id: convId,
+          scope: 'chat_memory',
+        })
+        const reply = res.reply ?? res.content ?? ''
+        const aiMsg: AiMessage = { role: 'assistant', content: reply, created_at: new Date().toISOString() }
+        setMessages((prev) => [...prev, aiMsg])
+        loadConversations()
+      }
     } catch (err) {
       setError((err as { message?: string }).message ?? '发送失败')
     } finally {
@@ -244,28 +289,34 @@ export default function AiChatPage() {
           }}
         >
           {/* 本机节点状态横幅 */}
-          <NodeStatusBanner />
+          <NodeStatusBanner onlineNodeId={onlineNodeId} onlineNodeName={onlineNodeName} />
           {messages.length === 0 && !messagesLoading && (
             <div className={styles.welcome}>
               <h2>你好，我是一龙 AI</h2>
-              <p>随时可以开始对话，我会记住我们聊过的内容。</p>
+              <p>{onlineNodeId ? `本机「${onlineNodeName}」已就绪，直接输入需求或命令。` : '随时可以开始对话，我会记住我们聊过的内容。'}</p>
             </div>
           )}
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
           {messages.filter((m) => m.role !== 'system').map((m, i) => {
             const isUser = m.role === 'user'
-            const hasMarkdown = !isUser && /[#*`\[\]>|]/.test(m.content)
+            const isNode = !isUser && m.node_exec === true
+            const hasMarkdown = !isUser && !isNode && /[#*`\[\]>|]/.test(m.content)
+            const avatarLabel = isUser ? (user?.account?.[0]?.toUpperCase() ?? '我') : (isNode ? '🖥' : 'AI')
+            const nameLabel = isUser ? (user?.nickname ?? user?.account ?? '我') : (isNode ? `本机 · ${m.node_display_name ?? ''}` : 'AI')
             return (
               <div key={i} className={[styles.msgRow, isUser ? styles.ownRow : ''].join(' ')}>
-                <div className={styles.avatar}>{isUser ? (user?.account?.[0]?.toUpperCase() ?? '我') : 'AI'}</div>
+                <div className={[styles.avatar, isNode ? styles.nodeAvatar : ''].join(' ')}>{avatarLabel}</div>
                 <div className={styles.msgBody}>
                   <div className={styles.msgMeta}>
-                    <strong>{isUser ? (user?.nickname ?? user?.account ?? '我') : 'AI'}</strong>
+                    <strong className={isNode ? styles.nodeLabel : ''}>{nameLabel}</strong>
                     {m.created_at && <span>{formatTime(m.created_at)}</span>}
+                    {isNode && m.exit_ok === false && <span className={styles.exitFail}>执行失败</span>}
                   </div>
-                  {hasMarkdown
-                    ? <div className={styles.msgContent}><MarkdownContent content={m.content} copy /></div>
-                    : <div className={styles.msgContent}>{m.content}</div>}
+                  {isNode
+                    ? <pre className={styles.nodeOutput}>{m.content}</pre>
+                    : hasMarkdown
+                      ? <div className={styles.msgContent}><MarkdownContent content={m.content} copy /></div>
+                      : <div className={styles.msgContent}>{m.content}</div>}
                 </div>
               </div>
             )
