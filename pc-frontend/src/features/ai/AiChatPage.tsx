@@ -43,7 +43,8 @@ export default function AiChatPage() {
   const modelLabel = useModelStore((s) => s.label)
 
   const [conversations, setConversations] = useState<AiConversation[]>([])
-  const [activeConvId, setActiveConvId] = useState<string | null>(null)
+  // 初始即创建新会话 ID，保证输入框始终可见（与旧版一致）
+  const [activeConvId, setActiveConvId] = useState<string>(() => uuidv4())
   const [messages, setMessages] = useState<AiMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [input, setInput] = useState('')
@@ -126,8 +127,7 @@ export default function AiChatPage() {
     setError('')
     if (textareaRef.current) textareaRef.current.style.height = '46px'
 
-    const convId = activeConvId ?? uuidv4()
-    if (!activeConvId) setActiveConvId(convId)
+    const convId = activeConvId
 
     // 乐观更新：先显示用户消息
     const userMsg: AiMessage = { role: 'user', content: text, created_at: new Date().toISOString() }
@@ -203,9 +203,7 @@ export default function AiChatPage() {
       <div className={styles.chat}>
         <header className={styles.topbar}>
           <span className={styles.topbarTitle}>
-            {activeConvId
-              ? (conversations.find((c) => c.id === activeConvId)?.title ?? '新对话')
-              : '一龙 AI'}
+            {conversations.find((c) => c.id === activeConvId)?.title ?? '新对话'}
           </span>
           <div className={styles.topbarRight}>
             <span className={styles.modelBadge}>{shortButtonLabel(modelLabel)}</span>
@@ -244,13 +242,10 @@ export default function AiChatPage() {
             if (el) atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
           }}
         >
-          {!activeConvId && (
+          {messages.length === 0 && !messagesLoading && (
             <div className={styles.welcome}>
               <h2>你好，我是一龙 AI</h2>
               <p>随时可以开始对话，我会记住我们聊过的内容。</p>
-              <button className={styles.startBtn} onClick={newConversation} type="button">
-                + 开始新对话
-              </button>
             </div>
           )}
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
@@ -284,8 +279,7 @@ export default function AiChatPage() {
           )}
         </div>
 
-        {activeConvId !== null && (
-          <form className={styles.composer} onSubmit={handleSend}>
+        <form className={styles.composer} onSubmit={handleSend}>
             <button
               ref={modelBtnRef}
               className={styles.modelBtn}
@@ -313,7 +307,6 @@ export default function AiChatPage() {
               {sending ? '…' : '发送'}
             </button>
           </form>
-        )}
         {error && <p className={styles.sendError}>{error}</p>}
       </div>
 
