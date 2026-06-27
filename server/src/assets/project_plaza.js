@@ -322,11 +322,6 @@
 
   function renderCard(project) {
     const identity = projectIdentity(project);
-    const joined = state.joinedIds.has(project.id);
-    const busy = state.busyId === project.id;
-    const mode = normalizeJoinMode(project.join_mode);
-    const action = joined ? 'open' : mode === 'approval' ? 'apply' : 'join';
-    const actionLabel = busy ? '处理中...' : joinActionLabel(mode, joined);
     return `
       <div class="project-plaza-card" data-id="${escapeHtml(project.id)}">
         <div class="project-plaza-card-top">
@@ -336,7 +331,7 @@
             <div class="project-plaza-owner">创建者：${escapeHtml(project.owner_account || '未知')}</div>
           </div>
           <div class="project-plaza-actions">
-            <button class="project-plaza-btn" type="button" data-plaza-action="${action}" data-id="${escapeHtml(project.id)}" aria-label="${escapeHtml(actionLabel)}" title="${escapeHtml(actionLabel)}">${escapeHtml(actionLabel)}</button>
+            <button class="project-plaza-btn" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="进入项目空间" title="进入项目空间">进入项目空间</button>
             <button class="project-plaza-btn" type="button" data-plaza-action="share" data-id="${escapeHtml(project.id)}" aria-label="分享项目" title="分享项目">分享项目</button>
           </div>
         </div>
@@ -425,7 +420,7 @@
     if (!project) project = state.projects.find((p) => p.id === id);
     const app = bridge();
     if (project && typeof app.openProject === 'function') app.openProject(project);
-    else window.alert('项目已加入，但当前页面暂时无法打开，请刷新后重试');
+    else window.alert('项目暂时无法打开，请刷新后重试');
   }
 
   function projectShareText(project) {

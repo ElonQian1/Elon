@@ -12,6 +12,7 @@ internal data class ProjectSpaceSummary(
     val name: String,
     val description: String?,
     val role: String,
+    val joinMode: String,
     val memberCount: Int,
     val iconDataUrl: String?,
     val updatedAt: String

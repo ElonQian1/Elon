@@ -656,18 +656,13 @@ class MainActivity : AppCompatActivity() {
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             getListContainer = { binding.marketplaceListContainer },
-            openJoinedProject = { storeProject ->
-                val newProject = storeProject.toJointAppProject()
-                if (s.projects.none { it.id == storeProject.id }) {
-                    s.projects.add(newProject)
-                    projectStateActions.saveProjects()
-                }
-                val idx = s.projects.indexOfFirst { it.id == storeProject.id }.takeIf { it >= 0 }
-                    ?: s.projects.lastIndex
-                s.activeProjectIndex = idx
-                projectStateActions.saveProjects()
-                homeListActions.renderProjectList()
-                projectSpaceController.openProjectSpace(storeProject.id, storeProject.name, true)
+            openProjectSpace = { storeProject ->
+                projectSpaceController.openProjectSpace(
+                    storeProject.id,
+                    storeProject.displayTitle(),
+                    true,
+                    storeProject.iconDataUrl
+                )
             }
         )
     }

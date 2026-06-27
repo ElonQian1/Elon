@@ -607,6 +607,8 @@ pub struct ProjectSpaceSummary {
     pub display_name: Option<String>,
     pub description: Option<String>,
     pub role: String,
+    pub is_public: bool,
+    pub join_mode: String,
     pub member_count: i64,
     pub icon_data_url: Option<String>,
     pub updated_at: String,

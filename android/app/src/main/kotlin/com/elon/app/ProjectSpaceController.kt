@@ -96,6 +96,7 @@ internal class ProjectSpaceController(
             Toast.makeText(activity, "项目资源入口正在整理", Toast.LENGTH_SHORT).show()
         },
         openProjectMembers = { showMembers() },
+        joinProject = { handleProjectSpaceJoin() },
         projectApkActionLabel = {
             val space = activeSpace
             projectApkActionLabel(
@@ -115,6 +116,53 @@ internal class ProjectSpaceController(
             )
         }
     )
+
+    private fun handleProjectSpaceJoin() {
+        val space = activeSpace ?: return
+        if (!isProjectSpaceVisitor(space.project.role)) {
+            showMembers()
+            return
+        }
+        if (!AuthManager.isLoggedIn(activity)) {
+            Toast.makeText(activity, "请先登录后加入联合开发", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val token = AuthManager.token(activity)?.trim().orEmpty()
+        if (token.isBlank()) {
+            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val joinMode = normalizeProjectJoinMode(space.project.joinMode)
+        if (joinMode == PROJECT_JOIN_MODE_INVITE) {
+            Toast.makeText(activity, "这个项目仅支持邀请加入", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val projectId = space.project.id
+        thread(name = "project-space-join") {
+            val result = runCatching {
+                if (joinMode == PROJECT_JOIN_MODE_APPROVAL) {
+                    requestJoinStoreProject(http, serverUrl, projectId, token)
+                    "申请已提交，等待项目管理员审核"
+                } else {
+                    joinStoreProject(http, serverUrl, projectId, token)
+                    "已加入联合开发"
+                }
+            }
+            activity.runOnUiThread {
+                result
+                    .onSuccess { message ->
+                        Toast.makeText(activity, message, Toast.LENGTH_SHORT).show()
+                        if (joinMode != PROJECT_JOIN_MODE_APPROVAL) {
+                            reloadProjectSpaceAfterMemberRoleChange(reopenMembers = false)
+                        }
+                    }
+                    .onFailure {
+                        Toast.makeText(activity, it.message ?: "加入联合开发失败", Toast.LENGTH_SHORT).show()
+                    }
+            }
+        }
+    }
+
     private val postComposer = ProjectSpacePostComposer(
         activity = activity,
         dp = dp,

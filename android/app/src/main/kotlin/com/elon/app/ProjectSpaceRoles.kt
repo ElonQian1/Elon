@@ -8,7 +8,12 @@ internal fun projectRoleLabel(role: String?): String = when (role.normalizedProj
     "editor" -> "协作者"
     "member" -> "成员"
     "observer", "viewer" -> "只读成员"
+    "visitor" -> "访客"
     else -> role?.takeIf { it.isNotBlank() } ?: "成员"
+}
+
+internal fun isProjectSpaceVisitor(role: String?): Boolean {
+    return role.normalizedProjectRole() == "visitor"
 }
 
 internal fun canManageProjectMembers(role: String?): Boolean {

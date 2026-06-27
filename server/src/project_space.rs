@@ -136,7 +136,7 @@ pub async fn get_project_space(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    let access = match project_access(&state, &user.id, &project_id) {
+    let access = match project_space_access(&state, &user.id, &project_id) {
         Ok(access) => access,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
@@ -904,7 +904,7 @@ pub async fn list_channel_messages(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    let project = match project_access(&state, &user.id, &project_id) {
+    let project = match project_space_access(&state, &user.id, &project_id) {
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
@@ -986,7 +986,7 @@ pub async fn send_channel_message(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    let project = match project_access(&state, &user.id, &project_id) {
+    let project = match project_space_access(&state, &user.id, &project_id) {
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
@@ -1639,6 +1639,14 @@ fn query_limit(query: &HashMap<String, String>, fallback: i64) -> i64 {
         .get("limit")
         .and_then(|value| value.parse::<i64>().ok())
         .unwrap_or(fallback)
+}
+
+fn project_space_access(
+    state: &AppState,
+    user_id: &str,
+    project_id: &str,
+) -> anyhow::Result<ProjectAccess> {
+    state.store.get_project_space_access(user_id, project_id)
 }
 
 fn ensure_user_project_for_space(

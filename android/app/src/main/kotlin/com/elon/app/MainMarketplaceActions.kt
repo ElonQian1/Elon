@@ -19,7 +19,6 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import okhttp3.OkHttpClient
 import java.util.Locale
@@ -33,7 +32,7 @@ internal class MainMarketplaceActions(
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?,
     private val getListContainer: () -> LinearLayout,
-    private val openJoinedProject: (StoreProject) -> Unit = {}
+    private val openProjectSpace: (StoreProject) -> Unit = {}
 ) {
     private data class MarketplaceFilter(
         val key: String,
@@ -332,7 +331,6 @@ internal class MainMarketplaceActions(
     }
 
     private fun createCardHeader(project: StoreProject, identity: ProjectCardIdentity): View {
-        val alreadyJoined = isProjectJoined(project)
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -376,11 +374,10 @@ internal class MainMarketplaceActions(
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
-                val entryAction = iconActionButton(
+                addView(iconActionButton(
                     iconRes = R.drawable.ic_plaza_enter_space,
-                    description = projectEntryActionLabel(project, alreadyJoined)
-                ) { tryEnterProject(project, it) }
-                addView(entryAction, iconActionParams(first = true))
+                    description = "进入项目空间"
+                ) { openProjectSpace(project) }, iconActionParams(first = true))
                 addView(iconActionButton(
                     iconRes = R.drawable.ic_plaza_share_project,
                     description = "分享项目"
@@ -587,107 +584,6 @@ internal class MainMarketplaceActions(
         }
     }
 
-    private fun setIconButtonBusy(button: View, busy: Boolean) {
-        button.isEnabled = !busy
-        button.isClickable = !busy
-        button.alpha = if (busy) DISABLED_ACTION_ALPHA else 1f
-    }
-
-    private fun tryEnterProject(project: StoreProject, actionBtn: View) {
-        if (isProjectJoined(project)) {
-            openJoinedProject(project)
-            return
-        }
-        if (!AuthManager.isLoggedIn(activity)) {
-            Toast.makeText(activity, "请先登录后加入项目", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val token = AuthManager.token(activity) ?: run {
-            Toast.makeText(activity, "登录已过期，请重新登录", Toast.LENGTH_SHORT).show()
-            return
-        }
-        if (normalizeProjectJoinMode(project.joinMode) == PROJECT_JOIN_MODE_APPROVAL) {
-            tryRequestJoinProjectFromIcon(project, actionBtn, token)
-            return
-        }
-
-        setIconButtonBusy(actionBtn, true)
-        thread(name = "join-project") {
-            val result = runCatching { joinStoreProject(http, serverUrl, project.id, token) }
-            activity.runOnUiThread {
-                result
-                    .onSuccess {
-                        joinedIds.add(project.id)
-                        markProjectJoined(project, actionBtn)
-                        Toast.makeText(activity, projectJoinSuccessToast(project.joinMode), Toast.LENGTH_SHORT).show()
-                        openJoinedProject(project)
-                    }
-                    .onFailure {
-                        setIconButtonBusy(actionBtn, false)
-                        Toast.makeText(activity, it.message ?: "加入失败", Toast.LENGTH_SHORT).show()
-                    }
-            }
-        }
-    }
-
-    private fun tryRequestJoinProjectFromIcon(project: StoreProject, actionBtn: View, token: String) {
-        setIconButtonBusy(actionBtn, true)
-        thread(name = "request-join-project") {
-            val result = runCatching { requestJoinStoreProject(http, serverUrl, project.id, token) }
-            activity.runOnUiThread {
-                result
-                    .onSuccess {
-                        actionBtn.alpha = DISABLED_ACTION_ALPHA
-                        Toast.makeText(activity, "申请已提交，等待项目管理员审核", Toast.LENGTH_SHORT).show()
-                    }
-                    .onFailure {
-                        setIconButtonBusy(actionBtn, false)
-                        Toast.makeText(activity, it.message ?: "申请失败", Toast.LENGTH_SHORT).show()
-                    }
-            }
-        }
-    }
-
-    private fun tryInstallProjectFromIcon(project: StoreProject, installBtn: View, joinBtn: View?) {
-        if (!isAndroidApkInstallSupported()) {
-            Toast.makeText(activity, "当前设备不是 Android，无法直接安装 APK", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val apkUrl = project.latestApkUrl?.trim().orEmpty()
-        if (apkUrl.isBlank()) {
-            Toast.makeText(activity, "这个项目还没有可安装 APK", Toast.LENGTH_SHORT).show()
-            return
-        }
-        val token = AuthManager.token(activity)?.trim().orEmpty()
-        if (!AuthManager.isLoggedIn(activity) || token.isBlank()) {
-            Toast.makeText(activity, "请先登录后安装 APK", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        val shouldJoin = !isProjectJoined(project)
-        setIconButtonBusy(installBtn, true)
-        thread(name = "install-store-project") {
-            val result = runCatching {
-                if (shouldJoin) joinStoreProject(http, serverUrl, project.id, token)
-                apkUrl
-            }
-            activity.runOnUiThread {
-                setIconButtonBusy(installBtn, false)
-                result
-                    .onSuccess { url ->
-                        if (shouldJoin) {
-                            joinedIds.add(project.id)
-                            joinBtn?.let { markProjectJoined(project, it) }
-                        }
-                        openProjectApkInstall(activity, url, token, project.id, project.name, http)
-                    }
-                    .onFailure {
-                        Toast.makeText(activity, it.message ?: "安装失败", Toast.LENGTH_SHORT).show()
-                    }
-            }
-        }
-    }
-
     private fun shareProject(project: StoreProject) {
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
@@ -712,12 +608,6 @@ internal class MainMarketplaceActions(
 
     private fun isProjectJoined(project: StoreProject): Boolean {
         return !project.viewerRole.isNullOrBlank() || joinedIds.contains(project.id)
-    }
-
-    private fun markProjectJoined(project: StoreProject, joinBtn: View) {
-        joinBtn.contentDescription = projectEntryActionLabel(project, true)
-        setIconButtonBusy(joinBtn, false)
-        joinBtn.setOnClickListener { openJoinedProject(project) }
     }
 
     private fun centerMessage(text: String, color: String): TextView {
@@ -769,14 +659,6 @@ internal class MainMarketplaceActions(
 
     private fun isAsciiLetter(value: Char): Boolean {
         return value in 'A'..'Z' || value in 'a'..'z'
-    }
-
-    private fun projectEntryActionLabel(project: StoreProject, alreadyJoined: Boolean): String {
-        return if (alreadyJoined || normalizeProjectJoinMode(project.joinMode) != PROJECT_JOIN_MODE_APPROVAL) {
-            "进入空间"
-        } else {
-            "申请加入"
-        }
     }
 
     private fun rect(color: String, radiusDp: Int = 0): GradientDrawable {

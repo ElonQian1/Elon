@@ -27,6 +27,7 @@ internal class ProjectSpaceFeedView(
     private val openProjectDocuments: () -> Unit,
     private val openProjectResources: () -> Unit,
     private val openProjectMembers: () -> Unit,
+    private val joinProject: () -> Unit,
     private val projectApkActionLabel: () -> String,
     private val downloadProjectApk: () -> Unit
 ) {
@@ -109,8 +110,9 @@ internal class ProjectSpaceFeedView(
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
+            val visitor = isProjectSpaceVisitor(space.project.role)
             addView(TextView(activity).apply {
-                text = "加入"
+                text = if (visitor) "加入" else "成员"
                 textSize = 16f
                 setTypeface(typeface, Typeface.BOLD)
                 includeFontPadding = false
@@ -119,8 +121,8 @@ internal class ProjectSpaceFeedView(
                 background = roundedBackground("#D9D9D9", 16)
                 isClickable = true
                 foreground = selectableForeground()
-                setOnClickListener { openProjectMembers() }
-                contentDescription = "查看项目成员"
+                setOnClickListener { if (visitor) joinProject() else openProjectMembers() }
+                contentDescription = if (visitor) "申请加入联合开发" else "查看项目成员"
             }, LinearLayout.LayoutParams(dp(68), dp(30)).apply {
                 marginStart = dp(18)
             })

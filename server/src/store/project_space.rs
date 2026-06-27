@@ -86,13 +86,18 @@ impl Store {
         let conn = self.conn()?;
         let mut project = conn
             .query_row(
-            "SELECT p.id, p.name, p.description, pm.role,
+            "SELECT p.id, p.name, p.description, COALESCE(pm.role, 'visitor') AS role,
                     (SELECT COUNT(*) FROM project_members count_pm WHERE count_pm.project_id = p.id),
                     p.icon_data_url, p.updated_at, p.source_type, p.workspace_path,
-                    p.display_name
+                    p.display_name, p.is_public, p.join_mode
              FROM projects p
-             JOIN project_members pm ON pm.project_id = p.id
-             WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
+             LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
+             WHERE p.id = ?1
+               AND p.status != 'deleted'
+               AND (
+                    pm.user_id IS NOT NULL
+                    OR (p.is_public = 1 AND p.join_mode != 'invite')
+               )",
             params![project_id, user_id],
             |row| {
                 let mut project = ProjectSpaceSummary {
@@ -101,6 +106,8 @@ impl Store {
                     display_name: row.get(9)?,
                     description: row.get(2)?,
                     role: row.get(3)?,
+                    is_public: row.get::<_, i64>(10)? != 0,
+                    join_mode: row.get(11)?,
                     member_count: row.get(4)?,
                     icon_data_url: row.get(5)?,
                     updated_at: row.get(6)?,
@@ -117,8 +124,10 @@ impl Store {
         )
             .optional()?
             .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))?;
-        if let Some(role) = project_member_effective_role_locked(&conn, project_id, user_id)? {
-            project.role = role;
+        if project.role != "visitor" {
+            if let Some(role) = project_member_effective_role_locked(&conn, project_id, user_id)? {
+                project.role = role;
+            }
         }
         Ok(project)
     }
@@ -910,6 +919,40 @@ impl Store {
     }
 }
 
+fn project_space_is_public_for_visitors_locked(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+) -> Result<bool> {
+    let count: i64 = conn.query_row(
+        "SELECT COUNT(*)
+           FROM projects
+          WHERE id = ?1
+            AND status != 'deleted'
+            AND is_public = 1
+            AND join_mode != 'invite'",
+        params![project_id],
+        |row| row.get(0),
+    )?;
+    Ok(count > 0)
+}
+
+fn visitor_project_channel_permissions(channel_kind: &str) -> ProjectChannelPermissions {
+    let can_view = matches!(
+        channel_kind,
+        "announcements" | "discussion" | "requirements" | "suggestions" | "issues"
+    );
+    let can_send = matches!(
+        channel_kind,
+        "discussion" | "requirements" | "suggestions" | "issues"
+    );
+    ProjectChannelPermissions {
+        can_view,
+        can_send,
+        can_start_ai: false,
+        can_manage: false,
+    }
+}
+
 fn project_member_channel_permissions_locked(
     conn: &rusqlite::Connection,
     project_id: &str,
@@ -918,6 +961,17 @@ fn project_member_channel_permissions_locked(
 ) -> Result<ProjectChannelPermissions> {
     let channel = project_channel_permission_context_locked(conn, project_id, channel_id)?;
     let channel_kind = channel.kind.as_str();
+    if !project_member_exists_locked(conn, project_id, user_id)? {
+        if project_space_is_public_for_visitors_locked(conn, project_id)? {
+            return Ok(visitor_project_channel_permissions(channel_kind));
+        }
+        return Ok(ProjectChannelPermissions {
+            can_view: false,
+            can_send: false,
+            can_start_ai: false,
+            can_manage: false,
+        });
+    }
     let role_refs = project_member_role_refs_locked(conn, project_id, user_id)?;
     let role_ids: Vec<String> = role_refs.iter().map(|role| role.id.clone()).collect();
     let is_owner = role_ids.iter().any(|role| role == "owner");
@@ -1393,6 +1447,21 @@ fn ensure_project_channel_category_exists_locked(
     )
     .optional()?
     .ok_or_else(|| anyhow!("频道分类不存在"))
+}
+
+fn project_member_exists_locked(
+    conn: &rusqlite::Connection,
+    project_id: &str,
+    user_id: &str,
+) -> Result<bool> {
+    conn.query_row(
+        "SELECT 1 FROM project_members WHERE project_id = ?1 AND user_id = ?2",
+        params![project_id, user_id],
+        |row| row.get::<_, i64>(0),
+    )
+    .optional()
+    .map(|value| value.is_some())
+    .map_err(Into::into)
 }
 
 fn ensure_project_member_exists_locked(

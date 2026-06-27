@@ -3236,7 +3236,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   if (projectSpaceJoinBtn) {
     projectSpaceJoinBtn.addEventListener('click', () => {
-      showNativeOnly('成员列表和加入管理请在 Android APK 中使用。');
+      joinCurrentProjectSpace();
     });
   }
   if (projectSpacePostBtn) {
@@ -5254,6 +5254,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const role = String((project && project.role) || '').toLowerCase();
     return role === 'owner' || role === 'admin' || role === 'editor';
   }
+  function projectSpaceRole(project) {
+    return String((project && (project.role || project.viewer_role || project.viewerRole)) || '').trim().toLowerCase();
+  }
+  function isProjectSpaceVisitor(project) {
+    const role = projectSpaceRole(project);
+    if (role) return role === 'visitor';
+    return !!project && !projects.some((item) => item && item.id === project.id);
+  }
+  function projectSpaceJoinMode(project) {
+    const mode = String((project && (project.join_mode || project.joinMode)) || 'approval').trim().toLowerCase();
+    return ['open', 'approval', 'readonly', 'invite'].includes(mode) ? mode : 'approval';
+  }
   function canEditProjectAnnouncement(project) {
     const role = String((project && project.role) || '').trim().toLowerCase();
     return role === 'owner' || role === 'creator';
@@ -5304,6 +5316,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       if (projectSpaceName) projectSpaceName.textContent = '项目';
       if (projectSpaceMeta) projectSpaceMeta.textContent = '创建者： 项目成员\n成员 1    帖子 0';
       if (projectSpacePostCount) projectSpacePostCount.textContent = '0贴';
+      if (projectSpaceJoinBtn) projectSpaceJoinBtn.textContent = '加入';
       projectIntroCard.textContent = '添加项目简介';
       projectIntroCard.classList.add('empty');
       projectIntroCard.disabled = true;
@@ -5318,6 +5331,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       projectSpaceMeta.textContent = '创建者： ' + projectSpaceOwnerOf(project) +
         '\n成员 ' + members + '    帖子 ' + currentProjectSpacePostCount;
     }
+    if (projectSpaceJoinBtn) projectSpaceJoinBtn.textContent = isProjectSpaceVisitor(project) ? '加入' : '成员';
     projectIntroCard.textContent = description || (editable ? '添加项目简介' : '暂无项目简介');
     projectIntroCard.classList.toggle('empty', !description);
     projectIntroCard.disabled = !editable;
@@ -5678,6 +5692,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '加载项目空间失败');
     currentProjectSpaceLatestApkUrl = String(data.latest_apk_url || data.latestApkUrl || '').trim();
+    if (data.project && currentProject && currentProject.id === project.id) {
+      currentProject = Object.assign({}, currentProject, data.project);
+      renderProjectIntroCard(currentProject);
+    }
     const channels = Array.isArray(data.channels) ? data.channels : [];
     await Promise.all(channels.map(async (channel) => {
       if (!channel || !channel.id) return;
@@ -5687,6 +5705,43 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       channel.messages = msgRes.ok && Array.isArray(msgData.messages) ? msgData.messages : [];
     }));
     renderProjectSpaceFeed({ project: data.project || project, channels }, false);
+  }
+  async function joinCurrentProjectSpace() {
+    if (!currentProject || !currentProject.id) return;
+    if (!isProjectSpaceVisitor(currentProject)) {
+      showNativeOnly('成员列表和加入管理请在 Android APK 中使用。');
+      return;
+    }
+    if (!token) {
+      window.alert('请先登录后加入联合开发');
+      return;
+    }
+    const projectId = currentProject.id;
+    const mode = projectSpaceJoinMode(currentProject);
+    if (mode === 'invite') {
+      window.alert('这个项目仅支持邀请加入');
+      return;
+    }
+    if (projectSpaceJoinBtn) projectSpaceJoinBtn.disabled = true;
+    try {
+      const path = mode === 'approval' ? '/request-join' : '/join';
+      const res = await api('/api/projects/' + encodeURIComponent(projectId) + path, {
+        method: 'POST',
+        body: mode === 'approval' ? JSON.stringify({ message: '' }) : '{}'
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.ok === false) {
+        throw new Error(data.error || data.message || '加入联合开发失败');
+      }
+      window.alert(data.message || (mode === 'approval' ? '申请已提交，等待项目管理员审核' : '已加入联合开发'));
+      if (mode !== 'approval') {
+        await loadProjects();
+      }
+    } catch (err) {
+      window.alert((err && err.message) || '加入联合开发失败');
+    } finally {
+      if (projectSpaceJoinBtn) projectSpaceJoinBtn.disabled = false;
+    }
   }
   async function editProjectAnnouncement(channel, currentText) {
     if (!currentProject || !channel || !canEditProjectAnnouncement(currentProject)) return;

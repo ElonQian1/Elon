@@ -838,6 +838,60 @@ impl Store {
         Ok(access)
     }
 
+    pub fn get_project_space_access(
+        &self,
+        user_id: &str,
+        project_id: &str,
+    ) -> Result<ProjectAccess> {
+        if self.project_member_is_banned(project_id, user_id)? {
+            anyhow::bail!("你已被该项目封禁，无法访问项目空间");
+        }
+        if let Ok(access) = self.get_project_access(user_id, project_id) {
+            return Ok(access);
+        }
+        self.conn()?
+            .query_row(
+                "SELECT p.id, p.name, p.workspace_key, p.source_type, p.repo_url, p.branch,
+                        p.workspace_path, p.node_id,
+                        p.storage_node_id, p.storage_repo_path, p.storage_repo_url,
+                        p.storage_worktree_path, COALESCE(p.storage_status, 'none'), p.status,
+                        COALESCE(
+                            (SELECT prp.mode
+                               FROM project_runtime_permissions prp
+                              WHERE prp.project_id = p.id),
+                            'project_write'
+                        ) AS runtime_permission
+                 FROM projects p
+                 WHERE p.id = ?1
+                   AND p.status != 'deleted'
+                   AND p.is_public = 1
+                   AND p.join_mode != 'invite'",
+                params![project_id],
+                |row| {
+                    Ok(ProjectAccess {
+                        id: row.get(0)?,
+                        name: row.get(1)?,
+                        workspace_key: row.get(2)?,
+                        source_type: row.get(3)?,
+                        repo_url: row.get(4)?,
+                        branch: row.get(5)?,
+                        workspace_path: row.get(6)?,
+                        node_id: row.get(7)?,
+                        storage_node_id: row.get(8)?,
+                        storage_repo_path: row.get(9)?,
+                        storage_repo_url: row.get(10)?,
+                        storage_worktree_path: row.get(11)?,
+                        storage_status: row.get(12)?,
+                        status: row.get(13)?,
+                        runtime_permission: row.get(14)?,
+                        role: "visitor".to_string(),
+                    })
+                },
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("项目不存在，或当前用户无权访问"))
+    }
+
     pub fn update_project_git_metadata(
         &self,
         user_id: &str,

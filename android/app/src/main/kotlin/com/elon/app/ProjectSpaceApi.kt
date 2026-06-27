@@ -402,6 +402,7 @@ private fun parseProjectSpaceSummary(project: JSONObject) = ProjectSpaceSummary(
     name = project.optProjectSpaceDisplayName() ?: project.optString("name", "项目空间"),
     description = project.optString("description").takeIf { it.isNotBlank() },
     role = project.optString("role", "member"),
+    joinMode = normalizeProjectJoinMode(project.optString("join_mode", project.optString("joinMode", PROJECT_JOIN_MODE_INVITE))),
     memberCount = project.optInt("member_count", 0),
     iconDataUrl = project.optProjectSpaceIconDataUrl(),
     updatedAt = project.optString("updated_at", "")
