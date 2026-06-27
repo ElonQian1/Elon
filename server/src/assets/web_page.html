@@ -789,8 +789,8 @@
     }
     .project-space-name {
       color: var(--ink-soft);
-      font-size: 15px;
-      font-weight: 400;
+      font-size: 18px;
+      font-weight: 700;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
@@ -838,14 +838,14 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      font-size: 12px;
+      font-size: 15px;
       cursor: pointer;
       padding: 0;
       white-space: nowrap;
     }
     .project-space-action-icon {
-      width: 24px;
-      height: 24px;
+      width: 28px;
+      height: 28px;
       object-fit: contain;
       display: block;
       flex: none;
@@ -954,7 +954,7 @@
     }
     .project-space-post-head {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       gap: 5px;
       margin-left: 9px;
     }
@@ -979,18 +979,27 @@
       object-fit: cover;
       display: block;
     }
-    .project-space-post-user { min-width: 0; flex: 1; }
+    .project-space-post-user {
+      min-width: 0;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      text-align: left;
+    }
     .project-space-post-name {
       color: var(--ink);
-      font-size: 18px;
+      font-size: 15px;
       overflow: hidden;
+      text-align: left;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .project-space-post-time {
       color: #777777;
-      font-size: 13px;
+      font-size: 12px;
       margin-top: 2px;
+      text-align: left;
     }
     .project-space-topic {
       color: var(--ink);
@@ -999,6 +1008,7 @@
       height: 19px;
       padding: 0 8px;
       display: inline-flex;
+      align-self: flex-start;
       align-items: center;
       justify-content: center;
       font-size: 14px;
@@ -1132,8 +1142,8 @@
         padding-right: 38px;
       }
       .project-space-actions { padding-left: 24px; padding-right: 24px; }
-      .project-space-action { font-size: 12px; gap: 6px; }
-      .project-space-action-icon { width: 24px; height: 24px; }
+      .project-space-action { font-size: 15px; gap: 6px; }
+      .project-space-action-icon { width: 28px; height: 28px; }
       .project-space-post-metrics { padding-left: 0; padding-right: 0; }
     }
     .project-workspace-health {

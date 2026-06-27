@@ -82,9 +82,9 @@ internal class ProjectSpaceFeedView(
                 gravity = Gravity.CENTER_VERTICAL
                 addView(TextView(activity).apply {
                     text = space.project.name.ifBlank { "项目名称" }
-                    textSize = 15f
+                    textSize = 18f
                     setTextColor(Color.parseColor("#B8B8B8"))
-                    setTypeface(typeface, Typeface.NORMAL)
+                    setTypeface(typeface, Typeface.BOLD)
                     includeFontPadding = true
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -190,12 +190,12 @@ internal class ProjectSpaceFeedView(
             setOnClickListener { onClick() }
             addView(ImageView(activity).apply {
                 setImageResource(iconRes)
-            }, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+            }, LinearLayout.LayoutParams(dp(28), dp(28)).apply {
                 marginEnd = dp(6)
             })
             addView(TextView(activity).apply {
                 text = label
-                textSize = 12f
+                textSize = 15f
                 includeFontPadding = false
                 setTextColor(Color.parseColor("#B8B8B8"))
                 maxLines = 1
@@ -458,25 +458,27 @@ internal class ProjectSpaceFeedView(
     private fun postHeader(sender: String, avatarDataUrl: String?, timeText: String, topic: String): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
+            gravity = Gravity.TOP
             addView(avatar(sender, avatarDataUrl), LinearLayout.LayoutParams(dp(34), dp(34)).apply {
                 marginEnd = dp(5)
             })
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
-                gravity = Gravity.CENTER_VERTICAL
+                gravity = Gravity.START
                 addView(TextView(activity).apply {
                     text = sender
-                    textSize = 18f
+                    textSize = 15f
                     includeFontPadding = false
+                    gravity = Gravity.START
                     setTextColor(Color.parseColor("#D9D9D9"))
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
                 addView(TextView(activity).apply {
                     text = "回复于$timeText"
-                    textSize = 13f
+                    textSize = 12f
                     includeFontPadding = false
+                    gravity = Gravity.START
                     setTextColor(Color.parseColor("#777777"))
                     setPadding(0, dp(2), 0, 0)
                 })
