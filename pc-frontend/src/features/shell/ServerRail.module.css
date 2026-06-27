@@ -69,12 +69,6 @@
   flex-shrink: 0;
 }
 
-.modelWrap {
-  width: 48px;
-  display: flex;
-  justify-content: center;
-}
-
 .spacer { flex: 1; }
 
 .userAvatar {
@@ -88,19 +82,6 @@
   background: #3c6fa2;
   border-radius: 16px;
   color: #fff;
-}
-
-.legacyAvatar {
-  background: #2a2d34;
-  color: #d4d7dd;
-  font-size: 14px;
-  font-weight: 800;
-}
-
-.legacyAvatar:hover {
-  background: #6b5a33;
-  border-radius: 16px;
-  color: #fff1c6;
 }
 
 /* ── Tooltip（hover 时显示在 rail 右侧）── */

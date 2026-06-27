@@ -2,8 +2,6 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import { useAuthStore } from '../../store/auth'
 import { useProjectStore } from '../conversation/useProjectStore'
-import { ModelPickerButton } from '../models/ModelPicker'
-import { getPcLegacyUrl, rememberPcLegacyToken } from './pcLegacyUrl'
 import styles from './ServerRail.module.css'
 
 interface RailItem {
@@ -28,9 +26,7 @@ export default function ServerRail() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const user = useAuthStore((s) => s.user)
-  const token = useAuthStore((s) => s.token)
   const [tooltip, setTooltip] = useState<{ text: string; y: number } | null>(null)
-  const legacyUrl = getPcLegacyUrl()
 
   // 项目列表（从 store 读取，实时响应）
   const projects = useProjectStore((s) => s.projects)
@@ -98,23 +94,6 @@ export default function ServerRail() {
       })}
 
       <div className={styles.divider} />
-
-      {/* 模型选择器（紧凑版）*/}
-      <div className={styles.modelWrap}>
-        <ModelPickerButton compact />
-      </div>
-
-      <a
-        className={[styles.avatar, styles.legacyAvatar].join(' ')}
-        href={legacyUrl}
-        onMouseEnter={(e) => showTip(e, '切换旧版对照')}
-        onMouseLeave={() => setTooltip(null)}
-        onClick={() => rememberPcLegacyToken(token)}
-        title="切换旧版对照"
-        aria-label="切换旧版对照"
-      >
-        <span className={styles.icon}>旧</span>
-      </a>
 
       <div className={styles.spacer} />
 
