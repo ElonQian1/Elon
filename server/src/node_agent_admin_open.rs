@@ -10,17 +10,15 @@ pub fn admin_port_from_env() -> u16 {
         .unwrap_or(7799)
 }
 
-/// 打开云端 PC 工作台（带 node_port 参数），让用户在熟悉的云端界面登录后自动绑定本机节点。
-/// 回退到本地管理页（legacy 模式）可通过 NODE_OPEN_LOCAL=1 切换。
+/// 打开云端 PC 工作台。用户登录后云端页面会自动探测本机节点并完成绑定。
+/// 回退到本地管理页可通过 NODE_OPEN_LOCAL=1 切换。
 #[cfg(windows)]
 fn admin_url(port: u16) -> String {
     if std::env::var("NODE_OPEN_LOCAL").map(|v| v == "1").unwrap_or(false) {
-        // 显式要求打开旧版本地管理页
         return format!("http://127.0.0.1:{port}/");
     }
     let cloud_base = std::env::var("NODE_CLOUD_URL")
         .unwrap_or_else(|_| "ws://43.139.149.158:8080/agent/ws".to_string());
-    // ws://host/path → http://host
     let http_base = if let Some(rest) = cloud_base.strip_prefix("wss://") {
         format!("https://{}", rest.split('/').next().unwrap_or("43.139.149.158:8080"))
     } else if let Some(rest) = cloud_base.strip_prefix("ws://") {
@@ -28,7 +26,8 @@ fn admin_url(port: u16) -> String {
     } else {
         "http://43.139.149.158:8080".to_string()
     };
-    format!("{http_base}/pc?node_port={port}")
+    // 直接打开 PC 工作台；云端页面会在后台静默探测 localhost:7799
+    format!("{http_base}/pc")
 }
 
 #[cfg(windows)]
