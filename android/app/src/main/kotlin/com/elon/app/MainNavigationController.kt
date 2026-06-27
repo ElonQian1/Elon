@@ -176,8 +176,8 @@ internal class MainNavigationController(
     private fun showProjectSpaceBottomMenu() {
         setNavigationBarColor(R.color.elon_bg_app)
         binding.pageTabs.visibility = View.GONE
-        binding.projectSpaceAiMenu.visibility = View.VISIBLE
-        binding.projectSpaceAiMenu.bringToFront()
+        binding.projectSpaceAiMenu.visibility = View.GONE
+        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun setNavigationBarColor(colorRes: Int) {
@@ -933,6 +933,7 @@ internal class MainNavigationController(
         binding.moreButton.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
+        binding.topTitleText.visibility = View.GONE
         bringProjectSpaceFloatingControlsToFront()
     }
 

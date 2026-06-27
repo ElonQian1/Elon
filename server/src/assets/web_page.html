@@ -738,15 +738,15 @@
       min-height: 104px;
     }
     .project-space-summary {
-      background: var(--panel);
-      padding: 8px 20px 14px;
+      background: var(--bg);
+      padding: 42px 38px 0;
       display: grid;
-      grid-template-columns: minmax(0, 0.72fr) minmax(0, 1.7fr);
-      gap: 12px;
+      grid-template-columns: minmax(0, 1fr) 68px;
+      gap: 18px;
       align-items: center;
     }
     #projectProgressPanel .project-space-summary {
-      display: none;
+      display: grid;
     }
     .project-space-title {
       min-width: 0;
@@ -754,22 +754,21 @@
     .project-space-heading {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 18px;
       min-width: 0;
     }
     .project-space-icon {
       position: relative;
       flex: none;
-      width: 42px;
-      height: 42px;
-      border-radius: 8px;
-      background: #2A2A2A;
-      color: #D6D6D6;
+      width: 45px;
+      height: 45px;
+      border-radius: 6px;
+      background: #FFFFFF;
+      color: transparent;
       display: grid;
       place-items: center;
       overflow: hidden;
-      font-size: 24px;
-      font-weight: 700;
+      font-size: 0;
       line-height: 1;
     }
     .project-space-icon.hidden {
@@ -783,86 +782,100 @@
       object-fit: cover;
     }
     .project-space-name {
-      color: var(--ink);
+      color: var(--ink-soft);
       font-size: 17px;
-      font-weight: 700;
+      font-weight: 400;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .project-space-meta {
-      margin-top: 8px;
-      color: var(--ink-soft);
-      font-size: 13px;
+      margin-top: 9px;
+      color: var(--ink-faint);
+      font-size: 15px;
+      line-height: 1.25;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
+      white-space: pre-line;
+    }
+    .project-space-join {
+      width: 68px;
+      height: 30px;
+      border: 0;
+      border-radius: 16px;
+      background: #D9D9D9;
+      color: #000000;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
     }
     .project-space-intro-card {
-      min-height: 84px;
+      display: none;
+    }
+    .project-space-actions {
+      height: 42px;
+      margin-top: 24px;
+      padding: 0 34px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      align-items: center;
+      gap: 0;
+    }
+    .project-space-action {
+      min-width: 0;
+      height: 42px;
       border: 0;
-      border-radius: 14px;
-      background: var(--project-space-info-bg);
-      color: var(--project-space-info-ink);
-      padding: 12px 16px;
-      text-align: center;
-      font-size: 13px;
-      line-height: 1.45;
-      white-space: pre-wrap;
-      overflow: hidden;
-      display: -webkit-box;
-      -webkit-line-clamp: 4;
-      -webkit-box-orient: vertical;
-      -webkit-box-pack: center;
-      -webkit-box-align: center;
+      background: transparent;
+      color: var(--ink-soft);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-size: 15px;
       cursor: pointer;
+      padding: 0;
+      white-space: nowrap;
     }
-    .project-space-intro-card.empty {
-      color: var(--project-space-info-ink-faint);
+    .project-space-action svg {
+      width: 32px;
+      height: 32px;
+      stroke: var(--ink);
+      fill: none;
+      stroke-width: 2.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      flex: none;
     }
-    .project-space-intro-card:disabled {
-      cursor: default;
-      opacity: 1;
+    .project-space-preview-grid {
+      height: 167px;
+      margin-top: 18px;
+      padding: 0 18px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .project-space-preview-cell {
+      border-radius: 9px;
+      background: #7B7B7B;
     }
     .project-space-feed {
       position: relative;
-      padding: 6px 0 0;
-      background: var(--bg);
+      margin-top: 21px;
+      padding: 15px 0 86px;
+      min-height: 460px;
+      background: #000000;
+      border-radius: 20px 20px 0 0;
     }
     .project-space-announcement {
-      position: relative;
-      background: #212121;
-      border-radius: 18px 18px 0 0;
-      margin: 0;
-      padding: 20px 20px 42px;
-      color: var(--project-space-info-ink);
-      cursor: pointer;
-    }
-    .project-space-post-area {
-      position: relative;
-      min-height: 464px;
-      background: #000000;
-      border-radius: 18px 18px 0 0;
-      margin-top: -56px;
-      padding: 0 0 34px;
-      transition: margin-top 220ms ease;
-      will-change: margin-top;
-    }
-    .project-space-feed.announcement-expanded .project-space-post-area {
-      margin-top: 0;
-    }
-    .project-space-post-card {
-      background: var(--panel);
-      border-radius: 18px;
-      margin: 6px 8px;
-      padding: 18px;
+      min-height: 43px;
+      margin: 26px 20px 0;
+      border-radius: 14px;
+      background: #7D7D7D;
       color: var(--ink);
-      cursor: pointer;
-    }
-    .project-space-post-list {
-      padding-top: 6px;
-    }
-    .project-space-announcement.editable {
+      display: flex;
+      align-items: center;
+      padding: 0 16px 0 14px;
       cursor: pointer;
     }
     .project-space-announcement.editable:focus-visible {
@@ -870,99 +883,80 @@
       outline-offset: 2px;
     }
     .project-space-announcement-title {
+      flex: none;
       color: var(--ink);
       font-size: 15px;
-      font-weight: 700;
-    }
-    .project-space-announcement-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 12px;
-      min-height: 48px;
-    }
-    .project-space-announcement-body-row {
-      display: block;
-      padding-top: 7px;
-      padding-right: 60px;
+      font-weight: 400;
+      margin-right: 14px;
     }
     .project-space-announcement-body {
-      color: var(--project-space-info-ink-soft);
-      font-size: 14px;
-      line-height: 1.55;
-      white-space: pre-wrap;
-    }
-    .project-space-feed:not(.announcement-expanded) .project-space-announcement-body {
-      display: -webkit-box;
-      -webkit-line-clamp: 2;
-      -webkit-box-orient: vertical;
-      overflow: hidden;
-    }
-    .project-space-announcement-menu-wrap {
-      position: relative;
-      flex: none;
-      width: 48px;
-      height: 48px;
-    }
-    .project-space-announcement-menu-btn {
-      width: 48px;
-      height: 48px;
-      border: 0;
-      background: transparent;
+      min-width: 0;
+      flex: 1;
       color: var(--ink);
-      cursor: pointer;
+      font-size: 15px;
+      line-height: 1.25;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-post-count {
+      flex: none;
+      min-width: 44px;
+      height: 18px;
+      border-radius: 9px;
+      background: #252525;
+      color: var(--ink);
       display: grid;
       place-items: center;
-      padding: 0;
-      -webkit-tap-highlight-color: transparent;
+      font-size: 13px;
+      margin-left: 12px;
+      padding: 0 8px;
     }
-    .project-space-announcement-menu-btn svg {
-      width: 28px;
-      height: 28px;
-      stroke: currentColor;
-      stroke-width: 2.2;
-      stroke-linecap: round;
-      fill: none;
+    .project-space-topic-row {
+      height: 24px;
+      padding: 0 24px 0 34px;
+      display: flex;
+      align-items: center;
+      gap: 29px;
     }
-    .project-space-announcement-popup {
-      position: absolute;
-      top: 34px;
-      right: -8px;
-      width: 128px;
-      padding: 8px 0;
-      border-radius: 16px;
-      background: #BDBDBD;
-      z-index: 30;
-      filter: drop-shadow(0 8px 14px rgba(0,0,0,0.24));
+    .project-space-topic-chip {
+      height: 18px;
+      border-radius: 4px;
+      background: #777777;
+      color: var(--ink);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 7px;
+      font-size: 14px;
+      line-height: 1;
+      white-space: nowrap;
     }
-    .project-space-announcement-popup::before {
-      content: "";
-      position: absolute;
-      top: -11px;
-      right: 26px;
-      width: 0;
-      height: 0;
-      border-left: 12px solid transparent;
-      border-right: 12px solid transparent;
-      border-bottom: 12px solid #BDBDBD;
-    }
-    .project-space-announcement-popup button {
-      width: 100%;
-      height: 46px;
-      border: 0;
+    .project-space-post-area {
+      position: relative;
       background: transparent;
-      color: #3F4146;
-      font-size: 17px;
+      margin: 0;
+      padding: 0;
+    }
+    .project-space-post-card {
+      background: var(--project-space-info-bg);
+      border-radius: 15px;
+      margin: 14px 10px 0;
+      padding: 20px 24px 15px;
+      color: var(--ink);
       cursor: pointer;
+    }
+    .project-space-post-list {
+      padding-top: 0;
     }
     .project-space-post-head {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 18px;
     }
     .project-space-post-avatar {
-      width: 48px;
-      height: 48px;
+      width: 51px;
+      height: 51px;
       border-radius: 50%;
       background: #D8D8D8;
       color: #101010;
@@ -971,6 +965,7 @@
       font-weight: 700;
       flex: none;
       overflow: hidden;
+      font-size: 17px;
     }
     .project-space-post-avatar img {
       width: 100%;
@@ -981,38 +976,46 @@
     .project-space-post-user { min-width: 0; flex: 1; }
     .project-space-post-name {
       color: var(--ink);
-      font-size: 14px;
+      font-size: 17px;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     .project-space-post-time {
-      color: var(--ink-soft);
+      color: var(--ink-muted);
       font-size: 13px;
-      margin-top: 4px;
+      margin-top: 9px;
     }
     .project-space-topic {
-      color: var(--ink-soft);
-      font-size: 13px;
+      color: var(--ink);
+      background: #000000;
+      border-radius: 6px;
+      height: 20px;
+      padding: 0 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
       white-space: nowrap;
     }
     .project-space-post-title {
       color: var(--ink);
       font-size: 16px;
       line-height: 1.55;
-      margin-top: 20px;
+      margin-top: 22px;
       white-space: pre-wrap;
     }
     .project-space-post-body {
-      color: var(--ink-soft);
-      font-size: 14px;
+      color: #8E8E8E;
+      font-size: 16px;
       line-height: 1.55;
-      margin-top: 10px;
+      margin-top: 12px;
       white-space: pre-wrap;
     }
     .project-space-post-media {
-      width: 100%;
-      height: 150px;
+      width: 234px;
+      max-width: 100%;
+      height: 111px;
       object-fit: cover;
       display: block;
       border-radius: 6px;
@@ -1023,29 +1026,29 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 8px;
-      color: var(--ink-soft);
-      font-size: 13px;
+      color: var(--ink-muted);
+      font-size: 16px;
       line-height: 1;
       text-align: center;
-      padding: 18px 8px 0;
+      padding: 21px 52px 0;
     }
     .project-space-post-metric {
-      min-height: 32px;
+      min-height: 34px;
       border: 0;
       border-radius: 8px;
       background: transparent;
-      color: var(--ink-soft);
+      color: var(--ink-muted);
       display: inline-flex;
       align-items: center;
       justify-content: center;
-      gap: 5px;
+      gap: 7px;
       font: inherit;
       cursor: pointer;
       -webkit-tap-highlight-color: transparent;
     }
     .project-space-post-metric svg {
-      width: 18px;
-      height: 18px;
+      width: 24px;
+      height: 24px;
       fill: currentColor;
       flex: none;
     }
@@ -1074,13 +1077,7 @@
       cursor: pointer;
     }
     .project-space-feed-actions {
-      position: fixed;
-      right: max(8px, calc((100vw - 720px) / 2 + 8px));
-      bottom: calc(var(--bottom-menu-height) + env(safe-area-inset-bottom) + 14px);
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      z-index: 20;
+      display: none;
     }
     .project-space-feed-actions.hidden,
     .project-space-feed-actions .project-space-fab:first-child {
@@ -1112,8 +1109,13 @@
     }
     @media (max-width: 520px) {
       .project-space-summary {
-        grid-template-columns: 1fr;
+        padding-left: 38px;
+        padding-right: 38px;
       }
+      .project-space-actions { padding-left: 34px; padding-right: 34px; }
+      .project-space-action { font-size: 15px; gap: 8px; }
+      .project-space-action svg { width: 32px; height: 32px; }
+      .project-space-post-metrics { padding-left: 52px; padding-right: 52px; }
     }
     .project-workspace-health {
       background: var(--panel);
@@ -2459,30 +2461,43 @@
             <div class="project-space-icon" id="projectSpaceIcon" aria-hidden="true">项</div>
             <div class="project-space-title">
               <div class="project-space-name" id="projectSpaceName">项目</div>
-              <div class="project-space-meta" id="projectSpaceMeta">1 位成员 · 所有者</div>
+              <div class="project-space-meta" id="projectSpaceMeta">创建者： 项目成员
+成员 1    帖子 0</div>
             </div>
           </div>
-          <button class="project-space-intro-card empty" id="projectIntroCard" type="button">添加项目简介</button>
+          <button class="project-space-join" id="projectSpaceJoinBtn" type="button">加入</button>
+        </div>
+        <button class="project-space-intro-card empty hidden" id="projectIntroCard" type="button">添加项目简介</button>
+        <div class="project-space-actions">
+          <button class="project-space-action" id="projectSpaceDocsBtn" type="button" aria-label="项目文档">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 10.5H11.5L14 13H28V25H4Z"></path></svg>
+            <span>项目文档</span>
+          </button>
+          <button class="project-space-action" id="projectSpaceResourcesBtn" type="button" aria-label="项目资源">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M4 10.5H11.5L14 13H28V25H4Z"></path></svg>
+            <span>项目资源</span>
+          </button>
+          <button class="project-space-action" id="projectSpaceDownloadBtn" type="button" aria-label="下载 APK">
+            <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M16 5V18M10.5 12.5L16 18L21.5 12.5M7 19V25H25V19"></path></svg>
+            <span>下载APK</span>
+          </button>
+        </div>
+        <div class="project-space-preview-grid" aria-hidden="true">
+          <div class="project-space-preview-cell"></div>
+          <div class="project-space-preview-cell"></div>
+          <div class="project-space-preview-cell"></div>
+        </div>
+        <div class="project-space-announcement" id="projectSpacePinnedBar">
+          <div class="project-space-announcement-title">置顶</div>
+          <div class="project-space-announcement-body" id="projectSpaceAnnouncement">创建者自定义标题最多显示16个字</div>
+          <div class="project-space-post-count" id="projectSpacePostCount">0贴</div>
         </div>
         <div class="project-space-feed" id="projectSpaceFeed">
-          <div class="project-space-announcement">
-            <div class="project-space-announcement-header">
-              <div class="project-space-announcement-title">公告</div>
-              <div class="project-space-announcement-menu-wrap">
-                <button class="project-space-announcement-menu-btn" id="projectSpaceAnnouncementMenuBtn" type="button" aria-label="项目快捷入口">
-                  <svg viewBox="0 0 28 28" aria-hidden="true">
-                    <path d="M8 9H20M8 14H20M8 19H20"></path>
-                  </svg>
-                </button>
-                <div class="project-space-announcement-popup hidden" id="projectSpaceAnnouncementMenu">
-                  <button id="projectSpaceDocsBtn" type="button">项目文档</button>
-                  <button id="projectSpaceDownloadBtn" type="button">下载APK</button>
-                </div>
-              </div>
-            </div>
-            <div class="project-space-announcement-body-row">
-              <div class="project-space-announcement-body" id="projectSpaceAnnouncement">不得发布与主题内容不相关的帖子。</div>
-            </div>
+          <div class="project-space-topic-row" aria-label="项目话题">
+            <span class="project-space-topic-chip">需求</span>
+            <span class="project-space-topic-chip">讨论</span>
+            <span class="project-space-topic-chip">意见</span>
+            <span class="project-space-topic-chip">问题反馈</span>
           </div>
           <div class="project-space-post-area">
             <div id="projectSpacePostList" class="project-space-post-list">
@@ -3097,11 +3112,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectIntroCard = $('projectIntroCard');
   const projectSpaceFeed = $('projectSpaceFeed');
   const projectSpaceAnnouncement = $('projectSpaceAnnouncement');
+  const projectSpacePostCount = $('projectSpacePostCount');
   const projectSpaceAnnouncementMenuBtn = $('projectSpaceAnnouncementMenuBtn');
   const projectSpaceAnnouncementMenu = $('projectSpaceAnnouncementMenu');
   const projectSpacePostList = $('projectSpacePostList');
   const projectSpaceDownloadBtn = $('projectSpaceDownloadBtn');
   const projectSpaceDocsBtn = $('projectSpaceDocsBtn');
+  const projectSpaceResourcesBtn = $('projectSpaceResourcesBtn');
+  const projectSpaceJoinBtn = $('projectSpaceJoinBtn');
   const projectSpacePostBtn = $('projectSpacePostBtn');
   const projectWorkspaceHealth = $('projectWorkspaceHealth');
   const currentStageText = $('currentStageText');
@@ -3180,6 +3198,16 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectSpaceDocsBtn.addEventListener('click', () => {
       if (projectSpaceAnnouncementMenu) projectSpaceAnnouncementMenu.classList.add('hidden');
       openProjectDocumentDialog(currentProject);
+    });
+  }
+  if (projectSpaceResourcesBtn) {
+    projectSpaceResourcesBtn.addEventListener('click', () => {
+      showNativeOnly('项目资源入口正在整理。');
+    });
+  }
+  if (projectSpaceJoinBtn) {
+    projectSpaceJoinBtn.addEventListener('click', () => {
+      showNativeOnly('成员列表和加入管理请在 Android APK 中使用。');
     });
   }
   if (projectSpacePostBtn) {
@@ -3363,6 +3391,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let groups = [];
   let currentProject = null;
   let currentProjectSpaceLatestApkUrl = '';
+  let currentProjectSpacePostCount = 0;
   let projectSpaceAnnouncementExpanded = false;
   let currentFriend = null;
   let currentGroup = null;
@@ -5177,6 +5206,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function resetProjectPage() {
     projectHealthRequestSeq += 1;
     currentProjectSpaceLatestApkUrl = '';
+    currentProjectSpacePostCount = 0;
     projectSpaceAnnouncementExpanded = false;
     if (projectSpaceFeed) projectSpaceFeed.classList.remove('announcement-expanded');
     currentStageText.textContent = '待提交需求';
@@ -5201,6 +5231,19 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   function projectTitleOf(project) {
     return String((project && (project.name || project.title)) || '项目').trim() || '项目';
+  }
+  function projectSpaceOwnerOf(project) {
+    if (!project) return '项目成员';
+    return cleanProjectSpaceField(
+      project.owner_account ||
+      project.ownerAccount ||
+      project.created_by_account ||
+      project.createdByAccount ||
+      project.created_by_name ||
+      project.createdByName ||
+      project.owner ||
+      project.creator
+    ) || '项目成员';
   }
   function projectIconUrlOf(project) {
     if (!project) return '';
@@ -5230,7 +5273,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (!project) {
       renderProjectSpaceIcon(null);
       if (projectSpaceName) projectSpaceName.textContent = '项目';
-      if (projectSpaceMeta) projectSpaceMeta.textContent = '1 位成员 · 所有者';
+      if (projectSpaceMeta) projectSpaceMeta.textContent = '创建者： 项目成员\n成员 1    帖子 0';
+      if (projectSpacePostCount) projectSpacePostCount.textContent = '0贴';
       projectIntroCard.textContent = '添加项目简介';
       projectIntroCard.classList.add('empty');
       projectIntroCard.disabled = true;
@@ -5242,7 +5286,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (projectSpaceName) projectSpaceName.textContent = projectTitleOf(project);
     if (projectSpaceMeta) {
       const members = project.member_count || project.memberCount || 1;
-      projectSpaceMeta.textContent = members + ' 位成员 · ' + (project.role || 'owner');
+      projectSpaceMeta.textContent = '创建者： ' + projectSpaceOwnerOf(project) +
+        '\n成员 ' + members + '    帖子 ' + currentProjectSpacePostCount;
     }
     projectIntroCard.textContent = description || (editable ? '添加项目简介' : '暂无项目简介');
     projectIntroCard.classList.toggle('empty', !description);
@@ -5450,9 +5495,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       announcementCard.onkeydown = null;
     };
     if (!space) {
+      currentProjectSpacePostCount = 0;
       projectSpaceAnnouncementExpanded = false;
       if (projectSpaceFeed) projectSpaceFeed.classList.remove('announcement-expanded');
-      projectSpaceAnnouncement.textContent = '不得发布与主题内容不相关的帖子。';
+      projectSpaceAnnouncement.textContent = '创建者自定义标题最多显示16个字';
+      if (projectSpacePostCount) projectSpacePostCount.textContent = '0贴';
       resetAnnouncementAction();
       projectSpacePostList.innerHTML = projectSpaceEmptyHtml('还没有帖子，点击+好发布内容', true);
       wireProjectSpaceEmptyPostButton();
@@ -5470,7 +5517,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       cleanProjectSpaceAnnouncementText(announcements[0] && announcements[0].last_message) ||
       '不得发布与主题内容不相关的帖子。';
     const parsedAnnouncement = cleanProjectSpaceAnnouncementText(parseProjectSpacePostText(announcementText).body);
-    projectSpaceAnnouncement.textContent = parsedAnnouncement || announcementText;
+    projectSpaceAnnouncement.textContent = (parsedAnnouncement || announcementText)
+      .replace(/\s+/g, ' ')
+      .trim()
+      .slice(0, 16) || '创建者自定义标题最多显示16个字';
     if (projectSpaceFeed) {
       projectSpaceFeed.classList.toggle('announcement-expanded', projectSpaceAnnouncementExpanded);
     }
@@ -5525,6 +5575,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       })
       .sort((a, b) => String(b.message.created_at || '').localeCompare(String(a.message.created_at || '')))
       .slice(0, 40);
+    currentProjectSpacePostCount = posts.length;
+    if (projectSpacePostCount) projectSpacePostCount.textContent = posts.length + '贴';
+    renderProjectIntroCard(project);
     if (!posts.length) {
       projectSpacePostList.innerHTML = projectSpaceEmptyHtml(
         loading ? '正在加载帖子...' : '还没有帖子，点击+好发布内容',

@@ -1,6 +1,5 @@
 package com.elon.app
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
 import android.graphics.BitmapFactory
@@ -10,9 +9,6 @@ import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
-import android.view.ViewTreeObserver
-import android.view.animation.AccelerateDecelerateInterpolator
-import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -29,12 +25,12 @@ internal class ProjectSpaceFeedView(
     private val openPostComposer: () -> Unit,
     private val openAnnouncementEditor: (ProjectChannel, String) -> Unit,
     private val openProjectDocuments: () -> Unit,
+    private val openProjectResources: () -> Unit,
+    private val openProjectMembers: () -> Unit,
     private val projectApkActionLabel: () -> String,
     private val downloadProjectApk: () -> Unit
 ) {
     private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
-    private val announcementExpandedByProject = mutableMapOf<String, Boolean>()
-    private var announcementAnimator: ValueAnimator? = null
 
     fun render(
         container: LinearLayout,
@@ -42,82 +38,253 @@ internal class ProjectSpaceFeedView(
         messagesByChannel: Map<String, List<ProjectChannelMessage>>,
         loading: Boolean
     ) {
-        val feedShell = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp(6)
-            }
-        }
-        val announcementExpanded = announcementExpandedByProject[space.project.id] == true
-        val stack = FrameLayout(activity).apply {
-            clipChildren = false
-            clipToPadding = false
-        }
-        val announcement = announcementBlock(space, messagesByChannel, announcementExpanded)
-        announcement.contentDescription = if (announcementExpanded) "收起项目公告" else "展开项目公告"
-        stack.addView(announcement, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ))
-
-        val frame = FrameLayout(activity).apply {
-            minimumHeight = dp(464)
-            setPadding(0, 0, 0, dp(34))
-            background = roundedBackground(
-                colorHex = "#000000",
-                topStartDp = 18,
-                topEndDp = 18,
-                bottomEndDp = 0,
-                bottomStartDp = 0
-            )
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-        val frameParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ).apply {
-            topMargin = dp(ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
-        }
-        val feedColumn = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(6), 0, 0)
-        }
-        frame.addView(feedColumn, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT
-        ))
-
         val posts = feedPosts(space, messagesByChannel)
-        when {
-            posts.isNotEmpty() -> posts.forEach { feedColumn.addView(postCard(it)) }
-            loading -> feedColumn.addView(emptyState("正在加载帖子...", showButton = false))
-            else -> feedColumn.addView(emptyState("还没有帖子，点击+好发布内容", showButton = true))
+        val root = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setBackgroundColor(Color.parseColor("#000000"))
+            setPadding(0, dp(PROJECT_SPACE_CONTENT_TOP_DP), 0, dp(40))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
         }
 
-        announcement.setOnClickListener {
-            val nextExpanded = !(announcementExpandedByProject[space.project.id] == true)
-            announcementExpandedByProject[space.project.id] = nextExpanded
-            animateAnnouncementFrame(frame, announcement, nextExpanded)
-            announcement.contentDescription = if (nextExpanded) "收起项目公告" else "展开项目公告"
-        }
-        stack.addView(frame, frameParams)
-        syncAnnouncementFrameAfterMeasure(stack, frame, announcement, announcementExpanded)
-        feedShell.addView(stack)
-        container.addView(feedShell)
+        root.addView(projectHero(space, posts.size))
+        root.addView(projectQuickActions())
+        root.addView(projectPreviewStrip())
+        root.addView(projectPinnedBar(space, messagesByChannel, posts.size))
+        root.addView(projectFeedPanel(posts, loading))
+        container.addView(root)
     }
 
-    private fun announcementBlock(
+    private fun projectHero(space: ProjectSpace, postCount: Int): LinearLayout {
+        val owner = space.members.firstOrNull { it.role.equals("owner", ignoreCase = true) }
+            ?: space.members.firstOrNull()
+        val ownerName = owner?.account?.takeIf { it.isNotBlank() } ?: "项目成员"
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(38), 0, dp(38), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(58)
+            )
+
+            addView(projectIcon(space.project), LinearLayout.LayoutParams(dp(45), dp(45)).apply {
+                marginEnd = dp(18)
+            })
+
+            addView(LinearLayout(activity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(TextView(activity).apply {
+                    text = space.project.name.ifBlank { "项目名称" }
+                    textSize = 17f
+                    setTextColor(Color.parseColor("#B8B8B8"))
+                    setTypeface(typeface, Typeface.NORMAL)
+                    includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                })
+                addView(TextView(activity).apply {
+                    text = "创建者： $ownerName"
+                    textSize = 15f
+                    setTextColor(Color.parseColor("#777777"))
+                    includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    setPadding(0, dp(10), 0, 0)
+                })
+                addView(TextView(activity).apply {
+                    text = "成员 ${space.project.memberCount.coerceAtLeast(1)}    帖子 $postCount"
+                    textSize = 15f
+                    setTextColor(Color.parseColor("#777777"))
+                    includeFontPadding = false
+                    maxLines = 1
+                    ellipsize = TextUtils.TruncateAt.END
+                    setPadding(0, dp(8), 0, 0)
+                })
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+
+            addView(TextView(activity).apply {
+                text = "加入"
+                textSize = 16f
+                setTypeface(typeface, Typeface.BOLD)
+                includeFontPadding = false
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#000000"))
+                background = roundedBackground("#D9D9D9", 16)
+                isClickable = true
+                foreground = selectableForeground()
+                setOnClickListener { openProjectMembers() }
+                contentDescription = "查看项目成员"
+            }, LinearLayout.LayoutParams(dp(68), dp(30)).apply {
+                marginStart = dp(18)
+            })
+        }
+    }
+
+    private fun projectIcon(project: ProjectSpaceSummary): View {
+        val bitmap = UserProfileStore.decodeAvatar(project.iconDataUrl.cleanProjectSpaceDisplayName())
+        if (bitmap != null) {
+            return ImageView(activity).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                    cornerRadius = dp(6).toFloat()
+                    setAntiAlias(true)
+                })
+            }
+        }
+        return View(activity).apply {
+            background = roundedBackground("#FFFFFF", 6)
+        }
+    }
+
+    private fun projectQuickActions(): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(34), 0, dp(34), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(42)
+            ).apply {
+                topMargin = dp(24)
+            }
+            addView(quickAction(
+                iconRes = R.drawable.ic_project_space_folder,
+                label = "项目文档",
+                description = "打开项目文档",
+                onClick = openProjectDocuments
+            ), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+            addView(quickAction(
+                iconRes = R.drawable.ic_project_space_folder,
+                label = "项目资源",
+                description = "查看项目资源",
+                onClick = openProjectResources
+            ), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+            addView(quickAction(
+                iconRes = R.drawable.ic_project_space_download,
+                label = projectApkActionLabel(),
+                description = "下载项目 APK",
+                onClick = downloadProjectApk
+            ), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
+        }
+    }
+
+    private fun quickAction(
+        iconRes: Int,
+        label: String,
+        description: String,
+        onClick: () -> Unit
+    ): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = description
+            setOnClickListener { onClick() }
+            addView(ImageView(activity).apply {
+                setImageResource(iconRes)
+                setColorFilter(Color.parseColor("#D9D9D9"))
+            }, LinearLayout.LayoutParams(dp(32), dp(32)).apply {
+                marginEnd = dp(8)
+            })
+            addView(TextView(activity).apply {
+                text = label
+                textSize = 15f
+                includeFontPadding = false
+                setTextColor(Color.parseColor("#B8B8B8"))
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            })
+        }
+    }
+
+    private fun projectPreviewStrip(): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(dp(18), 0, dp(18), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(167)
+            ).apply {
+                topMargin = dp(18)
+            }
+            repeat(3) { index ->
+                addView(View(activity).apply {
+                    background = roundedBackground("#7B7B7B", 9)
+                }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f).apply {
+                    if (index < 2) marginEnd = dp(16)
+                })
+            }
+        }
+    }
+
+    private fun projectPinnedBar(
         space: ProjectSpace,
         messagesByChannel: Map<String, List<ProjectChannelMessage>>,
-        expanded: Boolean
+        postCount: Int
     ): LinearLayout {
         val announcement = space.channels.firstOrNull { it.kind == "announcements" }
+        val pinnedText = latestAnnouncementText(announcement, messagesByChannel)
+            .replace(Regex("""\s+"""), " ")
+            .take(16)
+            .ifBlank { "创建者自定义标题最多显示16个字" }
+        val editable = announcement != null && canEditProjectAnnouncement(space.project.role)
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(14), 0, dp(16), 0)
+            background = roundedBackground("#7D7D7D", 14)
+            if (editable) {
+                isClickable = true
+                foreground = selectableForeground()
+                setOnClickListener {
+                    announcement?.let { openAnnouncementEditor(it, latestAnnouncementText(it, messagesByChannel)) }
+                }
+                contentDescription = "编辑置顶公告"
+            }
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(43)
+            ).apply {
+                setMargins(dp(20), dp(26), dp(20), 0)
+            }
+
+            addView(TextView(activity).apply {
+                text = "置顶"
+                textSize = 15f
+                includeFontPadding = false
+                setTextColor(Color.parseColor("#D9D9D9"))
+            })
+            addView(TextView(activity).apply {
+                text = pinnedText
+                textSize = 15f
+                includeFontPadding = false
+                setTextColor(Color.parseColor("#D9D9D9"))
+                maxLines = 1
+                ellipsize = TextUtils.TruncateAt.END
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dp(14)
+                marginEnd = dp(12)
+            })
+            addView(TextView(activity).apply {
+                text = "${postCount.coerceAtLeast(0)}贴"
+                textSize = 13f
+                includeFontPadding = false
+                gravity = Gravity.CENTER
+                setTextColor(Color.parseColor("#D9D9D9"))
+                background = roundedBackground("#252525", 9)
+            }, LinearLayout.LayoutParams(dp(44), dp(18)))
+        }
+    }
+
+    private fun latestAnnouncementText(
+        announcement: ProjectChannel?,
+        messagesByChannel: Map<String, List<ProjectChannelMessage>>
+    ): String {
         val latest = announcement?.let { channel ->
             messagesByChannel[channel.id]
                 .orEmpty()
@@ -126,130 +293,74 @@ internal class ProjectSpaceFeedView(
         val textValue = cleanAnnouncementText(latest?.content)
             ?: cleanAnnouncementText(announcement?.lastMessage)
             ?: "不得发布与主题内容不相关的帖子。"
-        val displayText = parseProjectSpacePostText(textValue).detailText
+        return parseProjectSpacePostText(textValue).detailText
             .takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
             ?: "不得发布与主题内容不相关的帖子。"
-        val announcementChannel = announcement
-        val editable = announcementChannel != null && canEditProjectAnnouncement(space.project.role)
-
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(20), dp(20), dp(42))
-            background = roundedBackground(
-                colorHex = PROJECT_SPACE_INFO_BG,
-                topStartDp = 18,
-                topEndDp = 18,
-                bottomEndDp = 0,
-                bottomStartDp = 0
-            )
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-            contentDescription = if (expanded) "收起项目公告" else "展开项目公告"
-            if (editable) {
-                isClickable = true
-                foreground = selectableForeground()
-                contentDescription = "编辑项目公告"
-                setOnClickListener {
-                    announcementChannel?.let { openAnnouncementEditor(it, displayText) }
-                }
-            }
-            if (editable) {
-                setOnLongClickListener {
-                    announcementChannel?.let { openAnnouncementEditor(it, displayText) }
-                    true
-                }
-            }
-            addView(FrameLayout(activity).apply {
-                addView(LinearLayout(activity).apply {
-                    orientation = LinearLayout.VERTICAL
-                    addView(TextView(activity).apply {
-                        text = "公告"
-                        textSize = 15f
-                        setTypeface(typeface, Typeface.BOLD)
-                        setTextColor(Color.parseColor("#D6D6D6"))
-                    })
-                    addView(TextView(activity).apply {
-                        text = displayText
-                        textSize = 14f
-                        setTextColor(Color.parseColor("#A8A8A8"))
-                        setLineSpacing(dp(3).toFloat(), 1f)
-                        maxLines = if (expanded) Int.MAX_VALUE else ANNOUNCEMENT_COLLAPSED_MAX_LINES
-                        ellipsize = if (expanded) null else TextUtils.TruncateAt.END
-                        setPadding(0, dp(7), dp(60), 0)
-                    }, LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.MATCH_PARENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ))
-                }, FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.WRAP_CONTENT
-                ))
-                addView(projectSpaceAnnouncementMenuButton(
-                    activity = activity,
-                    dp = dp,
-                    selectableForeground = selectableForeground,
-                    onOpenDocuments = openProjectDocuments,
-                    apkActionLabel = projectApkActionLabel,
-                    onDownloadApk = downloadProjectApk
-                ), FrameLayout.LayoutParams(dp(48), dp(48)).apply {
-                    gravity = Gravity.TOP or Gravity.END
-                })
-            })
-        }
     }
 
     private fun cleanAnnouncementText(value: String?): String? {
         return value?.trim()?.takeIf { it.isNotBlank() && !it.equals("null", ignoreCase = true) }
     }
 
-    private fun syncAnnouncementFrameAfterMeasure(
-        parent: View,
-        frame: View,
-        announcement: View,
-        expanded: Boolean
-    ) {
-        parent.viewTreeObserver.addOnPreDrawListener(object : ViewTreeObserver.OnPreDrawListener {
-            override fun onPreDraw(): Boolean {
-                if (parent.viewTreeObserver.isAlive) {
-                    parent.viewTreeObserver.removeOnPreDrawListener(this)
+    private fun projectFeedPanel(posts: List<ProjectSpaceFeedPost>, loading: Boolean): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(15), 0, dp(86))
+            minimumHeight = dp(460)
+            background = roundedBackground(
+                colorHex = "#000000",
+                topStartDp = 20,
+                topEndDp = 20,
+                bottomEndDp = 0,
+                bottomStartDp = 0
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dp(21)
+            }
+
+            addView(topicChips())
+            when {
+                posts.isNotEmpty() -> posts.forEachIndexed { index, post ->
+                    val card = postCard(post)
+                    val params = card.layoutParams as LinearLayout.LayoutParams
+                    params.topMargin = if (index == 0) dp(14) else dp(10)
+                    addView(card, params)
                 }
-                setAnnouncementFrameOffset(frame, announcementPostOffset(announcement, expanded))
-                return true
+                loading -> addView(emptyState("正在加载帖子...", showButton = false))
+                else -> addView(emptyState("还没有帖子，点击+好发布内容", showButton = true))
             }
-        })
+        }
     }
 
-    private fun announcementPostOffset(announcement: View, expanded: Boolean): Int {
-        if (!expanded) return dp(ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
-        return announcement.height
-            .takeIf { it > 0 }
-            ?: announcement.measuredHeight.takeIf { it > 0 }
-            ?: dp(ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP)
-    }
-
-    private fun setAnnouncementFrameOffset(frame: View, offset: Int) {
-        val params = frame.layoutParams as? FrameLayout.LayoutParams ?: return
-        if (params.topMargin == offset) return
-        params.topMargin = offset
-        frame.layoutParams = params
-    }
-
-    private fun animateAnnouncementFrame(frame: View, announcement: View, expanded: Boolean) {
-        val params = frame.layoutParams as? FrameLayout.LayoutParams ?: return
-        val target = announcementPostOffset(announcement, expanded)
-        val start = params.topMargin
-        announcementAnimator?.cancel()
-        if (start == target) return
-        announcementAnimator = ValueAnimator.ofInt(start, target).apply {
-            duration = ANNOUNCEMENT_ANIMATION_MS
-            interpolator = AccelerateDecelerateInterpolator()
-            addUpdateListener { animator ->
-                params.topMargin = animator.animatedValue as Int
-                frame.layoutParams = params
+    private fun topicChips(): LinearLayout {
+        val topics = listOf("需求", "讨论", "意见", "问题反馈")
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(34), 0, dp(24), 0)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(24)
+            )
+            topics.forEach { topic ->
+                addView(TextView(activity).apply {
+                    text = topic
+                    textSize = 14f
+                    includeFontPadding = false
+                    gravity = Gravity.CENTER
+                    setTextColor(Color.parseColor("#D9D9D9"))
+                    background = roundedBackground("#777777", 4)
+                    setPadding(dp(7), 0, dp(7), 0)
+                }, LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    dp(18)
+                ).apply {
+                    marginEnd = if (topic == "问题反馈") 0 else dp(29)
+                })
             }
-            start()
         }
     }
 
@@ -276,10 +387,11 @@ internal class ProjectSpaceFeedView(
         val timeText = parseChatMessageCreatedAt(post.message.createdAt)
             ?.let { formatChatTimelineLabel(it) }
             ?: "刚刚"
+        val bodyText = postBodyWithoutImages(postText.body).ifBlank { postText.title }
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(14), dp(14), dp(14), dp(12))
-            background = roundedBackground("#222222", 10)
+            setPadding(dp(24), dp(20), dp(24), dp(15))
+            background = roundedBackground("#1F2023", 15)
             isClickable = true
             foreground = selectableForeground()
             setOnClickListener { openPost(post.channel, post.message) }
@@ -287,27 +399,27 @@ internal class ProjectSpaceFeedView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                setMargins(dp(8), dp(4), dp(8), dp(4))
+                setMargins(dp(10), dp(14), dp(10), 0)
             }
 
             addView(postHeader(sender, post.message.senderAvatarDataUrl, timeText, projectSpaceTopicLabel(post.channel)))
             addView(TextView(activity).apply {
                 text = postText.title
                 textSize = 16f
-                setTextColor(Color.parseColor("#D6D6D6"))
-                setTypeface(typeface, Typeface.BOLD)
-                maxLines = 1
+                setTextColor(Color.parseColor("#D9D9D9"))
+                setLineSpacing(dp(4).toFloat(), 1f)
+                maxLines = 2
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(10), 0, 0)
+                setPadding(0, dp(22), 0, 0)
             })
             addView(TextView(activity).apply {
-                text = postText.body.ifBlank { postText.title }
-                textSize = 14f
-                setTextColor(Color.parseColor("#A8A8A8"))
-                setLineSpacing(dp(3).toFloat(), 1f)
+                text = bodyText
+                textSize = 16f
+                setTextColor(Color.parseColor("#8E8E8E"))
+                setLineSpacing(dp(4).toFloat(), 1f)
                 maxLines = 3
                 ellipsize = TextUtils.TruncateAt.END
-                setPadding(0, dp(8), 0, 0)
+                setPadding(0, dp(12), 0, 0)
             })
             extractProjectPostImageSource(postText.body)?.let { source ->
                 addView(postImagePreview(source))
@@ -320,55 +432,63 @@ internal class ProjectSpaceFeedView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            addView(avatar(sender, avatarDataUrl), LinearLayout.LayoutParams(dp(40), dp(40)).apply {
-                marginEnd = dp(10)
+            addView(avatar(sender, avatarDataUrl), LinearLayout.LayoutParams(dp(51), dp(51)).apply {
+                marginEnd = dp(18)
             })
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_VERTICAL
                 addView(TextView(activity).apply {
                     text = sender
-                    textSize = 14f
-                    setTextColor(Color.parseColor("#D6D6D6"))
+                    textSize = 17f
+                    includeFontPadding = false
+                    setTextColor(Color.parseColor("#D9D9D9"))
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
                 addView(TextView(activity).apply {
                     text = "回复于$timeText"
-                    textSize = 12f
-                    setTextColor(Color.parseColor("#777777"))
-                    setPadding(0, dp(3), 0, 0)
+                    textSize = 13f
+                    includeFontPadding = false
+                    setTextColor(Color.parseColor("#AFAFAF"))
+                    setPadding(0, dp(9), 0, 0)
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
                 text = topic
-                textSize = 13f
-                setTextColor(Color.parseColor("#A8A8A8"))
+                textSize = 14f
+                includeFontPadding = false
+                setTextColor(Color.parseColor("#D9D9D9"))
                 gravity = Gravity.CENTER
                 maxLines = 1
-                background = roundedBackground("#151515", 8)
-                setPadding(dp(10), dp(5), dp(10), dp(5))
-            })
+                background = roundedBackground("#000000", 6)
+                setPadding(dp(8), 0, dp(8), 0)
+            }, LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                dp(20)
+            ))
         }
     }
 
     private fun avatar(sender: String, avatarDataUrl: String?): View {
         val bitmap = UserProfileStore.decodeAvatar(avatarDataUrl.cleanProjectSpaceDisplayName())
         if (bitmap != null) {
-            return TextView(activity).apply {
-                background = RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
-                    cornerRadius = dp(20).toFloat()
+            return ImageView(activity).apply {
+                scaleType = ImageView.ScaleType.CENTER_CROP
+                setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                    cornerRadius = dp(26).toFloat()
                     setAntiAlias(true)
-                }
+                })
             }
         }
         return TextView(activity).apply {
             text = sender.firstOrNull()?.toString() ?: "成"
             gravity = Gravity.CENTER
             includeFontPadding = false
-            textSize = 16f
+            textSize = 17f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(Color.parseColor("#101010"))
-            background = roundedBackground("#D8D8D8", 20)
+            background = roundedBackground("#D8D8D8", 26)
         }
     }
 
@@ -379,10 +499,10 @@ internal class ProjectSpaceFeedView(
             setImageResource(android.R.drawable.ic_menu_gallery)
             tag = source
             layoutParams = LinearLayout.LayoutParams(
-                dp(220),
-                dp(112)
+                dp(234),
+                dp(111)
             ).apply {
-                topMargin = dp(12)
+                topMargin = dp(16)
             }
         }
         thread(name = "project-post-image-preview") {
@@ -407,7 +527,7 @@ internal class ProjectSpaceFeedView(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(8), dp(10), dp(8), 0)
+            setPadding(dp(52), dp(21), dp(52), 0)
             addView(metricButton(
                 iconRes = R.drawable.ic_project_post_share,
                 value = shareCount.toString(),
@@ -460,7 +580,7 @@ internal class ProjectSpaceFeedView(
         }
         val valueText = TextView(activity).apply {
             text = value
-            textSize = 13f
+            textSize = 16f
             includeFontPadding = false
             setTextColor(color)
             gravity = Gravity.CENTER
@@ -472,10 +592,10 @@ internal class ProjectSpaceFeedView(
             isClickable = true
             foreground = selectableForeground()
             contentDescription = description
-            minimumHeight = dp(32)
-            setPadding(dp(8), dp(6), dp(8), dp(6))
-            addView(icon, LinearLayout.LayoutParams(dp(18), dp(18)).apply {
-                marginEnd = dp(5)
+            minimumHeight = dp(34)
+            setPadding(dp(4), dp(5), dp(4), dp(5))
+            addView(icon, LinearLayout.LayoutParams(dp(24), dp(24)).apply {
+                marginEnd = dp(7)
             })
             addView(valueText, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -501,7 +621,7 @@ internal class ProjectSpaceFeedView(
     }
 
     private fun metricColor(selected: Boolean): Int {
-        return Color.parseColor(if (selected) "#58BE6A" else "#A8A8A8")
+        return Color.parseColor(if (selected) "#58BE6A" else "#AFAFAF")
     }
 
     private fun sharePost(
@@ -512,7 +632,7 @@ internal class ProjectSpaceFeedView(
         val topic = projectSpaceTopicLabel(post.channel)
         val shareText = buildString {
             append("【").append(postText.title).append("】")
-            postText.body.trim().takeIf { it.isNotBlank() }?.let { body ->
+            postBodyWithoutImages(postText.body).trim().takeIf { it.isNotBlank() }?.let { body ->
                 append("\n\n").append(body)
             }
             append("\n\n来自项目话题：").append(topic)
@@ -544,7 +664,7 @@ internal class ProjectSpaceFeedView(
                 text = textValue
                 textSize = 15f
                 gravity = Gravity.CENTER
-                setTextColor(Color.parseColor("#A8A8A8"))
+                setTextColor(Color.parseColor("#AFAFAF"))
             })
             if (showButton) {
                 addView(TextView(activity).apply {
@@ -552,8 +672,8 @@ internal class ProjectSpaceFeedView(
                     textSize = 24f
                     includeFontPadding = false
                     gravity = Gravity.CENTER
-                    setTextColor(Color.parseColor("#D6D6D6"))
-                    background = roundedBackground(PROJECT_SPACE_INFO_BG, 24)
+                    setTextColor(Color.parseColor("#D9D9D9"))
+                    background = roundedBackground("#212121", 24)
                     isClickable = true
                     foreground = selectableForeground()
                     setOnClickListener { openPostComposer() }
@@ -598,10 +718,7 @@ internal class ProjectSpaceFeedView(
         const val MAX_FEED_POSTS = 40
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
-        const val PROJECT_SPACE_INFO_BG = "#212121"
-        const val ANNOUNCEMENT_COLLAPSED_POST_OFFSET_DP = 104
-        const val ANNOUNCEMENT_COLLAPSED_MAX_LINES = 2
-        const val ANNOUNCEMENT_ANIMATION_MS = 220L
+        const val PROJECT_SPACE_CONTENT_TOP_DP = 42
     }
 
     private data class MetricButtonViews(
@@ -632,4 +749,16 @@ private fun extractProjectPostImageSource(text: String): String? {
         """https?://\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?""",
         RegexOption.IGNORE_CASE
     ).find(text)?.value
+}
+
+private fun postBodyWithoutImages(text: String): String {
+    return text
+        .replace(Regex("""!\[[^]]*]\(([^)]+)\)"""), "")
+        .replace(
+            Regex("""https?://\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?""", RegexOption.IGNORE_CASE),
+            ""
+        )
+        .lines()
+        .joinToString("\n") { it.trimEnd() }
+        .trim()
 }
