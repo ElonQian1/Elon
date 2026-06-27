@@ -961,7 +961,7 @@
     .project-space-post-avatar {
       width: 34px;
       height: 34px;
-      border-radius: 50%;
+      border-radius: 999px;
       background: #D8D8D8;
       color: #101010;
       display: grid;
@@ -969,11 +969,13 @@
       font-weight: 700;
       flex: none;
       overflow: hidden;
+      clip-path: circle(50% at 50% 50%);
       font-size: 18px;
     }
     .project-space-post-avatar img {
       width: 100%;
       height: 100%;
+      border-radius: 50%;
       object-fit: cover;
       display: block;
     }
@@ -988,7 +990,7 @@
     .project-space-post-time {
       color: #777777;
       font-size: 13px;
-      margin-top: 8px;
+      margin-top: 2px;
     }
     .project-space-topic {
       color: var(--ink);
@@ -1004,9 +1006,9 @@
     }
     .project-space-post-title {
       color: var(--ink);
-      font-size: 19px;
+      font-size: 15px;
       font-weight: 700;
-      line-height: 1.28;
+      line-height: 1.45;
       margin-top: 20px;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -1015,8 +1017,8 @@
     .project-space-post-body {
       color: #8E8E8E;
       display: -webkit-box;
-      font-size: 19px;
-      line-height: 1.28;
+      font-size: 15px;
+      line-height: 1.45;
       margin-top: 6px;
       overflow: hidden;
       white-space: normal;
@@ -1061,8 +1063,8 @@
     }
     .project-space-post-metric img,
     .project-space-post-metric svg {
-      width: 16px;
-      height: 16px;
+      width: 22px;
+      height: 22px;
       flex: none;
     }
     .project-space-post-metric img {
@@ -1132,7 +1134,7 @@
       .project-space-actions { padding-left: 24px; padding-right: 24px; }
       .project-space-action { font-size: 12px; gap: 6px; }
       .project-space-action-icon { width: 24px; height: 24px; }
-      .project-space-post-metrics { padding-left: 52px; padding-right: 52px; }
+      .project-space-post-metrics { padding-left: 0; padding-right: 0; }
     }
     .project-workspace-health {
       background: var(--panel);

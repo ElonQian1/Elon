@@ -416,7 +416,7 @@ internal class ProjectSpaceFeedView(
             )
             addView(TextView(activity).apply {
                 text = postText.title
-                textSize = 19f
+                textSize = 15f
                 setTextColor(Color.parseColor("#D9D9D9"))
                 setTypeface(typeface, Typeface.BOLD)
                 setLineSpacing(dp(4).toFloat(), 1f)
@@ -432,7 +432,7 @@ internal class ProjectSpaceFeedView(
             })
             addView(TextView(activity).apply {
                 text = bodyText
-                textSize = 19f
+                textSize = 15f
                 setTextColor(Color.parseColor("#8E8E8E"))
                 setLineSpacing(dp(3).toFloat(), 1f)
                 maxLines = 3
@@ -478,7 +478,7 @@ internal class ProjectSpaceFeedView(
                     textSize = 13f
                     includeFontPadding = false
                     setTextColor(Color.parseColor("#777777"))
-                    setPadding(0, dp(8), 0, 0)
+                    setPadding(0, dp(2), 0, 0)
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(activity).apply {
@@ -503,7 +503,7 @@ internal class ProjectSpaceFeedView(
             return ImageView(activity).apply {
                 scaleType = ImageView.ScaleType.CENTER_CROP
                 setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
-                    cornerRadius = dp(17).toFloat()
+                    setCircular(true)
                     setAntiAlias(true)
                 })
             }
@@ -620,10 +620,10 @@ internal class ProjectSpaceFeedView(
             isClickable = true
             foreground = selectableForeground()
             contentDescription = description
-            minimumHeight = dp(34)
+            minimumHeight = dp(40)
             setPadding(dp(4), dp(5), dp(4), dp(5))
-            addView(icon, LinearLayout.LayoutParams(dp(16), dp(16)).apply {
-                marginEnd = dp(7)
+            addView(icon, LinearLayout.LayoutParams(dp(22), dp(22)).apply {
+                marginEnd = dp(8)
             })
             addView(valueText, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
