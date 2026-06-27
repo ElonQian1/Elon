@@ -50,6 +50,8 @@ export default function AiChatPage() {
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [friends, setFriends] = useState<Friend[]>([])
+  const [totalUserCount, setTotalUserCount] = useState(0)
+  const [userQuery, setUserQuery] = useState('')
 
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -58,10 +60,20 @@ export default function AiChatPage() {
 
   useEffect(() => {
     loadConversations()
-    api.get<{ recommendations?: Friend[] }>('/api/me/friends/recommendations')
-      .then(d => setFriends(d.recommendations ?? []))
+    api.get<{ recommendations?: Friend[]; total_count?: number }>('/api/me/friends/recommendations?limit=50')
+      .then(d => {
+        setFriends(d.recommendations ?? [])
+        setTotalUserCount(d.total_count ?? d.recommendations?.length ?? 0)
+      })
       .catch(() => {})
   }, [user?.id]) // eslint-disable-line
+
+  // 客户端搜索过滤
+  const filteredFriends = userQuery.trim()
+    ? friends.filter(f =>
+        (f.nickname ?? f.account).toLowerCase().includes(userQuery.toLowerCase())
+      )
+    : friends
 
   useEffect(() => {
     if (atBottomRef.current && feedRef.current) {
@@ -280,22 +292,43 @@ export default function AiChatPage() {
         {error && <p className={styles.sendError}>{error}</p>}
       </div>
 
-      {/* ══ 右侧好友栏 ══ */}
+      {/* ══ 右侧用户栏 ══ */}
       <aside className={styles.userPanel}>
         <div className={styles.userPanelTitle}>
           <span>用户{friends.length > 0 ? ` — ${friends.length}` : ''}</span>
+          {totalUserCount > friends.length && (
+            <small className={styles.userPanelMore}>共{totalUserCount}位</small>
+          )}
         </div>
         <div className={styles.userPanelList}>
+          {/* 搜索框 */}
+          {friends.length > 0 && (
+            <div className={styles.userPanelSearch}>
+              <input
+                className={styles.userPanelSearchInput}
+                value={userQuery}
+                onChange={e => setUserQuery(e.target.value)}
+                placeholder="搜索用户"
+                autoComplete="off"
+              />
+              {userQuery && (
+                <button className={styles.userPanelSearchClear} type="button" onClick={() => setUserQuery('')}>×</button>
+              )}
+            </div>
+          )}
           {friends.length === 0 && (
-            <p className={styles.userPanelHint}>暂无联系人</p>
+            <p className={styles.userPanelHint}>暂无用户</p>
+          )}
+          {filteredFriends.length === 0 && userQuery && (
+            <p className={styles.userPanelHint}>没有匹配的用户</p>
           )}
           {/* 在线 */}
-          {friends.filter(f => f.is_online).length > 0 && (
+          {filteredFriends.filter(f => f.is_online).length > 0 && (
             <>
               <div className={styles.userPanelSection}>
-                在线 · {friends.filter(f => f.is_online).length}
+                在线 · {filteredFriends.filter(f => f.is_online).length}
               </div>
-              {friends.filter(f => f.is_online).map(f => (
+              {filteredFriends.filter(f => f.is_online).map(f => (
                 <div key={f.id} className={styles.userPanelItem}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOnline].join(' ')}>
                     {(f.nickname ?? f.account)[0].toUpperCase()}
@@ -309,12 +342,12 @@ export default function AiChatPage() {
             </>
           )}
           {/* 离线 */}
-          {friends.filter(f => !f.is_online).length > 0 && (
+          {filteredFriends.filter(f => !f.is_online).length > 0 && (
             <>
               <div className={styles.userPanelSection}>
-                离线 · {friends.filter(f => !f.is_online).length}
+                离线 · {filteredFriends.filter(f => !f.is_online).length}
               </div>
-              {friends.filter(f => !f.is_online).map(f => (
+              {filteredFriends.filter(f => !f.is_online).map(f => (
                 <div key={f.id} className={styles.userPanelItem}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOffline].join(' ')}>
                     {(f.nickname ?? f.account)[0].toUpperCase()}
@@ -326,6 +359,10 @@ export default function AiChatPage() {
                 </div>
               ))}
             </>
+          )}
+          {/* 提示条 */}
+          {totalUserCount > friends.length && !userQuery && (
+            <p className={styles.userPanelHint}>已显示 {friends.length} 位，可搜索查找其他用户</p>
           )}
         </div>
       </aside>

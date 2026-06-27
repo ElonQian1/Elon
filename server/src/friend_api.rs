@@ -105,22 +105,34 @@ pub async fn list_friend_groups(
     }
 }
 
+#[derive(Deserialize)]
+pub struct RecommendationsQuery {
+    pub limit: Option<i64>,
+}
+
 pub async fn list_friend_recommendations(
     State(state): State<Arc<AppState>>,
     headers: HeaderMap,
+    Query(query): Query<RecommendationsQuery>,
 ) -> Response {
     let user = match auth_from_headers(&state, &headers) {
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
+    let limit = query.limit.unwrap_or(50).max(1).min(200) as usize;
     match state.store.list_friend_recommendations(&user.id) {
         Ok(mut recommendations) => {
+            let total_count = recommendations.len();
             let online = state.online_users.read().await;
             for r in &mut recommendations {
                 r.is_online = r.id == SOCIAL_AI_USER_ID || online.contains_key(&r.id);
             }
+            // 在线用户排在前面，离线用户在后面
+            recommendations.sort_by(|a, b| b.is_online.cmp(&a.is_online));
+            let shown = recommendations.into_iter().take(limit).collect::<Vec<_>>();
             Json(serde_json::json!({
-                "recommendations": recommendations
+                "recommendations": shown,
+                "total_count": total_count
             }))
             .into_response()
         }

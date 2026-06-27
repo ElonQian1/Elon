@@ -118,7 +118,8 @@ impl Store {
              ORDER BY already_friend ASC,
                       mutual_friend_count DESC,
                       COALESCE(u.nickname, u.email, u.phone, u.id) COLLATE NOCASE ASC,
-                      u.created_at DESC",
+                      u.created_at DESC
+             LIMIT 500",
         )?;
         let recommendations = stmt
             .query_map(params![user_id, SOCIAL_AI_USER_ID], |row| {
