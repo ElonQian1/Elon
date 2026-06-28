@@ -259,10 +259,12 @@ export default function ConversationPage() {
   // (memberPopover state removed - not currently used)
 
   // 消息分组：判断某条消息是否与上一条来自同一发送者（仅用于非任务消息）
-  function isGrouped(idx: number): boolean {
-    if (idx === 0) return false
-    const cur  = messages[idx]
-    const prev = messages[idx - 1]
+  // src 必须与当前渲染的消息数组一致，避免索引越界
+  function isGroupedIn(src: Message[], idx: number): boolean {
+    if (idx === 0 || idx >= src.length) return false
+    const cur  = src[idx]
+    const prev = src[idx - 1]
+    if (!cur || !prev) return false
     const curRole  = clean(cur.kind  ?? cur.role  ?? '').toLowerCase()
     const prevRole = clean(prev.kind ?? prev.role ?? '').toLowerCase()
     const curId  = clean(cur.user_id  ?? (cur as Record<string, unknown>).userId  ?? '')
@@ -310,7 +312,7 @@ export default function ConversationPage() {
         if (last?.type === 'task' && last.taskId === tid) last.msgs.push(msg)
         else groups.push({ type: 'task', taskId: tid, msgs: [msg], key: `task-${tid}-${i}` })
       } else {
-        groups.push({ type: 'single', msg, grouped: isGrouped(i), key: msg.id ?? String(i) })
+        groups.push({ type: 'single', msg, grouped: isGroupedIn(src, i), key: msg.id ?? String(i) })
       }
     }
     return groups
