@@ -1,3 +1,13 @@
+/**
+ * DevTaskCard — Claude Desktop 风格的 AI 任务进度展示
+ *
+ * 设计原则：
+ * - tool_call / tool_result → 可折叠内联 chip（默认折叠）
+ * - 运行状态 → 细小状态行，不占主要视觉空间
+ * - 最终结果 → 主文本，突出展示
+ * - 工具审批 → 保留可操作 banner
+ */
+import { useState } from 'react'
 import styles from './DevTaskCard.module.css'
 import { clean } from '../../lib/utils'
 import {
@@ -16,175 +26,184 @@ interface DevTaskMessageProps {
 export function DevTaskMessage({ message, context, onCancel, onApprove }: DevTaskMessageProps) {
   const kind = clean(message.kind ?? message.role ?? message.message_kind ?? '').toLowerCase()
   if (!['ai_task', 'ai_progress', 'ai_result'].includes(kind)) return null
-  if (kind === 'ai_task') return <TaskStartCard message={message} context={context} onCancel={onCancel} />
-  if (kind === 'ai_progress') return <ProgressCard message={message} context={context} onCancel={onCancel} onApprove={onApprove} />
-  return <ResultCard message={message} context={context} />
+  if (kind === 'ai_task') return <TaskHeader message={message} context={context} onCancel={onCancel} />
+  if (kind === 'ai_progress') return <ProgressLine message={message} context={context} onCancel={onCancel} onApprove={onApprove} />
+  return <ResultBlock message={message} />
 }
 
-/* ── Task Start Card ── */
-function TaskStartCard({ message, context, onCancel }: Omit<DevTaskMessageProps, 'onApprove'>) {
+/* ══ TaskHeader — 顶部任务标题（一行，简洁） ══ */
+function TaskHeader({ message, context, onCancel }: Omit<DevTaskMessageProps, 'onApprove'>) {
   const taskId = clean(message.task_id ?? message.taskId ?? '')
   const task = taskId ? context.tasks.get(taskId) ?? null : null
   const status = statusForTask(task)
-  const request = clean(message.content ?? message.text ?? '').replace(/^发起\s*AI\s*开发任务[:：]\s*/i, '')
+  const request = clean(message.content ?? message.text ?? '').replace(/^发起\s*AI\s*开发任务[：:]\s*/i, '')
   const canCancel = !!taskId && !taskIsTerminal(task)
   return (
-    <DevTaskCard
-      tone={status.tone} eyebrow="AI 开发任务" title={status.label}
-      body={request || '已提交开发任务。'} taskId={taskId}
-      meta={task?.progressCount ? `${task.progressCount} 条进度` : '等待执行'}
-      canCancel={canCancel} onCancel={onCancel}
-    />
+    <div className={[styles.taskHeader, styles[`h_${status.tone}`]].join(' ')}>
+      <span className={styles.taskIcon}>{statusIcon(status.tone)}</span>
+      <span className={styles.taskLabel}>{status.label}</span>
+      {request && <span className={styles.taskRequest}>{request}</span>}
+      <div className={styles.taskMeta}>
+        {taskId && <span className={styles.taskId}>{shortId(taskId)}</span>}
+        {task?.progressCount ? <span>{task.progressCount} 步</span> : null}
+      </div>
+      {canCancel && onCancel && (
+        <button className={styles.cancelSmall} onClick={() => { if (window.confirm('停止任务？')) onCancel(taskId) }}>停止</button>
+      )}
+    </div>
   )
 }
 
-/* ── Progress Card ── */
-function ProgressCard({ message, context, onCancel, onApprove }: DevTaskMessageProps) {
+/* ══ ProgressLine — 进度行（工具调用/状态） ══ */
+function ProgressLine({ message, context, onCancel, onApprove }: DevTaskMessageProps) {
   const taskId = clean(message.task_id ?? message.taskId ?? '')
   const task = taskId ? context.tasks.get(taskId) ?? null : null
   const canCancel = !!taskId && !taskIsTerminal(task)
   const content = clean(message.content ?? message.text ?? '')
   const event = parseToolEvent(content)
-  if (!event) {
-    return (
-      <DevTaskCard
-        tone="running" eyebrow="执行进度" title="Agent 正在处理"
-        body={content} taskId={taskId} meta="来自运行时" canCancel={canCancel} onCancel={onCancel}
-      />
-    )
-  }
-  return <ToolEventCard event={event} taskId={taskId} context={context} canCancel={canCancel} onCancel={onCancel} onApprove={onApprove} />
-}
 
-/* ── Tool Event Card ── */
-function ToolEventCard({ event, taskId, context, canCancel, onCancel, onApprove }: {
-  event: ToolEvent; taskId: string; context: TaskContext; canCancel: boolean
-  onCancel?: DevTaskMessageProps['onCancel']; onApprove?: DevTaskMessageProps['onApprove']
-}) {
+  if (!event) {
+    return <StatusLine text={content} />
+  }
   if (event.type === 'runtime_status') {
     const label = runtimeStatusLabel(clean(event.phase ?? '').toLowerCase())
-    return (
-      <DevTaskCard
-        tone={label.tone} eyebrow="运行阶段" title={label.title}
-        body={clean(event.message ?? '') || label.body} taskId={taskId}
-        meta={`${clean(event.runtime ?? 'runtime')} · ${Number(event.turn) > 0 ? `第 ${event.turn} 轮` : '运行阶段'}`}
-        canCancel={canCancel} onCancel={onCancel}
-      />
-    )
+    const text = clean(event.message ?? '') || label.body
+    return <StatusLine text={text} tone={label.tone} runtime={clean(event.runtime ?? '')} turn={Number(event.turn)} />
   }
   if (event.type === 'runtime_summary') {
     const total = Number(event.total_tools ?? 0); const failed = Number(event.failed_tools ?? 0)
     const status = clean(event.status ?? '').toLowerCase()
     const canceled = ['canceled', 'cancelled', 'stopped'].includes(status)
     const ok = failed === 0 && !canceled && !['error', 'failed'].includes(status)
-    return (
-      <DevTaskCard
-        tone={canceled ? 'canceled' : (ok ? 'done' : 'failed')}
-        eyebrow="执行摘要" title={canceled ? 'Runtime 已停止' : (ok ? 'Runtime 已完成' : 'Runtime 有失败工具')}
-        body={[clean(event.message ?? '') || (canceled ? '运行已停止。' : (ok ? '运行已完成。' : '运行结束。')), `工具调用 ${total} 个，失败 ${failed} 个。`].join('\n')}
-        taskId={taskId} meta={`${clean(event.runtime ?? 'runtime')} · ${Number(event.turn) > 0 ? `第 ${event.turn} 轮` : '运行结束'}`}
-        canCancel={canCancel} onCancel={onCancel}
-      />
-    )
+    const tone: TaskTone = canceled ? 'canceled' : (ok ? 'done' : 'failed')
+    return <StatusLine text={clean(event.message ?? '') || `${total} 步完成，${failed} 步失败`} tone={tone} runtime={clean(event.runtime ?? '')} turn={Number(event.turn)} />
   }
   if (event.type === 'tool_approval_required') {
     const approvalId = clean(event.approval_id ?? '')
     const savedState = approvalId ? approvalStateFor(context, taskId, approvalId) : null
     const closedState = savedState && savedState.status !== 'pending' ? savedState : null
     const tool = clean(event.tool ?? 'tool')
-    return (
-      <DevTaskCard
-        tone={closedState?.tone ?? 'approval'}
-        eyebrow="工具审批"
-        title={closedState ? `${tool} ${closedState.label}` : `确认 ${tool}`}
-        body={formatApprovalBody(event)} bodyIsHtml={false}
-        taskId={taskId} meta={closedState?.meta ?? '批准前不会执行'}
-        canCancel={canCancel} onCancel={onCancel}
-        approvalId={!closedState && approvalId ? approvalId : undefined}
-        onApprove={onApprove}
-      />
-    )
+    return <ApprovalBanner tool={tool} event={event} taskId={taskId} closedState={closedState} canCancel={canCancel} onCancel={onCancel} approvalId={!closedState && approvalId ? approvalId : undefined} onApprove={onApprove} />
   }
   if (event.type === 'tool_approval_decision') {
     const finalState = approvalFinalState(event)
-    return (
-      <DevTaskCard
-        tone={finalState.tone} eyebrow="工具审批" title={`${clean(event.tool ?? 'tool')} ${finalState.label}`}
-        body={`决定: ${clean(event.decision ?? event.status ?? '已处理')}`}
-        taskId={taskId} meta={finalState.meta} canCancel={canCancel} onCancel={onCancel}
-      />
-    )
+    return <StatusLine text={`${clean(event.tool ?? 'tool')} ${finalState.label}`} tone={finalState.tone} />
   }
+  return <ToolChip event={event} />
+}
+
+/* ══ ToolChip — Claude 风格可折叠工具调用 ══ */
+function ToolChip({ event }: { event: ToolEvent }) {
+  const [open, setOpen] = useState(false)
   const isResult = event.type === 'tool_result'
   const failed = isResult && clean(event.status ?? '').toLowerCase() === 'error'
   const tool = clean(event.tool ?? 'tool')
+  const summary = isResult
+    ? (clean(event.result ?? '').slice(0, 80) || '完成')
+    : briefArgs(event.args)
   return (
-    <DevTaskCard
-      tone={failed ? 'failed' : (isResult ? 'done' : 'running')}
-      eyebrow={isResult ? '工具结果' : '工具调用'}
-      title={isResult ? `${tool} 执行结果` : `正在调用 ${tool}`}
-      body={isResult ? (clean(event.result ?? '') || '完成') : JSON.stringify(event.args ?? {}, null, 2)}
-      taskId={taskId} meta={isResult ? (failed ? '工具返回错误' : '工具已完成') : '等待工具返回'}
-      canCancel={canCancel} onCancel={onCancel}
-    />
+    <div className={[styles.toolChip, failed ? styles.toolFailed : isResult ? styles.toolDone : styles.toolRunning].join(' ')}>
+      <button className={styles.toolChipBtn} onClick={() => setOpen(!open)} type="button">
+        <span className={styles.toolChipArrow}>{open ? '▾' : '▸'}</span>
+        <span className={styles.toolChipIcon}>{isResult ? (failed ? '✗' : '✓') : '⟳'}</span>
+        <span className={styles.toolChipName}>{tool}</span>
+        {!open && summary && <span className={styles.toolChipSummary}>{summary}</span>}
+      </button>
+      {open && (
+        <div className={styles.toolChipBody}>
+          {!isResult && event.args && (
+            <pre className={styles.toolChipPre}>{JSON.stringify(event.args, null, 2)}</pre>
+          )}
+          {isResult && (
+            <pre className={[styles.toolChipPre, failed ? styles.toolChipPreErr : ''].join(' ')}>
+              {clean(event.result ?? '') || '（无输出）'}
+            </pre>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
-/* ── Result Card ── */
-function ResultCard({ message, context: _context }: Omit<DevTaskMessageProps, 'onCancel' | 'onApprove'>) {
-  const taskId = clean(message.task_id ?? message.taskId ?? '')
+/* ══ StatusLine — 极简状态行 ══ */
+function StatusLine({ text, tone, runtime, turn }: {
+  text: string; tone?: TaskTone; runtime?: string; turn?: number
+}) {
+  const dot = tone === 'done' ? styles.dotDone : tone === 'failed' ? styles.dotFail : tone === 'canceled' ? styles.dotCancel : styles.dotRun
+  return (
+    <div className={styles.statusLine}>
+      <span className={[styles.dot, dot].join(' ')} />
+      <span className={styles.statusText}>{text}</span>
+      {(runtime || (turn && turn > 0)) && (
+        <span className={styles.statusMeta}>
+          {runtime || ''}{turn && turn > 0 ? ` · 第${turn}轮` : ''}
+        </span>
+      )}
+    </div>
+  )
+}
+
+/* ══ ApprovalBanner — 审批横幅 ══ */
+function ApprovalBanner({ tool, event, taskId, closedState, canCancel, onCancel, approvalId, onApprove }: {
+  tool: string; event: ToolEvent; taskId: string
+  closedState: { tone: TaskTone; label: string; meta: string } | null
+  canCancel: boolean; onCancel?: (id: string) => void
+  approvalId?: string; onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
+}) {
+  const [open, setOpen] = useState(false)
+  const tone = closedState?.tone ?? 'approval'
+  return (
+    <div className={[styles.approvalBanner, styles[`tone_${tone}`]].join(' ')}>
+      <div className={styles.approvalHead}>
+        <span>🔐</span>
+        <strong>{closedState ? `${tool} ${closedState.label}` : `确认执行 ${tool}？`}</strong>
+        <button className={styles.approvalToggle} onClick={() => setOpen(!open)} type="button">{open ? '隐藏详情' : '查看详情'}</button>
+        {!closedState && approvalId && onApprove && (
+          <>
+            <button className={styles.approveBtn} onClick={() => onApprove(taskId, approvalId, 'approve')}>批准</button>
+            <button className={styles.denyBtn} onClick={() => onApprove(taskId, approvalId, 'deny')}>拒绝</button>
+          </>
+        )}
+        {canCancel && onCancel && !closedState && (
+          <button className={styles.cancelSmall} onClick={() => { if (window.confirm('停止任务？')) onCancel(taskId) }}>停止</button>
+        )}
+      </div>
+      {open && <pre className={styles.toolChipPre}>{formatApprovalBody(event)}</pre>}
+    </div>
+  )
+}
+
+/* ══ ResultBlock — 最终结果（突出展示） ══ */
+function ResultBlock({ message }: { message: ChatMessage }) {
   const content = clean(message.content ?? message.text ?? '')
   const canceled = /停止|取消|canceled|cancelled/i.test(content)
   const failed = !canceled && /失败|错误|error|failed/i.test(content)
+  const tone: TaskTone = canceled ? 'canceled' : (failed ? 'failed' : 'done')
   return (
-    <DevTaskCard
-      tone={canceled ? 'canceled' : (failed ? 'failed' : 'done')}
-      eyebrow="执行结果"
-      title={canceled ? '任务已停止' : (failed ? '任务失败' : '任务完成')}
-      body={content} taskId={taskId}
-      meta={canceled ? '已中断运行' : (failed ? '需要继续处理' : '可以检查变更')}
-    />
-  )
-}
-
-/* ── Base Card Component ── */
-interface DevTaskCardProps {
-  tone: TaskTone; eyebrow: string; title: string; body: string; bodyIsHtml?: boolean
-  taskId: string; meta: string; canCancel?: boolean; onCancel?: (id: string) => void
-  approvalId?: string; onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
-}
-
-function DevTaskCard({ tone, eyebrow, title, body, bodyIsHtml, taskId, meta, canCancel, onCancel, approvalId, onApprove }: DevTaskCardProps) {
-  return (
-    <div className={styles.wrap}>
-      <section className={[styles.card, styles[tone]].join(' ')}>
-        <div className={styles.head}>
-          <span>{eyebrow}</span>
-          <strong>{title}</strong>
-        </div>
-        {bodyIsHtml
-          ? <div className={styles.htmlBody} dangerouslySetInnerHTML={{ __html: body }} />
-          : <pre className={styles.body}>{body}</pre>}
-        <div className={styles.foot}>
-          <div>
-            {taskId && <span title={taskId}>任务 {shortId(taskId)}</span>}
-            <span>{meta}</span>
-          </div>
-          <div className={styles.actions}>
-            {approvalId && onApprove && (
-              <>
-                <button className={styles.approveBtn} onClick={() => onApprove(taskId, approvalId, 'approve')}>批准</button>
-                <button className={styles.denyBtn} onClick={() => onApprove(taskId, approvalId, 'deny')}>拒绝</button>
-              </>
-            )}
-            {canCancel && onCancel && (
-              <button className={styles.cancelBtn} onClick={() => { if (window.confirm('停止这个 AI 开发任务？')) onCancel(taskId) }}>停止</button>
-            )}
-          </div>
-        </div>
-      </section>
+    <div className={[styles.resultBlock, styles[`r_${tone}`]].join(' ')}>
+      <span className={styles.resultIcon}>{tone === 'done' ? '✓' : tone === 'canceled' ? '◉' : '✗'}</span>
+      <div className={styles.resultContent}>
+        <span className={styles.resultLabel}>{tone === 'done' ? '任务完成' : tone === 'canceled' ? '任务已停止' : '任务失败'}</span>
+        {content && <p className={styles.resultText}>{content}</p>}
+      </div>
     </div>
   )
+}
+
+function statusIcon(tone: TaskTone): string {
+  if (tone === 'done') return '✓'
+  if (tone === 'failed') return '✗'
+  if (tone === 'canceled') return '◉'
+  if (tone === 'approval') return '🔐'
+  return '⟳'
+}
+
+function briefArgs(args: unknown): string {
+  if (!args) return ''
+  if (typeof args === 'string') return args.slice(0, 60)
+  const obj = args as Record<string, unknown>
+  const val = obj.command ?? obj.path ?? obj.content ?? obj.query ?? obj.input ?? ''
+  return String(val ?? '').slice(0, 60)
 }
 
 function formatApprovalBody(event: ToolEvent): string {

@@ -1,15 +1,181 @@
-/* 对应旧 pc_app_dev_tasks.css 的任务卡样式 */
+/* Claude Desktop 风格：紧凑、层次清晰、折叠优先 */
 
-.wrap {
-  margin-bottom: 8px;
+/* ── TaskHeader ── 一行任务标题 */
+.taskHeader {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  font-size: 13px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.07);
+  flex-wrap: wrap;
+}
+.h_running { border-left: 3px solid var(--accent, #5865f2); }
+.h_done    { border-left: 3px solid #23a55a; }
+.h_failed  { border-left: 3px solid #da373c; }
+.h_canceled{ border-left: 3px solid #888; }
+.h_approval{ border-left: 3px solid #c8a040; }
+.h_queued  { border-left: 3px solid #555; }
+.h_muted   { border-left: 3px solid #444; }
+
+.taskIcon  { font-size: 12px; color: var(--text-muted, #888); }
+.taskLabel { font-weight: 700; color: var(--text-primary, #eee); font-size: 12px; }
+.taskRequest { color: var(--text-secondary, #aaa); font-size: 12px; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taskMeta  { display: flex; gap: 6px; margin-left: auto; }
+.taskMeta span { font-size: 11px; color: var(--text-muted, #666); }
+.taskId    { font-family: monospace; }
+
+/* ── StatusLine ── 极简进度行 */
+.statusLine {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 12px;
+  font-size: 12px;
+  color: var(--text-muted, #888);
+  line-height: 1.4;
+}
+.dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dotRun    { background: var(--accent, #5865f2); animation: pulse 1.2s ease-in-out infinite; }
+.dotDone   { background: #23a55a; }
+.dotFail   { background: #da373c; }
+.dotCancel { background: #888; }
+.statusText { color: var(--text-secondary, #aaa); flex: 1; }
+.statusMeta { font-size: 10px; color: var(--text-muted, #666); white-space: nowrap; }
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
 }
 
-.card {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--bg-surface);
+/* ── ToolChip ── 可折叠工具调用 */
+.toolChip {
+  margin: 2px 0 2px 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(255,255,255,.07);
+  overflow: hidden;
+  font-size: 12px;
+}
+.toolRunning { border-color: rgba(88,101,242,.3); background: rgba(88,101,242,.05); }
+.toolDone    { border-color: rgba(35,165,90,.25); background: rgba(35,165,90,.04); }
+.toolFailed  { border-color: rgba(218,55,60,.3);  background: rgba(218,55,60,.05); }
+
+.toolChipBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: inherit;
+  font-size: 12px;
+}
+.toolChipBtn:hover { background: rgba(255,255,255,.04); }
+.toolChipArrow { color: var(--text-muted, #666); font-size: 10px; flex-shrink: 0; }
+.toolChipIcon  { font-size: 11px; flex-shrink: 0; }
+.toolRunning .toolChipIcon { color: #7289da; }
+.toolDone    .toolChipIcon { color: #23a55a; }
+.toolFailed  .toolChipIcon { color: #da373c; }
+.toolChipName    { font-family: 'Cascadia Code', monospace; font-weight: 600; color: var(--text-primary, #eee); flex-shrink: 0; }
+.toolChipSummary { color: var(--text-muted, #777); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; font-family: 'Cascadia Code', monospace; }
+
+.toolChipBody { padding: 0 10px 8px; }
+.toolChipPre  {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: rgba(0,0,0,.3);
+  border-radius: 4px;
+  font-size: 11.5px;
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  line-height: 1.5;
+  color: #c9d1d9;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.toolChipPreErr { color: #ff7b7b; }
+
+/* ── ApprovalBanner ── 审批横幅 */
+.approvalBanner {
+  margin: 4px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(200,160,64,.4);
+  background: rgba(200,160,64,.07);
+  font-size: 12px;
   overflow: hidden;
 }
+.tone_done     { border-color: rgba(35,165,90,.3); background: rgba(35,165,90,.05); }
+.tone_failed   { border-color: rgba(218,55,60,.3); background: rgba(218,55,60,.05); }
+.tone_canceled { border-color: rgba(120,120,120,.3); background: rgba(120,120,120,.05); }
+
+.approvalHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 12px;
+  flex-wrap: wrap;
+}
+.approvalHead strong { color: var(--text-primary, #eee); flex: 1; }
+.approvalToggle { background: none; border: none; color: var(--text-muted, #888); cursor: pointer; font-size: 11px; padding: 2px 6px; }
+.approvalToggle:hover { color: var(--text-primary, #eee); }
+
+/* ── ResultBlock ── 最终结果 */
+.resultBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.03);
+  margin-top: 4px;
+}
+.r_done    { border-color: rgba(35,165,90,.25); background: rgba(35,165,90,.04); }
+.r_failed  { border-color: rgba(218,55,60,.2);  background: rgba(218,55,60,.04); }
+.r_canceled{ border-color: rgba(120,120,120,.2); }
+
+.resultIcon {
+  font-size: 14px;
+  line-height: 1;
+  padding-top: 2px;
+  flex-shrink: 0;
+}
+.r_done    .resultIcon { color: #23a55a; }
+.r_failed  .resultIcon { color: #da373c; }
+.r_canceled .resultIcon { color: #888; }
+.resultContent { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.resultLabel { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.r_done    .resultLabel { color: #23a55a; }
+.r_failed  .resultLabel { color: #da373c; }
+.r_canceled .resultLabel { color: #888; }
+.resultText { font-size: 13px; color: var(--text-secondary, #bbb); line-height: 1.6; margin: 0; white-space: pre-wrap; word-break: break-word; }
+
+/* ── Shared action buttons ── */
+.cancelSmall { background: none; border: 1px solid rgba(218,55,60,.4); color: #da373c; border-radius: 4px; font-size: 11px; padding: 2px 8px; cursor: pointer; margin-left: auto; }
+.cancelSmall:hover { background: rgba(218,55,60,.1); }
+.approveBtn { height: 24px; padding: 0 10px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #23a55a; color: #fff; border: none; cursor: pointer; }
+.approveBtn:hover { background: #1d8a4a; }
+.denyBtn    { height: 24px; padding: 0 10px; border-radius: 4px; font-size: 12px; font-weight: 600; background: #da373c; color: #fff; border: none; cursor: pointer; }
+.denyBtn:hover { background: #b02a2e; }
+
+/* ── Legacy compat (keep card/wrap for old references) ── */
+.wrap { margin-bottom: 4px; }
+.card { border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); overflow: hidden; }
+.card.running { border-left: 3px solid var(--accent); }
+.card.done    { border-left: 3px solid #23a55a; }
+.card.failed  { border-left: 3px solid var(--danger); }
+.card.canceled{ border-left: 3px solid #888; }
+.card.approval{ border-left: 3px solid #c8a040; }
+.card.queued  { border-left: 3px solid #666; }
+.card.muted   { border-left: 3px solid #444; }
+
 
 /* tone variants */
 .card.queued   { border-left: 3px solid #666; }
