@@ -162,6 +162,11 @@ export default function ConversationPage() {
         const best = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
         await selectChannel(best.id)
       }
+      // 从 landing 首页发送时，标记等待新会话出现后自动切入
+      if (sessionView === null || sessionView === undefined) {
+        prevSessionIdsRef.current = new Set(sessions.map((s) => s.id))
+        waitingForNewSession.current = true
+      }
       await sendMessage(fullContent, selectedAgent || null)
     } catch (err) {
       setSendError((err as { message?: string }).message ?? '发送失败')
@@ -555,7 +560,8 @@ export default function ConversationPage() {
         {activeProjectId && <NodeOfflineBanner />}
 
         {/* 消息列表（1fr）*/}
-        {!activeChannelId ? (
+        {/* 无频道或未选中会话（landing）vs 选中会话（feed）*/}
+        {!activeChannelId || sessionView === null ? (
           <div className={styles.messageList}>
             {!activeProjectId ? (
               /* 无项目：全局欢迎页 */
@@ -571,7 +577,7 @@ export default function ConversationPage() {
                   project={activeProject}
                   channels={channels}
                   landing={landing}
-                  onSelectChannel={selectChannel}
+                  onSelectChannel={(id) => { setSessionView(null); selectChannel(id) }}
                 />
               )
             )}
@@ -1728,6 +1734,17 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
     owner: styles.popoverHeadOwner, admin: styles.popoverHeadAdmin,
     editor: styles.popoverHeadEditor, collaborator: styles.popoverHeadEditor,
   }[roleKey] ?? ''
+  const [isFriend, setIsFriend] = useState(false)
+  const [addingFriend, setAddingFriend] = useState(false)
+  const [addMsg, setAddMsg] = useState('')
+
+  // 启动时检查是否已是好友
+  useEffect(() => {
+    if (!member.user_id) return
+    api.get<{ friends?: Array<{ id: string }> }>('/api/me/friends')
+      .then(d => setIsFriend(!!(d.friends ?? []).find(f => f.id === member.user_id)))
+      .catch(() => {})
+  }, [member.user_id])
 
   // 点击外部关闭
   useEffect(() => {
@@ -1740,6 +1757,20 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
 
   function copyId() {
     navigator.clipboard.writeText(member.user_id).catch(() => {})
+  }
+
+  async function addFriend() {
+    if (isFriend || addingFriend) return
+    setAddingFriend(true)
+    try {
+      await api.post('/api/me/friends', { query: member.user_id, search_type: 'user_id' })
+      setIsFriend(true)
+      setAddMsg('已添加')
+    } catch (err) {
+      setAddMsg((err as { message?: string }).message ?? '添加失败')
+    } finally {
+      setAddingFriend(false)
+    }
   }
 
   const details: [string, string][] = [
@@ -1794,6 +1825,11 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
         )}
         <div className={styles.memberPopoverActions}>
           <button className={styles.memberPopoverBtn} type="button" onClick={copyId}>复制 ID</button>
+          <button className={styles.memberPopoverBtn} type="button"
+            onClick={addFriend} disabled={isFriend || addingFriend}
+            style={{ background: isFriend ? 'rgba(88,190,106,.1)' : undefined, color: isFriend ? 'var(--green,#58BE6A)' : undefined, cursor: isFriend ? 'default' : 'pointer' }}>
+            {addMsg || (isFriend ? '已是好友' : addingFriend ? '添加中…' : '加好友')}
+          </button>
         </div>
       </div>
     </div>

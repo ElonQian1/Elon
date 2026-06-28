@@ -43,6 +43,7 @@ interface Friend {
   nickname?: string
   avatar_data_url?: string | null
   is_online?: boolean
+  already_friend?: boolean
 }
 
 export default function AiChatPage() {
@@ -507,6 +508,9 @@ function UserProfilePopover({ friend, anchorY, onClose }: { friend: Friend; anch
   const popRef = useRef<HTMLDivElement>(null)
   const name = friend.nickname ?? friend.account
   const isOnline = !!friend.is_online
+  const [isFriend, setIsFriend] = useState(!!friend.already_friend)
+  const [addingFriend, setAddingFriend] = useState(false)
+  const [addMsg, setAddMsg] = useState('')
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -525,6 +529,20 @@ function UserProfilePopover({ friend, anchorY, onClose }: { friend: Friend; anch
 
   function copyId() {
     navigator.clipboard.writeText(friend.id).catch(() => {})
+  }
+
+  async function addFriend() {
+    if (isFriend || addingFriend) return
+    setAddingFriend(true)
+    try {
+      await api.post('/api/me/friends', { query: friend.id, search_type: 'user_id' })
+      setIsFriend(true)
+      setAddMsg('已添加')
+    } catch (err) {
+      setAddMsg((err as { message?: string }).message ?? '添加失败')
+    } finally {
+      setAddingFriend(false)
+    }
   }
 
   return (
@@ -587,10 +605,15 @@ function UserProfilePopover({ friend, anchorY, onClose }: { friend: Friend; anch
             </div>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+        <div style={{ display: 'flex', gap: 6, marginTop: 10, flexWrap: 'wrap' }}>
           <button style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: 'rgba(255,255,255,.04)', color: 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             type="button" onClick={() => { onClose(); navigate('/friends') }}>
             发消息
+          </button>
+          <button
+            style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: isFriend ? 'rgba(88,190,106,.1)' : 'rgba(255,255,255,.04)', color: isFriend ? 'var(--green,#58BE6A)' : 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: isFriend ? 'default' : 'pointer', opacity: addingFriend ? 0.6 : 1 }}
+            type="button" onClick={addFriend} disabled={isFriend || addingFriend}>
+            {addMsg || (isFriend ? '已是好友' : addingFriend ? '添加中…' : '加好友')}
           </button>
           <button style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: 'rgba(255,255,255,.04)', color: 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
             type="button" onClick={copyId}>
