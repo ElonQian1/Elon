@@ -43,7 +43,7 @@ export default function ConversationPage() {
   const token = useAuthStore((s) => s.token)
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
-    messages, messagesLoading, sendingMessage, landing, spaceLoading, spaceError,
+    messages, messagesLoading, sendingMessage, landing,
     loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
@@ -211,7 +211,10 @@ export default function ConversationPage() {
   const memberPanelContext = activeChannel?.name ?? activeProject?.name ?? '我的项目'
   const memberPanelCount = activeProjectId ? spaceMembers.length : (user ? 1 : 0)
 
-  // 消息分组：判断某条消息是否与上一条来自同一发送者
+  // 成员卡片弹窗
+  // (memberPopover state removed - not currently used)
+
+  // 消息分组：判断某条消息是否与上一条来自同一发送者（仅用于非任务消息）
   function isGrouped(idx: number): boolean {
     if (idx === 0) return false
     const cur  = messages[idx]
@@ -220,24 +223,38 @@ export default function ConversationPage() {
     const prevRole = clean(prev.kind ?? prev.role ?? '').toLowerCase()
     const curId  = clean(cur.user_id  ?? (cur as Record<string, unknown>).userId  ?? '')
     const prevId = clean(prev.user_id ?? (prev as Record<string, unknown>).userId ?? '')
-    // DevTask 消息不参与分组
     if (['ai_task','ai_progress','ai_result'].includes(curRole)) return false
     if (['ai_task','ai_progress','ai_result'].includes(prevRole)) return false
-    // 同角色（user/assistant）且 uid 一致（或都是 AI 消息）→ 分组
     if (curRole === prevRole) {
       if (curRole === 'user' || curRole === 'human') return curId !== '' && curId === prevId
-      return true  // AI 消息连续也分组
+      return true
     }
     return false
   }
+
+  // 会话视图模式：null=默认(全部) / 'new'=新建空会话 / string=只看该task_id
+  const [sessionView, setSessionView] = useState<string | 'new' | null>(null)
+  const prevSessionIdsRef = useRef<Set<string>>(new Set())
+  const waitingForNewSession = useRef(false)
+
+  // 根据会话视图过滤显示的消息（必须在 messageGroups 之前声明）
+  const displayMessages = useMemo(() => {
+    if (!sessionView) return messages
+    if (sessionView === 'new') return []
+    return messages.filter((msg) => {
+      const tid = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
+      return tid === sessionView
+    })
+  }, [messages, sessionView])
 
   // 消息分组：dev频道中把同一 task_id 的消息聚合为 DevTaskGroup（任务级折叠层）
   type SingleGroup = { type: 'single'; msg: Message; grouped: boolean; key: string }
   type TaskGroup   = { type: 'task';   taskId: string; msgs: Message[]; key: string }
   const messageGroups = useMemo(() => {
+    const src = displayMessages
     const groups: Array<SingleGroup | TaskGroup> = []
-    for (let i = 0; i < messages.length; i++) {
-      const msg  = messages[i]
+    for (let i = 0; i < src.length; i++) {
+      const msg  = src[i]
       const kind = clean(msg.kind ?? msg.role ?? '').toLowerCase()
       const tid  = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
       const isTask = isDevChannel && ['ai_task','ai_progress','ai_result'].includes(kind) && !!tid
@@ -250,9 +267,9 @@ export default function ConversationPage() {
       }
     }
     return groups
-  }, [messages, isDevChannel]) // eslint-disable-line
+  }, [displayMessages, isDevChannel]) // eslint-disable-line
 
-  // 会话列表：从已加载消息中提取（每个 task_id = 一个会话），用于侧边栏导航
+  // 会话列表：从已加载消息中提取（每个 task_id = 一个会话）
   const sessions = useMemo(() => {
     const taskOrder = new Map<string, number>()
     messages.forEach((msg, i) => {
@@ -272,14 +289,31 @@ export default function ConversationPage() {
     return list.sort((a, b) => (taskOrder.get(b.id) ?? 0) - (taskOrder.get(a.id) ?? 0))
   }, [taskContext, messages])
 
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  // sessionView='new' 时，一旦出现新 task_id 自动切到它
+  useEffect(() => {
+    if (!waitingForNewSession.current) return
+    const newSession = sessions.find((s) => !prevSessionIdsRef.current.has(s.id))
+    if (newSession) {
+      setSessionView(newSession.id)
+      waitingForNewSession.current = false
+    }
+  }, [sessions])
 
-  function scrollToSession(taskId: string) {
-    setActiveSessionId(taskId)
-    const el = feedRef.current
-    if (!el) return
-    const target = el.querySelector(`[data-task-id="${CSS.escape(taskId)}"]`) as HTMLElement | null
-    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  // 切换频道时重置会话视图
+  useEffect(() => {
+    setSessionView(null)
+    waitingForNewSession.current = false
+  }, [activeChannelId]) // eslint-disable-line
+
+  function startNewSession() {
+    prevSessionIdsRef.current = new Set(sessions.map((s) => s.id))
+    setSessionView('new')
+    waitingForNewSession.current = true
+    setTimeout(() => textareaRef.current?.focus(), 50)
+  }
+
+  function openSession(taskId: string) {
+    setSessionView(taskId)
   }
 
   return (
@@ -365,27 +399,30 @@ export default function ConversationPage() {
                 })
               )}
 
-              {/* ── 会话列表：选中频道且有会话时显示 ── */}
-              {activeChannelId && sessions.length > 0 && (
+              {/* ── 会话列表：选中频道时显示，点击进入隔离语境运行 ── */}
+              {activeChannelId && (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,.04)', marginTop: 4, paddingBottom: 4 }}>
                   <div style={{ padding: '8px 12px 3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)' }}>会话记录</span>
+                    <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)' }}>会话</span>
                     <button
                       type="button"
                       title="新建会话"
-                      onClick={() => { setActiveSessionId(null); setTimeout(() => textareaRef.current?.focus(), 50) }}
-                      style={{ background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: 4, width: 18, height: 18, color: 'var(--text-soft)', fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                      onClick={startNewSession}
+                      style={{ background: sessionView === 'new' ? 'rgba(60,111,162,.3)' : 'rgba(255,255,255,.08)', border: 'none', borderRadius: 4, width: 18, height: 18, color: 'var(--text-soft)', fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
                     >+</button>
                   </div>
+                  {sessions.length === 0 && (
+                    <div style={{ padding: '4px 12px 6px', fontSize: 11, color: 'var(--text-muted)' }}>发送第一条消息自动创建会话</div>
+                  )}
                   {sessions.map((s) => (
                     <button
                       key={s.id}
                       type="button"
-                      onClick={() => scrollToSession(s.id)}
+                      onClick={() => openSession(s.id)}
                       style={{
                         width: 'calc(100% - 8px)', display: 'flex', flexDirection: 'column', gap: 1,
                         padding: '5px 10px', margin: '1px 4px',
-                        background: s.id === activeSessionId ? 'rgba(60,111,162,.2)' : 'transparent',
+                        background: s.id === sessionView ? 'rgba(60,111,162,.2)' : 'transparent',
                         border: 'none', borderRadius: 5, textAlign: 'left', cursor: 'pointer',
                         color: 'var(--text-soft)', transition: 'background .1s',
                       }}
@@ -544,12 +581,15 @@ export default function ConversationPage() {
                 <p>正在读取消息…</p>
               </div>
             )}
-            {!messagesLoading && messages.length === 0 && (
+            {!messagesLoading && displayMessages.length === 0 && (
               <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
-                <p>还没有消息，发送第一条吧！</p>
+                {sessionView === 'new'
+                  ? <><strong>新会话</strong><p>输入消息开始全新对话，发送后自动保存为独立会话。</p></>
+                  : <p>还没有消息，发送第一条吧！</p>
+                }
               </div>
             )}
-            {messages.length > 0 && messageGroups.map((group) =>
+            {displayMessages.length > 0 && messageGroups.map((group) =>
               group.type === 'task' ? (
                 <div key={group.key} data-task-id={group.taskId} className={styles.devTaskWrap}>
                   <DevTaskGroup
@@ -679,18 +719,15 @@ export default function ConversationPage() {
         </div>
         <div className={styles.memberList}>
           {selectedMember && (
-            <MemberProfileCard member={selectedMember} onClose={() => setSelectedMember(null)} />
+            <MemberProfilePopover member={selectedMember} onClose={() => setSelectedMember(null)} />
           )}
-          {activeProjectId && spaceLoading && spaceMembers.length === 0 && (
+          {activeProjectId && messagesLoading && spaceMembers.length === 0 && (
             <MemberLoadingRows />
-          )}
-          {activeProjectId && !spaceLoading && spaceError && (
-            <p className={styles.sideHint}>{spaceError}</p>
           )}
           {activeProjectId && spaceMembers.length > 0 && (
             <MemberSearch members={spaceMembers} onSelect={setSelectedMember} />
           )}
-          {activeProjectId && !spaceLoading && !spaceError && spaceMembers.length === 0 && (
+          {activeProjectId && !messagesLoading && spaceMembers.length === 0 && (
             <p className={styles.sideHint}>暂无项目成员</p>
           )}
           {!activeProjectId && user && (
@@ -1667,30 +1704,76 @@ function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect:
   )
 }
 
-function MemberProfileCard({ member, onClose }: { member: ProjectMember; onClose: () => void }) {
+/* ── 浮动用户卡片（Discord 风格，定位于右侧栏左侧）── */
+function MemberProfilePopover({ member, onClose }: { member: ProjectMember; onClose: () => void }) {
+  const popRef = useRef<HTMLDivElement>(null)
   const status = memberPresenceStatus(member)
   const name = member.account || member.user_id
+  const roleKey = (member.role ?? '').toLowerCase()
+  const roleHeadCls = {
+    owner: styles.popoverHeadOwner, admin: styles.popoverHeadAdmin,
+    editor: styles.popoverHeadEditor, collaborator: styles.popoverHeadEditor,
+  }[roleKey] ?? ''
+
+  // 点击外部关闭
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [onClose])
+
+  function copyId() {
+    navigator.clipboard.writeText(member.user_id).catch(() => {})
+  }
+
+  const details: [string, string][] = [
+    member.account && ['账号', member.account],
+    member.user_id && ['用户 ID', member.user_id.slice(0, 14)],
+    member.joined_at && ['加入时间', formatTime(member.joined_at)],
+  ].filter(Boolean) as [string, string][]
+
   return (
-    <section className={styles.memberProfileCard}>
-      <button className={styles.memberProfileClose} type="button" onClick={onClose}>×</button>
-      <div className={[
-        styles.memberProfileAvatar,
-        status === 'online' ? styles.memberAvatarOnline : '',
-        status === 'idle' ? styles.memberIdle : '',
-        status === 'dnd' ? styles.memberDnd : '',
-        status === 'offline' ? styles.memberAvatarOffline : '',
-      ].filter(Boolean).join(' ')}>
-        {member.avatar_data_url
-          ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-          : memberInitial(member)
-        }
+    <div ref={popRef} className={styles.memberPopover} style={{ position: 'fixed', right: 284, top: '20%', zIndex: 200 }}>
+      {/* 头部 */}
+      <div className={[styles.memberPopoverHead, roleHeadCls].join(' ')}>
+        <div className={[
+          styles.memberPopoverAvatar,
+          status === 'online' ? styles.memberAvatarOnline : styles.memberAvatarOffline,
+        ].join(' ')}>
+          {member.avatar_data_url
+            ? <img src={member.avatar_data_url} alt="" />
+            : <span>{name[0]?.toUpperCase() ?? '?'}</span>
+          }
+        </div>
+        <button className={styles.memberPopoverClose} onClick={onClose} type="button">×</button>
       </div>
-      <div className={styles.memberProfileCopy}>
-        <strong>{name}</strong>
-        <span>{presenceLabel(status)} · {memberRoleSummary(member)}</span>
-        <small>{memberSubtitle(member)}</small>
+      {/* 主体 */}
+      <div className={styles.memberPopoverBody}>
+        <strong className={styles.memberPopoverName}>{name}</strong>
+        <span className={styles.memberPopoverSub}>{presenceLabel(status)}</span>
+        <div className={styles.memberPopoverMeta}>
+          <em className={styles.memberPopoverPill}>{memberRoleSummary(member)}</em>
+          <em className={[styles.memberPopoverPill, status === 'online' ? styles.memberPopoverPillOnline : ''].join(' ')}>
+            {presenceLabel(status)}
+          </em>
+        </div>
+        {details.length > 0 && (
+          <div className={styles.memberPopoverDetails}>
+            {details.map(([label, value]) => (
+              <div key={label} className={styles.memberPopoverDetail}>
+                <span>{label}</span>
+                <strong title={value}>{value}</strong>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className={styles.memberPopoverActions}>
+          <button className={styles.memberPopoverBtn} type="button" onClick={copyId}>复制 ID</button>
+        </div>
       </div>
-    </section>
+    </div>
   )
 }
 
