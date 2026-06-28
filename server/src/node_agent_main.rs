@@ -2436,6 +2436,15 @@ fn running_as_legacy_agent_exe() -> bool {
 
 async fn run_agent_runtime() -> Result<()> {
     dotenvy::dotenv().ok();
+    // 也加载 _internal/node-agent.env（由启动器或 save-openai-key 写入的持久化配置）
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            let internal_env = dir.join("_internal").join("node-agent.env");
+            if internal_env.exists() {
+                dotenvy::from_path(internal_env).ok();
+            }
+        }
+    }
     node_agent_proxy::ensure_localhost_no_proxy();
     tracing_subscriber::fmt()
         .with_env_filter(std::env::var("RUST_LOG").unwrap_or_else(|_| "info".into()))
