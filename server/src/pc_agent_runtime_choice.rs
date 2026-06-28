@@ -62,7 +62,9 @@ pub(crate) async fn choose_pc_agent_runtime(
     agent_name: Option<&str>,
     route_preference: Option<PcRuntimeRoutePreference>,
 ) -> PcAgentRuntimeChoice {
-    let option = agent_name.and_then(|name| state.ai_cli.find_option(Some(name)).cloned());
+    let option = agent_name
+        .filter(|name| state.ai_cli.has_option(name))
+        .and_then(|name| state.ai_cli.find_option(Some(name)).cloned());
     let requested_cli = requested_cli_name(option.as_ref(), agent_name);
     let summary = state
         .agent_manager
