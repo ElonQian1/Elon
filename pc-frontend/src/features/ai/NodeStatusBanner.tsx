@@ -9,7 +9,6 @@
  */
 import { useEffect, useState, useRef } from 'react'
 import { api } from '../../api/client'
-import { useAuthStore } from '../../store/auth'
 import styles from './NodeStatusBanner.module.css'
 
 interface NodeInfo {
@@ -23,8 +22,6 @@ interface NodeInfo {
 
 type Status = 'loading' | 'no_node' | 'offline' | 'online'
 
-const SERVER_URL = 'http://43.139.149.158:8080'
-const WS_URL = 'ws://43.139.149.158:8080/agent/ws'
 const POLL_INTERVAL_MS = 6000
 
 interface Props {
@@ -77,22 +74,6 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
     window.location.href = '/pc/'
   }
 
-  /** 生成 .bat 文件：下载 exe + 注入用户 token + 自动启动 */
-  function downloadSetupBat() {
-    const token = useAuthStore.getState().token ?? ''
-    const bat = `@echo off\r\ntitle 一龙开发平台 — 自动配置启动\r\necho.\r\necho =====================================================\r\necho   一龙开发平台  一键启动脚本\r\necho =====================================================\r\necho.\r\necho 第一步：下载程序（约 11 MB）...\r\ncurl -L --progress-bar -o "%TEMP%\\elon-pc-node.exe" "${SERVER_URL}/api/node-agent/download/windows"\r\nif errorlevel 1 (\r\n  echo.\r\n  echo [错误] 下载失败，请检查网络后重试。\r\n  pause\r\n  exit /b 1\r\n)\r\necho.\r\necho 第二步：启动（首次运行自动注册到你的账号）...\r\nset NODE_USER_TOKEN=${token}\r\nset NODE_CLOUD_URL=${WS_URL}\r\n"%TEMP%\\elon-pc-node.exe"\r\necho.\r\necho 程序已退出。\r\npause\r\n`
-    const blob = new Blob([bat], { type: 'text/plain;charset=gbk' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = '一键启动一龙开发平台.bat'
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-    setStep(2)
-  }
-
   if (status === 'online' && !expanded) {
     return (
       <div className={styles.pill} title={`本机 CLI 已就绪：${nodeDisplayName}`}>
@@ -135,23 +116,24 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
         <div className={[styles.step, step >= 1 ? styles.stepActive : ''].join(' ')}>
           <span className={styles.stepNum}>1</span>
           <div className={styles.stepBody}>
-            <strong>下载启动脚本</strong>
-            <small>Windows 一键下载 + 自动注册到你的账号</small>
+            <strong>下载安裃程序</strong>
+            <small>下载后双击运行，自动安裃并注册到你的账号</small>
           </div>
-          <button
+          <a
             className={styles.stepBtn}
-            type="button"
-            onClick={downloadSetupBat}
+            href="/api/node-agent/download/windows"
+            download
+            onClick={() => setStep(2)}
           >
-            下载 .bat
-          </button>
+            下载 .exe
+          </a>
         </div>
 
         <div className={[styles.step, step >= 2 ? styles.stepActive : styles.stepDimmed].join(' ')}>
           <span className={styles.stepNum}>2</span>
           <div className={styles.stepBody}>
-            <strong>双击运行脚本</strong>
-            <small>运行「一键启动一龙开发平台.bat」，自动下载并连接</small>
+            <strong>双击运行安裃</strong>
+            <small>双击「一龙开发平台.exe」，它会自动安裃并在后台运行</small>
           </div>
           <button className={styles.stepBtn} type="button" onClick={() => setStep(3)}>
             已运行
