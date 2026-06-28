@@ -84,7 +84,11 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         spaceLoading: false,
         spaceError: '',
       })
-      // 进入项目后停留在项目首页（landing），由用户手动选择频道。
+      // 自动加载 AI 开发频道的消息，以便侧边栏展示历史会话列表（不强制进入频道）
+      const preferred = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
+      if (preferred) {
+        await get().selectChannel(preferred.id)
+      }
     } catch (err) {
       console.warn('Failed to load project space:', err)
       set({ spaceLoading: false, spaceError: (err as { message?: string }).message ?? '项目空间加载失败' })
