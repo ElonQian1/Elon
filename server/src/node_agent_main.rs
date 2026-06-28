@@ -2437,11 +2437,12 @@ fn running_as_legacy_agent_exe() -> bool {
 async fn run_agent_runtime() -> Result<()> {
     dotenvy::dotenv().ok();
     // 也加载 _internal/node-agent.env（由启动器或 save-openai-key 写入的持久化配置）
+    // 使用 override 模式：持久化文件优先于父进程继承的 env 变量，避免残留的外部 env 污染
     if let Ok(exe) = std::env::current_exe() {
         if let Some(dir) = exe.parent() {
             let internal_env = dir.join("_internal").join("node-agent.env");
             if internal_env.exists() {
-                dotenvy::from_path(internal_env).ok();
+                dotenvy::from_path_override(internal_env).ok();
             }
         }
     }
