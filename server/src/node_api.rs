@@ -1154,7 +1154,7 @@ pub async fn node_agent_version(State(state): State<Arc<AppState>>) -> impl Into
 /// GET /api/node-agent/download/windows — 下载最新 Windows 客户端 exe
 /// 不需要登录（执行文件不含敏感信息）
 pub async fn download_node_agent_windows(State(state): State<Arc<AppState>>) -> impl IntoResponse {
-    download_node_agent_binary(state, "elon-pc-node.exe", "一龙PC节点.exe").await
+    download_node_agent_binary(state, "elon-pc-node.exe", "一龙开发平台.exe").await
 }
 
 /// GET /api/node-agent/download/windows-client — 下载 Windows 客户端包

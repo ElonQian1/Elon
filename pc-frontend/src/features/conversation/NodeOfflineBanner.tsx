@@ -51,7 +51,7 @@ export default function NodeOfflineBanner() {
     // bat 脚本：下载节点 exe 并注入用户 token 启动（已有则覆盖，保证最新版本）
     const bat = [
       '@echo off',
-      'title 一龙 PC 节点 — 重新启动',
+      'title 一龙开发平台 — 重新启动',
       'echo.',
       'echo =============================================',
       'echo   一龙 PC 节点  重新启动脚本',
@@ -79,7 +79,7 @@ export default function NodeOfflineBanner() {
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href     = url
-    a.download = '重启一龙PC节点.bat'
+    a.download = '重启一龙开发平台.bat'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)

@@ -80,12 +80,12 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
   /** 生成 .bat 文件：下载 exe + 注入用户 token + 自动启动 */
   function downloadSetupBat() {
     const token = useAuthStore.getState().token ?? ''
-    const bat = `@echo off\r\ntitle 一龙 PC 节点 — 自动配置启动\r\necho.\r\necho =====================================================\r\necho   一龙 PC 节点  一键启动脚本\r\necho =====================================================\r\necho.\r\necho 第一步：下载节点程序（约 11 MB）...\r\ncurl -L --progress-bar -o "%TEMP%\\elon-pc-node.exe" "${SERVER_URL}/api/node-agent/download/windows"\r\nif errorlevel 1 (\r\n  echo.\r\n  echo [错误] 下载失败，请检查网络后重试。\r\n  pause\r\n  exit /b 1\r\n)\r\necho.\r\necho 第二步：启动节点（首次运行自动注册到你的账号）...\r\nset NODE_USER_TOKEN=${token}\r\nset NODE_CLOUD_URL=${WS_URL}\r\n"%TEMP%\\elon-pc-node.exe"\r\necho.\r\necho 节点已退出。\r\npause\r\n`
+    const bat = `@echo off\r\ntitle 一龙开发平台 — 自动配置启动\r\necho.\r\necho =====================================================\r\necho   一龙开发平台  一键启动脚本\r\necho =====================================================\r\necho.\r\necho 第一步：下载程序（约 11 MB）...\r\ncurl -L --progress-bar -o "%TEMP%\\elon-pc-node.exe" "${SERVER_URL}/api/node-agent/download/windows"\r\nif errorlevel 1 (\r\n  echo.\r\n  echo [错误] 下载失败，请检查网络后重试。\r\n  pause\r\n  exit /b 1\r\n)\r\necho.\r\necho 第二步：启动（首次运行自动注册到你的账号）...\r\nset NODE_USER_TOKEN=${token}\r\nset NODE_CLOUD_URL=${WS_URL}\r\n"%TEMP%\\elon-pc-node.exe"\r\necho.\r\necho 程序已退出。\r\npause\r\n`
     const blob = new Blob([bat], { type: 'text/plain;charset=gbk' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = '一键启动一龙PC节点.bat'
+    a.download = '一键启动一龙开发平台.bat'
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
@@ -117,7 +117,7 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
         <span className={[styles.statusDot, status === 'offline' ? styles.dotOffline : styles.dotNone].join(' ')} />
         <strong className={styles.bannerTitle}>
           {status === 'offline'
-            ? `本机节点未运行（${nodeDisplayName}）`
+            ? `一龙开发平台未运行（${nodeDisplayName}）`
             : '连接你的 Windows 电脑，让 AI 真正帮你干活'}
         </strong>
         {status === 'online' && (
@@ -127,8 +127,8 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
 
       <p className={styles.bannerDesc}>
         {status === 'offline'
-          ? '节点已注册但当前未运行。请在你的 Windows 电脑上启动「一龙 PC 节点」，AI 就能访问本机文件和执行命令行。'
-          : '一龙 PC 节点（约 11 MB）运行在你的 Windows 电脑上，连接后 AI 可以完整访问命令行、读写文件、自动开发和打包应用。'}
+          ? '一龙开发平台已安装但当前未运行。请在你的 Windows 电脑上重新启动「一龙开发平台」，AI 就能访问本机文件和执行命令行。'
+          : '一龙开发平台（约 11 MB）运行在你的 Windows 电脑上，连接后 AI 可以完整访问命令行、读写文件、自动开发和打包应用。'}
       </p>
 
       <div className={styles.steps}>
@@ -151,7 +151,7 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
           <span className={styles.stepNum}>2</span>
           <div className={styles.stepBody}>
             <strong>双击运行脚本</strong>
-            <small>运行「一键启动一龙PC节点.bat」，自动下载并连接</small>
+            <small>运行「一键启动一龙开发平台.bat」，自动下载并连接</small>
           </div>
           <button className={styles.stepBtn} type="button" onClick={() => setStep(3)}>
             已运行

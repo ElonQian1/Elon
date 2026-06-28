@@ -12,12 +12,12 @@ mod windows_integration;
 
 use anyhow::Result;
 
-pub(crate) const APP_NAME: &str = "一龙PC节点";
+pub(crate) const APP_NAME: &str = "一龙开发平台";
 /// Canonical user-facing Windows entry. It contains both the launcher and the
 /// background node runtime; no separate agent exe is shipped on Windows.
-pub(crate) const CLIENT_EXE_NAME: &str = "一龙PC节点.exe";
-pub(crate) const UNINSTALL_NAME: &str = "卸载一龙PC节点";
-pub(crate) const UNINSTALL_EXE_NAME: &str = "卸载一龙PC节点.exe";
+pub(crate) const CLIENT_EXE_NAME: &str = "一龙开发平台.exe";
+pub(crate) const UNINSTALL_NAME: &str = "卸载一龙开发平台";
+pub(crate) const UNINSTALL_EXE_NAME: &str = "卸载一龙开发平台.exe";
 pub(crate) const INTERNAL_DIR_NAME: &str = "_internal";
 pub(crate) const AGENT_RUNTIME_ARG: &str = "--agent-runtime";
 pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";

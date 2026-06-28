@@ -92,7 +92,7 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
     let internal_dir = paths::internal_dir(install_dir);
     std::fs::create_dir_all(&internal_dir)
         .with_context(|| format!("无法创建内部目录 {}", internal_dir.display()))?;
-    let tmp_exe = internal_dir.join("一龙PC节点.exe.new");
+    let tmp_exe = internal_dir.join("一龙开发平台.exe.new");
     let tmp_version = internal_dir.join("node-agent-version.json.new");
     let bytes = reqwest::blocking::get(&download_url)
         .with_context(|| format!("无法下载 {download_url}"))?
@@ -228,7 +228,7 @@ fn package_replace_script(
         .unwrap_or_default();
     let restart = pid_to_wait
         .map(|_| {
-            "$client = Join-Path $installDir '一龙PC节点.exe'\nStart-Process -FilePath $client -WindowStyle Hidden\n"
+            "$client = Join-Path $installDir '一龙开发平台.exe'\nStart-Process -FilePath $client -WindowStyle Hidden\n"
                 .to_string()
         })
         .unwrap_or_default();
@@ -243,16 +243,19 @@ $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-upda
 New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 try {{
   Expand-Archive -LiteralPath $zip -DestinationPath $extractDir -Force
-  $packageClient = Join-Path $extractDir '一龙PC节点.exe'
-  $packageUninstall = Join-Path $extractDir '卸载一龙PC节点.exe'
+  # 支持新旧包名称（新：一龙开发平台，旧：一龙PC节点）
+  $packageClient = Join-Path $extractDir '一龙开发平台.exe'
+  if (-not (Test-Path -LiteralPath $packageClient)) {{ $packageClient = Join-Path $extractDir '一龙PC节点.exe' }}
+  $packageUninstall = Join-Path $extractDir '卸载一龙开发平台.exe'
+  if (-not (Test-Path -LiteralPath $packageUninstall)) {{ $packageUninstall = Join-Path $extractDir '卸载一龙PC节点.exe' }}
   $packageInternal = Join-Path $extractDir '_internal'
   if (!(Test-Path -LiteralPath $packageClient)) {{ throw '完整客户端包缺少主程序' }}
   if (!(Test-Path -LiteralPath $packageUninstall)) {{ throw '完整客户端包缺少卸载程序' }}
   New-Item -ItemType Directory -Force -Path $installDir | Out-Null
   $targetInternal = Join-Path $installDir '_internal'
   New-Item -ItemType Directory -Force -Path $targetInternal | Out-Null
-  Copy-Item -LiteralPath $packageClient -Destination (Join-Path $installDir '一龙PC节点.exe') -Force
-  Copy-Item -LiteralPath $packageUninstall -Destination (Join-Path $installDir '卸载一龙PC节点.exe') -Force
+  Copy-Item -LiteralPath $packageClient -Destination (Join-Path $installDir '一龙开发平台.exe') -Force
+  Copy-Item -LiteralPath $packageUninstall -Destination (Join-Path $installDir '卸载一龙开发平台.exe') -Force
   if (Test-Path -LiteralPath $packageInternal) {{
     Copy-Item -Path (Join-Path $packageInternal '*') -Destination $targetInternal -Recurse -Force
   }}
@@ -376,9 +379,9 @@ mod tests {
         use std::path::Path;
 
         let script = super::self_replace_script(
-            Path::new(r"C:\ElonNode\_internal\一龙PC节点.exe.new"),
-            Path::new(r"C:\ElonNode\一龙PC节点.exe"),
-            Path::new(r"C:\ElonNode\卸载一龙PC节点.exe"),
+            Path::new(r"C:\ElonNode\_internal\一龙开发平台.exe.new"),
+            Path::new(r"C:\ElonNode\一龙开发平台.exe"),
+            Path::new(r"C:\ElonNode\卸载一龙开发平台.exe"),
             Path::new(r"C:\ElonNode\_internal\node-agent-version.json.new"),
             Path::new(r"C:\ElonNode\_internal\node-agent-version.json"),
         );

@@ -7,26 +7,26 @@ use std::{
     path::{Path, PathBuf},
 };
 
-const CLIENT_EXE_NAME: &str = "一龙PC节点.exe";
-const UNINSTALL_EXE_NAME: &str = "卸载一龙PC节点.exe";
+const CLIENT_EXE_NAME: &str = "一龙开发平台.exe";
+const UNINSTALL_EXE_NAME: &str = "卸载一龙开发平台.exe";
 const INTERNAL_DIR_NAME: &str = "_internal";
-const START_MENU_FOLDER_NAME: &str = "一龙PC节点";
+const START_MENU_FOLDER_NAME: &str = "一龙开发平台";
 const START_MENU_ENTRY_NAMES: &[&str] = &[
-    "一龙PC节点",
+    "一龙开发平台",
     "打开运行日志",
     "导出诊断",
     "检查更新",
     "修复客户端",
-    "卸载一龙PC节点",
+    "卸载一龙开发平台",
 ];
 #[cfg(any(windows, test))]
 const START_MENU_SHORTCUT_FILES: &[&str] = &[
-    "一龙PC节点.lnk",
+    "一龙开发平台.lnk",
     "打开运行日志.lnk",
     "导出诊断.lnk",
     "检查更新.lnk",
     "修复客户端.lnk",
-    "卸载一龙PC节点.lnk",
+    "卸载一龙开发平台.lnk",
 ];
 
 #[cfg(any(windows, test))]
@@ -542,7 +542,7 @@ mod tests {
         fs::create_dir_all(&start_menu).unwrap();
         fs::write(dir.join(CLIENT_EXE_NAME), "client").unwrap();
         fs::write(dir.join(UNINSTALL_EXE_NAME), "uninstall").unwrap();
-        fs::write(start_menu.join("一龙PC节点.lnk"), "shortcut").unwrap();
+        fs::write(start_menu.join("一龙开发平台.lnk"), "shortcut").unwrap();
 
         let status = status_for_install_dir_with_start_menu(
             &dir,
@@ -585,7 +585,7 @@ mod tests {
     }
 
     fn start_menu_dir(suffix: &str) -> PathBuf {
-        unique_test_dir(suffix).join("Programs").join("一龙PC节点")
+        unique_test_dir(suffix).join("Programs").join("一龙开发平台")
     }
 
     fn write_shortcuts(folder: &Path, names: &[&str]) {

@@ -41,40 +41,40 @@ struct ShortcutSpec {
 #[cfg(any(windows, test))]
 const START_MENU_SHORTCUTS: &[ShortcutSpec] = &[
     ShortcutSpec {
-        file_name: "一龙PC节点.lnk",
+        file_name: "一龙开发平台.lnk",
         target: ShortcutTarget::Client,
         arguments: "",
-        description: "打开一龙 PC 工作台",
+        description: "打开一龙开发平台",
     },
     ShortcutSpec {
         file_name: "打开运行日志.lnk",
         target: ShortcutTarget::Client,
         arguments: "--open-logs",
-        description: "打开一龙 PC 节点运行日志",
+        description: "打开一龙开发平台运行日志",
     },
     ShortcutSpec {
         file_name: "导出诊断.lnk",
         target: ShortcutTarget::Client,
         arguments: "--export-diagnostics",
-        description: "导出一龙 PC 节点脱敏诊断文件",
+        description: "导出一龙开发平台脱敏诊断文件",
     },
     ShortcutSpec {
         file_name: "检查更新.lnk",
         target: ShortcutTarget::Client,
         arguments: "--check-update",
-        description: "检查并安装一龙 PC 节点更新",
+        description: "检查并安装一龙开发平台更新",
     },
     ShortcutSpec {
         file_name: "修复客户端.lnk",
         target: ShortcutTarget::Client,
         arguments: "--repair",
-        description: "修复一龙 PC 节点主程序、卸载程序、开始菜单和自启动",
+        description: "修复一龙开发平台主程序、卸载程序、开始菜单和自启动",
     },
     ShortcutSpec {
-        file_name: "卸载一龙PC节点.lnk",
+        file_name: "卸载一龙开发平台.lnk",
         target: ShortcutTarget::Uninstall,
         arguments: "",
-        description: "卸载一龙 PC 节点客户端",
+        description: "卸载一龙开发平台客户端",
     },
 ];
 
@@ -341,9 +341,9 @@ mod tests {
         assert!(names.contains(&"一龙PC节点.lnk"));
         assert!(names.contains(&"打开运行日志.lnk"));
         assert!(names.contains(&"导出诊断.lnk"));
-        assert!(names.contains(&"检查更新.lnk"));
+        assert!(names.contains(&"一龙开发平台.lnk"));
         assert!(names.contains(&"修复客户端.lnk"));
-        assert!(names.contains(&"卸载一龙PC节点.lnk"));
+        assert!(names.contains(&"卸载一龙开发平台.lnk"));
         assert!(START_MENU_SHORTCUTS
             .iter()
             .all(|spec| spec.file_name.ends_with(".lnk")));
@@ -379,7 +379,7 @@ fn remove_legacy_startup_shortcuts() {
     let script = r#"
 $startup = [Environment]::GetFolderPath('Startup')
 if (Test-Path -LiteralPath $startup) {
-  '一龙PC节点.lnk','ElonNodeAgentTray.lnk','elon-node-agent.lnk' | ForEach-Object {
+  '一龙开发平台.lnk','一龙开发平台.lnk','一龙PC节点.lnk','ElonNodeAgentTray.lnk','elon-node-agent.lnk' | ForEach-Object {
     Remove-Item -LiteralPath (Join-Path $startup $_) -Force -ErrorAction SilentlyContinue
   }
 }

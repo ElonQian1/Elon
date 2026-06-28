@@ -148,7 +148,7 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
             <h3>还没有可用的本机节点</h3>
             <div className={styles.stepList}>
               <div><strong>1</strong><span>下载 Win 端压缩包并解压。</span></div>
-              <div><strong>2</strong><span>双击「一龙PC节点.exe」，它会自动安装并注册网页一键唤起。</span></div>
+              <div><strong>2</strong><span>双击「一龙开发平台.exe」，它会自动安装并注册网页一键唤起。</span></div>
               <div><strong>3</strong><span>安装后点击"启动 Win 端"，在本机页面登录并注册 PC 节点。</span></div>
             </div>
           </div>

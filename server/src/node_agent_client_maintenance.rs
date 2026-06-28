@@ -125,7 +125,7 @@ fn status_payload() -> Value {
             { "target": "diagnostics_dir", "label": "诊断目录", "purpose": "保存可发给客服或开发者的脱敏诊断文件。" },
             { "target": "config_dir", "label": "配置目录", "purpose": "查看本机节点凭证和运行配置所在目录。" }
         ],
-        "client_care_summary": "普通用户日常只需要运行一龙PC节点.exe；需要移除时运行卸载一龙PC节点.exe。运行日志、任务记录、诊断、更新和卸载都集中在本面板。",
+        "client_care_summary": "普通用户日常只需要运行一龙开发平台.exe；需要移除时运行卸载一龙开发平台.exe。运行日志、任务记录、诊断、更新和卸载都集中在本面板。",
         "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
     });
 

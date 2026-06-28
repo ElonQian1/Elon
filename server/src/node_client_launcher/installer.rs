@@ -29,6 +29,9 @@ const LEGACY_TOP_LEVEL_FILES: &[&str] = &[
     "node-agent-version.json",
     "node-agent.env.example",
     "README.txt",
+    // 旧名称 exe，重命名后自动清除
+    "一龙PC节点.exe",
+    "卸载一龙PC节点.exe",
 ];
 
 const LEGACY_INTERNAL_FILES: &[&str] = &[
@@ -39,6 +42,7 @@ const LEGACY_INTERNAL_FILES: &[&str] = &[
     "elon-pc-node.exe",
     "elon-pc-node.exe.new",
     "一龙PC节点.exe.new",
+    "一龙开发平台.exe.new", // 名称更新后的临时文件
 ];
 
 pub(crate) fn ensure_installed() -> Result<PathBuf> {
