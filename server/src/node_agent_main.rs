@@ -1064,6 +1064,26 @@ async fn run_cli_prompt(run: CliPromptRun) {
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
     }
+    // 显式设置 CODEX_HOME 为本机实际路径，避免继承服务器端 Linux 路径（如 /root/.codex）
+    if cli_name == "codex" {
+        let codex_home = std::env::var("CODEX_HOME")
+            .ok()
+            .filter(|v| {
+                let p = std::path::Path::new(v.trim());
+                !v.trim().is_empty() && p.exists()
+            })
+            .or_else(|| {
+                // Windows: %USERPROFILE%\.codex  /  Linux/Mac: $HOME/.codex
+                std::env::var("USERPROFILE")
+                    .or_else(|_| std::env::var("HOME"))
+                    .ok()
+                    .map(|h| format!("{}/.codex", h))
+                    .filter(|p| std::path::Path::new(p).exists())
+            });
+        if let Some(home) = codex_home {
+            cmd.env("CODEX_HOME", &home);
+        }
+    }
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         // copilot 用 --allow-all 时仍会检测 stdin 是否可读；
