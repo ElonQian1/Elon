@@ -44,7 +44,7 @@ export default function ConversationPage() {
   const token = useAuthStore((s) => s.token)
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
-    messages, messagesLoading, sendingMessage, landing,
+    messages, messagesLoading, sendingMessage, landing, spaceLoading, spaceError,
     loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
@@ -254,6 +254,11 @@ export default function ConversationPage() {
   const memberPanelTitle = activeChannel ? '频道成员' : activeProjectId ? '项目成员' : '工作台'
   const memberPanelContext = activeChannel?.name ?? activeProject?.name ?? '我的项目'
   const memberPanelCount = activeProjectId ? spaceMembers.length : (user ? 1 : 0)
+  const memberPanelSummary = activeChannel
+    ? channelPermissionSummary(activeChannel)
+    : activeProjectId
+      ? `项目共 ${spaceMembers.length} 位成员，按角色分组`
+      : '个人 AI 工作台'
 
   // 成员卡片弹窗
   // (memberPopover state removed - not currently used)
@@ -774,13 +779,27 @@ export default function ConversationPage() {
             />,
             document.body
           )}
-          {activeProjectId && messagesLoading && spaceMembers.length === 0 && (
+          {activeProjectId && (
+            <MemberContextSummary
+              label={memberPanelSummary}
+              members={spaceMembers}
+              channel={activeChannel}
+            />
+          )}
+          {activeProjectId && spaceLoading && spaceMembers.length === 0 && (
             <MemberLoadingRows />
           )}
-          {activeProjectId && spaceMembers.length > 0 && (
-            <MemberSearch members={spaceMembers} onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }} />
+          {activeProjectId && !spaceLoading && spaceError && (
+            <p className={styles.sideHint}>{spaceError}</p>
           )}
-          {activeProjectId && !messagesLoading && spaceMembers.length === 0 && (
+          {activeProjectId && spaceMembers.length > 0 && (
+            <MemberSearch
+              members={spaceMembers}
+              onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
+              placeholder={activeChannel ? '搜索频道成员' : '搜索项目成员'}
+            />
+          )}
+          {activeProjectId && !spaceLoading && !spaceError && spaceMembers.length === 0 && (
             <p className={styles.sideHint}>暂无项目成员</p>
           )}
           {!activeProjectId && user && (
@@ -869,6 +888,15 @@ const CHANNEL_PERMISSION_OPTIONS: PermissionOption[] = [
 function channelCanManage(channel: Channel) {
   const permissions = channel.permissions ?? {}
   return !!(permissions.can_manage || permissions.canManage)
+}
+
+function channelPermissionSummary(channel: Channel) {
+  const permissions = channel.permissions ?? {}
+  const parts = ['可查看']
+  if (permissions.can_send || permissions.canSend) parts.push('可发言')
+  if (permissions.can_start_ai || permissions.canStartAi) parts.push('可启动 AI')
+  if (permissions.can_manage || permissions.canManage) parts.push('可管理权限')
+  return `${channel.name} · ${parts.join(' / ')}`
 }
 
 function filterMembers(members: ProjectMember[], query: string) {
@@ -1636,7 +1664,15 @@ const MEMBER_VIRTUAL_ROW_HEIGHT = 48
 const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
 
-function MemberSearch({ members, onSelect }: { members: ProjectMember[]; onSelect: (member: ProjectMember, y: number) => void }) {
+function MemberSearch({
+  members,
+  onSelect,
+  placeholder,
+}: {
+  members: ProjectMember[]
+  onSelect: (member: ProjectMember, y: number) => void
+  placeholder: string
+}) {
   const [query, setQuery] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
   const q = query.trim().toLowerCase()
@@ -1658,7 +1694,7 @@ function MemberSearch({ members, onSelect }: { members: ProjectMember[]; onSelec
             setQuery(e.target.value)
             setScrollTop(0)
           }}
-          placeholder="搜索成员"
+          placeholder={placeholder}
           autoComplete="off"
         />
         {query && (
@@ -1696,18 +1732,81 @@ function filterVisibleMembers(members: ProjectMember[], query: string) {
   })
 }
 
+const ROLE_GROUPS = [
+  { id: 'owner', label: '拥有者' },
+  { id: 'admin', label: '管理员' },
+  { id: 'builder', label: '开发协作' },
+  { id: 'reviewer', label: '测试与观察' },
+  { id: 'restricted', label: '受限成员' },
+  { id: 'member', label: '成员' },
+] as const
+
+type RoleGroupId = typeof ROLE_GROUPS[number]['id']
+
+function memberRoleGroup(member: ProjectMember): RoleGroupId {
+  if (member.is_banned || member.is_muted) return 'restricted'
+  const keys = memberRoleKeys(member)
+  if (keys.some(key => ['owner', '拥有者'].includes(key))) return 'owner'
+  if (keys.some(key => ['admin', 'administrator', '管理员'].includes(key))) return 'admin'
+  if (keys.some(key => ['developer', 'dev', 'maintainer', 'editor', 'collaborator', 'builder', '开发者', '维护者', '协作者', '构建发布员'].includes(key))) return 'builder'
+  if (keys.some(key => ['tester', 'qa', 'observer', 'viewer', 'guest', 'readonly', '只读成员', '观察者', '测试者', '访客'].includes(key))) return 'reviewer'
+  return 'member'
+}
+
+function memberRoleKeys(member: ProjectMember) {
+  return [
+    member.role,
+    ...(member.roles ?? []).flatMap(role => [role.id, role.name]),
+  ].filter(Boolean).map(value => clean(String(value)).toLowerCase())
+}
+
+function memberPrimaryRoleKey(member: ProjectMember) {
+  return clean(member.roles?.[0]?.id ?? member.role ?? 'member').toLowerCase()
+}
+
+function memberPrimaryRoleLabel(member: ProjectMember) {
+  const role = member.roles?.[0]
+  if (role?.name) return role.name
+  return roleLabel(member.role ?? 'member')
+}
+
+function memberRolePosition(member: ProjectMember) {
+  return member.roles?.[0]?.position ?? 0
+}
+
+function sortMembersForPanel(members: ProjectMember[]) {
+  return [...members].sort((left, right) => {
+    const leftStatus = memberPresenceStatus(left)
+    const rightStatus = memberPresenceStatus(right)
+    const leftOnline = leftStatus === 'offline' ? 0 : 1
+    const rightOnline = rightStatus === 'offline' ? 0 : 1
+    return rightOnline - leftOnline
+      || memberRolePosition(right) - memberRolePosition(left)
+      || clean(left.account ?? left.user_id).localeCompare(clean(right.account ?? right.user_id))
+  })
+}
+
+function memberRolePillClass(roleKey: string) {
+  if (roleKey === 'owner') return styles.memberRolePillOwner
+  if (roleKey === 'admin') return styles.memberRolePillAdmin
+  if (['developer', 'dev', 'maintainer', 'editor', 'collaborator', 'builder'].includes(roleKey)) return styles.memberRolePillEditor
+  if (['tester', 'qa', 'observer', 'viewer', 'guest'].includes(roleKey)) return styles.memberRolePillObserver
+  return ''
+}
+
+function memberAvatarRoleClass(roleKey: string) {
+  if (roleKey === 'owner') return styles.memberAvatarOwner
+  if (roleKey === 'admin') return styles.memberAvatarAdmin
+  if (['developer', 'dev', 'maintainer', 'editor', 'collaborator', 'builder'].includes(roleKey)) return styles.memberAvatarEditor
+  if (['tester', 'qa', 'observer', 'viewer', 'guest'].includes(roleKey)) return styles.memberAvatarObserver
+  return ''
+}
+
 function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
-  const roleLabelMap: Record<string, string> = {
-    admin: '管理员',
-    owner: '管理员',
-    collaborator: '协作者',
-    editor: '协作者',
-  }
-  const groups: [string, ProjectMember[]][] = [
-    ['管理员', members.filter(m => ['admin', 'owner'].includes((m.role ?? '').toLowerCase()))],
-    ['协作者', members.filter(m => ['collaborator', 'editor'].includes((m.role ?? '').toLowerCase()))],
-    ['成员', members.filter(m => !roleLabelMap[(m.role ?? '').toLowerCase()])],
-  ]
+  const groups = ROLE_GROUPS.map((group) => [
+    group.label,
+    sortMembersForPanel(members.filter((member) => memberRoleGroup(member) === group.id)),
+  ] as [string, ProjectMember[]])
   return groups.flatMap(([label, list]) => {
     if (!list.length) return []
     return [
@@ -1718,24 +1817,12 @@ function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
 }
 
 function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect: (member: ProjectMember, y: number) => void }) {
-  const roleKey = (member.role ?? '').toLowerCase()
-  const roleLabelMap: Record<string, string> = {
-    admin: '管理员', owner: '管理员',
-    collaborator: '协作者', editor: '协作者',
-  }
-  const roleCss: Record<string, string> = {
-    admin: styles.memberRolePillAdmin, owner: styles.memberRolePillOwner,
-    collaborator: styles.memberRolePillEditor, editor: styles.memberRolePillEditor,
-  }
-  const avatarCss: Record<string, string> = {
-    admin: styles.memberAvatarAdmin, owner: styles.memberAvatarOwner,
-    collaborator: styles.memberAvatarEditor, editor: styles.memberAvatarEditor,
-  }
-  const roleBadge = roleLabelMap[roleKey]
+  const roleKey = memberPrimaryRoleKey(member)
+  const roleBadge = memberPrimaryRoleLabel(member)
   const name = member.account ?? member.user_id
   const avatarCls = [
     styles.memberAvatar,
-    avatarCss[roleKey] ?? '',
+    memberAvatarRoleClass(roleKey),
     member.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline,
   ].filter(Boolean).join(' ')
   return (
@@ -1752,7 +1839,7 @@ function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect:
       <div className={styles.memberCopy}>
         <div className={styles.memberLine}>
           <strong className={styles.memberItemName}>{name}</strong>
-          {roleBadge && <em className={[styles.memberRolePill, roleCss[roleKey] ?? ''].join(' ')}>{roleBadge}</em>}
+          {roleBadge && <em className={[styles.memberRolePill, memberRolePillClass(roleKey)].join(' ')}>{roleBadge}</em>}
         </div>
         <span className={styles.memberSub}>{memberSubtitle(member)}</span>
       </div>
@@ -1769,10 +1856,12 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
   const popRef = useRef<HTMLDivElement>(null)
   const status = memberPresenceStatus(member)
   const name = member.account || member.user_id
-  const roleKey = (member.role ?? '').toLowerCase()
+  const roleKey = memberPrimaryRoleKey(member)
   const roleHeadCls = {
     owner: styles.popoverHeadOwner, admin: styles.popoverHeadAdmin,
-    editor: styles.popoverHeadEditor, collaborator: styles.popoverHeadEditor,
+    developer: styles.popoverHeadEditor, dev: styles.popoverHeadEditor,
+    maintainer: styles.popoverHeadEditor, editor: styles.popoverHeadEditor,
+    collaborator: styles.popoverHeadEditor, builder: styles.popoverHeadEditor,
   }[roleKey] ?? ''
   const [isFriend, setIsFriend] = useState(false)
   const [addingFriend, setAddingFriend] = useState(false)
@@ -1874,6 +1963,40 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
       </div>
     </div>
   )
+}
+
+function MemberContextSummary({
+  label,
+  members,
+  channel,
+}: {
+  label: string
+  members: ProjectMember[]
+  channel?: Channel
+}) {
+  const stats = memberPanelStats(members)
+  return (
+    <section className={styles.memberContextSummary}>
+      <strong>{channel ? '频道视图' : '项目视图'}</strong>
+      <span>{label}</span>
+      {members.length > 0 && (
+        <div className={styles.memberContextStats}>
+          <em>在线 {stats.online}</em>
+          <em>离线 {stats.offline}</em>
+          {stats.restricted > 0 && <em>受限 {stats.restricted}</em>}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function memberPanelStats(members: ProjectMember[]) {
+  return members.reduce((stats, member) => {
+    if (memberPresenceStatus(member) === 'offline') stats.offline += 1
+    else stats.online += 1
+    if (member.is_banned || member.is_muted) stats.restricted += 1
+    return stats
+  }, { online: 0, offline: 0, restricted: 0 })
 }
 
 function MemberLoadingRows() {
