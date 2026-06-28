@@ -96,14 +96,14 @@ pub async fn run_for_project_in_workspace(
         });
         let pc_user_message =
             append_project_dev_profile_context(state, user_id, project, user_message);
-        if let Err(e) = ai_cli::run_with_pc_agent_workspace(
+        let run_result = ai_cli::run_with_pc_agent_workspace(
             agent_id,
             user_id,
             pc_workspace,
             &pc_user_message,
             None,
             ai_cli::AiCliRequestMode::Execute,
-            session_scope,
+            session_scope.clone(),
             Some(runtime_choice.cli_name.as_str()),
             runtime_choice.copilot_model.as_deref(),
             runtime_choice.codex_reasoning_effort.as_deref(),
@@ -111,10 +111,44 @@ pub async fn run_for_project_in_workspace(
             state,
             &tx,
         )
-        .await
-        {
-            error!("PC 本地项目代理运行出错: {}", e);
-            let _ = tx.send(WsMessage::error(e.to_string()).to_json());
+        .await;
+        if let Err(e) = run_result {
+            let error_str = e.to_string();
+            // Codex 额度/认证失败时，自动切换 Copilot 重试
+            if runtime_choice.cli_name == "codex"
+                && is_codex_fallback_error(&error_str)
+                && node_cli_available(state, agent_id, "copilot").await
+            {
+                let _ = tx.send(
+                    WsMessage::progress(
+                        "Codex 额度已用尽，正在自动切换到 Copilot 继续执行…",
+                    )
+                    .to_json(),
+                );
+                if let Err(e2) = ai_cli::run_with_pc_agent_workspace(
+                    agent_id,
+                    user_id,
+                    pc_workspace,
+                    &pc_user_message,
+                    None,
+                    ai_cli::AiCliRequestMode::Execute,
+                    session_scope,
+                    Some("copilot"),
+                    None,
+                    None,
+                    Some("Copilot（Codex 额度回退）"),
+                    state,
+                    &tx,
+                )
+                .await
+                {
+                    error!("Copilot 回退执行出错: {}", e2);
+                    let _ = tx.send(WsMessage::error(e2.to_string()).to_json());
+                }
+            } else {
+                error!("PC 本地项目代理运行出错: {}", e);
+                let _ = tx.send(WsMessage::error(error_str).to_json());
+            }
         }
         return;
     }
@@ -226,19 +260,20 @@ pub async fn plan_for_project_in_workspace(
         );
         let pc_user_message =
             append_project_dev_profile_context(state, user_id, project, user_message);
-        if let Err(e) = ai_cli::run_with_pc_agent_workspace(
+        let plan_session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+            project_id: project.id.clone(),
+            user_id: user_id.to_string(),
+            conversation_id: cid.to_string(),
+            runtime_permission: project.runtime_permission.clone(),
+        });
+        let plan_result = ai_cli::run_with_pc_agent_workspace(
             agent_id,
             user_id,
             pc_workspace,
             &pc_user_message,
             None,
             ai_cli::AiCliRequestMode::Plan,
-            conversation_id.map(|cid| ai_cli::NativeSessionScope {
-                project_id: project.id.clone(),
-                user_id: user_id.to_string(),
-                conversation_id: cid.to_string(),
-                runtime_permission: project.runtime_permission.clone(),
-            }),
+            plan_session_scope.clone(),
             Some(runtime_choice.cli_name.as_str()),
             runtime_choice.copilot_model.as_deref(),
             runtime_choice.codex_reasoning_effort.as_deref(),
@@ -246,10 +281,43 @@ pub async fn plan_for_project_in_workspace(
             state,
             &tx,
         )
-        .await
-        {
-            error!("PC 本地项目规划运行出错: {}", e);
-            let _ = tx.send(WsMessage::error(e.to_string()).to_json());
+        .await;
+        if let Err(e) = plan_result {
+            let error_str = e.to_string();
+            if runtime_choice.cli_name == "codex"
+                && is_codex_fallback_error(&error_str)
+                && node_cli_available(state, agent_id, "copilot").await
+            {
+                let _ = tx.send(
+                    WsMessage::progress(
+                        "Codex 额度已用尽，正在自动切换到 Copilot 继续规划…",
+                    )
+                    .to_json(),
+                );
+                if let Err(e2) = ai_cli::run_with_pc_agent_workspace(
+                    agent_id,
+                    user_id,
+                    pc_workspace,
+                    &pc_user_message,
+                    None,
+                    ai_cli::AiCliRequestMode::Plan,
+                    plan_session_scope,
+                    Some("copilot"),
+                    None,
+                    None,
+                    Some("Copilot（Codex 额度回退）"),
+                    state,
+                    &tx,
+                )
+                .await
+                {
+                    error!("Copilot 规划回退出错: {}", e2);
+                    let _ = tx.send(WsMessage::error(e2.to_string()).to_json());
+                }
+            } else {
+                error!("PC 本地项目规划运行出错: {}", e);
+                let _ = tx.send(WsMessage::error(error_str).to_json());
+            }
         }
         return;
     }
@@ -294,6 +362,32 @@ fn pc_project_binding(project: &ProjectAccess) -> Option<(&str, &str)> {
         }
         _ => None,
     }
+}
+
+/// Codex 额度耗尽或认证失效时返回 true，此时可自动切换到 Copilot
+fn is_codex_fallback_error(error: &str) -> bool {
+    use crate::errors::{classify_ai_error, AiErrorCategory};
+    let classified = classify_ai_error(error);
+    matches!(
+        classified.category,
+        AiErrorCategory::Quota | AiErrorCategory::AuthConfig
+    )
+}
+
+/// 检查指定 PC 节点上某个 CLI 是否可用
+async fn node_cli_available(state: &Arc<AppState>, agent_id: &str, cli_name: &str) -> bool {
+    state
+        .agent_manager
+        .list()
+        .await
+        .into_iter()
+        .find(|a| a.agent_id == agent_id)
+        .map(|a| {
+            a.allowed_clis
+                .iter()
+                .any(|c| c.eq_ignore_ascii_case(cli_name))
+        })
+        .unwrap_or(false)
 }
 
 fn append_project_dev_profile_context(
