@@ -252,6 +252,36 @@ export default function ConversationPage() {
     return groups
   }, [messages, isDevChannel]) // eslint-disable-line
 
+  // 会话列表：从已加载消息中提取（每个 task_id = 一个会话），用于侧边栏导航
+  const sessions = useMemo(() => {
+    const taskOrder = new Map<string, number>()
+    messages.forEach((msg, i) => {
+      const tid = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
+      if (tid && !taskOrder.has(tid)) taskOrder.set(tid, i)
+    })
+    const list: Array<{ id: string; title: string; done: boolean; failed: boolean; steps: number }> = []
+    taskContext.tasks.forEach((task, taskId) => {
+      list.push({
+        id: taskId,
+        title: (task.request ?? '').slice(0, 40) || '新会话',
+        done: !!task.result,
+        failed: task.failed || task.canceled,
+        steps: task.progressCount,
+      })
+    })
+    return list.sort((a, b) => (taskOrder.get(b.id) ?? 0) - (taskOrder.get(a.id) ?? 0))
+  }, [taskContext, messages])
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+
+  function scrollToSession(taskId: string) {
+    setActiveSessionId(taskId)
+    const el = feedRef.current
+    if (!el) return
+    const target = el.querySelector(`[data-task-id="${CSS.escape(taskId)}"]`) as HTMLElement | null
+    if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
   return (
     <div className={styles.layout}>
 
@@ -305,36 +335,73 @@ export default function ConversationPage() {
         {/* 内容区：根据是否有选中项目切换两种视图 */}
         <div className={styles.channelList}>
           {activeProjectId ? (
-            /* —— Discord 式：只显当前项目的频道 —— */
-            filteredChannels.length === 0 ? (
-              <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>
-                还没有频道
-              </div>
-            ) : (
-              filteredChannels.map((c) => {
-                const isDev = c.kind === 'ai_development'
-                return (
-                  <button
-                    key={c.id}
-                    className={[
-                      styles.channelItem,
-                      isDev ? styles.devChannel : '',
-                      c.id === activeChannelId ? styles.channelActive : '',
-                    ].join(' ')}
-                    onClick={() => selectChannel(c.id)}
-                    type="button"
-                  >
-                    <span className={styles.channelGlyph}>{isDev ? '🛠' : '#'}</span>
-                    <span className={styles.channelMain}>
-                      <strong>{c.name}</strong>
-                      {c.description && <span>{c.description}</span>}
-                    </span>
-                  </button>
-                )
-              })
-            )
+            /* —— Discord 式：只显当前项目的频道 + 会话列表 —— */
+            <>
+              {filteredChannels.length === 0 ? (
+                <div style={{ padding: '12px 16px', color: 'var(--text-muted)', fontSize: 13 }}>
+                  还没有频道
+                </div>
+              ) : (
+                filteredChannels.map((c) => {
+                  const isDev = c.kind === 'ai_development'
+                  return (
+                    <button
+                      key={c.id}
+                      className={[
+                        styles.channelItem,
+                        isDev ? styles.devChannel : '',
+                        c.id === activeChannelId ? styles.channelActive : '',
+                      ].join(' ')}
+                      onClick={() => selectChannel(c.id)}
+                      type="button"
+                    >
+                      <span className={styles.channelGlyph}>{isDev ? '🛠' : '#'}</span>
+                      <span className={styles.channelMain}>
+                        <strong>{c.name}</strong>
+                        {c.description && <span>{c.description}</span>}
+                      </span>
+                    </button>
+                  )
+                })
+              )}
+
+              {/* ── 会话列表：选中频道且有会话时显示 ── */}
+              {activeChannelId && sessions.length > 0 && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,.04)', marginTop: 4, paddingBottom: 4 }}>
+                  <div style={{ padding: '8px 12px 3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)' }}>会话记录</span>
+                    <button
+                      type="button"
+                      title="新建会话"
+                      onClick={() => { setActiveSessionId(null); setTimeout(() => textareaRef.current?.focus(), 50) }}
+                      style={{ background: 'rgba(255,255,255,.08)', border: 'none', borderRadius: 4, width: 18, height: 18, color: 'var(--text-soft)', fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
+                    >+</button>
+                  </div>
+                  {sessions.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => scrollToSession(s.id)}
+                      style={{
+                        width: 'calc(100% - 8px)', display: 'flex', flexDirection: 'column', gap: 1,
+                        padding: '5px 10px', margin: '1px 4px',
+                        background: s.id === activeSessionId ? 'rgba(60,111,162,.2)' : 'transparent',
+                        border: 'none', borderRadius: 5, textAlign: 'left', cursor: 'pointer',
+                        color: 'var(--text-soft)', transition: 'background .1s',
+                      }}
+                    >
+                      <span style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
+                        {s.failed ? '✗ ' : s.done ? '✓ ' : '⟳ '}{s.title}
+                      </span>
+                      {s.steps > 0 && (
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.steps} 步</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </>
           ) : (
-            /* —— 项目列表视图 —— */
             <>
               {!projectsLoaded && (
                 <div style={{ padding: '6px 9px', color: 'var(--text-muted)', fontSize: 13 }}>读取中…</div>
@@ -484,7 +551,7 @@ export default function ConversationPage() {
             )}
             {messages.length > 0 && messageGroups.map((group) =>
               group.type === 'task' ? (
-                <div key={group.key} className={styles.devTaskWrap}>
+                <div key={group.key} data-task-id={group.taskId} className={styles.devTaskWrap}>
                   <DevTaskGroup
                     messages={group.msgs as Parameters<typeof DevTaskGroup>[0]['messages']}
                     taskContext={taskContext}
