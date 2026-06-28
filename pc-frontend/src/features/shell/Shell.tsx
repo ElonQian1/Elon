@@ -30,18 +30,16 @@ function NodeConnectBanner() {
 export default function Shell() {
   useNotifications()
   const token = useAuthStore((s) => s.token)
-  const user = useAuthStore((s) => s.user)
   const fetchMe = useAuthStore((s) => s.fetchMe)
 
-  // token 存在但 user 为空时（页面刷新后等），自动拉取用户信息
+  // token 存在时始终刷新用户信息（确保 user.id 格式正确）
+  // 不再依赖 !user 判断，因为旧版 localStorage 可能存了格式错误的 user 对象
   useEffect(() => {
-    if (!token || user) return
+    if (!token) return
     fetchMe().catch((err: { status?: number }) => {
-      // 401 = token 已失效，直接登出重新登录
       if (err?.status === 401) {
         useAuthStore.getState().logout()
       }
-      // 其他错误（网络异常等）默默剩下，下次订阅变化时再试
     })
   }, [token]) // eslint-disable-line
 
