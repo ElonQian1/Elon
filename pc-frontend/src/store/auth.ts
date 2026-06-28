@@ -35,8 +35,10 @@ export const useAuthStore = create<AuthState>()(
       },
 
       fetchMe: async () => {
-        const user = await api.get<User>('/api/me')
-        set({ user })
+        // /api/me 返回 { "user": {...} } 格式，需要取出内层 user
+        const res = await api.get<{ user?: User }>('/api/me')
+        const user = res?.user ?? (res as unknown as User)
+        if (user?.id) set({ user })
       },
     }),
     {

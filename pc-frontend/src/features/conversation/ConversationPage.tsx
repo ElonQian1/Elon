@@ -80,11 +80,15 @@ export default function ConversationPage() {
 
   // 加载项目会话列表（与手机端同步）
   useEffect(() => {
-    if (!activeProjectId || !user?.id) return
+    if (!activeProjectId) return
+    const uid = user?.id ?? useAuthStore.getState().user?.id
+    if (!uid) return
     setMemberConversations([])
     api.get<{ conversations?: MemberConv[] }>(
-      `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(user.id)}/conversations?limit=50`
-    ).then((d) => setMemberConversations(d.conversations ?? [])).catch(() => {})
+      `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(uid)}/conversations?limit=50`
+    ).then((d) => setMemberConversations(d.conversations ?? [])).catch((err: { message?: string; status?: number }) => {
+      console.warn('[MemberConversations] failed:', err?.status, err?.message)
+    })
   }, [activeProjectId, user?.id]) // eslint-disable-line
 
   // 项目切换时清空会话消息
@@ -331,16 +335,17 @@ export default function ConversationPage() {
 
   // 打开一个会话：从服务端加载该会话的消息（与手机端同步）
   async function openConversation(convId: string) {
-    if (!activeProjectId || !user?.id) return
+    const uid = user?.id ?? useAuthStore.getState().user?.id
+    if (!activeProjectId || !uid) return
     setSessionView(convId)
     setConvMessages([])
     setConvLoading(true)
     try {
       const data = await api.get<{ messages?: Message[] }>(
-        `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(user.id)}/conversations/${encodeURIComponent(convId)}/messages?limit=120`
+        `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(uid)}/conversations/${encodeURIComponent(convId)}/messages?limit=120`
       )
       setConvMessages((data.messages ?? []) as Message[])
-    } catch { /* ignore */ }
+    } catch (err) { console.warn('[ConvMessages] failed:', err) }
     finally { setConvLoading(false) }
   }
 
