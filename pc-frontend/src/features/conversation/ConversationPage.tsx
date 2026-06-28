@@ -59,6 +59,12 @@ export default function ConversationPage() {
   const [showModeration, setShowModeration] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [memberPopoverY, setMemberPopoverY] = useState(200)
+
+  // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
+  interface MemberConv { id: string; title?: string | null; last_task_status?: string | null; last_message?: string | null; updated_at?: string }
+  const [memberConversations, setMemberConversations] = useState<MemberConv[]>([])
+  const [convMessages, setConvMessages] = useState<Message[]>([])
+  const [convLoading, setConvLoading] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
   const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
   const [inviteStatus, setInviteStatus] = useState('')
@@ -71,6 +77,22 @@ export default function ConversationPage() {
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
+
+  // 加载项目会话列表（与手机端同步）
+  useEffect(() => {
+    if (!activeProjectId || !user?.id) return
+    setMemberConversations([])
+    api.get<{ conversations?: MemberConv[] }>(
+      `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(user.id)}/conversations?limit=50`
+    ).then((d) => setMemberConversations(d.conversations ?? [])).catch(() => {})
+  }, [activeProjectId, user?.id]) // eslint-disable-line
+
+  // 项目切换时清空会话消息
+  useEffect(() => {
+    setConvMessages([])
+    setSessionView(null)
+    waitingForNewSession.current = false
+  }, [activeProjectId]) // eslint-disable-line
 
   useEffect(() => {
     setSelectedMember(null)
@@ -164,10 +186,21 @@ export default function ConversationPage() {
       }
       // 从 landing 首页发送时，标记等待新会话出现后自动切入
       if (sessionView === null || sessionView === undefined) {
-        prevSessionIdsRef.current = new Set(sessions.map((s) => s.id))
+        prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
         waitingForNewSession.current = true
       }
       await sendMessage(fullContent, selectedAgent || null)
+      // 发送后刷新会话列表（新会话会出现在顶部）
+      if (activeProjectId && user?.id) {
+        setTimeout(async () => {
+          try {
+            const d = await api.get<{ conversations?: MemberConv[] }>(
+              `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(user.id)}/conversations?limit=50`
+            )
+            setMemberConversations(d.conversations ?? [])
+          } catch {}
+        }, 400)
+      }
     } catch (err) {
       setSendError((err as { message?: string }).message ?? '发送失败')
     }
@@ -248,11 +281,14 @@ export default function ConversationPage() {
   const displayMessages = useMemo(() => {
     if (!sessionView) return messages
     if (sessionView === 'new') return []
+    // 选中了真实会话（从服务端加载）
+    if (convMessages.length > 0 || convLoading) return convMessages
+    // 降级：从频道消息中按 task_id 过滤
     return messages.filter((msg) => {
       const tid = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
       return tid === sessionView
     })
-  }, [messages, sessionView])
+  }, [messages, sessionView, convMessages, convLoading])
 
   // 消息分组：dev频道中把同一 task_id 的消息聚合为 DevTaskGroup（任务级折叠层）
   type SingleGroup = { type: 'single'; msg: Message; grouped: boolean; key: string }
@@ -276,51 +312,48 @@ export default function ConversationPage() {
     return groups
   }, [displayMessages, isDevChannel]) // eslint-disable-line
 
-  // 会话列表：从已加载消息中提取（每个 task_id = 一个会话）
-  const sessions = useMemo(() => {
-    const taskOrder = new Map<string, number>()
-    messages.forEach((msg, i) => {
-      const tid = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
-      if (tid && !taskOrder.has(tid)) taskOrder.set(tid, i)
-    })
-    const list: Array<{ id: string; title: string; done: boolean; failed: boolean; steps: number }> = []
-    taskContext.tasks.forEach((task, taskId) => {
-      list.push({
-        id: taskId,
-        title: (task.request ?? '').slice(0, 40) || '新会话',
-        done: !!task.result,
-        failed: task.failed || task.canceled,
-        steps: task.progressCount,
-      })
-    })
-    return list.sort((a, b) => (taskOrder.get(b.id) ?? 0) - (taskOrder.get(a.id) ?? 0))
-  }, [taskContext, messages])
-
-  // sessionView='new' 时，一旦出现新 task_id 自动切到它
+  // sessionView='new' 时，一旦会话列表出现新会话，自动切入
   useEffect(() => {
     if (!waitingForNewSession.current) return
-    const newSession = sessions.find((s) => !prevSessionIdsRef.current.has(s.id))
-    if (newSession) {
-      setSessionView(newSession.id)
+    const newConv = memberConversations.find((c) => !prevSessionIdsRef.current.has(c.id))
+    if (newConv) {
       waitingForNewSession.current = false
+      openConversation(newConv.id)
     }
-  }, [sessions])
+  }, [memberConversations]) // eslint-disable-line
 
   // 切换频道时重置会话视图
   useEffect(() => {
     setSessionView(null)
+    setConvMessages([])
     waitingForNewSession.current = false
   }, [activeChannelId]) // eslint-disable-line
 
+  // 打开一个会话：从服务端加载该会话的消息（与手机端同步）
+  async function openConversation(convId: string) {
+    if (!activeProjectId || !user?.id) return
+    setSessionView(convId)
+    setConvMessages([])
+    setConvLoading(true)
+    try {
+      const data = await api.get<{ messages?: Message[] }>(
+        `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(user.id)}/conversations/${encodeURIComponent(convId)}/messages?limit=120`
+      )
+      setConvMessages((data.messages ?? []) as Message[])
+    } catch { /* ignore */ }
+    finally { setConvLoading(false) }
+  }
+
   function startNewSession() {
-    prevSessionIdsRef.current = new Set(sessions.map((s) => s.id))
+    prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
     setSessionView('new')
+    setConvMessages([])
     waitingForNewSession.current = true
     setTimeout(() => textareaRef.current?.focus(), 50)
   }
 
-  function openSession(taskId: string) {
-    setSessionView(taskId)
+  function openSession(convId: string) {
+    openConversation(convId)
   }
 
   return (
@@ -418,27 +451,27 @@ export default function ConversationPage() {
                       style={{ background: sessionView === 'new' ? 'rgba(60,111,162,.3)' : 'rgba(255,255,255,.08)', border: 'none', borderRadius: 4, width: 18, height: 18, color: 'var(--text-soft)', fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
                     >+</button>
                   </div>
-                  {sessions.length === 0 && (
+                  {memberConversations.length === 0 && (
                     <div style={{ padding: '4px 12px 6px', fontSize: 11, color: 'var(--text-muted)' }}>发送第一条消息自动创建会话</div>
                   )}
-                  {sessions.map((s) => (
+                  {memberConversations.map((c) => (
                     <button
-                      key={s.id}
+                      key={c.id}
                       type="button"
-                      onClick={() => openSession(s.id)}
+                      onClick={() => openSession(c.id)}
                       style={{
                         width: 'calc(100% - 8px)', display: 'flex', flexDirection: 'column', gap: 1,
                         padding: '5px 10px', margin: '1px 4px',
-                        background: s.id === sessionView ? 'rgba(60,111,162,.2)' : 'transparent',
+                        background: c.id === sessionView ? 'rgba(60,111,162,.2)' : 'transparent',
                         border: 'none', borderRadius: 5, textAlign: 'left', cursor: 'pointer',
                         color: 'var(--text-soft)', transition: 'background .1s',
                       }}
                     >
                       <span style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                        {s.failed ? '✗ ' : s.done ? '✓ ' : '⟳ '}{s.title}
+                        {c.last_task_status === 'error' || c.last_task_status === 'failed' ? '✗ ' : ''}{(c.title || c.last_message || '新会话').slice(0, 40)}
                       </span>
-                      {s.steps > 0 && (
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{s.steps} 步</span>
+                      {c.updated_at && (
+                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{formatTime(c.updated_at)}</span>
                       )}
                     </button>
                   ))}
