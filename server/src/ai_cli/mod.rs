@@ -730,14 +730,14 @@ fn native_session_uuid(cli_name: &str, scope: &NativeSessionScope) -> String {
     );
     let hash = sha2::Sha256::digest(seed.as_bytes());
     format!(
-        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:02x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
+        "{:02x}{:02x}{:02x}{:02x}-{:02x}{:02x}-4{:x}{:02x}-{:02x}{:02x}-{:02x}{:02x}{:02x}{:02x}{:02x}{:02x}",
         hash[0],
         hash[1],
         hash[2],
         hash[3],
         hash[4],
         hash[5],
-        hash[6] & 0x0f,
+        hash[6] & 0x0f, // 单个十六进制位，用 {:x} 避免零填充为两位
         hash[7],
         (hash[8] & 0x3f) | 0x80,
         hash[9],
