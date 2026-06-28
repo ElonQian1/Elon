@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
@@ -63,6 +65,7 @@ export default function AiChatPage() {
   const [usersLoading, setUsersLoading] = useState(true)
   const [usersError, setUsersError] = useState('')
   const [selectedFriend, setSelectedFriend] = useState<Friend | null>(null)
+  const [friendPopoverY, setFriendPopoverY] = useState(200)
   // 节点在线状态（由本页面轮询，同时传给 NodeStatusBanner 避免重复请求）
   const [onlineNodeId, setOnlineNodeId] = useState<string | null>(null)
   const [onlineNodeName, setOnlineNodeName] = useState<string>('')
@@ -396,8 +399,13 @@ export default function AiChatPage() {
           )}
         </div>
         <div className={styles.userPanelList}>
-          {selectedFriend && (
-            <UserProfileCard friend={selectedFriend} onClose={() => setSelectedFriend(null)} />
+          {selectedFriend && createPortal(
+            <UserProfilePopover
+              friend={selectedFriend}
+              anchorY={friendPopoverY}
+              onClose={() => setSelectedFriend(null)}
+            />,
+            document.body
           )}
           {/* 搜索框 */}
           {(friends.length > 0 || userQuery) && (
@@ -437,7 +445,10 @@ export default function AiChatPage() {
                 在线 · {onlineFriends.length}
               </div>
               {onlineFriends.map(f => (
-                <button key={f.id} className={styles.userPanelItem} type="button" onClick={() => setSelectedFriend(f)}>
+                <button key={f.id} className={styles.userPanelItem} type="button" onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect()
+                  setSelectedFriend(f); setFriendPopoverY(r.top + r.height / 2)
+                }}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOnline].join(' ')}>
                     {f.avatar_data_url
                       ? <img src={f.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
@@ -459,7 +470,10 @@ export default function AiChatPage() {
                 离线 · {offlineFriends.length}
               </div>
               {offlineFriends.map(f => (
-                <button key={f.id} className={styles.userPanelItem} type="button" onClick={() => setSelectedFriend(f)}>
+                <button key={f.id} className={styles.userPanelItem} type="button" onClick={(e) => {
+                  const r = e.currentTarget.getBoundingClientRect()
+                  setSelectedFriend(f); setFriendPopoverY(r.top + r.height / 2)
+                }}>
                   <div className={[styles.userPanelAvatar, styles.userPanelAvatarOffline].join(' ')}>
                     {f.avatar_data_url
                       ? <img src={f.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
@@ -488,22 +502,103 @@ export default function AiChatPage() {
   )
 }
 
-function UserProfileCard({ friend, onClose }: { friend: Friend; onClose: () => void }) {
+function UserProfilePopover({ friend, anchorY, onClose }: { friend: Friend; anchorY: number; onClose: () => void }) {
+  const navigate = useNavigate()
+  const popRef = useRef<HTMLDivElement>(null)
   const name = friend.nickname ?? friend.account
+  const isOnline = !!friend.is_online
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (popRef.current && !popRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [onClose])
+
+  const POPOVER_WIDTH = 284
+  const POPOVER_HEIGHT = 280
+  const viewW = window.innerWidth
+  const viewH = window.innerHeight
+  const popTop = Math.min(Math.max(anchorY - 20, 12), viewH - POPOVER_HEIGHT - 12)
+  const popLeft = Math.max(8, viewW - 280 - POPOVER_WIDTH - 8)
+
+  function copyId() {
+    navigator.clipboard.writeText(friend.id).catch(() => {})
+  }
+
   return (
-    <section className={styles.userProfileCard}>
-      <button className={styles.userProfileClose} type="button" onClick={onClose}>×</button>
-      <div className={[styles.userProfileAvatar, friend.is_online ? styles.userPanelAvatarOnline : styles.userPanelAvatarOffline].join(' ')}>
-        {friend.avatar_data_url
-          ? <img src={friend.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-          : name[0].toUpperCase()
-        }
+    <div ref={popRef} style={{
+      position: 'fixed', left: popLeft, top: popTop, zIndex: 9999,
+      width: POPOVER_WIDTH, background: '#1e1f22',
+      border: '1px solid rgba(255,255,255,.12)', borderRadius: 10,
+      overflow: 'hidden', boxShadow: '0 8px 32px rgba(0,0,0,.55)',
+    }}>
+      {/* 头部 */}
+      <div style={{ position: 'relative', height: 72, background: isOnline ? 'linear-gradient(135deg,#0a2d1f,#0d2012)' : '#2c2e35' }}>
+        <div style={{
+          position: 'absolute', bottom: -18, left: 14,
+          width: 56, height: 56, borderRadius: '50%', border: '4px solid #1e1f22',
+          background: '#38414a', display: 'grid', placeItems: 'center', overflow: 'hidden',
+        }}>
+          {friend.avatar_data_url
+            ? <img src={friend.avatar_data_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : <span style={{ fontSize: 20, fontWeight: 800, color: 'white' }}>{name[0]?.toUpperCase()}</span>
+          }
+          {/* 在线小点 */}
+          <span style={{
+            position: 'absolute', right: 1, bottom: 1,
+            width: 13, height: 13, borderRadius: '50%', border: '3px solid #1e1f22',
+            background: isOnline ? 'var(--green,#58BE6A)' : '#545862',
+          }} />
+        </div>
+        <button onClick={onClose} type="button" style={{
+          position: 'absolute', top: 8, right: 8,
+          width: 28, height: 28, border: 0, borderRadius: '50%',
+          background: 'rgba(0,0,0,.35)', color: '#c4c8d4', fontSize: 18,
+          cursor: 'pointer', display: 'grid', placeItems: 'center',
+        }}>×</button>
       </div>
-      <div className={styles.userProfileCopy}>
-        <strong>{name}</strong>
-        <span>{friend.is_online ? '在线' : '离线'}</span>
-        <small>{friend.account}</small>
+      {/* 主体 */}
+      <div style={{ padding: '24px 14px 14px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <strong style={{ display: 'block', fontSize: 15, fontWeight: 800, color: 'var(--text)', marginTop: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</strong>
+        <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{isOnline ? '在线' : '离线'}</span>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 6 }}>
+          <em style={{ display: 'inline-flex', alignItems: 'center', height: 17, padding: '0 6px', borderRadius: 4, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: isOnline ? 'var(--green,#58BE6A)' : '#aab0bd', fontSize: 10, fontWeight: 800, fontStyle: 'normal' }}>
+            {isOnline ? '在线' : '离线'}
+          </em>
+          {friend.id && (
+            <em style={{ display: 'inline-flex', alignItems: 'center', height: 17, padding: '0 6px', borderRadius: 4, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.04)', color: '#aab0bd', fontSize: 10, fontWeight: 800, fontStyle: 'normal' }}>
+              {friend.id.slice(0, 7).toUpperCase()}
+            </em>
+          )}
+        </div>
+        <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,.06)', paddingTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
+          {friend.account && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, gap: 8 }}>
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>账号</span>
+              <strong style={{ color: 'var(--text-soft)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>{friend.account}</strong>
+            </div>
+          )}
+          {friend.id && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, gap: 8 }}>
+              <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>用户 ID</span>
+              <strong style={{ color: 'var(--text-soft)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }} title={friend.id}>{friend.id.slice(0, 14).toUpperCase()}</strong>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 6, marginTop: 10 }}>
+          <button style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: 'rgba(255,255,255,.04)', color: 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            type="button" onClick={() => { onClose(); navigate('/friends') }}>
+            发消息
+          </button>
+          <button style={{ flex: 1, height: 30, border: '1px solid rgba(255,255,255,.12)', borderRadius: 6, background: 'rgba(255,255,255,.04)', color: 'var(--text-soft)', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+            type="button" onClick={copyId}>
+            复制 ID
+          </button>
+        </div>
       </div>
-    </section>
+    </div>
   )
 }
+
