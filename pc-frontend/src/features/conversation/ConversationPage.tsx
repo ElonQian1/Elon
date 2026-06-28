@@ -11,6 +11,7 @@ import { DevTaskMessage } from '../dev/DevTaskCard'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
+import NodeOfflineBanner from './NodeOfflineBanner'
 import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime, clean } from '../../lib/utils'
@@ -421,6 +422,9 @@ export default function ConversationPage() {
             </button>
           </div>
         </header>
+
+        {/* 节点离线提示：电脑重启后节点未运行时出现 */}
+        {activeProjectId && <NodeOfflineBanner />}
 
         {/* 消息列表（1fr）*/}
         {!activeChannelId ? (
