@@ -358,6 +358,30 @@ where
             }
         };
         messages.push(json!({"role": "assistant", "content": content}));
+        // 若模型使用原生 tool_calls，将刚加入的纯文本版本替换为含 tool_calls 字段的完整原始消息
+        let used_native_tool_calls = {
+            let has_tc = response
+                .get("choices")
+                .and_then(Value::as_array)
+                .and_then(|c| c.first())
+                .and_then(|c| c.get("message"))
+                .and_then(|m| m.get("tool_calls"))
+                .and_then(Value::as_array)
+                .map(|tc| !tc.is_empty())
+                .unwrap_or(false);
+            if has_tc {
+                if let Some(orig_msg) = response
+                    .get("choices")
+                    .and_then(Value::as_array)
+                    .and_then(|c| c.first())
+                    .and_then(|c| c.get("message"))
+                    .cloned()
+                {
+                    *messages.last_mut().unwrap() = orig_msg;
+                }
+            }
+            has_tc
+        };
         let agent = match parse_agent_response(&content) {
             Ok(agent) => agent,
             Err(error) => {
@@ -427,7 +451,13 @@ where
         }
 
         let mut results = Vec::new();
+        let mut tool_call_id_results: Vec<(String, String)> = Vec::new();
         for (index, action) in actions.into_iter().enumerate() {
+            let action_tool_call_id = action
+                .get("tool_call_id")
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .to_string();
             let tool_index = index + 1;
             let tool = tool_name(&action);
             let mut approved_approval_diff = None;
@@ -464,6 +494,7 @@ where
                             &tool,
                             &result,
                         );
+                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
                         continue;
                     }
                 };
@@ -492,6 +523,7 @@ where
                             &tool,
                             &result,
                         );
+                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
                         continue;
                     }
                 };
@@ -601,6 +633,7 @@ where
                             &tool,
                             &result,
                         );
+                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
                         continue;
                     }
                     ApprovalOutcome::TimedOut => {
@@ -641,6 +674,7 @@ where
                             &tool,
                             &result,
                         );
+                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
                         continue;
                     }
                     ApprovalOutcome::Canceled => {
@@ -703,6 +737,7 @@ where
                         &tool,
                         &result,
                     );
+                    tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
                     continue;
                 }
             }
@@ -719,6 +754,7 @@ where
                 req_id,
                 tool_result_chunk(req_id, turn, tool_index, &tool, &result, Some(&action)),
             );
+            tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
             record_tool_result(
                 &mut results,
                 &mut total_tools,
@@ -727,10 +763,21 @@ where
                 &result,
             );
         }
-        messages.push(json!({
-            "role": "user",
-            "content": format!("Tool results JSON:\n{}", serde_json::to_string(&results)?),
-        }));
+        // 原生 tool_calls 用 role:tool 消息（含 tool_call_id），否则用 role:user JSON
+        if used_native_tool_calls && !tool_call_id_results.is_empty() {
+            for (tc_id, result_content) in &tool_call_id_results {
+                messages.push(json!({
+                    "role": "tool",
+                    "tool_call_id": tc_id,
+                    "content": result_content,
+                }));
+            }
+        } else {
+            messages.push(json!({
+                "role": "user",
+                "content": format!("Tool results JSON:\n{}", serde_json::to_string(&results)?),
+            }));
+        }
 
         if agent.get("done").and_then(Value::as_bool).unwrap_or(false) {
             send_chunk(
