@@ -1,0 +1,28 @@
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 折叠切换按钮 */
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 8px 3px 22px;
+  text-align: left;
+  transition: color .1s;
+  line-height: 1.6;
+}
+.toggle:hover { color: var(--text-soft); }
+
+.toggleArrow {
+  font-size: 10px;
+  line-height: 1;
+  width: 10px;
+  display: inline-block;
+}

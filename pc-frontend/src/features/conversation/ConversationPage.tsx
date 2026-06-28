@@ -8,6 +8,7 @@ import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import { ModelPickerPopover } from '../models/ModelPicker'
 import { DevTaskMessage } from '../dev/DevTaskCard'
+import DevTaskGroup from '../dev/DevTaskGroup'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
@@ -229,6 +230,27 @@ export default function ConversationPage() {
     }
     return false
   }
+
+  // 消息分组：dev频道中把同一 task_id 的消息聚合为 DevTaskGroup（任务级折叠层）
+  type SingleGroup = { type: 'single'; msg: Message; grouped: boolean; key: string }
+  type TaskGroup   = { type: 'task';   taskId: string; msgs: Message[]; key: string }
+  const messageGroups = useMemo(() => {
+    const groups: Array<SingleGroup | TaskGroup> = []
+    for (let i = 0; i < messages.length; i++) {
+      const msg  = messages[i]
+      const kind = clean(msg.kind ?? msg.role ?? '').toLowerCase()
+      const tid  = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
+      const isTask = isDevChannel && ['ai_task','ai_progress','ai_result'].includes(kind) && !!tid
+      if (isTask) {
+        const last = groups[groups.length - 1]
+        if (last?.type === 'task' && last.taskId === tid) last.msgs.push(msg)
+        else groups.push({ type: 'task', taskId: tid, msgs: [msg], key: `task-${tid}-${i}` })
+      } else {
+        groups.push({ type: 'single', msg, grouped: isGrouped(i), key: msg.id ?? String(i) })
+      }
+    }
+    return groups
+  }, [messages, isDevChannel]) // eslint-disable-line
 
   return (
     <div className={styles.layout}>
@@ -460,18 +482,29 @@ export default function ConversationPage() {
                 <p>还没有消息，发送第一条吧！</p>
               </div>
             )}
-            {messages.map((msg, idx) => (
-              <MessageItem
-                key={msg.id}
-                message={msg}
-                isDevChannel={isDevChannel}
-                taskContext={taskContext}
-                user={user}
-                onCancel={cancelTask}
-                onApprove={approveTool}
-                grouped={isGrouped(idx)}
-              />
-            ))}
+            {messages.length > 0 && messageGroups.map((group) =>
+              group.type === 'task' ? (
+                <div key={group.key} className={styles.devTaskWrap}>
+                  <DevTaskGroup
+                    messages={group.msgs as Parameters<typeof DevTaskGroup>[0]['messages']}
+                    taskContext={taskContext}
+                    onCancel={cancelTask}
+                    onApprove={approveTool}
+                  />
+                </div>
+              ) : (
+                <MessageItem
+                  key={group.key}
+                  message={group.msg}
+                  isDevChannel={isDevChannel}
+                  taskContext={taskContext}
+                  user={user}
+                  onCancel={cancelTask}
+                  onApprove={approveTool}
+                  grouped={group.grouped}
+                />
+              )
+            )}
             {/* P1.3：AI 打字指示器 */}
             {(hasRunningTask || sendingMessage) && (
               <div className={styles.typingRow}>
