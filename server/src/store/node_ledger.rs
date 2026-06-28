@@ -306,6 +306,27 @@ impl Store {
         Ok(owner)
     }
 
+    /// 续约节点 secret：验证旧 secret_hash 属于该用户后，更新为新 hash，返回 true；
+    /// 旧凭证不匹配或节点不属于该用户时返回 false（不修改任何内容）。
+    pub fn renew_node_credential_secret(
+        &self,
+        agent_id: &str,
+        old_secret_hash: &str,
+        new_secret_hash: &str,
+        owner_user_id: &str,
+    ) -> Result<bool> {
+        let conn = self.conn.lock().unwrap();
+        let updated = conn.execute(
+            "UPDATE node_credentials
+             SET secret_hash = ?4
+             WHERE agent_id = ?1
+               AND secret_hash = ?2
+               AND owner_user_id = ?3",
+            params![agent_id, old_secret_hash, owner_user_id, new_secret_hash],
+        )?;
+        Ok(updated > 0)
+    }
+
     /// 回填节点设备名。设备名来自 PC 系统名，和用户自定义 label 分开保存。
     pub fn update_node_credential_device_name(
         &self,

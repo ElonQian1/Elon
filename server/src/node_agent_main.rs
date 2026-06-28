@@ -266,7 +266,12 @@ fn env_flag(name: &str) -> Option<bool> {
 }
 
 /// 用登录 token 调用云端 `POST /api/me/nodes/register`，自动换取节点 agent_id + secret。
-async fn provision_node(cfg: &NodeConfig, token: &str) -> Result<Credentials> {
+/// 若 `existing` 不为空，则带上旧凭证让服务器续约（保留原 agent_id）。
+async fn provision_node(
+    cfg: &NodeConfig,
+    token: &str,
+    existing: Option<&Credentials>,
+) -> Result<Credentials> {
     let url = format!(
         "{}/api/me/nodes/register",
         cfg.cloud_http_url.trim_end_matches('/')
@@ -275,10 +280,15 @@ async fn provision_node(cfg: &NodeConfig, token: &str) -> Result<Credentials> {
         .timeout(Duration::from_secs(15))
         .build()
         .unwrap_or_default();
+    let mut body = serde_json::json!({ "label": machine_label() });
+    if let Some(creds) = existing {
+        body["existing_agent_id"] = serde_json::Value::String(creds.agent_id.clone());
+        body["existing_secret"] = serde_json::Value::String(creds.agent_secret.clone());
+    }
     let resp = client
         .post(&url)
         .bearer_auth(token)
-        .json(&serde_json::json!({ "label": machine_label() }))
+        .json(&body)
         .send()
         .await?;
     if !resp.status().is_success() {
@@ -2424,7 +2434,7 @@ async fn run_agent_runtime() -> Result<()> {
             .or_else(|| persisted.user_token.clone());
         if let Some(tok) = token {
             info!("检测到登录 token，正在自动注册节点…");
-            match provision_node(&cfg, &tok).await {
+            match provision_node(&cfg, &tok, None).await {
                 Ok(c) => {
                     info!("✅ 节点已自动注册: {}", c.agent_id);
                     save_persisted(&PersistedState::from_parts(Some(&c), &storage_settings));
@@ -3066,8 +3076,9 @@ async fn admin_login(
         }
     };
 
-    // 2) 用 token 注册/换取节点凭证
-    match provision_node(&rt.cfg, &token).await {
+    // 2) 用 token 注册/换取节点凭证；若已有凭证则尝试续约（保留 agent_id）
+    let existing = rt.creds.read().await.clone();
+    match provision_node(&rt.cfg, &token, existing.as_ref()).await {
         Ok(c) => {
             let agent_id = c.agent_id.clone();
             rt.set_creds(Some(c)).await;
