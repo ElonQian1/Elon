@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
@@ -57,6 +58,7 @@ export default function ConversationPage() {
   const [showInvites, setShowInvites] = useState(false)
   const [showModeration, setShowModeration] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
+  const [memberPopoverY, setMemberPopoverY] = useState(200)
   const [inviteCode, setInviteCode] = useState('')
   const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
   const [inviteStatus, setInviteStatus] = useState('')
@@ -718,14 +720,19 @@ export default function ConversationPage() {
           </div>
         </div>
         <div className={styles.memberList}>
-          {selectedMember && (
-            <MemberProfilePopover member={selectedMember} onClose={() => setSelectedMember(null)} />
+          {selectedMember && createPortal(
+            <MemberProfilePopover
+              member={selectedMember}
+              anchorY={memberPopoverY}
+              onClose={() => setSelectedMember(null)}
+            />,
+            document.body
           )}
           {activeProjectId && messagesLoading && spaceMembers.length === 0 && (
             <MemberLoadingRows />
           )}
           {activeProjectId && spaceMembers.length > 0 && (
-            <MemberSearch members={spaceMembers} onSelect={setSelectedMember} />
+            <MemberSearch members={spaceMembers} onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }} />
           )}
           {activeProjectId && !messagesLoading && spaceMembers.length === 0 && (
             <p className={styles.sideHint}>暂无项目成员</p>
@@ -1583,7 +1590,7 @@ const MEMBER_VIRTUAL_ROW_HEIGHT = 48
 const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
 
-function MemberSearch({ members, onSelect }: { members: ProjectMember[]; onSelect: (member: ProjectMember) => void }) {
+function MemberSearch({ members, onSelect }: { members: ProjectMember[]; onSelect: (member: ProjectMember, y: number) => void }) {
   const [query, setQuery] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
   const q = query.trim().toLowerCase()
@@ -1664,7 +1671,7 @@ function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
   })
 }
 
-function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect: (member: ProjectMember) => void }) {
+function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect: (member: ProjectMember, y: number) => void }) {
   const roleKey = (member.role ?? '').toLowerCase()
   const roleLabelMap: Record<string, string> = {
     admin: '管理员', owner: '管理员',
@@ -1686,7 +1693,10 @@ function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect:
     member.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline,
   ].filter(Boolean).join(' ')
   return (
-    <button className={styles.memberItem} type="button" onClick={() => onSelect(member)}>
+    <button className={styles.memberItem} type="button" onClick={(e) => {
+      const rect = e.currentTarget.getBoundingClientRect()
+      onSelect(member, rect.top + rect.height / 2)
+    }}>
       <div className={avatarCls}>
         {member.avatar_data_url
           ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
@@ -1705,7 +1715,11 @@ function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect:
 }
 
 /* ── 浮动用户卡片（Discord 风格，定位于右侧栏左侧）── */
-function MemberProfilePopover({ member, onClose }: { member: ProjectMember; onClose: () => void }) {
+function MemberProfilePopover({ member, anchorY, onClose }: {
+  member: ProjectMember
+  anchorY: number
+  onClose: () => void
+}) {
   const popRef = useRef<HTMLDivElement>(null)
   const status = memberPresenceStatus(member)
   const name = member.account || member.user_id
@@ -1734,8 +1748,17 @@ function MemberProfilePopover({ member, onClose }: { member: ProjectMember; onCl
     member.joined_at && ['加入时间', formatTime(member.joined_at)],
   ].filter(Boolean) as [string, string][]
 
+  const POPOVER_WIDTH = 284
+  const POPOVER_HEIGHT = 280
+  const viewW = window.innerWidth
+  const viewH = window.innerHeight
+  const popTop = Math.min(Math.max(anchorY - 20, 12), viewH - POPOVER_HEIGHT - 12)
+  // 定位在右侧栏左侧（右侧栏约 280px）
+  const popLeft = Math.max(8, viewW - 280 - POPOVER_WIDTH - 8)
+
   return (
-    <div ref={popRef} className={styles.memberPopover} style={{ position: 'fixed', right: 284, top: '20%', zIndex: 200 }}>
+    <div ref={popRef} className={styles.memberPopover}
+      style={{ position: 'fixed', left: popLeft, top: popTop, zIndex: 9999, width: POPOVER_WIDTH }}>
       {/* 头部 */}
       <div className={[styles.memberPopoverHead, roleHeadCls].join(' ')}>
         <div className={[
