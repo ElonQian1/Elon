@@ -457,10 +457,10 @@
 }
 .newMsgBtn:hover { background: #343741; color: var(--text); }
 
-/* 输入框区（composer）5 列：模型 | 路线 | 输入 | 附件 | 发送 */
+/* 输入框区（composer）4 列：AI 来源/模型 | 输入 | 附件 | 发送 */
 .composer {
   display: grid;
-  grid-template-columns: 42px 176px minmax(0, 1fr) 42px 68px;
+  grid-template-columns: minmax(138px, 176px) minmax(0, 1fr) 42px 68px;
   gap: 10px;
   align-items: end;
   min-height: 72px;
@@ -468,21 +468,44 @@
   border-top: 1px solid #1b1c20;
 }
 .composerModelBtn {
-  width: 42px;
+  min-width: 0;
+  width: 100%;
   height: 46px;
   border: 1px solid #3b3e46;
   border-radius: 8px;
   background: #2e3037;
   color: var(--text-soft);
-  font-size: 11px;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-  text-align: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  padding: 6px 10px;
+  text-align: left;
   overflow: hidden;
   transition: background 0.1s;
 }
 .composerModelBtn:hover { background: #393d47; }
+.composerModelBtn span,
+.composerModelBtn strong {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.composerModelBtn span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+}
+.composerModelBtn strong {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.2;
+}
 .composerTextarea {
   height: 46px;
   min-height: 46px;
@@ -598,6 +621,11 @@
 @media (max-width: 780px) {
   .layout { grid-template-columns: 1fr; }
   .channelPanel { display: none; }
+  .composer {
+    grid-template-columns: minmax(112px, 132px) minmax(0, 1fr) 42px 58px;
+    gap: 8px;
+    padding: 10px;
+  }
 }
 
 /* ── 消息分组：连续同一人发送时隐藏头像+元信息 ── */

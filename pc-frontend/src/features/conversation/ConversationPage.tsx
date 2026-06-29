@@ -13,10 +13,12 @@ import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
-import RuntimeRouteMenu from './RuntimeRouteMenu'
 import { api } from '../../api/client'
 import { formatTime, clean } from '../../lib/utils'
-import { shortButtonLabel } from '../models/modelUtils'
+import {
+  routeModelButtonCopy,
+  selectedAgentForRuntimeRoute,
+} from '../models/routeModelPolicy'
 import { RUNTIME_ROUTE_STORAGE_KEY, normalizeRuntimeRoute } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type {
@@ -58,6 +60,7 @@ export default function ConversationPage() {
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
+  const modelOptions = useModelStore((s) => s.options)
   const [input, setInput] = useState('')
   const [sendError, setSendError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
@@ -87,6 +90,10 @@ export default function ConversationPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
+  const modelButtonCopy = useMemo(
+    () => routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent),
+    [runtimeRoute, modelLabel, modelOptions, selectedAgent],
+  )
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
 
@@ -209,7 +216,8 @@ export default function ConversationPage() {
         prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
         waitingForNewSession.current = true
       }
-      await sendMessage(fullContent, selectedAgent || null, runtimeRoute)
+      const requestAgent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, runtimeRoute)
+      await sendMessage(fullContent, requestAgent || null, runtimeRoute)
       // 发送后刷新会话列表（新会话会出现在顶部）
       if (activeProjectId && user?.id) {
         setTimeout(async () => {
@@ -723,21 +731,17 @@ export default function ConversationPage() {
               </div>
             )}
             <div className={styles.composer}>
-              {/* 模型选择按钮 */}
+              {/* AI 来源和模型选择按钮 */}
               <button
                 ref={modelBtnRef}
                 className={styles.composerModelBtn}
                 type="button"
-                title={`AI 模型：${modelLabel || '服务器默认'}`}
+                title={modelButtonCopy.title}
                 onClick={() => setShowModelPicker((v) => !v)}
               >
-                {shortButtonLabel(modelLabel)}
+                <span>{modelButtonCopy.source}</span>
+                <strong>{modelButtonCopy.detail}</strong>
               </button>
-              <RuntimeRouteMenu
-                value={runtimeRoute}
-                disabled={sendingMessage}
-                onChange={setRuntimeRoute}
-              />
 
               {/* Textarea */}
               <textarea
@@ -868,7 +872,12 @@ export default function ConversationPage() {
 
       {/* 模型选择弹窗 */}
       {showModelPicker && (
-        <ModelPickerPopover anchorRef={modelBtnRef} onClose={() => setShowModelPicker(false)} />
+        <ModelPickerPopover
+          anchorRef={modelBtnRef}
+          runtimeRoute={runtimeRoute}
+          onRuntimeRouteChange={setRuntimeRoute}
+          onClose={() => setShowModelPicker(false)}
+        />
       )}
 
       {/* 新建项目弹窗 */}

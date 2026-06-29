@@ -68,6 +68,149 @@
   padding: 8px;
 }
 
+.singleBody {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.pickerBody {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 260px minmax(0, 1fr);
+  overflow: hidden;
+}
+
+.routePane {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.modelPane {
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.routeGroup {
+  display: grid;
+  gap: 6px;
+}
+
+.routeGroup + .routeGroup {
+  margin-top: 12px;
+}
+
+.routeGroupTitle {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 2px 4px;
+}
+
+.routeGroupTitle strong {
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.routeGroupTitle span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.routeOption {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 34px;
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 7px;
+  background: #24262d;
+}
+
+.routeOption:hover {
+  border-color: rgba(110, 168, 254, 0.42);
+  background: #2b2e36;
+}
+
+.routeOptionActive {
+  border-color: rgba(88, 190, 106, 0.55);
+  background: rgba(88, 190, 106, 0.1);
+}
+
+.routeOptionSelect {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 9px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.routeCode {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  height: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 5px;
+  color: #cbd4e1;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.routeCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.routeCopy strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.3;
+}
+
+.routeCopy span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.routeConfigLink {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 7px 7px 7px 0;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.routeConfigLink:hover,
+.routeConfigLink:focus {
+  border-color: rgba(110, 168, 254, 0.45);
+  color: #d8e5ff;
+  background: rgba(110, 168, 254, 0.12);
+  outline: none;
+}
+
 .section {
   padding: 10px 8px 5px;
   color: var(--text-muted);
@@ -136,6 +279,40 @@
   color: #ffdede;
 }
 
+.emptyCard {
+  display: grid;
+  gap: 8px;
+  margin: 4px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 8px;
+  background: #24262d;
+  color: var(--text-muted);
+  line-height: 1.5;
+  font-size: 12px;
+}
+
+.emptyCard strong {
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.emptyAction {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  border: 1px solid rgba(110, 168, 254, 0.36);
+  border-radius: 6px;
+  background: rgba(110, 168, 254, 0.1);
+  color: #d8e5ff;
+  padding: 0 10px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .footer {
   display: flex;
   justify-content: flex-end;
@@ -189,4 +366,16 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .pickerBody {
+    grid-template-columns: 1fr;
+  }
+
+  .routePane {
+    max-height: 260px;
+    border-right: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
 }

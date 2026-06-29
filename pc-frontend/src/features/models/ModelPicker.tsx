@@ -1,24 +1,46 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
+import { Settings } from 'lucide-react'
 import { useModelStore } from './useModelStore'
 import { useAuthStore } from '../../store/auth'
 import { providerGroupTitle, shortButtonLabel } from './modelUtils'
+import {
+  filterOptionsForRuntimeRoute,
+  optionMatchesRuntimeRoute,
+  routeModelEmptyState,
+} from './routeModelPolicy'
 import type { AgentOption } from './types'
+import {
+  ACTIVE_RUNTIME_ROUTE_GROUPS,
+  runtimeRouteOption,
+} from '../conversation/runtimeRoutes'
+import type { RuntimeRoute } from '../conversation/runtimeRoutes'
 import styles from './ModelPicker.module.css'
 
 interface Props {
   /** 触发按钮的 ref，用于定位 popover */
   anchorRef: React.RefObject<HTMLElement | null>
   onClose: () => void
+  runtimeRoute?: RuntimeRoute
+  onRuntimeRouteChange?: (value: RuntimeRoute) => void
 }
 
-export function ModelPickerPopover({ anchorRef, onClose }: Props) {
+export function ModelPickerPopover({
+  anchorRef,
+  onClose,
+  runtimeRoute,
+  onRuntimeRouteChange,
+}: Props) {
   const user = useAuthStore((s) => s.user)
   const { options, selectedAgent, label, codexCliOnly, loading, error, load, saveSelection } =
     useModelStore()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [pos, setPos] = useState({ left: 12, bottom: 12, width: 360 })
+  const hasRuntimeRoutePicker = !!runtimeRoute && !!onRuntimeRouteChange
+  const route = runtimeRoute ?? 'auto'
+  const selectedRoute = runtimeRouteOption(route)
 
   // 定位 popover（锚点按钮上方）
   useEffect(() => {
@@ -26,7 +48,8 @@ export function ModelPickerPopover({ anchorRef, onClose }: Props) {
       const el = anchorRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const width = Math.min(360, window.innerWidth - 24)
+      const targetWidth = hasRuntimeRoutePicker ? 640 : 360
+      const width = Math.min(targetWidth, window.innerWidth - 24)
       const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))
       const bottom = Math.max(12, window.innerHeight - rect.top + 8)
       setPos({ left: Math.round(left), bottom: Math.round(bottom), width })
@@ -34,7 +57,7 @@ export function ModelPickerPopover({ anchorRef, onClose }: Props) {
     reposition()
     window.addEventListener('resize', reposition)
     return () => window.removeEventListener('resize', reposition)
-  }, [anchorRef])
+  }, [anchorRef, hasRuntimeRoutePicker])
 
   // 初次打开时加载
   useEffect(() => {
@@ -51,6 +74,7 @@ export function ModelPickerPopover({ anchorRef, onClose }: Props) {
 
   async function handleSelect(option: AgentOption) {
     if (!user?.id) return
+    if (hasRuntimeRoutePicker && !optionMatchesRuntimeRoute(option, route)) return
     setSaving(true)
     setSaveError('')
     try {
@@ -63,9 +87,14 @@ export function ModelPickerPopover({ anchorRef, onClose }: Props) {
     }
   }
 
+  const visibleOptions = hasRuntimeRoutePicker
+    ? filterOptionsForRuntimeRoute(options, route)
+    : options
+  const emptyState = hasRuntimeRoutePicker ? routeModelEmptyState(route) : null
+
   // 按 provider 分组
   const groups = new Map<string, AgentOption[]>()
-  for (const opt of options) {
+  for (const opt of visibleOptions) {
     const title = providerGroupTitle(opt.provider)
     if (!groups.has(title)) groups.set(title, [])
     groups.get(title)!.push(opt)
@@ -87,47 +116,109 @@ export function ModelPickerPopover({ anchorRef, onClose }: Props) {
       >
         <header className={styles.header}>
           <div>
-            <strong>选择 AI 模型</strong>
-            <span>{label || '服务器默认'}</span>
+            <strong>{hasRuntimeRoutePicker ? '选择 AI 来源和模型' : '选择 AI 模型'}</strong>
+            <span>{hasRuntimeRoutePicker ? selectedRoute.title : label || '服务器默认'}</span>
           </div>
           <button className={styles.closeBtn} type="button" onClick={onClose} aria-label="关闭">
             ×
           </button>
         </header>
 
-        <div className={styles.list}>
-          {loading && <p className={styles.empty}>正在读取模型列表…</p>}
-          {!loading && (error || saveError) && (
-            <p className={styles.errorMsg}>{saveError || error}</p>
+        <div className={hasRuntimeRoutePicker ? styles.pickerBody : styles.singleBody}>
+          {hasRuntimeRoutePicker && (
+            <aside className={styles.routePane} aria-label="用哪个 AI">
+              {ACTIVE_RUNTIME_ROUTE_GROUPS.map((group) => (
+                <section className={styles.routeGroup} key={group.title}>
+                  <div className={styles.routeGroupTitle}>
+                    <strong>{group.title}</strong>
+                    <span>{group.description}</span>
+                  </div>
+                  {group.options.map((item) => (
+                    <div
+                      className={[
+                        styles.routeOption,
+                        item.value === route ? styles.routeOptionActive : '',
+                      ].join(' ')}
+                      key={item.value}
+                    >
+                      <button
+                        className={styles.routeOptionSelect}
+                        type="button"
+                        onClick={() => onRuntimeRouteChange?.(item.value)}
+                        aria-pressed={item.value === route}
+                      >
+                        <span className={styles.routeCode}>{item.code}</span>
+                        <span className={styles.routeCopy}>
+                          <strong>{item.title}</strong>
+                          <span>{item.subtitle}</span>
+                        </span>
+                      </button>
+                      {item.configHref && (
+                        <Link
+                          className={styles.routeConfigLink}
+                          to={item.configHref}
+                          title={item.configLabel ?? `${item.title}配置`}
+                          aria-label={item.configLabel ?? `${item.title}配置`}
+                          onClick={onClose}
+                        >
+                          <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </aside>
           )}
-          {!loading && !error && options.length === 0 && (
-            <p className={styles.empty}>
-              当前没有可选模型。请检查服务器 agent 配置或 PC 节点 CLI 配置。
-            </p>
-          )}
-          {!loading &&
-            Array.from(groups.entries()).map(([title, opts]) => (
-              <div key={title}>
-                {title !== '默认' && <div className={styles.section}>{title}</div>}
-                {opts.map((opt) => (
-                  <button
-                    key={opt.agentName || '__default__'}
-                    className={[styles.option, opt.agentName === selectedAgent ? styles.active : ''].join(' ')}
-                    type="button"
-                    disabled={saving}
-                    onClick={() => handleSelect(opt)}
-                  >
-                    <span>
-                      <strong>{opt.label}</strong>
-                      {opt.subtitle && <span>{opt.subtitle}</span>}
-                    </span>
-                    <span className={styles.check}>
-                      {opt.agentName === selectedAgent ? '✓' : ''}
-                    </span>
-                  </button>
+
+          <div className={styles.modelPane}>
+            <div className={styles.list}>
+              {loading && <p className={styles.empty}>正在读取模型列表…</p>}
+              {!loading && (error || saveError) && (
+                <p className={styles.errorMsg}>{saveError || error}</p>
+              )}
+              {!loading && !error && visibleOptions.length === 0 && (
+                <div className={styles.emptyCard}>
+                  <strong>{emptyState?.title ?? '当前没有可选模型'}</strong>
+                  <span>
+                    {emptyState?.body ?? '请检查服务器 agent 配置或 PC 节点 CLI 配置。'}
+                  </span>
+                  {emptyState?.actionHref && (
+                    <Link className={styles.emptyAction} to={emptyState.actionHref} onClick={onClose}>
+                      <Settings size={14} strokeWidth={2.2} aria-hidden="true" />
+                      {emptyState.actionLabel ?? '去配置'}
+                    </Link>
+                  )}
+                </div>
+              )}
+              {!loading &&
+                Array.from(groups.entries()).map(([title, opts]) => (
+                  <div key={title}>
+                    {title !== '默认' && <div className={styles.section}>{title}</div>}
+                    {opts.map((opt) => (
+                      <button
+                        key={opt.agentName || '__default__'}
+                        className={[
+                          styles.option,
+                          opt.agentName === selectedAgent ? styles.active : '',
+                        ].join(' ')}
+                        type="button"
+                        disabled={saving}
+                        onClick={() => handleSelect(opt)}
+                      >
+                        <span>
+                          <strong>{opt.label}</strong>
+                          {opt.subtitle && <span>{opt.subtitle}</span>}
+                        </span>
+                        <span className={styles.check}>
+                          {opt.agentName === selectedAgent ? '✓' : ''}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 ))}
-              </div>
-            ))}
+            </div>
+          </div>
         </div>
 
         <footer className={styles.footer}>
