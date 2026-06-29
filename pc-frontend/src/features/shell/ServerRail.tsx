@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Boxes, MonitorCog, Stethoscope, UsersRound, Mic2, UserRound } from 'lucide-react'
+import { Bot, Boxes, MonitorCog, UsersRound, Mic2, UserRound } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { useProjectStore } from '../conversation/useProjectStore'
 import styles from './ServerRail.module.css'
@@ -18,7 +18,6 @@ const RAIL_ITEMS: RailItem[] = [
   { path: '/ai',      Icon: Bot,          label: '一龙 AI',   color: '#243246', hoverColor: '#3c6fa2' },
   { path: '/',        Icon: Boxes,        label: '项目中心',  color: '#2c2e35', hoverColor: '#4f5d71' },
   { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2c2e35', hoverColor: '#4f5d71' },
-  { path: '/doctor',  Icon: Stethoscope,  label: '电脑医生',  color: '#283342', hoverColor: '#315d72' },
   { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2c2e35', hoverColor: '#365b44' },
   { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2f2a3a', hoverColor: '#7a4f9a' },
 ]

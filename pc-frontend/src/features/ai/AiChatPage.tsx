@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { Stethoscope } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
@@ -47,6 +48,7 @@ interface Friend {
 }
 
 export default function AiChatPage() {
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
@@ -237,6 +239,17 @@ export default function AiChatPage() {
         <div className={styles.sideHeader}>
           <span>一龙 AI</span>
           <button className={styles.newBtn} onClick={newConversation} title="新对话" type="button">+</button>
+        </div>
+        <div className={styles.pinnedTools}>
+          <button className={styles.pinnedTool} type="button" onClick={() => navigate('/doctor')}>
+            <span className={styles.pinnedToolIcon}>
+              <Stethoscope aria-hidden="true" size={18} strokeWidth={2.2} />
+            </span>
+            <span className={styles.pinnedToolCopy}>
+              <strong>电脑医生</strong>
+              <em>诊断和修复本机问题</em>
+            </span>
+          </button>
         </div>
         <div className={styles.convList}>
           {conversations.length === 0 && (

@@ -18,7 +18,7 @@
   background: var(--sidebar);
   border-right: 1px solid var(--line-soft);
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr) 64px;
+  grid-template-rows: 58px auto minmax(0, 1fr) 64px;
   overflow: hidden;
 }
 
@@ -44,6 +44,67 @@
   transition: background .1s, color .1s;
 }
 .newBtn:hover { background: #2a2c32; color: var(--text); }
+
+.pinnedTools {
+  padding: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, .04);
+}
+
+.pinnedTool {
+  width: 100%;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 9px;
+  align-items: center;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: rgba(60, 111, 162, .13);
+  color: #eaf2ff;
+  text-align: left;
+  transition: background .1s, color .1s;
+}
+
+.pinnedTool:hover {
+  background: rgba(87, 142, 199, .28);
+  color: #fff;
+}
+
+.pinnedToolIcon {
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .06);
+  color: #9fc7ff;
+}
+
+.pinnedToolCopy {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pinnedToolCopy strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pinnedToolCopy em {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .convList {
   overflow-y: auto;
