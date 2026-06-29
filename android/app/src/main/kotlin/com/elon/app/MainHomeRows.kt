@@ -230,9 +230,9 @@ internal class MainHomeRows(
 
     private fun startProjectMarkerWorkingPulse(icon: ImageView) {
         val idleColor = Color.parseColor(HOME_LIST_PREVIEW_COLOR)
-        val activeColor = Color.parseColor("#F2C94C")
+        val activeColor = Color.WHITE
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1050L
+            duration = 1350L
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
             interpolator = LinearInterpolator()
