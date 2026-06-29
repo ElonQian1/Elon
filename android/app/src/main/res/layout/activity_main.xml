@@ -953,15 +953,15 @@
 
             <TextView
                 android:id="@+id/modelButton"
-                android:layout_width="52dp"
+                android:layout_width="76dp"
                 android:layout_height="42dp"
                 android:layout_marginStart="8dp"
                 android:background="@drawable/bg_quick_button"
                 android:gravity="center"
                 android:maxLines="1"
-                android:text="默认"
+                android:text="自动"
                 android:textColor="@color/elon_text_primary"
-                android:textSize="13sp" />
+                android:textSize="12sp" />
 
             <TextView
                 android:id="@+id/sendButton"

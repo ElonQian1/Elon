@@ -105,6 +105,8 @@ pub struct SummarizeChannelSelectionRequest {
     pub post_content: String,
     pub summary_prompt: String,
     pub agent: Option<String>,
+    #[serde(default, alias = "runtimeRoute", alias = "pcRoute", alias = "pc_route")]
+    pub runtime_route: Option<String>,
     pub trace_id: Option<String>,
 }
 
@@ -1628,6 +1630,13 @@ fn summarize_channel_selection_response(
             "文档频道是固定只读频道，不能发帖总结",
         );
     }
+    let runtime_route = match req.runtime_route.as_deref() {
+        Some(value) => match PcRuntimeRoutePreference::from_request(value) {
+            Ok(route) => route,
+            Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+        },
+        None => None,
+    };
 
     let post_message = match state.store.insert_project_channel_message(
         &project_id,
@@ -1650,6 +1659,7 @@ fn summarize_channel_selection_response(
         channel_id,
         prompt: summary_prompt,
         agent: req.agent,
+        runtime_route,
         trace_id: trace_id.clone(),
     });
 

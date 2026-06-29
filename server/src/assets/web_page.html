@@ -2534,6 +2534,23 @@
       opacity: 0.58;
       cursor: not-allowed;
     }
+    .agent-route-actions {
+      display: grid;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .agent-route-action {
+      width: 100%;
+      min-height: 42px;
+      background: transparent;
+      border: 1px solid var(--line);
+      color: var(--ink);
+      border-radius: 6px;
+      padding: 8px 12px;
+      text-align: left;
+      cursor: pointer;
+    }
+    .agent-route-action:hover { background: #2A2A2A; }
 
     /* ===== 登录页 ===== */
     .login {
@@ -2846,7 +2863,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           <button id="projectBuildBtn">生成 APK</button>
           <button id="projectRecordBtn">进度记录</button>
           <button id="projectGitBtn">Git 仓库</button>
-          <button id="projectSettingsBtn">模型设置</button>
+          <button id="projectSettingsBtn">AI方式</button>
         </div>
         <div class="project-history" id="projectHistoryText">暂无进度记录</div>
       </div>
@@ -3103,7 +3120,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   <form id="inputBar" class="input-bar">
     <button class="image-edit-btn" type="button" id="imageEditBtn" title="图片编辑">✎</button>
     <textarea id="messageInput" placeholder="描述你想开发的 App 功能" rows="1"></textarea>
-    <button class="model-btn" type="button" id="modelBtn" title="选择模型">默认</button>
+    <button class="model-btn" type="button" id="modelBtn" title="选择AI方式和模型">自动</button>
     <button class="send-btn" type="submit" id="sendBtn">发送</button>
   </form>
 
@@ -3330,8 +3347,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   <form class="modal" id="agentForm">
     <h2>AI 代理设置</h2>
     <div>
-      <label for="agentList">模型</label>
+      <label for="runtimeRouteList">用谁的 AI</label>
+      <div class="agent-list" id="runtimeRouteList" role="listbox" aria-label="用谁的 AI"></div>
+      <label for="agentList" style="margin-top:12px">模型</label>
       <div class="agent-list" id="agentList" role="listbox" aria-label="模型"></div>
+      <div class="agent-route-actions" id="agentRouteActions"></div>
     </div>
     <div id="agentCustomPanel" style="display:none;margin-top:14px">
       <label for="agentCustomBase">自定义 API 地址</label>
@@ -3645,7 +3665,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   const agentMask = $('agentMask');
   const agentForm = $('agentForm');
+  const runtimeRouteList = $('runtimeRouteList');
   const agentList = $('agentList');
+  const agentRouteActions = $('agentRouteActions');
   const agentError = $('agentError');
   const agentRagStatus = $('agentRagStatus');
   const agentCustomPanel = $('agentCustomPanel');
@@ -3712,8 +3734,20 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let searchQuery = '';
   let contactFilterMode = 'all';
   let selectedAgent = '';
+  const RUNTIME_ROUTE_KEY = 'elon_runtime_route';
+  const runtimeRouteOptions = [
+    { value: 'auto', button: '自动', label: '自动选择', subtitle: '一龙按当前项目选择合适的 AI' },
+    { value: 'route_a', button: '本机AI', label: '本机AI', subtitle: '连接自己 PC 上已经登录的 Codex / Copilot / Claude' },
+    { value: 'route_b', button: '我的Key', label: '我的Key', subtitle: '用自己的 API Key，手机里的 AI 服务也共用' },
+    { value: 'route_c', button: '平台AI', label: '平台AI', subtitle: '使用一龙平台提供的 AI' },
+    { value: 'route_c2', button: '远程AI', label: '远程一龙AI', subtitle: '其他用户 PC 节点 + 一龙 CLI' },
+    { value: 'route_c3', button: '远Codex', label: '远程 Codex / Claude', subtitle: '其他用户 PC 节点 + Codex / Claude' }
+  ];
+  let selectedRuntimeRoute = localStorage.getItem(RUNTIME_ROUTE_KEY) || 'auto';
+  if (!runtimeRouteOptions.some((it) => it.value === selectedRuntimeRoute)) selectedRuntimeRoute = 'auto';
   let agentOptions = [];
   let agentSelectionInitialized = false;
+  let runtimeRouteInitialized = false;
   let agentLoading = false;
   let codexCliOnly = false;
   let userByokApiEnabled = false;
@@ -6313,7 +6347,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       return;
     }
     const payload = { message: text };
-    if (selectedAgent) payload.agent = selectedAgent;
+    const agentForRequest = selectedAgentForRequest();
+    if (agentForRequest) payload.agent = agentForRequest;
+    const runtimeRoute = runtimeRouteForRequest();
+    if (runtimeRoute) payload.runtimeRoute = runtimeRoute;
     socket.send(JSON.stringify(payload));
     appendBubble('user', text);
     messageInput.value = '';
@@ -6485,14 +6522,106 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function selectedAgentOption() {
     return agentOptions.find((it) => (it.name || '') === selectedAgent) || agentOptions[0] || { name: '', label: '默认模型' };
   }
+  function selectedRuntimeRouteOption() {
+    return runtimeRouteOptions.find((it) => it.value === selectedRuntimeRoute) || runtimeRouteOptions[0];
+  }
+  function runtimeRouteForRequest() {
+    return selectedRuntimeRoute && selectedRuntimeRoute !== 'auto' ? selectedRuntimeRoute : '';
+  }
+  function isCliAgentOption(item) {
+    const backend = (item.backend || '').toLowerCase();
+    if (backend === 'cli') return true;
+    const provider = (item.provider || '').toLowerCase();
+    return ['codex', 'copilot', 'github', 'claude', 'gemini'].includes(provider);
+  }
+  function matchesRuntimeRoute(item) {
+    if (!item) return false;
+    if (selectedRuntimeRoute === 'auto') return true;
+    if (selectedRuntimeRoute === 'route_a' || selectedRuntimeRoute === 'route_c3') return isCliAgentOption(item);
+    if (selectedRuntimeRoute === 'route_c') return !(item.name || '') || (item.backend || '').toLowerCase() === 'api';
+    return false;
+  }
+  function selectedAgentForRequest() {
+    const option = agentOptions.find((it) => (it.name || '') === selectedAgent);
+    return option && matchesRuntimeRoute(option) ? selectedAgent : '';
+  }
+  function routeEmptyModelLabel() {
+    if (selectedRuntimeRoute === 'route_b') return '在配置里填写模型';
+    if (selectedRuntimeRoute === 'route_c2') return '由远程节点的 API Key 决定';
+    return agentLoading ? '加载中...' : '暂无可选模型';
+  }
   function updateModelButton(label) {
     const raw = label || selectedAgentOption().label || '默认模型';
-    modelBtn.textContent = shortModelLabel(raw);
-    modelBtn.title = '选择模型：' + raw;
+    const route = selectedRuntimeRouteOption();
+    modelBtn.textContent = route.button || '自动';
+    modelBtn.title = 'AI方式：' + route.label + '；模型：' + raw;
+  }
+  function renderRuntimeRouteOptions() {
+    runtimeRouteList.innerHTML = '';
+    runtimeRouteOptions.forEach((item) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'agent-option' + (item.value === selectedRuntimeRoute ? ' active' : '');
+      const title = document.createElement('span');
+      title.className = 'agent-option-title';
+      title.textContent = item.label;
+      button.appendChild(title);
+      const subtitle = document.createElement('span');
+      subtitle.className = 'agent-option-subtitle';
+      subtitle.textContent = item.subtitle;
+      button.appendChild(subtitle);
+      button.setAttribute('role', 'option');
+      button.setAttribute('aria-selected', item.value === selectedRuntimeRoute ? 'true' : 'false');
+      button.addEventListener('click', () => selectRuntimeRoute(item.value));
+      runtimeRouteList.appendChild(button);
+    });
+  }
+  function renderRouteActions() {
+    agentRouteActions.innerHTML = '';
+    const addAction = (label, action) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'agent-route-action';
+      button.textContent = label;
+      button.addEventListener('click', action);
+      agentRouteActions.appendChild(button);
+    };
+    if (selectedRuntimeRoute === 'auto') {
+      addAction('⚙ 配置我的Key', () => selectRuntimeRoute('route_b'));
+      addAction('⚙ PC 节点大厅', () => {
+        agentMask.classList.remove('active');
+        openNodeMarketDialog();
+      });
+    } else if (selectedRuntimeRoute === 'route_a') {
+      addAction('⚙ 连接我的电脑', () => {
+        agentMask.classList.remove('active');
+        openNodeMarketDialog();
+      });
+    } else if (selectedRuntimeRoute === 'route_c2' || selectedRuntimeRoute === 'route_c3') {
+      addAction('⚙ 选择远程 PC 节点', () => {
+        agentMask.classList.remove('active');
+        openNodeMarketDialog();
+      });
+    }
+  }
+  function selectRuntimeRoute(value) {
+    selectedRuntimeRoute = runtimeRouteOptions.some((it) => it.value === value) ? value : 'auto';
+    localStorage.setItem(RUNTIME_ROUTE_KEY, selectedRuntimeRoute);
+    const current = agentOptions.find((it) => (it.name || '') === selectedAgent);
+    if (current && !matchesRuntimeRoute(current)) {
+      const fallback = agentOptions.find(matchesRuntimeRoute);
+      selectedAgent = fallback ? (fallback.name || '') : '';
+    }
+    renderRuntimeRouteOptions();
+    renderAgentOptions();
+    updateModelButton();
   }
   function renderAgentOptions() {
+    renderRuntimeRouteOptions();
+    renderRouteActions();
     agentList.innerHTML = '';
-    const items = agentOptions.length ? agentOptions : [{ name: '', label: agentLoading ? '加载中...' : '默认模型', disabled: agentLoading }];
+    const filtered = agentOptions.filter(matchesRuntimeRoute);
+    const items = filtered.length ? filtered : [{ name: '', label: routeEmptyModelLabel(), disabled: true }];
     items.forEach((item) => {
       const button = document.createElement('button');
       button.type = 'button';
@@ -6514,7 +6643,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       agentList.appendChild(button);
     });
     if (agentCustomPanel) {
-      agentCustomPanel.style.display = (codexCliOnly && !userByokApiEnabled) ? 'none' : '';
+      agentCustomPanel.style.display =
+        (codexCliOnly && !userByokApiEnabled) || selectedRuntimeRoute !== 'route_b' ? 'none' : '';
     }
   }
   function syncAgentCustomFields(config, apiKeySet) {
@@ -6639,6 +6769,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         label: modelOptionLabel(it),
         subtitle: modelOptionSubtitle(it),
         provider: it.provider || '',
+        backend: it.backend || '',
         model: it.model || '',
         reasoningEffort: it.reasoning_effort || '',
         reasoningSummary: it.reasoning_summary || '',
@@ -6655,6 +6786,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const options = [{ name: '', label: '默认模型' }].concat(serverOptions);
       agentOptions = options;
       const hasCustomConfig = !!((config.api_base || '').trim() || (config.model || '').trim());
+      if (!runtimeRouteInitialized) {
+        if (selectedRuntimeRoute === 'auto' && hasCustomConfig) selectedRuntimeRoute = 'route_b';
+        runtimeRouteInitialized = true;
+        localStorage.setItem(RUNTIME_ROUTE_KEY, selectedRuntimeRoute);
+      }
       if (!agentSelectionInitialized) {
         const configured = config && config.use_agent;
         selectedAgent = hasCustomConfig ? '' : (options.some((it) => it.name === configured) ? configured : '');
@@ -7828,7 +7964,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     try {
       await persistCustomAgent();
       selectedAgent = '';
+      selectedRuntimeRoute = 'route_b';
+      runtimeRouteInitialized = true;
+      localStorage.setItem(RUNTIME_ROUTE_KEY, selectedRuntimeRoute);
       updateModelButton('自定义模型');
+      renderAgentOptions();
       agentMask.classList.remove('active');
       await loadAgents();
     } catch (err) {

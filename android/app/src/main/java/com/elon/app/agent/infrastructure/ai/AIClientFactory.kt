@@ -50,28 +50,41 @@ object AIClientFactory {
         val token = MainAppBridge.authToken(ctx)
         val projectId = MainAppBridge.effectiveCliProjectId(ctx)
 
-        // 优先级 1：服务器 Codex CLI（主链路）
-        // 所有闲聊和手机脚本生成都走 Codex，保证 AGENTS.md 能被读取、脚本能被正确生成。
-        if (!token.isNullOrBlank() && !projectId.isNullOrBlank()) {
-            Log.i(TAG, "→ 选择 ElonServer CLI（project=$projectId）[首选]")
+        fun serverCliClient(): AIClient? {
+            if (token.isNullOrBlank() || projectId.isNullOrBlank()) return null
+            Log.i(TAG, "→ 选择 ElonServer CLI（project=$projectId）")
             return cachedElonServerClient
                 ?: ElonServerAIClient(ctx, projectId).also { cachedElonServerClient = it }
         }
 
-        // 优先级 2：用户自带混元 API Key（未登录服务器时的兜底）
-        if (cfg.hunyuanApiKey.isNotBlank()) {
-            Log.i(TAG, "→ 选择 Hunyuan（用户自带 Key，兜底）")
-            return HunyuanAIClient(cfg.hunyuanApiKey)
+        fun apiKeyClient(): AIClient? {
+            if (cfg.hunyuanApiKey.isNotBlank()) {
+                Log.i(TAG, "→ 选择 Hunyuan（用户自带 Key）")
+                return HunyuanAIClient(cfg.hunyuanApiKey)
+            }
+
+            if (cfg.openaiApiKey.isNotBlank()) {
+                Log.i(TAG, "→ 选择 OpenAICompat（用户自带 Key）")
+                return OpenAICompatAIClient(
+                    apiKey = cfg.openaiApiKey,
+                    provider = LLMProvider.OPENAI_COMPATIBLE,
+                    model = cfg.openaiModel.takeIf { it.isNotBlank() },
+                    apiBase = cfg.openaiApiBase.takeIf { it.isNotBlank() }
+                )
+            }
+
+            return null
         }
 
-        // 优先级 3：用户自带 OpenAI 兼容 Key（兜底）
-        if (cfg.openaiApiKey.isNotBlank()) {
-            Log.i(TAG, "→ 选择 OpenAICompat（用户自带 Key，兜底）")
-            return OpenAICompatAIClient(
-                apiKey = cfg.openaiApiKey,
-                provider = LLMProvider.OPENAI_COMPATIBLE
-            )
+        cfg.voiceModeOrder.forEach { mode ->
+            when (mode) {
+                AgentConfigActivity.VOICE_MODE_APIKEY -> apiKeyClient()?.let { return it }
+                AgentConfigActivity.VOICE_MODE_CLI -> serverCliClient()?.let { return it }
+            }
         }
+
+        apiKeyClient()?.let { return it }
+        serverCliClient()?.let { return it }
 
         // 都没有 → 返回 NoOp，让调用方在 chat 时收到友好错误
         Log.w(TAG, "→ 无可用 AI（未登录服务器，也没有配置 API Key）")

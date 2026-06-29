@@ -154,6 +154,7 @@ data class ModelOption(
     val agentName: String?,
     val provider: String = "",
     val modelId: String = "",
+    val backend: String = "",
     val reasoningEffort: String? = null,
     val reasoningSummary: String? = null,
     val verbosity: String? = null,

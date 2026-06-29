@@ -292,10 +292,12 @@ internal fun startProjectChannelAiTask(
     channelId: String,
     content: String,
     agent: String? = null,
+    runtimeRoute: String? = null,
     route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
     val payload = JSONObject().put("content", content)
     agent?.takeIf { it.isNotBlank() }?.let { payload.put("agent", it) }
+    runtimeRoute?.takeIf { it.isNotBlank() }?.let { payload.put("runtimeRoute", it) }
     return postProjectChannelPayload(
         http = http,
         serverUrl = serverUrl,
@@ -317,12 +319,14 @@ internal fun summarizeProjectChannelMessages(
     postContent: String,
     summaryPrompt: String,
     agent: String? = null,
+    runtimeRoute: String? = null,
     route: ProjectSpaceRoute = ProjectSpaceRoute()
 ): ProjectChannelMessage {
     val payload = JSONObject()
         .put("post_content", postContent)
         .put("summary_prompt", summaryPrompt)
     agent?.takeIf { it.isNotBlank() }?.let { payload.put("agent", it) }
+    runtimeRoute?.takeIf { it.isNotBlank() }?.let { payload.put("runtimeRoute", it) }
     return postProjectChannelPayload(
         http = http,
         serverUrl = serverUrl,

@@ -33,7 +33,8 @@ import java.net.URL
 class LLMClient(
     private val provider: LLMProvider = LLMProvider.DEEPSEEK,
     private val apiKey: String = "",  // 需要配置
-    private val model: String? = null  // 可选，使用默认模型
+    private val model: String? = null,  // 可选，使用默认模型
+    private val openAICompatibleBaseUrl: String? = null
 ) {
     companion object {
         private const val TAG = "LLMClient"
@@ -98,10 +99,19 @@ class LLMClient(
      * 调用 OpenAI 兼容接口
      */
     private fun callOpenAICompatible(messages: List<ChatMessage>): String {
-        val url = URL("https://api.openai.com/v1/chat/completions")
+        val url = openAICompatibleChatUrl()
         val modelName = model ?: "gpt-3.5-turbo"
         
         return callOpenAIStyle(url, apiKey, modelName, messages, authHeader = "Authorization" to "Bearer $apiKey")
+    }
+
+    private fun openAICompatibleChatUrl(): URL {
+        val base = openAICompatibleBaseUrl?.trim()?.trimEnd('/')
+        if (!base.isNullOrBlank()) {
+            val path = if (base.endsWith("/chat/completions")) base else "$base/chat/completions"
+            return URL(path)
+        }
+        return URL("https://api.openai.com/v1/chat/completions")
     }
     
     /**

@@ -20,10 +20,16 @@ import com.elon.app.agent.application.Message
 class OpenAICompatAIClient(
     apiKey: String,
     provider: LLMProvider = LLMProvider.DEEPSEEK,
-    model: String? = null
+    model: String? = null,
+    apiBase: String? = null
 ) : AIClient {
 
-    private val inner = LLMClient(provider = provider, apiKey = apiKey, model = model)
+    private val inner = LLMClient(
+        provider = provider,
+        apiKey = apiKey,
+        model = model,
+        openAICompatibleBaseUrl = apiBase
+    )
 
     override suspend fun chat(messages: List<Message>): String {
         val converted = messages.map { ChatMessage(role = it.role, content = it.content) }

@@ -218,6 +218,7 @@ pub async fn run_for_project_in_workspace(
         user_message,
         preflight_note.as_deref(),
         agent_name,
+        pc_runtime_route,
         trace_id,
         require_git_for_this_request,
         state,
@@ -323,6 +324,7 @@ pub async fn plan_for_project_in_workspace(
     }
 
     let user_config_workspace = state.get_user_workspace(user_id);
+    let route_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
     if let Err(e) = run_backend_with_workspace(
         user_id,
         workspace,
@@ -336,7 +338,7 @@ pub async fn plan_for_project_in_workspace(
         }),
         user_message,
         None,
-        agent_name,
+        route_agent_name,
         trace_id,
         CapabilityRoute::CodeAgent,
         true,
@@ -349,6 +351,26 @@ pub async fn plan_for_project_in_workspace(
     {
         error!("项目级 AI 规划运行出错: {}", e);
         let _ = tx.send(WsMessage::error(e.to_string()).to_json());
+    }
+}
+
+fn requested_agent_for_runtime_route<'a>(
+    agent_name: Option<&'a str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+) -> Option<&'a str> {
+    if agent_name
+        .map(str::trim)
+        .is_some_and(|name| !name.is_empty())
+    {
+        return agent_name;
+    }
+    match pc_runtime_route {
+        Some(
+            PcRuntimeRoutePreference::RouteB
+            | PcRuntimeRoutePreference::RouteC
+            | PcRuntimeRoutePreference::RouteC2,
+        ) => Some("api"),
+        _ => agent_name,
     }
 }
 
@@ -459,6 +481,7 @@ async fn run_dispatch_with_workspace(
     user_message: &str,
     preflight_note: Option<&str>,
     agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<&str>,
     require_existing_git: bool,
     state: &Arc<AppState>,
@@ -498,6 +521,7 @@ async fn run_dispatch_with_workspace(
     info!("intent routing decision: {:?}", decision);
 
     let codex_cli_only = state.ai_cli.codex_cli_only;
+    let requested_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
     let user_byok_api_override = codex_cli_only
         && crate::user_agent_secrets::user_byok_api_enabled()
         && UserAgentConfig::load(user_config_workspace)
@@ -521,7 +545,7 @@ async fn run_dispatch_with_workspace(
                 "当前已锁定只使用 Codex CLI，但服务端没有可用的 Codex CLI 选项"
             ));
         }
-        if agent_name
+        if requested_agent_name
             .map(|name| !is_local_cli_option(state, name))
             .unwrap_or(false)
         {
@@ -544,16 +568,31 @@ async fn run_dispatch_with_workspace(
         decision.route
     };
     let backend_agent_name = if codex_cli_only && !user_byok_api_override {
-        agent_name.filter(|name| is_local_cli_option(state, name))
+        requested_agent_name.filter(|name| is_local_cli_option(state, name))
     } else if state.ai_cli.enabled {
-        agent_name.filter(|name| is_local_cli_option(state, name))
+        match requested_agent_name {
+            Some(name) if is_local_cli_option(state, name) => requested_agent_name,
+            Some(_)
+                if matches!(
+                    pc_runtime_route,
+                    Some(
+                        PcRuntimeRoutePreference::RouteB
+                            | PcRuntimeRoutePreference::RouteC
+                            | PcRuntimeRoutePreference::RouteC2
+                    )
+                ) =>
+            {
+                requested_agent_name
+            }
+            _ => None,
+        }
     } else if image_cli_only {
-        match agent_name {
-            Some(name) if is_local_cli_option(state, name) => agent_name,
+        match requested_agent_name {
+            Some(name) if is_local_cli_option(state, name) => requested_agent_name,
             _ => Some("codex_cli"),
         }
     } else {
-        agent_name
+        requested_agent_name
     };
 
     // ImageThenCode 两步管道：先文生图，把 URL 注入消息，再走代码 Agent 集成

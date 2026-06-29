@@ -16,6 +16,7 @@ internal class MainPreparedMessageActions(
     private val userId: () -> String,
     private val projectIconDataUrl: (String) -> String?,
     private val selectedAgentForRequest: () -> String?,
+    private val selectedRuntimeRouteForRequest: () -> String?,
     private val appendMessage: (ChatMessage) -> Unit,
     private val collapseInputComposer: () -> Unit,
     private val looksLikeDevelopmentRequest: (String) -> Boolean,
@@ -137,6 +138,7 @@ internal class MainPreparedMessageActions(
             addProperty("execution_mode", executionMode.wireValue)
             addProperty("plan_mode", executionMode.isPlan)
             selectedAgentForRequest()?.let { addProperty("agent", it) }
+            selectedRuntimeRouteForRequest()?.let { addProperty("runtimeRoute", it) }
             if (attachmentRefs.size() > 0) add("attachments", attachmentRefs)
         }
     }

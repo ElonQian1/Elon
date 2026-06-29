@@ -3,7 +3,9 @@
 
 use std::sync::Arc;
 
-use crate::{agent, store::ProjectAccess, types::AppState};
+use crate::{
+    agent, pc_agent_runtime_choice::PcRuntimeRoutePreference, store::ProjectAccess, types::AppState,
+};
 
 pub(crate) struct ChannelSummaryTask {
     pub state: Arc<AppState>,
@@ -13,6 +15,7 @@ pub(crate) struct ChannelSummaryTask {
     pub channel_id: String,
     pub prompt: String,
     pub agent: Option<String>,
+    pub runtime_route: Option<PcRuntimeRoutePreference>,
     pub trace_id: String,
 }
 
@@ -33,6 +36,7 @@ pub(crate) fn spawn_channel_summary(task: ChannelSummaryTask) {
         let run_user_id = task.user_id.clone();
         let run_prompt = task.prompt.clone();
         let run_agent = task.agent.clone();
+        let run_runtime_route = task.runtime_route;
         let run_trace_id = task.trace_id.clone();
         let summary_conversation_id = format!("channel-summary-{}", task.channel_id);
         let download_base = format!(
@@ -47,7 +51,7 @@ pub(crate) fn spawn_channel_summary(task: ChannelSummaryTask) {
                 Some(&summary_conversation_id),
                 &run_prompt,
                 run_agent.as_deref(),
-                None,
+                run_runtime_route,
                 Some(&run_trace_id),
                 &run_state,
                 tx,

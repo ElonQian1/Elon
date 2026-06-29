@@ -433,6 +433,7 @@ class MainActivity : AppCompatActivity() {
                 s.projects.firstOrNull { it.id == projectId }?.iconDataUrl
             },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
+            selectedRuntimeRouteForRequest = { modelActions.selectedRuntimeRouteForRequest() },
             appendMessage = workflowActions.messageAppendActions::appendMessage,
             collapseInputComposer = { inputActions.inputFocusActions.collapseInputComposer() },
             looksLikeDevelopmentRequest = ::looksLikeDevelopmentRequest,
@@ -687,6 +688,7 @@ class MainActivity : AppCompatActivity() {
             },
             showCreateAndOpenPersonalConversation = { title, onCreated -> conversationActions.showCreateConversationDialog(title, onCreated) },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
+            selectedRuntimeRouteForRequest = { modelActions.selectedRuntimeRouteForRequest() },
             onProjectDescriptionUpdated = ::updateProjectDescriptionFromSpace,
             pickPostImage = projectPostImageUploader::pickLocalImage,
             localProjectIconDataUrl = ::localProjectIconDataUrl,
@@ -790,6 +792,9 @@ class MainActivity : AppCompatActivity() {
             getActionPopup = { actionPopup },
             setActionPopup = { actionPopup = it },
             openSettings = { quickCommandActions.openSettings() },
+            openNodeSettings = {
+                startActivity(Intent(this, com.elon.app.agent.ui.NodeActivity::class.java))
+            },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         )

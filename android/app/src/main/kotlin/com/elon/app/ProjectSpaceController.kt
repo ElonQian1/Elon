@@ -41,6 +41,7 @@ internal class ProjectSpaceController(
     private val openPersonalAiChat: (Int) -> Unit,
     private val showCreateAndOpenPersonalConversation: (suggestedTitle: String?, onCreated: (Int) -> Unit) -> Unit,
     private val selectedAgentForRequest: () -> String?,
+    private val selectedRuntimeRouteForRequest: () -> String?,
     private val onProjectDescriptionUpdated: (projectId: String, description: String?) -> Unit,
     private val pickPostImage: (ProjectSpaceSummary, (Result<String>) -> Unit) -> Unit,
     private val localProjectIconDataUrl: (String) -> String?,
@@ -537,6 +538,7 @@ internal class ProjectSpaceController(
                         channelId = channel.id,
                         content = text,
                         agent = selectedAgentForRequest(),
+                        runtimeRoute = selectedRuntimeRouteForRequest(),
                         route = route
                     )
                 } else {
@@ -653,6 +655,7 @@ internal class ProjectSpaceController(
                     postContent = summary.channelPost,
                     summaryPrompt = summary.channelPrompt,
                     agent = selectedAgentForRequest(),
+                    runtimeRoute = selectedRuntimeRouteForRequest(),
                     route = route
                 )
             }

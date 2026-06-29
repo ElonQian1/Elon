@@ -42,6 +42,7 @@ internal class MainModelActions(
     private val getActionPopup: () -> PopupWindow?,
     private val setActionPopup: (PopupWindow?) -> Unit,
     private val openSettings: () -> Unit,
+    private val openNodeSettings: () -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
@@ -50,6 +51,8 @@ internal class MainModelActions(
     var codexCliOnly = true
         private set
     var selectedAgentName: String? = null
+        private set
+    var selectedRuntimeRoute: AiRuntimeRoute = AiRuntimeRoute.Auto
         private set
     var currentModelLabel = "默认"
         private set
@@ -63,9 +66,14 @@ internal class MainModelActions(
         return selectedAgentName?.takeIf { it.isNotBlank() }
     }
 
+    fun selectedRuntimeRouteForRequest(): String? {
+        return selectedRuntimeRoute.wireValue
+    }
+
     fun restoreCachedModelSelection() {
         val label = cachedModelLabel() ?: return
         selectedAgentName = cachedModelAgentName()
+        selectedRuntimeRoute = cachedRuntimeRoute()
         currentModelLabel = label
         updateModelButton()
     }
@@ -102,8 +110,9 @@ internal class MainModelActions(
                         codexCliOnly = true
                         modelOptions = options
                         selectedAgentName = effectiveUseAgent
+                        selectedRuntimeRoute = cachedRuntimeRoute()
                         currentModelLabel = label
-                        cacheModelSelection(effectiveUseAgent, currentModelLabel)
+                        cacheModelSelection(effectiveUseAgent, currentModelLabel, selectedRuntimeRoute)
                         updateModelButton()
                         afterLoad?.invoke()
                     }
@@ -135,9 +144,12 @@ internal class MainModelActions(
                     codexCliOnly = false
                     modelOptions = options
                     selectedAgentName = effectiveUseAgent
+                    selectedRuntimeRoute = cachedRuntimeRoute().let { cached ->
+                        if (cached == AiRuntimeRoute.Auto && hasCustomConfig) AiRuntimeRoute.MyKey else cached
+                    }
                     currentModelLabel = label
                     if (shouldSyncCache) {
-                        cacheModelSelection(effectiveUseAgent, label)
+                        cacheModelSelection(effectiveUseAgent, label, selectedRuntimeRoute)
                     }
                     updateModelButton()
                     afterLoad?.invoke()
@@ -168,9 +180,9 @@ internal class MainModelActions(
     }
 
     fun updateModelButton() {
-        binding.modelButton.text = shortModelLabel(currentModelLabel)
-        binding.modelButton.contentDescription = "选择模型：$currentModelLabel"
-        modelButtonShellProvider()?.contentDescription = "选择模型：$currentModelLabel"
+        binding.modelButton.text = selectedRuntimeRoute.buttonLabel
+        binding.modelButton.contentDescription = "AI方式：${selectedRuntimeRoute.title}；模型：$currentModelLabel"
+        modelButtonShellProvider()?.contentDescription = "AI方式：${selectedRuntimeRoute.title}；模型：$currentModelLabel"
     }
 
     /// 软锁定回调：进入有首次 CLI 记录的会话时自动切换回对应的 agent
@@ -179,7 +191,10 @@ internal class MainModelActions(
         val option = modelOptions.firstOrNull { it.agentName == agentName } ?: return
         selectedAgentName = agentName
         currentModelLabel = option.label
-        cacheModelSelection(agentName, option.label)
+        if (!option.matchesRuntimeRoute(selectedRuntimeRoute)) {
+            selectedRuntimeRoute = if (option.isCliModelOption()) AiRuntimeRoute.MyPcAi else AiRuntimeRoute.PlatformAi
+        }
+        cacheModelSelection(agentName, option.label, selectedRuntimeRoute)
         updateModelButton()
     }
 
@@ -193,6 +208,7 @@ internal class MainModelActions(
             val name = item.optString("name", "")
             val model = item.optString("model", "")
             val provider = item.optString("provider", "")
+            val backend = item.optString("backend", "")
             val reasoningEffort = jsonStringOrNull(item, "reasoning_effort")
             val reasoningSummary = jsonStringOrNull(item, "reasoning_summary")
             val verbosity = jsonStringOrNull(item, "verbosity")
@@ -208,6 +224,7 @@ internal class MainModelActions(
                         agentName = name,
                         provider = provider,
                         modelId = model,
+                        backend = backend,
                         reasoningEffort = reasoningEffort,
                         reasoningSummary = reasoningSummary,
                         verbosity = verbosity,
@@ -248,11 +265,16 @@ internal class MainModelActions(
         return parts.joinToString(" · ").takeIf { it.isNotBlank() }
     }
 
-    private fun cacheModelSelection(agentName: String?, label: String) {
+    private fun cacheModelSelection(
+        agentName: String?,
+        label: String,
+        runtimeRoute: AiRuntimeRoute = selectedRuntimeRoute
+    ) {
         prefs.edit().apply {
             if (agentName.isNullOrBlank()) remove(PREF_SELECTED_AGENT)
             else putString(PREF_SELECTED_AGENT, agentName)
             putString(PREF_SELECTED_MODEL_LABEL, label)
+            putString(PREF_SELECTED_RUNTIME_ROUTE, runtimeRoute.wireValue ?: "auto")
         }.apply()
     }
 
@@ -268,33 +290,91 @@ internal class MainModelActions(
             ?.takeIf { it.isNotBlank() && it != "null" }
     }
 
+    private fun cachedRuntimeRoute(): AiRuntimeRoute {
+        return AiRuntimeRoute.fromStored(prefs.getString(PREF_SELECTED_RUNTIME_ROUTE, null))
+    }
+
+    private fun saveRuntimeRouteSelection(route: AiRuntimeRoute) {
+        selectedRuntimeRoute = route
+        val selectedOption = modelOptions.firstOrNull { isModelOptionSelected(it) }
+        if (selectedOption != null && !selectedOption.matchesRuntimeRoute(route)) {
+            val fallback = modelOptions.firstOrNull { it.matchesRuntimeRoute(route) && it.agentName == null }
+                ?: modelOptions.firstOrNull { it.matchesRuntimeRoute(route) }
+            selectedAgentName = fallback?.agentName
+            currentModelLabel = fallback?.label ?: route.title
+        }
+        cacheModelSelection(selectedAgentName, currentModelLabel, route)
+        updateModelButton()
+        Toast.makeText(activity, "已切换为${route.title}", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun configRowsForRuntimeRoute(): List<PopupRowItem.Action> {
+        val rows = mutableListOf<PopupRowItem.Action>()
+        when (selectedRuntimeRoute) {
+            AiRuntimeRoute.MyKey -> {
+                rows.add(PopupRowItem.Action("⚙ 配置我的Key", "保存 API Key 和模型，手机 AI 服务共用", openSettings))
+            }
+            AiRuntimeRoute.MyPcAi -> {
+                rows.add(PopupRowItem.Action("⚙ 连接我的电脑", "安装或查看自己的 PC 节点", openNodeSettings))
+            }
+            AiRuntimeRoute.RemoteAi,
+            AiRuntimeRoute.RemoteCodex -> {
+                rows.add(PopupRowItem.Action("⚙ 选择远程 PC 节点", "查看在线节点、容量和可用 AI", openNodeSettings))
+            }
+            AiRuntimeRoute.Auto -> {
+                rows.add(PopupRowItem.Action("⚙ 配置我的Key", "保存自己的 API Key 和模型", openSettings))
+                rows.add(PopupRowItem.Action("⚙ 我的电脑 / 节点", "连接自己的 PC 或查看远程节点", openNodeSettings))
+            }
+            AiRuntimeRoute.PlatformAi -> {
+                rows.add(PopupRowItem.Action("⚙ 平台模型设置", "切换平台模型或恢复默认", openSettings))
+            }
+        }
+        if (
+            !codexCliOnly &&
+            selectedRuntimeRoute != AiRuntimeRoute.MyKey &&
+            selectedRuntimeRoute != AiRuntimeRoute.Auto
+        ) {
+            rows.add(PopupRowItem.Action("我的Key设置", "需要自己付费模型时在这里配置", openSettings))
+        }
+        return rows
+    }
+
     private fun showModelPopup(anchor: View) {
         getActionPopup()?.takeIf { it !== modelPopup }?.dismiss()
         modelPopup?.takeIf { it.isShowing }?.dismiss()
         modelPopup = null
 
         val selectableOptions = modelOptions.ifEmpty { listOf(ModelOption(currentModelLabel, selectedAgentName, "")) }
-        val showCustomRow = !codexCliOnly
 
-        // ── 构建带分组信息的行项目（section header + option rows）──────────────────
+        // ── 构建带分组信息的行项目（section header + route rows + option rows）──────
         val items = mutableListOf<PopupRowItem>()
-        // "服务器默认" 不分组，直接排最前
-        selectableOptions.filter { it.agentName == null }.forEach { items.add(PopupRowItem.Option(it)) }
-        // 其余按 provider 分组
-        val grouped = selectableOptions
-            .filter { it.agentName != null }
-            .groupByTo(linkedMapOf()) { opt -> providerGroupTitle(opt.provider) }
-        grouped.forEach { (header, opts) ->
-            if (opts.isNotEmpty()) {
-                items.add(PopupRowItem.Header(header))
-                opts.forEach { items.add(PopupRowItem.Option(it)) }
+        items.add(PopupRowItem.Header("用谁的 AI"))
+        AiRuntimeRoute.quickOptions.forEach { items.add(PopupRowItem.Route(it)) }
+
+        val visibleModels = selectableOptions.filter { it.matchesRuntimeRoute(selectedRuntimeRoute) }
+        if (visibleModels.isNotEmpty()) {
+            items.add(PopupRowItem.Header("模型"))
+            visibleModels.filter { it.agentName == null }.forEach { items.add(PopupRowItem.Option(it)) }
+            val grouped = visibleModels
+                .filter { it.agentName != null }
+                .groupByTo(linkedMapOf()) { opt -> providerGroupTitle(opt.provider) }
+            grouped.forEach { (header, opts) ->
+                if (opts.isNotEmpty()) {
+                    if (selectedRuntimeRoute == AiRuntimeRoute.Auto) items.add(PopupRowItem.Header(header))
+                    opts.forEach { items.add(PopupRowItem.Option(it)) }
+                }
             }
+        }
+        val actionRows = configRowsForRuntimeRoute()
+        if (actionRows.isNotEmpty()) {
+            items.add(PopupRowItem.Header("配置"))
+            items.addAll(actionRows)
         }
 
         val headerHeight = dp(30)
-        val rowHeight = dp(60)
+        val rowHeight = dp(52)
         val availablePopupWidth = (activity.resources.displayMetrics.widthPixels - dp(24)).coerceAtLeast(dp(176))
-        val popupWidth = dp(296).coerceAtMost(availablePopupWidth)
+        val popupWidth = dp(320).coerceAtMost(availablePopupWidth)
         val arrowHeight = dp(8)
 
         // 计算总高度（header 行更矮）
@@ -302,15 +382,10 @@ internal class MainModelActions(
         var dividerCount = 0
         items.forEachIndexed { idx, item ->
             contentHeight += if (item is PopupRowItem.Header) headerHeight else rowHeight
-            // header 上方不加 divider；option 与下一个 option 之间加 divider
             val next = items.getOrNull(idx + 1)
-            if (item is PopupRowItem.Option && next is PopupRowItem.Option) dividerCount++
+            if (item !is PopupRowItem.Header && next !is PopupRowItem.Header && next != null) dividerCount++
         }
-        if (showCustomRow) {
-            if (items.isNotEmpty()) dividerCount++
-            contentHeight += rowHeight
-        }
-        val panelHeight = (contentHeight + dividerCount).coerceAtMost(dp(380))
+        val panelHeight = (contentHeight + dividerCount).coerceAtMost(dp(430))
         val totalHeight = panelHeight + arrowHeight
 
         val root = FrameLayout(activity).apply {
@@ -342,25 +417,41 @@ internal class MainModelActions(
                 is PopupRowItem.Header -> {
                     panel.addView(createSectionHeaderView(item.title))
                 }
+                is PopupRowItem.Route -> {
+                    panel.addView(createModelPopupRow(
+                        item.route.title,
+                        item.route.subtitle,
+                        item.route == selectedRuntimeRoute
+                    ) {
+                        dismissModelPopup(animate = false)
+                        saveRuntimeRouteSelection(item.route)
+                    })
+                    val next = items.getOrNull(idx + 1)
+                    if (next !is PopupRowItem.Header && next != null) {
+                        panel.addView(createPopupDivider(marginStart = dp(16)))
+                    }
+                }
                 is PopupRowItem.Option -> {
                     panel.addView(createModelPopupRow(item.option.label, item.option.subtitle, isModelOptionSelected(item.option)) {
                         dismissModelPopup(animate = false)
                         saveModelSelection(item.option)
                     })
                     val next = items.getOrNull(idx + 1)
-                    if (next is PopupRowItem.Option) {
+                    if (next !is PopupRowItem.Header && next != null) {
+                        panel.addView(createPopupDivider(marginStart = dp(16)))
+                    }
+                }
+                is PopupRowItem.Action -> {
+                    panel.addView(createModelPopupRow(item.title, item.subtitle, false) {
+                        dismissModelPopup(animate = false)
+                        item.action()
+                    })
+                    val next = items.getOrNull(idx + 1)
+                    if (next !is PopupRowItem.Header && next != null) {
                         panel.addView(createPopupDivider(marginStart = dp(16)))
                     }
                 }
             }
-        }
-
-        if (showCustomRow) {
-            if (items.isNotEmpty()) panel.addView(createPopupDivider(marginStart = dp(16)))
-            panel.addView(createModelPopupRow("自定义模型", null, currentModelLabel.startsWith("自定义")) {
-                dismissModelPopup(animate = false)
-                openSettings()
-            })
         }
 
         val anchorLocation = IntArray(2)
@@ -396,7 +487,7 @@ internal class MainModelActions(
             }
         )
         if (!showAbove) {
-            (panel.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
+            (scroll.layoutParams as FrameLayout.LayoutParams).topMargin = arrowHeight
         }
 
         val popup = PopupWindow(root, popupWidth, totalHeight, false).apply {
@@ -638,11 +729,14 @@ internal class MainModelActions(
     private companion object {
         const val PREF_SELECTED_AGENT = "selected_agent_name"
         const val PREF_SELECTED_MODEL_LABEL = "selected_model_label"
+        const val PREF_SELECTED_RUNTIME_ROUTE = "selected_runtime_route"
         const val MODEL_POPUP_REOPEN_SUPPRESS_MS = 260L
     }
 }
 
 private sealed class PopupRowItem {
     data class Header(val title: String) : PopupRowItem()
+    data class Route(val route: AiRuntimeRoute) : PopupRowItem()
     data class Option(val option: ModelOption) : PopupRowItem()
+    data class Action(val title: String, val subtitle: String?, val action: () -> Unit) : PopupRowItem()
 }

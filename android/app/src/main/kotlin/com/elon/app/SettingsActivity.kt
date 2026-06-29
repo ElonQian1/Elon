@@ -370,6 +370,10 @@ class SettingsActivity : AppCompatActivity() {
         val payload = JSONObject()
         var cachedAgentName: String? = null
         var cachedModelLabel = "服务器默认"
+        var cachedRuntimeRoute = "auto"
+        var customApiBaseForLocal: String? = null
+        var customApiKeyForLocal: String? = null
+        var customModelForLocal: String? = null
 
         when (group.checkedRadioButtonId) {
             R.id.modeDefault -> {
@@ -389,6 +393,7 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 cachedAgentName = selected.name
                 cachedModelLabel = selected.label
+                cachedRuntimeRoute = "route_c"
                 payload.put("use_agent", selected.name)
                 payload.put("api_base",  JSONObject.NULL)
                 payload.put("api_key",   JSONObject.NULL)
@@ -404,6 +409,10 @@ class SettingsActivity : AppCompatActivity() {
                     return
                 }
                 cachedModelLabel = "自定义模型"
+                cachedRuntimeRoute = "route_b"
+                customApiBaseForLocal = base
+                customApiKeyForLocal = key
+                customModelForLocal = model
                 payload.put("use_agent", JSONObject.NULL)
                 payload.put("api_base",  base)
                 // 密钥为空则不修改服务端已保存的密钥
@@ -424,7 +433,14 @@ class SettingsActivity : AppCompatActivity() {
                 }
                 val respBody = resp.body?.string() ?: ""
                 if (resp.isSuccessful) {
-                    cacheModelSelection(cachedAgentName, cachedModelLabel)
+                    if (customApiBaseForLocal != null && customModelForLocal != null) {
+                        syncCustomAgentToLocalAi(
+                            base = customApiBaseForLocal.orEmpty(),
+                            key = customApiKeyForLocal.orEmpty(),
+                            model = customModelForLocal.orEmpty()
+                        )
+                    }
+                    cacheModelSelection(cachedAgentName, cachedModelLabel, cachedRuntimeRoute)
                     Toast.makeText(this@SettingsActivity, "✅ 配置已保存", Toast.LENGTH_SHORT).show()
                     setResult(Activity.RESULT_OK)
                     finish()
@@ -447,11 +463,24 @@ class SettingsActivity : AppCompatActivity() {
             .takeIf { it.isNotBlank() && it != "null" }
     }
 
-    private fun cacheModelSelection(agentName: String?, label: String) {
+    private fun syncCustomAgentToLocalAi(base: String, key: String, model: String) {
+        val editor = getSharedPreferences("agent_config", MODE_PRIVATE)
+            .edit()
+            .putString("openai_api_base", base)
+            .putString("openai_api_model", model)
+            .putString("voice_mode_order", "apikey,cli,simple")
+        if (key.isNotEmpty()) {
+            editor.putString("openai_api_key", key)
+        }
+        editor.apply()
+    }
+
+    private fun cacheModelSelection(agentName: String?, label: String, runtimeRoute: String = "auto") {
         prefs.edit().apply {
             if (agentName.isNullOrBlank()) remove("selected_agent_name")
             else putString("selected_agent_name", agentName)
             putString("selected_model_label", label)
+            putString("selected_runtime_route", runtimeRoute)
         }.apply()
     }
 

@@ -53,6 +53,8 @@ class AgentConfigActivity : Activity() {
                 hunyuanApiKey   = prefs.getString("hunyuan_api_key", "") ?: "",
                 qwenVLApiKey    = prefs.getString("qwen_vl_api_key", "") ?: "",
                 openaiApiKey    = prefs.getString("openai_api_key", "") ?: "",
+                openaiApiBase   = prefs.getString("openai_api_base", "") ?: "",
+                openaiModel     = prefs.getString("openai_api_model", "") ?: "",
                 visionProvider  = prefs.getString("vision_provider", "none") ?: "none",
                 websocketPort   = prefs.getInt("websocket_port", 11452),
                 voiceModeOrder  = order,
@@ -528,11 +530,14 @@ class AgentConfigActivity : Activity() {
         }
         val serverUrl = cliServerUrlInput.text.toString().trim()
             .ifBlank { "http://43.139.149.158:8080" }
+        val existing = getConfig()
 
         val config = AgentConfig(
             hunyuanApiKey  = hunyuanKeyInput.text.toString().trim(),
             qwenVLApiKey   = qwenVLKeyInput.text.toString().trim(),
             openaiApiKey   = openaiKeyInput.text.toString().trim(),
+            openaiApiBase  = existing.openaiApiBase,
+            openaiModel    = existing.openaiModel,
             visionProvider = visionProvider,
             websocketPort  = websocketPortInput.text.toString().toIntOrNull() ?: 11452,
             voiceModeOrder = order,
@@ -574,6 +579,8 @@ class AgentConfigActivity : Activity() {
             .putString("hunyuan_api_key",   config.hunyuanApiKey)
             .putString("qwen_vl_api_key",   config.qwenVLApiKey)
             .putString("openai_api_key",    config.openaiApiKey)
+            .putString("openai_api_base",   config.openaiApiBase)
+            .putString("openai_api_model",  config.openaiModel)
             .putString("vision_provider",   config.visionProvider)
             .putInt("websocket_port",        config.websocketPort)
             .putString("voice_mode_order",   config.voiceModeOrder.joinToString(","))
@@ -615,6 +622,8 @@ data class AgentConfig(
     val hunyuanApiKey:  String,
     val qwenVLApiKey:   String = "",
     val openaiApiKey:   String = "",
+    val openaiApiBase:  String = "",
+    val openaiModel:    String = "",
     val visionProvider: String = "none",        // none | qwen | openai
     val websocketPort:  Int    = 11452,
     val voiceModeOrder: List<String> = AgentConfigActivity.DEFAULT_MODE_ORDER, // 回退顺序列表
