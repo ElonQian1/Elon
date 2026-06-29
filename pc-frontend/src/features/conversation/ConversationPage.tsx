@@ -2239,11 +2239,11 @@ function MemberProfilePopover({ member, anchorY, channel, onClose }: {
   const [addingFriend, setAddingFriend] = useState(false)
   const [addMsg, setAddMsg] = useState('')
 
-  // 启动时检查是否已是好友
+  // 启动时检查是否已是好友（只查单个用户，不加载全量列表）
   useEffect(() => {
     if (!member.user_id) return
-    api.get<{ friends?: Array<{ id: string }> }>('/api/me/friends')
-      .then(d => setIsFriend(!!(d.friends ?? []).find(f => f.id === member.user_id)))
+    api.get<{ already_friend?: boolean }>(`/api/me/friends/search?query=${encodeURIComponent(member.user_id)}&search_type=user_id`)
+      .then(d => setIsFriend(!!d.already_friend))
       .catch(() => {})
   }, [member.user_id])
 
