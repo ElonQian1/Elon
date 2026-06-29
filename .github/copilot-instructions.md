@@ -74,7 +74,7 @@
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户
 - **长期主义模块化**：新建源文件 ≤500 行，超 800 行必须拆分，入口文件只做组装。详见 `.github/instructions/modular-architecture.instructions.md`
 - **PC 前端迁移规则**：PC 工作台新功能默认进入 `pc-frontend/`；旧 `server/src/assets/pc_*.html/js/css` 进入收缩期，只做 bugfix、兼容桥接和迁移删除。涉及 `/pc`、`pc_*`、React/Vite/TypeScript、前端构建或发布链路时，必须读取 `.github/instructions/pc-frontend-migration.instructions.md` 和 `docs/pc-frontend-migration.md`。
-- **APP 颜色规范**：任何 APK/APP UI、主题、按钮、卡片、底部导航、状态胶囊或配色调整，必须先读取并遵守 `docs/APP 颜色规范.md`；只有用户明确要求更新颜色规范时，才修改该文件。
+- **APP UI 设计规范**：任何 APK/APP UI、主题、按钮、卡片、底部导航、状态胶囊或配色调整，必须先读取并遵守 `docs/Design.md` 和 `docs/APP 颜色规范.md`；只有用户明确要求更新设计规范时，才修改这些文件。
 - **按图复刻 UI 必须做视觉验收**：用户给截图、红框、手绘稿或要求“按比例复刻”时，AI 完成后必须对照原图检查排版对齐、板块比例、字体层级、间距、触控尺寸和视觉重心；必须通过截图/预览自查，发现按钮偏位、左右/上下不齐、元素比例失真、文字挤压或间距不合理时，先修正再提交/发布，不能把“差不多”的 UI 交付给用户。
 - **APK UI ↔ 网页 UI 同步**：改动 APK 任何 layout XML、Toolbar、Tab、气泡、颜色主题时，必须在同一 commit 同步更新 `server/src/assets/web_page.html`。对照规则见 `.github/instructions/apk-web-ui-sync.instructions.md`
 - **后端运行代码变更**：先 commit + push 到 `origin/main`，再运行 `.\scripts\publish-server.ps1`；脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`。版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。并行任务若发布被后续 main 或服务器版本超越，汇报代码已推送和发布被最新主线接管，不要重复 rebase 重跑。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
@@ -120,6 +120,7 @@
 | `.github/instructions/pc-frontend-migration.instructions.md` | PC 工作台从原生静态 HTML/CSS/JS 迁移到 Vite + React + TypeScript 的规则 |
 | `.github/instructions/apk-web-ui-sync.instructions.md` | APK UI 改动时必须同步更新网页端的对照规则和检查清单 |
 | `docs/pc-frontend-migration.md` | PC 前端迁移路线、模块状态和多 AI 协作约定 |
+| `docs/Design.md` | 项目级设计 DNA、AI UI 执行流程、UI Kit/Figma/MCP 协作规则 |
 | `docs/APP 颜色规范.md` | APP 暗色 UI 配色 token、按钮、卡片、导航、状态胶囊颜色规范 |
 | `docs/system-architecture.md` | 系统架构详细设计、组件交互、数据流 |
 | `docs/ai-agent-workflow.md` | AI代理如何执行代码修改→编译→部署的完整流程 |
