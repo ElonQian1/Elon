@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
+import UserAvatar from '../shell/UserAvatar'
 import styles from './AccountPage.module.css'
 
 interface Balance {
@@ -82,9 +83,7 @@ export default function AccountPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>账号信息</h2>
           <div className={styles.profileCard}>
-            <div className={styles.avatar}>
-              {(user?.nickname ?? user?.account ?? '?')[0]?.toUpperCase()}
-            </div>
+            <UserAvatar user={user} size="panel" showStatus />
             <div className={styles.profileInfo}>
               <strong>{user?.nickname ?? user?.account}</strong>
               <span>{user?.account}</span>

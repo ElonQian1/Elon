@@ -1,0 +1,70 @@
+.avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  overflow: hidden;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #5865f2, #3c4658);
+  color: #fff;
+  font-weight: 900;
+  line-height: 1;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .08);
+}
+
+.rail {
+  width: 48px;
+  height: 48px;
+  font-size: 17px;
+}
+
+.compact {
+  width: 38px;
+  height: 38px;
+  font-size: 15px;
+}
+
+.panel {
+  width: 52px;
+  height: 52px;
+  font-size: 20px;
+}
+
+.image,
+.initial {
+  grid-area: 1 / 1;
+  width: 100%;
+  height: 100%;
+}
+
+.image {
+  display: block;
+  object-fit: cover;
+}
+
+.initial {
+  display: grid;
+  place-items: center;
+}
+
+.hasImage .initial {
+  display: none;
+}
+
+.statusDot {
+  position: absolute;
+  right: -1px;
+  bottom: -1px;
+  width: 13px;
+  height: 13px;
+  border: 3px solid #151619;
+  border-radius: 50%;
+  background: #23a559;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, .16);
+}
+
+.rail .statusDot {
+  right: 1px;
+  bottom: 1px;
+  border-color: var(--rail);
+}

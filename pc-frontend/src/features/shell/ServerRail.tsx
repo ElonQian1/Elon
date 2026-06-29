@@ -1,9 +1,10 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Bot, Boxes, MonitorCog, UsersRound, Mic2, UserRound } from 'lucide-react'
+import { Bot, Boxes, MonitorCog, UsersRound, Mic2 } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { useProjectStore } from '../conversation/useProjectStore'
+import UserAvatar, { userDisplayName } from './UserAvatar'
 import styles from './ServerRail.module.css'
 
 interface RailItem {
@@ -112,15 +113,14 @@ export default function ServerRail() {
       {user && (
         <button
           className={[styles.avatar, styles.userAvatar].join(' ')}
-          title={`${user.nickname ?? user.account} — 账号设置`}
-          onMouseEnter={(e) => showTip(e, user.nickname ?? user.account ?? '账号')}
+          title={`${userDisplayName(user)} — 账号设置`}
+          aria-label={`${userDisplayName(user)} — 账号设置`}
+          onMouseEnter={(e) => showTip(e, userDisplayName(user))}
           onMouseLeave={() => setTooltip(null)}
           onClick={() => navigate('/account')}
           type="button"
         >
-          <span className={styles.icon}>
-            {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? <UserRound aria-hidden="true" size={20} strokeWidth={2.3} />}
-          </span>
+          <UserAvatar user={user} size="rail" showStatus className={styles.railUserAvatar} />
         </button>
       )}
 

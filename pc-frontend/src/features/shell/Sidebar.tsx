@@ -1,7 +1,9 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { LogOut, Settings } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { ModelPickerButton } from '../models/ModelPicker'
 import { getPcLegacyUrl, rememberPcLegacyToken } from './pcLegacyUrl'
+import UserAvatar, { userDisplayName } from './UserAvatar'
 import styles from './Sidebar.module.css'
 
 interface NavItem {
@@ -18,10 +20,12 @@ const NAV_ITEMS: NavItem[] = [
 ]
 
 export default function Sidebar() {
+  const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
   const legacyUrl = getPcLegacyUrl()
+  const displayName = userDisplayName(user)
 
   return (
     <nav className={styles.sidebar}>
@@ -49,12 +53,40 @@ export default function Sidebar() {
 
       <div className={styles.footer}>
         <ModelPickerButton />
-      {user && (
-          <div className={styles.userRow}>
-            <span className={styles.userName}>{user.nickname ?? user.account}</span>
-            <button className={styles.logoutBtn} onClick={logout} title="退出登录">
-              ↩
+        {user && (
+          <div className={styles.userCard}>
+            <button
+              className={styles.userProfile}
+              type="button"
+              onClick={() => navigate('/account')}
+              title="账号中心"
+            >
+              <UserAvatar user={user} size="compact" showStatus />
+              <span className={styles.userCopy}>
+                <strong>{displayName}</strong>
+                <small>{user.account}</small>
+              </span>
             </button>
+            <div className={styles.userActions}>
+              <button
+                className={styles.userActionBtn}
+                type="button"
+                onClick={() => navigate('/account')}
+                title="账号设置"
+                aria-label="账号设置"
+              >
+                <Settings size={16} aria-hidden="true" />
+              </button>
+              <button
+                className={styles.userActionBtn}
+                type="button"
+                onClick={logout}
+                title="退出登录"
+                aria-label="退出登录"
+              >
+                <LogOut size={16} aria-hidden="true" />
+              </button>
+            </div>
           </div>
         )}
         <a
