@@ -181,6 +181,9 @@ internal class ProjectSpacePlayStoreHeaderView(
     }
 
     private fun metricCell(value: CharSequence, label: String, caption: String): LinearLayout {
+        val detail = listOf(label, caption)
+            .filter { it.isNotBlank() }
+            .joinToString(" ")
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
@@ -195,9 +198,9 @@ internal class ProjectSpacePlayStoreHeaderView(
                 ellipsize = TextUtils.TruncateAt.END
             })
             addView(TextView(activity).apply {
-                text = label
-                textSize = 13f
-                includeFontPadding = false
+                text = detail
+                setVisualTextSize(12)
+                includeFontPadding = true
                 setTextColor(Color.parseColor(PLAY_TEXT_SECONDARY))
                 gravity = Gravity.CENTER
                 maxLines = 1
@@ -208,22 +211,6 @@ internal class ProjectSpacePlayStoreHeaderView(
             ).apply {
                 topMargin = dp(7)
             })
-            if (caption.isNotBlank()) {
-                addView(TextView(activity).apply {
-                    text = caption
-                    textSize = 13f
-                    includeFontPadding = false
-                    setTextColor(Color.parseColor(PLAY_TEXT_SECONDARY))
-                    gravity = Gravity.CENTER
-                    maxLines = 1
-                    ellipsize = TextUtils.TruncateAt.END
-                }, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = dp(3)
-                })
-            }
         }
     }
 
