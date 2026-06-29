@@ -522,6 +522,21 @@ export default function ConversationPage() {
                   暂无项目，点击 + 新建
                 </div>
               )}
+              {/* 发现广场入口 */}
+              {projectsLoaded && (
+                <button
+                  className={styles.channelItem}
+                  style={{ marginTop: 8, color: 'var(--text-muted)', borderTop: '1px solid rgba(255,255,255,.05)', paddingTop: 10 }}
+                  onClick={() => navigate('/plaza')}
+                  type="button"
+                >
+                  <span className={styles.channelGlyph}>🔍</span>
+                  <span className={styles.channelMain}>
+                    <strong>发现广场</strong>
+                    <span>浏览公开项目，加入協作</span>
+                  </span>
+                </button>
+              )}
             </>
           )}
         </div>
