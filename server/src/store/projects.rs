@@ -678,6 +678,7 @@ impl Store {
                     banned_until: row.get(7)?,
                     is_muted: row.get::<_, i64>(8)? != 0,
                     is_banned: row.get::<_, i64>(9)? != 0,
+                    channel_permissions: None,
                 })
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
@@ -999,6 +1000,7 @@ fn project_member_entry(
                 banned_until: row.get(7)?,
                 is_muted: row.get::<_, i64>(8)? != 0,
                 is_banned: row.get::<_, i64>(9)? != 0,
+                channel_permissions: None,
             })
         },
     )?;

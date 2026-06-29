@@ -736,6 +736,32 @@ async fn project_space_response(
             apply_project_member_presence(member, online.contains_key(&member.user_id));
         }
     }
+    let visible_channel_ids: Vec<String> = channels.iter().map(|channel| channel.id.clone()).collect();
+    for member in &mut members {
+        let mut channel_permissions = HashMap::new();
+        for channel_id in &visible_channel_ids {
+            match state
+                .store
+                .project_member_channel_permissions(&access.id, channel_id, &member.user_id)
+            {
+                Ok(permissions) => {
+                    channel_permissions.insert(channel_id.clone(), permissions);
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        project_id = %access.id,
+                        channel_id = %channel_id,
+                        member_user_id = %member.user_id,
+                        error = %e,
+                        "failed to load project member channel permissions"
+                    );
+                }
+            }
+        }
+        if !channel_permissions.is_empty() {
+            member.channel_permissions = Some(channel_permissions);
+        }
+    }
     Json(serde_json::json!({
         "project": project,
         "categories": categories,

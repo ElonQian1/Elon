@@ -502,6 +502,8 @@ pub struct ProjectMemberEntry {
     pub banned_until: Option<String>,
     pub is_muted: bool,
     pub is_banned: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub channel_permissions: Option<std::collections::HashMap<String, ProjectChannelPermissions>>,
 }
 
 /// 项目成员持有的角色引用。`role` 仍表示最高/有效角色，`roles` 表示全部叠加角色。

@@ -68,6 +68,8 @@ export interface ProjectMember {
   banned_until?: string | null
   is_muted?: boolean
   is_banned?: boolean
+  channel_permissions?: Record<string, ChannelPermissions>
+  channelPermissions?: Record<string, ChannelPermissions>
 }
 
 export interface UserPresenceSettings {
