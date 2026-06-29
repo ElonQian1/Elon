@@ -5,8 +5,16 @@ import { Stethoscope } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
-import { shortButtonLabel } from '../models/modelUtils'
+import {
+  routeModelButtonCopy,
+  selectedAgentForRuntimeRoute,
+} from '../models/routeModelPolicy'
 import { ModelPickerPopover } from '../models/ModelPicker'
+import {
+  RUNTIME_ROUTE_STORAGE_KEY,
+  normalizeRuntimeRoute,
+} from '../conversation/runtimeRoutes'
+import type { RuntimeRoute } from '../conversation/runtimeRoutes'
 import MarkdownContent from '../markdown/MarkdownContent'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import { formatTime } from '../../lib/utils'
@@ -53,6 +61,7 @@ export default function AiChatPage() {
   const user = useAuthStore((s) => s.user)
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
+  const modelOptions = useModelStore((s) => s.options)
 
   const [conversations, setConversations] = useState<AiConversation[]>([])
   // 初始即创建新会话 ID，保证输入框始终可见（与旧版一致）
@@ -63,6 +72,9 @@ export default function AiChatPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
+  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => normalizeRuntimeRoute(
+    typeof window === 'undefined' ? null : window.localStorage.getItem(RUNTIME_ROUTE_STORAGE_KEY),
+  ))
   const [friends, setFriends] = useState<Friend[]>([])
   const [totalUserCount, setTotalUserCount] = useState(0)
   const [userQuery, setUserQuery] = useState('')
@@ -78,6 +90,14 @@ export default function AiChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const atBottomRef = useRef(true)
+  const modelButtonCopy = useMemo(
+    () => routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent),
+    [runtimeRoute, modelLabel, modelOptions, selectedAgent],
+  )
+
+  useEffect(() => {
+    window.localStorage.setItem(RUNTIME_ROUTE_STORAGE_KEY, runtimeRoute)
+  }, [runtimeRoute])
 
   useEffect(() => {
     let cancelled = false
@@ -178,6 +198,14 @@ export default function AiChatPage() {
     e.preventDefault()
     const text = input.trim()
     if (!text || sending) return
+    if (runtimeRoute === 'route_c2' || runtimeRoute === 'route_c3') {
+      setError('普通聊天暂未绑定远程 PC 节点。请先在节点页选择远程节点，或切回自动/平台AI。')
+      return
+    }
+    if (runtimeRoute === 'route_a' && !onlineNodeId) {
+      setError('已选择本机AI，但当前账号没有在线的本机节点。请启动一龙开发平台，或切回自动/平台AI。')
+      return
+    }
     setInput('')
     setError('')
     if (textareaRef.current) textareaRef.current.style.height = '46px'
@@ -191,7 +219,9 @@ export default function AiChatPage() {
 
     setSending(true)
     try {
-      if (onlineNodeId) {
+      const requestAgent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, runtimeRoute)
+      const useLocalNode = !!onlineNodeId && (runtimeRoute === 'auto' || runtimeRoute === 'route_a')
+      if (useLocalNode) {
         // ── 节点在线：直接在用户电脑上执行 ────────────────────────────────
         const res = await api.post<{ output: string; req_id: string; node_id: string; node_display_name: string; exit_ok: boolean; error?: string }>(
           '/api/me/node/exec',
@@ -210,7 +240,8 @@ export default function AiChatPage() {
         // ── 无节点：走云端 AI 对话 ───────────────────────────────────────
         const res = await api.post<LmChatResponse>('/api/llm/chat', {
           messages: [{ role: 'user', content: text }],
-          agent: selectedAgent || null,
+          agent: requestAgent || null,
+          runtimeRoute,
           conversation_id: convId,
           scope: 'chat_memory',
         })
@@ -281,7 +312,7 @@ export default function AiChatPage() {
             {conversations.find((c) => c.id === activeConvId)?.title ?? '新对话'}
           </span>
           <div className={styles.topbarRight}>
-            <span className={styles.modelBadge}>{shortButtonLabel(modelLabel)}</span>
+            <span className={styles.modelBadge}>{modelButtonCopy.source} · {modelButtonCopy.detail}</span>
             <button className={styles.topbarBtn} type="button"
               title="分享这台电脑的算力" onClick={() => { window.location.href = '/pc/node' }}>
               分享算力
@@ -368,10 +399,11 @@ export default function AiChatPage() {
               ref={modelBtnRef}
               className={styles.modelBtn}
               type="button"
-              title={`AI 模型：${modelLabel || '服务器默认'}`}
+              title={modelButtonCopy.title}
               onClick={() => setShowModelPicker((v) => !v)}
             >
-              {shortButtonLabel(modelLabel)}
+              <span>{modelButtonCopy.source}</span>
+              <strong>{modelButtonCopy.detail}</strong>
             </button>
             <textarea
               ref={textareaRef}
@@ -503,7 +535,12 @@ export default function AiChatPage() {
       </aside>
 
       {showModelPicker && (
-        <ModelPickerPopover anchorRef={modelBtnRef} onClose={() => setShowModelPicker(false)} />
+        <ModelPickerPopover
+          anchorRef={modelBtnRef}
+          runtimeRoute={runtimeRoute}
+          onRuntimeRouteChange={setRuntimeRoute}
+          onClose={() => setShowModelPicker(false)}
+        />
       )}
     </div>
   )

@@ -73,7 +73,7 @@ export function routeModelEmptyState(route: RuntimeRoute): RouteModelEmptyState 
   if (route === 'route_b') {
     return {
       title: '模型在我的Key配置里填写',
-      body: '这里不会再列平台模型。保存 API 地址、API key 和模型名后，项目会用你的 key 跑一龙 CLI 能力。',
+      body: '这里不会再列平台模型。保存 API 地址、API key 和模型名后，聊天和项目开发会优先使用你的 key。',
       actionHref: routeOption.configHref,
       actionLabel: routeOption.configLabel ?? '配置我的Key',
     }

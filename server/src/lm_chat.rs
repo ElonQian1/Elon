@@ -18,14 +18,15 @@ use axum::{
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, path::PathBuf, sync::Arc};
 
 use crate::{
     agent_api_loop::resolve_agent,
     agent_fallback::call_chat_llm_with_default_fallback_options,
     conversation_router::{resolve_system_conversation_route, ConversationEntryKind},
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_auth::{auth_from_headers, json_error},
-    types::AppState,
+    types::{AppState, UserAgentConfig},
     user_memory_extract::extract_and_save_memories_scoped,
 };
 
@@ -41,6 +42,14 @@ pub struct LmChatRequest {
     pub conversation_title: Option<String>,
     /// 可选：聊天归档作用域。默认 phone_control；普通聊天传 chat_memory。
     pub scope: Option<String>,
+    /// 可选：PC 端 AI 来源选择。普通聊天支持 auto / route_b / route_c。
+    #[serde(
+        default,
+        alias = "runtimeRoute",
+        alias = "pcRuntimeRoute",
+        alias = "pc_runtime_route"
+    )]
+    pub runtime_route: Option<String>,
 }
 
 const CHAT_MEMORY_LOCAL_CLI_NOTE: &str = "=== PC 本机 CLI 使用规则 ===
@@ -75,6 +84,37 @@ pub async fn lm_chat_handler(
 
     if req.messages.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "messages 不能为空");
+    }
+    let pc_runtime_route = match req.runtime_route.as_deref() {
+        Some(value) => match PcRuntimeRoutePreference::from_request(value) {
+            Ok(route) => route,
+            Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+        },
+        None => None,
+    };
+    if matches!(
+        pc_runtime_route,
+        Some(
+            PcRuntimeRoutePreference::RouteA
+                | PcRuntimeRoutePreference::RouteC2
+                | PcRuntimeRoutePreference::RouteC3
+        )
+    ) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "普通聊天暂不通过 /api/llm/chat 执行本机或远程 PC 节点；请使用 PC 前端节点通道或切换到我的Key/平台AI",
+        );
+    }
+    let user_agent_workspace = state.get_user_workspace(&user.id);
+    if pc_runtime_route == Some(PcRuntimeRoutePreference::RouteB)
+        && !UserAgentConfig::load(&user_agent_workspace)
+            .map(|cfg| cfg.has_direct_custom_api())
+            .unwrap_or(false)
+    {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "已选择我的Key，但还没有保存 API 地址、API key 和模型名；请先完成配置，或切回自动/平台AI",
+        );
     }
 
     let entry_kind = ConversationEntryKind::from_scope(req.scope.as_deref());
@@ -151,7 +191,12 @@ pub async fn lm_chat_handler(
     }
 
     // ── 4. 调用 LLM ──────────────────────────────────────────────────────────
-    let agent = match resolve_agent(&state, std::path::Path::new(""), req.agent.as_deref()).await {
+    let platform_workspace = PathBuf::new();
+    let agent_workspace = match pc_runtime_route {
+        Some(PcRuntimeRoutePreference::RouteC) => platform_workspace.as_path(),
+        _ => user_agent_workspace.as_path(),
+    };
+    let agent = match resolve_agent(&state, agent_workspace, req.agent.as_deref()).await {
         Ok(a) => a,
         Err(e) => {
             return json_error(
