@@ -1,6 +1,6 @@
 ﻿# 一龙项目 AI 工作入口
 
-最后更新：2026-06-24
+最后更新：2026-06-29
 
 本文件是所有 AI 工具（Codex / Codex CLI / Copilot / Copilot CLI）的共享路由层。
 
@@ -19,6 +19,7 @@
 |---|---|
 | 项目定位、架构、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
+| Rust 格式化、`cargo fmt`、纯格式化拆提交 | `.github/instructions/git-deploy-workflow.instructions.md` 的 Rust 格式化章节 |
 | PowerShell 版本、`powershell`/`pwsh` 选择、PS5 设备兼容 | `docs/powershell-version-policy.md` |
 | 模块化、拆文件、治理巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
 | 后端架构、API、数据流 | `docs/system-architecture.md` 和任务相关源码 |

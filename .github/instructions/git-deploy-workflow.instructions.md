@@ -216,9 +216,9 @@ powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -App
 
 ---
 
-## 🦀 Rust 代码格式化规则（增量自律）
+## 🦀 Rust 代码格式化规则（增量优先，纯格式化拆提交）
 
-> **方针**：不重构历史代码、只对新改动增量规范。改 `.rs` 文件后，**只对自己改过的文件**跑仓库格式化脚本；脚本会按文件所属 crate 的 `Cargo.toml` 读取 edition，再调用 `rustfmt --edition <crate edition>`。
+> **方针**：日常任务不重构历史代码，优先只对新改动增量规范。改 `.rs` 文件后，**只对自己改过的文件**跑仓库格式化脚本；脚本会按文件所属 crate 的 `Cargo.toml` 读取 edition，再调用 `rustfmt --edition <crate edition>`。
 
 ```powershell
 # ✅ 一条命令格式化所有本次改动的 .rs 文件（修改 + 新增全覆盖）
@@ -227,7 +227,7 @@ $rs = @(git diff --name-only) + @(git ls-files --others --exclude-standard) |
 if ($rs) { powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1 -Apply -Files $rs }
 ```
 
-如果用户明确要求做一次全量 Rust 格式化，必须走仓库脚本逐个指定 crate manifest，让 `cargo fmt` 从 `Cargo.toml` 读取 edition：
+如果用户明确要求、任务确实需要，或已经产生一次全量 Rust 格式化，必须走仓库脚本逐个指定 crate manifest，让 `cargo fmt` 从 `Cargo.toml` 读取 edition：
 
 ```powershell
 # 只检查
@@ -236,6 +236,13 @@ powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1
 # 全量写入格式化
 powershell -ExecutionPolicy Bypass -File scripts\format-rust.ps1 -Apply
 ```
+
+全量 Rust 格式化本身不是错误；错误的是把它和业务/文案/逻辑改动混在同一个 commit。正确处理：
+
+1. 最好在业务修改前，从干净 worktree 运行全量格式化，然后单独提交 `style(rust): 全量格式化 Rust 代码`。
+2. 如果已经在任务中产生全量格式化，先用 `git diff --stat` / `git diff --check` 确认它是纯 rustfmt 机械变化；不要为了缩小 diff 回退纯格式化。
+3. 将纯格式化文件或格式化 hunks 单独提交为 `style(rust): ...`；业务、文案、测试语义改动另起提交。
+4. 只有格式化命令用错 edition、生成非 rustfmt 变化、或碰到来源不明的未提交改动/其他代理正在负责的文件时，才停止并报告；不要自动回退别人的改动。
 
 Linux/macOS/服务器 CLI 使用：
 
@@ -248,8 +255,9 @@ bash scripts/format-rust.sh --apply --files server/src/main.rs
 ```
 
 **禁止**：
-- `cargo fmt`（无参数）：会扫描整个 crate 数百个历史文件，产生大量无关 diff，污染 PR 历史
-- 修改其他 AI 负责的 `.rs` 文件的格式
+- 把全量 `cargo fmt` / rustfmt 结果混入业务 commit
+- 在仓库根裸跑 `cargo fmt` 或 `rustfmt` 后继续提交，而不经过仓库脚本/edition 复核
+- 修改来源不明的未提交改动，或覆盖其他 AI 正在负责的 `.rs` 文件
 
 > `scripts/format-rust.* --files <files>` 只格式化指定文件，几百毫秒完成，不触发重编译；脚本会从所属 crate manifest 读取 edition。仓库根目录也有 `rustfmt.toml` 固化 edition，显式参数和 `scripts/format-rust.*` 的 manifest-path 用于避免 AI 或脚本在其他工作目录直接调用 rustfmt 时回退到旧默认 edition。
 
