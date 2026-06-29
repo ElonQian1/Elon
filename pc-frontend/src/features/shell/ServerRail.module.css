@@ -24,11 +24,11 @@
   border: 0;
   border-radius: 50%;
   background: var(--item-color, #27292f);
-  color: var(--text);
+  color: #dfe7f1;
   display: grid;
   place-items: center;
   position: relative;
-  transition: border-radius .14s ease, background .14s ease;
+  transition: border-radius .14s ease, background .14s ease, color .14s ease;
   flex-shrink: 0;
   text-decoration: none;
 }
@@ -54,12 +54,22 @@
 .active {
   border-radius: 16px;
   background: var(--item-hover, var(--green));
+  color: #fff;
+}
+
+.avatar:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
 }
 
 .icon {
-  font-size: 20px;
-  line-height: 1;
+  width: 21px;
+  height: 21px;
+  display: block;
+  line-height: 21px;
+  text-align: center;
   user-select: none;
+  pointer-events: none;
 }
 
 .divider {
@@ -89,7 +99,10 @@
   position: fixed;
   left: 80px;
   z-index: 200;
-  padding: 7px 10px;
+  max-width: min(260px, calc(100vw - 96px));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 8px 10px;
   border-radius: 6px;
   background: #0b0c0f;
   color: #fff;
@@ -97,7 +110,7 @@
   font-weight: 700;
   white-space: nowrap;
   pointer-events: none;
-  box-shadow: 0 8px 24px rgba(0,0,0,.4);
+  box-shadow: 0 10px 26px rgba(0,0,0,.35);
 }
 
 .tooltip::before {

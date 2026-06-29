@@ -14,3 +14,45 @@
   display: flex;
   flex-direction: column;
 }
+
+.nodeBanner {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 6px 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  background: var(--sidebar-2);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.35;
+  flex-shrink: 0;
+}
+
+.nodeBanner span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeBannerIcon {
+  flex: 0 0 auto;
+}
+
+.nodeBannerConnecting {
+  background: rgba(60, 111, 162, .18);
+  color: #9fc7ff;
+}
+
+.nodeBannerSuccess {
+  background: var(--green-soft);
+  color: #dff6e8;
+}
+
+.nodeBannerError {
+  background: rgba(223, 92, 92, .14);
+  color: #ffdede;
+}
