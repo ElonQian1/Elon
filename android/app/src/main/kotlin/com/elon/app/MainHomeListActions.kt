@@ -31,6 +31,8 @@ internal class MainHomeListActions(
     private val compactProjectTitle: () -> String,
     private val formatTime: (Long) -> String,
     private val isTaskRunning: (String, String) -> Boolean,
+    private val isProjectTaskRunning: (AppProject) -> Boolean,
+    private val projectCompletionCount: (AppProject) -> Int,
     private val homeRows: () -> MainHomeRows,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
@@ -166,10 +168,14 @@ internal class MainHomeListActions(
                     }
                 )
                 is HomeChatItem.ProjectItem -> {
+                    val projectWorking = isProjectWorking(item.project)
+                    val completionCount = projectCompletionCount(item.project)
                     val row = if (item.project.isJointDevelopmentProject()) {
                         homeRows().createGroupRow(
                             item.project.toProjectHomeGroup(activity, item.members),
-                            showProjectMarker = true
+                            showProjectMarker = true,
+                            projectWorking = projectWorking,
+                            projectCompletionCount = completionCount
                         ) {
                             clearFriendSearchState()
                             openFriendPageProject(item.index)
@@ -177,7 +183,9 @@ internal class MainHomeListActions(
                     } else {
                         homeRows().createFriendRow(
                             item.project.toProjectHomeFriend(),
-                            showProjectMarker = true
+                            showProjectMarker = true,
+                            projectWorking = projectWorking,
+                            projectCompletionCount = completionCount
                         ) {
                             clearFriendSearchState()
                             openFriendPageProject(item.index)
@@ -565,8 +573,12 @@ internal class MainHomeListActions(
 
     private fun isProjectWorking(project: AppProject): Boolean {
         if (projectHasRunningStatus(project)) return true
+        if (isProjectTaskRunning(project)) return true
+        val projectIds = project.projectTaskBadgeIds()
         return project.conversations.any { conversation ->
-            !conversation.ended && isTaskRunning(project.projectSpaceId(), conversation.id)
+            !conversation.ended && projectIds.any { projectId ->
+                !projectId.isNullOrBlank() && isTaskRunning(projectId, conversation.id)
+            }
         }
     }
 

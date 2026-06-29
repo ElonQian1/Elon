@@ -151,6 +151,9 @@ internal fun notifyBackgroundTaskCompleted(
     conversationId: String? = null
 ) {
     markTaskCompletionNotified(prefs, projectId, conversationId)
+    if (success) {
+        markProjectTaskCompletionBadge(prefs, projectId)
+    }
     val count = prefs.getInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0) + 1
     prefs.edit().putInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
     setTaskLauncherBadgeCount(context, count)
@@ -169,6 +172,7 @@ internal fun notifyProjectTaskDoneFromGlobalWs(
     if (wasTaskCompletionRecentlyNotified(prefs, projectId, conversationId)) return
 
     markTaskCompletionNotified(prefs, projectId, conversationId)
+    markProjectTaskCompletionBadge(prefs, projectId)
     val count = prefs.getInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, 0).coerceAtLeast(0) + 1
     prefs.edit().putInt(TaskWorkService.PREF_COMPLETED_TASK_BADGE_COUNT, count).apply()
     setTaskLauncherBadgeCount(context, count)

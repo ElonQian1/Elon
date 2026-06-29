@@ -83,7 +83,10 @@ internal class MainTaskActions(
             persistActiveWork = conversationTaskRegistryActions()::persistActiveWork,
             updateConversationTaskFromService =
                 conversationTaskRegistryActions()::updateConversationTaskFromService,
-            drainNextQueuedMessage = drainNextQueuedMessage
+            drainNextQueuedMessage = drainNextQueuedMessage,
+            markProjectTaskCompleted = { projectId ->
+                markProjectTaskCompletionBadge(prefs, projectId)
+            }
         )
     }
 

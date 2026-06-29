@@ -308,6 +308,7 @@ class MainActivity : AppCompatActivity() {
         gws.addListener(globalWsListener)
         gws.start(this)
         if (::binding.isInitialized) {
+            homeListActions.renderConversationList()
             profileQuickActions.refreshProfileSummary()
             if (::chatAdapter.isInitialized) chatAdapter.refreshUserProfile()
         }
@@ -412,6 +413,9 @@ class MainActivity : AppCompatActivity() {
                 is GlobalWsEvent.Typing -> {
                     // 好友正在输入，通知聊天界面显示"正在输入..."
                     friendChatActions.handleTypingEvent(event.fromUserId)
+                }
+                is GlobalWsEvent.ProjectTaskDone -> {
+                    homeListActions.renderConversationList()
                 }
                 else -> Unit
             }
@@ -893,17 +897,31 @@ class MainActivity : AppCompatActivity() {
                 val key = conversationTaskRegistryActions.conversationTaskKey(projectId, conversationId)
                 s.runningConversationTasks.containsKey(key)
             },
+            isProjectTaskRunning = { project ->
+                val ids = project.projectTaskBadgeIds().mapNotNull { it?.takeIf(String::isNotBlank) }.toSet()
+                s.runningConversationTasks.values.any { task -> task.projectId in ids }
+            },
+            projectCompletionCount = { project ->
+                projectTaskCompletionBadgeCount(prefs, project.projectTaskBadgeIds())
+            },
             homeRows = { homeRows() },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground,
             showCreateProjectDialog = { projectActions.showCreateProjectDialog() },
             showProjectPlaza = { navigationController.showProjectPlaza() },
             openFriendPageProject = { index ->
+                s.projects.getOrNull(index)?.let(::clearProjectTaskCompletionBadge)
                 navigationController.captureProjectEntryReturnTarget()
                 conversationOpenActions.openProject(index)
             },
-            openProject = { index -> openProjectSpaceForProject(index, true) },
-            openProjectConversations = { index -> openProjectConversationsForProject(index, true) },
+            openProject = { index ->
+                s.projects.getOrNull(index)?.let(::clearProjectTaskCompletionBadge)
+                openProjectSpaceForProject(index, true)
+            },
+            openProjectConversations = { index ->
+                s.projects.getOrNull(index)?.let(::clearProjectTaskCompletionBadge)
+                openProjectConversationsForProject(index, true)
+            },
             showProjectActions = { index, anchor -> projectActions.showProjectActions(index, anchor) },
             showAddFriendDialog = { friendActions.showAddFriendDialog() },
             openFriend = { friend ->
@@ -927,6 +945,12 @@ class MainActivity : AppCompatActivity() {
             friendId = friendChatActions.currentFriend()?.id,
             groupId = groupChatActions.currentGroup()?.id
         )
+    }
+
+    private fun clearProjectTaskCompletionBadge(project: AppProject) {
+        if (clearProjectTaskCompletionBadges(prefs, project.projectTaskBadgeIds())) {
+            homeListActions.renderConversationList()
+        }
     }
 
     private fun startSocialSummaryPolling() {

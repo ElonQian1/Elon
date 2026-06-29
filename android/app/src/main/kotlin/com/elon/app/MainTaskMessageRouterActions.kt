@@ -13,7 +13,8 @@ internal class MainTaskMessageRouterActions(
     private val removeConversationTask: (String?, String?, String?) -> ConversationTaskState?,
     private val persistActiveWork: () -> Unit,
     private val updateConversationTaskFromService: (String?, String?, String?, Boolean?, Boolean?) -> ConversationTaskState?,
-    private val drainNextQueuedMessage: (String?, String?) -> Unit
+    private val drainNextQueuedMessage: (String?, String?) -> Unit,
+    private val markProjectTaskCompleted: (String?) -> Unit = {}
 ) {
     fun appendTaskMessage(
         raw: String,
@@ -25,7 +26,8 @@ internal class MainTaskMessageRouterActions(
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
         val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
         val key = taskKey(traceId, projectId, conversationId)
-        if (key == activeConversationTaskKey() && isProjectConversationVisible()) {
+        val activeVisible = key == activeConversationTaskKey() && isProjectConversationVisible()
+        if (activeVisible) {
             appendActiveMessage(raw)
         } else {
             val effectiveIsDevelopment = isDevelopment
@@ -34,6 +36,9 @@ internal class MainTaskMessageRouterActions(
             appendBackgroundTaskMessage(raw, key, effectiveIsDevelopment)
         }
         if (type == "done" || type == "error") {
+            if (type == "done" && !activeVisible) {
+                markProjectTaskCompleted(projectId ?: projectIdFromTaskKey(key))
+            }
             removeConversationTask(traceId, projectId, conversationId)
             persistActiveWork()
             drainNextQueuedMessage(projectId, conversationId)
@@ -49,5 +54,11 @@ internal class MainTaskMessageRouterActions(
                 conversationTaskKey(projectId, conversationId)
             else -> activeConversationTaskKey()
         }
+    }
+
+    private fun projectIdFromTaskKey(key: String?): String? {
+        return key
+            ?.substringBefore('\u001F', "")
+            ?.takeIf { it.isNotBlank() }
     }
 }

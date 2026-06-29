@@ -74,6 +74,8 @@ internal class MainHomeRows(
     fun createFriendRow(
         friend: AppFriend,
         showProjectMarker: Boolean = false,
+        projectWorking: Boolean = false,
+        projectCompletionCount: Int = 0,
         onClick: () -> Unit
     ): View {
         val row = LinearLayout(activity).apply {
@@ -92,7 +94,7 @@ internal class MainHomeRows(
             setOnClickListener { onClick() }
         }
 
-        row.addView(createFriendAvatar(friend, showProjectMarker))
+        row.addView(createFriendAvatar(friend, showProjectMarker, projectCompletionCount))
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -117,7 +119,7 @@ internal class MainHomeRows(
         })
         row.addView(middle)
 
-        createHomeRowTrailing(friend.lastMessageAt, showProjectMarker)?.let { trailing ->
+        createHomeRowTrailing(friend.lastMessageAt, showProjectMarker, projectWorking)?.let { trailing ->
             row.addView(trailing)
         }
         return row
@@ -126,6 +128,8 @@ internal class MainHomeRows(
     fun createGroupRow(
         group: AppGroup,
         showProjectMarker: Boolean = false,
+        projectWorking: Boolean = false,
+        projectCompletionCount: Int = 0,
         onClick: () -> Unit
     ): View {
         val row = LinearLayout(activity).apply {
@@ -144,7 +148,7 @@ internal class MainHomeRows(
             setOnClickListener { onClick() }
         }
 
-        row.addView(createGroupAvatar(group, showProjectMarker))
+        row.addView(createGroupAvatar(group, showProjectMarker, projectCompletionCount))
 
         val middle = LinearLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
@@ -169,13 +173,13 @@ internal class MainHomeRows(
         })
         row.addView(middle)
 
-        createHomeRowTrailing(group.lastMessageAt ?: group.createdAt, showProjectMarker)?.let { trailing ->
+        createHomeRowTrailing(group.lastMessageAt ?: group.createdAt, showProjectMarker, projectWorking)?.let { trailing ->
             row.addView(trailing)
         }
         return row
     }
 
-    private fun createHomeRowTrailing(time: Long?, showProjectMarker: Boolean): View? {
+    private fun createHomeRowTrailing(time: Long?, showProjectMarker: Boolean, projectWorking: Boolean): View? {
         if (time == null && !showProjectMarker) return null
 
         return LinearLayout(activity).apply {
@@ -206,21 +210,48 @@ internal class MainHomeRows(
             }
 
             if (showProjectMarker) {
-                addView(createProjectMarkerIcon(), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
+                addView(createProjectMarkerIcon(projectWorking), LinearLayout.LayoutParams(dp(42), dp(42)).apply {
                     topMargin = if (time == null) 0 else dp(2)
                 })
             }
         }
     }
 
-    private fun createProjectMarkerIcon(): ImageView {
+    private fun createProjectMarkerIcon(projectWorking: Boolean): ImageView {
         return ImageView(activity).apply {
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
             scaleType = ImageView.ScaleType.FIT_CENTER
             translationX = dp(PROJECT_MARKER_VISUAL_OFFSET_DP).toFloat()
             setImageResource(R.drawable.ic_home_project_marker)
             imageTintList = ColorStateList.valueOf(Color.parseColor(HOME_LIST_PREVIEW_COLOR))
+            if (projectWorking) startProjectMarkerWorkingPulse(this)
         }
+    }
+
+    private fun startProjectMarkerWorkingPulse(icon: ImageView) {
+        val idleColor = Color.parseColor(HOME_LIST_PREVIEW_COLOR)
+        val activeColor = Color.parseColor("#F2C94C")
+        val animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            duration = 1050L
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.RESTART
+            interpolator = LinearInterpolator()
+            addUpdateListener { valueAnimator ->
+                val pulse = sin(Math.PI * valueAnimator.animatedFraction).toFloat()
+                icon.imageTintList = ColorStateList.valueOf(blendColor(idleColor, activeColor, pulse))
+                val scale = 0.94f + 0.06f * pulse
+                icon.scaleX = scale
+                icon.scaleY = scale
+                icon.alpha = 0.58f + 0.42f * pulse
+            }
+        }
+        icon.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+            override fun onViewAttachedToWindow(v: View) = Unit
+            override fun onViewDetachedFromWindow(v: View) {
+                animator.cancel()
+            }
+        })
+        animator.start()
     }
 
     private fun createHomeChatTitle(title: String): TextView {
@@ -564,7 +595,11 @@ internal class MainHomeRows(
         }
     }
 
-    private fun createFriendAvatar(friend: AppFriend, showProjectMarker: Boolean = false): View {
+    private fun createFriendAvatar(
+        friend: AppFriend,
+        showProjectMarker: Boolean = false,
+        projectCompletionCount: Int = 0
+    ): View {
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
@@ -576,8 +611,9 @@ internal class MainHomeRows(
                 layoutParams = FrameLayout.LayoutParams(size, size)
             }
             addView(avatar)
-            if (friend.unreadCount > 0) {
-                addView(createUnreadBadge(friend.unreadCount))
+            val unreadCount = projectCompletionCount.takeIf { it > 0 } ?: friend.unreadCount
+            if (unreadCount > 0) {
+                addView(createUnreadBadge(unreadCount))
             }
             if (showProjectMarker) {
                 addView(createAvatarCornerDot("#F2C94C"))
@@ -587,7 +623,11 @@ internal class MainHomeRows(
         }
     }
 
-    private fun createGroupAvatar(group: AppGroup, showProjectMarker: Boolean = false): View {
+    private fun createGroupAvatar(
+        group: AppGroup,
+        showProjectMarker: Boolean = false,
+        projectCompletionCount: Int = 0
+    ): View {
         val size = dp(44)
         return FrameLayout(activity).apply {
             layoutParams = LinearLayout.LayoutParams(size, size)
@@ -599,8 +639,9 @@ internal class MainHomeRows(
                 if (group.members.isEmpty()) createGroupFallbackAvatar(size)
                 else createGroupMemberGrid(group.members.take(9), size)
             )
-            if (group.unreadCount > 0) {
-                addView(createUnreadBadge(group.unreadCount))
+            val unreadCount = projectCompletionCount.takeIf { it > 0 } ?: group.unreadCount
+            if (unreadCount > 0) {
+                addView(createUnreadBadge(unreadCount))
             }
             if (showProjectMarker) {
                 addView(createAvatarCornerDot("#F2C94C"))

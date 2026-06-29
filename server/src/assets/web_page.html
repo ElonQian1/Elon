@@ -443,6 +443,21 @@
       -webkit-mask: var(--project-marker-url) center / contain no-repeat;
       mask: var(--project-marker-url) center / contain no-repeat;
     }
+    .conversation-item .project-marker.working {
+      animation: project-marker-work-pulse 1.05s linear infinite;
+    }
+    @keyframes project-marker-work-pulse {
+      0%, 100% {
+        background: var(--ink-list-preview);
+        opacity: 0.58;
+        transform: translateX(12px) scale(0.94);
+      }
+      50% {
+        background: var(--pull-filter-project);
+        opacity: 1;
+        transform: translateX(12px) scale(1);
+      }
+    }
     .conversation-item .item-delete {
       display: none;
       flex-shrink: 0;
@@ -3718,6 +3733,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
 
   // ====== 状态 ======
   const TOKEN_KEY = 'lodex_token';
+  const PROJECT_TASK_COMPLETION_BADGES_KEY = 'elon_project_task_completion_badges_v1';
   let token = localStorage.getItem(TOKEN_KEY) || localStorage.getItem('elon_token') || '';
   let authMode = 'login';
   let currentUser = null;
@@ -4166,6 +4182,67 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       || normalized.includes('正在')
       || normalized.includes('处理中')
       || normalized.includes('工作中');
+  }
+  function projectTaskBadgeIds(project) {
+    const ids = [
+      project && project.id,
+      project && project.project_id,
+      project && project.projectId,
+      project && project.collaboration_project_id,
+      project && project.collaborationProjectId
+    ];
+    return Array.from(new Set(ids.map((id) => String(id || '').trim()).filter(Boolean)));
+  }
+  function loadProjectTaskCompletionBadges() {
+    try {
+      return JSON.parse(localStorage.getItem(PROJECT_TASK_COMPLETION_BADGES_KEY) || '{}') || {};
+    } catch {
+      return {};
+    }
+  }
+  function saveProjectTaskCompletionBadges(badges) {
+    localStorage.setItem(PROJECT_TASK_COMPLETION_BADGES_KEY, JSON.stringify(badges || {}));
+  }
+  function projectTaskCompletionBadgeCount(project) {
+    const badges = loadProjectTaskCompletionBadges();
+    return Math.min(99, projectTaskBadgeIds(project).reduce((sum, id) => {
+      return sum + Math.max(0, Number(badges[id] || 0));
+    }, 0));
+  }
+  function markProjectTaskCompletionBadge(projectId) {
+    const id = String(projectId || '').trim();
+    if (!id) return;
+    const badges = loadProjectTaskCompletionBadges();
+    badges[id] = Math.min(99, Math.max(0, Number(badges[id] || 0)) + 1);
+    saveProjectTaskCompletionBadges(badges);
+  }
+  function clearProjectTaskCompletionBadge(project) {
+    const ids = projectTaskBadgeIds(project);
+    if (!ids.length) return;
+    const badges = loadProjectTaskCompletionBadges();
+    let changed = false;
+    ids.forEach((id) => {
+      if (Object.prototype.hasOwnProperty.call(badges, id)) {
+        delete badges[id];
+        changed = true;
+      }
+    });
+    if (changed) saveProjectTaskCompletionBadges(badges);
+  }
+  function projectIsWorkingForHome(project) {
+    const currentIds = projectTaskBadgeIds(currentProject);
+    if (busy && currentIds.length) {
+      const projectIds = projectTaskBadgeIds(project);
+      if (projectIds.some((id) => currentIds.includes(id))) return true;
+    }
+    return isWorkingStatus(
+      project && (
+        project.stage ||
+        project.status ||
+        project.last_task_status ||
+        project.lastTaskStatus
+      )
+    );
   }
   function formatChatTimelineLabel(ms) {
     if (!ms) return '';
@@ -4627,6 +4704,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     } else {
       avatar.textContent = avatarInitial(projectTitleOf(project), '项');
     }
+    const unread = projectTaskCompletionBadgeCount(project);
+    if (unread > 0) {
+      const badge = document.createElement('span');
+      badge.className = 'avatar-badge';
+      badge.textContent = unread > 99 ? '99+' : String(unread);
+      avatar.appendChild(badge);
+    }
     return avatar;
   }
 
@@ -4644,7 +4728,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     if (item.kind === 'project') {
       const marker = document.createElement('span');
-      marker.className = 'project-marker';
+      marker.className = 'project-marker' + (projectIsWorkingForHome(item.data) ? ' working' : '');
       marker.style.setProperty('--project-marker-url', 'url("data:image/png;base64,__HOME_PROJECT_MARKER_PNG_B64__")');
       marker.setAttribute('aria-hidden', 'true');
       trailing.appendChild(marker);
@@ -4680,7 +4764,11 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     row.addEventListener('click', () => {
       if (item.kind === 'friend') openFriendChat(data);
       else if (item.kind === 'group') openGroupChat(data);
-      else selectProject(data);
+      else {
+        clearProjectTaskCompletionBadge(data);
+        renderConversationList();
+        selectProject(data);
+      }
     });
     return row;
   }
@@ -6351,6 +6439,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         loadFriendMessages(false).catch(() => {});
       }
     } else if (data.type === 'project_task_done') {
+      markProjectTaskCompletionBadge(data.projectId || data.project_id);
+      renderConversationList();
       loadProjects().catch(() => {});
     }
   }
