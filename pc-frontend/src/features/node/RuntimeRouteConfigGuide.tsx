@@ -42,7 +42,7 @@ const ROUTE_CONFIG_GUIDES: Record<RouteConfigKey, RouteConfigGuide> = {
       '节点工作区、Git 和开发环境就绪',
       '节点详情里的本机 API key 或一龙 AI 能力显示就绪',
     ],
-    target: '服务器节点大厅中的远程 PC 节点',
+    target: '服务器节点大厅中的其他用户 PC 节点',
   },
   route_c3: {
     code: '远程Codex',
@@ -53,7 +53,7 @@ const ROUTE_CONFIG_GUIDES: Record<RouteConfigKey, RouteConfigGuide> = {
       '节点工作区、Git 和开发环境就绪',
       '节点详情里的本机AI显示就绪',
     ],
-    target: '服务器节点大厅中的远程 PC 节点',
+    target: '服务器节点大厅中的其他用户 PC 节点',
   },
 }
 

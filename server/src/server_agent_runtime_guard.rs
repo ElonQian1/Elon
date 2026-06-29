@@ -215,21 +215,21 @@ impl ServerRuntimeAdmissionError {
             Self::TooManyGlobalConcurrent {
                 max_concurrent_global,
             } => format!(
-                "Route C 远程模型当前全局任务过多：平台最多同时运行 {max_concurrent_global} 个请求，请稍后重试"
+                "平台AI当前全局任务过多：平台最多同时运行 {max_concurrent_global} 个请求，请稍后重试"
             ),
             Self::TooManyConcurrent {
                 max_concurrent_per_user,
             } => format!(
-                "Route C 远程模型任务并发过高：每个用户最多同时运行 {max_concurrent_per_user} 个请求"
+                "平台AI任务并发过高：每个用户最多同时运行 {max_concurrent_per_user} 个请求"
             ),
             Self::RateLimited {
                 max_requests_per_minute,
                 retry_after_secs,
             } => format!(
-                "Route C 远程模型请求过快：每分钟最多 {max_requests_per_minute} 次，请 {retry_after_secs} 秒后重试"
+                "平台AI请求过快：每分钟最多 {max_requests_per_minute} 次，请 {retry_after_secs} 秒后重试"
             ),
             Self::DuplicateRecent { retry_after_secs } => format!(
-                "Route C 远程模型检测到相同请求刚刚提交，请 {retry_after_secs} 秒后重试或等待当前任务结果"
+                "平台AI检测到相同请求刚刚提交，请 {retry_after_secs} 秒后重试或等待当前任务结果"
             ),
         }
     }
@@ -358,7 +358,7 @@ pub(crate) fn admission_availability(
         return ServerRuntimeAdmissionAvailability {
             ready: false,
             reason: Some("global_concurrency_limited"),
-            public_message: Some("Route C 远程模型全局并发已满"),
+            public_message: Some("平台AI全局并发已满"),
             retry_after_secs: Some(1),
         };
     }
@@ -366,7 +366,7 @@ pub(crate) fn admission_availability(
         return ServerRuntimeAdmissionAvailability {
             ready: false,
             reason: Some("user_concurrency_limited"),
-            public_message: Some("当前用户 Route C 远程模型并发已满"),
+            public_message: Some("当前用户平台AI并发已满"),
             retry_after_secs: Some(1),
         };
     }
@@ -374,7 +374,7 @@ pub(crate) fn admission_availability(
         return ServerRuntimeAdmissionAvailability {
             ready: false,
             reason: Some("rate_limited"),
-            public_message: Some("当前用户 Route C 远程模型请求频率已达上限"),
+            public_message: Some("当前用户平台AI请求频率已达上限"),
             retry_after_secs: snapshot.rate_limit_retry_after_secs,
         };
     }

@@ -321,7 +321,7 @@ fn server_runtime_agent_usage_mode_allowed(agent: &AgentConfig) -> bool {
 }
 
 fn unsupported_agent_usage_mode_message() -> &'static str {
-    "Route C 服务器模型只允许使用平台 server_api_key agent；当前 agent 不是服务器 API Key 模式，请由平台运营调整默认 agent 或 allowlist。"
+    "平台AI只允许使用平台 API key 模型通道；当前模型通道不是平台 API key 模式，请由运营调整默认通道或允许列表。"
 }
 
 fn validate_runtime_messages(messages: &[Value]) -> Result<(), &'static str> {

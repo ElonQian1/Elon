@@ -274,7 +274,7 @@ fn local_project_registration_readiness(
     }
     if !inspect.codex_available && !inspect.copilot_available {
         warnings.push(
-            "本机未检测到 Codex/Copilot CLI，开发任务会优先走 Route B/C 模型能力。".to_string(),
+            "本机未检测到 Codex/Copilot，开发任务会优先使用我的 API key 或平台AI。".to_string(),
         );
     }
 
@@ -745,8 +745,9 @@ fn inspect_agent_runtime_freshness(project_root: &Path) -> AgentRuntimeFreshness
     let Ok(text) = std::fs::read_to_string(&script) else {
         return AgentRuntimeFreshness {
             status: "missing".to_string(),
-            summary: "项目缺少 scripts\\elon-agent.ps1，Route B/C 自研运行时需要重新生成项目脚本。"
-                .to_string(),
+            summary:
+                "项目缺少 scripts\\elon-agent.ps1，我的Key/平台AI运行能力需要重新生成项目脚本。"
+                    .to_string(),
             script_path,
             has_elon_agent: false,
             has_command_budget: false,
@@ -776,7 +777,7 @@ fn inspect_agent_runtime_freshness(project_root: &Path) -> AgentRuntimeFreshness
     } else {
         AgentRuntimeFreshness {
             status: "stale".to_string(),
-            summary: "项目内 scripts\\elon-agent.ps1 是旧版模板，缺少 run_command 预算或输出截断保护；建议重新生成后再长期使用 Route B/C。".to_string(),
+            summary: "项目内 scripts\\elon-agent.ps1 是旧版模板，缺少 run_command 预算或输出截断保护；建议重新生成后再长期使用我的Key/平台AI。".to_string(),
             script_path,
             has_elon_agent: true,
             has_command_budget,
@@ -1014,8 +1015,9 @@ mod tests {
         project.detected_files.clear();
         project.agent_runtime = AgentRuntimeFreshness {
             status: "missing".to_string(),
-            summary: "项目缺少 scripts\\elon-agent.ps1，Route B/C 自研运行时需要重新生成项目脚本。"
-                .to_string(),
+            summary:
+                "项目缺少 scripts\\elon-agent.ps1，我的Key/平台AI运行能力需要重新生成项目脚本。"
+                    .to_string(),
             script_path: "C:\\demo\\scripts\\elon-agent.ps1".to_string(),
             has_elon_agent: false,
             has_command_budget: false,
@@ -1041,7 +1043,7 @@ mod tests {
         assert!(readiness
             .warnings
             .iter()
-            .any(|warning| warning.contains("Route B/C")));
+            .any(|warning| warning.contains("我的Key/平台AI")));
         assert!(readiness
             .warnings
             .iter()

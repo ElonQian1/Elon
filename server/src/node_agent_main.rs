@@ -3468,7 +3468,7 @@ struct SaveOpenAiKeyReq {
     base_url: Option<String>,
 }
 
-/// POST /api/save-openai-key — 保存 Route B / Codex CLI 共用的 OpenAI-compatible 配置。
+/// POST /api/save-openai-key — 保存本机 API key / Codex 共用的 OpenAI-compatible 配置。
 async fn admin_save_openai_key(
     axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
     axum::Json(req): axum::Json<SaveOpenAiKeyReq>,
@@ -3493,10 +3493,10 @@ async fn admin_save_openai_key(
         }
     };
 
-    // 当前进程立即生效：Route B 内置 runtime 和 Route A CLI 子进程都会继承。
+    // 当前进程立即生效：本机 API key 运行方式和 Codex 子进程都会继承。
     node_agent_api_runtime_config::apply_to_process(&save);
 
-    // 持久化到启动器实际读取的 _internal/node-agent.env，避免重启后 Route B 丢配置。
+    // 持久化到启动器实际读取的 _internal/node-agent.env，避免重启后本机 API key 配置丢失。
     if let Some(env_file) = node_agent_env_file_path() {
         if let Err(error) = node_agent_api_runtime_config::persist_to_env_file(&env_file, &save) {
             return (
@@ -3512,9 +3512,9 @@ async fn admin_save_openai_key(
     let status = node_agent_api_runtime_config::status_from_env();
     let contract = node_agent_api_runtime_config::tool_contract();
     let msg = if status.ready {
-        "Route B 本机 API runtime 已就绪，Codex CLI 也会继承该 API Key"
+        "我的 API key 已就绪，Codex 也会继承该 API key"
     } else {
-        "API Key 已保存；Route B 还需要配置模型后才会就绪"
+        "API key 已保存；还需要配置模型后才会就绪"
     };
     (
         StatusCode::OK,

@@ -4,7 +4,7 @@
  * 策略：
  *  - 每 6s 轮询 /api/me/nodes
  *  - 无节点：展示"下载 → 安装 → 启动"3 步引导 + 下载按钮
- *  - 节点在线：绿色已就绪，提供"进入本机开发频道"按钮（这是真正能执行 CLI 的地方）
+ *  - 节点在线：绿色已就绪，提供"进入本机开发频道"按钮
  *  - 不影响当前对话内容，以浮动横幅形式挂在聊天区顶部
  */
 import { useEffect, useState, useRef } from 'react'
@@ -76,9 +76,9 @@ export default function NodeStatusBanner({ onlineNodeId: extNodeId, onlineNodeNa
 
   if (status === 'online' && !expanded) {
     return (
-      <div className={styles.pill} title={`本机 CLI 已就绪：${nodeDisplayName}`}>
+      <div className={styles.pill} title={`本机AI已就绪：${nodeDisplayName}`}>
         <span className={styles.pillDot} />
-        <span className={styles.pillText}>本机 CLI 已就绪</span>
+        <span className={styles.pillText}>本机AI已就绪</span>
         <button className={styles.pillAction} type="button" onClick={openDevChannel}>
           进入开发频道 →
         </button>

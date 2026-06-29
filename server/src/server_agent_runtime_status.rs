@@ -107,19 +107,19 @@ fn agent_blocking_reason(agent_status: &'static str) -> ServerAgentRuntimeBlocki
         "agent_not_allowed" => ServerAgentRuntimeBlockingReason {
             code: "agent_policy_blocked",
             scope: "agentPolicy",
-            message: "Route C 服务器模型不允许当前 agent 策略".to_string(),
+            message: "平台AI不允许当前模型通道策略".to_string(),
             retry_after_secs: None,
         },
         "unsupported_agent_usage_mode" => ServerAgentRuntimeBlockingReason {
             code: "no_server_api_key_agent",
             scope: "agentPolicy",
-            message: "Route C 只允许 server_api_key agent；当前 agent 模式不会被调用".to_string(),
+            message: "平台AI只允许平台 API key 模式；当前模型通道不会被调用".to_string(),
             retry_after_secs: None,
         },
         _ => ServerAgentRuntimeBlockingReason {
             code: "agent_unavailable",
             scope: "agent",
-            message: "服务器未配置可用 Route C agent".to_string(),
+            message: "服务器未配置可用的平台AI模型通道".to_string(),
             retry_after_secs: None,
         },
     }
@@ -132,19 +132,19 @@ fn budget_blocking_reason(
         "user_exhausted" => Some(ServerAgentRuntimeBlockingReason {
             code: "user_budget_exhausted",
             scope: "budget",
-            message: "Route C 今日个人额度已用完".to_string(),
+            message: "平台AI今日个人额度已用完".to_string(),
             retry_after_secs: Some(budget.reset_after_secs),
         }),
         "exhausted" => Some(ServerAgentRuntimeBlockingReason {
             code: "platform_budget_exhausted",
             scope: "budget",
-            message: "Route C 今日平台预算已用完".to_string(),
+            message: "平台AI今日平台预算已用完".to_string(),
             retry_after_secs: Some(budget.reset_after_secs),
         }),
         "unavailable" => Some(ServerAgentRuntimeBlockingReason {
             code: "budget_unavailable",
             scope: "budget",
-            message: "Route C 预算系统暂时不可用".to_string(),
+            message: "平台AI预算系统暂时不可用".to_string(),
             retry_after_secs: Some(budget.reset_after_secs),
         }),
         _ => None,
@@ -162,7 +162,7 @@ fn admission_blocking_reason(
         scope: "admission",
         message: admission_availability
             .public_message
-            .unwrap_or("Route C 当前容量受限")
+            .unwrap_or("平台AI当前容量受限")
             .to_string(),
         retry_after_secs: admission_availability.retry_after_secs,
     })
@@ -269,7 +269,7 @@ mod tests {
         let admission = ServerRuntimeAdmissionAvailability {
             ready: false,
             reason: Some("rate_limited"),
-            public_message: Some("当前用户 Route C 远程模型请求频率已达上限"),
+            public_message: Some("当前用户平台AI请求频率已达上限"),
             retry_after_secs: Some(17),
         };
         let reasons = route_c_blocking_reasons(
@@ -302,7 +302,7 @@ mod tests {
 
         assert_eq!(status, "disabled");
         assert_eq!(reasons[0].code, "operator_disabled");
-        assert!(reasons[0].message.contains("运营开关"));
+        assert!(reasons[0].message.contains("运营暂停"));
     }
 
     #[test]

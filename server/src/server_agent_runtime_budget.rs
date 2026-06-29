@@ -108,18 +108,17 @@ impl ServerRuntimeBudgetError {
             Self::DailyCallLimitReached(status) => {
                 let limit = status.daily_call_limit.unwrap_or_default();
                 format!(
-                    "Route C 远程模型今日平台预算已用完：每日最多 {limit} 次服务器模型调用，请稍后再试或改用本机 CLI / 自带 API Key。"
+                    "平台AI今日平台预算已用完：每日最多 {limit} 次平台模型调用，请稍后再试，或改用本机AI / 我的 API key。"
                 )
             }
             Self::UserDailyCallLimitReached(status) => {
                 let limit = status.per_user_daily_call_limit.unwrap_or_default();
                 format!(
-                    "Route C 远程模型今日个人额度已用完：每个用户每日最多 {limit} 次服务器模型调用，请稍后再试或改用本机 CLI / 自带 API Key。"
+                    "平台AI今日个人额度已用完：每个用户每日最多 {limit} 次平台模型调用，请稍后再试，或改用本机AI / 我的 API key。"
                 )
             }
             Self::StoreUnavailable(_) => {
-                "Route C 远程模型预算系统暂时不可用，请稍后再试或改用本机 CLI / 自带 API Key。"
-                    .to_string()
+                "平台AI预算系统暂时不可用，请稍后再试，或改用本机AI / 我的 API key。".to_string()
             }
         }
     }

@@ -8138,9 +8138,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function syncProjectRuntimePermissionHint() {
     const mode = normalizeProjectRuntimePermission(projectRuntimePermissionMode.value);
     projectRuntimePermissionHint.textContent = mode === 'danger_full_access'
-      ? 'Route A/B/C 都允许 AI 使用完整本机命令行、绝对路径文件读写和 cmd/powershell 排障。'
+      ? '所有 AI 方式都允许使用完整本机命令行、绝对路径文件读写和 cmd/powershell 排障。'
       : (mode === 'full_access'
-        ? 'Route A 的 Codex/Copilot 可按授权绕过项目沙箱；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
+        ? '本机AI里的 Codex/Copilot 可按授权绕过项目沙箱；我的Key/平台AI/远程AI仍保留项目路径和命令白名单，但 build/test 会执行项目代码。'
         : '默认限制在项目工作区内读写，适合普通开发项目。');
     projectRuntimePermissionHint.style.color = mode === 'project_write' ? 'var(--ink-soft)' : '#b45309';
   }
@@ -8203,8 +8203,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (runtimeMode === 'full_access' || runtimeMode === 'danger_full_access') {
       const label = runtimeMode === 'danger_full_access' ? '完整本机命令行' : '完全访问';
       const detail = runtimeMode === 'danger_full_access'
-        ? 'Route A/B/C 都可能运行任意 cmd/powershell 命令，并读写项目目录外的本机文件和系统设置。'
-        : 'Route A 的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；Route B/C 仍保留项目路径和命令白名单，但 build/test 会执行项目代码。';
+        ? '所有 AI 方式都可能运行任意 cmd/powershell 命令，并读写项目目录外的本机文件和系统设置。'
+        : '本机AI里的 Codex/Copilot 可能读取或修改项目目录外的本机文件和系统设置；我的Key/平台AI/远程AI仍保留项目路径和命令白名单，但 build/test 会执行项目代码。';
       const ok = window.confirm('确认给项目「' + projectNameOf(pendingVisibilityProject) + '」开启' + label + '？' + detail);
       if (!ok) {
         saveProjectVisibilityBtn.disabled = false;

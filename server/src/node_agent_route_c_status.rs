@@ -242,7 +242,7 @@ mod tests {
             "admission_availability": {
                 "ready": false,
                 "reason": "rate_limited",
-                "publicMessage": "当前用户 Route C 远程模型请求频率已达上限",
+                "publicMessage": "当前用户平台AI请求频率已达上限",
                 "retryAfterSecs": 17
             }
         }));
@@ -287,7 +287,7 @@ mod tests {
             "blockingReasons": [{
                 "code": "platform_budget_exhausted",
                 "scope": "budget",
-                "message": "Route C 今日平台预算已用完"
+                "message": "平台AI今日平台预算已用完"
             }]
         })));
     }
@@ -329,7 +329,7 @@ mod tests {
             "blockingReasons": [{
                 "code": "platform_budget_exhausted",
                 "scope": "budget",
-                "message": "Route C 今日平台预算已用完",
+                "message": "平台AI今日平台预算已用完",
                 "retryAfterSecs": 3600
             }]
         }));

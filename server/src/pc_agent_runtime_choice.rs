@@ -104,7 +104,7 @@ pub(crate) async fn choose_pc_agent_runtime(
             cli_name: requested_cli_name(option.as_ref(), agent_name),
             copilot_model: None,
             codex_reasoning_effort: None,
-            model_label: Some("运行路线不可用".to_string()),
+            model_label: Some("AI方式不可用".to_string()),
             error: Some(error),
         },
     }
@@ -144,14 +144,14 @@ fn choice_from_cli(
             cli_name,
             copilot_model: None,
             codex_reasoning_effort: None,
-            model_label: route_label.or_else(|| Some("一龙服务器模型（Route C.1）".to_string())),
+            model_label: route_label.or_else(|| Some("平台AI".to_string())),
             error: None,
         },
         "api-runtime" => PcAgentRuntimeChoice {
             cli_name,
             copilot_model: None,
             codex_reasoning_effort: None,
-            model_label: route_label.or_else(|| Some("本机 API Runtime（Route B）".to_string())),
+            model_label: route_label.or_else(|| Some("我的 API key".to_string())),
             error: None,
         },
         _ => PcAgentRuntimeChoice {
@@ -174,10 +174,10 @@ fn runtime_route_model_label(
 ) -> Option<String> {
     match route_preference {
         Some(PcRuntimeRoutePreference::RouteC2) => {
-            Some("远程 PC API Runtime（Route C.2）".to_string())
+            Some("远程AI（其他用户 PC 节点 + 一龙 CLI）".to_string())
         }
         Some(PcRuntimeRoutePreference::RouteC3) => Some(format!(
-            "远程 PC CLI（Route C.3 · {}）",
+            "远程Codex（其他用户 PC 节点 + {}）",
             cli_display_name(cli_name)
         )),
         _ => None,
@@ -190,7 +190,7 @@ fn cli_display_name(cli_name: &str) -> &'static str {
         "codex" => "Codex",
         "claude" => "Claude",
         "gemini" => "Gemini",
-        _ => "AI CLI",
+        _ => "AI工具",
     }
 }
 
@@ -260,7 +260,7 @@ fn choose_cli_for_runtime(
     let Some(runtime) = dev_runtime else {
         return Ok(requested_cli);
     };
-    // Route B 必须排在 Route C 前面：用户配置了自己的 API key 时，
+    // 用户配置了自己的 API key 时优先走本机，避免消耗平台AI预算。
     // 模型调用和本地工具循环都由用户 PC 自己承担，不消耗平台服务器模型。
     if runtime.api_runtime_ready {
         return Ok("api-runtime".to_string());
@@ -281,7 +281,7 @@ fn choose_forced_route(
         PcRuntimeRoutePreference::RouteA => {
             if !route_a_runtime_ready(dev_runtime) {
                 return Err(
-                    "已强制 Route A，但本机 AI CLI 版本探测未通过；请修复 CLI 登录/安装，或切回自动使用 Route C。"
+                    "已选择本机AI，但这台电脑上的 AI 工具检测未通过；请修复登录/安装，或切回自动。"
                         .to_string(),
                 );
             }
@@ -294,34 +294,34 @@ fn choose_forced_route(
                 return Ok(requested_cli);
             }
             first_available_route_a_cli(allowed_clis).ok_or_else(|| {
-                "已强制 Route A，但此 PC 节点没有可用的 Codex/Copilot/Claude/Gemini CLI".to_string()
+                "已选择本机AI，但此 PC 节点没有可用的 Codex/Copilot/Claude/Gemini。".to_string()
             })
         }
         PcRuntimeRoutePreference::RouteB => {
             if dev_runtime.is_some_and(|runtime| runtime.api_runtime_ready) {
                 Ok("api-runtime".to_string())
             } else {
-                Err("已强制 Route B，但本机 API Runtime 未就绪；请配置 API key 和模型，或切回自动。".to_string())
+                Err("已选择我的 API key，但本机 API key 未就绪；请配置 API key 和模型，或切回自动。".to_string())
             }
         }
         PcRuntimeRoutePreference::RouteC => {
             if route_c_runtime_ready(dev_runtime) {
                 Ok("server-runtime".to_string())
             } else {
-                Err("已强制 Route C，但服务器模型 Runtime 未就绪或被限流/预算保护挡住；请确认 Win 客户端已登录、云端 Route C 可接单，或切回自动。".to_string())
+                Err("已选择平台AI，但平台AI暂时不可用或被限流/预算保护挡住；请确认 Win 客户端已登录，或切回自动。".to_string())
             }
         }
         PcRuntimeRoutePreference::RouteC2 => {
             if dev_runtime.is_some_and(|runtime| runtime.api_runtime_ready) {
                 Ok("api-runtime".to_string())
             } else {
-                Err("已强制 Route C.2，但目标远程 PC 节点的 API Runtime 未就绪；请选择已配置 API key 的远程节点，或切回自动。".to_string())
+                Err("已选择远程AI，但目标其他用户 PC 节点的 API key 未就绪；请选择已配置 API key 的远程节点，或切回自动。".to_string())
             }
         }
         PcRuntimeRoutePreference::RouteC3 => {
             if !route_a_runtime_ready(dev_runtime) {
                 return Err(
-                    "已强制 Route C.3，但目标远程 PC 节点的 CLI 探测未通过；请选择已登录 Codex/Copilot 的远程节点，或切回自动。"
+                    "已选择远程Codex，但目标其他用户 PC 节点的 AI 工具检测未通过；请选择已登录 Codex/Copilot 的远程节点，或切回自动。"
                         .to_string(),
                 );
             }
@@ -334,7 +334,7 @@ fn choose_forced_route(
                 return Ok(requested_cli);
             }
             first_available_route_a_cli(allowed_clis).ok_or_else(|| {
-                "已强制 Route C.3，但目标远程 PC 节点没有可用的 Codex/Copilot/Claude/Gemini CLI"
+                "已选择远程Codex，但目标其他用户 PC 节点没有可用的 Codex/Copilot/Claude/Gemini。"
                     .to_string()
             })
         }
@@ -581,7 +581,7 @@ mod tests {
                 "blockingReasons": [{
                     "code": "platform_budget_exhausted",
                     "scope": "budget",
-                    "message": "Route C 今日平台预算已用完"
+                    "message": "平台AI今日平台预算已用完"
                 }]
             })),
             ..Default::default()
@@ -727,9 +727,9 @@ mod tests {
             "codex".to_string(),
             Some(PcRuntimeRoutePreference::RouteC2),
         )
-        .expect_err("route C.2 should require API Runtime readiness");
-        assert!(err.contains("Route C.2"));
-        assert!(err.contains("API Runtime"));
+        .expect_err("remote AI should require API key readiness");
+        assert!(err.contains("远程AI"));
+        assert!(err.contains("API key"));
     }
 
     #[test]
@@ -763,9 +763,9 @@ mod tests {
             "codex".to_string(),
             Some(PcRuntimeRoutePreference::RouteC3),
         )
-        .expect_err("route C.3 should require remote CLI readiness");
-        assert!(err.contains("Route C.3"));
-        assert!(err.contains("CLI"));
+        .expect_err("remote Codex should require remote AI tool readiness");
+        assert!(err.contains("远程Codex"));
+        assert!(err.contains("AI 工具"));
     }
 
     #[test]
@@ -776,9 +776,9 @@ mod tests {
             "codex".to_string(),
             Some(PcRuntimeRoutePreference::RouteC),
         )
-        .expect_err("route C should not be selected when server runtime is not ready");
-        assert!(err.contains("Route C"));
-        assert!(err.contains("未就绪"));
+        .expect_err("platform AI should not be selected when server runtime is not ready");
+        assert!(err.contains("平台AI"));
+        assert!(err.contains("暂时不可用"));
     }
 
     #[test]
@@ -802,8 +802,8 @@ mod tests {
             "codex".to_string(),
             Some(PcRuntimeRoutePreference::RouteC),
         )
-        .expect_err("route C should not bypass cloud admission protection");
-        assert!(err.contains("Route C"));
+        .expect_err("platform AI should not bypass cloud admission protection");
+        assert!(err.contains("平台AI"));
         assert!(err.contains("限流"));
         assert!(err.contains("预算"));
     }
@@ -829,8 +829,8 @@ mod tests {
             "codex".to_string(),
             Some(PcRuntimeRoutePreference::RouteC),
         )
-        .expect_err("route C should not bypass cloud blocking reasons");
-        assert!(err.contains("Route C"));
+        .expect_err("platform AI should not bypass cloud blocking reasons");
+        assert!(err.contains("平台AI"));
         assert!(err.contains("限流"));
         assert!(err.contains("预算"));
     }
@@ -848,8 +848,8 @@ mod tests {
             "codex".to_string(),
             Some(PcRuntimeRoutePreference::RouteA),
         )
-        .expect_err("route A should not be selected when CLI probe failed");
-        assert!(err.contains("Route A"));
+        .expect_err("local AI should not be selected when tool probe failed");
+        assert!(err.contains("本机AI"));
         assert!(err.contains("未通过"));
     }
 }

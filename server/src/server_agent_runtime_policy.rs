@@ -51,8 +51,7 @@ impl ServerAgentRuntimePolicy {
     }
 
     pub(crate) fn public_disabled_message(&self) -> String {
-        "Route C 服务器模型当前已由平台运营开关暂停，请稍后再试或改用本机 CLI / 自带 API Key。"
-            .to_string()
+        "平台AI当前已由运营暂停，请稍后再试，或改用本机AI / 我的 API key。".to_string()
     }
 }
 
@@ -124,8 +123,7 @@ impl ServerAgentRuntimeAgentPolicy {
     }
 
     pub(crate) fn public_denied_message(&self) -> String {
-        "Route C 服务器模型不允许选择该 agent；请使用默认服务器模型，或由平台运营配置允许的 Route C agent。"
-            .to_string()
+        "平台AI暂不允许选择这个模型通道；请使用默认平台AI，或等待运营开放。".to_string()
     }
 }
 
@@ -163,7 +161,7 @@ mod tests {
                 .reason
                 .as_deref()
                 .is_some_and(|reason| reason.contains(SERVER_AGENT_RUNTIME_ENABLED_ENV)));
-            assert!(policy.public_disabled_message().contains("Route C"));
+            assert!(policy.public_disabled_message().contains("平台AI"));
         }
     }
 
@@ -185,7 +183,7 @@ mod tests {
         assert!(policy.allows_requested_agent(None, "main"));
         assert!(policy.allows_requested_agent(Some("main"), "main"));
         assert!(!policy.allows_requested_agent(Some("expensive"), "main"));
-        assert!(policy.public_denied_message().contains("Route C"));
+        assert!(policy.public_denied_message().contains("平台AI"));
     }
 
     #[test]
