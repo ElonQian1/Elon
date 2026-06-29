@@ -109,7 +109,10 @@ export function ModelPickerPopover({
         onClick={onClose}
       />
       <section
-        className={styles.popover}
+        className={[
+          styles.popover,
+          hasRuntimeRoutePicker ? styles.routePopover : '',
+        ].join(' ')}
         role="dialog"
         aria-label="选择 AI 模型"
         style={{ left: pos.left, bottom: pos.bottom, width: pos.width }}

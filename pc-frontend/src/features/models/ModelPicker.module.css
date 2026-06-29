@@ -24,6 +24,11 @@
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.42);
 }
 
+.routePopover {
+  height: min(620px, calc(100vh - 96px));
+  max-height: calc(100vh - 24px);
+}
+
 .header {
   display: flex;
   align-items: center;
@@ -63,8 +68,10 @@
 }
 
 .list {
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 8px;
 }
 
@@ -76,19 +83,23 @@
 .pickerBody {
   min-height: 0;
   display: grid;
+  grid-template-rows: minmax(0, 1fr);
   grid-template-columns: 260px minmax(0, 1fr);
   overflow: hidden;
 }
 
 .routePane {
+  height: 100%;
   min-height: 0;
   overflow-y: auto;
+  scrollbar-gutter: stable;
   padding: 8px;
   border-right: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .modelPane {
   min-width: 0;
+  height: 100%;
   min-height: 0;
   overflow: hidden;
 }
@@ -369,7 +380,12 @@
 }
 
 @media (max-width: 720px) {
+  .routePopover {
+    height: min(680px, calc(100vh - 24px));
+  }
+
   .pickerBody {
+    grid-template-rows: minmax(0, auto) minmax(0, 1fr);
     grid-template-columns: 1fr;
   }
 
