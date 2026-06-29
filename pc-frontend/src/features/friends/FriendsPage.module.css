@@ -12,8 +12,8 @@
 .sidebar {
   background: var(--sidebar);
   border-right: 1px solid var(--line-soft);
-  display: grid;
-  grid-template-rows: 58px auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
 }
 
@@ -70,6 +70,7 @@
   background: #18191e;
   border-bottom: 1px solid var(--line-soft);
   max-height: 140px;
+  flex-shrink: 0;
   overflow-y: auto;
 }
 .searchItem {
@@ -92,8 +93,43 @@
 }
 .addBtn:hover { background: var(--green); color: white; }
 
+.modeToggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  flex-shrink: 0;
+}
+.modeButton {
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #202126;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background .1s, border-color .1s, color .1s;
+}
+.modeButton:hover {
+  background: #2b2d33;
+  color: var(--text);
+}
+.modeActive {
+  border-color: rgba(75, 137, 207, .65);
+  background: rgba(60, 111, 162, .22);
+  color: #eaf2ff;
+}
+
 /* 好友列表 */
 .friendList {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   scrollbar-width: thin;
   padding: 6px 0 12px;
@@ -109,14 +145,30 @@
   padding-top: 10px;
 }
 .sectionHeader {
+  width: 100%;
+  border: 0;
+  background: transparent;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 8px;
   padding: 6px 12px 5px;
   color: var(--text-muted);
+  font-family: inherit;
   font-size: 11px;
   font-weight: 800;
-  letter-spacing: .04em;
+  letter-spacing: 0;
+  text-align: left;
+}
+button.sectionHeader {
+  cursor: pointer;
+}
+button.sectionHeader:hover {
+  color: var(--text-soft);
+}
+button.sectionHeader:focus-visible {
+  outline: 2px solid rgba(75, 137, 207, .72);
+  outline-offset: -2px;
 }
 .sectionHeader span {
   text-transform: uppercase;
@@ -125,6 +177,16 @@
   color: var(--text-muted);
   font-size: 11px;
   font-weight: 700;
+  flex-shrink: 0;
+}
+.sectionTitle {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.sectionTitle svg {
+  flex-shrink: 0;
 }
 .sectionHint {
   margin: 0;
@@ -175,6 +237,21 @@
   min-width: 0;
   font-size: 13px; font-weight: 600;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.conversationType {
+  height: 16px;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.06);
+  color: var(--text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 800;
+  flex-shrink: 0;
 }
 .unreadBadge {
   min-width: 16px; height: 16px;

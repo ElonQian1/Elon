@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
+import { ChevronDown, ChevronRight, Layers, List } from 'lucide-react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { formatTime } from '../../lib/utils'
@@ -57,6 +58,8 @@ interface FriendSearchResponse {
 }
 
 type ConversationKind = 'friend' | 'group'
+type ConversationDisplayMode = 'grouped' | 'active'
+type CollapsibleSection = 'friends' | 'groups'
 
 interface ActiveConversation {
   kind: ConversationKind
@@ -86,6 +89,10 @@ export default function FriendsPage() {
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
+  const [displayMode, setDisplayMode] = useState<ConversationDisplayMode>(() => readConversationDisplayMode())
+  const [collapsedSections, setCollapsedSections] = useState<Record<CollapsibleSection, boolean>>(
+    () => readCollapsedSections(),
+  )
 
   // 搜索添加好友
   const [searchQ, setSearchQ] = useState('')
@@ -101,6 +108,14 @@ export default function FriendsPage() {
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages])
+
+  useEffect(() => {
+    writeLocalPreference(DISPLAY_MODE_STORAGE_KEY, displayMode)
+  }, [displayMode])
+
+  useEffect(() => {
+    writeLocalPreference(COLLAPSED_SECTIONS_STORAGE_KEY, JSON.stringify(collapsedSections))
+  }, [collapsedSections])
 
   const friendConversationItems = useMemo(() => {
     return sortConversationItems(friends.map((friend) => ({
@@ -129,13 +144,13 @@ export default function FriendsPage() {
     })))
   }, [groups])
 
-  const conversationItems = useMemo(
-    () => [...friendConversationItems, ...groupConversationItems],
+  const allConversationItems = useMemo(
+    () => sortConversationItems([...friendConversationItems, ...groupConversationItems]),
     [friendConversationItems, groupConversationItems],
   )
 
   const activeItem = activeConversation
-    ? conversationItems.find((item) => item.kind === activeConversation.kind && item.id === activeConversation.id)
+    ? allConversationItems.find((item) => item.kind === activeConversation.kind && item.id === activeConversation.id)
     : undefined
 
   async function loadSocialConversations() {
@@ -260,7 +275,14 @@ export default function FriendsPage() {
     }
   }
 
-  function renderConversationItem(item: ConversationItem) {
+  function toggleSection(section: CollapsibleSection) {
+    setCollapsedSections((prev) => ({
+      ...prev,
+      [section]: !prev[section],
+    }))
+  }
+
+  function renderConversationItem(item: ConversationItem, showTypeBadge = false) {
     return (
       <button
         key={`${item.kind}:${item.id}`}
@@ -280,6 +302,9 @@ export default function FriendsPage() {
         <div className={styles.friendMeta}>
           <div className={styles.friendNameRow}>
             <strong>{item.title}</strong>
+            {showTypeBadge && (
+              <span className={styles.conversationType}>{item.kind === 'group' ? '群' : '友'}</span>
+            )}
             {item.unreadCount > 0 && (
               <span className={styles.unreadBadge}>{item.unreadCount}</span>
             )}
@@ -292,6 +317,37 @@ export default function FriendsPage() {
           <span className={styles.msgTime}>{formatTime(item.lastMessageAt)}</span>
         )}
       </button>
+    )
+  }
+
+  function renderConversationSection(
+    section: CollapsibleSection,
+    title: string,
+    items: ConversationItem[],
+    emptyText: string,
+  ) {
+    const collapsed = collapsedSections[section]
+    const SectionIcon = collapsed ? ChevronRight : ChevronDown
+    return (
+      <section className={styles.conversationSection}>
+        <button
+          className={styles.sectionHeader}
+          onClick={() => toggleSection(section)}
+          type="button"
+          aria-expanded={!collapsed}
+        >
+          <span className={styles.sectionTitle}>
+            <SectionIcon size={14} strokeWidth={2.2} />
+            {title}
+          </span>
+          <small>{items.length}</small>
+        </button>
+        {!collapsed && (
+          items.length === 0
+            ? <p className={styles.sectionHint}>{emptyText}</p>
+            : items.map((item) => renderConversationItem(item))
+        )}
+      </section>
     )
   }
 
@@ -343,29 +399,47 @@ export default function FriendsPage() {
           </div>
         )}
 
+        <div className={styles.modeToggle} role="group" aria-label="会话显示模式">
+          <button
+            className={[styles.modeButton, displayMode === 'grouped' ? styles.modeActive : ''].join(' ')}
+            onClick={() => setDisplayMode('grouped')}
+            type="button"
+            aria-pressed={displayMode === 'grouped'}
+            title="好友和群聊分层显示，并支持折叠"
+          >
+            <Layers size={14} strokeWidth={2.1} />
+            <span>分层</span>
+          </button>
+          <button
+            className={[styles.modeButton, displayMode === 'active' ? styles.modeActive : ''].join(' ')}
+            onClick={() => setDisplayMode('active')}
+            type="button"
+            aria-pressed={displayMode === 'active'}
+            title="好友和群聊混在一起，最近活跃在前"
+          >
+            <List size={14} strokeWidth={2.1} />
+            <span>活跃</span>
+          </button>
+        </div>
+
         <div className={styles.friendList}>
-          {conversationItems.length === 0 && (
+          {allConversationItems.length === 0 && (
             <p className={styles.hint}>暂无好友或群聊，搜索手机号添加好友</p>
           )}
-          <section className={styles.conversationSection}>
-            <div className={styles.sectionHeader}>
-              <span>好友会话</span>
-              <small>{friendConversationItems.length}</small>
-            </div>
-            {friendConversationItems.length === 0
-              ? <p className={styles.sectionHint}>暂无好友会话</p>
-              : friendConversationItems.map(renderConversationItem)}
-          </section>
-
-          <section className={styles.conversationSection}>
-            <div className={styles.sectionHeader}>
-              <span>群聊</span>
-              <small>{groupConversationItems.length}</small>
-            </div>
-            {groupConversationItems.length === 0
-              ? <p className={styles.sectionHint}>暂无群聊</p>
-              : groupConversationItems.map(renderConversationItem)}
-          </section>
+          {displayMode === 'grouped' ? (
+            <>
+              {renderConversationSection('friends', '好友会话', friendConversationItems, '暂无好友会话')}
+              {renderConversationSection('groups', '群聊', groupConversationItems, '暂无群聊')}
+            </>
+          ) : (
+            <section className={styles.conversationSection}>
+              <div className={styles.sectionHeader}>
+                <span>活跃优先</span>
+                <small>{allConversationItems.length}</small>
+              </div>
+              {allConversationItems.map((item) => renderConversationItem(item, true))}
+            </section>
+          )}
         </div>
       </aside>
 
@@ -445,6 +519,41 @@ export default function FriendsPage() {
       </div>
     </div>
   )
+}
+
+const DISPLAY_MODE_STORAGE_KEY = 'elon_pc_friends_display_mode'
+const COLLAPSED_SECTIONS_STORAGE_KEY = 'elon_pc_friends_collapsed_sections'
+
+function readConversationDisplayMode(): ConversationDisplayMode {
+  try {
+    const stored = window.localStorage.getItem(DISPLAY_MODE_STORAGE_KEY)
+    return stored === 'active' ? 'active' : 'grouped'
+  } catch {
+    return 'grouped'
+  }
+}
+
+function readCollapsedSections(): Record<CollapsibleSection, boolean> {
+  const fallback = { friends: false, groups: false }
+  try {
+    const stored = window.localStorage.getItem(COLLAPSED_SECTIONS_STORAGE_KEY)
+    if (!stored) return fallback
+    const parsed = JSON.parse(stored) as Partial<Record<CollapsibleSection, unknown>>
+    return {
+      friends: parsed.friends === true,
+      groups: parsed.groups === true,
+    }
+  } catch {
+    return fallback
+  }
+}
+
+function writeLocalPreference(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value)
+  } catch {
+    // localStorage can be blocked by browser privacy settings.
+  }
 }
 
 function avatarInitial(value: string | undefined, fallback: string) {
