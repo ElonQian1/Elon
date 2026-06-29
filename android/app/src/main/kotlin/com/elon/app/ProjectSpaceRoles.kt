@@ -28,6 +28,10 @@ internal fun canEditProjectAnnouncement(role: String?): Boolean {
     return role.normalizedProjectRole() in setOf("owner", "creator")
 }
 
+internal fun canEditProjectDescription(role: String?): Boolean {
+    return role.normalizedProjectRole() in setOf("owner", "admin", "editor")
+}
+
 private fun String?.normalizedProjectRole(): String? {
     return this?.trim()?.lowercase(Locale.ROOT)?.takeIf { it.isNotBlank() }
 }

@@ -1379,8 +1379,89 @@
     .project-space-phone-line.short {
       margin-right: 14px;
     }
-    #projectProgressPanel .project-space-announcement,
+    #projectProgressPanel .project-space-intro-card {
+      position: relative;
+      display: block;
+      width: calc(100% - 48px);
+      min-height: 132px;
+      margin: 28px 24px 0;
+      padding: 54px 0 0;
+      border: 0;
+      background: transparent;
+      color: var(--store-detail-muted);
+      text-align: left;
+      font-size: 16px;
+      line-height: 1.42;
+      white-space: normal;
+      cursor: pointer;
+    }
+    #projectProgressPanel .project-space-intro-card.empty {
+      color: var(--ink-faint);
+    }
+    #projectProgressPanel .project-space-intro-card:disabled {
+      opacity: 1;
+      cursor: default;
+    }
+    #projectProgressPanel .project-space-intro-card::before {
+      content: "关于此应用";
+      position: absolute;
+      left: 0;
+      top: 0;
+      color: var(--store-detail-ink);
+      font-size: 20px;
+      font-weight: 700;
+      line-height: 36px;
+    }
+    #projectProgressPanel .project-space-intro-card::after {
+      content: "›";
+      position: absolute;
+      right: 0;
+      top: 0;
+      width: 42px;
+      height: 36px;
+      border-radius: 10px;
+      background: #2A2A2A;
+      color: var(--store-detail-ink);
+      display: grid;
+      place-items: center;
+      font-size: 34px;
+      line-height: 1;
+    }
     #projectProgressPanel .project-space-feed {
+      display: block;
+      margin-top: 24px;
+      padding: 0 0 86px;
+      min-height: 460px;
+      background: var(--store-detail-bg);
+      border-radius: 0;
+    }
+    #projectProgressPanel .project-space-topic-row {
+      height: 28px;
+      padding: 0 24px;
+      gap: 13px;
+    }
+    #projectProgressPanel .project-space-topic-chip {
+      flex: 1;
+      height: 28px;
+      border: 1px solid var(--store-detail-divider);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--store-detail-muted);
+      font-size: 12px;
+      padding: 0 7px;
+    }
+    #projectProgressPanel .project-space-post-list {
+      padding-top: 8px;
+    }
+    #projectProgressPanel .project-space-post-card {
+      margin: 10px 14px 0;
+      border: 1px solid var(--store-detail-divider);
+      background: var(--store-detail-bg);
+    }
+    #projectProgressPanel .project-space-post-card:first-child {
+      margin-top: 10px;
+    }
+    #projectProgressPanel .project-space-announcement {
       display: none;
     }
     .project-workspace-health {
@@ -2768,7 +2849,6 @@
           <button class="project-space-join hidden" id="projectSpaceJoinBtn" type="button">加入</button>
           <button class="project-space-install" id="projectSpaceDownloadBtn" type="button">安装</button>
         </div>
-        <button class="project-space-intro-card empty hidden" id="projectIntroCard" type="button">添加项目简介</button>
         <div class="project-space-actions">
           <button class="project-space-action" id="projectSpaceDocsBtn" type="button" aria-label="项目文档">
             <img class="project-space-action-icon" src="/assets/ic_side_menu_folder_closed.png" alt="" aria-hidden="true" />
@@ -2833,6 +2913,7 @@
             </div>
           </div>
         </div>
+        <button class="project-space-intro-card empty hidden" id="projectIntroCard" type="button">添加项目简介</button>
         <div class="project-space-announcement" id="projectSpacePinnedBar">
           <div class="project-space-announcement-title">置顶</div>
           <div class="project-space-announcement-body" id="projectSpaceAnnouncement">创建者自定义标题最多显示16个字</div>
@@ -5746,6 +5827,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       if (projectSpaceDownloadBtn) projectSpaceDownloadBtn.textContent = '安装';
       projectIntroCard.textContent = '添加项目简介';
       projectIntroCard.classList.add('empty');
+      projectIntroCard.classList.add('hidden');
       projectIntroCard.disabled = true;
       return;
     }
@@ -5763,6 +5845,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (projectSpaceDownloadBtn) projectSpaceDownloadBtn.textContent = currentProjectSpaceLatestApkUrl ? '安装' : '暂无APK';
     projectIntroCard.textContent = description || (editable ? '添加项目简介' : '暂无项目简介');
     projectIntroCard.classList.toggle('empty', !description);
+    projectIntroCard.classList.remove('hidden');
     projectIntroCard.disabled = !editable;
   }
   function projectSpaceTopicLabel(kind, name) {

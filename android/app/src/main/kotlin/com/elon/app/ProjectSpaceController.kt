@@ -76,26 +76,13 @@ internal class ProjectSpaceController(
         isSpaceLandingActive = { activeChannel == null && activeMemberConversation == null },
         renderLanding = { renderProjectSpaceLanding() }
     )
-    private val announcementEditor = ProjectSpaceAnnouncementEditor(
-        activity = activity,
-        dp = dp,
-        onSubmit = { channel, content, onComplete ->
-            feedData.submitAnnouncement(channel, content, onComplete)
-        }
-    )
     private val feedView = ProjectSpaceFeedView(
         activity = activity,
         dp = dp,
         selectableForeground = selectableForeground,
         openPost = { channel, post -> openChannel(channel, postMessage = post) },
         openPostComposer = { renderPostComposer() },
-        openAnnouncementEditor = { channel, currentText ->
-            activeSpace?.let { announcementEditor.show(it, channel, currentText) }
-        },
-        openProjectDocuments = { showProjectDocumentsDialog() },
-        openProjectResources = {
-            Toast.makeText(activity, "项目资源入口正在整理", Toast.LENGTH_SHORT).show()
-        },
+        openProjectDescription = { space -> showProjectDescriptionDialog(space) },
         openProjectMembers = { showMembers() },
         joinProject = { handleProjectSpaceJoin() },
         projectApkActionLabel = {
@@ -1012,8 +999,13 @@ internal class ProjectSpaceController(
     }
 
     private fun showProjectDescriptionDialog(space: ProjectSpace) {
-        if (!canEditProjectDescription(space.project.role)) {
-            Toast.makeText(activity, "当前成员角色不能编辑项目简介", Toast.LENGTH_SHORT).show()
+        val editable = canEditProjectDescription(space.project.role)
+        if (!editable) {
+            AlertDialog.Builder(activity)
+                .setTitle("项目简介")
+                .setMessage(space.project.description?.trim()?.takeIf { it.isNotBlank() } ?: "暂无项目简介")
+                .setPositiveButton("知道了", null)
+                .show()
             return
         }
         val input = EditText(activity).apply {
@@ -1393,8 +1385,5 @@ internal class ProjectSpaceController(
         const val PROJECT_SPACE_AI_EXPAND_AT_TOP_DP = 4
         const val PROJECT_SPACE_AI_ICON_MARGIN_END_DP = 8
 
-        fun canEditProjectDescription(role: String?): Boolean {
-            return role?.trim()?.lowercase() in setOf("owner", "admin", "editor")
-        }
     }
 }
