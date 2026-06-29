@@ -816,6 +816,7 @@ export default function ConversationPage() {
             <MemberProfilePopover
               member={selectedMember}
               anchorY={memberPopoverY}
+              channel={activeChannel}
               onClose={() => setSelectedMember(null)}
             />,
             document.body
@@ -963,7 +964,7 @@ function memberChannelPermissions(member: ProjectMember, channelId?: string) {
 function memberCanViewChannel(member: ProjectMember, channelId?: string) {
   const permissions = memberChannelPermissions(member, channelId)
   if (!permissions) return true
-  return channelPermissionValue(permissions, 'can_view', 'canView')
+  return memberChannelCanView(permissions)
 }
 
 function membersHaveChannelPermissionMap(members: ProjectMember[], channelId?: string) {
@@ -1009,13 +1010,24 @@ function memberSubtitle(member: ProjectMember) {
 function memberChannelSubtitle(member: ProjectMember, channelId?: string) {
   const permissions = memberChannelPermissions(member, channelId)
   if (!permissions) return memberSubtitle(member)
-  if (!channelPermissionValue(permissions, 'can_view', 'canView')) return '无频道访问权限'
+  const parts = memberChannelCapabilityLabels(permissions)
+  if (!memberChannelCanView(permissions)) return parts[0] ?? '无频道访问权限'
+  return `${parts.join(' / ')} · ${memberSubtitle(member)}`
+}
+
+function memberChannelCanView(permissions?: ChannelPermissions) {
+  return channelPermissionValue(permissions, 'can_view', 'canView')
+}
+
+function memberChannelCapabilityLabels(permissions?: ChannelPermissions) {
+  if (!permissions) return []
+  if (!memberChannelCanView(permissions)) return ['无频道访问权限']
   const parts = [
     channelPermissionValue(permissions, 'can_send', 'canSend') ? '可发言' : '只读',
   ]
   if (channelPermissionValue(permissions, 'can_start_ai', 'canStartAi')) parts.push('可启动 AI')
   if (channelPermissionValue(permissions, 'can_manage', 'canManage')) parts.push('可管理')
-  return `${parts.join(' / ')} · ${memberSubtitle(member)}`
+  return parts
 }
 
 function memberPresenceStatus(member: ProjectMember) {
@@ -1478,6 +1490,7 @@ function PermissionDrawer({
   }
 
   const selectedMember = members.find((member) => member.user_id === memberId)
+  const selectedChannel = channels.find((channel) => channel.id === channelId)
 
   return (
     <div className={styles.drawerBackdrop}>
@@ -1528,6 +1541,11 @@ function PermissionDrawer({
                 ))}
               </select>
             </div>
+            <ChannelMemberPermissionPreview
+              channel={selectedChannel}
+              channelId={channelId}
+              members={members}
+            />
             <PermissionRoleGrid
               roles={roles}
               options={permissionOptions}
@@ -1548,6 +1566,84 @@ function PermissionDrawer({
           </section>
         </div>
       </section>
+    </div>
+  )
+}
+
+function ChannelMemberPermissionPreview({
+  channel,
+  channelId,
+  members,
+}: {
+  channel?: Channel
+  channelId: string
+  members: ProjectMember[]
+}) {
+  const hasPermissionMap = membersHaveChannelPermissionMap(members, channelId)
+  const visibleMembers = membersForChannel(members, channelId)
+  const hiddenMembers = hasPermissionMap
+    ? members.filter((member) => !memberCanViewChannel(member, channelId))
+    : []
+  const onlineCount = visibleMembers.filter((member) => memberPresenceStatus(member) !== 'offline').length
+  const previewMembers = sortMembersForPanel(visibleMembers).slice(0, 8)
+  const hiddenPreview = sortMembersForPanel(hiddenMembers).slice(0, 3)
+
+  return (
+    <article className={styles.permissionPreview}>
+      <div className={styles.permissionPreviewHead}>
+        <div>
+          <strong>频道成员预览</strong>
+          <span>{channel?.name ?? '当前频道'}</span>
+        </div>
+        <div className={styles.permissionPreviewStats}>
+          <em>可见 {visibleMembers.length}</em>
+          {hasPermissionMap && <em>隐藏 {hiddenMembers.length}</em>}
+          <em>在线 {onlineCount}</em>
+        </div>
+      </div>
+      <div className={styles.permissionPreviewList}>
+        {previewMembers.map((member) => (
+          <ChannelMemberPreviewRow key={member.user_id} member={member} channelId={channelId} />
+        ))}
+        {hiddenPreview.map((member) => (
+          <ChannelMemberPreviewRow key={`hidden-${member.user_id}`} member={member} channelId={channelId} hidden />
+        ))}
+        {previewMembers.length === 0 && hiddenPreview.length === 0 && (
+          <p className={styles.sideHint}>暂无成员</p>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function ChannelMemberPreviewRow({
+  member,
+  channelId,
+  hidden,
+}: {
+  member: ProjectMember
+  channelId: string
+  hidden?: boolean
+}) {
+  const roleKey = memberPrimaryRoleKey(member)
+  const name = member.account ?? member.user_id
+  const avatarCls = [
+    styles.memberAvatar,
+    memberAvatarRoleClass(roleKey),
+    memberPresenceStatus(member) === 'offline' ? styles.memberAvatarOffline : styles.memberAvatarOnline,
+  ].filter(Boolean).join(' ')
+  return (
+    <div className={[styles.permissionPreviewRow, hidden ? styles.permissionPreviewRowHidden : ''].filter(Boolean).join(' ')}>
+      <div className={avatarCls}>
+        {member.avatar_data_url
+          ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          : name[0]?.toUpperCase()
+        }
+      </div>
+      <div>
+        <strong>{name}</strong>
+        <span>{memberChannelSubtitle(member, channelId)}</span>
+      </div>
     </div>
   )
 }
@@ -1947,9 +2043,10 @@ function MemberListItem({
 }
 
 /* ── 浮动用户卡片（Discord 风格，定位于右侧栏左侧）── */
-function MemberProfilePopover({ member, anchorY, onClose }: {
+function MemberProfilePopover({ member, anchorY, channel, onClose }: {
   member: ProjectMember
   anchorY: number
+  channel?: Channel
   onClose: () => void
 }) {
   const popRef = useRef<HTMLDivElement>(null)
@@ -1957,10 +2054,10 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
   const name = member.account || member.user_id
   const roleKey = memberPrimaryRoleKey(member)
   const roleHeadCls = {
-    owner: styles.popoverHeadOwner, admin: styles.popoverHeadAdmin,
-    developer: styles.popoverHeadEditor, dev: styles.popoverHeadEditor,
-    maintainer: styles.popoverHeadEditor, editor: styles.popoverHeadEditor,
-    collaborator: styles.popoverHeadEditor, builder: styles.popoverHeadEditor,
+    owner: styles.memberPopoverHeadOwner, admin: styles.memberPopoverHeadAdmin,
+    developer: styles.memberPopoverHeadEditor, dev: styles.memberPopoverHeadEditor,
+    maintainer: styles.memberPopoverHeadEditor, editor: styles.memberPopoverHeadEditor,
+    collaborator: styles.memberPopoverHeadEditor, builder: styles.memberPopoverHeadEditor,
   }[roleKey] ?? ''
   const [isFriend, setIsFriend] = useState(false)
   const [addingFriend, setAddingFriend] = useState(false)
@@ -2006,12 +2103,15 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
     member.user_id && ['用户 ID', member.user_id.slice(0, 14)],
     member.joined_at && ['加入时间', formatTime(member.joined_at)],
   ].filter(Boolean) as [string, string][]
+  const channelPermissions = memberChannelPermissions(member, channel?.id)
+  const channelCapabilityLabels = memberChannelCapabilityLabels(channelPermissions)
 
-  const POPOVER_WIDTH = 284
-  const POPOVER_HEIGHT = 280
+  const POPOVER_WIDTH = 300
+  const POPOVER_HEIGHT = 360
   const viewW = window.innerWidth
   const viewH = window.innerHeight
-  const popTop = Math.min(Math.max(anchorY - 20, 12), viewH - POPOVER_HEIGHT - 12)
+  const maxTop = Math.max(12, viewH - POPOVER_HEIGHT - 12)
+  const popTop = Math.min(Math.max(anchorY - 20, 12), maxTop)
   // 定位在右侧栏左侧（右侧栏约 280px）
   const popLeft = Math.max(8, viewW - 280 - POPOVER_WIDTH - 8)
 
@@ -2041,6 +2141,27 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
             {presenceLabel(status)}
           </em>
         </div>
+        {channel && channelPermissions && (
+          <div className={styles.memberPopoverChannel}>
+            <div>
+              <span>当前频道</span>
+              <strong>{channel.name}</strong>
+            </div>
+            <div className={styles.memberPopoverChannelPills}>
+              {channelCapabilityLabels.map((label) => (
+                <em
+                  key={label}
+                  className={[
+                    styles.memberPopoverPill,
+                    label === '无频道访问权限' ? styles.memberPopoverPillDanger : '',
+                  ].join(' ')}
+                >
+                  {label}
+                </em>
+              ))}
+            </div>
+          </div>
+        )}
         {details.length > 0 && (
           <div className={styles.memberPopoverDetails}>
             {details.map(([label, value]) => (
