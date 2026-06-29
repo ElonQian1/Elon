@@ -162,6 +162,7 @@ async fn run_server_runtime_inner(
     let guard = ToolGuard::new(workspace, runtime_permission);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(150))
+        .no_proxy()  // 绕过本机代理（HTTP_PROXY 可能指向 SOCKS5 端口，HTTP CONNECT 协议不兼容）
         .build()
         .unwrap_or_default();
     let server_url = config.server_url.clone();
@@ -206,6 +207,7 @@ async fn run_api_runtime_inner(
     let guard = ToolGuard::new(workspace, runtime_permission);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(150))
+        .no_proxy()  // 绕过本机代理（HTTP_PROXY 可能指向 SOCKS5 端口，HTTP CONNECT 协议不兼容）
         .build()
         .unwrap_or_default();
     let initial_model = Some(config.model.clone());
@@ -1065,8 +1067,43 @@ async fn call_api_runtime(
         let status = response.status();
         let body = limited_runtime_response_text(response, "本机 API runtime").await?;
         if status.is_success() {
-            return serde_json::from_str(&body).context("本机 API runtime 响应不是 JSON");
+            let parsed = serde_json::from_str::<Value>(&body)
+                .context("本机 API runtime 响应不是 JSON")?;
+            // 检查响应是否包含 tool_calls 或有效内容，避免"200 但内容无法处理"的情况
+            let has_tool_calls = parsed
+                .get("choices")
+                .and_then(Value::as_array)
+                .and_then(|c| c.first())
+                .and_then(|c| c.get("message"))
+                .and_then(|m| m.get("tool_calls"))
+                .and_then(Value::as_array)
+                .map(|tc| !tc.is_empty())
+                .unwrap_or(false);
+            let content_str = parsed
+                .get("choices")
+                .and_then(Value::as_array)
+                .and_then(|c| c.first())
+                .and_then(|c| c.get("message"))
+                .and_then(|m| m.get("content"))
+                .and_then(Value::as_str)
+                .unwrap_or("")
+                .trim();
+            let has_json_content = !content_str.is_empty()
+                && (content_str.starts_with('{') || content_str.starts_with('['));
+            if has_tool_calls || has_json_content {
+                return Ok(parsed);
+            }
+            // 200 但内容不可处理（模型返回了思考文字而非 JSON/tool_calls）→ 降级重试
+            if !attempted.contains(&(false, false)) {
+                tracing::warn!(
+                    "api-runtime 200 但内容不可处理（模式 json={json_mode}/tools={tools_mode}），降级到无工具 JSON 模式重试"
+                );
+                attempts.push_front((false, false));
+            }
+            last_error = Some((status, body));
+            continue;
         }
+        tracing::warn!("api-runtime {status} body[{}c]: {body}", body.len());
 
         let retry_without_json =
             json_mode && api_runtime_should_retry_without_json_mode(status, &body);
@@ -1121,7 +1158,11 @@ fn api_runtime_chat_payload(
         "messages": messages,
         "temperature": 0.2
     });
-    if json_mode {
+    // 当消息历史含 role:tool 时不发 json_object，避免部分模型（如混元）拒绝该组合
+    let has_tool_results = messages
+        .iter()
+        .any(|m| m.get("role").and_then(Value::as_str) == Some("tool"));
+    if json_mode && !has_tool_results {
         payload["response_format"] = json!({ "type": "json_object" });
     }
     if tools_mode {
