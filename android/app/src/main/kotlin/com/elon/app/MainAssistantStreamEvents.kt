@@ -34,9 +34,10 @@ internal class MainAssistantStreamEvents(
             handleFoldedCliOutput(content)
             return null
         }
+        val routineHeartbeat = isRoutineHeartbeatProgress(content)
         val surfaced = maybeAppendWorkflowProgressNarrative(content)
-        handleProgress(content, !surfaced)
-        if (surfaced) return null
+        handleProgress(content, !surfaced && !routineHeartbeat)
+        if (surfaced || routineHeartbeat) return null
         return if (shouldShowProgressBubble(content)) {
             ChatMessage("ai-progress", workflowProgressMessage(content))
         } else {

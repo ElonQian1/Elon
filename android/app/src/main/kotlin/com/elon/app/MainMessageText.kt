@@ -101,6 +101,8 @@ internal fun friendlyErrorMessage(raw: String, code: String? = null, retryable: 
     return when {
         isStructuredAiErrorCode(normalizedCode) && raw.isNotBlank() ->
             raw
+        source.contains("conversation worktree still has uncommitted changes") ->
+            "项目会话工作区里还有未提交改动，本轮改动已保留，但暂时不能自动合并。请稍后重试；如果仍失败，需要在 PC 节点提交或清理该会话工作区。"
         isTransientAiServiceConnectionError(source) ->
             transientAiServiceConnectionMessage(retryable)
         source.contains("free_quota_exhausted") ||

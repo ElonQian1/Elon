@@ -225,13 +225,15 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
             category: AiErrorCategory::Workspace,
             retryable: false,
             retry_after_secs: None,
-            message: detail
-                .as_deref()
-                .map(|value| truncate_chars(value, 180))
-                .filter(|value| !value.is_empty())
-                .unwrap_or_else(|| {
-                    "项目工作区准备失败，请检查项目 Git/worktree 状态后重试。".into()
-                }),
+            message: dirty_conversation_worktree_message(&lower).unwrap_or_else(|| {
+                detail
+                    .as_deref()
+                    .map(|value| truncate_chars(value, 180))
+                    .filter(|value| !value.is_empty())
+                    .unwrap_or_else(|| {
+                        "项目工作区准备失败，请检查项目 Git/worktree 状态后重试。".into()
+                    })
+            }),
             operator_detail: detail,
         };
     }
@@ -323,6 +325,14 @@ fn contains_workspace_error(lower: &str) -> bool {
         || lower.contains("合并回项目主分支失败")
 }
 
+fn dirty_conversation_worktree_message(lower: &str) -> Option<String> {
+    lower
+        .contains("conversation worktree still has uncommitted changes")
+        .then(|| {
+            "项目会话工作区里还有未提交改动，本轮改动已保留但暂时不能自动合并。请稍后重试；如果仍失败，需要在 PC 节点提交或清理该会话工作区。".into()
+        })
+}
+
 fn compact_detail(raw: &str) -> String {
     truncate_chars(&raw.split_whitespace().collect::<Vec<_>>().join(" "), 700)
 }
@@ -362,5 +372,16 @@ mod tests {
         let classified = classify_ai_error("invalid api key");
         assert_eq!(classified.code, "ai_auth_config_error");
         assert!(!classified.retryable);
+    }
+
+    #[test]
+    fn classifies_dirty_conversation_worktree_with_user_facing_message() {
+        let classified = classify_ai_error(
+            "PC CLI 执行失败: conversation worktree still has uncommitted changes: /tmp/worktree",
+        );
+
+        assert_eq!(classified.code, "project_workspace_error");
+        assert!(classified.message.contains("未提交改动"));
+        assert!(!classified.message.contains("/tmp/worktree"));
     }
 }

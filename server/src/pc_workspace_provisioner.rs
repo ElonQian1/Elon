@@ -287,6 +287,7 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
         .as_deref()
         .ok_or_else(|| anyhow!("isolated conversation workspace is missing branch"))?;
 
+    let saved_dirty_commit = ensure_conversation_workspace_committed(&active_workspace)?;
     if !worktree_clean(&active_workspace)? {
         return Ok(format!(
             "conversation worktree still has uncommitted changes: {}",
@@ -343,6 +344,12 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
 
     if before == after {
         Ok("conversation branch had no new commits".into())
+    } else if let Some(commit) = saved_dirty_commit {
+        Ok(format!(
+            "conversation branch merged: {} (saved dirty worktree as {})",
+            short_sha(&after),
+            short_sha(&commit)
+        ))
     } else {
         Ok(format!("conversation branch merged: {}", short_sha(&after)))
     }
@@ -420,6 +427,33 @@ fn worktree_clean(repo: &Path) -> Result<bool> {
         .is_empty())
 }
 
+fn ensure_conversation_workspace_committed(repo: &Path) -> Result<Option<String>> {
+    if worktree_clean(repo)? {
+        return Ok(None);
+    }
+    run_git_dynamic(repo, &["add", "-A"])?;
+    let output = Command::new("git")
+        .args(["commit", "-m", "chore(ai): 保存会话工作区改动"])
+        .current_dir(repo)
+        .output()
+        .context("failed to run git commit for conversation worktree")?;
+    if !output.status.success() {
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let detail = format!("{} {}", stdout.trim(), stderr.trim())
+            .trim()
+            .to_string();
+        if detail.contains("nothing to commit") {
+            return Ok(None);
+        }
+        return Err(anyhow!(
+            "conversation worktree auto-commit failed: {}",
+            detail
+        ));
+    }
+    git_output(repo, &["rev-parse", "HEAD"]).map(Some)
+}
+
 fn short_sha(sha: &str) -> String {
     sha.chars().take(12).collect()
 }
@@ -471,9 +505,14 @@ fn run_git_dynamic(repo: &Path, args: &[&str]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::prepare_conversation_workspace;
+    use super::{
+        ensure_conversation_workspace_committed, git_output, prepare_conversation_workspace,
+        worktree_clean,
+    };
     use elon_pc_dev_runtime::safe_path_part;
     use std::fs;
+    use std::path::Path;
+    use std::process::Command;
     use uuid::Uuid;
 
     #[test]
@@ -505,5 +544,46 @@ mod tests {
         assert_eq!(workspace.branch, None);
         assert_eq!(workspace.workspace_path, base.to_string_lossy().to_string());
         let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn dirty_conversation_workspace_is_auto_committed() {
+        let repo = std::env::temp_dir().join(format!(
+            "elon_dirty_conversation_{}",
+            Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&repo).expect("repo should create");
+        run_git(&repo, &["init"]);
+        run_git(&repo, &["config", "user.email", "ai@example.test"]);
+        run_git(&repo, &["config", "user.name", "AI Test"]);
+        fs::write(repo.join("README.md"), "seed\n").expect("seed file should write");
+        run_git(&repo, &["add", "README.md"]);
+        run_git(&repo, &["commit", "-m", "seed"]);
+
+        fs::write(repo.join("README.md"), "changed\n").expect("dirty file should write");
+        let commit = ensure_conversation_workspace_committed(&repo)
+            .expect("auto commit should succeed")
+            .expect("dirty workspace should create a commit");
+
+        assert!(!commit.is_empty());
+        assert!(worktree_clean(&repo).expect("status should be readable"));
+        let subject = git_output(&repo, &["log", "-1", "--pretty=%s"])
+            .expect("commit subject should be readable");
+        assert_eq!(subject, "chore(ai): 保存会话工作区改动");
+        let _ = fs::remove_dir_all(repo);
+    }
+
+    fn run_git(repo: &Path, args: &[&str]) {
+        let output = Command::new("git")
+            .args(args)
+            .current_dir(repo)
+            .output()
+            .expect("git should start");
+        assert!(
+            output.status.success(),
+            "git {:?} failed: {}",
+            args,
+            String::from_utf8_lossy(&output.stderr)
+        );
     }
 }

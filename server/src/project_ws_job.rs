@@ -445,21 +445,45 @@ pub(crate) async fn emit_project_job_event(
     raw: String,
 ) {
     let raw = enrich_project_ws_event(raw, task_id);
-    {
-        let mut backlog = job.backlog.lock().await;
-        backlog.push(raw.clone());
-        if backlog.len() > PROJECT_WS_BACKLOG_LIMIT {
-            let overflow = backlog.len() - PROJECT_WS_BACKLOG_LIMIT;
-            backlog.drain(0..overflow);
+    let ephemeral = is_ephemeral_progress_event(&raw);
+    if !ephemeral {
+        {
+            let mut backlog = job.backlog.lock().await;
+            backlog.push(raw.clone());
+            if backlog.len() > PROJECT_WS_BACKLOG_LIMIT {
+                let overflow = backlog.len() - PROJECT_WS_BACKLOG_LIMIT;
+                backlog.drain(0..overflow);
+            }
         }
+        let _ = state.store.record_task_event(task_id, &raw);
     }
-    let _ = state.store.record_task_event(task_id, &raw);
     if let Some(trace_id) = job.trace_id.as_deref() {
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
             record_server_message(state, trace_id, &value, raw.len());
         }
     }
     let _ = job.broadcaster.send(raw);
+}
+
+fn is_ephemeral_progress_event(raw: &str) -> bool {
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(raw) else {
+        return false;
+    };
+    if value.get("type").and_then(|value| value.as_str()) != Some("progress") {
+        return false;
+    }
+    let Some(message) = value.get("message").and_then(|value| value.as_str()) else {
+        return false;
+    };
+    is_cli_heartbeat_message(message)
+}
+
+fn is_cli_heartbeat_message(message: &str) -> bool {
+    let clean = message.split_whitespace().collect::<Vec<_>>().join(" ");
+    clean.starts_with("CLI 仍在运行")
+        || clean.starts_with("AI 还在思考（已等待 ")
+        || clean.starts_with("AI 还在后台处理（已等待 ")
+        || clean.contains(" 正在处理中…（已等待 ") && clean.ends_with("s）")
 }
 
 pub(crate) async fn cancel_project_ws_job(
@@ -502,4 +526,33 @@ fn schedule_project_job_cleanup(key: String, job: Arc<ProjectWsJob>) {
             jobs.remove(&key);
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_ephemeral_progress_event;
+    use crate::types::WsMessage;
+
+    #[test]
+    fn detects_model_processing_heartbeat_as_ephemeral() {
+        let raw = WsMessage::progress("Codex (GPT-5.5 · 推理 xhigh) 正在处理中…（已等待 235s）")
+            .to_json();
+
+        assert!(is_ephemeral_progress_event(&raw));
+    }
+
+    #[test]
+    fn detects_silent_cli_heartbeat_as_ephemeral() {
+        let raw =
+            WsMessage::progress("AI 还在后台处理（已等待 120 秒，本轮已静默 80 秒）…").to_json();
+
+        assert!(is_ephemeral_progress_event(&raw));
+    }
+
+    #[test]
+    fn keeps_meaningful_progress_events_in_history() {
+        let raw = WsMessage::progress("代码修改完成，正在提交并合并…").to_json();
+
+        assert!(!is_ephemeral_progress_event(&raw));
+    }
 }

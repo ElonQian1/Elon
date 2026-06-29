@@ -120,10 +120,8 @@ pub async fn run_for_project_in_workspace(
                 && node_cli_available(state, agent_id, "copilot").await
             {
                 let _ = tx.send(
-                    WsMessage::progress(
-                        "Codex 额度已用尽，正在自动切换到 Copilot 继续执行…",
-                    )
-                    .to_json(),
+                    WsMessage::progress("Codex 额度已用尽，正在自动切换到 Copilot 继续执行…")
+                        .to_json(),
                 );
                 if let Err(e2) = ai_cli::run_with_pc_agent_workspace(
                     agent_id,
@@ -143,11 +141,19 @@ pub async fn run_for_project_in_workspace(
                 .await
                 {
                     error!("Copilot 回退执行出错: {}", e2);
-                    let _ = tx.send(WsMessage::error(e2.to_string()).to_json());
+                    let _ = tx.send(
+                        WsMessage::classified_error(crate::errors::classify_ai_error(
+                            &e2.to_string(),
+                        ))
+                        .to_json(),
+                    );
                 }
             } else {
                 error!("PC 本地项目代理运行出错: {}", e);
-                let _ = tx.send(WsMessage::error(error_str).to_json());
+                let _ = tx.send(
+                    WsMessage::classified_error(crate::errors::classify_ai_error(&error_str))
+                        .to_json(),
+                );
             }
         }
         return;
@@ -227,7 +233,9 @@ pub async fn run_for_project_in_workspace(
     .await
     {
         error!("项目级 AI 代理运行出错: {}", e);
-        let _ = tx.send(WsMessage::error(e.to_string()).to_json());
+        let _ = tx.send(
+            WsMessage::classified_error(crate::errors::classify_ai_error(&e.to_string())).to_json(),
+        );
     }
 }
 
@@ -290,10 +298,8 @@ pub async fn plan_for_project_in_workspace(
                 && node_cli_available(state, agent_id, "copilot").await
             {
                 let _ = tx.send(
-                    WsMessage::progress(
-                        "Codex 额度已用尽，正在自动切换到 Copilot 继续规划…",
-                    )
-                    .to_json(),
+                    WsMessage::progress("Codex 额度已用尽，正在自动切换到 Copilot 继续规划…")
+                        .to_json(),
                 );
                 if let Err(e2) = ai_cli::run_with_pc_agent_workspace(
                     agent_id,

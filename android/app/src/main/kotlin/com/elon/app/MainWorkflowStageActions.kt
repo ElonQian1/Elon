@@ -11,6 +11,7 @@ internal class MainWorkflowStageActions(
     fun handleProgress(content: String, recordProgressEvidence: Boolean = true) {
         val lower = content.lowercase(Locale.CHINA)
         val facing = userFacingProgress(content)
+        val routineHeartbeat = isRoutineHeartbeatProgress(content)
         when {
             content.contains("进入队列") || content.contains("排队") ->
                 updateStage("任务排队", facing)
@@ -43,10 +44,12 @@ internal class MainWorkflowStageActions(
             else ->
                 updateStage("开发实现", facing)
         }
-        if (recordProgressEvidence && !content.startsWith("CLI 仍在运行")) {
+        if (recordProgressEvidence && !routineHeartbeat) {
             recordEvidence("progress", userFacingProgress(content))
         }
-        addProjectEvent("进度更新：${summarize(content, 30)}")
+        if (!routineHeartbeat) {
+            addProjectEvent("进度更新：${summarize(content, 30)}")
+        }
     }
 
     fun handleTaskEvent(event: String, taskId: String?, content: String) {

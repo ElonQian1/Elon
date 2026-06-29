@@ -24,13 +24,30 @@ internal fun initialWorkflowMessage(isDevelopment: Boolean): String {
     return if (isDevelopment) "正在按这个计划推进。" else "正在整理回复。"
 }
 
+private val modelProcessingHeartbeatRegex =
+    Regex("""^.+ \(.+\) 正在处理中…（已等待 \d+s）$""")
+private val thinkingHeartbeatRegex =
+    Regex("""^AI 还在思考（已等待 \d+ 秒）…$""")
+private val backgroundHeartbeatRegex =
+    Regex("""^AI 还在后台处理（已等待 \d+ 秒，本轮已静默 \d+ 秒）…$""")
+
+internal fun isRoutineHeartbeatProgress(content: String): Boolean {
+    val clean = content.replace(Regex("\\s+"), " ").trim()
+    return clean.startsWith("CLI 仍在运行") ||
+        modelProcessingHeartbeatRegex.matches(clean) ||
+        thinkingHeartbeatRegex.matches(clean) ||
+        backgroundHeartbeatRegex.matches(clean)
+}
+
 internal fun workflowProgressMessage(content: String): String {
+    if (isRoutineHeartbeatProgress(content)) return "正在思考"
     val progress = userFacingProgress(content.ifBlank { "正在推进当前任务。" })
     if (progress == "正在思考") return progress
     return "${progressStepLabel(progress)}：$progress"
 }
 
 internal fun shouldShowProgressBubble(content: String): Boolean {
+    if (isRoutineHeartbeatProgress(content)) return false
     val progress = userFacingProgress(content)
     return !isRoutineWorkflowMessage(workflowProgressMessage(content)) &&
         !isRoutineWorkflowMessage(progress) &&
@@ -52,6 +69,7 @@ internal fun shouldShowProgressBubble(content: String): Boolean {
 }
 
 internal fun userFacingProgress(content: String): String {
+    if (isRoutineHeartbeatProgress(content)) return "正在思考"
     extractUserVisibleCliMessage(content)?.let { return it }
     return when {
         content.startsWith("AI 回复片段") ->
