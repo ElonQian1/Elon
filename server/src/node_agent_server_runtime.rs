@@ -162,7 +162,6 @@ async fn run_server_runtime_inner(
     let guard = ToolGuard::new(workspace, runtime_permission);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(150))
-        .no_proxy()  // 绕过本机代理（HTTP_PROXY 可能指向 SOCKS5 端口，HTTP CONNECT 协议不兼容）
         .build()
         .unwrap_or_default();
     let server_url = config.server_url.clone();
@@ -207,7 +206,7 @@ async fn run_api_runtime_inner(
     let guard = ToolGuard::new(workspace, runtime_permission);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(150))
-        .no_proxy()  // 绕过本机代理（HTTP_PROXY 可能指向 SOCKS5 端口，HTTP CONNECT 协议不兼容）
+        .no_proxy()  // 绕过本机代理（代理可能停止或不稳定，混元 API 支持直连）
         .build()
         .unwrap_or_default();
     let initial_model = Some(config.model.clone());
@@ -1094,11 +1093,20 @@ async fn call_api_runtime(
                 return Ok(parsed);
             }
             // 200 但内容不可处理（模型返回了思考文字而非 JSON/tool_calls）→ 降级重试
-            if !attempted.contains(&(false, false)) {
+            // 优先保留 json_object 去掉 tools；再其次完全降级
+            let degraded_mode = if json_mode && tools_mode && !attempted.contains(&(true, false)) {
+                Some((true, false))
+            } else if !attempted.contains(&(false, false)) {
+                Some((false, false))
+            } else {
+                None
+            };
+            if let Some(next) = degraded_mode {
                 tracing::warn!(
-                    "api-runtime 200 但内容不可处理（模式 json={json_mode}/tools={tools_mode}），降级到无工具 JSON 模式重试"
+                    "api-runtime 200 但内容不可处理（模式 json={json_mode}/tools={tools_mode}），降级到 json={}/tools={} 重试",
+                    next.0, next.1
                 );
-                attempts.push_front((false, false));
+                attempts.push_front(next);
             }
             last_error = Some((status, body));
             continue;
