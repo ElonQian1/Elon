@@ -29,9 +29,9 @@ internal class ChatAiSideMenuView(
     private val openPersonalProject: (Int) -> Unit,
     private val openJointProject: (Int) -> Unit,
     private val openProjectSpace: () -> Unit,
-    private val copyConversationIdentity: (Int) -> Unit,
+    private val renameConversation: (Int) -> Unit,
     private val isConversationWorking: (Int) -> Boolean,
-    private val showCreateConversationDialog: () -> Unit,
+    private val createConversationAndOpen: () -> Unit,
     private val requestClose: (Boolean) -> Unit,
     private val bottomReservedHeightDp: Int,
     private val dp: (Int) -> Int,
@@ -307,7 +307,10 @@ internal class ChatAiSideMenuView(
                         requestClose(true)
                         openConversation(index)
                     },
-                    onLongClick = { copyConversationIdentity(index) }
+                    onLongClick = {
+                        requestClose(true)
+                        postDelayed({ renameConversation(index) }, DURATION_MS)
+                    }
                 )
             )
         }
@@ -340,7 +343,7 @@ internal class ChatAiSideMenuView(
                     setPadding(dp(4), dp(4), dp(4), dp(4))
                     setOnClickListener {
                         requestClose(true)
-                        postDelayed({ showCreateConversationDialog() }, DURATION_MS)
+                        postDelayed({ createConversationAndOpen() }, DURATION_MS)
                     }
                 },
                 LinearLayout.LayoutParams(dp(38), dp(38)).apply {

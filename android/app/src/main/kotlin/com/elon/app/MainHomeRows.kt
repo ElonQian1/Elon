@@ -56,7 +56,7 @@ internal class MainHomeRows(
     private val openProject: (Int) -> Unit,
     private val showProjectActions: (Int, View?) -> Unit,
     private val openConversation: (Int) -> Unit,
-    private val showConversationActions: (Int) -> Unit,
+    private val showRenameConversationDialog: (Int) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
 ) {
@@ -420,7 +420,7 @@ internal class MainHomeRows(
             foreground = selectableForeground()
             setOnClickListener { openConversation(index) }
             setOnLongClickListener {
-                showConversationActions(index)
+                showRenameConversationDialog(index)
                 true
             }
         }

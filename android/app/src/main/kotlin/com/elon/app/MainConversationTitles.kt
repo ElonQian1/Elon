@@ -10,6 +10,7 @@ private val AUTO_CONVERSATION_PLACEHOLDER_TITLES = setOf(
 )
 
 internal fun shouldAutoGenerateConversationTitle(conversation: AppConversation): Boolean {
+    if (conversation.titleManuallyEdited) return false
     val title = conversation.title.trim()
     return title.startsWith("新会话") || title in AUTO_CONVERSATION_PLACEHOLDER_TITLES
 }

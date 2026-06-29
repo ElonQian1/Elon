@@ -545,6 +545,7 @@ class MainActivity : AppCompatActivity() {
             refreshServerVersion = { profileQuickActions.refreshServerVersion() },
             openConversation = conversationOpenActions::openConversation,
             showConversationActions = { index -> conversationActions.showConversationActions(index) },
+            showRenameConversationDialog = { index -> conversationActions.showRenameConversationDialog(index) },
             showHomeActionPopup = { anchor, tab -> actionPopups.showHomeActionPopup(anchor, tab) },
             showChatActionPopup = { anchor -> actionPopups.showChatActionPopup(anchor) },
             showContactChatSettings = { showActiveContactChatSettings() },
@@ -690,7 +691,7 @@ class MainActivity : AppCompatActivity() {
                     .takeIf { it >= 0 } ?: s.activeProjectIndex
                 conversationOpenActions.openProjectSpaceConversation(idx, conversationIndex)
             },
-            showCreateAndOpenPersonalConversation = { title, onCreated -> conversationActions.showCreateConversationDialog(title, onCreated) },
+            showCreateAndOpenPersonalConversation = { title, onCreated -> conversationActions.createConversationAndOpen(title, onCreated) },
             selectedAgentForRequest = { modelActions.selectedAgentForRequest() },
             selectedRuntimeRouteForRequest = { modelActions.selectedRuntimeRouteForRequest() },
             onProjectDescriptionUpdated = ::updateProjectDescriptionFromSpace,
@@ -709,7 +710,7 @@ class MainActivity : AppCompatActivity() {
             conversations = { projectStateActions.conversations },
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             openConversation = conversationOpenActions::openConversation,
-            copyConversationIdentity = conversationIdentityActions::copyConversationIdentity,
+            renameConversation = { index -> conversationActions.showRenameConversationDialog(index) },
             isConversationWorking = homeListActions::isConversationWorking,
             showProjectShareSideMenu = { friendChatActions.isActive() || groupChatActions.isActive() },
             projects = { s.projects },
@@ -726,7 +727,7 @@ class MainActivity : AppCompatActivity() {
             },
             openProjectManagement = { openProjectSpaceForProject(s.activeProjectIndex, true) },
             sendProjectShare = chatProjectShareActions::sendToCurrentChat,
-            showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
+            createConversationAndOpen = { conversationActions.createConversationAndOpen() },
             confirmLogout = { accountActions().confirmLogout() },
             dismissActionPopup = {
                 actionPopup?.dismiss()
@@ -748,6 +749,7 @@ class MainActivity : AppCompatActivity() {
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             chatAdapterProvider = { chatAdapter },
             titleEditText = { value -> mainTitleEditText(this, value, uiTools::dp) },
+            openConversation = { index -> conversationOpenActions.openConversation(index) },
             saveConversations = projectStateActions::saveConversations,
             renderConversationList = homeListActions::renderConversationList,
             setSendEnabled = { enabled -> inputActions.sendEnabledActions.setSendEnabled(enabled) },
@@ -1019,7 +1021,7 @@ class MainActivity : AppCompatActivity() {
             },
             showProjectActions = { index, anchor -> projectActions.showProjectActions(index, anchor) },
             openConversation = conversationOpenActions::openConversation,
-            showConversationActions = { index -> conversationActions.showConversationActions(index) },
+            showRenameConversationDialog = { index -> conversationActions.showRenameConversationDialog(index) },
             dp = uiTools::dp,
             selectableForeground = uiTools::selectableForeground
         ).also { homeRows = it }
@@ -1396,7 +1398,7 @@ class MainActivity : AppCompatActivity() {
             activity = this,
             binding = binding,
             activeConversation = projectStateActions::activeConversation,
-            showCreateConversationDialog = { conversationActions.showCreateConversationDialog() },
+            createConversationAndOpen = { conversationActions.createConversationAndOpen() },
             showChat = { navigationController.showChat() },
             sendMessage = { inputActions.sendMessageActions.sendMessage() },
             enablePlanModeWithStarterPrompt = { inputActions.enablePlanModeWithStarterPrompt() }
@@ -1449,8 +1451,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun sendSelectedDiscussionToAi(prompt: String) {
         if (projectStateActions.activeConversation().ended) {
-            conversationActions.showCreateConversationDialog()
-            return
+            conversationActions.createConversationAndOpen()
         }
         friendChatActions.closeFriendChat()
         groupChatActions.closeGroupChat()

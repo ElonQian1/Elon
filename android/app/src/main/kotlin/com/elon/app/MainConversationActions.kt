@@ -15,34 +15,25 @@ internal class MainConversationActions(
     private val setActiveConversationIndex: (Int) -> Unit,
     private val chatAdapterProvider: () -> ChatAdapter,
     private val titleEditText: (String) -> EditText,
+    private val openConversation: (Int) -> Unit,
     private val saveConversations: () -> Unit,
     private val renderConversationList: () -> Unit,
     private val setSendEnabled: (Boolean) -> Unit,
     private val onConversationsChanged: () -> Unit = {}
 ) {
-    fun showCreateConversationDialog(suggestedTitle: String? = null, onCreated: ((Int) -> Unit)? = null) {
+    fun createConversationAndOpen(suggestedTitle: String? = null, onCreated: ((Int) -> Unit)? = null) {
         val conversations = conversationsProvider()
-        val input = titleEditText(suggestedTitle ?: "新会话 ${conversations.size + 1}")
-        val dialog = AlertDialog.Builder(activity)
-            .setTitle("新建会话")
-            .setView(input)
-            .setNegativeButton("取消", null)
-            .setPositiveButton("创建", null)
-            .create()
-
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
-                val title = input.text.toString().trim()
-                if (title.isBlank()) {
-                    input.error = "请输入会话标题"
-                    return@setOnClickListener
-                }
-                createConversation(title, onCreated)
-                dialog.dismiss()
-            }
+        val title = suggestedTitle
+            ?.trim()
+            ?.takeIf { it.isNotBlank() }
+            ?: "新会话 ${conversations.size + 1}"
+        val index = createConversation(title)
+        setActiveConversationIndex(index)
+        if (onCreated != null) {
+            onCreated(index)
+        } else {
+            openConversation(index)
         }
-        dialog.show()
-        input.selectAll()
     }
 
     fun showConversationActions(index: Int) {
@@ -67,7 +58,7 @@ internal class MainConversationActions(
             .show()
     }
 
-    private fun createConversation(title: String, onCreated: ((Int) -> Unit)? = null) {
+    private fun createConversation(title: String): Int {
         val conversations = conversationsProvider()
         val project = activeProjectProvider()
         conversations.add(newAppConversation(title, "点击进入开发会话"))
@@ -76,10 +67,10 @@ internal class MainConversationActions(
         saveConversations()
         renderConversationList()
         onConversationsChanged()
-        onCreated?.invoke(conversations.lastIndex)
+        return conversations.lastIndex
     }
 
-    private fun showRenameConversationDialog(index: Int) {
+    fun showRenameConversationDialog(index: Int) {
         val conversations = conversationsProvider()
         if (index !in conversations.indices) return
         val conversation = conversations[index]
@@ -99,6 +90,7 @@ internal class MainConversationActions(
                     return@setOnClickListener
                 }
                 conversation.title = summarize(title, 24)
+                conversation.titleManuallyEdited = true
                 conversation.updatedAt = System.currentTimeMillis()
                 saveConversations()
                 renderConversationList()

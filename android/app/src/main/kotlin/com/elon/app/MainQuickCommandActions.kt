@@ -8,7 +8,7 @@ internal class MainQuickCommandActions(
     private val activity: AppCompatActivity,
     private val binding: ActivityMainBinding,
     private val activeConversation: () -> AppConversation,
-    private val showCreateConversationDialog: () -> Unit,
+    private val createConversationAndOpen: () -> Unit,
     private val showChat: () -> Unit,
     private val sendMessage: () -> Unit,
     private val enablePlanModeWithStarterPrompt: () -> Unit
@@ -20,8 +20,7 @@ internal class MainQuickCommandActions(
 
     fun sendQuickCommand(text: String) {
         if (activeConversation().ended) {
-            showCreateConversationDialog()
-            return
+            createConversationAndOpen()
         }
         showChat()
         replaceInput(text)

@@ -31,6 +31,7 @@ internal class MainNavigationController(
     private val refreshServerVersion: () -> Unit,
     private val openConversation: (Int) -> Unit,
     private val showConversationActions: (Int) -> Unit,
+    private val showRenameConversationDialog: (Int) -> Unit,
     private val showHomeActionPopup: (View, TextView) -> Unit,
     private val showChatActionPopup: (View) -> Unit,
     private val showContactChatSettings: () -> Unit,
@@ -81,7 +82,7 @@ internal class MainNavigationController(
         binding.projectPlazaTopTabWrap.setOnClickListener { showProjectPlaza() }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
-            showConversationActions(0)
+            showRenameConversationDialog(0)
             true
         }
         binding.searchButton.setOnClickListener { showFriendLocalSearch() }
