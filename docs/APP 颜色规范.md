@@ -55,6 +55,13 @@
 | 成功 / 无需审批 / 可安装状态点 | `color.status.success` | `elon_status_success` | `--success` | `#58BE6A` | 图 2 绿色状态点 |
 | 项目状态 / 好友页下拉筛选项目进度 | `color.status.project` | `elon_status_project` | `--pull-filter-project` | `#F2C94C` | 好友页项目角标与项目筛选进度 |
 | 需审批 / 异常状态点 | `color.status.danger` | `elon_status_danger` | `--danger` | `#E62129` | 图 2 红色状态点 |
+| 项目空间商店详情背景 | `color.store.detail.bg` | `elon_store_detail_bg` | `--store-detail-bg` | `#131313` | 2026-06-29 Google Play 详情页参考图 |
+| 项目空间商店详情主文字 | `color.store.detail.text.primary` | `elon_store_detail_text_primary` | `--store-detail-ink` | `#E3E3E3` | 2026-06-29 Google Play 详情页参考图 |
+| 项目空间商店详情次文字 | `color.store.detail.text.secondary` | `elon_store_detail_text_secondary` | `--store-detail-muted` | `#C6C6C6` | 2026-06-29 Google Play 详情页参考图 |
+| 项目空间商店详情链接蓝 | `color.store.detail.link` | `elon_store_detail_link` | `--store-detail-link` | `#A8C7FA` | 2026-06-29 Google Play 详情页参考图 |
+| 项目空间商店详情分隔线 | `color.store.detail.divider` | `elon_store_detail_divider` | `--store-detail-divider` | `#444444` | 2026-06-29 Google Play 详情页参考图 |
+| 项目空间商店详情安装按钮 | `color.store.detail.button` | `elon_store_detail_button` | `--store-detail-button` | `#AEC6F6` | 2026-06-29 Google Play 详情页参考图 |
+| 项目空间商店详情安装按钮文字 | `color.store.detail.button.text` | `elon_store_detail_button_text` | `--store-detail-button-ink` | `#182E63` | 2026-06-29 Google Play 详情页参考图 |
 
 ### 颜色使用规则
 

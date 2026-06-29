@@ -45,4 +45,12 @@
 
     <color name="elon_nav_bg">#1A1A1A</color>
     <color name="elon_nav_active_bg">#1A1A1A</color>
+
+    <color name="elon_store_detail_bg">#131313</color>
+    <color name="elon_store_detail_text_primary">#E3E3E3</color>
+    <color name="elon_store_detail_text_secondary">#C6C6C6</color>
+    <color name="elon_store_detail_link">#A8C7FA</color>
+    <color name="elon_store_detail_divider">#444444</color>
+    <color name="elon_store_detail_button">#AEC6F6</color>
+    <color name="elon_store_detail_button_text">#182E63</color>
 </resources>

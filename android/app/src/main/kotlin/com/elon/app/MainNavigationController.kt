@@ -229,6 +229,7 @@ internal class MainNavigationController(
     }
 
     private fun applyBottomTabChrome(tab: TextView) {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach {
             updateBottomTabVisual(it, it == tab)
         }
@@ -790,6 +791,7 @@ internal class MainNavigationController(
     }
 
     private fun applyChatChrome() {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
@@ -804,6 +806,7 @@ internal class MainNavigationController(
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
+        binding.moreButton.setImageResource(R.drawable.ic_more_horizontal)
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.moreButton.contentDescription = "聊天功能"
         binding.stageHintText.visibility = View.VISIBLE
@@ -816,6 +819,7 @@ internal class MainNavigationController(
     }
 
     private fun applyConversationHomeChrome() {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         updateBottomTabSelection(binding.tabChat)
         binding.conversationPage.visibility = View.VISIBLE
         binding.projectPage.visibility = View.GONE
@@ -839,6 +843,7 @@ internal class MainNavigationController(
     }
 
     private fun applyFriendChatChrome(title: String) {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         updateBottomTabSelection(binding.tabChat)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
@@ -853,6 +858,7 @@ internal class MainNavigationController(
         binding.projectMembersButton.visibility = View.GONE
         updateFriendVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
+        binding.moreButton.setImageResource(R.drawable.ic_more_horizontal)
         binding.moreButton.setOnClickListener { showContactChatSettings() }
         binding.moreButton.contentDescription = "聊天设置"
         binding.quickActionStrip.visibility = View.GONE
@@ -862,6 +868,7 @@ internal class MainNavigationController(
     }
 
     private fun applyProjectHomeChrome() {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.projectPage.visibility = View.VISIBLE
@@ -890,6 +897,7 @@ internal class MainNavigationController(
     }
 
     private fun applyMarketplaceChrome() {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.GONE
@@ -915,6 +923,7 @@ internal class MainNavigationController(
     }
 
     private fun applyProjectSpaceChrome(title: String) {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_store_detail_bg))
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.GONE
@@ -927,10 +936,12 @@ internal class MainNavigationController(
         binding.backButton.visibility = View.VISIBLE
         binding.searchButton.visibility = View.GONE
         binding.addButton.visibility = View.GONE
-        binding.projectMembersButton.visibility = View.VISIBLE
-        binding.projectMembersButton.setOnClickListener { showProjectMembers() }
+        binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
-        binding.moreButton.visibility = View.GONE
+        binding.moreButton.visibility = View.VISIBLE
+        binding.moreButton.setImageResource(R.drawable.ic_more_vertical)
+        binding.moreButton.setOnClickListener { showProjectMembers() }
+        binding.moreButton.contentDescription = "项目成员"
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
         binding.topTitleText.visibility = View.GONE
@@ -947,6 +958,7 @@ internal class MainNavigationController(
     }
 
     private fun applyProjectChannelChrome(title: String) {
+        binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         updateBottomTabSelection(binding.tabProject)
         binding.conversationPage.visibility = View.GONE
         binding.chatPage.visibility = View.VISIBLE
