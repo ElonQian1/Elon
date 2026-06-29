@@ -1409,6 +1409,12 @@
   font-weight: 800;
 }
 
+.permissionPreviewNote {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
 .permissionPreviewList {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1447,9 +1453,22 @@
 .permissionPreviewRow strong {
   color: var(--text);
   font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.permissionPreviewRow strong em {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(250,174,64,.12);
+  color: #faae40;
+  font-size: 9px;
+  font-style: normal;
 }
 
 .permissionPreviewRow span {

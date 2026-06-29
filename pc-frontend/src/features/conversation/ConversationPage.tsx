@@ -925,6 +925,29 @@ const CHANNEL_PERMISSION_OPTIONS: PermissionOption[] = [
   { key: 'manage_channel', label: '管理频道权限' },
 ]
 
+const ROLE_PERMISSION_VIEW_MEMBERS = 'view_members'
+const ROLE_PERMISSION_SEND_MESSAGES = 'send_messages'
+const ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS = 'manage_project_settings'
+
+const BUILTIN_ROLE_PERMISSIONS: Record<string, string[]> = {
+  owner: [
+    ROLE_PERMISSION_VIEW_MEMBERS,
+    ROLE_PERMISSION_SEND_MESSAGES,
+    ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS,
+  ],
+  admin: [
+    ROLE_PERMISSION_VIEW_MEMBERS,
+    ROLE_PERMISSION_SEND_MESSAGES,
+    ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS,
+  ],
+  editor: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  developer: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  maintainer: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  member: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  observer: [ROLE_PERMISSION_VIEW_MEMBERS],
+  viewer: [ROLE_PERMISSION_VIEW_MEMBERS],
+}
+
 function channelCanManage(channel: Channel) {
   const permissions = channel.permissions ?? {}
   return !!(permissions.can_manage || permissions.canManage)
@@ -972,6 +995,120 @@ function membersForChannel(members: ProjectMember[], channelId?: string) {
   return members.filter(member => memberCanViewChannel(member, channelId))
 }
 
+function projectedMemberChannelPermissions({
+  member,
+  channel,
+  categoryId,
+  roles,
+  categoryRoleOverrides,
+  categoryMemberOverrides,
+  channelRoleOverrides,
+  channelMemberOverrides,
+}: {
+  member: ProjectMember
+  channel?: Channel
+  categoryId?: string
+  roles: ProjectRole[]
+  categoryRoleOverrides: PermissionOverride[]
+  categoryMemberOverrides: PermissionOverride[]
+  channelRoleOverrides: PermissionOverride[]
+  channelMemberOverrides: PermissionOverride[]
+}): ChannelPermissions {
+  if (!channel) {
+    return memberChannelPermissions(member) ?? {
+      can_view: true,
+      can_send: false,
+      can_start_ai: false,
+      can_manage: false,
+    }
+  }
+  const roleIds = memberRoleIds(member)
+  const channelKind = clean(channel.kind ?? '').toLowerCase()
+  if (roleIds.includes('owner')) {
+    return {
+      can_view: true,
+      can_send: channelKind !== 'docs',
+      can_start_ai: channelKind === 'ai_development',
+      can_manage: true,
+    }
+  }
+
+  const applyDraft = (permission: string, base: boolean) => {
+    let next = base
+    if (channel.category_id && channel.category_id === categoryId && channel.permission_sync !== false) {
+      next = applyRolePermissionOverrides(next, roleIds, categoryRoleOverrides, permission)
+      next = applyMemberPermissionOverride(next, member.user_id, categoryMemberOverrides, permission)
+    }
+    next = applyRolePermissionOverrides(next, roleIds, channelRoleOverrides, permission)
+    return applyMemberPermissionOverride(next, member.user_id, channelMemberOverrides, permission)
+  }
+
+  const canViewBase = projectMemberHasRolePermission(member, roles, ROLE_PERMISSION_VIEW_MEMBERS)
+  const canSendBase = projectMemberHasRolePermission(member, roles, ROLE_PERMISSION_SEND_MESSAGES)
+    && channelKind !== 'docs'
+    && channelKind !== 'announcements'
+  const canStartAiBase = ['owner', 'admin', 'editor', 'developer', 'maintainer']
+    .includes(memberPrimaryRoleKey(member)) && channelKind === 'ai_development'
+  const canManageBase = projectMemberHasRolePermission(member, roles, ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS)
+
+  return {
+    can_view: applyDraft('view_channel', canViewBase),
+    can_send: channelKind === 'docs' ? false : applyDraft('send_messages', canSendBase),
+    can_start_ai: channelKind === 'ai_development' && applyDraft('start_ai_tasks', canStartAiBase),
+    can_manage: applyDraft('manage_channel', canManageBase),
+  }
+}
+
+function memberRoleIds(member: ProjectMember) {
+  const ids = [
+    member.role,
+    ...(member.roles ?? []).map((role) => role.id),
+  ]
+  return Array.from(new Set(ids.map((id) => clean(id ?? '').toLowerCase()).filter(Boolean)))
+}
+
+function projectMemberHasRolePermission(member: ProjectMember, roles: ProjectRole[], permission: string) {
+  return memberRoleIds(member).some((roleId) => {
+    if (roleId === 'owner') return true
+    const role = roles.find((item) => clean(item.id).toLowerCase() === roleId)
+    const permissions = role?.permissions?.length ? role.permissions : BUILTIN_ROLE_PERMISSIONS[roleId]
+    return !!permissions?.includes(permission)
+  })
+}
+
+function applyRolePermissionOverrides(base: boolean, roleIds: string[], overrides: PermissionOverride[], permission: string) {
+  if (roleIds.length === 0) return false
+  let denied = false
+  let allowed = false
+  for (const override of overrides) {
+    const roleId = clean(String(override.role_id ?? override.roleId ?? '')).toLowerCase()
+    if (!roleId || !roleIds.includes(roleId)) continue
+    if ((override.deny ?? []).includes(permission)) denied = true
+    if ((override.allow ?? []).includes(permission)) allowed = true
+  }
+  if (denied) return false
+  if (allowed) return true
+  return base
+}
+
+function applyMemberPermissionOverride(base: boolean, memberId: string, overrides: PermissionOverride[], permission: string) {
+  const targetId = clean(memberId)
+  const effects = overrides.filter((override) =>
+    clean(String(override.user_id ?? override.userId ?? '')) === targetId
+  )
+  if (effects.some((override) => (override.deny ?? []).includes(permission))) return false
+  if (effects.some((override) => (override.allow ?? []).includes(permission))) return true
+  return base
+}
+
+function channelPermissionsChanged(next: ChannelPermissions, current?: ChannelPermissions) {
+  if (!current) return false
+  return memberChannelCanView(next) !== memberChannelCanView(current)
+    || channelPermissionValue(next, 'can_send', 'canSend') !== channelPermissionValue(current, 'can_send', 'canSend')
+    || channelPermissionValue(next, 'can_start_ai', 'canStartAi') !== channelPermissionValue(current, 'can_start_ai', 'canStartAi')
+    || channelPermissionValue(next, 'can_manage', 'canManage') !== channelPermissionValue(current, 'can_manage', 'canManage')
+}
+
 function filterMembers(members: ProjectMember[], query: string) {
   const needle = clean(query).toLowerCase()
   if (!needle) return members
@@ -1004,6 +1141,10 @@ function memberSubtitle(member: ProjectMember) {
 
 function memberChannelSubtitle(member: ProjectMember, channelId?: string) {
   const permissions = memberChannelPermissions(member, channelId)
+  return memberChannelSubtitleForPermissions(member, permissions)
+}
+
+function memberChannelSubtitleForPermissions(member: ProjectMember, permissions?: ChannelPermissions) {
   if (!permissions) return memberSubtitle(member)
   const parts = memberChannelCapabilityLabels(permissions)
   if (!memberChannelCanView(permissions)) return parts[0] ?? '无频道访问权限'
@@ -1539,7 +1680,13 @@ function PermissionDrawer({
             <ChannelMemberPermissionPreview
               channel={selectedChannel}
               channelId={channelId}
+              categoryId={categoryId}
+              roles={roles}
               members={members}
+              categoryRoleOverrides={categoryRoleOverrides}
+              categoryMemberOverrides={categoryMemberOverrides}
+              channelRoleOverrides={channelRoleOverrides}
+              channelMemberOverrides={channelMemberOverrides}
             />
             <PermissionRoleGrid
               roles={roles}
@@ -1568,20 +1715,52 @@ function PermissionDrawer({
 function ChannelMemberPermissionPreview({
   channel,
   channelId,
+  categoryId,
+  roles,
   members,
+  categoryRoleOverrides,
+  categoryMemberOverrides,
+  channelRoleOverrides,
+  channelMemberOverrides,
 }: {
   channel?: Channel
   channelId: string
+  categoryId?: string
+  roles: ProjectRole[]
   members: ProjectMember[]
+  categoryRoleOverrides: PermissionOverride[]
+  categoryMemberOverrides: PermissionOverride[]
+  channelRoleOverrides: PermissionOverride[]
+  channelMemberOverrides: PermissionOverride[]
 }) {
-  const hasPermissionMap = membersHaveChannelPermissionMap(members, channelId)
-  const visibleMembers = membersForChannel(members, channelId)
-  const hiddenMembers = hasPermissionMap
-    ? members.filter((member) => !memberCanViewChannel(member, channelId))
-    : []
-  const onlineCount = visibleMembers.filter((member) => memberPresenceStatus(member) !== 'offline').length
-  const previewMembers = sortMembersForPanel(visibleMembers).slice(0, 8)
-  const hiddenPreview = sortMembersForPanel(hiddenMembers).slice(0, 3)
+  const entries = members.map((member) => {
+    const permissions = projectedMemberChannelPermissions({
+      member,
+      channel,
+      categoryId,
+      roles,
+      categoryRoleOverrides,
+      categoryMemberOverrides,
+      channelRoleOverrides,
+      channelMemberOverrides,
+    })
+    const savedPermissions = memberChannelPermissions(member, channelId)
+    return {
+      member,
+      permissions,
+      changed: channelPermissionsChanged(permissions, savedPermissions),
+    }
+  })
+  const visibleEntries = entries
+    .filter((entry) => memberChannelCanView(entry.permissions))
+    .sort((left, right) => compareMembersForPanel(left.member, right.member))
+  const hiddenEntries = entries
+    .filter((entry) => !memberChannelCanView(entry.permissions))
+    .sort((left, right) => compareMembersForPanel(left.member, right.member))
+  const onlineCount = visibleEntries.filter((entry) => memberPresenceStatus(entry.member) !== 'offline').length
+  const changedCount = entries.filter((entry) => entry.changed).length
+  const previewEntries = visibleEntries.slice(0, 8)
+  const hiddenPreview = hiddenEntries.slice(0, 3)
 
   return (
     <article className={styles.permissionPreview}>
@@ -1591,19 +1770,32 @@ function ChannelMemberPermissionPreview({
           <span>{channel?.name ?? '当前频道'}</span>
         </div>
         <div className={styles.permissionPreviewStats}>
-          <em>可见 {visibleMembers.length}</em>
-          {hasPermissionMap && <em>隐藏 {hiddenMembers.length}</em>}
+          <em>预览可见 {visibleEntries.length}</em>
+          <em>隐藏 {hiddenEntries.length}</em>
           <em>在线 {onlineCount}</em>
+          {changedCount > 0 && <em>未保存 {changedCount}</em>}
         </div>
       </div>
+      <span className={styles.permissionPreviewNote}>根据当前表单实时预估，保存后会与服务端权限重新同步。</span>
       <div className={styles.permissionPreviewList}>
-        {previewMembers.map((member) => (
-          <ChannelMemberPreviewRow key={member.user_id} member={member} channelId={channelId} />
+        {previewEntries.map((entry) => (
+          <ChannelMemberPreviewRow
+            key={entry.member.user_id}
+            member={entry.member}
+            permissions={entry.permissions}
+            changed={entry.changed}
+          />
         ))}
-        {hiddenPreview.map((member) => (
-          <ChannelMemberPreviewRow key={`hidden-${member.user_id}`} member={member} channelId={channelId} hidden />
+        {hiddenPreview.map((entry) => (
+          <ChannelMemberPreviewRow
+            key={`hidden-${entry.member.user_id}`}
+            member={entry.member}
+            permissions={entry.permissions}
+            changed={entry.changed}
+            hidden
+          />
         ))}
-        {previewMembers.length === 0 && hiddenPreview.length === 0 && (
+        {previewEntries.length === 0 && hiddenPreview.length === 0 && (
           <p className={styles.sideHint}>暂无成员</p>
         )}
       </div>
@@ -1613,11 +1805,13 @@ function ChannelMemberPermissionPreview({
 
 function ChannelMemberPreviewRow({
   member,
-  channelId,
+  permissions,
+  changed,
   hidden,
 }: {
   member: ProjectMember
-  channelId: string
+  permissions: ChannelPermissions
+  changed?: boolean
   hidden?: boolean
 }) {
   const roleKey = memberPrimaryRoleKey(member)
@@ -1636,8 +1830,8 @@ function ChannelMemberPreviewRow({
         }
       </div>
       <div>
-        <strong>{name}</strong>
-        <span>{memberChannelSubtitle(member, channelId)}</span>
+        <strong>{name}{changed && <em>未保存</em>}</strong>
+        <span>{memberChannelSubtitleForPermissions(member, permissions)}</span>
       </div>
     </div>
   )
@@ -1957,15 +2151,17 @@ function memberRolePosition(member: ProjectMember) {
 }
 
 function sortMembersForPanel(members: ProjectMember[]) {
-  return [...members].sort((left, right) => {
-    const leftStatus = memberPresenceStatus(left)
-    const rightStatus = memberPresenceStatus(right)
-    const leftOnline = leftStatus === 'offline' ? 0 : 1
-    const rightOnline = rightStatus === 'offline' ? 0 : 1
-    return rightOnline - leftOnline
-      || memberRolePosition(right) - memberRolePosition(left)
-      || clean(left.account ?? left.user_id).localeCompare(clean(right.account ?? right.user_id))
-  })
+  return [...members].sort(compareMembersForPanel)
+}
+
+function compareMembersForPanel(left: ProjectMember, right: ProjectMember) {
+  const leftStatus = memberPresenceStatus(left)
+  const rightStatus = memberPresenceStatus(right)
+  const leftOnline = leftStatus === 'offline' ? 0 : 1
+  const rightOnline = rightStatus === 'offline' ? 0 : 1
+  return rightOnline - leftOnline
+    || memberRolePosition(right) - memberRolePosition(left)
+    || clean(left.account ?? left.user_id).localeCompare(clean(right.account ?? right.user_id))
 }
 
 function memberRolePillClass(roleKey: string) {
