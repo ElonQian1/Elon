@@ -32,8 +32,18 @@ export default function ServerRail() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
   function isActive(path: string) {
-    if (path === '/') return pathname === '/' && !activeProjectId
+    if (path === '/') return pathname === '/'
     return pathname.startsWith(path)
+  }
+
+  function handleRailClick(path: string) {
+    // 点击「项目中心」时：如果当前有活跃项目，先清空选中（回到项目列表）
+    if (path === '/' && activeProjectId) {
+      useProjectStore.getState().selectProject('')
+      navigate('/')
+      return
+    }
+    navigate(path)
   }
 
   async function openProject(id: string) {
@@ -56,7 +66,7 @@ export default function ServerRail() {
             key={item.path}
             className={[styles.avatar, active ? styles.active : ''].join(' ')}
             style={{ '--item-color': item.color, '--item-hover': item.hoverColor } as React.CSSProperties}
-            onClick={() => navigate(item.path)}
+            onClick={() => handleRailClick(item.path)}
             onMouseEnter={(e) => showTip(e, item.label)}
             onMouseLeave={() => setTooltip(null)}
             title={item.label}
