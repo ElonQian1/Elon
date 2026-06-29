@@ -19,7 +19,7 @@ use crate::{
         task_control_event,
     },
     store::{ProjectAccess, PublicUser},
-    types::AppState,
+    types::{AppState, WsMessage},
 };
 
 /// 单个已升级的 WebSocket 连接的完整会话循环。
@@ -140,6 +140,19 @@ pub(crate) async fn handle_project_ws(
         );
 
         let trace_id = clean_trace_id(request.trace_id.as_deref());
+        let pc_runtime_route = match request.pc_runtime_route() {
+            Ok(route) => route,
+            Err(message) => {
+                if sender
+                    .send(Message::Text(WsMessage::error(message).to_json()))
+                    .await
+                    .is_err()
+                {
+                    break;
+                }
+                continue;
+            }
+        };
         let client_request_id =
             project_client_request_id(&request, &project.id, &user.id, &conversation_id, &message);
         state.server_traces.record(
@@ -152,6 +165,7 @@ pub(crate) async fn handle_project_ws(
                 "client_request_id": &client_request_id,
                 "message_chars": message.chars().count(),
                 "agent": request.agent.as_deref(),
+                "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
                 "execution_mode": request.execution_mode.as_deref(),
                 "plan_mode": request.plan_mode,
             }),
@@ -163,6 +177,7 @@ pub(crate) async fn handle_project_ws(
         let fingerprint = project_ws_fingerprint(
             &conversation_id,
             request.agent.as_deref(),
+            pc_runtime_route.map(|route| route.as_request_value()),
             execution_mode.as_str(),
             request.project_icon_data_url.as_deref(),
             &message,
@@ -178,6 +193,7 @@ pub(crate) async fn handle_project_ws(
             request.agent,
             attachments,
             execution_mode,
+            pc_runtime_route,
             Some(trace_id.clone()),
             client_request_id.clone(),
             fingerprint,

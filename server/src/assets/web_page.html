@@ -47,6 +47,13 @@
       --project-space-info-ink: #D9D9D9;
       --project-space-info-ink-soft: #AFAFAF;
       --project-space-info-ink-faint: #777777;
+      --store-detail-bg: #131313;
+      --store-detail-ink: #E3E3E3;
+      --store-detail-muted: #C6C6C6;
+      --store-detail-link: #A8C7FA;
+      --store-detail-divider: #444444;
+      --store-detail-button: #AEC6F6;
+      --store-detail-button-ink: #182E63;
       --badge-info-bg: #16251A;
       --badge-info-ink: #8DDC9B;
       --badge-neutral-bg: #1A1A1A;
@@ -1145,6 +1152,209 @@
       .project-space-action { font-size: 15px; gap: 6px; }
       .project-space-action-icon { width: 28px; height: 28px; }
       .project-space-post-metrics { padding-left: 0; padding-right: 0; }
+    }
+    #projectProgressPanel {
+      background: var(--store-detail-bg);
+      padding-bottom: 28px;
+    }
+    #projectProgressPanel .project-space-summary {
+      display: block;
+      background: var(--store-detail-bg);
+      padding: 24px 24px 0;
+    }
+    #projectProgressPanel .project-space-heading {
+      display: flex;
+      align-items: flex-start;
+      gap: 24px;
+      min-height: 0;
+    }
+    #projectProgressPanel .project-space-icon {
+      width: 72px;
+      height: 72px;
+      border-radius: 18px;
+      background: #2EA7DF;
+      color: #FFFFFF;
+      display: grid;
+      place-items: center;
+      overflow: hidden;
+      flex: none;
+      font-size: 22px;
+      font-weight: 700;
+      line-height: 1;
+    }
+    #projectProgressPanel .project-space-icon img {
+      width: 100%;
+      height: 100%;
+      border-radius: 18px;
+      object-fit: cover;
+      display: block;
+    }
+    #projectProgressPanel .project-space-title {
+      min-width: 0;
+      padding-top: 2px;
+    }
+    #projectProgressPanel .project-space-name {
+      color: var(--store-detail-ink);
+      font-size: 32px;
+      font-weight: 400;
+      line-height: 1.05;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    #projectProgressPanel .project-space-meta {
+      margin-top: 12px;
+      color: var(--store-detail-link);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1.1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-store-subtitle {
+      margin-top: 7px;
+      color: var(--store-detail-muted);
+      font-size: 16px;
+      line-height: 1.1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-metrics {
+      height: 68px;
+      margin-top: 30px;
+      display: flex;
+      align-items: center;
+      color: var(--store-detail-ink);
+    }
+    .project-space-metric {
+      min-width: 0;
+      flex: 1;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .project-space-metric-value {
+      color: var(--store-detail-ink);
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-metric-value .star { color: var(--store-detail-link); }
+    .project-space-metric-label {
+      margin-top: 9px;
+      color: var(--store-detail-muted);
+      font-size: 15px;
+      line-height: 1;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .project-space-metric-label.tight { margin-top: 4px; }
+    .project-space-metric-divider {
+      width: 1px;
+      height: 26px;
+      background: var(--store-detail-divider);
+      flex: none;
+    }
+    #projectProgressPanel .project-space-join {
+      display: none;
+    }
+    .project-space-install {
+      width: calc(100% - 48px);
+      height: 40px;
+      margin: 28px 24px 0;
+      border: 0;
+      border-radius: 20px;
+      background: var(--store-detail-button);
+      color: var(--store-detail-button-ink);
+      display: grid;
+      place-items: center;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      padding: 0;
+    }
+    #projectProgressPanel .project-space-actions {
+      display: none;
+    }
+    #projectProgressPanel .project-space-preview-grid {
+      height: 167px;
+      margin-top: 16px;
+      padding: 0 24px;
+      display: flex;
+      gap: 13px;
+      overflow-x: auto;
+      scroll-snap-type: x proximity;
+    }
+    #projectProgressPanel .project-space-preview-grid::-webkit-scrollbar {
+      display: none;
+    }
+    #projectProgressPanel .project-space-preview-cell {
+      width: 88px;
+      height: 167px;
+      border-radius: 8px;
+      padding: 8px;
+      flex: 0 0 88px;
+      scroll-snap-align: start;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      background: #28AEEA;
+      overflow: hidden;
+    }
+    .project-space-preview-cell.powerful { background: #14AFC5; }
+    .project-space-preview-cell.secure { background: #38B95C; }
+    .project-space-preview-cell.private { background: #168F8F; }
+    .project-space-preview-title {
+      color: #FFFFFF;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+      white-space: nowrap;
+    }
+    .project-space-preview-subtitle {
+      margin-top: 5px;
+      color: rgba(255,255,255,.9);
+      font-size: 6px;
+      line-height: 1.15;
+      text-align: center;
+    }
+    .project-space-phone-mock {
+      width: 64px;
+      flex: 1;
+      margin-top: 8px;
+      border-radius: 10px;
+      background: #20384B;
+      padding: 7px 5px 5px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .project-space-phone-line {
+      height: 7px;
+      border-radius: 2px;
+      background: #FFFFFF;
+    }
+    .project-space-phone-line:first-child {
+      height: 10px;
+      background: #2BBF92;
+    }
+    .project-space-phone-line.short {
+      margin-right: 14px;
+    }
+    #projectProgressPanel .project-space-announcement,
+    #projectProgressPanel .project-space-feed {
+      display: none;
     }
     .project-workspace-health {
       background: var(--panel);
@@ -2490,11 +2700,30 @@
             <div class="project-space-icon" id="projectSpaceIcon" aria-hidden="true">项</div>
             <div class="project-space-title">
               <div class="project-space-name" id="projectSpaceName">项目</div>
-              <div class="project-space-meta" id="projectSpaceMeta">创建者： 项目成员
-成员 1    帖子 0</div>
+              <div class="project-space-meta" id="projectSpaceMeta">Elon Project</div>
+              <div class="project-space-store-subtitle" id="projectSpaceStoreSubtitle">项目协作空间</div>
             </div>
           </div>
-          <button class="project-space-join" id="projectSpaceJoinBtn" type="button">加入</button>
+          <div class="project-space-metrics">
+            <div class="project-space-metric">
+              <div class="project-space-metric-value">4.8<span class="star">★</span></div>
+              <div class="project-space-metric-label" id="projectSpacePostCount">0贴</div>
+              <div class="project-space-metric-label tight">评价 ⓘ</div>
+            </div>
+            <div class="project-space-metric-divider"></div>
+            <div class="project-space-metric">
+              <div class="project-space-metric-value" id="projectSpaceMemberMetric">成员 1</div>
+              <div class="project-space-metric-label">协作</div>
+              <div class="project-space-metric-label tight">空间</div>
+            </div>
+            <div class="project-space-metric-divider"></div>
+            <div class="project-space-metric">
+              <div class="project-space-metric-value">12+</div>
+              <div class="project-space-metric-label">12 岁以上 ⓘ</div>
+            </div>
+          </div>
+          <button class="project-space-join hidden" id="projectSpaceJoinBtn" type="button">加入</button>
+          <button class="project-space-install" id="projectSpaceDownloadBtn" type="button">安装</button>
         </div>
         <button class="project-space-intro-card empty hidden" id="projectIntroCard" type="button">添加项目简介</button>
         <div class="project-space-actions">
@@ -2506,20 +2735,65 @@
             <img class="project-space-action-icon" src="/assets/ic_side_menu_folder_closed.png" alt="" aria-hidden="true" />
             <span>项目资源</span>
           </button>
-          <button class="project-space-action" id="projectSpaceDownloadBtn" type="button" aria-label="下载 APK">
+          <button class="project-space-action" type="button" aria-label="下载 APK">
             <img class="project-space-action-icon" src="/assets/ic_plaza_download_apk.png" alt="" aria-hidden="true" />
             <span>下载APK</span>
           </button>
         </div>
         <div class="project-space-preview-grid" aria-hidden="true">
-          <div class="project-space-preview-cell"></div>
-          <div class="project-space-preview-cell"></div>
-          <div class="project-space-preview-cell"></div>
+          <div class="project-space-preview-cell">
+            <div class="project-space-preview-title">Fast</div>
+            <div class="project-space-preview-subtitle">Simple, reliable builds</div>
+            <div class="project-space-phone-mock">
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+            </div>
+          </div>
+          <div class="project-space-preview-cell powerful">
+            <div class="project-space-preview-title">Powerful</div>
+            <div class="project-space-preview-subtitle">AI edits and packages</div>
+            <div class="project-space-phone-mock">
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+            </div>
+          </div>
+          <div class="project-space-preview-cell secure">
+            <div class="project-space-preview-title">Secure</div>
+            <div class="project-space-preview-subtitle">Private project space</div>
+            <div class="project-space-phone-mock">
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+            </div>
+          </div>
+          <div class="project-space-preview-cell private">
+            <div class="project-space-preview-title">Private</div>
+            <div class="project-space-preview-subtitle">Only your team sees it</div>
+            <div class="project-space-phone-mock">
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+              <span class="project-space-phone-line"></span>
+              <span class="project-space-phone-line short"></span>
+            </div>
+          </div>
         </div>
         <div class="project-space-announcement" id="projectSpacePinnedBar">
           <div class="project-space-announcement-title">置顶</div>
           <div class="project-space-announcement-body" id="projectSpaceAnnouncement">创建者自定义标题最多显示16个字</div>
-          <div class="project-space-post-count" id="projectSpacePostCount">0贴</div>
+          <div class="project-space-post-count">0贴</div>
         </div>
         <div class="project-space-feed" id="projectSpaceFeed">
           <div class="project-space-topic-row" aria-label="项目话题">
@@ -3138,6 +3412,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectSpaceIcon = $('projectSpaceIcon');
   const projectSpaceName = $('projectSpaceName');
   const projectSpaceMeta = $('projectSpaceMeta');
+  const projectSpaceStoreSubtitle = $('projectSpaceStoreSubtitle');
+  const projectSpaceMemberMetric = $('projectSpaceMemberMetric');
   const projectIntroCard = $('projectIntroCard');
   const projectSpaceFeed = $('projectSpaceFeed');
   const projectSpaceAnnouncement = $('projectSpaceAnnouncement');
@@ -5314,9 +5590,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (!project) {
       renderProjectSpaceIcon(null);
       if (projectSpaceName) projectSpaceName.textContent = '项目';
-      if (projectSpaceMeta) projectSpaceMeta.textContent = '创建者： 项目成员\n成员 1    帖子 0';
+      if (projectSpaceMeta) projectSpaceMeta.textContent = 'Elon Project';
+      if (projectSpaceStoreSubtitle) projectSpaceStoreSubtitle.textContent = '项目协作空间';
+      if (projectSpaceMemberMetric) projectSpaceMemberMetric.textContent = '成员 1';
       if (projectSpacePostCount) projectSpacePostCount.textContent = '0贴';
       if (projectSpaceJoinBtn) projectSpaceJoinBtn.textContent = '加入';
+      if (projectSpaceDownloadBtn) projectSpaceDownloadBtn.textContent = '安装';
       projectIntroCard.textContent = '添加项目简介';
       projectIntroCard.classList.add('empty');
       projectIntroCard.disabled = true;
@@ -5326,12 +5605,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const editable = canEditProjectDescription(project);
     renderProjectSpaceIcon(project);
     if (projectSpaceName) projectSpaceName.textContent = projectTitleOf(project);
-    if (projectSpaceMeta) {
-      const members = project.member_count || project.memberCount || 1;
-      projectSpaceMeta.textContent = '创建者： ' + projectSpaceOwnerOf(project) +
-        '\n成员 ' + members + '    帖子 ' + currentProjectSpacePostCount;
+    const members = project.member_count || project.memberCount || 1;
+    if (projectSpaceMeta) projectSpaceMeta.textContent = projectSpaceOwnerOf(project);
+    if (projectSpaceStoreSubtitle) {
+      projectSpaceStoreSubtitle.textContent = currentProjectSpaceLatestApkUrl ? '包含可安装 APK' : '项目协作空间';
     }
+    if (projectSpaceMemberMetric) projectSpaceMemberMetric.textContent = '成员 ' + members;
     if (projectSpaceJoinBtn) projectSpaceJoinBtn.textContent = isProjectSpaceVisitor(project) ? '加入' : '成员';
+    if (projectSpaceDownloadBtn) projectSpaceDownloadBtn.textContent = currentProjectSpaceLatestApkUrl ? '安装' : '暂无APK';
     projectIntroCard.textContent = description || (editable ? '添加项目简介' : '暂无项目简介');
     projectIntroCard.classList.toggle('empty', !description);
     projectIntroCard.disabled = !editable;

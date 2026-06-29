@@ -14,13 +14,17 @@ import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
+import RuntimeRouteMenu from './RuntimeRouteMenu'
 import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime, clean } from '../../lib/utils'
 import { shortButtonLabel } from '../models/modelUtils'
+import { RUNTIME_ROUTE_STORAGE_KEY, normalizeRuntimeRoute } from './runtimeRoutes'
+import type { RuntimeRoute } from './runtimeRoutes'
 import type {
   Channel,
   ChannelCategory,
+  ChannelPermissions,
   ChannelPermissionResponse,
   Message,
   PermissionOption,
@@ -53,6 +57,9 @@ export default function ConversationPage() {
   const [sendError, setSendError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
+  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => normalizeRuntimeRoute(
+    typeof window === 'undefined' ? null : window.localStorage.getItem(RUNTIME_ROUTE_STORAGE_KEY),
+  ))
   const [showPermissions, setShowPermissions] = useState(false)
   const [showPresence, setShowPresence] = useState(false)
   const [showInvites, setShowInvites] = useState(false)
@@ -77,6 +84,10 @@ export default function ConversationPage() {
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
+
+  useEffect(() => {
+    window.localStorage.setItem(RUNTIME_ROUTE_STORAGE_KEY, runtimeRoute)
+  }, [runtimeRoute])
 
   // 加载项目会话列表（与手机端同步）
   useEffect(() => {
@@ -193,7 +204,7 @@ export default function ConversationPage() {
         prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
         waitingForNewSession.current = true
       }
-      await sendMessage(fullContent, selectedAgent || null)
+      await sendMessage(fullContent, selectedAgent || null, runtimeRoute)
       // 发送后刷新会话列表（新会话会出现在顶部）
       if (activeProjectId && user?.id) {
         setTimeout(async () => {
@@ -251,11 +262,16 @@ export default function ConversationPage() {
 
   // 成员列表：从 project space 读取
   const spaceMembers = members
+  const hasChannelMemberPermissions = !!activeChannelId && membersHaveChannelPermissionMap(spaceMembers, activeChannelId)
+  const panelMembers = useMemo(
+    () => activeChannelId ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
+    [spaceMembers, activeChannelId],
+  )
   const memberPanelTitle = activeChannel ? '频道成员' : activeProjectId ? '项目成员' : '工作台'
   const memberPanelContext = activeChannel?.name ?? activeProject?.name ?? '我的项目'
-  const memberPanelCount = activeProjectId ? spaceMembers.length : (user ? 1 : 0)
+  const memberPanelCount = activeProjectId ? panelMembers.length : (user ? 1 : 0)
   const memberPanelSummary = activeChannel
-    ? channelPermissionSummary(activeChannel)
+    ? channelPermissionSummary(activeChannel, panelMembers.length, spaceMembers.length, hasChannelMemberPermissions)
     : activeProjectId
       ? `项目共 ${spaceMembers.length} 位成员，按角色分组`
       : '个人 AI 工作台'
@@ -712,6 +728,11 @@ export default function ConversationPage() {
               >
                 {shortButtonLabel(modelLabel)}
               </button>
+              <RuntimeRouteMenu
+                value={runtimeRoute}
+                disabled={sendingMessage}
+                onChange={setRuntimeRoute}
+              />
 
               {/* Textarea */}
               <textarea
@@ -775,6 +796,7 @@ export default function ConversationPage() {
             <MemberProfilePopover
               member={selectedMember}
               anchorY={memberPopoverY}
+              channel={activeChannel}
               onClose={() => setSelectedMember(null)}
             />,
             document.body
@@ -782,25 +804,28 @@ export default function ConversationPage() {
           {activeProjectId && (
             <MemberContextSummary
               label={memberPanelSummary}
-              members={spaceMembers}
+              members={panelMembers}
               channel={activeChannel}
+              projectTotal={spaceMembers.length}
+              usingChannelPermissions={hasChannelMemberPermissions}
             />
           )}
-          {activeProjectId && spaceLoading && spaceMembers.length === 0 && (
+          {activeProjectId && spaceLoading && panelMembers.length === 0 && (
             <MemberLoadingRows />
           )}
           {activeProjectId && !spaceLoading && spaceError && (
             <p className={styles.sideHint}>{spaceError}</p>
           )}
-          {activeProjectId && spaceMembers.length > 0 && (
+          {activeProjectId && panelMembers.length > 0 && (
             <MemberSearch
-              members={spaceMembers}
+              members={panelMembers}
               onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
               placeholder={activeChannel ? '搜索频道成员' : '搜索项目成员'}
+              channelId={activeChannelId ?? undefined}
             />
           )}
-          {activeProjectId && !spaceLoading && !spaceError && spaceMembers.length === 0 && (
-            <p className={styles.sideHint}>暂无项目成员</p>
+          {activeProjectId && !spaceLoading && !spaceError && panelMembers.length === 0 && (
+            <p className={styles.sideHint}>{activeChannel ? '暂无可见频道成员' : '暂无项目成员'}</p>
           )}
           {!activeProjectId && user && (
             <>
@@ -885,18 +910,188 @@ const CHANNEL_PERMISSION_OPTIONS: PermissionOption[] = [
   { key: 'manage_channel', label: '管理频道权限' },
 ]
 
+const ROLE_PERMISSION_VIEW_MEMBERS = 'view_members'
+const ROLE_PERMISSION_SEND_MESSAGES = 'send_messages'
+const ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS = 'manage_project_settings'
+
+const BUILTIN_ROLE_PERMISSIONS: Record<string, string[]> = {
+  owner: [
+    ROLE_PERMISSION_VIEW_MEMBERS,
+    ROLE_PERMISSION_SEND_MESSAGES,
+    ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS,
+  ],
+  admin: [
+    ROLE_PERMISSION_VIEW_MEMBERS,
+    ROLE_PERMISSION_SEND_MESSAGES,
+    ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS,
+  ],
+  editor: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  developer: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  maintainer: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  member: [ROLE_PERMISSION_VIEW_MEMBERS, ROLE_PERMISSION_SEND_MESSAGES],
+  observer: [ROLE_PERMISSION_VIEW_MEMBERS],
+  viewer: [ROLE_PERMISSION_VIEW_MEMBERS],
+}
+
 function channelCanManage(channel: Channel) {
   const permissions = channel.permissions ?? {}
   return !!(permissions.can_manage || permissions.canManage)
 }
 
-function channelPermissionSummary(channel: Channel) {
+function channelPermissionSummary(
+  channel: Channel,
+  visibleCount?: number,
+  totalCount?: number,
+  usingChannelPermissions?: boolean,
+) {
   const permissions = channel.permissions ?? {}
   const parts = ['可查看']
   if (permissions.can_send || permissions.canSend) parts.push('可发言')
   if (permissions.can_start_ai || permissions.canStartAi) parts.push('可启动 AI')
   if (permissions.can_manage || permissions.canManage) parts.push('可管理权限')
-  return `${channel.name} · ${parts.join(' / ')}`
+  const scope = usingChannelPermissions && typeof visibleCount === 'number' && typeof totalCount === 'number'
+    ? `可见 ${visibleCount}/${totalCount} · `
+    : ''
+  return `${channel.name} · ${scope}${parts.join(' / ')}`
+}
+
+function channelPermissionValue(permissions: ChannelPermissions | undefined, snakeKey: keyof ChannelPermissions, camelKey: keyof ChannelPermissions) {
+  return !!(permissions?.[snakeKey] || permissions?.[camelKey])
+}
+
+function memberChannelPermissions(member: ProjectMember, channelId?: string) {
+  if (!channelId) return undefined
+  return member.channel_permissions?.[channelId] ?? member.channelPermissions?.[channelId]
+}
+
+function memberCanViewChannel(member: ProjectMember, channelId?: string) {
+  const permissions = memberChannelPermissions(member, channelId)
+  if (!permissions) return true
+  return memberChannelCanView(permissions)
+}
+
+function membersHaveChannelPermissionMap(members: ProjectMember[], channelId?: string) {
+  if (!channelId) return false
+  return members.some(member => !!memberChannelPermissions(member, channelId))
+}
+
+function membersForChannel(members: ProjectMember[], channelId?: string) {
+  if (!channelId || !membersHaveChannelPermissionMap(members, channelId)) return members
+  return members.filter(member => memberCanViewChannel(member, channelId))
+}
+
+function projectedMemberChannelPermissions({
+  member,
+  channel,
+  categoryId,
+  roles,
+  categoryRoleOverrides,
+  categoryMemberOverrides,
+  channelRoleOverrides,
+  channelMemberOverrides,
+}: {
+  member: ProjectMember
+  channel?: Channel
+  categoryId?: string
+  roles: ProjectRole[]
+  categoryRoleOverrides: PermissionOverride[]
+  categoryMemberOverrides: PermissionOverride[]
+  channelRoleOverrides: PermissionOverride[]
+  channelMemberOverrides: PermissionOverride[]
+}): ChannelPermissions {
+  if (!channel) {
+    return memberChannelPermissions(member) ?? {
+      can_view: true,
+      can_send: false,
+      can_start_ai: false,
+      can_manage: false,
+    }
+  }
+  const roleIds = memberRoleIds(member)
+  const channelKind = clean(channel.kind ?? '').toLowerCase()
+  if (roleIds.includes('owner')) {
+    return {
+      can_view: true,
+      can_send: channelKind !== 'docs',
+      can_start_ai: channelKind === 'ai_development',
+      can_manage: true,
+    }
+  }
+
+  const applyDraft = (permission: string, base: boolean) => {
+    let next = base
+    if (channel.category_id && channel.category_id === categoryId && channel.permission_sync !== false) {
+      next = applyRolePermissionOverrides(next, roleIds, categoryRoleOverrides, permission)
+      next = applyMemberPermissionOverride(next, member.user_id, categoryMemberOverrides, permission)
+    }
+    next = applyRolePermissionOverrides(next, roleIds, channelRoleOverrides, permission)
+    return applyMemberPermissionOverride(next, member.user_id, channelMemberOverrides, permission)
+  }
+
+  const canViewBase = projectMemberHasRolePermission(member, roles, ROLE_PERMISSION_VIEW_MEMBERS)
+  const canSendBase = projectMemberHasRolePermission(member, roles, ROLE_PERMISSION_SEND_MESSAGES)
+    && channelKind !== 'docs'
+    && channelKind !== 'announcements'
+  const canStartAiBase = ['owner', 'admin', 'editor', 'developer', 'maintainer']
+    .includes(memberPrimaryRoleKey(member)) && channelKind === 'ai_development'
+  const canManageBase = projectMemberHasRolePermission(member, roles, ROLE_PERMISSION_MANAGE_PROJECT_SETTINGS)
+
+  return {
+    can_view: applyDraft('view_channel', canViewBase),
+    can_send: channelKind === 'docs' ? false : applyDraft('send_messages', canSendBase),
+    can_start_ai: channelKind === 'ai_development' && applyDraft('start_ai_tasks', canStartAiBase),
+    can_manage: applyDraft('manage_channel', canManageBase),
+  }
+}
+
+function memberRoleIds(member: ProjectMember) {
+  const ids = [
+    member.role,
+    ...(member.roles ?? []).map((role) => role.id),
+  ]
+  return Array.from(new Set(ids.map((id) => clean(id ?? '').toLowerCase()).filter(Boolean)))
+}
+
+function projectMemberHasRolePermission(member: ProjectMember, roles: ProjectRole[], permission: string) {
+  return memberRoleIds(member).some((roleId) => {
+    if (roleId === 'owner') return true
+    const role = roles.find((item) => clean(item.id).toLowerCase() === roleId)
+    const permissions = role?.permissions?.length ? role.permissions : BUILTIN_ROLE_PERMISSIONS[roleId]
+    return !!permissions?.includes(permission)
+  })
+}
+
+function applyRolePermissionOverrides(base: boolean, roleIds: string[], overrides: PermissionOverride[], permission: string) {
+  if (roleIds.length === 0) return false
+  let denied = false
+  let allowed = false
+  for (const override of overrides) {
+    const roleId = clean(String(override.role_id ?? override.roleId ?? '')).toLowerCase()
+    if (!roleId || !roleIds.includes(roleId)) continue
+    if ((override.deny ?? []).includes(permission)) denied = true
+    if ((override.allow ?? []).includes(permission)) allowed = true
+  }
+  if (denied) return false
+  if (allowed) return true
+  return base
+}
+
+function applyMemberPermissionOverride(base: boolean, memberId: string, overrides: PermissionOverride[], permission: string) {
+  const targetId = clean(memberId)
+  const effects = overrides.filter((override) =>
+    clean(String(override.user_id ?? override.userId ?? '')) === targetId
+  )
+  if (effects.some((override) => (override.deny ?? []).includes(permission))) return false
+  if (effects.some((override) => (override.allow ?? []).includes(permission))) return true
+  return base
+}
+
+function channelPermissionsChanged(next: ChannelPermissions, current?: ChannelPermissions) {
+  if (!current) return false
+  return memberChannelCanView(next) !== memberChannelCanView(current)
+    || channelPermissionValue(next, 'can_send', 'canSend') !== channelPermissionValue(current, 'can_send', 'canSend')
+    || channelPermissionValue(next, 'can_start_ai', 'canStartAi') !== channelPermissionValue(current, 'can_start_ai', 'canStartAi')
+    || channelPermissionValue(next, 'can_manage', 'canManage') !== channelPermissionValue(current, 'can_manage', 'canManage')
 }
 
 function filterMembers(members: ProjectMember[], query: string) {
@@ -927,6 +1122,33 @@ function memberSubtitle(member: ProjectMember) {
   if (activity) return activity
   if (customStatus) return customStatus
   return memberRoleSummary(member)
+}
+
+function memberChannelSubtitle(member: ProjectMember, channelId?: string) {
+  const permissions = memberChannelPermissions(member, channelId)
+  return memberChannelSubtitleForPermissions(member, permissions)
+}
+
+function memberChannelSubtitleForPermissions(member: ProjectMember, permissions?: ChannelPermissions) {
+  if (!permissions) return memberSubtitle(member)
+  const parts = memberChannelCapabilityLabels(permissions)
+  if (!memberChannelCanView(permissions)) return parts[0] ?? '无频道访问权限'
+  return `${parts.join(' / ')} · ${memberSubtitle(member)}`
+}
+
+function memberChannelCanView(permissions?: ChannelPermissions) {
+  return channelPermissionValue(permissions, 'can_view', 'canView')
+}
+
+function memberChannelCapabilityLabels(permissions?: ChannelPermissions) {
+  if (!permissions) return []
+  if (!memberChannelCanView(permissions)) return ['无频道访问权限']
+  const parts = [
+    channelPermissionValue(permissions, 'can_send', 'canSend') ? '可发言' : '只读',
+  ]
+  if (channelPermissionValue(permissions, 'can_start_ai', 'canStartAi')) parts.push('可启动 AI')
+  if (channelPermissionValue(permissions, 'can_manage', 'canManage')) parts.push('可管理')
+  return parts
 }
 
 function memberPresenceStatus(member: ProjectMember) {
@@ -1389,6 +1611,7 @@ function PermissionDrawer({
   }
 
   const selectedMember = members.find((member) => member.user_id === memberId)
+  const selectedChannel = channels.find((channel) => channel.id === channelId)
 
   return (
     <div className={styles.drawerBackdrop}>
@@ -1439,6 +1662,17 @@ function PermissionDrawer({
                 ))}
               </select>
             </div>
+            <ChannelMemberPermissionPreview
+              channel={selectedChannel}
+              channelId={channelId}
+              categoryId={categoryId}
+              roles={roles}
+              members={members}
+              categoryRoleOverrides={categoryRoleOverrides}
+              categoryMemberOverrides={categoryMemberOverrides}
+              channelRoleOverrides={channelRoleOverrides}
+              channelMemberOverrides={channelMemberOverrides}
+            />
             <PermissionRoleGrid
               roles={roles}
               options={permissionOptions}
@@ -1459,6 +1693,131 @@ function PermissionDrawer({
           </section>
         </div>
       </section>
+    </div>
+  )
+}
+
+function ChannelMemberPermissionPreview({
+  channel,
+  channelId,
+  categoryId,
+  roles,
+  members,
+  categoryRoleOverrides,
+  categoryMemberOverrides,
+  channelRoleOverrides,
+  channelMemberOverrides,
+}: {
+  channel?: Channel
+  channelId: string
+  categoryId?: string
+  roles: ProjectRole[]
+  members: ProjectMember[]
+  categoryRoleOverrides: PermissionOverride[]
+  categoryMemberOverrides: PermissionOverride[]
+  channelRoleOverrides: PermissionOverride[]
+  channelMemberOverrides: PermissionOverride[]
+}) {
+  const entries = members.map((member) => {
+    const permissions = projectedMemberChannelPermissions({
+      member,
+      channel,
+      categoryId,
+      roles,
+      categoryRoleOverrides,
+      categoryMemberOverrides,
+      channelRoleOverrides,
+      channelMemberOverrides,
+    })
+    const savedPermissions = memberChannelPermissions(member, channelId)
+    return {
+      member,
+      permissions,
+      changed: channelPermissionsChanged(permissions, savedPermissions),
+    }
+  })
+  const visibleEntries = entries
+    .filter((entry) => memberChannelCanView(entry.permissions))
+    .sort((left, right) => compareMembersForPanel(left.member, right.member))
+  const hiddenEntries = entries
+    .filter((entry) => !memberChannelCanView(entry.permissions))
+    .sort((left, right) => compareMembersForPanel(left.member, right.member))
+  const onlineCount = visibleEntries.filter((entry) => memberPresenceStatus(entry.member) !== 'offline').length
+  const changedCount = entries.filter((entry) => entry.changed).length
+  const previewEntries = visibleEntries.slice(0, 8)
+  const hiddenPreview = hiddenEntries.slice(0, 3)
+
+  return (
+    <article className={styles.permissionPreview}>
+      <div className={styles.permissionPreviewHead}>
+        <div>
+          <strong>频道成员预览</strong>
+          <span>{channel?.name ?? '当前频道'}</span>
+        </div>
+        <div className={styles.permissionPreviewStats}>
+          <em>预览可见 {visibleEntries.length}</em>
+          <em>隐藏 {hiddenEntries.length}</em>
+          <em>在线 {onlineCount}</em>
+          {changedCount > 0 && <em>未保存 {changedCount}</em>}
+        </div>
+      </div>
+      <span className={styles.permissionPreviewNote}>根据当前表单实时预估，保存后会与服务端权限重新同步。</span>
+      <div className={styles.permissionPreviewList}>
+        {previewEntries.map((entry) => (
+          <ChannelMemberPreviewRow
+            key={entry.member.user_id}
+            member={entry.member}
+            permissions={entry.permissions}
+            changed={entry.changed}
+          />
+        ))}
+        {hiddenPreview.map((entry) => (
+          <ChannelMemberPreviewRow
+            key={`hidden-${entry.member.user_id}`}
+            member={entry.member}
+            permissions={entry.permissions}
+            changed={entry.changed}
+            hidden
+          />
+        ))}
+        {previewEntries.length === 0 && hiddenPreview.length === 0 && (
+          <p className={styles.sideHint}>暂无成员</p>
+        )}
+      </div>
+    </article>
+  )
+}
+
+function ChannelMemberPreviewRow({
+  member,
+  permissions,
+  changed,
+  hidden,
+}: {
+  member: ProjectMember
+  permissions: ChannelPermissions
+  changed?: boolean
+  hidden?: boolean
+}) {
+  const roleKey = memberPrimaryRoleKey(member)
+  const name = member.account ?? member.user_id
+  const avatarCls = [
+    styles.memberAvatar,
+    memberAvatarRoleClass(roleKey),
+    memberPresenceStatus(member) === 'offline' ? styles.memberAvatarOffline : styles.memberAvatarOnline,
+  ].filter(Boolean).join(' ')
+  return (
+    <div className={[styles.permissionPreviewRow, hidden ? styles.permissionPreviewRowHidden : ''].filter(Boolean).join(' ')}>
+      <div className={avatarCls}>
+        {member.avatar_data_url
+          ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+          : name[0]?.toUpperCase()
+        }
+      </div>
+      <div>
+        <strong>{name}{changed && <em>未保存</em>}</strong>
+        <span>{memberChannelSubtitleForPermissions(member, permissions)}</span>
+      </div>
     </div>
   )
 }
@@ -1668,10 +2027,12 @@ function MemberSearch({
   members,
   onSelect,
   placeholder,
+  channelId,
 }: {
   members: ProjectMember[]
   onSelect: (member: ProjectMember, y: number) => void
   placeholder: string
+  channelId?: string
 }) {
   const [query, setQuery] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
@@ -1708,7 +2069,7 @@ function MemberSearch({
             <div style={{ transform: `translateY(${start * MEMBER_VIRTUAL_ROW_HEIGHT}px)` }}>
               {visibleRows.map(row => row.kind === 'header'
                 ? <div key={row.id} className={styles.memberVirtualHeader}><div className={styles.memberSection}>{row.label} · {row.count}</div></div>
-                : <MemberListItem key={row.id} member={row.member} onSelect={onSelect} />
+                : <MemberListItem key={row.id} member={row.member} onSelect={onSelect} channelId={channelId} />
               )}
             </div>
           </div>
@@ -1775,15 +2136,17 @@ function memberRolePosition(member: ProjectMember) {
 }
 
 function sortMembersForPanel(members: ProjectMember[]) {
-  return [...members].sort((left, right) => {
-    const leftStatus = memberPresenceStatus(left)
-    const rightStatus = memberPresenceStatus(right)
-    const leftOnline = leftStatus === 'offline' ? 0 : 1
-    const rightOnline = rightStatus === 'offline' ? 0 : 1
-    return rightOnline - leftOnline
-      || memberRolePosition(right) - memberRolePosition(left)
-      || clean(left.account ?? left.user_id).localeCompare(clean(right.account ?? right.user_id))
-  })
+  return [...members].sort(compareMembersForPanel)
+}
+
+function compareMembersForPanel(left: ProjectMember, right: ProjectMember) {
+  const leftStatus = memberPresenceStatus(left)
+  const rightStatus = memberPresenceStatus(right)
+  const leftOnline = leftStatus === 'offline' ? 0 : 1
+  const rightOnline = rightStatus === 'offline' ? 0 : 1
+  return rightOnline - leftOnline
+    || memberRolePosition(right) - memberRolePosition(left)
+    || clean(left.account ?? left.user_id).localeCompare(clean(right.account ?? right.user_id))
 }
 
 function memberRolePillClass(roleKey: string) {
@@ -1816,7 +2179,15 @@ function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
   })
 }
 
-function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect: (member: ProjectMember, y: number) => void }) {
+function MemberListItem({
+  member,
+  onSelect,
+  channelId,
+}: {
+  member: ProjectMember
+  onSelect: (member: ProjectMember, y: number) => void
+  channelId?: string
+}) {
   const roleKey = memberPrimaryRoleKey(member)
   const roleBadge = memberPrimaryRoleLabel(member)
   const name = member.account ?? member.user_id
@@ -1841,16 +2212,17 @@ function MemberListItem({ member, onSelect }: { member: ProjectMember; onSelect:
           <strong className={styles.memberItemName}>{name}</strong>
           {roleBadge && <em className={[styles.memberRolePill, memberRolePillClass(roleKey)].join(' ')}>{roleBadge}</em>}
         </div>
-        <span className={styles.memberSub}>{memberSubtitle(member)}</span>
+        <span className={styles.memberSub}>{memberChannelSubtitle(member, channelId)}</span>
       </div>
     </button>
   )
 }
 
 /* ── 浮动用户卡片（Discord 风格，定位于右侧栏左侧）── */
-function MemberProfilePopover({ member, anchorY, onClose }: {
+function MemberProfilePopover({ member, anchorY, channel, onClose }: {
   member: ProjectMember
   anchorY: number
+  channel?: Channel
   onClose: () => void
 }) {
   const popRef = useRef<HTMLDivElement>(null)
@@ -1858,10 +2230,10 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
   const name = member.account || member.user_id
   const roleKey = memberPrimaryRoleKey(member)
   const roleHeadCls = {
-    owner: styles.popoverHeadOwner, admin: styles.popoverHeadAdmin,
-    developer: styles.popoverHeadEditor, dev: styles.popoverHeadEditor,
-    maintainer: styles.popoverHeadEditor, editor: styles.popoverHeadEditor,
-    collaborator: styles.popoverHeadEditor, builder: styles.popoverHeadEditor,
+    owner: styles.memberPopoverHeadOwner, admin: styles.memberPopoverHeadAdmin,
+    developer: styles.memberPopoverHeadEditor, dev: styles.memberPopoverHeadEditor,
+    maintainer: styles.memberPopoverHeadEditor, editor: styles.memberPopoverHeadEditor,
+    collaborator: styles.memberPopoverHeadEditor, builder: styles.memberPopoverHeadEditor,
   }[roleKey] ?? ''
   const [isFriend, setIsFriend] = useState(false)
   const [addingFriend, setAddingFriend] = useState(false)
@@ -1907,12 +2279,15 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
     member.user_id && ['用户 ID', member.user_id.slice(0, 14)],
     member.joined_at && ['加入时间', formatTime(member.joined_at)],
   ].filter(Boolean) as [string, string][]
+  const channelPermissions = memberChannelPermissions(member, channel?.id)
+  const channelCapabilityLabels = memberChannelCapabilityLabels(channelPermissions)
 
-  const POPOVER_WIDTH = 284
-  const POPOVER_HEIGHT = 280
+  const POPOVER_WIDTH = 300
+  const POPOVER_HEIGHT = 360
   const viewW = window.innerWidth
   const viewH = window.innerHeight
-  const popTop = Math.min(Math.max(anchorY - 20, 12), viewH - POPOVER_HEIGHT - 12)
+  const maxTop = Math.max(12, viewH - POPOVER_HEIGHT - 12)
+  const popTop = Math.min(Math.max(anchorY - 20, 12), maxTop)
   // 定位在右侧栏左侧（右侧栏约 280px）
   const popLeft = Math.max(8, viewW - 280 - POPOVER_WIDTH - 8)
 
@@ -1942,6 +2317,27 @@ function MemberProfilePopover({ member, anchorY, onClose }: {
             {presenceLabel(status)}
           </em>
         </div>
+        {channel && channelPermissions && (
+          <div className={styles.memberPopoverChannel}>
+            <div>
+              <span>当前频道</span>
+              <strong>{channel.name}</strong>
+            </div>
+            <div className={styles.memberPopoverChannelPills}>
+              {channelCapabilityLabels.map((label) => (
+                <em
+                  key={label}
+                  className={[
+                    styles.memberPopoverPill,
+                    label === '无频道访问权限' ? styles.memberPopoverPillDanger : '',
+                  ].join(' ')}
+                >
+                  {label}
+                </em>
+              ))}
+            </div>
+          </div>
+        )}
         {details.length > 0 && (
           <div className={styles.memberPopoverDetails}>
             {details.map(([label, value]) => (
@@ -1969,16 +2365,23 @@ function MemberContextSummary({
   label,
   members,
   channel,
+  projectTotal,
+  usingChannelPermissions,
 }: {
   label: string
   members: ProjectMember[]
   channel?: Channel
+  projectTotal?: number
+  usingChannelPermissions?: boolean
 }) {
   const stats = memberPanelStats(members)
   return (
     <section className={styles.memberContextSummary}>
       <strong>{channel ? '频道视图' : '项目视图'}</strong>
       <span>{label}</span>
+      {channel && usingChannelPermissions && typeof projectTotal === 'number' && (
+        <span>按频道权限过滤，项目成员 {projectTotal} 人</span>
+      )}
       {members.length > 0 && (
         <div className={styles.memberContextStats}>
           <em>在线 {stats.online}</em>

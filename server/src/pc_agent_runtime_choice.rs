@@ -40,10 +40,17 @@ impl PcRuntimeRoutePreference {
         match clean.as_str() {
             "route_a" | "route-a" | "a" | "cli-wrapper" | "cli_wrapper" => Ok(Some(Self::RouteA)),
             "route_b" | "route-b" | "b" | "api-runtime" | "api_runtime" => Ok(Some(Self::RouteB)),
-            "route_c" | "route-c" | "c" | "server-runtime" | "server_runtime" => {
+            "route_c" | "route-c" | "route_c1" | "route-c1" | "c" | "c1"
+            | "server-runtime" | "server_runtime" => {
                 Ok(Some(Self::RouteC))
             }
-            _ => Err("runtimeRoute 必须为 auto、route_a、route_b 或 route_c".to_string()),
+            "route_c2" | "route-c2" | "c2" | "remote-api-runtime" | "remote_api_runtime" => {
+                Err("Route C.2（远程别人 PC 节点 + API Runtime）还未开放；当前只能选择 auto、route_a、route_b 或 route_c1。".to_string())
+            }
+            "route_c3" | "route-c3" | "c3" | "remote-cli-runtime" | "remote_cli_runtime" => {
+                Err("Route C.3（远程别人 PC 节点 CLI）还未开放；当前只能选择 auto、route_a、route_b 或 route_c1。".to_string())
+            }
+            _ => Err("runtimeRoute 必须为 auto、route_a、route_b 或 route_c1".to_string()),
         }
     }
 
@@ -126,7 +133,7 @@ fn choice_from_cli(
             cli_name,
             copilot_model: None,
             codex_reasoning_effort: None,
-            model_label: Some("一龙服务器模型（Route C）".to_string()),
+            model_label: Some("一龙服务器模型（Route C.1）".to_string()),
             error: None,
         },
         "api-runtime" => PcAgentRuntimeChoice {
@@ -590,6 +597,31 @@ mod tests {
             .unwrap(),
             "api-runtime"
         );
+    }
+
+    #[test]
+    fn route_c1_alias_maps_to_server_runtime() {
+        assert_eq!(
+            PcRuntimeRoutePreference::from_request("route_c1").unwrap(),
+            Some(PcRuntimeRoutePreference::RouteC)
+        );
+        assert_eq!(
+            PcRuntimeRoutePreference::from_request("c1").unwrap(),
+            Some(PcRuntimeRoutePreference::RouteC)
+        );
+    }
+
+    #[test]
+    fn route_c2_and_c3_are_explicitly_not_open() {
+        let c2 = PcRuntimeRoutePreference::from_request("route_c2")
+            .expect_err("route C.2 should not be silently accepted");
+        let c3 = PcRuntimeRoutePreference::from_request("route_c3")
+            .expect_err("route C.3 should not be silently accepted");
+
+        assert!(c2.contains("Route C.2"));
+        assert!(c2.contains("还未开放"));
+        assert!(c3.contains("Route C.3"));
+        assert!(c3.contains("还未开放"));
     }
 
     #[test]

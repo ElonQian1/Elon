@@ -457,10 +457,10 @@
 }
 .newMsgBtn:hover { background: #343741; color: var(--text); }
 
-/* 输入框区（composer）4 列：42px | 1fr | 42px | 68px */
+/* 输入框区（composer）5 列：模型 | 路线 | 输入 | 附件 | 发送 */
 .composer {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px 68px;
+  grid-template-columns: 42px 176px minmax(0, 1fr) 42px 68px;
   gap: 10px;
   align-items: end;
   min-height: 72px;
@@ -1191,6 +1191,7 @@
    ══════════════════════════════════════ */
 .memberPopover {
   width: 284px;
+  max-height: calc(100vh - 24px);
   background: #1e1f22;
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 10px;
@@ -1240,6 +1241,8 @@
 .memberPopoverBody {
   padding: 24px 14px 14px;
   display: flex; flex-direction: column; gap: 4px;
+  max-height: 430px;
+  overflow: auto;
 }
 .memberPopoverName {
   display: block; font-size: 15px; font-weight: 800;
@@ -1256,6 +1259,37 @@
   font-size: 10px; font-weight: 800; font-style: normal; white-space: nowrap;
 }
 .memberPopoverPillOnline { color: var(--green,#58BE6A); border-color: rgba(88,190,106,.25); background: rgba(88,190,106,.06); }
+.memberPopoverPillDanger { color: var(--red,#df5c5c); border-color: rgba(223,92,92,.28); background: rgba(223,92,92,.08); }
+.memberPopoverChannel {
+  margin-top: 8px;
+  padding: 8px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 6px;
+  background: rgba(255,255,255,.03);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.memberPopoverChannel div:first-child {
+  min-width: 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+}
+.memberPopoverChannel span { color: var(--text-muted); }
+.memberPopoverChannel strong {
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: right;
+}
+.memberPopoverChannelPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
 .memberPopoverDetails {
   margin-top: 10px; border-top: 1px solid rgba(255,255,255,.06); padding-top: 8px;
   display: flex; flex-direction: column; gap: 5px;
@@ -1320,6 +1354,131 @@
   gap: 10px;
 }
 
+.permissionPreview {
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.permissionPreviewHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.permissionPreviewHead div:first-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.permissionPreviewHead strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.permissionPreviewHead span {
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permissionPreviewStats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.permissionPreviewStats em {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.05);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.permissionPreviewNote {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.permissionPreviewList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.permissionPreviewRow {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px;
+  border-radius: 4px;
+  background: rgba(255,255,255,.025);
+}
+
+.permissionPreviewRowHidden {
+  opacity: .58;
+  background: rgba(223,92,92,.06);
+}
+
+.permissionPreviewRow .memberAvatar {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+
+.permissionPreviewRow div:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.permissionPreviewRow strong {
+  color: var(--text);
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.permissionPreviewRow strong em {
+  flex-shrink: 0;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(250,174,64,.12);
+  color: #faae40;
+  font-size: 9px;
+  font-style: normal;
+}
+
+.permissionPreviewRow span {
+  color: var(--text-muted);
+  font-size: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .permissionCardHead {
   display: flex;
   align-items: center;
@@ -1363,4 +1522,14 @@
 
 .savePermissionBtn {
   align-self: flex-end;
+}
+
+@media (max-width: 900px) {
+  .permissionColumns {
+    grid-template-columns: 1fr;
+  }
+
+  .permissionPreviewList {
+    grid-template-columns: 1fr;
+  }
 }

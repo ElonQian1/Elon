@@ -1,24 +1,26 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
+import type { LucideIcon } from 'lucide-react'
+import { Bot, Boxes, MonitorCog, Stethoscope, UsersRound, Mic2, UserRound } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
 import { useProjectStore } from '../conversation/useProjectStore'
 import styles from './ServerRail.module.css'
 
 interface RailItem {
   path: string
-  emoji: string
+  Icon: LucideIcon
   label: string
   color: string
   hoverColor: string
 }
 
 const RAIL_ITEMS: RailItem[] = [
-  { path: '/ai',      emoji: '🤖', label: '一龙 AI',   color: '#243246', hoverColor: '#3c6fa2' },
-  { path: '/',        emoji: '📦', label: '项目中心',  color: '#2c2e35', hoverColor: '#4f5d71' },
-  { path: '/friends', emoji: '👥', label: '好友',      color: '#2c2e35', hoverColor: '#4f5d71' },
-  { path: '/doctor',  emoji: '🩺', label: '电脑医生',  color: '#283342', hoverColor: '#315d72' },
-  { path: '/node',    emoji: '🖥️', label: '分享算力',  color: '#2c2e35', hoverColor: '#365b44' },
-  { path: '/voice',   emoji: '🎙️', label: 'AI 声音',  color: '#2f2a3a', hoverColor: '#7a4f9a' },
+  { path: '/ai',      Icon: Bot,          label: '一龙 AI',   color: '#243246', hoverColor: '#3c6fa2' },
+  { path: '/',        Icon: Boxes,        label: '项目中心',  color: '#2c2e35', hoverColor: '#4f5d71' },
+  { path: '/friends', Icon: UsersRound,   label: '好友',      color: '#2c2e35', hoverColor: '#4f5d71' },
+  { path: '/doctor',  Icon: Stethoscope,  label: '电脑医生',  color: '#283342', hoverColor: '#315d72' },
+  { path: '/node',    Icon: MonitorCog,   label: '分享算力',  color: '#2c2e35', hoverColor: '#365b44' },
+  { path: '/voice',   Icon: Mic2,         label: 'AI 声音',  color: '#2f2a3a', hoverColor: '#7a4f9a' },
 ]
 
 export default function ServerRail() {
@@ -32,7 +34,7 @@ export default function ServerRail() {
   const activeProjectId = useProjectStore((s) => s.activeProjectId)
 
   function isActive(path: string) {
-    if (path === '/') return pathname === '/'
+    if (path === '/') return pathname === '/' && !activeProjectId
     return pathname.startsWith(path)
   }
 
@@ -61,6 +63,7 @@ export default function ServerRail() {
     <nav className={styles.rail}>
       {RAIL_ITEMS.map((item) => {
         const active = isActive(item.path)
+        const Icon = item.Icon
         return (
           <button
             key={item.path}
@@ -72,7 +75,7 @@ export default function ServerRail() {
             title={item.label}
             type="button"
           >
-            <span className={styles.icon}>{item.emoji}</span>
+            <Icon className={styles.icon} aria-hidden="true" strokeWidth={2.3} />
           </button>
         )
       })}
@@ -117,7 +120,7 @@ export default function ServerRail() {
           type="button"
         >
           <span className={styles.icon}>
-            {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? '?'}
+            {(user.nickname ?? user.account)?.[0]?.toUpperCase() ?? <UserRound aria-hidden="true" size={20} strokeWidth={2.3} />}
           </span>
         </button>
       )}

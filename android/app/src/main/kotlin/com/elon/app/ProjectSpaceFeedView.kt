@@ -32,7 +32,17 @@ internal class ProjectSpaceFeedView(
     private val downloadProjectApk: () -> Unit
 ) {
     private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
+    private val playStoreHeader = ProjectSpacePlayStoreHeaderView(
+        activity = activity,
+        dp = dp,
+        selectableForeground = selectableForeground,
+        openProjectMembers = openProjectMembers,
+        joinProject = joinProject,
+        projectApkActionLabel = projectApkActionLabel,
+        downloadProjectApk = downloadProjectApk
+    )
 
+    @Suppress("UNUSED_PARAMETER")
     fun render(
         container: LinearLayout,
         space: ProjectSpace,
@@ -40,22 +50,7 @@ internal class ProjectSpaceFeedView(
         loading: Boolean
     ) {
         val posts = feedPosts(space, messagesByChannel)
-        val root = LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setBackgroundColor(Color.parseColor(PROJECT_SPACE_PAGE_BG))
-            setPadding(0, dp(PROJECT_SPACE_CONTENT_TOP_DP), 0, dp(40))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        }
-
-        root.addView(projectHero(space, posts.size))
-        root.addView(projectQuickActions())
-        root.addView(projectPreviewStrip())
-        root.addView(projectPinnedBar(space, messagesByChannel, posts.size))
-        root.addView(projectFeedPanel(posts, loading))
-        container.addView(root)
+        container.addView(playStoreHeader.render(space, posts.size))
     }
 
     private fun projectHero(space: ProjectSpace, postCount: Int): LinearLayout {

@@ -1,3 +1,5 @@
+import type { RuntimeRoute } from './runtimeRoutes'
+
 export interface Project {
   id: string
   name: string
@@ -68,6 +70,8 @@ export interface ProjectMember {
   banned_until?: string | null
   is_muted?: boolean
   is_banned?: boolean
+  channel_permissions?: Record<string, ChannelPermissions>
+  channelPermissions?: Record<string, ChannelPermissions>
 }
 
 export interface UserPresenceSettings {
@@ -205,11 +209,13 @@ export interface Message {
 export interface SendMessagePayload {
   content: string
   agent?: string | null
+  runtimeRoute?: RuntimeRoute
 }
 
 export interface StartAiTaskPayload {
   content: string
   agent?: string | null
+  runtimeRoute?: RuntimeRoute
 }
 
 export interface ProjectListResponse {
