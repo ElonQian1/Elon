@@ -113,8 +113,7 @@
   font-weight: 900;
 }
 
-.routeOption,
-.routeOptionDisabled {
+.routeOption {
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr) auto;
   gap: 10px;
@@ -125,9 +124,6 @@
   padding: 10px;
   background: #24262d;
   text-align: left;
-}
-
-.routeOption {
   cursor: pointer;
 }
 
@@ -139,10 +135,6 @@
 .routeOptionActive {
   border-color: rgba(88,190,106,.55);
   background: rgba(88,190,106,.1);
-}
-
-.routeOptionDisabled {
-  opacity: .62;
 }
 
 .routeCode {
@@ -185,16 +177,6 @@
   color: #aeb8c8;
 }
 
-.routeOptionDisabled b {
-  align-self: center;
-  border: 1px solid rgba(255,255,255,.08);
-  border-radius: 5px;
-  padding: 3px 6px;
-  color: var(--text-muted);
-  font-size: 10px;
-  white-space: nowrap;
-}
-
 @media (max-width: 780px) {
   .routeButton {
     width: 140px;
@@ -204,13 +186,7 @@
     width: calc(100vw - 24px);
   }
 
-  .routeOption,
-  .routeOptionDisabled {
+  .routeOption {
     grid-template-columns: 68px minmax(0, 1fr);
-  }
-
-  .routeOptionDisabled b {
-    grid-column: 2;
-    justify-self: start;
   }
 }

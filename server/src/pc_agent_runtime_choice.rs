@@ -29,6 +29,8 @@ pub(crate) enum PcRuntimeRoutePreference {
     RouteA,
     RouteB,
     RouteC,
+    RouteC2,
+    RouteC3,
 }
 
 impl PcRuntimeRoutePreference {
@@ -40,17 +42,18 @@ impl PcRuntimeRoutePreference {
         match clean.as_str() {
             "route_a" | "route-a" | "a" | "cli-wrapper" | "cli_wrapper" => Ok(Some(Self::RouteA)),
             "route_b" | "route-b" | "b" | "api-runtime" | "api_runtime" => Ok(Some(Self::RouteB)),
-            "route_c" | "route-c" | "route_c1" | "route-c1" | "c" | "c1"
-            | "server-runtime" | "server_runtime" => {
-                Ok(Some(Self::RouteC))
-            }
+            "route_c" | "route-c" | "route_c1" | "route-c1" | "c" | "c1" | "server-runtime"
+            | "server_runtime" => Ok(Some(Self::RouteC)),
             "route_c2" | "route-c2" | "c2" | "remote-api-runtime" | "remote_api_runtime" => {
-                Err("Route C.2（远程别人 PC 节点 + API Runtime）还未开放；当前只能选择 auto、route_a、route_b 或 route_c1。".to_string())
+                Ok(Some(Self::RouteC2))
             }
             "route_c3" | "route-c3" | "c3" | "remote-cli-runtime" | "remote_cli_runtime" => {
-                Err("Route C.3（远程别人 PC 节点 CLI）还未开放；当前只能选择 auto、route_a、route_b 或 route_c1。".to_string())
+                Ok(Some(Self::RouteC3))
             }
-            _ => Err("runtimeRoute 必须为 auto、route_a、route_b 或 route_c1".to_string()),
+            _ => Err(
+                "runtimeRoute 必须为 auto、route_a、route_b、route_c1、route_c2 或 route_c3"
+                    .to_string(),
+            ),
         }
     }
 
@@ -59,6 +62,8 @@ impl PcRuntimeRoutePreference {
             Self::RouteA => "route_a",
             Self::RouteB => "route_b",
             Self::RouteC => "route_c",
+            Self::RouteC2 => "route_c2",
+            Self::RouteC3 => "route_c3",
         }
     }
 }
@@ -94,7 +99,7 @@ pub(crate) async fn choose_pc_agent_runtime(
     );
 
     match chosen_cli {
-        Ok(cli) => choice_from_cli(cli, option.as_ref(), agent_name),
+        Ok(cli) => choice_from_cli(cli, option.as_ref(), agent_name, route_preference),
         Err(error) => PcAgentRuntimeChoice {
             cli_name: requested_cli_name(option.as_ref(), agent_name),
             copilot_model: None,
@@ -109,49 +114,83 @@ fn choice_from_cli(
     cli_name: String,
     option: Option<&AiCliOption>,
     agent_name: Option<&str>,
+    route_preference: Option<PcRuntimeRoutePreference>,
 ) -> PcAgentRuntimeChoice {
+    let route_label = runtime_route_model_label(route_preference, &cli_name);
     match cli_name.as_str() {
         "copilot" => PcAgentRuntimeChoice {
             cli_name,
             copilot_model: option.and_then(|o| o.model.clone()),
             codex_reasoning_effort: None,
-            model_label: option
-                .map(AiCliOption::display_label)
-                .or_else(|| agent_name.map(String::from)),
+            model_label: route_label.or_else(|| {
+                option
+                    .map(AiCliOption::display_label)
+                    .or_else(|| agent_name.map(String::from))
+            }),
             error: None,
         },
         "codex" => PcAgentRuntimeChoice {
             cli_name,
             copilot_model: option.and_then(|o| o.model.clone()),
             codex_reasoning_effort: option.and_then(|o| o.reasoning_effort.clone()),
-            model_label: option
-                .map(AiCliOption::display_label)
-                .or_else(|| agent_name.map(String::from)),
+            model_label: route_label.or_else(|| {
+                option
+                    .map(AiCliOption::display_label)
+                    .or_else(|| agent_name.map(String::from))
+            }),
             error: None,
         },
         "server-runtime" => PcAgentRuntimeChoice {
             cli_name,
             copilot_model: None,
             codex_reasoning_effort: None,
-            model_label: Some("一龙服务器模型（Route C.1）".to_string()),
+            model_label: route_label.or_else(|| Some("一龙服务器模型（Route C.1）".to_string())),
             error: None,
         },
         "api-runtime" => PcAgentRuntimeChoice {
             cli_name,
             copilot_model: None,
             codex_reasoning_effort: None,
-            model_label: Some("本机 API Runtime（Route B）".to_string()),
+            model_label: route_label.or_else(|| Some("本机 API Runtime（Route B）".to_string())),
             error: None,
         },
         _ => PcAgentRuntimeChoice {
             cli_name,
             copilot_model: None,
             codex_reasoning_effort: None,
-            model_label: option
-                .map(AiCliOption::display_label)
-                .or_else(|| agent_name.map(String::from)),
+            model_label: route_label.or_else(|| {
+                option
+                    .map(AiCliOption::display_label)
+                    .or_else(|| agent_name.map(String::from))
+            }),
             error: None,
         },
+    }
+}
+
+fn runtime_route_model_label(
+    route_preference: Option<PcRuntimeRoutePreference>,
+    cli_name: &str,
+) -> Option<String> {
+    match route_preference {
+        Some(PcRuntimeRoutePreference::RouteC2) => {
+            Some("远程 PC API Runtime（Route C.2）".to_string())
+        }
+        Some(PcRuntimeRoutePreference::RouteC3) => Some(format!(
+            "远程 PC CLI（Route C.3 · {}）",
+            cli_display_name(cli_name)
+        )),
+        _ => None,
+    }
+}
+
+fn cli_display_name(cli_name: &str) -> &'static str {
+    match cli_name {
+        "copilot" => "Copilot",
+        "codex" => "Codex",
+        "claude" => "Claude",
+        "gemini" => "Gemini",
+        _ => "AI CLI",
     }
 }
 
@@ -271,6 +310,33 @@ fn choose_forced_route(
             } else {
                 Err("已强制 Route C，但服务器模型 Runtime 未就绪或被限流/预算保护挡住；请确认 Win 客户端已登录、云端 Route C 可接单，或切回自动。".to_string())
             }
+        }
+        PcRuntimeRoutePreference::RouteC2 => {
+            if dev_runtime.is_some_and(|runtime| runtime.api_runtime_ready) {
+                Ok("api-runtime".to_string())
+            } else {
+                Err("已强制 Route C.2，但目标远程 PC 节点的 API Runtime 未就绪；请选择已配置 API key 的远程节点，或切回自动。".to_string())
+            }
+        }
+        PcRuntimeRoutePreference::RouteC3 => {
+            if !route_a_runtime_ready(dev_runtime) {
+                return Err(
+                    "已强制 Route C.3，但目标远程 PC 节点的 CLI 探测未通过；请选择已登录 Codex/Copilot 的远程节点，或切回自动。"
+                        .to_string(),
+                );
+            }
+            if cli_available(allowed_clis, &requested_cli)
+                && matches!(
+                    requested_cli.as_str(),
+                    "codex" | "copilot" | "claude" | "gemini"
+                )
+            {
+                return Ok(requested_cli);
+            }
+            first_available_route_a_cli(allowed_clis).ok_or_else(|| {
+                "已强制 Route C.3，但目标远程 PC 节点没有可用的 Codex/Copilot/Claude/Gemini CLI"
+                    .to_string()
+            })
         }
     }
 }
@@ -612,16 +678,94 @@ mod tests {
     }
 
     #[test]
-    fn route_c2_and_c3_are_explicitly_not_open() {
-        let c2 = PcRuntimeRoutePreference::from_request("route_c2")
-            .expect_err("route C.2 should not be silently accepted");
-        let c3 = PcRuntimeRoutePreference::from_request("route_c3")
-            .expect_err("route C.3 should not be silently accepted");
+    fn route_c2_and_c3_aliases_are_open() {
+        assert_eq!(
+            PcRuntimeRoutePreference::from_request("route_c2").unwrap(),
+            Some(PcRuntimeRoutePreference::RouteC2)
+        );
+        assert_eq!(
+            PcRuntimeRoutePreference::from_request("remote-api-runtime").unwrap(),
+            Some(PcRuntimeRoutePreference::RouteC2)
+        );
+        assert_eq!(
+            PcRuntimeRoutePreference::from_request("route_c3").unwrap(),
+            Some(PcRuntimeRoutePreference::RouteC3)
+        );
+        assert_eq!(
+            PcRuntimeRoutePreference::from_request("remote-cli-runtime").unwrap(),
+            Some(PcRuntimeRoutePreference::RouteC3)
+        );
+    }
 
-        assert!(c2.contains("Route C.2"));
-        assert!(c2.contains("还未开放"));
-        assert!(c3.contains("Route C.3"));
-        assert!(c3.contains("还未开放"));
+    #[test]
+    fn forced_route_c2_selects_remote_api_runtime() {
+        let runtime = NodeDevRuntimeProfile {
+            api_runtime_ready: true,
+            route_a_ready: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            choose_cli_for_runtime(
+                &["codex".to_string()],
+                Some(&runtime),
+                "codex".to_string(),
+                Some(PcRuntimeRoutePreference::RouteC2),
+            )
+            .unwrap(),
+            "api-runtime"
+        );
+    }
+
+    #[test]
+    fn forced_route_c2_requires_api_runtime() {
+        let err = choose_cli_for_runtime(
+            &["codex".to_string()],
+            Some(&NodeDevRuntimeProfile {
+                route_a_ready: true,
+                ..Default::default()
+            }),
+            "codex".to_string(),
+            Some(PcRuntimeRoutePreference::RouteC2),
+        )
+        .expect_err("route C.2 should require API Runtime readiness");
+        assert!(err.contains("Route C.2"));
+        assert!(err.contains("API Runtime"));
+    }
+
+    #[test]
+    fn forced_route_c3_selects_remote_cli() {
+        let runtime = NodeDevRuntimeProfile {
+            route_a_ready: true,
+            api_runtime_ready: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            choose_cli_for_runtime(
+                &["copilot".to_string()],
+                Some(&runtime),
+                "codex".to_string(),
+                Some(PcRuntimeRoutePreference::RouteC3),
+            )
+            .unwrap(),
+            "copilot"
+        );
+    }
+
+    #[test]
+    fn forced_route_c3_requires_cli_probe() {
+        let err = choose_cli_for_runtime(
+            &["codex".to_string()],
+            Some(&NodeDevRuntimeProfile {
+                route_a_ready: false,
+                api_runtime_ready: true,
+                ..Default::default()
+            }),
+            "codex".to_string(),
+            Some(PcRuntimeRoutePreference::RouteC3),
+        )
+        .expect_err("route C.3 should require remote CLI readiness");
+        assert!(err.contains("Route C.3"));
+        assert!(err.contains("CLI"));
     }
 
     #[test]

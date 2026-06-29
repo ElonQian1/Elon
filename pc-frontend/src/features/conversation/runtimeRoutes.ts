@@ -1,4 +1,4 @@
-export type RuntimeRoute = 'auto' | 'route_a' | 'route_b' | 'route_c'
+export type RuntimeRoute = 'auto' | 'route_a' | 'route_b' | 'route_c' | 'route_c2' | 'route_c3'
 
 export interface RuntimeRouteOption {
   value: RuntimeRoute
@@ -15,25 +15,16 @@ export interface RuntimeRouteGroup {
   options: RuntimeRouteOption[]
 }
 
-export interface FutureRuntimeRouteOption {
-  key: string
-  code: string
-  title: string
-  subtitle: string
-  description: string
-  stage: string
-}
-
 export const RUNTIME_ROUTE_STORAGE_KEY = 'elon_pc_project_runtime_route'
 
-export const RUNTIME_ROUTE_OPTIONS: RuntimeRouteOption[] = [
+export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
   {
     value: 'auto',
     code: 'Auto',
     shortLabel: '自动路线',
     title: '自动选择',
-    subtitle: '按当前 PC 节点能力选择',
-    description: '优先使用本机 CLI；不可用时按本机 API Runtime、服务器 API key Runtime 兜底。',
+    subtitle: '按项目绑定 PC 节点能力选择',
+    description: '优先使用项目节点 CLI；不可用时按 API Runtime、服务器 API key Runtime 兜底。',
   },
   {
     value: 'route_a',
@@ -61,30 +52,40 @@ export const RUNTIME_ROUTE_OPTIONS: RuntimeRouteOption[] = [
   },
 ]
 
-export const ACTIVE_RUNTIME_ROUTE_GROUPS: RuntimeRouteGroup[] = [
+export const SECOND_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
   {
-    title: '当前可用',
-    description: '这几条路线已经接入项目 AI 任务。',
-    options: RUNTIME_ROUTE_OPTIONS,
+    value: 'route_c2',
+    code: 'Route C.2',
+    shortLabel: '远程 API',
+    title: '远程 PC 节点 API Runtime',
+    subtitle: '服务器分配远程 PC 节点，模型 key 在该节点 Runtime 中使用',
+    description: '项目工作区、工具执行、审批和审计都在远程 PC harness 上运行；要求目标节点已配置 API Runtime。',
+  },
+  {
+    value: 'route_c3',
+    code: 'Route C.3',
+    shortLabel: '远程 CLI',
+    title: '远程 PC 节点 CLI',
+    subtitle: '服务器分配远程 PC 节点，使用该节点上的 Copilot / Codex CLI',
+    description: '项目工作区和 CLI 会话都在远程 PC 节点上隔离执行；要求目标节点 CLI 登录和探测通过。',
   },
 ]
 
-export const FUTURE_RUNTIME_ROUTES: FutureRuntimeRouteOption[] = [
+export const RUNTIME_ROUTE_OPTIONS: RuntimeRouteOption[] = [
+  ...FIRST_STAGE_RUNTIME_ROUTES,
+  ...SECOND_STAGE_RUNTIME_ROUTES,
+]
+
+export const ACTIVE_RUNTIME_ROUTE_GROUPS: RuntimeRouteGroup[] = [
   {
-    key: 'route_c2',
-    code: 'Route C.2',
-    title: '远程别人 PC 节点 + API key + PC harness',
-    subtitle: '下一阶段：把项目派到可授权的远程 PC 节点执行',
-    description: '需要先完成节点授权、项目隔离、密钥归属、计费结算和审计边界。',
-    stage: '第二阶段',
+    title: '第一阶段：本机 / 平台兜底',
+    description: '适合项目工作区在自己的 PC 节点上，或让服务器模型兜底。',
+    options: FIRST_STAGE_RUNTIME_ROUTES,
   },
   {
-    key: 'route_c3',
-    code: 'Route C.3',
-    title: '远程别人 PC 节点 CLI + PC harness',
-    subtitle: '下一阶段后半：使用远程节点上的 Copilot/Codex CLI',
-    description: '需要在 C.2 的远程节点安全边界上，再补远程 CLI 登录状态、命令审批、会话隔离和收益结算。',
-    stage: '第二阶段',
+    title: '第二阶段：远程 PC 节点',
+    description: '适合使用服务器节点大厅里可授权、可计费、可审计的别人 PC 节点。',
+    options: SECOND_STAGE_RUNTIME_ROUTES,
   },
 ]
 

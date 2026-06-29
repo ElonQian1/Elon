@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from 'react'
 import styles from './RuntimeRouteMenu.module.css'
 import {
   ACTIVE_RUNTIME_ROUTE_GROUPS,
-  FUTURE_RUNTIME_ROUTES,
   runtimeRouteDescription,
   runtimeRouteOption,
 } from './runtimeRoutes'
@@ -60,7 +59,7 @@ export default function RuntimeRouteMenu({ value, disabled, onChange }: Props) {
         <div className={styles.routePopover} role="menu" aria-label="选择项目 AI 运行路线">
           <div className={styles.routePopoverHead}>
             <strong>选择项目 AI 运行路线</strong>
-            <span>决定模型在哪里调用、PC harness 在哪里执行。</span>
+            <span>决定模型在哪里调用、PC harness 在哪台电脑执行。</span>
           </div>
 
           {ACTIVE_RUNTIME_ROUTE_GROUPS.map((group) => (
@@ -91,24 +90,6 @@ export default function RuntimeRouteMenu({ value, disabled, onChange }: Props) {
               ))}
             </section>
           ))}
-
-          <section className={styles.routeGroup}>
-            <div className={styles.routeGroupTitle}>
-              <strong>下一阶段</strong>
-              <span>远程别人 PC 节点需要先补授权、隔离、计费和审计。</span>
-            </div>
-            {FUTURE_RUNTIME_ROUTES.map((route) => (
-              <div className={styles.routeOptionDisabled} key={route.key} aria-disabled="true">
-                <span className={styles.routeCode}>{route.code}</span>
-                <span className={styles.routeOptionCopy}>
-                  <strong>{route.title}</strong>
-                  <em>{route.subtitle}</em>
-                  <span>{route.description}</span>
-                </span>
-                <b>{route.stage}</b>
-              </div>
-            ))}
-          </section>
         </div>
       )}
     </div>
