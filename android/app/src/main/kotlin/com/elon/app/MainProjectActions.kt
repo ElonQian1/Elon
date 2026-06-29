@@ -39,6 +39,7 @@ internal class MainProjectActions(
     private val saveProjects: () -> Unit,
     private val renderProjectList: () -> Unit,
     private val openProject: (Int) -> Unit,
+    private val openCreatedProjectChat: (Int) -> Unit,
     private val openProjectSpace: (AppProject) -> Unit,
     private val openProjectIconPicker: (AppProject) -> Unit,
     private val showGitProjectDialog: () -> Unit,
@@ -883,7 +884,7 @@ internal class MainProjectActions(
                     setActiveConversationIndex(0)
                     saveProjects()
                     renderProjectList()
-                    openProjectSpace(projects[index])
+                    openCreatedProjectChat(index)
                     val doneMsg = if (created.workspacePending) {
                         "项目已创建，工作区将在 PC 节点上线后自动初始化"
                     } else {

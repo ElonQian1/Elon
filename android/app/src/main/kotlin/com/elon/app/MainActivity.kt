@@ -1079,6 +1079,10 @@ class MainActivity : AppCompatActivity() {
             saveProjects = projectStateActions::saveProjects,
             renderProjectList = homeListActions::renderProjectList,
             openProject = conversationOpenActions::openProject,
+            openCreatedProjectChat = { index ->
+                navigationController.captureProjectEntryReturnTarget()
+                conversationOpenActions.openProject(index)
+            },
             openProjectSpace = { project -> openProjectSpaceForProject(project, true) },
             openProjectIconPicker = ::openProjectIconPicker,
             showGitProjectDialog = ::showGitProjectDialog,
