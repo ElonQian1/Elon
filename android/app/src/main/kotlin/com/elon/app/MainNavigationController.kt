@@ -807,6 +807,7 @@ internal class MainNavigationController(
         hideVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
         binding.moreButton.setImageResource(R.drawable.ic_more_horizontal)
+        applyDefaultMoreButtonIconInsets()
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.moreButton.contentDescription = "聊天功能"
         binding.stageHintText.visibility = View.VISIBLE
@@ -859,6 +860,7 @@ internal class MainNavigationController(
         updateFriendVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
         binding.moreButton.setImageResource(R.drawable.ic_more_horizontal)
+        applyDefaultMoreButtonIconInsets()
         binding.moreButton.setOnClickListener { showContactChatSettings() }
         binding.moreButton.contentDescription = "聊天设置"
         binding.quickActionStrip.visibility = View.GONE
@@ -940,6 +942,7 @@ internal class MainNavigationController(
         hideVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
         binding.moreButton.setImageResource(R.drawable.ic_project_members_toolbar)
+        applyProjectMemberMoreButtonIconInsets()
         binding.moreButton.setOnClickListener { showProjectMembers() }
         binding.moreButton.contentDescription = "项目成员"
         binding.topTitleText.setOnLongClickListener(null)
@@ -1064,6 +1067,14 @@ internal class MainNavigationController(
 
     private fun resetProjectHomeScroll() {
         binding.projectScrollView.post { binding.projectScrollView.scrollTo(0, 0) }
+    }
+
+    private fun applyDefaultMoreButtonIconInsets() {
+        binding.moreButton.setPadding(dp(8), dp(8), dp(8), dp(8))
+    }
+
+    private fun applyProjectMemberMoreButtonIconInsets() {
+        binding.moreButton.setPadding(dp(8), dp(11), dp(8), dp(5))
     }
 
     private fun designPx(value: Int): Int {
