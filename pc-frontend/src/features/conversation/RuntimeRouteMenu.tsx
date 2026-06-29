@@ -48,20 +48,20 @@ export default function RuntimeRouteMenu({ value, disabled, onChange }: Props) {
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
-        title={`运行路线：${runtimeRouteDescription(value)}`}
+        title={`AI运行方式：${runtimeRouteDescription(value)}`}
         disabled={disabled}
         onClick={() => setOpen((next) => !next)}
       >
-        <span className={styles.routeButtonLabel}>运行路线</span>
+        <span className={styles.routeButtonLabel}>AI方式</span>
         <strong>{selected.shortLabel}</strong>
         <span className={styles.routeChevron}>⌄</span>
       </button>
 
       {open && (
-        <div className={styles.routePopover} role="menu" aria-label="选择项目 AI 运行路线">
+        <div className={styles.routePopover} role="menu" aria-label="选择项目 AI 运行方式">
           <div className={styles.routePopoverHead}>
-            <strong>选择项目 AI 运行路线</strong>
-            <span>决定模型在哪里调用、PC harness 在哪台电脑执行。</span>
+            <strong>选择项目 AI 运行方式</strong>
+            <span>决定 AI 用哪一边，以及项目开发动作在哪台电脑完成。</span>
           </div>
 
           {ACTIVE_RUNTIME_ROUTE_GROUPS.map((group) => (

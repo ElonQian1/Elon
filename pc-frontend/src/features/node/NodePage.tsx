@@ -241,9 +241,9 @@ function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSumm
     ['显卡', (hw.gpu_names ?? []).join('、') || '未上报'],
     ['工作区', runtime.workspace_root_path ?? '未配置'],
     ['Git', runtime.git_ready ? '可用' : '未就绪'],
-    ['CLI Runtime', runtime.route_a_ready ? '就绪' : '未就绪'],
-    ['API Runtime', runtime.api_runtime_ready ? '就绪' : '未就绪'],
-    ['AI Agent', node.ai_cli_ready ? '就绪' : '未就绪'],
+    ['本机AI', runtime.route_a_ready ? '就绪' : '未就绪'],
+    ['本机API key', runtime.api_runtime_ready ? '就绪' : '未就绪'],
+    ['一龙开发环境', node.ai_cli_ready ? '就绪' : '未就绪'],
   ]
 
   return (
