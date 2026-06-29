@@ -47,9 +47,9 @@ export default function ServerRail() {
   }
 
   async function openProject(id: string) {
-    // Discord 式：直接切换项目，停在 / 页面
-    if (pathname !== '/') navigate('/')
+    // 先更新状态（高亮立即生效），再导航到 /
     await useProjectStore.getState().selectProject(id)
+    if (pathname !== '/') navigate('/')
   }
 
   function showTip(e: React.MouseEvent<HTMLElement>, text: string) {
@@ -82,7 +82,7 @@ export default function ServerRail() {
 
       {/* ── 每个项目的 logo 按钮 ── */}
       {projects.map((p) => {
-        const isActiveProject = p.id === activeProjectId && pathname === '/'
+        const isActiveProject = p.id === activeProjectId
         const iconSrc = p.icon_data_url || p.icon || ''
         return (
           <button
