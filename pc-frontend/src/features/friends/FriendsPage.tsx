@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { api } from '../../api/client'
 import { useAuthStore } from '../../store/auth'
 import { formatTime } from '../../lib/utils'
@@ -9,15 +9,34 @@ interface Friend {
   id: string
   account: string
   nickname?: string
+  avatar_data_url?: string
   last_message?: string
   last_message_at?: string
   unread_count?: number
   is_online?: boolean
 }
 
-interface FriendMessage {
+interface FriendGroupMemberPreview {
+  id: string
+  display_name: string
+  avatar_data_url?: string
+}
+
+interface FriendGroup {
+  id: string
+  name: string
+  member_count?: number
+  members?: FriendGroupMemberPreview[]
+  created_at?: string
+  last_message?: string
+  last_message_at?: string
+  unread_count?: number
+}
+
+interface SocialMessage {
   id: string
   sender_user_id: string
+  sender_name?: string
   content: string
   created_at: string
   outgoing: boolean
@@ -29,11 +48,40 @@ interface SearchResult {
   is_self: boolean
 }
 
+interface FriendSearchResponse {
+  found?: boolean
+  user?: Friend
+  already_friend?: boolean
+  is_self?: boolean
+  results?: SearchResult[]
+}
+
+type ConversationKind = 'friend' | 'group'
+
+interface ActiveConversation {
+  kind: ConversationKind
+  id: string
+}
+
+interface ConversationItem {
+  kind: ConversationKind
+  id: string
+  title: string
+  subtitle: string
+  lastMessage?: string
+  lastMessageAt?: string
+  unreadCount: number
+  isOnline?: boolean
+  friend?: Friend
+  group?: FriendGroup
+}
+
 export default function FriendsPage() {
   const me = useAuthStore((s) => s.user)
   const [friends, setFriends] = useState<Friend[]>([])
-  const [activeFriendId, setActiveFriendId] = useState<string | null>(null)
-  const [messages, setMessages] = useState<FriendMessage[]>([])
+  const [groups, setGroups] = useState<FriendGroup[]>([])
+  const [activeConversation, setActiveConversation] = useState<ActiveConversation | null>(null)
+  const [messages, setMessages] = useState<SocialMessage[]>([])
   const [messagesLoading, setMessagesLoading] = useState(false)
   const [input, setInput] = useState('')
   const [sending, setSending] = useState(false)
@@ -48,31 +96,72 @@ export default function FriendsPage() {
   const feedRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  useEffect(() => { loadFriends() }, [me?.id]) // eslint-disable-line
+  useEffect(() => { loadSocialConversations() }, [me?.id]) // eslint-disable-line
 
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages])
 
-  async function loadFriends() {
-    try {
-      const data = await api.get<{ friends?: Friend[] }>('/api/me/friends')
-      setFriends(data.friends ?? [])
-    } catch { /* ignore */ }
+  const conversationItems = useMemo(() => {
+    const friendItems: ConversationItem[] = friends.map((friend) => ({
+      kind: 'friend',
+      id: friend.id,
+      title: friend.nickname ?? friend.account,
+      subtitle: friend.last_message || friend.account || '暂无消息',
+      lastMessage: friend.last_message,
+      lastMessageAt: friend.last_message_at,
+      unreadCount: friend.unread_count ?? 0,
+      isOnline: friend.is_online,
+      friend,
+    }))
+    const groupItems: ConversationItem[] = groups.map((group) => ({
+      kind: 'group',
+      id: group.id,
+      title: group.name || '群聊',
+      subtitle: group.last_message || `${group.member_count ?? 0} 位成员`,
+      lastMessage: group.last_message,
+      lastMessageAt: group.last_message_at ?? group.created_at,
+      unreadCount: group.unread_count ?? 0,
+      group,
+    }))
+    return [...groupItems, ...friendItems].sort((a, b) => {
+      const byTime = timestampOf(b.lastMessageAt) - timestampOf(a.lastMessageAt)
+      if (byTime !== 0) return byTime
+      return a.title.localeCompare(b.title, 'zh-Hans-CN')
+    })
+  }, [friends, groups])
+
+  const activeItem = activeConversation
+    ? conversationItems.find((item) => item.kind === activeConversation.kind && item.id === activeConversation.id)
+    : undefined
+
+  async function loadSocialConversations() {
+    const [friendResult, groupResult] = await Promise.allSettled([
+      api.get<{ friends?: Friend[] }>('/api/me/friends'),
+      api.get<{ groups?: FriendGroup[] }>('/api/me/groups'),
+    ])
+    if (friendResult.status === 'fulfilled') setFriends(friendResult.value.friends ?? [])
+    if (groupResult.status === 'fulfilled') setGroups(groupResult.value.groups ?? [])
   }
 
-  async function selectFriend(friendId: string) {
-    setActiveFriendId(friendId)
+  async function selectConversation(item: ConversationItem) {
+    setActiveConversation({ kind: item.kind, id: item.id })
     setMessages([])
     setMessagesLoading(true)
     setError('')
     try {
-      const data = await api.get<{ messages?: FriendMessage[] }>(
-        `/api/me/friends/${encodeURIComponent(friendId)}/messages?limit=80`,
-      )
+      const endpoint = item.kind === 'friend'
+        ? `/api/me/friends/${encodeURIComponent(item.id)}/messages?limit=80`
+        : `/api/me/groups/${encodeURIComponent(item.id)}/messages?limit=120`
+      const data = await api.get<{ messages?: SocialMessage[] }>(endpoint)
       setMessages(data.messages ?? [])
+      void loadSocialConversations()
     } catch { /* ignore */ }
     finally { setMessagesLoading(false) }
+  }
+
+  function activeTitle() {
+    return activeItem?.title ?? '会话'
   }
 
   const autoResize = useCallback(() => {
@@ -86,31 +175,33 @@ export default function FriendsPage() {
   async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault()
     const text = input.trim()
-    if (!text || sending || !activeFriendId) return
+    if (!text || sending || !activeConversation) return
     setInput('')
     setError('')
     if (textareaRef.current) textareaRef.current.style.height = '46px'
     setSending(true)
-    // 乐观更新
-    const optimistic: FriendMessage = {
+    const current = activeConversation
+    const optimistic: SocialMessage = {
       id: `tmp-${Date.now()}`,
       sender_user_id: me?.id ?? '',
+      sender_name: me?.nickname ?? me?.account ?? '我',
       content: text,
       created_at: new Date().toISOString(),
       outgoing: true,
     }
     setMessages((prev) => [...prev, optimistic])
     try {
-      const res = await api.post<{ message?: FriendMessage }>(
-        `/api/me/friends/${encodeURIComponent(activeFriendId)}/messages`,
+      const endpoint = current.kind === 'friend'
+        ? `/api/me/friends/${encodeURIComponent(current.id)}/messages`
+        : `/api/me/groups/${encodeURIComponent(current.id)}/messages`
+      const res = await api.post<{ message?: SocialMessage }>(
+        endpoint,
         { content: text },
       )
-      // 用服务端返回替换乐观消息
       if (res.message) {
         setMessages((prev) => prev.map((m) => m.id === optimistic.id ? res.message! : m))
       }
-      // 刷新好友列表（更新最后消息）
-      loadFriends()
+      void loadSocialConversations()
     } catch (err) {
       setError((err as { message?: string }).message ?? '发送失败')
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id))
@@ -133,21 +224,31 @@ export default function FriendsPage() {
     setSearchLoading(true)
     setSearchResults([])
     try {
-      const data = await api.get<{ results?: SearchResult[] }>(
+      const data = await api.get<FriendSearchResponse>(
         `/api/me/friends/search?q=${encodeURIComponent(q)}`,
       )
-      setSearchResults(data.results ?? [])
+      if (data.results) {
+        setSearchResults(data.results)
+      } else if (data.found && data.user) {
+        setSearchResults([{
+          user: data.user,
+          already_friend: !!data.already_friend,
+          is_self: !!data.is_self,
+        }])
+      } else {
+        setSearchResults([])
+      }
     } catch { /* ignore */ }
     finally { setSearchLoading(false) }
   }
 
-  async function handleAddFriend(userId: string) {
-    setAddingId(userId)
+  async function handleAddFriend(result: SearchResult) {
+    setAddingId(result.user.id)
     try {
-      await api.post('/api/me/friends', { phone: userId })
-      await loadFriends()
+      await api.post('/api/me/friends', { query: result.user.id, search_type: 'user_id' })
+      await loadSocialConversations()
       setSearchResults((prev) => prev.map((r) =>
-        r.user.id === userId ? { ...r, already_friend: true } : r,
+        r.user.id === result.user.id ? { ...r, already_friend: true } : r,
       ))
     } catch (err) {
       alert((err as { message?: string }).message ?? '添加失败')
@@ -156,17 +257,14 @@ export default function FriendsPage() {
     }
   }
 
-  const activeFriend = friends.find((f) => f.id === activeFriendId)
-
   return (
     <div className={styles.layout}>
-      {/* 好友列表（左栏）*/}
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
-          <span>好友</span>
+          <span>会话</span>
+          <small>{groups.length} 群聊 · {friends.length} 好友</small>
         </div>
 
-        {/* 搜索栏 */}
         <form onSubmit={handleSearch} className={styles.searchForm}>
           <input
             className={styles.searchInput}
@@ -179,7 +277,6 @@ export default function FriendsPage() {
           </button>
         </form>
 
-        {/* 搜索结果 */}
         {searchResults.length > 0 && (
           <div className={styles.searchResults}>
             {searchResults.filter((r) => !r.is_self).map((r) => (
@@ -197,7 +294,7 @@ export default function FriendsPage() {
                     <button
                       className={styles.addBtn}
                       disabled={addingId === r.user.id}
-                      onClick={() => handleAddFriend(r.user.account)}
+                      onClick={() => handleAddFriend(r)}
                       type="button"
                     >
                       {addingId === r.user.id ? '…' : '+'}
@@ -208,85 +305,90 @@ export default function FriendsPage() {
           </div>
         )}
 
-        {/* 好友列表 */}
         <div className={styles.friendList}>
-          {friends.length === 0 && (
-            <p className={styles.hint}>暂无好友，搜索手机号添加</p>
+          {conversationItems.length === 0 && (
+            <p className={styles.hint}>暂无好友或群聊，搜索手机号添加好友</p>
           )}
-          {friends.map((f) => (
+          {conversationItems.map((item) => (
             <button
-              key={f.id}
-              className={[styles.friendItem, f.id === activeFriendId ? styles.friendActive : ''].join(' ')}
-              onClick={() => selectFriend(f.id)}
+              key={`${item.kind}:${item.id}`}
+              className={[
+                styles.friendItem,
+                item.kind === activeConversation?.kind && item.id === activeConversation?.id ? styles.friendActive : '',
+              ].join(' ')}
+              onClick={() => selectConversation(item)}
               type="button"
             >
               <div className={styles.friendAvatarWrap}>
-                <div className={styles.friendAvatar}>
-                  {(f.nickname ?? f.account)[0]?.toUpperCase()}
+                <div className={[styles.friendAvatar, item.kind === 'group' ? styles.groupAvatar : ''].join(' ')}>
+                  {avatarInitial(item.title, item.kind === 'group' ? '群' : '友')}
                 </div>
-                {f.is_online && <div className={styles.onlineDot} />}
+                {item.isOnline && <div className={styles.onlineDot} />}
               </div>
               <div className={styles.friendMeta}>
                 <div className={styles.friendNameRow}>
-                  <strong>{f.nickname ?? f.account}</strong>
-                  {(f.unread_count ?? 0) > 0 && (
-                    <span className={styles.unreadBadge}>{f.unread_count}</span>
+                  <strong>{item.title}</strong>
+                  <span className={styles.conversationType}>{item.kind === 'group' ? '群' : '友'}</span>
+                  {item.unreadCount > 0 && (
+                    <span className={styles.unreadBadge}>{item.unreadCount}</span>
                   )}
                 </div>
                 <span className={styles.lastMsg}>
-                  {f.last_message
-                    ? f.last_message.slice(0, 28) + (f.last_message.length > 28 ? '…' : '')
-                    : ''}
+                  {truncateText(item.subtitle, 28)}
                 </span>
               </div>
-              {f.last_message_at && (
-                <span className={styles.msgTime}>{formatTime(f.last_message_at)}</span>
+              {item.lastMessageAt && (
+                <span className={styles.msgTime}>{formatTime(item.lastMessageAt)}</span>
               )}
             </button>
           ))}
         </div>
       </aside>
 
-      {/* 聊天区 */}
       <div className={styles.chat}>
         <header className={styles.topbar}>
-          {activeFriend ? (
+          {activeItem ? (
             <div className={styles.topbarFriend}>
-              <div className={styles.topbarAvatar}>
-                {(activeFriend.nickname ?? activeFriend.account)[0]?.toUpperCase()}
+              <div className={[styles.topbarAvatar, activeItem.kind === 'group' ? styles.groupAvatar : ''].join(' ')}>
+                {avatarInitial(activeItem.title, activeItem.kind === 'group' ? '群' : '友')}
               </div>
               <div>
-                <strong>{activeFriend.nickname ?? activeFriend.account}</strong>
-                <span className={[styles.onlineStatus, activeFriend.is_online ? styles.onlineTrue : ''].join(' ')}>
-                  {activeFriend.is_online ? '在线' : '离线'}
+                <strong>{activeItem.title}</strong>
+                <span className={[styles.onlineStatus, activeItem.isOnline ? styles.onlineTrue : ''].join(' ')}>
+                  {activeItem.kind === 'group'
+                    ? `${activeItem.group?.member_count ?? 0} 位成员`
+                    : activeItem.isOnline ? '在线' : '离线'}
                 </span>
               </div>
             </div>
           ) : (
-            <span className={styles.topbarTitle}>选择好友开始聊天</span>
+            <span className={styles.topbarTitle}>选择好友或群聊开始聊天</span>
           )}
         </header>
 
         <div className={styles.feed} ref={feedRef}>
-          {!activeFriendId && (
+          {!activeConversation && (
             <div className={styles.welcome}>
-              <p>从左侧选择一位好友开始私聊</p>
+              <p>从左侧选择一位好友或群聊开始聊天</p>
             </div>
           )}
           {messagesLoading && <p className={styles.hint}>读取消息…</p>}
           {messages.map((m, i) => {
             const isMe = m.outgoing || m.sender_user_id === me?.id
             const hasMarkdown = !isMe && /[#*`\[\]>|]/.test(m.content)
+            const senderName = isMe
+              ? (me?.nickname ?? me?.account ?? '我')
+              : (activeItem?.kind === 'group'
+                ? (m.sender_name ?? '群成员')
+                : activeItem?.title ?? '对方')
             return (
               <div key={m.id ?? i} className={[styles.msgRow, isMe ? styles.ownRow : ''].join(' ')}>
                 <div className={styles.avatar}>
-                  {isMe
-                    ? (me?.account?.[0]?.toUpperCase() ?? '我')
-                    : (activeFriend?.nickname ?? activeFriend?.account ?? '?')[0]?.toUpperCase()}
+                  {avatarInitial(senderName, isMe ? '我' : activeItem?.kind === 'group' ? '群' : '友')}
                 </div>
                 <div className={styles.msgBody}>
                   <div className={styles.msgMeta}>
-                    <strong>{isMe ? (me?.nickname ?? me?.account ?? '我') : (activeFriend?.nickname ?? activeFriend?.account ?? '对方')}</strong>
+                    <strong>{senderName}</strong>
                     <span>{formatTime(m.created_at)}</span>
                   </div>
                   {hasMarkdown
@@ -298,7 +400,7 @@ export default function FriendsPage() {
           })}
         </div>
 
-        {activeFriendId && (
+        {activeConversation && (
           <form className={styles.composer} onSubmit={handleSend}>
             <textarea
               ref={textareaRef}
@@ -306,7 +408,7 @@ export default function FriendsPage() {
               value={input}
               onChange={(e) => { setInput(e.target.value); autoResize() }}
               onKeyDown={handleKeyDown}
-              placeholder={`发送消息给 ${activeFriend?.nickname ?? activeFriend?.account ?? '好友'}…`}
+              placeholder={`发送消息到 ${activeTitle()}…`}
               disabled={sending}
               rows={1}
             />
@@ -319,4 +421,19 @@ export default function FriendsPage() {
       </div>
     </div>
   )
+}
+
+function avatarInitial(value: string | undefined, fallback: string) {
+  const chars = Array.from((value || fallback).trim())
+  return (chars[0] || fallback).toUpperCase()
+}
+
+function timestampOf(value: string | undefined) {
+  if (!value) return 0
+  const ms = Date.parse(value)
+  return Number.isFinite(ms) ? ms : 0
+}
+
+function truncateText(value: string, length: number) {
+  return value.length > length ? `${value.slice(0, length)}…` : value
 }
