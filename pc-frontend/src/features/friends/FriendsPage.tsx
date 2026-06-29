@@ -102,8 +102,8 @@ export default function FriendsPage() {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages])
 
-  const conversationItems = useMemo(() => {
-    const friendItems: ConversationItem[] = friends.map((friend) => ({
+  const friendConversationItems = useMemo(() => {
+    return sortConversationItems(friends.map((friend) => ({
       kind: 'friend',
       id: friend.id,
       title: friend.nickname ?? friend.account,
@@ -113,8 +113,11 @@ export default function FriendsPage() {
       unreadCount: friend.unread_count ?? 0,
       isOnline: friend.is_online,
       friend,
-    }))
-    const groupItems: ConversationItem[] = groups.map((group) => ({
+    })))
+  }, [friends])
+
+  const groupConversationItems = useMemo(() => {
+    return sortConversationItems(groups.map((group) => ({
       kind: 'group',
       id: group.id,
       title: group.name || '群聊',
@@ -123,13 +126,13 @@ export default function FriendsPage() {
       lastMessageAt: group.last_message_at ?? group.created_at,
       unreadCount: group.unread_count ?? 0,
       group,
-    }))
-    return [...groupItems, ...friendItems].sort((a, b) => {
-      const byTime = timestampOf(b.lastMessageAt) - timestampOf(a.lastMessageAt)
-      if (byTime !== 0) return byTime
-      return a.title.localeCompare(b.title, 'zh-Hans-CN')
-    })
-  }, [friends, groups])
+    })))
+  }, [groups])
+
+  const conversationItems = useMemo(
+    () => [...friendConversationItems, ...groupConversationItems],
+    [friendConversationItems, groupConversationItems],
+  )
 
   const activeItem = activeConversation
     ? conversationItems.find((item) => item.kind === activeConversation.kind && item.id === activeConversation.id)
@@ -257,12 +260,47 @@ export default function FriendsPage() {
     }
   }
 
+  function renderConversationItem(item: ConversationItem) {
+    return (
+      <button
+        key={`${item.kind}:${item.id}`}
+        className={[
+          styles.friendItem,
+          item.kind === activeConversation?.kind && item.id === activeConversation?.id ? styles.friendActive : '',
+        ].join(' ')}
+        onClick={() => selectConversation(item)}
+        type="button"
+      >
+        <div className={styles.friendAvatarWrap}>
+          <div className={[styles.friendAvatar, item.kind === 'group' ? styles.groupAvatar : ''].join(' ')}>
+            {avatarInitial(item.title, item.kind === 'group' ? '群' : '友')}
+          </div>
+          {item.isOnline && <div className={styles.onlineDot} />}
+        </div>
+        <div className={styles.friendMeta}>
+          <div className={styles.friendNameRow}>
+            <strong>{item.title}</strong>
+            {item.unreadCount > 0 && (
+              <span className={styles.unreadBadge}>{item.unreadCount}</span>
+            )}
+          </div>
+          <span className={styles.lastMsg}>
+            {truncateText(item.subtitle, 28)}
+          </span>
+        </div>
+        {item.lastMessageAt && (
+          <span className={styles.msgTime}>{formatTime(item.lastMessageAt)}</span>
+        )}
+      </button>
+    )
+  }
+
   return (
     <div className={styles.layout}>
       <aside className={styles.sidebar}>
         <div className={styles.sideHeader}>
           <span>会话</span>
-          <small>{groups.length} 群聊 · {friends.length} 好友</small>
+          <small>{friends.length} 好友 · {groups.length} 群聊</small>
         </div>
 
         <form onSubmit={handleSearch} className={styles.searchForm}>
@@ -309,39 +347,25 @@ export default function FriendsPage() {
           {conversationItems.length === 0 && (
             <p className={styles.hint}>暂无好友或群聊，搜索手机号添加好友</p>
           )}
-          {conversationItems.map((item) => (
-            <button
-              key={`${item.kind}:${item.id}`}
-              className={[
-                styles.friendItem,
-                item.kind === activeConversation?.kind && item.id === activeConversation?.id ? styles.friendActive : '',
-              ].join(' ')}
-              onClick={() => selectConversation(item)}
-              type="button"
-            >
-              <div className={styles.friendAvatarWrap}>
-                <div className={[styles.friendAvatar, item.kind === 'group' ? styles.groupAvatar : ''].join(' ')}>
-                  {avatarInitial(item.title, item.kind === 'group' ? '群' : '友')}
-                </div>
-                {item.isOnline && <div className={styles.onlineDot} />}
-              </div>
-              <div className={styles.friendMeta}>
-                <div className={styles.friendNameRow}>
-                  <strong>{item.title}</strong>
-                  <span className={styles.conversationType}>{item.kind === 'group' ? '群' : '友'}</span>
-                  {item.unreadCount > 0 && (
-                    <span className={styles.unreadBadge}>{item.unreadCount}</span>
-                  )}
-                </div>
-                <span className={styles.lastMsg}>
-                  {truncateText(item.subtitle, 28)}
-                </span>
-              </div>
-              {item.lastMessageAt && (
-                <span className={styles.msgTime}>{formatTime(item.lastMessageAt)}</span>
-              )}
-            </button>
-          ))}
+          <section className={styles.conversationSection}>
+            <div className={styles.sectionHeader}>
+              <span>好友会话</span>
+              <small>{friendConversationItems.length}</small>
+            </div>
+            {friendConversationItems.length === 0
+              ? <p className={styles.sectionHint}>暂无好友会话</p>
+              : friendConversationItems.map(renderConversationItem)}
+          </section>
+
+          <section className={styles.conversationSection}>
+            <div className={styles.sectionHeader}>
+              <span>群聊</span>
+              <small>{groupConversationItems.length}</small>
+            </div>
+            {groupConversationItems.length === 0
+              ? <p className={styles.sectionHint}>暂无群聊</p>
+              : groupConversationItems.map(renderConversationItem)}
+          </section>
         </div>
       </aside>
 
@@ -432,6 +456,14 @@ function timestampOf(value: string | undefined) {
   if (!value) return 0
   const ms = Date.parse(value)
   return Number.isFinite(ms) ? ms : 0
+}
+
+function sortConversationItems(items: ConversationItem[]) {
+  return [...items].sort((a, b) => {
+    const byTime = timestampOf(b.lastMessageAt) - timestampOf(a.lastMessageAt)
+    if (byTime !== 0) return byTime
+    return a.title.localeCompare(b.title, 'zh-Hans-CN')
+  })
 }
 
 function truncateText(value: string, length: number) {
