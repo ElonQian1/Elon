@@ -18,6 +18,8 @@ import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime, clean } from '../../lib/utils'
 import { shortButtonLabel } from '../models/modelUtils'
+import { RUNTIME_ROUTE_OPTIONS, RUNTIME_ROUTE_STORAGE_KEY, normalizeRuntimeRoute, runtimeRouteDescription } from './runtimeRoutes'
+import type { RuntimeRoute } from './runtimeRoutes'
 import type {
   Channel,
   ChannelCategory,
@@ -54,6 +56,9 @@ export default function ConversationPage() {
   const [sendError, setSendError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
+  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => normalizeRuntimeRoute(
+    typeof window === 'undefined' ? null : window.localStorage.getItem(RUNTIME_ROUTE_STORAGE_KEY),
+  ))
   const [showPermissions, setShowPermissions] = useState(false)
   const [showPresence, setShowPresence] = useState(false)
   const [showInvites, setShowInvites] = useState(false)
@@ -78,6 +83,10 @@ export default function ConversationPage() {
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
+
+  useEffect(() => {
+    window.localStorage.setItem(RUNTIME_ROUTE_STORAGE_KEY, runtimeRoute)
+  }, [runtimeRoute])
 
   // 加载项目会话列表（与手机端同步）
   useEffect(() => {
@@ -194,7 +203,7 @@ export default function ConversationPage() {
         prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
         waitingForNewSession.current = true
       }
-      await sendMessage(fullContent, selectedAgent || null)
+      await sendMessage(fullContent, selectedAgent || null, runtimeRoute)
       // 发送后刷新会话列表（新会话会出现在顶部）
       if (activeProjectId && user?.id) {
         setTimeout(async () => {
@@ -733,6 +742,17 @@ export default function ConversationPage() {
               >
                 {shortButtonLabel(modelLabel)}
               </button>
+              <select
+                className={styles.runtimeRouteSelect}
+                value={runtimeRoute}
+                title={`运行路线：${runtimeRouteDescription(runtimeRoute)}`}
+                onChange={(e) => setRuntimeRoute(normalizeRuntimeRoute(e.target.value))}
+                disabled={sendingMessage}
+              >
+                {RUNTIME_ROUTE_OPTIONS.map((route) => (
+                  <option key={route.value} value={route.value}>{route.label}</option>
+                ))}
+              </select>
 
               {/* Textarea */}
               <textarea

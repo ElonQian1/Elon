@@ -61,6 +61,10 @@ pub async fn chat_project(
     if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
+    let pc_runtime_route = match req.pc_runtime_route() {
+        Ok(route) => route,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+    };
 
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
@@ -89,6 +93,7 @@ pub async fn chat_project(
             "conversation_id": &conversation_id,
             "message_chars": message.chars().count(),
             "agent": req.agent.as_deref(),
+            "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
             "execution_mode": req.execution_mode.as_deref(),
             "plan_mode": req.plan_mode,
         }),
@@ -137,7 +142,7 @@ pub async fn chat_project(
             req.agent,
             attachments,
             ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
-            None,
+            pc_runtime_route,
             Some(trace_id.clone()),
             tx,
         )
@@ -276,6 +281,10 @@ pub async fn chat_project_stream(
     if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
+    let pc_runtime_route = match req.pc_runtime_route() {
+        Ok(route) => route,
+        Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
+    };
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
         &user.id,
@@ -314,7 +323,7 @@ pub async fn chat_project_stream(
         req.agent,
         attachments,
         ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
-        None,
+        pc_runtime_route,
         Some(trace_id),
         tx,
     )

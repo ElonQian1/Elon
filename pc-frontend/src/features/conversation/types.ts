@@ -1,3 +1,5 @@
+import type { RuntimeRoute } from './runtimeRoutes'
+
 export interface Project {
   id: string
   name: string
@@ -207,11 +209,13 @@ export interface Message {
 export interface SendMessagePayload {
   content: string
   agent?: string | null
+  runtimeRoute?: RuntimeRoute
 }
 
 export interface StartAiTaskPayload {
   content: string
   agent?: string | null
+  runtimeRoute?: RuntimeRoute
 }
 
 export interface ProjectListResponse {

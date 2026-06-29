@@ -457,10 +457,10 @@
 }
 .newMsgBtn:hover { background: #343741; color: var(--text); }
 
-/* 输入框区（composer）4 列：42px | 1fr | 42px | 68px */
+/* 输入框区（composer）5 列：模型 | 路线 | 输入 | 附件 | 发送 */
 .composer {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px 68px;
+  grid-template-columns: 42px 82px minmax(0, 1fr) 42px 68px;
   gap: 10px;
   align-items: end;
   min-height: 72px;
@@ -483,6 +483,27 @@
   transition: background 0.1s;
 }
 .composerModelBtn:hover { background: #393d47; }
+.runtimeRouteSelect {
+  height: 46px;
+  min-width: 0;
+  border: 1px solid #3b3e46;
+  border-radius: 8px;
+  background: #25272d;
+  color: var(--text-soft);
+  padding: 0 8px;
+  font-size: 11px;
+  font-weight: 800;
+  outline: none;
+}
+.runtimeRouteSelect:hover,
+.runtimeRouteSelect:focus {
+  border-color: #4b5361;
+  background: #30333b;
+}
+.runtimeRouteSelect:disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
 .composerTextarea {
   height: 46px;
   min-height: 46px;

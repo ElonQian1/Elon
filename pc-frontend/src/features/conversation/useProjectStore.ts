@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../../api/client'
 import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse } from './types'
+import type { RuntimeRoute } from './runtimeRoutes'
 
 interface ProjectState {
   projects: Project[]
@@ -24,7 +25,7 @@ interface ProjectState {
   reloadProjectSpace: () => Promise<void>
   selectChannel: (id: string) => Promise<void>
   loadMessages: (projectId: string, channelId: string) => Promise<void>
-  sendMessage: (content: string, agent?: string | null) => Promise<void>
+  sendMessage: (content: string, agent?: string | null, runtimeRoute?: RuntimeRoute) => Promise<void>
   cancelTask: (taskId: string) => Promise<void>
   approveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
   startPolling: () => void
@@ -142,14 +143,14 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }
   },
 
-  sendMessage: async (content: string, agent?: string | null) => {
+  sendMessage: async (content: string, agent?: string | null, runtimeRoute: RuntimeRoute = 'auto') => {
     const { activeProjectId, activeChannelId } = get()
     if (!activeProjectId || !activeChannelId || !content.trim()) return
     set({ sendingMessage: true })
     try {
       await api.post(
         `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(activeChannelId)}/ai-tasks`,
-        { content, agent: agent ?? null },
+        { content, agent: agent ?? null, runtimeRoute },
       )
       // 立即刷新消息
       await get().loadMessages(activeProjectId, activeChannelId)

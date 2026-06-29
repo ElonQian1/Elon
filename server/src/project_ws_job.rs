@@ -18,6 +18,7 @@ use tokio::sync::{broadcast, watch, Mutex};
 
 use crate::{
     billing,
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_chat::run_project_agent_with_scheduler,
     project_execution_mode::ProjectExecutionMode,
     project_keys::project_ws_job_key,
@@ -56,6 +57,7 @@ pub(crate) async fn get_or_start_project_ws_job(
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<String>,
     client_request_id: String,
     fingerprint: String,
@@ -225,6 +227,7 @@ pub(crate) async fn get_or_start_project_ws_job(
             agent_name,
             attachments,
             execution_mode,
+            pc_runtime_route,
             trace_id,
             task_id,
             job_for_task,
@@ -248,6 +251,7 @@ async fn run_project_ws_job(
     agent_name: Option<String>,
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<String>,
     task_id: String,
     job: Arc<ProjectWsJob>,
@@ -264,6 +268,7 @@ async fn run_project_ws_job(
                 "conversation_id": &conversation_id,
                 "message_chars": message.chars().count(),
                 "agent": agent_name.as_deref(),
+                "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
                 "execution_mode": execution_mode.as_str(),
             }),
         );
@@ -310,6 +315,7 @@ async fn run_project_ws_job(
     let task_project_icon_data_url = project_icon_data_url.clone();
     let task_agent_name = agent_name.clone();
     let task_attachments = attachments.clone();
+    let task_pc_runtime_route = pc_runtime_route;
     let task_trace_id = trace_id.clone();
     let agent_task = tokio::spawn(async move {
         run_project_agent_with_scheduler(
@@ -323,7 +329,7 @@ async fn run_project_ws_job(
             task_agent_name,
             task_attachments,
             execution_mode,
-            None,
+            task_pc_runtime_route,
             task_trace_id,
             tx,
         )

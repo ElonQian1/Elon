@@ -2,7 +2,9 @@ use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use crate::{store::TaskSnapshot, types::WsMessage};
+use crate::{
+    pc_agent_runtime_choice::PcRuntimeRoutePreference, store::TaskSnapshot, types::WsMessage,
+};
 
 pub const PROJECT_WS_BACKLOG_LIMIT: usize = 512;
 
@@ -14,6 +16,15 @@ pub struct ProjectChatRequest {
     pub client_request_id: Option<String>,
     pub message: String,
     pub agent: Option<String>,
+    #[serde(
+        default,
+        alias = "runtimeRoute",
+        alias = "pcRuntimeRoute",
+        alias = "pc_runtime_route",
+        alias = "pcRoute",
+        alias = "pc_route"
+    )]
+    pub runtime_route: Option<String>,
     pub execution_mode: Option<String>,
     pub plan_mode: Option<bool>,
     pub conversation_id: Option<String>,
@@ -26,6 +37,16 @@ pub struct ProjectChatRequest {
     /// 仅闲聊：true 时强制走轻量 casual chat，绝不进入项目 Codex 开发工作流。
     /// 悬浮球语音 agent 借用 AI 对话能力时设为 true，避免误判为开发任务而启动 Codex 导致超时。
     pub chat_only: Option<bool>,
+}
+
+impl ProjectChatRequest {
+    pub(crate) fn pc_runtime_route(&self) -> Result<Option<PcRuntimeRoutePreference>, String> {
+        self.runtime_route
+            .as_deref()
+            .map(PcRuntimeRoutePreference::from_request)
+            .transpose()
+            .map(Option::flatten)
+    }
 }
 
 #[derive(Deserialize)]
@@ -132,11 +153,12 @@ pub fn project_client_request_id(
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| {
             stable_request_id(&format!(
-                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+                "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
                 project_id,
                 user_id,
                 conversation_id,
                 request.agent.as_deref().unwrap_or(""),
+                request.runtime_route.as_deref().unwrap_or(""),
                 request.execution_mode.as_deref().unwrap_or(""),
                 message
             ))
@@ -198,6 +220,7 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         client_request_id: None,
         message: raw.to_string(),
         agent: None,
+        runtime_route: None,
         execution_mode: None,
         plan_mode: None,
         conversation_id: None,
@@ -313,6 +336,29 @@ mod tests {
         assert_eq!(attachment.size_bytes, Some(128));
         assert_eq!(attachment.image_width, Some(640));
         assert_eq!(attachment.image_height, Some(480));
+    }
+
+    #[test]
+    fn parses_project_chat_runtime_route_aliases() {
+        let request = serde_json::from_str::<ProjectChatRequest>(
+            r#"{"message":"run","runtimeRoute":"server-runtime"}"#,
+        )
+        .expect("request should parse");
+
+        assert_eq!(
+            request.pc_runtime_route().expect("route should parse"),
+            Some(PcRuntimeRoutePreference::RouteC)
+        );
+    }
+
+    #[test]
+    fn rejects_unknown_project_chat_runtime_route() {
+        let request = serde_json::from_str::<ProjectChatRequest>(
+            r#"{"message":"run","runtimeRoute":"remote-neighbor"}"#,
+        )
+        .expect("request should parse");
+
+        assert!(request.pc_runtime_route().is_err());
     }
 
     #[test]
