@@ -7,6 +7,8 @@ export interface RuntimeRouteOption {
   title: string
   subtitle: string
   description: string
+  configHref?: string
+  configLabel?: string
 }
 
 export interface RuntimeRouteGroup {
@@ -33,6 +35,8 @@ export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
     title: '本机 CLI',
     subtitle: 'Copilot / Codex 在这台电脑上执行',
     description: '使用本机已登录的 Copilot、Codex、Claude 或 Gemini CLI，模型调用、文件读写和命令都发生在本机。',
+    configHref: '/node?route=route_a',
+    configLabel: '配置本机 CLI',
   },
   {
     value: 'route_b',
@@ -41,6 +45,8 @@ export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
     title: '自带 API key + 本机 harness',
     subtitle: '模型 key 属于用户，工具循环在本机',
     description: '用用户自己配置的 OpenAI-compatible API key 调模型，本机 PC harness 负责读写文件、运行命令和审批。',
+    configHref: '/node?route=route_b',
+    configLabel: '配置 API Runtime',
   },
   {
     value: 'route_c',
@@ -60,6 +66,8 @@ export const SECOND_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
     title: '远程 PC 节点 API Runtime',
     subtitle: '服务器分配远程 PC 节点，模型 key 在该节点 Runtime 中使用',
     description: '项目工作区、工具执行、审批和审计都在远程 PC harness 上运行；要求目标节点已配置 API Runtime。',
+    configHref: '/node?route=route_c2',
+    configLabel: '配置远程 API 节点',
   },
   {
     value: 'route_c3',
@@ -68,6 +76,8 @@ export const SECOND_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
     title: '远程 PC 节点 CLI',
     subtitle: '服务器分配远程 PC 节点，使用该节点上的 Copilot / Codex CLI',
     description: '项目工作区和 CLI 会话都在远程 PC 节点上隔离执行；要求目标节点 CLI 登录和探测通过。',
+    configHref: '/node?route=route_c3',
+    configLabel: '配置远程 CLI 节点',
   },
 ]
 

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
+import { Settings } from 'lucide-react'
 import styles from './RuntimeRouteMenu.module.css'
 import {
   ACTIVE_RUNTIME_ROUTE_GROUPS,
@@ -69,24 +71,39 @@ export default function RuntimeRouteMenu({ value, disabled, onChange }: Props) {
                 <span>{group.description}</span>
               </div>
               {group.options.map((route) => (
-                <button
+                <div
                   className={[
                     styles.routeOption,
                     route.value === value ? styles.routeOptionActive : '',
                   ].join(' ')}
                   key={route.value}
-                  type="button"
-                  role="menuitemradio"
-                  aria-checked={route.value === value}
-                  onClick={() => choose(route.value)}
                 >
-                  <span className={styles.routeCode}>{route.code}</span>
-                  <span className={styles.routeOptionCopy}>
-                    <strong>{route.title}</strong>
-                    <em>{route.subtitle}</em>
-                    <span>{route.description}</span>
-                  </span>
-                </button>
+                  <button
+                    className={styles.routeOptionSelect}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={route.value === value}
+                    onClick={() => choose(route.value)}
+                  >
+                    <span className={styles.routeCode}>{route.code}</span>
+                    <span className={styles.routeOptionCopy}>
+                      <strong>{route.title}</strong>
+                      <em>{route.subtitle}</em>
+                      <span>{route.description}</span>
+                    </span>
+                  </button>
+                  {route.configHref && (
+                    <Link
+                      className={styles.routeConfigLink}
+                      to={route.configHref}
+                      title={route.configLabel ?? `${route.title}配置`}
+                      aria-label={route.configLabel ?? `${route.title}配置`}
+                      onClick={() => setOpen(false)}
+                    >
+                      <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
+                    </Link>
+                  )}
+                </div>
               ))}
             </section>
           ))}

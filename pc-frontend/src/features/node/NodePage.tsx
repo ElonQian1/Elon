@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
+import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { safeNodeAdminUrl } from '../../lib/utils'
 import type { NodeSummary, LocalNodeStatus } from './types'
 import styles from './NodePage.module.css'
@@ -11,7 +13,10 @@ const LAUNCH_URL = 'elon-node://open'
 export default function NodePage() {
   const [nodes, setNodes] = useState<NodeSummary[]>([])
   const [selectedNodeId, setSelectedNodeId] = useState('')
+  const [searchParams] = useSearchParams()
   const adminUrl = safeNodeAdminUrl()
+  const routeConfig = searchParams.get('route')
+  const routeConfigKey = isRouteConfigKey(routeConfig) ? routeConfig : null
 
   useEffect(() => {
     fetchMyNodes().then(setNodes).catch(() => {})
@@ -60,6 +65,7 @@ export default function NodePage() {
       </aside>
 
       <main className={styles.main}>
+        {routeConfigKey && <RuntimeRouteConfigGuide route={routeConfigKey} />}
         {!selectedNodeId
           ? <LocalNodePanel adminUrl={adminUrl} />
           : selected
@@ -235,6 +241,8 @@ function NodeDetailPanel({ node, onBack, adminUrl: _adminUrl }: { node: NodeSumm
     ['显卡', (hw.gpu_names ?? []).join('、') || '未上报'],
     ['工作区', runtime.workspace_root_path ?? '未配置'],
     ['Git', runtime.git_ready ? '可用' : '未就绪'],
+    ['CLI Runtime', runtime.route_a_ready ? '就绪' : '未就绪'],
+    ['API Runtime', runtime.api_runtime_ready ? '就绪' : '未就绪'],
     ['AI Agent', node.ai_cli_ready ? '就绪' : '未就绪'],
   ]
 

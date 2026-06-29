@@ -101,6 +101,74 @@
 
 .versionLine { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
 
+/* ── 路线配置提示 ── */
+.routeGuide {
+  max-width: 720px;
+  margin-bottom: 18px;
+  border: 1px solid rgba(110,168,254,.22);
+  border-radius: var(--radius-md);
+  background: rgba(110,168,254,.07);
+  padding: 16px;
+}
+
+.routeGuideHead {
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.routeGuideCode {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: var(--radius-sm);
+  color: #d8e5ff;
+  background: rgba(255,255,255,.05);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.routeGuide h3 {
+  margin: 0 0 5px;
+  font-size: 15px;
+}
+
+.routeGuide p,
+.routeGuide span,
+.routeGuide li {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.routeGuide p { margin: 0; }
+
+.routeGuideGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 180px) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.routeGuideGrid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.routeGuideGrid strong {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.routeGuideGrid ul {
+  margin: 0;
+  padding-left: 16px;
+}
+
 /* ── 本机未连接时的步骤卡 ── */
 .setupCard {
   background: var(--bg-surface);
@@ -212,4 +280,8 @@
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .sidebar { display: none; }
+  .routeGuideHead,
+  .routeGuideGrid {
+    grid-template-columns: 1fr;
+  }
 }
