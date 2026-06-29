@@ -1191,19 +1191,23 @@
     }
     #projectProgressPanel .project-space-title {
       min-width: 0;
-      padding-top: 2px;
+      height: 72px;
+      padding-top: 0;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
     }
     #projectProgressPanel .project-space-name {
       color: var(--store-detail-ink);
-      font-size: 28px;
+      font-size: 24px;
       font-weight: 400;
-      line-height: 1.05;
+      line-height: 1.02;
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
     }
     #projectProgressPanel .project-space-meta {
-      margin-top: 9px;
+      margin-top: 4px;
       color: var(--store-detail-link);
       font-size: 16px;
       font-weight: 500;
@@ -1213,9 +1217,9 @@
       white-space: nowrap;
     }
     .project-space-store-subtitle {
-      margin-top: 5px;
+      margin-top: 3px;
       color: var(--store-detail-muted);
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.1;
       overflow: hidden;
       text-overflow: ellipsis;

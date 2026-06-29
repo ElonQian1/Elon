@@ -77,7 +77,6 @@ internal class ProjectSpacePlayStoreHeaderView(
             clipChildren = false
 
             addView(projectIcon(space.project), LinearLayout.LayoutParams(dp(72), dp(72)).apply {
-                topMargin = dp(2)
                 marginEnd = dp(24)
             })
 
@@ -86,7 +85,7 @@ internal class ProjectSpacePlayStoreHeaderView(
                 gravity = Gravity.CENTER_VERTICAL
                 addView(TextView(activity).apply {
                     text = space.project.name.ifBlank { "项目空间" }
-                    textSize = 28f
+                    textSize = 24f
                     includeFontPadding = false
                     setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
                     maxLines = 1
@@ -104,11 +103,11 @@ internal class ProjectSpacePlayStoreHeaderView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(9)
+                    topMargin = dp(4)
                 })
                 addView(TextView(activity).apply {
                     text = subtitle
-                    textSize = 14f
+                    textSize = 13f
                     includeFontPadding = false
                     setTextColor(Color.parseColor(PLAY_TEXT_SECONDARY))
                     maxLines = 1
@@ -117,9 +116,9 @@ internal class ProjectSpacePlayStoreHeaderView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(5)
+                    topMargin = dp(3)
                 })
-            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            }, LinearLayout.LayoutParams(0, dp(72), 1f))
         }
     }
 
