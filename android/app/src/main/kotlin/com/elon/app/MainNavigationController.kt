@@ -939,7 +939,7 @@ internal class MainNavigationController(
         binding.projectMembersButton.visibility = View.GONE
         hideVoiceCallButton()
         binding.moreButton.visibility = View.VISIBLE
-        binding.moreButton.setImageResource(R.drawable.ic_more_vertical)
+        binding.moreButton.setImageResource(R.drawable.ic_project_members_toolbar)
         binding.moreButton.setOnClickListener { showProjectMembers() }
         binding.moreButton.contentDescription = "项目成员"
         binding.topTitleText.setOnLongClickListener(null)

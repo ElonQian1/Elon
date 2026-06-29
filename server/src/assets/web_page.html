@@ -196,6 +196,14 @@
     .icon-btn:hover { background: rgba(255,255,255,0.06); color: var(--ink); }
     .icon-btn svg, .icon-btn img { width: 100%; height: 100%; display: block; }
     .icon-btn img { object-fit: contain; }
+    #moreBtn .toolbar-members-icon {
+      display: none;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+    }
+    #moreBtn.project-members-mode .more-chat-icon { display: none; }
+    #moreBtn.project-members-mode .toolbar-members-icon { display: block; }
     #addBtn .add-btn-project-icon { display: none; }
     #addBtn.project-create-mode .add-btn-plus { display: none; }
     #addBtn.project-create-mode .add-btn-project-icon { display: block; }
@@ -2671,7 +2679,8 @@
       <img class="add-btn-project-icon" src="data:image/png;base64,__POPUP_NEW_PROJECT_PNG_B64__" alt="" aria-hidden="true" />
     </button>
     <button class="icon-btn" id="moreBtn" title="聊天设置" style="display:none">
-      <svg viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6.5 13h.1M13 13h.1M19.5 13h.1"/></svg>
+      <svg class="more-chat-icon" viewBox="0 0 26 26" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><path d="M6.5 13h.1M13 13h.1M19.5 13h.1"/></svg>
+      <img class="toolbar-members-icon" src="/assets/ic_project_members_toolbar.png" alt="" aria-hidden="true" />
     </button>
   </header>
 
@@ -3746,6 +3755,13 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let selectedRuntimeRoute = localStorage.getItem(RUNTIME_ROUTE_KEY) || 'auto';
   if (!runtimeRouteOptions.some((it) => it.value === selectedRuntimeRoute)) selectedRuntimeRoute = 'auto';
   let agentOptions = [];
+
+  function setMoreButtonMode(mode) {
+    const projectMembersMode = mode === 'project-members';
+    moreBtn.classList.toggle('project-members-mode', projectMembersMode);
+    moreBtn.title = projectMembersMode ? '项目成员' : '聊天设置';
+    moreBtn.setAttribute('aria-label', moreBtn.title);
+  }
   let agentSelectionInitialized = false;
   let runtimeRouteInitialized = false;
   let agentLoading = false;
@@ -4385,6 +4401,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     // 返回按钮：聊天详情页显示
     backBtn.style.display = inChat ? '' : 'none';
     voiceCallBtn.style.display = (inFriendChat && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
+    setMoreButtonMode('chat');
     moreBtn.style.display = isContactChatActive() ? '' : 'none';
     // 新建按钮：聊天首页和项目首页都显示；项目首页同时有页内入口，保持与 APK 一致。
     const addAsFriend = tabId === 'chatPage' && !inChat;
@@ -4461,6 +4478,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     if (e.target === voiceCallMask) voiceCallMask.classList.remove('active');
   });
   moreBtn.addEventListener('click', () => {
+    if (moreBtn.classList.contains('project-members-mode')) {
+      showNativeOnly('项目成员列表请在 Android APK 中使用。');
+      return;
+    }
     const name = currentFriend ? friendDisplayName(currentFriend) : currentGroup ? groupDisplayName(currentGroup) : '聊天';
     showNativeOnly('「' + name + '」的聊天设置、成员管理和长按消息操作请在 Android APK 中使用。网页版已同步私聊/群聊收发。');
   });
@@ -4969,6 +4990,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     backBtn.style.display = '';
     addBtn.style.display = 'none';
     searchBtn.style.display = 'none';
+    setMoreButtonMode('chat');
     moreBtn.style.display = '';
     voiceCallBtn.style.display = (currentFriend && currentFriend.id === SOCIAL_AI_USER_ID) ? '' : 'none';
     if (tabsBar) tabsBar.classList.add('hidden');
@@ -5548,6 +5570,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     currentProjectSpaceLatestApkUrl = '';
     currentProjectSpacePostCount = 0;
     projectSpaceAnnouncementExpanded = false;
+    setMoreButtonMode('chat');
+    moreBtn.style.display = isContactChatActive() ? '' : 'none';
     if (projectSpaceFeed) projectSpaceFeed.classList.remove('announcement-expanded');
     currentStageText.textContent = '待提交需求';
     projectOverviewText.textContent = '项目管理\n当前没有正在执行的开发任务。';
@@ -6130,6 +6154,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     currentProjectSpaceLatestApkUrl = String(p.latest_apk_url || p.latestApkUrl || '').trim();
     projectSpaceAnnouncementExpanded = false;
+    setMoreButtonMode('project-members');
+    moreBtn.style.display = '';
     renderProjectIntroCard(p);
     STAGE_ELS().forEach((el, i) => {
       el.className = 'stage-line';

@@ -24,6 +24,8 @@ const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_convers
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
 const SIDE_MENU_FOLDER_CLOSED_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable-xxxhdpi/ic_side_menu_folder_closed.png");
+const PROJECT_MEMBERS_TOOLBAR_ICON_PNG: &[u8] =
+    include_bytes!("../../android/app/src/main/res/drawable-xxxhdpi/ic_project_members_toolbar.png");
 const PROJECT_SPACE_POST_SHARE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_share.png");
 const PROJECT_SPACE_POST_COMMENT_ICON_PNG: &[u8] =
@@ -191,6 +193,10 @@ pub async fn project_plaza_download_apk_icon() -> impl IntoResponse {
 
 pub async fn side_menu_folder_closed_icon() -> impl IntoResponse {
     plaza_icon_response(SIDE_MENU_FOLDER_CLOSED_ICON_PNG)
+}
+
+pub async fn project_members_toolbar_icon() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_MEMBERS_TOOLBAR_ICON_PNG)
 }
 
 pub async fn project_space_post_share_icon() -> impl IntoResponse {
