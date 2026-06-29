@@ -86,7 +86,7 @@ internal class ProjectSpacePlayStoreHeaderView(
                 gravity = Gravity.CENTER_VERTICAL
                 addView(TextView(activity).apply {
                     text = space.project.name.ifBlank { "项目空间" }
-                    textSize = 32f
+                    textSize = 28f
                     includeFontPadding = false
                     setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
                     maxLines = 1
@@ -94,9 +94,9 @@ internal class ProjectSpacePlayStoreHeaderView(
                 })
                 addView(TextView(activity).apply {
                     text = ownerName
-                    textSize = 18f
+                    textSize = 16f
                     includeFontPadding = false
-                    setTypeface(typeface, Typeface.BOLD)
+                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                     setTextColor(Color.parseColor(PLAY_LINK))
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -104,11 +104,11 @@ internal class ProjectSpacePlayStoreHeaderView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(12)
+                    topMargin = dp(9)
                 })
                 addView(TextView(activity).apply {
                     text = subtitle
-                    textSize = 16f
+                    textSize = 14f
                     includeFontPadding = false
                     setTextColor(Color.parseColor(PLAY_TEXT_SECONDARY))
                     maxLines = 1
@@ -117,7 +117,7 @@ internal class ProjectSpacePlayStoreHeaderView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(7)
+                    topMargin = dp(5)
                 })
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         }
@@ -140,7 +140,7 @@ internal class ProjectSpacePlayStoreHeaderView(
                 text = project.name.firstOrNull()?.toString() ?: "项"
                 gravity = Gravity.CENTER
                 includeFontPadding = false
-                textSize = 22f
+                textSize = 20f
                 setTypeface(typeface, Typeface.BOLD)
                 setTextColor(Color.WHITE)
                 background = roundedBackground("#2EA7DF", 999)
@@ -182,9 +182,9 @@ internal class ProjectSpacePlayStoreHeaderView(
             gravity = Gravity.CENTER
             addView(TextView(activity).apply {
                 text = value
-                textSize = 18f
+                textSize = 16f
                 includeFontPadding = false
-                setTypeface(typeface, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
                 gravity = Gravity.CENTER
                 maxLines = 1
@@ -192,7 +192,7 @@ internal class ProjectSpacePlayStoreHeaderView(
             })
             addView(TextView(activity).apply {
                 text = label
-                textSize = 15f
+                textSize = 13f
                 includeFontPadding = false
                 setTextColor(Color.parseColor(PLAY_TEXT_SECONDARY))
                 gravity = Gravity.CENTER
@@ -202,12 +202,12 @@ internal class ProjectSpacePlayStoreHeaderView(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = dp(9)
+                topMargin = dp(7)
             })
             if (caption.isNotBlank()) {
                 addView(TextView(activity).apply {
                     text = caption
-                    textSize = 15f
+                    textSize = 13f
                     includeFontPadding = false
                     setTextColor(Color.parseColor(PLAY_TEXT_SECONDARY))
                     gravity = Gravity.CENTER
@@ -217,7 +217,7 @@ internal class ProjectSpacePlayStoreHeaderView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(4)
+                    topMargin = dp(3)
                 })
             }
         }
@@ -247,10 +247,10 @@ internal class ProjectSpacePlayStoreHeaderView(
     private fun installButton(): TextView {
         return TextView(activity).apply {
             text = projectApkActionLabel().ifBlank { "安装" }
-            textSize = 16f
+            textSize = 14f
             includeFontPadding = false
             gravity = Gravity.CENTER
-            setTypeface(typeface, Typeface.BOLD)
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
             setTextColor(Color.parseColor(PLAY_INSTALL_TEXT))
             background = roundedBackground(PLAY_INSTALL_BG, 20)
             isClickable = true
@@ -293,9 +293,9 @@ internal class ProjectSpacePlayStoreHeaderView(
             background = roundedBackground(card.bg, 8)
             addView(TextView(activity).apply {
                 text = card.title
-                textSize = 16f
+                textSize = 14f
                 includeFontPadding = false
-                setTypeface(typeface, Typeface.BOLD)
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                 setTextColor(Color.WHITE)
                 gravity = Gravity.CENTER
                 maxLines = 1
@@ -355,7 +355,7 @@ internal class ProjectSpacePlayStoreHeaderView(
     )
 
     private companion object {
-        const val PLAY_CONTENT_TOP_DP = 24
+        const val PLAY_CONTENT_TOP_DP = 16
         const val PLAY_BG = "#131313"
         const val PLAY_TEXT_PRIMARY = "#E3E3E3"
         const val PLAY_TEXT_SECONDARY = "#C6C6C6"
