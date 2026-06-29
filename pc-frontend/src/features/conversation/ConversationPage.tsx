@@ -14,11 +14,12 @@ import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
+import RuntimeRouteMenu from './RuntimeRouteMenu'
 import { api } from '../../api/client'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { formatTime, clean } from '../../lib/utils'
 import { shortButtonLabel } from '../models/modelUtils'
-import { RUNTIME_ROUTE_OPTIONS, RUNTIME_ROUTE_STORAGE_KEY, normalizeRuntimeRoute, runtimeRouteDescription } from './runtimeRoutes'
+import { RUNTIME_ROUTE_STORAGE_KEY, normalizeRuntimeRoute } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type {
   Channel,
@@ -742,17 +743,11 @@ export default function ConversationPage() {
               >
                 {shortButtonLabel(modelLabel)}
               </button>
-              <select
-                className={styles.runtimeRouteSelect}
+              <RuntimeRouteMenu
                 value={runtimeRoute}
-                title={`运行路线：${runtimeRouteDescription(runtimeRoute)}`}
-                onChange={(e) => setRuntimeRoute(normalizeRuntimeRoute(e.target.value))}
                 disabled={sendingMessage}
-              >
-                {RUNTIME_ROUTE_OPTIONS.map((route) => (
-                  <option key={route.value} value={route.value}>{route.label}</option>
-                ))}
-              </select>
+                onChange={setRuntimeRoute}
+              />
 
               {/* Textarea */}
               <textarea
