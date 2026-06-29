@@ -7,6 +7,7 @@ import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextUtils
 import android.text.style.ForegroundColorSpan
+import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -85,16 +86,16 @@ internal class ProjectSpacePlayStoreHeaderView(
                 gravity = Gravity.CENTER_VERTICAL
                 addView(TextView(activity).apply {
                     text = space.project.name.ifBlank { "项目空间" }
-                    textSize = 24f
-                    includeFontPadding = false
+                    setVisualTextSize(23)
+                    includeFontPadding = true
                     setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
                 })
                 addView(TextView(activity).apply {
                     text = ownerName
-                    textSize = 16f
-                    includeFontPadding = false
+                    setVisualTextSize(15)
+                    includeFontPadding = true
                     typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
                     setTextColor(Color.parseColor(PLAY_LINK))
                     maxLines = 1
@@ -103,12 +104,12 @@ internal class ProjectSpacePlayStoreHeaderView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(4)
+                    topMargin = dp(2)
                 })
                 addView(TextView(activity).apply {
                     text = subtitle
-                    textSize = 13f
-                    includeFontPadding = false
+                    setVisualTextSize(12)
+                    includeFontPadding = true
                     setTextColor(Color.parseColor(PLAY_TEXT_SECONDARY))
                     maxLines = 1
                     ellipsize = TextUtils.TruncateAt.END
@@ -116,10 +117,14 @@ internal class ProjectSpacePlayStoreHeaderView(
                     LinearLayout.LayoutParams.MATCH_PARENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
                 ).apply {
-                    topMargin = dp(3)
+                    topMargin = dp(1)
                 })
             }, LinearLayout.LayoutParams(0, dp(72), 1f))
         }
+    }
+
+    private fun TextView.setVisualTextSize(sizeDp: Int) {
+        setTextSize(TypedValue.COMPLEX_UNIT_DIP, sizeDp.toFloat())
     }
 
     private fun projectIcon(project: ProjectSpaceSummary): View {
