@@ -150,66 +150,6 @@
   background: rgba(87, 142, 199, .28);
 }
 
-/* 用户条（底部 64px）*/
-.userStrip {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 9px;
-  align-items: center;
-  padding: 10px;
-  background: #151619;
-}
-.userProfileBtn {
-  min-width: 0;
-  height: 44px;
-  display: grid;
-  grid-template-columns: 40px minmax(0, 1fr);
-  gap: 9px;
-  align-items: center;
-  border: 0;
-  border-radius: 7px;
-  background: transparent;
-  color: inherit;
-  padding: 3px 4px;
-  text-align: left;
-}
-.userProfileBtn:hover { background: #22242a; }
-.userDot {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  background: #38414a;
-  color: white;
-  display: grid;
-  place-items: center;
-  font-size: 14px;
-  font-weight: 800;
-  flex-shrink: 0;
-}
-.userInfo { min-width: 0; }
-.userInfo strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 13px;
-  color: var(--text);
-}
-.userInfo span {
-  display: block;
-  color: var(--text-muted);
-  font-size: 11px;
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.userActions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
 /* ══════════════════════════════════════
    聊天区（中 1fr）
    grid-rows: 58px | 1fr | auto

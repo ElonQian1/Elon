@@ -72,6 +72,7 @@
 }
 
 .footer {
+  position: relative;
   padding: 10px 8px 6px;
   border-top: 1px solid var(--border);
   margin-top: 4px;
@@ -79,103 +80,4 @@
   flex-direction: column;
   gap: 8px;
   background: rgba(0, 0, 0, .08);
-}
-
-.userCard {
-  min-width: 0;
-  min-height: 54px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: 6px;
-  padding: 6px;
-  border-radius: 8px;
-  background: #151619;
-  border: 1px solid transparent;
-  transition: background var(--transition), border-color var(--transition);
-}
-
-.userCard:hover {
-  background: #1d1f24;
-  border-color: rgba(255, 255, 255, .06);
-}
-
-.userProfile {
-  min-width: 0;
-  height: 42px;
-  display: grid;
-  grid-template-columns: 38px minmax(0, 1fr);
-  align-items: center;
-  gap: 9px;
-  padding: 2px;
-  border-radius: 7px;
-  color: var(--text-primary);
-  text-align: left;
-}
-
-.userProfile:hover {
-  background: rgba(255, 255, 255, .045);
-}
-
-.userCopy {
-  min-width: 0;
-  display: block;
-}
-
-.userCopy strong,
-.userCopy small {
-  display: block;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.userCopy strong {
-  font-size: 13px;
-  color: var(--text-primary);
-  font-weight: 800;
-}
-
-.userCopy small {
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.userActions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-}
-
-.userActionBtn {
-  width: 30px;
-  height: 30px;
-  display: grid;
-  place-items: center;
-  border-radius: 6px;
-  color: #b5bac1;
-  transition: background var(--transition), color var(--transition);
-}
-
-.userActionBtn:hover {
-  background: #2b2d34;
-  color: #fff;
-}
-
-.userActionBtn:focus-visible {
-  outline: 2px solid var(--focus-ring);
-  outline-offset: 2px;
-}
-
-.legacyLink {
-  font-size: 11px;
-  color: var(--text-muted);
-  text-align: center;
-}
-
-.legacyLink:hover {
-  color: var(--text-secondary);
 }

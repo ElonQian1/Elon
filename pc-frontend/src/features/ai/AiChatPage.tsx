@@ -8,6 +8,7 @@ import { useModelStore } from '../models/useModelStore'
 import { shortButtonLabel } from '../models/modelUtils'
 import { ModelPickerPopover } from '../models/ModelPicker'
 import MarkdownContent from '../markdown/MarkdownContent'
+import SidebarUserStrip from '../shell/SidebarUserStrip'
 import { formatTime } from '../../lib/utils'
 import NodeStatusBanner from './NodeStatusBanner'
 import styles from './AiChatPage.module.css'
@@ -270,15 +271,7 @@ export default function AiChatPage() {
             </button>
           ))}
         </div>
-        <div className={styles.userStrip}>
-          <div className={styles.userDot}>
-            {(user?.nickname ?? user?.account ?? '?')[0]?.toUpperCase()}
-          </div>
-          <div className={styles.userInfo}>
-            <strong>{user?.nickname ?? user?.account}</strong>
-            <span>{user?.account}</span>
-          </div>
-        </div>
+        <SidebarUserStrip />
       </aside>
 
       {/* 聊天区 */}

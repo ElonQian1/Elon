@@ -46,13 +46,13 @@ import {
   MemberContextSummary,
   MemberLoadingRows,
 } from './MemberPanel'
+import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
 export default function ConversationPage() {
   useChannelAutoRefresh()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
-  const token = useAuthStore((s) => s.token)
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
     messages, messagesLoading, sendingMessage, landing, spaceLoading, spaceError,
@@ -555,31 +555,7 @@ export default function ConversationPage() {
           )}
         </div>
 
-        {/* 用户条（64px）*/}
-        <div className={styles.userStrip}>
-          <button
-            className={styles.userProfileBtn}
-            type="button"
-            title="账号设置"
-            onClick={() => navigate('/account')}
-          >
-            <div className={styles.userDot}>
-              {(user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '?'}
-            </div>
-            <div className={styles.userInfo}>
-              <strong>{user?.nickname ?? user?.account ?? (token ? '加载中…' : '未登录')}</strong>
-              <span>{user?.account}</span>
-            </div>
-          </button>
-          <div className={styles.userActions}>
-            <button
-              className={styles.iconBtn}
-              onClick={() => useAuthStore.getState().logout()}
-              title="退出登录"
-              type="button"
-            >↩</button>
-          </div>
-        </div>
+        <SidebarUserStrip />
       </aside>
 
       {/* ══ 聊天区（中 1fr）══ */}
