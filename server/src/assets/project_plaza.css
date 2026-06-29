@@ -116,6 +116,7 @@
   padding: 0;
   text-align: left;
   box-sizing: border-box;
+  cursor: pointer;
 }
 
 .project-plaza-card-top {
@@ -202,12 +203,6 @@
   cursor: pointer;
   padding: 0;
   white-space: nowrap;
-}
-
-.project-plaza-btn[data-plaza-action="open"],
-.project-plaza-btn[data-plaza-action="join"],
-.project-plaza-btn[data-plaza-action="apply"] {
-  background-image: url("/assets/ic_plaza_enter_space.png");
 }
 
 .project-plaza-btn[data-plaza-action="share"] {

@@ -15,7 +15,6 @@
     loading: false,
     projects: [],
     joinedIds: new Set(),
-    expandedDescIds: new Set(),
     busyId: '',
     filterKey: 'all',
     query: '',
@@ -310,14 +309,10 @@
   function renderDescription(project, identity) {
     const desc = identity.subtitle || cleanText(project.description) || '暂无简介';
     const collapsible = Array.from(desc).length > 46;
-    const expanded = state.expandedDescIds.has(project.id);
-    const shown = collapsible && !expanded
+    const shown = collapsible
       ? Array.from(desc).slice(0, 46).join('').trimEnd() + '...'
       : desc;
-    const toggle = collapsible
-      ? `<button class="project-plaza-more" type="button" data-plaza-action="toggle-desc" data-id="${escapeHtml(project.id)}">${expanded ? '收起' : '更多 »'}</button>`
-      : '';
-    return `<div class="project-plaza-desc ${collapsible && !expanded ? 'is-collapsed' : ''}">应用介绍：${escapeHtml(shown)}${toggle}</div>`;
+    return `<div class="project-plaza-desc ${collapsible ? 'is-collapsed' : ''}">应用介绍：${escapeHtml(shown)}</div>`;
   }
 
   function renderCard(project) {
@@ -331,7 +326,6 @@
             <div class="project-plaza-owner">创建者：${escapeHtml(project.owner_account || '未知')}</div>
           </div>
           <div class="project-plaza-actions">
-            <button class="project-plaza-btn" type="button" data-plaza-action="open" data-id="${escapeHtml(project.id)}" aria-label="进入项目空间" title="进入项目空间">进入项目空间</button>
             <button class="project-plaza-btn" type="button" data-plaza-action="share" data-id="${escapeHtml(project.id)}" aria-label="分享项目" title="分享项目">分享项目</button>
           </div>
         </div>
@@ -484,29 +478,31 @@
 
   function handleAction(event) {
     const actionEl = event.target.closest('[data-plaza-action]');
-    if (!actionEl) return;
-    event.preventDefault();
-    if (actionEl.getAttribute('aria-disabled') === 'true') return;
-    const action = actionEl.dataset.plazaAction;
-    const id = actionEl.dataset.id || '';
-    if (action === 'filter') {
-      state.filterKey = actionEl.dataset.filter || 'all';
-      loadProjects();
-    } else if (action === 'toggle-desc') {
-      if (state.expandedDescIds.has(id)) state.expandedDescIds.delete(id);
-      else state.expandedDescIds.add(id);
-      render();
-    } else if (action === 'join') {
-      joinProject(id);
-    } else if (action === 'apply') {
-      applyToJoin(id);
-    } else if (action === 'open') {
-      openJoinedProject(id);
-    } else if (action === 'share') {
-      shareProject(id);
-    } else if (action === 'download') {
-      downloadProjectApk(id);
+    if (actionEl) {
+      event.preventDefault();
+      if (actionEl.getAttribute('aria-disabled') === 'true') return;
+      const action = actionEl.dataset.plazaAction;
+      const id = actionEl.dataset.id || '';
+      if (action === 'filter') {
+        state.filterKey = actionEl.dataset.filter || 'all';
+        loadProjects();
+      } else if (action === 'join') {
+        joinProject(id);
+      } else if (action === 'apply') {
+        applyToJoin(id);
+      } else if (action === 'open') {
+        openJoinedProject(id);
+      } else if (action === 'share') {
+        shareProject(id);
+      } else if (action === 'download') {
+        downloadProjectApk(id);
+      }
+      return;
     }
+    const card = event.target.closest('.project-plaza-card[data-id]');
+    if (!card) return;
+    event.preventDefault();
+    openJoinedProject(card.dataset.id || '');
   }
 
   function init() {

@@ -56,9 +56,6 @@ internal class MainMarketplaceActions(
     private var searchDebounce: Runnable? = null
     private var searchQuery = ""
     private var activeFilterKey = FILTER_ALL
-    private val expandedDescriptionIds = mutableSetOf<String>()
-    private var renderedProjects: List<StoreProject> = emptyList()
-
     @Volatile
     private var loadSerial = 0
 
@@ -280,7 +277,6 @@ internal class MainMarketplaceActions(
     }
 
     private fun renderProjects(projects: List<StoreProject>) {
-        renderedProjects = projects
         val container = ensureDiscoveryShell()
         container.removeAllViews()
         if (projects.isEmpty()) {
@@ -303,6 +299,9 @@ internal class MainMarketplaceActions(
         val identity = identityFor(project)
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
+            isClickable = true
+            foreground = selectableForeground()
+            setOnClickListener { openProjectSpace(project) }
             addView(createCardHeader(project, identity), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
@@ -375,13 +374,9 @@ internal class MainMarketplaceActions(
                 orientation = LinearLayout.HORIZONTAL
                 gravity = Gravity.CENTER
                 addView(iconActionButton(
-                    iconRes = R.drawable.ic_plaza_enter_space,
-                    description = "进入项目空间"
-                ) { openProjectSpace(project) }, iconActionParams(first = true))
-                addView(iconActionButton(
                     iconRes = R.drawable.ic_plaza_share_project,
                     description = "分享项目"
-                ) { shareProject(project) }, iconActionParams())
+                ) { shareProject(project) }, iconActionParams(first = true))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 dp(ACTION_ICON_TOUCH_DP)
@@ -484,35 +479,14 @@ internal class MainMarketplaceActions(
 
     private fun createDescription(project: StoreProject, identity: ProjectCardIdentity): TextView {
         val desc = identity.subtitle ?: project.description?.trim()?.takeIf { it.isNotBlank() } ?: "暂无简介"
-        val collapsible = desc.length > DESC_COLLAPSE_CHAR_LIMIT
-        val expanded = expandedDescriptionIds.contains(project.id)
-        val shownDesc = if (collapsible && !expanded) {
-            "${desc.take(DESC_COLLAPSE_CHAR_LIMIT).trimEnd()}...    更多 »"
-        } else if (collapsible) {
-            "$desc    收起"
-        } else {
-            desc
-        }
         return TextView(activity).apply {
             includeFontPadding = false
-            text = "应用介绍：$shownDesc"
-            maxLines = if (collapsible && !expanded) DESC_COLLAPSED_LINES else Int.MAX_VALUE
-            if (collapsible && !expanded) ellipsize = TextUtils.TruncateAt.END
+            text = "应用介绍：$desc"
+            maxLines = DESC_COLLAPSED_LINES
+            ellipsize = TextUtils.TruncateAt.END
             setTextColor(Color.parseColor(COLOR_TEXT_SECONDARY))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_CARD_DESC_SP)
             setLineSpacing(dp(3).toFloat(), 1.0f)
-            if (collapsible) {
-                isClickable = true
-                foreground = selectableForeground()
-                setOnClickListener {
-                    if (expandedDescriptionIds.contains(project.id)) {
-                        expandedDescriptionIds.remove(project.id)
-                    } else {
-                        expandedDescriptionIds.add(project.id)
-                    }
-                    renderProjects(renderedProjects)
-                }
-            }
         }
     }
 
@@ -729,7 +703,6 @@ internal class MainMarketplaceActions(
         const val ACTION_ICON_TOUCH_DP = 40
         const val ACTION_ICON_SIZE_DP = 30
         const val ACTION_ICON_GAP_DP = 2
-        const val DESC_COLLAPSE_CHAR_LIMIT = 46
         const val DESC_COLLAPSED_LINES = 2
         const val DISABLED_ACTION_ALPHA = 0.45f
     }
