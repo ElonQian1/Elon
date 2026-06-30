@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { nodeApi } from '../node/localNodeApi'
 import { safeNodeAdminUrl, clean } from '../../lib/utils'
-import type { AgentRunsData, AgentRunEntry } from './types'
+import SidecarTerminalPanel from './SidecarTerminalPanel'
+import type { AgentRunsData, AgentRunEntry, SidecarSession } from './types'
 import styles from './AgentRunsPanel.module.css'
 
 const POLL_INTERVAL = 4500
@@ -31,6 +32,9 @@ export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId
         activeControls: Array.isArray(r.active_controls ?? r.activeControls)
           ? (r.active_controls ?? r.activeControls) as Record<string, unknown>[]
           : [],
+        sidecarSessions: Array.isArray(r.sidecar_sessions ?? r.sidecarSessions)
+          ? (r.sidecar_sessions ?? r.sidecarSessions) as SidecarSession[]
+          : [],
         recentTasks: Array.isArray(r.recent_tasks ?? r.recentTasks)
           ? (r.recent_tasks ?? r.recentTasks) as Record<string, unknown>[]
           : [],
@@ -40,7 +44,7 @@ export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId
         loadedAt: Date.now(),
       })
     } catch (err) {
-      setData({ runs: [], activeControls: [], recentTasks: [], recoveryEntry: null, logDir: '', workspacePath, loadedAt: Date.now(), error: (err as Error).message })
+      setData({ runs: [], activeControls: [], sidecarSessions: [], recentTasks: [], recoveryEntry: null, logDir: '', workspacePath, loadedAt: Date.now(), error: (err as Error).message })
     } finally {
       setLoading(false)
     }
@@ -61,7 +65,8 @@ export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId
     </div>
   )
 
-  const hasContent = data.recoveryEntry || data.activeControls.length || data.recentTasks.length || data.runs.length
+  const activeSidecar = data.sidecarSessions.find(sidecarAttachable) ?? data.sidecarSessions[0]
+  const hasContent = activeSidecar || data.recoveryEntry || data.activeControls.length || data.recentTasks.length || data.runs.length
   if (!hasContent) return (
     <div className={styles.panel}>
       <div className={styles.panelHead}><strong>本机 Agent 运行</strong><button onClick={() => load(true)}>刷新</button></div>
@@ -76,6 +81,7 @@ export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId
         <button onClick={() => load(true)}>刷新</button>
       </div>
       <div className={styles.list}>
+        {activeSidecar && <SidecarTerminalPanel adminUrl={adminUrl} session={activeSidecar} />}
         {data.recoveryEntry && <RecoveryItem entry={data.recoveryEntry} />}
         {data.activeControls.map((ctrl, i) => <ControlItem key={i} control={ctrl} />)}
         {data.recentTasks.slice(0, 3).map((task, i) => <RecentTaskItem key={i} task={task} />)}
@@ -83,6 +89,12 @@ export default function AgentRunsPanel({ workspacePath }: Omit<Props, 'projectId
       </div>
     </div>
   )
+}
+
+function sidecarAttachable(session: SidecarSession): boolean {
+  return session.attachable_after_restart === true
+    || session.attachableAfterRestart === true
+    || session.capabilities?.terminal_attach === true
 }
 
 function statusTone(status: string): string {

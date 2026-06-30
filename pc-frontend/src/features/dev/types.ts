@@ -93,10 +93,70 @@ export interface AgentRunEntry {
   lastError?: string
 }
 
+export interface SidecarCapabilities {
+  terminal_attach?: boolean
+  output_stream_replay?: boolean
+  terminal_input?: boolean
+  terminal_resize?: boolean
+  tool_approval_recovery?: boolean
+  cancel?: boolean
+}
+
+export interface SidecarSession {
+  session_id?: string
+  sessionId?: string
+  task_id?: string
+  taskId?: string
+  cli_name?: string
+  cliName?: string
+  route?: string
+  state?: string
+  transport?: string
+  endpoint?: string | null
+  sidecar_pid?: number
+  sidecarPid?: number
+  child_pid?: number
+  childPid?: number
+  started_at_ms?: number
+  startedAtMs?: number
+  last_seen_at_ms?: number
+  lastSeenAtMs?: number
+  attachable_after_restart?: boolean
+  attachableAfterRestart?: boolean
+  approval_recoverable_after_restart?: boolean
+  approvalRecoverableAfterRestart?: boolean
+  capabilities?: SidecarCapabilities
+}
+
+export interface SidecarOutputRecord {
+  type?: string
+  record_type?: string
+  stream?: string | null
+  text?: string | null
+  child_pid?: number | null
+  exit_code?: number | null
+  success?: boolean | null
+  canceled?: boolean | null
+  error?: string | null
+  at_ms?: number
+}
+
+export interface SidecarAttachResponse {
+  ok?: boolean
+  task_id?: string
+  attached?: boolean
+  session?: SidecarSession
+  output_records?: SidecarOutputRecord[]
+  next_offset?: number
+  transport?: string
+  error?: string
+}
+
 export interface AgentRunsData {
   runs: AgentRunEntry[]
   activeControls: Record<string, unknown>[]
   recentTasks: Record<string, unknown>[]
+  sidecarSessions: SidecarSession[]
   recoveryEntry: Record<string, unknown> | null
   logDir: string
   workspacePath: string

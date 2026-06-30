@@ -15,6 +15,7 @@ use std::{
 
 use crate::{
     node_agent_active_task::ActiveCliPromptView,
+    node_agent_cli_sidecar::{now_ms, sidecar_status_view},
     node_agent_project_agent_recovery::{recovery_entry_from, ProjectAgentRunRecoveryEntry},
     node_agent_task_approval_snapshot::TaskApprovalJournalSnapshot,
     node_agent_task_journal::TaskJournalRecord,
@@ -22,6 +23,7 @@ use crate::{
         task_attach_state, task_resume_contract, task_resume_contract_with_journal_approvals,
         TaskAttachState, TaskResumeContract,
     },
+    node_agent_workspace_match::record_cwd_matches_workspace,
     NodeRuntime,
 };
 
@@ -45,6 +47,7 @@ struct ProjectAgentRunsResponse {
     workspace_path: String,
     log_dir: String,
     recovery_entry: Option<ProjectAgentRunRecoveryEntry>,
+    sidecar_sessions: Vec<Value>,
     active_controls: Vec<ProjectAgentRunControl>,
     recent_tasks: Vec<ProjectAgentRunTaskResume>,
     runs: Vec<ProjectAgentRunSummary>,
@@ -144,6 +147,8 @@ pub(crate) async fn list_handler(
             );
             response.recovery_entry =
                 recovery_entry_from(&response.active_controls, &response.recent_tasks);
+            response.sidecar_sessions =
+                project_sidecar_sessions(&runtime, &workspace, RECENT_TASKS_LIMIT);
             (StatusCode::OK, Json(json!(response))).into_response()
         }
         Err(error) => (
@@ -185,10 +190,34 @@ fn list_project_agent_runs(req: &ProjectAgentRunsReq) -> Result<ProjectAgentRuns
         workspace_path: workspace.to_string_lossy().to_string(),
         log_dir: log_dir.to_string_lossy().to_string(),
         recovery_entry: None,
+        sidecar_sessions: Vec::new(),
         active_controls: Vec::new(),
         recent_tasks: Vec::new(),
         runs,
     })
+}
+
+fn project_sidecar_sessions(runtime: &NodeRuntime, workspace: &Path, limit: usize) -> Vec<Value> {
+    let now = now_ms();
+    let relevant_task_ids: BTreeSet<String> = runtime
+        .task_journal_records_for_workspace(workspace, RECENT_TASK_CANDIDATE_LIMIT)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|record| record.req_id)
+        .collect();
+    runtime
+        .cli_sidecars
+        .latest_sessions(50)
+        .unwrap_or_default()
+        .into_iter()
+        .filter(|session| session.is_attachable_at(now))
+        .filter(|session| {
+            record_cwd_matches_workspace(session.cwd.as_deref(), workspace)
+                || relevant_task_ids.contains(&session.task_id)
+        })
+        .take(limit)
+        .map(|session| sidecar_status_view(&session))
+        .collect()
 }
 
 #[cfg(test)]

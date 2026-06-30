@@ -510,6 +510,9 @@
   padding: 6px 8px 16px;
   scrollbar-width: thin;
 }
+.agentRunsSlot {
+  margin: 8px 0 10px;
+}
 .memberSection {
   margin: 12px 8px 6px;
   color: var(--text-muted);

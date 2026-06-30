@@ -194,8 +194,8 @@ pub(crate) fn status_payload_for(
             "任意外部终端仍不可接管；只有一龙管理的 sidecar 会话进入恢复协议。"
         ],
         "future_work": [
-            "为 sidecar attach 增加前端终端面板和权限确认。",
-            "补充屏幕级终端 buffer/ANSI 视图；当前 attach API 回放 PTY 字节流。"
+            "PC 网页端已接入项目级 sidecar 终端面板，可重接、读取输出、写入输入并同步尺寸。",
+            "补充屏幕级 ANSI 终端 buffer；当前前端显示 PTY 字节流的可读文本视图。"
         ],
         "routes": routes
     })

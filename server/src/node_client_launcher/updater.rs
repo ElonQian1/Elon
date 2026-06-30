@@ -2,9 +2,13 @@
 
 use anyhow::{Context, Result};
 use serde::Deserialize;
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
 use super::{command as launcher_command, env_file, paths, process, DEFAULT_BASE_URL};
+
+const DEFAULT_UPDATE_CONNECT_TIMEOUT_SECS: u64 = 20;
+const DEFAULT_UPDATE_DOWNLOAD_TIMEOUT_SECS: u64 = 15 * 60;
+const DEFAULT_UPDATE_DOWNLOAD_RETRIES: usize = 3;
 
 #[derive(Debug, Deserialize)]
 struct VersionInfo {
@@ -40,7 +44,10 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
 
     let base_url = update_base_url(&env_values);
     let version_url = format!("{}/api/node-agent/version", base_url.trim_end_matches('/'));
-    let remote_text = reqwest::blocking::get(&version_url)
+    let client = update_http_client()?;
+    let remote_text = client
+        .get(&version_url)
+        .send()
         .with_context(|| format!("无法请求 {version_url}"))?
         .error_for_status()
         .with_context(|| format!("版本接口返回错误 {version_url}"))?
@@ -94,12 +101,7 @@ fn try_update_client_if_needed(install_dir: &Path) -> Result<bool> {
         .with_context(|| format!("无法创建内部目录 {}", internal_dir.display()))?;
     let tmp_exe = internal_dir.join("一龙开发平台.exe.new");
     let tmp_version = internal_dir.join("node-agent-version.json.new");
-    let bytes = reqwest::blocking::get(&download_url)
-        .with_context(|| format!("无法下载 {download_url}"))?
-        .error_for_status()
-        .with_context(|| format!("下载接口返回错误 {download_url}"))?
-        .bytes()
-        .context("无法读取下载内容")?;
+    let bytes = download_bytes_with_retries(&client, &download_url, "无法读取下载内容")?;
     if bytes.len() < 1024 * 1024 {
         anyhow::bail!("下载的客户端程序过小，疑似异常响应");
     }
@@ -142,12 +144,8 @@ fn try_update_from_client_package(
     let tmp_zip = internal_dir.join("elon-node-agent-windows.zip.new");
     let tmp_version = internal_dir.join("node-agent-version.json.new");
     let version_file = paths::version_file(install_dir);
-    let bytes = reqwest::blocking::get(package_url)
-        .with_context(|| format!("无法下载 {package_url}"))?
-        .error_for_status()
-        .with_context(|| format!("下载接口返回错误 {package_url}"))?
-        .bytes()
-        .context("无法读取完整客户端包内容")?;
+    let client = update_http_client()?;
+    let bytes = download_bytes_with_retries(&client, package_url, "无法读取完整客户端包内容")?;
     if bytes.len() < 1024 * 1024 {
         anyhow::bail!("下载的完整客户端包过小，疑似异常响应");
     }
@@ -164,6 +162,81 @@ fn try_update_from_client_package(
         replace_client_package(&tmp_zip, install_dir, &tmp_version, &version_file)?;
         Ok(false)
     }
+}
+
+fn update_http_client() -> Result<reqwest::blocking::Client> {
+    reqwest::blocking::Client::builder()
+        .connect_timeout(Duration::from_secs(env_u64(
+            "NODE_AGENT_UPDATE_CONNECT_TIMEOUT_SECS",
+            DEFAULT_UPDATE_CONNECT_TIMEOUT_SECS,
+            2,
+            120,
+        )))
+        .timeout(Duration::from_secs(env_u64(
+            "NODE_AGENT_UPDATE_DOWNLOAD_TIMEOUT_SECS",
+            DEFAULT_UPDATE_DOWNLOAD_TIMEOUT_SECS,
+            60,
+            60 * 60,
+        )))
+        .build()
+        .context("无法创建更新下载客户端")
+}
+
+fn download_bytes_with_retries(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    read_context: &'static str,
+) -> Result<Vec<u8>> {
+    let attempts = env_usize(
+        "NODE_AGENT_UPDATE_DOWNLOAD_RETRIES",
+        DEFAULT_UPDATE_DOWNLOAD_RETRIES,
+        1,
+        5,
+    );
+    let mut last_error = None;
+    for attempt in 1..=attempts {
+        match download_bytes_once(client, url, read_context) {
+            Ok(bytes) => return Ok(bytes),
+            Err(error) => {
+                last_error = Some(error);
+                if attempt < attempts {
+                    std::thread::sleep(Duration::from_millis(700 * attempt as u64));
+                }
+            }
+        }
+    }
+    Err(last_error.unwrap_or_else(|| anyhow::anyhow!("下载失败: {url}")))
+}
+
+fn download_bytes_once(
+    client: &reqwest::blocking::Client,
+    url: &str,
+    read_context: &'static str,
+) -> Result<Vec<u8>> {
+    let response = client
+        .get(url)
+        .send()
+        .with_context(|| format!("无法下载 {url}"))?
+        .error_for_status()
+        .with_context(|| format!("下载接口返回错误 {url}"))?;
+    let bytes = response.bytes().context(read_context)?;
+    Ok(bytes.to_vec())
+}
+
+fn env_u64(name: &str, default: u64, min: u64, max: u64) -> u64 {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(default)
+        .clamp(min, max)
+}
+
+fn env_usize(name: &str, default: usize, min: usize, max: usize) -> usize {
+    std::env::var(name)
+        .ok()
+        .and_then(|value| value.trim().parse::<usize>().ok())
+        .unwrap_or(default)
+        .clamp(min, max)
 }
 
 fn replace_client_package(

@@ -5,6 +5,12 @@ export interface Project {
   name: string
   description?: string
   template?: string
+  source_type?: string
+  workspace_key?: string
+  workspace_path?: string | null
+  node_id?: string | null
+  storage_worktree_path?: string | null
+  runtime_permission?: string
   created_at?: string
   updated_at?: string
   icon?: string           // 已废弃字段，保留兼容

@@ -9,6 +9,7 @@ import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import { ModelPickerPopover } from '../models/ModelPicker'
 import DevTaskGroup from '../dev/DevTaskGroup'
+import AgentRunsPanel from '../dev/AgentRunsPanel'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
@@ -314,6 +315,7 @@ export default function ConversationPage() {
   const activeProject = projects.find((p) => p.id === activeProjectId)
   const activeChannel = channels.find((c) => c.id === activeChannelId)
   const isDevChannel = activeChannel?.kind === 'ai_development'
+  const activeWorkspacePath = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
   const canManagePermissions = channels.some(channelCanManage)
   // taskContext 和 hasRunningTask 已在上方 P1.3 代码块中定义
 
@@ -836,6 +838,13 @@ export default function ConversationPage() {
               onClose={() => setSelectedMember(null)}
             />,
             document.body
+          )}
+          {activeProjectId && (
+            isDevChannel && activeWorkspacePath ? (
+              <div className={styles.agentRunsSlot}>
+                <AgentRunsPanel workspacePath={activeWorkspacePath} />
+              </div>
+            ) : null
           )}
           {activeProjectId && (
             <MemberContextSummary
