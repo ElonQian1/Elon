@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, Check, GitMerge, Network, RefreshCw, ShieldCheck, Wallet, X } from 'lucide-react'
 import { loadMatterGovernance, updateMatterMergeRequest } from './api'
+import BudgetPolicyPanel from './BudgetPolicyPanel'
 import MergeGatePanel from './MergeGatePanel'
 import type { MatterGovernanceSummary, ProjectAiMergeRequest, ProjectAiReview } from './types'
 import styles from './MatterGovernancePanel.module.css'
@@ -81,6 +82,12 @@ export default function MatterGovernancePanel({ projectId, matterId, refreshKey 
       {governance ? (
         <div className={styles.content}>
           <SummaryStrip governance={governance} />
+          <BudgetPolicyPanel
+            governance={governance}
+            matterId={matterId}
+            onChanged={() => void refresh()}
+            projectId={projectId}
+          />
           <TaskGraph governance={governance} />
           <ReviewList reviews={governance.reviews} />
           <MergeQueue

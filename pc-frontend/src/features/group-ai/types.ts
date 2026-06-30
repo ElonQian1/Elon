@@ -220,6 +220,11 @@ export interface MatterGovernanceResponse {
   governance: MatterGovernanceSummary
 }
 
+export interface UpdateMatterBudgetPolicyPayload {
+  maxBilledCostRmbFen?: number | null
+  pauseOnBudgetExceeded?: boolean
+}
+
 export interface MatterDetailResponse {
   ok: boolean
   matter: ProjectAiMatter
@@ -361,6 +366,11 @@ export interface UpdateMergeRequestPayload {
 export interface MergeRequestResponse {
   ok: boolean
   merge_request: ProjectAiMergeRequest
+}
+
+export interface MatterPolicyResponse {
+  ok: boolean
+  matter: ProjectAiMatter
 }
 
 export interface MergeGateResponse {

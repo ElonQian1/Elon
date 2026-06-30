@@ -518,6 +518,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(group_ai::governance_api::get_matter_governance),
         )
         .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/budget-policy",
+            post(group_ai::governance_api::update_matter_budget_policy_handler),
+        )
+        .route(
             "/api/projects/:project_id/ai/matters/:matter_id/reviews",
             post(group_ai::governance_api::record_matter_review),
         )

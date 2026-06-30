@@ -47,6 +47,7 @@ interface Props {
     assignment: ProjectAiMatterAssignment,
     action: AssignmentAction,
   ) => void
+  realtimeVersion?: number
 }
 
 export default function MatterDetailView({
@@ -58,6 +59,7 @@ export default function MatterDetailView({
   onAction,
   onAutomationAction,
   onAssignmentAction,
+  realtimeVersion = 0,
 }: Props) {
   const [artifact, setArtifact] = useState<AssignmentArtifact | null>(null)
   const [artifactBusy, setArtifactBusy] = useState('')
@@ -169,7 +171,7 @@ export default function MatterDetailView({
       <MatterGovernancePanel
         projectId={projectId}
         matterId={matter.id}
-        refreshKey={governanceVersion}
+        refreshKey={governanceVersion + realtimeVersion}
       />
 
       <div className={styles.columns}>

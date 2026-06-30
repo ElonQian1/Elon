@@ -16,6 +16,7 @@ mod merge_gate;
 mod merge_git;
 mod permissions;
 mod planner;
+mod policy;
 mod review_gate;
 mod review_result;
 pub(crate) mod types;

@@ -163,6 +163,31 @@ impl Store {
         let conn = self.conn()?;
         get_project_ai_matter_locked(&conn, &project_id, &matter_id)
     }
+
+    pub(crate) fn update_project_ai_matter_node_policy(
+        &self,
+        project_id: &str,
+        matter_id: &str,
+        node_policy: Value,
+    ) -> Result<ProjectAiMatter> {
+        let project_id = clean_required(project_id, "project_id")?;
+        let matter_id = clean_required(matter_id, "matter_id")?;
+        let node_policy_json = serde_json::to_string(&node_policy)?;
+        let ts = now();
+        let conn = self.conn()?;
+        let updated = conn.execute(
+            "UPDATE project_ai_matters
+                SET node_policy_json = ?3,
+                    updated_at = ?4
+              WHERE project_id = ?1 AND id = ?2",
+            params![project_id, matter_id, node_policy_json, ts],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("Matter 不存在");
+        }
+        get_project_ai_matter_locked(&conn, &project_id, &matter_id)?
+            .ok_or_else(|| anyhow!("Matter 策略更新后读取失败"))
+    }
 }
 
 fn get_project_ai_node_authorization_by_node_locked(

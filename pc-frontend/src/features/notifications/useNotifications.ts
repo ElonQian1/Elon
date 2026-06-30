@@ -3,6 +3,7 @@ import { useAuthStore } from '../../store/auth'
 
 const MAX_RECONNECT_MS = 30_000
 const DONE_EVENT_TYPE = 'project_task_done'
+const GROUP_AI_EVENT_TYPE = 'project_ai_matter_event'
 
 /** 对应旧 pc_app_notifications.js：WebSocket 任务完成通知 + 声音 + 标题角标 */
 export function useNotifications() {
@@ -73,7 +74,12 @@ export function useNotifications() {
     function handleMessage(raw: string) {
       let data: Record<string, unknown>
       try { data = JSON.parse(raw) } catch { return }
-      if (!data || data.type !== DONE_EVENT_TYPE) return
+      if (!data) return
+      if (data.type === GROUP_AI_EVENT_TYPE) {
+        handleGroupAiEvent(data)
+        return
+      }
+      if (data.type !== DONE_EVENT_TYPE) return
 
       const key = [data.projectId ?? '', data.conversationId ?? '', data.message ?? ''].join('|')
       const now = Date.now()
@@ -85,6 +91,32 @@ export function useNotifications() {
       showBrowserNotification(data)
       playDoneSound()
       markTitle()
+    }
+
+    function handleGroupAiEvent(data: Record<string, unknown>) {
+      const key = [data.projectId ?? '', data.matterId ?? '', data.matterEventType ?? '', data.message ?? ''].join('|')
+      const now = Date.now()
+      if (key === s.lastEventKey && now - s.lastEventAt < 30_000) return
+      s.lastEventKey = key
+      s.lastEventAt = now
+
+      window.dispatchEvent(new CustomEvent('elon:project-ai-matter-event', { detail: data }))
+      showGroupAiNotification(data)
+      markTitle()
+    }
+
+    function showGroupAiNotification(data: Record<string, unknown>) {
+      if (!('Notification' in window) || Notification.permission !== 'granted') return
+      const message = String(data.message ?? '群体 AI Matter 已更新').trim()
+      const eventType = String(data.matterEventType ?? '').trim()
+      try {
+        const n = new Notification('群体 AI 开发已更新', {
+          body: `${eventType || 'matter'} · ${message}`.slice(0, 220),
+          tag: `elon-group-ai-${data.matterId ?? data.projectId ?? Date.now()}`,
+          ...({ renotify: true } as object),
+        } as NotificationOptions)
+        n.onclick = () => { window.focus(); n.close() }
+      } catch { /* ignore */ }
     }
 
     function showBrowserNotification(data: Record<string, unknown>) {

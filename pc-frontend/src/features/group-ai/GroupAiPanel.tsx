@@ -57,6 +57,7 @@ export default function GroupAiPanel({ projectId, channels }: Props) {
   const [brief, setBrief] = useState('')
   const [mode, setMode] = useState<Mode>('critic')
   const [criteria, setCriteria] = useState('实现前确认范围\n输出验证命令和风险\n审核 Bot 独立检查')
+  const [realtimeVersion, setRealtimeVersion] = useState(0)
 
   const selectedMatter = matters.find((matter) => matter.id === selectedMatterId) ?? matters[0]
   const latestEventId = events[events.length - 1]?.id ?? ''
@@ -87,6 +88,19 @@ export default function GroupAiPanel({ projectId, channels }: Props) {
     }, 5000)
     return () => window.clearInterval(timer)
   }, [selectedMatter?.id, detailShouldPoll, projectId, latestEventId])
+
+  useEffect(() => {
+    function onMatterEvent(event: Event) {
+      const detail = (event as CustomEvent<{ projectId?: string; matterId?: string }>).detail
+      if (!detail || detail.projectId !== projectId) return
+      setRealtimeVersion((value) => value + 1)
+      void refresh()
+      if (detail.matterId) void loadDetail(detail.matterId)
+    }
+
+    window.addEventListener('elon:project-ai-matter-event', onMatterEvent)
+    return () => window.removeEventListener('elon:project-ai-matter-event', onMatterEvent)
+  }, [projectId, selectedMatterId])
 
   async function refresh() {
     if (!projectId) return
@@ -342,6 +356,7 @@ export default function GroupAiPanel({ projectId, channels }: Props) {
               onAction={matterAction}
               onAutomationAction={matterAutomationAction}
               onAssignmentAction={assignmentAction}
+              realtimeVersion={realtimeVersion}
             />
           ) : (
             <div className={styles.empty}>选择一个 Matter</div>

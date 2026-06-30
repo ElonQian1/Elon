@@ -18,11 +18,12 @@ use crate::{
         permissions::{
             authenticate_project_member, ensure_can_decide_matter, ensure_can_operate_assignment,
         },
+        policy::{budget_policy_payload, update_matter_budget_policy},
         types::{
             CreateMergeRequestInput, CreateMergeRequestRequest, ProjectAiMatter,
             ProjectAiMatterAssignment, RecordAssignmentArtifactInput,
             RecordAssignmentArtifactRequest, RecordReviewInput, RecordReviewRequest,
-            UpdateMergeRequestRequest,
+            UpdateMatterBudgetPolicyRequest, UpdateMergeRequestRequest,
         },
     },
     project_auth::json_error,
@@ -142,6 +143,38 @@ pub(crate) async fn get_matter_governance(
     }
     match matter_governance_summary(&state, &project_id, &matter_id) {
         Ok(summary) => Json(json!({ "ok": true, "governance": summary })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
+}
+
+pub(crate) async fn update_matter_budget_policy_handler(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, matter_id)): Path<(String, String)>,
+    Json(req): Json<UpdateMatterBudgetPolicyRequest>,
+) -> Response {
+    let (user, access) = match authenticate_project_member(&state, &headers, &project_id) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    let matter = match require_matter(&state, &project_id, &matter_id) {
+        Ok(matter) => matter,
+        Err(response) => return response,
+    };
+    if let Err(response) = ensure_can_decide_matter(&access, &user.id, &matter) {
+        return response;
+    }
+    match update_matter_budget_policy(&state, &project_id, &matter_id, req) {
+        Ok(updated) => {
+            insert_event(
+                &state,
+                &updated,
+                &user.id,
+                "budget_policy_updated",
+                budget_policy_payload(&updated),
+            );
+            Json(json!({ "ok": true, "matter": updated })).into_response()
+        }
         Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
     }
 }

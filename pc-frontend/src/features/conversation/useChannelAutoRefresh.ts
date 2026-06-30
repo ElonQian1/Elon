@@ -18,6 +18,10 @@ interface TaskDoneEvent extends CustomEvent {
   detail: { projectId?: string; conversationId?: string }
 }
 
+interface GroupAiMatterEvent extends CustomEvent {
+  detail: { projectId?: string; matterId?: string; matterEventType?: string }
+}
+
 export function useChannelAutoRefresh() {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -32,8 +36,20 @@ export function useChannelAutoRefresh() {
       }
     }
 
+    function onGroupAiMatterEvent(e: GroupAiMatterEvent) {
+      const { activeProjectId, activeChannelId, loadMessages } = useProjectStore.getState()
+      const eventProjectId = e.detail?.projectId ?? ''
+      if (activeProjectId && activeChannelId && (!eventProjectId || eventProjectId === activeProjectId)) {
+        loadMessages(activeProjectId, activeChannelId).catch(() => {})
+      }
+    }
+
     window.addEventListener('elon:project-task-done', onTaskDone as EventListener)
-    return () => window.removeEventListener('elon:project-task-done', onTaskDone as EventListener)
+    window.addEventListener('elon:project-ai-matter-event', onGroupAiMatterEvent as EventListener)
+    return () => {
+      window.removeEventListener('elon:project-task-done', onTaskDone as EventListener)
+      window.removeEventListener('elon:project-ai-matter-event', onGroupAiMatterEvent as EventListener)
+    }
   }, [])
 
   // 自适应轮询

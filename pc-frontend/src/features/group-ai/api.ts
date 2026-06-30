@@ -16,8 +16,10 @@ import type {
   MergeGateResponse,
   MergeRequestResponse,
   MattersResponse,
+  MatterPolicyResponse,
   NodesResponse,
   ApplyMergeRequestPayload,
+  UpdateMatterBudgetPolicyPayload,
   UpdateMergeRequestPayload,
 } from './types'
 
@@ -146,6 +148,17 @@ export async function updateMatterMergeRequest(
       projectId,
       `matters/${encodeURIComponent(matterId)}/merge-requests/${encodeURIComponent(mergeRequestId)}`,
     ),
+    payload,
+  )
+}
+
+export async function updateMatterBudgetPolicy(
+  projectId: string,
+  matterId: string,
+  payload: UpdateMatterBudgetPolicyPayload,
+) {
+  return api.post<MatterPolicyResponse>(
+    projectPath(projectId, `matters/${encodeURIComponent(matterId)}/budget-policy`),
     payload,
   )
 }

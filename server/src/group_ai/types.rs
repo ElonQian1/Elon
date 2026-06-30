@@ -95,6 +95,14 @@ pub(crate) struct CreateMatterRecord {
     pub plan_json: Value,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct UpdateMatterBudgetPolicyRequest {
+    #[serde(default, alias = "maxBilledCostRmbFen")]
+    pub max_billed_cost_rmb_fen: Option<i64>,
+    #[serde(default, alias = "pauseOnBudgetExceeded")]
+    pub pause_on_budget_exceeded: Option<bool>,
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ProjectAiMatter {
     pub id: String,

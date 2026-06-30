@@ -408,6 +408,62 @@ mod tests {
     }
 
     #[test]
+    fn matter_node_policy_updates_are_durable() {
+        let store = temp_store();
+        let user = store
+            .create_user("group-ai-policy@example.com", "secret1", None, None)
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "Group AI Policy", None, None)
+            .expect("project should be created")
+            .project;
+        let channel = store
+            .list_project_space_channels(&user.id, &project.id)
+            .expect("channels should list")
+            .into_iter()
+            .find(|channel| channel.kind == "ai_development")
+            .expect("ai development channel should exist");
+        let matter = store
+            .create_project_ai_matter(CreateMatterRecord {
+                project_id: project.id.clone(),
+                channel_id: channel.id,
+                requester_user_id: user.id.clone(),
+                source_message_id: None,
+                title: "预算策略".to_string(),
+                brief: "验证 Matter 预算策略保存".to_string(),
+                collaboration_mode: "critic".to_string(),
+                participant_user_ids: vec![user.id.clone()],
+                node_policy_json: json!({ "mode": "project_write" }),
+                acceptance_criteria: vec!["预算可保存".to_string()],
+                plan_json: json!({ "roles": [] }),
+            })
+            .expect("matter should be created");
+
+        let updated = store
+            .update_project_ai_matter_node_policy(
+                &project.id,
+                &matter.id,
+                json!({
+                    "mode": "project_write",
+                    "budget": {
+                        "max_billed_cost_rmb_fen": 120,
+                        "pause_on_budget_exceeded": true
+                    }
+                }),
+            )
+            .expect("policy should update");
+
+        assert_eq!(
+            updated.node_policy["budget"]["max_billed_cost_rmb_fen"],
+            120
+        );
+        assert_eq!(
+            updated.node_policy["budget"]["pause_on_budget_exceeded"],
+            true
+        );
+    }
+
+    #[test]
     fn governance_artifacts_reviews_and_merge_queue_are_durable() {
         let store = temp_store();
         let user = store
