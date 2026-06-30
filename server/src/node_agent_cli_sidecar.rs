@@ -81,6 +81,58 @@ impl CliSidecarRegistry {
         })
     }
 
+    pub(crate) fn touch_session(
+        &self,
+        session_id: &str,
+        state: Option<&str>,
+        child_pid: Option<u32>,
+    ) -> Result<bool> {
+        let session_id = session_id.trim();
+        if session_id.is_empty() {
+            return Ok(false);
+        }
+        with_task_journal_io_lock(|| {
+            let mut sessions = self.load_sessions()?;
+            let Some(session) = sessions.get_mut(session_id) else {
+                return Ok(false);
+            };
+            if let Some(state) = state.map(str::trim).filter(|value| !value.is_empty()) {
+                session.state = state.to_string();
+            }
+            if child_pid.is_some() {
+                session.child_pid = child_pid;
+            }
+            session.last_seen_at_ms = now_ms();
+            self.save_sessions(&sessions)?;
+            Ok(true)
+        })
+    }
+
+    pub(crate) fn mark_task_terminal(&self, task_id: &str, state: &str) -> Result<bool> {
+        let task_id = task_id.trim();
+        if task_id.is_empty() {
+            return Ok(false);
+        }
+        with_task_journal_io_lock(|| {
+            let mut sessions = self.load_sessions()?;
+            let Some((_, session)) = sessions
+                .iter_mut()
+                .filter(|(_, session)| session.task_id == task_id)
+                .max_by(|(_, left), (_, right)| {
+                    left.last_seen_at_ms
+                        .cmp(&right.last_seen_at_ms)
+                        .then_with(|| left.started_at_ms.cmp(&right.started_at_ms))
+                })
+            else {
+                return Ok(false);
+            };
+            session.state = state.to_string();
+            session.last_seen_at_ms = now_ms();
+            self.save_sessions(&sessions)?;
+            Ok(true)
+        })
+    }
+
     pub(crate) fn latest_sessions(&self, limit: usize) -> Result<Vec<CliSidecarSessionRecord>> {
         with_task_journal_io_lock(|| {
             let mut sessions: Vec<_> = self.load_sessions()?.into_values().collect();
@@ -206,6 +258,22 @@ impl CliSidecarRegistry {
     fn command_path(&self, task_id: &str) -> PathBuf {
         self.dir
             .join(format!("commands-{}.jsonl", safe_file_component(task_id)))
+    }
+
+    pub(crate) fn command_mailbox_path(&self, task_id: &str) -> PathBuf {
+        self.command_path(task_id)
+    }
+
+    pub(crate) fn output_path(&self, task_id: &str, session_id: &str) -> PathBuf {
+        self.dir.join(format!(
+            "output-{}-{}.jsonl",
+            safe_file_component(task_id),
+            safe_file_component(session_id)
+        ))
+    }
+
+    pub(crate) fn dir(&self) -> PathBuf {
+        self.dir.clone()
     }
 }
 

@@ -55,6 +55,10 @@ mod node_agent_api_runtime_tools;
 mod node_agent_cli_security;
 mod node_agent_cli_session_bridge;
 mod node_agent_cli_sidecar;
+mod node_agent_cli_sidecar_io;
+mod node_agent_cli_sidecar_runner;
+#[cfg(test)]
+mod node_agent_cli_sidecar_runner_tests;
 mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
@@ -1010,38 +1014,49 @@ async fn run_cli_prompt(run: CliPromptRun) {
         }
     };
     let mut cmd = tokio::process::Command::new(actual_bin);
+    let mut sidecar_args = Vec::new();
+    let mut sidecar_env = Vec::new();
     if let Some((_, args)) = batch_wrapper.as_ref() {
         cmd.args(args);
+        sidecar_args.extend(args.iter().map(|arg| arg.to_string()));
     }
     if cli_name == "codex" {
         // 从 extra_args 提取 --codex-model=xxx 和 --codex-effort=yyy，在 exec 前插入
         // 例如：codex -m gpt-5.4-mini -c model_reasoning_effort="medium" exec ...
         for a in &extra_args {
             if let Some(model) = a.strip_prefix("--codex-model=") {
-                cmd.arg("-m");
-                cmd.arg(model);
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "-m");
+                push_tracked_arg(&mut cmd, &mut sidecar_args, model);
             } else if let Some(effort) = a.strip_prefix("--codex-effort=") {
-                cmd.arg("-c");
-                cmd.arg(format!("model_reasoning_effort=\"{}\"", effort));
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "-c");
+                push_tracked_arg(
+                    &mut cmd,
+                    &mut sidecar_args,
+                    format!("model_reasoning_effort=\"{}\"", effort),
+                );
             }
         }
-        cmd.arg("exec");
+        push_tracked_arg(&mut cmd, &mut sidecar_args, "exec");
         if let Some(ref real_sid) = codex_plan.session_id {
             // 续接已有会话
-            cmd.arg("resume");
-            cmd.arg(real_sid);
+            push_tracked_arg(&mut cmd, &mut sidecar_args, "resume");
+            push_tracked_arg(&mut cmd, &mut sidecar_args, real_sid);
         } else {
             // 首次执行：默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
             if full_access {
-                cmd.arg("--dangerously-bypass-approvals-and-sandbox");
+                push_tracked_arg(
+                    &mut cmd,
+                    &mut sidecar_args,
+                    "--dangerously-bypass-approvals-and-sandbox",
+                );
             } else if cli_prompt_read_only(runtime_permission.as_deref()) {
-                cmd.arg("--sandbox");
-                cmd.arg("read-only");
-                cmd.arg("--skip-git-repo-check");
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "--sandbox");
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "read-only");
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
             } else {
-                cmd.arg("--sandbox");
-                cmd.arg("workspace-write");
-                cmd.arg("--skip-git-repo-check");
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "--sandbox");
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "workspace-write");
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
             }
         }
         // 其余 extra_args，跳过已处理的 --session-id / --codex-model / --codex-effort
@@ -1051,29 +1066,30 @@ async fn run_cli_prompt(run: CliPromptRun) {
                 && !a.starts_with("--codex-effort=")
                 && (full_access || a != "--dangerously-bypass-approvals-and-sandbox")
             {
-                cmd.arg(a);
+                push_tracked_arg(&mut cmd, &mut sidecar_args, a);
             }
         }
     } else if cli_name == "copilot" {
         if full_access {
-            cmd.arg("--allow-all");
+            push_tracked_arg(&mut cmd, &mut sidecar_args, "--allow-all");
         }
         for a in &extra_args {
-            cmd.arg(a);
+            push_tracked_arg(&mut cmd, &mut sidecar_args, a);
         }
     } else {
         for a in &extra_args {
-            cmd.arg(a);
+            push_tracked_arg(&mut cmd, &mut sidecar_args, a);
         }
     }
     // prompt 传递方式
     if cli_name == "codex" {
         // Codex: prompt 是位置参数（-p 是 --profile，不是 prompt）
-        cmd.arg(&prompt);
+        push_tracked_arg(&mut cmd, &mut sidecar_args, &prompt);
     } else if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
-        cmd.args(["-p", &prompt]);
+        push_tracked_arg(&mut cmd, &mut sidecar_args, "-p");
+        push_tracked_arg(&mut cmd, &mut sidecar_args, &prompt);
     } else {
-        cmd.arg(&prompt);
+        push_tracked_arg(&mut cmd, &mut sidecar_args, &prompt);
     }
     if let Some(dir) = &cwd {
         cmd.current_dir(dir);
@@ -1096,20 +1112,223 @@ async fn run_cli_prompt(run: CliPromptRun) {
             });
         if let Some(home) = codex_home {
             cmd.env("CODEX_HOME", &home);
+            sidecar_env.push(("CODEX_HOME".to_string(), home));
         }
     }
+    let stdin_piped_empty = cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini";
     cmd.stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         // copilot 用 --allow-all 时仍会检测 stdin 是否可读；
         // 用 piped（而非 null）让它认为 stdin 存在但为空流，避免权限拒绝。
-        .stdin(
-            if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
-                std::process::Stdio::piped()
-            } else {
-                std::process::Stdio::null()
-            },
-        );
+        .stdin(if stdin_piped_empty {
+            std::process::Stdio::piped()
+        } else {
+            std::process::Stdio::null()
+        });
     hide_tokio_command_window(&mut cmd);
+
+    let codex_key = codex_plan.scope_key.clone();
+
+    if node_agent_cli_sidecar_runner::sidecar_enabled() {
+        let sidecar_registry = runtime.cli_sidecars.clone();
+        let session_id = node_agent_cli_sidecar_runner::session_id_for_task(&req_id);
+        let output_path = sidecar_registry.output_path(&req_id, &session_id);
+        let launch_config = node_agent_cli_sidecar_runner::CliSidecarLaunchConfig {
+            session_id,
+            task_id: req_id.clone(),
+            cli_name: cli_name.to_string(),
+            route: node_agent_active_task::route_for_cli(cli_name).to_string(),
+            program: actual_bin.to_string(),
+            args: sidecar_args.clone(),
+            cwd: cwd.clone(),
+            env: sidecar_env.clone(),
+            output_path,
+            registry_dir: sidecar_registry.dir(),
+            task_journal_dir: None,
+            timeout_secs: if cli_name == "codex" { 300 } else { 180 },
+            stdin_piped_empty,
+        };
+        match node_agent_cli_sidecar_runner::spawn_sidecar(launch_config).await {
+            Ok(launch) => {
+                if let Some(pid) = launch.sidecar_pid {
+                    runtime.set_cli_prompt_os_pid(&req_id, Some(pid)).await;
+                    if let Err(error) = task_journal.record_process_started(&req_id, pid) {
+                        warn!("PC 任务 journal 写入 sidecar pid 失败: {error}");
+                    }
+                }
+                let result = node_agent_cli_sidecar_runner::follow_sidecar_output(
+                    &sidecar_registry,
+                    &req_id,
+                    &launch.output_path,
+                    &mut cancel_rx,
+                    |event| match event {
+                        node_agent_cli_sidecar_runner::CliSidecarOutputEvent::Stdout(text) => {
+                            if cli_name == "codex" {
+                                if let Some(real_id) =
+                                    text.strip_prefix("session id: ").map(str::trim)
+                                {
+                                    if let Some(ref key) = codex_key {
+                                        persist_codex_session_compat(
+                                            &task_journal,
+                                            &codex_sessions_file,
+                                            &req_id,
+                                            key,
+                                            real_id,
+                                        );
+                                    }
+                                    return;
+                                }
+                            }
+                            send_cli_chunk_message(&out_tx, &req_id, &text);
+                        }
+                        node_agent_cli_sidecar_runner::CliSidecarOutputEvent::Stderr(text) => {
+                            if cli_name == "codex" {
+                                if !text.trim().is_empty() {
+                                    info!("[codex stderr] {}", text.trim_end());
+                                }
+                            } else {
+                                send_cli_chunk_message(&out_tx, &req_id, &text);
+                            }
+                        }
+                        node_agent_cli_sidecar_runner::CliSidecarOutputEvent::ChildStarted(pid) => {
+                            if let Err(error) = task_journal.record_process_started(&req_id, pid) {
+                                warn!("PC 任务 journal 写入 sidecar child pid 失败: {error}");
+                            }
+                        }
+                    },
+                )
+                .await;
+                let result = match result {
+                    Ok(result) => result,
+                    Err(error) => {
+                        let message = format!("sidecar 输出跟随失败: {error}");
+                        record_cli_done_outcome(&task_journal, &req_id, false, Some(&message));
+                        let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
+                            req_id,
+                            exit_ok: false,
+                            error: Some(message),
+                            prompt_tokens: None,
+                            cached_input_tokens: None,
+                            completion_tokens: None,
+                            reasoning_tokens: None,
+                            total_tokens: None,
+                            model: None,
+                            workspace_status: None,
+                        }));
+                        return;
+                    }
+                };
+                if result.canceled {
+                    let message = "用户已停止 PC CLI 任务".to_string();
+                    let (exit_ok, error, workspace_status) =
+                        finalize_cli_prompt_workspace(false, Some(message), conversation_workspace);
+                    let model = cli_model_from_args(cli_name, &extra_args);
+                    record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
+                    let _ = out_tx.send(ws_text(&cli_done_message(
+                        req_id,
+                        exit_ok,
+                        error,
+                        None,
+                        model,
+                        workspace_status,
+                    )));
+                    return;
+                }
+                if !result.exit_ok
+                    && cli_name == "codex"
+                    && codex_plan.is_resume()
+                    && node_agent_codex_session::stale_resume_failure(
+                        &result.stdout_text,
+                        &result.stderr_text,
+                    )
+                {
+                    if let Some(scope_key) = codex_plan.scope_key.as_deref() {
+                        node_agent_codex_session::clear_stale_session(
+                            &task_journal,
+                            &codex_sessions_file,
+                            &req_id,
+                            scope_key,
+                        )
+                        .await;
+                    }
+                    send_cli_chunk(
+                        &out_tx,
+                        &task_journal,
+                        &req_id,
+                        "stdout",
+                        "codex\n已发现本机 Codex session 失效，正在清理旧 session 并自动重新开始本轮任务。\n",
+                    );
+                    Box::pin(run_cli_prompt(CliPromptRun {
+                        req_id,
+                        bin: bin_owned,
+                        cli_name: cli_name_owned,
+                        extra_args,
+                        runtime_permission,
+                        cwd,
+                        conversation_workspace,
+                        prompt,
+                        server_runtime_config,
+                        approval_state,
+                        task_journal,
+                        runtime,
+                        cancel_rx,
+                        out_tx,
+                    }))
+                    .await;
+                    return;
+                }
+                if result.exit_ok
+                    && cli_name == "codex"
+                    && !result
+                        .stdout_text
+                        .lines()
+                        .any(|line| line.trim() == "codex")
+                {
+                    let diagnostic = if result.stdout_text.trim().is_empty() {
+                        "Codex CLI 执行完成，但没有返回可解析输出。请查看 PC 节点日志确认是否已完成文件修改。"
+                    } else {
+                        "Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查看 PC 节点日志确认是否已完成文件修改。"
+                    };
+                    let text = format!("codex\n{diagnostic}\n");
+                    let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
+                        req_id: req_id.clone(),
+                        text: text.clone(),
+                    }));
+                    let _ = task_journal.record_cli_chunk(&req_id, "stdout", &text);
+                }
+                let error = if result.exit_ok {
+                    None
+                } else {
+                    Some(cli_done_error(
+                        cli_name,
+                        &result.stdout_text,
+                        &result.stderr_text,
+                    ))
+                };
+                let (exit_ok, error, workspace_status) =
+                    finalize_cli_prompt_workspace(result.exit_ok, error, conversation_workspace);
+                record_cli_done_outcome(&task_journal, &req_id, exit_ok, error.as_deref());
+                let combined_usage_text = format!("{}\n{}", result.stdout_text, result.stderr_text);
+                let usage = cli_usage::parse_cli_usage(&combined_usage_text);
+                let model = usage
+                    .as_ref()
+                    .and_then(|u| u.model.clone())
+                    .or_else(|| cli_model_from_args(cli_name, &extra_args));
+                let _ = out_tx.send(ws_text(&cli_done_message(
+                    req_id,
+                    exit_ok,
+                    error,
+                    usage,
+                    model,
+                    workspace_status,
+                )));
+                return;
+            }
+            Err(error) => {
+                warn!("启动 CLI sidecar 失败，回落到直接子进程: {error:#}");
+            }
+        }
+    }
 
     let mut child = match cmd.spawn() {
         Ok(c) => c,
@@ -1152,9 +1371,14 @@ async fn run_cli_prompt(run: CliPromptRun) {
             loop {
                 buf.clear();
                 match reader.read_until(b'\n', &mut buf).await {
-                    Ok(0) | Err(_) => { let _ = stderr_tx.send(None); break; }
+                    Ok(0) | Err(_) => {
+                        let _ = stderr_tx.send(None);
+                        break;
+                    }
                     Ok(_) => {
-                        while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) { buf.pop(); }
+                        while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) {
+                            buf.pop();
+                        }
                         let _ = stderr_tx.send(Some(String::from_utf8_lossy(&buf).into_owned()));
                     }
                 }
@@ -1168,8 +1392,6 @@ async fn run_cli_prompt(run: CliPromptRun) {
 
     // 对 Codex：从 stdout 提取真实 session id（格式: "session id: <uuid>"）
     // 并持久化到本地，以便下次用 exec resume <real_id> 续接
-    let codex_key = codex_plan.scope_key.clone();
-
     while !stdout_done || !stderr_done {
         tokio::select! {
             line = stdout_lines.next_line(), if !stdout_done => match line {
@@ -1380,6 +1602,49 @@ fn send_cli_chunk(
         req_id: req_id.to_string(),
         text: text.to_string(),
     }));
+}
+
+fn send_cli_chunk_message(
+    out_tx: &tokio::sync::mpsc::UnboundedSender<Message>,
+    req_id: &str,
+    text: &str,
+) {
+    let _ = out_tx.send(ws_text(&AgentToServer::CliChunk {
+        req_id: req_id.to_string(),
+        text: text.to_string(),
+    }));
+}
+
+fn push_tracked_arg(
+    cmd: &mut tokio::process::Command,
+    sidecar_args: &mut Vec<String>,
+    arg: impl AsRef<str>,
+) {
+    let arg = arg.as_ref().to_string();
+    cmd.arg(&arg);
+    sidecar_args.push(arg);
+}
+
+fn persist_codex_session_compat(
+    task_journal: &node_agent_task_journal::TaskJournal,
+    codex_sessions_file: &Path,
+    req_id: &str,
+    key: &str,
+    real_id: &str,
+) {
+    if let Err(error) = task_journal.record_codex_session(req_id, key, real_id) {
+        warn!("PC 任务 journal 写入 Codex session 失败: {error}");
+    }
+    let mut map: serde_json::Map<String, serde_json::Value> =
+        std::fs::read_to_string(codex_sessions_file)
+            .ok()
+            .and_then(|text| serde_json::from_str(&text).ok())
+            .unwrap_or_default();
+    map.insert(key.to_string(), serde_json::json!(real_id));
+    if let Ok(text) = serde_json::to_string(&map) {
+        let _ = std::fs::write(codex_sessions_file, text);
+    }
+    info!("🔖 Codex session saved: {} → {}", key, real_id);
 }
 
 fn record_cli_done_outcome(
@@ -1626,9 +1891,14 @@ async fn run_exec(
             loop {
                 buf.clear();
                 match reader.read_until(b'\n', &mut buf).await {
-                    Ok(0) | Err(_) => { let _ = tx.send(None); break; }
+                    Ok(0) | Err(_) => {
+                        let _ = tx.send(None);
+                        break;
+                    }
                     Ok(_) => {
-                        while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) { buf.pop(); }
+                        while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) {
+                            buf.pop();
+                        }
                         let _ = tx.send(Some(String::from_utf8_lossy(&buf).into_owned()));
                     }
                 }
@@ -2357,7 +2627,10 @@ async fn run_session(
                                 let _ = tx_c.send(ws_text(&reply));
                             });
                         }
-                        ServerToAgent::UpdateClient { version, download_url } => {
+                        ServerToAgent::UpdateClient {
+                            version,
+                            download_url,
+                        } => {
                             let ver = version.as_deref().unwrap_or("latest");
                             info!("⬆️  收到云端更新指令，目标版本: {}", ver);
                             let cloud_http = runtime.cloud_http_url();
@@ -2365,7 +2638,9 @@ async fn run_session(
                                 match crate::node_agent_client_maintenance::push_update_from_server(
                                     &cloud_http,
                                     download_url.as_deref(),
-                                ).await {
+                                )
+                                .await
+                                {
                                     Ok(msg) => info!("✅ 自动更新已启动: {}", msg),
                                     Err(e) => warn!("⚠️  自动更新失败（需手动更新）: {}", e),
                                 }
@@ -2423,6 +2698,15 @@ async fn run_loop(runtime: Arc<NodeRuntime>) {
 // ── 入口 ─────────────────────────────────────────────────────────────────────
 
 fn main() -> Result<()> {
+    if let Some(config_path) = cli_sidecar_config_arg() {
+        return tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()?
+            .block_on(node_agent_cli_sidecar_runner::run_sidecar_from_config_path(
+                config_path,
+            ));
+    }
+
     #[cfg(windows)]
     {
         let runtime_mode =
@@ -2436,6 +2720,16 @@ fn main() -> Result<()> {
         .enable_all()
         .build()?
         .block_on(run_agent_runtime())
+}
+
+fn cli_sidecar_config_arg() -> Option<PathBuf> {
+    let mut args = std::env::args().skip(1);
+    while let Some(arg) = args.next() {
+        if arg == "--cli-sidecar" {
+            return args.next().map(PathBuf::from);
+        }
+    }
+    None
 }
 
 #[cfg(windows)]
