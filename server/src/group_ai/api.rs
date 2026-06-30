@@ -19,6 +19,7 @@ use crate::{
             start_matter as start_matter_action, AssignmentActionInput, MatterDetail,
         },
         bot_selector::{available_nodes_for_project, bots_for_project},
+        executor::schedule_assignment_run,
         permissions::{
             authenticate_project_member, ensure_can_authorize_node, ensure_can_create_matter,
             ensure_node_provider,
@@ -344,6 +345,37 @@ pub(crate) async fn retry_assignment(
         req,
         retry_assignment_action,
     )
+}
+
+pub(crate) async fn run_assignment(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, matter_id, assignment_id)): Path<(String, String, String)>,
+    Json(req): Json<AssignmentActionRequest>,
+) -> Response {
+    let (user, access) = match authenticate_project_member(&state, &headers, &project_id) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    let matter = match state.store.get_project_ai_matter(&project_id, &matter_id) {
+        Ok(Some(matter)) => matter,
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "Matter 不存在"),
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    };
+    let assignment = match state.store.get_project_ai_matter_assignment(&assignment_id) {
+        Ok(Some(assignment)) if assignment.matter_id == matter_id => assignment,
+        Ok(Some(_)) => return json_error(StatusCode::BAD_REQUEST, "Assignment 不属于当前 Matter"),
+        Ok(None) => return json_error(StatusCode::NOT_FOUND, "Assignment 不存在"),
+        Err(error) => return json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    };
+    if let Err(response) = ensure_can_operate_assignment(&access, &user.id, &matter, &assignment) {
+        return response;
+    }
+
+    match schedule_assignment_run(state, access, matter, assignment, user.id, req.comment) {
+        Ok(detail) => matter_detail_response(detail),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
 }
 
 pub(crate) async fn record_assignment_settlement_handler(

@@ -165,6 +165,32 @@ impl Store {
             .optional()
             .map_err(Into::into)
     }
+
+    pub fn get_project_execution_session_by_request_id(
+        &self,
+        request_id: &str,
+    ) -> Result<Option<ProjectExecutionSession>> {
+        let request_id = request_id.trim();
+        if request_id.is_empty() {
+            return Ok(None);
+        }
+        self.conn()?
+            .query_row(
+                "SELECT id, project_id, conversation_id, user_id, node_id, request_id,
+                        base_workspace_path, active_workspace_path, branch, isolated,
+                        status, merge_status, last_error, model,
+                        prompt_tokens, cached_input_tokens, completion_tokens, reasoning_tokens,
+                        total_tokens, token_usage_event_id, billing_event_id,
+                        created_at, updated_at
+                 FROM project_execution_sessions
+                 WHERE request_id = ?1
+                 LIMIT 1",
+                params![request_id],
+                project_execution_session_from_row,
+            )
+            .optional()
+            .map_err(Into::into)
+    }
 }
 
 fn project_execution_session_from_row(
@@ -267,5 +293,15 @@ mod tests {
         assert_eq!(latest.total_tokens, 130);
         assert_eq!(latest.token_usage_event_id.as_deref(), Some("tok-a"));
         assert_eq!(latest.billing_event_id.as_deref(), Some("bev-a"));
+
+        let by_request = store
+            .get_project_execution_session_by_request_id("req-a")
+            .expect("request lookup should query")
+            .expect("request lookup should find session");
+        assert_eq!(by_request.id, latest.id);
+        assert_eq!(
+            by_request.branch.as_deref(),
+            Some("ai/session/prj-a/conv-a")
+        );
     }
 }

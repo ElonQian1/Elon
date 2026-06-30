@@ -59,6 +59,11 @@ export default function GroupAiPanel({ projectId, channels }: Props) {
   const [criteria, setCriteria] = useState('实现前确认范围\n输出验证命令和风险\n审核 Bot 独立检查')
 
   const selectedMatter = matters.find((matter) => matter.id === selectedMatterId) ?? matters[0]
+  const detailShouldPoll = Boolean(
+    selectedMatter?.id &&
+      (selectedMatter.status === 'running' ||
+        assignments.some((assignment) => assignment.status === 'running')),
+  )
 
   useEffect(() => {
     void refresh()
@@ -72,6 +77,14 @@ export default function GroupAiPanel({ projectId, channels }: Props) {
     }
     void loadDetail(selectedMatter.id)
   }, [selectedMatter?.id])
+
+  useEffect(() => {
+    if (!selectedMatter?.id || !detailShouldPoll) return
+    const timer = window.setInterval(() => {
+      void loadDetail(selectedMatter.id)
+    }, 5000)
+    return () => window.clearInterval(timer)
+  }, [selectedMatter?.id, detailShouldPoll, projectId])
 
   async function refresh() {
     if (!projectId) return
@@ -97,6 +110,7 @@ export default function GroupAiPanel({ projectId, channels }: Props) {
   async function loadDetail(matterId: string) {
     try {
       const detail = await loadMatterDetail(projectId, matterId)
+      setMatters((current) => current.map((item) => (item.id === detail.matter.id ? detail.matter : item)))
       setAssignments(detail.assignments ?? [])
       setEvents(detail.events ?? [])
     } catch {
@@ -351,9 +365,20 @@ function MatterDetail({
                 <span>{assignmentStatusLabel(assignment.status)}</span>
               </div>
               <span>{assignment.cli_name} · {assignment.runtime_route}</span>
-              <small>{assignment.node_id}{assignment.branch_name ? ` · ${assignment.branch_name}` : ''}</small>
+              <small>
+                {assignment.node_id}
+                {assignment.branch_name ? ` · ${assignment.branch_name}` : ''}
+                {assignment.worktree_path ? ` · ${assignment.worktree_path}` : ''}
+              </small>
               {assignment.result_summary && <p>{assignment.result_summary}</p>}
               <div className={styles.assignmentActions}>
+                <ActionButton
+                  icon={<Play size={14} />}
+                  label="执行"
+                  disabled={!canRunAssignment(matter, assignment)}
+                  busy={busy === `run:${assignment.id}`}
+                  onClick={() => onAssignmentAction(matter, assignment, 'run')}
+                />
                 <ActionButton
                   icon={<Check size={14} />}
                   label="完成"
@@ -452,7 +477,13 @@ function eventHint(event: ProjectAiEvent) {
   const computeCallId = stringPayload(payload, 'compute_call_id')
   const assignmentId = stringPayload(payload, 'assignment_id')
   const accountingStatus = stringPayload(payload, 'accounting_status')
-  const parts = [computeCallId && `compute ${computeCallId}`, assignmentId && `assignment ${assignmentId}`, accountingStatus]
+  const branchName = stringPayload(payload, 'branch_name')
+  const parts = [
+    computeCallId && `compute ${computeCallId}`,
+    branchName && `branch ${branchName}`,
+    assignmentId && `assignment ${assignmentId}`,
+    accountingStatus,
+  ]
     .filter((item): item is string => Boolean(item))
     .slice(0, 2)
   return parts.join(' · ')
@@ -465,4 +496,11 @@ function stringPayload(payload: Record<string, unknown>, key: string) {
 
 function isDone(matter: ProjectAiMatter) {
   return matter.status === 'done' || matter.status === 'canceled'
+}
+
+function canRunAssignment(matter: ProjectAiMatter, assignment: ProjectAiMatterAssignment) {
+  return (
+    !isDone(matter) &&
+    !['running', 'completed', 'settled', 'settled_no_provider'].includes(assignment.status)
+  )
 }

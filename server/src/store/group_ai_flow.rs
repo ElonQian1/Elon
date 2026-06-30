@@ -130,6 +130,43 @@ impl Store {
             .ok_or_else(|| anyhow!("Matter assignment 更新后读取失败"))
     }
 
+    pub(crate) fn update_project_ai_matter_assignment_execution(
+        &self,
+        assignment_id: &str,
+        status: &str,
+        result_summary: Option<&str>,
+        worktree_path: Option<&str>,
+        branch_name: Option<&str>,
+    ) -> Result<ProjectAiMatterAssignment> {
+        let assignment_id = clean_required(assignment_id, "assignment_id")?;
+        let status = clean_required(status, "status")?;
+        let ts = now();
+        let conn = self.conn()?;
+        let updated = conn.execute(
+            "UPDATE project_ai_matter_assignments
+                SET status = ?2,
+                    result_summary = COALESCE(?3, result_summary),
+                    worktree_path = COALESCE(?4, worktree_path),
+                    branch_name = COALESCE(?5, branch_name),
+                    updated_at = ?6
+              WHERE id = ?1",
+            params![
+                assignment_id,
+                status,
+                clean_optional(result_summary),
+                clean_optional(worktree_path),
+                clean_optional(branch_name),
+                ts,
+            ],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("Matter assignment 不存在");
+        }
+        drop(conn);
+        self.get_project_ai_matter_assignment(&assignment_id)?
+            .ok_or_else(|| anyhow!("Matter assignment 执行结果更新后读取失败"))
+    }
+
     pub(crate) fn list_project_ai_matter_assignments(
         &self,
         matter_id: &str,
@@ -333,6 +370,22 @@ mod tests {
             updated.result_summary.as_deref(),
             Some("节点离线，等待重试")
         );
+
+        let executed = store
+            .update_project_ai_matter_assignment_execution(
+                &assignment.id,
+                "completed",
+                Some("产物已生成"),
+                Some("D:/repo/.worktrees/group-ai"),
+                Some("group-ai/paim-demo"),
+            )
+            .expect("execution artifact should update");
+        assert_eq!(executed.status, "completed");
+        assert_eq!(
+            executed.worktree_path.as_deref(),
+            Some("D:/repo/.worktrees/group-ai")
+        );
+        assert_eq!(executed.branch_name.as_deref(), Some("group-ai/paim-demo"));
 
         store
             .insert_project_ai_event(

@@ -14,6 +14,7 @@ mod ai_cli_streaming;
 mod ai_cli_tests;
 mod ai_cli_trace;
 mod ai_cli_types;
+mod pc_dispatch_capture;
 
 pub use self::ai_cli_types::{AiCliRequestMode, IntentGateResult, NativeSessionScope};
 
@@ -33,6 +34,9 @@ pub(crate) use self::ai_cli_process::{
 pub(crate) use self::ai_cli_runner::codex_thread_uri;
 #[cfg(test)]
 pub(crate) use self::ai_cli_runner::{codex_exec_json_args, codex_resume_args};
+pub(crate) use self::pc_dispatch_capture::{
+    run_pc_agent_workspace_capture, PcAgentWorkspaceCaptureRequest, PcAgentWorkspaceCaptureResult,
+};
 
 use self::{
     ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message},

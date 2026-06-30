@@ -120,7 +120,7 @@ export interface CreateMatterPlanPayload {
   acceptanceCriteria: string[]
 }
 
-export type AssignmentAction = 'complete' | 'fail' | 'retry' | 'settlement'
+export type AssignmentAction = 'run' | 'complete' | 'fail' | 'retry' | 'settlement'
 
 export interface AssignmentActionPayload {
   comment?: string

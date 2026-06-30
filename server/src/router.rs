@@ -525,6 +525,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(group_ai::api::retry_assignment),
         )
         .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/run",
+            post(group_ai::api::run_assignment),
+        )
+        .route(
             "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/settlement",
             post(group_ai::api::record_assignment_settlement_handler),
         )
