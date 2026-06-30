@@ -34,10 +34,7 @@ pub(crate) fn schedule_assignment_run(
     if assignment.runtime_route != "pc_node_cli" {
         anyhow::bail!("第一版群体 AI 执行只支持 pc_node_cli Assignment");
     }
-    if matches!(
-        assignment.status.as_str(),
-        "running" | "completed" | "settled" | "settled_no_provider"
-    ) {
+    if !assignment_can_be_dispatched(&assignment.status) {
         anyhow::bail!("当前 Assignment 状态不能重复执行");
     }
 
@@ -425,4 +422,8 @@ fn mark_review_ready_if_all_finished(job: &AssignmentRunJob) {
 
 fn is_finished_assignment_status(status: &str) -> bool {
     matches!(status, "completed" | "settled" | "settled_no_provider")
+}
+
+pub(crate) fn assignment_can_be_dispatched(status: &str) -> bool {
+    matches!(status, "planned" | "failed")
 }

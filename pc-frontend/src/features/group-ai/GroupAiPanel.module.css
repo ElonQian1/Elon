@@ -85,6 +85,16 @@
   font-size: 12px;
 }
 
+.inlineError {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid rgba(223, 92, 92, .3);
+  border-radius: 6px;
+  background: rgba(223, 92, 92, .08);
+  color: #ffd7d7;
+  font-size: 12px;
+}
+
 .grid {
   display: grid;
   grid-template-columns: minmax(280px, 1fr) minmax(320px, 1fr);
@@ -358,6 +368,92 @@
   flex-wrap: wrap;
   gap: 6px;
   margin-top: 5px;
+}
+
+.artifactPanel {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(108, 168, 255, .24);
+  border-radius: 6px;
+  background: #232833;
+}
+
+.artifactHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.artifactHeader strong {
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.artifactHeader span {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(108, 168, 255, .14);
+  color: #bcd8ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.artifactPanel p,
+.artifactMuted {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.artifactGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.artifactGrid div {
+  min-width: 0;
+}
+
+.artifactGrid span {
+  display: block;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.artifactGrid strong {
+  display: block;
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.diffBox {
+  display: grid;
+  gap: 3px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 8px;
+  border-radius: 6px;
+  background: #191a1f;
+}
+
+.diffBox code {
+  overflow: hidden;
+  color: #d7e2f5;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .event small {

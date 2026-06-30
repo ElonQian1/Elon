@@ -1,9 +1,13 @@
 mod actions;
 pub(crate) mod api;
+mod artifacts;
+mod automation;
+pub(crate) mod automation_api;
 mod bot_selector;
 mod execution_prompt;
 mod execution_recording;
 mod executor;
+mod live;
 mod permissions;
 mod planner;
 pub(crate) mod types;

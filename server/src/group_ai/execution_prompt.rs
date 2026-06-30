@@ -22,6 +22,7 @@ pub(crate) fn build_assignment_execution_prompt(
         .as_deref()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("由节点运行时创建或复用当前工作区");
+    let role_guidance = role_guidance(&assignment.role);
 
     format!(
         r#"你正在执行「一龙」群体 AI 开发中的一个 Assignment。你是多个用户、多个 PC 节点、多种 AI 共同开发流程里的执行节点之一。
@@ -43,6 +44,9 @@ Assignment:
 验收标准:
 {criteria}
 
+角色重点:
+{role_guidance}
+
 执行要求:
 1. 只围绕本 Assignment 的角色和 Matter 需求工作，避免无关重构。
 2. 可以修改代码、补测试、运行必要验证；不要 push、不要部署、不要发布 APK。
@@ -61,7 +65,16 @@ Assignment:
         branch = branch,
         runtime_permission = runtime_permission,
         criteria = criteria,
+        role_guidance = role_guidance,
     )
+}
+
+fn role_guidance(role: &str) -> &'static str {
+    let role = role.trim().to_ascii_lowercase();
+    if role.contains("review") || role.contains("critic") {
+        return "- 以独立审核为主：检查已完成 Assignment 的结果、风险、遗漏、测试证据和人工合并建议。\n- 除非必须修复小问题，否则不要做大范围实现改动；输出可验收/需返工/需人工合并的明确结论。";
+    }
+    "- 以实现交付为主：完成本角色负责的代码、测试、文档或诊断产物，并明确交给 reviewer 审核的证据。"
 }
 
 #[cfg(test)]

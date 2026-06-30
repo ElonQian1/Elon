@@ -93,6 +93,118 @@ export interface MatterDetailResponse {
   events?: ProjectAiEvent[]
 }
 
+export interface AutomationMatterResponse extends MatterDetailResponse {
+  scheduled_count?: number
+  skipped_count?: number
+  errors?: Array<{
+    assignment_id: string
+    role: string
+    reason: string
+  }>
+}
+
+export interface MatterEventsDeltaResponse {
+  ok: boolean
+  events?: ProjectAiEvent[]
+  latest_event_id?: string | null
+  latest_event_created_at?: string | null
+  has_more?: boolean
+}
+
+export interface ProjectExecutionSession {
+  id: string
+  project_id: string
+  conversation_id: string
+  user_id: string
+  node_id: string
+  request_id: string
+  base_workspace_path?: string | null
+  active_workspace_path?: string | null
+  branch?: string | null
+  isolated: boolean
+  status: string
+  merge_status?: string | null
+  last_error?: string | null
+  model?: string | null
+  prompt_tokens: number
+  cached_input_tokens: number
+  completion_tokens: number
+  reasoning_tokens: number
+  total_tokens: number
+  token_usage_event_id?: string | null
+  billing_event_id?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NodeComputeRun {
+  id: string
+  compute_call_id: string
+  consumer_user_id: string
+  provider_user_id?: string | null
+  node_id: string
+  model_id?: string | null
+  feature: string
+  usage_mode: string
+  status: string
+  started_at: string
+  finished_at?: string | null
+  duration_ms?: number | null
+  prompt_tokens: number
+  completion_tokens: number
+  billed_cost_rmb_fen: number
+  provider_earned_fen: number
+  settlement_status?: string | null
+  route_reason?: string | null
+  error_message?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface NodeQualityScore {
+  node_id: string
+  total_runs: number
+  successful_runs: number
+  failed_runs: number
+  avg_duration_ms?: number | null
+  last_finished_at?: string | null
+  total_provider_earned_fen: number
+  success_rate_x1000: number
+}
+
+export interface LocalDiffProbe {
+  available: boolean
+  reason?: string | null
+  status_short: string[]
+  diff_stat: string[]
+}
+
+export interface ArtifactMergeGuide {
+  manual_merge_required: boolean
+  worktree_path?: string | null
+  branch_name?: string | null
+  merge_status?: string | null
+  can_server_diff: boolean
+  recommended_action: string
+}
+
+export interface AssignmentArtifact {
+  assignment: ProjectAiMatterAssignment
+  latest_event?: ProjectAiEvent | null
+  compute_call_id?: string | null
+  pc_req_id?: string | null
+  execution_session?: ProjectExecutionSession | null
+  compute_run?: NodeComputeRun | null
+  node_quality?: NodeQualityScore | null
+  merge: ArtifactMergeGuide
+  local_diff: LocalDiffProbe
+}
+
+export interface AssignmentArtifactResponse {
+  ok: boolean
+  artifact: AssignmentArtifact
+}
+
 export interface NodesResponse {
   ok: boolean
   project_id: string
@@ -121,6 +233,8 @@ export interface CreateMatterPlanPayload {
 }
 
 export type AssignmentAction = 'run' | 'complete' | 'fail' | 'retry' | 'settlement'
+
+export type MatterAutomationAction = 'run-all' | 'review'
 
 export interface AssignmentActionPayload {
   comment?: string

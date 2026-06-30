@@ -501,6 +501,18 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(group_ai::api::start_matter),
         )
         .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/run-all",
+            post(group_ai::automation_api::run_matter_assignments),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/review",
+            post(group_ai::automation_api::run_review_assignment),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/events",
+            get(group_ai::automation_api::list_matter_events),
+        )
+        .route(
             "/api/projects/:project_id/ai/matters/:matter_id/request-changes",
             post(group_ai::api::request_matter_changes),
         )
@@ -527,6 +539,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/run",
             post(group_ai::api::run_assignment),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/artifact",
+            get(group_ai::automation_api::get_assignment_artifact),
         )
         .route(
             "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/settlement",

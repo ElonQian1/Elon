@@ -1,11 +1,15 @@
 import { api } from '../../api/client'
 import type {
+  AssignmentArtifactResponse,
   AssignmentAction,
   AssignmentActionPayload,
+  AutomationMatterResponse,
   AvailableGroupAiNode,
   BotsResponse,
   CreateMatterPlanPayload,
+  MatterAutomationAction,
   MatterDetailResponse,
+  MatterEventsDeltaResponse,
   MattersResponse,
   NodesResponse,
 } from './types'
@@ -47,6 +51,13 @@ export async function loadMatterDetail(projectId: string, matterId: string) {
   )
 }
 
+export async function loadMatterEvents(projectId: string, matterId: string, after = '') {
+  const query = after ? `?after=${encodeURIComponent(after)}` : ''
+  return api.get<MatterEventsDeltaResponse>(
+    projectPath(projectId, `matters/${encodeURIComponent(matterId)}/events${query}`),
+  )
+}
+
 export async function postMatterAction(
   projectId: string,
   matterId: string,
@@ -72,5 +83,30 @@ export async function postAssignmentAction(
       `matters/${encodeURIComponent(matterId)}/assignments/${encodeURIComponent(assignmentId)}/${action}`,
     ),
     payload,
+  )
+}
+
+export async function postMatterAutomation(
+  projectId: string,
+  matterId: string,
+  action: MatterAutomationAction,
+  comment = '',
+) {
+  return api.post<AutomationMatterResponse>(
+    projectPath(projectId, `matters/${encodeURIComponent(matterId)}/${action}`),
+    { comment },
+  )
+}
+
+export async function loadAssignmentArtifact(
+  projectId: string,
+  matterId: string,
+  assignmentId: string,
+) {
+  return api.get<AssignmentArtifactResponse>(
+    projectPath(
+      projectId,
+      `matters/${encodeURIComponent(matterId)}/assignments/${encodeURIComponent(assignmentId)}/artifact`,
+    ),
   )
 }
