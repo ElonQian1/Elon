@@ -274,6 +274,94 @@ async fn sidecar_runner_persists_codex_session_from_pty_output() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[tokio::test]
+async fn sidecar_runner_records_codex_approval_prompt_and_decision() {
+    let root = temp_dir("runner-codex-approval");
+    let registry = CliSidecarRegistry::new(root.join("sidecars"));
+    let journal_dir = root.join("journal");
+    let journal = TaskJournal::new(&journal_dir);
+    let task_id = "task-sidecar-codex-approval";
+    let session_id = "sidecar-codex-approval";
+    let output_path = registry.output_path(task_id, session_id);
+    let (program, args) = codex_approval_prompt_command();
+
+    journal
+        .record_started(TaskJournalStart {
+            req_id: task_id,
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some(task_id),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("project_write"),
+        })
+        .expect("task should be registered before sidecar output");
+
+    let run = tokio::spawn(run_sidecar(CliSidecarLaunchConfig {
+        session_id: session_id.to_string(),
+        task_id: task_id.to_string(),
+        cli_name: "codex".to_string(),
+        route: "route_a_external_cli".to_string(),
+        program,
+        args,
+        cwd: None,
+        env: Vec::new(),
+        output_path: output_path.clone(),
+        registry_dir: registry.dir(),
+        task_journal_dir: Some(journal_dir.clone()),
+        codex_session_scope_key: None,
+        legacy_codex_sessions_file: None,
+        timeout_secs: 10,
+        stdin_piped_empty: false,
+        initial_cols: default_cols(),
+        initial_rows: default_rows(),
+    }));
+
+    wait_for_pending_approval(&journal, task_id, "sidecar_tap_1").await;
+    let waiting = registry
+        .session_for_task(task_id)
+        .expect("sidecar session lookup should work")
+        .expect("sidecar session should exist");
+    assert_eq!(waiting.state, "waiting_approval");
+    assert!(registry
+        .record_tool_approval_decision(task_id, "sidecar_tap_1", "approve")
+        .expect("approval decision should be queued"));
+
+    tokio::time::timeout(Duration::from_secs(10), run)
+        .await
+        .expect("sidecar should finish")
+        .expect("join should succeed")
+        .expect("sidecar run should succeed");
+
+    let snapshot = journal
+        .snapshot(task_id, 0, 100)
+        .expect("task journal snapshot should load");
+    assert_eq!(snapshot.approvals.pending_count, 0);
+    assert_eq!(snapshot.approvals.decided_count, 1);
+    assert_eq!(snapshot.approvals.approvals[0].approval_id, "sidecar_tap_1");
+    assert_eq!(snapshot.approvals.approvals[0].status, "approved");
+    assert_eq!(
+        snapshot.approvals.approvals[0]
+            .checkpoint
+            .as_ref()
+            .expect("sidecar checkpoint should be preserved")["restart_recovery"]["next_action"],
+        "approve_or_deny_sidecar_waiter"
+    );
+
+    let mut offset = 0;
+    let records = read_new_output_records(&output_path, &mut offset)
+        .expect("sidecar output records should load");
+    let runtime_text = records
+        .iter()
+        .filter(|record| record.stream.as_deref() == Some("runtime"))
+        .filter_map(|record| record.text.as_deref())
+        .collect::<String>();
+    assert!(runtime_text.contains(r#""type":"tool_approval_required""#));
+    assert!(runtime_text.contains(r#""type":"tool_approval_decision""#));
+    assert!(runtime_text.contains(r#""decision":"approve""#));
+
+    let _ = fs::remove_dir_all(root);
+}
+
 fn shell_echo_command() -> (String, Vec<String>) {
     if cfg!(windows) {
         (
@@ -289,6 +377,27 @@ fn shell_echo_command() -> (String, Vec<String>) {
             vec![
                 "-c".to_string(),
                 "echo sidecar-out; echo sidecar-err >&2".to_string(),
+            ],
+        )
+    }
+}
+
+fn codex_approval_prompt_command() -> (String, Vec<String>) {
+    if cfg!(windows) {
+        (
+            "powershell".to_string(),
+            vec![
+                "-NoProfile".to_string(),
+                "-Command".to_string(),
+                "$e=[char]27; Write-Output \"$e[33mAllow command?$e[0m\"; Write-Output '$ echo sidecar-approved'; Write-Output '[y/N]'; $x=[Console]::In.ReadLine(); Write-Output \"decision:$x\"".to_string(),
+            ],
+        )
+    } else {
+        (
+            "sh".to_string(),
+            vec![
+                "-c".to_string(),
+                "printf '\\033[33mAllow command?\\033[0m\\n$ echo sidecar-approved\\n[y/N]\\n'; read x; printf 'decision:%s\\n' \"$x\"".to_string(),
             ],
         )
     }
@@ -352,6 +461,23 @@ fn approval_read_command() -> (String, Vec<String>) {
             ],
         )
     }
+}
+
+async fn wait_for_pending_approval(journal: &TaskJournal, task_id: &str, approval_id: &str) {
+    for _ in 0..80 {
+        if let Ok(snapshot) = journal.snapshot(task_id, 0, 50) {
+            if snapshot
+                .approvals
+                .pending_approval_ids()
+                .iter()
+                .any(|id| id == approval_id)
+            {
+                return;
+            }
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!("sidecar approval {approval_id} did not become pending");
 }
 
 async fn wait_for_attachable_session(registry: &CliSidecarRegistry, task_id: &str) {

@@ -19,6 +19,7 @@ use crate::{
     node_agent_cli_sidecar_io::{
         append_output, read_new_commands, read_new_output_records, CliSidecarOutputRecord,
     },
+    node_agent_codex_approval::CodexApprovalTracker,
     node_agent_codex_session::{self, CodexSessionCapture},
     node_agent_task_journal::TaskJournal,
 };
@@ -146,7 +147,7 @@ pub(crate) async fn follow_sidecar_output(
                 "chunk" => {
                     let text = record.text.unwrap_or_default();
                     match record.stream.as_deref() {
-                        Some("stdout") | Some("pty") => {
+                        Some("stdout") | Some("pty") | Some("runtime") => {
                             stdout_text.push_str(&text);
                             on_event(CliSidecarOutputEvent::Stdout(text));
                         }
@@ -240,6 +241,7 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
     }
     let mut pty_output_rx = pty.take_output_rx();
 
+    let mut codex_approval_tracker = CodexApprovalTracker::default();
     let mut codex_session_capture = CodexSessionCapture::default();
     let mut mailbox_offset = 0_u64;
     let mut processed_commands = HashSet::new();
@@ -256,13 +258,21 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
     let success = loop {
         tokio::select! {
             _ = heartbeat.tick() => {
-                let state = if canceled { "cancel_requested" } else { "running" };
+                let state = if canceled {
+                    "cancel_requested"
+                } else if codex_approval_tracker.has_pending() {
+                    "waiting_approval"
+                } else {
+                    "running"
+                };
                 let _ = registry.touch_session(&config.session_id, Some(state), child_pid);
             }
             _ = mailbox.tick() => {
                 consume_mailbox(
                     &registry,
                     &config,
+                    &task_journal,
+                    &mut codex_approval_tracker,
                     &mut mailbox_offset,
                     &mut processed_commands,
                     &mut pty,
@@ -293,6 +303,8 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
                         write_pty_chunk(
                             &config,
                             &task_journal,
+                            &registry,
+                            &mut codex_approval_tracker,
                             &mut codex_session_capture,
                             &mut pty,
                             &text,
@@ -343,6 +355,8 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
 fn write_pty_chunk(
     config: &CliSidecarLaunchConfig,
     task_journal: &TaskJournal,
+    registry: &CliSidecarRegistry,
+    codex_approval_tracker: &mut CodexApprovalTracker,
     codex_session_capture: &mut CodexSessionCapture,
     pty: &mut CliPtyProcess,
     text: &str,
@@ -354,12 +368,22 @@ fn write_pty_chunk(
     if visible.is_empty() {
         return Ok(());
     }
-    write_chunk(config, task_journal, codex_session_capture, "pty", &visible)
+    write_chunk(
+        config,
+        task_journal,
+        registry,
+        codex_approval_tracker,
+        codex_session_capture,
+        "pty",
+        &visible,
+    )
 }
 
 fn write_chunk(
     config: &CliSidecarLaunchConfig,
     task_journal: &TaskJournal,
+    registry: &CliSidecarRegistry,
+    codex_approval_tracker: &mut CodexApprovalTracker,
     codex_session_capture: &mut CodexSessionCapture,
     stream: &str,
     text: &str,
@@ -396,12 +420,39 @@ fn write_chunk(
     )?;
     let journal_stream = if stream == "pty" { "stdout" } else { stream };
     let _ = task_journal.record_cli_chunk(&config.task_id, journal_stream, &visible_text);
+    if config.cli_name == "codex" {
+        if let Some(event) = codex_approval_tracker.observe_output(
+            &config.task_id,
+            &config.session_id,
+            &visible_text,
+            now_ms(),
+        ) {
+            write_tool_event(config, task_journal, &event)?;
+            let _ = registry.touch_session(&config.session_id, Some("waiting_approval"), None);
+        }
+    }
+    Ok(())
+}
+
+fn write_tool_event(
+    config: &CliSidecarLaunchConfig,
+    task_journal: &TaskJournal,
+    event: &serde_json::Value,
+) -> Result<()> {
+    let text = format!("{}\n", serde_json::to_string(event)?);
+    append_output(
+        &config.output_path,
+        CliSidecarOutputRecord::chunk("runtime", &text),
+    )?;
+    let _ = task_journal.record_cli_chunk(&config.task_id, "runtime", &text);
     Ok(())
 }
 
 fn consume_mailbox(
     registry: &CliSidecarRegistry,
     config: &CliSidecarLaunchConfig,
+    task_journal: &TaskJournal,
+    codex_approval_tracker: &mut CodexApprovalTracker,
     offset: &mut u64,
     processed: &mut HashSet<String>,
     pty: &mut CliPtyProcess,
@@ -442,6 +493,14 @@ fn consume_mailbox(
                 }
             }
             "tool_approval_decision" => {
+                if let Some(event) = codex_approval_tracker.observe_decision(
+                    &config.task_id,
+                    command.approval_id.as_deref(),
+                    command.decision.as_deref(),
+                    now_ms(),
+                ) {
+                    write_tool_event(config, task_journal, &event)?;
+                }
                 if let Some(input) = command
                     .decision
                     .as_deref()
@@ -449,7 +508,12 @@ fn consume_mailbox(
                 {
                     pty.write_input(input)?;
                 }
-                let _ = registry.touch_session(&config.session_id, Some("running"), None);
+                let state = if codex_approval_tracker.has_pending() {
+                    "waiting_approval"
+                } else {
+                    "running"
+                };
+                let _ = registry.touch_session(&config.session_id, Some(state), None);
             }
             _ => {}
         }

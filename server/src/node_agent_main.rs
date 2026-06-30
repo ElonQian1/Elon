@@ -69,6 +69,7 @@ mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
 mod node_agent_client_maintenance;
+mod node_agent_codex_approval;
 mod node_agent_codex_session;
 mod node_agent_file_info;
 mod node_agent_file_range;
