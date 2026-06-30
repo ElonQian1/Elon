@@ -1,25 +1,25 @@
 import { Check } from 'lucide-react'
+import { effortDisplayName, normalizeEffort } from './modelGroups'
 import { providerGroupTitle } from './modelUtils'
+import type { ModelOptionGroup } from './modelGroups'
 import type { AgentOption } from './types'
 import styles from './ModelPicker.module.css'
 
 interface Props {
-  option: AgentOption | null
-  selected: boolean
+  group: ModelOptionGroup | null
+  selectedAgent: string
   saving: boolean
   routeTitle?: string
   onSelect: (option: AgentOption) => void
 }
 
-const EFFORT_ROWS = [
-  { key: 'low', label: 'Low', note: '快速响应' },
-  { key: 'medium', label: 'Medium', note: '平衡速度和推理' },
-  { key: 'high', label: 'High', note: '更深推理' },
-  { key: 'max', label: 'Max', note: '最高推理预算' },
-]
-
-function normalize(value: string): string {
-  return value.trim().toLowerCase().replace(/\s+/g, '_')
+const EFFORT_NOTES: Record<string, string> = {
+  minimal: '最小推理，最快响应',
+  low: '快速响应',
+  medium: '平衡速度和推理',
+  high: '更深推理',
+  xhigh: '最高推理预算',
+  max: '最高推理预算',
 }
 
 function modelIdentity(option: AgentOption): string {
@@ -34,17 +34,27 @@ function contextLabel(option: AgentOption): string {
 }
 
 function effortLabel(option: AgentOption): string {
-  return option.reasoningEffort || (option.agentName ? '服务端默认' : '自动')
+  return option.reasoningEffort ? effortDisplayName(option.reasoningEffort) : 'Auto'
+}
+
+function effortNote(option: AgentOption): string {
+  const effort = normalizeEffort(option.reasoningEffort)
+  const details = [
+    EFFORT_NOTES[effort] ?? '跟随服务端策略',
+    option.verbosity ? `输出 ${option.verbosity}` : '',
+    option.reasoningSummary ? `摘要 ${option.reasoningSummary}` : '',
+  ].filter(Boolean)
+  return details.join(' · ')
 }
 
 export function ModelHoverPreview({
-  option,
-  selected,
+  group,
+  selectedAgent,
   saving,
   routeTitle,
   onSelect,
 }: Props) {
-  if (!option) {
+  if (!group) {
     return (
       <aside className={styles.previewPane} aria-label="模型详情">
         <div className={styles.previewEmpty}>
@@ -55,14 +65,14 @@ export function ModelHoverPreview({
     )
   }
 
+  const option = group.selectedOption ?? group.primaryOption
   const provider = providerGroupTitle(option.provider)
-  const activeEffort = normalize(option.reasoningEffort)
   const meta = [
     routeTitle ? ['AI 来源', routeTitle] : null,
     ['运行方式', provider],
     ['模型 ID', modelIdentity(option)],
     ['最大上下文', contextLabel(option)],
-    ['推理强度', effortLabel(option)],
+    ['推理档位', group.options.length > 1 ? `${group.options.length} 个可选` : effortLabel(option)],
     option.verbosity ? ['输出细节', option.verbosity] : null,
     option.reasoningSummary ? ['推理摘要', option.reasoningSummary] : null,
   ].filter(Boolean) as [string, string][]
@@ -71,8 +81,8 @@ export function ModelHoverPreview({
     <aside className={styles.previewPane} aria-label="模型详情">
       <div className={styles.previewHeader}>
         <span className={styles.previewProvider}>{provider}</span>
-        <strong>{option.label}</strong>
-        {option.subtitle && <p>{option.subtitle}</p>}
+        <strong>{group.label}</strong>
+        {group.subtitle && <p>{group.subtitle}</p>}
       </div>
 
       <dl className={styles.previewMeta}>
@@ -87,35 +97,27 @@ export function ModelHoverPreview({
       <section className={styles.previewEffort} aria-label="Thinking Effort">
         <h3>Thinking Effort</h3>
         <div className={styles.effortRows}>
-          {EFFORT_ROWS.map((row) => {
-            const active = activeEffort === row.key
+          {group.options.map((item) => {
+            const active = item.agentName === selectedAgent
             return (
-              <div className={active ? styles.effortRowActive : styles.effortRow} key={row.key}>
-                <span>{active ? '✓' : ''}</span>
-                <strong>{row.label}</strong>
-                <em>{row.note}</em>
-              </div>
+              <button
+                className={active ? styles.effortRowActive : styles.effortRow}
+                key={item.agentName || `${group.key}:default`}
+                type="button"
+                disabled={saving || active}
+                onClick={() => onSelect(item)}
+                aria-pressed={active}
+              >
+                <span>
+                  {active ? <Check size={14} strokeWidth={2.3} aria-hidden="true" /> : ''}
+                </span>
+                <strong>{effortDisplayName(item.reasoningEffort)}</strong>
+                <em>{effortNote(item)}</em>
+              </button>
             )
           })}
-          {!activeEffort && (
-            <div className={styles.effortRowActive}>
-              <span>✓</span>
-              <strong>Auto</strong>
-              <em>跟随服务端策略</em>
-            </div>
-          )}
         </div>
       </section>
-
-      <button
-        className={styles.previewSelectBtn}
-        type="button"
-        disabled={selected || saving}
-        onClick={() => onSelect(option)}
-      >
-        <Check size={15} strokeWidth={2.3} aria-hidden="true" />
-        {selected ? '当前模型' : '选择此模型'}
-      </button>
     </aside>
   )
 }

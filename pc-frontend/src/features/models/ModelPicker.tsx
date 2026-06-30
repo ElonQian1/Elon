@@ -5,6 +5,7 @@ import { Settings } from 'lucide-react'
 import { useModelStore } from './useModelStore'
 import { useAuthStore } from '../../store/auth'
 import { providerGroupTitle, shortButtonLabel } from './modelUtils'
+import { groupModelOptions } from './modelGroups'
 import { ModelHoverPreview } from './ModelHoverPreview'
 import {
   filterOptionsForRuntimeRoute,
@@ -12,6 +13,7 @@ import {
   routeModelEmptyState,
 } from './routeModelPolicy'
 import type { AgentOption } from './types'
+import type { ModelOptionGroup } from './modelGroups'
 import {
   ACTIVE_RUNTIME_ROUTE_GROUPS,
   DEFAULT_RUNTIME_ROUTE,
@@ -94,19 +96,20 @@ export function ModelPickerPopover({
     ? filterOptionsForRuntimeRoute(options, route)
     : options
   const emptyState = hasRuntimeRoutePicker ? routeModelEmptyState(route) : null
-  const selectedOption = visibleOptions.find((opt) => opt.agentName === selectedAgent) ?? null
-  const previewOption =
-    visibleOptions.find((opt) => optionKey(opt) === previewKey) ??
-    selectedOption ??
-    visibleOptions[0] ??
+  const modelGroups = groupModelOptions(visibleOptions, selectedAgent)
+  const selectedGroup = modelGroups.find((group) => group.selectedOption) ?? null
+  const previewGroup =
+    modelGroups.find((group) => group.key === previewKey) ??
+    selectedGroup ??
+    modelGroups[0] ??
     null
 
   // 按 provider 分组
-  const groups = new Map<string, AgentOption[]>()
-  for (const opt of visibleOptions) {
-    const title = providerGroupTitle(opt.provider)
-    if (!groups.has(title)) groups.set(title, [])
-    groups.get(title)!.push(opt)
+  const providerGroups = new Map<string, ModelOptionGroup[]>()
+  for (const group of modelGroups) {
+    const title = providerGroupTitle(group.provider)
+    if (!providerGroups.has(title)) providerGroups.set(title, [])
+    providerGroups.get(title)!.push(group)
   }
 
   const popover = (
@@ -187,8 +190,8 @@ export function ModelPickerPopover({
           )}
 
           <ModelHoverPreview
-            option={previewOption}
-            selected={!!previewOption && previewOption.agentName === selectedAgent}
+            group={previewGroup}
+            selectedAgent={selectedAgent}
             saving={saving}
             routeTitle={hasRuntimeRoutePicker ? selectedRoute.title : undefined}
             onSelect={handleSelect}
@@ -215,28 +218,28 @@ export function ModelPickerPopover({
                 </div>
               )}
               {!loading &&
-                Array.from(groups.entries()).map(([title, opts]) => (
+                Array.from(providerGroups.entries()).map(([title, groupedOptions]) => (
                   <div key={title}>
                     {title !== '默认' && <div className={styles.section}>{title}</div>}
-                    {opts.map((opt) => (
+                    {groupedOptions.map((group) => (
                       <button
-                        key={opt.agentName || '__default__'}
+                        key={group.key}
                         className={[
                           styles.option,
-                          opt.agentName === selectedAgent ? styles.active : '',
+                          group.selectedOption ? styles.active : '',
                         ].join(' ')}
                         type="button"
                         disabled={saving}
-                        onMouseEnter={() => setPreviewKey(optionKey(opt))}
-                        onFocus={() => setPreviewKey(optionKey(opt))}
-                        onClick={() => handleSelect(opt)}
+                        onMouseEnter={() => setPreviewKey(group.key)}
+                        onFocus={() => setPreviewKey(group.key)}
+                        onClick={() => handleSelect(group.primaryOption)}
                       >
                         <span>
-                          <strong>{opt.label}</strong>
-                          {opt.subtitle && <span>{opt.subtitle}</span>}
+                          <strong>{group.label}</strong>
+                          {group.subtitle && <span>{group.subtitle}</span>}
                         </span>
                         <span className={styles.check}>
-                          {opt.agentName === selectedAgent ? '✓' : ''}
+                          {group.selectedOption ? '✓' : ''}
                         </span>
                       </button>
                     ))}
@@ -261,10 +264,6 @@ export function ModelPickerPopover({
   )
 
   return createPortal(popover, document.body)
-}
-
-function optionKey(option: AgentOption): string {
-  return option.agentName || `default:${option.provider}:${option.label}`
 }
 
 /** 触发模型选择器的按钮，嵌入侧边栏或工具栏 */
