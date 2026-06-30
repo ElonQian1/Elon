@@ -735,6 +735,45 @@ pub async fn run_with_pc_agent_workspace(
     .await
 }
 
+pub async fn run_with_pc_agent_chat(
+    agent_id: &str,
+    user_id: &str,
+    user_message: &str,
+    native_session_scope: Option<NativeSessionScope>,
+    cli_name: Option<&str>,
+    copilot_model: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
+    model_label: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<()> {
+    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow!(msg));
+    }
+
+    let read_only_scope = native_session_scope.map(|mut scope| {
+        scope.runtime_permission = "read_only".to_string();
+        scope
+    });
+
+    run_via_pc_agent(
+        agent_id,
+        user_id,
+        None,
+        user_message,
+        None,
+        AiCliRequestMode::Execute,
+        read_only_scope,
+        cli_name.unwrap_or("codex"),
+        copilot_model,
+        codex_reasoning_effort,
+        model_label,
+        state,
+        tx,
+    )
+    .await
+}
+
 fn native_session_uuid(cli_name: &str, scope: &NativeSessionScope) -> String {
     use sha2::Digest;
 
@@ -825,8 +864,11 @@ async fn run_via_pc_agent(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
+    let lightweight_pc_chat = !request_mode.is_plan() && cwd.is_none();
     // prompt 构造
-    let prompt = if request_mode.is_plan() {
+    let prompt = if lightweight_pc_chat {
+        pc_lightweight_chat_prompt(user_message, cli_name, model_label.or(copilot_model))
+    } else if request_mode.is_plan() {
         match preflight_note {
             Some(note) => format!(
                 "当前是 Plan 模式：只生成开发计划，不改文件、不运行命令、不提交、不打包。\n\n注意：{}\n\n{}",
@@ -861,8 +903,8 @@ async fn run_via_pc_agent(
     let (pc_req_id, mut rx, cancel_handle) = {
         let mut last_err = anyhow::anyhow!("dispatch failed");
         let mut result = Err(last_err);
-        const MAX_ATTEMPTS: u32 = 25;
-        for attempt in 0..MAX_ATTEMPTS {
+        let max_attempts = if lightweight_pc_chat { 3 } else { 25 };
+        for attempt in 0..max_attempts {
             let project_context = native_session_scope
                 .as_ref()
                 .map(|scope| CliProjectContext {
@@ -894,13 +936,15 @@ async fn run_via_pc_agent(
                     last_err = e;
                     let msg = last_err.to_string();
                     let is_offline = msg.contains("agent not connected");
-                    if is_offline && attempt + 1 < MAX_ATTEMPTS {
+                    if is_offline && attempt + 1 < max_attempts {
                         let wait = format!(
                             "PC 节点短暂离线，等待重连（{}/{}）…",
                             attempt + 1,
-                            MAX_ATTEMPTS
+                            max_attempts
                         );
-                        let _ = tx.send(WsMessage::progress(wait).to_json());
+                        if !lightweight_pc_chat {
+                            let _ = tx.send(WsMessage::progress(wait).to_json());
+                        }
                         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
                     } else {
                         result = Err(last_err);
@@ -973,30 +1017,34 @@ async fn run_via_pc_agent(
     let mut stream_started = false;
     let is_codex = cli_name == "codex";
 
-    // 进度心跳：每 5s 发一次"正在处理"，避免用户以为卡死（之前 15s 太长）
+    // 进度心跳：开发/规划每 5s 发一次；轻量聊天只回流真实文本，不刷内部状态。
     let progress_tx = tx.clone();
     let cli_label = pc_cli_progress_label(cli_name);
     let disp_model_clone = display_model.clone();
-    let progress_handle = tokio::spawn(async move {
-        let mut elapsed: u64 = 0;
-        loop {
-            tokio::time::sleep(std::time::Duration::from_secs(5)).await;
-            elapsed += 5;
-            let _ = progress_tx.send(
-                WsMessage::progress(format!(
-                    "{} ({}) 正在处理中…（已等待 {}s）",
-                    cli_label, disp_model_clone, elapsed
-                ))
-                .to_json(),
-            );
-        }
-    });
+    let mut progress_handle = if lightweight_pc_chat {
+        None
+    } else {
+        Some(tokio::spawn(async move {
+            let mut elapsed: u64 = 0;
+            loop {
+                tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                elapsed += 5;
+                let _ = progress_tx.send(
+                    WsMessage::progress(format!(
+                        "{} ({}) 正在处理中…（已等待 {}s）",
+                        cli_label, disp_model_clone, elapsed
+                    ))
+                    .to_json(),
+                );
+            }
+        }))
+    };
 
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
                 if let Some(event) = pc_cli_passthrough_event(&text) {
-                    progress_handle.abort();
+                    abort_pc_progress(&mut progress_handle);
                     let _ = tx.send(event);
                     continue;
                 }
@@ -1020,7 +1068,7 @@ async fn run_via_pc_agent(
                         continue;
                     }
                     // 有效内容：流式发送
-                    progress_handle.abort(); // 收到第一行有效内容时停止心跳
+                    abort_pc_progress(&mut progress_handle); // 收到第一行有效内容时停止心跳
                     if !stream_started {
                         stream_started = true;
                         let _ = tx.send(
@@ -1049,7 +1097,7 @@ async fn run_via_pc_agent(
                 }
                 if !stream_started {
                     stream_started = true;
-                    progress_handle.abort();
+                    abort_pc_progress(&mut progress_handle);
                     let _ = tx.send(
                         WsMessage::AssistantMessage {
                             text: text.clone(),
@@ -1082,7 +1130,7 @@ async fn run_via_pc_agent(
                 workspace_status,
                 ..
             } => {
-                progress_handle.abort(); // 停止心跳
+                abort_pc_progress(&mut progress_handle); // 停止心跳
                 pc_cancel_guard.disarm();
                 let mut cli_usage = None;
                 let mut accounting_result = None;
@@ -1214,7 +1262,7 @@ async fn run_via_pc_agent(
         }
     }
 
-    progress_handle.abort();
+    abort_pc_progress(&mut progress_handle);
     finish_pc_node_compute_run(
         state,
         &pc_accounting_key,
@@ -1226,6 +1274,37 @@ async fn run_via_pc_agent(
     );
     pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
+}
+
+fn abort_pc_progress(handle: &mut Option<tokio::task::JoinHandle<()>>) {
+    if let Some(handle) = handle.take() {
+        handle.abort();
+    }
+}
+
+fn pc_lightweight_chat_prompt(
+    user_message: &str,
+    cli_name: &str,
+    model_label: Option<&str>,
+) -> String {
+    let model_line = model_label
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("\n当前选择：{value}"))
+        .unwrap_or_default();
+
+    format!(
+        "你是「一龙」里的本机 {} 对话助手。当前是轻量聊天模式，不是项目开发执行模式。{}\n\n\
+请直接回复用户。规则：\n\
+- 不读取项目文件，不检查 Git，不运行命令，不修改代码，不编译或发布 APK。\n\
+- 如果用户只是说想法、闲聊、问概念，正常交流并帮他梳理。\n\
+- 如果用户明确要改代码、构建、发布，只做简短确认和追问，不要声称已经执行。\n\
+- 回复中文，简洁自然，不要输出工具日志，不要使用「用户可见：」前缀。\n\n\
+用户消息：\n{}",
+        pc_cli_progress_label(cli_name),
+        model_line,
+        user_message
+    )
 }
 
 fn pc_cli_passthrough_event(text: &str) -> Option<String> {
@@ -1603,7 +1682,7 @@ fn extract_codex_reply(output: &str) -> String {
 mod pc_cli_passthrough_tests {
     use super::{
         native_session_uuid, pc_cli_passthrough_event, pc_dispatch_started_event,
-        pc_route_a_extra_args, AiCliRequestMode, NativeSessionScope,
+        pc_lightweight_chat_prompt, pc_route_a_extra_args, AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -1693,5 +1772,16 @@ mod pc_cli_passthrough_tests {
                 "gpt-5".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn pc_lightweight_chat_prompt_blocks_project_workflow() {
+        let prompt = pc_lightweight_chat_prompt("我有一个想法", "codex", Some("Codex"));
+
+        assert!(prompt.contains("轻量聊天模式"));
+        assert!(prompt.contains("不是项目开发执行模式"));
+        assert!(prompt.contains("不运行命令"));
+        assert!(prompt.contains("不修改代码"));
+        assert!(prompt.contains("我有一个想法"));
     }
 }

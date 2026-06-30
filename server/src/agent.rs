@@ -80,6 +80,46 @@ pub async fn run_for_project_in_workspace(
     );
     let requires_project_workflow = requires_project_workflow_for_message(user_message, workspace);
 
+    if !requires_project_workflow && pc_cli_chat_requested(pc_runtime_route) {
+        if let Some((agent_id, _pc_workspace)) = pc_project_binding(project) {
+            let runtime_choice =
+                choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
+            if let Some(error) = runtime_choice.error {
+                let _ = tx.send(WsMessage::error(error).to_json());
+                return;
+            }
+            let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+                project_id: project.id.clone(),
+                user_id: user_id.to_string(),
+                conversation_id: cid.to_string(),
+                runtime_permission: "read_only".to_string(),
+            });
+            if let Err(error) = ai_cli::run_with_pc_agent_chat(
+                agent_id,
+                user_id,
+                user_message,
+                session_scope,
+                Some(runtime_choice.cli_name.as_str()),
+                runtime_choice.copilot_model.as_deref(),
+                runtime_choice.codex_reasoning_effort.as_deref(),
+                runtime_choice.model_label.as_deref(),
+                state,
+                &tx,
+            )
+            .await
+            {
+                error!("PC 本机轻量聊天运行出错: {}", error);
+                let _ = tx.send(
+                    WsMessage::classified_error(crate::errors::classify_ai_error(
+                        &error.to_string(),
+                    ))
+                    .to_json(),
+                );
+            }
+            return;
+        }
+    }
+
     if requires_project_workflow {
         if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
             let runtime_choice =
@@ -244,6 +284,13 @@ fn requires_project_workflow_for_message(user_message: &str, workspace: &Path) -
         || is_short_resume_command(user_message, workspace)
         || is_short_build_command(user_message, workspace)
         || is_project_delivery_request(user_message, workspace)
+}
+
+fn pc_cli_chat_requested(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> bool {
+    matches!(
+        pc_runtime_route,
+        Some(PcRuntimeRoutePreference::RouteA | PcRuntimeRoutePreference::RouteC3)
+    )
 }
 
 pub async fn plan_for_project_in_workspace(
@@ -936,7 +983,8 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
 
 #[cfg(test)]
 mod tests {
-    use super::requires_project_workflow_for_message;
+    use super::{pc_cli_chat_requested, requires_project_workflow_for_message};
+    use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
     use std::path::Path;
 
     #[test]
@@ -953,5 +1001,19 @@ mod tests {
             "帮我在首页加一个按钮",
             Path::new("C:/tmp/project")
         ));
+    }
+
+    #[test]
+    fn explicit_pc_cli_routes_can_handle_light_chat() {
+        assert!(pc_cli_chat_requested(Some(
+            PcRuntimeRoutePreference::RouteA
+        )));
+        assert!(pc_cli_chat_requested(Some(
+            PcRuntimeRoutePreference::RouteC3
+        )));
+        assert!(!pc_cli_chat_requested(Some(
+            PcRuntimeRoutePreference::RouteC
+        )));
+        assert!(!pc_cli_chat_requested(None));
     }
 }
