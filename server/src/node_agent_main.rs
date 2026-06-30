@@ -3018,7 +3018,12 @@ async fn admin_status(
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
     let full_access_grant_count = rt.full_access_grants.list().await.len();
-    let active_cli_prompt_count = rt.active_cli_prompts.len().await;
+    let active_cli_prompts = rt.active_cli_prompts.views_without_approvals().await;
+    let active_cli_prompt_count = active_cli_prompts.len();
+    let recent_task_records = rt.task_journal.latest_records(20).unwrap_or_else(|error| {
+        warn!("PC 任务 journal 读取失败，CLI 会话桥接状态降级为空摘要: {error}");
+        Vec::new()
+    });
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
@@ -3042,7 +3047,10 @@ async fn admin_status(
         "storage": storage,
         "full_access_grant_count": full_access_grant_count,
         "runtime_policy": node_agent_full_access::runtime_policy_summary(),
-        "cli_session_bridge": node_agent_cli_session_bridge::status_payload(),
+        "cli_session_bridge": node_agent_cli_session_bridge::status_payload_for(
+            &active_cli_prompts,
+            &recent_task_records,
+        ),
         "models": live,
     });
     if node_agent_local_admin::can_expose_local_admin_token(&headers, &rt.cloud_http_url()) {
