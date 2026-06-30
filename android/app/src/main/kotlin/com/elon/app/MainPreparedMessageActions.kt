@@ -182,18 +182,16 @@ internal class MainPreparedMessageActions(
     ) {
         if (requestIsDevelopment) {
             acceptDevelopmentRequest(visibleText)
-        } else {
-            updateProjectViews("普通消息已发送，开发项目记录保持不变。")
-        }
-        appendMessage(
-            CodexInteractionPresentation.intentMessage(
-                visibleText = visibleText,
-                outgoingText = outgoingText,
-                isDevelopment = requestIsDevelopment,
-                executionMode = executionMode,
-                hasAttachments = attachmentRefs.size() > 0
+            appendMessage(
+                CodexInteractionPresentation.intentMessage(
+                    visibleText = visibleText,
+                    outgoingText = outgoingText,
+                    isDevelopment = true,
+                    executionMode = executionMode,
+                    hasAttachments = attachmentRefs.size() > 0
+                )
             )
-        )
+        }
         appendMessage(ChatMessage("ai-working", initialWorkflowMessage(requestIsDevelopment)))
     }
 

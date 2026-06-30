@@ -66,11 +66,13 @@ internal class MainAssistantStreamEvents(
     fun assistantMessage(json: JsonObject): ChatMessage? {
         val text = jsonStringOrNull(json, "text").orEmpty().trim()
         if (text.isBlank()) return null
-        if (isDevelopmentRequest()) {
+        val developmentRequest = isDevelopmentRequest()
+        if (developmentRequest) {
             addProjectEvent("AI 说明：${summarize(text, 36)}")
         }
         val modelUsed = jsonStringOrNull(json, "model_used")
         val streamId = jsonStringOrNull(json, "stream_id")
-        return ChatMessage("ai-intent", text, modelUsed = modelUsed, streamId = streamId)
+        val role = if (developmentRequest) "ai-intent" else "ai"
+        return ChatMessage(role, text, modelUsed = modelUsed, streamId = streamId)
     }
 }

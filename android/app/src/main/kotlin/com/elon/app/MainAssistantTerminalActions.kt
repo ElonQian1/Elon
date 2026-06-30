@@ -38,8 +38,6 @@ internal class MainAssistantTerminalActions(
             )
             addProjectEvent(if (apkUrl != null) "生成 APK 下载链接" else "任务完成")
             recordEvidence("result", if (apkUrl != null) "APK 已生成：$apkUrl" else "任务完成")
-        } else {
-            updateProjectViews("普通消息已回复，开发项目记录保持不变。")
         }
         setActiveRequestIsDevelopment(false)
         setActiveRequestIsPlanning(false)
