@@ -19,6 +19,7 @@ use crate::{
     node_agent_cli_sidecar_io::{
         append_output, read_new_commands, read_new_output_records, CliSidecarOutputRecord,
     },
+    node_agent_codex_session::{self, CodexSessionCapture},
     node_agent_task_journal::TaskJournal,
 };
 
@@ -39,6 +40,10 @@ pub(crate) struct CliSidecarLaunchConfig {
     pub registry_dir: PathBuf,
     #[serde(default)]
     pub task_journal_dir: Option<PathBuf>,
+    #[serde(default)]
+    pub codex_session_scope_key: Option<String>,
+    #[serde(default)]
+    pub legacy_codex_sessions_file: Option<PathBuf>,
     pub timeout_secs: u64,
     #[serde(default)]
     pub stdin_piped_empty: bool,
@@ -235,6 +240,7 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
     }
     let mut pty_output_rx = pty.take_output_rx();
 
+    let mut codex_session_capture = CodexSessionCapture::default();
     let mut mailbox_offset = 0_u64;
     let mut processed_commands = HashSet::new();
     let mut reader_closed = false;
@@ -284,7 +290,13 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
             event = pty_output_rx.recv() => {
                 match event {
                     Some(CliPtyEvent::Output(text)) => {
-                        write_pty_chunk(&config, &task_journal, &mut pty, &text)?;
+                        write_pty_chunk(
+                            &config,
+                            &task_journal,
+                            &mut codex_session_capture,
+                            &mut pty,
+                            &text,
+                        )?;
                     }
                     Some(CliPtyEvent::ReaderError(error)) => {
                         append_output(
@@ -331,6 +343,7 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
 fn write_pty_chunk(
     config: &CliSidecarLaunchConfig,
     task_journal: &TaskJournal,
+    codex_session_capture: &mut CodexSessionCapture,
     pty: &mut CliPtyProcess,
     text: &str,
 ) -> Result<()> {
@@ -341,25 +354,48 @@ fn write_pty_chunk(
     if visible.is_empty() {
         return Ok(());
     }
-    write_chunk(config, task_journal, "pty", &visible)
+    write_chunk(config, task_journal, codex_session_capture, "pty", &visible)
 }
 
 fn write_chunk(
     config: &CliSidecarLaunchConfig,
     task_journal: &TaskJournal,
+    codex_session_capture: &mut CodexSessionCapture,
     stream: &str,
     text: &str,
 ) -> Result<()> {
+    let (session_from_line, visible_text) = if config.cli_name == "codex" {
+        node_agent_codex_session::strip_session_id_lines(text)
+    } else {
+        (None, text.to_string())
+    };
+    let session_from_capture = if config.cli_name == "codex" {
+        codex_session_capture.observe(text)
+    } else {
+        None
+    };
+    let session_id = session_from_line.or(session_from_capture);
+    if let (Some(scope_key), Some(session_id)) = (
+        config.codex_session_scope_key.as_deref(),
+        session_id.as_deref(),
+    ) {
+        node_agent_codex_session::persist_session_compat(
+            task_journal,
+            config.legacy_codex_sessions_file.as_deref(),
+            &config.task_id,
+            scope_key,
+            session_id,
+        );
+    }
+    if visible_text.is_empty() {
+        return Ok(());
+    }
     append_output(
         &config.output_path,
-        CliSidecarOutputRecord::chunk(stream, text),
+        CliSidecarOutputRecord::chunk(stream, &visible_text),
     )?;
     let journal_stream = if stream == "pty" { "stdout" } else { stream };
-    let is_codex_session_id =
-        config.cli_name == "codex" && text.trim_start().starts_with("session id: ");
-    if !is_codex_session_id {
-        let _ = task_journal.record_cli_chunk(&config.task_id, journal_stream, text);
-    }
+    let _ = task_journal.record_cli_chunk(&config.task_id, journal_stream, &visible_text);
     Ok(())
 }
 

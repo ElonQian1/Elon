@@ -1602,6 +1602,8 @@ async fn run_cli_prompt(run: CliPromptRun) {
             output_path,
             registry_dir: sidecar_registry.dir(),
             task_journal_dir: None,
+            codex_session_scope_key: codex_key.clone(),
+            legacy_codex_sessions_file: Some(codex_sessions_file.clone()),
             timeout_secs: if cli_name == "codex" { 300 } else { 180 },
             stdin_piped_empty,
             initial_cols: node_agent_cli_pty::default_cols(),
@@ -1623,22 +1625,26 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     |event| match event {
                         node_agent_cli_sidecar_runner::CliSidecarOutputEvent::Stdout(text) => {
                             if cli_name == "codex" {
-                                if let Some(real_id) =
-                                    text.strip_prefix("session id: ").map(str::trim)
+                                let (session_id, visible_text) =
+                                    node_agent_codex_session::strip_session_id_lines(&text);
+                                if let (Some(ref key), Some(real_id)) =
+                                    (codex_key.as_ref(), session_id.as_deref())
                                 {
-                                    if let Some(ref key) = codex_key {
-                                        persist_codex_session_compat(
-                                            &task_journal,
-                                            &codex_sessions_file,
-                                            &req_id,
-                                            key,
-                                            real_id,
-                                        );
-                                    }
+                                    node_agent_codex_session::persist_session_compat(
+                                        &task_journal,
+                                        Some(&codex_sessions_file),
+                                        &req_id,
+                                        key,
+                                        real_id,
+                                    );
+                                }
+                                if visible_text.is_empty() {
                                     return;
                                 }
+                                send_cli_chunk_message(&out_tx, &req_id, &visible_text);
+                            } else {
+                                send_cli_chunk_message(&out_tx, &req_id, &text);
                             }
-                            send_cli_chunk_message(&out_tx, &req_id, &text);
                         }
                         node_agent_cli_sidecar_runner::CliSidecarOutputEvent::Stderr(text) => {
                             if cli_name == "codex" {
@@ -1856,25 +1862,17 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     stdout_text.push('\n');
                     // 提取 Codex 真实 session id 并持久化
                     if cli_name == "codex" {
-                        if let Some(real_id) = l.strip_prefix("session id: ").map(str::trim) {
+                        if let Some(real_id) =
+                            node_agent_codex_session::extract_session_id_from_text(&l)
+                        {
                             if let Some(ref key) = codex_key {
-                                // 新版本把 Codex session 写入 task journal，临时文件仅保留为旧版本兼容。
-                                if let Err(error) =
-                                    task_journal.record_codex_session(&req_id, key, real_id)
-                                {
-                                    warn!("PC 任务 journal 写入 Codex session 失败: {error}");
-                                }
-                                let mut map: serde_json::Map<String, serde_json::Value> =
-                                    tokio::fs::read_to_string(&codex_sessions_file).await
-                                        .ok()
-                                        .and_then(|s| serde_json::from_str(&s).ok())
-                                        .unwrap_or_default();
-                                map.insert(key.clone(), serde_json::json!(real_id));
-                                let _ = tokio::fs::write(
-                                    &codex_sessions_file,
-                                    serde_json::to_string(&map).unwrap_or_default(),
-                                ).await;
-                                info!("🔖 Codex session saved: {} → {}", key, real_id);
+                                node_agent_codex_session::persist_session_compat(
+                                    &task_journal,
+                                    Some(&codex_sessions_file),
+                                    &req_id,
+                                    key,
+                                    &real_id,
+                                );
                             }
                             // session id 行本身不发给用户
                             continue;
@@ -1896,6 +1894,20 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     stderr_text.push_str(&l);
                     stderr_text.push('\n');
                     if cli_name == "codex" {
+                        if let Some(real_id) =
+                            node_agent_codex_session::extract_session_id_from_text(&l)
+                        {
+                            if let Some(ref key) = codex_key {
+                                node_agent_codex_session::persist_session_compat(
+                                    &task_journal,
+                                    Some(&codex_sessions_file),
+                                    &req_id,
+                                    key,
+                                    &real_id,
+                                );
+                            }
+                            continue;
+                        }
                         // Codex stderr 有"Reading additional input from stdin..."等噪音，不发给用户
                         // 但写入本机 journal，页面恢复时可在本机上下文里回放诊断信息。
                         if !l.trim().is_empty() {
@@ -2131,28 +2143,6 @@ fn push_tracked_arg(
     let arg = arg.as_ref().to_string();
     cmd.arg(&arg);
     sidecar_args.push(arg);
-}
-
-fn persist_codex_session_compat(
-    task_journal: &node_agent_task_journal::TaskJournal,
-    codex_sessions_file: &Path,
-    req_id: &str,
-    key: &str,
-    real_id: &str,
-) {
-    if let Err(error) = task_journal.record_codex_session(req_id, key, real_id) {
-        warn!("PC 任务 journal 写入 Codex session 失败: {error}");
-    }
-    let mut map: serde_json::Map<String, serde_json::Value> =
-        std::fs::read_to_string(codex_sessions_file)
-            .ok()
-            .and_then(|text| serde_json::from_str(&text).ok())
-            .unwrap_or_default();
-    map.insert(key.to_string(), serde_json::json!(real_id));
-    if let Ok(text) = serde_json::to_string(&map) {
-        let _ = std::fs::write(codex_sessions_file, text);
-    }
-    info!("🔖 Codex session saved: {} → {}", key, real_id);
 }
 
 fn record_cli_done_outcome(

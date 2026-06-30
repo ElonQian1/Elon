@@ -7,6 +7,7 @@ use crate::{
     node_agent_cli_sidecar_runner::{
         follow_sidecar_output, run_sidecar, CliSidecarLaunchConfig, CliSidecarOutputEvent,
     },
+    node_agent_task_journal::{TaskJournal, TaskJournalStart},
 };
 use std::{fs, path::PathBuf, time::Duration};
 use tokio::sync::watch;
@@ -32,6 +33,8 @@ async fn sidecar_runner_registers_real_child_and_replays_output() {
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
         task_journal_dir: Some(root.join("journal")),
+        codex_session_scope_key: None,
+        legacy_codex_sessions_file: None,
         timeout_secs: 10,
         stdin_piped_empty: false,
         initial_cols: default_cols(),
@@ -103,6 +106,8 @@ async fn sidecar_runner_accepts_terminal_input_and_resize_after_attach() {
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
         task_journal_dir: Some(root.join("journal")),
+        codex_session_scope_key: None,
+        legacy_codex_sessions_file: None,
         timeout_secs: 10,
         stdin_piped_empty: false,
         initial_cols: 90,
@@ -159,6 +164,8 @@ async fn sidecar_runner_writes_recovered_tool_approval_to_pty() {
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
         task_journal_dir: Some(root.join("journal")),
+        codex_session_scope_key: None,
+        legacy_codex_sessions_file: None,
         timeout_secs: 10,
         stdin_piped_empty: false,
         initial_cols: 90,
@@ -188,6 +195,85 @@ async fn sidecar_runner_writes_recovered_tool_approval_to_pty() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[tokio::test]
+async fn sidecar_runner_persists_codex_session_from_pty_output() {
+    let root = temp_dir("runner-codex-session");
+    let registry = CliSidecarRegistry::new(root.join("sidecars"));
+    let journal_dir = root.join("journal");
+    let journal = TaskJournal::new(&journal_dir);
+    let task_id = "task-sidecar-codex-session";
+    let session_id = "sidecar-codex-session";
+    let codex_session = "019f172c-2d52-7e33-8ce5-5af73dada2bf";
+    let scope_key = "scope-codex-session";
+    let legacy_file = root.join("legacy-codex-sessions.json");
+    let output_path = registry.output_path(task_id, session_id);
+    let (program, args) = codex_session_echo_command(codex_session);
+
+    journal
+        .record_started(TaskJournalStart {
+            req_id: task_id,
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some(task_id),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("project_write"),
+        })
+        .expect("task should be registered before sidecar output");
+
+    run_sidecar(CliSidecarLaunchConfig {
+        session_id: session_id.to_string(),
+        task_id: task_id.to_string(),
+        cli_name: "codex".to_string(),
+        route: "route_a_external_cli".to_string(),
+        program,
+        args,
+        cwd: None,
+        env: Vec::new(),
+        output_path: output_path.clone(),
+        registry_dir: registry.dir(),
+        task_journal_dir: Some(journal_dir.clone()),
+        codex_session_scope_key: Some(scope_key.to_string()),
+        legacy_codex_sessions_file: Some(legacy_file.clone()),
+        timeout_secs: 10,
+        stdin_piped_empty: false,
+        initial_cols: default_cols(),
+        initial_rows: default_rows(),
+    })
+    .await
+    .expect("sidecar should persist codex session");
+
+    let snapshot = journal
+        .snapshot(task_id, 0, 50)
+        .expect("task journal snapshot should load");
+    let record = snapshot
+        .record
+        .expect("task record should remain available");
+    assert_eq!(record.codex_session_id.as_deref(), Some(codex_session));
+    assert_eq!(record.codex_session_scope_key.as_deref(), Some(scope_key));
+    assert_eq!(
+        journal
+            .load_codex_session(scope_key)
+            .expect("codex session cache should load")
+            .as_deref(),
+        Some(codex_session)
+    );
+    assert!(fs::read_to_string(&legacy_file)
+        .expect("legacy session cache should be written")
+        .contains(codex_session));
+
+    let mut offset = 0;
+    let records = read_new_output_records(&output_path, &mut offset)
+        .expect("sidecar output records should load");
+    let visible = records
+        .iter()
+        .filter_map(|record| record.text.as_deref())
+        .collect::<String>();
+    assert!(!visible.contains(codex_session));
+    assert!(visible.contains("codex-ready"));
+
+    let _ = fs::remove_dir_all(root);
+}
+
 fn shell_echo_command() -> (String, Vec<String>) {
     if cfg!(windows) {
         (
@@ -203,6 +289,29 @@ fn shell_echo_command() -> (String, Vec<String>) {
             vec![
                 "-c".to_string(),
                 "echo sidecar-out; echo sidecar-err >&2".to_string(),
+            ],
+        )
+    }
+}
+
+fn codex_session_echo_command(session_id: &str) -> (String, Vec<String>) {
+    if cfg!(windows) {
+        (
+            "powershell".to_string(),
+            vec![
+                "-NoProfile".to_string(),
+                "-Command".to_string(),
+                format!(
+                    "$e=[char]27; Write-Output \"$e[36mSession ID: {session_id}$e[0m\"; Write-Output \"codex-ready\""
+                ),
+            ],
+        )
+    } else {
+        (
+            "sh".to_string(),
+            vec![
+                "-c".to_string(),
+                format!("printf '\\033[36mSession ID: {session_id}\\033[0m\\ncodex-ready\\n'"),
             ],
         )
     }
