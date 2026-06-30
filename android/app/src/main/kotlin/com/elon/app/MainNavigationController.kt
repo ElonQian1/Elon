@@ -553,11 +553,33 @@ internal class MainNavigationController(
             onFriendChatClosed()
         }
         chatReturnTarget = returnTarget
-        val shouldAnimate = animate && binding.projectPage.visibility == View.VISIBLE
+        val shouldAnimateFromProject = animate && binding.projectPage.visibility == View.VISIBLE
+        val shouldAnimateFromConversation = animate && binding.conversationPage.visibility == View.VISIBLE
         actionPopupProvider()?.dismiss()
         closeChatSideMenu(false)
         applyChatChrome()
-        if (shouldAnimate) {
+        if (shouldAnimateFromConversation) {
+            collapseInputComposer(false)
+            pageTransitionRunning = true
+            WechatPageTransition.enterFromRight(
+                container = binding.contentContainer,
+                incoming = listOf(binding.chatPage),
+                outgoing = listOf(binding.conversationPage),
+                incomingFull = listOf(binding.inputLayout),
+                outgoingFull = listOf(binding.pageTabs),
+                onEnd = {
+                    binding.conversationPage.visibility = View.GONE
+                    hideBottomMenus()
+                    binding.projectPage.visibility = View.GONE
+                    binding.profilePage.visibility = View.GONE
+                    binding.marketplacePage.visibility = View.GONE
+                    binding.chatPage.visibility = View.VISIBLE
+                    binding.inputLayout.visibility = View.VISIBLE
+                    clearPageTranslations()
+                    pageTransitionRunning = false
+                }
+            )
+        } else if (shouldAnimateFromProject) {
             collapseInputComposer(false)
             pageTransitionRunning = true
             WechatPageTransition.enterFromLeft(
