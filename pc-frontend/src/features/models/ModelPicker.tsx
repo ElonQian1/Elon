@@ -52,6 +52,8 @@ export function ModelPickerPopover({
   const [saveError, setSaveError] = useState('')
   const [pos, setPos] = useState({ left: 12, bottom: 12, width: 360 })
   const [previewKey, setPreviewKey] = useState<string | null>(null)
+  const [previewAnchorRect, setPreviewAnchorRect] = useState<DOMRect | null>(null)
+  const previewCloseTimer = useRef<number | null>(null)
   const hasRuntimeRoutePicker = !!runtimeRoute && !!onRuntimeRouteChange
   const route = runtimeRoute ?? DEFAULT_RUNTIME_ROUTE
   const selectedRoute = runtimeRouteOption(route)
@@ -62,7 +64,7 @@ export function ModelPickerPopover({
       const el = anchorRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const targetWidth = hasRuntimeRoutePicker ? 860 : 680
+      const targetWidth = hasRuntimeRoutePicker ? 680 : 430
       const width = Math.min(targetWidth, window.innerWidth - 24)
       const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))
       const bottom = Math.max(12, window.innerHeight - rect.top + 8)
@@ -72,6 +74,12 @@ export function ModelPickerPopover({
     window.addEventListener('resize', reposition)
     return () => window.removeEventListener('resize', reposition)
   }, [anchorRef, hasRuntimeRoutePicker])
+
+  useEffect(() => {
+    return () => {
+      if (previewCloseTimer.current) window.clearTimeout(previewCloseTimer.current)
+    }
+  }, [])
 
   // 初次打开时加载
   useEffect(() => {
@@ -102,17 +110,35 @@ export function ModelPickerPopover({
     }
   }
 
+  function cancelPreviewClose() {
+    if (previewCloseTimer.current) {
+      window.clearTimeout(previewCloseTimer.current)
+      previewCloseTimer.current = null
+    }
+  }
+
+  function schedulePreviewClose() {
+    cancelPreviewClose()
+    previewCloseTimer.current = window.setTimeout(() => {
+      setPreviewKey(null)
+      setPreviewAnchorRect(null)
+      previewCloseTimer.current = null
+    }, 180)
+  }
+
+  function showPreview(group: ModelOptionGroup, element: HTMLElement) {
+    cancelPreviewClose()
+    setPreviewKey(group.key)
+    setPreviewAnchorRect(element.getBoundingClientRect())
+  }
+
   const visibleOptions = hasRuntimeRoutePicker
     ? filterOptionsForRuntimeRoute(options, route)
     : options
   const emptyState = hasRuntimeRoutePicker ? routeModelEmptyState(route) : null
   const modelGroups = groupModelOptions(visibleOptions, selectedAgent)
-  const selectedGroup = modelGroups.find((group) => group.selectedOption) ?? null
   const previewGroup =
-    modelGroups.find((group) => group.key === previewKey) ??
-    selectedGroup ??
-    modelGroups[0] ??
-    null
+    previewKey ? modelGroups.find((group) => group.key === previewKey) ?? null : null
 
   // 按 provider 分组
   const providerGroups = new Map<string, ModelOptionGroup[]>()
@@ -171,6 +197,7 @@ export function ModelPickerPopover({
                         type="button"
                         onClick={() => {
                           setPreviewKey(null)
+                          setPreviewAnchorRect(null)
                           onRuntimeRouteChange?.(item.value)
                         }}
                         aria-pressed={item.value === route}
@@ -199,16 +226,8 @@ export function ModelPickerPopover({
             </aside>
           )}
 
-          <ModelHoverPreview
-            group={previewGroup}
-            selectedAgent={selectedAgent}
-            saving={saving}
-            routeTitle={hasRuntimeRoutePicker ? selectedRoute.title : undefined}
-            onSelect={handleSelect}
-          />
-
           <div className={styles.modelPane}>
-            <div className={styles.list}>
+            <div className={styles.list} onScroll={schedulePreviewClose}>
               {loading && <p className={styles.empty}>正在读取模型列表…</p>}
               {!loading && (error || saveError) && (
                 <p className={styles.errorMsg}>{saveError || error}</p>
@@ -242,8 +261,9 @@ export function ModelPickerPopover({
                         type="button"
                         disabled={saving}
                         aria-disabled={group.primaryOption.selectable === false}
-                        onMouseEnter={() => setPreviewKey(group.key)}
-                        onFocus={() => setPreviewKey(group.key)}
+                        onMouseEnter={(event) => showPreview(group, event.currentTarget)}
+                        onMouseLeave={schedulePreviewClose}
+                        onFocus={(event) => showPreview(group, event.currentTarget)}
                         onClick={() => handleSelect(group.primaryOption)}
                       >
                         <span>
@@ -255,6 +275,8 @@ export function ModelPickerPopover({
                             ? '探测'
                             : group.selectedOption
                               ? '✓'
+                              : group.options.length > 1
+                                ? '›'
                               : ''}
                         </span>
                       </button>
@@ -279,6 +301,16 @@ export function ModelPickerPopover({
           )}
         </footer>
       </section>
+      <ModelHoverPreview
+        group={previewGroup}
+        anchorRect={previewAnchorRect}
+        selectedAgent={selectedAgent}
+        saving={saving}
+        routeTitle={hasRuntimeRoutePicker ? selectedRoute.title : undefined}
+        onSelect={handleSelect}
+        onMouseEnter={cancelPreviewClose}
+        onMouseLeave={schedulePreviewClose}
+      />
     </>
   )
 

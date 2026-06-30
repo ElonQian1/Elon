@@ -1,4 +1,6 @@
 import { Check } from 'lucide-react'
+import type { CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import { effortDisplayName, normalizeEffort } from './modelGroups'
 import { providerGroupTitle } from './modelUtils'
 import type { ModelOptionGroup } from './modelGroups'
@@ -7,10 +9,13 @@ import styles from './ModelPicker.module.css'
 
 interface Props {
   group: ModelOptionGroup | null
+  anchorRect: DOMRect | null
   selectedAgent: string
   saving: boolean
   routeTitle?: string
   onSelect: (option: AgentOption) => void
+  onMouseEnter: () => void
+  onMouseLeave: () => void
 }
 
 const EFFORT_NOTES: Record<string, string> = {
@@ -47,23 +52,40 @@ function effortNote(option: AgentOption): string {
   return details.join(' · ')
 }
 
+function floatingStyle(anchorRect: DOMRect): CSSProperties {
+  const gap = 10
+  const narrow = window.innerWidth <= 720
+  const width = Math.min(narrow ? 360 : 330, window.innerWidth - 24)
+  const maxHeight = Math.min(narrow ? 360 : 460, window.innerHeight - 24)
+  const openLeft = anchorRect.left - width - gap
+  const openRight = anchorRect.right + gap
+  const left = narrow
+    ? Math.max(12, Math.min(anchorRect.left, window.innerWidth - width - 12))
+    : openLeft >= 12
+      ? openLeft
+      : Math.max(12, Math.min(openRight, window.innerWidth - width - 12))
+  const preferredTop = narrow ? anchorRect.bottom + 8 : anchorRect.top - 8
+  const top = Math.max(12, Math.min(preferredTop, window.innerHeight - maxHeight - 12))
+
+  return {
+    left: Math.round(left),
+    top: Math.round(top),
+    width: Math.round(width),
+    maxHeight: Math.round(maxHeight),
+  }
+}
+
 export function ModelHoverPreview({
   group,
+  anchorRect,
   selectedAgent,
   saving,
   routeTitle,
   onSelect,
+  onMouseEnter,
+  onMouseLeave,
 }: Props) {
-  if (!group) {
-    return (
-      <aside className={styles.previewPane} aria-label="模型详情">
-        <div className={styles.previewEmpty}>
-          <strong>暂无模型</strong>
-          <span>当前来源没有返回可选模型。</span>
-        </div>
-      </aside>
-    )
-  }
+  if (!group || !anchorRect) return null
 
   const option = group.selectedOption ?? group.primaryOption
   const provider = providerGroupTitle(option.provider)
@@ -80,8 +102,14 @@ export function ModelHoverPreview({
       : null,
   ].filter(Boolean) as [string, string][]
 
-  return (
-    <aside className={styles.previewPane} aria-label="模型详情">
+  return createPortal(
+    <aside
+      className={styles.effortPopover}
+      style={floatingStyle(anchorRect)}
+      aria-label="模型档位详情"
+      onMouseEnter={onMouseEnter}
+      onMouseLeave={onMouseLeave}
+    >
       <div className={styles.previewHeader}>
         <span className={styles.previewProvider}>{provider}</span>
         <strong>{group.label}</strong>
@@ -122,6 +150,7 @@ export function ModelHoverPreview({
           })}
         </div>
       </section>
-    </aside>
+    </aside>,
+    document.body,
   )
 }
