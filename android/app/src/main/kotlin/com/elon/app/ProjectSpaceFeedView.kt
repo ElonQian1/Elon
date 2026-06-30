@@ -55,7 +55,7 @@ internal class ProjectSpaceFeedView(
         loading: Boolean
     ) {
         val posts = feedPosts(space, messagesByChannel)
-        container.addView(playStoreHeader.render(space, posts.size, projectPreviewImages(space, posts)))
+        container.addView(playStoreHeader.render(space, posts.size, projectPreviewImages(space)))
         container.addView(projectStoreContent(space, posts, loading))
     }
 
@@ -210,15 +210,10 @@ internal class ProjectSpaceFeedView(
             .take(MAX_FEED_POSTS)
     }
 
-    private fun projectPreviewImages(
-        space: ProjectSpace,
-        posts: List<ProjectSpaceFeedPost>
-    ): List<String?> {
+    private fun projectPreviewImages(space: ProjectSpace): List<String?> {
         val manual = space.galleryImages.take(PROJECT_PREVIEW_SLOT_COUNT)
         val manualSet = manual.mapNotNull { it.cleanProjectSpaceDisplayName() }.toSet()
-        val automatic = (space.landingPreviewImages + posts.mapNotNull {
-            extractProjectSpacePostImageSource(parseProjectSpacePostText(it.message.content).body)
-        })
+        val automatic = space.landingPreviewImages
             .mapNotNull { it.cleanProjectSpaceDisplayName() }
             .filterNot { it in manualSet }
             .distinct()

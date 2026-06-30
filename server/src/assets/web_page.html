@@ -6030,22 +6030,18 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       ? images.slice(0, 4).map(cleanProjectSpaceImageSource)
       : [];
   }
-  function projectSpacePreviewImages(project, space, posts) {
+  function projectSpacePreviewImages(project, space) {
     const manual = projectSpaceGalleryImages(project, space);
     const manualSet = new Set(manual.filter(Boolean));
-    const automatic = [
-      ...projectSpaceLandingImages(space && space.landing),
-      ...(posts || []).map((item) => {
-        const post = parseProjectSpacePostText(item && item.message && item.message.content);
-        return extractProjectSpacePostImageSource(post.body);
-      })
-    ].map(cleanProjectSpaceImageSource).filter((url) => url && !manualSet.has(url));
+    const automatic = projectSpaceLandingImages(space && space.landing)
+      .map(cleanProjectSpaceImageSource)
+      .filter((url) => url && !manualSet.has(url));
     const uniqueAutomatic = Array.from(new Set(automatic));
     return [0, 1, 2, 3].map((slot) => manual[slot] || uniqueAutomatic[slot] || '');
   }
-  function renderProjectSpacePreviews(project, space, posts) {
+  function renderProjectSpacePreviews(project, space) {
     if (!projectSpacePreviewGrid) return;
-    const images = projectSpacePreviewImages(project, space, posts);
+    const images = projectSpacePreviewImages(project, space);
     projectSpacePreviewGrid.innerHTML = images.map((source, index) => {
       if (!source) {
         return '<div class="project-space-preview-cell placeholder" aria-label="应用图片占位">' +
@@ -6200,7 +6196,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       if (projectSpacePostCount) projectSpacePostCount.textContent = '0贴';
       resetAnnouncementAction();
       projectSpacePostList.innerHTML = projectSpaceEmptyHtml('还没有帖子，点击+好发布内容', true);
-      renderProjectSpacePreviews(null, null, []);
+      renderProjectSpacePreviews(null, null);
       wireProjectSpaceEmptyPostButton();
       syncProjectSpacePostEntry();
       return;
@@ -6277,7 +6273,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     currentProjectSpacePostCount = posts.length;
     if (projectSpacePostCount) projectSpacePostCount.textContent = posts.length + '贴';
     renderProjectIntroCard(project);
-    renderProjectSpacePreviews(project, space, posts);
+    renderProjectSpacePreviews(project, space);
     if (!posts.length) {
       projectSpacePostList.innerHTML = projectSpaceEmptyHtml(
         loading ? '正在加载帖子...' : '还没有帖子，点击+好发布内容',
