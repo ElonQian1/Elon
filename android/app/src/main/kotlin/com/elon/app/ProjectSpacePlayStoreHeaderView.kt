@@ -129,18 +129,17 @@ internal class ProjectSpacePlayStoreHeaderView(
                 })
             }, LinearLayout.LayoutParams(0, dp(72), 1f))
 
-            addView(joinButton(space), LinearLayout.LayoutParams(dp(104), dp(48)).apply {
-                marginStart = dp(18)
-                topMargin = dp(12)
+            addView(joinButton(), LinearLayout.LayoutParams(dp(88), dp(48)).apply {
+                marginStart = dp(14)
+                topMargin = dp(10)
             })
         }
     }
 
-    private fun joinButton(space: ProjectSpace): TextView {
-        val visitor = isProjectSpaceVisitor(space.project.role)
+    private fun joinButton(): TextView {
         return TextView(activity).apply {
-            text = if (visitor) "加入" else "成员"
-            setVisualTextSize(19)
+            text = "加入"
+            setVisualTextSize(16)
             includeFontPadding = false
             gravity = Gravity.CENTER
             typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
@@ -148,10 +147,8 @@ internal class ProjectSpacePlayStoreHeaderView(
             background = roundedStrokeBackground(PLAY_BG, 8, "#5A5A5A", 1)
             isClickable = true
             foreground = selectableForeground()
-            contentDescription = if (visitor) "加入项目" else "查看项目成员"
-            setOnClickListener {
-                if (visitor) joinProject() else openProjectMembers()
-            }
+            contentDescription = "加入项目"
+            setOnClickListener { joinProject() }
         }
     }
 

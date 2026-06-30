@@ -1312,9 +1312,9 @@
       flex: 1 1 auto;
     }
     #projectProgressPanel .project-space-join {
-      width: 104px;
+      width: 88px;
       height: 48px;
-      margin-top: 12px;
+      margin-top: 10px;
       border: 1px solid #5A5A5A;
       border-radius: 8px;
       background: transparent;
@@ -1322,7 +1322,7 @@
       display: grid;
       place-items: center;
       flex: none;
-      font-size: 19px;
+      font-size: 16px;
       font-weight: 500;
     }
     .project-space-install {
@@ -2968,7 +2968,7 @@
             <div id="projectSpacePostList" class="project-space-post-list">
               <div class="project-space-feed-empty">正在加载帖子...</div>
             </div>
-            <div class="project-space-feed-actions">
+            <div class="project-space-feed-actions hidden">
               <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button" aria-label="发布帖子">
                 <img src="/assets/ic_project_post_compose.png" alt="" aria-hidden="true" />
                 <span>发帖</span>
@@ -3284,9 +3284,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     </button>
   </nav>
   <nav class="project-space-ai-menu hidden" id="projectSpaceAiMenu">
-    <button type="button" id="projectSpaceAiMenuBtn" title="打开项目 AI 会话">
-      <img class="project-space-ai-icon" src="data:image/png;base64,__PROJECT_AI_ICON_PNG_B64__" alt="" aria-hidden="true" />
-      <span>Ai 会话</span>
+    <button type="button" id="projectSpaceAiMenuBtn" title="发布帖子">
+      <img class="project-space-ai-icon" src="/assets/ic_project_post_compose.png" alt="" aria-hidden="true" />
+      <span>发帖</span>
     </button>
   </nav>
 </main>
@@ -3687,20 +3687,14 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   }
   if (projectSpaceAiMenuBtn) {
     projectSpaceAiMenuBtn.addEventListener('click', () => {
-      if (currentProject) {
-        selectProject(currentProject);
-      } else {
-        showNativeOnly('项目空间底部 Ai 会话请在 Android APK 中打开。');
-      }
+      showNativeOnly('发布项目空间帖子和上传本地图片请在 Android APK 中使用，网页版已同步帖子预览。');
     });
   }
   let projectSpaceAiMenuMotionTimer = 0;
   function syncProjectSpacePostEntry() {
     const actions = document.querySelector('.project-space-feed-actions');
     if (!actions || !projectSpaceAiMenu) return;
-    const shouldShow = !projectSpaceAiMenu.classList.contains('hidden') &&
-      projectSpaceAiMenu.classList.contains('compact');
-    actions.classList.toggle('hidden', !shouldShow);
+    actions.classList.add('hidden');
   }
   function syncProjectSpaceAiMenuMotion() {
     if (!projectPage || !projectSpaceAiMenu) return;
@@ -5885,7 +5879,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     if (projectSpaceMemberMetric) projectSpaceMemberMetric.textContent = '成员 ' + members;
     if (projectSpaceJoinBtn) {
-      projectSpaceJoinBtn.textContent = isProjectSpaceVisitor(project) ? '加入' : '成员';
+      projectSpaceJoinBtn.textContent = '加入';
       projectSpaceJoinBtn.classList.remove('hidden');
     }
     if (projectSpaceDownloadBtn) projectSpaceDownloadBtn.textContent = currentProjectSpaceLatestApkUrl ? '安装' : '暂无APK';
@@ -6267,7 +6261,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   async function joinCurrentProjectSpace() {
     if (!currentProject || !currentProject.id) return;
     if (!isProjectSpaceVisitor(currentProject)) {
-      showNativeOnly('成员列表和加入管理请在 Android APK 中使用。');
+      window.alert('你已经加入该项目');
       return;
     }
     if (!token) {

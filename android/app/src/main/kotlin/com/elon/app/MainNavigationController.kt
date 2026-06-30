@@ -57,7 +57,7 @@ internal class MainNavigationController(
     private val showProjectMembers: () -> Unit,
     private val loadMarketplace: () -> Unit,
     private val onAgentTabSelected: () -> Unit,
-    private val openProjectSpaceAiConversation: () -> Unit
+    private val openProjectSpacePostComposer: () -> Unit
 ) {
     private enum class ChatReturnTarget {
         FRIENDS,
@@ -88,7 +88,7 @@ internal class MainNavigationController(
         binding.searchButton.setOnClickListener { showFriendLocalSearch() }
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.voiceCallButton.setOnClickListener { openSocialAiVoiceCall() }
-        binding.projectSpaceAiMenu.setOnClickListener { openProjectSpaceAiConversation() }
+        binding.projectSpaceAiMenu.setOnClickListener { openProjectSpacePostComposer() }
         binding.backButton.setOnClickListener { navigateBackOneLevel() }
         selectBottomTab(binding.tabChat, animate = false)
     }
@@ -116,14 +116,12 @@ internal class MainNavigationController(
         setNavigationBarColor(R.color.elon_nav_bg)
         binding.pageTabs.visibility = View.VISIBLE
         binding.projectSpaceAiMenu.visibility = View.GONE
-        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun hideBottomMenus() {
         setNavigationBarColor(R.color.elon_nav_bg)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
-        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun showProjectTopTabs() {
@@ -178,7 +176,6 @@ internal class MainNavigationController(
         setNavigationBarColor(R.color.elon_bg_app)
         binding.pageTabs.visibility = View.GONE
         binding.projectSpaceAiMenu.visibility = View.GONE
-        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
     }
 
     private fun setNavigationBarColor(colorRes: Int) {
@@ -953,9 +950,6 @@ internal class MainNavigationController(
     }
 
     private fun bringProjectSpaceFloatingControlsToFront() {
-        if (binding.projectSpaceFeedActionsOverlay.visibility == View.VISIBLE) {
-            binding.projectSpaceFeedActionsOverlay.bringToFront()
-        }
         if (binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
             binding.projectSpaceAiMenu.bringToFront()
         }
@@ -1125,7 +1119,6 @@ internal class MainNavigationController(
         binding.inputLayout.translationX = 0f
         binding.pageTabs.translationX = 0f
         binding.projectSpaceAiMenu.translationX = 0f
-        binding.projectSpaceFeedActionsOverlay.translationX = 0f
     }
 
     private companion object {

@@ -66,7 +66,6 @@ internal class ProjectSpaceController(
     private var pendingMemberBack: ProjectMember? = null
     private var projectSpaceAiExpanded = true
     private var projectSpaceAiAnimator: ValueAnimator? = null
-    private var projectSpaceFeedActionsEnabled = false
     private val feedData = ProjectSpaceFeedData(
         activity = activity,
         http = http,
@@ -112,7 +111,7 @@ internal class ProjectSpaceController(
     private fun handleProjectSpaceJoin() {
         val space = activeSpace ?: return
         if (!isProjectSpaceVisitor(space.project.role)) {
-            showMembers()
+            Toast.makeText(activity, "你已经加入该项目", Toast.LENGTH_SHORT).show()
             return
         }
         if (!AuthManager.isLoggedIn(activity)) {
@@ -185,7 +184,6 @@ internal class ProjectSpaceController(
         openPersonalAiChat = openPersonalAiChat
     )
     init {
-        binding.projectSpacePostFab.setOnClickListener { renderPostComposer() }
         setupProjectSpaceAiMenuMotion()
     }
 
@@ -389,7 +387,6 @@ internal class ProjectSpaceController(
             messagesByChannel = feedData.messagesByChannel,
             loading = feedData.isLoading(space)
         )
-        showProjectSpaceFeedActions()
         feedData.ensure(space)
     }
 
@@ -781,6 +778,10 @@ internal class ProjectSpaceController(
         )
     }
 
+    fun openPostComposerFromSpace() {
+        renderPostComposer()
+    }
+
     private fun showProjectDocumentsDialog() {
         val space = activeSpace ?: return
         ProjectSpaceDocumentDialog.show(
@@ -1108,7 +1109,6 @@ internal class ProjectSpaceController(
         binding.projectScrollView.stopNestedScroll()
         binding.projectScrollView.scrollTo(0, 0)
         if (showAiMenu) showProjectSpaceAiMenu() else hideProjectSpaceAiMenu()
-        hideProjectSpaceFeedActions()
         binding.projectContentLayout.jumpDrawablesToCurrentState()
         return binding.projectContentLayout
     }
@@ -1123,25 +1123,9 @@ internal class ProjectSpaceController(
         projectSpaceAiAnimator?.cancel()
         projectSpaceAiAnimator = null
         binding.projectSpaceAiMenu.visibility = View.GONE
-        syncProjectSpacePostEntry()
     }
 
-    private fun showProjectSpaceFeedActions() {
-        projectSpaceFeedActionsEnabled = true
-        syncProjectSpacePostEntry()
-    }
-
-    private fun hideProjectSpaceFeedActions() {
-        projectSpaceFeedActionsEnabled = false
-        binding.projectSpaceFeedActionsOverlay.visibility = View.GONE
-    }
-
-    private fun syncProjectSpacePostEntry() {
-        val shouldShowPostEntry = projectSpaceFeedActionsEnabled &&
-            binding.projectSpaceAiMenu.visibility == View.VISIBLE &&
-            !projectSpaceAiExpanded
-        binding.projectSpaceFeedActionsOverlay.visibility = if (shouldShowPostEntry) View.VISIBLE else View.GONE
-        if (shouldShowPostEntry) binding.projectSpaceFeedActionsOverlay.bringToFront()
+    private fun bringProjectSpaceAiMenuToFront() {
         if (binding.projectSpaceAiMenu.visibility == View.VISIBLE) {
             binding.projectSpaceAiMenu.bringToFront()
         }
@@ -1179,14 +1163,14 @@ internal class ProjectSpaceController(
             currentLabelWidth == targetLabelWidth &&
             projectSpaceAiAnimator == null
         if (alreadyAtTarget) {
-            syncProjectSpacePostEntry()
+            bringProjectSpaceAiMenuToFront()
             return
         }
 
         projectSpaceAiExpanded = expanded
         projectSpaceAiAnimator?.cancel()
         projectSpaceAiAnimator = null
-        if (expanded) syncProjectSpacePostEntry()
+        if (expanded) bringProjectSpaceAiMenuToFront()
         syncProjectSpaceAiMenuStyle()
 
         val targetIconMargin = if (expanded) dp(PROJECT_SPACE_AI_ICON_MARGIN_END_DP) else 0
@@ -1195,7 +1179,7 @@ internal class ProjectSpaceController(
 
         if (!animate || menu.visibility != View.VISIBLE || menu.width <= 0) {
             applyProjectSpaceAiMenuFrame(targetWidth, targetIconMargin, targetLabelWidth)
-            syncProjectSpacePostEntry()
+            bringProjectSpaceAiMenuToFront()
             return
         }
 
@@ -1225,7 +1209,7 @@ internal class ProjectSpaceController(
                     if (cancelled) return
                     applyProjectSpaceAiMenuFrame(targetWidth, targetIconMargin, targetLabelWidth)
                     projectSpaceAiAnimator = null
-                    syncProjectSpacePostEntry()
+                    bringProjectSpaceAiMenuToFront()
                 }
             })
         }
