@@ -18,7 +18,11 @@ internal class MainStageHintShimmer(
     private var token = 0
 
     fun update() {
-        if (isActiveConversationWorking() && binding.chatPage.visibility == View.VISIBLE) {
+        if (
+            isActiveConversationWorking() &&
+            binding.chatPage.visibility == View.VISIBLE &&
+            binding.stageHintBar.visibility == View.VISIBLE
+        ) {
             start()
         } else {
             stop()

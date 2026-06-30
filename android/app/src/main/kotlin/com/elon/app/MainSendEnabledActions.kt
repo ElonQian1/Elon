@@ -1,5 +1,6 @@
 package com.elon.app
 
+import android.view.View
 import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.TextView
@@ -22,16 +23,20 @@ internal class MainSendEnabledActions(
 ) {
     fun setSendEnabled(enabled: Boolean) {
         val conversationEnded = !isFriendChatActive() && activeConversation().ended
-        val canSend = (enabled || isActiveConversationWorking()) && !conversationEnded
+        val isWorking = isActiveConversationWorking()
+        val canSend = (enabled || isWorking) && !conversationEnded
         setInputCanSend(canSend)
         binding.inputEdit.isEnabled = !conversationEnded
         binding.inputEdit.hint = if (conversationEnded) {
             "会话已结束，请新建会话继续"
-        } else if (isActiveConversationWorking()) {
+        } else if (isWorking) {
             "输入提醒、下一轮消息或分叉方案"
         } else {
             "文本内容在此输入。"
         }
+        binding.stagePauseWorkButton.visibility = if (isWorking) View.VISIBLE else View.GONE
+        binding.stagePauseWorkButton.isEnabled = isWorking && !conversationEnded
+        binding.stagePauseWorkButton.alpha = if (isWorking && !conversationEnded) 1f else 0.4f
         inputModeButton()?.let { button ->
             button.isEnabled = !conversationEnded
             button.alpha = if (conversationEnded) 0.55f else 1f

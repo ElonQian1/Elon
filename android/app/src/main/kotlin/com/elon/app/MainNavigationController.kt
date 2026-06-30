@@ -808,7 +808,7 @@ internal class MainNavigationController(
         applyDefaultMoreButtonIconInsets()
         binding.moreButton.setOnClickListener { showChatActionPopup(binding.moreButton) }
         binding.moreButton.contentDescription = "聊天功能"
-        binding.stageHintText.visibility = View.VISIBLE
+        binding.stageHintBar.visibility = View.VISIBLE
         renderConversationList()
         binding.topTitleText.text = activeConversationProvider().title
         binding.topTitleText.setOnLongClickListener {
@@ -862,7 +862,7 @@ internal class MainNavigationController(
         binding.moreButton.setOnClickListener { showContactChatSettings() }
         binding.moreButton.contentDescription = "聊天设置"
         binding.quickActionStrip.visibility = View.GONE
-        binding.stageHintText.visibility = View.GONE
+        binding.stageHintBar.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
     }
@@ -973,7 +973,7 @@ internal class MainNavigationController(
         hideVoiceCallButton()
         binding.moreButton.visibility = View.GONE
         binding.quickActionStrip.visibility = View.GONE
-        binding.stageHintText.visibility = View.GONE
+        binding.stageHintBar.visibility = View.GONE
         binding.topTitleText.setOnLongClickListener(null)
         binding.topTitleText.text = title
     }

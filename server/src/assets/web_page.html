@@ -491,12 +491,43 @@
     .chat-view { flex: 1; display: flex; flex-direction: column; min-height: 0; position: relative; }
     .stage-hint {
       flex: 0 0 auto;
-      min-height: 42px;
-      background: var(--bg-hint);
+      min-height: 48px;
+      background: var(--panel);
       color: var(--ink-soft);
       font-size: 13px;
-      padding: 0 16px;
+      padding: 0 12px 0 16px;
       display: flex; align-items: center;
+      gap: 8px;
+    }
+    .stage-hint-text {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .stage-pause-btn {
+      width: 48px;
+      height: 48px;
+      flex: 0 0 48px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #212121;
+      color: var(--ink);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      cursor: pointer;
+    }
+    .stage-pause-btn svg {
+      width: 20px;
+      height: 20px;
+      display: block;
+    }
+    .stage-pause-btn:disabled {
+      opacity: .45;
+      cursor: default;
     }
     .group-summary-strip {
       flex: 0 0 auto;
@@ -2843,7 +2874,15 @@
       <div id="conversationList" class="conversation-list"></div>
       <!-- 项目内聊天视图 -->
       <div id="chatView" class="chat-view hidden">
-        <div class="stage-hint" id="stageHint">点击输入需求，开发进度会自动记录到项目页。</div>
+        <div class="stage-hint" id="stageHint">
+          <span class="stage-hint-text" id="stageHintText">点击输入需求，开发进度会自动记录到项目页。</span>
+          <button class="stage-pause-btn hidden" id="stagePauseBtn" type="button" title="暂停当前工作" aria-label="暂停当前工作">
+            <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false">
+              <rect x="6" y="4.5" width="2.5" height="11" rx=".6" fill="currentColor"></rect>
+              <rect x="11.5" y="4.5" width="2.5" height="11" rx=".6" fill="currentColor"></rect>
+            </svg>
+          </button>
+        </div>
         <button id="groupSummaryStrip" class="group-summary-strip hidden" type="button">
           <span class="summary-text">
             <span id="groupSummaryTitle" class="summary-title">AI 总结帖</span>
@@ -3567,6 +3606,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const chatView = $('chatView');
   const chatList = $('chatList');
   const stageHint = $('stageHint');
+  const stageHintText = $('stageHintText');
+  const stagePauseBtn = $('stagePauseBtn');
   const groupSummaryStrip = $('groupSummaryStrip');
   const groupSummaryTitle = $('groupSummaryTitle');
   const groupSummaryMeta = $('groupSummaryMeta');
@@ -3869,6 +3910,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let socket = null;
   let appSocket = null;
   let busy = false;
+  let pauseRequested = false;
   let progressLog = [];
   let pendingVisibilityProject = null;
   let searchQuery = '';
@@ -3928,10 +3970,21 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       return url.toString();
     } catch { return href; }
   }
+  function setStageHintText(text) {
+    if (stageHintText) stageHintText.textContent = text;
+  }
+  function syncStagePauseButton() {
+    if (!stagePauseBtn) return;
+    const show = busy && !!currentProject;
+    stagePauseBtn.classList.toggle('hidden', !show);
+    stagePauseBtn.disabled = !show || pauseRequested;
+  }
   function setBusy(value) {
     busy = !!value;
+    if (!busy) pauseRequested = false;
+    syncStagePauseButton();
     updateSendButtonState();
-    if (!busy) stageHint.textContent = '点击输入需求，开发进度会自动记录到项目页。';
+    if (!busy) setStageHintText('点击输入需求，开发进度会自动记录到项目页。');
   }
   function isContactChatActive() {
     return !!currentFriend || !!currentGroup;
@@ -5545,7 +5598,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
         el.textContent = STAGE_NAMES[i] + '：进行中';
         if (!allDone) {
           currentStageText.textContent = STAGE_NAMES[i] + ' 进行中…';
-          stageHint.textContent = STAGE_NAMES[i] + ' 进行中…';
+          setStageHintText(STAGE_NAMES[i] + ' 进行中…');
         }
       } else {
         el.textContent = STAGE_NAMES[i] + '：等待';
@@ -6494,9 +6547,27 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           if (data.step_current) updateStageLines(data.step_current, false);
         } else if (data.type === 'tool_call') appendBubble('progress', '工具：' + (data.tool || ''));
         else if (data.type === 'tool_result') appendBubble('progress', (data.tool || 'tool') + '\n' + (data.result || ''));
-        else if (data.type === 'done') {
+        else if (data.type === 'task_event') {
+          const event = data.event || '';
+          const msg = data.message || '';
+          if (event === 'cancel_requested') {
+            pauseRequested = true;
+            syncStagePauseButton();
+            setStageHintText(msg || '正在暂停当前工作…');
+            appendBubble('progress', msg || '已发送暂停请求，任务会尽快停止。');
+          } else if (event === 'canceled') {
+            setBusy(false);
+            setStageHintText(msg || '已暂停当前工作，可以继续输入。');
+            appendBubble('progress', msg || '任务已取消。');
+            loadProjects();
+          } else if (event === 'cancel_ignored') {
+            setBusy(false);
+            setStageHintText(msg || '没有找到可暂停的运行中任务。');
+            appendBubble('progress', msg || '没有找到可暂停的运行中任务。');
+          }
+        } else if (data.type === 'done') {
           setBusy(false);
-          stageHint.textContent = '✓ 任务完成，可以继续描述新需求。';
+          setStageHintText('✓ 任务完成，可以继续描述新需求。');
           updateStageLines(4, true);
           currentStageText.textContent = '✓ 任务完成';
           if (progressLog.length) {
@@ -6512,7 +6583,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
           if (data.apk_url) refreshDownloadPage().catch(() => {});
         } else if (data.type === 'error') {
           setBusy(false);
-          appendBubble('error', data.message || 'unknown error');
+          const message = data.message || 'unknown error';
+          const canceled = /取消|停止|cancel/i.test(message);
+          if (canceled) setStageHintText('已暂停当前工作，可以继续输入。');
+          appendBubble(canceled ? 'progress' : 'error', message);
           loadProjects();
         }
       } catch {
@@ -6576,6 +6650,27 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       renderConversationList();
       loadProjects().catch(() => {});
     }
+  }
+
+  function requestProjectTaskPause() {
+    if (!currentProject || !busy || pauseRequested) return;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      appendBubble('error', '项目通道未连接，正在重连后再暂停…');
+      connectSocket();
+      return;
+    }
+    pauseRequested = true;
+    syncStagePauseButton();
+    setStageHintText('正在请求暂停当前工作…');
+    appendBubble('progress', '已发送暂停请求。');
+    socket.send(JSON.stringify({ op: 'cancel', message: '' }));
+  }
+  if (stagePauseBtn) {
+    stagePauseBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      requestProjectTaskPause();
+    });
   }
 
   inputBar.addEventListener('submit', (e) => {

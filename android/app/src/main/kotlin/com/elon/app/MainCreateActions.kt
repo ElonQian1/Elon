@@ -57,6 +57,7 @@ internal class MainCreateActions(
         val adapter = ChatAdapter(activeConversation().messages, pauseCurrentWork, showMessageActions, retryFailedAttachmentMessage)
         setChatAdapter(adapter)
         binding.chatList.adapter = adapter
+        binding.stagePauseWorkButton.setOnClickListener { pauseCurrentWork() }
         setupNavigation()
         setupQuickActions()
         setupBackHandling()

@@ -434,7 +434,7 @@ internal class MainInputComposerSetup(
             }
             false
         }
-        binding.stageHintText.setOnClickListener {
+        binding.stageHintBar.setOnClickListener {
             collapseAttachmentPanel()
             collapseEmojiPanel()
             collapseInputComposer()
