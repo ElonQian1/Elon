@@ -202,18 +202,10 @@ pub async fn chat_project(
         error.as_deref(),
     );
 
-    // 把本轮对话写入 messages 表，供历史记录和记忆提取使用。
+    // create_task 已经写入本轮 user 消息；这里只补写 assistant，供历史记录和记忆提取使用。
     // 仅在有实质回复时写入，避免记录错误/空响应污染历史。
     if !reply.is_empty() && error.is_none() {
         if !original_user_message.trim().is_empty() {
-            let _ = state.store.add_message(
-                &project_id_for_history,
-                Some(&conversation_id),
-                Some(&task_id),
-                Some(&user.id),
-                "user",
-                original_user_message.trim(),
-            );
             let _ = state.store.add_message(
                 &project_id_for_history,
                 Some(&conversation_id),
