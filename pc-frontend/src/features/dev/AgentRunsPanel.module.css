@@ -156,6 +156,10 @@
   font-size: 10px;
 }
 
+.terminalStateGood { color: #71d69b !important; }
+.terminalStateWarn { color: #f0bd5b !important; }
+.terminalStateBad { color: #ff8080 !important; }
+
 .terminalActions button,
 .terminalForm button {
   width: 28px;
@@ -181,9 +185,35 @@
   cursor: not-allowed;
 }
 
+.terminalCapabilities {
+  min-height: 27px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 8px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.terminalCapabilities::-webkit-scrollbar { display: none; }
+
+.terminalCapabilities span {
+  flex: 0 0 auto;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 6px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 4px;
+  background: rgba(255,255,255,.04);
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1;
+}
+
 .terminalOutputWrap {
   min-height: 0;
-  height: 218px;
+  height: 206px;
   padding: 8px;
 }
 
@@ -204,6 +234,48 @@
   font-size: 11px;
   line-height: 1.45;
 }
+
+.ansiBold { font-weight: 700; }
+.ansiDim { opacity: .66; }
+.ansiUnderline { text-decoration: underline; text-underline-offset: 2px; }
+.ansiInverse {
+  color: #0a0d12 !important;
+  background: #d8e0ec !important;
+}
+
+.ansiFgBlack { color: #49515f; }
+.ansiFgRed { color: #ff7d7d; }
+.ansiFgGreen { color: #79d98e; }
+.ansiFgYellow { color: #f0c96b; }
+.ansiFgBlue { color: #82b1ff; }
+.ansiFgMagenta { color: #d7a1ff; }
+.ansiFgCyan { color: #73d8df; }
+.ansiFgWhite { color: #d8e0ec; }
+.ansiFgBrightBlack { color: #808a9a; }
+.ansiFgBrightRed { color: #ffa3a3; }
+.ansiFgBrightGreen { color: #a2ebb0; }
+.ansiFgBrightYellow { color: #ffe08c; }
+.ansiFgBrightBlue { color: #a8c8ff; }
+.ansiFgBrightMagenta { color: #e5bdff; }
+.ansiFgBrightCyan { color: #9cecf0; }
+.ansiFgBrightWhite { color: #ffffff; }
+
+.ansiBgBlack { background-color: #252b35; }
+.ansiBgRed { background-color: rgba(255, 125, 125, .18); }
+.ansiBgGreen { background-color: rgba(121, 217, 142, .18); }
+.ansiBgYellow { background-color: rgba(240, 201, 107, .18); }
+.ansiBgBlue { background-color: rgba(130, 177, 255, .18); }
+.ansiBgMagenta { background-color: rgba(215, 161, 255, .18); }
+.ansiBgCyan { background-color: rgba(115, 216, 223, .18); }
+.ansiBgWhite { background-color: rgba(216, 224, 236, .2); }
+.ansiBgBrightBlack { background-color: rgba(128, 138, 154, .18); }
+.ansiBgBrightRed { background-color: rgba(255, 163, 163, .2); }
+.ansiBgBrightGreen { background-color: rgba(162, 235, 176, .2); }
+.ansiBgBrightYellow { background-color: rgba(255, 224, 140, .2); }
+.ansiBgBrightBlue { background-color: rgba(168, 200, 255, .2); }
+.ansiBgBrightMagenta { background-color: rgba(229, 189, 255, .2); }
+.ansiBgBrightCyan { background-color: rgba(156, 236, 240, .2); }
+.ansiBgBrightWhite { background-color: rgba(255, 255, 255, .22); }
 
 .terminalForm {
   display: grid;
