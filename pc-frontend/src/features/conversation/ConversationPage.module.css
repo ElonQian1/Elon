@@ -14,13 +14,13 @@
 
 /* ══════════════════════════════════════
    频道面板（左 304px）
-   grid-rows: 58px | 48px | 1fr | 64px
+   grid-rows: 58px | 48px | 1fr | 78px
    ══════════════════════════════════════ */
 .channelPanel {
   background: var(--sidebar);
   border-right: 1px solid #16171a;
   display: grid;
-  grid-template-rows: 58px 48px minmax(0, 1fr) 64px;
+  grid-template-rows: 58px 48px minmax(0, 1fr) 78px;
   min-height: 0;
   position: relative;
 }

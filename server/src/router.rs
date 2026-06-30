@@ -25,7 +25,7 @@ use crate::{
     project_space_task_snapshot, project_storage_git, project_store, project_workspace_health,
     project_workspace_recovery, release_claim, route_c_admin, server_agent_runtime,
     speech_translate, token_usage_api, user_api, user_archive_api, user_memory_api,
-    voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
+    user_progression, voice_asr_upload, voice_tts_api, voice_ws_realtime_chat, voice_ws_transcribe,
     voice_ws_virtual_mic, web,
 };
 
@@ -178,6 +178,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/auth/login", post(auth_api::login))
         .route("/api/auth/register", post(auth_api::register))
         .route("/api/me", get(auth_api::me))
+        .route("/api/me/progression", get(user_progression::get_my_progression))
         .route(
             "/api/external/apps/:app_id",
             get(external_app_api::get_external_app),

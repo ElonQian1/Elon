@@ -10,6 +10,7 @@
 | 项目 API / 项目空间 | `server/src/project_api.rs` 及同领域拆分模块 |
 | AI CLI 调度 | `server/src/ai_cli/`、`server/src/agent.rs` |
 | 模型供应商和自定义模型 | `server/src/model_*`、`server/src/agent_model_*` |
+| 用户等级、经验条、token 消耗/分享算力经验 | `server/src/user_progression.rs`、`server/src/store/user_progression.rs`、`server/src/token_usage_api.rs`、`server/src/store/node_ledger.rs` |
 | context compiler / repo map | `server/src/context_compiler/` |
 | 项目 RAG 工具上下文 | `server/src/context_compiler/agent_rag_context.rs` |
 | 符号索引 API | `server/src/context_compiler/symbol_index_api.rs` |

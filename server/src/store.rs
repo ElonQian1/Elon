@@ -68,6 +68,7 @@ mod token_usage;
 mod user_archive;
 mod user_memories;
 mod user_presence;
+mod user_progression;
 mod users;
 
 pub use admin_stats::{
@@ -124,6 +125,7 @@ pub use user_memories::{
     UserMemory, MEMORY_SCOPE_CHAT, MEMORY_SCOPE_GLOBAL, MEMORY_SCOPE_PHONE_CONTROL,
     MEMORY_SCOPE_PROJECT,
 };
+pub use user_progression::UserProgressionLedger;
 
 pub struct Store {
     conn: Mutex<Connection>,

@@ -1,0 +1,51 @@
+.wrap {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.meta {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: #d9dde5;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.meta span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.track {
+  position: relative;
+  width: 100%;
+  height: 7px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18);
+}
+
+.consumed,
+.provided {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: block;
+}
+
+.consumed {
+  left: 0;
+  background: var(--green, #2ea861);
+}
+
+.provided {
+  background: var(--yellow, #d8a535);
+}

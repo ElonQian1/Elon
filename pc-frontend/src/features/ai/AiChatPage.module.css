@@ -18,7 +18,7 @@
   background: var(--sidebar);
   border-right: 1px solid var(--line-soft);
   display: grid;
-  grid-template-rows: 58px auto minmax(0, 1fr) 64px;
+  grid-template-rows: 58px auto minmax(0, 1fr) 78px;
   overflow: hidden;
 }
 

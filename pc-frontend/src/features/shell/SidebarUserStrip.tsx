@@ -2,6 +2,8 @@ import { useCallback, useId, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Settings } from 'lucide-react'
 import { useAuthStore } from '../../store/auth'
+import LevelExperienceBar from '../billing/LevelExperienceBar'
+import { useUserProgression } from '../billing/useUserProgression'
 import UserAvatar, { userDisplayName } from './UserAvatar'
 import UserAccountMenu from './UserAccountMenu'
 import styles from './SidebarUserStrip.module.css'
@@ -14,6 +16,7 @@ export default function SidebarUserStrip() {
   const user = useAuthStore((s) => s.user)
   const token = useAuthStore((s) => s.token)
   const logout = useAuthStore((s) => s.logout)
+  const progression = useUserProgression(user?.id, token)
   const displayName = user ? userDisplayName(user) : token ? '加载中…' : '未登录'
 
   const closeMenu = useCallback(() => setMenuOpen(false), [])
@@ -33,6 +36,10 @@ export default function SidebarUserStrip() {
       ref={stripRef}
       className={[styles.strip, menuOpen ? styles.stripOpen : ''].filter(Boolean).join(' ')}
     >
+      <div className={styles.progressSlot}>
+        <LevelExperienceBar progression={progression} />
+      </div>
+
       <button
         className={styles.profileBtn}
         type="button"
