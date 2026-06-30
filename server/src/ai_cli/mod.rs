@@ -53,6 +53,7 @@ use crate::{
 
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
 const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
+const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 8;
 
 pub use self::ai_cli_intent_gate::confirm_project_intent;
 
@@ -1040,7 +1041,59 @@ async fn run_via_pc_agent(
         }))
     };
 
-    while let Some(event) = rx.recv().await {
+    loop {
+        let event = if lightweight_pc_chat {
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS),
+                rx.recv(),
+            )
+            .await
+            {
+                Ok(Some(event)) => event,
+                Ok(None) => break,
+                Err(_) => {
+                    abort_pc_progress(&mut progress_handle);
+                    let reply =
+                        lightweight_pc_chat_reply_or_fallback(&full_text, is_codex, user_message);
+                    let _ = tx.send(
+                        WsMessage::AssistantMessage {
+                            text: reply,
+                            model_used: Some(display_model.clone()),
+                            stream_id: None,
+                            node_id: Some(agent_id.to_string()),
+                        }
+                        .to_json(),
+                    );
+                    pc_billing_call.release_no_usage();
+                    finish_pc_node_compute_run(
+                        state,
+                        &pc_accounting_key,
+                        "released_no_usage",
+                        None,
+                        None,
+                        None,
+                        Some("Lightweight PC chat timed out before CliDone; returned fallback"),
+                    );
+                    let _ = tx.send(
+                        WsMessage::Done {
+                            message: String::new(),
+                            apk_url: None,
+                            image_url: None,
+                            model_used: Some(display_model.clone()),
+                            node_id: Some(agent_id.to_string()),
+                        }
+                        .to_json(),
+                    );
+                    return Ok(());
+                }
+            }
+        } else {
+            match rx.recv().await {
+                Some(event) => event,
+                None => break,
+            }
+        };
+
         match event {
             AgentToServer::CliChunk { text, .. } => {
                 if lightweight_pc_chat {
@@ -1197,12 +1250,7 @@ async fn run_via_pc_agent(
                 {
                     // Copilot/Codex 流式已发，CliDone 只需补发未流式的部分
                     let reply = if lightweight_pc_chat {
-                        let extracted = extract_lightweight_pc_chat_reply(&full_text, is_codex);
-                        if extracted.is_empty() {
-                            fallback_lightweight_pc_chat_reply(user_message)
-                        } else {
-                            extracted
-                        }
+                        lightweight_pc_chat_reply_or_fallback(&full_text, is_codex, user_message)
                     } else if stream_started {
                         String::new() // 已流式完毕，Done 不重复发
                     } else if is_codex {
@@ -1274,6 +1322,40 @@ async fn run_via_pc_agent(
     }
 
     abort_pc_progress(&mut progress_handle);
+    if lightweight_pc_chat {
+        let reply = lightweight_pc_chat_reply_or_fallback(&full_text, is_codex, user_message);
+        let _ = tx.send(
+            WsMessage::AssistantMessage {
+                text: reply,
+                model_used: Some(display_model.clone()),
+                stream_id: None,
+                node_id: Some(agent_id.to_string()),
+            }
+            .to_json(),
+        );
+        pc_billing_call.release_no_usage();
+        finish_pc_node_compute_run(
+            state,
+            &pc_accounting_key,
+            "released_no_usage",
+            None,
+            None,
+            None,
+            Some("Lightweight PC chat channel closed before CliDone; returned fallback"),
+        );
+        let _ = tx.send(
+            WsMessage::Done {
+                message: String::new(),
+                apk_url: None,
+                image_url: None,
+                model_used: Some(display_model.clone()),
+                node_id: Some(agent_id.to_string()),
+            }
+            .to_json(),
+        );
+        return Ok(());
+    }
+
     finish_pc_node_compute_run(
         state,
         &pc_accounting_key,
@@ -1335,6 +1417,19 @@ fn extract_lightweight_pc_chat_reply(output: &str, is_codex: bool) -> String {
     }
 
     extract_marker_lightweight_reply(&clean)
+}
+
+fn lightweight_pc_chat_reply_or_fallback(
+    output: &str,
+    is_codex: bool,
+    user_message: &str,
+) -> String {
+    let extracted = extract_lightweight_pc_chat_reply(output, is_codex);
+    if extracted.is_empty() {
+        fallback_lightweight_pc_chat_reply(user_message)
+    } else {
+        extracted
+    }
 }
 
 fn fallback_lightweight_pc_chat_reply(user_message: &str) -> String {
@@ -1913,9 +2008,10 @@ fn extract_codex_reply(output: &str) -> String {
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
     use super::{
-        extract_lightweight_pc_chat_reply, native_session_uuid, pc_cli_passthrough_event,
-        pc_dispatch_started_event, pc_lightweight_chat_prompt, pc_route_a_extra_args,
-        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
+        extract_lightweight_pc_chat_reply, lightweight_pc_chat_reply_or_fallback,
+        native_session_uuid, pc_cli_passthrough_event, pc_dispatch_started_event,
+        pc_lightweight_chat_prompt, pc_route_a_extra_args, strip_terminal_control_sequences,
+        AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2039,5 +2135,13 @@ tokens used\n\
     #[test]
     fn pc_lightweight_chat_strips_orphan_ansi_fragments() {
         assert_eq!(strip_terminal_control_sequences("[m你好[?25h[22m"), "你好");
+    }
+
+    #[test]
+    fn pc_lightweight_chat_fallback_keeps_tiny_greeting_visible() {
+        let reply = lightweight_pc_chat_reply_or_fallback("", true, "你好");
+
+        assert!(!reply.trim().is_empty());
+        assert!(reply.contains("你好") || reply.contains("我在"));
     }
 }

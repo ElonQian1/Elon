@@ -12,7 +12,8 @@ use crate::{
         is_short_resume_command,
     },
     agent_routing::{
-        api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
+        api_agent_name, choose_backend, has_api_agents, is_local_cli_option, quick_casual_reply,
+        resolve_cli_option_id,
     },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
@@ -81,6 +82,20 @@ pub async fn run_for_project_in_workspace(
     let requires_project_workflow = requires_project_workflow_for_message(user_message, workspace);
 
     if !requires_project_workflow && pc_cli_chat_requested(pc_runtime_route) {
+        if let Some(reply) = quick_casual_reply(user_message) {
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: reply.to_string(),
+                    apk_url: None,
+                    image_url: None,
+                    model_used: None,
+                    node_id: None,
+                }
+                .to_json(),
+            );
+            return;
+        }
+
         if let Some((agent_id, _pc_workspace)) = pc_project_binding(project) {
             let runtime_choice =
                 choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
