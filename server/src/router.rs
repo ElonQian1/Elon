@@ -493,6 +493,42 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(group_ai::api::list_matters),
         )
         .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/approve",
+            post(group_ai::api::approve_matter),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/start",
+            post(group_ai::api::start_matter),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/request-changes",
+            post(group_ai::api::request_matter_changes),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/accept",
+            post(group_ai::api::accept_matter),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/cancel",
+            post(group_ai::api::cancel_matter),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/complete",
+            post(group_ai::api::complete_assignment),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/fail",
+            post(group_ai::api::fail_assignment),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/retry",
+            post(group_ai::api::retry_assignment),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/settlement",
+            post(group_ai::api::record_assignment_settlement_handler),
+        )
+        .route(
             "/api/projects/:project_id/ai/matters/:matter_id",
             get(group_ai::api::get_matter),
         )

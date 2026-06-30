@@ -1,3 +1,4 @@
+mod actions;
 pub(crate) mod api;
 mod bot_selector;
 mod permissions;

@@ -5,6 +5,11 @@ pub(crate) const COLLAB_MODE_SOLO: &str = "solo";
 pub(crate) const COLLAB_MODE_CRITIC: &str = "critic";
 pub(crate) const COLLAB_MODE_SPLIT: &str = "split";
 pub(crate) const MATTER_STATUS_PLAN_READY: &str = "plan_ready";
+pub(crate) const MATTER_STATUS_RUNNING: &str = "running";
+pub(crate) const MATTER_STATUS_REVIEW_READY: &str = "review_ready";
+pub(crate) const MATTER_STATUS_DONE: &str = "done";
+pub(crate) const MATTER_STATUS_CANCELED: &str = "canceled";
+pub(crate) const MATTER_STATUS_FAILED: &str = "failed";
 
 #[derive(Debug, Clone, Serialize)]
 pub(crate) struct ProjectAiNodeAuthorization {
@@ -110,4 +115,49 @@ pub(crate) struct ProjectAiMatter {
     pub final_decision: Option<String>,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CreateMatterAssignmentRecord {
+    pub matter_id: String,
+    pub bot_id: String,
+    pub assignee_user_id: Option<String>,
+    pub provider_user_id: String,
+    pub node_id: String,
+    pub role: String,
+    pub runtime_route: String,
+    pub cli_name: String,
+    pub worktree_path: Option<String>,
+    pub branch_name: Option<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiMatterAssignment {
+    pub id: String,
+    pub matter_id: String,
+    pub bot_id: String,
+    pub assignee_user_id: Option<String>,
+    pub provider_user_id: String,
+    pub node_id: String,
+    pub role: String,
+    pub runtime_route: String,
+    pub cli_name: String,
+    pub worktree_path: Option<String>,
+    pub branch_name: Option<String>,
+    pub status: String,
+    pub result_summary: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiEvent {
+    pub id: String,
+    pub matter_id: String,
+    pub project_id: String,
+    pub actor_user_id: Option<String>,
+    pub event_type: String,
+    pub payload: Value,
+    pub created_at: String,
 }

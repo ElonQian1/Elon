@@ -66,6 +66,18 @@ pub struct NodeQualityScore {
 }
 
 impl Store {
+    pub fn get_node_compute_run_by_compute_call_id(
+        &self,
+        compute_call_id: &str,
+    ) -> Result<Option<NodeComputeRun>> {
+        let compute_call_id = compute_call_id.trim();
+        if compute_call_id.is_empty() {
+            return Ok(None);
+        }
+        let conn = self.conn.lock().unwrap();
+        select_run_by_compute_call_id(&conn, compute_call_id)
+    }
+
     pub fn start_node_compute_run(&self, input: NodeComputeRunStart<'_>) -> Result<NodeComputeRun> {
         let compute_call_id = input.compute_call_id.trim();
         let ts = now();
@@ -346,6 +358,11 @@ mod tests {
 
         assert_eq!(first.id, second.id);
         assert_eq!(first.status, "started");
+        let fetched = store
+            .get_node_compute_run_by_compute_call_id("pc_agent_cli:req-1")
+            .unwrap()
+            .unwrap();
+        assert_eq!(fetched.id, first.id);
 
         let finished = store
             .finish_node_compute_run(

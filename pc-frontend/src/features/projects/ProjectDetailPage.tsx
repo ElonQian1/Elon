@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { api } from '../../api/client'
+import GroupAiPanel from '../group-ai/GroupAiPanel'
 import { useProjectStore } from '../conversation/useProjectStore'
 import ProjectReadinessCard from './ProjectReadinessCard'
 import type { ProjectMember } from '../conversation/types'
 import styles from './ProjectDetailPage.module.css'
 
-type Tab = 'overview' | 'members' | 'workspace'
+type Tab = 'overview' | 'members' | 'workspace' | 'groupAi'
 
 interface WorkspaceHealth {
   workspace_exists?: boolean
@@ -88,14 +89,14 @@ export default function ProjectDetailPage() {
       </header>
 
       <nav className={styles.tabs}>
-        {(['overview', 'members', 'workspace'] as Tab[]).map((key) => (
+        {(['overview', 'members', 'workspace', 'groupAi'] as Tab[]).map((key) => (
           <button
             key={key}
             className={[styles.tab, tab === key ? styles.tabActive : ''].join(' ')}
             onClick={() => setTab(key)}
             type="button"
           >
-            {{ overview: '概览', members: '成员', workspace: '工作区' }[key]}
+            {{ overview: '概览', members: '成员', workspace: '工作区', groupAi: '群体 AI' }[key]}
           </button>
         ))}
       </nav>
@@ -103,6 +104,7 @@ export default function ProjectDetailPage() {
       <div className={styles.content}>
         {tab === 'overview' && <OverviewTab project={project} space={space} />}
         {tab === 'members' && <MembersTab members={memberList} onRefresh={loadMembers} projectId={id ?? ''} />}
+        {tab === 'groupAi' && <GroupAiPanel projectId={id ?? ''} channels={space?.channels ?? []} />}
         {tab === 'workspace' && (
           <WorkspaceTab
             health={health}
