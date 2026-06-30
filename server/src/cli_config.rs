@@ -4,6 +4,8 @@
 //! Copilot API 代理 agent 生成等无关 AppState 的逻辑全部塞在一起。
 //! 本模块抽出来后 `types.rs` 只保留共享数据结构骨架。
 
+use std::{collections::HashMap, process::Command};
+
 use serde::Deserialize;
 
 use crate::types::AgentConfig;
@@ -299,6 +301,12 @@ fn provider_cli_options(
 
     let configured_efforts =
         split_list(&std::env::var(format!("{}_CLI_REASONING_EFFORTS", prefix)).unwrap_or_default());
+    let codex_catalog_efforts =
+        if provider.eq_ignore_ascii_case("codex") && configured_efforts.is_empty() {
+            codex_reasoning_effort_catalog(&bin)
+        } else {
+            HashMap::new()
+        };
     let default_reasoning_summary = std::env::var(format!("{}_CLI_REASONING_SUMMARY", prefix))
         .ok()
         .and_then(clean_optional);
@@ -311,7 +319,11 @@ fn provider_cli_options(
         .flat_map(|model| {
             let efforts = if provider.eq_ignore_ascii_case("codex") {
                 if configured_efforts.is_empty() {
-                    default_codex_reasoning_efforts(&model)
+                    codex_catalog_efforts
+                        .get(&model.trim().to_ascii_lowercase())
+                        .cloned()
+                        .filter(|efforts| !efforts.is_empty())
+                        .unwrap_or_else(|| fallback_codex_reasoning_efforts(&model))
                 } else {
                     configured_efforts.clone()
                 }
@@ -436,16 +448,80 @@ fn default_codex_models() -> Vec<String> {
         .collect()
 }
 
-fn default_codex_reasoning_efforts(model: &str) -> Vec<String> {
-    let model = model.trim().to_ascii_lowercase();
-    let efforts: &[&str] = if model.contains("mini") || model.contains("spark") {
-        &["low", "medium"]
-    } else if model == "gpt-5.5" {
-        &["high", "xhigh"]
-    } else {
-        &["medium", "high"]
-    };
-    efforts.iter().map(|value| (*value).to_string()).collect()
+#[derive(Debug, Deserialize)]
+struct CodexModelCatalog {
+    #[serde(default)]
+    models: Vec<CodexCatalogModel>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexCatalogModel {
+    slug: String,
+    #[serde(default)]
+    supported_reasoning_levels: Vec<CodexReasoningLevel>,
+}
+
+#[derive(Debug, Deserialize)]
+struct CodexReasoningLevel {
+    effort: String,
+}
+
+fn codex_reasoning_effort_catalog(bin: &str) -> HashMap<String, Vec<String>> {
+    match Command::new(bin)
+        .args(["debug", "models", "--bundled"])
+        .output()
+    {
+        Ok(output) if output.status.success() => {
+            let raw = String::from_utf8_lossy(&output.stdout);
+            parse_codex_reasoning_effort_catalog(&raw).unwrap_or_else(|err| {
+                tracing::warn!("Codex CLI 模型 catalog 解析失败: {}", err);
+                HashMap::new()
+            })
+        }
+        Ok(output) => {
+            tracing::warn!("Codex CLI 模型 catalog 读取失败: {}", output.status);
+            HashMap::new()
+        }
+        Err(err) => {
+            tracing::warn!("Codex CLI 模型 catalog 命令启动失败: {}", err);
+            HashMap::new()
+        }
+    }
+}
+
+fn parse_codex_reasoning_effort_catalog(
+    raw: &str,
+) -> Result<HashMap<String, Vec<String>>, serde_json::Error> {
+    let catalog: CodexModelCatalog = serde_json::from_str(raw)?;
+    let mut by_model = HashMap::new();
+    for model in catalog.models {
+        let slug = model.slug.trim().to_ascii_lowercase();
+        if slug.is_empty() {
+            continue;
+        }
+        let mut efforts = Vec::new();
+        for level in model.supported_reasoning_levels {
+            if let Some(effort) = clean_optional(level.effort) {
+                if !efforts
+                    .iter()
+                    .any(|existing: &String| existing.eq_ignore_ascii_case(&effort))
+                {
+                    efforts.push(effort);
+                }
+            }
+        }
+        if !efforts.is_empty() {
+            by_model.insert(slug, efforts);
+        }
+    }
+    Ok(by_model)
+}
+
+fn fallback_codex_reasoning_efforts(_model: &str) -> Vec<String> {
+    ["low", "medium", "high", "xhigh"]
+        .into_iter()
+        .map(ToString::to_string)
+        .collect()
 }
 
 fn codex_profile_label(
@@ -669,5 +745,59 @@ mod tests {
         );
 
         assert!(config.find_codex_option(Some("copilot:gpt-4o")).is_none());
+    }
+
+    #[test]
+    fn parse_codex_catalog_keeps_all_supported_reasoning_levels() {
+        let catalog = r#"{
+            "models": [
+                {
+                    "slug": "gpt-5.4",
+                    "supported_reasoning_levels": [
+                        { "effort": "low" },
+                        { "effort": "medium" },
+                        { "effort": "high" },
+                        { "effort": "xhigh" }
+                    ]
+                },
+                {
+                    "slug": "gpt-5.4-mini",
+                    "supported_reasoning_levels": [
+                        { "effort": "low" },
+                        { "effort": "medium" },
+                        { "effort": "medium" }
+                    ]
+                }
+            ]
+        }"#;
+
+        let efforts = parse_codex_reasoning_effort_catalog(catalog).unwrap();
+
+        assert_eq!(
+            efforts.get("gpt-5.4").unwrap(),
+            &vec![
+                "low".to_string(),
+                "medium".to_string(),
+                "high".to_string(),
+                "xhigh".to_string()
+            ]
+        );
+        assert_eq!(
+            efforts.get("gpt-5.4-mini").unwrap(),
+            &vec!["low".to_string(), "medium".to_string()]
+        );
+    }
+
+    #[test]
+    fn fallback_codex_efforts_are_not_two_level_only() {
+        assert_eq!(
+            fallback_codex_reasoning_efforts("gpt-5.4"),
+            vec![
+                "low".to_string(),
+                "medium".to_string(),
+                "high".to_string(),
+                "xhigh".to_string()
+            ]
+        );
     }
 }
