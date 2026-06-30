@@ -59,6 +59,7 @@ mod node_agent_api_runtime_tools;
 mod node_agent_cli_pty;
 mod node_agent_cli_security;
 mod node_agent_cli_session_bridge;
+mod node_agent_cli_session_bridge_capabilities;
 mod node_agent_cli_sidecar;
 mod node_agent_cli_sidecar_admin;
 mod node_agent_cli_sidecar_io;

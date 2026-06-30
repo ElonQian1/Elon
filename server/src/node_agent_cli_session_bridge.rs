@@ -3,6 +3,9 @@ use std::collections::BTreeSet;
 
 use crate::{
     node_agent_active_task::ActiveCliPromptView,
+    node_agent_cli_session_bridge_capabilities::{
+        capability_summary, insert_compat_fields, SIDECAR_TOOL_APPROVAL_RECOVERY_SUPPORTED,
+    },
     node_agent_cli_sidecar::{now_ms, sidecar_status_view, CliSidecarSessionRecord},
     node_agent_task_journal::TaskJournalRecord,
 };
@@ -31,6 +34,14 @@ pub(crate) fn status_payload_for(
         .map(sidecar_status_view);
     let managed_sidecar_available = summary.sidecar_attachable_count > 0;
     let sidecar_approval_available = summary.sidecar_approval_recoverable_count > 0;
+    let capability_summary = capability_summary(
+        managed_sidecar_available,
+        sidecar_approval_available,
+        summary.sidecar_attachable_count,
+        summary.sidecar_approval_recoverable_count,
+        summary.codex_session_count,
+        summary.recent_record_count,
+    );
     let status = if managed_sidecar_available {
         "sidecar_recoverable_continuity"
     } else {
@@ -77,6 +88,8 @@ pub(crate) fn status_payload_for(
         "restores_prompt_or_api_key": false,
         "restores_original_tty": managed_sidecar_available,
         "restores_tool_approval_waiter": sidecar_approval_available,
+        "restores_tool_approval_waiter_supported": SIDECAR_TOOL_APPROVAL_RECOVERY_SUPPORTED,
+        "restores_tool_approval_waiter_currently_available": sidecar_approval_available,
         "next_action": restart_next_action(&summary),
         "reason": restart_reason
     });
@@ -138,7 +151,7 @@ pub(crate) fn status_payload_for(
         }),
     ];
 
-    json!({
+    let mut payload = json!({
         "status": status,
         "mode": mode,
         "current_state": current_state,
@@ -198,7 +211,14 @@ pub(crate) fn status_payload_for(
             "补充屏幕级终端 buffer；当前前端显示 PTY 字节流的 ANSI 可读视图。"
         ],
         "routes": routes
-    })
+    });
+    insert_compat_fields(
+        &mut payload,
+        capability_summary,
+        managed_sidecar_available,
+        sidecar_approval_available,
+    );
+    payload
 }
 
 #[derive(Debug, Default)]
@@ -323,7 +343,7 @@ fn summary_text(summary: &ContinuitySummary) -> &'static str {
     if summary.sidecar_attachable_count > 0 {
         "已具备一龙托管 PTY/ConPTY sidecar 会话恢复层：可在节点重启后通过本机 attach API 读取输出、写入终端输入、调整尺寸，并恢复可验证审批；任意外部终端仍不可接管。"
     } else {
-        "已具备本机运行句柄、任务 journal、Codex session 和云端快照的恢复基础层；仍不重新接管非 sidecar 管理的原 CLI TTY，节点重启后的非 sidecar 旧审批卡不会继续批准。"
+        "已具备一龙托管 PTY/ConPTY sidecar 能力、任务 journal、Codex session 和云端快照恢复基础层；当前没有可重接 sidecar 会话时，仍不重新接管非 sidecar 管理的原 CLI TTY，节点重启后的非 sidecar 旧审批卡不会继续批准。"
     }
 }
 
@@ -482,6 +502,8 @@ mod tests {
         assert_eq!(status["current_state"], "ready_no_session");
         assert_eq!(status["restart_recovery_supported"], true);
         assert_eq!(status["post_restart_approval_supported"], false);
+        assert_eq!(status["post_restart_approval_capability_supported"], true);
+        assert_eq!(status["post_restart_approval_currently_available"], false);
         assert_eq!(status["can_resume_after_node_restart"], false);
         assert_eq!(status["json_stream_supported"], true);
         assert_eq!(status["codex_resume_supported"], true);
@@ -492,7 +514,7 @@ mod tests {
         assert!(status["summary"]
             .as_str()
             .unwrap_or_default()
-            .contains("恢复基础层"));
+            .contains("当前没有可重接 sidecar"));
         assert!(status["continuity_modes"]
             .as_array()
             .is_some_and(|items| items.len() >= 3));
@@ -526,6 +548,41 @@ mod tests {
             "managed_pty_conpty_attach_read_write_resize"
         );
         assert_eq!(status["managed_conpty_sidecar_active"], false);
+        assert_eq!(status["managed_tty_reattach_capability_supported"], true);
+        assert_eq!(status["managed_tty_reattach_currently_available"], false);
+        assert_eq!(status["sidecar_tool_approval_recovery_supported"], true);
+        assert_eq!(
+            status["sidecar_tool_approval_recovery_currently_available"],
+            false
+        );
+        assert_eq!(
+            status["restart_recovery"]["restores_tool_approval_waiter_supported"],
+            true
+        );
+        assert_eq!(
+            status["restart_recovery"]["restores_tool_approval_waiter_currently_available"],
+            false
+        );
+        assert_eq!(
+            status["capability_summary"]["managed_pty_conpty_sidecar"]["supported"],
+            true
+        );
+        assert_eq!(
+            status["capability_summary"]["managed_pty_conpty_sidecar"]["currently_available"],
+            false
+        );
+        assert_eq!(
+            status["capability_summary"]["post_restart_tool_approval"]["supported"],
+            true
+        );
+        assert_eq!(
+            status["capability_summary"]["post_restart_tool_approval"]["currently_available"],
+            false
+        );
+        assert_eq!(
+            status["capability_summary"]["external_tty_takeover"]["supported"],
+            false
+        );
         assert_eq!(
             status["sidecar_attach_api"]["write"],
             "/api/cli-sidecars/:task_id/input"
@@ -620,8 +677,19 @@ mod tests {
         assert_eq!(status["status"], "sidecar_recoverable_continuity");
         assert_eq!(status["current_state"], "managed_sidecar_attachable");
         assert_eq!(status["managed_tty_reattach_supported"], true);
+        assert_eq!(status["managed_tty_reattach_currently_available"], true);
         assert_eq!(status["can_resume_after_node_restart"], true);
         assert_eq!(status["can_approve_after_node_restart"], true);
+        assert_eq!(status["post_restart_approval_capability_supported"], true);
+        assert_eq!(status["post_restart_approval_currently_available"], true);
+        assert_eq!(
+            status["capability_summary"]["managed_pty_conpty_sidecar"]["currently_available"],
+            true
+        );
+        assert_eq!(
+            status["capability_summary"]["post_restart_tool_approval"]["recoverable_count"],
+            1
+        );
         assert_eq!(
             status["restart_recovery"]["mode"],
             "managed_pty_conpty_sidecar_attach"
