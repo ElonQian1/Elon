@@ -1043,6 +1043,10 @@ async fn run_via_pc_agent(
     while let Some(event) = rx.recv().await {
         match event {
             AgentToServer::CliChunk { text, .. } => {
+                if lightweight_pc_chat {
+                    full_text.push_str(&text);
+                    continue;
+                }
                 if let Some(event) = pc_cli_passthrough_event(&text) {
                     abort_pc_progress(&mut progress_handle);
                     let _ = tx.send(event);
@@ -1192,7 +1196,14 @@ async fn run_via_pc_agent(
                             .unwrap_or(true))
                 {
                     // Copilot/Codex 流式已发，CliDone 只需补发未流式的部分
-                    let reply = if stream_started {
+                    let reply = if lightweight_pc_chat {
+                        let extracted = extract_lightweight_pc_chat_reply(&full_text, is_codex);
+                        if extracted.is_empty() {
+                            fallback_lightweight_pc_chat_reply(user_message)
+                        } else {
+                            extracted
+                        }
+                    } else if stream_started {
                         String::new() // 已流式完毕，Done 不重复发
                     } else if is_codex {
                         extract_codex_reply(&full_text)
@@ -1305,6 +1316,217 @@ fn pc_lightweight_chat_prompt(
         model_line,
         user_message
     )
+}
+
+fn extract_lightweight_pc_chat_reply(output: &str, is_codex: bool) -> String {
+    let clean = strip_terminal_control_sequences(output);
+    if let Some(reply) = extract_json_agent_message(&clean) {
+        let reply = sanitize_lightweight_pc_reply(&reply);
+        if !reply.is_empty() {
+            return reply;
+        }
+    }
+
+    if is_codex {
+        let reply = sanitize_lightweight_pc_reply(&extract_codex_reply(&clean));
+        if !reply.is_empty() {
+            return reply;
+        }
+    }
+
+    extract_marker_lightweight_reply(&clean)
+}
+
+fn fallback_lightweight_pc_chat_reply(user_message: &str) -> String {
+    quick_casual_reply(user_message)
+        .unwrap_or("我在。刚才本机 AI 没有返回可读内容，你可以继续说。")
+        .to_string()
+}
+
+fn extract_marker_lightweight_reply(output: &str) -> String {
+    let mut collecting = false;
+    let mut reply_lines = Vec::<String>::new();
+
+    for raw in output.lines() {
+        let line = raw.trim();
+        if is_lightweight_reply_marker(line) {
+            collecting = true;
+            reply_lines.clear();
+            continue;
+        }
+        if !collecting {
+            continue;
+        }
+        if is_codex_output_boundary(line) {
+            if reply_lines.is_empty() {
+                continue;
+            }
+            break;
+        }
+        if !is_lightweight_cli_noise_line(line) {
+            reply_lines.push(line.to_string());
+        }
+    }
+
+    reply_lines.join("\n").trim().to_string()
+}
+
+fn sanitize_lightweight_pc_reply(reply: &str) -> String {
+    let clean = strip_terminal_control_sequences(reply);
+    clean
+        .lines()
+        .map(str::trim)
+        .filter(|line| {
+            !line.is_empty()
+                && !is_lightweight_cli_noise_line(line)
+                && !is_codex_output_boundary(line)
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string()
+}
+
+fn strip_terminal_control_sequences(input: &str) -> String {
+    let chars = input.chars().collect::<Vec<_>>();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+
+    while i < chars.len() {
+        let ch = chars[i];
+        if ch == '\u{1b}' {
+            i += 1;
+            if i < chars.len() && chars[i] == '[' {
+                i += 1;
+                while i < chars.len() {
+                    let next = chars[i];
+                    i += 1;
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+                continue;
+            }
+            if i < chars.len() && chars[i] == ']' {
+                i += 1;
+                while i < chars.len() {
+                    if chars[i] == '\u{7}' {
+                        i += 1;
+                        break;
+                    }
+                    if chars[i] == '\u{1b}' && i + 1 < chars.len() && chars[i + 1] == '\\' {
+                        i += 2;
+                        break;
+                    }
+                    i += 1;
+                }
+                continue;
+            }
+            continue;
+        }
+
+        if let Some(end) = orphan_csi_end(&chars, i) {
+            i = end;
+            continue;
+        }
+
+        if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+            i += 1;
+            continue;
+        }
+
+        out.push(ch);
+        i += 1;
+    }
+
+    out
+}
+
+fn orphan_csi_end(chars: &[char], start: usize) -> Option<usize> {
+    if chars.get(start) != Some(&'[') {
+        return None;
+    }
+
+    let mut i = start + 1;
+    if chars.get(i) == Some(&'?') {
+        i += 1;
+    }
+
+    let mut saw_param = false;
+    while i < chars.len() && (chars[i].is_ascii_digit() || chars[i] == ';') {
+        saw_param = true;
+        i += 1;
+    }
+
+    if i < chars.len() && chars[i].is_ascii_alphabetic() && (saw_param || chars[i] == 'm') {
+        Some(i + 1)
+    } else {
+        None
+    }
+}
+
+fn is_lightweight_reply_marker(line: &str) -> bool {
+    matches!(
+        line.trim().to_ascii_lowercase().as_str(),
+        "codex" | "assistant"
+    )
+}
+
+fn is_codex_output_boundary(line: &str) -> bool {
+    let lower = line.trim().to_ascii_lowercase();
+    matches!(
+        lower.as_str(),
+        "user" | "exec" | "tokens used" | "tool" | "system" | "output:"
+    ) || lower.starts_with("openai codex")
+        || lower.starts_with("workdir:")
+        || lower.starts_with("model:")
+        || lower.starts_with("provider:")
+        || lower.starts_with("approval:")
+        || lower.starts_with("sandbox:")
+        || lower.starts_with("reasoning")
+        || lower.starts_with("session id:")
+        || lower.starts_with("wall time:")
+        || lower.starts_with("process exited")
+        || lower.starts_with("original token count:")
+        || lower.starts_with("succeeded in")
+        || lower.starts_with("failed in")
+        || lower.starts_with("error:")
+        || lower == "assistant"
+}
+
+fn is_lightweight_cli_noise_line(line: &str) -> bool {
+    let trimmed = line.trim();
+    if trimmed.is_empty() {
+        return true;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+
+    is_lightweight_reply_marker(trimmed)
+        || lower.starts_with("]0;")
+        || lower.starts_with("[warn")
+        || lower.starts_with("warn ")
+        || lower.starts_with("warning:")
+        || lower.starts_with("2026-")
+        || lower.starts_with('{') && lower.contains("\"type\"")
+        || lower.contains("cmd.exe")
+        || lower.contains("windows\\system32")
+        || lower.contains("unc ")
+        || trimmed.contains("路径不受支持")
+        || trimmed.contains("默认值设为")
+        || lower.contains("sqlx::query")
+        || lower.contains("slow statement")
+        || lower.contains("delete from logs")
+        || lower.contains("rows_affected")
+        || lower.contains("rows_returned")
+        || lower.contains("db.statement")
+        || lower.contains("elapsed")
+        || lower.contains("event.timestamp=")
+        || lower.contains("mcp_server=")
+        || lower.contains("model_client.")
+        || lower.contains("responses_websocket")
+        || lower.contains("feedback_tags")
+        || lower.contains("auth_header")
+        || lower.starts_with(r"\\?\")
 }
 
 fn pc_cli_passthrough_event(text: &str) -> Option<String> {
@@ -1656,13 +1878,14 @@ fn clamp_i64_to_u32(value: i64) -> u32 {
 ///   <数字>
 ///   <AI 回复重复>       ← 丢弃
 fn extract_codex_reply(output: &str) -> String {
-    let lines: Vec<&str> = output.lines().collect();
+    let clean = strip_terminal_control_sequences(output);
+    let lines: Vec<&str> = clean.lines().collect();
     let mut in_codex_reply = false;
-    let mut reply_lines: Vec<&str> = Vec::new();
+    let mut reply_lines: Vec<String> = Vec::new();
 
     for line in &lines {
         let trimmed = line.trim();
-        if trimmed == "codex" && !in_codex_reply {
+        if is_lightweight_reply_marker(trimmed) && !in_codex_reply {
             in_codex_reply = true;
             continue;
         }
@@ -1671,7 +1894,16 @@ fn extract_codex_reply(output: &str) -> String {
             if trimmed == "tokens used" || trimmed.chars().all(|c| c.is_ascii_digit() || c == ',') {
                 break;
             }
-            reply_lines.push(line);
+            if is_codex_output_boundary(trimmed) {
+                if reply_lines.is_empty() {
+                    continue;
+                }
+                break;
+            }
+            if is_lightweight_cli_noise_line(trimmed) {
+                continue;
+            }
+            reply_lines.push(trimmed.to_string());
         }
     }
 
@@ -1681,8 +1913,9 @@ fn extract_codex_reply(output: &str) -> String {
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
     use super::{
-        native_session_uuid, pc_cli_passthrough_event, pc_dispatch_started_event,
-        pc_lightweight_chat_prompt, pc_route_a_extra_args, AiCliRequestMode, NativeSessionScope,
+        extract_lightweight_pc_chat_reply, native_session_uuid, pc_cli_passthrough_event,
+        pc_dispatch_started_event, pc_lightweight_chat_prompt, pc_route_a_extra_args,
+        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -1783,5 +2016,28 @@ mod pc_cli_passthrough_tests {
         assert!(prompt.contains("不运行命令"));
         assert!(prompt.contains("不修改代码"));
         assert!(prompt.contains("我有一个想法"));
+    }
+
+    #[test]
+    fn pc_lightweight_chat_reply_ignores_terminal_noise() {
+        let output = "\u{1b}[m\\\\?\\C:\\Users\\ELon\n\
+用作为当前目录的以上路径启动了 CMD.EXE。\n\
+UNC 路径不受支持。默认值设为 Windows 目录。\n\
+]0;C:\\WINDOWS\\system32\\cmd.exe\u{1b}[?25h]0;C:\\WINDOWS\\system32\\cmd.exe\n\
+2026-06-30T12:14:19.451149Z WARN sqlx::query: slow statement: execution time exceeded alert threshold db.statement=\"DELETE FROM logs WHERE ts < ?\" rows_affected=10449 rows_returned=0 elapsed=1.54s\n\
+codex\n\
+你好，我在。\n\
+tokens used\n\
+1\n";
+
+        assert_eq!(
+            extract_lightweight_pc_chat_reply(output, true),
+            "你好，我在。"
+        );
+    }
+
+    #[test]
+    fn pc_lightweight_chat_strips_orphan_ansi_fragments() {
+        assert_eq!(strip_terminal_control_sequences("[m你好[?25h[22m"), "你好");
     }
 }
