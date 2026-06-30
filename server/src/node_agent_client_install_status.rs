@@ -585,7 +585,9 @@ mod tests {
     }
 
     fn start_menu_dir(suffix: &str) -> PathBuf {
-        unique_test_dir(suffix).join("Programs").join("一龙开发平台")
+        unique_test_dir(suffix)
+            .join("Programs")
+            .join("一龙开发平台")
     }
 
     fn write_shortcuts(folder: &Path, names: &[&str]) {

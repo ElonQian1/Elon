@@ -58,10 +58,13 @@ pub(crate) fn prepare_cli_base_cwd(
     // runtime_permission = "full_access" 允许 copilot/codex 执行任意命令（无沙盒限制）。
     let context = project_context.unwrap_or_else(|| CliProjectContext {
         project_id: "chat".to_string(),
-        conversation_id: format!("chat-{}", std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .subsec_nanos()),
+        conversation_id: format!(
+            "chat-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .subsec_nanos()
+        ),
         runtime_permission: Some("full_access".to_string()),
     });
 
@@ -75,8 +78,7 @@ pub(crate) fn prepare_cli_base_cwd(
                 .ok()
         });
 
-    let cwd_str = effective_cwd
-        .ok_or_else(|| anyhow!("PC CLI 执行必须携带项目工作目录。"))?;
+    let cwd_str = effective_cwd.ok_or_else(|| anyhow!("PC CLI 执行必须携带项目工作目录。"))?;
     let path = PathBuf::from(&cwd_str);
     if !path.is_absolute() {
         bail!("PC CLI 工作目录必须是绝对路径: {cwd_str}");

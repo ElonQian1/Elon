@@ -206,7 +206,7 @@ async fn run_api_runtime_inner(
     let guard = ToolGuard::new(workspace, runtime_permission);
     let client = reqwest::Client::builder()
         .timeout(Duration::from_secs(150))
-        .no_proxy()  // 绕过本机代理（代理可能停止或不稳定，混元 API 支持直连）
+        .no_proxy() // 绕过本机代理（代理可能停止或不稳定，混元 API 支持直连）
         .build()
         .unwrap_or_default();
     let initial_model = Some(config.model.clone());
@@ -495,7 +495,10 @@ where
                             &tool,
                             &result,
                         );
-                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
+                        tool_call_id_results.push((
+                            action_tool_call_id.clone(),
+                            truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        ));
                         continue;
                     }
                 };
@@ -524,7 +527,10 @@ where
                             &tool,
                             &result,
                         );
-                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
+                        tool_call_id_results.push((
+                            action_tool_call_id.clone(),
+                            truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        ));
                         continue;
                     }
                 };
@@ -634,7 +640,10 @@ where
                             &tool,
                             &result,
                         );
-                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
+                        tool_call_id_results.push((
+                            action_tool_call_id.clone(),
+                            truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        ));
                         continue;
                     }
                     ApprovalOutcome::TimedOut => {
@@ -675,7 +684,10 @@ where
                             &tool,
                             &result,
                         );
-                        tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
+                        tool_call_id_results.push((
+                            action_tool_call_id.clone(),
+                            truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                        ));
                         continue;
                     }
                     ApprovalOutcome::Canceled => {
@@ -738,7 +750,10 @@ where
                         &tool,
                         &result,
                     );
-                    tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
+                    tool_call_id_results.push((
+                        action_tool_call_id.clone(),
+                        truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+                    ));
                     continue;
                 }
             }
@@ -755,7 +770,10 @@ where
                 req_id,
                 tool_result_chunk(req_id, turn, tool_index, &tool, &result, Some(&action)),
             );
-            tool_call_id_results.push((action_tool_call_id.clone(), truncate_chars(&result, MAX_TOOL_RESULT_CHARS)));
+            tool_call_id_results.push((
+                action_tool_call_id.clone(),
+                truncate_chars(&result, MAX_TOOL_RESULT_CHARS),
+            ));
             record_tool_result(
                 &mut results,
                 &mut total_tools,
@@ -1066,8 +1084,8 @@ async fn call_api_runtime(
         let status = response.status();
         let body = limited_runtime_response_text(response, "本机 API runtime").await?;
         if status.is_success() {
-            let parsed = serde_json::from_str::<Value>(&body)
-                .context("本机 API runtime 响应不是 JSON")?;
+            let parsed =
+                serde_json::from_str::<Value>(&body).context("本机 API runtime 响应不是 JSON")?;
             // 检查响应是否包含 tool_calls 或有效内容，避免"200 但内容无法处理"的情况
             let has_tool_calls = parsed
                 .get("choices")
