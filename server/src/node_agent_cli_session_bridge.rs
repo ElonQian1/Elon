@@ -37,22 +37,22 @@ pub(crate) fn status_payload_for(
         "recoverable_continuity"
     };
     let mode = if managed_sidecar_available {
-        "managed_conpty_sidecar_with_journal_recovery"
+        "managed_pty_conpty_sidecar_attach"
     } else {
         "spawned_process_json_bridge_with_journal_recovery"
     };
     let restart_mode = if managed_sidecar_available {
-        "managed_conpty_sidecar_attach"
+        "managed_pty_conpty_sidecar_attach"
     } else {
         "task_journal_snapshot_and_cli_native_resume"
     };
     let restart_reason = if managed_sidecar_available {
-        "由一龙启动并由 sidecar 持有的 CLI 会话可以在节点重启后重新 attach；prompt/API key 仍不写入恢复文件。"
+        "由一龙启动并由 sidecar 持有的 PTY/ConPTY CLI 会话可以在节点重启后通过本机 attach API 重新读写；prompt/API key 仍不写入恢复文件。"
     } else {
         "节点重启后使用本机 journal 和云端任务快照恢复上下文；Codex 任务还可用已记录 session id 自动尝试 exec resume。"
     };
     let second_recommended_action = if managed_sidecar_available {
-        "节点重启后先 attach sidecar；只有 sidecar mailbox 仍可验证的审批才允许继续批准。"
+        "节点重启后先 attach sidecar 的 PTY/ConPTY 会话；只有 sidecar mailbox 仍可验证的审批才允许继续批准。"
     } else {
         "节点重启或任务 detached 后，回放 journal/快照并开新一轮继续，不再批准非 sidecar 的旧审批卡。"
     };
@@ -82,8 +82,8 @@ pub(crate) fn status_payload_for(
     });
     let resume_order = vec![
         json!({
-            "kind": "managed_conpty_sidecar_attach",
-            "label": "重接一龙 sidecar 持有的 CLI 会话",
+            "kind": "managed_pty_conpty_sidecar_attach",
+            "label": "重接一龙 sidecar 持有的 PTY/ConPTY CLI 会话",
             "available_when": "任务由一龙 sidecar 启动且 sidecar 心跳仍有效",
             "currently_available": managed_sidecar_available,
             "requires_new_task": false
@@ -120,15 +120,15 @@ pub(crate) fn status_payload_for(
     let routes = vec![
         json!({
             "name": "Codex CLI",
-            "mode": "managed_sidecar_or_exec_json_resume",
+            "mode": "managed_pty_conpty_sidecar_or_exec_json_resume",
             "tty_takeover_supported": managed_sidecar_available,
-            "continuity": "managed ConPTY sidecar attach; fallback codex exec resume --json <thread>"
+            "continuity": "managed PTY/ConPTY sidecar attach/read/write/resize; fallback codex exec resume --json <thread>"
         }),
         json!({
             "name": "Copilot CLI",
-            "mode": "managed_sidecar_or_continue_in_workspace",
+            "mode": "managed_pty_conpty_sidecar_or_continue_in_workspace",
             "tty_takeover_supported": managed_sidecar_available,
-            "continuity": "managed ConPTY sidecar attach; fallback copilot --continue"
+            "continuity": "managed PTY/ConPTY sidecar attach/read/write/resize; fallback copilot --continue"
         }),
         json!({
             "name": "Fallback",
@@ -148,7 +148,12 @@ pub(crate) fn status_payload_for(
         "managed_conpty_sidecar_supported": true,
         "managed_conpty_sidecar_active": managed_sidecar_available,
         "sidecar_protocol_supported": true,
-        "sidecar_protocol_mode": "managed_conpty_sidecar_mailbox",
+        "sidecar_protocol_mode": "managed_pty_conpty_attach_read_write_resize",
+        "sidecar_attach_api": {
+            "read": "/api/cli-sidecars/:task_id/attach?since=<offset>",
+            "write": "/api/cli-sidecars/:task_id/input",
+            "resize": "/api/cli-sidecars/:task_id/resize"
+        },
         "sidecar_attachable_count": summary.sidecar_attachable_count,
         "sidecar_approval_recoverable_count": summary.sidecar_approval_recoverable_count,
         "process_handle_reconnect_supported": true,
@@ -172,11 +177,11 @@ pub(crate) fn status_payload_for(
         "restart_recovery": restart_recovery,
         "not_supported": [
             "attach_external_cli_tty_not_started_by_elon_sidecar",
-            "stream_pixels_or_terminal_buffer_from_original_cli",
+            "attach_non_sidecar_external_cli_tty",
             "approve_tool_after_node_restart_without_managed_sidecar"
         ],
         "continuity_modes": [
-            "managed ConPTY sidecar attach",
+            "managed PTY/ConPTY sidecar attach/read/write/resize",
             "codex exec resume --json <thread>",
             "copilot --continue",
             "backend conversation continuity note"
@@ -189,9 +194,8 @@ pub(crate) fn status_payload_for(
             "任意外部终端仍不可接管；只有一龙管理的 sidecar 会话进入恢复协议。"
         ],
         "future_work": [
-            "把 Route A 的普通 Command 执行器逐步切到 sidecar runner。",
             "为 sidecar attach 增加前端终端面板和权限确认。",
-            "补充真实 ConPTY 屏幕 buffer 回放，而不是只回放结构化输出。"
+            "补充屏幕级终端 buffer/ANSI 视图；当前 attach API 回放 PTY 字节流。"
         ],
         "routes": routes
     })
@@ -302,7 +306,7 @@ fn display_summary(summary: &ContinuitySummary) -> &'static str {
             "可重连本机运行句柄；仍不接管原 CLI 终端，输出通过 journal/JSON 桥接。"
         }
         "managed_sidecar_attachable" => {
-            "可重接一龙 sidecar 持有的 CLI 会话；节点重启后仍可恢复输出和可验证审批。"
+            "可重接一龙 sidecar 持有的 PTY/ConPTY CLI 会话；节点重启后仍可读写终端、调整尺寸并恢复可验证审批。"
         }
         "codex_session_resumable" => {
             "可基于本机 journal 和 Codex session 续接；原 CLI 终端不可重接。"
@@ -317,7 +321,7 @@ fn display_summary(summary: &ContinuitySummary) -> &'static str {
 
 fn summary_text(summary: &ContinuitySummary) -> &'static str {
     if summary.sidecar_attachable_count > 0 {
-        "已具备一龙托管 sidecar 会话恢复层：可在节点重启后重接由 sidecar 持有的 CLI，会话输出和可验证审批通过本机 mailbox 恢复；任意外部终端仍不可接管。"
+        "已具备一龙托管 PTY/ConPTY sidecar 会话恢复层：可在节点重启后通过本机 attach API 读取输出、写入终端输入、调整尺寸，并恢复可验证审批；任意外部终端仍不可接管。"
     } else {
         "已具备本机运行句柄、任务 journal、Codex session 和云端快照的恢复基础层；仍不重新接管非 sidecar 管理的原 CLI TTY，节点重启后的非 sidecar 旧审批卡不会继续批准。"
     }
@@ -329,7 +333,7 @@ fn recommended_primary_action(summary: &ContinuitySummary) -> &'static str {
             "仍是 live 任务时，使用本机控制句柄处理取消、状态查询和当前内存中的审批。"
         }
         "managed_sidecar_attachable" => {
-            "优先重接 sidecar 会话；审批只能写入 sidecar mailbox 并由 sidecar 校验后执行。"
+            "优先重接 sidecar PTY/ConPTY 会话；终端输入/resize/审批只能写入 sidecar mailbox 并由 sidecar 校验后执行。"
         }
         "codex_session_resumable" => {
             "优先使用已记录的 Codex session 自动续接，并在失败时清理失效 session。"
@@ -344,7 +348,7 @@ fn recommended_primary_action(summary: &ContinuitySummary) -> &'static str {
 
 fn restart_next_action(summary: &ContinuitySummary) -> &'static str {
     if summary.sidecar_attachable_count > 0 {
-        "managed_conpty_sidecar_attach"
+        "managed_pty_conpty_sidecar_attach"
     } else if summary.codex_session_count > 0 {
         "codex_exec_resume_or_snapshot_continue"
     } else if summary.recent_record_count > 0 {
@@ -391,11 +395,13 @@ fn latest_task_from_sidecar(session: &CliSidecarSessionRecord) -> Value {
         "cli_name": session.cli_name,
         "route": session.route,
         "status": session.state,
-        "recovery_kind": "managed_conpty_sidecar_attach",
+        "recovery_kind": "managed_pty_conpty_sidecar_attach",
         "can_cancel": session.capabilities.cancel,
         "can_continue_from_snapshot": false,
         "can_resume_codex_session": false,
         "can_attach_sidecar": true,
+        "can_write_terminal": session.capabilities.terminal_input,
+        "can_resize_terminal": session.capabilities.terminal_resize,
         "can_approve_after_node_restart": session.can_recover_tool_approval_after_restart(now_ms()),
         "updated_at_ms": session.last_seen_at_ms,
     })
@@ -515,11 +521,15 @@ mod tests {
                     .unwrap_or_default()
                     .contains("不再批准非 sidecar")
             }));
-        assert!(status["future_work"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|item| item.as_str().unwrap_or_default().contains("ConPTY")));
+        assert_eq!(
+            status["sidecar_protocol_mode"],
+            "managed_pty_conpty_attach_read_write_resize"
+        );
+        assert_eq!(status["managed_conpty_sidecar_active"], false);
+        assert_eq!(
+            status["sidecar_attach_api"]["write"],
+            "/api/cli-sidecars/:task_id/input"
+        );
     }
 
     #[test]
@@ -614,7 +624,7 @@ mod tests {
         assert_eq!(status["can_approve_after_node_restart"], true);
         assert_eq!(
             status["restart_recovery"]["mode"],
-            "managed_conpty_sidecar_attach"
+            "managed_pty_conpty_sidecar_attach"
         );
         assert_eq!(status["restart_recovery"]["restores_original_tty"], true);
         assert_eq!(
@@ -623,13 +633,21 @@ mod tests {
         );
         assert_eq!(
             status["latest_recoverable_task"]["recovery_kind"],
-            "managed_conpty_sidecar_attach"
+            "managed_pty_conpty_sidecar_attach"
+        );
+        assert_eq!(
+            status["latest_recoverable_task"]["can_write_terminal"],
+            true
+        );
+        assert_eq!(
+            status["latest_recoverable_task"]["can_resize_terminal"],
+            true
         );
         assert_eq!(status["latest_sidecar_session"]["session_id"], "sidecar-1");
         assert_eq!(status["state_summary"]["sidecar_attachable_count"], 1);
         assert_eq!(
             status["resume_order"].as_array().unwrap().first().unwrap()["kind"],
-            "managed_conpty_sidecar_attach"
+            "managed_pty_conpty_sidecar_attach"
         );
     }
 

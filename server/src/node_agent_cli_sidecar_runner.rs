@@ -12,6 +12,9 @@ use std::{
 use tokio::sync::watch;
 
 use crate::{
+    node_agent_cli_pty::{
+        default_cols, default_rows, CliPtyEvent, CliPtyProcess, CliPtySpawnConfig,
+    },
     node_agent_cli_sidecar::{now_ms, CliSidecarRegistry, CliSidecarSessionRecord},
     node_agent_cli_sidecar_io::{
         append_output, read_new_commands, read_new_output_records, CliSidecarOutputRecord,
@@ -39,6 +42,10 @@ pub(crate) struct CliSidecarLaunchConfig {
     pub timeout_secs: u64,
     #[serde(default)]
     pub stdin_piped_empty: bool,
+    #[serde(default = "default_cols")]
+    pub initial_cols: u16,
+    #[serde(default = "default_rows")]
+    pub initial_rows: u16,
 }
 
 #[derive(Debug, Clone)]
@@ -134,7 +141,7 @@ pub(crate) async fn follow_sidecar_output(
                 "chunk" => {
                     let text = record.text.unwrap_or_default();
                     match record.stream.as_deref() {
-                        Some("stdout") => {
+                        Some("stdout") | Some("pty") => {
                             stdout_text.push_str(&text);
                             on_event(CliSidecarOutputEvent::Stdout(text));
                         }
@@ -197,29 +204,15 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
         started_at,
     ))?;
 
-    let mut cmd = tokio::process::Command::new(&config.program);
-    cmd.args(&config.args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-    if let Some(cwd) = config
-        .cwd
-        .as_deref()
-        .filter(|value| !value.trim().is_empty())
-    {
-        cmd.current_dir(cwd);
-    }
-    for (key, value) in &config.env {
-        cmd.env(key, value);
-    }
-    if config.stdin_piped_empty {
-        cmd.stdin(Stdio::piped());
-    } else {
-        cmd.stdin(Stdio::null());
-    }
-    hide_tokio_command_window(&mut cmd);
-
-    let mut child = match cmd.spawn() {
-        Ok(child) => child,
+    let mut pty = match CliPtyProcess::spawn(CliPtySpawnConfig {
+        program: &config.program,
+        args: &config.args,
+        cwd: config.cwd.as_deref(),
+        env: &config.env,
+        cols: config.initial_cols,
+        rows: config.initial_rows,
+    }) {
+        Ok(pty) => pty,
         Err(error) => {
             let message = format!("无法启动 sidecar CLI {}: {error}", config.program);
             append_output(
@@ -230,11 +223,8 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
             return Err(anyhow::anyhow!(message));
         }
     };
-    if config.stdin_piped_empty {
-        let _ = child.stdin.take();
-    }
 
-    let child_pid = child.id();
+    let child_pid = pty.child_pid();
     if let Some(pid) = child_pid {
         let _ = registry.touch_session(&config.session_id, Some("running"), Some(pid));
         let _ = task_journal.record_process_started(&config.task_id, pid);
@@ -243,45 +233,46 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
             CliSidecarOutputRecord::child_started(pid),
         )?;
     }
-
-    let stdout = child
-        .stdout
-        .take()
-        .context("sidecar child stdout missing")?;
-    let stderr = child
-        .stderr
-        .take()
-        .context("sidecar child stderr missing")?;
-    let (line_tx, mut line_rx) = tokio::sync::mpsc::unbounded_channel::<SidecarLine>();
-    spawn_stdout_reader(stdout, line_tx.clone());
-    spawn_stderr_reader(stderr, line_tx);
+    let mut pty_output_rx = pty.take_output_rx();
 
     let mut mailbox_offset = 0_u64;
     let mut processed_commands = HashSet::new();
-    let mut stdout_done = false;
-    let mut stderr_done = false;
+    let mut reader_closed = false;
+    let mut child_exit = None;
+    let mut child_exit_observed_at = None;
     let mut canceled = false;
-    let mut interval = tokio::time::interval(Duration::from_secs(SIDECAR_HEARTBEAT_SECS));
+    let mut timed_out = false;
+    let mut heartbeat = tokio::time::interval(Duration::from_secs(SIDECAR_HEARTBEAT_SECS));
+    let mut mailbox = tokio::time::interval(Duration::from_millis(SIDECAR_POLL_MS));
     let timeout = tokio::time::sleep(Duration::from_secs(config.timeout_secs.max(1)));
     tokio::pin!(timeout);
 
     let success = loop {
         tokio::select! {
-            _ = interval.tick() => {
+            _ = heartbeat.tick() => {
                 let state = if canceled { "cancel_requested" } else { "running" };
                 let _ = registry.touch_session(&config.session_id, Some(state), child_pid);
+            }
+            _ = mailbox.tick() => {
                 consume_mailbox(
                     &registry,
                     &config,
                     &mut mailbox_offset,
                     &mut processed_commands,
-                    &mut child,
+                    &mut pty,
                     &mut canceled,
                 )?;
+                if child_exit.is_none() {
+                    child_exit = pty.try_wait()?;
+                    if child_exit.is_some() {
+                        child_exit_observed_at = Some(tokio::time::Instant::now());
+                    }
+                }
             }
-            _ = &mut timeout => {
+            _ = &mut timeout, if !timed_out => {
+                timed_out = true;
                 canceled = true;
-                let _ = child.kill().await;
+                let _ = pty.kill();
                 append_output(
                     &config.output_path,
                     CliSidecarOutputRecord::error(format!(
@@ -290,30 +281,34 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
                     )),
                 )?;
             }
-            line = line_rx.recv() => {
-                match line {
-                    Some(SidecarLine::Stdout(text)) => {
-                        write_chunk(&config, &task_journal, "stdout", &text)?;
+            event = pty_output_rx.recv() => {
+                match event {
+                    Some(CliPtyEvent::Output(text)) => {
+                        write_pty_chunk(&config, &task_journal, &mut pty, &text)?;
                     }
-                    Some(SidecarLine::Stderr(text)) => {
-                        write_chunk(&config, &task_journal, "stderr", &text)?;
+                    Some(CliPtyEvent::ReaderError(error)) => {
+                        append_output(
+                            &config.output_path,
+                            CliSidecarOutputRecord::chunk("pty_error", &format!("{error}\n")),
+                        )?;
+                        reader_closed = true;
                     }
-                    Some(SidecarLine::StdoutDone) => stdout_done = true,
-                    Some(SidecarLine::StderrDone) => stderr_done = true,
-                    None => {
-                        stdout_done = true;
-                        stderr_done = true;
-                    }
+                    Some(CliPtyEvent::ReaderClosed) | None => reader_closed = true,
                 }
-            }
-            status = child.wait(), if stdout_done && stderr_done => {
-                break status.map(|status| status.success()).unwrap_or(false);
             }
         }
 
-        if let Some(status) = child.try_wait()? {
-            if stdout_done && stderr_done {
-                break status.success();
+        if child_exit.is_none() {
+            child_exit = pty.try_wait()?;
+            if child_exit.is_some() {
+                child_exit_observed_at = Some(tokio::time::Instant::now());
+            }
+        }
+        if let Some(success) = child_exit {
+            let drained_after_exit = child_exit_observed_at
+                .is_some_and(|instant| instant.elapsed() >= Duration::from_millis(500));
+            if reader_closed || canceled || drained_after_exit {
+                break success;
             }
         }
     };
@@ -333,6 +328,22 @@ pub(crate) async fn run_sidecar(config: CliSidecarLaunchConfig) -> Result<()> {
     Ok(())
 }
 
+fn write_pty_chunk(
+    config: &CliSidecarLaunchConfig,
+    task_journal: &TaskJournal,
+    pty: &mut CliPtyProcess,
+    text: &str,
+) -> Result<()> {
+    if text.contains("\x1b[6n") {
+        pty.write_input("\x1b[1;1R")?;
+    }
+    let visible = text.replace("\x1b[6n", "");
+    if visible.is_empty() {
+        return Ok(());
+    }
+    write_chunk(config, task_journal, "pty", &visible)
+}
+
 fn write_chunk(
     config: &CliSidecarLaunchConfig,
     task_journal: &TaskJournal,
@@ -343,10 +354,11 @@ fn write_chunk(
         &config.output_path,
         CliSidecarOutputRecord::chunk(stream, text),
     )?;
+    let journal_stream = if stream == "pty" { "stdout" } else { stream };
     let is_codex_session_id =
         config.cli_name == "codex" && text.trim_start().starts_with("session id: ");
     if !is_codex_session_id {
-        let _ = task_journal.record_cli_chunk(&config.task_id, stream, text);
+        let _ = task_journal.record_cli_chunk(&config.task_id, journal_stream, text);
     }
     Ok(())
 }
@@ -356,27 +368,51 @@ fn consume_mailbox(
     config: &CliSidecarLaunchConfig,
     offset: &mut u64,
     processed: &mut HashSet<String>,
-    child: &mut tokio::process::Child,
+    pty: &mut CliPtyProcess,
     canceled: &mut bool,
 ) -> Result<()> {
     let path = registry.command_mailbox_path(&config.task_id);
     for command in read_new_commands(&path, offset)? {
-        let key = format!(
-            "{}:{}:{}",
-            command.command,
-            command.approval_id.as_deref().unwrap_or(""),
-            command.at_ms
-        );
+        let key = command.command_id.clone().unwrap_or_else(|| {
+            format!(
+                "{}:{}:{}:{}:{}:{}",
+                command.command,
+                command.approval_id.as_deref().unwrap_or(""),
+                command.text.as_deref().unwrap_or(""),
+                command.cols.unwrap_or_default(),
+                command.rows.unwrap_or_default(),
+                command.at_ms
+            )
+        });
         if !processed.insert(key) {
             continue;
         }
         match command.command.as_str() {
             "cancel" => {
                 *canceled = true;
-                let _ = child.start_kill();
+                let _ = pty.kill();
                 let _ = registry.touch_session(&config.session_id, Some("cancel_requested"), None);
             }
+            "terminal_input" => {
+                if let Some(text) = command.text.as_deref() {
+                    pty.write_input(text)?;
+                    let _ = registry.touch_session(&config.session_id, Some("running"), None);
+                }
+            }
+            "terminal_resize" => {
+                if let (Some(cols), Some(rows)) = (command.cols, command.rows) {
+                    pty.resize(cols, rows)?;
+                    let _ = registry.touch_session(&config.session_id, Some("running"), None);
+                }
+            }
             "tool_approval_decision" => {
+                if let Some(input) = command
+                    .decision
+                    .as_deref()
+                    .and_then(approval_decision_input)
+                {
+                    pty.write_input(input)?;
+                }
                 let _ = registry.touch_session(&config.session_id, Some("running"), None);
             }
             _ => {}
@@ -385,60 +421,12 @@ fn consume_mailbox(
     Ok(())
 }
 
-fn spawn_stdout_reader(
-    stdout: tokio::process::ChildStdout,
-    tx: tokio::sync::mpsc::UnboundedSender<SidecarLine>,
-) {
-    tokio::spawn(async move {
-        use tokio::io::AsyncBufReadExt;
-        let mut lines = tokio::io::BufReader::new(stdout).lines();
-        loop {
-            match lines.next_line().await {
-                Ok(Some(line)) => {
-                    let _ = tx.send(SidecarLine::Stdout(format!("{line}\n")));
-                }
-                Ok(None) | Err(_) => {
-                    let _ = tx.send(SidecarLine::StdoutDone);
-                    break;
-                }
-            }
-        }
-    });
-}
-
-fn spawn_stderr_reader(
-    stderr: tokio::process::ChildStderr,
-    tx: tokio::sync::mpsc::UnboundedSender<SidecarLine>,
-) {
-    tokio::spawn(async move {
-        use tokio::io::AsyncBufReadExt;
-        let mut reader = tokio::io::BufReader::new(stderr);
-        let mut buf = Vec::new();
-        loop {
-            buf.clear();
-            match reader.read_until(b'\n', &mut buf).await {
-                Ok(0) | Err(_) => {
-                    let _ = tx.send(SidecarLine::StderrDone);
-                    break;
-                }
-                Ok(_) => {
-                    while matches!(buf.last(), Some(&b'\n') | Some(&b'\r')) {
-                        buf.pop();
-                    }
-                    let text = format!("{}\n", String::from_utf8_lossy(&buf));
-                    let _ = tx.send(SidecarLine::Stderr(text));
-                }
-            }
-        }
-    });
-}
-
-#[derive(Debug)]
-enum SidecarLine {
-    Stdout(String),
-    Stderr(String),
-    StdoutDone,
-    StderrDone,
+fn approval_decision_input(decision: &str) -> Option<&'static str> {
+    match decision.trim().to_ascii_lowercase().as_str() {
+        "approve" | "approved" => Some("y\r"),
+        "deny" | "denied" | "reject" | "rejected" => Some("n\r"),
+        _ => None,
+    }
 }
 
 fn config_path_for(session_id: &str) -> PathBuf {

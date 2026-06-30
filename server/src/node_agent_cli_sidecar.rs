@@ -27,6 +27,10 @@ pub(crate) struct CliSidecarCapabilities {
     #[serde(default)]
     pub output_stream_replay: bool,
     #[serde(default)]
+    pub terminal_input: bool,
+    #[serde(default)]
+    pub terminal_resize: bool,
+    #[serde(default)]
     pub tool_approval_recovery: bool,
     #[serde(default)]
     pub cancel: bool,
@@ -55,12 +59,20 @@ pub(crate) struct CliSidecarSessionRecord {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub(crate) struct CliSidecarCommandRecord {
+    #[serde(default)]
+    pub command_id: Option<String>,
     pub task_id: String,
     pub command: String,
     #[serde(default)]
     pub approval_id: Option<String>,
     #[serde(default)]
     pub decision: Option<String>,
+    #[serde(default)]
+    pub text: Option<String>,
+    #[serde(default)]
+    pub cols: Option<u16>,
+    #[serde(default)]
+    pub rows: Option<u16>,
     pub at_ms: u128,
 }
 
@@ -175,7 +187,7 @@ impl CliSidecarRegistry {
         if !session.is_attachable_at(now_ms()) || !session.capabilities.cancel {
             return Ok(false);
         }
-        self.append_sidecar_command(task_id, "cancel", None, None)
+        self.append_sidecar_command(task_id, "cancel", None, None, None, None, None)
     }
 
     pub(crate) fn record_tool_approval_decision(
@@ -198,6 +210,53 @@ impl CliSidecarRegistry {
             "tool_approval_decision",
             Some(approval_id),
             Some(decision),
+            None,
+            None,
+            None,
+        )
+    }
+
+    pub(crate) fn record_terminal_input(&self, task_id: &str, text: &str) -> Result<bool> {
+        let Some(session) = self.session_for_task(task_id)? else {
+            return Ok(false);
+        };
+        if !session.is_attachable_at(now_ms()) || !session.capabilities.terminal_input {
+            return Ok(false);
+        }
+        if text.is_empty() {
+            return Ok(false);
+        }
+        self.append_sidecar_command(
+            task_id,
+            "terminal_input",
+            None,
+            None,
+            Some(text),
+            None,
+            None,
+        )
+    }
+
+    pub(crate) fn record_terminal_resize(
+        &self,
+        task_id: &str,
+        cols: u16,
+        rows: u16,
+    ) -> Result<bool> {
+        let Some(session) = self.session_for_task(task_id)? else {
+            return Ok(false);
+        };
+        if !session.is_attachable_at(now_ms()) || !session.capabilities.terminal_resize {
+            return Ok(false);
+        }
+        self.append_sidecar_command(
+            task_id,
+            "terminal_resize",
+            None,
+            None,
+            None,
+            Some(cols),
+            Some(rows),
         )
     }
 
@@ -207,6 +266,9 @@ impl CliSidecarRegistry {
         command: &str,
         approval_id: Option<&str>,
         decision: Option<&str>,
+        text: Option<&str>,
+        cols: Option<u16>,
+        rows: Option<u16>,
     ) -> Result<bool> {
         let task_id = task_id.trim();
         if task_id.is_empty() {
@@ -215,10 +277,14 @@ impl CliSidecarRegistry {
         self.ensure_dir()?;
         let path = self.command_path(task_id);
         let record = CliSidecarCommandRecord {
+            command_id: Some(format!("cmd-{}", uuid::Uuid::new_v4().simple())),
             task_id: task_id.to_string(),
             command: command.to_string(),
             approval_id: approval_id.map(str::to_string),
             decision: decision.map(str::to_string),
+            text: text.map(str::to_string),
+            cols,
+            rows,
             at_ms: now_ms(),
         };
         let mut file = OpenOptions::new()
@@ -296,7 +362,7 @@ impl CliSidecarSessionRecord {
             route: route.into(),
             cwd,
             state: "running".to_string(),
-            transport: "managed_conpty_sidecar".to_string(),
+            transport: "managed_pty_conpty_sidecar".to_string(),
             endpoint,
             sidecar_pid,
             child_pid,
@@ -305,6 +371,8 @@ impl CliSidecarSessionRecord {
             capabilities: CliSidecarCapabilities {
                 terminal_attach: true,
                 output_stream_replay: true,
+                terminal_input: true,
+                terminal_resize: true,
                 tool_approval_recovery: true,
                 cancel: true,
             },

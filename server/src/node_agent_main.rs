@@ -55,9 +55,11 @@ mod node_agent_active_task_registry;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
+mod node_agent_cli_pty;
 mod node_agent_cli_security;
 mod node_agent_cli_session_bridge;
 mod node_agent_cli_sidecar;
+mod node_agent_cli_sidecar_admin;
 mod node_agent_cli_sidecar_io;
 mod node_agent_cli_sidecar_runner;
 #[cfg(test)]
@@ -1601,6 +1603,8 @@ async fn run_cli_prompt(run: CliPromptRun) {
             task_journal_dir: None,
             timeout_secs: if cli_name == "codex" { 300 } else { 180 },
             stdin_piped_empty,
+            initial_cols: node_agent_cli_pty::default_cols(),
+            initial_rows: node_agent_cli_pty::default_rows(),
         };
         match node_agent_cli_sidecar_runner::spawn_sidecar(launch_config).await {
             Ok(launch) => {
@@ -3647,6 +3651,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/register-project",
                 axum::routing::post(admin_register_project),
             )
+            .merge(node_agent_cli_sidecar_admin::routes())
             .merge(node_agent_task_journal_api::routes())
             .route(
                 "/api/project-folder/pick",

@@ -122,6 +122,14 @@ pub(crate) fn read_new_output_records(
     path: &Path,
     offset: &mut u64,
 ) -> Result<Vec<CliSidecarOutputRecord>> {
+    read_output_records_from(path, offset, usize::MAX)
+}
+
+pub(crate) fn read_output_records_from(
+    path: &Path,
+    offset: &mut u64,
+    limit: usize,
+) -> Result<Vec<CliSidecarOutputRecord>> {
     if !path.exists() {
         return Ok(Vec::new());
     }
@@ -141,6 +149,9 @@ pub(crate) fn read_new_output_records(
         }
         if let Ok(record) = serde_json::from_str::<CliSidecarOutputRecord>(line.trim()) {
             records.push(record);
+            if records.len() >= limit {
+                break;
+            }
         }
     }
     *offset = reader.stream_position()?;

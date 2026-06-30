@@ -256,9 +256,9 @@ fn task_resume_contract_with_journal_pending(
             sidecar_session,
             run_handle: None,
             strategy: TaskResumeStrategy {
-                kind: "managed_conpty_sidecar_attach",
-                label: "重接 sidecar 会话",
-                reason: "任务由一龙 sidecar 持有，node-agent 重启后可重新连接 sidecar 控制面；审批决定写入 sidecar mailbox，由 sidecar 复核后执行。",
+                kind: "managed_pty_conpty_sidecar_attach",
+                label: "重接 PTY/ConPTY sidecar 会话",
+                reason: "任务由一龙 sidecar 持有 PTY/ConPTY，node-agent 重启后可重新连接 sidecar 控制面；终端输入、resize 和审批决定写入 sidecar mailbox，由 sidecar 复核后执行。",
                 requires_new_task: false,
                 uses_cloud_snapshot: false,
                 uses_local_journal: true,
@@ -381,9 +381,8 @@ fn tty_reattach_status() -> TaskResumeTtyReattach {
         fallback: "journal_replay_snapshot_continue_and_codex_session_resume",
         reason: "当前节点只能重连本机控制句柄、回放 journal、处理仍在内存中的审批 waiter，不能重新接管已经打开的原 CLI 终端 TTY。",
         required_future_work: vec![
-            "为 Route A CLI 子进程建立可恢复 PTY/ConPTY 会话层。",
-            "把 PTY 会话 id、生命周期和安全授权写入本机 journal。",
-            "在前端接入 attach 协议前，继续使用 journal 回放和快照续跑。",
+            "外部 CLI 终端仍不能被接管；需要从一龙 sidecar 启动的任务才有 PTY/ConPTY attach。",
+            "非 sidecar 任务继续使用 journal 回放、Codex session resume 和云端快照续跑。",
         ],
     }
 }
@@ -392,12 +391,12 @@ fn sidecar_tty_reattach_status() -> TaskResumeTtyReattach {
     TaskResumeTtyReattach {
         status: "supported",
         supported: true,
-        mode: "managed_conpty_sidecar_reattach",
+        mode: "managed_pty_conpty_sidecar_reattach",
         fallback: "journal_replay_snapshot_continue_and_codex_session_resume",
-        reason: "该任务由一龙 sidecar 启动并持有 ConPTY/控制 mailbox，node-agent 重启后可以重接 sidecar，而不是接管任意外部终端。",
+        reason: "该任务由一龙 sidecar 启动并持有 PTY/ConPTY 与控制 mailbox，node-agent 重启后可以重接 sidecar、读写终端和 resize，而不是接管任意外部终端。",
         required_future_work: vec![
             "在 PC 前端接入真实终端 attach 面板。",
-            "为 sidecar 输出补充屏幕 buffer 回放。",
+            "为 sidecar 输出补充屏幕级 buffer/ANSI 视图；当前恢复协议回放 PTY 字节流。",
         ],
     }
 }

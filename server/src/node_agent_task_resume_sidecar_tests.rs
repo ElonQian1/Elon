@@ -33,12 +33,12 @@ fn sidecar_contract_can_reattach_and_recover_pending_approval() {
     assert_eq!(resume_json["next_action"], "attach_sidecar");
     assert_eq!(
         resume_json["strategy"]["kind"],
-        "managed_conpty_sidecar_attach"
+        "managed_pty_conpty_sidecar_attach"
     );
     assert_eq!(resume_json["tty_reattach"]["supported"], true);
     assert_eq!(
         resume_json["tty_reattach"]["mode"],
-        "managed_conpty_sidecar_reattach"
+        "managed_pty_conpty_sidecar_reattach"
     );
     assert_eq!(
         resume_json["tool_approval_recovery"]["status"],

@@ -49,6 +49,7 @@ thiserror = "1"
 # 异步流
 futures = "0.3"
 tokio-stream = "0.1"
+portable-pty = "0.9.0"
 
 # UUID
 uuid = { version = "1", features = ["v4"] }
