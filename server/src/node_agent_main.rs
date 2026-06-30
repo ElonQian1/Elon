@@ -54,6 +54,7 @@ mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
 mod node_agent_cli_security;
 mod node_agent_cli_session_bridge;
+mod node_agent_cli_sidecar;
 mod node_agent_client_diagnostic_logs;
 mod node_agent_client_diagnostics;
 mod node_agent_client_install_status;
@@ -87,6 +88,9 @@ mod node_agent_task_journal_recovery_tests;
 #[cfg(test)]
 mod node_agent_task_lifecycle_pressure_tests;
 mod node_agent_task_resume;
+mod node_agent_task_resume_sidecar;
+#[cfg(test)]
+mod node_agent_task_resume_sidecar_tests;
 mod node_agent_tool_approval;
 mod node_agent_tool_guard;
 mod node_agent_workspace_match;
@@ -1098,11 +1102,13 @@ async fn run_cli_prompt(run: CliPromptRun) {
         .stderr(std::process::Stdio::piped())
         // copilot 用 --allow-all 时仍会检测 stdin 是否可读；
         // 用 piped（而非 null）让它认为 stdin 存在但为空流，避免权限拒绝。
-        .stdin(if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
-            std::process::Stdio::piped()
-        } else {
-            std::process::Stdio::null()
-        });
+        .stdin(
+            if cli_name == "copilot" || cli_name == "claude" || cli_name == "gemini" {
+                std::process::Stdio::piped()
+            } else {
+                std::process::Stdio::null()
+            },
+        );
     hide_tokio_command_window(&mut cmd);
 
     let mut child = match cmd.spawn() {
@@ -2542,6 +2548,8 @@ pub(crate) struct NodeRuntime {
     storage_settings: RwLock<pc_storage_repo::StorageSettings>,
     /// 正在执行的 CLI prompt 请求，用于接收云端 stop/cancel 后终止子进程。
     active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry,
+    /// 一龙托管的 CLI sidecar 会话 registry，用于节点重启后重新发现可 attach 的会话。
+    cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry,
     /// 本地任务 registry/jsonl，用于后续重启后恢复任务现场和 attach。
     task_journal: node_agent_task_journal::TaskJournal,
     /// 正在等待用户批准/拒绝的 Route B/C 工具调用。
@@ -2574,6 +2582,7 @@ impl NodeRuntime {
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
             active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
+            cli_sidecars: node_agent_cli_sidecar::CliSidecarRegistry::default(),
             task_journal: node_agent_task_journal::TaskJournal::default(),
             tool_approvals: node_agent_tool_approval::ToolApprovalState::default(),
             full_access_grants: node_agent_full_access::FullAccessGrantState::load_default(),
@@ -2628,8 +2637,21 @@ impl NodeRuntime {
             if let Err(error) = self.task_journal.record_cancel_requested(req_id) {
                 warn!("PC 任务 journal 写入取消事件失败: {error}");
             }
+            return true;
         }
-        canceled
+        match self.cli_sidecars.record_cancel_command(req_id) {
+            Ok(true) => {
+                if let Err(error) = self.task_journal.record_cancel_requested(req_id) {
+                    warn!("PC sidecar 任务 journal 写入取消事件失败: {error}");
+                }
+                true
+            }
+            Ok(false) => false,
+            Err(error) => {
+                warn!("PC sidecar 取消命令写入失败: {error}");
+                false
+            }
+        }
     }
 
     pub(crate) async fn active_cli_prompt_view(
@@ -2682,9 +2704,23 @@ impl NodeRuntime {
     }
 
     async fn decide_tool_approval(&self, req_id: &str, approval_id: &str, decision: &str) -> bool {
-        self.tool_approvals
+        if self
+            .tool_approvals
             .decide(req_id, approval_id, decision)
             .await
+        {
+            return true;
+        }
+        match self
+            .cli_sidecars
+            .record_tool_approval_decision(req_id, approval_id, decision)
+        {
+            Ok(accepted) => accepted,
+            Err(error) => {
+                warn!("PC sidecar 工具审批决定写入失败: {error}");
+                false
+            }
+        }
     }
 
     async fn finish_cli_prompt(&self, req_id: &str) {
@@ -3039,6 +3075,10 @@ async fn admin_status(
         warn!("PC 任务 journal 读取失败，CLI 会话桥接状态降级为空摘要: {error}");
         Vec::new()
     });
+    let sidecar_sessions = rt.cli_sidecars.latest_sessions(20).unwrap_or_else(|error| {
+        warn!("PC CLI sidecar registry 读取失败，CLI 会话桥接 sidecar 状态降级为空摘要: {error}");
+        Vec::new()
+    });
     let cli_pairs = detect_available_clis();
     let available_clis: Vec<String> = cli_pairs.iter().map(|(name, _)| name.clone()).collect();
     rt.set_cli_paths(cli_pairs.clone()).await;
@@ -3068,6 +3108,7 @@ async fn admin_status(
         "cli_session_bridge": node_agent_cli_session_bridge::status_payload_for(
             &active_cli_prompts,
             &recent_task_records,
+            &sidecar_sessions,
         ),
         "allowed_clis": available_clis,
         "cli_tools": cli_pairs.iter().map(|(name, path)| serde_json::json!({

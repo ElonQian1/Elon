@@ -4,8 +4,12 @@ use serde::Serialize;
 
 use crate::{
     node_agent_active_task::ActiveCliPromptView,
+    node_agent_cli_sidecar::CliSidecarSessionRecord,
     node_agent_task_approval_snapshot::TaskApprovalJournalSnapshot,
     node_agent_task_journal::TaskJournalRecord,
+    node_agent_task_resume_sidecar::{
+        sidecar_limitations, sidecar_session_from_record, TaskResumeSidecarSession,
+    },
 };
 
 #[derive(Debug, Clone, Serialize)]
@@ -18,6 +22,7 @@ pub(crate) struct TaskAttachState {
     reason: &'static str,
     run_handle: Option<ActiveCliPromptView>,
     codex_session: Option<TaskResumeCodexSession>,
+    sidecar_session: Option<TaskResumeSidecarSession>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -34,6 +39,7 @@ pub(crate) struct TaskResumeContract {
     codex_session: Option<TaskResumeCodexSession>,
     continue_mode: &'static str,
     tty_reattach: TaskResumeTtyReattach,
+    sidecar_session: Option<TaskResumeSidecarSession>,
     run_handle: Option<TaskResumeRunHandle>,
     strategy: TaskResumeStrategy,
     limitations: Vec<&'static str>,
@@ -42,13 +48,13 @@ pub(crate) struct TaskResumeContract {
 }
 
 #[derive(Debug, Clone, Serialize)]
-struct TaskResumeTtyReattach {
-    status: &'static str,
-    supported: bool,
-    mode: &'static str,
-    fallback: &'static str,
-    reason: &'static str,
-    required_future_work: Vec<&'static str>,
+pub(crate) struct TaskResumeTtyReattach {
+    pub(crate) status: &'static str,
+    pub(crate) supported: bool,
+    pub(crate) mode: &'static str,
+    pub(crate) fallback: &'static str,
+    pub(crate) reason: &'static str,
+    pub(crate) required_future_work: Vec<&'static str>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,7 +99,16 @@ pub(crate) fn task_attach_state(
     record: Option<&TaskJournalRecord>,
     active: Option<ActiveCliPromptView>,
 ) -> TaskAttachState {
+    task_attach_state_with_sidecar(record, active, None)
+}
+
+pub(crate) fn task_attach_state_with_sidecar(
+    record: Option<&TaskJournalRecord>,
+    active: Option<ActiveCliPromptView>,
+    sidecar: Option<CliSidecarSessionRecord>,
+) -> TaskAttachState {
     let codex_session = codex_session_from_record(record);
+    let sidecar_session = sidecar.and_then(sidecar_session_from_record);
     if let Some(handle) = active {
         return TaskAttachState {
             status: "live",
@@ -105,6 +120,20 @@ pub(crate) fn task_attach_state(
                 "本机节点仍持有该任务的运行控制句柄，可以重连控制面并处理当前内存中的审批 waiter。",
             run_handle: Some(handle),
             codex_session,
+            sidecar_session,
+        };
+    }
+    if let Some(sidecar_session) = sidecar_session {
+        return TaskAttachState {
+            status: "sidecar_recoverable",
+            live: false,
+            can_reconnect: true,
+            continue_mode: "managed_sidecar_attach",
+            source: "sidecar_registry",
+            reason: "该任务由一龙 sidecar 持有，node-agent 重启后可以重接 sidecar 控制面并恢复可验证审批。",
+            run_handle: None,
+            codex_session,
+            sidecar_session: Some(sidecar_session),
         };
     }
     match record.map(|record| record.status.as_str()) {
@@ -117,6 +146,7 @@ pub(crate) fn task_attach_state(
             reason: "本机 journal 显示任务未终态，但当前节点已没有运行句柄，只能基于快照继续。",
             run_handle: None,
             codex_session,
+            sidecar_session: None,
         },
         Some(_) => TaskAttachState {
             status: "terminal",
@@ -127,6 +157,7 @@ pub(crate) fn task_attach_state(
             reason: "本机进程已经结束，只能基于任务快照继续新一轮处理。",
             run_handle: None,
             codex_session,
+            sidecar_session: None,
         },
         None => TaskAttachState {
             status: "missing",
@@ -137,6 +168,7 @@ pub(crate) fn task_attach_state(
             reason: "本机没有该任务的 journal 记录，前端只能使用云端任务快照。",
             run_handle: None,
             codex_session: None,
+            sidecar_session: None,
         },
     }
 }
@@ -158,6 +190,7 @@ fn task_resume_contract_with_journal_pending(
 ) -> TaskResumeContract {
     let active_approval_ids = active_approval_ids(attach);
     let can_approve_tools = !active_approval_ids.is_empty();
+    let sidecar_pending_approval_ids = journal_pending_approval_ids.clone();
     let tool_approval_recovery = tool_approval_recovery_status(
         attach.status,
         active_approval_ids.clone(),
@@ -165,6 +198,7 @@ fn task_resume_contract_with_journal_pending(
     );
     let run_handle = resume_run_handle(attach);
     let codex_session = attach.codex_session.clone();
+    let sidecar_session = attach.sidecar_session.clone();
     let can_resume_codex_session = codex_session.is_some();
     match attach.status {
         "live" => TaskResumeContract {
@@ -180,6 +214,7 @@ fn task_resume_contract_with_journal_pending(
             codex_session,
             continue_mode: attach.continue_mode,
             tty_reattach: tty_reattach_status(),
+            sidecar_session,
             run_handle,
             strategy: TaskResumeStrategy {
                 kind: "control_handle_reconnect",
@@ -191,6 +226,45 @@ fn task_resume_contract_with_journal_pending(
             },
             limitations: shared_limitations(),
             next_action: "wait_or_cancel",
+            reason: attach.reason,
+        },
+        "sidecar_recoverable" => TaskResumeContract {
+            status: attach.status,
+            can_reconnect: true,
+            can_cancel: attach
+                .sidecar_session
+                .as_ref()
+                .is_some_and(|session| session.can_attach_terminal),
+            can_stream_live_output: attach
+                .sidecar_session
+                .as_ref()
+                .is_some_and(|session| session.can_stream_live_output),
+            can_replay_journal_events: true,
+            can_approve_tools: attach
+                .sidecar_session
+                .as_ref()
+                .is_some_and(|session| {
+                    session.can_recover_tool_approval_after_restart
+                        && !sidecar_pending_approval_ids.is_empty()
+                }),
+            active_approval_ids: sidecar_pending_approval_ids,
+            tool_approval_recovery,
+            can_resume_codex_session,
+            codex_session,
+            continue_mode: attach.continue_mode,
+            tty_reattach: sidecar_tty_reattach_status(),
+            sidecar_session,
+            run_handle: None,
+            strategy: TaskResumeStrategy {
+                kind: "managed_conpty_sidecar_attach",
+                label: "重接 sidecar 会话",
+                reason: "任务由一龙 sidecar 持有，node-agent 重启后可重新连接 sidecar 控制面；审批决定写入 sidecar mailbox，由 sidecar 复核后执行。",
+                requires_new_task: false,
+                uses_cloud_snapshot: false,
+                uses_local_journal: true,
+            },
+            limitations: sidecar_limitations(),
+            next_action: "attach_sidecar",
             reason: attach.reason,
         },
         "detached" => TaskResumeContract {
@@ -206,6 +280,7 @@ fn task_resume_contract_with_journal_pending(
             codex_session,
             continue_mode: attach.continue_mode,
             tty_reattach: tty_reattach_status(),
+            sidecar_session,
             run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
@@ -232,6 +307,7 @@ fn task_resume_contract_with_journal_pending(
             codex_session,
             continue_mode: attach.continue_mode,
             tty_reattach: tty_reattach_status(),
+            sidecar_session,
             run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "snapshot_continue",
@@ -258,6 +334,7 @@ fn task_resume_contract_with_journal_pending(
             codex_session: None,
             continue_mode: "snapshot_continue",
             tty_reattach: tty_reattach_status(),
+            sidecar_session,
             run_handle: None,
             strategy: TaskResumeStrategy {
                 kind: "cloud_snapshot_only",
@@ -311,6 +388,20 @@ fn tty_reattach_status() -> TaskResumeTtyReattach {
     }
 }
 
+fn sidecar_tty_reattach_status() -> TaskResumeTtyReattach {
+    TaskResumeTtyReattach {
+        status: "supported",
+        supported: true,
+        mode: "managed_conpty_sidecar_reattach",
+        fallback: "journal_replay_snapshot_continue_and_codex_session_resume",
+        reason: "该任务由一龙 sidecar 启动并持有 ConPTY/控制 mailbox，node-agent 重启后可以重接 sidecar，而不是接管任意外部终端。",
+        required_future_work: vec![
+            "在 PC 前端接入真实终端 attach 面板。",
+            "为 sidecar 输出补充屏幕 buffer 回放。",
+        ],
+    }
+}
+
 fn tool_approval_recovery_status(
     attach_status: &'static str,
     active_approval_ids: Vec<String>,
@@ -344,6 +435,30 @@ fn tool_approval_recovery_status(
                 "将工具审批 waiter 状态写入可恢复本机存储。",
                 "恢复时校验任务进程、文件 hash 和审批请求仍然一致。",
             ],
+        },
+        "sidecar_recoverable" if !journal_pending_approval_ids.is_empty() => {
+            TaskResumeToolApprovalRecovery {
+                status: "sidecar_waiter_recoverable",
+                can_approve_now: true,
+                active_approval_ids: Vec::new(),
+                journal_pending_approval_ids,
+                journal_pending_count,
+                replay_source: "sidecar_mailbox_and_local_journal",
+                pending_after_restart_action: "approve_or_deny_sidecar_waiter",
+                reason: "审批 waiter 由 sidecar 持有；node-agent 重启后只写入 sidecar mailbox，由 sidecar 校验任务、审批 id 和安全指纹后继续执行。",
+                required_future_work: Vec::new(),
+            }
+        }
+        "sidecar_recoverable" => TaskResumeToolApprovalRecovery {
+            status: "sidecar_no_pending_waiter",
+            can_approve_now: false,
+            active_approval_ids: Vec::new(),
+            journal_pending_approval_ids,
+            journal_pending_count,
+            replay_source: "sidecar_mailbox_and_local_journal",
+            pending_after_restart_action: "wait_refresh_or_attach_sidecar",
+            reason: "sidecar 会话可重接，但本机 journal 当前没有未决审批 id；前端应先刷新 sidecar 状态。",
+            required_future_work: Vec::new(),
         },
         "detached" => TaskResumeToolApprovalRecovery {
             status: "lost_after_restart",
