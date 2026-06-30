@@ -1,6 +1,7 @@
 // server/src/node_agent_client_maintenance.rs
 
 use axum::{http::StatusCode, Json};
+#[cfg(windows)]
 use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use serde::Deserialize;
 use serde_json::{json, Value};
