@@ -27,6 +27,20 @@ internal class ProjectSpaceFeedData(
         loadingProjectId = null
     }
 
+    fun invalidate(projectId: String?) {
+        val matchesLoaded = projectId == null || loadedProjectId == projectId
+        val matchesLoading = projectId == null || loadingProjectId == projectId
+        if (matchesLoaded || matchesLoading) {
+            mutableMessagesByChannel.clear()
+        }
+        if (matchesLoaded) {
+            loadedProjectId = null
+        }
+        if (matchesLoading) {
+            loadingProjectId = null
+        }
+    }
+
     fun isLoading(space: ProjectSpace): Boolean {
         return loadingProjectId == space.project.id
     }

@@ -299,6 +299,37 @@ internal class ProjectSpaceController(
         }
     }
 
+    fun refreshCurrentProjectSpace(onComplete: ((Boolean) -> Unit)? = null) {
+        val projectId = activeProjectId?.trim()?.takeIf { it.isNotBlank() }
+        if (projectId == null) {
+            onComplete?.invoke(false)
+            return
+        }
+        val route = activeRoute
+        val resolvedLocalIcon = activeSpace?.project?.iconDataUrl.cleanProjectIconDataUrl()
+            ?: localProjectIconDataUrl(projectId).cleanProjectIconDataUrl()
+        thread(name = "project-space-refresh") {
+            val result = runCatching { fetchProjectSpace(http, serverUrl, activity, projectId, route) }
+            activity.runOnUiThread {
+                if (activeProjectId != projectId) {
+                    onComplete?.invoke(false)
+                    return@runOnUiThread
+                }
+                result.onSuccess { space ->
+                    val nextSpace = space.withProjectIcon(resolvedLocalIcon)
+                    spaceCache[projectId] = nextSpace
+                    activeSpace = nextSpace
+                    activeProjectTitle = nextSpace.project.name
+                    feedData.invalidate(projectId)
+                    renderProjectSpaceLanding()
+                    onComplete?.invoke(true)
+                }.onFailure {
+                    onComplete?.invoke(false)
+                }
+            }
+        }
+    }
+
     fun updateProjectIcon(projectIds: Set<String>, iconDataUrl: String?) {
         val ids = projectIds.mapNotNull { it.trim().takeIf(String::isNotBlank) }.toSet()
         if (ids.isEmpty()) return

@@ -539,7 +539,7 @@ internal class MainHomeListActions(
                             compareByDescending<StoreProject> { it.memberCount }
                                 .thenBy { it.displayTitle() }
                         )
-                    if (binding.projectPage.visibility == View.VISIBLE) renderProjectList()
+                    if (isProjectHomeVisible()) renderProjectList()
                 }
             }
         }
@@ -555,9 +555,14 @@ internal class MainHomeListActions(
             changed = true
             project.copy(iconDataUrl = cleanIcon)
         }
-        if (changed && binding.projectPage.visibility == View.VISIBLE) {
+        if (changed && isProjectHomeVisible()) {
             renderProjectList()
         }
+    }
+
+    private fun isProjectHomeVisible(): Boolean {
+        return binding.projectPage.visibility == View.VISIBLE &&
+            binding.pageTabs.visibility == View.VISIBLE
     }
 
     fun refreshPlazaBannerProjects() {

@@ -53,10 +53,15 @@ internal class MainProjectViewActions(
         binding.projectWorkflowText.text = projectWorkflowCardText(stage)
         updateStageLines(stage)
         renderConversationList()
-        if (binding.projectPage.visibility == View.VISIBLE) {
+        if (isProjectHomeVisible()) {
             renderProjectList()
         }
         updateStageHintShimmer()
+    }
+
+    private fun isProjectHomeVisible(): Boolean {
+        return binding.projectPage.visibility == View.VISIBLE &&
+            binding.pageTabs.visibility == View.VISIBLE
     }
 
     private fun updateStageLines(stage: String) {

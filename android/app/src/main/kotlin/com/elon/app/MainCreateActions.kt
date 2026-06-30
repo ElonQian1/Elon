@@ -39,6 +39,7 @@ internal class MainCreateActions(
     private val restorePendingActiveWork: () -> Unit,
     private val checkAndOfferGuestImport: () -> Unit,
     private val syncProjectsFromServer: (((Boolean) -> Unit)?) -> Unit,
+    private val refreshCurrentProjectSpace: (((Boolean) -> Unit)?) -> Unit,
     private val getWaitingForReply: () -> Boolean,
     private val getBackendConnected: () -> Boolean,
     private val isActiveConversationWorking: () -> Boolean,
@@ -116,6 +117,17 @@ internal class MainCreateActions(
                 Toast.makeText(activity, "请先登录后同步项目", Toast.LENGTH_SHORT).show()
                 return@setOnRefreshListener
             }
+            if (isProjectSpacePageActive()) {
+                refreshCurrentProjectSpace { ok ->
+                    binding.projectPage.isRefreshing = false
+                    Toast.makeText(
+                        activity,
+                        if (ok) "项目空间已刷新" else "刷新失败，请稍后再试",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                return@setOnRefreshListener
+            }
             syncProjectsFromServer { ok ->
                 binding.projectPage.isRefreshing = false
                 Toast.makeText(
@@ -125,6 +137,11 @@ internal class MainCreateActions(
                 ).show()
             }
         }
+    }
+
+    private fun isProjectSpacePageActive(): Boolean {
+        return binding.projectPage.visibility == View.VISIBLE &&
+            binding.pageTabs.visibility != View.VISIBLE
     }
 
     private fun SwipeRefreshLayout.tryDisableArrowhead() {

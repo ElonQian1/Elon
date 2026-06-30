@@ -48,7 +48,9 @@ internal class MainAccountActions(
                     val selfIconChanged = mergeElonSelfProjectIcon(remoteElonSelfIcon)
                     if (projectsChanged || selfIconChanged) {
                         saveProjects()
-                        renderProjectList()
+                        if (canRenderProjectListWithoutDisruptingSpace()) {
+                            renderProjectList()
+                        }
                     }
                 }
                 onComplete?.let { activity.runOnUiThread { it(true) } }
@@ -288,10 +290,17 @@ internal class MainAccountActions(
         }
         if (count > 0) {
             saveProjects()
-            renderProjectList()
+            if (canRenderProjectListWithoutDisruptingSpace()) {
+                renderProjectList()
+            }
             refreshAccountUi()
             Toast.makeText(activity, "已导入 $count 个游客项目", Toast.LENGTH_SHORT).show()
         }
+    }
+
+    private fun canRenderProjectListWithoutDisruptingSpace(): Boolean {
+        return binding.projectPage.visibility != View.VISIBLE ||
+            binding.pageTabs.visibility == View.VISIBLE
     }
 
     private fun confirmLogoutStep2() {

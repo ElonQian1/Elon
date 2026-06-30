@@ -277,6 +277,7 @@ class MainActivity : AppCompatActivity() {
             restorePendingActiveWork = { conversationTaskRegistryActions.restorePendingActiveWork() },
             checkAndOfferGuestImport = { accountActions().checkAndOfferGuestImport() },
             syncProjectsFromServer = { onComplete -> accountActions().syncProjectsFromServer(onComplete) },
+            refreshCurrentProjectSpace = { onComplete -> projectSpaceController.refreshCurrentProjectSpace(onComplete) },
             getWaitingForReply = { s.waitingForReply },
             getBackendConnected = { s.backendConnected },
             isActiveConversationWorking = conversationTaskRegistryActions::isActiveConversationWorking,
