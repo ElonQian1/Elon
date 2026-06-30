@@ -227,10 +227,7 @@ fn package_replace_script(
         .map(|pid| format!("Wait-Process -Id {pid} -ErrorAction SilentlyContinue\n"))
         .unwrap_or_default();
     let restart = pid_to_wait
-        .map(|_| {
-            "$client = Join-Path $installDir '一龙开发平台.exe'\nStart-Process -FilePath $client -WindowStyle Hidden\n"
-                .to_string()
-        })
+        .map(|_| restart_agent_runtime_after_update_script("$client", "$installDir"))
         .unwrap_or_default();
     format!(
         r#"
@@ -264,6 +261,7 @@ try {{
   Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
 }}
+$client = Join-Path $installDir '一龙开发平台.exe'
 {restart}"#,
         wait = wait,
         tmp_zip = launcher_command::ps_single_quote(&tmp_zip.to_string_lossy()),
@@ -340,19 +338,87 @@ $client = '{client}'
 $uninstall = '{uninstall}'
 $tmpVersion = '{tmp_version}'
 $versionFile = '{version_file}'
+$installDir = [System.IO.Path]::GetDirectoryName($client)
 Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
 Move-Item -LiteralPath $tmpExe -Destination $client -Force
 Copy-Item -LiteralPath $client -Destination $uninstall -Force
 Move-Item -LiteralPath $tmpVersion -Destination $versionFile -Force
-Start-Process -FilePath $client -WindowStyle Hidden
+{restart}
 "#,
         pid = std::process::id(),
         tmp_exe = launcher_command::ps_single_quote(&tmp_exe.to_string_lossy()),
         client = launcher_command::ps_single_quote(&client.to_string_lossy()),
         uninstall = launcher_command::ps_single_quote(&uninstall.to_string_lossy()),
         tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy()),
-        version_file = launcher_command::ps_single_quote(&version_file.to_string_lossy())
+        version_file = launcher_command::ps_single_quote(&version_file.to_string_lossy()),
+        restart = restart_agent_runtime_after_update_script("$client", "$installDir")
     )
+}
+
+#[cfg(windows)]
+const UPDATE_RESTART_HELPERS: &str = r#"
+function Get-ElonNodeAdminPort {
+  param([Parameter(Mandatory = $true)][string]$InstallDir)
+  $port = 7799
+  $envFile = Join-Path $InstallDir '_internal\node-agent.env'
+  if (Test-Path -LiteralPath $envFile) {
+    foreach ($line in (Get-Content -LiteralPath $envFile -ErrorAction SilentlyContinue)) {
+      if ($line -match '^\s*NODE_ADMIN_PORT\s*=\s*"?([0-9]+)"?\s*$') {
+        $port = [int]$Matches[1]
+      }
+    }
+  }
+  return $port
+}
+
+function Test-ElonNodeAdminHealth {
+  param([Parameter(Mandatory = $true)][int]$Port)
+  try {
+    $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$Port/api/status" -UseBasicParsing -TimeoutSec 2
+    return (($resp.StatusCode -eq 200) -and ([string]$resp.Content).Contains('"local_admin_token_header"'))
+  } catch {
+    return $false
+  }
+}
+
+function Wait-ElonNodeAdminHealth {
+  param(
+    [Parameter(Mandatory = $true)][int]$Port,
+    [int]$TimeoutSeconds = 25
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ((Get-Date) -lt $deadline) {
+    if (Test-ElonNodeAdminHealth -Port $Port) { return $true }
+    Start-Sleep -Milliseconds 500
+  }
+  return (Test-ElonNodeAdminHealth -Port $Port)
+}
+
+function Start-ElonNodeRuntimeAndWait {
+  param(
+    [Parameter(Mandatory = $true)][string]$Client,
+    [Parameter(Mandatory = $true)][string]$InstallDir
+  )
+  $port = Get-ElonNodeAdminPort -InstallDir $InstallDir
+  Start-Process -FilePath $Client -ArgumentList '--agent-runtime' -WorkingDirectory $InstallDir -WindowStyle Hidden
+  if (-not (Wait-ElonNodeAdminHealth -Port $port -TimeoutSeconds 25)) {
+    Start-Process -FilePath $Client -ArgumentList '--agent-runtime' -WorkingDirectory $InstallDir -WindowStyle Hidden
+    if (-not (Wait-ElonNodeAdminHealth -Port $port -TimeoutSeconds 10)) {
+      throw "新版一龙节点启动后健康检查超时: http://127.0.0.1:$port/api/status"
+    }
+  }
+}
+"#;
+
+#[cfg(windows)]
+fn restart_agent_runtime_after_update_script(client_expr: &str, install_dir_expr: &str) -> String {
+    let mut script = String::from(UPDATE_RESTART_HELPERS);
+    script.push_str("Start-ElonNodeRuntimeAndWait -Client ");
+    script.push_str(client_expr);
+    script.push_str(" -InstallDir ");
+    script.push_str(install_dir_expr);
+    script.push('\n');
+    script
 }
 
 fn update_base_url(env_values: &std::collections::HashMap<String, String>) -> String {
@@ -387,10 +453,14 @@ mod tests {
         );
 
         assert!(script.contains("$ErrorActionPreference = 'Stop'"));
-        assert!(script.contains("Start-Process -FilePath $client -WindowStyle Hidden"));
+        assert!(
+            script.contains("Start-ElonNodeRuntimeAndWait -Client $client -InstallDir $installDir")
+        );
+        assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));
+        assert!(script.contains("Wait-ElonNodeAdminHealth"));
         assert!(
             script.find("Move-Item -LiteralPath $tmpExe").unwrap()
-                < script.find("Start-Process -FilePath $client").unwrap()
+                < script.find("Start-ElonNodeRuntimeAndWait").unwrap()
         );
     }
 
@@ -411,6 +481,10 @@ mod tests {
         assert!(script.contains("Expand-Archive -LiteralPath $zip"));
         assert!(script.contains("Copy-Item -Path (Join-Path $packageInternal '*')"));
         assert!(script.contains("Move-Item -LiteralPath $tmpVersion"));
-        assert!(script.contains("Start-Process -FilePath $client -WindowStyle Hidden"));
+        assert!(
+            script.contains("Start-ElonNodeRuntimeAndWait -Client $client -InstallDir $installDir")
+        );
+        assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));
+        assert!(script.contains("Wait-ElonNodeAdminHealth"));
     }
 }

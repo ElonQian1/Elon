@@ -50,7 +50,7 @@ pub fn command_from_path(program: &Path) -> Command {
     {
         if is_windows_script(program) {
             let mut command = Command::new("cmd");
-            command.args(["/D", "/S", "/C"]).arg(program);
+            command.args(["/D", "/S", "/C", "call"]).arg(program);
             apply_hidden_window(&mut command);
             return command;
         }
@@ -174,4 +174,35 @@ fn is_windows_script(path: &Path) -> bool {
         .and_then(OsStr::to_str)
         .map(|ext| matches!(ext.to_ascii_lowercase().as_str(), "cmd" | "bat"))
         .unwrap_or(false)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn command_args(command: &Command) -> Vec<String> {
+        command
+            .get_args()
+            .map(|arg| arg.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn windows_script_commands_use_call_before_script_path() {
+        let command = command_from_path(Path::new(r"C:\Program Files\nodejs\npm.cmd"));
+        let args = command_args(&command);
+
+        assert_eq!(command.get_program().to_string_lossy(), "cmd");
+        assert_eq!(
+            args,
+            vec![
+                "/D".to_string(),
+                "/S".to_string(),
+                "/C".to_string(),
+                "call".to_string(),
+                r"C:\Program Files\nodejs\npm.cmd".to_string()
+            ]
+        );
+    }
 }

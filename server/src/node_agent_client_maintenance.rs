@@ -1,6 +1,7 @@
 // server/src/node_agent_client_maintenance.rs
 
 use axum::{http::StatusCode, Json};
+use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
 use serde::Deserialize;
 use serde_json::{json, Value};
 use std::{
@@ -764,10 +765,14 @@ pub(crate) async fn push_update_from_server(
     // 没有安装程序时：直接下载新版 exe，写旁路 bat 脚本替换并重启
     let url = download_url_override
         .map(str::to_string)
-        .unwrap_or_else(|| format!("{}/api/node-agent/download/windows", cloud_http_url.trim_end_matches('/')));
+        .unwrap_or_else(|| {
+            format!(
+                "{}/api/node-agent/download/windows",
+                cloud_http_url.trim_end_matches('/')
+            )
+        });
 
-    let current_exe = std::env::current_exe()
-        .map_err(|e| format!("无法定位当前 exe: {e}"))?;
+    let current_exe = std::env::current_exe().map_err(|e| format!("无法定位当前 exe: {e}"))?;
     let download_path = current_exe.with_extension("new.exe");
     let bat_path = current_exe.with_extension("update.bat");
 
@@ -776,13 +781,20 @@ pub(crate) async fn push_update_from_server(
         .timeout(std::time::Duration::from_secs(120))
         .build()
         .unwrap_or_default();
-    let resp = client.get(&url).send().await
+    let resp = client
+        .get(&url)
+        .send()
+        .await
         .map_err(|e| format!("下载新版失败: {e}"))?;
     if !resp.status().is_success() {
         return Err(format!("下载服务器返回 {}", resp.status()));
     }
-    let bytes = resp.bytes().await.map_err(|e| format!("读取下载内容失败: {e}"))?;
-    tokio::fs::write(&download_path, &bytes).await
+    let bytes = resp
+        .bytes()
+        .await
+        .map_err(|e| format!("读取下载内容失败: {e}"))?;
+    tokio::fs::write(&download_path, &bytes)
+        .await
         .map_err(|e| format!("写入新版 exe 失败: {e}"))?;
 
     // 写一个 bat 脚本：等待当前进程退出后替换并重启
@@ -791,7 +803,8 @@ pub(crate) async fn push_update_from_server(
     let bat_content = format!(
         "@echo off\r\ntimeout /t 2 /nobreak >nul\r\nmove /y \"{new_str}\" \"{cur_str}\"\r\nstart \"\" \"{cur_str}\" --agent-runtime\r\ndel \"%~f0\"\r\n"
     );
-    tokio::fs::write(&bat_path, bat_content.as_bytes()).await
+    tokio::fs::write(&bat_path, bat_content.as_bytes())
+        .await
         .map_err(|e| format!("写入更新脚本失败: {e}"))?;
 
     // 启动 bat 然后退出当前进程
@@ -814,7 +827,10 @@ pub(crate) async fn push_update_from_server(
         std::process::exit(0);
     });
 
-    Ok(format!("已下载新版本并启动替换脚本，节点将在 2 秒后自动重启。下载大小: {} KB", bytes.len() / 1024))
+    Ok(format!(
+        "已下载新版本并启动替换脚本，节点将在 2 秒后自动重启。下载大小: {} KB",
+        bytes.len() / 1024
+    ))
 }
 
 fn spawn_client_action(action: ClientAction) -> Result<(), String> {
@@ -866,13 +882,10 @@ fn spawn_client_action(action: ClientAction) -> Result<(), String> {
 
 #[cfg(windows)]
 fn query_autostart_command() -> Result<Option<String>, String> {
-    let mut command = Command::new("reg");
-    command.args([
-        "query",
-        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-        "/v",
-        crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME,
-    ]);
+    let script = autostart_query_script();
+    let mut command = Command::new("powershell");
+    command.args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-Command"]);
+    command.arg(script);
     apply_hidden_window(&mut command);
     let output = command
         .stdout(Stdio::piped())
@@ -880,22 +893,13 @@ fn query_autostart_command() -> Result<Option<String>, String> {
         .output()
         .map_err(|error| format!("无法读取开机自启动设置: {error}"))?;
     if !output.status.success() {
-        return Ok(None);
+        return Err(format!(
+            "无法读取开机自启动设置: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    for line in stdout.lines() {
-        let trimmed = line.trim();
-        if !trimmed.starts_with(crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME) {
-            continue;
-        }
-        if let Some((_, value)) = trimmed.split_once("REG_SZ") {
-            let value = value.trim();
-            if !value.is_empty() {
-                return Ok(Some(value.to_string()));
-            }
-        }
-    }
-    Ok(None)
+    let encoded = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    decode_autostart_command(&encoded)
 }
 
 #[cfg(windows)]
@@ -903,6 +907,48 @@ fn command_targets_path(command: &str, expected_path: &str) -> bool {
     let actual = command.trim().trim_matches('"').to_ascii_lowercase();
     let expected = expected_path.trim().trim_matches('"').to_ascii_lowercase();
     !expected.is_empty() && actual.contains(&expected)
+}
+
+#[cfg(windows)]
+fn autostart_query_script() -> String {
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
+$name = '{}'
+$key = [Microsoft.Win32.Registry]::CurrentUser.OpenSubKey($keyPath)
+if ($null -eq $key) {{ exit 0 }}
+try {{
+  $value = $key.GetValue($name, $null)
+  if ($null -ne $value) {{
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes([string]$value)
+    [Console]::Out.Write([Convert]::ToBase64String($bytes))
+  }}
+}} finally {{
+  $key.Dispose()
+}}
+"#,
+        ps_single_quote(crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME)
+    )
+}
+
+#[cfg(windows)]
+fn decode_autostart_command(encoded: &str) -> Result<Option<String>, String> {
+    let encoded = encoded.trim();
+    if encoded.is_empty() {
+        return Ok(None);
+    }
+    let bytes = B64
+        .decode(encoded)
+        .map_err(|error| format!("开机自启动设置不是合法 base64: {error}"))?;
+    String::from_utf8(bytes)
+        .map(Some)
+        .map_err(|error| format!("开机自启动设置不是 UTF-8: {error}"))
+}
+
+#[cfg(windows)]
+fn ps_single_quote(value: &str) -> String {
+    value.replace('\'', "''")
 }
 
 fn maintenance_paths() -> MaintenancePaths {
@@ -1095,6 +1141,22 @@ mod tests {
         );
         assert!(install_dir_from_local_app_data(Some(" ")).is_none());
         assert!(install_dir_from_local_app_data(None).is_none());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn autostart_command_decode_preserves_unicode_path() {
+        use base64::{engine::general_purpose::STANDARD as B64, Engine as _};
+
+        let command = r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe""#;
+        let encoded = B64.encode(command.as_bytes());
+
+        assert_eq!(
+            super::decode_autostart_command(&encoded)
+                .unwrap()
+                .as_deref(),
+            Some(command)
+        );
     }
 
     #[test]

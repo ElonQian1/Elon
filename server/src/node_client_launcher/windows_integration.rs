@@ -88,18 +88,8 @@ pub(crate) fn enable_autostart(install_dir: &Path) -> Result<()> {
         remove_legacy_scheduled_task();
         remove_legacy_run_values();
         remove_legacy_startup_shortcuts();
-        let mut cmd = launcher_command::silent_command("reg");
-        cmd.args([
-            "add",
-            r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
-            "/v",
-            RUN_VALUE_NAME,
-            "/t",
-            "REG_SZ",
-            "/d",
-            &value,
-            "/f",
-        ]);
+        let script = set_autostart_value_script(&value);
+        let mut cmd = launcher_command::powershell_hidden_command(&script);
         let status = launcher_command::status_hidden(&mut cmd).context("无法注册开机自启")?;
         if !status.success() {
             anyhow::bail!("注册开机自启失败");
@@ -321,6 +311,26 @@ fn start_menu_shortcut_ps_items() -> String {
 }
 
 #[cfg(windows)]
+fn set_autostart_value_script(value: &str) -> String {
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+$keyPath = 'Software\Microsoft\Windows\CurrentVersion\Run'
+$name = '{}'
+$value = '{}'
+$key = [Microsoft.Win32.Registry]::CurrentUser.CreateSubKey($keyPath)
+try {{
+  $key.SetValue($name, $value, [Microsoft.Win32.RegistryValueKind]::String)
+}} finally {{
+  if ($null -ne $key) {{ $key.Dispose() }}
+}}
+"#,
+        launcher_command::ps_single_quote(RUN_VALUE_NAME),
+        launcher_command::ps_single_quote(value)
+    )
+}
+
+#[cfg(windows)]
 fn remove_legacy_scheduled_task() {
     let mut cmd = launcher_command::silent_command("schtasks");
     cmd.args(["/Delete", "/TN", LEGACY_TASK_NAME, "/F"]);
@@ -356,6 +366,19 @@ mod tests {
         assert!(START_MENU_SHORTCUTS
             .iter()
             .any(|spec| matches!(spec.target, ShortcutTarget::Uninstall)));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn autostart_script_writes_unicode_registry_value_without_reg_exe() {
+        let script = super::set_autostart_value_script(
+            r#""C:\Users\ELon\AppData\Local\ElonNode\一龙开发平台.exe""#,
+        );
+
+        assert!(script.contains("[Microsoft.Win32.Registry]::CurrentUser.CreateSubKey"));
+        assert!(script.contains("SetValue($name, $value"));
+        assert!(script.contains("一龙开发平台.exe"));
+        assert!(!script.contains("reg add"));
     }
 }
 

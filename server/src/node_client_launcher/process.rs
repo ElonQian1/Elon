@@ -30,19 +30,36 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         .unwrap_or(DEFAULT_ADMIN_PORT);
     let port = select_admin_port(port);
 
-    if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) && !agent_runtime_running(install_dir) {
-        let mut cmd = launcher_command::silent_command(&client);
-        cmd.arg(AGENT_RUNTIME_ARG)
-            .current_dir(install_dir)
-            .envs(&env_values)
-            .env("NODE_ADMIN_PORT", port.to_string())
-            .env("NODE_AUTO_OPEN_ADMIN", "0");
-        launcher_command::spawn_hidden(&mut cmd)
-            .with_context(|| format!("无法启动 {}", client.display()))?;
-        wait_for_admin_ready(port, Duration::from_secs(15));
+    if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
+        if !agent_runtime_running(install_dir) {
+            spawn_agent_runtime(&client, install_dir, port, &env_values)?;
+        }
+        if !wait_for_admin_ready(port, Duration::from_secs(15)) {
+            spawn_agent_runtime(&client, install_dir, port, &env_values)?;
+            if !wait_for_admin_ready(port, Duration::from_secs(10)) {
+                bail!("一龙节点本机管理接口启动超时：http://127.0.0.1:{port}/api/status");
+            }
+        }
     }
 
     open_pc_web_page(port, &env_values)
+}
+
+fn spawn_agent_runtime(
+    client: &Path,
+    install_dir: &Path,
+    port: u16,
+    env_values: &std::collections::HashMap<String, String>,
+) -> Result<()> {
+    let mut cmd = launcher_command::silent_command(client);
+    cmd.arg(AGENT_RUNTIME_ARG)
+        .current_dir(install_dir)
+        .envs(env_values)
+        .env("NODE_ADMIN_PORT", port.to_string())
+        .env("NODE_AUTO_OPEN_ADMIN", "0");
+    launcher_command::spawn_hidden(&mut cmd)
+        .with_context(|| format!("无法启动 {}", client.display()))?;
+    Ok(())
 }
 
 pub(crate) fn stop_agent() {
