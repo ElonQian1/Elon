@@ -18,6 +18,9 @@ export interface RuntimeRouteGroup {
 }
 
 export const RUNTIME_ROUTE_STORAGE_KEY = 'elon_pc_project_runtime_route'
+export const RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_pc_project_runtime_route_default_v2'
+export const RUNTIME_ROUTE_DEFAULT_VERSION = 'platform-ai-default-20260630'
+export const DEFAULT_RUNTIME_ROUTE: RuntimeRoute = 'route_c'
 
 export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
   {
@@ -99,14 +102,44 @@ export const ACTIVE_RUNTIME_ROUTE_GROUPS: RuntimeRouteGroup[] = [
   },
 ]
 
-export function normalizeRuntimeRoute(value: unknown): RuntimeRoute {
+export function normalizeRuntimeRoute(
+  value: unknown,
+  fallback: RuntimeRoute = DEFAULT_RUNTIME_ROUTE,
+): RuntimeRoute {
   return RUNTIME_ROUTE_OPTIONS.some((item) => item.value === value)
     ? value as RuntimeRoute
-    : 'auto'
+    : fallback
+}
+
+function getStorageValue(storage: Storage, key: string): string | null {
+  try {
+    return storage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+export function initialRuntimeRouteFromStorage(storage?: Storage | null): RuntimeRoute {
+  if (!storage) return DEFAULT_RUNTIME_ROUTE
+  const stored = getStorageValue(storage, RUNTIME_ROUTE_STORAGE_KEY)
+  const defaultVersion = getStorageValue(storage, RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
+  if (!stored || (!defaultVersion && stored === 'auto')) return DEFAULT_RUNTIME_ROUTE
+  return normalizeRuntimeRoute(stored)
+}
+
+export function persistRuntimeRouteSelection(storage: Storage | null | undefined, value: RuntimeRoute): void {
+  try {
+    storage?.setItem(RUNTIME_ROUTE_STORAGE_KEY, value)
+    storage?.setItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, RUNTIME_ROUTE_DEFAULT_VERSION)
+  } catch {
+    // Ignore blocked storage; the selected route still works for the current session.
+  }
 }
 
 export function runtimeRouteOption(value: RuntimeRoute): RuntimeRouteOption {
-  return RUNTIME_ROUTE_OPTIONS.find((item) => item.value === value) ?? RUNTIME_ROUTE_OPTIONS[0]
+  return RUNTIME_ROUTE_OPTIONS.find((item) => item.value === value)
+    ?? RUNTIME_ROUTE_OPTIONS.find((item) => item.value === DEFAULT_RUNTIME_ROUTE)
+    ?? RUNTIME_ROUTE_OPTIONS[0]
 }
 
 export function runtimeRouteDescription(value: RuntimeRoute): string {

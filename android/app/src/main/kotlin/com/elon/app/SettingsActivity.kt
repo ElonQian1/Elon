@@ -370,7 +370,7 @@ class SettingsActivity : AppCompatActivity() {
         val payload = JSONObject()
         var cachedAgentName: String? = null
         var cachedModelLabel = "服务器默认"
-        var cachedRuntimeRoute = "auto"
+        var cachedRuntimeRoute = "route_c"
         var customApiBaseForLocal: String? = null
         var customApiKeyForLocal: String? = null
         var customModelForLocal: String? = null
@@ -475,12 +475,13 @@ class SettingsActivity : AppCompatActivity() {
         editor.apply()
     }
 
-    private fun cacheModelSelection(agentName: String?, label: String, runtimeRoute: String = "auto") {
+    private fun cacheModelSelection(agentName: String?, label: String, runtimeRoute: String = "route_c") {
         prefs.edit().apply {
             if (agentName.isNullOrBlank()) remove("selected_agent_name")
             else putString("selected_agent_name", agentName)
             putString("selected_model_label", label)
             putString("selected_runtime_route", runtimeRoute)
+            putBoolean("selected_runtime_route_default_v2", true)
         }.apply()
     }
 

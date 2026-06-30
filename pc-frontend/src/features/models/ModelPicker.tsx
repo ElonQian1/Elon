@@ -13,6 +13,7 @@ import {
 import type { AgentOption } from './types'
 import {
   ACTIVE_RUNTIME_ROUTE_GROUPS,
+  DEFAULT_RUNTIME_ROUTE,
   runtimeRouteOption,
 } from '../conversation/runtimeRoutes'
 import type { RuntimeRoute } from '../conversation/runtimeRoutes'
@@ -39,7 +40,7 @@ export function ModelPickerPopover({
   const [saveError, setSaveError] = useState('')
   const [pos, setPos] = useState({ left: 12, bottom: 12, width: 360 })
   const hasRuntimeRoutePicker = !!runtimeRoute && !!onRuntimeRouteChange
-  const route = runtimeRoute ?? 'auto'
+  const route = runtimeRoute ?? DEFAULT_RUNTIME_ROUTE
   const selectedRoute = runtimeRouteOption(route)
 
   // 定位 popover（锚点按钮上方）

@@ -52,7 +52,7 @@ internal class MainModelActions(
         private set
     var selectedAgentName: String? = null
         private set
-    var selectedRuntimeRoute: AiRuntimeRoute = AiRuntimeRoute.Auto
+    var selectedRuntimeRoute: AiRuntimeRoute = AiRuntimeRoute.default
         private set
     var currentModelLabel = "默认"
         private set
@@ -144,9 +144,7 @@ internal class MainModelActions(
                     codexCliOnly = false
                     modelOptions = options
                     selectedAgentName = effectiveUseAgent
-                    selectedRuntimeRoute = cachedRuntimeRoute().let { cached ->
-                        if (cached == AiRuntimeRoute.Auto && hasCustomConfig) AiRuntimeRoute.MyKey else cached
-                    }
+                    selectedRuntimeRoute = cachedRuntimeRoute()
                     currentModelLabel = label
                     if (shouldSyncCache) {
                         cacheModelSelection(effectiveUseAgent, label, selectedRuntimeRoute)
@@ -275,6 +273,7 @@ internal class MainModelActions(
             else putString(PREF_SELECTED_AGENT, agentName)
             putString(PREF_SELECTED_MODEL_LABEL, label)
             putString(PREF_SELECTED_RUNTIME_ROUTE, runtimeRoute.wireValue ?: "auto")
+            putBoolean(PREF_SELECTED_RUNTIME_ROUTE_DEFAULT_VERSION, true)
         }.apply()
     }
 
@@ -291,7 +290,12 @@ internal class MainModelActions(
     }
 
     private fun cachedRuntimeRoute(): AiRuntimeRoute {
-        return AiRuntimeRoute.fromStored(prefs.getString(PREF_SELECTED_RUNTIME_ROUTE, null))
+        val stored = prefs.getString(PREF_SELECTED_RUNTIME_ROUTE, null)
+        val defaultVersionSeen = prefs.getBoolean(PREF_SELECTED_RUNTIME_ROUTE_DEFAULT_VERSION, false)
+        if (stored.isNullOrBlank() || (!defaultVersionSeen && stored.equals("auto", ignoreCase = true))) {
+            return AiRuntimeRoute.default
+        }
+        return AiRuntimeRoute.fromStored(stored)
     }
 
     private fun saveRuntimeRouteSelection(route: AiRuntimeRoute) {
@@ -730,6 +734,7 @@ internal class MainModelActions(
         const val PREF_SELECTED_AGENT = "selected_agent_name"
         const val PREF_SELECTED_MODEL_LABEL = "selected_model_label"
         const val PREF_SELECTED_RUNTIME_ROUTE = "selected_runtime_route"
+        const val PREF_SELECTED_RUNTIME_ROUTE_DEFAULT_VERSION = "selected_runtime_route_default_v2"
         const val MODEL_POPUP_REOPEN_SUPPRESS_MS = 260L
     }
 }

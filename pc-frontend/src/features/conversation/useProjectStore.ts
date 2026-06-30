@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { api } from '../../api/client'
 import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse } from './types'
+import { DEFAULT_RUNTIME_ROUTE } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 
 interface ProjectState {
@@ -139,7 +140,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }
   },
 
-  sendMessage: async (content: string, agent?: string | null, runtimeRoute: RuntimeRoute = 'auto') => {
+  sendMessage: async (content: string, agent?: string | null, runtimeRoute: RuntimeRoute = DEFAULT_RUNTIME_ROUTE) => {
     const { activeProjectId, activeChannelId } = get()
     if (!activeProjectId || !activeChannelId || !content.trim()) return
     set({ sendingMessage: true })

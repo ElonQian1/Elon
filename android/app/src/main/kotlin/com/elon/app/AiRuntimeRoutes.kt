@@ -49,6 +49,8 @@ internal enum class AiRuntimeRoute(
     );
 
     companion object {
+        val default: AiRuntimeRoute = PlatformAi
+
         val quickOptions: List<AiRuntimeRoute> = listOf(
             Auto,
             MyPcAi,
@@ -60,8 +62,9 @@ internal enum class AiRuntimeRoute(
 
         fun fromStored(value: String?): AiRuntimeRoute {
             val clean = value?.trim().orEmpty()
-            if (clean.isBlank() || clean.equals("auto", ignoreCase = true)) return Auto
-            return quickOptions.firstOrNull { it.wireValue.equals(clean, ignoreCase = true) } ?: Auto
+            if (clean.isBlank()) return default
+            if (clean.equals("auto", ignoreCase = true)) return Auto
+            return quickOptions.firstOrNull { it.wireValue.equals(clean, ignoreCase = true) } ?: default
         }
     }
 }

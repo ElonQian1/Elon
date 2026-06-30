@@ -3842,6 +3842,9 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let contactFilterMode = 'all';
   let selectedAgent = '';
   const RUNTIME_ROUTE_KEY = 'elon_runtime_route';
+  const RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_runtime_route_default_v2';
+  const RUNTIME_ROUTE_DEFAULT_VERSION = 'platform-ai-default-20260630';
+  const DEFAULT_RUNTIME_ROUTE = 'route_c';
   const runtimeRouteOptions = [
     { value: 'auto', button: '自动', label: '自动选择', subtitle: '一龙按当前项目选择合适的 AI' },
     { value: 'route_a', button: '本机AI', label: '本机AI', subtitle: '连接自己 PC 上已经登录的 Codex / Copilot / Claude' },
@@ -3850,8 +3853,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     { value: 'route_c2', button: '远程AI', label: '远程一龙AI', subtitle: '其他用户 PC 节点 + 一龙 CLI' },
     { value: 'route_c3', button: '远Codex', label: '远程 Codex / Claude', subtitle: '其他用户 PC 节点 + Codex / Claude' }
   ];
-  let selectedRuntimeRoute = localStorage.getItem(RUNTIME_ROUTE_KEY) || 'auto';
-  if (!runtimeRouteOptions.some((it) => it.value === selectedRuntimeRoute)) selectedRuntimeRoute = 'auto';
+  let selectedRuntimeRoute = initialRuntimeRouteFromStorage();
   let agentOptions = [];
 
   function setMoreButtonMode(mode) {
@@ -6723,7 +6725,22 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     return agentOptions.find((it) => (it.name || '') === selectedAgent) || agentOptions[0] || { name: '', label: '默认模型' };
   }
   function selectedRuntimeRouteOption() {
-    return runtimeRouteOptions.find((it) => it.value === selectedRuntimeRoute) || runtimeRouteOptions[0];
+    return runtimeRouteOptions.find((it) => it.value === selectedRuntimeRoute) ||
+      runtimeRouteOptions.find((it) => it.value === DEFAULT_RUNTIME_ROUTE) ||
+      runtimeRouteOptions[0];
+  }
+  function isValidRuntimeRoute(value) {
+    return runtimeRouteOptions.some((it) => it.value === value);
+  }
+  function initialRuntimeRouteFromStorage() {
+    const stored = localStorage.getItem(RUNTIME_ROUTE_KEY);
+    const defaultVersion = localStorage.getItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY);
+    if (!stored || (!defaultVersion && stored === 'auto')) return DEFAULT_RUNTIME_ROUTE;
+    return isValidRuntimeRoute(stored) ? stored : DEFAULT_RUNTIME_ROUTE;
+  }
+  function persistRuntimeRouteSelection(value) {
+    localStorage.setItem(RUNTIME_ROUTE_KEY, value);
+    localStorage.setItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, RUNTIME_ROUTE_DEFAULT_VERSION);
   }
   function runtimeRouteForRequest() {
     return selectedRuntimeRoute && selectedRuntimeRoute !== 'auto' ? selectedRuntimeRoute : '';
@@ -6805,8 +6822,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
   }
   function selectRuntimeRoute(value) {
-    selectedRuntimeRoute = runtimeRouteOptions.some((it) => it.value === value) ? value : 'auto';
-    localStorage.setItem(RUNTIME_ROUTE_KEY, selectedRuntimeRoute);
+    selectedRuntimeRoute = isValidRuntimeRoute(value) ? value : DEFAULT_RUNTIME_ROUTE;
+    persistRuntimeRouteSelection(selectedRuntimeRoute);
     const current = agentOptions.find((it) => (it.name || '') === selectedAgent);
     if (current && !matchesRuntimeRoute(current)) {
       const fallback = agentOptions.find(matchesRuntimeRoute);
@@ -6987,9 +7004,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       agentOptions = options;
       const hasCustomConfig = !!((config.api_base || '').trim() || (config.model || '').trim());
       if (!runtimeRouteInitialized) {
-        if (selectedRuntimeRoute === 'auto' && hasCustomConfig) selectedRuntimeRoute = 'route_b';
         runtimeRouteInitialized = true;
-        localStorage.setItem(RUNTIME_ROUTE_KEY, selectedRuntimeRoute);
+        persistRuntimeRouteSelection(selectedRuntimeRoute);
       }
       if (!agentSelectionInitialized) {
         const configured = config && config.use_agent;
@@ -8166,7 +8182,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       selectedAgent = '';
       selectedRuntimeRoute = 'route_b';
       runtimeRouteInitialized = true;
-      localStorage.setItem(RUNTIME_ROUTE_KEY, selectedRuntimeRoute);
+      persistRuntimeRouteSelection(selectedRuntimeRoute);
       updateModelButton('自定义模型');
       renderAgentOptions();
       agentMask.classList.remove('active');

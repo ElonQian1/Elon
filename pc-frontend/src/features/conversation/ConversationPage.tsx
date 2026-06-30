@@ -19,7 +19,7 @@ import {
   routeModelButtonCopy,
   selectedAgentForRuntimeRoute,
 } from '../models/routeModelPolicy'
-import { RUNTIME_ROUTE_STORAGE_KEY, normalizeRuntimeRoute } from './runtimeRoutes'
+import { initialRuntimeRouteFromStorage, persistRuntimeRouteSelection } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type {
   Message,
@@ -65,8 +65,8 @@ export default function ConversationPage() {
   const [sendError, setSendError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
-  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => normalizeRuntimeRoute(
-    typeof window === 'undefined' ? null : window.localStorage.getItem(RUNTIME_ROUTE_STORAGE_KEY),
+  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialRuntimeRouteFromStorage(
+    typeof window === 'undefined' ? null : window.localStorage,
   ))
   const [showPermissions, setShowPermissions] = useState(false)
   const [showPresence, setShowPresence] = useState(false)
@@ -98,7 +98,7 @@ export default function ConversationPage() {
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
 
   useEffect(() => {
-    window.localStorage.setItem(RUNTIME_ROUTE_STORAGE_KEY, runtimeRoute)
+    persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
   }, [runtimeRoute])
 
   // 加载项目会话列表（与手机端同步）

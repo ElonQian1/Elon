@@ -11,8 +11,8 @@ import {
 } from '../models/routeModelPolicy'
 import { ModelPickerPopover } from '../models/ModelPicker'
 import {
-  RUNTIME_ROUTE_STORAGE_KEY,
-  normalizeRuntimeRoute,
+  initialRuntimeRouteFromStorage,
+  persistRuntimeRouteSelection,
 } from '../conversation/runtimeRoutes'
 import type { RuntimeRoute } from '../conversation/runtimeRoutes'
 import MarkdownContent from '../markdown/MarkdownContent'
@@ -72,8 +72,8 @@ export default function AiChatPage() {
   const [sending, setSending] = useState(false)
   const [error, setError] = useState('')
   const [showModelPicker, setShowModelPicker] = useState(false)
-  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => normalizeRuntimeRoute(
-    typeof window === 'undefined' ? null : window.localStorage.getItem(RUNTIME_ROUTE_STORAGE_KEY),
+  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialRuntimeRouteFromStorage(
+    typeof window === 'undefined' ? null : window.localStorage,
   ))
   const [friends, setFriends] = useState<Friend[]>([])
   const [totalUserCount, setTotalUserCount] = useState(0)
@@ -96,7 +96,7 @@ export default function AiChatPage() {
   )
 
   useEffect(() => {
-    window.localStorage.setItem(RUNTIME_ROUTE_STORAGE_KEY, runtimeRoute)
+    persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
   }, [runtimeRoute])
 
   useEffect(() => {
