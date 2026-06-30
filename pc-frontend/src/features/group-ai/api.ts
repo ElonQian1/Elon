@@ -6,12 +6,16 @@ import type {
   AutomationMatterResponse,
   AvailableGroupAiNode,
   BotsResponse,
+  CreateMergeRequestPayload,
   CreateMatterPlanPayload,
+  MatterGovernanceResponse,
   MatterAutomationAction,
   MatterDetailResponse,
   MatterEventsDeltaResponse,
+  MergeRequestResponse,
   MattersResponse,
   NodesResponse,
+  UpdateMergeRequestPayload,
 } from './types'
 
 const projectPath = (projectId: string, suffix: string) =>
@@ -55,6 +59,12 @@ export async function loadMatterEvents(projectId: string, matterId: string, afte
   const query = after ? `?after=${encodeURIComponent(after)}` : ''
   return api.get<MatterEventsDeltaResponse>(
     projectPath(projectId, `matters/${encodeURIComponent(matterId)}/events${query}`),
+  )
+}
+
+export async function loadMatterGovernance(projectId: string, matterId: string) {
+  return api.get<MatterGovernanceResponse>(
+    projectPath(projectId, `matters/${encodeURIComponent(matterId)}/governance`),
   )
 }
 
@@ -108,5 +118,31 @@ export async function loadAssignmentArtifact(
       projectId,
       `matters/${encodeURIComponent(matterId)}/assignments/${encodeURIComponent(assignmentId)}/artifact`,
     ),
+  )
+}
+
+export async function createMatterMergeRequest(
+  projectId: string,
+  matterId: string,
+  payload: CreateMergeRequestPayload,
+) {
+  return api.post<MergeRequestResponse>(
+    projectPath(projectId, `matters/${encodeURIComponent(matterId)}/merge-requests`),
+    payload,
+  )
+}
+
+export async function updateMatterMergeRequest(
+  projectId: string,
+  matterId: string,
+  mergeRequestId: string,
+  payload: UpdateMergeRequestPayload,
+) {
+  return api.post<MergeRequestResponse>(
+    projectPath(
+      projectId,
+      `matters/${encodeURIComponent(matterId)}/merge-requests/${encodeURIComponent(mergeRequestId)}`,
+    ),
+    payload,
   )
 }

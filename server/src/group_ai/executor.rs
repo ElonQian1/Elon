@@ -14,9 +14,10 @@ use crate::{
             assignment_status_from_compute_run, compute_run_payload, insert_event, session_payload,
             write_channel_notice,
         },
+        review_result::record_review_from_assignment_result,
         types::{
-            ProjectAiMatter, ProjectAiMatterAssignment, MATTER_STATUS_FAILED,
-            MATTER_STATUS_REVIEW_READY, MATTER_STATUS_RUNNING,
+            ProjectAiMatter, ProjectAiMatterAssignment, RecordAssignmentArtifactInput,
+            MATTER_STATUS_FAILED, MATTER_STATUS_REVIEW_READY, MATTER_STATUS_RUNNING,
         },
     },
     store::{ProjectAccess, ProjectExecutionSession},
@@ -239,6 +240,23 @@ fn finish_assignment_success(job: &AssignmentRunJob, capture: PcAgentWorkspaceCa
                     updated.role
                 ),
             );
+            record_execution_artifact(
+                job,
+                &updated,
+                &summary,
+                worktree_path,
+                branch_name,
+                capture.compute_call_id.as_deref(),
+                session.as_ref(),
+                compute_run.as_ref(),
+            );
+            record_review_from_assignment_result(
+                &job.state,
+                &job.matter,
+                &updated,
+                &job.actor_user_id,
+                &summary,
+            );
             mark_review_ready_if_all_finished(job);
         }
         Err(error) => {
@@ -372,6 +390,49 @@ fn result_summary_from_capture(capture: &PcAgentWorkspaceCaptureResult) -> Strin
             .to_string();
     }
     truncate_chars(capture.transcript.trim(), 4000)
+}
+
+fn record_execution_artifact(
+    job: &AssignmentRunJob,
+    assignment: &ProjectAiMatterAssignment,
+    summary: &str,
+    worktree_path: &str,
+    branch_name: Option<&str>,
+    compute_call_id: Option<&str>,
+    session: Option<&ProjectExecutionSession>,
+    compute_run: Option<&crate::store::NodeComputeRun>,
+) {
+    let metadata = json!({
+        "schema": "project_ai.assignment_artifact.v1",
+        "source": "pc_node_capture",
+        "compute_call_id": compute_call_id,
+        "execution_session_id": session.map(|session| session.id.as_str()),
+        "compute_run_status": compute_run.map(|run| run.status.as_str()),
+        "manual_merge_required": true
+    });
+    if let Err(error) =
+        job.state
+            .store
+            .record_project_ai_assignment_artifact(RecordAssignmentArtifactInput {
+                project_id: job.project_id.clone(),
+                matter_id: job.matter_id.clone(),
+                assignment_id: assignment.id.clone(),
+                uploader_user_id: Some(job.actor_user_id.clone()),
+                artifact_kind: "pc_node_execution_report".to_string(),
+                summary: Some(summary.to_string()),
+                worktree_path: Some(worktree_path.to_string()),
+                branch_name: branch_name.map(ToOwned::to_owned),
+                files: Vec::new(),
+                diff_stat: Vec::new(),
+                test_results: Vec::new(),
+                metadata,
+            })
+    {
+        tracing::warn!(
+            assignment_id = assignment.id,
+            "Assignment artifact 自动登记失败: {error:#}"
+        );
+    }
 }
 
 fn mark_review_ready_if_all_finished(job: &AssignmentRunJob) {

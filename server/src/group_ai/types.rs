@@ -161,3 +161,159 @@ pub(crate) struct ProjectAiEvent {
     pub payload: Value,
     pub created_at: String,
 }
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct RecordAssignmentArtifactRequest {
+    #[serde(default, alias = "artifactKind")]
+    pub artifact_kind: Option<String>,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(default, alias = "worktreePath")]
+    pub worktree_path: Option<String>,
+    #[serde(default, alias = "branchName")]
+    pub branch_name: Option<String>,
+    #[serde(default)]
+    pub files: Vec<String>,
+    #[serde(default, alias = "diffStat")]
+    pub diff_stat: Vec<String>,
+    #[serde(default, alias = "testResults")]
+    pub test_results: Vec<String>,
+    #[serde(default)]
+    pub metadata: Option<Value>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RecordAssignmentArtifactInput {
+    pub project_id: String,
+    pub matter_id: String,
+    pub assignment_id: String,
+    pub uploader_user_id: Option<String>,
+    pub artifact_kind: String,
+    pub summary: Option<String>,
+    pub worktree_path: Option<String>,
+    pub branch_name: Option<String>,
+    pub files: Vec<String>,
+    pub diff_stat: Vec<String>,
+    pub test_results: Vec<String>,
+    pub metadata: Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiAssignmentArtifact {
+    pub id: String,
+    pub project_id: String,
+    pub matter_id: String,
+    pub assignment_id: String,
+    pub uploader_user_id: Option<String>,
+    pub artifact_kind: String,
+    pub summary: Option<String>,
+    pub worktree_path: Option<String>,
+    pub branch_name: Option<String>,
+    pub files: Vec<String>,
+    pub diff_stat: Vec<String>,
+    pub test_results: Vec<String>,
+    pub metadata: Value,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct RecordReviewRequest {
+    #[serde(default, alias = "reviewerBotId")]
+    pub reviewer_bot_id: Option<String>,
+    #[serde(default, alias = "targetAssignmentId")]
+    pub target_assignment_id: Option<String>,
+    #[serde(default)]
+    pub severity: Option<String>,
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default)]
+    pub finding: Option<Value>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct RecordReviewInput {
+    pub matter_id: String,
+    pub reviewer_bot_id: Option<String>,
+    pub reviewer_user_id: Option<String>,
+    pub target_assignment_id: Option<String>,
+    pub severity: String,
+    pub finding: Value,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiReview {
+    pub id: String,
+    pub matter_id: String,
+    pub reviewer_bot_id: Option<String>,
+    pub reviewer_user_id: Option<String>,
+    pub target_assignment_id: Option<String>,
+    pub severity: String,
+    pub finding: Value,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct CreateMergeRequestRequest {
+    #[serde(alias = "assignmentId")]
+    pub assignment_id: String,
+    #[serde(default, alias = "worktreePath")]
+    pub worktree_path: Option<String>,
+    #[serde(default, alias = "branchName")]
+    pub branch_name: Option<String>,
+    #[serde(default, alias = "mergeStrategy")]
+    pub merge_strategy: Option<String>,
+    #[serde(default, alias = "reviewStatus")]
+    pub review_status: Option<String>,
+    #[serde(default, alias = "riskLevel")]
+    pub risk_level: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub(crate) struct UpdateMergeRequestRequest {
+    #[serde(default)]
+    pub status: Option<String>,
+    #[serde(default, alias = "reviewStatus")]
+    pub review_status: Option<String>,
+    #[serde(default, alias = "riskLevel")]
+    pub risk_level: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CreateMergeRequestInput {
+    pub project_id: String,
+    pub matter_id: String,
+    pub assignment_id: String,
+    pub requested_by_user_id: Option<String>,
+    pub worktree_path: Option<String>,
+    pub branch_name: Option<String>,
+    pub merge_strategy: String,
+    pub review_status: String,
+    pub risk_level: String,
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiMergeRequest {
+    pub id: String,
+    pub project_id: String,
+    pub matter_id: String,
+    pub assignment_id: String,
+    pub requested_by_user_id: Option<String>,
+    pub worktree_path: Option<String>,
+    pub branch_name: Option<String>,
+    pub status: String,
+    pub merge_strategy: String,
+    pub review_status: String,
+    pub risk_level: String,
+    pub notes: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}

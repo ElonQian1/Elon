@@ -86,6 +86,100 @@ export interface ProjectAiEvent {
   created_at: string
 }
 
+export interface ProjectAiAssignmentArtifact {
+  id: string
+  project_id: string
+  matter_id: string
+  assignment_id: string
+  uploader_user_id?: string | null
+  artifact_kind: string
+  summary?: string | null
+  worktree_path?: string | null
+  branch_name?: string | null
+  files: string[]
+  diff_stat: string[]
+  test_results: string[]
+  metadata?: Record<string, unknown> | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectAiReview {
+  id: string
+  matter_id: string
+  reviewer_bot_id?: string | null
+  reviewer_user_id?: string | null
+  target_assignment_id?: string | null
+  severity: string
+  finding?: Record<string, unknown> | null
+  status: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ProjectAiMergeRequest {
+  id: string
+  project_id: string
+  matter_id: string
+  assignment_id: string
+  requested_by_user_id?: string | null
+  worktree_path?: string | null
+  branch_name?: string | null
+  status: string
+  merge_strategy: string
+  review_status: string
+  risk_level: string
+  notes?: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface MatterTaskNode {
+  id: string
+  label: string
+  kind: string
+  status: string
+}
+
+export interface MatterTaskEdge {
+  from: string
+  to: string
+  relation: string
+}
+
+export interface MatterTaskGraph {
+  nodes: MatterTaskNode[]
+  edges: MatterTaskEdge[]
+}
+
+export interface MatterPolicySummary {
+  node_policy?: Record<string, unknown> | null
+  permission_levels: string[]
+  allowed_clis: string[]
+  warnings: string[]
+}
+
+export interface MatterBudgetSummary {
+  status: string
+  compute_call_count: number
+  billed_cost_rmb_fen: number
+  provider_earned_fen: number
+  warnings: string[]
+}
+
+export interface MatterGovernanceSummary {
+  reviews: ProjectAiReview[]
+  merge_requests: ProjectAiMergeRequest[]
+  task_graph: MatterTaskGraph
+  policy: MatterPolicySummary
+  budget: MatterBudgetSummary
+}
+
+export interface MatterGovernanceResponse {
+  ok: boolean
+  governance: MatterGovernanceSummary
+}
+
 export interface MatterDetailResponse {
   ok: boolean
   matter: ProjectAiMatter
@@ -198,11 +292,35 @@ export interface AssignmentArtifact {
   node_quality?: NodeQualityScore | null
   merge: ArtifactMergeGuide
   local_diff: LocalDiffProbe
+  uploaded_artifacts?: ProjectAiAssignmentArtifact[]
+  merge_requests?: ProjectAiMergeRequest[]
 }
 
 export interface AssignmentArtifactResponse {
   ok: boolean
   artifact: AssignmentArtifact
+}
+
+export interface CreateMergeRequestPayload {
+  assignmentId: string
+  worktreePath?: string | null
+  branchName?: string | null
+  mergeStrategy?: string
+  reviewStatus?: string
+  riskLevel?: string
+  notes?: string
+}
+
+export interface UpdateMergeRequestPayload {
+  status?: string
+  reviewStatus?: string
+  riskLevel?: string
+  notes?: string
+}
+
+export interface MergeRequestResponse {
+  ok: boolean
+  merge_request: ProjectAiMergeRequest
 }
 
 export interface NodesResponse {

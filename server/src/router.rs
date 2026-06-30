@@ -513,6 +513,22 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(group_ai::automation_api::list_matter_events),
         )
         .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/governance",
+            get(group_ai::governance_api::get_matter_governance),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/reviews",
+            post(group_ai::governance_api::record_matter_review),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/merge-requests",
+            post(group_ai::governance_api::create_merge_request),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/merge-requests/:merge_request_id",
+            post(group_ai::governance_api::update_merge_request),
+        )
+        .route(
             "/api/projects/:project_id/ai/matters/:matter_id/request-changes",
             post(group_ai::api::request_matter_changes),
         )
@@ -543,6 +559,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/artifact",
             get(group_ai::automation_api::get_assignment_artifact),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/artifacts",
+            post(group_ai::governance_api::record_assignment_artifact),
         )
         .route(
             "/api/projects/:project_id/ai/matters/:matter_id/assignments/:assignment_id/settlement",

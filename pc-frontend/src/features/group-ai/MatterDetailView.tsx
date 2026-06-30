@@ -5,12 +5,13 @@ import {
   Check,
   CirclePause,
   GitBranch,
+  GitMerge,
   Play,
   RotateCcw,
   ShieldCheck,
   X,
 } from 'lucide-react'
-import { loadAssignmentArtifact } from './api'
+import { createMatterMergeRequest, loadAssignmentArtifact } from './api'
 import {
   assignmentStatusLabel,
   canRunAssignment,
@@ -19,6 +20,7 @@ import {
   modeLabel,
   statusLabel,
 } from './labels'
+import MatterGovernancePanel from './MatterGovernancePanel'
 import type {
   AssignmentAction,
   AssignmentArtifact,
@@ -60,6 +62,8 @@ export default function MatterDetailView({
   const [artifact, setArtifact] = useState<AssignmentArtifact | null>(null)
   const [artifactBusy, setArtifactBusy] = useState('')
   const [artifactError, setArtifactError] = useState('')
+  const [mergeBusy, setMergeBusy] = useState('')
+  const [governanceVersion, setGovernanceVersion] = useState(0)
 
   async function openArtifact(assignment: ProjectAiMatterAssignment) {
     setArtifactBusy(assignment.id)
@@ -71,6 +75,29 @@ export default function MatterDetailView({
       setArtifactError((err as { message?: string }).message ?? '产物包加载失败')
     } finally {
       setArtifactBusy('')
+    }
+  }
+
+  async function queueMerge(candidate: AssignmentArtifact) {
+    setMergeBusy(candidate.assignment.id)
+    setArtifactError('')
+    try {
+      await createMatterMergeRequest(projectId, matter.id, {
+        assignmentId: candidate.assignment.id,
+        worktreePath: candidate.merge.worktree_path,
+        branchName: candidate.merge.branch_name,
+        mergeStrategy: 'manual',
+        reviewStatus: 'pending',
+        riskLevel: 'medium',
+        notes: candidate.merge.recommended_action,
+      })
+      const response = await loadAssignmentArtifact(projectId, matter.id, candidate.assignment.id)
+      setArtifact(response.artifact)
+      setGovernanceVersion((value) => value + 1)
+    } catch (err) {
+      setArtifactError((err as { message?: string }).message ?? '加入合并队列失败')
+    } finally {
+      setMergeBusy('')
     }
   }
 
@@ -139,6 +166,12 @@ export default function MatterDetailView({
         {matter.acceptance_criteria.map((item) => <span key={item}>{item}</span>)}
       </div>
 
+      <MatterGovernancePanel
+        projectId={projectId}
+        matterId={matter.id}
+        refreshKey={governanceVersion}
+      />
+
       <div className={styles.columns}>
         <div>
           <SectionTitle icon={<Bot size={16} />} title="Assignments" />
@@ -195,7 +228,13 @@ export default function MatterDetailView({
           ))}
           {!assignments.length && <div className={styles.empty}>尚未分配</div>}
           {artifactError && <div className={styles.inlineError}>{artifactError}</div>}
-          {artifact && <ArtifactPanel artifact={artifact} />}
+          {artifact && (
+            <ArtifactPanel
+              artifact={artifact}
+              mergeBusy={mergeBusy === artifact.assignment.id}
+              onQueueMerge={queueMerge}
+            />
+          )}
         </div>
 
         <div>
@@ -214,10 +253,23 @@ export default function MatterDetailView({
   )
 }
 
-function ArtifactPanel({ artifact }: { artifact: AssignmentArtifact }) {
+function ArtifactPanel({
+  artifact,
+  mergeBusy,
+  onQueueMerge,
+}: {
+  artifact: AssignmentArtifact
+  mergeBusy: boolean
+  onQueueMerge: (artifact: AssignmentArtifact) => void
+}) {
   const quality = artifact.node_quality
   const compute = artifact.compute_run
   const session = artifact.execution_session
+  const uploaded = artifact.uploaded_artifacts ?? []
+  const mergeRequests = artifact.merge_requests ?? []
+  const canQueueMerge = artifact.merge.manual_merge_required && (
+    Boolean(artifact.merge.worktree_path) || Boolean(artifact.merge.branch_name)
+  )
   return (
     <div className={styles.artifactPanel}>
       <div className={styles.artifactHeader}>
@@ -225,6 +277,15 @@ function ArtifactPanel({ artifact }: { artifact: AssignmentArtifact }) {
         <span>{artifact.merge.manual_merge_required ? '待人工合并' : '未生成合并产物'}</span>
       </div>
       <p>{artifact.merge.recommended_action}</p>
+      <div className={styles.assignmentActions}>
+        <ActionButton
+          icon={<GitMerge size={14} />}
+          label="加入合并队列"
+          disabled={!canQueueMerge}
+          busy={mergeBusy}
+          onClick={() => onQueueMerge(artifact)}
+        />
+      </div>
       <div className={styles.artifactGrid}>
         <ArtifactField label="branch" value={artifact.merge.branch_name} />
         <ArtifactField label="worktree" value={artifact.merge.worktree_path} />
@@ -243,6 +304,24 @@ function ArtifactPanel({ artifact }: { artifact: AssignmentArtifact }) {
         </div>
       ) : (
         <small className={styles.artifactMuted}>{artifact.local_diff.reason}</small>
+      )}
+      {uploaded.length > 0 && (
+        <div className={styles.diffBox}>
+          {uploaded.map((item) => (
+            <code key={item.id}>
+              {item.artifact_kind} · {item.branch_name || item.worktree_path || item.summary || item.id}
+            </code>
+          ))}
+        </div>
+      )}
+      {mergeRequests.length > 0 && (
+        <div className={styles.diffBox}>
+          {mergeRequests.map((item) => (
+            <code key={item.id}>
+              {item.status} · {item.review_status} · {item.branch_name || item.assignment_id}
+            </code>
+          ))}
+        </div>
       )}
     </div>
   )

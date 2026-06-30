@@ -72,9 +72,21 @@ Assignment:
 fn role_guidance(role: &str) -> &'static str {
     let role = role.trim().to_ascii_lowercase();
     if role.contains("review") || role.contains("critic") {
-        return "- 以独立审核为主：检查已完成 Assignment 的结果、风险、遗漏、测试证据和人工合并建议。\n- 除非必须修复小问题，否则不要做大范围实现改动；输出可验收/需返工/需人工合并的明确结论。";
+        return r#"- 以独立审核为主：检查已完成 Assignment 的结果、风险、遗漏、测试证据和人工合并建议。
+- 除非必须修复小问题，否则不要做大范围实现改动。
+- 输出末尾必须附带一个 JSON 对象，schema 固定为 project_ai.review_result.v1，例如：
+{
+  "schema": "project_ai.review_result.v1",
+  "status": "passed|needs_changes|blocked",
+  "risk_level": "low|medium|high",
+  "summary": "审核结论",
+  "failed_criteria": [],
+  "required_fixes": [],
+  "target_assignment_id": null,
+  "merge_recommendation": "manual_merge|request_changes|reject"
+}"#;
     }
-    "- 以实现交付为主：完成本角色负责的代码、测试、文档或诊断产物，并明确交给 reviewer 审核的证据。"
+    "- 以实现交付为主：完成本角色负责的代码、测试、文档或诊断产物，并明确交给 reviewer 审核的证据。\n- 结果中列出关键文件、diff 摘要、测试命令和人工合并建议，便于系统登记 artifact 和 merge queue。"
 }
 
 #[cfg(test)]

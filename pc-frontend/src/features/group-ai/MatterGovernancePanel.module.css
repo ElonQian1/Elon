@@ -1,0 +1,215 @@
+.panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: #202227;
+}
+
+.header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+}
+
+.header h4 {
+  margin: 0;
+  color: var(--text);
+  font-size: 14px;
+}
+
+.header span,
+.empty,
+.error {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.iconButton,
+.queueButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  background: #262a31;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.iconButton {
+  width: 30px;
+}
+
+.iconButton:disabled,
+.queueButton:disabled {
+  cursor: not-allowed;
+  opacity: .54;
+}
+
+.error {
+  padding: 8px 10px;
+  border: 1px solid rgba(239, 117, 117, .28);
+  border-radius: 5px;
+  background: rgba(239, 117, 117, .1);
+  color: #ffc6c6;
+}
+
+.content {
+  display: grid;
+  gap: 12px;
+}
+
+.summaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.metric,
+.block,
+.review,
+.mergeItem,
+.node {
+  min-width: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: #24272e;
+}
+
+.metric {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 7px;
+  padding: 9px;
+}
+
+.metric svg {
+  grid-row: span 3;
+  margin-top: 2px;
+  color: #86b8ff;
+}
+
+.metric span,
+.blockTitle,
+.node span,
+.review span,
+.mergeItem small {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.metric strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metric small,
+.review small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.block {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.blockTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-soft);
+}
+
+.nodeList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.node {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+}
+
+.node strong,
+.mergeTop strong,
+.review strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node small {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.review,
+.mergeItem {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+}
+
+.review > div,
+.mergeTop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.review p,
+.mergeItem p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.review span,
+.mergeTop span {
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(108, 168, 255, .14);
+  color: #bcd8ff;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.mergeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.queueButton {
+  padding: 4px 8px;
+}
+
+@media (max-width: 920px) {
+  .summaryGrid,
+  .nodeList {
+    grid-template-columns: 1fr;
+  }
+}

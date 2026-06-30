@@ -110,6 +110,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (76, "用户展示在线状态与项目邀请链接", migration_v76),
     (77, "项目空间商店截图列表", migration_v77),
     (78, "群体 AI 开发 Matter 与节点授权骨架", migration_v78),
+    (79, "群体 AI 产物上传与人工合并队列", migration_v79),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2731,6 +2732,69 @@ fn migration_v78(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_ai_events_project_created
           ON project_ai_events(project_id, created_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v79(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_ai_assignment_artifacts (
+          id                TEXT PRIMARY KEY,
+          project_id        TEXT NOT NULL,
+          matter_id         TEXT NOT NULL,
+          assignment_id     TEXT NOT NULL,
+          uploader_user_id  TEXT,
+          artifact_kind     TEXT NOT NULL DEFAULT 'execution_report',
+          summary           TEXT,
+          worktree_path     TEXT,
+          branch_name       TEXT,
+          files_json        TEXT NOT NULL DEFAULT '[]',
+          diff_stat_json    TEXT NOT NULL DEFAULT '[]',
+          test_results_json TEXT NOT NULL DEFAULT '[]',
+          metadata_json     TEXT NOT NULL DEFAULT '{}',
+          created_at        TEXT NOT NULL,
+          updated_at        TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (matter_id) REFERENCES project_ai_matters(id),
+          FOREIGN KEY (assignment_id) REFERENCES project_ai_matter_assignments(id),
+          FOREIGN KEY (uploader_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_ai_assignment_artifacts_assignment
+          ON project_ai_assignment_artifacts(assignment_id, created_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_project_ai_assignment_artifacts_matter
+          ON project_ai_assignment_artifacts(matter_id, created_at DESC);
+
+        CREATE TABLE IF NOT EXISTS project_ai_merge_requests (
+          id                   TEXT PRIMARY KEY,
+          project_id           TEXT NOT NULL,
+          matter_id            TEXT NOT NULL,
+          assignment_id        TEXT NOT NULL,
+          requested_by_user_id TEXT,
+          worktree_path        TEXT,
+          branch_name          TEXT,
+          status               TEXT NOT NULL DEFAULT 'open'
+                               CHECK (status IN ('open', 'approved', 'merged', 'rejected', 'canceled')),
+          merge_strategy       TEXT NOT NULL DEFAULT 'manual',
+          review_status        TEXT NOT NULL DEFAULT 'pending',
+          risk_level           TEXT NOT NULL DEFAULT 'medium',
+          notes                TEXT,
+          created_at           TEXT NOT NULL,
+          updated_at           TEXT NOT NULL,
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (matter_id) REFERENCES project_ai_matters(id),
+          FOREIGN KEY (assignment_id) REFERENCES project_ai_matter_assignments(id),
+          FOREIGN KEY (requested_by_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_ai_merge_requests_matter
+          ON project_ai_merge_requests(matter_id, status, updated_at DESC);
+
+        CREATE INDEX IF NOT EXISTS idx_project_ai_merge_requests_assignment
+          ON project_ai_merge_requests(assignment_id, status, updated_at DESC);
         "#,
     )?;
     Ok(())

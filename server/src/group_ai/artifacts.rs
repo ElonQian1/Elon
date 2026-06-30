@@ -4,7 +4,10 @@ use serde_json::Value;
 use std::{path::Path, process::Command};
 
 use crate::{
-    group_ai::types::{ProjectAiEvent, ProjectAiMatterAssignment},
+    group_ai::types::{
+        ProjectAiAssignmentArtifact, ProjectAiEvent, ProjectAiMatterAssignment,
+        ProjectAiMergeRequest,
+    },
     store::{NodeComputeRun, NodeQualityScore, ProjectExecutionSession},
     types::AppState,
 };
@@ -18,6 +21,8 @@ pub(crate) struct AssignmentArtifact {
     pub execution_session: Option<ProjectExecutionSession>,
     pub compute_run: Option<NodeComputeRun>,
     pub node_quality: Option<NodeQualityScore>,
+    pub uploaded_artifacts: Vec<ProjectAiAssignmentArtifact>,
+    pub merge_requests: Vec<ProjectAiMergeRequest>,
     pub merge: ArtifactMergeGuide,
     pub local_diff: LocalDiffProbe,
 }
@@ -91,6 +96,16 @@ pub(crate) fn assignment_artifact(
         .node_quality_scores()
         .ok()
         .and_then(|scores| scores.get(&assignment.node_id).cloned());
+    let uploaded_artifacts =
+        state
+            .store
+            .list_project_ai_assignment_artifacts(project_id, matter_id, assignment_id)?;
+    let merge_requests = state
+        .store
+        .list_project_ai_merge_requests(project_id, matter_id)?
+        .into_iter()
+        .filter(|request| request.assignment_id == assignment_id)
+        .collect::<Vec<_>>();
     let worktree_path = execution_session
         .as_ref()
         .and_then(|session| session.active_workspace_path.clone())
@@ -127,6 +142,8 @@ pub(crate) fn assignment_artifact(
         execution_session,
         compute_run,
         node_quality,
+        uploaded_artifacts,
+        merge_requests,
         merge,
         local_diff,
     })
