@@ -68,21 +68,14 @@ pub async fn node_exec_handler(
     let agent = if let Some(ref node_id) = req.node_id {
         let found = agents.iter().find(|a| a.agent_id == *node_id);
         match found {
-            Some(a) => {
-                match state.store.get_node_credential_owner(&a.agent_id) {
-                    Ok(Some(owner)) if owner == user.id => PickedAgent {
-                        agent_id: a.agent_id.clone(),
-                        device_name: a.device_name.clone(),
-                        allowed_clis: a.allowed_clis.clone(),
-                    },
-                    _ => {
-                        return json_error(
-                            StatusCode::FORBIDDEN,
-                            "指定的节点不属于当前账号或不在线",
-                        )
-                    }
-                }
-            }
+            Some(a) => match state.store.get_node_credential_owner(&a.agent_id) {
+                Ok(Some(owner)) if owner == user.id => PickedAgent {
+                    agent_id: a.agent_id.clone(),
+                    device_name: a.device_name.clone(),
+                    allowed_clis: a.allowed_clis.clone(),
+                },
+                _ => return json_error(StatusCode::FORBIDDEN, "指定的节点不属于当前账号或不在线"),
+            },
             None => return json_error(StatusCode::NOT_FOUND, "指定的节点未在线"),
         }
     } else {
@@ -140,12 +133,7 @@ pub async fn node_exec_handler(
         .await
     {
         Ok(v) => v,
-        Err(e) => {
-            return json_error(
-                StatusCode::BAD_GATEWAY,
-                format!("分发到 PC 节点失败：{e}"),
-            )
-        }
+        Err(e) => return json_error(StatusCode::BAD_GATEWAY, format!("分发到 PC 节点失败：{e}")),
     };
 
     // ── 5. 收集流式输出 ────────────────────────────────────────────────────

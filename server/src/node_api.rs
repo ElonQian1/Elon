@@ -373,11 +373,12 @@ pub async fn register_node(
         random_suffix
     );
 
-    if let Err(e) =
-        state
-            .store
-            .create_node_credential(&agent_id, &new_secret_hash, &user.id, req.label.as_deref())
-    {
+    if let Err(e) = state.store.create_node_credential(
+        &agent_id,
+        &new_secret_hash,
+        &user.id,
+        req.label.as_deref(),
+    ) {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(serde_json::json!({"error": format!("创建凭证失败: {e}")})),
@@ -1271,18 +1272,30 @@ pub async fn push_node_update(
         .and_then(|s| s.strip_prefix("Bearer "))
         .unwrap_or("");
     if presented.is_empty() || presented != state.admin_token {
-        return (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"error":"admin token required"}))).into_response();
+        return (
+            StatusCode::UNAUTHORIZED,
+            Json(serde_json::json!({"error":"admin token required"})),
+        )
+            .into_response();
     }
-    let version_file = state.data_dir.join("downloads").join("node-agent-version.json");
-    let version = tokio::fs::read_to_string(&version_file).await
+    let version_file = state
+        .data_dir
+        .join("downloads")
+        .join("node-agent-version.json");
+    let version = tokio::fs::read_to_string(&version_file)
+        .await
         .ok()
         .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
         .and_then(|v| v["version"].as_str().map(str::to_string));
-    let count = state.agent_manager.broadcast_update_client(version.clone(), None).await;
+    let count = state
+        .agent_manager
+        .broadcast_update_client(version.clone(), None)
+        .await;
     Json(serde_json::json!({
         "ok": true,
         "broadcast_to": count,
         "version": version,
         "message": format!("{count} 个在线节点已收到更新指令"),
-    })).into_response()
+    }))
+    .into_response()
 }

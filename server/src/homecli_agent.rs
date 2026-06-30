@@ -286,10 +286,14 @@ impl AgentManager {
         let agents = self.agents.read().await;
         let mut count = 0;
         for agent in agents.values() {
-            if agent.cmd_tx.send(homecli_proto::ServerToAgent::UpdateClient {
-                version: version.clone(),
-                download_url: download_url.clone(),
-            }).is_ok() {
+            if agent
+                .cmd_tx
+                .send(homecli_proto::ServerToAgent::UpdateClient {
+                    version: version.clone(),
+                    download_url: download_url.clone(),
+                })
+                .is_ok()
+            {
                 count += 1;
             }
         }
