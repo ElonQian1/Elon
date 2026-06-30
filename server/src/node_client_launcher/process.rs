@@ -2,6 +2,7 @@
 
 use anyhow::{bail, Context, Result};
 use std::{
+    collections::HashMap,
     io::{Read, Write},
     net::TcpStream,
     path::Path,
@@ -9,11 +10,14 @@ use std::{
 };
 
 use super::{
-    command as launcher_command, env_file, paths, AGENT_RUNTIME_ARG, CLIENT_EXE_NAME,
+    command as launcher_command, env_file, log_file, paths, AGENT_RUNTIME_ARG, CLIENT_EXE_NAME,
     DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
 };
 
 const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_millis(900);
+const ADMIN_PC_WEB_READY_WAIT: Duration = Duration::from_secs(5);
+const ADMIN_LOCAL_READY_WAIT: Duration = Duration::from_secs(15);
+const ADMIN_LOCAL_RETRY_WAIT: Duration = Duration::from_secs(10);
 const ADMIN_PORT_FALLBACK_LIMIT: u16 = 20;
 const ADMIN_HEALTH_READ_LIMIT: usize = 4096;
 
@@ -34,10 +38,34 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         if !agent_runtime_running(install_dir) {
             spawn_agent_runtime(&client, install_dir, port, &env_values)?;
         }
-        if !wait_for_admin_ready(port, Duration::from_secs(15)) {
-            spawn_agent_runtime(&client, install_dir, port, &env_values)?;
-            if !wait_for_admin_ready(port, Duration::from_secs(10)) {
+
+        let open_target = open_target_from_env_values(&env_values);
+        let first_wait = if open_target.requires_admin_ready() {
+            ADMIN_LOCAL_READY_WAIT
+        } else {
+            ADMIN_PC_WEB_READY_WAIT
+        };
+
+        if !wait_for_admin_ready(port, first_wait) {
+            if !agent_runtime_running(install_dir) {
+                spawn_agent_runtime(&client, install_dir, port, &env_values)?;
+            }
+
+            if open_target.requires_admin_ready()
+                && !wait_for_admin_ready(port, ADMIN_LOCAL_RETRY_WAIT)
+            {
                 bail!("一龙节点本机管理接口启动超时：http://127.0.0.1:{port}/api/status");
+            }
+
+            if !open_target.requires_admin_ready() && !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
+                log_file::record_event(
+                    install_dir,
+                    "launcher_admin_wait_timeout",
+                    false,
+                    &format!(
+                        "admin api still warming; opening PC workspace anyway: http://127.0.0.1:{port}/api/status"
+                    ),
+                );
             }
         }
     }
@@ -49,7 +77,7 @@ fn spawn_agent_runtime(
     client: &Path,
     install_dir: &Path,
     port: u16,
-    env_values: &std::collections::HashMap<String, String>,
+    env_values: &HashMap<String, String>,
 ) -> Result<()> {
     let mut cmd = launcher_command::silent_command(client);
     cmd.arg(AGENT_RUNTIME_ARG)
@@ -105,16 +133,9 @@ pub(crate) fn launch_installed_client(install_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-pub(crate) fn open_pc_web_page(
-    port: u16,
-    env_values: &std::collections::HashMap<String, String>,
-) -> Result<()> {
+pub(crate) fn open_pc_web_page(port: u16, env_values: &HashMap<String, String>) -> Result<()> {
     let local_admin_url = format!("http://127.0.0.1:{port}/");
-    let open_target = env_values
-        .get("NODE_AGENT_OPEN_TARGET")
-        .map(|value| value.trim().to_ascii_lowercase())
-        .unwrap_or_else(|| "pc_web".to_string());
-    let url = if open_target == "local_admin" {
+    let url = if open_target_from_env_values(env_values) == OpenTarget::LocalAdmin {
         local_admin_url
     } else {
         let base_url = web_base_url(env_values);
@@ -144,7 +165,30 @@ fn open_url(url: &str) -> Result<()> {
     Ok(())
 }
 
-fn web_base_url(env_values: &std::collections::HashMap<String, String>) -> String {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum OpenTarget {
+    PcWeb,
+    LocalAdmin,
+}
+
+impl OpenTarget {
+    fn requires_admin_ready(self) -> bool {
+        matches!(self, Self::LocalAdmin)
+    }
+}
+
+fn open_target_from_env_values(env_values: &HashMap<String, String>) -> OpenTarget {
+    match env_values
+        .get("NODE_AGENT_OPEN_TARGET")
+        .map(|value| value.trim().to_ascii_lowercase())
+        .as_deref()
+    {
+        Some("local_admin") => OpenTarget::LocalAdmin,
+        _ => OpenTarget::PcWeb,
+    }
+}
+
+fn web_base_url(env_values: &HashMap<String, String>) -> String {
     env_values
         .get("NODE_AGENT_WEB_BASE_URL")
         .or_else(|| env_values.get("NODE_AGENT_UPDATE_BASE_URL"))
@@ -302,6 +346,29 @@ mod tests {
         assert!(!admin_status_response_healthy(
             "HTTP/1.1 404 Not Found\r\n\r\n{\"local_admin_token_header\":\"x\"}"
         ));
+    }
+
+    #[test]
+    fn open_target_defaults_to_pc_workspace() {
+        let env_values = HashMap::new();
+
+        assert_eq!(open_target_from_env_values(&env_values), OpenTarget::PcWeb);
+        assert!(!open_target_from_env_values(&env_values).requires_admin_ready());
+    }
+
+    #[test]
+    fn local_admin_open_target_requires_ready_admin_api() {
+        let mut env_values = HashMap::new();
+        env_values.insert(
+            "NODE_AGENT_OPEN_TARGET".to_string(),
+            " local_ADMIN ".to_string(),
+        );
+
+        assert_eq!(
+            open_target_from_env_values(&env_values),
+            OpenTarget::LocalAdmin
+        );
+        assert!(open_target_from_env_values(&env_values).requires_admin_ready());
     }
 
     #[cfg(windows)]
