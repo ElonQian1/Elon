@@ -54,6 +54,8 @@ struct AgentRuntimeFreshness {
     status: String,
     summary: String,
     script_path: String,
+    runtime_scope: &'static str,
+    registration_required: bool,
     has_elon_agent: bool,
     has_command_budget: bool,
     has_output_limit: bool,
@@ -269,7 +271,7 @@ fn local_project_registration_readiness(
     if project.project_type.is_none() {
         warnings.push("未识别到常见项目类型，运行/测试/构建命令需要后续手动补充。".to_string());
     }
-    if project.agent_runtime.status != "current" {
+    if project.agent_runtime.registration_required && project.agent_runtime.status != "current" {
         warnings.push(project.agent_runtime.summary.clone());
     }
     if !inspect.codex_available && !inspect.copilot_available {
@@ -305,7 +307,7 @@ fn local_project_registration_readiness(
         autofill_fields.push("构建命令".to_string());
     }
     if project.agent_runtime.status == "current" {
-        autofill_fields.push("Agent Runtime".to_string());
+        autofill_fields.push("便携一龙入口".to_string());
     }
 
     let can_register = missing_fields.is_empty();
@@ -745,10 +747,11 @@ fn inspect_agent_runtime_freshness(project_root: &Path) -> AgentRuntimeFreshness
     let Ok(text) = std::fs::read_to_string(&script) else {
         return AgentRuntimeFreshness {
             status: "missing".to_string(),
-            summary:
-                "项目缺少 scripts\\elon-agent.ps1，我的Key/平台AI运行能力需要重新生成项目脚本。"
-                    .to_string(),
+            summary: "未生成项目内便携一龙入口 scripts\\elon-agent.ps1；不影响 Win 端节点内置开发能力，仅影响离线或无一龙客户端时在项目目录直接运行一龙 agent。"
+                .to_string(),
             script_path,
+            runtime_scope: "project_portable_cli_entry",
+            registration_required: false,
             has_elon_agent: false,
             has_command_budget: false,
             has_output_limit: false,
@@ -765,10 +768,12 @@ fn inspect_agent_runtime_freshness(project_root: &Path) -> AgentRuntimeFreshness
         AgentRuntimeFreshness {
             status: "current".to_string(),
             summary: format!(
-                "Agent Runtime 已包含命令预算和输出截断保护，默认每轮最多 {} 个 run_command。",
+                "项目内便携一龙入口已包含命令预算和输出截断保护，默认每轮最多 {} 个 run_command；可作为离线或无一龙客户端时的高级入口。",
                 max_run_commands_default.unwrap_or(8)
             ),
             script_path,
+            runtime_scope: "project_portable_cli_entry",
+            registration_required: false,
             has_elon_agent: true,
             has_command_budget,
             has_output_limit,
@@ -777,8 +782,10 @@ fn inspect_agent_runtime_freshness(project_root: &Path) -> AgentRuntimeFreshness
     } else {
         AgentRuntimeFreshness {
             status: "stale".to_string(),
-            summary: "项目内 scripts\\elon-agent.ps1 是旧版模板，缺少 run_command 预算或输出截断保护；建议重新生成后再长期使用我的Key/平台AI。".to_string(),
+            summary: "项目内便携一龙入口 scripts\\elon-agent.ps1 是旧版模板，缺少 run_command 预算或输出截断保护；不影响 Win 端节点内置开发能力，需要离线或无客户端使用时再重新生成。".to_string(),
             script_path,
+            runtime_scope: "project_portable_cli_entry",
+            registration_required: false,
             has_elon_agent: true,
             has_command_budget,
             has_output_limit,
@@ -958,9 +965,11 @@ mod tests {
     fn current_agent_runtime() -> AgentRuntimeFreshness {
         AgentRuntimeFreshness {
             status: "current".to_string(),
-            summary: "Agent Runtime 已包含命令预算和输出截断保护，默认每轮最多 8 个 run_command。"
+            summary: "项目内便携一龙入口已包含命令预算和输出截断保护，默认每轮最多 8 个 run_command；可作为离线或无一龙客户端时的高级入口。"
                 .to_string(),
             script_path: "C:\\demo\\scripts\\elon-agent.ps1".to_string(),
+            runtime_scope: "project_portable_cli_entry",
+            registration_required: false,
             has_elon_agent: true,
             has_command_budget: true,
             has_output_limit: true,
@@ -983,7 +992,7 @@ mod tests {
         assert!(readiness.autofill_fields.contains(&"构建命令".to_string()));
         assert!(readiness
             .autofill_fields
-            .contains(&"Agent Runtime".to_string()));
+            .contains(&"便携一龙入口".to_string()));
         assert_eq!(readiness.next_action.kind, "auto_register");
         assert_eq!(readiness.register_payload.name, "demo");
         assert_eq!(
@@ -1002,6 +1011,34 @@ mod tests {
     }
 
     #[test]
+    fn registration_readiness_stays_ready_when_only_portable_agent_entry_is_missing() {
+        let mut project = local_project();
+        project.agent_runtime = AgentRuntimeFreshness {
+            status: "missing".to_string(),
+            summary: "未生成项目内便携一龙入口 scripts\\elon-agent.ps1；不影响 Win 端节点内置开发能力，仅影响离线或无一龙客户端时在项目目录直接运行一龙 agent。"
+                .to_string(),
+            script_path: "C:\\demo\\scripts\\elon-agent.ps1".to_string(),
+            runtime_scope: "project_portable_cli_entry",
+            registration_required: false,
+            has_elon_agent: false,
+            has_command_budget: false,
+            has_output_limit: false,
+            max_run_commands_default: None,
+        };
+        let inspect = inspect_status();
+
+        let readiness = local_project_registration_readiness(&project, &inspect);
+
+        assert!(readiness.can_register);
+        assert_eq!(readiness.status, "ready");
+        assert!(readiness.warnings.is_empty());
+        assert!(!readiness
+            .autofill_fields
+            .contains(&"便携一龙入口".to_string()));
+        assert_eq!(readiness.next_action.kind, "auto_register");
+    }
+
+    #[test]
     fn registration_readiness_warns_about_gitless_unknown_project() {
         let mut project = local_project();
         project.repo_url = None;
@@ -1015,10 +1052,11 @@ mod tests {
         project.detected_files.clear();
         project.agent_runtime = AgentRuntimeFreshness {
             status: "missing".to_string(),
-            summary:
-                "项目缺少 scripts\\elon-agent.ps1，我的Key/平台AI运行能力需要重新生成项目脚本。"
-                    .to_string(),
+            summary: "未生成项目内便携一龙入口 scripts\\elon-agent.ps1；不影响 Win 端节点内置开发能力，仅影响离线或无一龙客户端时在项目目录直接运行一龙 agent。"
+                .to_string(),
             script_path: "C:\\demo\\scripts\\elon-agent.ps1".to_string(),
+            runtime_scope: "project_portable_cli_entry",
+            registration_required: false,
             has_elon_agent: false,
             has_command_budget: false,
             has_output_limit: false,
@@ -1043,8 +1081,8 @@ mod tests {
         assert!(readiness
             .warnings
             .iter()
-            .any(|warning| warning.contains("我的Key/平台AI")));
-        assert!(readiness
+            .any(|warning| warning.contains("未检测到 Codex/Copilot")));
+        assert!(!readiness
             .warnings
             .iter()
             .any(|warning| warning.contains("elon-agent.ps1")));
@@ -1077,6 +1115,9 @@ mod tests {
 
         let missing = inspect_agent_runtime_freshness(&dir);
         assert_eq!(missing.status, "missing");
+        assert_eq!(missing.runtime_scope, "project_portable_cli_entry");
+        assert!(!missing.registration_required);
+        assert!(missing.summary.contains("不影响 Win 端节点内置开发能力"));
         assert!(!missing.has_elon_agent);
 
         let scripts = dir.join("scripts");
@@ -1088,6 +1129,8 @@ mod tests {
         .unwrap();
         let stale = inspect_agent_runtime_freshness(&dir);
         assert_eq!(stale.status, "stale");
+        assert!(!stale.registration_required);
+        assert!(stale.summary.contains("不影响 Win 端节点内置开发能力"));
         assert!(stale.has_elon_agent);
         assert!(!stale.has_command_budget);
         assert!(!stale.has_output_limit);
@@ -1099,6 +1142,7 @@ mod tests {
         .unwrap();
         let current = inspect_agent_runtime_freshness(&dir);
         assert_eq!(current.status, "current");
+        assert!(!current.registration_required);
         assert_eq!(current.max_run_commands_default, Some(8));
         assert!(current.has_command_budget);
         assert!(current.has_output_limit);
