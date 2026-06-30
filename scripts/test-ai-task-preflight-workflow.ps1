@@ -51,6 +51,7 @@ Assert-Contains $preflightContent "function Write-AiWorkflowGuard" "PowerShell p
 Assert-Contains $preflightShContent "write_ai_workflow_guard()" "Shell preflight must print the AI workflow guard."
 Assert-Contains $preflightContent "EDIT_ROOT=" "PowerShell preflight must expose the only safe edit root."
 Assert-Contains $preflightShContent "EDIT_ROOT=" "Shell preflight must expose the only safe edit root."
+Assert-Contains $preflightContent "AUTO_CLEANUP=skipped_created_worktree" "PowerShell preflight must not clean up the worktree it just created."
 
 function Assert-DocumentContains {
     param(

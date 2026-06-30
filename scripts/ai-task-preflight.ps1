@@ -269,14 +269,16 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
 # 仅删除满足"已合并到 origin/main + 无未提交内容 + 不是当前 worktree"的，
 # 有未提交改动的会被自动保留。要禁用：-SkipAutoCleanup
 # ─────────────────────────────────────────────────────────────
-if (-not $SkipAutoCleanup) {
+if (-not $SkipAutoCleanup -and $createdWorktree) {
+    # A newly-created worktree starts clean and already merged with origin/main.
+    # Running cleanup after creation can race with the just-emitted edit root, so
+    # leave cleanup to task finish or the next preflight run.
+    Write-Host "AUTO_CLEANUP=skipped_created_worktree"
+} elseif (-not $SkipAutoCleanup) {
     $cleanupScript = Join-Path $repoRoot "scripts\cleanup-task-worktrees.ps1"
     if (Test-Path -LiteralPath $cleanupScript) {
         try {
             $cleanupArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $cleanupScript, "-Apply")
-            if ($createdWorktree -and -not [string]::IsNullOrWhiteSpace($createdWorktreePath)) {
-                $cleanupArgs += @("-ExcludePath", $createdWorktreePath)
-            }
             $cleanupOut = & powershell @cleanupArgs 2>&1
             $removedLine = $cleanupOut | Select-String -Pattern "^完成：清理" | Select-Object -Last 1
             if ($removedLine) {
