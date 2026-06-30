@@ -11,6 +11,8 @@ mod updater;
 mod windows_integration;
 
 use anyhow::Result;
+#[cfg(windows)]
+use std::path::Path;
 
 pub(crate) const APP_NAME: &str = "一龙开发平台";
 /// Canonical user-facing Windows entry. It contains both the launcher and the
@@ -22,6 +24,7 @@ pub(crate) const INTERNAL_DIR_NAME: &str = "_internal";
 pub(crate) const AGENT_RUNTIME_ARG: &str = "--agent-runtime";
 pub(crate) const DEFAULT_BASE_URL: &str = "http://43.139.149.158:8080";
 pub(crate) const DEFAULT_ADMIN_PORT: u16 = 7799;
+pub(crate) const AUTOSTART_RUN_VALUE_NAME: &str = windows_integration::RUN_VALUE_NAME;
 
 #[derive(Clone, Copy)]
 enum ClientCommand {
@@ -62,6 +65,21 @@ pub(crate) fn run() -> Result<()> {
         }
     }
     result
+}
+
+#[cfg(windows)]
+pub(crate) fn set_autostart_enabled(install_dir: &Path, enabled: bool) -> Result<()> {
+    if enabled {
+        windows_integration::enable_autostart(install_dir)
+    } else {
+        windows_integration::disable_autostart();
+        Ok(())
+    }
+}
+
+#[cfg(not(windows))]
+pub(crate) fn set_autostart_enabled(_install_dir: &std::path::Path, _enabled: bool) -> Result<()> {
+    anyhow::bail!("当前平台不支持 Windows 开机自启动设置")
 }
 
 fn run_command(command: ClientCommand) -> Result<()> {

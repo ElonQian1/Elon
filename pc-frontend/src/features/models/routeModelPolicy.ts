@@ -31,9 +31,14 @@ function isPlatformAgentOption(option: AgentOption): boolean {
   return !clean(option.agentName) || backend === 'api' || backend === 'default'
 }
 
+function isLocalModelProbeOption(option: AgentOption): boolean {
+  return clean(option.backend).toLowerCase() === 'local_model'
+}
+
 export function optionMatchesRuntimeRoute(option: AgentOption, route: RuntimeRoute): boolean {
   if (route === 'auto') return true
-  if (route === 'route_a' || route === 'route_c3') return isCliAgentOption(option)
+  if (route === 'route_a') return isCliAgentOption(option) || isLocalModelProbeOption(option)
+  if (route === 'route_c3') return isCliAgentOption(option)
   if (route === 'route_c') return isPlatformAgentOption(option)
   return false
 }
@@ -54,7 +59,9 @@ export function selectedAgentForRuntimeRoute(
   if (!normalized) return ''
   if (route === 'auto') return normalized
   const option = options.find((item) => item.agentName === normalized)
-  return option && optionMatchesRuntimeRoute(option, route) ? normalized : ''
+  return option && option.selectable !== false && optionMatchesRuntimeRoute(option, route)
+    ? normalized
+    : ''
 }
 
 function selectedOptionForRuntimeRoute(
@@ -65,7 +72,9 @@ function selectedOptionForRuntimeRoute(
   const normalized = clean(selectedAgent)
   if (!normalized) return null
   const option = options.find((item) => item.agentName === normalized) ?? null
-  return option && optionMatchesRuntimeRoute(option, route) ? option : null
+  return option && option.selectable !== false && optionMatchesRuntimeRoute(option, route)
+    ? option
+    : null
 }
 
 export function routeModelEmptyState(route: RuntimeRoute): RouteModelEmptyState {
@@ -89,7 +98,7 @@ export function routeModelEmptyState(route: RuntimeRoute): RouteModelEmptyState 
   if (route === 'route_a') {
     return {
       title: '还没有可用的本机AI',
-      body: '这台电脑需要安装并登录 Codex、Copilot、Claude 或 Gemini，检测通过后才会出现可选 CLI。',
+      body: '这台电脑需要安装并登录 Codex、Copilot、Claude 或 Gemini；Ollama / LM Studio 模型会作为本机模型探测结果显示。',
       actionHref: routeOption.configHref,
       actionLabel: routeOption.configLabel ?? '配置本机AI',
     }
@@ -122,6 +131,7 @@ export function routeModelButtonCopy(
 ): RouteModelButtonCopy {
   const source = runtimeRouteOption(route)
   const matchingOptions = filterOptionsForRuntimeRoute(options, route)
+  const selectableMatchingOptions = matchingOptions.filter((option) => option.selectable !== false)
   const selectedOption = selectedOptionForRuntimeRoute(selectedAgent, options, route)
 
   let detail = ''
@@ -129,7 +139,8 @@ export function routeModelButtonCopy(
   else if (route === 'route_c2') detail = '远程节点决定'
   else if (selectedOption) detail = shortButtonLabel(selectedOption.label)
   else if (route === 'auto') detail = shortButtonLabel(selectedLabel || '自动模型')
-  else if (matchingOptions.length > 0) detail = route === 'route_c' ? '平台默认' : '自动选择'
+  else if (selectableMatchingOptions.length > 0) detail = route === 'route_c' ? '平台默认' : '自动选择'
+  else if (matchingOptions.length > 0 && route === 'route_a') detail = '仅探测'
   else if (route === 'route_a') detail = '去配置'
   else if (route === 'route_c3') detail = '选远程节点'
   else detail = '暂无模型'

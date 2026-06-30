@@ -62,4 +62,23 @@ export interface LocalNodeStatus {
   local_admin_token?: string
   local_admin_token_header?: string
   models?: NodeSummary['models']
+  allowed_clis?: string[]
+  cli_tools?: { name?: string; label?: string; path?: string; available?: boolean; backend?: string }[]
+  local_ai?: {
+    cli_tools?: { name?: string; label?: string; path?: string; available?: boolean }[]
+    models?: NodeSummary['models']
+  }
+}
+
+export interface AutostartStatus {
+  ok?: boolean
+  supported?: boolean
+  enabled?: boolean
+  source?: string
+  run_value_name?: string
+  expected_command?: string | null
+  actual_command?: string | null
+  install_error?: string | null
+  summary?: string
+  message?: string
 }

@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Settings } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { safeNodeAdminUrl } from '../../lib/utils'
-import type { NodeSummary, LocalNodeStatus } from './types'
+import type { AutostartStatus, NodeSummary, LocalNodeStatus } from './types'
 import styles from './NodePage.module.css'
 
 const DOWNLOAD_URL = '/api/node-agent/download/windows-client'
@@ -166,8 +167,29 @@ function LocalNodePanel({ adminUrl }: { adminUrl: string }) {
 /* ── 本机已连接时的管理面板（精简版） ── */
 function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initialStatus: LocalNodeStatus }) {
   const [status, setStatus] = useState(initialStatus)
+  const [autostart, setAutostart] = useState<AutostartStatus | null>(null)
+  const [autostartBusy, setAutostartBusy] = useState(false)
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
+  const cliNames = [
+    ...(status.allowed_clis ?? []),
+    ...(status.cli_tools ?? []).map((item) => item.name ?? item.label ?? ''),
+  ].filter(Boolean)
+  const uniqueCliNames = Array.from(new Set(cliNames.map((item) => String(item).trim()).filter(Boolean)))
+  const localModelCount = status.local_ai?.models?.length ?? status.models?.length ?? 0
+
+  const loadAutostart = useCallback(async () => {
+    try {
+      const data = await nodeApi<AutostartStatus>(adminUrl, '/api/client-maintenance/autostart')
+      setAutostart(data)
+    } catch (err) {
+      setAutostart({ supported: false, enabled: false, summary: (err as Error).message })
+    }
+  }, [adminUrl])
+
+  useEffect(() => {
+    loadAutostart()
+  }, [loadAutostart])
 
   async function login() {
     setResult('绑定中…'); setError('')
@@ -187,6 +209,23 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     } catch (err) { setError((err as Error).message) }
   }
 
+  async function toggleAutostart() {
+    const nextEnabled = !(autostart?.enabled)
+    setAutostartBusy(true); setResult(''); setError('')
+    try {
+      const data = await nodeApi<AutostartStatus>(adminUrl, '/api/client-maintenance/autostart', {
+        method: 'POST',
+        body: JSON.stringify({ enabled: nextEnabled }),
+      })
+      setAutostart(data)
+      setResult(data.message || (nextEnabled ? '已开启开机自启动。' : '已关闭开机自启动。'))
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setAutostartBusy(false)
+    }
+  }
+
   return (
     <div className={styles.adminPanel}>
       <div className={styles.adminRow}>
@@ -203,6 +242,9 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           ['登录', status.logged_in ? '已登录' : '未登录'],
           ['节点 ID', status.agent_id ?? '登录后自动生成'],
           ['版本', status.version ?? '未知'],
+          ['开机自启动', autostart?.enabled ? '已开启' : autostart ? '未开启' : '检测中'],
+          ['本机AI', uniqueCliNames.length ? uniqueCliNames.join('、') : '未检测到 Codex/Copilot'],
+          ['本机模型', localModelCount ? `${localModelCount} 个` : '未检测到'],
         ].map(([k, v]) => (
           <div key={k}><span>{k}</span><strong>{v}</strong></div>
         ))}
@@ -212,10 +254,20 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           {status.logged_in ? '重新绑定当前账号' : '用当前账号注册节点'}
         </button>
         <button className={styles.btn} disabled={!status.logged_in} onClick={logout}>登出本机节点</button>
+        <button
+          className={[styles.btn, styles.iconBtn].join(' ')}
+          disabled={autostartBusy || autostart?.supported === false}
+          onClick={toggleAutostart}
+          title="配置开机自启动"
+        >
+          <Settings size={15} strokeWidth={2.2} aria-hidden="true" />
+          {autostart?.enabled ? '关闭开机自启动' : '开启开机自启动'}
+        </button>
         <button className={styles.btn} onClick={() => window.open(adminUrl, '_blank', 'noopener')}>
           高级本机页
         </button>
       </div>
+      {autostart?.summary && <p className={styles.hintLine}>{autostart.summary}</p>}
       {result && <p className={styles.resultOk}>{result}</p>}
       {error && <p className={styles.resultErr}>{error}</p>}
     </div>

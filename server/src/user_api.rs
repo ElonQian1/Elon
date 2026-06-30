@@ -456,7 +456,17 @@ fn is_cli_selection(state: &AppState, name: &str) -> bool {
 fn is_cli_alias(name: &str) -> bool {
     matches!(
         name.trim().to_ascii_lowercase().as_str(),
-        "codex" | "codex_cli" | "copilot" | "copilot_cli" | "cli" | "local" | "local_cli"
+        "codex"
+            | "codex_cli"
+            | "copilot"
+            | "copilot_cli"
+            | "claude"
+            | "claude_cli"
+            | "gemini"
+            | "gemini_cli"
+            | "cli"
+            | "local"
+            | "local_cli"
     )
 }
 

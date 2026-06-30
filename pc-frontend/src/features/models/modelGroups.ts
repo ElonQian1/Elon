@@ -43,7 +43,9 @@ export function groupModelOptions(
     const existing = groups.get(key)
     if (existing) {
       existing.options.push(option)
-      if (option.agentName === selectedAgent) existing.selectedOption = option
+      if (option.selectable !== false && option.agentName === selectedAgent) {
+        existing.selectedOption = option
+      }
       continue
     }
 
@@ -52,14 +54,17 @@ export function groupModelOptions(
       provider: option.provider,
       label: baseModelLabel(option),
       options: [option],
-      selectedOption: option.agentName === selectedAgent ? option : null,
+      selectedOption: option.selectable !== false && option.agentName === selectedAgent
+        ? option
+        : null,
     })
   }
 
   return Array.from(groups.values()).map((group) => {
     const sortedOptions = sortByEffort(group.options)
     const selectedOption =
-      sortedOptions.find((option) => option.agentName === selectedAgent) ?? group.selectedOption
+      sortedOptions.find((option) => option.selectable !== false && option.agentName === selectedAgent) ??
+      group.selectedOption
     const primaryOption = selectedOption ?? pickPrimaryOption(sortedOptions)
 
     return {
@@ -144,11 +149,13 @@ function groupSubtitle(
 }
 
 function pickPrimaryOption(options: AgentOption[]): AgentOption {
+  const selectable = options.filter((option) => option.selectable !== false)
+  const candidates = selectable.length ? selectable : options
   for (const effort of PRIMARY_EFFORTS) {
-    const found = options.find((option) => normalizeEffort(option.reasoningEffort) === effort)
+    const found = candidates.find((option) => normalizeEffort(option.reasoningEffort) === effort)
     if (found) return found
   }
-  return options[0]
+  return candidates[0]
 }
 
 function sortByEffort(options: AgentOption[]): AgentOption[] {

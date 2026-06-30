@@ -9,7 +9,7 @@ use std::path::Path;
 use super::{command as launcher_command, paths, APP_NAME};
 
 #[cfg(windows)]
-const RUN_VALUE_NAME: &str = "ElonNodeAgent";
+pub(crate) const RUN_VALUE_NAME: &str = "ElonNodeAgent";
 #[cfg(windows)]
 const LEGACY_TASK_NAME: &str = "ElonNodeAgentTray";
 #[cfg(windows)]
@@ -338,7 +338,7 @@ mod tests {
             .map(|spec| spec.file_name)
             .collect::<Vec<_>>();
 
-        assert!(names.contains(&"一龙PC节点.lnk"));
+        assert!(names.contains(&"一龙开发平台.lnk"));
         assert!(names.contains(&"打开运行日志.lnk"));
         assert!(names.contains(&"导出诊断.lnk"));
         assert!(names.contains(&"一龙开发平台.lnk"));

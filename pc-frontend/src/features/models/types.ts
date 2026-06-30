@@ -10,6 +10,9 @@ export interface AgentOption {
   reasoningSummary: string
   verbosity: string
   subtitle: string
+  source?: 'server' | 'local_cli' | 'local_model'
+  selectable?: boolean
+  unavailableReason?: string
 }
 
 export interface RawAgentItem {

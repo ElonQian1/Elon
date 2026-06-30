@@ -94,26 +94,15 @@ pub(crate) fn resolve_cli_option_id(
         return Some(opt.id.clone());
     }
 
-    if is_codex_alias(name) {
+    if let Some(cli) = named_cli_alias(name) {
         return state
             .ai_cli
             .options
             .iter()
             .find(|opt| {
-                opt.provider.eq_ignore_ascii_case("codex")
-                    || opt.id.to_ascii_lowercase().contains("codex")
-            })
-            .map(|opt| opt.id.clone());
-    }
-
-    if is_copilot_alias(name) {
-        return state
-            .ai_cli
-            .options
-            .iter()
-            .find(|opt| {
-                opt.provider.eq_ignore_ascii_case("copilot")
-                    || opt.id.to_ascii_lowercase().contains("copilot")
+                opt.provider.eq_ignore_ascii_case(cli)
+                    || opt.id.to_ascii_lowercase().contains(cli)
+                    || opt.bin.to_ascii_lowercase().contains(cli)
             })
             .map(|opt| opt.id.clone());
     }
@@ -126,7 +115,7 @@ pub(crate) fn is_local_cli_option(state: &Arc<AppState>, name: &str) -> bool {
 }
 
 fn is_cli_alias(name: &str) -> bool {
-    is_local_default_alias(name) || is_codex_alias(name) || is_copilot_alias(name)
+    is_local_default_alias(name) || named_cli_alias(name).is_some()
 }
 
 fn is_local_default_alias(name: &str) -> bool {
@@ -136,18 +125,14 @@ fn is_local_default_alias(name: &str) -> bool {
     )
 }
 
-fn is_codex_alias(name: &str) -> bool {
-    matches!(
-        name.trim().to_ascii_lowercase().as_str(),
-        "codex" | "codex_cli"
-    )
-}
-
-fn is_copilot_alias(name: &str) -> bool {
-    matches!(
-        name.trim().to_ascii_lowercase().as_str(),
-        "copilot" | "copilot_cli"
-    )
+fn named_cli_alias(name: &str) -> Option<&'static str> {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "codex" | "codex_cli" => Some("codex"),
+        "copilot" | "copilot_cli" => Some("copilot"),
+        "claude" | "claude_cli" => Some("claude"),
+        "gemini" | "gemini_cli" => Some("gemini"),
+        _ => None,
+    }
 }
 
 fn is_api_backend_alias(name: &str) -> bool {

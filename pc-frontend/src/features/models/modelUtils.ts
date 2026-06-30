@@ -1,5 +1,6 @@
 /** 纯业务逻辑，对应旧 pc_app_models.js 中的 helper 函数 */
 import { clean } from '../../lib/utils'
+import type { LocalNodeStatus } from '../node/types'
 import type { AgentOption, AgentConfigResponse, RawAgentItem } from './types'
 
 export function providerGroupTitle(provider: string): string {
@@ -98,6 +99,8 @@ function normalizeAgentOption(item: RawAgentItem): AgentOption | null {
       codexSubtitle(modelId, reasoningEffort, reasoningSummary, verbosity) ||
       clean(item.api_base) ||
       providerGroupTitle(provider),
+    source: 'server',
+    selectable: true,
   }
 }
 
@@ -114,6 +117,8 @@ export function buildOptions(data: AgentConfigResponse): AgentOption[] {
       reasoningSummary: '',
       verbosity: '',
       subtitle: '使用服务器当前默认模型',
+      source: 'server',
+      selectable: true,
     })
   }
   const agents = Array.isArray(data.available_agents) ? data.available_agents : []
@@ -122,6 +127,93 @@ export function buildOptions(data: AgentConfigResponse): AgentOption[] {
     if (opt) options.push(opt)
   }
   return options
+}
+
+const LOCAL_CLI_LABELS: Record<string, string> = {
+  codex: 'Codex',
+  copilot: 'Copilot',
+  claude: 'Claude',
+  gemini: 'Gemini',
+}
+
+function normalizeCliName(value: string): string {
+  const lower = clean(value).toLowerCase()
+  for (const name of Object.keys(LOCAL_CLI_LABELS)) {
+    if (lower === name || lower === `${name}_cli` || lower.includes(name)) return name
+  }
+  return ''
+}
+
+function cliNameFromOption(option: AgentOption): string {
+  if (clean(option.backend).toLowerCase() !== 'cli') return ''
+  return normalizeCliName(`${option.provider} ${option.agentName} ${option.label}`)
+}
+
+function localCliNames(status: LocalNodeStatus | null | undefined): string[] {
+  const names = new Set<string>()
+  for (const item of status?.allowed_clis ?? []) {
+    const name = normalizeCliName(item)
+    if (name) names.add(name)
+  }
+  for (const item of [...(status?.cli_tools ?? []), ...(status?.local_ai?.cli_tools ?? [])]) {
+    const name = normalizeCliName(item.name ?? item.label ?? '')
+    if (name && item.available !== false) names.add(name)
+  }
+  return Array.from(names)
+}
+
+export function mergeLocalNodeOptions(
+  serverOptions: AgentOption[],
+  localStatus: LocalNodeStatus | null | undefined,
+): AgentOption[] {
+  const merged = [...serverOptions]
+  const existingCliNames = new Set(
+    merged
+      .map(cliNameFromOption)
+      .filter(Boolean),
+  )
+  for (const cli of localCliNames(localStatus)) {
+    if (existingCliNames.has(cli)) continue
+    merged.push({
+      label: LOCAL_CLI_LABELS[cli] ?? cli.toUpperCase(),
+      agentName: cli,
+      provider: cli,
+      backend: 'cli',
+      modelId: '',
+      reasoningEffort: '',
+      reasoningSummary: '',
+      verbosity: '',
+      subtitle: '本机节点已检测到，可作为本机AI接入',
+      source: 'local_cli',
+      selectable: true,
+    })
+  }
+
+  const models = localStatus?.local_ai?.models ?? localStatus?.models ?? []
+  const seenModels = new Set<string>()
+  for (const model of models) {
+    const modelId = clean(model.model_id)
+    if (!modelId) continue
+    const provider = clean(model.provider) || 'local'
+    const key = `${provider}:${modelId}`.toLowerCase()
+    if (seenModels.has(key)) continue
+    seenModels.add(key)
+    merged.push({
+      label: model.display_name || friendlyModelName(modelId),
+      agentName: `local-model:${key}`,
+      provider,
+      backend: 'local_model',
+      modelId,
+      reasoningEffort: '',
+      reasoningSummary: '',
+      verbosity: '',
+      subtitle: '本机模型已检测到；项目开发请先接入本机 API runtime',
+      source: 'local_model',
+      selectable: false,
+      unavailableReason: '本机模型目前是节点 LLM 探测结果，还不是可直接选择的项目开发 agent。',
+    })
+  }
+  return merged
 }
 
 export function resolveSelection(

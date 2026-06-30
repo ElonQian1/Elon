@@ -447,6 +447,15 @@
   background: rgba(35, 165, 90, 0.16);
 }
 
+.optionDisabled {
+  cursor: default;
+  opacity: 0.72;
+}
+
+.optionDisabled:hover {
+  background: transparent;
+}
+
 .option strong,
 .option span {
   display: block;
@@ -520,10 +529,21 @@
 
 .footer {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
   gap: 8px;
   padding: 10px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.footerStatus {
+  margin-right: auto;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .footer button {

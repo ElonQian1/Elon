@@ -37,8 +37,17 @@ export function ModelPickerPopover({
   onRuntimeRouteChange,
 }: Props) {
   const user = useAuthStore((s) => s.user)
-  const { options, selectedAgent, label, codexCliOnly, loading, error, load, saveSelection } =
-    useModelStore()
+  const {
+    options,
+    selectedAgent,
+    label,
+    codexCliOnly,
+    localAiSummary,
+    loading,
+    error,
+    load,
+    saveSelection,
+  } = useModelStore()
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [pos, setPos] = useState({ left: 12, bottom: 12, width: 360 })
@@ -79,6 +88,7 @@ export function ModelPickerPopover({
 
   async function handleSelect(option: AgentOption) {
     if (!user?.id) return
+    if (option.selectable === false) return
     if (hasRuntimeRoutePicker && !optionMatchesRuntimeRoute(option, route)) return
     setSaving(true)
     setSaveError('')
@@ -226,10 +236,12 @@ export function ModelPickerPopover({
                         key={group.key}
                         className={[
                           styles.option,
+                          group.primaryOption.selectable === false ? styles.optionDisabled : '',
                           group.selectedOption ? styles.active : '',
                         ].join(' ')}
                         type="button"
                         disabled={saving}
+                        aria-disabled={group.primaryOption.selectable === false}
                         onMouseEnter={() => setPreviewKey(group.key)}
                         onFocus={() => setPreviewKey(group.key)}
                         onClick={() => handleSelect(group.primaryOption)}
@@ -239,7 +251,11 @@ export function ModelPickerPopover({
                           {group.subtitle && <span>{group.subtitle}</span>}
                         </span>
                         <span className={styles.check}>
-                          {group.selectedOption ? '✓' : ''}
+                          {group.primaryOption.selectable === false
+                            ? '探测'
+                            : group.selectedOption
+                              ? '✓'
+                              : ''}
                         </span>
                       </button>
                     ))}
@@ -250,6 +266,9 @@ export function ModelPickerPopover({
         </div>
 
         <footer className={styles.footer}>
+          {hasRuntimeRoutePicker && localAiSummary && (
+            <span className={styles.footerStatus}>{localAiSummary}</span>
+          )}
           <button type="button" disabled={saving} onClick={() => user?.id && load(user.id)}>
             刷新
           </button>

@@ -14,10 +14,11 @@ const ROUTE_CONFIG_GUIDES: Record<RouteConfigKey, RouteConfigGuide> = {
   route_a: {
     code: '本机AI',
     title: '配置本机AI',
-    body: '这种方式会使用项目电脑上已经登录的 Codex、Copilot 或 Claude。',
+    body: '这种方式会使用项目电脑上已经登录的 Codex、Copilot、Claude，或展示本机 Ollama / LM Studio 模型探测结果。',
     checks: [
       '本机 Win 端已启动并绑定当前账号',
-      '节点详情里的本机AI显示就绪',
+      '节点详情里的本机AI显示 Codex、Copilot、Claude 或 Gemini',
+      '本机模型列表能看到 Ollama / LM Studio；项目开发前需接入本机 API runtime',
       '目标 AI 工具已在该电脑上完成登录授权',
     ],
     target: '本机节点或项目绑定的个人 PC 节点',

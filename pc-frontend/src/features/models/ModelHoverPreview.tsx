@@ -75,6 +75,9 @@ export function ModelHoverPreview({
     ['推理档位', group.options.length > 1 ? `${group.options.length} 个可选` : effortLabel(option)],
     option.verbosity ? ['输出细节', option.verbosity] : null,
     option.reasoningSummary ? ['推理摘要', option.reasoningSummary] : null,
+    option.selectable === false
+      ? ['选择状态', option.unavailableReason || '当前只作为探测结果展示']
+      : null,
   ].filter(Boolean) as [string, string][]
 
   return (
@@ -99,12 +102,13 @@ export function ModelHoverPreview({
         <div className={styles.effortRows}>
           {group.options.map((item) => {
             const active = item.agentName === selectedAgent
+            const disabled = saving || active || item.selectable === false
             return (
               <button
                 className={active ? styles.effortRowActive : styles.effortRow}
                 key={item.agentName || `${group.key}:default`}
                 type="button"
-                disabled={saving || active}
+                disabled={disabled}
                 onClick={() => onSelect(item)}
                 aria-pressed={active}
               >
@@ -112,7 +116,7 @@ export function ModelHoverPreview({
                   {active ? <Check size={14} strokeWidth={2.3} aria-hidden="true" /> : ''}
                 </span>
                 <strong>{effortDisplayName(item.reasoningEffort)}</strong>
-                <em>{effortNote(item)}</em>
+                <em>{item.selectable === false ? item.unavailableReason || '探测结果' : effortNote(item)}</em>
               </button>
             )
           })}

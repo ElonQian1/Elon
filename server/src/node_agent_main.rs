@@ -735,6 +735,16 @@ fn detect_available_clis() -> Vec<(String, String)> {
         .collect()
 }
 
+fn local_cli_display_label(name: &str) -> &'static str {
+    match name.trim().to_ascii_lowercase().as_str() {
+        "codex" => "Codex",
+        "copilot" => "Copilot",
+        "claude" => "Claude",
+        "gemini" => "Gemini",
+        _ => "本机 AI CLI",
+    }
+}
+
 /// 处理 extra_args 中的 `--attachment <url>` 参数：
 /// 下载图片到本地临时文件，然后根据 CLI 类型转换参数格式：
 /// - Copilot: `--attachment <url>` → `--attachment <local_path>`
@@ -2805,6 +2815,11 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::get(node_agent_client_maintenance::status_handler),
             )
             .route(
+                "/api/client-maintenance/autostart",
+                axum::routing::get(node_agent_client_maintenance::autostart_status_handler)
+                    .post(node_agent_client_maintenance::autostart_set_handler),
+            )
+            .route(
                 "/api/client-maintenance/open",
                 axum::routing::post(node_agent_client_maintenance::open_target_handler),
             )
@@ -3024,6 +3039,9 @@ async fn admin_status(
         warn!("PC 任务 journal 读取失败，CLI 会话桥接状态降级为空摘要: {error}");
         Vec::new()
     });
+    let cli_pairs = detect_available_clis();
+    let available_clis: Vec<String> = cli_pairs.iter().map(|(name, _)| name.clone()).collect();
+    rt.set_cli_paths(cli_pairs.clone()).await;
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
@@ -3051,6 +3069,23 @@ async fn admin_status(
             &active_cli_prompts,
             &recent_task_records,
         ),
+        "allowed_clis": available_clis,
+        "cli_tools": cli_pairs.iter().map(|(name, path)| serde_json::json!({
+            "name": name,
+            "label": local_cli_display_label(name),
+            "path": path,
+            "available": true,
+            "backend": "cli",
+        })).collect::<Vec<_>>(),
+        "local_ai": {
+            "cli_tools": cli_pairs.iter().map(|(name, path)| serde_json::json!({
+                "name": name,
+                "label": local_cli_display_label(name),
+                "path": path,
+                "available": true,
+            })).collect::<Vec<_>>(),
+            "models": live,
+        },
         "models": live,
     });
     if node_agent_local_admin::can_expose_local_admin_token(&headers, &rt.cloud_http_url()) {

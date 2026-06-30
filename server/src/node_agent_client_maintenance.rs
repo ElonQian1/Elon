@@ -18,8 +18,51 @@ pub(crate) struct OpenTargetRequest {
     target: String,
 }
 
+#[derive(Deserialize)]
+pub(crate) struct AutostartSetRequest {
+    enabled: bool,
+}
+
 pub(crate) async fn status_handler() -> Json<Value> {
     Json(status_payload())
+}
+
+pub(crate) async fn autostart_status_handler() -> Json<Value> {
+    Json(autostart_status_payload())
+}
+
+pub(crate) async fn autostart_set_handler(
+    Json(req): Json<AutostartSetRequest>,
+) -> (StatusCode, Json<Value>) {
+    match set_autostart(req.enabled) {
+        Ok(()) => {
+            record_maintenance_event(
+                "autostart",
+                true,
+                if req.enabled { "enabled" } else { "disabled" },
+            );
+            let mut payload = autostart_status_payload();
+            if let Some(object) = payload.as_object_mut() {
+                object.insert("ok".to_string(), Value::Bool(true));
+                object.insert(
+                    "message".to_string(),
+                    Value::String(
+                        if req.enabled {
+                            "已开启开机自启动。"
+                        } else {
+                            "已关闭开机自启动。"
+                        }
+                        .to_string(),
+                    ),
+                );
+            }
+            (StatusCode::OK, Json(payload))
+        }
+        Err(error) => {
+            record_maintenance_event("autostart", false, &error);
+            error_response(StatusCode::BAD_REQUEST, error)
+        }
+    }
 }
 
 pub(crate) async fn open_target_handler(
@@ -126,10 +169,74 @@ fn status_payload() -> Value {
             { "target": "config_dir", "label": "配置目录", "purpose": "查看本机节点凭证和运行配置所在目录。" }
         ],
         "client_care_summary": "普通用户日常只需要运行一龙开发平台.exe；需要移除时运行卸载一龙开发平台.exe。运行日志、任务记录、诊断、更新和卸载都集中在本面板。",
+        "autostart": autostart_status_payload(),
         "cli_session_bridge": crate::node_agent_cli_session_bridge::status_payload(),
     });
 
     with_install_status(payload)
+}
+
+fn autostart_status_payload() -> Value {
+    #[cfg(windows)]
+    {
+        let installed = installed_paths();
+        let actual_command = query_autostart_command().unwrap_or(None);
+        let expected_command = installed
+            .as_ref()
+            .ok()
+            .map(|paths| format!("\"{}\"", paths.client_exe.display()));
+        let expected_path = installed
+            .as_ref()
+            .ok()
+            .map(|paths| paths.client_exe.to_string_lossy().to_string());
+        let enabled = match (&actual_command, &expected_path) {
+            (Some(actual), Some(expected)) => command_targets_path(actual, expected),
+            (Some(_), None) => true,
+            _ => false,
+        };
+        let summary = if enabled {
+            "开机后会自动启动一龙开发平台。"
+        } else {
+            "开机后不会自动启动一龙开发平台。"
+        };
+        json!({
+            "supported": true,
+            "enabled": enabled,
+            "source": "hkcu_run",
+            "run_value_name": crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME,
+            "expected_command": expected_command,
+            "actual_command": actual_command,
+            "install_error": installed.err().map(|error| error.to_string()),
+            "summary": summary,
+        })
+    }
+    #[cfg(not(windows))]
+    {
+        json!({
+            "supported": false,
+            "enabled": false,
+            "source": "unsupported",
+            "run_value_name": "ElonNodeAgent",
+            "expected_command": Value::Null,
+            "actual_command": Value::Null,
+            "install_error": "当前平台不支持 Windows 开机自启动设置。",
+            "summary": "请在安装 Win 端的一龙开发平台电脑上配置开机自启动。",
+        })
+    }
+}
+
+fn set_autostart(enabled: bool) -> Result<(), String> {
+    #[cfg(windows)]
+    {
+        let installed = installed_paths()?;
+        crate::node_client_launcher::set_autostart_enabled(&installed.install_dir, enabled)
+            .map_err(|error| format!("开机自启动设置失败: {error:#}"))
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = enabled;
+        Err("当前平台不支持 Windows 开机自启动设置。".to_string())
+    }
 }
 
 fn with_install_status(mut payload: Value) -> Value {
@@ -755,6 +862,47 @@ fn spawn_client_action(action: ClientAction) -> Result<(), String> {
         let _ = action;
         Err("当前平台不支持 Windows 客户端维护动作。".to_string())
     }
+}
+
+#[cfg(windows)]
+fn query_autostart_command() -> Result<Option<String>, String> {
+    let mut command = Command::new("reg");
+    command.args([
+        "query",
+        r"HKCU\Software\Microsoft\Windows\CurrentVersion\Run",
+        "/v",
+        crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME,
+    ]);
+    apply_hidden_window(&mut command);
+    let output = command
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .output()
+        .map_err(|error| format!("无法读取开机自启动设置: {error}"))?;
+    if !output.status.success() {
+        return Ok(None);
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    for line in stdout.lines() {
+        let trimmed = line.trim();
+        if !trimmed.starts_with(crate::node_client_launcher::AUTOSTART_RUN_VALUE_NAME) {
+            continue;
+        }
+        if let Some((_, value)) = trimmed.split_once("REG_SZ") {
+            let value = value.trim();
+            if !value.is_empty() {
+                return Ok(Some(value.to_string()));
+            }
+        }
+    }
+    Ok(None)
+}
+
+#[cfg(windows)]
+fn command_targets_path(command: &str, expected_path: &str) -> bool {
+    let actual = command.trim().trim_matches('"').to_ascii_lowercase();
+    let expected = expected_path.trim().trim_matches('"').to_ascii_lowercase();
+    !expected.is_empty() && actual.contains(&expected)
 }
 
 fn maintenance_paths() -> MaintenancePaths {

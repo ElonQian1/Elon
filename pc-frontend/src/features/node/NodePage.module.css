@@ -99,7 +99,14 @@
 .btn.primary:hover { background: var(--accent-hover); }
 .btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.iconBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .versionLine { font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }
+.hintLine { font-size: 12px; color: var(--text-muted); margin: -4px 0 0; }
 
 /* ── 路线配置提示 ── */
 .routeGuide {
