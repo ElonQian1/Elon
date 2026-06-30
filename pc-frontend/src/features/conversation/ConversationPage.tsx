@@ -14,7 +14,7 @@ import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import { api } from '../../api/client'
-import { formatTime, clean } from '../../lib/utils'
+import { clean } from '../../lib/utils'
 import {
   routeModelButtonCopy,
   selectedAgentForRuntimeRoute,
@@ -27,6 +27,21 @@ import type {
   ProjectInvitePreviewResponse,
   ProjectMember,
 } from './types'
+import MemberConversationList from './MemberConversationList'
+import {
+  listMemberConversationMessages,
+  listMemberConversations,
+  sameConversationTarget,
+  sendMemberConversationDiscussion,
+  targetDisplayName,
+  targetFromProjectMember,
+  targetFromUser,
+} from './memberConversationApi'
+import type {
+  MemberConversationEntry,
+  MemberConversationMessage,
+  MemberConversationTarget,
+} from './memberConversationApi'
 import {
   channelCanManage,
   channelPermissionSummary,
@@ -76,10 +91,11 @@ export default function ConversationPage() {
   const [memberPopoverY, setMemberPopoverY] = useState(200)
 
   // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
-  interface MemberConv { id: string; title?: string | null; last_task_status?: string | null; last_message?: string | null; updated_at?: string }
-  const [memberConversations, setMemberConversations] = useState<MemberConv[]>([])
+  const [memberConversationTarget, setMemberConversationTarget] = useState<MemberConversationTarget | null>(null)
+  const [memberConversations, setMemberConversations] = useState<MemberConversationEntry[]>([])
   const [convMessages, setConvMessages] = useState<Message[]>([])
   const [convLoading, setConvLoading] = useState(false)
+  const [sendingMemberDiscussion, setSendingMemberDiscussion] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
   const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
   const [inviteStatus, setInviteStatus] = useState('')
@@ -101,29 +117,42 @@ export default function ConversationPage() {
     persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
   }, [runtimeRoute])
 
+  const ownConversationTarget = useMemo(() => targetFromUser(user), [user])
+  const activeConversationTarget = memberConversationTarget ?? ownConversationTarget
+  const activeConversationTargetId = activeConversationTarget?.userId ?? ''
+  const isOwnConversationTarget = !!ownConversationTarget
+    && !!activeConversationTarget
+    && sameConversationTarget(ownConversationTarget, activeConversationTarget)
+  const activeConversationTargetName = targetDisplayName(activeConversationTarget)
+  const isAssistingMember = !!activeConversationTarget && !isOwnConversationTarget
+
   // 加载项目会话列表（与手机端同步）
   useEffect(() => {
     if (!activeProjectId) return
-    const uid = user?.id ?? useAuthStore.getState().user?.id
-    if (!uid) return
+    if (!activeConversationTargetId) return
     setMemberConversations([])
-    api.get<{ conversations?: MemberConv[] }>(
-      `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(uid)}/conversations?limit=50`
-    ).then((d) => setMemberConversations(d.conversations ?? [])).catch((err: { message?: string; status?: number }) => {
+    listMemberConversations(activeProjectId, activeConversationTargetId).then(setMemberConversations).catch((err: { message?: string; status?: number }) => {
       console.warn('[MemberConversations] failed:', err?.status, err?.message)
     })
-  }, [activeProjectId, user?.id]) // eslint-disable-line
+  }, [activeProjectId, activeConversationTargetId]) // eslint-disable-line
 
   // 项目切换时清空会话消息
   useEffect(() => {
     setConvMessages([])
     setSessionView(null)
+    setMemberConversationTarget(null)
     waitingForNewSession.current = false
   }, [activeProjectId]) // eslint-disable-line
 
   useEffect(() => {
     setSelectedMember(null)
   }, [activeProjectId, activeChannelId])
+
+  useEffect(() => {
+    setSessionView(null)
+    setConvMessages([])
+    waitingForNewSession.current = false
+  }, [activeConversationTargetId])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -196,7 +225,12 @@ export default function ConversationPage() {
   async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault()
     const text = input.trim()
-    if (!text || sendingMessage) return
+    const isMemberDiscussion = isAssistingMember && !!activeProjectId && !!activeConversationTargetId && !!sessionView && sessionView !== 'new'
+    if (!text || sendingMessage || sendingMemberDiscussion) return
+    if (isAssistingMember && !isMemberDiscussion) {
+      setSendError('请先选择这个成员的一个会话')
+      return
+    }
     setInput('')
     setSendError('')
     setAttachments([])   // P1.4：发送后清空附件
@@ -206,6 +240,20 @@ export default function ConversationPage() {
       const fullContent = attachments.length > 0
         ? text + attachmentsToMarkdown(attachments)
         : text
+      if (isMemberDiscussion) {
+        setSendingMemberDiscussion(true)
+        const message = await sendMemberConversationDiscussion(
+          activeProjectId,
+          activeConversationTargetId,
+          String(sessionView),
+          fullContent,
+        )
+        setConvMessages((prev) => [...prev, message as MemberConversationMessage])
+        listMemberConversations(activeProjectId, activeConversationTargetId)
+          .then(setMemberConversations)
+          .catch(() => {})
+        return
+      }
       // 项目首页发送：没有选中频道时，自动选择最佳频道（ai_development > 第一个）
       if (!activeChannelId && channels.length > 0) {
         const best = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
@@ -222,15 +270,15 @@ export default function ConversationPage() {
       if (activeProjectId && user?.id) {
         setTimeout(async () => {
           try {
-            const d = await api.get<{ conversations?: MemberConv[] }>(
-              `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(user.id)}/conversations?limit=50`
-            )
-            setMemberConversations(d.conversations ?? [])
+            const conversations = await listMemberConversations(activeProjectId, user.id)
+            setMemberConversations(conversations)
           } catch {}
         }, 400)
       }
     } catch (err) {
       setSendError((err as { message?: string }).message ?? '发送失败')
+    } finally {
+      setSendingMemberDiscussion(false)
     }
   }
 
@@ -306,7 +354,7 @@ export default function ConversationPage() {
     if (['ai_task','ai_progress','ai_result'].includes(curRole)) return false
     if (['ai_task','ai_progress','ai_result'].includes(prevRole)) return false
     if (curRole === prevRole) {
-      if (curRole === 'user' || curRole === 'human') return curId !== '' && curId === prevId
+      if (curRole === 'user' || curRole === 'human' || curRole === 'discussion') return curId !== '' && curId === prevId
       return true
     }
     return false
@@ -316,6 +364,11 @@ export default function ConversationPage() {
   const [sessionView, setSessionView] = useState<string | 'new' | null>(null)
   const prevSessionIdsRef = useRef<Set<string>>(new Set())
   const waitingForNewSession = useRef(false)
+  const memberDiscussionNeedsConversation = isAssistingMember && (!sessionView || sessionView === 'new')
+  const composerBusy = sendingMessage || sendingMemberDiscussion
+  const composerDisabled = composerBusy
+    || memberDiscussionNeedsConversation
+    || (!activeChannelId && channels.length === 0 && !isAssistingMember)
 
   // 根据会话视图过滤显示的消息（必须在 messageGroups 之前声明）
   const displayMessages = useMemo(() => {
@@ -371,21 +424,26 @@ export default function ConversationPage() {
 
   // 打开一个会话：从服务端加载该会话的消息（与手机端同步）
   async function openConversation(convId: string) {
-    const uid = user?.id ?? useAuthStore.getState().user?.id
-    if (!activeProjectId || !uid) return
+    if (!activeProjectId || !activeConversationTargetId) return
     setSessionView(convId)
     setConvMessages([])
     setConvLoading(true)
     try {
-      const data = await api.get<{ messages?: Message[] }>(
-        `/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(uid)}/conversations/${encodeURIComponent(convId)}/messages?limit=120`
+      const messages = await listMemberConversationMessages(
+        activeProjectId,
+        activeConversationTargetId,
+        convId,
       )
-      setConvMessages((data.messages ?? []) as Message[])
+      setConvMessages(messages as Message[])
     } catch (err) { console.warn('[ConvMessages] failed:', err) }
     finally { setConvLoading(false) }
   }
 
   function startNewSession() {
+    if (!isOwnConversationTarget) {
+      setSendError('只能为自己的项目会话新建对话')
+      return
+    }
     prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
     setSessionView('new')
     setConvMessages([])
@@ -395,6 +453,19 @@ export default function ConversationPage() {
 
   function openSession(convId: string) {
     openConversation(convId)
+  }
+
+  function openMemberConversations(member: ProjectMember) {
+    const target = targetFromProjectMember(member)
+    setMemberConversationTarget(target)
+    setSelectedMember(null)
+    setMemberPopoverY(200)
+    setSendError('')
+  }
+
+  function resetMemberConversationTarget() {
+    setMemberConversationTarget(null)
+    setSendError('')
   }
 
   return (
@@ -480,43 +551,16 @@ export default function ConversationPage() {
                 })
               )}
 
-              {/* ── 会话列表：选中频道时显示，点击进入隔离语境运行 ── */}
-              {activeChannelId && (
-                <div style={{ borderTop: '1px solid rgba(255,255,255,.04)', marginTop: 4, paddingBottom: 4 }}>
-                  <div style={{ padding: '8px 12px 3px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '.05em', color: 'var(--text-muted)' }}>会话</span>
-                    <button
-                      type="button"
-                      title="新建会话"
-                      onClick={startNewSession}
-                      style={{ background: sessionView === 'new' ? 'rgba(60,111,162,.3)' : 'rgba(255,255,255,.08)', border: 'none', borderRadius: 4, width: 18, height: 18, color: 'var(--text-soft)', fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}
-                    >+</button>
-                  </div>
-                  {memberConversations.length === 0 && (
-                    <div style={{ padding: '4px 12px 6px', fontSize: 11, color: 'var(--text-muted)' }}>发送第一条消息自动创建会话</div>
-                  )}
-                  {memberConversations.map((c) => (
-                    <button
-                      key={c.id}
-                      type="button"
-                      onClick={() => openSession(c.id)}
-                      style={{
-                        width: 'calc(100% - 8px)', display: 'flex', flexDirection: 'column', gap: 1,
-                        padding: '5px 10px', margin: '1px 4px',
-                        background: c.id === sessionView ? 'rgba(60,111,162,.2)' : 'transparent',
-                        border: 'none', borderRadius: 5, textAlign: 'left', cursor: 'pointer',
-                        color: 'var(--text-soft)', transition: 'background .1s',
-                      }}
-                    >
-                      <span style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', display: 'block' }}>
-                        {c.last_task_status === 'error' || c.last_task_status === 'failed' ? '✗ ' : ''}{(c.title || c.last_message || '新会话').slice(0, 40)}
-                      </span>
-                      {c.updated_at && (
-                        <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{formatTime(c.updated_at)}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
+              {activeConversationTarget && (
+                <MemberConversationList
+                  conversations={memberConversations}
+                  selectedId={sessionView}
+                  targetName={activeConversationTargetName}
+                  isOwnTarget={isOwnConversationTarget}
+                  onOpen={openSession}
+                  onStartNew={startNewSession}
+                  onResetTarget={resetMemberConversationTarget}
+                />
               )}
             </>
           ) : (
@@ -611,7 +655,7 @@ export default function ConversationPage() {
 
         {/* 消息列表（1fr）*/}
         {/* 无频道或未选中会话（landing）vs 选中会话（feed）*/}
-        {!activeChannelId || sessionView === null ? (
+        {sessionView === null ? (
           <div className={styles.messageList}>
             {!activeProjectId ? (
               /* 无项目：全局欢迎页 */
@@ -622,7 +666,12 @@ export default function ConversationPage() {
               </div>
             ) : (
               /* 项目首页：富内容 landing（与旧版 pc_project_landing.js 功能对等）*/
-              activeProject && (
+              isAssistingMember ? (
+                <div className={styles.emptyState}>
+                  <strong>{activeConversationTargetName} 的项目会话</strong>
+                  <p>从左侧选择一个公开会话后，你可以用自己的账号继续协助他。</p>
+                </div>
+              ) : activeProject && (
                 <ProjectLanding
                   project={activeProject}
                   channels={channels}
@@ -727,13 +776,15 @@ export default function ConversationPage() {
                 onChange={(e) => { setInput(e.target.value); autoResize() }}
                 onKeyDown={handleKeyDown}
                 placeholder={
-                  !activeChannelId
+                  isAssistingMember
+                    ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
+                    : !activeChannelId
                     ? `向 ${activeProject?.name ?? '项目'} 发送消息或需求… (Enter 发送)`
                     : isDevChannel
                       ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
                       : `在 #${activeChannel?.name ?? ''} 发送消息`
                 }
-                disabled={sendingMessage || (!activeChannelId && channels.length === 0)}
+                disabled={composerDisabled}
                 rows={1}
               />
 
@@ -741,7 +792,7 @@ export default function ConversationPage() {
               {activeProjectId && (
                 <AttachmentButton
                   projectId={activeProjectId}
-                  disabled={sendingMessage}
+                  disabled={composerDisabled}
                   onAttached={(att) => setAttachments((prev) => [...prev, att])}
                 />
               )}
@@ -750,9 +801,9 @@ export default function ConversationPage() {
               <button
                 className={styles.sendBtn}
                 type="submit"
-                disabled={(!input.trim() && attachments.length === 0) || sendingMessage}
+                disabled={(!input.trim() && attachments.length === 0) || composerDisabled}
               >
-                {sendingMessage ? '…' : '发送'}
+                {sendingMessage || sendingMemberDiscussion ? '…' : '发送'}
               </button>
             </div>
             {sendError && <p className={styles.sendError}>{sendError}</p>}
@@ -802,10 +853,12 @@ export default function ConversationPage() {
             <p className={styles.sideHint}>{spaceError}</p>
           )}
           {activeProjectId && panelMembers.length > 0 && (
-            <MemberSearch
-              members={panelMembers}
-              onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
-              placeholder={activeChannel ? '搜索频道成员' : '搜索项目成员'}
+              <MemberSearch
+                members={panelMembers}
+                onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
+                onOpenConversations={openMemberConversations}
+                activeConversationMemberId={isAssistingMember ? activeConversationTargetId : null}
+                placeholder={activeChannel ? '搜索频道成员' : '搜索项目成员'}
               channelId={activeChannelId ?? undefined}
             />
           )}

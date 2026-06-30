@@ -528,7 +528,37 @@
   min-height: 44px;
   transition: background 0.1s;
 }
-.memberItem:hover { background: #2b2e34; }
+.memberItem:hover,
+.memberItemActive { background: #2b2e34; }
+.memberItemActive {
+  box-shadow: inset 3px 0 0 rgba(88, 101, 242, .9);
+}
+.memberAvatarButton,
+.memberInfoButton {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.memberAvatarButton {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+}
+.memberAvatarButton:focus-visible,
+.memberInfoButton:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+.memberInfoButton {
+  width: 100%;
+  display: block;
+}
 .memberAvatar {
   width: 32px;
   height: 32px;

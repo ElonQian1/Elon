@@ -127,11 +127,15 @@ function filterVisibleMembers(members: ProjectMember[], query: string) {
 export function MemberSearch({
   members,
   onSelect,
+  onOpenConversations,
+  activeConversationMemberId,
   placeholder,
   channelId,
 }: {
   members: ProjectMember[]
   onSelect: (member: ProjectMember, y: number) => void
+  onOpenConversations?: (member: ProjectMember) => void
+  activeConversationMemberId?: string | null
   placeholder: string
   channelId?: string
 }) {
@@ -170,7 +174,16 @@ export function MemberSearch({
             <div style={{ transform: `translateY(${start * MEMBER_VIRTUAL_ROW_HEIGHT}px)` }}>
               {visibleRows.map(row => row.kind === 'header'
                 ? <div key={row.id} className={styles.memberVirtualHeader}><div className={styles.memberSection}>{row.label} · {row.count}</div></div>
-                : <MemberListItem key={row.id} member={row.member} onSelect={onSelect} channelId={channelId} />
+                : (
+                  <MemberListItem
+                    key={row.id}
+                    member={row.member}
+                    onSelect={onSelect}
+                    onOpenConversations={onOpenConversations}
+                    activeConversationMemberId={activeConversationMemberId}
+                    channelId={channelId}
+                  />
+                )
               )}
             </div>
           </div>
@@ -184,10 +197,14 @@ export function MemberSearch({
 function MemberListItem({
   member,
   onSelect,
+  onOpenConversations,
+  activeConversationMemberId,
   channelId,
 }: {
   member: ProjectMember
   onSelect: (member: ProjectMember, y: number) => void
+  onOpenConversations?: (member: ProjectMember) => void
+  activeConversationMemberId?: string | null
   channelId?: string
 }) {
   const roleKey = memberPrimaryRoleKey(member)
@@ -198,25 +215,37 @@ function MemberListItem({
     memberAvatarRoleClass(roleKey),
     member.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline,
   ].filter(Boolean).join(' ')
+  const active = activeConversationMemberId === member.user_id
+  function openProfile(e: React.MouseEvent<HTMLElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    onSelect(member, rect.top + rect.height / 2)
+  }
   return (
-    <button className={styles.memberItem} type="button" onClick={(e) => {
-      const rect = e.currentTarget.getBoundingClientRect()
-      onSelect(member, rect.top + rect.height / 2)
-    }}>
-      <div className={avatarCls}>
-        {member.avatar_data_url
-          ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
-          : name[0].toUpperCase()
-        }
-      </div>
-      <div className={styles.memberCopy}>
-        <div className={styles.memberLine}>
-          <strong className={styles.memberItemName}>{name}</strong>
-          {roleBadge && <em className={[styles.memberRolePill, memberRolePillClass(roleKey)].join(' ')}>{roleBadge}</em>}
-        </div>
-        <span className={styles.memberSub}>{memberChannelSubtitle(member, channelId)}</span>
-      </div>
-    </button>
+    <div className={[styles.memberItem, active ? styles.memberItemActive : ''].join(' ')}>
+      <button
+        className={styles.memberAvatarButton}
+        type="button"
+        onClick={() => onOpenConversations?.(member)}
+        title={`查看 ${name} 的项目会话`}
+        aria-label={`查看 ${name} 的项目会话`}
+      >
+        <span className={avatarCls}>
+          {member.avatar_data_url
+            ? <img src={member.avatar_data_url} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', display: 'block' }} />
+            : name[0].toUpperCase()
+          }
+        </span>
+      </button>
+      <button className={styles.memberInfoButton} type="button" onClick={openProfile}>
+        <span className={styles.memberCopy}>
+          <span className={styles.memberLine}>
+            <strong className={styles.memberItemName}>{name}</strong>
+            {roleBadge && <em className={[styles.memberRolePill, memberRolePillClass(roleKey)].join(' ')}>{roleBadge}</em>}
+          </span>
+          <span className={styles.memberSub}>{memberChannelSubtitle(member, channelId)}</span>
+        </span>
+      </button>
+    </div>
   )
 }
 

@@ -26,20 +26,29 @@ export function MessageItem({ message, isDevChannel, taskContext, user, onCancel
     )
   }
 
-  const isUser = kind === 'user' || kind === 'human'
-  const isAi = !isUser
+  const isUserRole = kind === 'user' || kind === 'human' || kind === 'discussion'
+  const isOwn = typeof message.outgoing === 'boolean' ? message.outgoing : isUserRole
+  const isAi = !isUserRole
   const content = clean(message.content ?? message.text ?? '')
   const time = message.created_at ? formatTime(message.created_at) : ''
-  const displayName = isUser ? (user?.nickname ?? user?.account ?? '我') : 'AI'
+  const senderName = clean(
+    message.sender_name
+      ?? (message as Record<string, unknown>).senderName
+      ?? (message as Record<string, unknown>).sender_account
+      ?? '',
+  )
+  const displayName = isUserRole
+    ? senderName || (isOwn ? (user?.nickname ?? user?.account ?? '我') : '成员')
+    : 'AI'
 
   // AI 消息：检测是否含 Markdown 特征，有则渲染 Markdown
   const hasMarkdown = isAi && /[#*`\[\]>|]/.test(content)
 
   return (
-    <div className={[styles.messageRow, isUser ? styles.ownRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
+    <div className={[styles.messageRow, isOwn ? styles.ownRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
       <div className={styles.messageAvatar}>
-        {isUser
-          ? ((user?.nickname ?? user?.account)?.[0]?.toUpperCase() ?? '我')
+        {isUserRole
+          ? (displayName[0]?.toUpperCase() ?? '我')
           : 'AI'}
       </div>
       <div className={styles.messageBody}>
