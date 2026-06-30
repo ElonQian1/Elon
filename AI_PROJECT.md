@@ -4,7 +4,9 @@
 
 ## 项目是什么
 
-elon 是一个云端 APK 开发平台。用户在手机 APK 里用自然语言描述需求，后端把任务交给 AI CLI/Codex/Copilot 等代理，在真实 Git 工作区修改代码、验证、构建、发布，再把结果回传给用户。
+elon 是一个通过持续讨论把模糊想法变成可交付应用的 AI 开发平台。用户在手机 APK 或 PC 工作台里描述目标，一龙 AI 先帮助用户澄清产品方向；对不确定性较高的需求，可由低成本“预言家 AI（Demo Oracle）”生成可讨论的 demo、页面草图或交互预演。方向确认后，总调度 AI 再从平台的 AI-to-AI Skill 能力库中选择和组合合适 Skill，把任务交给 AI CLI/Codex/Copilot 等代理，在真实 Git 工作区修改代码、验证、构建、发布，最后把 APK、项目或其他产物回传给用户。
+
+这里的 Skill 主要面向 AI 调用，而不是要求普通用户手动挑选提示词。用户负责表达目标和判断 demo 是否符合预期；总调度 AI 负责需求理解、Skill 路由、Matter 计划、执行编排和验收汇报。
 
 本仓库同时包含：
 
@@ -13,6 +15,24 @@ elon 是一个云端 APK 开发平台。用户在手机 APK 里用自然语言�
 - `scripts/`：后端发布、APK 发布、预检、worktree 清理等自动化脚本。
 - `default-project-docs/`：给用户新项目种下的 AI 工作入口和默认规则模板。
 - `.github/`：本仓库 AI 代理的规则权威、专项 instructions、skills。
+
+## 产品演进方向
+
+当前长期产品链路定义为：
+
+```text
+用户讨论需求
+  -> 一龙 AI 持续澄清目标
+  -> 预言家 AI 低成本生成 demo（按不确定性触发）
+  -> 用户确认、修改或放弃方向
+  -> 总调度 AI 生成 Matter 并选择 AI-to-AI Skill
+  -> Skill Agent / Worker Bot 在隔离工作区执行
+  -> Reviewer / Verifier 验收
+  -> 构建、发布和分发
+  -> 将成功流程、偏好和质量数据沉淀为 Context / Taste / Skill
+```
+
+短期先验证“官方 Skill + 预言家 demo + Matter 执行”的闭环，不急于开放交易市场。长期再把 Skill 做成可发布、可审核、可计费、可组合、可升级的能力仓库，并把生成的应用接入版本分发和二次创作体系。详细路线见 `docs/ai-to-ai-skill-oracle-roadmap.md`。
 
 ## 当前项目理解能力
 

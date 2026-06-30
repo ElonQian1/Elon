@@ -6,6 +6,8 @@
 
 本模块把分流规则集中在 `server/src/intent_router.rs`，避免在 Web、APK、项目会话、CLI fallback 等不同路径里重复写关键词判断。
 
+长期上，能力路由不只区分聊天和代码开发，还要识别用户当前处于“产品讨论、demo 预演、Skill 规划、正式开发、验收发布”中的哪个阶段。现有 `intent_router` 继续承担安全分流；总调度 AI 在其后负责需求成熟度判断和 Skill 选择，不能让低成本分类模型直接获得写代码或发布权限。
+
 ## 当前能力矩阵
 
 | 能力路线 | 代码枚举 | 主要执行者 | 适合请求 |
@@ -13,6 +15,18 @@
 | 普通聊天 | `CapabilityRoute::ChatAgent` | Codex CLI only（当前测试期强制） | 闲聊、解释、配置问题、模型选择说明 |
 | 代码/项目开发 | `CapabilityRoute::CodeAgent` | Codex CLI only（当前测试期强制） | App、Web、服务端、APK、部署、修复、重构 |
 | 图片处理（测试期） | `CapabilityRoute::CodeAgent` | Codex CLI only | “画一张图”“生成头像/海报/壁纸”“生成 App 图标并替换” |
+
+## 目标能力阶段
+
+| 产品阶段 | 主要执行者 | 目的 | 默认副作用 |
+| --- | --- | --- | --- |
+| `ProductDiscussion` | 一龙会话主 AI | 通过讨论澄清用户、场景、目标和约束 | 无 |
+| `DemoPreview` | 预言家 AI / Demo Oracle | 用低成本生成静态 demo、草图、流程和待确认问题 | 只写临时 demo 空间 |
+| `SkillPlanning` | 总调度 AI + Skill Router | 选择 Skill 组合，生成 Matter、预算、风险和验收标准 | 无正式代码写入 |
+| `FormalDevelopment` | Skill Agent / Worker Bot | 在隔离 worktree 中实现正式功能 | 受审批的代码修改 |
+| `ReviewAndRelease` | Reviewer / Verifier + 人类决策者 | 审查、构建、发布和分发 | 受审批的合并/发布 |
+
+这些是产品目标阶段，不表示当前代码枚举已经全部实现。MVP 应先在现有 `ChatAgent -> CodeAgent` 之间增加可选的 `DemoPreview` 和 `SkillPlanning`，并保持小改动可以直接进入正式开发。
 
 ## 意图类型
 
@@ -59,6 +73,8 @@
 2. 当置信度低于阈值，例如 `< 70`，再调用低价分类模型。
 3. 分类模型只输出结构化 JSON，不直接决定执行。
 4. 服务端再用能力矩阵做最终校验，防止模型把不能执行的能力误分出去。
+
+预言家 AI 可以复用低价模型，但它不是纯分类器。分类器只回答“当前属于什么阶段”；预言家 AI 要基于总调度 AI 的需求摘要生成可讨论 demo。两者都不能绕过确定性安全规则、项目权限和 Matter 审批。
 
 建议 JSON 结构：
 

@@ -7,6 +7,10 @@
 ```text
 Android APK / Web UI
   -> Rust API server
+  -> Intent Router / Conversation Owner
+  -> Demo Oracle（低成本产品预演，按需触发）
+  -> Group AI Coordinator / Matter Planner
+  -> AI-to-AI Skill Router / Skill Registry
   -> AI CLI / API agent routing
   -> Project workspace / Git worktree
   -> Context compiler / repo map / symbol index
@@ -15,13 +19,17 @@ Android APK / Web UI
 
 ## 运行时主链路
 
-1. 用户在 APK 或 Web 里输入自然语言需求。
-2. 后端识别项目、用户、会话和模型配置。
-3. AI CLI 或 API agent 在真实 Git 工作区执行任务。
-4. context compiler 为 AI 生成 repo map、symbol index、task pack 和验证线索。
-5. AI 修改代码后执行最小有效验证。
-6. 业务提交进入 `origin/main`。
-7. 后端或 APK 发布脚本按需构建、上传、部署和验证。
+1. 用户在 APK 或 Web 里通过多轮讨论表达自然语言需求。
+2. 后端识别项目、用户、会话、模型配置以及需求成熟度。
+3. 对目标仍不清晰、改动成本高或存在多个产品方向的需求，调用预言家 AI 生成低成本 demo、页面草图、用户流程和待确认问题；明确的小改动跳过该阶段。
+4. 用户确认方向后，Group AI Coordinator 生成 Matter，Skill Router 从官方或已审核 Skill 中选择能力组合，并说明选择理由、成本和风险。
+5. AI CLI、API agent 或 Worker Bot 在真实 Git 隔离工作区执行任务。
+6. context compiler 为不同角色生成裁剪后的 repo map、symbol index、task pack 和验证线索。
+7. AI 修改代码后由 Reviewer / Verifier 执行最小有效验证和独立审查。
+8. 业务提交进入目标项目 Git 历史，再由后端或 APK 发布脚本按需构建、上传、部署和验证。
+9. 运行结果、用户验收和失败原因沉淀为 Context、Taste、Skill 质量数据。
+
+预言家 AI 不是正式开发者，也不拥有发布权限。它默认使用低成本模型和受限工具，只允许生成临时 demo 产物；不得直接修改正式项目主线、接入真实支付、执行生产部署或把假数据包装成已完成能力。
 
 ## 项目理解 / RAG 架构
 

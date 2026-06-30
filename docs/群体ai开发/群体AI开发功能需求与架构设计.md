@@ -71,7 +71,9 @@ MVP 可以限制在“同一个项目内的成员和他们授权的节点”，�
 | Matter | Project AI Matter | 从讨论转成可执行事项，有发起人、负责人、参与 Bot、产物、验收标准和状态 |
 | Context | Project Context Pack | 项目文档、repo map、符号索引、历史决策和任务相关文件 |
 | Taste | Project / User Preference | 项目成员验收、打回理由、风格偏好、架构偏好 |
-| Skill | Reusable Task Skill | 可复用的任务模板、测试清单、发布清单、项目规范 |
+| Skill | AI-to-AI Skill Package | 面向总调度 AI 和 Worker Bot 的机器可读能力包，声明适用意图、输入输出、权限、成本、测试和兼容性 |
+| Demo Oracle | 预言家 AI / Demo Oracle | 在正式 Matter 和 Skill 执行前，用低成本把模糊需求生成可讨论 demo、草图和用户流程 |
+| Skill Router | Skill Router | 根据需求、项目上下文、成功率、成本、风险和兼容性选择 Skill 组合 |
 | Orchestration | Group AI Coordinator | 负责任务拆解、派发、审核、合并、验收汇报 |
 
 ## 4. 功能需求
@@ -218,7 +220,48 @@ ELON_NODE_WORKSPACE_ROOT/
 - Taste：不同项目成员喜欢或拒绝的实现风格、UI 风格、命名习惯、审核偏好。
 - Skill：可复用任务模板、测试清单、发布清单、项目专属 agent 指令。
 
-MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再独立做 `project_ai_preferences` 和 `project_ai_skills`。
+MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再独立做 `project_ai_preferences` 和 `project_ai_skills`。项目内沉淀的 Skill 经过脱敏、测试、权限审计和作者确认后，才允许升级为平台 Skill；不能自动把用户私有项目经验公开到市场。
+
+### R9. 预言家 AI 与 demo 预演
+
+当用户需求仍处于讨论阶段、存在多个方向、正式开发成本较高或用户明确要求先看效果时，总调度 AI 应先调用预言家 AI，而不是直接创建重型开发任务。
+
+预言家 AI 的输入：
+
+- 总调度 AI 整理后的产品目标、目标用户、核心场景和不确定点。
+- 当前项目已有页面、设计规范和可复用组件摘要。
+- 可用官方 Skill 的能力摘要，仅用于提出后续建议，不直接执行正式 Skill。
+- 本轮 demo 的预算、时间、允许产物类型和禁止事项。
+
+预言家 AI 的输出：
+
+- 一句话产品定位和核心用户流程。
+- 3 至 5 个关键页面或状态。
+- 静态 HTML/前端 mock、截图式草图、流程图或可点击轻原型之一。
+- 假数据和未实现能力的明确标记。
+- 需要用户确认的问题。
+- 建议的 Skill 候选、选择理由和预计成本区间。
+
+硬边界：
+
+1. demo 写入独立临时目录或 artifact，不进入项目正式分支。
+2. 默认不连接真实数据库、支付、生产密钥和外部用户数据。
+3. demo 通过不等于正式功能完成，用户确认后必须重新生成 Matter 和验收标准。
+4. 小范围、目标明确的修改可以跳过预言家 AI，避免增加等待和 token 成本。
+5. 预言家 AI 只提供可讨论证据，最终产品方向仍由用户决定。
+
+### R10. AI-to-AI Skill 路由
+
+Skill 由机器可读 manifest 和执行说明组成，至少声明：
+
+- Skill ID、版本、作者和兼容范围。
+- `intents`、`capabilities`、输入 schema、输出 artifact 类型。
+- 所需权限、允许工具、风险等级和数据边界。
+- 预计 token、节点、构建和第三方 API 成本。
+- 前置条件、冲突领域和可组合 Skill。
+- 验收标准、测试入口、历史成功率和失败原因。
+
+Skill Router 不能只按关键词匹配。推荐评分维度为：需求匹配、项目兼容、历史成功率、与其他 Skill 的冲突、预算、权限、节点可用性和风险。MVP 只路由官方 Skill，路由结果写入 Matter 并向用户解释“选择了什么、为什么、预计会产生什么结果”。
 
 ## 5. 架构设计
 
@@ -228,7 +271,10 @@ MVP 可以先写入项目作用域 `user_memories` 或项目文档；后续再�
 APK / PC 项目频道
   -> Rust API Server
   -> Group AI Coordinator
+       -> Product Discussion / Requirement Maturity
+       -> Demo Oracle（按需）
        -> Matter Planner
+       -> Skill Registry / Skill Router
        -> Member / Permission Resolver
        -> Node / Bot Selector
        -> Context Pack Builder
@@ -399,6 +445,16 @@ POST /api/project-worktrees/dispose
 - 明确群体 AI 开发只进入项目空间，不进入普通聊天。
 - 明确 Matter、Bot、协作模式、验收卡的产品语言。
 - 明确 PC 节点执行和 worktree 隔离是硬规则。
+- 明确一龙会话主 AI 是长期对话 owner；预言家 AI 和 Skill Agent 都是受限旁路角色。
+
+### 阶段 0.5：预言家 AI 与官方 Skill 试验
+
+- 定义 demo artifact 契约、临时存储位置、预算和安全边界。
+- 先支持静态 HTML 或现有前端组件组成的可点击 demo，不做真实后端。
+- 建立 3 至 5 个官方 Skill manifest，覆盖页面原型、项目初始化、UI 实现、测试和发布检查。
+- 让总调度 AI 输出需求成熟度，并决定跳过 demo、生成 demo 或继续讨论。
+- demo 经用户确认后再创建 Matter；记录确认、打回和放弃原因。
+- Skill Router 只给出官方 Skill 建议，不开放第三方交易。
 
 ### 阶段 1：单项目、多成员授权节点、多 Bot
 
@@ -443,6 +499,14 @@ POST /api/project-worktrees/dispose
 - 项目成员验收和打回理由结构化进入项目偏好。
 - 成功流程沉淀为项目 Skill。
 - 新 Bot 加入项目时自动读取项目 Taste / Skill。
+
+### 阶段 5：Skill 仓库与分发
+
+- 把验证通过的官方 Skill 升级为版本化 Skill Registry。
+- 增加安装、依赖、兼容性、安全审核、调用记录和质量评分。
+- 邀请制开放创作者提交，先审核后上架。
+- 支持按次、订阅或项目授权计费，模型/节点成本与 Skill 价值分开记录。
+- 长期将 Skill 生成的应用、模板和插件接入版本分发、更新和二次创作体系。
 
 ## 7. 权限、安全和成本
 
