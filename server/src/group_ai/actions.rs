@@ -9,10 +9,14 @@ pub(crate) use assignment_actions::{
 };
 
 use crate::{
-    group_ai::types::{
-        CreateMatterAssignmentRecord, ProjectAiEvent, ProjectAiMatter, ProjectAiMatterAssignment,
-        MATTER_STATUS_CANCELED, MATTER_STATUS_DONE, MATTER_STATUS_PLAN_READY,
-        MATTER_STATUS_RUNNING,
+    group_ai::{
+        learning::record_matter_decision_learning,
+        review_gate::{ensure_matter_acceptance_ready, review_gate_summary},
+        types::{
+            CreateMatterAssignmentRecord, ProjectAiEvent, ProjectAiMatter,
+            ProjectAiMatterAssignment, MATTER_STATUS_CANCELED, MATTER_STATUS_DONE,
+            MATTER_STATUS_PLAN_READY, MATTER_STATUS_RUNNING,
+        },
     },
     types::AppState,
 };
@@ -148,6 +152,7 @@ pub(crate) fn request_changes(
 ) -> Result<MatterDetail> {
     let matter = require_matter(state, project_id, matter_id)?;
     ensure_not_terminal(&matter)?;
+    let gate = review_gate_summary(state, project_id, matter_id).ok();
     state.store.update_project_ai_matter_status(
         project_id,
         matter_id,
@@ -163,6 +168,14 @@ pub(crate) fn request_changes(
         "changes_requested",
         json!({ "comment": clean_comment(comment) }),
     )?;
+    record_matter_decision_learning(
+        state,
+        &matter,
+        actor_user_id,
+        "changes_requested",
+        comment,
+        gate.as_ref(),
+    );
     write_channel_notice(
         state,
         &matter,
@@ -183,6 +196,7 @@ pub(crate) fn accept_matter(
     if matter.status == MATTER_STATUS_CANCELED {
         anyhow::bail!("已取消的 Matter 不能验收");
     }
+    let gate = ensure_matter_acceptance_ready(state, project_id, matter_id)?;
     state.store.update_project_ai_matter_status(
         project_id,
         matter_id,
@@ -196,8 +210,16 @@ pub(crate) fn accept_matter(
         matter_id,
         actor_user_id,
         "matter_accepted",
-        json!({ "comment": clean_comment(comment) }),
+        json!({ "comment": clean_comment(comment), "review_gate": &gate }),
     )?;
+    record_matter_decision_learning(
+        state,
+        &matter,
+        actor_user_id,
+        "accepted",
+        comment,
+        Some(&gate),
+    );
     write_channel_notice(state, &matter, actor_user_id, "群体 AI Matter 已验收完成。")?;
     require_detail(state, project_id, matter_id)
 }
@@ -267,7 +289,7 @@ fn assignment_records_from_plan(
         .and_then(Value::as_array)
         .ok_or_else(|| anyhow!("Matter 计划缺少 roles"))?;
     let mut records = Vec::new();
-    for role in roles {
+    for (index, role) in roles.iter().enumerate() {
         let role_name = string_field(role, "role").unwrap_or("parallel_worker");
         let bot_id = string_field(role, "bot_id").ok_or_else(|| anyhow!("计划角色缺少 bot_id"))?;
         let provider_user_id = string_field(role, "provider_user_id")
@@ -288,7 +310,18 @@ fn assignment_records_from_plan(
             runtime_route: runtime_route.to_string(),
             cli_name: cli_name.to_string(),
             worktree_path: None,
-            branch_name: Some(format!("group-ai/{}", matter.id)),
+            branch_name: Some(
+                string_field(role, "branch_name")
+                    .map(ToOwned::to_owned)
+                    .unwrap_or_else(|| {
+                        format!(
+                            "group-ai/{}-{}-{}",
+                            matter.id,
+                            index + 1,
+                            branch_slug(role_name)
+                        )
+                    }),
+            ),
             status: "planned".to_string(),
         });
     }
@@ -311,13 +344,22 @@ pub(super) fn write_event(
     event_type: &str,
     payload: Value,
 ) -> Result<ProjectAiEvent> {
-    state.store.insert_project_ai_event(
+    let event = state.store.insert_project_ai_event(
         project_id,
         matter_id,
         Some(actor_user_id),
         event_type,
         payload,
-    )
+    )?;
+    crate::project_events::publish_group_ai_matter_event(
+        state,
+        project_id,
+        matter_id,
+        Some(actor_user_id),
+        event_type,
+        "群体 AI Matter 状态已更新。",
+    );
+    Ok(event)
 }
 
 pub(super) fn write_channel_notice(
@@ -344,4 +386,26 @@ pub(super) fn clean_comment(value: Option<&str>) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
+}
+
+fn branch_slug(value: &str) -> String {
+    let slug = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('-')
+        .chars()
+        .take(32)
+        .collect::<String>();
+    if slug.is_empty() {
+        "worker".to_string()
+    } else {
+        slug
+    }
 }

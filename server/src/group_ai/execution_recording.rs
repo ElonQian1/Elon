@@ -25,6 +25,15 @@ pub(super) fn insert_event(
             event_type,
             "群体 AI 事件写入失败: {error:#}"
         );
+    } else {
+        crate::project_events::publish_group_ai_matter_event(
+            state,
+            &matter.project_id,
+            &matter.id,
+            actor_user_id,
+            event_type,
+            "群体 AI Matter 有新的执行事件。",
+        );
     }
 }
 

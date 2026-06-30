@@ -11,6 +11,10 @@ use crate::{
     group_ai::{
         artifacts::assignment_artifact,
         governance::matter_governance_summary,
+        merge_gate::{
+            apply_merge_request as apply_merge_request_action, check_merge_gate,
+            ApplyMergeRequestBody,
+        },
         permissions::{
             authenticate_project_member, ensure_can_decide_matter, ensure_can_operate_assignment,
         },
@@ -234,6 +238,73 @@ pub(crate) async fn update_merge_request(
     Json(json!({ "ok": true, "merge_request": merge_request })).into_response()
 }
 
+pub(crate) async fn check_merge_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, matter_id, merge_request_id)): Path<(String, String, String)>,
+) -> Response {
+    let (user, access) = match authenticate_project_member(&state, &headers, &project_id) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    let matter = match require_matter(&state, &project_id, &matter_id) {
+        Ok(matter) => matter,
+        Err(response) => return response,
+    };
+    if let Err(response) = ensure_can_decide_matter(&access, &user.id, &matter) {
+        return response;
+    }
+    match check_merge_gate(&state, &access, &project_id, &matter_id, &merge_request_id) {
+        Ok(report) => {
+            insert_event(
+                &state,
+                &matter,
+                &user.id,
+                "merge_gate_checked",
+                json!({
+                    "merge_request_id": merge_request_id,
+                    "can_apply": report.can_apply,
+                    "review_gate": &report.review_gate.status,
+                    "check_count": report.checks.len()
+                }),
+            );
+            Json(json!({ "ok": true, "merge_gate": report })).into_response()
+        }
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
+}
+
+pub(crate) async fn apply_merge_request(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((project_id, matter_id, merge_request_id)): Path<(String, String, String)>,
+    Json(req): Json<ApplyMergeRequestBody>,
+) -> Response {
+    let (user, access) = match authenticate_project_member(&state, &headers, &project_id) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    let matter = match require_matter(&state, &project_id, &matter_id) {
+        Ok(matter) => matter,
+        Err(response) => return response,
+    };
+    if let Err(response) = ensure_can_decide_matter(&access, &user.id, &matter) {
+        return response;
+    }
+    match apply_merge_request_action(
+        &state,
+        &access,
+        &project_id,
+        &matter_id,
+        &merge_request_id,
+        &user.id,
+        req,
+    ) {
+        Ok(report) => Json(json!({ "ok": true, "merge_apply": report })).into_response(),
+        Err(error) => json_error(StatusCode::BAD_REQUEST, error.to_string()),
+    }
+}
+
 fn assignment_context(
     state: &Arc<AppState>,
     headers: &HeaderMap,
@@ -295,6 +366,15 @@ fn insert_event(
             matter_id = matter.id,
             event_type,
             "群体 AI 治理事件写入失败: {error:#}"
+        );
+    } else {
+        crate::project_events::publish_group_ai_matter_event(
+            state,
+            &matter.project_id,
+            &matter.id,
+            Some(actor_user_id),
+            event_type,
+            "群体 AI 治理状态已更新。",
         );
     }
 }

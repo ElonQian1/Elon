@@ -1,4 +1,7 @@
-use crate::group_ai::types::{ProjectAiMatter, ProjectAiMatterAssignment};
+use crate::group_ai::{
+    context_policy::assignment_context_policy,
+    types::{ProjectAiMatter, ProjectAiMatterAssignment},
+};
 
 pub(crate) fn build_assignment_execution_prompt(
     matter: &ProjectAiMatter,
@@ -23,6 +26,9 @@ pub(crate) fn build_assignment_execution_prompt(
         .filter(|value| !value.trim().is_empty())
         .unwrap_or("由节点运行时创建或复用当前工作区");
     let role_guidance = role_guidance(&assignment.role);
+    let context_policy = assignment_context_policy(matter, assignment);
+    let context_policy_json =
+        serde_json::to_string_pretty(&context_policy).unwrap_or_else(|_| "{}".to_string());
 
     format!(
         r#"你正在执行「一龙」群体 AI 开发中的一个 Assignment。你是多个用户、多个 PC 节点、多种 AI 共同开发流程里的执行节点之一。
@@ -47,12 +53,16 @@ Assignment:
 角色重点:
 {role_guidance}
 
+上下文与文件所有权:
+{context_policy_json}
+
 执行要求:
 1. 只围绕本 Assignment 的角色和 Matter 需求工作，避免无关重构。
-2. 可以修改代码、补测试、运行必要验证；不要 push、不要部署、不要发布 APK。
-3. 如果运行时已经给你隔离 worktree/branch，在其中完成改动；否则保留在当前工作区，并在结果里说明。
-4. 结束时必须输出：改动摘要、关键文件、验证命令和结果、风险、需要人工合并/审核的点。
-5. 如果无法执行，明确说明阻塞原因和下一步需要谁处理。
+2. 只修改 owned_paths 覆盖的模块；确需跨区修改时在结果中声明原因，不要直接扩大范围。
+3. 可以修改代码、补测试、运行必要验证；不要 push、不要部署、不要发布 APK。
+4. 如果运行时已经给你隔离 worktree/branch，在其中完成改动；否则保留在当前工作区，并在结果里说明。
+5. 结束时必须输出：改动摘要、关键文件、验证命令和结果、风险、需要人工合并/审核的点。
+6. 如果无法执行，明确说明阻塞原因和下一步需要谁处理。
 "#,
         title = matter.title,
         mode = matter.collaboration_mode,

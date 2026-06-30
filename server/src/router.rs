@@ -530,6 +530,14 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             post(group_ai::governance_api::update_merge_request),
         )
         .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/merge-requests/:merge_request_id/check",
+            post(group_ai::governance_api::check_merge_request),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id/merge-requests/:merge_request_id/apply",
+            post(group_ai::governance_api::apply_merge_request),
+        )
+        .route(
             "/api/projects/:project_id/ai/matters/:matter_id/request-changes",
             post(group_ai::api::request_matter_changes),
         )

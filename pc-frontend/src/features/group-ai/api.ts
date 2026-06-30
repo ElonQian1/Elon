@@ -12,9 +12,12 @@ import type {
   MatterAutomationAction,
   MatterDetailResponse,
   MatterEventsDeltaResponse,
+  MergeApplyResponse,
+  MergeGateResponse,
   MergeRequestResponse,
   MattersResponse,
   NodesResponse,
+  ApplyMergeRequestPayload,
   UpdateMergeRequestPayload,
 } from './types'
 
@@ -142,6 +145,35 @@ export async function updateMatterMergeRequest(
     projectPath(
       projectId,
       `matters/${encodeURIComponent(matterId)}/merge-requests/${encodeURIComponent(mergeRequestId)}`,
+    ),
+    payload,
+  )
+}
+
+export async function checkMatterMergeRequest(
+  projectId: string,
+  matterId: string,
+  mergeRequestId: string,
+) {
+  return api.post<MergeGateResponse>(
+    projectPath(
+      projectId,
+      `matters/${encodeURIComponent(matterId)}/merge-requests/${encodeURIComponent(mergeRequestId)}/check`,
+    ),
+    {},
+  )
+}
+
+export async function applyMatterMergeRequest(
+  projectId: string,
+  matterId: string,
+  mergeRequestId: string,
+  payload: ApplyMergeRequestPayload = {},
+) {
+  return api.post<MergeApplyResponse>(
+    projectPath(
+      projectId,
+      `matters/${encodeURIComponent(matterId)}/merge-requests/${encodeURIComponent(mergeRequestId)}/apply`,
     ),
     payload,
   )

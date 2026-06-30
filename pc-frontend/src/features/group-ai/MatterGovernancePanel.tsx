@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { AlertTriangle, Check, GitMerge, Network, RefreshCw, ShieldCheck, Wallet, X } from 'lucide-react'
 import { loadMatterGovernance, updateMatterMergeRequest } from './api'
+import MergeGatePanel from './MergeGatePanel'
 import type { MatterGovernanceSummary, ProjectAiMergeRequest, ProjectAiReview } from './types'
 import styles from './MatterGovernancePanel.module.css'
 
@@ -84,7 +85,10 @@ export default function MatterGovernancePanel({ projectId, matterId, refreshKey 
           <ReviewList reviews={governance.reviews} />
           <MergeQueue
             busy={busy}
+            matterId={matterId}
+            onChanged={() => void refresh()}
             requests={governance.merge_requests}
+            projectId={projectId}
             onStatus={(request, status) => void setMergeStatus(request, status)}
           />
         </div>
@@ -97,19 +101,24 @@ export default function MatterGovernancePanel({ projectId, matterId, refreshKey 
 
 function SummaryStrip({ governance }: { governance: MatterGovernanceSummary }) {
   const warnings = [...governance.policy.warnings, ...governance.budget.warnings]
+  const budgetMax = governance.budget.max_billed_cost_rmb_fen
+  const budgetDetail =
+    typeof budgetMax === 'number'
+      ? `${governance.budget.remaining_billed_cost_rmb_fen ?? 0} 分剩余`
+      : `${governance.budget.compute_call_count} 次调用`
   return (
     <div className={styles.summaryGrid}>
       <Metric
         icon={<Wallet size={15} />}
         label="预算"
         value={`${governance.budget.billed_cost_rmb_fen} 分`}
-        detail={`${governance.budget.compute_call_count} 次调用`}
+        detail={budgetDetail}
       />
       <Metric
         icon={<ShieldCheck size={15} />}
-        label="权限"
-        value={`${governance.policy.permission_levels.length || 0} 档`}
-        detail={governance.policy.allowed_clis.join(', ') || '未限制 CLI'}
+        label="门禁"
+        value={governance.review_gate.status}
+        detail={`${governance.review_gate.passed_reviews} 通过 · ${governance.review_gate.blockers.length} 阻塞`}
       />
       <Metric
         icon={<AlertTriangle size={15} />}
@@ -159,13 +168,19 @@ function ReviewList({ reviews }: { reviews: ProjectAiReview[] }) {
 }
 
 function MergeQueue({
+  projectId,
+  matterId,
   requests,
   busy,
   onStatus,
+  onChanged,
 }: {
+  projectId: string
+  matterId: string
   requests: ProjectAiMergeRequest[]
   busy: string
   onStatus: (request: ProjectAiMergeRequest, status: string) => void
+  onChanged: () => void
 }) {
   return (
     <div className={styles.block}>
@@ -187,13 +202,6 @@ function MergeQueue({
               onClick={() => onStatus(request, 'approved')}
             />
             <QueueButton
-              busy={busy === `${request.id}:merged`}
-              disabled={request.status === 'merged'}
-              icon={<GitMerge size={13} />}
-              label="已合并"
-              onClick={() => onStatus(request, 'merged')}
-            />
-            <QueueButton
               busy={busy === `${request.id}:rejected`}
               disabled={request.status === 'rejected'}
               icon={<X size={13} />}
@@ -201,6 +209,12 @@ function MergeQueue({
               onClick={() => onStatus(request, 'rejected')}
             />
           </div>
+          <MergeGatePanel
+            matterId={matterId}
+            onChanged={onChanged}
+            projectId={projectId}
+            request={request}
+          />
         </div>
       ))}
       {!requests.length && <div className={styles.empty}>暂无待合并产物</div>}

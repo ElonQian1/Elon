@@ -1,8 +1,12 @@
 use serde_json::{json, Value};
 use std::collections::BTreeSet;
 
-use crate::group_ai::types::{
-    CreateMatterPlanRequest, ProjectAiBot, COLLAB_MODE_CRITIC, COLLAB_MODE_SOLO, COLLAB_MODE_SPLIT,
+use crate::group_ai::{
+    context_policy::{plan_ownership, verification_commands},
+    types::{
+        CreateMatterPlanRequest, ProjectAiBot, COLLAB_MODE_CRITIC, COLLAB_MODE_SOLO,
+        COLLAB_MODE_SPLIT,
+    },
 };
 
 pub(crate) struct MatterPlanDraft {
@@ -28,6 +32,9 @@ pub(crate) fn build_matter_plan(
     let title = clean_title(request.title.as_deref(), &request.brief);
     let participant_user_ids =
         participant_user_ids(requester_user_id, selected_bots.iter().copied());
+    let ownership = plan_ownership(&collaboration_mode, &request.brief, &selected_bots);
+    let verification_commands = verification_commands(&request.brief);
+    let requires_review_gate = collaboration_mode != COLLAB_MODE_SOLO;
     let warnings = if selected_bots.is_empty() {
         vec!["当前项目还没有可用的授权 AI Bot，Matter 只会保存计划。"]
     } else {
@@ -45,12 +52,27 @@ pub(crate) fn build_matter_plan(
             "dispatch_state": "not_dispatched",
             "authorized_bot_count": bots.len(),
             "selected_bot_count": selected_bots.len(),
+            "budget": {
+                "max_billed_cost_rmb_fen": null,
+                "pause_on_budget_exceeded": true
+            },
+            "merge_policy": {
+                "requires_human_merge": true,
+                "requires_review_gate": requires_review_gate
+            },
         }),
         plan_json: json!({
             "schema_version": 1,
             "collaboration_mode": collaboration_mode,
             "brief": request.brief.trim(),
             "roles": plan_roles(&selected_bots),
+            "ownership": ownership,
+            "verification_commands": verification_commands,
+            "merge_policy": {
+                "requires_human_merge": true,
+                "requires_review_gate": requires_review_gate,
+                "acceptance_requires_empty_merge_queue": true
+            },
             "steps": [
                 "梳理需求、上下文、风险与验收条件",
                 "由实现 Bot 在隔离工作区完成实现并输出 diff 与验证命令",

@@ -54,6 +54,7 @@ async fn handle(
     let mut friend_rx = crate::friend_events::subscribe();
     let mut group_rx = crate::friend_events::subscribe_groups();
     let mut project_task_rx = crate::project_events::subscribe();
+    let mut project_ai_rx = crate::project_events::subscribe_group_ai();
     let mut presence_rx = crate::presence_events::subscribe();
     let mut typing_rx = crate::typing_events::subscribe();
     let mut billing_rx = crate::billing_events::subscribe();
@@ -121,6 +122,18 @@ async fn handle(
                         if tx.send(Message::Text(payload)).await.is_err() { break; }
                     }
                     Err(RecvError::Lagged(_)) => { /* 项目列表刷新时可服主务器查最新状态 */ }
+                    _ => {}
+                }
+            }
+            msg = project_ai_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) if authenticated_user_id
+                        .as_ref()
+                        .is_some_and(|uid| event.member_user_ids.iter().any(|id| id == uid)) => {
+                        let Some(payload) = event.to_json() else { continue; };
+                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                    }
+                    Err(RecvError::Lagged(_)) => {}
                     _ => {}
                 }
             }

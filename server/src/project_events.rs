@@ -18,6 +18,11 @@ static PROJECT_TASK_DONE_TX: LazyLock<broadcast::Sender<ProjectTaskDoneEvent>> =
         let (tx, _) = broadcast::channel(64);
         tx
     });
+static PROJECT_AI_MATTER_TX: LazyLock<broadcast::Sender<ProjectAiMatterEvent>> =
+    LazyLock::new(|| {
+        let (tx, _) = broadcast::channel(128);
+        tx
+    });
 
 /// 项目任务完成推送事件。
 ///
@@ -43,7 +48,30 @@ pub struct ProjectTaskDoneEvent {
     pub member_user_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectAiMatterEvent {
+    #[serde(rename = "type")]
+    pub event_type: &'static str,
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "matterId")]
+    pub matter_id: String,
+    #[serde(rename = "matterEventType")]
+    pub matter_event_type: String,
+    #[serde(rename = "triggeredByUserId", skip_serializing_if = "Option::is_none")]
+    pub triggered_by_user_id: Option<String>,
+    pub message: String,
+    #[serde(skip)]
+    pub member_user_ids: Vec<String>,
+}
+
 impl ProjectTaskDoneEvent {
+    pub fn to_json(&self) -> Option<String> {
+        serde_json::to_string(self).ok()
+    }
+}
+
+impl ProjectAiMatterEvent {
     pub fn to_json(&self) -> Option<String> {
         serde_json::to_string(self).ok()
     }
@@ -51,6 +79,10 @@ impl ProjectTaskDoneEvent {
 
 pub fn subscribe() -> broadcast::Receiver<ProjectTaskDoneEvent> {
     PROJECT_TASK_DONE_TX.subscribe()
+}
+
+pub fn subscribe_group_ai() -> broadcast::Receiver<ProjectAiMatterEvent> {
+    PROJECT_AI_MATTER_TX.subscribe()
 }
 
 /// 广播项目任务完成事件给所有在线项目成员。
@@ -102,4 +134,34 @@ pub fn publish_task_done(
         member_user_ids: member_ids,
     };
     let _ = PROJECT_TASK_DONE_TX.send(event);
+}
+
+pub fn publish_group_ai_matter_event(
+    state: &AppState,
+    project_id: &str,
+    matter_id: &str,
+    triggered_by_user_id: Option<&str>,
+    matter_event_type: &str,
+    message: &str,
+) {
+    let member_ids = state
+        .store
+        .list_project_members(project_id)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|member| member.user_id)
+        .collect::<Vec<_>>();
+    if member_ids.is_empty() {
+        return;
+    }
+    let event = ProjectAiMatterEvent {
+        event_type: "project_ai_matter_event",
+        project_id: project_id.to_string(),
+        matter_id: matter_id.to_string(),
+        matter_event_type: matter_event_type.chars().take(80).collect(),
+        triggered_by_user_id: triggered_by_user_id.map(ToOwned::to_owned),
+        message: message.chars().take(240).collect(),
+        member_user_ids: member_ids,
+    };
+    let _ = PROJECT_AI_MATTER_TX.send(event);
 }

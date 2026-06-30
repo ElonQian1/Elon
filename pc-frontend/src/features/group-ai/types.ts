@@ -163,13 +163,53 @@ export interface MatterBudgetSummary {
   status: string
   compute_call_count: number
   billed_cost_rmb_fen: number
+  max_billed_cost_rmb_fen?: number | null
+  remaining_billed_cost_rmb_fen?: number | null
   provider_earned_fen: number
   warnings: string[]
+}
+
+export interface ReviewGateSummary {
+  status: string
+  passed_reviews: number
+  blocking_reviews: number
+  pending_merge_requests: number
+  unfinished_assignments: number
+  blockers: string[]
+  warnings: string[]
+}
+
+export interface MergeGateCheck {
+  name: string
+  status: string
+  detail: string
+  output: string[]
+}
+
+export interface MergeGateReport {
+  merge_request: ProjectAiMergeRequest
+  review_gate: ReviewGateSummary
+  target_workspace_path?: string | null
+  source_worktree_path?: string | null
+  source_ref?: string | null
+  can_apply: boolean
+  checks: MergeGateCheck[]
+  verification_commands: string[]
+  warnings: string[]
+}
+
+export interface MergeApplyReport {
+  merge_request: ProjectAiMergeRequest
+  gate: MergeGateReport
+  commit_sha?: string | null
+  verification_results: MergeGateCheck[]
+  message: string
 }
 
 export interface MatterGovernanceSummary {
   reviews: ProjectAiReview[]
   merge_requests: ProjectAiMergeRequest[]
+  review_gate: ReviewGateSummary
   task_graph: MatterTaskGraph
   policy: MatterPolicySummary
   budget: MatterBudgetSummary
@@ -321,6 +361,21 @@ export interface UpdateMergeRequestPayload {
 export interface MergeRequestResponse {
   ok: boolean
   merge_request: ProjectAiMergeRequest
+}
+
+export interface MergeGateResponse {
+  ok: boolean
+  merge_gate: MergeGateReport
+}
+
+export interface MergeApplyResponse {
+  ok: boolean
+  merge_apply: MergeApplyReport
+}
+
+export interface ApplyMergeRequestPayload {
+  commitMessage?: string
+  verificationCommands?: string[]
 }
 
 export interface NodesResponse {

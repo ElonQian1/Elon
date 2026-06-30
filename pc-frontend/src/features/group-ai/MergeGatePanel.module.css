@@ -1,0 +1,96 @@
+.panel {
+  display: grid;
+  gap: 7px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  background: #262a31;
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.actions button:disabled {
+  cursor: not-allowed;
+  opacity: .54;
+}
+
+.error,
+.blocker {
+  margin: 0;
+  color: #ffc6c6;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.result {
+  display: grid;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.gateState {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.gateState[data-state='passed'] {
+  color: #9ee9bd;
+}
+
+.gateState[data-state='blocked'] {
+  color: #ffc6c6;
+}
+
+.gateState span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.checks span {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, .06);
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.checks span[data-state='passed'] {
+  color: #9ee9bd;
+}
+
+.checks span[data-state='failed'] {
+  color: #ffc6c6;
+}
+
+.result small {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

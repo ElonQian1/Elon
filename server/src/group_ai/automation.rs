@@ -8,6 +8,7 @@ use crate::{
         actions::{matter_detail, start_matter, MatterDetail},
         execution_recording::insert_event,
         executor::{assignment_can_be_dispatched, schedule_assignment_run},
+        governance::budget_dispatch_blocker,
         types::{
             CreateMatterAssignmentRecord, ProjectAiBot, ProjectAiMatterAssignment,
             MATTER_STATUS_CANCELED, MATTER_STATUS_DONE, MATTER_STATUS_PLAN_READY,
@@ -47,6 +48,7 @@ pub(crate) fn schedule_matter_assignments(
         actor_user_id,
         comment.as_deref(),
     )?;
+    ensure_budget_allows_dispatch(&state, &detail, actor_user_id)?;
     let candidates = detail.assignments.clone();
     let mut scheduled_count = 0;
     let mut skipped_count = 0;
@@ -115,6 +117,7 @@ pub(crate) fn schedule_review_assignment(
         actor_user_id,
         comment.as_deref(),
     )?;
+    ensure_budget_allows_dispatch(&state, &detail, actor_user_id)?;
     let assignment = match detail
         .assignments
         .iter()
@@ -181,6 +184,24 @@ pub(crate) fn schedule_review_assignment(
         skipped_count: 0,
         errors: Vec::new(),
     })
+}
+
+fn ensure_budget_allows_dispatch(
+    state: &AppState,
+    detail: &MatterDetail,
+    actor_user_id: &str,
+) -> Result<()> {
+    let Some(reason) = budget_dispatch_blocker(state, &detail.matter)? else {
+        return Ok(());
+    };
+    insert_event(
+        state,
+        &detail.matter,
+        Some(actor_user_id),
+        "dispatch_blocked_by_budget",
+        json!({ "reason": reason }),
+    );
+    anyhow::bail!("{reason}");
 }
 
 fn ensure_assignments_ready(
