@@ -5,6 +5,7 @@ import { Settings } from 'lucide-react'
 import { useModelStore } from './useModelStore'
 import { useAuthStore } from '../../store/auth'
 import { providerGroupTitle, shortButtonLabel } from './modelUtils'
+import { ModelHoverPreview } from './ModelHoverPreview'
 import {
   filterOptionsForRuntimeRoute,
   optionMatchesRuntimeRoute,
@@ -39,6 +40,7 @@ export function ModelPickerPopover({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
   const [pos, setPos] = useState({ left: 12, bottom: 12, width: 360 })
+  const [previewKey, setPreviewKey] = useState<string | null>(null)
   const hasRuntimeRoutePicker = !!runtimeRoute && !!onRuntimeRouteChange
   const route = runtimeRoute ?? DEFAULT_RUNTIME_ROUTE
   const selectedRoute = runtimeRouteOption(route)
@@ -49,7 +51,7 @@ export function ModelPickerPopover({
       const el = anchorRef.current
       if (!el) return
       const rect = el.getBoundingClientRect()
-      const targetWidth = hasRuntimeRoutePicker ? 640 : 360
+      const targetWidth = hasRuntimeRoutePicker ? 860 : 680
       const width = Math.min(targetWidth, window.innerWidth - 24)
       const left = Math.max(12, Math.min(rect.left, window.innerWidth - width - 12))
       const bottom = Math.max(12, window.innerHeight - rect.top + 8)
@@ -92,6 +94,12 @@ export function ModelPickerPopover({
     ? filterOptionsForRuntimeRoute(options, route)
     : options
   const emptyState = hasRuntimeRoutePicker ? routeModelEmptyState(route) : null
+  const selectedOption = visibleOptions.find((opt) => opt.agentName === selectedAgent) ?? null
+  const previewOption =
+    visibleOptions.find((opt) => optionKey(opt) === previewKey) ??
+    selectedOption ??
+    visibleOptions[0] ??
+    null
 
   // 按 provider 分组
   const groups = new Map<string, AgentOption[]>()
@@ -148,7 +156,10 @@ export function ModelPickerPopover({
                       <button
                         className={styles.routeOptionSelect}
                         type="button"
-                        onClick={() => onRuntimeRouteChange?.(item.value)}
+                        onClick={() => {
+                          setPreviewKey(null)
+                          onRuntimeRouteChange?.(item.value)
+                        }}
                         aria-pressed={item.value === route}
                       >
                         <span className={styles.routeCode}>{item.code}</span>
@@ -174,6 +185,14 @@ export function ModelPickerPopover({
               ))}
             </aside>
           )}
+
+          <ModelHoverPreview
+            option={previewOption}
+            selected={!!previewOption && previewOption.agentName === selectedAgent}
+            saving={saving}
+            routeTitle={hasRuntimeRoutePicker ? selectedRoute.title : undefined}
+            onSelect={handleSelect}
+          />
 
           <div className={styles.modelPane}>
             <div className={styles.list}>
@@ -208,6 +227,8 @@ export function ModelPickerPopover({
                         ].join(' ')}
                         type="button"
                         disabled={saving}
+                        onMouseEnter={() => setPreviewKey(optionKey(opt))}
+                        onFocus={() => setPreviewKey(optionKey(opt))}
                         onClick={() => handleSelect(opt)}
                       >
                         <span>
@@ -240,6 +261,10 @@ export function ModelPickerPopover({
   )
 
   return createPortal(popover, document.body)
+}
+
+function optionKey(option: AgentOption): string {
+  return option.agentName || `default:${option.provider}:${option.label}`
 }
 
 /** 触发模型选择器的按钮，嵌入侧边栏或工具栏 */
