@@ -19,7 +19,7 @@ const ADMIN_PC_WEB_READY_WAIT: Duration = Duration::from_secs(5);
 const ADMIN_LOCAL_READY_WAIT: Duration = Duration::from_secs(15);
 const ADMIN_LOCAL_RETRY_WAIT: Duration = Duration::from_secs(10);
 const ADMIN_PORT_FALLBACK_LIMIT: u16 = 20;
-const ADMIN_HEALTH_READ_LIMIT: usize = 4096;
+const ADMIN_HEALTH_READ_LIMIT: usize = 16 * 1024;
 
 pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     let client = paths::client_exe(install_dir);
@@ -355,6 +355,17 @@ mod tests {
         assert!(!admin_status_response_healthy(
             "HTTP/1.1 404 Not Found\r\n\r\n{\"local_admin_token_header\":\"x\"}"
         ));
+    }
+
+    #[test]
+    fn admin_health_accepts_large_status_response() {
+        let response = format!(
+            "HTTP/1.1 200 OK\r\n\r\n{{\"padding\":\"{}\",\"local_admin_token_header\":\"x\"}}",
+            "x".repeat(8 * 1024)
+        );
+
+        assert!(response.len() < ADMIN_HEALTH_READ_LIMIT);
+        assert!(admin_status_response_healthy(&response));
     }
 
     #[test]
