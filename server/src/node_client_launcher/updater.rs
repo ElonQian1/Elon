@@ -309,7 +309,10 @@ $ErrorActionPreference = 'Stop'
 $installDir = '{install_dir}'
 $tmpVersion = '{tmp_version}'
 $versionFile = '{version_file}'
+$client = Join-Path $installDir '一龙开发平台.exe'
+$uninstall = Join-Path $installDir '卸载一龙开发平台.exe'
 $extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N'))
+{replace_helpers}
 New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
 try {{
   Expand-Archive -LiteralPath $zip -DestinationPath $extractDir -Force
@@ -324,23 +327,24 @@ try {{
   New-Item -ItemType Directory -Force -Path $installDir | Out-Null
   $targetInternal = Join-Path $installDir '_internal'
   New-Item -ItemType Directory -Force -Path $targetInternal | Out-Null
-  Copy-Item -LiteralPath $packageClient -Destination (Join-Path $installDir '一龙开发平台.exe') -Force
-  Copy-Item -LiteralPath $packageUninstall -Destination (Join-Path $installDir '卸载一龙开发平台.exe') -Force
+  Stop-ElonNodeClientProcesses -Client $client
+  Copy-ElonNodeFileWithRetry -Source $packageClient -Destination $client
+  Copy-ElonNodeFileWithRetry -Source $packageUninstall -Destination $uninstall
   if (Test-Path -LiteralPath $packageInternal) {{
     Copy-Item -Path (Join-Path $packageInternal '*') -Destination $targetInternal -Recurse -Force
   }}
-  Move-Item -LiteralPath $tmpVersion -Destination $versionFile -Force
+  Move-ElonNodeFileWithRetry -Source $tmpVersion -Destination $versionFile
 }} finally {{
   Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
   Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
 }}
-$client = Join-Path $installDir '一龙开发平台.exe'
 {restart}"#,
         wait = wait,
         tmp_zip = launcher_command::ps_single_quote(&tmp_zip.to_string_lossy()),
         install_dir = launcher_command::ps_single_quote(&install_dir.to_string_lossy()),
         tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy()),
         version_file = launcher_command::ps_single_quote(&version_file.to_string_lossy()),
+        replace_helpers = UPDATE_REPLACE_HELPERS,
         restart = restart
     )
 }
@@ -412,10 +416,12 @@ $uninstall = '{uninstall}'
 $tmpVersion = '{tmp_version}'
 $versionFile = '{version_file}'
 $installDir = [System.IO.Path]::GetDirectoryName($client)
+{replace_helpers}
 Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
-Move-Item -LiteralPath $tmpExe -Destination $client -Force
-Copy-Item -LiteralPath $client -Destination $uninstall -Force
-Move-Item -LiteralPath $tmpVersion -Destination $versionFile -Force
+Stop-ElonNodeClientProcesses -Client $client
+Move-ElonNodeFileWithRetry -Source $tmpExe -Destination $client
+Copy-ElonNodeFileWithRetry -Source $client -Destination $uninstall
+Move-ElonNodeFileWithRetry -Source $tmpVersion -Destination $versionFile
 {restart}
 "#,
         pid = std::process::id(),
@@ -424,9 +430,84 @@ Move-Item -LiteralPath $tmpVersion -Destination $versionFile -Force
         uninstall = launcher_command::ps_single_quote(&uninstall.to_string_lossy()),
         tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy()),
         version_file = launcher_command::ps_single_quote(&version_file.to_string_lossy()),
+        replace_helpers = UPDATE_REPLACE_HELPERS,
         restart = restart_agent_runtime_after_update_script("$client", "$installDir")
     )
 }
+
+#[cfg(windows)]
+const UPDATE_REPLACE_HELPERS: &str = r#"
+function Get-ElonNodeClientProcesses {
+  param([Parameter(Mandatory = $true)][string]$Client)
+  $fullClient = [System.IO.Path]::GetFullPath($Client)
+  Get-CimInstance Win32_Process | Where-Object {
+    $matchesClient = $false
+    if ($_.ExecutablePath) {
+      try {
+        $matchesClient = ([System.IO.Path]::GetFullPath($_.ExecutablePath) -ieq $fullClient)
+      } catch {}
+    }
+    $matchesClient -or ($_.Name -eq 'elon-node-agent.exe')
+  }
+}
+
+function Stop-ElonNodeClientProcesses {
+  param(
+    [Parameter(Mandatory = $true)][string]$Client,
+    [int]$TimeoutSeconds = 20
+  )
+  $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+  while ($true) {
+    $targets = @(Get-ElonNodeClientProcesses -Client $Client)
+    if ($targets.Count -eq 0) { return }
+    foreach ($target in $targets) {
+      try { Invoke-CimMethod -InputObject $target -MethodName Terminate | Out-Null } catch {}
+    }
+    if ((Get-Date) -ge $deadline) {
+      throw "旧版一龙节点仍在运行，无法完成更新: $Client"
+    }
+    Start-Sleep -Milliseconds 500
+  }
+}
+
+function Copy-ElonNodeFileWithRetry {
+  param(
+    [Parameter(Mandatory = $true)][string]$Source,
+    [Parameter(Mandatory = $true)][string]$Destination,
+    [int]$Attempts = 30
+  )
+  $lastError = $null
+  for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+    try {
+      Copy-Item -LiteralPath $Source -Destination $Destination -Force
+      return
+    } catch {
+      $lastError = $_
+      Start-Sleep -Milliseconds ([Math]::Min(250 * $attempt, 2000))
+    }
+  }
+  throw $lastError
+}
+
+function Move-ElonNodeFileWithRetry {
+  param(
+    [Parameter(Mandatory = $true)][string]$Source,
+    [Parameter(Mandatory = $true)][string]$Destination,
+    [int]$Attempts = 30
+  )
+  $lastError = $null
+  for ($attempt = 1; $attempt -le $Attempts; $attempt++) {
+    try {
+      Move-Item -LiteralPath $Source -Destination $Destination -Force
+      return
+    } catch {
+      $lastError = $_
+      Start-Sleep -Milliseconds ([Math]::Min(250 * $attempt, 2000))
+    }
+  }
+  throw $lastError
+}
+"#;
 
 #[cfg(windows)]
 const UPDATE_RESTART_HELPERS: &str = r#"
@@ -529,10 +610,21 @@ mod tests {
         assert!(
             script.contains("Start-ElonNodeRuntimeAndWait -Client $client -InstallDir $installDir")
         );
+        assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
+        assert!(script.contains("Move-ElonNodeFileWithRetry -Source $tmpExe"));
+        assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $client"));
         assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));
         assert!(script.contains("Wait-ElonNodeAdminHealth"));
         assert!(
-            script.find("Move-Item -LiteralPath $tmpExe").unwrap()
+            script
+                .find("Move-ElonNodeFileWithRetry -Source $tmpExe")
+                .unwrap()
+                < script.find("Start-ElonNodeRuntimeAndWait").unwrap()
+        );
+        assert!(
+            script
+                .find("Move-ElonNodeFileWithRetry -Source $tmpVersion")
+                .unwrap()
                 < script.find("Start-ElonNodeRuntimeAndWait").unwrap()
         );
     }
@@ -552,8 +644,11 @@ mod tests {
 
         assert!(script.contains("Wait-Process -Id 1234"));
         assert!(script.contains("Expand-Archive -LiteralPath $zip"));
+        assert!(script.contains("Stop-ElonNodeClientProcesses -Client $client"));
+        assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
+        assert!(script.contains("Copy-ElonNodeFileWithRetry -Source $packageUninstall"));
         assert!(script.contains("Copy-Item -Path (Join-Path $packageInternal '*')"));
-        assert!(script.contains("Move-Item -LiteralPath $tmpVersion"));
+        assert!(script.contains("Move-ElonNodeFileWithRetry -Source $tmpVersion"));
         assert!(
             script.contains("Start-ElonNodeRuntimeAndWait -Client $client -InstallDir $installDir")
         );

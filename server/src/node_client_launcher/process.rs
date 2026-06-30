@@ -96,13 +96,18 @@ pub(crate) fn stop_agent() {
     {
         let script = format!(
             r#"
-$targets = Get-CimInstance Win32_Process | Where-Object {{
-  ($_.Name -eq '{client}' -and $_.CommandLine -match '--agent-runtime') -or
-  ($_.Name -eq 'elon-node-agent.exe')
-}}
-foreach ($target in $targets) {{
-  Invoke-CimMethod -InputObject $target -MethodName Terminate | Out-Null
-}}
+$deadline = (Get-Date).AddSeconds(10)
+do {{
+  $targets = @(Get-CimInstance Win32_Process | Where-Object {{
+    ($_.Name -eq '{client}' -and $_.CommandLine -match '--agent-runtime') -or
+    ($_.Name -eq 'elon-node-agent.exe')
+  }})
+  foreach ($target in $targets) {{
+    Invoke-CimMethod -InputObject $target -MethodName Terminate | Out-Null
+  }}
+  if ($targets.Count -eq 0) {{ break }}
+  Start-Sleep -Milliseconds 300
+}} while ((Get-Date) -lt $deadline)
 "#,
             client = launcher_command::ps_single_quote(CLIENT_EXE_NAME)
         );
