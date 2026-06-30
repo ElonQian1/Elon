@@ -1,0 +1,113 @@
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+
+pub(crate) const COLLAB_MODE_SOLO: &str = "solo";
+pub(crate) const COLLAB_MODE_CRITIC: &str = "critic";
+pub(crate) const COLLAB_MODE_SPLIT: &str = "split";
+pub(crate) const MATTER_STATUS_PLAN_READY: &str = "plan_ready";
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiNodeAuthorization {
+    pub id: String,
+    pub project_id: String,
+    pub provider_user_id: String,
+    pub node_id: String,
+    pub allowed_clis: Vec<String>,
+    pub permission_level: String,
+    pub enabled: bool,
+    pub created_by_user_id: String,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct UpsertNodeAuthorizationRequest {
+    #[serde(alias = "nodeId")]
+    pub node_id: String,
+    #[serde(default, alias = "allowedClis")]
+    pub allowed_clis: Vec<String>,
+    #[serde(default, alias = "permissionLevel")]
+    pub permission_level: Option<String>,
+    #[serde(default)]
+    pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct AvailableGroupAiNode {
+    pub node_id: String,
+    pub provider_user_id: String,
+    pub display_name: String,
+    pub short_id: String,
+    pub online: bool,
+    pub cli_connected: bool,
+    pub allowed_clis: Vec<String>,
+    pub authorized: bool,
+    pub authorization: Option<ProjectAiNodeAuthorization>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiBot {
+    pub bot_id: String,
+    pub project_id: String,
+    pub provider_user_id: String,
+    pub node_id: String,
+    pub display_name: String,
+    pub runtime_route: String,
+    pub cli_name: String,
+    pub capabilities: Vec<String>,
+    pub risk_level: String,
+    pub online: bool,
+    pub cli_connected: bool,
+}
+
+#[derive(Debug, Deserialize)]
+pub(crate) struct CreateMatterPlanRequest {
+    #[serde(alias = "channelId")]
+    pub channel_id: String,
+    #[serde(default, alias = "sourceMessageId")]
+    pub source_message_id: Option<String>,
+    #[serde(default)]
+    pub title: Option<String>,
+    pub brief: String,
+    #[serde(default, alias = "collaborationMode")]
+    pub collaboration_mode: Option<String>,
+    #[serde(default, alias = "acceptanceCriteria")]
+    pub acceptance_criteria: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct CreateMatterRecord {
+    pub project_id: String,
+    pub channel_id: String,
+    pub requester_user_id: String,
+    pub source_message_id: Option<String>,
+    pub title: String,
+    pub brief: String,
+    pub collaboration_mode: String,
+    pub participant_user_ids: Vec<String>,
+    pub node_policy_json: Value,
+    pub acceptance_criteria: Vec<String>,
+    pub plan_json: Value,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub(crate) struct ProjectAiMatter {
+    pub id: String,
+    pub project_id: String,
+    pub channel_id: String,
+    pub requester_user_id: String,
+    pub decision_user_id: Option<String>,
+    pub source_message_id: Option<String>,
+    pub title: String,
+    pub brief: String,
+    pub collaboration_mode: String,
+    pub status: String,
+    pub participant_user_ids: Vec<String>,
+    pub node_policy: Value,
+    pub acceptance_criteria: Vec<String>,
+    pub plan: Value,
+    pub final_summary: Option<String>,
+    pub final_decision: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}

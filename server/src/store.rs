@@ -25,6 +25,7 @@ mod external_apps;
 mod external_apps_tests;
 mod friend_messages;
 mod friends;
+mod group_ai;
 mod group_summary;
 #[cfg(test)]
 mod group_summary_tests;

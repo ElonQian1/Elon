@@ -82,6 +82,7 @@ mod external_app_usage_policy;
 mod friend_api;
 mod friend_events;
 mod global_ws;
+mod group_ai;
 mod group_chat_project_docs;
 mod group_chat_retrieval_api;
 mod group_summary_api;

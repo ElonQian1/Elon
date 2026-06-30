@@ -17,7 +17,7 @@ use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
     billing_api, billing_pay, chat_attachments, context_compiler, external_app_api,
     external_app_chat_bootstrap, external_app_mvp_chat, external_app_route_c_sdk,
-    external_app_tool_report_api, friend_api, global_ws, group_chat_retrieval_api,
+    external_app_tool_report_api, friend_api, global_ws, group_ai, group_chat_retrieval_api,
     group_summary_api, lan_peer, lm_chat, node_api, node_compute_admin, node_payout_admin,
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
     project_deletion, project_docs, project_downloads, project_git, project_join_requests,
@@ -471,6 +471,30 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/projects/:project_id/space/gallery-image",
             axum::routing::patch(project_space::update_project_gallery_image),
+        )
+        .route(
+            "/api/projects/:project_id/ai/available-nodes",
+            get(group_ai::api::available_nodes),
+        )
+        .route(
+            "/api/projects/:project_id/ai/node-authorizations",
+            post(group_ai::api::upsert_node_authorization),
+        )
+        .route(
+            "/api/projects/:project_id/ai/bots",
+            get(group_ai::api::list_bots),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/plan",
+            post(group_ai::api::create_matter_plan),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters",
+            get(group_ai::api::list_matters),
+        )
+        .route(
+            "/api/projects/:project_id/ai/matters/:matter_id",
+            get(group_ai::api::get_matter),
         )
         .route(
             "/api/projects/:project_id/landing/sync",
