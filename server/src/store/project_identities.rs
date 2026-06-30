@@ -149,6 +149,12 @@ pub(super) fn find_owner_project_by_identity(
                         ) AS last_apk_url,
                         p.icon_data_url,
                         p.updated_at,
+                        COALESCE(
+                            (SELECT prp.mode
+                               FROM project_runtime_permissions prp
+                              WHERE prp.project_id = p.id),
+                            'project_write'
+                        ) AS runtime_permission,
                         p.display_name
                  FROM project_identities pi
                  JOIN projects p ON p.id = pi.project_id
@@ -208,6 +214,12 @@ pub(super) fn find_owner_project_by_git_remote(
                 ) AS last_apk_url,
                 p.icon_data_url,
                 p.updated_at,
+                COALESCE(
+                    (SELECT prp.mode
+                       FROM project_runtime_permissions prp
+                      WHERE prp.project_id = p.id),
+                    'project_write'
+                ) AS runtime_permission,
                 p.display_name
          FROM projects p
          LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?1

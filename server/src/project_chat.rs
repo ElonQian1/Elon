@@ -58,6 +58,12 @@ pub async fn chat_project(
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
     }
+    if looks_like_replaced_unicode_mojibake(&message) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "请求正文疑似发生字符编码损坏，中文已变成大量问号。请使用 UTF-8 发送 JSON；Windows 脚本建议使用 PowerShell 7，或先把 JSON 写成 UTF-8 文件后再用 curl.exe --data-binary @file 发送。",
+        );
+    }
     if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
     }
@@ -150,6 +156,7 @@ pub async fn chat_project(
     }
 
     let mut reply = String::new();
+    let mut streamed_reply = String::new();
     let mut apk_url = None;
     let mut image_url = None;
     let mut error = None;
@@ -157,8 +164,19 @@ pub async fn chat_project(
         if let Ok(value) = serde_json::from_str::<serde_json::Value>(&raw) {
             record_server_message(&state, &trace_id, &value, raw.len());
             match value.get("type").and_then(|t| t.as_str()) {
+                Some("assistant_message") => {
+                    append_nonempty_ws_text(&mut streamed_reply, value["text"].as_str());
+                }
+                Some("assistant_chunk") => {
+                    append_nonempty_ws_text(&mut streamed_reply, value["text"].as_str());
+                }
                 Some("done") => {
-                    reply = value["message"].as_str().unwrap_or("完成").to_string();
+                    let message = value["message"].as_str().unwrap_or_default().trim();
+                    reply = if message.is_empty() {
+                        ai_cli::truncate_chars(streamed_reply.trim(), 12_000)
+                    } else {
+                        message.to_string()
+                    };
                     apk_url = value["apk_url"].as_str().map(ToOwned::to_owned);
                     image_url = value["image_url"].as_str().map(ToOwned::to_owned);
                 }
@@ -170,6 +188,9 @@ pub async fn chat_project(
                 _ => {}
             }
         }
+    }
+    if reply.is_empty() && error.is_none() && !streamed_reply.trim().is_empty() {
+        reply = ai_cli::truncate_chars(streamed_reply.trim(), 12_000);
     }
 
     let status = if error.is_some() { "failed" } else { "done" };
@@ -277,6 +298,12 @@ pub async fn chat_project_stream(
     let message = req.message.trim().to_string();
     if message.is_empty() {
         return json_error(StatusCode::BAD_REQUEST, "message 不能为空");
+    }
+    if looks_like_replaced_unicode_mojibake(&message) {
+        return json_error(
+            StatusCode::BAD_REQUEST,
+            "请求正文疑似发生字符编码损坏，中文已变成大量问号。请使用 UTF-8 发送 JSON；Windows 脚本建议使用 PowerShell 7，或先把 JSON 写成 UTF-8 文件后再用 curl.exe --data-binary @file 发送。",
+        );
     }
     if let Err(msg) = billing::check_can_call(&state.store, &user.id) {
         return json_error(StatusCode::PAYMENT_REQUIRED, msg);
@@ -404,6 +431,62 @@ fn append_project_icon_context(
     format!("{message}\n\n[项目 APK 图标]\n{note}")
 }
 
+fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
+    let mut total = 0usize;
+    let mut question_marks = 0usize;
+    let mut replacement_chars = 0usize;
+    let mut cjk = 0usize;
+
+    for ch in message.chars() {
+        if ch.is_whitespace() {
+            continue;
+        }
+        total += 1;
+        match ch {
+            '?' => question_marks += 1,
+            '\u{FFFD}' => replacement_chars += 1,
+            '\u{4E00}'..='\u{9FFF}'
+            | '\u{3400}'..='\u{4DBF}'
+            | '\u{20000}'..='\u{2A6DF}'
+            | '\u{2A700}'..='\u{2B73F}'
+            | '\u{2B740}'..='\u{2B81F}'
+            | '\u{2B820}'..='\u{2CEAF}'
+            | '\u{F900}'..='\u{FAFF}' => cjk += 1,
+            _ => {}
+        }
+    }
+
+    if total < 40 || cjk > 0 {
+        return false;
+    }
+    let damaged = question_marks + replacement_chars;
+    damaged >= 12 && damaged * 100 >= total * 20
+}
+
+#[cfg(test)]
+mod tests {
+    use super::looks_like_replaced_unicode_mojibake;
+
+    #[test]
+    fn detects_windows_question_mark_mojibake() {
+        let message = "?????????? Win ? Codex ????????????????????????????????\n\
+            1. ?? AGENTS.md ? .github/copilot-instructions.md???????????\n\
+            2. ?? server/src/git_command_error.rs?server/src/node_agent_main.rs?";
+
+        assert!(looks_like_replaced_unicode_mojibake(message));
+    }
+
+    #[test]
+    fn allows_normal_chinese_and_question_marks() {
+        assert!(!looks_like_replaced_unicode_mojibake(
+            "这是一次 Win 端 Codex 产品链路实测，请读取项目源码并运行 git status？"
+        ));
+        assert!(!looks_like_replaced_unicode_mojibake(
+            "Why??? Can Codex read AGENTS.md and run cargo check?"
+        ));
+    }
+}
+
 fn clean_project_icon_context_data_url(project_icon_data_url: Option<&str>) -> Option<String> {
     let value = project_icon_data_url?.trim();
     if value.is_empty() || value.len() > MAX_PROJECT_ICON_CONTEXT_DATA_URL_BYTES {
@@ -413,6 +496,16 @@ fn clean_project_icon_context_data_url(project_icon_data_url: Option<&str>) -> O
         return None;
     }
     Some(value.to_string())
+}
+
+fn append_nonempty_ws_text(buffer: &mut String, text: Option<&str>) {
+    let Some(text) = text.map(str::trim).filter(|value| !value.is_empty()) else {
+        return;
+    };
+    if !buffer.is_empty() && !buffer.ends_with('\n') {
+        buffer.push('\n');
+    }
+    buffer.push_str(text);
 }
 
 fn write_project_icon_metadata(

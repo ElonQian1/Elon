@@ -1261,13 +1261,19 @@ async fn run_via_pc_agent(
                             })
                             .unwrap_or(true))
                 {
-                    // Copilot/Codex 流式已发，CliDone 只需补发未流式的部分
+                    // Codex 的 PTY 输出会先流式给前端；HTTP/历史记录仍依赖 done.message，
+                    // 因此需要从完整输出中提取最终可读总结，避免任务完成但聊天记录为空。
+                    let codex_final_reply = if is_codex {
+                        extract_codex_reply(&full_text)
+                    } else {
+                        String::new()
+                    };
                     let reply = if lightweight_pc_chat {
                         extract_lightweight_pc_chat_reply(&full_text, is_codex)
+                    } else if is_codex {
+                        codex_final_reply.clone()
                     } else if stream_started {
                         String::new() // 已流式完毕，Done 不重复发
-                    } else if is_codex {
-                        extract_codex_reply(&full_text)
                     } else {
                         full_text.trim().to_string()
                     };
@@ -1300,10 +1306,10 @@ async fn run_via_pc_agent(
                         }
                         return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
                     }
-                    if !reply.is_empty() {
+                    if !reply.is_empty() && (!stream_started || lightweight_pc_chat) {
                         let _ = tx.send(
                             WsMessage::AssistantMessage {
-                                text: reply,
+                                text: reply.clone(),
                                 model_used: Some(display_model.clone()),
                                 stream_id: None,
                                 node_id: Some(agent_id.to_string()),
@@ -1335,7 +1341,7 @@ async fn run_via_pc_agent(
                     }
                     let _ = tx.send(
                         WsMessage::Done {
-                            message: String::new(),
+                            message: reply,
                             apk_url: None,
                             image_url: None,
                             model_used: Some(display_model.clone()),
@@ -1986,40 +1992,56 @@ fn clamp_i64_to_u32(value: i64) -> u32 {
     value.clamp(0, u32::MAX as i64) as u32
 }
 
-/// 从 Codex exec 的完整输出中提取第一段 AI 回复文本。
+/// 从 Codex exec 的完整输出中提取最后一段 AI 回复文本。
 /// Codex exec 的输出格式：
 ///   [启动信息头 ... ---]
 ///   user
 ///   <用户消息回放>
 ///   [可能的错误日志]
 ///   codex
-///   <AI 回复>          ← 只取这段
+///   <AI 回复>
+///   [可能穿插 exec/tool/user 等边界后继续输出]
+///   codex
+///   <AI 最终回复>      ← 只取最后一段有用回复
 ///   tokens used
 ///   <AI 回复重复>       ← 丢弃
 ///   <数字>
 ///   <AI 回复重复>       ← 丢弃
 fn extract_codex_reply(output: &str) -> String {
     let clean = strip_terminal_control_sequences(output);
-    let lines: Vec<&str> = clean.lines().collect();
     let mut in_codex_reply = false;
     let mut reply_lines: Vec<String> = Vec::new();
+    let mut replies: Vec<String> = Vec::new();
 
-    for line in &lines {
+    for line in clean.lines() {
         let trimmed = line.trim();
-        if is_lightweight_reply_marker(trimmed) && !in_codex_reply {
+        if is_lightweight_reply_marker(trimmed) {
+            if !reply_lines.is_empty() {
+                replies.push(reply_lines.join("\n").trim().to_string());
+                reply_lines.clear();
+            }
             in_codex_reply = true;
             continue;
         }
         if in_codex_reply {
             // tokens used 或纯数字行表示回复结束（后面是重复内容）
-            if trimmed == "tokens used" || trimmed.chars().all(|c| c.is_ascii_digit() || c == ',') {
-                break;
+            if trimmed == "tokens used"
+                || (!trimmed.is_empty() && trimmed.chars().all(|c| c.is_ascii_digit() || c == ','))
+            {
+                if !reply_lines.is_empty() {
+                    replies.push(reply_lines.join("\n").trim().to_string());
+                    reply_lines.clear();
+                }
+                in_codex_reply = false;
+                continue;
             }
             if is_codex_output_boundary(trimmed) {
-                if reply_lines.is_empty() {
-                    continue;
+                if !reply_lines.is_empty() {
+                    replies.push(reply_lines.join("\n").trim().to_string());
+                    reply_lines.clear();
                 }
-                break;
+                in_codex_reply = false;
+                continue;
             }
             if is_lightweight_cli_noise_line(trimmed) {
                 continue;
@@ -2028,15 +2050,34 @@ fn extract_codex_reply(output: &str) -> String {
         }
     }
 
-    reply_lines.join("\n").trim().to_string()
+    if !reply_lines.is_empty() {
+        replies.push(reply_lines.join("\n").trim().to_string());
+    }
+
+    replies
+        .into_iter()
+        .rev()
+        .find(|reply| is_useful_codex_reply(reply))
+        .unwrap_or_default()
+}
+
+fn is_useful_codex_reply(reply: &str) -> bool {
+    let trimmed = reply.trim();
+    if trimmed.is_empty() {
+        return false;
+    }
+    let lower = trimmed.to_ascii_lowercase();
+    !lower.contains("codex cli 执行完成，但没有返回可解析输出")
+        && !lower.contains("codex cli 执行完成，但输出里没有可解析的 codex 回复段")
 }
 
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
     use super::{
-        extract_lightweight_pc_chat_reply, native_session_uuid, pc_cli_passthrough_event,
-        pc_dispatch_started_event, pc_lightweight_chat_prompt, pc_route_a_extra_args,
-        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
+        extract_codex_reply, extract_lightweight_pc_chat_reply, native_session_uuid,
+        pc_cli_passthrough_event, pc_dispatch_started_event, pc_lightweight_chat_prompt,
+        pc_route_a_extra_args, strip_terminal_control_sequences, AiCliRequestMode,
+        NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2160,6 +2201,40 @@ tokens used\n\
     #[test]
     fn pc_lightweight_chat_strips_orphan_ansi_fragments() {
         assert_eq!(strip_terminal_control_sequences("[m你好[?25h[22m"), "你好");
+    }
+
+    #[test]
+    fn pc_codex_reply_extracts_last_summary_block() {
+        let output = "\u{1b}[35mcodex\u{1b}[m\n\
+规则文件已成功读取。\n\
+exec\n\
+git status\n\
+\u{1b}[35mcodex\u{1b}[m\n\
+完成。本次只新增了记录文件。\n\
+\n\
+结果汇总：\n\
+- 读取代码成功。\n\
+- Git 可用。\n\
+tokens used\n\
+44,443\n";
+
+        let reply = extract_codex_reply(output);
+
+        assert!(reply.contains("完成。本次只新增了记录文件。"));
+        assert!(reply.contains("结果汇总"));
+        assert!(!reply.contains("规则文件已成功读取"));
+    }
+
+    #[test]
+    fn pc_codex_reply_ignores_false_unparseable_diagnostic() {
+        let output = "codex\n\
+完成。真实最终回复。\n\
+tokens used\n\
+1\n\
+codex\n\
+Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查看 PC 节点日志确认是否已完成文件修改。\n";
+
+        assert_eq!(extract_codex_reply(output), "完成。真实最终回复。");
     }
 
     #[test]

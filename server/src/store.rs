@@ -1384,6 +1384,26 @@ mod tests {
         assert_eq!(first.project.source_type, "local_path");
         assert_eq!(first.project.node_id.as_deref(), Some("node-a"));
 
+        let same_path = store
+            .register_external_project(
+                &user.id,
+                None,
+                "Different Project Name",
+                Some("same pc path"),
+                r"D:\rust\active-projects\one",
+                Some("node-a"),
+                None,
+                None,
+            )
+            .expect("same external path should reuse identity");
+        assert!(same_path.reused_existing);
+        assert_eq!(same_path.project.id, first.project.id);
+        assert_eq!(
+            same_path.project.workspace_path.as_deref(),
+            Some(r"D:\rust\active-projects\one")
+        );
+        assert_eq!(same_path.project.runtime_permission, "project_write");
+
         let second = store
             .register_external_project(
                 &user.id,

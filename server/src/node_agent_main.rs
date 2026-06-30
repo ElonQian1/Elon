@@ -1738,10 +1738,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                 }
                 if result.exit_ok
                     && cli_name == "codex"
-                    && !result
-                        .stdout_text
-                        .lines()
-                        .any(|line| line.trim() == "codex")
+                    && !contains_codex_reply_marker(&result.stdout_text)
                 {
                     let diagnostic = if result.stdout_text.trim().is_empty() {
                         "Codex CLI 执行完成，但没有返回可解析输出。请查看 PC 节点日志确认是否已完成文件修改。"
@@ -1998,7 +1995,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
         .await;
         return;
     }
-    if exit_ok && cli_name == "codex" && !stdout_text.lines().any(|line| line.trim() == "codex") {
+    if exit_ok && cli_name == "codex" && !contains_codex_reply_marker(&stdout_text) {
         let diagnostic = if stdout_text.trim().is_empty() {
             "Codex CLI 执行完成，但没有返回可解析输出。请查看 PC 节点日志确认是否已完成文件修改。"
         } else {
@@ -2072,6 +2069,58 @@ fn send_cli_chunk_message(
         req_id: req_id.to_string(),
         text: text.to_string(),
     }));
+}
+
+fn contains_codex_reply_marker(output: &str) -> bool {
+    strip_cli_control_sequences(output)
+        .lines()
+        .any(|line| line.trim().eq_ignore_ascii_case("codex"))
+}
+
+fn strip_cli_control_sequences(input: &str) -> String {
+    let chars: Vec<char> = input.chars().collect();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let ch = chars[i];
+        if ch == '\u{1b}' {
+            i += 1;
+            if i < chars.len() && chars[i] == '[' {
+                i += 1;
+                while i < chars.len() {
+                    let next = chars[i];
+                    i += 1;
+                    if ('@'..='~').contains(&next) {
+                        break;
+                    }
+                }
+                continue;
+            }
+            if i < chars.len() && chars[i] == ']' {
+                i += 1;
+                while i < chars.len() {
+                    if chars[i] == '\u{7}' {
+                        i += 1;
+                        break;
+                    }
+                    if chars[i] == '\u{1b}' && i + 1 < chars.len() && chars[i + 1] == '\\' {
+                        i += 2;
+                        break;
+                    }
+                    i += 1;
+                }
+                continue;
+            }
+            continue;
+        }
+        if ch.is_control() && ch != '\n' && ch != '\r' && ch != '\t' {
+            i += 1;
+            continue;
+        }
+        out.push(ch);
+        i += 1;
+    }
+    out
 }
 
 fn push_tracked_arg(
