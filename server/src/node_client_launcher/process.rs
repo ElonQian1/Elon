@@ -152,9 +152,7 @@ pub(crate) fn open_pc_web_page(port: u16, env_values: &HashMap<String, String>) 
 fn open_url(url: &str) -> Result<()> {
     #[cfg(windows)]
     {
-        let mut cmd = launcher_command::open_url_command(url);
-        launcher_command::spawn_hidden(&mut cmd)
-            .with_context(|| format!("无法打开管理页 {url}"))?;
+        launcher_command::open_url(url).with_context(|| format!("无法打开管理页 {url}"))?;
     }
     #[cfg(not(windows))]
     {

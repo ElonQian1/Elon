@@ -1,6 +1,6 @@
 // server/src/node_client_launcher/mod.rs
 
-mod command;
+pub(crate) mod command;
 mod env_file;
 mod installer;
 pub(crate) mod log_file;

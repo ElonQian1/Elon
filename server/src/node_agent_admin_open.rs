@@ -47,14 +47,7 @@ pub fn maybe_open_admin_page(port: u16) {
     std::thread::spawn(move || {
         wait_for_admin_port(port);
         let url = admin_url(port);
-        let mut cmd = std::process::Command::new("explorer.exe");
-        cmd
-            // 避免 cmd /C start 额外拉起 shell，减少旧系统上闪黑窗的概率。
-            .arg(&url)
-            .stdin(std::process::Stdio::null())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null());
-        if let Err(err) = spawn_hidden(&mut cmd) {
+        if let Err(err) = crate::node_client_launcher::command::open_url(&url) {
             tracing::warn!(%url, error = %err, "无法自动打开 node-agent 管理页");
         }
     });
@@ -83,14 +76,4 @@ fn auto_open_enabled() -> bool {
             )
         })
         .unwrap_or(true)
-}
-
-#[cfg(windows)]
-fn spawn_hidden(command: &mut std::process::Command) -> std::io::Result<std::process::Child> {
-    use std::os::windows::process::CommandExt;
-    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-    const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
-    command
-        .creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP)
-        .spawn()
 }

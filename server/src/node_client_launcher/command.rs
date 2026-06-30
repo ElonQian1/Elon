@@ -2,6 +2,7 @@
 
 use std::{
     ffi::OsStr,
+    io,
     process::{Child, Command, ExitStatus, Output, Stdio},
 };
 
@@ -58,16 +59,75 @@ pub(crate) fn cmd_hidden_command(command_line: &str) -> Command {
 }
 
 #[cfg(windows)]
-pub(crate) fn open_url_command(url: &str) -> Command {
-    // 打开网页不再绕 cmd /C start，避免 shell 窗口闪现和参数二次解析。
-    let mut command = silent_command("explorer.exe");
-    command.arg(url);
-    command
+const SW_SHOWNORMAL: i32 = 1;
+
+#[cfg(windows)]
+#[link(name = "shell32")]
+unsafe extern "system" {
+    fn ShellExecuteW(
+        hwnd: *mut std::ffi::c_void,
+        lpOperation: *const u16,
+        lpFile: *const u16,
+        lpParameters: *const u16,
+        lpDirectory: *const u16,
+        nShowCmd: i32,
+    ) -> isize;
+}
+
+#[cfg(windows)]
+pub(crate) fn open_url(url: &str) -> io::Result<()> {
+    let url = url.trim();
+    if !is_http_url(url) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            format!("refusing to open non-http URL: {url}"),
+        ));
+    }
+    shell_execute_open(url)
 }
 
 #[cfg(windows)]
 pub(crate) fn ps_single_quote(value: &str) -> String {
     value.replace('\'', "''")
+}
+
+#[cfg(windows)]
+fn shell_execute_open(target: &str) -> io::Result<()> {
+    let operation = wide_null("open");
+    let target = wide_null(target);
+    let result = unsafe {
+        ShellExecuteW(
+            std::ptr::null_mut(),
+            operation.as_ptr(),
+            target.as_ptr(),
+            std::ptr::null(),
+            std::ptr::null(),
+            SW_SHOWNORMAL,
+        )
+    };
+    if result > 32 {
+        Ok(())
+    } else {
+        Err(io::Error::other(format!(
+            "ShellExecuteW(open) failed with code {result}"
+        )))
+    }
+}
+
+#[cfg(windows)]
+fn wide_null(value: &str) -> Vec<u16> {
+    use std::os::windows::ffi::OsStrExt;
+
+    OsStr::new(value)
+        .encode_wide()
+        .chain(std::iter::once(0))
+        .collect()
+}
+
+#[cfg(windows)]
+fn is_http_url(value: &str) -> bool {
+    let value = value.trim_start().to_ascii_lowercase();
+    value.starts_with("http://") || value.starts_with("https://")
 }
 
 #[cfg(windows)]
@@ -115,14 +175,13 @@ mod tests {
             .any(|pair| pair == ["-Command", "Write-Output ok"]));
     }
 
-    #[cfg(windows)]
     #[test]
-    fn open_url_command_avoids_cmd_and_powershell_shells() {
-        let command = open_url_command("http://127.0.0.1:7799/?a=1&b=2");
-        let args = command_args(&command);
-
-        assert_eq!(command.get_program().to_string_lossy(), "explorer.exe");
-        assert_eq!(args, vec!["http://127.0.0.1:7799/?a=1&b=2"]);
+    #[cfg(windows)]
+    fn http_url_validator_rejects_local_paths_and_empty_targets() {
+        assert!(is_http_url("http://127.0.0.1:7799/?a=1&b=2"));
+        assert!(is_http_url(" https://example.com/pc"));
+        assert!(!is_http_url(""));
+        assert!(!is_http_url(r"C:\Users\Administrator\Documents"));
     }
 
     #[cfg(windows)]
