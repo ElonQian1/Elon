@@ -81,7 +81,51 @@ pub async fn run_for_project_in_workspace(
     );
     let requires_project_workflow = requires_project_workflow_for_message(user_message, workspace);
 
-    if !requires_project_workflow && pc_cli_chat_requested(pc_runtime_route) {
+    if !requires_project_workflow {
+        let requested_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
+        let cli_first_chat = pc_cli_chat_requested(pc_runtime_route)
+            || agent_name
+                .map(|name| is_local_cli_option(state, name))
+                .unwrap_or(false);
+        if cli_first_chat {
+            if let Some((agent_id, _pc_workspace)) = pc_project_binding(project) {
+                let runtime_choice =
+                    choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
+                if let Some(error) = runtime_choice.error {
+                    warn!("PC 本机轻量聊天不可用，回退普通聊天: {}", error);
+                } else {
+                    let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+                        project_id: project.id.clone(),
+                        user_id: user_id.to_string(),
+                        conversation_id: cid.to_string(),
+                        runtime_permission: "read_only".to_string(),
+                    });
+                    match ai_cli::run_with_pc_agent_chat(
+                        agent_id,
+                        user_id,
+                        user_message,
+                        session_scope,
+                        Some(runtime_choice.cli_name.as_str()),
+                        runtime_choice.copilot_model.as_deref(),
+                        runtime_choice.codex_reasoning_effort.as_deref(),
+                        runtime_choice.model_label.as_deref(),
+                        state,
+                        &tx,
+                    )
+                    .await
+                    {
+                        Ok(ai_cli::PcAgentChatOutcome::Answered) => return,
+                        Ok(ai_cli::PcAgentChatOutcome::NoReadableReply) => {
+                            warn!("PC 本机轻量聊天未返回可读内容，回退普通聊天");
+                        }
+                        Err(error) => {
+                            warn!("PC 本机轻量聊天运行出错，回退普通聊天: {}", error);
+                        }
+                    }
+                }
+            }
+        }
+
         if let Some(reply) = quick_casual_reply(user_message) {
             let _ = tx.send(
                 WsMessage::Done {
@@ -96,43 +140,30 @@ pub async fn run_for_project_in_workspace(
             return;
         }
 
-        if let Some((agent_id, _pc_workspace)) = pc_project_binding(project) {
-            let runtime_choice =
-                choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
-            if let Some(error) = runtime_choice.error {
-                let _ = tx.send(WsMessage::error(error).to_json());
-                return;
-            }
-            let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
-                project_id: project.id.clone(),
-                user_id: user_id.to_string(),
-                conversation_id: cid.to_string(),
-                runtime_permission: "read_only".to_string(),
-            });
-            if let Err(error) = ai_cli::run_with_pc_agent_chat(
-                agent_id,
-                user_id,
-                user_message,
-                session_scope,
-                Some(runtime_choice.cli_name.as_str()),
-                runtime_choice.copilot_model.as_deref(),
-                runtime_choice.codex_reasoning_effort.as_deref(),
-                runtime_choice.model_label.as_deref(),
-                state,
-                &tx,
-            )
-            .await
-            {
-                error!("PC 本机轻量聊天运行出错: {}", error);
-                let _ = tx.send(
-                    WsMessage::classified_error(crate::errors::classify_ai_error(
-                        &error.to_string(),
-                    ))
+        if let Err(error) = run_api_inner_with_workspace(
+            user_id,
+            workspace,
+            &user_config_workspace,
+            download_base,
+            user_message,
+            None,
+            trace_id,
+            api_agent_name(state, requested_agent_name),
+            false,
+            Some(MEMORY_SCOPE_PROJECT),
+            Some(&project.id),
+            state,
+            &tx,
+        )
+        .await
+        {
+            error!("项目普通聊天 AI 运行出错: {}", error);
+            let _ = tx.send(
+                WsMessage::classified_error(crate::errors::classify_ai_error(&error.to_string()))
                     .to_json(),
-                );
-            }
-            return;
+            );
         }
+        return;
     }
 
     if requires_project_workflow {
@@ -1019,7 +1050,15 @@ mod tests {
     }
 
     #[test]
-    fn explicit_pc_cli_routes_can_handle_light_chat() {
+    fn open_idea_stays_in_chat_route() {
+        assert!(!requires_project_workflow_for_message(
+            "我有一个想法",
+            Path::new("C:/tmp/project")
+        ));
+    }
+
+    #[test]
+    fn explicit_pc_cli_routes_are_cli_first_for_chat() {
         assert!(pc_cli_chat_requested(Some(
             PcRuntimeRoutePreference::RouteA
         )));

@@ -202,7 +202,11 @@ async fn run_with_workspace_mode(
             )
             .await
             {
-                Ok(()) => return Ok(()),
+                Ok(PcAgentRunOutcome::Completed) => return Ok(()),
+                Ok(PcAgentRunOutcome::NoReadableLightweightReply) => {
+                    tracing::warn!("[ai_cli] PC agent CLI 未返回可读内容，回退本地");
+                    let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
+                }
                 Err(e) => {
                     tracing::warn!("[ai_cli] PC agent CLI 失败，回退本地: {e:#}");
                     let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
@@ -722,7 +726,7 @@ pub async fn run_with_pc_agent_workspace(
         return Err(anyhow!(msg));
     }
 
-    run_via_pc_agent(
+    let outcome = run_via_pc_agent(
         agent_id,
         user_id,
         Some(workspace_path),
@@ -737,7 +741,20 @@ pub async fn run_with_pc_agent_workspace(
         state,
         tx,
     )
-    .await
+    .await?;
+
+    match outcome {
+        PcAgentRunOutcome::Completed => Ok(()),
+        PcAgentRunOutcome::NoReadableLightweightReply => {
+            Err(anyhow!("PC agent CLI 未返回可读内容"))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PcAgentChatOutcome {
+    Answered,
+    NoReadableReply,
 }
 
 pub async fn run_with_pc_agent_chat(
@@ -751,7 +768,7 @@ pub async fn run_with_pc_agent_chat(
     model_label: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
-) -> Result<()> {
+) -> Result<PcAgentChatOutcome> {
     if let Err(msg) = billing::check_can_call(&state.store, user_id) {
         return Err(anyhow!(msg));
     }
@@ -761,7 +778,7 @@ pub async fn run_with_pc_agent_chat(
         scope
     });
 
-    run_via_pc_agent(
+    let outcome = run_via_pc_agent(
         agent_id,
         user_id,
         None,
@@ -776,7 +793,12 @@ pub async fn run_with_pc_agent_chat(
         state,
         tx,
     )
-    .await
+    .await?;
+
+    Ok(match outcome {
+        PcAgentRunOutcome::Completed => PcAgentChatOutcome::Answered,
+        PcAgentRunOutcome::NoReadableLightweightReply => PcAgentChatOutcome::NoReadableReply,
+    })
 }
 
 fn native_session_uuid(cli_name: &str, scope: &NativeSessionScope) -> String {
@@ -854,6 +876,12 @@ fn pc_route_a_extra_args(
 
 /// 把 AI 请求委托给通过 WS 连接的 PC agent，在 PC 上执行指定 CLI（copilot 或 codex）。
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum PcAgentRunOutcome {
+    Completed,
+    NoReadableLightweightReply,
+}
+
 async fn run_via_pc_agent(
     agent_id: &str,
     user_id: &str,
@@ -868,7 +896,7 @@ async fn run_via_pc_agent(
     model_label: Option<&str>,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
-) -> Result<()> {
+) -> Result<PcAgentRunOutcome> {
     let lightweight_pc_chat = !request_mode.is_plan() && cwd.is_none();
     // prompt 构造
     let prompt = if lightweight_pc_chat {
@@ -1057,17 +1085,6 @@ async fn run_via_pc_agent(
                 Ok(None) => break,
                 Err(_) => {
                     abort_pc_progress(&mut progress_handle);
-                    let reply =
-                        lightweight_pc_chat_reply_or_fallback(&full_text, is_codex, user_message);
-                    let _ = tx.send(
-                        WsMessage::AssistantMessage {
-                            text: reply,
-                            model_used: Some(display_model.clone()),
-                            stream_id: None,
-                            node_id: Some(agent_id.to_string()),
-                        }
-                        .to_json(),
-                    );
                     pc_billing_call.release_no_usage();
                     finish_pc_node_compute_run(
                         state,
@@ -1076,19 +1093,11 @@ async fn run_via_pc_agent(
                         None,
                         None,
                         None,
-                        Some("Lightweight PC chat timed out before CliDone; returned fallback"),
+                        Some(
+                            "Lightweight PC chat timed out before CliDone; fallback to normal chat",
+                        ),
                     );
-                    let _ = tx.send(
-                        WsMessage::Done {
-                            message: String::new(),
-                            apk_url: None,
-                            image_url: None,
-                            model_used: Some(display_model.clone()),
-                            node_id: Some(agent_id.to_string()),
-                        }
-                        .to_json(),
-                    );
-                    return Ok(());
+                    return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
                 }
             }
         } else {
@@ -1254,7 +1263,7 @@ async fn run_via_pc_agent(
                 {
                     // Copilot/Codex 流式已发，CliDone 只需补发未流式的部分
                     let reply = if lightweight_pc_chat {
-                        lightweight_pc_chat_reply_or_fallback(&full_text, is_codex, user_message)
+                        extract_lightweight_pc_chat_reply(&full_text, is_codex)
                     } else if stream_started {
                         String::new() // 已流式完毕，Done 不重复发
                     } else if is_codex {
@@ -1262,6 +1271,35 @@ async fn run_via_pc_agent(
                     } else {
                         full_text.trim().to_string()
                     };
+                    if lightweight_pc_chat && reply.is_empty() {
+                        if cli_usage.is_none() {
+                            pc_billing_call.release_no_usage();
+                            finish_pc_node_compute_run(
+                                state,
+                                &pc_accounting_key,
+                                "released_no_usage",
+                                None,
+                                None,
+                                None,
+                                Some(
+                                    "Lightweight PC chat completed without readable reply; fallback to normal chat",
+                                ),
+                            );
+                        } else {
+                            finish_pc_node_compute_run(
+                                state,
+                                &pc_accounting_key,
+                                "settled",
+                                cli_usage.as_ref(),
+                                accounting_result.as_ref(),
+                                node_transaction.as_ref(),
+                                Some(
+                                    "Lightweight PC chat used tokens but returned no readable reply; fallback to normal chat",
+                                ),
+                            );
+                        }
+                        return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
+                    }
                     if !reply.is_empty() {
                         let _ = tx.send(
                             WsMessage::AssistantMessage {
@@ -1305,7 +1343,7 @@ async fn run_via_pc_agent(
                         }
                         .to_json(),
                     );
-                    return Ok(());
+                    return Ok(PcAgentRunOutcome::Completed);
                 } else {
                     let error_message = format!("PC CLI 执行失败: {}", error.unwrap_or_default());
                     finish_pc_node_compute_run(
@@ -1327,16 +1365,29 @@ async fn run_via_pc_agent(
 
     abort_pc_progress(&mut progress_handle);
     if lightweight_pc_chat {
-        let reply = lightweight_pc_chat_reply_or_fallback(&full_text, is_codex, user_message);
-        let _ = tx.send(
-            WsMessage::AssistantMessage {
-                text: reply,
-                model_used: Some(display_model.clone()),
-                stream_id: None,
-                node_id: Some(agent_id.to_string()),
-            }
-            .to_json(),
-        );
+        let reply = extract_lightweight_pc_chat_reply(&full_text, is_codex);
+        if !reply.is_empty() {
+            let _ = tx.send(
+                WsMessage::AssistantMessage {
+                    text: reply,
+                    model_used: Some(display_model.clone()),
+                    stream_id: None,
+                    node_id: Some(agent_id.to_string()),
+                }
+                .to_json(),
+            );
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: String::new(),
+                    apk_url: None,
+                    image_url: None,
+                    model_used: Some(display_model.clone()),
+                    node_id: Some(agent_id.to_string()),
+                }
+                .to_json(),
+            );
+            return Ok(PcAgentRunOutcome::Completed);
+        }
         pc_billing_call.release_no_usage();
         finish_pc_node_compute_run(
             state,
@@ -1345,19 +1396,9 @@ async fn run_via_pc_agent(
             None,
             None,
             None,
-            Some("Lightweight PC chat channel closed before CliDone; returned fallback"),
+            Some("Lightweight PC chat channel closed before CliDone; fallback to normal chat"),
         );
-        let _ = tx.send(
-            WsMessage::Done {
-                message: String::new(),
-                apk_url: None,
-                image_url: None,
-                model_used: Some(display_model.clone()),
-                node_id: Some(agent_id.to_string()),
-            }
-            .to_json(),
-        );
-        return Ok(());
+        return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
     }
 
     finish_pc_node_compute_run(
@@ -1421,25 +1462,6 @@ fn extract_lightweight_pc_chat_reply(output: &str, is_codex: bool) -> String {
     }
 
     extract_marker_lightweight_reply(&clean)
-}
-
-fn lightweight_pc_chat_reply_or_fallback(
-    output: &str,
-    is_codex: bool,
-    user_message: &str,
-) -> String {
-    let extracted = extract_lightweight_pc_chat_reply(output, is_codex);
-    if extracted.is_empty() {
-        fallback_lightweight_pc_chat_reply(user_message)
-    } else {
-        extracted
-    }
-}
-
-fn fallback_lightweight_pc_chat_reply(user_message: &str) -> String {
-    quick_casual_reply(user_message)
-        .unwrap_or("我在。刚才本机 AI 没有返回可读内容，你可以继续说。")
-        .to_string()
 }
 
 fn extract_marker_lightweight_reply(output: &str) -> String {
@@ -2012,10 +2034,9 @@ fn extract_codex_reply(output: &str) -> String {
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
     use super::{
-        extract_lightweight_pc_chat_reply, lightweight_pc_chat_reply_or_fallback,
-        native_session_uuid, pc_cli_passthrough_event, pc_dispatch_started_event,
-        pc_lightweight_chat_prompt, pc_route_a_extra_args, strip_terminal_control_sequences,
-        AiCliRequestMode, NativeSessionScope,
+        extract_lightweight_pc_chat_reply, native_session_uuid, pc_cli_passthrough_event,
+        pc_dispatch_started_event, pc_lightweight_chat_prompt, pc_route_a_extra_args,
+        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2142,10 +2163,9 @@ tokens used\n\
     }
 
     #[test]
-    fn pc_lightweight_chat_fallback_keeps_tiny_greeting_visible() {
-        let reply = lightweight_pc_chat_reply_or_fallback("", true, "你好");
+    fn pc_lightweight_chat_empty_output_stays_empty_for_upstream_fallback() {
+        let reply = extract_lightweight_pc_chat_reply("", true);
 
-        assert!(!reply.trim().is_empty());
-        assert!(reply.contains("你好") || reply.contains("我在"));
+        assert!(reply.trim().is_empty());
     }
 }
