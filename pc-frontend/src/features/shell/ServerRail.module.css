@@ -1,4 +1,4 @@
-/* 对应旧 server-rail — 72px 竖向图标轨 */
+/* Material + enterprise quiet tool rail */
 
 .rail {
   grid-column: 1;
@@ -8,10 +8,10 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
-  padding: 12px 8px;
+  gap: 8px;
+  padding: 10px 8px;
   overflow-y: auto;
-  border-right: 1px solid #0b0c0e;
+  border-right: 1px solid rgba(255, 255, 255, .06);
   scrollbar-width: none;
   flex-shrink: 0;
 }
@@ -19,16 +19,16 @@
 .rail::-webkit-scrollbar { width: 0; }
 
 .avatar {
-  width: 48px;
-  height: 48px;
+  width: 44px;
+  height: 44px;
   border: 0;
-  border-radius: 50%;
-  background: var(--item-color, #27292f);
-  color: #dfe7f1;
+  border-radius: 8px;
+  background: transparent;
+  color: #aeb7c5;
   display: grid;
   place-items: center;
   position: relative;
-  transition: border-radius .14s ease, background .14s ease, color .14s ease;
+  transition: background .14s ease, color .14s ease, box-shadow .14s ease, transform .14s ease;
   flex-shrink: 0;
   text-decoration: none;
 }
@@ -37,24 +37,27 @@
 .avatar::before {
   content: "";
   position: absolute;
-  left: -10px;
+  left: -8px;
   top: 50%;
-  width: 4px;
+  width: 3px;
   height: 0;
   border-radius: 0 999px 999px 0;
-  background: #f2f3f5;
+  background: var(--blue);
   transform: translateY(-50%);
   transition: height .14s ease;
 }
 
-.avatar:hover::before { height: 20px; }
-.active::before       { height: 36px; }
+.avatar:hover::before { height: 18px; }
+.active::before       { height: 28px; }
 
 .avatar:hover,
 .active {
-  border-radius: 16px;
-  background: var(--item-hover, var(--green));
-  color: #fff;
+  background: rgba(255, 255, 255, .07);
+  color: #f4f7fb;
+}
+
+.active {
+  box-shadow: inset 0 0 0 1px rgba(108, 168, 255, .28);
 }
 
 .avatar:focus-visible {
@@ -63,40 +66,40 @@
 }
 
 .icon {
-  width: 21px;
-  height: 21px;
+  width: 22px;
+  height: 22px;
   display: block;
-  line-height: 21px;
+  line-height: 22px;
   text-align: center;
   user-select: none;
   pointer-events: none;
+  stroke-width: 2.2;
 }
 
 .divider {
-  width: 32px;
+  width: 36px;
   height: 1px;
-  background: var(--line-soft);
+  background: rgba(255, 255, 255, .08);
   flex-shrink: 0;
 }
 
 .spacer { flex: 1; }
 
 .userAvatar {
-  background: #27292f;
+  background: rgba(255, 255, 255, .04);
   font-size: 14px;
   font-weight: 700;
   color: var(--text-soft);
 }
 
 .userAvatar:hover {
-  background: #3c6fa2;
-  border-radius: 16px;
+  background: rgba(108, 168, 255, .16);
   color: #fff;
 }
 
 .railUserAvatar {
-  border-radius: inherit;
-  transition: border-radius .14s ease;
+  border-radius: 8px;
+  transition: border-radius .14s ease, box-shadow .14s ease;
 }
 
 /* ── Tooltip（hover 时显示在 rail 右侧）── */
@@ -109,13 +112,14 @@
   text-overflow: ellipsis;
   padding: 8px 10px;
   border-radius: 6px;
-  background: #0b0c0f;
+  background: #11151b;
   color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+  font-size: 12px;
+  font-weight: 650;
   white-space: nowrap;
   pointer-events: none;
-  box-shadow: 0 10px 26px rgba(0,0,0,.35);
+  border: 1px solid rgba(255, 255, 255, .08);
+  box-shadow: var(--shadow-popover);
 }
 
 .tooltip::before {
@@ -125,28 +129,35 @@
   top: 50%;
   transform: translateY(-50%) rotate(45deg);
   width: 10px; height: 10px;
-  background: #0b0c0f;
+  background: #11151b;
 }
 
 /* ── 项目 logo 按钮 ── */
 .projectAvatar {
-  background: #2c2e35;
+  background: rgba(255, 255, 255, .04);
   overflow: hidden;
 }
 .projectAvatar:hover,
 .projectAvatar.active {
-  border-radius: 16px;
+  background: rgba(108, 168, 255, .16);
 }
 .projectIcon {
-  width: 48px;
-  height: 48px;
+  width: 34px;
+  height: 34px;
   object-fit: cover;
-  border-radius: inherit;
+  object-position: center;
+  border-radius: 8px;
   display: block;
 }
 .projectFallback {
-  font-size: 18px;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, .06);
+  font-size: 16px;
   font-weight: 800;
-  color: #c4c8d4;
+  color: #cbd3df;
   user-select: none;
 }

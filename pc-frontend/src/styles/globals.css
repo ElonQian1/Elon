@@ -1,4 +1,4 @@
-/* 全局暗色主题：与旧 pc_app.css 的 Discord 风格 token 对齐 */
+/* 全局暗色主题：Material + enterprise quiet UI tokens */
 
 *, *::before, *::after {
   box-sizing: border-box;
@@ -9,14 +9,13 @@
 :root {
   color-scheme: dark;
 
-  /* 旧版完整 token（保持与 pc_app.css 一致） */
-  --rail:           #101113;
-  --sidebar:        #191a1d;
-  --sidebar-2:      #202126;
-  --surface:        #24252a;
-  --surface-2:      #2d2e35;
-  --line:           #353740;
-  --line-soft:      #2b2d34;
+  --rail:           #0d0f12;
+  --sidebar:        #17191d;
+  --sidebar-2:      #1e2127;
+  --surface:        #23262d;
+  --surface-2:      #2b2f37;
+  --line:           #3a3f49;
+  --line-soft:      #2c3038;
   --text:           #eceef3;
   --text-soft:      #c5c8d0;
   --text-muted:     #8f939d;
@@ -28,7 +27,7 @@
   --radius:         8px;
 
   /* 供新组件使用的别名 */
-  --bg-base:        #111214;
+  --bg-base:        #101216;
   --bg-surface:     var(--surface);
   --bg-elevated:    var(--surface-2);
   --bg-hover:       #2d2e35;
@@ -53,7 +52,7 @@ html, body, #root {
   height: 100%;
   width: 100%;
   overflow: hidden;
-  background: #111214;
+  background: var(--bg-base);
   color: var(--text);
 }
 
