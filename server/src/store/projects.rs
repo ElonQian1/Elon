@@ -863,6 +863,72 @@ impl Store {
         }
 
         tx.execute(
+            "DELETE FROM project_ai_reviews
+              WHERE matter_id IN (SELECT id FROM project_ai_matters WHERE project_id = ?1)
+                 OR target_assignment_id IN (
+                    SELECT a.id
+                      FROM project_ai_matter_assignments a
+                      JOIN project_ai_matters m ON m.id = a.matter_id
+                     WHERE m.project_id = ?1
+                 )",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_ai_matter_assignments
+              WHERE matter_id IN (SELECT id FROM project_ai_matters WHERE project_id = ?1)",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_ai_events
+              WHERE project_id = ?1
+                 OR matter_id IN (SELECT id FROM project_ai_matters WHERE project_id = ?1)",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_ai_matters WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_ai_bots WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_ai_node_authorizations WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_runtime_permission_audit WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_runtime_permissions WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_landing_upload_tokens WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_dev_profiles WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_identities WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_execution_sessions WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_member_conversation_discussion_messages WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
+            "DELETE FROM project_join_requests WHERE project_id = ?1",
+            params![project_id],
+        )?;
+        tx.execute(
             "DELETE FROM task_events WHERE task_id IN (SELECT id FROM tasks WHERE project_id = ?1)",
             params![project_id],
         )?;
@@ -1657,6 +1723,106 @@ mod tests {
         store
             .finish_task(&task, "done", Some("done"), None, None)
             .expect("task should finish");
+        store
+            .set_project_runtime_permission(&project.id, &user.id, "full_access")
+            .expect("runtime permission should be recorded");
+        let matter_id = "delete-matter";
+        let assignment_id = "delete-assignment";
+        {
+            let conn = store.conn().expect("connection should open");
+            let ts = now();
+            conn.execute(
+                "INSERT INTO project_join_requests
+                   (id, project_id, user_id, message, status, created_at, updated_at)
+                 VALUES ('delete-join-request', ?1, ?2, 'join', 'pending', ?3, ?3)",
+                params![project.id, user.id, ts],
+            )
+            .expect("join request should insert");
+            conn.execute(
+                "INSERT INTO project_member_conversation_discussion_messages
+                   (id, project_id, member_user_id, conversation_id, sender_user_id, content, created_at)
+                 VALUES ('delete-discussion', ?1, ?2, 'conv', ?2, 'discussion', ?3)",
+                params![project.id, user.id, ts],
+            )
+            .expect("discussion message should insert");
+            conn.execute(
+                "INSERT INTO project_execution_sessions
+                   (id, project_id, conversation_id, user_id, node_id, request_id, status, created_at, updated_at)
+                 VALUES ('delete-session', ?1, 'conv', ?2, 'node-delete', 'request-delete', 'done', ?3, ?3)",
+                params![project.id, user.id, ts],
+            )
+            .expect("execution session should insert");
+            conn.execute(
+                "INSERT INTO project_landing_upload_tokens
+                   (id, project_id, token_hash, created_by, created_at)
+                 VALUES ('delete-landing-token', ?1, 'delete-token-hash', ?2, ?3)",
+                params![project.id, user.id, ts],
+            )
+            .expect("landing token should insert");
+            conn.execute(
+                "INSERT OR REPLACE INTO project_dev_profiles (project_id, updated_at)
+                 VALUES (?1, ?2)",
+                params![project.id, ts],
+            )
+            .expect("dev profile should insert");
+            conn.execute(
+                "INSERT INTO project_identities
+                   (id, project_id, owner_user_id, scope_key, identity_type, identity_value, created_at, updated_at)
+                 VALUES ('delete-identity', ?1, ?2, 'delete-scope', 'package', 'com.elon.delete', ?3, ?3)",
+                params![project.id, user.id, ts],
+            )
+            .expect("project identity should insert");
+            conn.execute(
+                "INSERT INTO project_ai_node_authorizations
+                   (id, project_id, provider_user_id, node_id, allowed_clis_json, permission_level,
+                    enabled, created_by_user_id, created_at, updated_at)
+                 VALUES ('delete-ai-auth', ?1, ?2, 'node-delete', '[]', 'project_write', 1, ?2, ?3, ?3)",
+                params![project.id, user.id, ts],
+            )
+            .expect("AI node authorization should insert");
+            conn.execute(
+                "INSERT INTO project_ai_bots
+                   (id, project_id, provider_user_id, node_id, display_name, runtime_route, cli_name,
+                    capabilities_json, risk_level, enabled, created_at, updated_at)
+                 VALUES ('delete-ai-bot', ?1, ?2, 'node-delete', 'Delete Bot', 'codex', 'codex',
+                         '[]', 'project_write', 1, ?3, ?3)",
+                params![project.id, user.id, ts],
+            )
+            .expect("AI bot should insert");
+            conn.execute(
+                "INSERT INTO project_ai_matters
+                   (id, project_id, channel_id, requester_user_id, title, brief, collaboration_mode,
+                    status, participant_user_ids_json, node_policy_json, acceptance_criteria_json,
+                    plan_json, created_at, updated_at)
+                 VALUES (?1, ?2, 'general', ?3, 'Delete Matter', 'brief', 'solo',
+                         'done', '[]', '{}', '[]', '{}', ?4, ?4)",
+                params![matter_id, project.id, user.id, ts],
+            )
+            .expect("AI matter should insert");
+            conn.execute(
+                "INSERT INTO project_ai_matter_assignments
+                   (id, matter_id, bot_id, provider_user_id, node_id, role, runtime_route,
+                    cli_name, status, created_at, updated_at)
+                 VALUES (?1, ?2, 'delete-ai-bot', ?3, 'node-delete', 'builder',
+                         'codex', 'codex', 'done', ?4, ?4)",
+                params![assignment_id, matter_id, user.id, ts],
+            )
+            .expect("AI assignment should insert");
+            conn.execute(
+                "INSERT INTO project_ai_reviews
+                   (id, matter_id, target_assignment_id, severity, finding_json, status, created_at, updated_at)
+                 VALUES ('delete-ai-review', ?1, ?2, 'info', '{}', 'open', ?3, ?3)",
+                params![matter_id, assignment_id, ts],
+            )
+            .expect("AI review should insert");
+            conn.execute(
+                "INSERT INTO project_ai_events
+                   (id, matter_id, project_id, actor_user_id, event_type, payload_json, created_at)
+                 VALUES ('delete-ai-event', ?1, ?2, ?3, 'created', '{}', ?4)",
+                params![matter_id, project.id, user.id, ts],
+            )
+            .expect("AI event should insert");
+        }
 
         let target = store
             .project_deletion_target(&user.id, &project.id)
@@ -1672,5 +1838,43 @@ mod tests {
             .list_task_events(&task, 10)
             .expect("task events query should work")
             .is_empty());
+        let conn = store.conn().expect("connection should open");
+        for table in [
+            "project_join_requests",
+            "project_member_conversation_discussion_messages",
+            "project_execution_sessions",
+            "project_runtime_permission_audit",
+            "project_runtime_permissions",
+            "project_landing_upload_tokens",
+            "project_dev_profiles",
+            "project_identities",
+            "project_ai_node_authorizations",
+            "project_ai_bots",
+            "project_ai_matters",
+            "project_ai_events",
+        ] {
+            let sql = format!("SELECT COUNT(*) FROM {table} WHERE project_id = ?1");
+            let count: i64 = conn
+                .query_row(&sql, params![project.id], |row| row.get(0))
+                .expect("project child count should query");
+            assert_eq!(count, 0, "{table} should be purged");
+        }
+        let assignment_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_ai_matter_assignments WHERE matter_id = ?1",
+                params![matter_id],
+                |row| row.get(0),
+            )
+            .expect("assignment count should query");
+        assert_eq!(assignment_count, 0);
+        let review_count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM project_ai_reviews
+                  WHERE matter_id = ?1 OR target_assignment_id = ?2",
+                params![matter_id, assignment_id],
+                |row| row.get(0),
+            )
+            .expect("review count should query");
+        assert_eq!(review_count, 0);
     }
 }
