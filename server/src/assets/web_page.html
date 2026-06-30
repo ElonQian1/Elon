@@ -439,24 +439,25 @@
       height: 42px;
       margin-top: 2px;
       pointer-events: none;
-      transform: translateX(12px);
+      transform: translateX(8px);
       background: var(--ink-list-preview);
       -webkit-mask: var(--project-marker-url) center / contain no-repeat;
       mask: var(--project-marker-url) center / contain no-repeat;
     }
     .conversation-item .project-marker.working {
       animation: project-marker-work-pulse 1.35s linear infinite;
+      animation-delay: var(--project-marker-pulse-delay, 0ms);
     }
     @keyframes project-marker-work-pulse {
       0%, 100% {
         background: var(--ink-list-preview);
         opacity: 0.58;
-        transform: translateX(12px) scale(0.94);
+        transform: translateX(8px) scale(0.94);
       }
       50% {
         background: #FFFFFF;
         opacity: 1;
-        transform: translateX(12px) scale(1);
+        transform: translateX(8px) scale(1);
       }
     }
     .conversation-item .item-delete {
@@ -4844,8 +4845,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     }
     if (item.kind === 'project') {
       const marker = document.createElement('span');
-      marker.className = 'project-marker' + (projectIsWorkingForHome(item.data) ? ' working' : '');
+      const projectWorking = projectIsWorkingForHome(item.data);
+      marker.className = 'project-marker' + (projectWorking ? ' working' : '');
       marker.style.setProperty('--project-marker-url', 'url("data:image/png;base64,__HOME_PROJECT_MARKER_PNG_B64__")');
+      if (projectWorking) {
+        marker.style.setProperty('--project-marker-pulse-delay', `-${Date.now() % 1350}ms`);
+      }
       marker.setAttribute('aria-hidden', 'true');
       trailing.appendChild(marker);
     }

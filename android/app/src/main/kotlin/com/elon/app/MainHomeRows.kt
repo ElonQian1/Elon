@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.graphics.Typeface
 import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
+import android.os.SystemClock
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
@@ -30,7 +31,8 @@ private val homeListMonthDayFormatter = DateTimeFormatter.ofPattern("M月d日", 
 private val homeListYearMonthDayFormatter = DateTimeFormatter.ofPattern("yyyy年M月d日", Locale.CHINA)
 private val homeListWeekdays = arrayOf("周一", "周二", "周三", "周四", "周五", "周六", "周日")
 private const val HOME_LIST_PREVIEW_COLOR = "#606060"
-private const val PROJECT_MARKER_VISUAL_OFFSET_DP = 12
+private const val PROJECT_MARKER_VISUAL_OFFSET_DP = 8
+private const val PROJECT_MARKER_WORK_PULSE_MS = 1350L
 
 private fun formatHomeListTime(timestampMs: Long, nowMs: Long = System.currentTimeMillis()): String {
     if (timestampMs <= 0L) return ""
@@ -195,6 +197,8 @@ internal class MainHomeRows(
             gravity = Gravity.END
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(14), 0, 0)
+            clipChildren = false
+            clipToPadding = false
 
             time?.let { value ->
                 addView(TextView(activity).apply {
@@ -231,18 +235,14 @@ internal class MainHomeRows(
     private fun startProjectMarkerWorkingPulse(icon: ImageView) {
         val idleColor = Color.parseColor(HOME_LIST_PREVIEW_COLOR)
         val activeColor = Color.WHITE
+        updateProjectMarkerWorkingPulse(icon, idleColor, activeColor)
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            duration = 1350L
+            duration = PROJECT_MARKER_WORK_PULSE_MS
             repeatCount = ValueAnimator.INFINITE
             repeatMode = ValueAnimator.RESTART
             interpolator = LinearInterpolator()
-            addUpdateListener { valueAnimator ->
-                val pulse = sin(Math.PI * valueAnimator.animatedFraction).toFloat()
-                icon.imageTintList = ColorStateList.valueOf(blendColor(idleColor, activeColor, pulse))
-                val scale = 0.94f + 0.06f * pulse
-                icon.scaleX = scale
-                icon.scaleY = scale
-                icon.alpha = 0.58f + 0.42f * pulse
+            addUpdateListener {
+                updateProjectMarkerWorkingPulse(icon, idleColor, activeColor)
             }
         }
         icon.addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
@@ -252,6 +252,17 @@ internal class MainHomeRows(
             }
         })
         animator.start()
+    }
+
+    private fun updateProjectMarkerWorkingPulse(icon: ImageView, idleColor: Int, activeColor: Int) {
+        val fraction = (SystemClock.uptimeMillis() % PROJECT_MARKER_WORK_PULSE_MS).toFloat() /
+            PROJECT_MARKER_WORK_PULSE_MS
+        val pulse = sin(Math.PI * fraction).toFloat()
+        icon.imageTintList = ColorStateList.valueOf(blendColor(idleColor, activeColor, pulse))
+        val scale = 0.94f + 0.06f * pulse
+        icon.scaleX = scale
+        icon.scaleY = scale
+        icon.alpha = 0.58f + 0.42f * pulse
     }
 
     private fun createHomeChatTitle(title: String): TextView {
