@@ -130,6 +130,40 @@ internal fun friendlyErrorMessage(raw: String, code: String? = null, retryable: 
     }
 }
 
+internal fun friendlyChatErrorMessage(raw: String, code: String? = null, retryable: Boolean? = null): String {
+    val nestedMessage = nestedApiErrorMessage(raw)
+    val source = listOf(raw, nestedMessage, code.orEmpty()).joinToString(" ").lowercase(Locale.CHINA)
+    return when {
+        source.contains("free_quota_exhausted") ||
+            source.contains("payment required") ||
+            source.contains("endpoint is inactive") ||
+            source.contains("ai_quota_unavailable") ->
+            "当前 AI 模型暂时不可用。你可以切换一个可用模型，或稍后再试。"
+        source.contains("unauthorized") ||
+            source.contains("invalid api key") ||
+            source.contains("api key") && source.contains("invalid") ||
+            source.contains("ai_auth_config_error") ->
+            "当前 AI 模型配置不可用。请检查模型设置，或先切换到其他可用模型。"
+        source.contains("rate limit") ||
+            source.contains("too many requests") ||
+            source.contains("429") ||
+            source.contains("ai_rate_limited") ||
+            source.contains("ai_service_busy") ->
+            "刚才 AI 通道有点忙，我没有拿到完整回复。你稍后直接重发一次就行。"
+        source.contains("timeout") ||
+            source.contains("超时") ||
+            source.contains("ai_service_timeout") ->
+            "刚才 AI 回复超时了，本轮没有完成。你可以直接再发一次，我会重新接上。"
+        isTransientAiServiceConnectionError(source) ||
+            source.contains("ai_provider_connection_unstable") ||
+            source.contains("connection") ||
+            source.contains("network") ->
+            "刚才连接 AI 服务不稳定，我没有拿到完整回复。你稍后重发一次就可以。"
+        else ->
+            friendlyErrorMessage(raw, code, retryable)
+    }
+}
+
 private fun isStructuredAiErrorCode(code: String): Boolean {
     return code == "ai_service_busy" ||
         code == "ai_provider_connection_unstable" ||

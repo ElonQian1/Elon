@@ -65,8 +65,12 @@ internal class MainAssistantTerminalActions(
 
     fun handleError(rawMessage: String, code: String? = null, retryable: Boolean? = null): ChatMessage {
         resetPendingRequestState()
-        val error = friendlyErrorMessage(rawMessage, code, retryable)
         val wasDevelopment = getActiveRequestIsDevelopment()
+        val error = if (wasDevelopment) {
+            friendlyErrorMessage(rawMessage, code, retryable)
+        } else {
+            friendlyChatErrorMessage(rawMessage, code, retryable)
+        }
         if (wasDevelopment) {
             updateStage("需要处理", error)
             addProjectEvent("发生错误：${summarize(error, 30)}")
@@ -76,7 +80,7 @@ internal class MainAssistantTerminalActions(
         setActiveRequestIsPlanning(false)
         stopWorkingEvidenceForActiveConversation()
         clearCurrentEvidence()
-        return ChatMessage("error", error)
+        return ChatMessage(if (wasDevelopment) "error" else "ai", error)
     }
 
     fun handleMalformedResponse() {

@@ -16,6 +16,7 @@ internal class MainAssistantStreamEvents(
     private val addProjectEvent: (String) -> Unit
 ) {
     fun taskEventMessage(json: JsonObject): ChatMessage? {
+        if (!isDevelopmentRequest()) return null
         val event = jsonStringOrNull(json, "event").orEmpty()
         val taskId = jsonStringOrNull(json, "task_id")
         val content = jsonStringOrNull(json, "message").orEmpty()
@@ -30,6 +31,7 @@ internal class MainAssistantStreamEvents(
 
     fun progressMessage(json: JsonObject): ChatMessage? {
         val content = jsonStringOrNull(json, "message") ?: ""
+        if (!isDevelopmentRequest()) return null
         if (isCliOutputProgress(content)) {
             handleFoldedCliOutput(content)
             return null
@@ -46,12 +48,14 @@ internal class MainAssistantStreamEvents(
     }
 
     fun handleToolCall(json: JsonObject) {
+        if (!isDevelopmentRequest()) return
         val tool = jsonStringOrNull(json, "tool") ?: "工具"
         maybeAppendToolCallNarrative(tool)
         markToolCallStarted(tool)
     }
 
     fun handleToolResult(json: JsonObject) {
+        if (!isDevelopmentRequest()) return
         val tool = jsonStringOrNull(json, "tool") ?: "工具"
         val result = jsonStringOrNull(json, "result").orEmpty()
         val evidence = if (result.isBlank()) {

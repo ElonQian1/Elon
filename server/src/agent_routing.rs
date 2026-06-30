@@ -160,12 +160,24 @@ pub(crate) fn casual_chat_prompt() -> &'static str {
 
 pub(crate) fn quick_casual_reply(user_message: &str) -> Option<&'static str> {
     match user_message.trim().to_lowercase().as_str() {
-        "你好" | "你好呀" | "在吗" | "你在吗" | "在不在" | "hi" | "hello" => {
+        "你好" | "你好呀" | "你好在吗" | "你好，在吗" | "在吗" | "你在吗" | "在不在" | "hi"
+        | "hello" => {
             Some("你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。")
         }
         "谢谢" | "谢谢你" | "辛苦了" => {
             Some("不客气，我在这边。你继续说下一步想怎么改就行。")
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::quick_casual_reply;
+
+    #[test]
+    fn quick_reply_handles_common_presence_greeting() {
+        assert!(quick_casual_reply("你好在吗").is_some());
+        assert!(quick_casual_reply("你好，在吗").is_some());
     }
 }

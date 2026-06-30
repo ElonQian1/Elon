@@ -161,16 +161,25 @@ async fn run_with_workspace_mode(
         return Err(anyhow!(msg));
     }
 
+    let planning_task = request_mode.is_plan();
+    let development_task = planning_task
+        || route != intent_router::CapabilityRoute::ChatAgent
+        || intent_router::looks_like_development_request(user_message);
+    let lightweight_chat_task =
+        route == intent_router::CapabilityRoute::ChatAgent && !development_task;
+    let tiny_chat_task = lightweight_chat_task && is_tiny_chat_message(user_message);
+
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
     // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
-    // 利用 PC 性能处理请求，同时将结果流式返回给 APK。
+    // 利用 PC 性能处理项目开发请求，同时将结果流式返回给 APK。
+    // 普通聊天不走 PC CLI，避免把节点/CLI 降级等内部状态暴露到对话里。
     // 通过 PC_CLI_RELAY_ENABLED=false 可禁用此功能，回退到云端本地 CLI。
     let pc_relay_enabled = std::env::var("PC_CLI_RELAY_ENABLED")
         .map(|v| v != "false")
         .unwrap_or(true);
-    if pc_relay_enabled {
+    if pc_relay_enabled && development_task {
         if let Some(agent_id) = state.agent_manager.any_connected_agent_id().await {
-            let _ = tx.send(WsMessage::progress("正在连接 PC Copilot CLI...").to_json());
+            let _ = tx.send(WsMessage::progress("正在连接 PC 开发节点。").to_json());
             match run_via_pc_agent(
                 &agent_id,
                 user_id,
@@ -191,10 +200,7 @@ async fn run_with_workspace_mode(
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     tracing::warn!("[ai_cli] PC agent CLI 失败，回退本地: {e:#}");
-                    let _ = tx.send(
-                        WsMessage::progress(format!("PC CLI 暂不可用，切换本地 CLI: {e}"))
-                            .to_json(),
-                    );
+                    let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
                 }
             }
         }
@@ -209,13 +215,6 @@ async fn run_with_workspace_mode(
 
     std::fs::create_dir_all(workspace)?;
 
-    let planning_task = request_mode.is_plan();
-    let development_task = planning_task
-        || route != intent_router::CapabilityRoute::ChatAgent
-        || intent_router::looks_like_development_request(user_message);
-    let lightweight_chat_task =
-        route == intent_router::CapabilityRoute::ChatAgent && !development_task;
-    let tiny_chat_task = lightweight_chat_task && is_tiny_chat_message(user_message);
     if lightweight_chat_task {
         cap_option_timeout(&mut option, chat_timeout_cap_secs(tiny_chat_task));
     }
