@@ -46,6 +46,7 @@ use self::{
     ai_cli_trace::{record_cli_retry, record_cli_session_skipped, CliTraceContext},
 };
 use crate::{
+    agent_routing::quick_casual_reply,
     billing, intent_router, tools,
     types::{AppState, WsMessage},
 };
@@ -137,6 +138,25 @@ async fn run_with_workspace_mode(
     request_mode: AiCliRequestMode,
     started: std::time::Instant,
 ) -> Result<()> {
+    if request_mode == AiCliRequestMode::Execute
+        && route == intent_router::CapabilityRoute::ChatAgent
+        && !intent_router::looks_like_development_request(user_message)
+    {
+        if let Some(reply) = quick_casual_reply(user_message) {
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: reply.to_string(),
+                    apk_url: None,
+                    image_url: None,
+                    model_used: None,
+                    node_id: None,
+                }
+                .to_json(),
+            );
+            return Ok(());
+        }
+    }
+
     if let Err(msg) = billing::check_can_call(&state.store, user_id) {
         return Err(anyhow!(msg));
     }

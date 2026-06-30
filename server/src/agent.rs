@@ -73,102 +73,101 @@ pub async fn run_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
-        let runtime_choice =
-            choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
-        if let Some(error) = runtime_choice.error {
-            let _ = tx.send(WsMessage::error(error).to_json());
-            return;
-        }
-        let _ = tx.send(
-            WsMessage::progress(format!(
-                "正在连接 PC 节点 {} 使用 {} 处理本地项目。",
-                agent_id,
-                runtime_choice.progress_label()
-            ))
-            .to_json(),
-        );
-        let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
-            project_id: project.id.clone(),
-            user_id: user_id.to_string(),
-            conversation_id: cid.to_string(),
-            runtime_permission: project.runtime_permission.clone(),
-        });
-        let pc_user_message =
-            append_project_dev_profile_context(state, user_id, project, user_message);
-        let run_result = ai_cli::run_with_pc_agent_workspace(
-            agent_id,
-            user_id,
-            pc_workspace,
-            &pc_user_message,
-            None,
-            ai_cli::AiCliRequestMode::Execute,
-            session_scope.clone(),
-            Some(runtime_choice.cli_name.as_str()),
-            runtime_choice.copilot_model.as_deref(),
-            runtime_choice.codex_reasoning_effort.as_deref(),
-            runtime_choice.model_label.as_deref(),
-            state,
-            &tx,
-        )
-        .await;
-        if let Err(e) = run_result {
-            let error_str = e.to_string();
-            // Codex 额度/认证失败时，自动切换 Copilot 重试
-            if runtime_choice.cli_name == "codex"
-                && is_codex_fallback_error(&error_str)
-                && node_cli_available(state, agent_id, "copilot").await
-            {
-                let _ = tx.send(
-                    WsMessage::progress("Codex 额度已用尽，正在自动切换到 Copilot 继续执行…")
-                        .to_json(),
-                );
-                if let Err(e2) = ai_cli::run_with_pc_agent_workspace(
-                    agent_id,
-                    user_id,
-                    pc_workspace,
-                    &pc_user_message,
-                    None,
-                    ai_cli::AiCliRequestMode::Execute,
-                    session_scope,
-                    Some("copilot"),
-                    None,
-                    None,
-                    Some("Copilot（Codex 额度回退）"),
-                    state,
-                    &tx,
-                )
-                .await
-                {
-                    error!("Copilot 回退执行出错: {}", e2);
-                    let _ = tx.send(
-                        WsMessage::classified_error(crate::errors::classify_ai_error(
-                            &e2.to_string(),
-                        ))
-                        .to_json(),
-                    );
-                }
-            } else {
-                error!("PC 本地项目代理运行出错: {}", e);
-                let _ = tx.send(
-                    WsMessage::classified_error(crate::errors::classify_ai_error(&error_str))
-                        .to_json(),
-                );
-            }
-        }
-        return;
-    }
-
     let user_config_workspace = state.get_user_workspace(user_id);
     let require_existing_git = matches!(
         project.source_type.as_str(),
         "local_path" | "github" | "pc_managed"
     );
-    let decision = intent_router::classify(user_message);
-    let requires_project_workflow = decision.route != CapabilityRoute::ChatAgent
-        || is_short_resume_command(user_message, &workspace)
-        || is_short_build_command(user_message, &workspace)
-        || is_project_delivery_request(user_message, &workspace);
+    let requires_project_workflow = requires_project_workflow_for_message(user_message, workspace);
+
+    if requires_project_workflow {
+        if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
+            let runtime_choice =
+                choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
+            if let Some(error) = runtime_choice.error {
+                let _ = tx.send(WsMessage::error(error).to_json());
+                return;
+            }
+            let _ = tx.send(
+                WsMessage::progress(format!(
+                    "正在连接 PC 节点 {} 使用 {} 处理本地项目。",
+                    agent_id,
+                    runtime_choice.progress_label()
+                ))
+                .to_json(),
+            );
+            let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+                project_id: project.id.clone(),
+                user_id: user_id.to_string(),
+                conversation_id: cid.to_string(),
+                runtime_permission: project.runtime_permission.clone(),
+            });
+            let pc_user_message =
+                append_project_dev_profile_context(state, user_id, project, user_message);
+            let run_result = ai_cli::run_with_pc_agent_workspace(
+                agent_id,
+                user_id,
+                pc_workspace,
+                &pc_user_message,
+                None,
+                ai_cli::AiCliRequestMode::Execute,
+                session_scope.clone(),
+                Some(runtime_choice.cli_name.as_str()),
+                runtime_choice.copilot_model.as_deref(),
+                runtime_choice.codex_reasoning_effort.as_deref(),
+                runtime_choice.model_label.as_deref(),
+                state,
+                &tx,
+            )
+            .await;
+            if let Err(e) = run_result {
+                let error_str = e.to_string();
+                // Codex 额度/认证失败时，自动切换 Copilot 重试
+                if runtime_choice.cli_name == "codex"
+                    && is_codex_fallback_error(&error_str)
+                    && node_cli_available(state, agent_id, "copilot").await
+                {
+                    let _ = tx.send(
+                        WsMessage::progress("Codex 额度已用尽，正在自动切换到 Copilot 继续执行…")
+                            .to_json(),
+                    );
+                    if let Err(e2) = ai_cli::run_with_pc_agent_workspace(
+                        agent_id,
+                        user_id,
+                        pc_workspace,
+                        &pc_user_message,
+                        None,
+                        ai_cli::AiCliRequestMode::Execute,
+                        session_scope,
+                        Some("copilot"),
+                        None,
+                        None,
+                        Some("Copilot（Codex 额度回退）"),
+                        state,
+                        &tx,
+                    )
+                    .await
+                    {
+                        error!("Copilot 回退执行出错: {}", e2);
+                        let _ = tx.send(
+                            WsMessage::classified_error(crate::errors::classify_ai_error(
+                                &e2.to_string(),
+                            ))
+                            .to_json(),
+                        );
+                    }
+                } else {
+                    error!("PC 本地项目代理运行出错: {}", e);
+                    let _ = tx.send(
+                        WsMessage::classified_error(crate::errors::classify_ai_error(&error_str))
+                            .to_json(),
+                    );
+                }
+            }
+            return;
+        }
+    }
+
     let require_git_for_this_request = require_existing_git && requires_project_workflow;
     let mut preflight_note: Option<String> = None;
     if require_git_for_this_request
@@ -237,6 +236,14 @@ pub async fn run_for_project_in_workspace(
             WsMessage::classified_error(crate::errors::classify_ai_error(&e.to_string())).to_json(),
         );
     }
+}
+
+fn requires_project_workflow_for_message(user_message: &str, workspace: &Path) -> bool {
+    let decision = intent_router::classify(user_message);
+    decision.route != CapabilityRoute::ChatAgent
+        || is_short_resume_command(user_message, workspace)
+        || is_short_build_command(user_message, workspace)
+        || is_project_delivery_request(user_message, workspace)
 }
 
 pub async fn plan_for_project_in_workspace(
@@ -924,5 +931,27 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
         (Some(git), None) => Some(git.to_string()),
         (None, Some(source)) => Some(source.to_string()),
         (None, None) => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::requires_project_workflow_for_message;
+    use std::path::Path;
+
+    #[test]
+    fn casual_greeting_does_not_require_project_workflow() {
+        assert!(!requires_project_workflow_for_message(
+            "你好",
+            Path::new("C:/tmp/project")
+        ));
+    }
+
+    #[test]
+    fn app_change_requires_project_workflow() {
+        assert!(requires_project_workflow_for_message(
+            "帮我在首页加一个按钮",
+            Path::new("C:/tmp/project")
+        ));
     }
 }
