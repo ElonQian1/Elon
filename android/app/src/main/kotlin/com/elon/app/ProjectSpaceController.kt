@@ -106,7 +106,8 @@ internal class ProjectSpaceController(
                 space?.project?.id,
                 space?.project?.name
             )
-        }
+        },
+        replaceProjectPreviewImage = { space, slot -> replaceProjectPreviewImage(space, slot) }
     )
 
     private fun handleProjectSpaceJoin() {
@@ -1123,6 +1124,57 @@ internal class ProjectSpaceController(
                     Toast.makeText(activity, error.message ?: "保存项目简介失败", Toast.LENGTH_SHORT).show()
                 }
             }
+        }
+    }
+
+    private fun replaceProjectPreviewImage(space: ProjectSpace, slot: Int) {
+        if (!canEditProjectDescription(space.project.role)) {
+            Toast.makeText(activity, "只有项目创建者或管理员可更换应用图片", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val projectId = space.project.id
+        val route = activeRoute
+        pickPostImage(space.project) { uploadResult ->
+            uploadResult
+                .onSuccess { imageUrl ->
+                    Toast.makeText(activity, "正在更新应用图片...", Toast.LENGTH_SHORT).show()
+                    thread(name = "project-preview-image-save") {
+                        val result = runCatching {
+                            updateProjectGalleryImage(
+                                http = http,
+                                serverUrl = serverUrl,
+                                context = activity,
+                                projectId = projectId,
+                                slot = slot,
+                                imageUrl = imageUrl,
+                                route = route
+                            )
+                        }
+                        activity.runOnUiThread {
+                            result
+                                .onSuccess { images ->
+                                    val current = activeSpace
+                                    if (current != null && current.project.id == projectId) {
+                                        val next = current.copy(galleryImages = images)
+                                        activeSpace = next
+                                        spaceCache[projectId] = next
+                                        renderProjectSpaceLanding()
+                                    }
+                                    Toast.makeText(activity, "应用图片已更新", Toast.LENGTH_SHORT).show()
+                                }
+                                .onFailure { error ->
+                                    Toast.makeText(
+                                        activity,
+                                        error.message ?: "保存应用图片失败",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                }
+                        }
+                    }
+                }
+                .onFailure { error ->
+                    Toast.makeText(activity, error.message ?: "选择图片失败", Toast.LENGTH_SHORT).show()
+                }
         }
     }
 

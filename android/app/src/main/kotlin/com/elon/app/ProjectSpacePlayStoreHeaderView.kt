@@ -27,9 +27,10 @@ internal class ProjectSpacePlayStoreHeaderView(
     private val openProjectDocuments: () -> Unit,
     private val openProjectResources: () -> Unit,
     private val projectApkActionLabel: () -> String,
-    private val downloadProjectApk: () -> Unit
+    private val downloadProjectApk: () -> Unit,
+    private val replaceProjectPreviewImage: (ProjectSpace, Int) -> Unit
 ) {
-    fun render(space: ProjectSpace, postCount: Int): LinearLayout {
+    fun render(space: ProjectSpace, postCount: Int, previewImages: List<String?>): LinearLayout {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             setBackgroundColor(Color.parseColor(PLAY_BG))
@@ -60,7 +61,7 @@ internal class ProjectSpacePlayStoreHeaderView(
                 topMargin = dp(28)
                 rightMargin = dp(24)
             })
-            addView(previewStrip(), LinearLayout.LayoutParams(
+            addView(previewStrip(space, previewImages), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(167)
             ).apply {
@@ -317,7 +318,7 @@ internal class ProjectSpacePlayStoreHeaderView(
         }
     }
 
-    private fun previewStrip(): HorizontalScrollView {
+    private fun previewStrip(space: ProjectSpace, previewImages: List<String?>): HorizontalScrollView {
         return HorizontalScrollView(activity).apply {
             isHorizontalScrollBarEnabled = false
             overScrollMode = View.OVER_SCROLL_NEVER
@@ -325,13 +326,8 @@ internal class ProjectSpacePlayStoreHeaderView(
             setPadding(dp(24), 0, dp(24), 0)
             addView(LinearLayout(activity).apply {
                 orientation = LinearLayout.HORIZONTAL
-                listOf(
-                    PreviewCard("Fast", "Simple, reliable builds", "#28AEEA", "#DDF5FF"),
-                    PreviewCard("Powerful", "AI edits and packages", "#14AFC5", "#E4FBFF"),
-                    PreviewCard("Secure", "Private project space", "#38B95C", "#F1FFF3"),
-                    PreviewCard("Private", "Only your team sees it", "#168F8F", "#E9FFFF")
-                ).forEachIndexed { index, card ->
-                    addView(previewCard(card), LinearLayout.LayoutParams(dp(88), dp(167)).apply {
+                (0 until PREVIEW_SLOT_COUNT).forEach { index ->
+                    addView(previewCard(space, index, previewImages.getOrNull(index)), LinearLayout.LayoutParams(dp(88), dp(167)).apply {
                         if (index < 3) marginEnd = dp(13)
                     })
                 }
@@ -342,59 +338,72 @@ internal class ProjectSpacePlayStoreHeaderView(
         }
     }
 
-    private fun previewCard(card: PreviewCard): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(8), dp(8), dp(8), dp(8))
-            background = roundedBackground(card.bg, 8)
-            addView(TextView(activity).apply {
-                text = card.title
-                textSize = 14f
-                includeFontPadding = false
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                setTextColor(Color.WHITE)
-                gravity = Gravity.CENTER
-                maxLines = 1
-                ellipsize = TextUtils.TruncateAt.END
-            })
-            addView(TextView(activity).apply {
-                text = card.subtitle
-                textSize = 6f
-                includeFontPadding = false
-                setTextColor(Color.parseColor(card.ink))
-                gravity = Gravity.CENTER
-                maxLines = 2
-                ellipsize = TextUtils.TruncateAt.END
-            }, LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply {
-                topMargin = dp(5)
-            })
-            addView(phoneMock(), LinearLayout.LayoutParams(dp(64), 0, 1f).apply {
-                topMargin = dp(8)
-            })
+    private fun previewCard(space: ProjectSpace, index: Int, source: String?): FrameLayout {
+        val cleanSource = source.cleanProjectSpaceDisplayName()
+        val editable = canEditProjectDescription(space.project.role)
+        return FrameLayout(activity).apply {
+            background = roundedStrokeBackground(PLAY_BG, 8, PLAY_PREVIEW_BORDER, 1)
+            clipToPadding = true
+            contentDescription = if (cleanSource == null) "应用图片占位" else "应用图片 ${index + 1}"
+            if (editable) {
+                isLongClickable = true
+                setOnLongClickListener {
+                    replaceProjectPreviewImage(space, index)
+                    true
+                }
+            }
+            if (cleanSource == null) {
+                addView(ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_project_preview_placeholder)
+                    scaleType = ImageView.ScaleType.CENTER_INSIDE
+                    adjustViewBounds = false
+                }, FrameLayout.LayoutParams(dp(34), dp(34), Gravity.CENTER))
+            } else {
+                addView(ImageView(activity).apply {
+                    tag = cleanSource
+                    scaleType = ImageView.ScaleType.CENTER
+                    setBackgroundColor(Color.parseColor(PLAY_BG))
+                    setImageResource(R.drawable.ic_project_preview_placeholder)
+                    setOnClickListener { openPreviewImage(cleanSource) }
+                    if (editable) {
+                        isLongClickable = true
+                        setOnLongClickListener {
+                            replaceProjectPreviewImage(space, index)
+                            true
+                        }
+                    }
+                    ChatImagePreviewLoader.cached(cleanSource)?.let { bitmap ->
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                            cornerRadius = dp(8).toFloat()
+                            setAntiAlias(true)
+                        })
+                    } ?: ChatImagePreviewLoader.load(activity, cleanSource) { bitmap ->
+                        post {
+                            if (tag == cleanSource) {
+                                scaleType = ImageView.ScaleType.CENTER_CROP
+                                setImageDrawable(RoundedBitmapDrawableFactory.create(resources, bitmap).apply {
+                                    cornerRadius = dp(8).toFloat()
+                                    setAntiAlias(true)
+                                })
+                            }
+                        }
+                    }
+                }, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT
+                ))
+            }
         }
     }
 
-    private fun phoneMock(): LinearLayout {
-        return LinearLayout(activity).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(5), dp(7), dp(5), dp(5))
-            background = roundedBackground("#20384B", 10)
-            repeat(7) { index ->
-                addView(View(activity).apply {
-                    background = roundedBackground(if (index % 3 == 0) "#2BBF92" else "#FFFFFF", 2)
-                }, LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    dp(if (index == 0) 10 else 7)
-                ).apply {
-                    if (index > 0) topMargin = dp(5)
-                    if (index % 2 == 1) rightMargin = dp(14)
-                })
-            }
+    private fun openPreviewImage(source: String) {
+        val attachment = if (source.startsWith("http://", true) || source.startsWith("https://", true)) {
+            ChatAttachment(kind = "image", displayName = "应用图片", mimeType = "image/*", url = source)
+        } else {
+            ChatAttachment(kind = "image", displayName = "应用图片", mimeType = "image/*", localPath = source)
         }
+        ChatImageViewer.show(activity, attachment)
     }
 
     private fun roundedBackground(colorHex: String, radiusDp: Int): GradientDrawable {
@@ -417,13 +426,6 @@ internal class ProjectSpacePlayStoreHeaderView(
         }
     }
 
-    private data class PreviewCard(
-        val title: String,
-        val subtitle: String,
-        val bg: String,
-        val ink: String
-    )
-
     private companion object {
         const val PLAY_CONTENT_TOP_DP = 16
         const val PLAY_BG = "#131313"
@@ -433,5 +435,7 @@ internal class ProjectSpacePlayStoreHeaderView(
         const val PLAY_DIVIDER = "#444444"
         const val PLAY_INSTALL_BG = "#AEC6F6"
         const val PLAY_INSTALL_TEXT = "#182E63"
+        const val PLAY_PREVIEW_BORDER = "#303030"
+        const val PREVIEW_SLOT_COUNT = 4
     }
 }

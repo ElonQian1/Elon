@@ -60,6 +60,31 @@ internal fun updateProjectSpaceDescription(
     }
 }
 
+internal fun updateProjectGalleryImage(
+    http: OkHttpClient,
+    serverUrl: String,
+    context: Context,
+    projectId: String,
+    slot: Int,
+    imageUrl: String,
+    route: ProjectSpaceRoute = ProjectSpaceRoute()
+): List<String> {
+    val payload = JSONObject()
+        .put("slot", slot)
+        .put("image_url", imageUrl)
+    val request = AuthManager.applyAuth(
+        context,
+        Request.Builder()
+            .url(projectSpaceUrl(serverUrl, projectId, route, "space/gallery-image"))
+            .method("PATCH", payload.toString().toRequestBody("application/json".toMediaType()))
+    ).build()
+    http.newCall(request).execute().use { response ->
+        val body = response.body?.string().orEmpty()
+        if (!response.isSuccessful) error(readProjectSpaceError(body, "保存应用图片失败"))
+        return parseProjectImageList(JSONObject(body).optJSONArray("gallery_images") ?: JSONArray())
+    }
+}
+
 internal fun fetchProjectChannelMessages(
     http: OkHttpClient,
     serverUrl: String,
@@ -397,7 +422,14 @@ private fun parseProjectSpace(json: JSONObject): ProjectSpace {
         project = parseProjectSpaceSummary(project),
         channels = List(channels.length()) { parseProjectChannel(channels.optJSONObject(it) ?: JSONObject()) },
         members = List(members.length()) { parseProjectMember(members.optJSONObject(it) ?: JSONObject()) },
-        latestApkUrl = json.optString("latest_apk_url").takeIf { it.isNotBlank() }
+        latestApkUrl = json.optString("latest_apk_url").takeIf { it.isNotBlank() },
+        galleryImages = parseProjectImageList(
+            json.optJSONArray("gallery_images")
+                ?: project.optJSONArray("gallery_images")
+                ?: project.optJSONArray("galleryImages")
+                ?: JSONArray()
+        ),
+        landingPreviewImages = parseLandingPreviewImages(json.optJSONObject("landing"))
     )
 }
 
@@ -427,6 +459,28 @@ private fun JSONObject.optProjectSpaceDisplayName(): String? {
         optString(key, "").cleanProjectSpaceApiString()?.let { return it }
     }
     return null
+}
+
+private fun parseProjectImageList(arr: JSONArray): List<String> {
+    return List(arr.length()) { index ->
+        arr.optString(index, "").cleanProjectSpaceApiString().orEmpty()
+    }.take(4)
+}
+
+private fun parseLandingPreviewImages(landing: JSONObject?): List<String> {
+    val media = landing?.optJSONArray("media") ?: return emptyList()
+    return buildList {
+        for (index in 0 until media.length()) {
+            val item = media.optJSONObject(index) ?: continue
+            val kind = item.optString("kind", item.optString("type", "")).trim().lowercase()
+            val url = item.optString("url", item.optString("src", "")).cleanProjectSpaceApiString()
+                ?: continue
+            val looksLikeImage = kind.contains("image") ||
+                url.substringBefore('?').lowercase().matches(Regex(""".*\.(png|jpe?g|webp|gif)$"""))
+            if (looksLikeImage) add(url)
+            if (size >= 4) break
+        }
+    }
 }
 
 private fun parseProjectChannel(json: JSONObject) = ProjectChannel(

@@ -30,7 +30,8 @@ internal class ProjectSpaceFeedView(
     private val openProjectDocuments: () -> Unit,
     private val openProjectResources: () -> Unit,
     private val projectApkActionLabel: () -> String,
-    private val downloadProjectApk: () -> Unit
+    private val downloadProjectApk: () -> Unit,
+    private val replaceProjectPreviewImage: (ProjectSpace, Int) -> Unit
 ) {
     private val metricPrefs = activity.getSharedPreferences(POST_METRIC_PREFS, Context.MODE_PRIVATE)
     private val playStoreHeader = ProjectSpacePlayStoreHeaderView(
@@ -42,7 +43,8 @@ internal class ProjectSpaceFeedView(
         openProjectDocuments = openProjectDocuments,
         openProjectResources = openProjectResources,
         projectApkActionLabel = projectApkActionLabel,
-        downloadProjectApk = downloadProjectApk
+        downloadProjectApk = downloadProjectApk,
+        replaceProjectPreviewImage = replaceProjectPreviewImage
     )
 
     @Suppress("UNUSED_PARAMETER")
@@ -53,7 +55,7 @@ internal class ProjectSpaceFeedView(
         loading: Boolean
     ) {
         val posts = feedPosts(space, messagesByChannel)
-        container.addView(playStoreHeader.render(space, posts.size))
+        container.addView(playStoreHeader.render(space, posts.size, projectPreviewImages(space, posts)))
         container.addView(projectStoreContent(space, posts, loading))
     }
 
@@ -206,6 +208,24 @@ internal class ProjectSpaceFeedView(
                 .map { ProjectSpaceFeedPost(channel, it, replyCounts[it.id] ?: 0) }
         }.sortedByDescending { parseChatMessageCreatedAt(it.message.createdAt) ?: 0L }
             .take(MAX_FEED_POSTS)
+    }
+
+    private fun projectPreviewImages(
+        space: ProjectSpace,
+        posts: List<ProjectSpaceFeedPost>
+    ): List<String?> {
+        val manual = space.galleryImages.take(PROJECT_PREVIEW_SLOT_COUNT)
+        val manualSet = manual.mapNotNull { it.cleanProjectSpaceDisplayName() }.toSet()
+        val automatic = (space.landingPreviewImages + posts.mapNotNull {
+            extractProjectSpacePostImageSource(parseProjectSpacePostText(it.message.content).body)
+        })
+            .mapNotNull { it.cleanProjectSpaceDisplayName() }
+            .filterNot { it in manualSet }
+            .distinct()
+        return (0 until PROJECT_PREVIEW_SLOT_COUNT).map { index ->
+            manual.getOrNull(index).cleanProjectSpaceDisplayName()
+                ?: automatic.getOrNull(index)
+        }
     }
 
     private fun postCard(post: ProjectSpaceFeedPost): LinearLayout {
@@ -562,6 +582,7 @@ internal class ProjectSpaceFeedView(
 
     private companion object {
         const val MAX_FEED_POSTS = 40
+        const val PROJECT_PREVIEW_SLOT_COUNT = 4
         const val MAX_IMAGE_PREVIEW_BYTES = 5 * 1024 * 1024
         const val POST_METRIC_PREFS = "project_post_metrics"
         const val PROJECT_SPACE_STORE_BG = "#131313"

@@ -4,7 +4,9 @@ internal data class ProjectSpace(
     val project: ProjectSpaceSummary,
     val channels: List<ProjectChannel>,
     val members: List<ProjectMember>,
-    val latestApkUrl: String?
+    val latestApkUrl: String?,
+    val galleryImages: List<String>,
+    val landingPreviewImages: List<String>
 )
 
 internal data class ProjectSpaceSummary(

@@ -917,13 +917,33 @@
       height: 167px;
       margin-top: 10px;
       padding: 0 18px;
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 16px;
+      display: flex;
+      gap: 13px;
+      overflow-x: auto;
     }
+    .project-space-preview-grid::-webkit-scrollbar { display: none; }
     .project-space-preview-cell {
+      width: 88px;
+      height: 167px;
+      flex: 0 0 88px;
       border-radius: 9px;
-      background: #7B7B7B;
+      border: 1px solid #303030;
+      background: var(--store-detail-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .project-space-preview-cell.placeholder img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+    }
+    .project-space-preview-cell.real img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
     }
     .project-space-feed {
       position: relative;
@@ -1407,18 +1427,27 @@
       width: 88px;
       height: 167px;
       border-radius: 8px;
-      padding: 8px;
+      padding: 0;
       flex: 0 0 88px;
       scroll-snap-align: start;
       display: flex;
-      flex-direction: column;
       align-items: center;
-      background: #28AEEA;
+      justify-content: center;
+      border: 1px solid #303030;
+      background: var(--store-detail-bg);
       overflow: hidden;
     }
-    .project-space-preview-cell.powerful { background: #14AFC5; }
-    .project-space-preview-cell.secure { background: #38B95C; }
-    .project-space-preview-cell.private { background: #168F8F; }
+    #projectProgressPanel .project-space-preview-cell.placeholder img {
+      width: 34px;
+      height: 34px;
+      object-fit: contain;
+    }
+    #projectProgressPanel .project-space-preview-cell.real img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
     .project-space-preview-title {
       color: #FFFFFF;
       font-size: 14px;
@@ -2941,54 +2970,18 @@
           </div>
           <button class="project-space-install" id="projectSpaceDownloadBtn" type="button">安装</button>
         </div>
-        <div class="project-space-preview-grid" aria-hidden="true">
-          <div class="project-space-preview-cell">
-            <div class="project-space-preview-title">Fast</div>
-            <div class="project-space-preview-subtitle">Simple, reliable builds</div>
-            <div class="project-space-phone-mock">
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-            </div>
+        <div class="project-space-preview-grid" id="projectSpacePreviewGrid" aria-label="应用图片">
+          <div class="project-space-preview-cell placeholder">
+            <img src="/assets/ic_project_preview_placeholder.png" alt="" />
           </div>
-          <div class="project-space-preview-cell powerful">
-            <div class="project-space-preview-title">Powerful</div>
-            <div class="project-space-preview-subtitle">AI edits and packages</div>
-            <div class="project-space-phone-mock">
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-            </div>
+          <div class="project-space-preview-cell placeholder">
+            <img src="/assets/ic_project_preview_placeholder.png" alt="" />
           </div>
-          <div class="project-space-preview-cell secure">
-            <div class="project-space-preview-title">Secure</div>
-            <div class="project-space-preview-subtitle">Private project space</div>
-            <div class="project-space-phone-mock">
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-            </div>
+          <div class="project-space-preview-cell placeholder">
+            <img src="/assets/ic_project_preview_placeholder.png" alt="" />
           </div>
-          <div class="project-space-preview-cell private">
-            <div class="project-space-preview-title">Private</div>
-            <div class="project-space-preview-subtitle">Only your team sees it</div>
-            <div class="project-space-phone-mock">
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-              <span class="project-space-phone-line"></span>
-              <span class="project-space-phone-line short"></span>
-            </div>
+          <div class="project-space-preview-cell placeholder">
+            <img src="/assets/ic_project_preview_placeholder.png" alt="" />
           </div>
         </div>
         <button class="project-space-intro-card empty hidden" id="projectIntroCard" type="button">添加项目简介</button>
@@ -3629,6 +3622,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   const projectSpaceAnnouncementMenu = $('projectSpaceAnnouncementMenu');
   const projectSpacePostList = $('projectSpacePostList');
   const projectSpaceDownloadBtn = $('projectSpaceDownloadBtn');
+  const projectSpacePreviewGrid = $('projectSpacePreviewGrid');
   const projectSpaceDocsBtn = $('projectSpaceDocsBtn');
   const projectSpaceResourcesBtn = $('projectSpaceResourcesBtn');
   const projectSpaceJoinBtn = $('projectSpaceJoinBtn');
@@ -6009,6 +6003,60 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const url = raw.match(/https?:\/\/\S+\.(?:png|jpe?g|webp|gif)(?:\?\S*)?/i);
     return url ? url[0] : '';
   }
+  function cleanProjectSpaceImageSource(value) {
+    const text = cleanProjectSpaceField(value);
+    if (!text) return '';
+    const lower = text.toLowerCase();
+    return lower.startsWith('http://') || lower.startsWith('https://') || lower.startsWith('data:image/')
+      ? text
+      : '';
+  }
+  function projectSpaceLandingImages(landing) {
+    const media = Array.isArray(landing && landing.media) ? landing.media : [];
+    return media.map((item) => {
+      const url = cleanProjectSpaceImageSource(item && (item.url || item.src));
+      if (!url) return '';
+      const kind = String(item && (item.kind || item.type) || '').toLowerCase();
+      const looksLikeImage = kind.includes('image') || /\.(png|jpe?g|webp|gif)(?:\?|$)/i.test(url);
+      return looksLikeImage ? url : '';
+    }).filter(Boolean).slice(0, 4);
+  }
+  function projectSpaceGalleryImages(project, space) {
+    const images =
+      (space && (space.gallery_images || space.galleryImages)) ||
+      (project && (project.gallery_images || project.galleryImages)) ||
+      [];
+    return Array.isArray(images)
+      ? images.slice(0, 4).map(cleanProjectSpaceImageSource)
+      : [];
+  }
+  function projectSpacePreviewImages(project, space, posts) {
+    const manual = projectSpaceGalleryImages(project, space);
+    const manualSet = new Set(manual.filter(Boolean));
+    const automatic = [
+      ...projectSpaceLandingImages(space && space.landing),
+      ...(posts || []).map((item) => {
+        const post = parseProjectSpacePostText(item && item.message && item.message.content);
+        return extractProjectSpacePostImageSource(post.body);
+      })
+    ].map(cleanProjectSpaceImageSource).filter((url) => url && !manualSet.has(url));
+    const uniqueAutomatic = Array.from(new Set(automatic));
+    return [0, 1, 2, 3].map((slot) => manual[slot] || uniqueAutomatic[slot] || '');
+  }
+  function renderProjectSpacePreviews(project, space, posts) {
+    if (!projectSpacePreviewGrid) return;
+    const images = projectSpacePreviewImages(project, space, posts);
+    projectSpacePreviewGrid.innerHTML = images.map((source, index) => {
+      if (!source) {
+        return '<div class="project-space-preview-cell placeholder" aria-label="应用图片占位">' +
+          '<img src="/assets/ic_project_preview_placeholder.png" alt="" /></div>';
+      }
+      return '<a class="project-space-preview-cell real" href="' + escapeHtml(source) +
+        '" target="_blank" rel="noopener" aria-label="应用图片 ' + (index + 1) + '">' +
+        '<img src="' + escapeHtml(source) + '" alt="" loading="lazy" onerror="this.onerror=null;this.src=&quot;/assets/ic_project_preview_placeholder.png&quot;;this.parentElement.className=&quot;project-space-preview-cell placeholder&quot;" />' +
+        '</a>';
+    }).join('');
+  }
   function projectSpacePostBodyWithoutImages(text) {
     return String(text || '')
       .replace(/!\[[^\]]*\]\(([^)]+)\)/g, '')
@@ -6152,6 +6200,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       if (projectSpacePostCount) projectSpacePostCount.textContent = '0贴';
       resetAnnouncementAction();
       projectSpacePostList.innerHTML = projectSpaceEmptyHtml('还没有帖子，点击+好发布内容', true);
+      renderProjectSpacePreviews(null, null, []);
       wireProjectSpaceEmptyPostButton();
       syncProjectSpacePostEntry();
       return;
@@ -6228,6 +6277,7 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     currentProjectSpacePostCount = posts.length;
     if (projectSpacePostCount) projectSpacePostCount.textContent = posts.length + '贴';
     renderProjectIntroCard(project);
+    renderProjectSpacePreviews(project, space, posts);
     if (!posts.length) {
       projectSpacePostList.innerHTML = projectSpaceEmptyHtml(
         loading ? '正在加载帖子...' : '还没有帖子，点击+好发布内容',
@@ -6314,7 +6364,12 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       const msgData = await msgRes.json().catch(() => ({}));
       channel.messages = msgRes.ok && Array.isArray(msgData.messages) ? msgData.messages : [];
     }));
-    renderProjectSpaceFeed({ project: data.project || project, channels }, false);
+    renderProjectSpaceFeed({
+      project: data.project || project,
+      channels,
+      landing: data.landing || null,
+      gallery_images: data.gallery_images || data.galleryImages || []
+    }, false);
   }
   async function joinCurrentProjectSpace() {
     if (!currentProject || !currentProject.id) return;

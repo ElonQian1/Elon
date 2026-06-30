@@ -89,10 +89,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .nest_service("/assets", pc_next_assets_svc)
         .fallback(web::pc_spa_index)
         .with_state(Arc::clone(&state));
-    let pc_legacy_svc = tower::ServiceBuilder::new()
-        .layer(no_cache)
-        .service(ServeDir::new(&pc_legacy_dist)
-            .not_found_service(ServeFile::new(pc_legacy_dist.join("index.html"))));
+    let pc_legacy_svc = tower::ServiceBuilder::new().layer(no_cache).service(
+        ServeDir::new(&pc_legacy_dist)
+            .not_found_service(ServeFile::new(pc_legacy_dist.join("index.html"))),
+    );
 
     Router::new()
         .route("/", get(web::web_page))
@@ -139,6 +139,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/assets/ic_project_post_compose.png",
             get(web::project_post_compose_icon),
+        )
+        .route(
+            "/assets/ic_project_preview_placeholder.png",
+            get(web::project_preview_placeholder_icon),
         )
         .route(
             "/assets/ic_add_friend_scan.png",
@@ -465,6 +469,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             axum::routing::patch(project_space::update_project_description),
         )
         .route(
+            "/api/projects/:project_id/space/gallery-image",
+            axum::routing::patch(project_space::update_project_gallery_image),
+        )
+        .route(
             "/api/projects/:project_id/landing/sync",
             post(project_landing_api::sync_project_landing),
         )
@@ -600,6 +608,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route(
             "/api/user/:user_id/projects/:project_id/space/description",
             axum::routing::patch(project_space::update_user_project_description),
+        )
+        .route(
+            "/api/user/:user_id/projects/:project_id/space/gallery-image",
+            axum::routing::patch(project_space::update_user_project_gallery_image),
         )
         .route(
             "/api/user/:user_id/projects/:project_id/docs",

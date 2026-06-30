@@ -108,6 +108,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (74, "项目频道成员权限覆盖", migration_v74),
     (75, "项目频道分类与分类权限继承", migration_v75),
     (76, "用户展示在线状态与项目邀请链接", migration_v76),
+    (77, "项目空间商店截图列表", migration_v77),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2568,6 +2569,16 @@ fn migration_v76(conn: &Connection) -> Result<()> {
         CREATE INDEX IF NOT EXISTS idx_project_invite_links_code
           ON project_invite_links(code);
         "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v77(conn: &Connection) -> Result<()> {
+    add_column_if_missing(
+        conn,
+        "projects",
+        "gallery_images_json",
+        "gallery_images_json TEXT",
     )?;
     Ok(())
 }

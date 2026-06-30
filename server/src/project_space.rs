@@ -76,6 +76,14 @@ pub struct UpdateProjectDescriptionRequest {
 }
 
 #[derive(Deserialize)]
+pub struct UpdateProjectGalleryImageRequest {
+    #[serde(alias = "index")]
+    pub slot: usize,
+    #[serde(default, alias = "imageUrl", alias = "url")]
+    pub image_url: Option<String>,
+}
+
+#[derive(Deserialize)]
 pub struct UpdateChannelRolePermissionRequest {
     pub member_id: Option<String>,
     #[serde(default)]
@@ -182,6 +190,43 @@ pub async fn update_project_description(
     update_project_description_response(state, user.id, project, req)
 }
 
+pub async fn update_user_project_gallery_image(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path((user_id, project_id)): Path<(String, String)>,
+    Query(query): Query<HashMap<String, String>>,
+    Json(req): Json<UpdateProjectGalleryImageRequest>,
+) -> Response {
+    let (_user, project) = match ensure_user_project_for_space(
+        &state,
+        &headers,
+        &user_id,
+        &project_id,
+        query.get("title").map(String::as_str),
+    ) {
+        Ok(pair) => pair,
+        Err(response) => return response,
+    };
+    update_project_gallery_image_response(state, project, req)
+}
+
+pub async fn update_project_gallery_image(
+    State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
+    Path(project_id): Path<String>,
+    Json(req): Json<UpdateProjectGalleryImageRequest>,
+) -> Response {
+    let user = match auth_from_headers(&state, &headers) {
+        Ok(user) => user,
+        Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
+    };
+    let project = match project_access(&state, &user.id, &project_id) {
+        Ok(project) => project,
+        Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
+    };
+    update_project_gallery_image_response(state, project, req)
+}
+
 fn update_project_description_response(
     state: Arc<AppState>,
     user_id: String,
@@ -196,6 +241,23 @@ fn update_project_description_response(
         .update_project_description(&user_id, &project.id, &req.description)
     {
         Ok(project) => Json(serde_json::json!({ "project": project })).into_response(),
+        Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
+    }
+}
+
+fn update_project_gallery_image_response(
+    state: Arc<AppState>,
+    project: ProjectAccess,
+    req: UpdateProjectGalleryImageRequest,
+) -> Response {
+    if !can_edit(&project.role) {
+        return json_error(StatusCode::FORBIDDEN, "当前成员角色不能更换项目应用图片");
+    }
+    match state
+        .store
+        .update_project_gallery_image(&project.id, req.slot, req.image_url.as_deref())
+    {
+        Ok(images) => Json(serde_json::json!({ "gallery_images": images })).into_response(),
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -738,14 +800,16 @@ async fn project_space_response(
             apply_project_member_presence(member, online.contains_key(&member.user_id));
         }
     }
-    let visible_channel_ids: Vec<String> = channels.iter().map(|channel| channel.id.clone()).collect();
+    let visible_channel_ids: Vec<String> =
+        channels.iter().map(|channel| channel.id.clone()).collect();
     for member in &mut members {
         let mut channel_permissions = HashMap::new();
         for channel_id in &visible_channel_ids {
-            match state
-                .store
-                .project_member_channel_permissions(&access.id, channel_id, &member.user_id)
-            {
+            match state.store.project_member_channel_permissions(
+                &access.id,
+                channel_id,
+                &member.user_id,
+            ) {
                 Ok(permissions) => {
                     channel_permissions.insert(channel_id.clone(), permissions);
                 }

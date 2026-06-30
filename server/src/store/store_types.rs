@@ -611,6 +611,8 @@ pub struct ProjectSpaceSummary {
     pub role: String,
     pub member_count: i64,
     pub icon_data_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub gallery_images: Vec<String>,
     pub updated_at: String,
 }
 

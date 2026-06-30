@@ -22,10 +22,12 @@ const HOME_PROJECT_MARKER_PNG_B64: &str = include_str!("assets/ic_home_project_m
 const HOME_PULL_FILTER_PNG_B64: &str = include_str!("assets/ic_home_pull_filter.b64");
 const PROJECT_AI_ICON_PNG_B64: &str = include_str!("assets/ic_project_ai_conversation.b64");
 const PROJECT_DOCUMENT_ICON_PNG_B64: &str = include_str!("assets/ic_project_document.b64");
-const SIDE_MENU_FOLDER_CLOSED_ICON_PNG: &[u8] =
-    include_bytes!("../../android/app/src/main/res/drawable-xxxhdpi/ic_side_menu_folder_closed.png");
-const PROJECT_MEMBERS_TOOLBAR_ICON_PNG: &[u8] =
-    include_bytes!("../../android/app/src/main/res/drawable-xxxhdpi/ic_project_members_toolbar.png");
+const SIDE_MENU_FOLDER_CLOSED_ICON_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-xxxhdpi/ic_side_menu_folder_closed.png"
+);
+const PROJECT_MEMBERS_TOOLBAR_ICON_PNG: &[u8] = include_bytes!(
+    "../../android/app/src/main/res/drawable-xxxhdpi/ic_project_members_toolbar.png"
+);
 const PROJECT_SPACE_POST_SHARE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_share.png");
 const PROJECT_SPACE_POST_COMMENT_ICON_PNG: &[u8] =
@@ -33,6 +35,8 @@ const PROJECT_SPACE_POST_COMMENT_ICON_PNG: &[u8] =
 const PROJECT_SPACE_POST_LIKE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_like.png");
 const PROJECT_POST_COMPOSE_ICON_PNG: &[u8] = include_bytes!("assets/ic_project_post_compose.png");
+const PROJECT_PREVIEW_PLACEHOLDER_ICON_PNG: &[u8] =
+    include_bytes!("assets/ic_project_preview_placeholder.png");
 const PLAZA_ENTER_SPACE_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_enter_space.png");
 const PLAZA_SHARE_PROJECT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_share_project.png");
 const PLAZA_DOWNLOAD_APK_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_download_apk.png");
@@ -216,6 +220,10 @@ pub async fn project_post_compose_icon() -> impl IntoResponse {
     plaza_icon_response(PROJECT_POST_COMPOSE_ICON_PNG)
 }
 
+pub async fn project_preview_placeholder_icon() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_PREVIEW_PLACEHOLDER_ICON_PNG)
+}
+
 pub async fn add_friend_scan_icon() -> impl IntoResponse {
     plaza_icon_response(ADD_FRIEND_SCAN_ICON_PNG)
 }
@@ -290,10 +298,12 @@ pub async fn pc_spa_index(State(state): State<Arc<AppState>>) -> impl IntoRespon
                 (header::CACHE_CONTROL, "no-cache, no-store, must-revalidate"),
             ],
             bytes,
-        ).into_response(),
+        )
+            .into_response(),
         Err(_) => (
             axum::http::StatusCode::SERVICE_UNAVAILABLE,
             "PC 前端尚未部署，请稍候重试。",
-        ).into_response(),
+        )
+            .into_response(),
     }
 }

@@ -47,6 +47,57 @@ const DEFAULT_CHANNELS: [(&str, &str, i64, &str); 8] = [
     ("AI开发", "ai_development", 50, "start"),
     ("构建发布", "builds", 60, "start"),
 ];
+const PROJECT_GALLERY_IMAGE_LIMIT: usize = 4;
+const PROJECT_GALLERY_IMAGE_URL_MAX: usize = 2048;
+
+fn parse_project_gallery_images(json: Option<&str>) -> Vec<String> {
+    let Some(json) = json else {
+        return Vec::new();
+    };
+    serde_json::from_str::<Vec<String>>(json)
+        .unwrap_or_default()
+        .into_iter()
+        .take(PROJECT_GALLERY_IMAGE_LIMIT)
+        .map(|value| {
+            value
+                .trim()
+                .take_if_project_gallery_image_url()
+                .unwrap_or_default()
+        })
+        .collect()
+}
+
+fn clean_project_gallery_image_url(value: &str) -> Result<Option<String>> {
+    let clean = value
+        .trim()
+        .take_if_project_gallery_image_url()
+        .unwrap_or_default();
+    if clean.is_empty() {
+        return Ok(None);
+    }
+    if clean.chars().count() > PROJECT_GALLERY_IMAGE_URL_MAX {
+        anyhow::bail!(
+            "项目图片地址不能超过 {} 个字符",
+            PROJECT_GALLERY_IMAGE_URL_MAX
+        );
+    }
+    Ok(Some(clean))
+}
+
+trait ProjectGalleryImageUrlExt {
+    fn take_if_project_gallery_image_url(&self) -> Option<String>;
+}
+
+impl ProjectGalleryImageUrlExt for str {
+    fn take_if_project_gallery_image_url(&self) -> Option<String> {
+        let value = self.trim();
+        let lower = value.to_ascii_lowercase();
+        let is_image = lower.starts_with("https://")
+            || lower.starts_with("http://")
+            || lower.starts_with("data:image/");
+        (is_image && !lower.eq("null")).then(|| value.to_string())
+    }
+}
 
 fn project_channel_message_from_row(
     row: &rusqlite::Row<'_>,
@@ -89,7 +140,7 @@ impl Store {
             "SELECT p.id, p.name, p.description, COALESCE(pm.role, 'visitor') AS role,
                     (SELECT COUNT(*) FROM project_members count_pm WHERE count_pm.project_id = p.id),
                     p.icon_data_url, p.updated_at, p.source_type, p.workspace_path,
-                    p.display_name
+                    p.display_name, p.gallery_images_json
              FROM projects p
              LEFT JOIN project_members pm ON pm.project_id = p.id AND pm.user_id = ?2
              WHERE p.id = ?1
@@ -108,6 +159,7 @@ impl Store {
                     role: row.get(3)?,
                     member_count: row.get(4)?,
                     icon_data_url: row.get(5)?,
+                    gallery_images: parse_project_gallery_images(row.get::<_, Option<String>>(10)?.as_deref()),
                     updated_at: row.get(6)?,
                 };
                 let source_type: String = row.get(7)?;
@@ -158,6 +210,53 @@ impl Store {
         }
         drop(conn);
         self.project_space_summary(user_id, project_id)
+    }
+
+    pub fn update_project_gallery_image(
+        &self,
+        project_id: &str,
+        slot: usize,
+        image_url: Option<&str>,
+    ) -> Result<Vec<String>> {
+        if slot >= PROJECT_GALLERY_IMAGE_LIMIT {
+            anyhow::bail!("项目图片最多支持 {} 张", PROJECT_GALLERY_IMAGE_LIMIT);
+        }
+        let clean_url = match image_url {
+            Some(value) => clean_project_gallery_image_url(value)?,
+            None => None,
+        };
+        let conn = self.conn()?;
+        let current_json: Option<String> = conn
+            .query_row(
+                "SELECT gallery_images_json FROM projects WHERE id = ?1 AND status != 'deleted'",
+                params![project_id],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("项目不存在"))?;
+        let mut images = parse_project_gallery_images(current_json.as_deref());
+        while images.len() <= slot {
+            images.push(String::new());
+        }
+        images[slot] = clean_url.unwrap_or_default();
+        while images.last().is_some_and(|value| value.trim().is_empty()) {
+            images.pop();
+        }
+        let next_json = if images.iter().any(|value| !value.trim().is_empty()) {
+            Some(serde_json::to_string(&images)?)
+        } else {
+            None
+        };
+        let updated = conn.execute(
+            "UPDATE projects
+                SET gallery_images_json = ?1, updated_at = ?2
+              WHERE id = ?3 AND status != 'deleted'",
+            params![next_json, now(), project_id],
+        )?;
+        if updated == 0 {
+            anyhow::bail!("项目不存在");
+        }
+        Ok(images)
     }
 
     pub fn list_project_space_channels(
