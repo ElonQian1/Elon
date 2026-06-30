@@ -453,7 +453,15 @@ function CodexStatusCard({
         <span className={styles.codexState}>{refreshing ? '刷新中' : status?.status ?? 'checking'}</span>
       </div>
       <p>{copy.body}</p>
+      {status?.diagnosis && <p className={styles.codexDiagnosis}>{status.diagnosis}</p>}
+      {status?.fix_hint && <p className={styles.codexFixHint}>{status.fix_hint}</p>}
       {status?.path && <code className={styles.codexPath}>{status.path}</code>}
+      {(status?.version || status?.reason) && (
+        <div className={styles.codexMeta}>
+          {status.version && <span>版本：{status.version}</span>}
+          {status.reason && <span>原因：{status.reason}</span>}
+        </div>
+      )}
       {showKeyForm && (
         <div className={styles.codexKeyGrid}>
           <input

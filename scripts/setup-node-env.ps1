@@ -38,6 +38,16 @@ function Has([string]$cmd) {
     $null -ne (Get-Command $cmd -ErrorAction SilentlyContinue)
 }
 
+function RunsVersion([string]$cmd) {
+    if (-not (Has $cmd)) { return $false }
+    try {
+        & $cmd --version *> $null
+        return ($LASTEXITCODE -eq 0)
+    } catch {
+        return $false
+    }
+}
+
 # winget 静默安装（已安装则跳过，返回 $true 表示成功/已存在）
 function WingetInstall([string]$id, [string]$label) {
     if (-not (Has 'winget')) {
@@ -107,21 +117,26 @@ if (Has 'node') {
 
 # ── 4. Codex CLI ──────────────────────────────────────────────────────────────
 Step "检查 Codex CLI (@openai/codex)"
-if (Has 'codex') {
-    Ok "Codex CLI 已安装"
-} elseif (Has 'npm') {
-    Step "安装 Codex CLI（npm install -g @openai/codex）"
-    # 先尝试国内镜像，失败再回落官方源
-    npm install -g @openai/codex --registry https://registry.npmmirror.com 2>$null
-    if ($LASTEXITCODE -ne 0) {
-        Warn "国内镜像失败，尝试官方源..."
-        npm install -g @openai/codex
-    }
-    Refresh-Path
-    if (Has 'codex') { Ok "Codex CLI 安装成功" }
-    else { Warn "Codex CLI 安装完毕，可能需要重启终端后验证（codex --version）" }
+if (RunsVersion 'codex') {
+    Ok "Codex CLI 已安装：$(codex --version)"
 } else {
-    Warn "npm 不可用，跳过 Codex CLI 安装。请先成功安装 Node.js 后重新运行本脚本。"
+    if (Has 'codex') {
+        Warn "检测到 codex 命令，但无法运行；常见原因是 PATH 指到了 Codex 桌面端的 WindowsApps 受保护资源。将继续安装/修复真正的 @openai/codex CLI。"
+    }
+    if (Has 'npm') {
+        Step "安装 Codex CLI（npm install -g @openai/codex）"
+        # 先尝试国内镜像，失败再回落官方源
+        npm install -g @openai/codex --registry https://registry.npmmirror.com 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            Warn "国内镜像失败，尝试官方源..."
+            npm install -g @openai/codex
+        }
+        Refresh-Path
+        if (RunsVersion 'codex') { Ok "Codex CLI 安装成功：$(codex --version)" }
+        else { Warn "Codex CLI 安装完毕，可能需要重启终端后验证（codex --version）" }
+    } else {
+        Warn "npm 不可用，跳过 Codex CLI 安装。请先成功安装 Node.js 后重新运行本脚本。"
+    }
 }
 
 # ── 5. Android SDK ────────────────────────────────────────────────────────────

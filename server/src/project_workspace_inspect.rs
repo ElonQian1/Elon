@@ -1,6 +1,10 @@
 use anyhow::Result;
 use homecli_proto::ProjectWorkspaceInspectStatus;
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    process::Stdio,
+    time::{Duration, Instant},
+};
 
 #[cfg(not(windows))]
 use std::process::Command;
@@ -105,7 +109,42 @@ fn first_git_remote_url(cwd: &Path) -> Option<String> {
 }
 
 fn command_available(name: &str) -> bool {
-    elon_pc_dev_runtime::command_path(name).is_some()
+    let Some(path) = elon_pc_dev_runtime::command_path(name) else {
+        return false;
+    };
+    if matches!(name, "codex" | "copilot" | "claude" | "gemini") {
+        return command_version_succeeds(&path, Duration::from_millis(900));
+    }
+    true
+}
+
+fn command_version_succeeds(path: &Path, timeout: Duration) -> bool {
+    let mut command = elon_pc_dev_runtime::command_from_path(path);
+    command
+        .arg("--version")
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .stdin(Stdio::null());
+    let Ok(mut child) = command.spawn() else {
+        return false;
+    };
+    let started_at = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(status)) => return status.success(),
+            Ok(None) if started_at.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(25)),
+            Err(_) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return false;
+            }
+        }
+    }
 }
 
 #[cfg(windows)]

@@ -324,8 +324,8 @@ fn command_status(name: &str, version_args: &[&str]) -> DevToolchainStatus {
     }
 }
 
-fn path_only_tool(name: &str) -> bool {
-    matches!(name, "codex" | "claude" | "gemini" | "copilot")
+fn path_only_tool(_name: &str) -> bool {
+    false
 }
 
 enum VersionCommandResult {

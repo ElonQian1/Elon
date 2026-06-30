@@ -286,6 +286,14 @@
   line-height: 1.5;
 }
 
+.codexCard .codexDiagnosis {
+  color: var(--text-secondary);
+}
+
+.codexCard .codexFixHint {
+  color: #c8a040;
+}
+
 .codexState {
   color: var(--text-muted);
   font-size: 11px;
@@ -305,6 +313,19 @@
   padding: 6px 8px;
   font-size: 11px;
   word-break: break-all;
+}
+
+.codexMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.codexMeta span {
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 
 .codexActions {

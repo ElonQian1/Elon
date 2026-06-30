@@ -27,6 +27,7 @@ pub fn command_candidates(name: &str) -> Vec<PathBuf> {
             }
         }
     }
+    sort_command_candidates(name, &mut found);
     found
 }
 
@@ -104,6 +105,19 @@ fn command_search_dirs() -> Vec<PathBuf> {
         ] {
             push_unique_dir(&mut dirs, dir);
         }
+
+        let codex_bin_root = PathBuf::from(&localappdata)
+            .join("OpenAI")
+            .join("Codex")
+            .join("bin");
+        if let Ok(entries) = std::fs::read_dir(codex_bin_root) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    push_unique_dir(&mut dirs, path);
+                }
+            }
+        }
     }
 
     #[cfg(not(windows))]
@@ -148,6 +162,36 @@ fn push_unique_dir(dirs: &mut Vec<PathBuf>, dir: PathBuf) {
         return;
     }
     dirs.push(dir);
+}
+
+fn sort_command_candidates(name: &str, candidates: &mut [PathBuf]) {
+    if !name.eq_ignore_ascii_case("codex") {
+        return;
+    }
+    candidates.sort_by_key(|path| codex_candidate_rank(path));
+}
+
+fn codex_candidate_rank(path: &Path) -> u8 {
+    let lower = path.to_string_lossy().to_ascii_lowercase();
+    let is_windows_apps = lower.contains("\\windowsapps\\");
+    let is_codex_desktop_resource = is_windows_apps
+        && lower.contains("\\openai.codex_")
+        && lower.contains("\\app\\resources\\");
+    let is_openai_codex_runtime =
+        lower.contains("\\appdata\\local\\openai\\codex\\bin\\") && lower.ends_with("\\codex.exe");
+    let is_script = lower.ends_with("\\codex.cmd") || lower.ends_with("\\codex.bat");
+
+    if is_script && !is_windows_apps {
+        0
+    } else if is_openai_codex_runtime {
+        1
+    } else if !is_windows_apps {
+        2
+    } else if is_codex_desktop_resource {
+        4
+    } else {
+        3
+    }
 }
 
 fn contains_path(paths: &[PathBuf], candidate: &Path) -> bool {
@@ -204,5 +248,31 @@ mod tests {
                 r"C:\Program Files\nodejs\npm.cmd".to_string()
             ]
         );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn codex_candidates_prefer_runtime_cli_over_windowsapps_desktop_resource() {
+        let mut candidates = vec![
+            PathBuf::from(
+                r"C:\Program Files\WindowsApps\OpenAI.Codex_1.0.0.0_x64__abc\app\resources\codex.exe",
+            ),
+            PathBuf::from(r"C:\Users\alice\AppData\Local\OpenAI\Codex\bin\hash123\codex.exe"),
+            PathBuf::from(r"C:\Users\alice\AppData\Roaming\npm\codex.cmd"),
+        ];
+
+        sort_command_candidates("codex", &mut candidates);
+
+        assert_eq!(
+            candidates[0],
+            PathBuf::from(r"C:\Users\alice\AppData\Roaming\npm\codex.cmd")
+        );
+        assert_eq!(
+            candidates[1],
+            PathBuf::from(r"C:\Users\alice\AppData\Local\OpenAI\Codex\bin\hash123\codex.exe")
+        );
+        assert!(candidates[2]
+            .to_string_lossy()
+            .contains(r"WindowsApps\OpenAI.Codex"));
     }
 }

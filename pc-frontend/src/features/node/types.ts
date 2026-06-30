@@ -76,12 +76,16 @@ export interface LocalCliToolStatus {
   name?: string
   label?: string
   path?: string | null
+  version?: string | null
   installed?: boolean
   runnable?: boolean
   logged_in?: boolean | null
   available?: boolean
   status?: 'checking' | 'ready' | 'not_installed' | 'not_runnable' | 'not_logged_in' | string
   detail?: string | null
+  reason?: string | null
+  diagnosis?: string | null
+  fix_hint?: string | null
   fix_action?: 'none' | 'wait' | 'install' | 'repair_path' | 'login' | string
   backend?: string
 }

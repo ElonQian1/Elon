@@ -696,12 +696,16 @@ struct LocalCliToolStatus {
     name: String,
     label: &'static str,
     path: Option<String>,
+    version: Option<String>,
     installed: bool,
     runnable: bool,
     logged_in: Option<bool>,
     available: bool,
     status: String,
     detail: Option<String>,
+    reason: Option<String>,
+    diagnosis: Option<String>,
+    fix_hint: Option<String>,
     fix_action: String,
     backend: &'static str,
 }
@@ -722,12 +726,16 @@ impl Default for LocalCliProbeSnapshot {
                     name: name.to_string(),
                     label: local_cli_display_label(name),
                     path: None,
+                    version: None,
                     installed: false,
                     runnable: false,
                     logged_in: if name == "codex" { Some(false) } else { None },
                     available: false,
                     status: "checking".to_string(),
                     detail: Some("正在后台检测，不阻塞 Win 端启动".to_string()),
+                    reason: Some("checking".to_string()),
+                    diagnosis: None,
+                    fix_hint: None,
                     fix_action: "wait".to_string(),
                     backend: "cli",
                 })
@@ -814,12 +822,16 @@ fn probe_generic_cli(name: &str, best_path: Option<PathBuf>) -> LocalCliToolStat
             name: name.to_string(),
             label,
             path: None,
+            version: None,
             installed: false,
             runnable: false,
             logged_in: None,
             available: false,
             status: "not_installed".to_string(),
             detail: Some(format!("{label} CLI 未安装或不在 PATH 中")),
+            reason: Some("not_found".to_string()),
+            diagnosis: Some(format!("未在 PATH 和常见安装目录中找到 {label} 命令。")),
+            fix_hint: Some("请安装对应 CLI，或把它的 bin 目录加入 PATH 后重新检测。".to_string()),
             fix_action: "install".to_string(),
             backend: "cli",
         };
@@ -830,6 +842,7 @@ fn probe_generic_cli(name: &str, best_path: Option<PathBuf>) -> LocalCliToolStat
         name: name.to_string(),
         label,
         path: Some(path.to_string_lossy().to_string()),
+        version: if runnable { run.summary.clone() } else { None },
         installed: true,
         runnable,
         logged_in: None,
@@ -844,6 +857,21 @@ fn probe_generic_cli(name: &str, best_path: Option<PathBuf>) -> LocalCliToolStat
                     .unwrap_or_else(|| format!("{label} CLI 无法执行")),
             )
         },
+        reason: if runnable {
+            None
+        } else {
+            run.reason.or_else(|| Some("run_failed".to_string()))
+        },
+        diagnosis: if runnable {
+            Some(format!("{label} CLI 可由 Win 端启动。"))
+        } else {
+            Some(format!("检测到 {label} 命令路径，但 Win 端无法启动它。"))
+        },
+        fix_hint: if runnable {
+            None
+        } else {
+            Some("请修复该 CLI 安装或 PATH 后重新检测。".to_string())
+        },
         fix_action: if runnable { "none" } else { "repair_path" }.to_string(),
         backend: "cli",
     }
@@ -856,6 +884,7 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             name: "codex".to_string(),
             label,
             path: None,
+            version: None,
             installed: false,
             runnable: false,
             logged_in: Some(false),
@@ -864,6 +893,14 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             detail: Some(
                 "未检测到 @openai/codex CLI；只安装 Codex 桌面端不一定会提供可调用的 codex 命令"
                     .to_string(),
+            ),
+            reason: Some("not_found".to_string()),
+            diagnosis: Some(
+                "没有找到可作为命令行工具启动的 Codex CLI。Codex 桌面端和 Codex CLI 是两层能力，桌面端不一定暴露可调用的 codex 命令。"
+                    .to_string(),
+            ),
+            fix_hint: Some(
+                "点击安装/修复，让 Win 端安装 @openai/codex CLI；安装后重新检测。".to_string(),
             ),
             fix_action: "install".to_string(),
             backend: "cli",
@@ -876,15 +913,22 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             name: "codex".to_string(),
             label,
             path: Some(path.to_string_lossy().to_string()),
+            version: None,
             installed: true,
             runnable: false,
             logged_in: Some(false),
             available: false,
             status: "not_runnable".to_string(),
-            detail: Some(run.summary.unwrap_or_else(|| {
+            detail: Some(run.summary.clone().unwrap_or_else(|| {
                 "检测到 codex 命令，但无法非交互执行；请安装 @openai/codex CLI 或修复 PATH"
                     .to_string()
             })),
+            reason: run
+                .reason
+                .clone()
+                .or_else(|| Some("run_failed".to_string())),
+            diagnosis: Some(codex_not_runnable_diagnosis(&path, run.reason.as_deref())),
+            fix_hint: Some(codex_not_runnable_fix_hint(&path)),
             fix_action: "repair_path".to_string(),
             backend: "cli",
         };
@@ -895,6 +939,7 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
         name: "codex".to_string(),
         label,
         path: Some(path.to_string_lossy().to_string()),
+        version: run.summary.clone(),
         installed: true,
         runnable: true,
         logged_in: Some(auth),
@@ -904,6 +949,21 @@ fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
             Some("Codex CLI 可运行，且已检测到 API key 或本机 Codex 登录文件".to_string())
         } else {
             Some("Codex CLI 可运行，但未检测到 OPENAI_API_KEY 或本机 Codex 登录文件".to_string())
+        },
+        reason: if auth {
+            None
+        } else {
+            Some("not_logged_in".to_string())
+        },
+        diagnosis: if auth {
+            Some("Win 端已找到可运行的 Codex CLI，并检测到本机鉴权。".to_string())
+        } else {
+            Some("Codex CLI 本身能启动，但当前用户还没有可用的 Codex/OpenAI 鉴权。".to_string())
+        },
+        fix_hint: if auth {
+            None
+        } else {
+            Some("请在此页保存 OpenAI API Key，或先在本机完成 Codex CLI 登录。".to_string())
         },
         fix_action: if auth { "none" } else { "login" }.to_string(),
         backend: "cli",
@@ -946,6 +1006,7 @@ struct QuickCommandStatus {
     success: bool,
     timed_out: bool,
     summary: Option<String>,
+    reason: Option<String>,
 }
 
 fn quick_command_status(program: &Path, args: &[&str], timeout: Duration) -> QuickCommandStatus {
@@ -958,10 +1019,16 @@ fn quick_command_status(program: &Path, args: &[&str], timeout: Duration) -> Qui
     let mut child = match command.spawn() {
         Ok(child) => child,
         Err(error) => {
+            let reason = if error.kind() == std::io::ErrorKind::PermissionDenied {
+                "permission_denied"
+            } else {
+                "spawn_failed"
+            };
             return QuickCommandStatus {
                 success: false,
                 timed_out: false,
                 summary: Some(format!("无法启动 {}：{error}", program.display())),
+                reason: Some(reason.to_string()),
             };
         }
     };
@@ -984,11 +1051,13 @@ fn quick_command_status(program: &Path, args: &[&str], timeout: Duration) -> Qui
                                 })
                             },
                         ),
+                        reason: (!output.status.success()).then(|| "exit_failed".to_string()),
                     },
                     Err(error) => QuickCommandStatus {
                         success: false,
                         timed_out: false,
                         summary: Some(format!("读取 {} 输出失败：{error}", program.display())),
+                        reason: Some("output_failed".to_string()),
                     },
                 };
             }
@@ -999,6 +1068,7 @@ fn quick_command_status(program: &Path, args: &[&str], timeout: Duration) -> Qui
                     success: false,
                     timed_out: true,
                     summary: Some(format!("{} 检测超时", program.display())),
+                    reason: Some("timeout".to_string()),
                 };
             }
             Ok(None) => std::thread::sleep(Duration::from_millis(25)),
@@ -1009,10 +1079,45 @@ fn quick_command_status(program: &Path, args: &[&str], timeout: Duration) -> Qui
                     success: false,
                     timed_out: false,
                     summary: Some(format!("检测 {} 失败：{error}", program.display())),
+                    reason: Some("run_failed".to_string()),
                 };
             }
         }
     }
+}
+
+fn codex_not_runnable_diagnosis(path: &Path, reason: Option<&str>) -> String {
+    if is_codex_desktop_resource_path(path) {
+        return "检测到的是 Codex 桌面端安装包里的受保护资源路径。Windows 可以启动桌面 App，但通常不允许一龙 Win 端直接把这个资源文件当命令行 CLI 调用。"
+            .to_string();
+    }
+    match reason {
+        Some("permission_denied") => {
+            "Windows 拒绝启动这个 codex 路径；常见原因是 PATH 指到了受保护应用包、权限异常或安装残缺。".to_string()
+        }
+        Some("timeout") => {
+            "codex --version 在短时间内没有返回；可能是命令卡在初始化、杀毒拦截或安装损坏。".to_string()
+        }
+        Some("exit_failed") => {
+            "codex 命令能启动，但版本检测返回失败；通常是 CLI 安装损坏或依赖环境异常。".to_string()
+        }
+        _ => "检测到 codex 命令路径，但 Win 端无法用非交互方式启动它。".to_string(),
+    }
+}
+
+fn codex_not_runnable_fix_hint(path: &Path) -> String {
+    if is_codex_desktop_resource_path(path) {
+        return "请点击安装/修复 Codex，让 Win 端安装真正的 @openai/codex CLI；如果已安装，请确保 npm/本地 Codex CLI 的 bin 目录排在 WindowsApps 桌面资源路径之前。"
+            .to_string();
+    }
+    "请点击安装/修复 Codex，或重新安装 @openai/codex CLI 后再检测。".to_string()
+}
+
+fn is_codex_desktop_resource_path(path: &Path) -> bool {
+    let lower = path.to_string_lossy().to_ascii_lowercase();
+    lower.contains("\\windowsapps\\")
+        && lower.contains("\\openai.codex_")
+        && lower.contains("\\app\\resources\\")
 }
 
 fn first_cli_output_line(stdout: &[u8], stderr: &[u8]) -> Option<String> {
@@ -4226,14 +4331,16 @@ async fn admin_env_check(
     axum::Json(result)
 }
 
-/// POST /api/install-env — Windows 上弹出安装向导窗口。
+/// POST /api/install-env — 用户主动触发的后台安装/修复任务。
 async fn admin_install_env(
     axum::extract::State(_rt): axum::extract::State<Arc<NodeRuntime>>,
 ) -> (axum::http::StatusCode, axum::Json<serde_json::Value>) {
     #[cfg(windows)]
     {
         let tmp = std::env::temp_dir().join("elon-setup-node-env.ps1");
-        if let Err(e) = std::fs::write(&tmp, SETUP_ENV_SCRIPT) {
+        let mut script_bytes = vec![0xEF, 0xBB, 0xBF];
+        script_bytes.extend_from_slice(SETUP_ENV_SCRIPT.as_bytes());
+        if let Err(e) = std::fs::write(&tmp, script_bytes) {
             return (
                 axum::http::StatusCode::INTERNAL_SERVER_ERROR,
                 axum::Json(serde_json::json!({
@@ -4250,15 +4357,37 @@ async fn admin_install_env(
             .map(|p| p.to_string_lossy().to_string())
             .unwrap_or_else(|| tmp.to_string_lossy().to_string());
 
-        match std::process::Command::new("powershell")
-            .args(["-ExecutionPolicy", "Bypass", "-File", &script_path])
-            .spawn()
+        let shell = elon_pc_dev_runtime::command_path("pwsh")
+            .or_else(|| elon_pc_dev_runtime::command_path("powershell"))
+            .unwrap_or_else(|| PathBuf::from("powershell"));
+        let mut command = std::process::Command::new(shell);
+        command.args([
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-WindowStyle",
+            "Hidden",
+            "-File",
+            &script_path,
+            "-Silent",
+        ]);
+        command.stdin(std::process::Stdio::null());
+        command.stdout(std::process::Stdio::null());
+        command.stderr(std::process::Stdio::null());
+        #[cfg(windows)]
         {
+            use std::os::windows::process::CommandExt;
+            const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+            const CREATE_NEW_PROCESS_GROUP: u32 = 0x0000_0200;
+            command.creation_flags(CREATE_NO_WINDOW | CREATE_NEW_PROCESS_GROUP);
+        }
+
+        match command.spawn() {
             Ok(_) => (
                 axum::http::StatusCode::OK,
                 axum::Json(serde_json::json!({
                     "ok": true,
-                    "msg": "安装脚本已在新窗口启动，按提示操作完成后刷新本页查看结果"
+                    "msg": "安装/修复任务已在后台启动，稍后刷新本页查看结果"
                 })),
             ),
             Err(e) => (
