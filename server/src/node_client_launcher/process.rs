@@ -14,7 +14,7 @@ use super::{
     DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
 };
 
-const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
+const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_secs(4);
 const ADMIN_PC_WEB_READY_WAIT: Duration = Duration::from_secs(5);
 const ADMIN_LOCAL_READY_WAIT: Duration = Duration::from_secs(15);
 const ADMIN_LOCAL_RETRY_WAIT: Duration = Duration::from_secs(10);
