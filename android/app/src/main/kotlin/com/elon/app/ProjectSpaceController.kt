@@ -85,6 +85,10 @@ internal class ProjectSpaceController(
         openProjectDescription = { space -> showProjectDescriptionDialog(space) },
         openProjectMembers = { showMembers() },
         joinProject = { handleProjectSpaceJoin() },
+        openProjectDocuments = { showProjectDocumentsDialog() },
+        openProjectResources = {
+            Toast.makeText(activity, "项目资源入口正在整理。", Toast.LENGTH_SHORT).show()
+        },
         projectApkActionLabel = {
             val space = activeSpace
             projectApkActionLabel(
@@ -377,7 +381,7 @@ internal class ProjectSpaceController(
             return
         }
         val space = activeSpace ?: return
-        val container = prepareProjectContent(showAiMenu = false)
+        val container = prepareProjectContent(showAiMenu = true)
         container.removeAllViews()
         feedView.render(
             container = container,
@@ -385,6 +389,7 @@ internal class ProjectSpaceController(
             messagesByChannel = feedData.messagesByChannel,
             loading = feedData.isLoading(space)
         )
+        showProjectSpaceFeedActions()
         feedData.ensure(space)
     }
 

@@ -32,6 +32,7 @@ const PROJECT_SPACE_POST_COMMENT_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_comment.png");
 const PROJECT_SPACE_POST_LIKE_ICON_PNG: &[u8] =
     include_bytes!("../../android/app/src/main/res/drawable/ic_project_space_post_like.png");
+const PROJECT_POST_COMPOSE_ICON_PNG: &[u8] = include_bytes!("assets/ic_project_post_compose.png");
 const PLAZA_ENTER_SPACE_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_enter_space.png");
 const PLAZA_SHARE_PROJECT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_share_project.png");
 const PLAZA_DOWNLOAD_APK_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_download_apk.png");
@@ -209,6 +210,10 @@ pub async fn project_space_post_comment_icon() -> impl IntoResponse {
 
 pub async fn project_space_post_like_icon() -> impl IntoResponse {
     plaza_icon_response(PROJECT_SPACE_POST_LIKE_ICON_PNG)
+}
+
+pub async fn project_post_compose_icon() -> impl IntoResponse {
+    plaza_icon_response(PROJECT_POST_COMPOSE_ICON_PNG)
 }
 
 pub async fn add_friend_scan_icon() -> impl IntoResponse {

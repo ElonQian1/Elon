@@ -1137,29 +1137,41 @@
       cursor: pointer;
     }
     .project-space-feed-actions {
-      display: none;
+      position: fixed;
+      right: max(8px, calc((100vw - 720px) / 2 + 8px));
+      bottom: calc(88px + env(safe-area-inset-bottom));
+      z-index: 18;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      pointer-events: none;
     }
-    .project-space-feed-actions.hidden,
-    .project-space-feed-actions .project-space-fab:first-child {
+    .project-space-feed-actions.hidden {
       display: none;
     }
     .project-space-fab {
-      width: 56px;
+      width: 128px;
       height: 56px;
       border: 0;
-      border-radius: 50%;
+      border-radius: 28px;
       background: var(--brand);
       color: var(--brand-ink);
-      font-size: 24px;
+      font-size: 16px;
       line-height: 1;
       cursor: pointer;
-      display: grid;
-      place-items: center;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 0;
+      pointer-events: auto;
     }
-    .project-space-fab svg {
-      width: 28px;
-      height: 28px;
-      vertical-align: middle;
+    .project-space-fab img {
+      width: 24px;
+      height: 24px;
+      object-fit: contain;
+      display: block;
+      filter: brightness(0);
     }
     .project-space-doc-icon {
       width: 28px;
@@ -1293,8 +1305,25 @@
       background: var(--store-detail-divider);
       flex: none;
     }
+    #projectProgressPanel .project-space-heading {
+      align-items: flex-start;
+    }
+    #projectProgressPanel .project-space-title {
+      flex: 1 1 auto;
+    }
     #projectProgressPanel .project-space-join {
-      display: none;
+      width: 104px;
+      height: 48px;
+      margin-top: 12px;
+      border: 1px solid #5A5A5A;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--store-detail-ink);
+      display: grid;
+      place-items: center;
+      flex: none;
+      font-size: 19px;
+      font-weight: 500;
     }
     .project-space-install {
       width: calc(100% - 48px);
@@ -1312,7 +1341,23 @@
       padding: 0;
     }
     #projectProgressPanel .project-space-actions {
-      display: none;
+      height: 36px;
+      margin-top: 14px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    #projectProgressPanel .project-space-action {
+      width: 104px;
+      height: 36px;
+      border: 1px solid #5A5A5A;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--store-detail-ink);
+      font-size: 14px;
+      gap: 0;
+      flex: none;
     }
     #projectProgressPanel .project-space-preview-grid {
       height: 167px;
@@ -1385,7 +1430,7 @@
       width: calc(100% - 48px);
       min-height: 132px;
       margin: 28px 24px 0;
-      padding: 54px 0 0;
+      padding: 58px 0 0;
       border: 0;
       background: transparent;
       color: var(--store-detail-muted);
@@ -1410,22 +1455,21 @@
       color: var(--store-detail-ink);
       font-size: 20px;
       font-weight: 700;
-      line-height: 36px;
+      line-height: 48px;
     }
     #projectProgressPanel .project-space-intro-card::after {
-      content: "›";
+      content: "";
       position: absolute;
-      right: 0;
-      top: 0;
-      width: 42px;
+      right: 6px;
+      top: 6px;
+      width: 36px;
       height: 36px;
-      border-radius: 10px;
-      background: #2A2A2A;
-      color: var(--store-detail-ink);
-      display: grid;
-      place-items: center;
-      font-size: 34px;
-      line-height: 1;
+      border-radius: 12px;
+      background-color: #2A2A2A;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 18 18'%3E%3Cpath d='M6.75 4.5 L11.25 9 L6.75 13.5' fill='none' stroke='%23E3E3E3' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-position: center;
+      background-repeat: no-repeat;
+      background-size: 18px 18px;
     }
     #projectProgressPanel .project-space-feed {
       display: block;
@@ -2829,6 +2873,15 @@
               <div class="project-space-meta" id="projectSpaceMeta">Elon Project</div>
               <div class="project-space-store-subtitle" id="projectSpaceStoreSubtitle">项目协作空间</div>
             </div>
+            <button class="project-space-join hidden" id="projectSpaceJoinBtn" type="button">加入</button>
+          </div>
+          <div class="project-space-actions">
+            <button class="project-space-action" id="projectSpaceDocsBtn" type="button" aria-label="项目文档">
+              <span>项目文档</span>
+            </button>
+            <button class="project-space-action" id="projectSpaceResourcesBtn" type="button" aria-label="项目资源">
+              <span>项目资源</span>
+            </button>
           </div>
           <div class="project-space-metrics">
             <div class="project-space-metric">
@@ -2846,22 +2899,7 @@
               <div class="project-space-metric-label">12 岁以上 ⓘ</div>
             </div>
           </div>
-          <button class="project-space-join hidden" id="projectSpaceJoinBtn" type="button">加入</button>
           <button class="project-space-install" id="projectSpaceDownloadBtn" type="button">安装</button>
-        </div>
-        <div class="project-space-actions">
-          <button class="project-space-action" id="projectSpaceDocsBtn" type="button" aria-label="项目文档">
-            <img class="project-space-action-icon" src="/assets/ic_side_menu_folder_closed.png" alt="" aria-hidden="true" />
-            <span>项目文档</span>
-          </button>
-          <button class="project-space-action" id="projectSpaceResourcesBtn" type="button" aria-label="项目资源">
-            <img class="project-space-action-icon" src="/assets/ic_side_menu_folder_closed.png" alt="" aria-hidden="true" />
-            <span>项目资源</span>
-          </button>
-          <button class="project-space-action" type="button" aria-label="下载 APK">
-            <img class="project-space-action-icon" src="/assets/ic_plaza_download_apk.png" alt="" aria-hidden="true" />
-            <span>下载APK</span>
-          </button>
         </div>
         <div class="project-space-preview-grid" aria-hidden="true">
           <div class="project-space-preview-cell">
@@ -2931,10 +2969,10 @@
               <div class="project-space-feed-empty">正在加载帖子...</div>
             </div>
             <div class="project-space-feed-actions">
-              <button class="project-space-fab" id="projectSpaceDocsLegacyBtn" title="项目文档" type="button" aria-label="项目文档">
-                <img class="project-space-doc-icon" src="data:image/png;base64,__PROJECT_DOCUMENT_ICON_PNG_B64__" alt="" aria-hidden="true" />
+              <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button" aria-label="发布帖子">
+                <img src="/assets/ic_project_post_compose.png" alt="" aria-hidden="true" />
+                <span>发帖</span>
               </button>
-              <button class="project-space-fab" id="projectSpacePostBtn" title="发布帖子" type="button" aria-label="发布帖子">+</button>
             </div>
           </div>
         </div>
@@ -5825,7 +5863,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       if (projectSpaceStoreSubtitle) projectSpaceStoreSubtitle.textContent = '项目协作空间';
       if (projectSpaceMemberMetric) projectSpaceMemberMetric.textContent = '成员 1';
       if (projectSpacePostCount) projectSpacePostCount.textContent = '0贴';
-      if (projectSpaceJoinBtn) projectSpaceJoinBtn.textContent = '加入';
+      if (projectSpaceJoinBtn) {
+        projectSpaceJoinBtn.textContent = '加入';
+        projectSpaceJoinBtn.classList.add('hidden');
+      }
       if (projectSpaceDownloadBtn) projectSpaceDownloadBtn.textContent = '安装';
       projectIntroCard.textContent = '添加项目简介';
       projectIntroCard.classList.add('empty');
@@ -5843,7 +5884,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       projectSpaceStoreSubtitle.textContent = currentProjectSpaceLatestApkUrl ? '包含可安装 APK' : '项目协作空间';
     }
     if (projectSpaceMemberMetric) projectSpaceMemberMetric.textContent = '成员 ' + members;
-    if (projectSpaceJoinBtn) projectSpaceJoinBtn.textContent = isProjectSpaceVisitor(project) ? '加入' : '成员';
+    if (projectSpaceJoinBtn) {
+      projectSpaceJoinBtn.textContent = isProjectSpaceVisitor(project) ? '加入' : '成员';
+      projectSpaceJoinBtn.classList.remove('hidden');
+    }
     if (projectSpaceDownloadBtn) projectSpaceDownloadBtn.textContent = currentProjectSpaceLatestApkUrl ? '安装' : '暂无APK';
     projectIntroCard.textContent = description || (editable ? '添加项目简介' : '暂无项目简介');
     projectIntroCard.classList.toggle('empty', !description);
@@ -6330,6 +6374,10 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     projectSpaceAnnouncementExpanded = false;
     setMoreButtonMode('project-members');
     moreBtn.style.display = '';
+    if (projectSpaceAiMenu) {
+      projectSpaceAiMenu.classList.remove('hidden', 'compact', 'animating');
+      syncProjectSpaceAiMenuMotion();
+    }
     renderProjectIntroCard(p);
     STAGE_ELS().forEach((el, i) => {
       el.className = 'stage-line';

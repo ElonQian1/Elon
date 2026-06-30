@@ -24,6 +24,8 @@ internal class ProjectSpacePlayStoreHeaderView(
     private val selectableForeground: () -> android.graphics.drawable.Drawable?,
     private val openProjectMembers: () -> Unit,
     private val joinProject: () -> Unit,
+    private val openProjectDocuments: () -> Unit,
+    private val openProjectResources: () -> Unit,
     private val projectApkActionLabel: () -> String,
     private val downloadProjectApk: () -> Unit
 ) {
@@ -38,11 +40,17 @@ internal class ProjectSpacePlayStoreHeaderView(
             )
 
             addView(projectAppHeader(space))
+            addView(projectQuickActions(), LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(36)
+            ).apply {
+                topMargin = dp(14)
+            })
             addView(projectMetrics(space, postCount), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 dp(68)
             ).apply {
-                topMargin = dp(30)
+                topMargin = dp(20)
             })
             addView(installButton(), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -120,6 +128,67 @@ internal class ProjectSpacePlayStoreHeaderView(
                     topMargin = dp(1)
                 })
             }, LinearLayout.LayoutParams(0, dp(72), 1f))
+
+            addView(joinButton(space), LinearLayout.LayoutParams(dp(104), dp(48)).apply {
+                marginStart = dp(18)
+                topMargin = dp(12)
+            })
+        }
+    }
+
+    private fun joinButton(space: ProjectSpace): TextView {
+        val visitor = isProjectSpaceVisitor(space.project.role)
+        return TextView(activity).apply {
+            text = if (visitor) "加入" else "成员"
+            setVisualTextSize(19)
+            includeFontPadding = false
+            gravity = Gravity.CENTER
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
+            background = roundedStrokeBackground(PLAY_BG, 8, "#5A5A5A", 1)
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = if (visitor) "加入项目" else "查看项目成员"
+            setOnClickListener {
+                if (visitor) joinProject() else openProjectMembers()
+            }
+        }
+    }
+
+    private fun projectQuickActions(): LinearLayout {
+        return LinearLayout(activity).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(dp(24), 0, dp(24), 0)
+            addView(projectQuickActionButton("项目文档", "查看项目文档", openProjectDocuments), LinearLayout.LayoutParams(
+                dp(104),
+                LinearLayout.LayoutParams.MATCH_PARENT
+            ).apply {
+                marginEnd = dp(12)
+            })
+            addView(projectQuickActionButton("项目资源", "查看项目资源", openProjectResources), LinearLayout.LayoutParams(
+                dp(104),
+                LinearLayout.LayoutParams.MATCH_PARENT
+            ))
+        }
+    }
+
+    private fun projectQuickActionButton(
+        label: String,
+        description: String,
+        onClick: () -> Unit
+    ): TextView {
+        return TextView(activity).apply {
+            text = label
+            textSize = 14f
+            includeFontPadding = false
+            gravity = Gravity.CENTER
+            setTextColor(Color.parseColor(PLAY_TEXT_PRIMARY))
+            background = roundedStrokeBackground(PLAY_BG, 8, "#5A5A5A", 1)
+            isClickable = true
+            foreground = selectableForeground()
+            contentDescription = description
+            setOnClickListener { onClick() }
         }
     }
 
@@ -335,6 +404,19 @@ internal class ProjectSpacePlayStoreHeaderView(
         return GradientDrawable().apply {
             setColor(Color.parseColor(colorHex))
             cornerRadius = dp(radiusDp).toFloat()
+        }
+    }
+
+    private fun roundedStrokeBackground(
+        colorHex: String,
+        radiusDp: Int,
+        strokeHex: String,
+        strokeWidthDp: Int
+    ): GradientDrawable {
+        return GradientDrawable().apply {
+            setColor(Color.parseColor(colorHex))
+            cornerRadius = dp(radiusDp).toFloat()
+            setStroke(dp(strokeWidthDp), Color.parseColor(strokeHex))
         }
     }
 

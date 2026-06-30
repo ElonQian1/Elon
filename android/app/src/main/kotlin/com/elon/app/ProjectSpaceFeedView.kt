@@ -9,6 +9,7 @@ import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.View
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
@@ -26,6 +27,8 @@ internal class ProjectSpaceFeedView(
     private val openProjectDescription: (ProjectSpace) -> Unit,
     private val openProjectMembers: () -> Unit,
     private val joinProject: () -> Unit,
+    private val openProjectDocuments: () -> Unit,
+    private val openProjectResources: () -> Unit,
     private val projectApkActionLabel: () -> String,
     private val downloadProjectApk: () -> Unit
 ) {
@@ -36,6 +39,8 @@ internal class ProjectSpaceFeedView(
         selectableForeground = selectableForeground,
         openProjectMembers = openProjectMembers,
         joinProject = joinProject,
+        openProjectDocuments = openProjectDocuments,
+        openProjectResources = openProjectResources,
         projectApkActionLabel = projectApkActionLabel,
         downloadProjectApk = downloadProjectApk
     )
@@ -91,21 +96,14 @@ internal class ProjectSpaceFeedView(
                 addView(TextView(activity).apply {
                     text = "关于此应用"
                     textSize = 20f
-                    includeFontPadding = true
+                    includeFontPadding = false
                     setTypeface(typeface, Typeface.BOLD)
                     setTextColor(Color.parseColor(PROJECT_SPACE_STORE_TEXT))
                 }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-                addView(TextView(activity).apply {
-                    text = "›"
-                    textSize = 34f
-                    includeFontPadding = false
-                    gravity = Gravity.CENTER
-                    setTextColor(Color.parseColor(PROJECT_SPACE_STORE_TEXT))
-                    background = roundedBackground("#2A2A2A", 10)
-                }, LinearLayout.LayoutParams(dp(42), dp(36)))
+                addView(aboutArrowButton(), LinearLayout.LayoutParams(dp(48), dp(48)))
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                dp(48)
             ))
 
             addView(TextView(activity).apply {
@@ -122,6 +120,18 @@ internal class ProjectSpaceFeedView(
             ).apply {
                 topMargin = dp(8)
             })
+        }
+    }
+
+    private fun aboutArrowButton(): FrameLayout {
+        return FrameLayout(activity).apply {
+            addView(FrameLayout(activity).apply {
+                background = roundedBackground("#2A2A2A", 12)
+                addView(ImageView(activity).apply {
+                    setImageResource(R.drawable.ic_project_space_chevron_right)
+                    scaleType = ImageView.ScaleType.CENTER
+                }, FrameLayout.LayoutParams(dp(18), dp(18), Gravity.CENTER))
+            }, FrameLayout.LayoutParams(dp(36), dp(36), Gravity.CENTER))
         }
     }
 
