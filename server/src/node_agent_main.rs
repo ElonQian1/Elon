@@ -1,6 +1,6 @@
 // server/src/node_agent_main.rs
 
-#![cfg_attr(windows, windows_subsystem = "windows")]
+#![cfg_attr(all(windows, not(test)), windows_subsystem = "windows")]
 
 //! elon-node-agent：用户 PC 端节点代理，将本机 LLM 算力贡献给 elon 平台。
 //!
@@ -50,6 +50,7 @@ use tracing::{info, warn};
 
 mod agent_runtime_error_summary;
 mod cli_usage;
+mod git_command_error;
 mod node_agent_active_task;
 mod node_agent_active_task_registry;
 mod node_agent_admin_open;

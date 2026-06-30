@@ -1,7 +1,8 @@
 use anyhow::{anyhow, Context, Result};
 use elon_pc_dev_runtime::{ensure_project_git_baseline, ProjectGitBaselineRequest};
 use std::path::Path;
-use std::process::Command;
+
+use crate::git_command_error::{git_command, git_failure_message, git_spawn_context};
 
 pub(crate) struct GitRemoteConfig {
     pub(crate) repo_url: String,
@@ -91,7 +92,7 @@ fn dir_is_empty(path: &Path) -> Result<bool> {
 }
 
 fn clone_git_remote(repo_url: &str, repo: &Path) -> Result<()> {
-    let output = Command::new("git")
+    let output = git_command()
         .arg("clone")
         .arg(repo_url)
         .arg(repo)
@@ -208,31 +209,25 @@ fn remote_default_branch(repo: &Path) -> Option<String> {
 }
 
 fn git_output(repo: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
+    let output = git_command()
         .args(args)
         .current_dir(repo)
         .output()
-        .context("failed to run git")?;
+        .with_context(|| format!("failed to run {}", git_spawn_context(args)))?;
     if !output.status.success() {
-        return Err(anyhow!(
-            "git command failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(anyhow!(git_failure_message(repo, args, &output)));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn run_git_dynamic(repo: &Path, args: &[&str]) -> Result<()> {
-    let output = Command::new("git")
+    let output = git_command()
         .args(args)
         .current_dir(repo)
         .output()
-        .context("failed to run git")?;
+        .with_context(|| format!("failed to run {}", git_spawn_context(args)))?;
     if !output.status.success() {
-        return Err(anyhow!(
-            "git command failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(anyhow!(git_failure_message(repo, args, &output)));
     }
     Ok(())
 }

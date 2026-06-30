@@ -4,8 +4,8 @@ use elon_pc_dev_runtime::{
     ProjectGitBaselineRequest, ProjectScaffoldRequest,
 };
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
+use crate::git_command_error::{git_command, git_failure_message, git_spawn_context};
 use crate::pc_workspace_git_remote::{
     clean_git_branch, clean_git_remote, ensure_git_remote_workspace, git_remote_origin,
 };
@@ -135,7 +135,7 @@ fn remove_conversation_worktrees(
                         "worktree",
                         "remove",
                         "--force",
-                        path.to_string_lossy().as_ref(),
+                        git_path_arg(&path).as_str(),
                     ],
                 );
             }
@@ -191,7 +191,7 @@ pub fn prepare_conversation_workspace(
     project_id: &str,
     conversation_id: &str,
 ) -> Result<ConversationWorkspaceResult> {
-    let base_workspace = PathBuf::from(base_workspace_path);
+    let base_workspace = git_path_buf(&PathBuf::from(base_workspace_path));
     if !is_git_work_tree(&base_workspace) {
         return Ok(ConversationWorkspaceResult {
             base_workspace_path: None,
@@ -218,7 +218,7 @@ pub fn prepare_conversation_workspace(
     if is_git_work_tree(&worktree_path) {
         return Ok(ConversationWorkspaceResult {
             base_workspace_path: Some(base_workspace.to_string_lossy().to_string()),
-            workspace_path: worktree_path.to_string_lossy().to_string(),
+            workspace_path: git_path_arg(&worktree_path),
             isolated: true,
             branch: Some(branch),
         });
@@ -240,15 +240,11 @@ pub fn prepare_conversation_workspace(
 
     let _ = git_fetch_origin(&base_workspace);
     let start_ref = conversation_start_ref(&base_workspace);
+    let worktree_arg = git_path_arg(&worktree_path);
     if local_branch_exists(&base_workspace, &branch) {
         run_git_dynamic(
             &base_workspace,
-            &[
-                "worktree",
-                "add",
-                worktree_path.to_string_lossy().as_ref(),
-                &branch,
-            ],
+            &["worktree", "add", worktree_arg.as_str(), &branch],
         )?;
     } else {
         run_git_dynamic(
@@ -258,7 +254,7 @@ pub fn prepare_conversation_workspace(
                 "add",
                 "-b",
                 &branch,
-                worktree_path.to_string_lossy().as_ref(),
+                worktree_arg.as_str(),
                 &start_ref,
             ],
         )?;
@@ -266,7 +262,7 @@ pub fn prepare_conversation_workspace(
 
     Ok(ConversationWorkspaceResult {
         base_workspace_path: Some(base_workspace.to_string_lossy().to_string()),
-        workspace_path: worktree_path.to_string_lossy().to_string(),
+        workspace_path: git_path_arg(&worktree_path),
         isolated: true,
         branch: Some(branch),
     })
@@ -279,9 +275,9 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     let base_workspace = workspace
         .base_workspace_path
         .as_ref()
-        .map(PathBuf::from)
+        .map(|path| git_path_buf(&PathBuf::from(path)))
         .ok_or_else(|| anyhow!("isolated conversation workspace is missing base workspace"))?;
-    let active_workspace = PathBuf::from(&workspace.workspace_path);
+    let active_workspace = git_path_buf(&PathBuf::from(&workspace.workspace_path));
     let branch = workspace
         .branch
         .as_deref()
@@ -311,20 +307,23 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     }
 
     let before = git_output(&base_workspace, &["rev-parse", "HEAD"])?;
-    let merge_output = Command::new("git")
-        .args(["merge", "--no-ff", "--no-edit", branch])
-        .current_dir(&base_workspace)
+    let merge_args = ["merge", "--no-ff", "--no-edit", branch];
+    let base_git_cwd = git_path_buf(&base_workspace);
+    let merge_output = git_command()
+        .args(merge_args)
+        .current_dir(&base_git_cwd)
         .output()
-        .context("failed to run git merge")?;
+        .with_context(|| format!("failed to run {}", git_spawn_context(&merge_args)))?;
     if !merge_output.status.success() {
-        let _ = Command::new("git")
+        let _ = git_command()
             .args(["merge", "--abort"])
-            .current_dir(&base_workspace)
+            .current_dir(&base_git_cwd)
             .output();
-        return Err(anyhow!(
-            "git merge failed: {}",
-            String::from_utf8_lossy(&merge_output.stderr).trim()
-        ));
+        return Err(anyhow!(git_failure_message(
+            &base_git_cwd,
+            &merge_args,
+            &merge_output
+        )));
     }
 
     if git_output(&base_workspace, &["remote", "get-url", "origin"]).is_ok() {
@@ -337,7 +336,7 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
             "worktree",
             "remove",
             "--force",
-            active_workspace.to_string_lossy().as_ref(),
+            git_path_arg(&active_workspace).as_str(),
         ],
     );
     let _ = run_git_dynamic(&base_workspace, &["branch", "-d", branch]);
@@ -432,26 +431,26 @@ fn ensure_conversation_workspace_committed(repo: &Path) -> Result<Option<String>
         return Ok(None);
     }
     run_git_dynamic(repo, &["add", "-A"])?;
-    let output = Command::new("git")
-        .args(["commit", "-m", "chore(ai): 保存会话工作区改动"])
-        .current_dir(repo)
-        .output()
-        .context("failed to run git commit for conversation worktree")?;
-    if !output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        let detail = format!("{} {}", stdout.trim(), stderr.trim())
-            .trim()
-            .to_string();
-        if detail.contains("nothing to commit") {
-            return Ok(None);
-        }
-        return Err(anyhow!(
-            "conversation worktree auto-commit failed: {}",
-            detail
-        ));
+    let tree = git_output(repo, &["write-tree"])?;
+    let head_tree = git_output(repo, &["rev-parse", "HEAD^{tree}"])?;
+    if tree == head_tree {
+        return Ok(None);
     }
-    git_output(repo, &["rev-parse", "HEAD"]).map(Some)
+    let head = git_output(repo, &["rev-parse", "HEAD"])?;
+    let commit = git_output(
+        repo,
+        &[
+            "commit-tree",
+            &tree,
+            "-p",
+            &head,
+            "-m",
+            "chore(ai): 保存会话工作区改动",
+        ],
+    )
+    .context("conversation worktree auto-commit failed")?;
+    run_git_dynamic(repo, &["reset", "--hard", &commit])?;
+    Ok(Some(commit))
 }
 
 fn short_sha(sha: &str) -> String {
@@ -459,55 +458,71 @@ fn short_sha(sha: &str) -> String {
 }
 
 fn git_head(repo: &Path) -> Result<String> {
-    let output = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .current_dir(repo)
+    let args = ["rev-parse", "--short", "HEAD"];
+    let git_cwd = git_path_buf(repo);
+    let output = git_command()
+        .args(args)
+        .current_dir(&git_cwd)
         .output()
-        .context("failed to run git rev-parse")?;
+        .with_context(|| format!("failed to run {}", git_spawn_context(&args)))?;
     if !output.status.success() {
-        return Err(anyhow!(
-            "git rev-parse failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(anyhow!(git_failure_message(&git_cwd, &args, &output)));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn git_output(repo: &Path, args: &[&str]) -> Result<String> {
-    let output = Command::new("git")
+    let git_cwd = git_path_buf(repo);
+    let output = git_command()
         .args(args)
-        .current_dir(repo)
+        .current_dir(&git_cwd)
         .output()
-        .context("failed to run git")?;
+        .with_context(|| format!("failed to run {}", git_spawn_context(args)))?;
     if !output.status.success() {
-        return Err(anyhow!(
-            "git command failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(anyhow!(git_failure_message(&git_cwd, args, &output)));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn run_git_dynamic(repo: &Path, args: &[&str]) -> Result<()> {
-    let output = Command::new("git")
+    let git_cwd = git_path_buf(repo);
+    let output = git_command()
         .args(args)
-        .current_dir(repo)
+        .current_dir(&git_cwd)
         .output()
-        .context("failed to run git")?;
+        .with_context(|| format!("failed to run {}", git_spawn_context(args)))?;
     if !output.status.success() {
-        return Err(anyhow!(
-            "git command failed: {}",
-            String::from_utf8_lossy(&output.stderr).trim()
-        ));
+        return Err(anyhow!(git_failure_message(&git_cwd, args, &output)));
     }
     Ok(())
+}
+
+fn git_path_arg(path: &Path) -> String {
+    git_path_buf(path).to_string_lossy().to_string()
+}
+
+#[cfg(windows)]
+fn git_path_buf(path: &Path) -> PathBuf {
+    let value = path.to_string_lossy();
+    if let Some(rest) = value.strip_prefix("\\\\?\\UNC\\") {
+        return PathBuf::from(format!("\\\\{rest}"));
+    }
+    if let Some(rest) = value.strip_prefix("\\\\?\\") {
+        return PathBuf::from(rest);
+    }
+    path.to_path_buf()
+}
+
+#[cfg(not(windows))]
+fn git_path_buf(path: &Path) -> PathBuf {
+    path.to_path_buf()
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        ensure_conversation_workspace_committed, git_output, prepare_conversation_workspace,
-        worktree_clean,
+        ensure_conversation_workspace_committed, git_output, git_path_arg,
+        prepare_conversation_workspace, worktree_clean,
     };
     use elon_pc_dev_runtime::safe_path_part;
     use std::fs;
@@ -526,6 +541,19 @@ mod tests {
     #[test]
     fn safe_path_part_uses_fallback_when_empty() {
         assert_eq!(safe_path_part("///", "fallback", 80), "fallback");
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn git_path_arg_strips_windows_verbatim_prefixes() {
+        assert_eq!(
+            git_path_arg(Path::new(r"\\?\C:\Users\Administrator\repo")),
+            r"C:\Users\Administrator\repo"
+        );
+        assert_eq!(
+            git_path_arg(Path::new(r"\\?\UNC\server\share\repo")),
+            r"\\server\share\repo"
+        );
     }
 
     #[test]
@@ -581,8 +609,10 @@ mod tests {
             .expect("git should start");
         assert!(
             output.status.success(),
-            "git {:?} failed: {}",
+            "git {:?} failed (status={:?}, stdout={}, stderr={})",
             args,
+            output.status.code(),
+            String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
     }

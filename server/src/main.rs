@@ -81,6 +81,7 @@ mod external_app_tool_report_contract;
 mod external_app_usage_policy;
 mod friend_api;
 mod friend_events;
+mod git_command_error;
 mod global_ws;
 mod group_ai;
 mod group_chat_project_docs;
