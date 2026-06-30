@@ -14,7 +14,7 @@ use super::{
     DEFAULT_ADMIN_PORT, DEFAULT_BASE_URL,
 };
 
-const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_millis(900);
+const ADMIN_HEALTH_TIMEOUT: Duration = Duration::from_secs(2);
 const ADMIN_PC_WEB_READY_WAIT: Duration = Duration::from_secs(5);
 const ADMIN_LOCAL_READY_WAIT: Duration = Duration::from_secs(15);
 const ADMIN_LOCAL_RETRY_WAIT: Duration = Duration::from_secs(10);
@@ -32,10 +32,11 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
         .get("NODE_ADMIN_PORT")
         .and_then(|value| value.parse::<u16>().ok())
         .unwrap_or(DEFAULT_ADMIN_PORT);
-    let port = select_admin_port(port);
+    let runtime_already_running = agent_runtime_running(install_dir);
+    let port = select_admin_port_for_runtime(port, runtime_already_running);
 
     if !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
-        if !agent_runtime_running(install_dir) {
+        if !runtime_already_running {
             spawn_agent_runtime(&client, install_dir, port, &env_values)?;
         }
 
@@ -241,6 +242,14 @@ fn select_admin_port(preferred: u16) -> u16 {
     preferred
 }
 
+fn select_admin_port_for_runtime(preferred: u16, runtime_already_running: bool) -> u16 {
+    if runtime_already_running {
+        preferred
+    } else {
+        select_admin_port(preferred)
+    }
+}
+
 fn agent_runtime_running(install_dir: &Path) -> bool {
     #[cfg(windows)]
     {
@@ -369,6 +378,11 @@ mod tests {
             OpenTarget::LocalAdmin
         );
         assert!(open_target_from_env_values(&env_values).requires_admin_ready());
+    }
+
+    #[test]
+    fn running_runtime_keeps_configured_admin_port() {
+        assert_eq!(select_admin_port_for_runtime(7799, true), 7799);
     }
 
     #[cfg(windows)]
