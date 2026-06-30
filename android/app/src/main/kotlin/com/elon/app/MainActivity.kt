@@ -586,6 +586,7 @@ class MainActivity : AppCompatActivity() {
             showProjectMembers = { projectSpaceController.showMembers() },
             loadMarketplace = { marketplaceActions.loadProjects() },
             onAgentTabSelected = { agentPageController.refresh() },
+            handleProjectSpaceInternalBack = projectSpaceController::handleProjectSpaceInternalBack,
             openProjectSpacePostComposer = projectSpaceController::openPostComposerFromSpace
         )
     }

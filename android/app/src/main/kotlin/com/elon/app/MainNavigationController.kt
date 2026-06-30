@@ -57,6 +57,7 @@ internal class MainNavigationController(
     private val showProjectMembers: () -> Unit,
     private val loadMarketplace: () -> Unit,
     private val onAgentTabSelected: () -> Unit,
+    private val handleProjectSpaceInternalBack: () -> Boolean,
     private val openProjectSpacePostComposer: () -> Unit
 ) {
     private enum class ChatReturnTarget {
@@ -400,6 +401,7 @@ internal class MainNavigationController(
             return
         }
         if (binding.projectPage.visibility == View.VISIBLE && binding.pageTabs.visibility != View.VISIBLE) {
+            if (handleProjectSpaceInternalBack()) return
             when (projectPageReturnTarget) {
                 ChatReturnTarget.FRIENDS -> showConversationHome(animate = true)
                 ChatReturnTarget.SOCIAL_CHAT -> {

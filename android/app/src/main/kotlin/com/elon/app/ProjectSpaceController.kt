@@ -62,6 +62,7 @@ internal class ProjectSpaceController(
     private var activeMemberListUserId: String? = null
     private var pendingOpenSelfMemberList = false
     private var activeAdapter: ChatAdapter? = null
+    private var activePostComposer = false
     private var polling = false
     private var pendingMemberBack: ProjectMember? = null
     private var projectSpaceAiExpanded = true
@@ -260,6 +261,7 @@ internal class ProjectSpaceController(
         activeMemberListUserId = null
         pendingOpenSelfMemberList = openSelfMemberList
         activeAdapter = null
+        activePostComposer = false
         stopPolling()
         resetProjectSpaceAiMenu()
         if (switchingProject) {
@@ -401,6 +403,7 @@ internal class ProjectSpaceController(
         activePostMessageId = null
         activeMemberConversation = null
         activeAdapter = null
+        activePostComposer = false
         stopPolling()
         // 从个人会话返回时，若来源是成员会话列表，恢复到成员会话列表而不是顶层空间
         val backMember = pendingMemberBack
@@ -706,6 +709,7 @@ internal class ProjectSpaceController(
         activeChannel = channel
         activePostMessageId = postMessage?.id
         activeMemberConversation = null
+        activePostComposer = false
         if (channel.kind == DOCS_CHANNEL_KIND) stopPolling()
         val messageKey = activeChannelMessageKey(channel, activePostMessageId)
         val messages = messagesByChannel.getOrPut(messageKey) { mutableListOf() }
@@ -801,6 +805,7 @@ internal class ProjectSpaceController(
         activePostMessageId = null
         activeMemberConversation = null
         activeAdapter = null
+        activePostComposer = true
         stopPolling()
         postComposer.render(
             container = prepareProjectContent(),
@@ -811,6 +816,12 @@ internal class ProjectSpaceController(
 
     fun openPostComposerFromSpace() {
         renderPostComposer()
+    }
+
+    fun handleProjectSpaceInternalBack(): Boolean {
+        if (!activePostComposer) return false
+        renderProjectSpaceLanding()
+        return true
     }
 
     private fun showProjectDocumentsDialog() {
@@ -892,6 +903,7 @@ internal class ProjectSpaceController(
     }
 
     private fun renderLoading() {
+        activePostComposer = false
         val container = prepareProjectContent()
         container.removeAllViews()
         container.addView(TextView(activity).apply {
@@ -904,6 +916,7 @@ internal class ProjectSpaceController(
     }
 
     private fun renderError(message: String) {
+        activePostComposer = false
         val container = prepareProjectContent()
         container.removeAllViews()
         container.addView(TextView(activity).apply {
@@ -1133,6 +1146,7 @@ internal class ProjectSpaceController(
         activeChannel = null
         activePostMessageId = null
         activeMemberConversation = null
+        activePostComposer = false
         memberConversationViews.renderList(prepareProjectContent(), space, member, isSelf)
     }
 
@@ -1327,6 +1341,7 @@ internal class ProjectSpaceController(
         activeChannel = null
         activePostMessageId = null
         activeMemberConversation = memberConversation
+        activePostComposer = false
         pendingMemberBack = member
         val messages = messagesByMemberConversation.getOrPut(memberConversation.key) { mutableListOf() }
         val adapter = ChatAdapter(
