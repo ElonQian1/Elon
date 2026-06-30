@@ -44,7 +44,7 @@
         android:layout_width="30dp"
         android:layout_height="30dp"
         android:layout_marginStart="8dp"
-        android:background="@drawable/bg_pause_work_button"
+        android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="暂停当前工作"
         android:padding="8dp"
         android:src="@drawable/ic_work_pause_square"
