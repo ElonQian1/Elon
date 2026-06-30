@@ -63,11 +63,27 @@ export interface LocalNodeStatus {
   local_admin_token_header?: string
   models?: NodeSummary['models']
   allowed_clis?: string[]
-  cli_tools?: { name?: string; label?: string; path?: string; available?: boolean; backend?: string }[]
+  cli_probe?: { refreshing?: boolean; refreshed_at_ms?: number; stale?: boolean }
+  codex_cli?: LocalCliToolStatus | null
+  cli_tools?: LocalCliToolStatus[]
   local_ai?: {
-    cli_tools?: { name?: string; label?: string; path?: string; available?: boolean }[]
+    cli_tools?: LocalCliToolStatus[]
     models?: NodeSummary['models']
   }
+}
+
+export interface LocalCliToolStatus {
+  name?: string
+  label?: string
+  path?: string | null
+  installed?: boolean
+  runnable?: boolean
+  logged_in?: boolean | null
+  available?: boolean
+  status?: 'checking' | 'ready' | 'not_installed' | 'not_runnable' | 'not_logged_in' | string
+  detail?: string | null
+  fix_action?: 'none' | 'wait' | 'install' | 'repair_path' | 'login' | string
+  backend?: string
 }
 
 export interface AutostartStatus {

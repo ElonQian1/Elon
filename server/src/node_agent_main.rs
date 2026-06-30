@@ -38,8 +38,11 @@ use homecli_proto::{
 };
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
-use std::time::Duration;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::{mpsc, watch, Notify, RwLock};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tower_http::cors::{AllowOrigin, CorsLayer};
@@ -684,6 +687,86 @@ fn cli_done_error(cli_name: &str, stdout_text: &str, stderr_text: &str) -> Strin
 
 // ── CLI 执行（CliPrompt / Exec）────────────────────────────────────────────────
 
+const CLI_PROBE_STALE_MS: u128 = 30_000;
+const CODEX_RUN_CHECK_TIMEOUT: Duration = Duration::from_millis(900);
+const GENERIC_CLI_RUN_CHECK_TIMEOUT: Duration = Duration::from_millis(700);
+
+#[derive(Clone, Debug, Serialize)]
+struct LocalCliToolStatus {
+    name: String,
+    label: &'static str,
+    path: Option<String>,
+    installed: bool,
+    runnable: bool,
+    logged_in: Option<bool>,
+    available: bool,
+    status: String,
+    detail: Option<String>,
+    fix_action: String,
+    backend: &'static str,
+}
+
+#[derive(Clone, Debug, Serialize)]
+struct LocalCliProbeSnapshot {
+    refreshed_at_ms: Option<u128>,
+    tools: Vec<LocalCliToolStatus>,
+}
+
+impl Default for LocalCliProbeSnapshot {
+    fn default() -> Self {
+        Self {
+            refreshed_at_ms: None,
+            tools: ["codex", "copilot", "claude", "gemini"]
+                .into_iter()
+                .map(|name| LocalCliToolStatus {
+                    name: name.to_string(),
+                    label: local_cli_display_label(name),
+                    path: None,
+                    installed: false,
+                    runnable: false,
+                    logged_in: if name == "codex" { Some(false) } else { None },
+                    available: false,
+                    status: "checking".to_string(),
+                    detail: Some("正在后台检测，不阻塞 Win 端启动".to_string()),
+                    fix_action: "wait".to_string(),
+                    backend: "cli",
+                })
+                .collect(),
+        }
+    }
+}
+
+impl LocalCliProbeSnapshot {
+    fn available_pairs(&self) -> Vec<(String, String)> {
+        self.tools
+            .iter()
+            .filter(|tool| tool.available)
+            .filter_map(|tool| {
+                tool.path
+                    .as_ref()
+                    .map(|path| (tool.name.clone(), path.clone()))
+            })
+            .collect()
+    }
+
+    fn available_names(&self) -> Vec<String> {
+        self.available_pairs()
+            .into_iter()
+            .map(|(name, _)| name)
+            .collect()
+    }
+
+    fn codex_status(&self) -> Option<LocalCliToolStatus> {
+        self.tools.iter().find(|tool| tool.name == "codex").cloned()
+    }
+
+    fn is_stale(&self) -> bool {
+        self.refreshed_at_ms
+            .map(|ms| now_epoch_ms().saturating_sub(ms) > CLI_PROBE_STALE_MS)
+            .unwrap_or(true)
+    }
+}
+
 /// 检测本机有哪些 CLI 可用。
 /// 检测本机可用的 CLI，返回 (cli名称, 完整路径) 对。
 ///
@@ -695,54 +778,6 @@ fn cli_done_error(cli_name: &str, stdout_text: &str, stderr_text: &str) -> Strin
 ///   b. PATH 里找到的 .cmd 且不含 VS Code globalStorage
 ///   c. 其他非 globalStorage 路径
 ///   d. 兜底：任何找到的路径
-fn detect_available_clis() -> Vec<(String, String)> {
-    let candidates = ["copilot", "codex", "claude", "gemini"];
-    candidates
-        .iter()
-        .filter_map(|name| {
-            let candidates_paths: Vec<String> = elon_pc_dev_runtime::command_candidates(name)
-                .into_iter()
-                .map(|path| path.to_string_lossy().to_string())
-                .collect();
-
-            if candidates_paths.is_empty() {
-                return None;
-            }
-
-            // ── 3. 选最优路径 ────────────────────────────────────────────────
-            // 过滤掉 VS Code 内置路径（无法独立运行）
-            let not_vscode = |p: &&String| {
-                let lower = p.to_lowercase();
-                !lower.contains("globalstorage") && !lower.contains("copilotcli\\copilot")
-            };
-
-            #[cfg(windows)]
-            let best = candidates_paths
-                .iter()
-                // a. 常见目录里的 .cmd（最可靠）
-                .find(|p| p.to_lowercase().ends_with(".cmd") && not_vscode(p))
-                // b. PATH 里的非 VS Code .cmd
-                .or_else(|| {
-                    candidates_paths
-                        .iter()
-                        .find(|p| p.to_lowercase().ends_with(".cmd"))
-                })
-                // c. 任何非 VS Code 路径
-                .or_else(|| candidates_paths.iter().find(not_vscode))
-                // d. 兜底
-                .or_else(|| candidates_paths.first());
-
-            #[cfg(not(windows))]
-            let best = candidates_paths
-                .iter()
-                .find(not_vscode)
-                .or_else(|| candidates_paths.first());
-
-            best.cloned().map(|p| (name.to_string(), p))
-        })
-        .collect()
-}
-
 fn local_cli_display_label(name: &str) -> &'static str {
     match name.trim().to_ascii_lowercase().as_str() {
         "codex" => "Codex",
@@ -751,6 +786,320 @@ fn local_cli_display_label(name: &str) -> &'static str {
         "gemini" => "Gemini",
         _ => "本机 AI CLI",
     }
+}
+
+fn probe_local_clis() -> LocalCliProbeSnapshot {
+    let tools = ["codex", "copilot", "claude", "gemini"]
+        .into_iter()
+        .map(probe_local_cli)
+        .collect();
+    LocalCliProbeSnapshot {
+        refreshed_at_ms: Some(now_epoch_ms()),
+        tools,
+    }
+}
+
+fn probe_local_cli(name: &str) -> LocalCliToolStatus {
+    let best_path = best_cli_path(name);
+    match name {
+        "codex" => probe_codex_cli(best_path),
+        _ => probe_generic_cli(name, best_path),
+    }
+}
+
+fn probe_generic_cli(name: &str, best_path: Option<PathBuf>) -> LocalCliToolStatus {
+    let label = local_cli_display_label(name);
+    let Some(path) = best_path else {
+        return LocalCliToolStatus {
+            name: name.to_string(),
+            label,
+            path: None,
+            installed: false,
+            runnable: false,
+            logged_in: None,
+            available: false,
+            status: "not_installed".to_string(),
+            detail: Some(format!("{label} CLI 未安装或不在 PATH 中")),
+            fix_action: "install".to_string(),
+            backend: "cli",
+        };
+    };
+    let run = quick_command_status(&path, &["--version"], GENERIC_CLI_RUN_CHECK_TIMEOUT);
+    let runnable = run.success || run.timed_out;
+    LocalCliToolStatus {
+        name: name.to_string(),
+        label,
+        path: Some(path.to_string_lossy().to_string()),
+        installed: true,
+        runnable,
+        logged_in: None,
+        available: runnable,
+        status: if runnable { "ready" } else { "not_runnable" }.to_string(),
+        detail: if runnable {
+            run.summary
+                .or_else(|| Some(format!("{label} CLI 已检测到")))
+        } else {
+            Some(
+                run.summary
+                    .unwrap_or_else(|| format!("{label} CLI 无法执行")),
+            )
+        },
+        fix_action: if runnable { "none" } else { "repair_path" }.to_string(),
+        backend: "cli",
+    }
+}
+
+fn probe_codex_cli(best_path: Option<PathBuf>) -> LocalCliToolStatus {
+    let label = local_cli_display_label("codex");
+    let Some(path) = best_path else {
+        return LocalCliToolStatus {
+            name: "codex".to_string(),
+            label,
+            path: None,
+            installed: false,
+            runnable: false,
+            logged_in: Some(false),
+            available: false,
+            status: "not_installed".to_string(),
+            detail: Some(
+                "未检测到 @openai/codex CLI；只安装 Codex 桌面端不一定会提供可调用的 codex 命令"
+                    .to_string(),
+            ),
+            fix_action: "install".to_string(),
+            backend: "cli",
+        };
+    };
+
+    let run = quick_command_status(&path, &["--version"], CODEX_RUN_CHECK_TIMEOUT);
+    if !run.success {
+        return LocalCliToolStatus {
+            name: "codex".to_string(),
+            label,
+            path: Some(path.to_string_lossy().to_string()),
+            installed: true,
+            runnable: false,
+            logged_in: Some(false),
+            available: false,
+            status: "not_runnable".to_string(),
+            detail: Some(run.summary.unwrap_or_else(|| {
+                "检测到 codex 命令，但无法非交互执行；请安装 @openai/codex CLI 或修复 PATH"
+                    .to_string()
+            })),
+            fix_action: "repair_path".to_string(),
+            backend: "cli",
+        };
+    }
+
+    let auth = codex_auth_configured();
+    LocalCliToolStatus {
+        name: "codex".to_string(),
+        label,
+        path: Some(path.to_string_lossy().to_string()),
+        installed: true,
+        runnable: true,
+        logged_in: Some(auth),
+        available: auth,
+        status: if auth { "ready" } else { "not_logged_in" }.to_string(),
+        detail: if auth {
+            Some("Codex CLI 可运行，且已检测到 API key 或本机 Codex 登录文件".to_string())
+        } else {
+            Some("Codex CLI 可运行，但未检测到 OPENAI_API_KEY 或本机 Codex 登录文件".to_string())
+        },
+        fix_action: if auth { "none" } else { "login" }.to_string(),
+        backend: "cli",
+    }
+}
+
+fn best_cli_path(name: &str) -> Option<PathBuf> {
+    let candidates_paths: Vec<PathBuf> = elon_pc_dev_runtime::command_candidates(name);
+    if candidates_paths.is_empty() {
+        return None;
+    }
+
+    let not_vscode = |p: &&PathBuf| {
+        let lower = p.to_string_lossy().to_ascii_lowercase();
+        !lower.contains("globalstorage") && !lower.contains("copilotcli\\copilot")
+    };
+
+    #[cfg(windows)]
+    let best = candidates_paths
+        .iter()
+        .find(|p| p.to_string_lossy().to_ascii_lowercase().ends_with(".cmd") && not_vscode(p))
+        .or_else(|| {
+            candidates_paths
+                .iter()
+                .find(|p| p.to_string_lossy().to_ascii_lowercase().ends_with(".cmd"))
+        })
+        .or_else(|| candidates_paths.iter().find(not_vscode))
+        .or_else(|| candidates_paths.first());
+
+    #[cfg(not(windows))]
+    let best = candidates_paths
+        .iter()
+        .find(not_vscode)
+        .or_else(|| candidates_paths.first());
+
+    best.cloned()
+}
+
+struct QuickCommandStatus {
+    success: bool,
+    timed_out: bool,
+    summary: Option<String>,
+}
+
+fn quick_command_status(program: &Path, args: &[&str], timeout: Duration) -> QuickCommandStatus {
+    let mut command = elon_pc_dev_runtime::command_from_path(program);
+    command
+        .args(args)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .stdin(std::process::Stdio::null());
+    let mut child = match command.spawn() {
+        Ok(child) => child,
+        Err(error) => {
+            return QuickCommandStatus {
+                success: false,
+                timed_out: false,
+                summary: Some(format!("无法启动 {}：{error}", program.display())),
+            };
+        }
+    };
+    let started_at = Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => {
+                return match child.wait_with_output() {
+                    Ok(output) => QuickCommandStatus {
+                        success: output.status.success(),
+                        timed_out: false,
+                        summary: first_cli_output_line(&output.stdout, &output.stderr).or_else(
+                            || {
+                                (!output.status.success()).then(|| {
+                                    format!(
+                                        "{} 退出码 {:?}",
+                                        program.display(),
+                                        output.status.code()
+                                    )
+                                })
+                            },
+                        ),
+                    },
+                    Err(error) => QuickCommandStatus {
+                        success: false,
+                        timed_out: false,
+                        summary: Some(format!("读取 {} 输出失败：{error}", program.display())),
+                    },
+                };
+            }
+            Ok(None) if started_at.elapsed() >= timeout => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return QuickCommandStatus {
+                    success: false,
+                    timed_out: true,
+                    summary: Some(format!("{} 检测超时", program.display())),
+                };
+            }
+            Ok(None) => std::thread::sleep(Duration::from_millis(25)),
+            Err(error) => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return QuickCommandStatus {
+                    success: false,
+                    timed_out: false,
+                    summary: Some(format!("检测 {} 失败：{error}", program.display())),
+                };
+            }
+        }
+    }
+}
+
+fn first_cli_output_line(stdout: &[u8], stderr: &[u8]) -> Option<String> {
+    [stdout, stderr].into_iter().find_map(|bytes| {
+        String::from_utf8_lossy(bytes)
+            .lines()
+            .map(str::trim)
+            .find(|line| !line.is_empty())
+            .map(|line| line.chars().take(240).collect())
+    })
+}
+
+fn codex_auth_configured() -> bool {
+    let api_runtime = node_agent_api_runtime_config::status_from_env();
+    if api_runtime.key_configured || env_key_present("CODEX_API_KEY") {
+        return true;
+    }
+    codex_home_candidates()
+        .into_iter()
+        .any(|home| codex_auth_file_present(&home))
+}
+
+fn env_key_present(name: &str) -> bool {
+    std::env::var(name)
+        .map(|value| !value.trim().is_empty())
+        .unwrap_or(false)
+}
+
+fn codex_home_candidates() -> Vec<PathBuf> {
+    let mut candidates = Vec::new();
+    if let Ok(home) = std::env::var("CODEX_HOME") {
+        push_unique_path(&mut candidates, PathBuf::from(home));
+    }
+    for key in ["USERPROFILE", "HOME"] {
+        if let Ok(home) = std::env::var(key) {
+            push_unique_path(&mut candidates, PathBuf::from(home).join(".codex"));
+        }
+    }
+    candidates
+}
+
+fn codex_auth_file_present(home: &Path) -> bool {
+    if ["auth.json", "credentials.json"]
+        .into_iter()
+        .map(|name| home.join(name))
+        .any(|path| non_empty_file(&path))
+    {
+        return true;
+    }
+
+    let config = home.join("config.toml");
+    if !non_empty_file(&config) {
+        return false;
+    }
+    std::fs::read_to_string(&config)
+        .map(|body| {
+            let lower = body.to_ascii_lowercase();
+            lower.contains("api_key") || lower.contains("openai_api_key")
+        })
+        .unwrap_or(false)
+}
+
+fn non_empty_file(path: &Path) -> bool {
+    path.exists()
+        && std::fs::metadata(path)
+            .map(|meta| meta.len() > 2)
+            .unwrap_or(false)
+}
+
+fn push_unique_path(paths: &mut Vec<PathBuf>, path: PathBuf) {
+    if path.as_os_str().is_empty() {
+        return;
+    }
+    let key = path.to_string_lossy().to_ascii_lowercase();
+    if !paths
+        .iter()
+        .any(|item| item.to_string_lossy().to_ascii_lowercase() == key)
+    {
+        paths.push(path);
+    }
+}
+
+fn now_epoch_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_millis())
+        .unwrap_or_default()
 }
 
 /// 处理 extra_args 中的 `--attachment <url>` 参数：
@@ -2097,6 +2446,7 @@ async fn run_session(
 
     // 扫描本地模型
     let models = discover_models(cfg).await;
+    runtime.set_models(models.clone()).await;
     if models.is_empty() {
         warn!("⚠️  未发现本地 LLM，节点将以无模型状态上线（可后续发送 RegisterCapabilities 更新）");
     } else {
@@ -2112,8 +2462,9 @@ async fn run_session(
     }
 
     // 检测本机可用的 CLI（返回 (cli名, 完整路径)）
-    let cli_pairs = detect_available_clis();
-    let available_clis: Vec<String> = cli_pairs.iter().map(|(name, _)| name.clone()).collect();
+    let cli_probe = runtime.refresh_cli_probe_now().await;
+    let cli_pairs = cli_probe.available_pairs();
+    let available_clis: Vec<String> = cli_probe.available_names();
     if !available_clis.is_empty() {
         info!(
             "🛠  检测到本地 CLI: {}",
@@ -2813,6 +3164,8 @@ async fn run_agent_runtime() -> Result<()> {
     let admin_port = node_agent_admin_open::admin_port_from_env();
     spawn_admin_server(runtime.clone(), admin_port);
     node_agent_admin_open::maybe_open_admin_page(admin_port);
+    runtime.ensure_cli_probe_background(true).await;
+    runtime.refresh_models_background();
 
     run_loop(runtime).await;
     Ok(())
@@ -2836,6 +3189,10 @@ pub(crate) struct NodeRuntime {
     hardware_cached: RwLock<NodeHardwareProfile>,
     /// CLI 名称 → 完整路径映射（启动时检测，避免 PATH 不完整导致 program not found）
     cli_paths: RwLock<Vec<(String, String)>>,
+    /// 本机 CLI 探测缓存；状态页只读缓存，后台刷新，避免打开 Win 端或 /node 时卡住。
+    cli_probe_cached: RwLock<LocalCliProbeSnapshot>,
+    cli_probe_refreshing: AtomicBool,
+    model_scan_refreshing: AtomicBool,
     /// 本地 TTS Worker URL（如 http://127.0.0.1:5011）；由管理页或环境变量设置
     tts_worker_url: RwLock<Option<String>>,
     /// 本机项目代码硬盘服务配置。
@@ -2873,6 +3230,9 @@ impl NodeRuntime {
             status: RwLock::new(NodeStatus::default()),
             hardware_cached: RwLock::new(crate::node_hardware_probe::collect_hardware_profile()),
             cli_paths: RwLock::new(Vec::new()),
+            cli_probe_cached: RwLock::new(LocalCliProbeSnapshot::default()),
+            cli_probe_refreshing: AtomicBool::new(false),
+            model_scan_refreshing: AtomicBool::new(false),
             tts_worker_url: RwLock::new(tts_url),
             storage_settings: RwLock::new(storage_settings),
             active_cli_prompts: node_agent_active_task_registry::ActiveCliPromptRegistry::new(),
@@ -2907,6 +3267,66 @@ impl NodeRuntime {
 
     async fn set_cli_paths(&self, paths: Vec<(String, String)>) {
         *self.cli_paths.write().await = paths;
+    }
+
+    async fn cached_cli_probe(&self) -> LocalCliProbeSnapshot {
+        self.cli_probe_cached.read().await.clone()
+    }
+
+    fn refresh_models_background(self: &Arc<Self>) {
+        if self.model_scan_refreshing.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let runtime = self.clone();
+        tokio::spawn(async move {
+            let models = discover_models(&runtime.cfg).await;
+            runtime.set_models(models).await;
+            runtime
+                .model_scan_refreshing
+                .store(false, Ordering::Release);
+        });
+    }
+
+    async fn ensure_cli_probe_background(self: &Arc<Self>, force: bool) {
+        let stale = self.cached_cli_probe().await.is_stale();
+        if !force && !stale {
+            return;
+        }
+        if self.cli_probe_refreshing.swap(true, Ordering::AcqRel) {
+            return;
+        }
+        let runtime = self.clone();
+        tokio::spawn(async move {
+            let snapshot = tokio::task::spawn_blocking(probe_local_clis)
+                .await
+                .unwrap_or_else(|_| LocalCliProbeSnapshot::default());
+            runtime.set_cli_probe_snapshot(snapshot).await;
+            runtime.cli_probe_refreshing.store(false, Ordering::Release);
+        });
+    }
+
+    async fn refresh_cli_probe_now(self: &Arc<Self>) -> LocalCliProbeSnapshot {
+        if self.cli_probe_refreshing.swap(true, Ordering::AcqRel) {
+            for _ in 0..24 {
+                tokio::time::sleep(Duration::from_millis(50)).await;
+                if !self.cli_probe_refreshing.load(Ordering::Acquire) {
+                    return self.cached_cli_probe().await;
+                }
+            }
+            return self.cached_cli_probe().await;
+        }
+        let snapshot = tokio::task::spawn_blocking(probe_local_clis)
+            .await
+            .unwrap_or_else(|_| LocalCliProbeSnapshot::default());
+        self.set_cli_probe_snapshot(snapshot.clone()).await;
+        self.cli_probe_refreshing.store(false, Ordering::Release);
+        snapshot
+    }
+
+    async fn set_cli_probe_snapshot(&self, snapshot: LocalCliProbeSnapshot) {
+        let pairs = snapshot.available_pairs();
+        self.set_cli_paths(pairs).await;
+        *self.cli_probe_cached.write().await = snapshot;
     }
 
     async fn cli_prompt_active(&self, req_id: &str) -> bool {
@@ -3081,6 +3501,10 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
         let protected_routes = axum::Router::new()
             .route("/api/env-check", axum::routing::get(admin_env_check))
             .route("/api/install-env", axum::routing::post(admin_install_env))
+            .route(
+                "/api/codex-cli/refresh",
+                axum::routing::post(admin_codex_cli_refresh),
+            )
             .route(
                 "/api/doctor/snapshot",
                 axum::routing::get(windows_doctor::snapshot_handler),
@@ -3355,10 +3779,17 @@ async fn admin_status(
     axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
     headers: axum::http::HeaderMap,
 ) -> axum::Json<serde_json::Value> {
-    let live = discover_models(&rt.cfg).await;
-    rt.set_models(live.clone()).await;
+    rt.refresh_models_background();
+    rt.ensure_cli_probe_background(false).await;
     let creds = rt.creds().await;
-    let st = rt.status.read().await;
+    let (connected, last_event, live) = {
+        let st = rt.status.read().await;
+        (
+            st.connected,
+            st.last_event.clone(),
+            st.models_cached.clone(),
+        )
+    };
     let hardware = rt.hardware_profile().await;
     let storage_settings = rt.storage_settings.read().await.clone();
     let storage = pc_storage_repo::storage_profile(&storage_settings);
@@ -3373,9 +3804,10 @@ async fn admin_status(
         warn!("PC CLI sidecar registry 读取失败，CLI 会话桥接 sidecar 状态降级为空摘要: {error}");
         Vec::new()
     });
-    let cli_pairs = detect_available_clis();
-    let available_clis: Vec<String> = cli_pairs.iter().map(|(name, _)| name.clone()).collect();
-    rt.set_cli_paths(cli_pairs.clone()).await;
+    let cli_probe = rt.cached_cli_probe().await;
+    let cli_refreshing = rt.cli_probe_refreshing.load(Ordering::Acquire);
+    let available_clis = cli_probe.available_names();
+    let codex_cli = cli_probe.codex_status();
     let mut payload = serde_json::json!({
         "version": env!("CARGO_PKG_VERSION"),
         "local_admin_token_header": node_agent_local_admin::LOCAL_ADMIN_TOKEN_HEADER,
@@ -3393,8 +3825,8 @@ async fn admin_status(
         "lm_studio_url": rt.cfg.lm_studio_url,
         "custom_url": rt.cfg.custom_url,
         "price_per_1k": rt.cfg.price_per_1k,
-        "connected": st.connected,
-        "last_event": st.last_event,
+        "connected": connected,
+        "last_event": last_event,
         "hardware": hardware,
         "storage": storage,
         "full_access_grant_count": full_access_grant_count,
@@ -3404,22 +3836,17 @@ async fn admin_status(
             &recent_task_records,
             &sidecar_sessions,
         ),
+        "cli_probe": {
+            "refreshing": cli_refreshing,
+            "refreshed_at_ms": cli_probe.refreshed_at_ms,
+            "stale": cli_probe.is_stale(),
+        },
+        "codex_cli": codex_cli,
         "allowed_clis": available_clis,
-        "cli_tools": cli_pairs.iter().map(|(name, path)| serde_json::json!({
-            "name": name,
-            "label": local_cli_display_label(name),
-            "path": path,
-            "available": true,
-            "backend": "cli",
-        })).collect::<Vec<_>>(),
+        "cli_tools": cli_probe.tools.clone(),
         "local_ai": {
-            "cli_tools": cli_pairs.iter().map(|(name, path)| serde_json::json!({
-                "name": name,
-                "label": local_cli_display_label(name),
-                "path": path,
-                "available": true,
-            })).collect::<Vec<_>>(),
-            "models": live,
+            "cli_tools": cli_probe.tools.clone(),
+            "models": live.clone(),
         },
         "models": live,
     });
@@ -3432,6 +3859,23 @@ async fn admin_status(
         }
     }
     axum::Json(payload)
+}
+
+async fn admin_codex_cli_refresh(
+    axum::extract::State(rt): axum::extract::State<Arc<NodeRuntime>>,
+) -> axum::Json<serde_json::Value> {
+    let cli_probe = rt.refresh_cli_probe_now().await;
+    axum::Json(serde_json::json!({
+        "ok": true,
+        "cli_probe": {
+            "refreshing": rt.cli_probe_refreshing.load(Ordering::Acquire),
+            "refreshed_at_ms": cli_probe.refreshed_at_ms,
+            "stale": cli_probe.is_stale(),
+        },
+        "codex_cli": cli_probe.codex_status(),
+        "allowed_clis": cli_probe.available_names(),
+        "cli_tools": cli_probe.tools,
+    }))
 }
 
 #[derive(Deserialize)]

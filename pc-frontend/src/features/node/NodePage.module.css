@@ -251,6 +251,84 @@
 .resultOk { font-size: 12px; color: #4caf78; }
 .resultErr { font-size: 12px; color: var(--danger); }
 
+.codexCard {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.codexHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.codexLabel {
+  display: block;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 800;
+  margin-bottom: 3px;
+}
+
+.codexHead h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.codexCard p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.codexState {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.codex_online .codexState { color: #4caf78; }
+.codex_offline .codexState { color: #e07070; }
+.codex_checking .codexState { color: #c8a040; }
+
+.codexPath {
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.codexActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.codexKeyGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(110px, .7fr) auto;
+  gap: 8px;
+}
+
+.codexKeyGrid input {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  color: var(--text-primary);
+  padding: 7px 9px;
+  font-size: 12px;
+}
+
 /* ── 节点详情 ── */
 .localPage, .detailPage { max-width: 720px; }
 
@@ -289,6 +367,9 @@
   .sidebar { display: none; }
   .routeGuideHead,
   .routeGuideGrid {
+    grid-template-columns: 1fr;
+  }
+  .codexKeyGrid {
     grid-template-columns: 1fr;
   }
 }

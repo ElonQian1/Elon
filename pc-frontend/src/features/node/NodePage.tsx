@@ -5,7 +5,7 @@ import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { safeNodeAdminUrl } from '../../lib/utils'
-import type { AutostartStatus, NodeSummary, LocalNodeStatus } from './types'
+import type { AutostartStatus, NodeSummary, LocalNodeStatus, LocalCliToolStatus } from './types'
 import styles from './NodePage.module.css'
 
 const DOWNLOAD_URL = '/api/node-agent/download/windows-client'
@@ -171,12 +171,29 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
   const [autostartBusy, setAutostartBusy] = useState(false)
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
+  const [codexBusy, setCodexBusy] = useState(false)
+  const [apiKey, setApiKey] = useState('')
+  const [apiModel, setApiModel] = useState('gpt-5')
   const cliNames = [
     ...(status.allowed_clis ?? []),
-    ...(status.cli_tools ?? []).map((item) => item.name ?? item.label ?? ''),
+    ...(status.cli_tools ?? [])
+      .filter((item) => item.available !== false)
+      .map((item) => item.name ?? item.label ?? ''),
   ].filter(Boolean)
   const uniqueCliNames = Array.from(new Set(cliNames.map((item) => String(item).trim()).filter(Boolean)))
   const localModelCount = status.local_ai?.models?.length ?? status.models?.length ?? 0
+  const codex = codexStatusFrom(status)
+
+  const refreshStatus = useCallback(async (quiet = false) => {
+    if (!quiet) { setResult('刷新中…'); setError('') }
+    try {
+      const data = await nodeApi<LocalNodeStatus>(adminUrl, '/api/status')
+      setStatus(data)
+      if (!quiet) setResult('本机状态已刷新。')
+    } catch (err) {
+      if (!quiet) setError((err as Error).message)
+    }
+  }, [adminUrl])
 
   const loadAutostart = useCallback(async () => {
     try {
@@ -191,6 +208,12 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     loadAutostart()
   }, [loadAutostart])
 
+  useEffect(() => {
+    if (!status.cli_probe?.refreshing && codex?.status !== 'checking') return
+    const timer = setTimeout(() => { refreshStatus(true) }, 1600)
+    return () => clearTimeout(timer)
+  }, [status.cli_probe?.refreshing, codex?.status, refreshStatus])
+
   async function login() {
     setResult('绑定中…'); setError('')
     try {
@@ -204,9 +227,59 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     try {
       await nodeApi(adminUrl, '/api/logout', { method: 'POST' })
       setResult('本机节点已登出。')
-      const s = await nodeApi<LocalNodeStatus>(adminUrl, '/api/status')
-      setStatus(s)
+      await refreshStatus(true)
     } catch (err) { setError((err as Error).message) }
+  }
+
+  async function refreshCodex() {
+    setCodexBusy(true); setResult('正在检测 Codex…'); setError('')
+    try {
+      await nodeApi(adminUrl, '/api/codex-cli/refresh', { method: 'POST' }, 5000)
+      await refreshStatus(true)
+      setResult('Codex 检测已完成。')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setCodexBusy(false)
+    }
+  }
+
+  async function installEnv() {
+    setCodexBusy(true); setResult('正在启动安装修复向导…'); setError('')
+    try {
+      const data = await nodeApi<{ msg?: string; message?: string }>(
+        adminUrl, '/api/install-env', { method: 'POST' }, 10000,
+      )
+      setResult(data.msg || data.message || '安装修复向导已启动。')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setCodexBusy(false)
+    }
+  }
+
+  async function saveCodexKey() {
+    const key = apiKey.trim()
+    if (!key) {
+      setError('请先填写 OpenAI API Key。')
+      return
+    }
+    setCodexBusy(true); setResult('正在保存 Codex 鉴权…'); setError('')
+    try {
+      const data = await nodeApi<{ msg?: string; message?: string }>(
+        adminUrl,
+        '/api/save-openai-key',
+        { method: 'POST', body: JSON.stringify({ api_key: key, model: apiModel.trim() || null }) },
+        10000,
+      )
+      setApiKey('')
+      await refreshCodex()
+      setResult(data.msg || data.message || 'Codex 鉴权已保存。')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setCodexBusy(false)
+    }
   }
 
   async function toggleAutostart() {
@@ -249,6 +322,18 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
           <div key={k}><span>{k}</span><strong>{v}</strong></div>
         ))}
       </div>
+      <CodexStatusCard
+        status={codex}
+        refreshing={!!status.cli_probe?.refreshing}
+        busy={codexBusy}
+        apiKey={apiKey}
+        apiModel={apiModel}
+        onApiKeyChange={setApiKey}
+        onApiModelChange={setApiModel}
+        onRefresh={refreshCodex}
+        onInstall={installEnv}
+        onSaveKey={saveCodexKey}
+      />
       <div className={styles.actions}>
         <button className={[styles.btn, styles.primary].join(' ')} onClick={login}>
           {status.logged_in ? '重新绑定当前账号' : '用当前账号注册节点'}
@@ -266,11 +351,140 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         <button className={styles.btn} onClick={() => window.open(adminUrl, '_blank', 'noopener')}>
           高级本机页
         </button>
+        <button className={styles.btn} onClick={() => refreshStatus()} disabled={codexBusy}>
+          刷新状态
+        </button>
       </div>
       {autostart?.summary && <p className={styles.hintLine}>{autostart.summary}</p>}
       {result && <p className={styles.resultOk}>{result}</p>}
       {error && <p className={styles.resultErr}>{error}</p>}
     </div>
+  )
+}
+
+function codexStatusFrom(status: LocalNodeStatus): LocalCliToolStatus | null {
+  return status.codex_cli
+    ?? status.cli_tools?.find((item) => String(item.name ?? '').toLowerCase() === 'codex')
+    ?? null
+}
+
+function codexStatusCopy(status: LocalCliToolStatus | null, refreshing: boolean) {
+  if (refreshing || !status || status.status === 'checking') {
+    return {
+      tone: 'checking',
+      title: 'Codex CLI 检测中',
+      body: 'Win 端正在后台检测 Codex，不会阻塞页面或节点启动。',
+      action: 'wait',
+    }
+  }
+  if (status.status === 'ready' || status.available) {
+    return {
+      tone: 'online',
+      title: 'Codex CLI 已就绪',
+      body: status.detail || '本机 Codex 可由一龙 Win 端托管执行。',
+      action: 'none',
+    }
+  }
+  if (status.status === 'not_installed') {
+    return {
+      tone: 'offline',
+      title: 'Codex CLI 未安装',
+      body: status.detail || '需要安装 @openai/codex CLI。',
+      action: 'install',
+    }
+  }
+  if (status.status === 'not_runnable') {
+    return {
+      tone: 'offline',
+      title: 'Codex CLI 不可运行',
+      body: status.detail || '检测到 codex 命令，但 Win 端无法启动它。',
+      action: 'repair_path',
+    }
+  }
+  if (status.status === 'not_logged_in') {
+    return {
+      tone: 'checking',
+      title: 'Codex CLI 未登录',
+      body: status.detail || '请保存 API Key 或完成 Codex CLI 登录。',
+      action: 'login',
+    }
+  }
+  return {
+    tone: 'checking',
+    title: 'Codex CLI 状态未知',
+    body: status.detail || '请重新检测。',
+    action: 'refresh',
+  }
+}
+
+function CodexStatusCard({
+  status,
+  refreshing,
+  busy,
+  apiKey,
+  apiModel,
+  onApiKeyChange,
+  onApiModelChange,
+  onRefresh,
+  onInstall,
+  onSaveKey,
+}: {
+  status: LocalCliToolStatus | null
+  refreshing: boolean
+  busy: boolean
+  apiKey: string
+  apiModel: string
+  onApiKeyChange: (value: string) => void
+  onApiModelChange: (value: string) => void
+  onRefresh: () => void
+  onInstall: () => void
+  onSaveKey: () => void
+}) {
+  const copy = codexStatusCopy(status, refreshing)
+  const showKeyForm = copy.action === 'login'
+  const showInstall = copy.action === 'install' || copy.action === 'repair_path'
+  return (
+    <section className={[styles.codexCard, styles[`codex_${copy.tone}`]].join(' ')}>
+      <div className={styles.codexHead}>
+        <div>
+          <span className={styles.codexLabel}>Codex</span>
+          <h4>{copy.title}</h4>
+        </div>
+        <span className={styles.codexState}>{refreshing ? '刷新中' : status?.status ?? 'checking'}</span>
+      </div>
+      <p>{copy.body}</p>
+      {status?.path && <code className={styles.codexPath}>{status.path}</code>}
+      {showKeyForm && (
+        <div className={styles.codexKeyGrid}>
+          <input
+            value={apiKey}
+            onChange={(event) => onApiKeyChange(event.target.value)}
+            placeholder="OpenAI API Key"
+            type="password"
+            autoComplete="off"
+          />
+          <input
+            value={apiModel}
+            onChange={(event) => onApiModelChange(event.target.value)}
+            placeholder="模型"
+            autoComplete="off"
+          />
+          <button className={[styles.btn, styles.primary].join(' ')} onClick={onSaveKey} disabled={busy}>
+            保存鉴权
+          </button>
+        </div>
+      )}
+      <div className={styles.codexActions}>
+        {showInstall && (
+          <button className={[styles.btn, styles.primary].join(' ')} onClick={onInstall} disabled={busy}>
+            安装/修复 Codex
+          </button>
+        )}
+        <button className={styles.btn} onClick={onRefresh} disabled={busy}>
+          重新检测
+        </button>
+      </div>
+    </section>
   )
 }
 
