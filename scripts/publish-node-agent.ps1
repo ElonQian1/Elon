@@ -151,8 +151,8 @@ $PackageInternal = Join-Path $PackageRoot "_internal"
 $WindowsClientPackage = Join-Path $TargetDir "release\$WindowsClientPackageName"
 New-Item -ItemType Directory -Force -Path $PackageRoot, $PackageInternal | Out-Null
 try {
-    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "一龙PC节点.exe") -Force
-    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "卸载一龙PC节点.exe") -Force
+    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "一龙开发平台.exe") -Force
+    Copy-Item -LiteralPath $WinBin -Destination (Join-Path $PackageRoot "卸载一龙开发平台.exe") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "node-agent.env.example") -Destination (Join-Path $PackageInternal "node-agent.env.example") -Force
     Copy-Item -LiteralPath (Join-Path $LauncherDir "README.txt") -Destination (Join-Path $PackageInternal "README.txt") -Force
     $PackageVersionInfo = [ordered]@{
