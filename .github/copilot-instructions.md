@@ -75,6 +75,7 @@
 - **长期主义模块化**：新建源文件 ≤500 行，超 800 行必须拆分，入口文件只做组装。详见 `.github/instructions/modular-architecture.instructions.md`
 - **PC 前端迁移规则**：PC 工作台新功能默认进入 `pc-frontend/`；旧 `server/src/assets/pc_*.html/js/css` 进入收缩期，只做 bugfix、兼容桥接和迁移删除。涉及 `/pc`、`pc_*`、React/Vite/TypeScript、前端构建或发布链路时，必须读取 `.github/instructions/pc-frontend-migration.instructions.md` 和 `docs/pc-frontend-migration.md`。
 - **APP 颜色规范**：任何 APK/APP UI、主题、按钮、卡片、底部导航、状态胶囊或配色调整，必须先读取并遵守 `docs/APP 颜色规范.md`；只有用户明确要求更新颜色规范时，才修改该文件。
+- **按图复刻 UI 必须做视觉验收**：用户给截图、红框、手绘稿或要求“按比例复刻”时，AI 完成后必须对照原图检查排版对齐、板块比例、字体层级、间距、触控尺寸和视觉重心；必须通过截图/预览自查，发现按钮偏位、左右/上下不齐、元素比例失真、文字挤压或间距不合理时，先修正再提交/发布，不能把“差不多”的 UI 交付给用户。
 - **APK UI ↔ 网页 UI 同步**：改动 APK 任何 layout XML、Toolbar、Tab、气泡、颜色主题时，必须在同一 commit 同步更新 `server/src/assets/web_page.html`。对照规则见 `.github/instructions/apk-web-ui-sync.instructions.md`
 - **后端运行代码变更**：先 commit + push 到 `origin/main`，再运行 `.\scripts\publish-server.ps1`；脚本会 POST `/api/release/claim` 让服务器原子分配新版本号，再编译、上传 binary、部署、`/api/release/finish`。版本号通过 `option_env!("ELON_BUILD_VERSION")` 编译期注入，**不再写入 git**。并行任务若发布被后续 main 或服务器版本超越，汇报代码已推送和发布被最新主线接管，不要重复 rebase 重跑。`server/Cargo.toml` 的 version 字段是冷启动兜底，禁止手动递增并提交。发布脚本会屏蔽全局 `target-cpu=native`，强制使用通用 `-C target-cpu=x86-64` 生成服务器可运行产物
 - **Android 新功能默认先同步代码到远端主线，再继续发布 APK**；只有用户明确要求只同步代码、暂不发布或发布稍后再说时，才不把发布成功作为完成定义
