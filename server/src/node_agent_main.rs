@@ -1600,6 +1600,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             program: actual_bin.to_string(),
             args: sidecar_args.clone(),
             cwd: cwd.clone(),
+            runtime_permission: runtime_permission.clone(),
             env: sidecar_env.clone(),
             output_path,
             registry_dir: sidecar_registry.dir(),

@@ -29,6 +29,7 @@ async fn sidecar_runner_registers_real_child_and_replays_output() {
         program,
         args,
         cwd: None,
+        runtime_permission: None,
         env: Vec::new(),
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
@@ -102,6 +103,7 @@ async fn sidecar_runner_accepts_terminal_input_and_resize_after_attach() {
         program,
         args,
         cwd: None,
+        runtime_permission: None,
         env: Vec::new(),
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
@@ -160,6 +162,7 @@ async fn sidecar_runner_writes_recovered_tool_approval_to_pty() {
         program,
         args,
         cwd: None,
+        runtime_permission: None,
         env: Vec::new(),
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
@@ -228,6 +231,7 @@ async fn sidecar_runner_persists_codex_session_from_pty_output() {
         program,
         args,
         cwd: None,
+        runtime_permission: Some("project_write".to_string()),
         env: Vec::new(),
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
@@ -304,6 +308,7 @@ async fn sidecar_runner_records_codex_approval_prompt_and_decision() {
         program,
         args,
         cwd: None,
+        runtime_permission: Some("project_write".to_string()),
         env: Vec::new(),
         output_path: output_path.clone(),
         registry_dir: registry.dir(),
@@ -362,6 +367,69 @@ async fn sidecar_runner_records_codex_approval_prompt_and_decision() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[tokio::test]
+async fn sidecar_runner_skips_codex_approval_prompt_in_danger_full_access() {
+    let root = temp_dir("runner-codex-approval-danger");
+    let registry = CliSidecarRegistry::new(root.join("sidecars"));
+    let journal_dir = root.join("journal");
+    let journal = TaskJournal::new(&journal_dir);
+    let task_id = "task-sidecar-codex-approval-danger";
+    let session_id = "sidecar-codex-approval-danger";
+    let output_path = registry.output_path(task_id, session_id);
+    let (program, args) = codex_approval_text_command();
+
+    journal
+        .record_started(TaskJournalStart {
+            req_id: task_id,
+            cli_name: "codex",
+            route: Some("route_a_external_cli"),
+            run_handle_id: Some(task_id),
+            cwd: Some("D:/demo"),
+            runtime_permission: Some("danger_full_access"),
+        })
+        .expect("task should be registered before sidecar output");
+
+    run_sidecar(CliSidecarLaunchConfig {
+        session_id: session_id.to_string(),
+        task_id: task_id.to_string(),
+        cli_name: "codex".to_string(),
+        route: "route_a_external_cli".to_string(),
+        program,
+        args,
+        cwd: None,
+        runtime_permission: Some("danger_full_access".to_string()),
+        env: Vec::new(),
+        output_path: output_path.clone(),
+        registry_dir: registry.dir(),
+        task_journal_dir: Some(journal_dir.clone()),
+        codex_session_scope_key: None,
+        legacy_codex_sessions_file: None,
+        timeout_secs: 10,
+        stdin_piped_empty: false,
+        initial_cols: default_cols(),
+        initial_rows: default_rows(),
+    })
+    .await
+    .expect("sidecar should run approval-like output");
+
+    let snapshot = journal
+        .snapshot(task_id, 0, 100)
+        .expect("task journal snapshot should load");
+    assert_eq!(snapshot.approvals.approvals.len(), 0);
+
+    let mut offset = 0;
+    let records = read_new_output_records(&output_path, &mut offset)
+        .expect("sidecar output records should load");
+    let runtime_text = records
+        .iter()
+        .filter(|record| record.stream.as_deref() == Some("runtime"))
+        .filter_map(|record| record.text.as_deref())
+        .collect::<String>();
+    assert!(!runtime_text.contains(r#""type":"tool_approval_required""#));
+
+    let _ = fs::remove_dir_all(root);
+}
+
 fn shell_echo_command() -> (String, Vec<String>) {
     if cfg!(windows) {
         (
@@ -398,6 +466,27 @@ fn codex_approval_prompt_command() -> (String, Vec<String>) {
             vec![
                 "-c".to_string(),
                 "printf '\\033[33mAllow command?\\033[0m\\n$ echo sidecar-approved\\n[y/N]\\n'; read x; printf 'decision:%s\\n' \"$x\"".to_string(),
+            ],
+        )
+    }
+}
+
+fn codex_approval_text_command() -> (String, Vec<String>) {
+    if cfg!(windows) {
+        (
+            "powershell".to_string(),
+            vec![
+                "-NoProfile".to_string(),
+                "-Command".to_string(),
+                "$e=[char]27; Write-Output \"$e[33mAllow command?$e[0m\"; Write-Output '$ echo should-not-request-approval'; Write-Output '[y/N]'; Write-Output 'done'".to_string(),
+            ],
+        )
+    } else {
+        (
+            "sh".to_string(),
+            vec![
+                "-c".to_string(),
+                "printf '\\033[33mAllow command?\\033[0m\\n$ echo should-not-request-approval\\n[y/N]\\ndone\\n'".to_string(),
             ],
         )
     }

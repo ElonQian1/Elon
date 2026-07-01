@@ -36,6 +36,8 @@ pub(crate) struct CliSidecarLaunchConfig {
     pub program: String,
     pub args: Vec<String>,
     pub cwd: Option<String>,
+    #[serde(default)]
+    pub runtime_permission: Option<String>,
     pub env: Vec<(String, String)>,
     pub output_path: PathBuf,
     pub registry_dir: PathBuf,
@@ -420,7 +422,7 @@ fn write_chunk(
     )?;
     let journal_stream = if stream == "pty" { "stdout" } else { stream };
     let _ = task_journal.record_cli_chunk(&config.task_id, journal_stream, &visible_text);
-    if config.cli_name == "codex" {
+    if config.cli_name == "codex" && !route_a_full_access(config.runtime_permission.as_deref()) {
         if let Some(event) = codex_approval_tracker.observe_output(
             &config.task_id,
             &config.session_id,
@@ -432,6 +434,13 @@ fn write_chunk(
         }
     }
     Ok(())
+}
+
+fn route_a_full_access(runtime_permission: Option<&str>) -> bool {
+    matches!(
+        runtime_permission.map(str::trim),
+        Some("full_access" | "danger_full_access")
+    )
 }
 
 fn write_tool_event(
