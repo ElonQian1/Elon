@@ -288,9 +288,16 @@ function Assert-TraceReplyContains {
 
 function Invoke-GitChecked {
     param([string[]]$GitArgs)
-    $output = & git -C $RepoRoot @GitArgs 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        throw "git $($GitArgs -join ' ') failed: $(($output | Out-String).Trim())"
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        $output = & git -C $RepoRoot @GitArgs 2>&1
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
+    if ($exitCode -ne 0) {
+        throw "git $($GitArgs -join ' ') failed ($exitCode): $(($output | Out-String).Trim())"
     }
     return $output
 }
