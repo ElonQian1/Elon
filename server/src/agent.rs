@@ -1632,6 +1632,10 @@ mod tests {
             "你好",
             Path::new("C:/tmp/project")
         ));
+        assert!(!requires_project_workflow_for_message(
+            "你好吗？",
+            Path::new("C:/tmp/project")
+        ));
     }
 
     #[test]

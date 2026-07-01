@@ -269,7 +269,10 @@ fn should_retry_without_json_response_mode(status: reqwest::StatusCode, body: &s
 
 #[cfg(test)]
 mod tests {
-    use super::{chat_completion_body, should_retry_without_json_response_mode};
+    use super::{
+        chat_completion_body, looks_like_node_casual_chat_failure,
+        should_retry_without_json_response_mode,
+    };
     use crate::types::AgentConfig;
     use serde_json::json;
 
@@ -306,6 +309,19 @@ mod tests {
         assert!(!should_retry_without_json_response_mode(
             reqwest::StatusCode::TOO_MANY_REQUESTS,
             "rate limit"
+        ));
+    }
+
+    #[test]
+    fn node_casual_chat_failure_text_falls_back_to_cloud_llm() {
+        assert!(looks_like_node_casual_chat_failure(
+            "PC CLI 执行失败: 调用 server-runtime 失败"
+        ));
+        assert!(looks_like_node_casual_chat_failure(
+            "server-runtime failed before producing a reply"
+        ));
+        assert!(!looks_like_node_casual_chat_failure(
+            "我在，状态正常。你可以继续说。"
         ));
     }
 
@@ -564,6 +580,30 @@ pub(crate) async fn try_casual_chat_via_node(
         }
     }
 
+    if looks_like_node_casual_chat_failure(&content) {
+        crate::node_router::finish_node_compute_run(
+            state,
+            &accounting_key,
+            crate::store::NodeComputeRunFinish {
+                status: "failed",
+                prompt_tokens: prompt_tokens as i64,
+                completion_tokens: completion_tokens as i64,
+                billed_cost_rmb_fen: 0,
+                provider_earned_fen: 0,
+                settlement_status: None,
+                error_message: Some(content.trim()),
+            },
+        );
+        crate::billing::release_trusted_call(
+            &state.store,
+            user_id,
+            &accounting_key,
+            "released_error",
+        );
+        tracing::warn!("节点普通聊天返回执行失败文本，降级到云端 LLM: {content}");
+        return None;
+    }
+
     if content.is_empty() {
         crate::node_router::finish_node_compute_run(
             state,
@@ -612,4 +652,15 @@ pub(crate) async fn try_casual_chat_via_node(
 
     let _ = node_id; // used above for find check
     Some((content, actual_node_id, model.to_string()))
+}
+
+fn looks_like_node_casual_chat_failure(content: &str) -> bool {
+    let normalized = content.trim().to_ascii_lowercase();
+    if normalized.is_empty() {
+        return false;
+    }
+    normalized.contains("pc cli 执行失败")
+        || normalized.contains("调用 server-runtime 失败")
+        || normalized.contains("server-runtime failed")
+        || (normalized.contains("server-runtime") && normalized.contains("失败"))
 }
