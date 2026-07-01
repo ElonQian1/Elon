@@ -184,6 +184,11 @@ internal class ChatSideMenuController(
         show()
     }
 
+    fun refreshVisibleContent() {
+        if (!isSetup || overlay.visibility != View.VISIBLE) return
+        applyContentMode()
+    }
+
     private fun handleSideMenuHandleTouch(view: View, event: MotionEvent): Boolean {
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {

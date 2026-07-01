@@ -44,7 +44,8 @@ internal class MainHomeListActions(
     private val showProjectActions: (Int, View?) -> Unit,
     private val showAddFriendDialog: () -> Unit,
     private val openFriend: (AppFriend) -> Unit,
-    private val openGroup: (AppGroup) -> Unit
+    private val openGroup: (AppGroup) -> Unit,
+    private val onConversationListRendered: () -> Unit = {}
 ) {
     private var friendSearchActive = false
     private var friendSearchQuery = ""
@@ -99,6 +100,11 @@ internal class MainHomeListActions(
     }
 
     fun renderConversationList() {
+        renderConversationListContent()
+        onConversationListRendered()
+    }
+
+    private fun renderConversationListContent() {
         val listVisible = binding.conversationPage.visibility == View.VISIBLE &&
             binding.chatPage.visibility != View.VISIBLE
         if (!listVisible && friendSearchActive) {

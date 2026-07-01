@@ -939,6 +939,9 @@ class MainActivity : AppCompatActivity() {
                 projectSpaceController.closeChannelChat()
                 groupChatActions.openGroup(group, animate = true)
                 syncVisibleChatNotificationState()
+            },
+            onConversationListRendered = {
+                chatSideMenuController.refreshVisibleContent()
             }
         )
     }

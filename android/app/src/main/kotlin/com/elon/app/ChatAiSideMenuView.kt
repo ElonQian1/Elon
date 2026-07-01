@@ -292,28 +292,44 @@ internal class ChatAiSideMenuView(
         while (conversationDirectoryGroup.childCount > 1) {
             conversationDirectoryGroup.removeViewAt(1)
         }
-        val items = conversations()
+        val items = conversationDirectoryEntries()
         if (items.isEmpty()) {
             conversationDirectoryGroup.addView(directoryRow("暂无会话", active = false, working = false, onClick = {}))
             return
         }
-        items.forEachIndexed { index, conversation ->
+        items.forEach { entry ->
             conversationDirectoryGroup.addView(
                 directoryRow(
-                    title = conversation.title,
-                    active = index == activeConversationIndex(),
-                    working = isConversationWorking(index),
+                    title = entry.conversation.title,
+                    active = entry.index == activeConversationIndex(),
+                    working = entry.working,
                     onClick = {
                         requestClose(true)
-                        openConversation(index)
+                        openConversation(entry.index)
                     },
                     onLongClick = {
                         requestClose(true)
-                        postDelayed({ renameConversation(index) }, DURATION_MS)
+                        postDelayed({ renameConversation(entry.index) }, DURATION_MS)
                     }
                 )
             )
         }
+    }
+
+    private fun conversationDirectoryEntries(): List<ConversationDirectoryEntry> {
+        return conversations()
+            .mapIndexed { index, conversation ->
+                ConversationDirectoryEntry(
+                    index = index,
+                    conversation = conversation,
+                    working = isConversationWorking(index)
+                )
+            }
+            .sortedWith(
+                compareByDescending<ConversationDirectoryEntry> { it.working }
+                    .thenByDescending { it.conversation.updatedAt }
+                    .thenBy { it.conversation.title }
+            )
     }
 
     private fun conversationHeaderRow(): LinearLayout {
@@ -448,3 +464,9 @@ internal class ChatAiSideMenuView(
         const val PROJECT_OPEN_DELAY_MS = 220L
     }
 }
+
+private data class ConversationDirectoryEntry(
+    val index: Int,
+    val conversation: AppConversation,
+    val working: Boolean
+)
