@@ -5,6 +5,7 @@ import { safeNodeAdminUrl } from '../../lib/utils'
 import type {
   DoctorMessage, DoctorSessionSummary, DoctorResult,
   DoctorSection, SnapshotData, MemoryItem,
+  DownloadRouterStatus, DownloadRouterDoctorReport,
 } from './types'
 
 function normalizeMessages(raw: unknown[]): DoctorMessage[] {
@@ -33,6 +34,8 @@ interface DoctorState {
   analysis: string
   snapshot: SnapshotData | null
   memories: MemoryItem[] | null
+  routerStatus: DownloadRouterStatus | null
+  routerDoctor: DownloadRouterDoctorReport | null
   result: DoctorResult | null
   selectedAgentName: string
 
@@ -45,6 +48,10 @@ interface DoctorState {
   loadSnapshot: () => Promise<void>
   analyze: (problem?: string) => Promise<void>
   repair: (action: string, adapterName?: string) => Promise<void>
+  loadRouterStatus: () => Promise<void>
+  setRouterProfile: (enabled: boolean, mode?: string) => Promise<void>
+  runRouterDoctor: () => Promise<void>
+  aiConfigureRouter: () => Promise<void>
   loadMemory: () => Promise<void>
   saveMemory: () => Promise<void>
 }
@@ -60,6 +67,8 @@ export const useDoctorStore = create<DoctorState>()((set, get) => ({
   analysis: '',
   snapshot: null,
   memories: null,
+  routerStatus: null,
+  routerDoctor: null,
   result: null,
   selectedAgentName: '',
 
@@ -210,6 +219,62 @@ export const useDoctorStore = create<DoctorState>()((set, get) => ({
       if (sessionId) await get().loadSession(sessionId)
     } catch (err) {
       set({ result: { kind: 'err', text: `修复失败：${(err as Error).message}` } })
+    }
+  },
+
+  loadRouterStatus: async () => {
+    const { nodeAdminUrl } = get()
+    try {
+      const data = await localJson<DownloadRouterStatus>(nodeAdminUrl, '/api/download-router/status')
+      set({ routerStatus: data })
+    } catch (err) {
+      set({ result: { kind: 'err', text: `读取下载加速状态失败：${(err as Error).message}` } })
+    }
+  },
+
+  setRouterProfile: async (enabled, mode) => {
+    const { nodeAdminUrl } = get()
+    set({ result: { kind: '', text: '正在保存智能下载加速配置…' } })
+    try {
+      const body = mode ? { enabled, mode } : { enabled }
+      const data = await localJson<DownloadRouterStatus>(nodeAdminUrl, '/api/download-router/profile', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      })
+      set({ routerStatus: data, result: { kind: 'ok', text: enabled ? '智能下载加速已启用。' : '智能下载加速已关闭。' } })
+    } catch (err) {
+      set({ result: { kind: 'err', text: `保存失败：${(err as Error).message}` } })
+    }
+  },
+
+  runRouterDoctor: async () => {
+    const { nodeAdminUrl } = get()
+    set({ result: { kind: '', text: '正在检测 Rust/npm 下载线路…' } })
+    try {
+      const data = await localJson<DownloadRouterDoctorReport>(nodeAdminUrl, '/api/download-router/doctor', {
+        method: 'POST',
+      })
+      set({ routerDoctor: data, result: { kind: 'ok', text: '下载线路诊断完成。' } })
+      await get().loadRouterStatus()
+    } catch (err) {
+      set({ result: { kind: 'err', text: `诊断失败：${(err as Error).message}` } })
+    }
+  },
+
+  aiConfigureRouter: async () => {
+    const { nodeAdminUrl } = get()
+    set({ result: { kind: '', text: '正在让 AI 助手应用推荐下载配置…' } })
+    try {
+      const data = await localJson<{ message?: string; status?: DownloadRouterStatus }>(nodeAdminUrl, '/api/download-router/ai-configure', {
+        method: 'POST',
+        body: JSON.stringify({ confirm: true, mode: 'auto' }),
+      })
+      set({
+        routerStatus: data.status ?? get().routerStatus,
+        result: { kind: 'ok', text: data.message ?? 'AI 助手已应用推荐下载配置。' },
+      })
+    } catch (err) {
+      set({ result: { kind: 'err', text: `AI 配置失败：${(err as Error).message}` } })
     }
   },
 

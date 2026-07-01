@@ -6,6 +6,7 @@ import styles from './DoctorPage.module.css'
 
 const SECTIONS = [
   { id: 'snapshot', icon: '查', title: '体检快照' },
+  { id: 'router', icon: '下', title: '下载加速' },
   { id: 'repair', icon: '修', title: '修复动作' },
   { id: 'memory', icon: '记', title: '问题记忆' },
 ] as const
@@ -14,9 +15,10 @@ export default function DoctorPage() {
   const user = useAuthStore((s) => s.user)
   const {
     sessions, sessionsLoaded, activeSessionId, messages,
-    section, result, memories, snapshot, problem, analysis,
+    section, result, memories, snapshot, problem, analysis, routerStatus, routerDoctor,
     loadSessions, loadSession, createSession, setSection,
     loadSnapshot, analyze, repair, loadMemory, saveMemory,
+    loadRouterStatus, setRouterProfile, runRouterDoctor, aiConfigureRouter,
   } = useDoctorStore()
 
   const [input, setInput] = useState('')
@@ -25,6 +27,7 @@ export default function DoctorPage() {
 
   useEffect(() => { loadSessions() }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { if (section === 'memory' && memories === null) loadMemory() }, [section]) // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (section === 'router' && routerStatus === null) loadRouterStatus() }, [section]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (feedRef.current) feedRef.current.scrollTop = feedRef.current.scrollHeight
   }, [messages, result])
@@ -55,6 +58,14 @@ export default function DoctorPage() {
     if (!window.confirm(`确认执行「${labels[action] ?? action}」？该动作会修改本机网络状态。`)) return
     await repair(action, adapterName.trim() || undefined)
   }
+
+  async function handleRouterToggle() {
+    const enabled = routerStatus?.profile?.enabled ?? true
+    await setRouterProfile(!enabled, !enabled ? 'auto' : 'off')
+  }
+
+  const routerEnabled = routerStatus?.profile?.enabled ?? true
+  const routerMode = routerStatus?.profile?.mode ?? 'auto'
 
   return (
     <div className={styles.layout}>
@@ -143,6 +154,62 @@ export default function DoctorPage() {
               {snapshot
                 ? <pre>{JSON.stringify(snapshot, null, 2)}</pre>
                 : <p>尚未采集体检快照，点击「只读体检」开始。</p>}
+            </div>
+          )}
+
+          {section === 'router' && (
+            <div className={styles.routerBox}>
+              <div className={styles.routerHeader}>
+                <div>
+                  <h3>智能下载加速</h3>
+                  <span className={routerEnabled ? styles.routerOk : styles.routerOff}>
+                    {routerEnabled ? `已启用 · ${routerMode}` : '已关闭'}
+                  </span>
+                </div>
+                <button className={styles.actionBtn} onClick={handleRouterToggle}>
+                  {routerEnabled ? '关闭' : '开启'}
+                </button>
+              </div>
+
+              <div className={styles.modeGrid}>
+                {[
+                  ['auto', '自动'],
+                  ['direct', '直连'],
+                  ['system_proxy', '系统代理'],
+                  ['off', '关闭'],
+                ].map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    className={[styles.modeBtn, routerMode === mode ? styles.modeActive : ''].join(' ')}
+                    onClick={() => setRouterProfile(mode !== 'off', mode)}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+
+              <div className={styles.routerActions}>
+                <button className={styles.repairBtn} onClick={loadRouterStatus}>刷新状态</button>
+                <button className={styles.repairBtn} onClick={runRouterDoctor}>运行诊断</button>
+                <button className={styles.repairBtn} onClick={aiConfigureRouter}>AI 应用推荐</button>
+              </div>
+
+              <div className={styles.routerMeta}>
+                <span>Profile</span>
+                <code>{routerStatus?.profilePath ?? '未读取'}</code>
+              </div>
+              <div className={styles.routerMeta}>
+                <span>Policy</span>
+                <code>{routerStatus?.wrapperPolicy ?? 'PATH wrapper + fail-open'}</code>
+              </div>
+
+              {routerDoctor && (
+                <div className={styles.snapshotBox}>
+                  <pre>{JSON.stringify(routerDoctor, null, 2)}</pre>
+                </div>
+              )}
+
+              {result && <div className={[styles.resultBox, styles[result.kind]].join(' ')}>{result.text}</div>}
             </div>
           )}
 

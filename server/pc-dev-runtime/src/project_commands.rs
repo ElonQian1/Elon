@@ -60,6 +60,19 @@ $ErrorActionPreference = 'Stop'
 $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 Set-Location $ProjectRoot
 
+function Enable-ElonToolRouter {
+    $routerBin = Join-Path $PSScriptRoot 'tool-router-bin'
+    if (-not (Test-Path -LiteralPath $routerBin -PathType Container)) { return }
+    $resolved = (Resolve-Path -LiteralPath $routerBin).Path
+    $parts = @($env:PATH -split [System.IO.Path]::PathSeparator | Where-Object { $_ })
+    if (-not ($parts | Where-Object { $_.TrimEnd('\') -ieq $resolved.TrimEnd('\') })) {
+        $env:PATH = $resolved + [System.IO.Path]::PathSeparator + $env:PATH
+    }
+    $env:ELON_ROUTER_PROJECT_ROOT = $ProjectRoot
+}
+
+Enable-ElonToolRouter
+
 function Invoke-External {
     param(
         [Parameter(Mandatory = $true)][string]$File,
@@ -224,6 +237,8 @@ mod tests {
         assert!(script
             .contains("ValidateSet('env', 'status', 'task', 'agent', 'check', 'build', 'test')"));
         assert!(script.contains("elon-dev-check.ps1"));
+        assert!(script.contains("Enable-ElonToolRouter"));
+        assert!(script.contains("tool-router-bin"));
         assert!(script.contains("elon-new-task.ps1"));
         assert!(script.contains("elon-agent.ps1"));
         assert!(script.contains("AgentMode"));

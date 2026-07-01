@@ -249,6 +249,37 @@ fn tool_definitions() -> Value {
             })
         ),
         function_tool(
+            "download_router_status",
+            "Read the current smart download router profile and wrapper policy without modifying configuration.",
+            json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
+            "download_router_doctor",
+            "Run a read-only smart download router diagnosis for common Rust and npm download sources.",
+            json!({
+                "type": "object",
+                "properties": {},
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
+            "download_router_configure",
+            "Configure smart download routing through the safe project router. Requires user approval in the local runtime.",
+            json!({
+                "type": "object",
+                "properties": {
+                    "mode": { "type": "string", "enum": ["auto", "direct", "system_proxy", "off"] },
+                    "reason": { "type": "string", "description": "Short reason for changing the router mode." }
+                },
+                "required": ["mode", "reason"],
+                "additionalProperties": false
+            })
+        ),
+        function_tool(
             "write_file",
             "Create or replace a project-relative text file. Requires user approval when writes are enabled.",
             json!({
@@ -347,6 +378,12 @@ mod tests {
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "git_show"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "download_router_status"));
+        assert!(tools
+            .iter()
+            .any(|tool| tool["function"]["name"] == "download_router_configure"));
         assert!(tools
             .iter()
             .any(|tool| tool["function"]["name"] == "apply_patch"));

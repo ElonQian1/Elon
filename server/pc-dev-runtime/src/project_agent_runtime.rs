@@ -76,7 +76,7 @@ scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Read README.md and tell m
 scripts\elon.ps1 agent -AgentMode api-runtime -Prompt "Create a docs note with the current project status" -DryRun
 ```
 
-Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `search_files`, `file_info`, `read_file`, `read_file_range`, read-only `git_status` / `git_diff` / `git_log`, `write_file`, `apply_patch`, and a small allowlist of project commands. `search_files` is read-only and bounded, so use it before broad file reads when locating symbols, filenames, TODOs, errors, or related code. `file_info` is read-only and helps inspect unknown files or directories before reading them. `git_status`, `git_diff`, and `git_log` are read-only git inspection tools and do not require command approval. `run_command` should use structured `program` + `args` fields instead of one shell string. File writes, patch application, and command execution require confirmation unless `-Yes` is provided. `-DryRun` previews writes, patch checks, and commands without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
+Route B is intentionally conservative. It only permits workspace-scoped `list_dir`, `search_files`, `file_info`, `read_file`, `read_file_range`, read-only `git_status` / `git_diff` / `git_log`, smart download router inspection/configuration through `download_router_status` / `download_router_doctor` / `download_router_configure`, `write_file`, `apply_patch`, and a small allowlist of project commands. `search_files` is read-only and bounded, so use it before broad file reads when locating symbols, filenames, TODOs, errors, or related code. `file_info` is read-only and helps inspect unknown files or directories before reading them. `git_status`, `git_diff`, `git_log`, `download_router_status`, and `download_router_doctor` are read-only and do not require command approval. `download_router_configure`, file writes, patch application, and command execution require confirmation unless `-Yes` is provided. `run_command` should use structured `program` + `args` fields instead of one shell string. `-DryRun` previews writes, patch checks, command execution, and download-router configuration without applying them. Each agent run has a `-MaxRunCommands` budget, a `-MaxContextChars` context budget, and truncates large command output before sending it back to the model. When the local conversation grows past the context budget, older assistant/tool-result messages are compacted into a metadata-only summary while the original instruction and recent turns are kept. This is not an OS sandbox: build/test commands can still execute project code, so only run it for projects you trust.
 
 ## Route C: Elon server runtime
 Use this when the PC does not have Codex/Claude/Gemini/Copilot installed and the user does not have their own API key.
@@ -126,6 +126,19 @@ $ErrorActionPreference = 'Stop'
 
 $ProjectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
 Set-Location $ProjectRoot
+
+function Enable-ElonToolRouter {
+    $routerBin = Join-Path $PSScriptRoot 'tool-router-bin'
+    if (-not (Test-Path -LiteralPath $routerBin -PathType Container)) { return }
+    $resolved = (Resolve-Path -LiteralPath $routerBin).Path
+    $parts = @($env:PATH -split [System.IO.Path]::PathSeparator | Where-Object { $_ })
+    if (-not ($parts | Where-Object { $_.TrimEnd('\') -ieq $resolved.TrimEnd('\') })) {
+        $env:PATH = $resolved + [System.IO.Path]::PathSeparator + $env:PATH
+    }
+    $env:ELON_ROUTER_PROJECT_ROOT = $ProjectRoot
+}
+
+Enable-ElonToolRouter
 
 if ($MaxRunCommands -lt 1) { $MaxRunCommands = 1 }
 if ($MaxRunCommands -gt 20) { $MaxRunCommands = 20 }
@@ -298,6 +311,9 @@ Schema:
     {"tool": "git_status"},
     {"tool": "git_diff", "path": "src/main.rs", "cached": false, "stat": false},
     {"tool": "git_log", "path": "src/main.rs", "limit": 20},
+    {"tool": "download_router_status"},
+    {"tool": "download_router_doctor"},
+    {"tool": "download_router_configure", "mode": "auto", "reason": "enable smart download routing for AI build commands"},
     {"tool": "write_file", "path": "docs/note.md", "content": "full content"},
     {"tool": "apply_patch", "patch": "unified diff", "check_only": false},
     {"tool": "run_command", "program": "cargo", "args": ["test"], "reason": "verify project tests"}
@@ -311,6 +327,8 @@ Rules:
 - Use file_info before reading unknown files, binary-looking files, or directories.
 - Use read_file_range for large files or when you only need a specific section.
 - Use git_status, git_diff, and git_log for read-only git inspection; do not spend run_command approvals on status/diff/log.
+- Use download_router_status and download_router_doctor before changing network download behavior.
+- Use download_router_configure only through the provided mode field: auto, direct, system_proxy, or off. It requires user approval.
 - Do not request destructive commands, privilege changes, downloads that execute code, persistence, credential access, or writes outside the project.
 - Prefer apply_patch with unified diff for local edits to existing project files.
 - Use write_file only for intentional new project files or full-file rewrites.
@@ -759,6 +777,16 @@ function Invoke-AgentGitLog {
     return Limit-AgentText $text $AgentCommandOutputMaxChars
 }
 
+function Invoke-ElonToolRouter {
+    param([string[]]$RouterArgs = @())
+    $script = Join-Path $PSScriptRoot 'elon-tool-router.ps1'
+    if (-not (Test-Path -LiteralPath $script -PathType Leaf)) {
+        return 'download router is not installed in this project'
+    }
+    $output = & $script @RouterArgs 2>&1 | Out-String
+    return Limit-AgentText $output $AgentCommandOutputMaxChars
+}
+
 function Invoke-AgentAction {
     param([Parameter(Mandatory = $true)]$Action)
     $tool = [string]$Action.tool
@@ -853,6 +881,26 @@ function Invoke-AgentAction {
             if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
             Set-Content -LiteralPath $full -Value $content -Encoding UTF8
             return "write_file ok: $path"
+        }
+        'download_router_status' {
+            return Invoke-ElonToolRouter @('status')
+        }
+        'download_router_doctor' {
+            return Invoke-ElonToolRouter @('doctor')
+        }
+        'download_router_configure' {
+            $mode = ([string]$Action.mode).Trim().ToLowerInvariant()
+            if (-not $mode) { $mode = 'auto' }
+            if (-not (@('auto', 'direct', 'system_proxy', 'off') -contains $mode)) {
+                return "download_router_configure denied by policy: invalid mode $mode"
+            }
+            if ($DryRun) {
+                return "dry-run: would configure download router mode=$mode"
+            }
+            if (-not (Confirm-AgentAction 'download_router_configure' "mode=$mode")) {
+                return "download_router_configure denied by user: mode=$mode"
+            }
+            return Invoke-ElonToolRouter @('profile', '-Mode', $mode)
         }
 # __ELON_APPLY_PATCH_ACTION__
         'run_command' {
@@ -1079,6 +1127,8 @@ mod tests {
             .contains("ValidateSet('status', 'cli-wrapper', 'api-runtime', 'server-runtime')"));
         assert!(script.contains("ValidateSet('codex', 'claude', 'gemini', 'copilot')"));
         assert!(script.contains("Invoke-CliWrapper"));
+        assert!(script.contains("Enable-ElonToolRouter"));
+        assert!(script.contains("tool-router-bin"));
         assert!(script.contains("Invoke-ApiRuntime"));
         assert!(script.contains("Invoke-ServerRuntime"));
         assert!(script.contains("[string]$RunId = ''"));
@@ -1110,9 +1160,13 @@ mod tests {
         assert!(script.contains("'git_status'"));
         assert!(script.contains("'git_diff'"));
         assert!(script.contains("'git_log'"));
+        assert!(script.contains("'download_router_status'"));
+        assert!(script.contains("'download_router_doctor'"));
+        assert!(script.contains("'download_router_configure'"));
         assert!(script.contains("Invoke-AgentGitStatus"));
         assert!(script.contains("Invoke-AgentGitDiff"));
         assert!(script.contains("Invoke-AgentGitLog"));
+        assert!(script.contains("Invoke-ElonToolRouter"));
         assert!(script.contains("core.quotepath=false"));
         assert!(script.contains("'apply_patch'"));
         assert!(script.contains("Invoke-AgentApplyPatch"));
@@ -1135,6 +1189,8 @@ mod tests {
         assert!(script.contains("\"tool\": \"git_status\""));
         assert!(script.contains("\"tool\": \"git_diff\""));
         assert!(script.contains("\"tool\": \"git_log\""));
+        assert!(script.contains("\"tool\": \"download_router_status\""));
+        assert!(script.contains("\"tool\": \"download_router_configure\""));
         assert!(script.contains("\"program\": \"cargo\""));
         assert!(script.contains("$shellMarkers"));
         assert!(script.contains("[regex]::IsMatch"));
@@ -1158,6 +1214,8 @@ mod tests {
         assert!(doc.contains("git_status"));
         assert!(doc.contains("git_diff"));
         assert!(doc.contains("git_log"));
+        assert!(doc.contains("download_router_status"));
+        assert!(doc.contains("download_router_configure"));
         assert!(doc.contains("apply_patch"));
         assert!(doc.contains("program"));
         assert!(doc.contains("args"));

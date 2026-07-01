@@ -1,4 +1,5 @@
 mod command_probe;
+mod download_router;
 mod paths;
 mod profile;
 mod project_agent_runtime;
@@ -12,6 +13,7 @@ mod project_scaffold;
 mod project_workflow;
 
 pub use command_probe::{command_candidates, command_from_path, command_output, command_path};
+pub use download_router::{download_router_doc, download_router_script, wrapper_script};
 pub use paths::{safe_path_part, workspace_root};
 pub use profile::{collect_dev_runtime_profile, collect_dev_runtime_profile_with_server_runtime};
 pub use project_git::{ensure_project_git_baseline, ProjectGitBaselineRequest};

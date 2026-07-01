@@ -40,6 +40,7 @@ pub(super) fn collect_snapshot() -> Value {
         "computerName": std::env::var("COMPUTERNAME").or_else(|_| std::env::var("HOSTNAME")).ok(),
         "userName": std::env::var("USERNAME").or_else(|_| std::env::var("USER")).ok(),
         "commands": checks,
+        "downloadRouter": crate::node_agent_download_router::status_payload(),
         "allowedRepairs": allowed_repairs(),
         "note": if cfg!(windows) {
             "默认只读采集系统代理、网卡、DNS 和关键 Windows 服务状态；修复动作需要用户确认。"

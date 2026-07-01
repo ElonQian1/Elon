@@ -106,6 +106,12 @@ fn local_tool_contract() -> NodeDevRuntimeToolContract {
             "file_info".to_string(),
             "read_file".to_string(),
             "read_file_range".to_string(),
+            "git_status".to_string(),
+            "git_diff".to_string(),
+            "git_log".to_string(),
+            "download_router_status".to_string(),
+            "download_router_doctor".to_string(),
+            "download_router_configure".to_string(),
             "write_file".to_string(),
             "apply_patch".to_string(),
             "run_command".to_string(),
@@ -113,6 +119,7 @@ fn local_tool_contract() -> NodeDevRuntimeToolContract {
         approval_required_tools: vec![
             "write_file".to_string(),
             "apply_patch".to_string(),
+            "download_router_configure".to_string(),
             "run_command".to_string(),
         ],
         path_policy: Some(
@@ -227,6 +234,13 @@ mod tests {
         assert!(contract
             .supported_tools
             .contains(&"read_file_range".to_string()));
+        assert!(contract.supported_tools.contains(&"git_status".to_string()));
+        assert!(contract
+            .supported_tools
+            .contains(&"download_router_status".to_string()));
+        assert!(contract
+            .approval_required_tools
+            .contains(&"download_router_configure".to_string()));
         assert!(contract
             .approval_required_tools
             .contains(&"run_command".to_string()));

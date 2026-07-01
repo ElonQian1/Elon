@@ -72,6 +72,7 @@ mod node_agent_client_install_status;
 mod node_agent_client_maintenance;
 mod node_agent_codex_approval;
 mod node_agent_codex_session;
+mod node_agent_download_router;
 mod node_agent_file_info;
 mod node_agent_file_range;
 mod node_agent_full_access;
@@ -3787,6 +3788,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 "/api/doctor/repair",
                 axum::routing::post(windows_doctor::repair_handler),
             )
+            .merge(node_agent_download_router::routes())
             .route(
                 "/api/save-openai-key",
                 axum::routing::post(admin_save_openai_key),
@@ -4097,6 +4099,7 @@ async fn admin_status(
             "refreshed_at_ms": cli_probe.refreshed_at_ms,
             "stale": cli_probe.is_stale(),
         },
+        "download_router": node_agent_download_router::status_payload(),
         "codex_cli": codex_cli,
         "allowed_clis": available_clis,
         "cli_tools": cli_probe.tools.clone(),
