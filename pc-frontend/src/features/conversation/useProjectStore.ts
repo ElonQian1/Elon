@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { api } from '../../api/client'
-import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse } from './types'
+import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse, SendMessageResponse } from './types'
 import { DEFAULT_RUNTIME_ROUTE } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 
@@ -20,13 +20,20 @@ interface ProjectState {
   messagesLoading: boolean
   sendingMessage: boolean
   pollTimer: ReturnType<typeof setInterval> | null
+  projectHomeVersion: number
 
   loadProjects: () => Promise<void>
   selectProject: (id: string) => Promise<void>
   reloadProjectSpace: () => Promise<void>
   selectChannel: (id: string) => Promise<void>
   loadMessages: (projectId: string, channelId: string) => Promise<void>
-  sendMessage: (content: string, agent?: string | null, runtimeRoute?: RuntimeRoute) => Promise<void>
+  sendMessage: (
+    content: string,
+    agent?: string | null,
+    runtimeRoute?: RuntimeRoute,
+    conversationId?: string | null,
+    conversationTitle?: string | null,
+  ) => Promise<SendMessageResponse | null>
   cancelTask: (taskId: string) => Promise<void>
   approveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
   startPolling: () => void
@@ -49,6 +56,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   messagesLoading: false,
   sendingMessage: false,
   pollTimer: null,
+  projectHomeVersion: 0,
 
   loadProjects: async () => {
     const data = await api.get<ProjectListResponse>('/api/me/projects')
@@ -56,7 +64,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   },
 
   selectProject: async (id: string) => {
-    if (get().activeProjectId === id) return
+    if (get().activeProjectId === id) {
+      get().stopPolling()
+      set((state) => ({
+        activeChannelId: '',
+        messages: [],
+        projectHomeVersion: state.projectHomeVersion + 1,
+      }))
+      return
+    }
     get().stopPolling()
     set({
       activeProjectId: id,
@@ -69,6 +85,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       spaceError: '',
       activeChannelId: '',
       messages: [],
+      projectHomeVersion: get().projectHomeVersion + 1,
     })
     if (!id) {
       set({ spaceLoading: false })
@@ -140,17 +157,30 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }
   },
 
-  sendMessage: async (content: string, agent?: string | null, runtimeRoute: RuntimeRoute = DEFAULT_RUNTIME_ROUTE) => {
+  sendMessage: async (
+    content: string,
+    agent?: string | null,
+    runtimeRoute: RuntimeRoute = DEFAULT_RUNTIME_ROUTE,
+    conversationId?: string | null,
+    conversationTitle?: string | null,
+  ) => {
     const { activeProjectId, activeChannelId } = get()
-    if (!activeProjectId || !activeChannelId || !content.trim()) return
+    if (!activeProjectId || !activeChannelId || !content.trim()) return null
     set({ sendingMessage: true })
     try {
-      await api.post(
+      const response = await api.post<SendMessageResponse>(
         `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(activeChannelId)}/ai-tasks`,
-        { content, agent: agent ?? null, runtimeRoute },
+        {
+          content,
+          agent: agent ?? null,
+          runtimeRoute,
+          conversation_id: conversationId || undefined,
+          conversation_title: conversationTitle || undefined,
+        },
       )
       // 立即刷新消息
       await get().loadMessages(activeProjectId, activeChannelId)
+      return response
     } catch (err) {
       console.warn('Failed to send message:', err)
       throw err

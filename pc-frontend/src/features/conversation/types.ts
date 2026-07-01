@@ -236,12 +236,23 @@ export interface SendMessagePayload {
   content: string
   agent?: string | null
   runtimeRoute?: RuntimeRoute
+  conversation_id?: string
+  conversation_title?: string
+}
+
+export interface SendMessageResponse {
+  task_id?: string
+  trace_id?: string
+  conversation_id?: string
+  message?: Message
 }
 
 export interface StartAiTaskPayload {
   content: string
   agent?: string | null
   runtimeRoute?: RuntimeRoute
+  conversation_id?: string
+  conversation_title?: string
 }
 
 export interface ProjectListResponse {

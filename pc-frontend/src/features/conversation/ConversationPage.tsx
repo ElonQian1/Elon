@@ -1,6 +1,7 @@
 ﻿import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
+import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
 import { AttachmentButton, AttachmentChip, attachmentsToMarkdown } from './AttachmentButton'
@@ -81,6 +82,7 @@ export default function ConversationPage() {
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
     messages, messagesLoading, sendingMessage, landing, spaceLoading, spaceError,
+    projectHomeVersion,
     loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
@@ -157,7 +159,7 @@ export default function ConversationPage() {
     setSessionView(null)
     setMemberConversationTarget(null)
     waitingForNewSession.current = false
-  }, [activeProjectId]) // eslint-disable-line
+  }, [activeProjectId, projectHomeVersion]) // eslint-disable-line
 
   useEffect(() => {
     setSelectedMember(null)
@@ -293,19 +295,27 @@ export default function ConversationPage() {
         const best = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
         await selectChannel(best.id)
       }
-      // 从 landing 首页发送时，标记等待新会话出现后自动切入
-      if (sessionView === null || sessionView === undefined) {
-        prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
-        waitingForNewSession.current = true
-      }
+      const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
+      const conversationId = isExistingConversation ? sessionView : uuidv4()
+      const conversationTitle = isExistingConversation ? null : titleFromMessage(text)
       const requestAgent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, runtimeRoute)
-      await sendMessage(fullContent, requestAgent || null, runtimeRoute)
-      // 发送后刷新会话列表（新会话会出现在顶部）
-      if (activeProjectId && user?.id) {
+      const response = await sendMessage(
+        fullContent,
+        requestAgent || null,
+        runtimeRoute,
+        conversationId,
+        conversationTitle,
+      )
+      const openedConversationId = response?.conversation_id ?? conversationId
+      waitingForNewSession.current = false
+      setSessionView(openedConversationId)
+      // 发送后刷新会话列表和当前会话消息，保证继续输入时仍在同一上下文。
+      if (activeProjectId && activeConversationTargetId) {
         setTimeout(async () => {
           try {
-            const conversations = await listMemberConversations(activeProjectId, user.id)
+            const conversations = await listMemberConversations(activeProjectId, activeConversationTargetId)
             setMemberConversations(conversations)
+            await openConversation(openedConversationId)
           } catch {}
         }, 400)
       }
@@ -553,6 +563,15 @@ export default function ConversationPage() {
     setSendError('')
   }
 
+  async function openProjectHome() {
+    if (!activeProjectId) return
+    setSessionView(null)
+    setConvMessages([])
+    setMemberConversationTarget(null)
+    waitingForNewSession.current = false
+    await selectProject(activeProjectId)
+  }
+
   return (
     <div className={styles.layout}>
 
@@ -569,12 +588,17 @@ export default function ConversationPage() {
                 title="返回项目列表"
                 type="button"
               >←</button>
-              <div style={{ minWidth: 0, flex: 1 }}>
+              <button
+                className={styles.workspaceHomeBtn}
+                onClick={openProjectHome}
+                title="项目首页"
+                type="button"
+              >
                 <strong className={styles.workspaceTitleText}>{activeProject?.name}</strong>
                 {activeProject?.description && (
                   <span className={styles.workspaceTitleMeta}>{activeProject.description}</span>
                 )}
-              </div>
+              </button>
               <button
                 className={styles.iconBtn}
                 onClick={() => navigate(`/projects/${activeProjectId}`)}
@@ -1074,4 +1098,10 @@ export default function ConversationPage() {
       )}
     </div>
   )
+}
+
+function titleFromMessage(message: string): string {
+  const title = message.replace(/\s+/g, ' ').trim()
+  if (!title) return '新会话'
+  return title.length > 24 ? `${title.slice(0, 24)}...` : title
 }

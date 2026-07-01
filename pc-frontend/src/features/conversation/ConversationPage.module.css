@@ -34,6 +34,20 @@
   border-bottom: 1px solid #111214;
   min-width: 0;
 }
+.workspaceHomeBtn {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 6px 4px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.workspaceHomeBtn:hover {
+  background: #24262b;
+}
 .workspaceTitleText {
   display: block;
   max-width: 220px;

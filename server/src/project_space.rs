@@ -100,6 +100,10 @@ pub struct StartChannelAiTaskRequest {
     pub agent: Option<String>,
     #[serde(default, alias = "runtimeRoute", alias = "pcRoute", alias = "pc_route")]
     pub runtime_route: Option<String>,
+    #[serde(default, alias = "conversationId")]
+    pub conversation_id: Option<String>,
+    #[serde(default, alias = "conversationTitle")]
+    pub conversation_title: Option<String>,
     pub trace_id: Option<String>,
 }
 
@@ -1564,13 +1568,25 @@ fn start_channel_ai_task_response(
         None => None,
     };
 
-    let conversation_id = format!("channel-{}", channel_id);
-    let conversation_title = format!("项目频道 {}", channel_id);
+    let fallback_conversation_id = format!("channel-{}", channel_id);
+    let fallback_conversation_title = format!("项目频道 {}", channel_id);
+    let conversation_id_hint = req
+        .conversation_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(fallback_conversation_id.as_str());
+    let conversation_title_hint = req
+        .conversation_title
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(fallback_conversation_title.as_str());
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
         &user_id,
-        Some(&conversation_id),
-        Some(&conversation_title),
+        Some(conversation_id_hint),
+        Some(conversation_title_hint),
     ) {
         Ok(id) => id,
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
@@ -1611,7 +1627,7 @@ fn start_channel_ai_task_response(
         project,
         project_id,
         channel_id,
-        conversation_id,
+        conversation_id: conversation_id.clone(),
         task_id: task_id.clone(),
         download_base,
         content,
@@ -1623,6 +1639,7 @@ fn start_channel_ai_task_response(
     Json(serde_json::json!({
         "task_id": task_id,
         "trace_id": trace_id,
+        "conversation_id": conversation_id,
         "message": task_message,
     }))
     .into_response()
