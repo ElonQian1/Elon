@@ -274,6 +274,18 @@ function Assert-TraceDone {
     }
 }
 
+function Assert-TraceReplyContains {
+    param(
+        [object]$Status,
+        [string]$TraceId,
+        [string]$Needle
+    )
+    $preview = [string]$Status.last_message_preview
+    if (!$preview.Contains($Needle)) {
+        throw "Trace $TraceId final reply did not contain '$Needle'. Preview: $preview"
+    }
+}
+
 function Invoke-GitChecked {
     param([string[]]$GitArgs)
     $output = & git -C $RepoRoot @GitArgs 2>&1
@@ -406,6 +418,7 @@ try {
         -WaitTimeoutSec $FirstReplyTimeoutSec
     $newStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $newTrace -TimeoutSec $FinishTimeoutSec
     Assert-TraceDone -Status $newStatus -TraceId $newTrace
+    Assert-TraceReplyContains -Status $newStatus -TraceId $newTrace -Needle $newTrace
     $summary.traces.new_conversation = [ordered]@{
         trace_id = $newTrace
         probe = $newProbe
@@ -422,6 +435,8 @@ try {
         -WaitTimeoutSec $FirstReplyTimeoutSec
     $contextStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $contextTrace -TimeoutSec $FinishTimeoutSec
     Assert-TraceDone -Status $contextStatus -TraceId $contextTrace
+    Assert-TraceReplyContains -Status $contextStatus -TraceId $contextTrace -Needle $contextTrace
+    Assert-TraceReplyContains -Status $contextStatus -TraceId $contextTrace -Needle $newTrace
     $summary.traces.context_conversation = [ordered]@{
         trace_id = $contextTrace
         probe = $contextProbe
