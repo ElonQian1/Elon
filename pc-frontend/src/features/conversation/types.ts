@@ -4,6 +4,8 @@ export interface Project {
   id: string
   name: string
   description?: string
+  role?: string
+  my_role?: string
   template?: string
   source_type?: string
   workspace_key?: string

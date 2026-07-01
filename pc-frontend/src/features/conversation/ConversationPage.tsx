@@ -25,6 +25,7 @@ import {
 import { initialRuntimeRouteFromStorage, persistRuntimeRouteSelection } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type {
+  Channel,
   Message,
   ProjectInvitePreview,
   ProjectInvitePreviewResponse,
@@ -98,7 +99,7 @@ export default function ConversationPage() {
   const user = useAuthStore((s) => s.user)
   const {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
-    messages, messagesLoading, sendingMessage, landing, spaceLoading, spaceError,
+    messages, messagesLoading, sendingMessage, space, landing, spaceLoading, spaceError,
     projectHomeVersion,
     loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
   } = useProjectStore()
@@ -282,21 +283,7 @@ export default function ConversationPage() {
     setShowNewMsg(false)
   }
 
-  // P1.3：判断是否有运行中任务（用于打字指示器）
   const taskContext = buildContext(messages as Parameters<typeof buildContext>[0])
-  const hasRunningTask = (() => {
-    const taskIds = new Set<string>()
-    const doneIds = new Set<string>()
-    for (const m of messages) {
-      const kind = ((m.kind ?? m.role ?? '') as string).toLowerCase()
-      const id = (m.task_id ?? m.taskId ?? '') as string
-      if (!id) continue
-      if (kind === 'ai_task') taskIds.add(id)
-      if (kind === 'ai_result' || isTerminalTaskStatus(m.task_status ?? m.taskStatus)) doneIds.add(id)
-    }
-    for (const id of taskIds) if (!doneIds.has(id)) return true
-    return false
-  })()
 
   function isTerminalTaskStatus(status: unknown): boolean {
     return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(String(status ?? '').toLowerCase())
@@ -318,16 +305,15 @@ export default function ConversationPage() {
       setSendError('请先选择这个成员的一个会话')
       return
     }
-    setInput('')
     setSendError('')
-    setAttachments([])   // P1.4：发送后清空附件
-    if (textareaRef.current) { textareaRef.current.style.height = '46px' }
+    const previousInput = input
+    const previousAttachments = attachments
+    const fullContent = attachments.length > 0
+      ? text + attachmentsToMarkdown(attachments)
+      : text
     try {
-      // P1.4：附件转为 markdown 追加到消息末尾
-      const fullContent = attachments.length > 0
-        ? text + attachmentsToMarkdown(attachments)
-        : text
       if (isMemberDiscussion) {
+        clearComposerDraft()
         setSendingMemberDiscussion(true)
         const message = await sendMemberConversationDiscussion(
           activeProjectId,
@@ -341,11 +327,29 @@ export default function ConversationPage() {
           .catch(() => {})
         return
       }
-      // 项目首页发送：没有选中频道时，自动选择最佳频道（ai_development > 第一个）
-      if (!activeChannelId && channels.length > 0) {
-        const best = channels.find((c) => c.kind === 'ai_development') ?? channels[0]
+
+      let targetChannelId = activeChannelId
+      let targetChannel = targetChannelId ? channels.find((c) => c.id === targetChannelId) : undefined
+      if (!targetChannelId) {
+        const best = channels.find((c) => c.kind === 'ai_development')
+        if (!best) {
+          setSendError('当前项目没有 AI 开发频道，不能发起 AI 对话')
+          return
+        }
+        targetChannelId = best.id
+        targetChannel = best
         await selectChannel(best.id)
       }
+      if (!targetChannel || targetChannel.kind !== 'ai_development') {
+        setSendError('请选择 AI 开发频道后再发送 AI 对话')
+        return
+      }
+      if (!channelAllowsAiStart(targetChannel)) {
+        setSendError('当前项目角色不能在这个频道发起 AI 开发')
+        return
+      }
+
+      clearComposerDraft()
       const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
       const conversationId = isExistingConversation ? sessionView : uuidv4()
       const conversationTitle = isExistingConversation ? null : titleFromMessage(text)
@@ -358,6 +362,7 @@ export default function ConversationPage() {
         conversationTitle,
         shouldPreferLocalNode && localNodeReady ? localNodeId : null,
         shouldPreferLocalNode && localNodeReady ? activeWorkspacePath : null,
+        targetChannelId,
       )
       const openedConversationId = response?.conversation_id ?? conversationId
       waitingForNewSession.current = false
@@ -384,10 +389,19 @@ export default function ConversationPage() {
         }, 400)
       }
     } catch (err) {
+      setInput(previousInput)
+      setAttachments(previousAttachments)
+      setTimeout(autoResize, 0)
       setSendError((err as { message?: string }).message ?? '发送失败')
     } finally {
       setSendingMemberDiscussion(false)
     }
+  }
+
+  function clearComposerDraft() {
+    setInput('')
+    setAttachments([])
+    if (textareaRef.current) { textareaRef.current.style.height = '46px' }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -419,10 +433,12 @@ export default function ConversationPage() {
     }
   }
 
-  const activeProject = projects.find((p) => p.id === activeProjectId)
+  const activeProject = space?.project ?? projects.find((p) => p.id === activeProjectId)
   const activeChannel = channels.find((c) => c.id === activeChannelId)
   const isDevChannel = activeChannel?.kind === 'ai_development'
   const activeWorkspacePath = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
+  const activeProjectRole = clean(activeProject?.role ?? activeProject?.my_role ?? space?.my_role).toLowerCase()
+  const activeProjectRoleLabel = projectRoleLabel(activeProjectRole)
   const localNodeId = clean(localNode?.agent_id)
   const localNodeOwnerOk = !!localNodeId && !!user?.id && clean(localNode?.owner_user_id) === user.id
   const localNodeReady = localNodeOwnerOk
@@ -430,38 +446,68 @@ export default function ConversationPage() {
     && localNode?.codex_cli?.available !== false
   const shouldPreferLocalNode = !['route_c2', 'route_c3'].includes(runtimeRoute)
   const projectBoundToLocalNode = !!localNodeId && activeProject?.node_id === localNodeId
+  const projectBoundToOtherNode = !!localNodeId && !!activeProject?.node_id && activeProject.node_id !== localNodeId
+  const activeChannelBlocksAi = !!activeChannel && activeChannel.kind === 'ai_development' && !channelAllowsAiStart(activeChannel)
+  const activeChannelIsNotAi = !!activeChannel && activeChannel.kind !== 'ai_development'
   const canManagePermissions = channels.some(channelCanManage)
   // taskContext 和 hasRunningTask 已在上方 P1.3 代码块中定义
 
   useEffect(() => {
-    if (!activeProjectId || !activeProject || !localNodeReady || !localNodeId || !activeWorkspacePath) return
+    if (!activeProjectId || !activeProject || !localNodeReady || !localNodeId) return
     if (!shouldPreferLocalNode) return
+    if (!projectRoleCanAutoBind(activeProjectRole)) {
+      setLocalBindStatus(activeProjectRole ? '当前项目不是 owner，不自动切换节点' : '')
+      return
+    }
     if (activeProject.node_id === localNodeId) {
       setLocalBindStatus('')
       return
     }
-    const key = `${activeProjectId}:${localNodeId}:${activeWorkspacePath}`
+    const key = `${activeProjectId}:${localNodeId}:${activeProject.node_id ?? ''}:${activeWorkspacePath || 'no-path'}`
     if (autoBindRef.current === key) return
     autoBindRef.current = key
     setLocalBindStatus('正在切换到当前电脑…')
-    api.post<{ project?: unknown; message?: string }>(
-      `/api/projects/${encodeURIComponent(activeProjectId)}/workspace/recover`,
-      {
-        action: 'bind_pc_node',
+    let canceled = false
+    async function recoverOnLocalNode() {
+      const endpoint = `/api/projects/${encodeURIComponent(activeProjectId)}/workspace/recover`
+      const bindPayload: { action: string; node_id: string; workspacePath?: string } = {
+        action: activeWorkspacePath ? 'bind_pc_node' : 'recreate_workspace',
         node_id: localNodeId,
-        workspacePath: activeWorkspacePath,
-      },
-    ).then(async () => {
+      }
+      if (activeWorkspacePath) bindPayload.workspacePath = activeWorkspacePath
+      try {
+        await api.post<{ project?: unknown; message?: string }>(endpoint, bindPayload)
+      } catch (err) {
+        const message = (err as { message?: string }).message ?? ''
+        if (!projectBoundToOtherNode || !activeWorkspacePath) throw err
+        if (canceled) return
+        setLocalBindStatus('旧目录不可用，正在当前电脑重建…')
+        try {
+          await api.post<{ project?: unknown; message?: string }>(endpoint, {
+            action: 'migrate_workspace',
+            node_id: localNodeId,
+          })
+        } catch (fallbackErr) {
+          throw fallbackErr instanceof Error || (fallbackErr as { message?: string }).message
+            ? fallbackErr
+            : new Error(message || '当前电脑自动绑定失败')
+        }
+      }
+      if (canceled) return
       setLocalBindStatus('已优先使用当前电脑')
       await loadProjects()
       await reloadProjectSpace()
-    }).catch((err: { message?: string }) => {
-      setLocalBindStatus(err.message ?? '当前电脑自动绑定失败')
+    }
+    recoverOnLocalNode().catch((err: { message?: string }) => {
+      if (!canceled) setLocalBindStatus(err.message ?? '当前电脑自动绑定失败')
     })
+    return () => { canceled = true }
   }, [
     activeProjectId,
     activeProject,
     activeWorkspacePath,
+    activeProjectRole,
+    projectBoundToOtherNode,
     localNodeReady,
     localNodeId,
     shouldPreferLocalNode,
@@ -536,6 +582,8 @@ export default function ConversationPage() {
   const composerBusy = sendingMessage || sendingMemberDiscussion
   const composerDisabled = composerBusy
     || memberDiscussionNeedsConversation
+    || activeChannelBlocksAi
+    || activeChannelIsNotAi
     || (!activeChannelId && channels.length === 0 && !isAssistingMember)
 
   // 根据会话视图过滤显示的消息（必须在 messageGroups 之前声明）
@@ -550,6 +598,21 @@ export default function ConversationPage() {
       return tid === sessionView
     })
   }, [messages, sessionView, convMessages, convLoading])
+
+  // P1.3：打字指示器只看当前可见会话，避免其它历史任务让本会话一直显示处理中。
+  const hasRunningTask = useMemo(() => {
+    const taskIds = new Set<string>()
+    const doneIds = new Set<string>()
+    for (const m of displayMessages) {
+      const kind = ((m.kind ?? m.role ?? '') as string).toLowerCase()
+      const id = (m.task_id ?? m.taskId ?? '') as string
+      if (!id) continue
+      if (kind === 'ai_task') taskIds.add(id)
+      if (kind === 'ai_result' || isTerminalTaskStatus(m.task_status ?? m.taskStatus)) doneIds.add(id)
+    }
+    for (const id of taskIds) if (!doneIds.has(id)) return true
+    return false
+  }, [displayMessages])
 
   // 消息分组：dev频道中把同一 task_id 的消息聚合为 DevTaskGroup（任务级折叠层）
   type SingleGroup = { type: 'single'; msg: Message; grouped: boolean; key: string }
@@ -927,7 +990,10 @@ export default function ConversationPage() {
             <>
               {/* 节点离线提示：电脑重启后节点未运行时出现 */}
               <NodeOfflineBanner />
-              <div className={styles.localNodeNotice}>
+              <div className={[
+                styles.localNodeNotice,
+                !localNodeReady ? styles.localNodeNoticeWarn : projectBoundToLocalNode ? styles.localNodeNoticeOk : styles.localNodeNoticeInfo,
+              ].join(' ')}>
                 <strong>
                   {localNodeReady
                     ? projectBoundToLocalNode ? '当前电脑节点已锁定' : '当前电脑节点优先'
@@ -939,6 +1005,27 @@ export default function ConversationPage() {
                     : localNodeError || '请确认 Windows 节点助手正在运行并已登录当前账号'}
                 </span>
               </div>
+              <div className={styles.projectRouteNotice}>
+                <span>
+                  <strong>当前项目</strong>
+                  {activeProject?.name ?? activeProjectId} · {activeProjectRoleLabel}
+                  {activeChannel ? ` · ${activeChannel.name}` : ' · 默认 AI开发频道'}
+                </span>
+                <span>
+                  {projectBoundToLocalNode
+                    ? '会使用本机节点'
+                    : activeProject?.node_id
+                      ? `项目记录绑定 ${shortNodeId(activeProject.node_id)}`
+                      : '项目尚未记录节点'}
+                </span>
+              </div>
+              {(activeChannelBlocksAi || activeChannelIsNotAi) && (
+                <div className={styles.permissionNotice}>
+                  {activeChannelIsNotAi
+                    ? '当前频道不是 AI 开发频道，请切换到 AI开发 后发起 AI 对话。'
+                    : '当前角色不能在这个频道发起 AI 开发。'}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1070,6 +1157,8 @@ export default function ConversationPage() {
                     ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
                     : !activeChannelId
                     ? `向 ${activeProject?.name ?? '项目'} 发送消息或需求… (Enter 发送)`
+                    : activeChannelIsNotAi
+                      ? '请选择 AI开发 频道后发起 AI 对话'
                     : isDevChannel
                       ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
                       : `在 #${activeChannel?.name ?? ''} 发送消息`
@@ -1285,4 +1374,31 @@ function titleFromMessage(message: string): string {
   const title = message.replace(/\s+/g, ' ').trim()
   if (!title) return '新会话'
   return title.length > 24 ? `${title.slice(0, 24)}...` : title
+}
+
+function channelAllowsAiStart(channel?: Channel | null): boolean {
+  if (!channel) return false
+  if (channel.kind !== 'ai_development') return false
+  const permissions = channel.permissions
+  if (!permissions) return true
+  return Boolean(permissions.can_start_ai ?? permissions.canStartAi)
+}
+
+function projectRoleCanAutoBind(role: string): boolean {
+  return role === 'owner'
+}
+
+function projectRoleLabel(role: string): string {
+  if (role === 'owner') return 'Owner'
+  if (role === 'admin') return 'Admin'
+  if (role === 'editor') return '协作者'
+  if (role === 'member') return '成员'
+  if (role === 'observer') return '只读'
+  return role || '未知角色'
+}
+
+function shortNodeId(nodeId: string): string {
+  const cleanId = clean(nodeId)
+  if (cleanId.length <= 18) return cleanId
+  return `${cleanId.slice(0, 11)}…${cleanId.slice(-6)}`
 }

@@ -35,6 +35,7 @@ interface ProjectState {
     conversationTitle?: string | null,
     localNodeId?: string | null,
     localWorkspacePath?: string | null,
+    channelIdOverride?: string | null,
   ) => Promise<SendMessageResponse | null>
   cancelTask: (taskId: string) => Promise<void>
   approveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
@@ -167,13 +168,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     conversationTitle?: string | null,
     localNodeId?: string | null,
     localWorkspacePath?: string | null,
+    channelIdOverride?: string | null,
   ) => {
     const { activeProjectId, activeChannelId } = get()
-    if (!activeProjectId || !activeChannelId || !content.trim()) return null
+    const channelId = channelIdOverride || activeChannelId
+    if (!activeProjectId || !channelId || !content.trim()) return null
     set({ sendingMessage: true })
     try {
       const response = await api.post<SendMessageResponse>(
-        `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(activeChannelId)}/ai-tasks`,
+        `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(channelId)}/ai-tasks`,
         {
           content,
           agent: agent ?? null,
@@ -185,7 +188,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
         },
       )
       // 立即刷新消息
-      await get().loadMessages(activeProjectId, activeChannelId)
+      await get().loadMessages(activeProjectId, channelId)
       return response
     } catch (err) {
       console.warn('Failed to send message:', err)
