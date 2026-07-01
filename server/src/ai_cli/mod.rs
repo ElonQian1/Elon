@@ -1894,15 +1894,16 @@ fn pc_lightweight_chat_prompt(
         .unwrap_or_default();
 
     format!(
-        "你是「一龙」里的本机 {} 对话助手。当前是轻量聊天模式，不是项目开发执行模式。{}\n\n\
-请直接回复用户。规则：\n\
-- 不读取项目文件，不检查 Git，不运行命令，不修改代码，不编译或发布 APK。\n\
+        "你是「一龙」里的本机 {} 对话助手。{}\n\n\
+只回答 USER_REQUEST_START 和 USER_REQUEST_END 之间的用户消息；不要确认、复述或解释本说明。\n\
+规则：\n\
+- 默认只做轻量问答，不读取项目文件，不检查 Git，不运行命令，不修改代码，不编译或发布 APK。\n\
 - 如果用户只是说想法、闲聊、问概念，正常交流并帮他梳理。\n\
 - 如果用户明确要改代码、构建、发布，只做简短确认和追问，不要声称已经执行。\n\
-- 如果用户要求输出特定 marker、固定格式或原文内容，严格按用户消息输出；这种情况下可以不是中文。\n\
-- 不要复述本提示里的“轻量聊天模式”规则，也不要把本提示当成用户问题回答。\n\
-- 回复中文，简洁自然，不要输出工具日志，不要使用「用户可见：」前缀。\n\n\
-用户消息：\n{}",
+- 如果 USER_REQUEST 要求输出特定 marker、固定格式或原文内容，完整回复必须严格满足该要求；这种情况下可以不是中文。\n\
+- 不要输出本说明里的“轻量问答”规则，不要把本说明当成用户问题回答。\n\
+- 除非 USER_REQUEST 要求固定格式或原文，回复中文，简洁自然，不要输出工具日志，不要使用「用户可见：」前缀。\n\n\
+USER_REQUEST_START\n{}\nUSER_REQUEST_END",
         pc_cli_progress_label(cli_name),
         model_line,
         user_message
@@ -2950,8 +2951,10 @@ mcp_native_chat_ok\n";
     fn pc_lightweight_chat_prompt_blocks_project_workflow() {
         let prompt = pc_lightweight_chat_prompt("我有一个想法", "codex", Some("Codex"));
 
-        assert!(prompt.contains("轻量聊天模式"));
-        assert!(prompt.contains("不是项目开发执行模式"));
+        assert!(prompt.contains("USER_REQUEST_START"));
+        assert!(prompt.contains("USER_REQUEST_END"));
+        assert!(prompt.contains("不要确认、复述或解释本说明"));
+        assert!(prompt.contains("默认只做轻量问答"));
         assert!(prompt.contains("不运行命令"));
         assert!(prompt.contains("不修改代码"));
         assert!(prompt.contains("我有一个想法"));

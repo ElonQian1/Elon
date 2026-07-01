@@ -1458,8 +1458,8 @@ async fn run_cli_prompt(run: CliPromptRun) {
     // 构建命令
     // Copilot: copilot --allow-all [extra_args] -p "<prompt>"
     // Claude/Gemini: claude|gemini [extra_args] -p "<prompt>"
-    // Codex 首次: codex exec --dangerously-bypass-approvals-and-sandbox "<prompt>"
-    // Codex 续接: codex exec resume <session-uuid> "<prompt>"
+    // Codex 首次: codex exec --json --dangerously-bypass-approvals-and-sandbox "<prompt>"
+    // Codex 续接: codex exec resume --json <session-uuid> "<prompt>"
     let full_access = cli_prompt_full_access(runtime_permission.as_deref());
     let codex_sessions_file = std::env::temp_dir().join("elon_codex_sessions.json");
     let codex_scope_key = if cli_name == "codex" {
@@ -1510,8 +1510,19 @@ async fn run_cli_prompt(run: CliPromptRun) {
         if let Some(ref real_sid) = codex_plan.session_id {
             // 续接已有会话
             push_tracked_arg(&mut cmd, &mut sidecar_args, "resume");
+            push_tracked_arg(&mut cmd, &mut sidecar_args, "--json");
+            if full_access {
+                push_tracked_arg(
+                    &mut cmd,
+                    &mut sidecar_args,
+                    "--dangerously-bypass-approvals-and-sandbox",
+                );
+            } else {
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "--skip-git-repo-check");
+            }
             push_tracked_arg(&mut cmd, &mut sidecar_args, real_sid);
         } else {
+            push_tracked_arg(&mut cmd, &mut sidecar_args, "--json");
             // 首次执行：默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
             if full_access {
                 push_tracked_arg(

@@ -412,7 +412,7 @@ try {
         -Serial $effectiveSerial `
         -TraceId $newTrace `
         -ConversationId $conversationId `
-        -Message "Reply only with marker $newTrace." `
+        -Message "Reply only with marker $newTrace. Your whole response must be exactly $newTrace." `
         -IsDevelopment $false `
         -WaitFor "first_reply" `
         -WaitTimeoutSec $FirstReplyTimeoutSec
@@ -429,7 +429,7 @@ try {
         -Serial $effectiveSerial `
         -TraceId $contextTrace `
         -ConversationId $conversationId `
-        -Message "Continue the same conversation. Reply with marker $contextTrace and include previous marker $newTrace." `
+        -Message "Continue the same conversation. Reply with marker $contextTrace and include the marker from your previous reply. Do not ask me to provide it." `
         -IsDevelopment $false `
         -WaitFor "first_reply" `
         -WaitTimeoutSec $FirstReplyTimeoutSec
