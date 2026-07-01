@@ -83,45 +83,63 @@ pub async fn run_for_project_in_workspace(
 
     if !requires_project_workflow {
         let requested_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
-        let cli_first_chat = pc_cli_chat_requested(pc_runtime_route)
+        let force_pc_cli_chat = pc_cli_chat_requested(pc_runtime_route)
             || agent_name
                 .map(|name| is_local_cli_option(state, name))
                 .unwrap_or(false);
-        if cli_first_chat {
-            if let Some((agent_id, _pc_workspace)) = pc_project_binding(project) {
-                let runtime_choice =
-                    choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
-                if let Some(error) = runtime_choice.error {
-                    warn!("PC 本机轻量聊天不可用，回退普通聊天: {}", error);
-                } else {
-                    let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
-                        project_id: project.id.clone(),
-                        user_id: user_id.to_string(),
-                        conversation_id: cid.to_string(),
-                        runtime_permission: "read_only".to_string(),
-                    });
-                    match ai_cli::run_with_pc_agent_chat(
-                        agent_id,
-                        user_id,
-                        user_message,
-                        session_scope,
-                        Some(runtime_choice.cli_name.as_str()),
-                        runtime_choice.copilot_model.as_deref(),
-                        runtime_choice.codex_reasoning_effort.as_deref(),
-                        runtime_choice.model_label.as_deref(),
-                        state,
-                        &tx,
-                    )
-                    .await
-                    {
-                        Ok(ai_cli::PcAgentChatOutcome::Answered) => return,
-                        Ok(ai_cli::PcAgentChatOutcome::NoReadableReply) => {
-                            warn!("PC 本机轻量聊天未返回可读内容，回退普通聊天");
-                        }
-                        Err(error) => {
-                            warn!("PC 本机轻量聊天运行出错，回退普通聊天: {}", error);
-                        }
-                    }
+        if force_pc_cli_chat {
+            let route_label = pc_cli_chat_route_label(pc_runtime_route);
+            let Some((agent_id, _pc_workspace)) = pc_project_binding(project) else {
+                let msg = format!(
+                    "已选择{route_label}，但当前项目还没有绑定可用 PC 节点。请先连接节点，或切回平台 AI。"
+                );
+                warn!("{msg}");
+                let _ = tx.send(WsMessage::error(msg).to_json());
+                return;
+            };
+
+            let runtime_choice =
+                choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
+            if let Some(error) = runtime_choice.error {
+                warn!("PC CLI 轻量聊天不可用，不回退 API: {}", error);
+                let _ = tx.send(WsMessage::error(error).to_json());
+                return;
+            }
+
+            let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+                project_id: project.id.clone(),
+                user_id: user_id.to_string(),
+                conversation_id: cid.to_string(),
+                runtime_permission: "read_only".to_string(),
+            });
+            match ai_cli::run_with_pc_agent_chat(
+                agent_id,
+                user_id,
+                user_message,
+                session_scope,
+                Some(runtime_choice.cli_name.as_str()),
+                runtime_choice.copilot_model.as_deref(),
+                runtime_choice.codex_reasoning_effort.as_deref(),
+                runtime_choice.model_label.as_deref(),
+                state,
+                &tx,
+            )
+            .await
+            {
+                Ok(ai_cli::PcAgentChatOutcome::Answered) => return,
+                Ok(ai_cli::PcAgentChatOutcome::NoReadableReply) => {
+                    let msg = format!(
+                        "{route_label}这轮没有返回可读内容，请稍后直接重发一次。我不会自动切换到平台 AI。"
+                    );
+                    warn!("{msg}");
+                    let _ = tx.send(WsMessage::error(msg).to_json());
+                    return;
+                }
+                Err(error) => {
+                    let msg = format!("{route_label}执行失败：{error}");
+                    warn!("{msg}");
+                    let _ = tx.send(WsMessage::error(msg).to_json());
+                    return;
                 }
             }
         }
@@ -337,6 +355,13 @@ fn pc_cli_chat_requested(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> 
         pc_runtime_route,
         Some(PcRuntimeRoutePreference::RouteA | PcRuntimeRoutePreference::RouteC3)
     )
+}
+
+fn pc_cli_chat_route_label(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> &'static str {
+    match pc_runtime_route {
+        Some(PcRuntimeRoutePreference::RouteC3) => "远程 Codex",
+        _ => "本机 AI",
+    }
 }
 
 pub async fn plan_for_project_in_workspace(
@@ -1029,7 +1054,9 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
 
 #[cfg(test)]
 mod tests {
-    use super::{pc_cli_chat_requested, requires_project_workflow_for_message};
+    use super::{
+        pc_cli_chat_requested, pc_cli_chat_route_label, requires_project_workflow_for_message,
+    };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
     use std::path::Path;
 
@@ -1069,5 +1096,18 @@ mod tests {
             PcRuntimeRoutePreference::RouteC
         )));
         assert!(!pc_cli_chat_requested(None));
+    }
+
+    #[test]
+    fn pc_cli_chat_labels_match_user_selected_route() {
+        assert_eq!(
+            pc_cli_chat_route_label(Some(PcRuntimeRoutePreference::RouteA)),
+            "本机 AI"
+        );
+        assert_eq!(
+            pc_cli_chat_route_label(Some(PcRuntimeRoutePreference::RouteC3)),
+            "远程 Codex"
+        );
+        assert_eq!(pc_cli_chat_route_label(None), "本机 AI");
     }
 }

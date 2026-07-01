@@ -57,7 +57,7 @@ use crate::{
 
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
 const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
-const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 8;
+const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 30;
 
 pub use self::ai_cli_intent_gate::confirm_project_intent;
 
