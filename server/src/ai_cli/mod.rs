@@ -1907,6 +1907,10 @@ fn pc_project_execution_prompt(
 当前请求已经被判定为项目开发、Git、构建或发布执行任务。请直接在当前工作区完成用户请求；不要只做计划，不要在读完 AGENTS、README 或规则文档后停下来要求用户再次说明任务。\n\
 必须先读取并遵守工作区入口规则；读完规则后回到下面“用户请求”逐项执行。\n\
 如果用户请求包含 Hard rules、Required direct tasks、End your final reply with marker 或类似完成契约，必须把它们当作本轮任务契约。\n\
+不要先回复“收到”“我会处理”“后续任务我会…”之类的自然语言确认；在非交互 exec 里，这会直接结束本轮任务。\n\
+第一步必须使用工具读取入口规则或运行诊断命令，之后继续完成用户请求里的文件、Git、构建或发布动作。\n\
+仓库规则若要求开始前给用户一句说明，只把它理解为执行过程中的简短进度说明；不能因此停止，且不能替代真实工具执行。\n\
+最终回复前必须确认任务契约已经产生可验证结果；如果用户要求创建文件、commit、push、发布或 marker，缺一项都不能宣称完成。\n\
 只有遇到真实阻塞（权限、缺少密钥、冲突无法判断、命令失败且无法恢复）才停下，并说明已经完成的步骤和阻塞证据。\n\n\
 {preflight}\
 用户请求：\n\
@@ -3007,6 +3011,10 @@ mcp_native_chat_ok\n";
         assert!(prompt.contains("不要只做计划"));
         assert!(prompt.contains("不要在读完 AGENTS"));
         assert!(prompt.contains("读完规则后回到下面"));
+        assert!(prompt.contains("不要先回复"));
+        assert!(prompt.contains("第一步必须使用工具"));
+        assert!(prompt.contains("不能替代真实工具执行"));
+        assert!(prompt.contains("缺一项都不能宣称完成"));
         assert!(prompt.contains("Hard rules"));
         assert!(prompt.contains("预检提示：workspace ok"));
         assert!(prompt.contains("Create docs/e2e.md"));
