@@ -59,12 +59,13 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
             }
 
             if !open_target.requires_admin_ready() && !admin_healthy(port, ADMIN_HEALTH_TIMEOUT) {
+                let runtime_running = agent_runtime_running(install_dir);
                 log_file::record_event(
                     install_dir,
                     "launcher_admin_wait_timeout",
                     false,
                     &format!(
-                        "admin api still warming; opening PC workspace anyway: http://127.0.0.1:{port}/api/status"
+                        "admin api still warming; runtime_running={runtime_running}; opening PC workspace anyway: http://127.0.0.1:{port}/api/status"
                     ),
                 );
             }
@@ -80,6 +81,29 @@ fn spawn_agent_runtime(
     port: u16,
     env_values: &HashMap<String, String>,
 ) -> Result<()> {
+    #[cfg(windows)]
+    {
+        match spawn_agent_runtime_via_powershell(client, install_dir, port, env_values) {
+            Ok(pid) => {
+                log_file::record_event(
+                    install_dir,
+                    "launcher_runtime_spawned",
+                    true,
+                    &format!("method=powershell; pid={pid}; port={port}"),
+                );
+                return Ok(());
+            }
+            Err(error) => {
+                log_file::record_event(
+                    install_dir,
+                    "launcher_runtime_spawn_powershell_failed",
+                    false,
+                    &format!("{error:#}"),
+                );
+            }
+        }
+    }
+
     let mut cmd = launcher_command::silent_command(client);
     cmd.arg(AGENT_RUNTIME_ARG)
         .current_dir(install_dir)
@@ -89,6 +113,71 @@ fn spawn_agent_runtime(
     launcher_command::spawn_hidden(&mut cmd)
         .with_context(|| format!("无法启动 {}", client.display()))?;
     Ok(())
+}
+
+#[cfg(windows)]
+fn spawn_agent_runtime_via_powershell(
+    client: &Path,
+    install_dir: &Path,
+    port: u16,
+    env_values: &HashMap<String, String>,
+) -> Result<u32> {
+    let script = spawn_agent_runtime_script(client, install_dir, port, env_values);
+    let mut ps = launcher_command::powershell_hidden_command(&script);
+    let output = launcher_command::output_hidden(&mut ps)
+        .context("failed to start node runtime via PowerShell")?;
+    if !output.status.success() {
+        bail!(
+            "PowerShell Start-Process failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    stdout
+        .lines()
+        .rev()
+        .find_map(|line| line.trim().parse::<u32>().ok())
+        .context("PowerShell Start-Process did not return a runtime pid")
+}
+
+#[cfg(windows)]
+fn spawn_agent_runtime_script(
+    client: &Path,
+    install_dir: &Path,
+    port: u16,
+    env_values: &HashMap<String, String>,
+) -> String {
+    let mut script = String::from("$ErrorActionPreference = 'Stop'\n");
+    let mut env_pairs: Vec<_> = env_values.iter().collect();
+    env_pairs.sort_by(|left, right| left.0.cmp(right.0));
+    for (key, value) in env_pairs {
+        push_process_env_assignment(&mut script, key, value);
+    }
+    push_process_env_assignment(&mut script, "NODE_ADMIN_PORT", &port.to_string());
+    push_process_env_assignment(&mut script, "NODE_AUTO_OPEN_ADMIN", "0");
+    script.push_str(&format!(
+        "$client = '{}'\n",
+        launcher_command::ps_single_quote(&client.to_string_lossy())
+    ));
+    script.push_str(&format!(
+        "$installDir = '{}'\n",
+        launcher_command::ps_single_quote(&install_dir.to_string_lossy())
+    ));
+    script.push_str("$process = Start-Process -FilePath $client -ArgumentList '--agent-runtime' -WorkingDirectory $installDir -WindowStyle Hidden -PassThru\n");
+    script.push_str(
+        "if ($null -eq $process) { throw 'Start-Process did not return a process handle' }\n",
+    );
+    script.push_str("Write-Output $process.Id\n");
+    script
+}
+
+#[cfg(windows)]
+fn push_process_env_assignment(script: &mut String, key: &str, value: &str) {
+    script.push_str(&format!(
+        "[Environment]::SetEnvironmentVariable('{}', '{}', 'Process')\n",
+        launcher_command::ps_single_quote(key),
+        launcher_command::ps_single_quote(value)
+    ));
 }
 
 pub(crate) fn stop_agent() {
@@ -407,5 +496,40 @@ mod tests {
         assert!(script.contains("--agent-runtime"));
         assert!(script.contains(r"C:\ElonNode\一龙PC节点.exe"));
         assert!(!script.contains("elon-node-agent.exe"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn runtime_spawn_script_uses_start_process_and_overrides_runtime_env() {
+        let mut env_values = HashMap::new();
+        env_values.insert("NODE_AUTO_OPEN_ADMIN".to_string(), "1".to_string());
+        env_values.insert(
+            "NODE_AGENT_WEB_BASE_URL".to_string(),
+            "http://example.test".to_string(),
+        );
+        env_values.insert("QUOTED".to_string(), "O'Hara".to_string());
+
+        let script = spawn_agent_runtime_script(
+            Path::new(r"C:\ElonNode\client.exe"),
+            Path::new(r"C:\ElonNode"),
+            7801,
+            &env_values,
+        );
+
+        assert!(script.contains("Start-Process -FilePath $client -ArgumentList '--agent-runtime'"));
+        assert!(script.contains(
+            "[Environment]::SetEnvironmentVariable('NODE_ADMIN_PORT', '7801', 'Process')"
+        ));
+        assert!(script
+            .contains("[Environment]::SetEnvironmentVariable('QUOTED', 'O''Hara', 'Process')"));
+        assert!(script.contains(r"$client = 'C:\ElonNode\client.exe'"));
+
+        let inherited_auto_open = script
+            .find("[Environment]::SetEnvironmentVariable('NODE_AUTO_OPEN_ADMIN', '1', 'Process')")
+            .unwrap();
+        let launcher_auto_open = script
+            .rfind("[Environment]::SetEnvironmentVariable('NODE_AUTO_OPEN_ADMIN', '0', 'Process')")
+            .unwrap();
+        assert!(launcher_auto_open > inherited_auto_open);
     }
 }
