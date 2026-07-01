@@ -350,6 +350,17 @@ export default function ConversationPage() {
       const openedConversationId = response?.conversation_id ?? conversationId
       waitingForNewSession.current = false
       setSessionView(openedConversationId)
+      const optimisticTaskId = clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId)
+      setConvMessages([{
+        id: `optimistic-${openedConversationId}-${Date.now()}`,
+        role: 'user',
+        content: fullContent,
+        created_at: new Date().toISOString(),
+        user_id: user?.id,
+        sender_name: user?.nickname ?? user?.account ?? '我',
+        outgoing: true,
+        task_id: optimisticTaskId || undefined,
+      } as Message])
       // 发送后刷新会话列表和当前会话消息，保证继续输入时仍在同一上下文。
       if (activeProjectId && activeConversationTargetId) {
         setTimeout(async () => {
@@ -587,6 +598,38 @@ export default function ConversationPage() {
     } catch (err) { console.warn('[ConvMessages] failed:', err) }
     finally { setConvLoading(false) }
   }
+
+  useEffect(() => {
+    if (!activeProjectId || !activeConversationTargetId || !sessionView || sessionView === 'new') return
+    let canceled = false
+    let timer: number | undefined
+
+    async function refreshConversation() {
+      try {
+        const nextMessages = await listMemberConversationMessages(
+          activeProjectId,
+          activeConversationTargetId,
+          String(sessionView),
+        )
+        if (canceled) return
+        setConvMessages(nextMessages as Message[])
+        listMemberConversations(activeProjectId, activeConversationTargetId)
+          .then((items) => { if (!canceled) setMemberConversations(items) })
+          .catch(() => {})
+        const delay = hasOpenConversationTask(nextMessages as Message[]) ? 3000 : 8000
+        timer = window.setTimeout(refreshConversation, delay)
+      } catch (err) {
+        console.warn('[ConvMessages] refresh failed:', err)
+        if (!canceled) timer = window.setTimeout(refreshConversation, 8000)
+      }
+    }
+
+    timer = window.setTimeout(refreshConversation, 1500)
+    return () => {
+      canceled = true
+      if (timer) window.clearTimeout(timer)
+    }
+  }, [activeProjectId, activeConversationTargetId, sessionView])
 
   function startNewSession() {
     if (!isOwnConversationTarget) {
@@ -1202,4 +1245,27 @@ function titleFromMessage(message: string): string {
   const title = message.replace(/\s+/g, ' ').trim()
   if (!title) return '新会话'
   return title.length > 24 ? `${title.slice(0, 24)}...` : title
+}
+
+function hasOpenConversationTask(messages: Message[]): boolean {
+  const taskIds = new Set<string>()
+  const doneIds = new Set<string>()
+  for (const message of messages) {
+    const role = clean(message.kind ?? message.role ?? '').toLowerCase()
+    const taskId = clean(message.task_id ?? message.taskId ?? '')
+    if (!taskId) continue
+    if (role === 'user' || role === 'human' || role === 'ai_task') taskIds.add(taskId)
+    if (
+      ['assistant', 'ai', 'ai_result'].includes(role)
+      || ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(
+        clean(message.task_status ?? message.taskStatus ?? '').toLowerCase(),
+      )
+    ) {
+      doneIds.add(taskId)
+    }
+  }
+  for (const taskId of taskIds) {
+    if (!doneIds.has(taskId)) return true
+  }
+  return false
 }

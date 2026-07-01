@@ -283,6 +283,10 @@
 .messageRow.ownRow { justify-content: flex-end; }
 .messageRow.ownRow .messageAvatar { order: 2; }
 .messageRow.ownRow .messageBody { order: 1; align-items: flex-end; }
+.messageRow.aiRow .messageAvatar {
+  background: #33415f;
+  color: #e5edff;
+}
 
 .messageAvatar {
   flex-shrink: 0;
@@ -335,13 +339,18 @@
 }
 /* AI 消息 — 淡蓝色 */
 .messageContent.aiContent { color: #dfe8ff; }
+.aiRow .messageContent {
+  display: inline-block;
+  padding: 8px 12px;
+  border: 1px solid rgba(96, 139, 214, .24);
+  border-radius: 8px 8px 8px 2px;
+  background: rgba(55, 69, 102, .38);
+  color: #e5edff;
+}
 
 /* Markdown 消息：去掉 pre-wrap，交给 MarkdownContent 组件处理 */
 .messageContent.markdownMsg {
   white-space: normal;
-  background: transparent;
-  border: none;
-  padding: 0;
 }
 
 /* Dev task card 包装 */

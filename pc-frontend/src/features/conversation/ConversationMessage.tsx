@@ -26,9 +26,9 @@ export function MessageItem({ message, isDevChannel, taskContext, user, onCancel
     )
   }
 
-  const isUserRole = kind === 'user' || kind === 'human' || kind === 'discussion'
-  const isOwn = typeof message.outgoing === 'boolean' ? message.outgoing : isUserRole
-  const isAi = !isUserRole
+  const isAi = ['assistant', 'ai', 'bot', 'system', 'ai_task', 'ai_progress', 'ai_result'].includes(kind)
+  const isUserRole = !isAi && (kind === 'user' || kind === 'human' || kind === 'discussion')
+  const isOwn = isAi ? false : (typeof message.outgoing === 'boolean' ? message.outgoing : isUserRole)
   const content = clean(message.content ?? message.text ?? '')
   const time = message.created_at ? formatTime(message.created_at) : ''
   const senderName = clean(
@@ -37,15 +37,15 @@ export function MessageItem({ message, isDevChannel, taskContext, user, onCancel
       ?? (message as Record<string, unknown>).sender_account
       ?? '',
   )
-  const displayName = isUserRole
-    ? senderName || (isOwn ? (user?.nickname ?? user?.account ?? '我') : '成员')
-    : 'AI'
+  const displayName = isAi
+    ? 'AI'
+    : senderName || (isOwn ? (user?.nickname ?? user?.account ?? '我') : '成员')
 
   // AI 消息：检测是否含 Markdown 特征，有则渲染 Markdown
   const hasMarkdown = isAi && /[#*`\[\]>|]/.test(content)
 
   return (
-    <div className={[styles.messageRow, isOwn ? styles.ownRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
+    <div className={[styles.messageRow, isOwn ? styles.ownRow : '', isAi ? styles.aiRow : '', grouped ? styles.grouped : ''].filter(Boolean).join(' ')}>
       <div className={styles.messageAvatar}>
         {isUserRole
           ? (displayName[0]?.toUpperCase() ?? '我')

@@ -153,7 +153,7 @@ impl Store {
                 SELECT m.id, m.project_id, m.conversation_id, m.task_id, m.user_id,
                        COALESCE(u.nickname, u.phone, u.email, m.user_id) AS sender_name,
                        m.role, m.content, m.created_at,
-                       CASE WHEN m.user_id = ?4 THEN 1 ELSE 0 END AS outgoing
+                       CASE WHEN LOWER(m.role) IN ('user', 'human') AND m.user_id = ?4 THEN 1 ELSE 0 END AS outgoing
                 FROM messages m
                 LEFT JOIN users u ON u.id = m.user_id
                 WHERE m.project_id = ?1
@@ -435,6 +435,20 @@ mod tests {
             .map(|message| message.content.as_str())
             .collect::<Vec<_>>();
         assert_eq!(contents, vec!["member request", "member reply"]);
+        let self_messages = store
+            .list_project_member_conversation_messages(
+                &member.id,
+                &project.id,
+                &member.id,
+                "default",
+                10,
+            )
+            .expect("member can inspect own project conversation messages");
+        assert_eq!(self_messages.len(), 2);
+        assert_eq!(self_messages[0].role, "user");
+        assert!(self_messages[0].outgoing);
+        assert_eq!(self_messages[1].role, "assistant");
+        assert!(!self_messages[1].outgoing);
 
         assert!(store
             .list_project_member_conversations(&outsider.id, &project.id, &member.id, 10)
