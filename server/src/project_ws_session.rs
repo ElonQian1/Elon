@@ -255,7 +255,6 @@ pub(crate) async fn handle_project_ws(
                 progress = job_rx.recv() => {
                     match progress {
                         Ok(progress) => {
-                            let terminal = is_terminal_project_ws_message(&progress);
                             if sender.send(Message::Text(progress.clone())).await.is_err() {
                                 record_server_transport(
                                     &state,
@@ -274,7 +273,7 @@ pub(crate) async fn handle_project_ws(
                                 &progress,
                                 &job.task_id,
                             );
-                            if terminal || job.finished.load(Ordering::SeqCst) {
+                            if should_stop_forwarding_after_send(&progress, job.finished.load(Ordering::SeqCst)) {
                                 break;
                             }
                         }
@@ -376,5 +375,26 @@ fn summarize_runtime_note(value: &str) -> String {
         format!("{}...", preview)
     } else {
         preview
+    }
+}
+
+fn should_stop_forwarding_after_send(raw: &str, _job_finished: bool) -> bool {
+    // A finished job can still have its terminal message queued behind the
+    // last progress event. Stop this WS loop only after done/error is sent.
+    is_terminal_project_ws_message(raw)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_stop_forwarding_after_send;
+
+    #[test]
+    fn finished_job_does_not_stop_before_terminal_message() {
+        let progress = r#"{"type":"progress","message":"syncing artifacts"}"#;
+        let done = r#"{"type":"done","message":"ok"}"#;
+
+        assert!(!should_stop_forwarding_after_send(progress, true));
+        assert!(should_stop_forwarding_after_send(done, false));
+        assert!(should_stop_forwarding_after_send(done, true));
     }
 }
