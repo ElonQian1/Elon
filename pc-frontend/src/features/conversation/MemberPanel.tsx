@@ -7,6 +7,7 @@ import {
   memberChannelSubtitle,
   memberChannelPermissions,
   memberChannelCapabilityLabels,
+  memberModerationSummary,
   memberRoleSummary,
   presenceLabel,
   memberPrimaryRoleKey,
@@ -24,6 +25,7 @@ const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
 const MEMBER_PANEL_COLLAPSED_KEY = 'elon.pc.memberPanel.collapsedStatusSections.v1'
 type MemberStatusSectionId = 'online' | 'offline'
+export type MemberModerationAction = 'mute' | 'unmute' | 'ban' | 'unban'
 
 /* ── 角色分组 ── */
 export const ROLE_GROUPS = [
@@ -335,11 +337,22 @@ function MemberListItem({
 }
 
 /* ── MemberProfilePopover ── */
-export function MemberProfilePopover({ member, anchorY, channel, onClose }: {
+export function MemberProfilePopover({
+  member,
+  anchorY,
+  channel,
+  canModerate,
+  onClose,
+  onOpenConversations,
+  onModerate,
+}: {
   member: ProjectMember
   anchorY: number
   channel?: Channel
+  canModerate?: boolean
   onClose: () => void
+  onOpenConversations?: (member: ProjectMember) => void
+  onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
 }) {
   const popRef = useRef<HTMLDivElement>(null)
   const status = memberPresenceStatus(member)
@@ -354,13 +367,22 @@ export function MemberProfilePopover({ member, anchorY, channel, onClose }: {
   const [isFriend, setIsFriend] = useState(false)
   const [addingFriend, setAddingFriend] = useState(false)
   const [addMsg, setAddMsg] = useState('')
+  const [moderating, setModerating] = useState<MemberModerationAction | ''>('')
+  const [moderationMsg, setModerationMsg] = useState('')
 
   useEffect(() => {
     if (!member.user_id) return
+    setIsFriend(false)
+    setAddMsg('')
     api.get<{ already_friend?: boolean }>(`/api/me/friends/search?query=${encodeURIComponent(member.user_id)}&search_type=user_id`)
       .then(d => setIsFriend(!!d.already_friend))
       .catch(() => {})
   }, [member.user_id])
+
+  useEffect(() => {
+    setModerating('')
+    setModerationMsg('')
+  }, [member.user_id, member.is_muted, member.is_banned])
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -374,6 +396,10 @@ export function MemberProfilePopover({ member, anchorY, channel, onClose }: {
     navigator.clipboard.writeText(member.user_id).catch(() => {})
   }
 
+  function openConversations() {
+    onOpenConversations?.(member)
+  }
+
   async function addFriend() {
     if (isFriend || addingFriend) return
     setAddingFriend(true)
@@ -385,6 +411,20 @@ export function MemberProfilePopover({ member, anchorY, channel, onClose }: {
       setAddMsg((err as { message?: string }).message ?? '添加失败')
     } finally {
       setAddingFriend(false)
+    }
+  }
+
+  async function moderate(action: MemberModerationAction, durationMinutes?: number) {
+    if (!onModerate || moderating) return
+    setModerating(action)
+    setModerationMsg('提交中...')
+    try {
+      await onModerate(member, action, durationMinutes)
+      setModerationMsg('已更新')
+    } catch (err) {
+      setModerationMsg((err as { message?: string }).message ?? '操作失败')
+    } finally {
+      setModerating('')
     }
   }
 
@@ -460,13 +500,43 @@ export function MemberProfilePopover({ member, anchorY, channel, onClose }: {
           </div>
         )}
         <div className={styles.memberPopoverActions}>
+          {onOpenConversations && (
+            <button className={[styles.memberPopoverBtn, styles.memberPopoverBtnPrimary].join(' ')} type="button" onClick={openConversations}>
+              打开会话
+            </button>
+          )}
           <button className={styles.memberPopoverBtn} type="button" onClick={copyId}>复制 ID</button>
           <button className={styles.memberPopoverBtn} type="button"
             onClick={addFriend} disabled={isFriend || addingFriend}
-            style={{ background: isFriend ? 'rgba(88,190,106,.1)' : undefined, color: isFriend ? 'var(--green,#58BE6A)' : undefined, cursor: isFriend ? 'default' : 'pointer' }}>
+            data-state={isFriend ? 'success' : undefined}>
             {addMsg || (isFriend ? '已是好友' : addingFriend ? '添加中…' : '加好友')}
           </button>
         </div>
+        {canModerate && onModerate && (
+          <div className={styles.memberPopoverModeration}>
+            <div className={styles.memberPopoverModerationHead}>
+              <strong>管理操作</strong>
+              <span>{moderationMsg || memberModerationSummary(member)}</span>
+            </div>
+            <div className={styles.memberPopoverModerationGrid}>
+              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('mute', 60)} disabled={!!moderating || !!member.is_banned}>
+                禁言1小时
+              </button>
+              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('mute', 1440)} disabled={!!moderating || !!member.is_banned}>
+                禁言1天
+              </button>
+              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('unmute')} disabled={!!moderating || !member.is_muted}>
+                解禁言
+              </button>
+              <button className={[styles.memberPopoverBtn, styles.memberPopoverBtnDanger].join(' ')} type="button" onClick={() => moderate('ban')} disabled={!!moderating || !!member.is_banned}>
+                封禁
+              </button>
+              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('unban')} disabled={!!moderating || !member.is_banned}>
+                解封
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

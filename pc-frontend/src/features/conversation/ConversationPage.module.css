@@ -1387,7 +1387,12 @@
   color: var(--text-soft); font-weight: 500;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right;
 }
-.memberPopoverActions { display: flex; gap: 6px; margin-top: 10px; }
+.memberPopoverActions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 10px;
+}
 .memberPopoverBtn {
   flex: 1; height: 30px;
   border: 1px solid rgba(255,255,255,.12); border-radius: 6px;
@@ -1396,6 +1401,57 @@
   transition: background .1s, color .1s;
 }
 .memberPopoverBtn:hover { background: rgba(255,255,255,.1); color: var(--text); }
+.memberPopoverBtn:disabled {
+  opacity: .45;
+  cursor: not-allowed;
+}
+.memberPopoverBtn:disabled:hover {
+  background: rgba(255,255,255,.04);
+  color: var(--text-soft);
+}
+.memberPopoverBtn[data-state="success"] {
+  background: rgba(88,190,106,.1);
+  border-color: rgba(88,190,106,.22);
+  color: var(--green,#58BE6A);
+}
+.memberPopoverBtnPrimary {
+  background: rgba(88,101,242,.16);
+  border-color: rgba(88,101,242,.34);
+  color: #d5d9ff;
+}
+.memberPopoverBtnDanger {
+  background: rgba(223,92,92,.1);
+  border-color: rgba(223,92,92,.28);
+  color: #ffb3b3;
+}
+.memberPopoverModeration {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.memberPopoverModerationHead {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.memberPopoverModerationHead strong {
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 800;
+}
+.memberPopoverModerationHead span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+.memberPopoverModerationGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
 
 
 .permissionColumns {

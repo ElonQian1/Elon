@@ -48,6 +48,8 @@ import {
   channelPermissionSummary,
   membersHaveChannelPermissionMap,
   membersForChannel,
+  projectMemberHasRolePermission,
+  ROLE_PERMISSION_MODERATE_MEMBERS,
   inviteTitle,
   roleLabel,
 } from './memberUtils'
@@ -62,6 +64,7 @@ import {
   MemberContextSummary,
   MemberLoadingRows,
 } from './MemberPanel'
+import type { MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
@@ -148,6 +151,13 @@ export default function ConversationPage() {
   useEffect(() => {
     setSelectedMember(null)
   }, [activeProjectId, activeChannelId])
+
+  useEffect(() => {
+    if (!selectedMember?.user_id) return
+    const fresh = members.find((member) => member.user_id === selectedMember.user_id)
+    if (fresh && fresh !== selectedMember) setSelectedMember(fresh)
+    if (!fresh) setSelectedMember(null)
+  }, [members, selectedMember])
 
   useEffect(() => {
     setSessionView(null)
@@ -325,6 +335,13 @@ export default function ConversationPage() {
 
   // 成员列表：从 project space 读取
   const spaceMembers = members
+  const currentProjectMember = useMemo(
+    () => spaceMembers.find((member) => member.user_id === user?.id),
+    [spaceMembers, user?.id],
+  )
+  const canModerateMembers = !!activeProjectId
+    && !!currentProjectMember
+    && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MODERATE_MEMBERS)
   const hasChannelMemberPermissions = !!activeChannelId && membersHaveChannelPermissionMap(spaceMembers, activeChannelId)
   const panelMembers = useMemo(
     () => activeChannelId ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
@@ -463,6 +480,16 @@ export default function ConversationPage() {
     setSelectedMember(null)
     setMemberPopoverY(200)
     setSendError('')
+  }
+
+  async function moderateMemberFromPopover(member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) {
+    if (!activeProjectId) return
+    await api.patch(`/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(member.user_id)}/moderation`, {
+      action,
+      duration_minutes: durationMinutes,
+      note: 'PC 成员资料卡操作',
+    })
+    await reloadProjectSpace()
   }
 
   function resetMemberConversationTarget() {
@@ -835,7 +862,10 @@ export default function ConversationPage() {
               member={selectedMember}
               anchorY={memberPopoverY}
               channel={activeChannel}
+              canModerate={canModerateMembers && selectedMember.user_id !== user?.id}
               onClose={() => setSelectedMember(null)}
+              onOpenConversations={openMemberConversations}
+              onModerate={moderateMemberFromPopover}
             />,
             document.body
           )}
@@ -954,4 +984,3 @@ export default function ConversationPage() {
     </div>
   )
 }
-
