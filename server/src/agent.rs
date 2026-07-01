@@ -89,7 +89,7 @@ pub async fn run_for_project_in_workspace(
                 .unwrap_or(false);
         if force_pc_cli_chat {
             let route_label = pc_cli_chat_route_label(pc_runtime_route);
-            let Some((agent_id, _pc_workspace)) = pc_project_binding(project) else {
+            let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project).await else {
                 let msg = format!(
                     "已选择{route_label}，但当前项目还没有绑定可用 PC 节点。请先连接节点，或切回平台 AI。"
                 );
@@ -97,6 +97,7 @@ pub async fn run_for_project_in_workspace(
                 let _ = tx.send(WsMessage::error(msg).to_json());
                 return;
             };
+            let agent_id = pc_binding.agent_id.as_str();
 
             let runtime_choice =
                 choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
@@ -185,7 +186,9 @@ pub async fn run_for_project_in_workspace(
     }
 
     if requires_project_workflow {
-        if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
+        if let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project).await {
+            let agent_id = pc_binding.agent_id.as_str();
+            let pc_workspace = pc_binding.workspace.as_str();
             let runtime_choice =
                 choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
             if let Some(error) = runtime_choice.error {
@@ -377,7 +380,9 @@ pub async fn plan_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Some((agent_id, pc_workspace)) = pc_project_binding(project) {
+    if let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project).await {
+        let agent_id = pc_binding.agent_id.as_str();
+        let pc_workspace = pc_binding.workspace.as_str();
         let runtime_choice =
             choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
         if let Some(error) = runtime_choice.error {
@@ -505,16 +510,100 @@ fn requested_agent_for_runtime_route<'a>(
     }
 }
 
-fn pc_project_binding(project: &ProjectAccess) -> Option<(&str, &str)> {
-    match (
-        project.node_id.as_deref(),
-        project.workspace_path.as_deref(),
-    ) {
-        (Some(agent_id), Some(workspace)) if !agent_id.is_empty() && !workspace.is_empty() => {
-            Some((agent_id, workspace))
-        }
-        _ => None,
+#[derive(Debug, Clone)]
+struct PcProjectBinding {
+    agent_id: String,
+    workspace: String,
+}
+
+async fn resolve_pc_project_binding(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+) -> Option<PcProjectBinding> {
+    let workspace = project.workspace_path.as_deref()?.trim();
+    if workspace.is_empty() {
+        return None;
     }
+
+    if let Some(agent_id) = project
+        .node_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        if pc_agent_belongs_to_user(state, user_id, agent_id)
+            && pc_agent_is_connected(state, agent_id).await
+        {
+            return Some(PcProjectBinding {
+                agent_id: agent_id.to_string(),
+                workspace: workspace.to_string(),
+            });
+        }
+        warn!(
+            project_id = %project.id,
+            user_id = %user_id,
+            bound_agent_id = %agent_id,
+            "PC project bound node is not usable for the current user; trying an online user node"
+        );
+    }
+
+    let fallback_agent_id = connected_pc_agent_for_user(state, user_id).await?;
+    warn!(
+        project_id = %project.id,
+        user_id = %user_id,
+        fallback_agent_id = %fallback_agent_id,
+        "PC project will run on the current user's online node"
+    );
+    Some(PcProjectBinding {
+        agent_id: fallback_agent_id,
+        workspace: workspace.to_string(),
+    })
+}
+
+fn pc_agent_belongs_to_user(state: &Arc<AppState>, user_id: &str, agent_id: &str) -> bool {
+    match state.store.get_node_credential_owner(agent_id) {
+        Ok(Some(owner)) if owner == user_id => true,
+        Ok(Some(owner)) => {
+            warn!(
+                agent_id = %agent_id,
+                owner_user_id = %owner,
+                request_user_id = %user_id,
+                "refusing PC node owned by another user"
+            );
+            false
+        }
+        Ok(None) => {
+            warn!(agent_id = %agent_id, "refusing PC node without credential owner");
+            false
+        }
+        Err(error) => {
+            warn!(
+                agent_id = %agent_id,
+                error = %error,
+                "failed to query PC node owner; refusing node"
+            );
+            false
+        }
+    }
+}
+
+async fn pc_agent_is_connected(state: &Arc<AppState>, agent_id: &str) -> bool {
+    state
+        .agent_manager
+        .list()
+        .await
+        .into_iter()
+        .any(|agent| agent.agent_id == agent_id)
+}
+
+async fn connected_pc_agent_for_user(state: &Arc<AppState>, user_id: &str) -> Option<String> {
+    for agent in state.agent_manager.list().await {
+        if pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
+            return Some(agent.agent_id);
+        }
+    }
+    None
 }
 
 /// Codex 额度耗尽或认证失效时返回 true，此时可自动切换到 Copilot
