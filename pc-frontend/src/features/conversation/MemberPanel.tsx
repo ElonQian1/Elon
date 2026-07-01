@@ -26,6 +26,7 @@ const MEMBER_LIST_WINDOW = 28
 const MEMBER_PANEL_COLLAPSED_KEY = 'elon.pc.memberPanel.collapsedStatusSections.v1'
 type MemberStatusSectionId = 'online' | 'offline'
 export type MemberModerationAction = 'mute' | 'unmute' | 'ban' | 'unban'
+export type MemberMenuRequest = { member: ProjectMember; x: number; y: number }
 
 /* ── 角色分组 ── */
 export const ROLE_GROUPS = [
@@ -182,6 +183,7 @@ export function MemberSearch({
   members,
   onSelect,
   onOpenConversations,
+  onOpenMenu,
   activeConversationMemberId,
   placeholder,
   channelId,
@@ -189,6 +191,7 @@ export function MemberSearch({
   members: ProjectMember[]
   onSelect: (member: ProjectMember, y: number) => void
   onOpenConversations?: (member: ProjectMember) => void
+  onOpenMenu?: (request: MemberMenuRequest) => void
   activeConversationMemberId?: string | null
   placeholder: string
   channelId?: string
@@ -265,6 +268,7 @@ export function MemberSearch({
                     member={row.member}
                     onSelect={onSelect}
                     onOpenConversations={onOpenConversations}
+                    onOpenMenu={onOpenMenu}
                     activeConversationMemberId={activeConversationMemberId}
                     channelId={channelId}
                   />
@@ -283,12 +287,14 @@ function MemberListItem({
   member,
   onSelect,
   onOpenConversations,
+  onOpenMenu,
   activeConversationMemberId,
   channelId,
 }: {
   member: ProjectMember
   onSelect: (member: ProjectMember, y: number) => void
   onOpenConversations?: (member: ProjectMember) => void
+  onOpenMenu?: (request: MemberMenuRequest) => void
   activeConversationMemberId?: string | null
   channelId?: string
 }) {
@@ -306,8 +312,16 @@ function MemberListItem({
     const rect = e.currentTarget.getBoundingClientRect()
     onSelect(member, rect.top + rect.height / 2)
   }
+  function openMenu(e: React.MouseEvent<HTMLElement>) {
+    e.preventDefault()
+    e.stopPropagation()
+    onOpenMenu?.({ member, x: e.clientX, y: e.clientY })
+  }
   return (
-    <div className={[styles.memberItem, active ? styles.memberItemActive : ''].join(' ')}>
+    <div
+      className={[styles.memberItem, active ? styles.memberItemActive : ''].join(' ')}
+      onContextMenu={openMenu}
+    >
       <button
         className={styles.memberAvatarButton}
         type="button"
@@ -332,6 +346,139 @@ function MemberListItem({
           <span className={styles.memberSub}>{memberChannelSubtitle(member, channelId)}</span>
         </span>
       </button>
+      {onOpenMenu && (
+        <button
+          className={styles.memberMoreButton}
+          type="button"
+          onClick={openMenu}
+          title={`打开 ${name} 的成员菜单`}
+          aria-label={`打开 ${name} 的成员菜单`}
+        >
+          ...
+        </button>
+      )}
+    </div>
+  )
+}
+
+/* ── MemberContextMenu ── */
+export function MemberContextMenu({
+  member,
+  x,
+  y,
+  canModerate,
+  onClose,
+  onOpenProfile,
+  onOpenConversations,
+  onOpenPermissions,
+  onModerate,
+}: {
+  member: ProjectMember
+  x: number
+  y: number
+  canModerate?: boolean
+  onClose: () => void
+  onOpenProfile: (member: ProjectMember, y: number) => void
+  onOpenConversations?: (member: ProjectMember) => void
+  onOpenPermissions?: (member: ProjectMember) => void
+  onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
+}) {
+  const menuRef = useRef<HTMLDivElement>(null)
+  const [moderating, setModerating] = useState<MemberModerationAction | ''>('')
+  const [message, setMessage] = useState('')
+  const name = member.account || member.user_id
+  const status = memberPresenceStatus(member)
+  const roleKey = memberPrimaryRoleKey(member)
+  const avatarCls = [
+    styles.memberMenuAvatar,
+    memberAvatarRoleClass(roleKey),
+    memberPresenceAvatarClass(status),
+  ].filter(Boolean).join(' ')
+
+  useEffect(() => {
+    function onDown(e: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) onClose()
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [onClose])
+
+  function run(action: () => void) {
+    action()
+    onClose()
+  }
+
+  function copyId() {
+    navigator.clipboard.writeText(member.user_id).catch(() => {})
+    onClose()
+  }
+
+  async function moderate(action: MemberModerationAction, durationMinutes?: number) {
+    if (!onModerate || moderating) return
+    setModerating(action)
+    setMessage('提交中...')
+    try {
+      await onModerate(member, action, durationMinutes)
+      setMessage('已更新')
+      onClose()
+    } catch (err) {
+      setMessage((err as { message?: string }).message ?? '操作失败')
+    } finally {
+      setModerating('')
+    }
+  }
+
+  const MENU_WIDTH = 220
+  const MENU_HEIGHT = canModerate ? 376 : 216
+  const left = Math.min(Math.max(x, 8), Math.max(8, window.innerWidth - MENU_WIDTH - 8))
+  const top = Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - MENU_HEIGHT - 8))
+
+  return (
+    <div
+      ref={menuRef}
+      className={styles.memberContextMenu}
+      style={{ position: 'fixed', left, top, width: MENU_WIDTH, zIndex: 10000 }}
+      role="menu"
+    >
+      <div className={styles.memberContextMenuHead}>
+        <span className={avatarCls}>
+          {member.avatar_data_url
+            ? <img src={member.avatar_data_url} alt="" />
+            : name[0]?.toUpperCase() ?? '?'
+          }
+        </span>
+        <div>
+          <strong>{name}</strong>
+          <em>{presenceLabel(status)} · {memberRoleSummary(member)}</em>
+        </div>
+      </div>
+      <div className={styles.memberContextMenuGroup}>
+        <button type="button" role="menuitem" onClick={() => run(() => onOpenProfile(member, y))}>查看资料</button>
+        {onOpenConversations && (
+          <button type="button" role="menuitem" onClick={() => run(() => onOpenConversations(member))}>打开会话</button>
+        )}
+        <button type="button" role="menuitem" onClick={copyId}>复制用户 ID</button>
+        {onOpenPermissions && (
+          <button type="button" role="menuitem" onClick={() => run(() => onOpenPermissions(member))}>频道权限</button>
+        )}
+      </div>
+      {canModerate && onModerate && (
+        <div className={styles.memberContextMenuGroup}>
+          <span className={styles.memberContextMenuLabel}>{message || memberModerationSummary(member)}</span>
+          <button type="button" role="menuitem" onClick={() => moderate('mute', 60)} disabled={!!moderating || !!member.is_banned}>禁言 1 小时</button>
+          <button type="button" role="menuitem" onClick={() => moderate('mute', 1440)} disabled={!!moderating || !!member.is_banned}>禁言 1 天</button>
+          <button type="button" role="menuitem" onClick={() => moderate('unmute')} disabled={!!moderating || !member.is_muted}>解禁言</button>
+          <button type="button" role="menuitem" onClick={() => moderate('ban')} disabled={!!moderating || !!member.is_banned} data-tone="danger">封禁</button>
+          <button type="button" role="menuitem" onClick={() => moderate('unban')} disabled={!!moderating || !member.is_banned}>解封</button>
+        </div>
+      )}
     </div>
   )
 }

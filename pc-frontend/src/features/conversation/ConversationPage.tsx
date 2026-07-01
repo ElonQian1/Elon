@@ -60,11 +60,12 @@ import { PermissionDrawer } from './PermissionDrawer'
 import { MessageItem } from './ConversationMessage'
 import {
   MemberSearch,
+  MemberContextMenu,
   MemberProfilePopover,
   MemberContextSummary,
   MemberLoadingRows,
 } from './MemberPanel'
-import type { MemberModerationAction } from './MemberPanel'
+import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
@@ -93,6 +94,8 @@ export default function ConversationPage() {
   const [showModeration, setShowModeration] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [memberPopoverY, setMemberPopoverY] = useState(200)
+  const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
+  const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
 
   // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
   const [memberConversationTarget, setMemberConversationTarget] = useState<MemberConversationTarget | null>(null)
@@ -150,6 +153,8 @@ export default function ConversationPage() {
 
   useEffect(() => {
     setSelectedMember(null)
+    setMemberMenu(null)
+    setPermissionFocusMemberId('')
   }, [activeProjectId, activeChannelId])
 
   useEffect(() => {
@@ -158,6 +163,13 @@ export default function ConversationPage() {
     if (fresh && fresh !== selectedMember) setSelectedMember(fresh)
     if (!fresh) setSelectedMember(null)
   }, [members, selectedMember])
+
+  useEffect(() => {
+    if (!memberMenu?.member.user_id) return
+    const fresh = members.find((member) => member.user_id === memberMenu.member.user_id)
+    if (fresh && fresh !== memberMenu.member) setMemberMenu({ ...memberMenu, member: fresh })
+    if (!fresh) setMemberMenu(null)
+  }, [members, memberMenu])
 
   useEffect(() => {
     setSessionView(null)
@@ -478,8 +490,21 @@ export default function ConversationPage() {
     const target = targetFromProjectMember(member)
     setMemberConversationTarget(target)
     setSelectedMember(null)
+    setMemberMenu(null)
     setMemberPopoverY(200)
     setSendError('')
+  }
+
+  function openMemberProfile(member: ProjectMember, y: number) {
+    setSelectedMember(member)
+    setMemberPopoverY(y)
+    setMemberMenu(null)
+  }
+
+  function openMemberPermissions(member: ProjectMember) {
+    setPermissionFocusMemberId(member.user_id)
+    setShowPermissions(true)
+    setMemberMenu(null)
   }
 
   async function moderateMemberFromPopover(member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) {
@@ -852,11 +877,25 @@ export default function ConversationPage() {
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowModeration(true)}>管理</button>}
             {activeProjectId && activeChannelId && canManagePermissions && (
-              <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPermissions(true)}>权限</button>
+              <button className={styles.memberInviteBtn} type="button" onClick={() => { setPermissionFocusMemberId(''); setShowPermissions(true) }}>权限</button>
             )}
           </div>
         </div>
         <div className={styles.memberList}>
+          {memberMenu && createPortal(
+            <MemberContextMenu
+              member={memberMenu.member}
+              x={memberMenu.x}
+              y={memberMenu.y}
+              canModerate={canModerateMembers && memberMenu.member.user_id !== user?.id}
+              onClose={() => setMemberMenu(null)}
+              onOpenProfile={openMemberProfile}
+              onOpenConversations={openMemberConversations}
+              onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
+              onModerate={moderateMemberFromPopover}
+            />,
+            document.body
+          )}
           {selectedMember && createPortal(
             <MemberProfilePopover
               member={selectedMember}
@@ -896,6 +935,7 @@ export default function ConversationPage() {
                 members={panelMembers}
                 onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
                 onOpenConversations={openMemberConversations}
+                onOpenMenu={setMemberMenu}
                 activeConversationMemberId={isAssistingMember ? activeConversationTargetId : null}
                 placeholder={activeChannel ? '搜索频道成员' : '搜索项目成员'}
               channelId={activeChannelId ?? undefined}
@@ -974,10 +1014,11 @@ export default function ConversationPage() {
         <PermissionDrawer
           projectId={activeProjectId}
           activeChannelId={activeChannelId}
+          initialMemberId={permissionFocusMemberId}
           channels={channels}
           categories={categories}
           members={members}
-          onClose={() => setShowPermissions(false)}
+          onClose={() => { setShowPermissions(false); setPermissionFocusMemberId('') }}
           onSaved={reloadProjectSpace}
         />
       )}
