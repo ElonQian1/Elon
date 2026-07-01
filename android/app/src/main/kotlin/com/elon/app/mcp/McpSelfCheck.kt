@@ -15,7 +15,7 @@ internal fun mcpSelfCheckTool(
     updateStatus: () -> Any
 ): JSONObject {
     val includeUpdateCheck = args.optBoolean("include_update_check", false)
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val taskStatus = taskStatusJson(context, JSONObject())
     val keepalive = McpDebugKeepAliveService.statusJson(context)
     val backgroundRuntime = backgroundDebugStatusJson(context)

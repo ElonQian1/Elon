@@ -14,7 +14,7 @@ import org.json.JSONObject
  */
 
 internal fun taskStatusJson(context: Context, args: JSONObject): JSONObject {
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val pendingTask = pendingTaskJson(prefs)
     val requestedTraceId = args.optString("trace_id").takeIf { it.isNotBlank() }
     val events = DebugTraceStore.recentEvents(300)
@@ -67,7 +67,7 @@ internal fun taskStatusJson(context: Context, args: JSONObject): JSONObject {
 }
 
 internal fun latencyReportJson(context: Context, args: JSONObject): JSONObject {
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val allEvents = DebugTraceStore.recentEvents(300)
     val requestedTraceId = args.optString("trace_id").takeIf { it.isNotBlank() }
     val pendingTraceId = pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }

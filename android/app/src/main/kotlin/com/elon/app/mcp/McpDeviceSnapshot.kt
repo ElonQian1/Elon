@@ -150,7 +150,7 @@ internal fun buildJson(): JSONObject {
 }
 
 internal fun backgroundDebugStatusJson(context: Context): JSONObject {
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val appForegroundRecorded = prefs.getBoolean(TaskWorkService.PREF_APP_IN_FOREGROUND, false)
     val processState = processStateJson()
     val appForeground = processState.optBoolean("foreground", appForegroundRecorded)

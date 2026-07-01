@@ -44,7 +44,7 @@ internal fun mcpTraceRecent(args: JSONObject): JSONObject {
 
 internal fun mcpDebugSession(context: Context, args: JSONObject): JSONObject {
     val action = args.optString("action", "status").lowercase(Locale.ROOT)
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val structured = when (action) {
         "start" -> startMcpDebugSession(
             prefs = prefs,

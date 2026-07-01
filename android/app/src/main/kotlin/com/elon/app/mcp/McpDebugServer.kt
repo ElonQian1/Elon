@@ -218,7 +218,7 @@ object McpDebugServer {
     }
 
     private fun diagnosticBundle(args: JSONObject): JSONObject {
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val prefs = AuthManager.userDataPrefs(appContext)
         val session = if (args.optBoolean("start_session", false)) {
             startMcpDebugSession(
                 prefs = prefs,
@@ -381,7 +381,7 @@ object McpDebugServer {
     }
 
     private fun statusJson(includeToken: Boolean): JSONObject {
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val prefs = AuthManager.userDataPrefs(appContext)
         val pendingTask = pendingTaskJson(prefs)
         val pendingTasks = pendingTasksJson(prefs)
         val pendingBusy = isTaskBusy(prefs)
@@ -405,7 +405,7 @@ object McpDebugServer {
             .put("background_debug_supported", true)
             .put("trace_persistence", "shared_preferences")
             .put("debug_keepalive", McpDebugKeepAliveService.statusJson(appContext))
-            .put("user_id", prefs.getString(TaskWorkService.PREF_USER_ID, null))
+            .put("user_id", AuthManager.effectiveUserId(appContext))
             .put("active_project_id", prefs.getString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, null))
             .put("pending_work", pendingBusy)
             .put("busy", pendingBusy)
@@ -448,7 +448,7 @@ object McpDebugServer {
     }
 
     private fun deviceSnapshotJson(): JSONObject {
-        val prefs = appContext.getSharedPreferences("elon", Context.MODE_PRIVATE)
+        val prefs = AuthManager.userDataPrefs(appContext)
         return JSONObject()
             .put("wall_time_ms", System.currentTimeMillis())
             .put("elapsed_realtime_ms", SystemClock.elapsedRealtime())

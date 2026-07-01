@@ -19,12 +19,9 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
     if (message.isEmpty()) {
         return toolResult("message is required", JSONObject().put("field", "message"), isError = true)
     }
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val force = args.optBoolean("force", false)
-    val userId = prefs.getString(TaskWorkService.PREF_USER_ID, null)
-        ?: UUID.randomUUID().toString().replace("-", "").also {
-            prefs.edit().putString(TaskWorkService.PREF_USER_ID, it).apply()
-        }
+    val userId = AuthManager.effectiveUserId(context)
     val projectId = args.optString("project_id").takeIf { it.isNotBlank() }
         ?: prefs.getString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, null)
         ?: "elon-self"

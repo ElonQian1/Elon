@@ -17,7 +17,7 @@ internal fun serverTraceJson(
     args: JSONObject,
     defaultServerBaseUrl: String,
 ): JSONObject {
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val events = DebugTraceStore.recentEvents(300)
     val traceId = args.optString("trace_id").takeIf { it.isNotBlank() }
         ?: pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }

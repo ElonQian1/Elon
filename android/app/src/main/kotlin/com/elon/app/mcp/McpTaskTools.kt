@@ -13,7 +13,7 @@ internal fun mcpTaskStatus(context: Context, args: JSONObject): JSONObject {
 
 internal fun mcpTaskControl(context: Context, args: JSONObject): JSONObject {
     val action = args.optString("action", "status").lowercase(Locale.ROOT)
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     when (action) {
         "pause" -> {
             val activeTraceId = pendingTaskJson(prefs)?.optString("trace_id")?.takeIf { it.isNotBlank() }
@@ -58,7 +58,7 @@ internal fun mcpTaskControl(context: Context, args: JSONObject): JSONObject {
 internal fun mcpTaskEvents(context: Context, args: JSONObject): JSONObject {
     val limit = args.optInt("limit", 40).coerceIn(1, 120)
     val clear = args.optBoolean("clear", false)
-    val prefs = context.getSharedPreferences("elon", Context.MODE_PRIVATE)
+    val prefs = AuthManager.userDataPrefs(context)
     val allEvents = queuedTaskEvents(prefs)
     val returned = allEvents.takeLast(limit)
     if (clear) {
