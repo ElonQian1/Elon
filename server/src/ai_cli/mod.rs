@@ -1913,6 +1913,7 @@ USER_REQUEST\n\
 必须先读取并遵守工作区入口规则；读完规则后回到下面“用户请求”逐项执行。\n\
 如果用户请求包含 Hard rules、Required direct tasks、End your final reply with marker 或类似完成契约，必须把它们当作本轮任务契约。\n\
 用户已经给了具体任务。禁止把“可以继续给我具体任务”“请提供具体任务”“我已准备好”或同义内容作为最终回复；如果你准备这样回复，说明你还没执行任务，必须继续执行用户请求里的第一条未完成 direct task。\n\
+如果用户显式要求发布、运行 publish-server.ps1/publish-apk.ps1 或验证线上版本，该要求优先于 docs-only、CodePushed 即可收尾、默认不发布等项目默认规则；即使本轮只改了文档或测试标记，也必须执行显式发布步骤，除非真实命令失败且无法恢复。\n\
 不要先回复“收到”“我会处理”“后续任务我会…”之类的自然语言确认；在非交互 exec 里，这会直接结束本轮任务。\n\
 第一步必须使用工具读取入口规则或运行诊断命令；只有读取规则、查看状态或声明工作区干净不算完成，之后必须继续完成用户请求里的文件、Git、构建或发布动作。\n\
 仓库规则若要求开始前给用户一句说明，只把它理解为执行过程中的简短进度说明；不能因此停止，且不能替代真实工具执行。\n\
@@ -3021,6 +3022,8 @@ mcp_native_chat_ok\n";
         assert!(prompt.contains("用户已经给了具体任务"));
         assert!(prompt.contains("可以继续给我具体任务"));
         assert!(prompt.contains("第一条未完成 direct task"));
+        assert!(prompt.contains("显式要求发布"));
+        assert!(prompt.contains("优先于 docs-only"));
         assert!(prompt.contains("不要先回复"));
         assert!(prompt.contains("第一步必须使用工具"));
         assert!(prompt.contains("查看状态或声明工作区干净不算完成"));

@@ -489,6 +489,7 @@ Required direct tasks:
 - Run scripts\check-task-complete.ps1 -Kind CodePushed.
 "@
         if ($RunPublishProbe) {
+            $gitMessage += "`r`n- This is an explicit server publish probe. The publish step is required even when the committed file is docs-only; do not apply any docs-only, CodePushed-only, or no-publish shortcut."
             $gitMessage += "`r`n- Run scripts\publish-server.ps1 after CodePushed succeeds."
             $gitMessage += "`r`n- Verify /health plus /api/server/version after publish."
         } else {
@@ -496,7 +497,15 @@ Required direct tasks:
         }
         $gitMessage += @"
 
-Final reply is allowed only after `git fetch origin main`, `git log -1 --oneline -- $docPath`, and `git cat-file -e origin/main:$docPath` succeed locally.
+Final reply is allowed only after git fetch origin main, git log -1 --oneline -- $docPath, and git cat-file -e origin/main:$docPath succeed locally.
+"@
+        if ($RunPublishProbe) {
+            $gitMessage += @"
+Because this run requested server publish, final reply is also allowed only after scripts\publish-server.ps1 succeeds and /api/server/version reports gitSha equal to the current HEAD.
+Your final reply must include SERVER_RELEASE_STATUS=published and the server gitSha.
+"@
+        }
+        $gitMessage += @"
 End your final reply with marker $gitTrace.
 "@
 
@@ -520,7 +529,51 @@ End your final reply with marker $gitTrace.
         $summary.traces.git_probe.pushed_commit = $pushedCommit
         if ($RunPublishProbe) {
             Write-Step "verify server publish gitSha $pushedCommit"
-            $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec $PublishVerifyTimeoutSec
+            try {
+                $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec ([Math]::Min($PublishVerifyTimeoutSec, 45))
+            } catch {
+                $summary.server_publish_initial_error = $_.Exception.Message
+                Write-Step "server publish not observed after git probe; continuing publish through native MCP"
+                $publishTrace = "${runId}_publish"
+                $publishMessage = @"
+Continue the same APK native MCP E2E development task. The previous Git probe pushed commit $pushedCommit, but server publish has not reached that SHA yet.
+
+Hard rules:
+- This is not a planning request.
+- Do not modify files.
+- Do not create a new commit.
+- Do not push another commit.
+- Do not run scripts\test-apk-mcp-e2e.ps1.
+- Do not run scripts\invoke-apk-mcp.ps1.
+- This is an explicit server publish test even though the pushed commit may be docs-only.
+
+Required direct tasks:
+- Run git fetch origin main.
+- Run git rev-parse HEAD and git rev-parse origin/main; both must equal $pushedCommit before publishing. If HEAD is behind origin/main, fast-forward or rebase without creating a new commit.
+- Run scripts\publish-server.ps1.
+- Verify /health and /api/server/version after publish. /api/server/version gitSha must equal $pushedCommit.
+
+End your final reply with marker $publishTrace.
+"@
+                $publishProbe = Start-ChatProbe `
+                    -Serial $effectiveSerial `
+                    -TraceId $publishTrace `
+                    -ConversationId "${conversationId}_git" `
+                    -Message $publishMessage `
+                    -IsDevelopment $true `
+                    -WaitFor "first_server_event" `
+                    -WaitTimeoutSec $FirstReplyTimeoutSec
+                $publishStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $publishTrace -TimeoutSec ([Math]::Max($FinishTimeoutSec, 1200))
+                Assert-TraceDone -Status $publishStatus -TraceId $publishTrace
+                $summary.traces.publish_probe = [ordered]@{
+                    trace_id = $publishTrace
+                    probe = $publishProbe
+                    final_status = $publishStatus
+                    expected_git_sha = $pushedCommit
+                }
+                Write-Step "verify server publish gitSha $pushedCommit after continuation"
+                $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec $PublishVerifyTimeoutSec
+            }
         }
     }
 
