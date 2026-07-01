@@ -16,8 +16,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
+import com.elon.app.mcp.McpNativeControlBridge
 import com.elon.app.update.AppUpdateManager
+import org.json.JSONObject
 import java.util.Date
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
 
 private const val SOCIAL_SUMMARY_REFRESH_MS = 8_000L
@@ -250,6 +254,73 @@ class MainActivity : AppCompatActivity() {
         messageSelectionActions.setup()
         agentPageController = AgentPageController(this, binding)
         agentPageController.setup()
+        McpNativeControlBridge.register(mcpNativeControlController)
+    }
+
+    private val mcpNativeControlActions: MainMcpNativeControlActions by lazy {
+        MainMcpNativeControlActions(
+            binding = binding,
+            projects = s.projects,
+            activeProjectIndex = { s.activeProjectIndex },
+            setActiveProjectIndex = { s.activeProjectIndex = it },
+            activeProject = projectStateActions::activeProject,
+            activeConversation = projectStateActions::activeConversation,
+            activeConversationIndex = { projectStateActions.activeConversationIndex },
+            setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
+            saveProjects = projectStateActions::saveProjects,
+            renderConversationList = homeListActions::renderConversationList,
+            setChatAdapter = ::setAdapterAndWireApkActions,
+            pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
+            showMessageActions = { anchor, message -> messageActions.showMessageActions(anchor, message) },
+            retryFailedAttachmentMessage = { message -> inputActions.retryFailedAttachmentMessage(message) },
+            navigationController = { navigationController },
+            sendMessage = { inputActions.sendMessageActions.sendMessage() },
+            waitingForReply = { s.waitingForReply },
+            backendConnected = { s.backendConnected },
+            activeRequestIsDevelopment = { s.activeRequestIsDevelopment },
+            runningTaskCount = { s.runningConversationTasks.size },
+            currentStage = { projectStateActions.currentStage }
+        )
+    }
+
+    private val mcpNativeControlController = object : McpNativeControlBridge.Controller {
+        override fun uiState(): JSONObject = runMcpNativeControlOnMain {
+            mcpNativeControlActions.uiState()
+        }
+
+        override fun control(args: JSONObject): JSONObject = runMcpNativeControlOnMain {
+            mcpNativeControlActions.control(args)
+        }
+    }
+
+    private fun runMcpNativeControlOnMain(action: () -> JSONObject): JSONObject {
+        if (Looper.myLooper() == Looper.getMainLooper()) return action()
+        var result: JSONObject? = null
+        var error: Throwable? = null
+        val latch = CountDownLatch(1)
+        runOnUiThread {
+            try {
+                result = action()
+            } catch (failure: Throwable) {
+                error = failure
+            } finally {
+                latch.countDown()
+            }
+        }
+        if (!latch.await(5, TimeUnit.SECONDS)) {
+            return JSONObject()
+                .put("control_ok", false)
+                .put("error", "main_thread_timeout")
+        }
+        error?.let {
+            return JSONObject()
+                .put("control_ok", false)
+                .put("error", it.javaClass.simpleName)
+                .put("message", it.message ?: "")
+        }
+        return result ?: JSONObject()
+            .put("control_ok", false)
+            .put("error", "empty_result")
     }
 
     private val createActions: MainCreateActions by lazy {
@@ -1535,6 +1606,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        McpNativeControlBridge.unregister(mcpNativeControlController)
         stopSocialSummaryPolling()
         friendChatActions.stopPolling()
         groupChatActions.stopPolling()

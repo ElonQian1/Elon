@@ -201,6 +201,8 @@ object McpDebugServer {
             "mcp_self_check" -> mcpSelfCheck(args)
             "mcp_metrics" -> mcpMetrics(args)
             "debug_keepalive" -> mcpDebugKeepalive(appContext, args)
+            "ui_state" -> mcpUiState(appContext, args)
+            "ui_control" -> mcpUiControl(appContext, args)
             "update_status" -> mcpUpdateStatus(args)
             "task_status" -> mcpTaskStatus(appContext, args)
             "task_control" -> mcpTaskControl(appContext, args)

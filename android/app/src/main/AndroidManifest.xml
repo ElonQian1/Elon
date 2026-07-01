@@ -138,6 +138,17 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
+        <receiver
+            android:name=".mcp.McpDebugControlReceiver"
+            android:exported="true"
+            android:permission="android.permission.DUMP">
+            <intent-filter>
+                <action android:name="com.elon.app.mcp.START_DEBUG" />
+                <action android:name="com.elon.app.mcp.STOP_DEBUG" />
+                <action android:name="com.elon.app.mcp.STATUS" />
+            </intent-filter>
+        </receiver>
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider;${applicationId}.update_provider"

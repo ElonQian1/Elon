@@ -791,7 +791,7 @@ internal class MainNavigationController(
         }
     }
 
-    private fun showProjectHome(animate: Boolean = false) {
+    fun showProjectHome(animate: Boolean = false) {
         if (animate) closeChatSideMenu(false)
         if (pageTransitionRunning) return
         clearMessageSelection()

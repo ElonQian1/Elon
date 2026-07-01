@@ -180,6 +180,34 @@ internal fun mcpToolsListResult(): JSONObject {
             )
             .put(
                 tool(
+                    name = "ui_state",
+                    title = "Native UI State",
+                    description = "Return native APK navigation, project, conversation, input, and runtime state without screenshots, UIAutomator, or XML scraping.",
+                    properties = JSONObject(),
+                    required = JSONArray()
+                )
+            )
+            .put(
+                tool(
+                    name = "ui_control",
+                    title = "Native UI Control",
+                    description = "Control the APK through native app actions such as open_main, show_project_home, open_project_chat, new_project_conversation, set_input_text, send_input, and send_project_message.",
+                    properties = JSONObject()
+                        .put("action", stringProperty("One of open_main, state, show_conversation_home, show_project_home, show_project_plaza, open_project_chat, new_project_conversation, set_input_text, send_input, send_project_message."))
+                        .put("project_id", stringProperty("Optional project id or project space id."))
+                        .put("project_index", intProperty("Optional project index."))
+                        .put("conversation_id", stringProperty("Optional local conversation id."))
+                        .put("conversation_index", intProperty("Optional local conversation index."))
+                        .put("conversation_title", stringProperty("Optional title when creating a conversation."))
+                        .put("title", stringProperty("Optional alias for conversation_title."))
+                        .put("text", stringProperty("Text for set_input_text."))
+                        .put("message", stringProperty("Message for send_project_message."))
+                        .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false.")),
+                    required = JSONArray().put("action")
+                )
+            )
+            .put(
+                tool(
                     name = "update_status",
                     title = "APK Update Status",
                     description = "Compare the installed APK version with the server version.json.",
