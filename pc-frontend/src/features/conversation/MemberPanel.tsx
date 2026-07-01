@@ -15,7 +15,8 @@ import styles from './ConversationPage.module.css'
 
 /* ── 虚拟列表类型和常量 ── */
 export type MemberVirtualRow =
-  | { kind: 'header'; id: string; label: string; count: number }
+  | { kind: 'status-header'; id: string; label: string; count: number }
+  | { kind: 'role-header'; id: string; label: string; count: number }
   | { kind: 'member'; id: string; member: ProjectMember }
 
 export const MEMBER_VIRTUAL_ROW_HEIGHT = 48
@@ -95,16 +96,46 @@ export function memberAvatarRoleClass(roleKey: string) {
   return ''
 }
 
+export function memberPresenceAvatarClass(status: string) {
+  if (status === 'idle') return styles.memberAvatarIdle
+  if (status === 'dnd') return styles.memberAvatarDnd
+  if (status === 'offline') return styles.memberAvatarOffline
+  return styles.memberAvatarOnline
+}
+
+function memberPresencePillClass(status: string) {
+  if (status === 'idle') return styles.memberPresencePillIdle
+  if (status === 'dnd') return styles.memberPresencePillDnd
+  if (status === 'offline') return styles.memberPresencePillOffline
+  return styles.memberPresencePillOnline
+}
+
 function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
-  const groups = ROLE_GROUPS.map((group) => [
-    group.label,
-    sortMembersForPanel(members.filter((member) => memberRoleGroup(member) === group.id)),
-  ] as [string, ProjectMember[]])
-  return groups.flatMap(([label, list]) => {
-    if (!list.length) return []
+  const buckets = [
+    {
+      id: 'online',
+      label: '在线',
+      members: members.filter((member) => memberPresenceStatus(member) !== 'offline'),
+    },
+    {
+      id: 'offline',
+      label: '离线',
+      members: members.filter((member) => memberPresenceStatus(member) === 'offline'),
+    },
+  ]
+  return buckets.flatMap((bucket) => {
+    if (!bucket.members.length) return []
+    const roleRows = ROLE_GROUPS.flatMap((group) => {
+      const list = sortMembersForPanel(bucket.members.filter((member) => memberRoleGroup(member) === group.id))
+      if (!list.length) return []
+      return [
+        { kind: 'role-header' as const, id: `role-${bucket.id}-${group.id}`, label: group.label, count: list.length },
+        ...list.map(member => ({ kind: 'member' as const, id: `${bucket.id}-${member.user_id}`, member })),
+      ]
+    })
     return [
-      { kind: 'header' as const, id: `header-${label}`, label, count: list.length },
-      ...list.map(member => ({ kind: 'member' as const, id: member.user_id, member })),
+      { kind: 'status-header' as const, id: `status-${bucket.id}`, label: bucket.label, count: bucket.members.length },
+      ...roleRows,
     ]
   })
 }
@@ -172,9 +203,22 @@ export function MemberSearch({
         {rows.length > 0 && (
           <div className={styles.memberVirtualCanvas} style={{ height: rows.length * MEMBER_VIRTUAL_ROW_HEIGHT }}>
             <div style={{ transform: `translateY(${start * MEMBER_VIRTUAL_ROW_HEIGHT}px)` }}>
-              {visibleRows.map(row => row.kind === 'header'
-                ? <div key={row.id} className={styles.memberVirtualHeader}><div className={styles.memberSection}>{row.label} · {row.count}</div></div>
-                : (
+              {visibleRows.map(row => {
+                if (row.kind === 'status-header') {
+                  return (
+                    <div key={row.id} className={styles.memberVirtualStatusHeader}>
+                      <div className={styles.memberStatusSection}>{row.label}<em>{row.count}</em></div>
+                    </div>
+                  )
+                }
+                if (row.kind === 'role-header') {
+                  return (
+                    <div key={row.id} className={styles.memberVirtualHeader}>
+                      <div className={styles.memberSection}>{row.label} · {row.count}</div>
+                    </div>
+                  )
+                }
+                return (
                   <MemberListItem
                     key={row.id}
                     member={row.member}
@@ -184,7 +228,7 @@ export function MemberSearch({
                     channelId={channelId}
                   />
                 )
-              )}
+              })}
             </div>
           </div>
         )}
@@ -209,11 +253,12 @@ function MemberListItem({
 }) {
   const roleKey = memberPrimaryRoleKey(member)
   const roleBadge = memberPrimaryRoleLabel(member)
+  const status = memberPresenceStatus(member)
   const name = member.account ?? member.user_id
   const avatarCls = [
     styles.memberAvatar,
     memberAvatarRoleClass(roleKey),
-    member.is_online ? styles.memberAvatarOnline : styles.memberAvatarOffline,
+    memberPresenceAvatarClass(status),
   ].filter(Boolean).join(' ')
   const active = activeConversationMemberId === member.user_id
   function openProfile(e: React.MouseEvent<HTMLElement>) {
@@ -241,6 +286,7 @@ function MemberListItem({
           <span className={styles.memberLine}>
             <strong className={styles.memberItemName}>{name}</strong>
             {roleBadge && <em className={[styles.memberRolePill, memberRolePillClass(roleKey)].join(' ')}>{roleBadge}</em>}
+            <em className={[styles.memberPresencePill, memberPresencePillClass(status)].join(' ')}>{presenceLabel(status)}</em>
           </span>
           <span className={styles.memberSub}>{memberChannelSubtitle(member, channelId)}</span>
         </span>
@@ -325,7 +371,7 @@ export function MemberProfilePopover({ member, anchorY, channel, onClose }: {
       <div className={[styles.memberPopoverHead, roleHeadCls].join(' ')}>
         <div className={[
           styles.memberPopoverAvatar,
-          status === 'online' ? styles.memberAvatarOnline : styles.memberAvatarOffline,
+          memberPresenceAvatarClass(status),
         ].join(' ')}>
           {member.avatar_data_url
             ? <img src={member.avatar_data_url} alt="" />

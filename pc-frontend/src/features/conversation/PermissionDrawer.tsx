@@ -24,7 +24,7 @@ import {
   memberRoleSummary,
   roleLabel,
 } from './memberUtils'
-import { compareMembersForPanel, memberAvatarRoleClass } from './MemberPanel'
+import { compareMembersForPanel, memberAvatarRoleClass, memberPresenceAvatarClass } from './MemberPanel'
 import styles from './ConversationPage.module.css'
 
 type PermissionEffect = '' | 'allow' | 'deny'
@@ -366,10 +366,11 @@ function ChannelMemberPreviewRow({
 }) {
   const roleKey = memberPrimaryRoleKey(member)
   const name = member.account ?? member.user_id
+  const status = memberPresenceStatus(member)
   const avatarCls = [
     styles.memberAvatar,
     memberAvatarRoleClass(roleKey),
-    memberPresenceStatus(member) === 'offline' ? styles.memberAvatarOffline : styles.memberAvatarOnline,
+    memberPresenceAvatarClass(status),
   ].filter(Boolean).join(' ')
   return (
     <div className={[styles.permissionPreviewRow, hidden ? styles.permissionPreviewRowHidden : ''].filter(Boolean).join(' ')}>
