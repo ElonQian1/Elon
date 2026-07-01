@@ -80,6 +80,26 @@ export interface ProjectMember {
   channelPermissions?: Record<string, ChannelPermissions>
 }
 
+export interface ProjectMemberAuditEntry {
+  id: string
+  project_id: string
+  actor_user_id?: string | null
+  actor_account?: string | null
+  target_user_id?: string | null
+  target_account?: string | null
+  action: string
+  old_role?: string | null
+  new_role?: string | null
+  note?: string | null
+  created_at: string
+}
+
+export interface ProjectMemberAuditResponse {
+  entries?: ProjectMemberAuditEntry[]
+  total?: number
+  project_id?: string
+}
+
 export interface UserPresenceSettings {
   user_id: string
   status: 'online' | 'idle' | 'dnd' | 'invisible' | string
