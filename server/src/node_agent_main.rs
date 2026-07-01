@@ -56,6 +56,8 @@ mod node_agent_active_task_registry;
 mod node_agent_admin_open;
 mod node_agent_api_runtime_config;
 mod node_agent_api_runtime_tools;
+#[cfg(test)]
+mod node_agent_cli_prompt_timeout_tests;
 mod node_agent_cli_pty;
 mod node_agent_cli_security;
 mod node_agent_cli_session_bridge;
@@ -1300,6 +1302,14 @@ fn cli_prompt_read_only(runtime_permission: Option<&str>) -> bool {
     )
 }
 
+fn cli_prompt_timeout_secs(cli_name: &str, runtime_permission: Option<&str>) -> u64 {
+    match cli_name.trim().to_ascii_lowercase().as_str() {
+        "codex" if cli_prompt_full_access(runtime_permission) => 1200,
+        "codex" => 300,
+        _ => 180,
+    }
+}
+
 struct CliPromptRun {
     req_id: String,
     bin: String,
@@ -1608,7 +1618,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
             task_journal_dir: None,
             codex_session_scope_key: codex_key.clone(),
             legacy_codex_sessions_file: Some(codex_sessions_file.clone()),
-            timeout_secs: if cli_name == "codex" { 300 } else { 180 },
+            timeout_secs: cli_prompt_timeout_secs(cli_name, runtime_permission.as_deref()),
             stdin_piped_empty,
             initial_cols: node_agent_cli_pty::default_cols(),
             initial_rows: node_agent_cli_pty::default_rows(),
@@ -1944,14 +1954,15 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     return;
                 }
             },
-            // 超时保护：Codex 5分钟、Copilot 3分钟内必须有 stdout EOF，否则强杀
+            // 超时保护：普通 Codex 聊天保留 5 分钟；full-access 开发/发布任务允许更长时间。
             _ = tokio::time::sleep(std::time::Duration::from_secs(
-                if cli_name == "codex" { 300 } else { 180 }
+                cli_prompt_timeout_secs(cli_name, runtime_permission.as_deref())
             )) => {
                 warn!("[{}] CLI 执行超时，强杀进程", cli_name);
                 let _ = child.kill().await;
-                let message = format!("{} 执行超时（超过{}分钟），已强制终止",
-                    cli_name, if cli_name == "codex" { 5 } else { 3 });
+                let timeout_secs = cli_prompt_timeout_secs(cli_name, runtime_permission.as_deref());
+                let message = format!("{} 执行超时（超过{}秒），已强制终止",
+                    cli_name, timeout_secs);
                 record_cli_done_outcome(&task_journal, &req_id, false, Some(&message));
                 let _ = out_tx.send(ws_text(&AgentToServer::CliDone {
                     req_id,

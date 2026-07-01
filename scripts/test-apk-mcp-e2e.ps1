@@ -366,9 +366,15 @@ try {
     if ($RunGitProbe -or $RunPublishProbe) {
         $docPath = "docs/codex-mcp-native-e2e-$runId.md"
         $gitMessage = @"
-Run a real self-project development smoke from APK native MCP.
+You are already inside an APK native MCP-triggered Codex development task for the elon self-project.
 
-Requirements:
+Hard rules:
+- Do not run scripts\test-apk-mcp-e2e.ps1.
+- Do not run scripts\invoke-apk-mcp.ps1.
+- Do not start another phone, APK, ADB, MCP, or E2E probe.
+- Work directly in the current Git worktree and complete the Git operations below.
+
+Required direct tasks:
 - Create or update $docPath with trace id $gitTrace and the current timestamp.
 - Run git status --short.
 - Commit only that file with message: test(mcp): verify native apk git path $runId
@@ -377,7 +383,8 @@ Requirements:
 "@
         if ($RunPublishProbe) {
             $gitMessage += @"
-- Run scripts\publish-server.ps1 after the push and verify /health plus /api/server/version.
+- Run scripts\publish-server.ps1 after CodePushed succeeds.
+- Verify /health plus /api/server/version after publish.
 "@
         } else {
             $gitMessage += @"
