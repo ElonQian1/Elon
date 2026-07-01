@@ -3609,11 +3609,35 @@ impl NodeRuntime {
 
     /// CLI 名称 → 本机允许执行的路径。找不到时直接拒绝，避免云端把 PC 节点当通用远程命令通道。
     async fn resolve_cli(
-        &self,
+        self: &Arc<Self>,
         name: &str,
     ) -> anyhow::Result<crate::node_agent_cli_security::ResolvedCli> {
-        let paths = self.cli_paths.read().await;
-        crate::node_agent_cli_security::resolve_cli_request(name, paths.as_slice())
+        let cached_paths = self.cli_paths.read().await.clone();
+        match crate::node_agent_cli_security::resolve_cli_request(name, cached_paths.as_slice()) {
+            Ok(resolved) => Ok(resolved),
+            Err(cached_error) => {
+                let refreshed = self.refresh_cli_probe_now().await;
+                let refreshed_paths = refreshed.available_pairs();
+                match crate::node_agent_cli_security::resolve_cli_request(
+                    name,
+                    refreshed_paths.as_slice(),
+                ) {
+                    Ok(resolved) => {
+                        info!(
+                            "PC CLI 缓存刷新后找到 {} CLI: {}",
+                            resolved.name(),
+                            resolved.bin()
+                        );
+                        Ok(resolved)
+                    }
+                    Err(_) => Err(cli_unavailable_after_refresh_error(
+                        name,
+                        cached_error,
+                        &refreshed,
+                    )),
+                }
+            }
+        }
     }
 
     /// 更新凭证（同时持久化），并唤醒连接循环重新评估。
@@ -3639,6 +3663,85 @@ impl NodeRuntime {
 
     async fn set_models(&self, models: Vec<ModelCapability>) {
         self.status.write().await.models_cached = models;
+    }
+}
+
+fn cli_unavailable_after_refresh_error(
+    name: &str,
+    cached_error: anyhow::Error,
+    refreshed: &LocalCliProbeSnapshot,
+) -> anyhow::Error {
+    let clean = name.trim().to_ascii_lowercase();
+    let detail = refreshed
+        .tools
+        .iter()
+        .find(|tool| tool.name.eq_ignore_ascii_case(&clean))
+        .map(cli_probe_tool_detail)
+        .unwrap_or_else(|| format!("刷新后仍未找到 {clean} CLI"));
+    anyhow!("此 PC 节点刷新本机 CLI 后仍不能使用 {clean}：{detail}。上一轮缓存错误：{cached_error}")
+}
+
+fn cli_probe_tool_detail(tool: &LocalCliToolStatus) -> String {
+    let mut parts = vec![format!("状态={}", tool.status)];
+    if let Some(path) = tool
+        .path
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        parts.push(format!("路径={path}"));
+    }
+    if let Some(detail) = tool
+        .detail
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        parts.push(detail.to_string());
+    }
+    if let Some(reason) = tool
+        .reason
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        parts.push(format!("原因={reason}"));
+    }
+    if let Some(hint) = tool
+        .fix_hint
+        .as_deref()
+        .filter(|value| !value.trim().is_empty())
+    {
+        parts.push(format!("建议={hint}"));
+    }
+    parts.join("；")
+}
+
+#[cfg(test)]
+mod node_agent_cli_probe_status_tests {
+    use super::{cli_probe_tool_detail, LocalCliToolStatus};
+
+    #[test]
+    fn cli_probe_tool_detail_keeps_actionable_context() {
+        let detail = cli_probe_tool_detail(&LocalCliToolStatus {
+            name: "codex".to_string(),
+            label: "Codex",
+            path: Some(r"C:\Users\me\AppData\Local\OpenAI\Codex\bin\abc\codex.exe".to_string()),
+            version: None,
+            installed: true,
+            runnable: false,
+            logged_in: Some(false),
+            available: false,
+            status: "not_runnable".to_string(),
+            detail: Some("检测到 codex 命令，但无法非交互执行".to_string()),
+            reason: Some("spawn_failed".to_string()),
+            diagnosis: None,
+            fix_hint: Some("请修复该 CLI 安装或 PATH 后重新检测。".to_string()),
+            fix_action: "repair_path".to_string(),
+            backend: "cli",
+        });
+
+        assert!(detail.contains("状态=not_runnable"));
+        assert!(detail.contains("路径=C:\\Users\\me"));
+        assert!(detail.contains("原因=spawn_failed"));
+        assert!(detail.contains("重新检测"));
     }
 }
 

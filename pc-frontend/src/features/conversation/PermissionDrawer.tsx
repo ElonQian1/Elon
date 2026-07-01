@@ -68,6 +68,7 @@ function updateOverride(
 export function PermissionDrawer({
   projectId,
   activeChannelId,
+  initialMemberId,
   channels,
   categories,
   members,
@@ -76,6 +77,7 @@ export function PermissionDrawer({
 }: {
   projectId: string
   activeChannelId: string
+  initialMemberId?: string
   channels: Channel[]
   categories: ChannelCategory[]
   members: ProjectMember[]
@@ -91,9 +93,17 @@ export function PermissionDrawer({
   const [categoryMemberOverrides, setCategoryMemberOverrides] = useState<PermissionOverride[]>([])
   const [channelRoleOverrides, setChannelRoleOverrides] = useState<PermissionOverride[]>([])
   const [channelMemberOverrides, setChannelMemberOverrides] = useState<PermissionOverride[]>([])
-  const [memberId, setMemberId] = useState(members[0]?.user_id ?? '')
+  const [memberId, setMemberId] = useState(initialMemberId || members[0]?.user_id || '')
   const [loading, setLoading] = useState(false)
   const [status, setStatus] = useState('')
+
+  useEffect(() => {
+    setMemberId((current) => {
+      if (initialMemberId && members.some((member) => member.user_id === initialMemberId)) return initialMemberId
+      if (!current || !members.some((member) => member.user_id === current)) return members[0]?.user_id ?? ''
+      return current
+    })
+  }, [initialMemberId, members])
 
   useEffect(() => {
     api.get<ProjectRolesResponse>(`/api/projects/${encodeURIComponent(projectId)}/roles`)

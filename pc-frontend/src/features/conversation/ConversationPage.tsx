@@ -48,6 +48,8 @@ import {
   channelPermissionSummary,
   membersHaveChannelPermissionMap,
   membersForChannel,
+  projectMemberHasRolePermission,
+  ROLE_PERMISSION_MODERATE_MEMBERS,
   inviteTitle,
   roleLabel,
 } from './memberUtils'
@@ -58,10 +60,12 @@ import { PermissionDrawer } from './PermissionDrawer'
 import { MessageItem } from './ConversationMessage'
 import {
   MemberSearch,
+  MemberContextMenu,
   MemberProfilePopover,
   MemberContextSummary,
   MemberLoadingRows,
 } from './MemberPanel'
+import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
@@ -90,6 +94,8 @@ export default function ConversationPage() {
   const [showModeration, setShowModeration] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [memberPopoverY, setMemberPopoverY] = useState(200)
+  const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
+  const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
 
   // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
   const [memberConversationTarget, setMemberConversationTarget] = useState<MemberConversationTarget | null>(null)
@@ -147,7 +153,23 @@ export default function ConversationPage() {
 
   useEffect(() => {
     setSelectedMember(null)
+    setMemberMenu(null)
+    setPermissionFocusMemberId('')
   }, [activeProjectId, activeChannelId])
+
+  useEffect(() => {
+    if (!selectedMember?.user_id) return
+    const fresh = members.find((member) => member.user_id === selectedMember.user_id)
+    if (fresh && fresh !== selectedMember) setSelectedMember(fresh)
+    if (!fresh) setSelectedMember(null)
+  }, [members, selectedMember])
+
+  useEffect(() => {
+    if (!memberMenu?.member.user_id) return
+    const fresh = members.find((member) => member.user_id === memberMenu.member.user_id)
+    if (fresh && fresh !== memberMenu.member) setMemberMenu({ ...memberMenu, member: fresh })
+    if (!fresh) setMemberMenu(null)
+  }, [members, memberMenu])
 
   useEffect(() => {
     setSessionView(null)
@@ -325,6 +347,13 @@ export default function ConversationPage() {
 
   // 成员列表：从 project space 读取
   const spaceMembers = members
+  const currentProjectMember = useMemo(
+    () => spaceMembers.find((member) => member.user_id === user?.id),
+    [spaceMembers, user?.id],
+  )
+  const canModerateMembers = !!activeProjectId
+    && !!currentProjectMember
+    && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MODERATE_MEMBERS)
   const hasChannelMemberPermissions = !!activeChannelId && membersHaveChannelPermissionMap(spaceMembers, activeChannelId)
   const panelMembers = useMemo(
     () => activeChannelId ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
@@ -461,8 +490,31 @@ export default function ConversationPage() {
     const target = targetFromProjectMember(member)
     setMemberConversationTarget(target)
     setSelectedMember(null)
+    setMemberMenu(null)
     setMemberPopoverY(200)
     setSendError('')
+  }
+
+  function openMemberProfile(member: ProjectMember, y: number) {
+    setSelectedMember(member)
+    setMemberPopoverY(y)
+    setMemberMenu(null)
+  }
+
+  function openMemberPermissions(member: ProjectMember) {
+    setPermissionFocusMemberId(member.user_id)
+    setShowPermissions(true)
+    setMemberMenu(null)
+  }
+
+  async function moderateMemberFromPopover(member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) {
+    if (!activeProjectId) return
+    await api.patch(`/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(member.user_id)}/moderation`, {
+      action,
+      duration_minutes: durationMinutes,
+      note: 'PC 成员资料卡操作',
+    })
+    await reloadProjectSpace()
   }
 
   function resetMemberConversationTarget() {
@@ -825,17 +877,34 @@ export default function ConversationPage() {
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowModeration(true)}>管理</button>}
             {activeProjectId && activeChannelId && canManagePermissions && (
-              <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPermissions(true)}>权限</button>
+              <button className={styles.memberInviteBtn} type="button" onClick={() => { setPermissionFocusMemberId(''); setShowPermissions(true) }}>权限</button>
             )}
           </div>
         </div>
         <div className={styles.memberList}>
+          {memberMenu && createPortal(
+            <MemberContextMenu
+              member={memberMenu.member}
+              x={memberMenu.x}
+              y={memberMenu.y}
+              canModerate={canModerateMembers && memberMenu.member.user_id !== user?.id}
+              onClose={() => setMemberMenu(null)}
+              onOpenProfile={openMemberProfile}
+              onOpenConversations={openMemberConversations}
+              onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
+              onModerate={moderateMemberFromPopover}
+            />,
+            document.body
+          )}
           {selectedMember && createPortal(
             <MemberProfilePopover
               member={selectedMember}
               anchorY={memberPopoverY}
               channel={activeChannel}
+              canModerate={canModerateMembers && selectedMember.user_id !== user?.id}
               onClose={() => setSelectedMember(null)}
+              onOpenConversations={openMemberConversations}
+              onModerate={moderateMemberFromPopover}
             />,
             document.body
           )}
@@ -866,6 +935,7 @@ export default function ConversationPage() {
                 members={panelMembers}
                 onSelect={(m, y) => { setSelectedMember(m); setMemberPopoverY(y) }}
                 onOpenConversations={openMemberConversations}
+                onOpenMenu={setMemberMenu}
                 activeConversationMemberId={isAssistingMember ? activeConversationTargetId : null}
                 placeholder={activeChannel ? '搜索频道成员' : '搜索项目成员'}
               channelId={activeChannelId ?? undefined}
@@ -944,14 +1014,14 @@ export default function ConversationPage() {
         <PermissionDrawer
           projectId={activeProjectId}
           activeChannelId={activeChannelId}
+          initialMemberId={permissionFocusMemberId}
           channels={channels}
           categories={categories}
           members={members}
-          onClose={() => setShowPermissions(false)}
+          onClose={() => { setShowPermissions(false); setPermissionFocusMemberId('') }}
           onSaved={reloadProjectSpace}
         />
       )}
     </div>
   )
 }
-
