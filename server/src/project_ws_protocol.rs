@@ -118,6 +118,7 @@ pub fn task_control_event(
 pub fn server_message_details(value: &serde_json::Value, bytes: usize) -> serde_json::Value {
     let message = value
         .get("message")
+        .or_else(|| value.get("text"))
         .and_then(|message| message.as_str())
         .unwrap_or_default();
     serde_json::json!({
@@ -398,6 +399,20 @@ mod tests {
         assert_eq!(value["task_id"], "tsk_123");
         assert_eq!(value["event"], "progress");
         assert!(value["emitted_at_ms"].as_u64().is_some());
+    }
+
+    #[test]
+    fn server_message_details_uses_text_for_assistant_chunks() {
+        let details = server_message_details(
+            &serde_json::json!({
+                "type": "assistant_chunk",
+                "text": "chunk preview"
+            }),
+            42,
+        );
+
+        assert_eq!(details["message_chars"], 13);
+        assert_eq!(details["message_preview"], "chunk preview");
     }
 
     #[test]

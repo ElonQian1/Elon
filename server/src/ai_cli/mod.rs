@@ -1180,32 +1180,11 @@ async fn run_via_pc_agent(
                 }
                 if is_codex {
                     full_text.push_str(&text);
-                    let clean_text = clean_codex_stream_chunk(&text);
-                    if clean_text.trim().is_empty() {
-                        continue;
-                    }
-                    // 有效内容：流式发送
-                    abort_pc_progress(&mut progress_handle); // 收到第一行有效内容时停止心跳
-                    if !stream_started {
-                        stream_started = true;
-                        let _ = tx.send(
-                            WsMessage::AssistantMessage {
-                                text: clean_text.clone(),
-                                model_used: Some(display_model.clone()),
-                                stream_id: Some(stream_id.clone()),
-                                node_id: Some(agent_id.to_string()),
-                            }
-                            .to_json(),
-                        );
-                    } else {
-                        let _ = tx.send(
-                            WsMessage::AssistantChunk {
-                                stream_id: stream_id.clone(),
-                                text: clean_text,
-                            }
-                            .to_json(),
-                        );
-                    }
+                    // Codex Route A runs in a PTY. Its raw stream includes model labels, prompt
+                    // echoes, cursor frames, and startup warnings split across chunks; filtering
+                    // each chunk independently still leaks noise into APK chat bubbles. Keep the
+                    // raw buffer for final reply extraction, but only forward structured passthrough
+                    // events above while the task is running.
                     continue;
                 }
                 if text.trim().is_empty() {
@@ -1725,6 +1704,8 @@ fn is_lightweight_cli_noise_line(line: &str) -> bool {
         || lower.contains("event.timestamp=")
         || lower.contains("mcp_server=")
         || lower.contains("model_client.")
+        || lower.contains("memories startup: error returned from database")
+        || lower.contains("no such table: stage1_outputs")
         || lower.contains("responses_websocket")
         || lower.contains("feedback_tags")
         || lower.contains("auth_header")
@@ -2189,6 +2170,7 @@ mod pc_cli_passthrough_tests {
 \u{1b}]0;C:\\WINDOWS\\system32\\cmd.exe \u{7}\
 \u{1b}[2m2026-07-01T07:02:50.938044Z\u{1b}[22m  \u{1b}[33mWARN \u{1b}[m\
 \u{1b}[2mcodex_core_plugins::manifest:\u{1b}[22m ignoring interface.defaultPrompt[0]\n\
+memories startup: error returned from database: (code: 1) no such table: stage1_outputs\n\
 mcp_native_chat_ok\n";
 
         let clean = clean_codex_stream_chunk(raw);
