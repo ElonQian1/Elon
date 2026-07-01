@@ -12,6 +12,8 @@ param(
     [int]$PollIntervalSec = 5,
     [switch]$RunGitProbe,
     [switch]$RunPublishProbe,
+    [string]$ServerBaseUrl = "http://43.139.149.158:8080",
+    [int]$PublishVerifyTimeoutSec = 900,
     [string]$ReportPath = ""
 )
 
@@ -272,6 +274,69 @@ function Assert-TraceDone {
     }
 }
 
+function Invoke-GitChecked {
+    param([string[]]$GitArgs)
+    $output = & git -C $RepoRoot @GitArgs 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw "git $($GitArgs -join ' ') failed: $(($output | Out-String).Trim())"
+    }
+    return $output
+}
+
+function Assert-GitProbePushed {
+    param(
+        [string]$DocPath,
+        [string]$RunId
+    )
+    Invoke-GitChecked -GitArgs @("fetch", "origin", "main") | Out-Null
+    Invoke-GitChecked -GitArgs @("cat-file", "-e", "origin/main:$DocPath") | Out-Null
+
+    $grep = "--grep=test(mcp): verify native apk git path $RunId"
+    $commit = (Invoke-GitChecked -GitArgs @("log", "-1", "--format=%H", $grep, "origin/main", "--", $DocPath) |
+        Select-Object -First 1)
+    $commit = ([string]$commit).Trim()
+    if (!$commit) {
+        throw "Git probe did not push expected commit for $DocPath on origin/main."
+    }
+    return $commit
+}
+
+function Wait-ServerGitSha {
+    param(
+        [string]$ExpectedSha,
+        [int]$TimeoutSec
+    )
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Max(1, $TimeoutSec))
+    $lastVersion = $null
+    $lastHealth = $null
+    do {
+        try {
+            $health = Invoke-WebRequest -Uri "$ServerBaseUrl/health" -UseBasicParsing -TimeoutSec 15
+            $lastHealth = [ordered]@{
+                status_code = [int]$health.StatusCode
+                body = ([string]$health.Content).Trim()
+            }
+            $version = Invoke-RestMethod -Uri "$ServerBaseUrl/api/server/version" -TimeoutSec 15
+            $lastVersion = $version
+            if ([string]$version.gitSha -eq $ExpectedSha) {
+                return [ordered]@{
+                    ok = $true
+                    expected_git_sha = $ExpectedSha
+                    health = $lastHealth
+                    version = $version
+                }
+            }
+        } catch {
+            $lastVersion = [ordered]@{
+                error = $_.Exception.Message
+            }
+        }
+        Start-Sleep -Seconds ([Math]::Max(1, $PollIntervalSec))
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+
+    throw "Server publish did not reach gitSha $ExpectedSha. Last health: $(ConvertTo-JsonCompact $lastHealth). Last version: $(ConvertTo-JsonCompact $lastVersion)"
+}
+
 function Start-ChatProbe {
     param(
         [string]$Serial,
@@ -406,11 +471,17 @@ End your final reply with marker $gitTrace.
             -WaitTimeoutSec $FirstReplyTimeoutSec
         $gitStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $gitTrace -TimeoutSec ([Math]::Max($FinishTimeoutSec, 1200))
         Assert-TraceDone -Status $gitStatus -TraceId $gitTrace
+        $pushedCommit = Assert-GitProbePushed -DocPath $docPath -RunId $runId
         $summary.traces.git_probe = [ordered]@{
             trace_id = $gitTrace
             probe = $gitProbe
             final_status = $gitStatus
             requested_publish = [bool]$RunPublishProbe
+            pushed_commit = $pushedCommit
+        }
+        if ($RunPublishProbe) {
+            Write-Step "verify server publish gitSha $pushedCommit"
+            $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec $PublishVerifyTimeoutSec
         }
     }
 
