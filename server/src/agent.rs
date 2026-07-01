@@ -713,8 +713,18 @@ async fn resolve_pc_project_binding(
                             bound_agent_id = %agent_id,
                             workspace_path = %workspace,
                             error = %error,
-                            "could not inspect bound PC project workspace; trying another online user node"
+                            "could not inspect bound PC project workspace"
                         );
+                        if pc_workspace_inspect_error_allows_bound_dispatch(&error) {
+                            send_optional_progress(
+                                tx,
+                                "绑定的 PC 节点工作区检查超时，继续使用当前绑定节点执行，避免自动切换到其它电脑。",
+                            );
+                            return Some(PcProjectBinding {
+                                agent_id: agent_id.to_string(),
+                                workspace: workspace.to_string(),
+                            });
+                        }
                         send_optional_progress(
                             tx,
                             "绑定的 PC 节点暂时无法确认工作区状态，正在查找其它在线 PC 节点。",
@@ -1077,6 +1087,11 @@ fn pc_workspace_inspect_problem(status: &ProjectWorkspaceInspectStatus) -> &'sta
     } else {
         "unknown"
     }
+}
+
+fn pc_workspace_inspect_error_allows_bound_dispatch(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+    lower.contains("timeout") || lower.contains("timed out") || lower.contains("超时")
 }
 
 /// Codex 额度耗尽或认证失效时返回 true，此时可自动切换到 Copilot
@@ -1617,7 +1632,8 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_cli_chat_requested, pc_cli_chat_route_label, pc_workspace_inspect_problem,
+        pc_cli_chat_requested, pc_cli_chat_route_label,
+        pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
         pc_workspace_inspect_usable, project_fields_require_pc_workspace,
         requires_project_workflow_for_message, should_attempt_pc_apk_sync,
     };
@@ -1786,6 +1802,19 @@ mod tests {
         status.copilot_available = false;
         assert!(!pc_workspace_inspect_usable(&status));
         assert_eq!(pc_workspace_inspect_problem(&status), "cli_unavailable");
+    }
+
+    #[test]
+    fn pc_workspace_inspect_timeout_keeps_bound_node() {
+        assert!(pc_workspace_inspect_error_allows_bound_dispatch(
+            "project workspace inspect timeout (6s)"
+        ));
+        assert!(pc_workspace_inspect_error_allows_bound_dispatch(
+            "PC 节点创建项目工作区超时（30 秒）"
+        ));
+        assert!(!pc_workspace_inspect_error_allows_bound_dispatch(
+            "workspace path does not exist"
+        ));
     }
 
     fn inspect_status() -> ProjectWorkspaceInspectStatus {
