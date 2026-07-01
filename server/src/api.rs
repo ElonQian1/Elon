@@ -60,6 +60,7 @@ pub struct ServerVersionResponse {
 pub async fn server_version() -> Json<ServerVersionResponse> {
     // 版本号优先取构建脚本注入的 ELON_BUILD_VERSION（来自 release_claim 服务器分配），
     // 否则回落到 CARGO_PKG_VERSION（本地 cargo run 时 Cargo.toml 的占位值）。
+    // 该接口也用于 PC / APK 端实测当前运行版本是否已完成发布切换。
     Json(ServerVersionResponse {
         service: "elon-server",
         status: "ok",
