@@ -1,6 +1,7 @@
 // server/src/agent.rs
 
 use anyhow::Result;
+use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
 use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
@@ -673,10 +674,43 @@ async fn resolve_pc_project_binding(
         let belongs_to_user = pc_agent_belongs_to_user(state, user_id, agent_id);
         if belongs_to_user && pc_agent_is_connected(state, agent_id).await {
             if let Some(workspace) = workspace {
-                return Some(PcProjectBinding {
-                    agent_id: agent_id.to_string(),
-                    workspace: workspace.to_string(),
-                });
+                match inspect_pc_agent_workspace(state, agent_id, workspace).await {
+                    Ok(status) if pc_workspace_inspect_usable(&status) => {
+                        return Some(PcProjectBinding {
+                            agent_id: agent_id.to_string(),
+                            workspace: workspace.to_string(),
+                        });
+                    }
+                    Ok(status) => {
+                        let problem = pc_workspace_inspect_problem(&status);
+                        warn!(
+                            project_id = %project.id,
+                            user_id = %user_id,
+                            bound_agent_id = %agent_id,
+                            workspace_path = %workspace,
+                            problem = %problem,
+                            "bound PC project workspace is not usable; trying another online user node"
+                        );
+                        send_optional_progress(
+                            tx,
+                            "绑定的 PC 节点工作区不可用，正在查找其它在线 PC 节点。",
+                        );
+                    }
+                    Err(error) => {
+                        warn!(
+                            project_id = %project.id,
+                            user_id = %user_id,
+                            bound_agent_id = %agent_id,
+                            workspace_path = %workspace,
+                            error = %error,
+                            "could not inspect bound PC project workspace; trying another online user node"
+                        );
+                        send_optional_progress(
+                            tx,
+                            "绑定的 PC 节点暂时无法确认工作区状态，正在查找其它在线 PC 节点。",
+                        );
+                    }
+                }
             }
         } else {
             bound_agent_wrong_owner = !belongs_to_user;
@@ -687,6 +721,40 @@ async fn resolve_pc_project_binding(
             bound_agent_id = %agent_id,
             "PC project bound node is not usable for the current user; trying an online user node"
         );
+    }
+
+    if let Some(workspace) = workspace {
+        if let Some(fallback_agent_id) = connected_pc_agent_with_existing_workspace(
+            state,
+            user_id,
+            workspace,
+            project.node_id.as_deref(),
+        )
+        .await
+        {
+            warn!(
+                project_id = %project.id,
+                user_id = %user_id,
+                fallback_agent_id = %fallback_agent_id,
+                workspace_path = %workspace,
+                "PC project will run on another online node that has the same workspace path"
+            );
+            send_optional_progress(tx, "已找到同一路径可用的在线 PC 节点，正在切换执行。");
+            return Some(PcProjectBinding {
+                agent_id: fallback_agent_id,
+                workspace: workspace.to_string(),
+            });
+        }
+    }
+
+    if project.source_type != "pc_managed" {
+        warn!(
+            project_id = %project.id,
+            user_id = %user_id,
+            workspace_path = ?workspace,
+            "local path PC project has no online node with the recorded workspace"
+        );
+        return None;
     }
 
     let fallback_agent_id = connected_pc_project_agent_for_user(state, user_id).await?;
@@ -927,6 +995,78 @@ async fn connected_pc_project_agent_for_user(
         }
     }
     None
+}
+
+async fn connected_pc_agent_with_existing_workspace(
+    state: &Arc<AppState>,
+    user_id: &str,
+    workspace: &str,
+    skip_agent_id: Option<&str>,
+) -> Option<String> {
+    let skip_agent_id = skip_agent_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    for agent in state.agent_manager.list().await {
+        if skip_agent_id == Some(agent.agent_id.as_str()) {
+            continue;
+        }
+        if !pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
+            continue;
+        }
+        match inspect_pc_agent_workspace(state, &agent.agent_id, workspace).await {
+            Ok(status) if pc_workspace_inspect_usable(&status) => return Some(agent.agent_id),
+            Ok(status) => {
+                warn!(
+                    agent_id = %agent.agent_id,
+                    workspace_path = %workspace,
+                    problem = %pc_workspace_inspect_problem(&status),
+                    "online PC node does not have a usable matching workspace"
+                );
+            }
+            Err(error) => {
+                warn!(
+                    agent_id = %agent.agent_id,
+                    workspace_path = %workspace,
+                    error = %error,
+                    "failed to inspect matching workspace on online PC node"
+                );
+            }
+        }
+    }
+    None
+}
+
+async fn inspect_pc_agent_workspace(
+    state: &Arc<AppState>,
+    agent_id: &str,
+    workspace: &str,
+) -> std::result::Result<ProjectWorkspaceInspectStatus, String> {
+    match state
+        .agent_manager
+        .dispatch_project_workspace_inspect(agent_id, workspace.to_string())
+        .await
+    {
+        Ok(AgentToServer::ProjectWorkspaceInspected { status, .. }) => Ok(status),
+        Ok(AgentToServer::ProjectWorkspaceInspectError { message, .. }) => Err(message),
+        Ok(other) => Err(format!("unexpected inspect response: {other:?}")),
+        Err(error) => Err(error.to_string()),
+    }
+}
+
+fn pc_workspace_inspect_usable(status: &ProjectWorkspaceInspectStatus) -> bool {
+    status.path_exists && status.is_dir && (status.codex_available || status.copilot_available)
+}
+
+fn pc_workspace_inspect_problem(status: &ProjectWorkspaceInspectStatus) -> &'static str {
+    if !status.path_exists {
+        "workspace_path_missing"
+    } else if !status.is_dir {
+        "workspace_path_not_directory"
+    } else if !status.codex_available && !status.copilot_available {
+        "cli_unavailable"
+    } else {
+        "unknown"
+    }
 }
 
 /// Codex 额度耗尽或认证失效时返回 true，此时可自动切换到 Copilot
@@ -1467,10 +1607,12 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_cli_chat_requested, pc_cli_chat_route_label, project_fields_require_pc_workspace,
+        pc_cli_chat_requested, pc_cli_chat_route_label, pc_workspace_inspect_problem,
+        pc_workspace_inspect_usable, project_fields_require_pc_workspace,
         requires_project_workflow_for_message,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
+    use homecli_proto::ProjectWorkspaceInspectStatus;
     use std::path::Path;
 
     #[test]
@@ -1585,5 +1727,41 @@ mod tests {
             None,
             Some("/srv/elon/project")
         ));
+    }
+
+    #[test]
+    fn pc_workspace_inspect_requires_existing_dir_and_cli() {
+        let mut status = inspect_status();
+        assert!(pc_workspace_inspect_usable(&status));
+
+        status.path_exists = false;
+        assert!(!pc_workspace_inspect_usable(&status));
+        assert_eq!(
+            pc_workspace_inspect_problem(&status),
+            "workspace_path_missing"
+        );
+
+        status = inspect_status();
+        status.codex_available = false;
+        status.copilot_available = false;
+        assert!(!pc_workspace_inspect_usable(&status));
+        assert_eq!(pc_workspace_inspect_problem(&status), "cli_unavailable");
+    }
+
+    fn inspect_status() -> ProjectWorkspaceInspectStatus {
+        ProjectWorkspaceInspectStatus {
+            workspace_path: r"D:\rust\active-projects\elon cli".to_string(),
+            path_exists: true,
+            is_dir: true,
+            is_git_worktree: true,
+            git_branch: Some("main".to_string()),
+            git_head: Some("2580208".to_string()),
+            git_remote_origin: Some("git@github.com:ElonQian1/Elon.git".to_string()),
+            has_uncommitted_changes: false,
+            uncommitted_count: Some(0),
+            disk_free_bytes: Some(10 * 1024 * 1024 * 1024),
+            codex_available: true,
+            copilot_available: false,
+        }
     }
 }
