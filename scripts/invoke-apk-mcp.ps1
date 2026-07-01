@@ -14,12 +14,12 @@ if (!(Test-Path -LiteralPath $Adb)) {
 }
 
 function Invoke-Adb {
-    param([Parameter(ValueFromRemainingArguments = $true)][string[]]$Args)
+    $adbArgs = @($args)
     $serialArgs = @()
     if ($DeviceSerial.Trim()) {
         $serialArgs = @("-s", $DeviceSerial.Trim())
     }
-    & $Adb @serialArgs @Args
+    & $Adb @serialArgs @AdbArgs
 }
 
 if (!$NoBootstrap) {

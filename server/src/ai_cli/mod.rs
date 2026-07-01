@@ -1179,22 +1179,9 @@ async fn run_via_pc_agent(
                     continue;
                 }
                 if is_codex {
-                    // Codex 0.133+ 直接输出 AI 回复，逐行流式发送给 APK
-                    // 过滤掉启动信息行（header 区域），只发有效回复内容
-                    let trimmed = text.trim();
-                    let is_header = trimmed.is_empty()
-                        || trimmed.starts_with("OpenAI Codex")
-                        || trimmed.starts_with("--------")
-                        || trimmed.starts_with("workdir:")
-                        || trimmed.starts_with("model:")
-                        || trimmed.starts_with("provider:")
-                        || trimmed.starts_with("approval:")
-                        || trimmed.starts_with("sandbox:")
-                        || trimmed.starts_with("reasoning effort:")
-                        || trimmed.starts_with("reasoning summaries:")
-                        || trimmed.starts_with("session id:");
                     full_text.push_str(&text);
-                    if is_header {
+                    let clean_text = clean_codex_stream_chunk(&text);
+                    if clean_text.trim().is_empty() {
                         continue;
                     }
                     // 有效内容：流式发送
@@ -1203,7 +1190,7 @@ async fn run_via_pc_agent(
                         stream_started = true;
                         let _ = tx.send(
                             WsMessage::AssistantMessage {
-                                text: text.clone(),
+                                text: clean_text.clone(),
                                 model_used: Some(display_model.clone()),
                                 stream_id: Some(stream_id.clone()),
                                 node_id: Some(agent_id.to_string()),
@@ -1214,7 +1201,7 @@ async fn run_via_pc_agent(
                         let _ = tx.send(
                             WsMessage::AssistantChunk {
                                 stream_id: stream_id.clone(),
-                                text: text.clone(),
+                                text: clean_text,
                             }
                             .to_json(),
                         );
@@ -1577,6 +1564,29 @@ fn sanitize_lightweight_pc_reply(reply: &str) -> String {
         .join("\n")
         .trim()
         .to_string()
+}
+
+fn clean_codex_stream_chunk(text: &str) -> String {
+    let clean = strip_terminal_control_sequences(text);
+    let mut lines = Vec::<String>::new();
+
+    for raw in clean.lines() {
+        let trimmed = raw.trim();
+        if trimmed.is_empty()
+            || is_lightweight_cli_noise_line(trimmed)
+            || is_codex_output_boundary(trimmed)
+            || trimmed == "--------"
+        {
+            continue;
+        }
+        lines.push(raw.trim_end().to_string());
+    }
+
+    let mut out = lines.join("\n");
+    if !out.is_empty() && clean.ends_with('\n') {
+        out.push('\n');
+    }
+    out
 }
 
 fn strip_terminal_control_sequences(input: &str) -> String {
@@ -2139,7 +2149,7 @@ fn is_useful_codex_reply(reply: &str) -> bool {
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
     use super::{
-        extract_codex_reply, extract_lightweight_pc_chat_reply,
+        clean_codex_stream_chunk, extract_codex_reply, extract_lightweight_pc_chat_reply,
         extract_lightweight_pc_chat_timeout_reply, native_session_uuid, pc_cli_passthrough_event,
         pc_dispatch_started_event, pc_lightweight_chat_prompt,
         pc_lightweight_chat_reasoning_effort, pc_route_a_extra_args,
@@ -2171,6 +2181,19 @@ mod pc_cli_passthrough_tests {
     fn pc_cli_passthrough_rejects_unknown_json_events() {
         assert!(pc_cli_passthrough_event(r#"{"type":"unknown","message":"x"}"#).is_none());
         assert!(pc_cli_passthrough_event("not json").is_none());
+    }
+
+    #[test]
+    fn pc_codex_stream_chunk_filters_terminal_noise() {
+        let raw = "\u{1b}[m\u{1b}]0;C:\\Windows\\system32\\cmd.EXE\u{7}\u{1b}[?25h\
+\u{1b}]0;C:\\WINDOWS\\system32\\cmd.exe \u{7}\
+\u{1b}[2m2026-07-01T07:02:50.938044Z\u{1b}[22m  \u{1b}[33mWARN \u{1b}[m\
+\u{1b}[2mcodex_core_plugins::manifest:\u{1b}[22m ignoring interface.defaultPrompt[0]\n\
+mcp_native_chat_ok\n";
+
+        let clean = clean_codex_stream_chunk(raw);
+
+        assert_eq!(clean, "mcp_native_chat_ok\n");
     }
 
     #[test]
