@@ -114,6 +114,7 @@ pub fn project_access(
             id: project_id.to_string(),
             name: project_id.to_string(),
             workspace_key: project_id.to_string(),
+            template: "android".to_string(),
             source_type: "local".to_string(),
             repo_url: None,
             branch: None,

@@ -883,6 +883,7 @@ pub struct ProjectAccess {
     pub id: String,
     pub name: String,
     pub workspace_key: String,
+    pub template: String,
     pub source_type: String,
     pub repo_url: Option<String>,
     pub branch: Option<String>,

@@ -18,7 +18,7 @@ use crate::{
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     pc_agent_runtime_choice::{choose_pc_agent_runtime, PcRuntimeRoutePreference},
-    source_hygiene,
+    project_workspace_provision, source_hygiene,
     store::{ProjectAccess, ProjectDevProfile, MEMORY_SCOPE_PROJECT},
     tools,
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
@@ -89,7 +89,7 @@ pub async fn run_for_project_in_workspace(
                 .unwrap_or(false);
         if force_pc_cli_chat {
             let route_label = pc_cli_chat_route_label(pc_runtime_route);
-            let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project).await else {
+            let Some(agent_id) = resolve_pc_chat_agent(state, user_id, project).await else {
                 let msg = format!(
                     "已选择{route_label}，但当前项目还没有绑定可用 PC 节点。请先连接节点，或切回平台 AI。"
                 );
@@ -97,7 +97,7 @@ pub async fn run_for_project_in_workspace(
                 let _ = tx.send(WsMessage::error(msg).to_json());
                 return;
             };
-            let agent_id = pc_binding.agent_id.as_str();
+            let agent_id = agent_id.as_str();
 
             let runtime_choice =
                 choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
@@ -186,7 +186,9 @@ pub async fn run_for_project_in_workspace(
     }
 
     if requires_project_workflow {
-        if let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project).await {
+        if let Some(pc_binding) =
+            resolve_pc_project_binding(state, user_id, project, Some(&tx)).await
+        {
             let agent_id = pc_binding.agent_id.as_str();
             let pc_workspace = pc_binding.workspace.as_str();
             let runtime_choice =
@@ -273,16 +275,14 @@ pub async fn run_for_project_in_workspace(
             }
             return;
         }
+        if project.source_type == "pc_managed" {
+            send_pc_workspace_unavailable_error(project, &tx);
+            return;
+        }
     }
 
     if requires_project_workflow && project_requires_pc_workspace(project) {
-        let msg = pc_workspace_unavailable_message(project);
-        warn!(
-            project_id = %project.id,
-            user_id = %user_id,
-            "PC workspace project cannot run without an online PC node"
-        );
-        let _ = tx.send(WsMessage::error(msg).to_json());
+        send_pc_workspace_unavailable_error(project, &tx);
         return;
     }
 
@@ -391,7 +391,7 @@ pub async fn plan_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project).await {
+    if let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project, Some(&tx)).await {
         let agent_id = pc_binding.agent_id.as_str();
         let pc_workspace = pc_binding.workspace.as_str();
         let runtime_choice =
@@ -471,13 +471,7 @@ pub async fn plan_for_project_in_workspace(
     }
 
     if project_requires_pc_workspace(project) {
-        let msg = pc_workspace_unavailable_message(project);
-        warn!(
-            project_id = %project.id,
-            user_id = %user_id,
-            "PC workspace project planning cannot run without an online PC node"
-        );
-        let _ = tx.send(WsMessage::error(msg).to_json());
+        send_pc_workspace_unavailable_error(project, &tx);
         return;
     }
 
@@ -577,35 +571,11 @@ fn path_looks_windows_workspace(path: &str) -> bool {
         && (bytes[2] == b'\\' || bytes[2] == b'/')
 }
 
-fn pc_workspace_unavailable_message(project: &ProjectAccess) -> String {
-    let workspace = project
-        .workspace_path
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .unwrap_or("未记录本机路径");
-    let node_hint = project
-        .node_id
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|node_id| format!("，绑定节点 {node_id} 当前不可用"))
-        .unwrap_or_default();
-    format!(
-        "当前项目绑定到 PC 本机工作区 {workspace}{node_hint}，但当前用户没有可用的在线 PC 节点可以访问它。请确认一龙开发平台/PC node 在线后重试；我不会在服务器上把这个本机路径当作 Git 仓库校验。"
-    )
-}
-
-async fn resolve_pc_project_binding(
+async fn resolve_pc_chat_agent(
     state: &Arc<AppState>,
     user_id: &str,
     project: &ProjectAccess,
-) -> Option<PcProjectBinding> {
-    let workspace = project.workspace_path.as_deref()?.trim();
-    if workspace.is_empty() {
-        return None;
-    }
-
+) -> Option<String> {
     if let Some(agent_id) = project
         .node_id
         .as_deref()
@@ -615,10 +585,47 @@ async fn resolve_pc_project_binding(
         if pc_agent_belongs_to_user(state, user_id, agent_id)
             && pc_agent_is_connected(state, agent_id).await
         {
-            return Some(PcProjectBinding {
-                agent_id: agent_id.to_string(),
-                workspace: workspace.to_string(),
-            });
+            return Some(agent_id.to_string());
+        }
+    }
+    connected_pc_agent_for_user(state, user_id).await
+}
+
+async fn resolve_pc_project_binding(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    tx: Option<&UnboundedSender<String>>,
+) -> Option<PcProjectBinding> {
+    let workspace = project
+        .workspace_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    let mut bound_agent_wrong_owner = false;
+    let bound_agent_missing = project
+        .node_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .is_none();
+
+    if let Some(agent_id) = project
+        .node_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        let belongs_to_user = pc_agent_belongs_to_user(state, user_id, agent_id);
+        if belongs_to_user && pc_agent_is_connected(state, agent_id).await {
+            if let Some(workspace) = workspace {
+                return Some(PcProjectBinding {
+                    agent_id: agent_id.to_string(),
+                    workspace: workspace.to_string(),
+                });
+            }
+        } else {
+            bound_agent_wrong_owner = !belongs_to_user;
         }
         warn!(
             project_id = %project.id,
@@ -628,17 +635,177 @@ async fn resolve_pc_project_binding(
         );
     }
 
-    let fallback_agent_id = connected_pc_agent_for_user(state, user_id).await?;
+    let fallback_agent_id = connected_pc_project_agent_for_user(state, user_id).await?;
     warn!(
         project_id = %project.id,
         user_id = %user_id,
         fallback_agent_id = %fallback_agent_id,
         "PC project will run on the current user's online node"
     );
+    if project.source_type == "pc_managed" {
+        let clone_url = clone_url_for_project_access(project, &fallback_agent_id);
+        let can_recreate_without_remote = workspace.is_none()
+            || clone_url.is_some()
+            || (project.role == "owner" && (bound_agent_wrong_owner || bound_agent_missing));
+        if can_recreate_without_remote {
+            return provision_pc_project_binding(
+                state,
+                user_id,
+                project,
+                &fallback_agent_id,
+                clone_url,
+                tx,
+            )
+            .await;
+        }
+
+        warn!(
+            project_id = %project.id,
+            user_id = %user_id,
+            fallback_agent_id = %fallback_agent_id,
+            workspace_path = ?workspace,
+            "PC managed project cannot move to fallback node because no portable git/storage source is available"
+        );
+        return None;
+    }
+    let workspace = workspace?;
     Some(PcProjectBinding {
         agent_id: fallback_agent_id,
         workspace: workspace.to_string(),
     })
+}
+
+async fn provision_pc_project_binding(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    agent_id: &str,
+    clone_url: Option<String>,
+    tx: Option<&UnboundedSender<String>>,
+) -> Option<PcProjectBinding> {
+    send_optional_progress(
+        tx,
+        if clone_url.is_some() {
+            "当前 PC 节点没有可用项目目录，正在从代码源重建本机工作区。"
+        } else {
+            "当前 PC 节点没有可用项目目录，正在重新创建本机托管工作区。"
+        },
+    );
+    let template = if project.template.trim().is_empty() {
+        "android"
+    } else {
+        project.template.as_str()
+    };
+    let provisioned = match project_workspace_provision::provision_project_workspace(
+        state,
+        agent_id,
+        user_id,
+        &project.id,
+        &project.name,
+        template,
+        clone_url.as_deref(),
+        project.branch.as_deref(),
+    )
+    .await
+    {
+        Ok(workspace) => workspace,
+        Err(error) => {
+            warn!(
+                project_id = %project.id,
+                user_id = %user_id,
+                agent_id = %agent_id,
+                error = %error,
+                "failed to provision PC project workspace before dispatch"
+            );
+            return None;
+        }
+    };
+
+    let local_storage_path = project.storage_repo_path.as_deref().filter(|path| {
+        project.storage_repo_url.is_none()
+            && project.storage_node_id.as_deref() == Some(agent_id)
+            && clone_url.as_deref() == Some(*path)
+    });
+    let persisted_remote_origin = provisioned
+        .git_remote_origin
+        .as_deref()
+        .filter(|origin| Some(*origin) != local_storage_path)
+        .or(project.repo_url.as_deref());
+
+    if let Err(error) = state.store.bind_project_to_pc_workspace(
+        user_id,
+        &project.id,
+        &provisioned.workspace_path,
+        agent_id,
+        provisioned.git_head.as_deref(),
+        persisted_remote_origin,
+        provisioned
+            .git_branch
+            .as_deref()
+            .or(project.branch.as_deref()),
+    ) {
+        warn!(
+            project_id = %project.id,
+            user_id = %user_id,
+            agent_id = %agent_id,
+            workspace_path = %provisioned.workspace_path,
+            error = %error,
+            "failed to persist PC project workspace binding"
+        );
+        return None;
+    }
+
+    Some(PcProjectBinding {
+        agent_id: agent_id.to_string(),
+        workspace: provisioned.workspace_path,
+    })
+}
+
+fn clone_url_for_project_access(project: &ProjectAccess, target_agent_id: &str) -> Option<String> {
+    if let Some(repo_url) = project
+        .repo_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return Some(repo_url.to_string());
+    }
+    if project.storage_node_id.as_deref() == Some(target_agent_id) {
+        if let Some(path) = project
+            .storage_repo_path
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            return Some(path.to_string());
+        }
+    }
+    project
+        .storage_repo_url
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned)
+}
+
+fn send_optional_progress(tx: Option<&UnboundedSender<String>>, message: &str) {
+    if let Some(tx) = tx {
+        let _ = tx.send(WsMessage::progress(message.to_string()).to_json());
+    }
+}
+
+fn send_pc_workspace_unavailable_error(project: &ProjectAccess, tx: &UnboundedSender<String>) {
+    let detail = project
+        .workspace_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("未记录目录");
+    let msg = format!(
+        "当前项目绑定的 PC 工作区不可用，且没有可自动迁移的 Git/硬盘代码源。原目录：{detail}。请先让原 PC 节点上线，或重新创建项目后再发送开发需求。"
+    );
+    warn!(project_id = %project.id, "{}", msg);
+    let _ = tx.send(WsMessage::error(msg).to_json());
 }
 
 fn pc_agent_belongs_to_user(state: &Arc<AppState>, user_id: &str, agent_id: &str) -> bool {
@@ -680,6 +847,28 @@ async fn pc_agent_is_connected(state: &Arc<AppState>, agent_id: &str) -> bool {
 async fn connected_pc_agent_for_user(state: &Arc<AppState>, user_id: &str) -> Option<String> {
     for agent in state.agent_manager.list().await {
         if pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
+            return Some(agent.agent_id);
+        }
+    }
+    None
+}
+
+async fn connected_pc_project_agent_for_user(
+    state: &Arc<AppState>,
+    user_id: &str,
+) -> Option<String> {
+    for agent in state.agent_manager.list().await {
+        if !pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
+            continue;
+        }
+        if project_workspace_provision::resolve_pc_project_node(
+            state,
+            user_id,
+            Some(&agent.agent_id),
+        )
+        .await
+        .is_ok()
+        {
             return Some(agent.agent_id);
         }
     }
