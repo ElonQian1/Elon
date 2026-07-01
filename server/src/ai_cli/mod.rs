@@ -57,7 +57,7 @@ use crate::{
 
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
 const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
-const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 30;
+const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 120;
 
 pub use self::ai_cli_intent_gate::confirm_project_intent;
 
@@ -778,6 +778,10 @@ pub async fn run_with_pc_agent_chat(
         scope
     });
 
+    let cli_name = cli_name.unwrap_or("codex");
+    let chat_codex_reasoning_effort =
+        pc_lightweight_chat_reasoning_effort(cli_name, codex_reasoning_effort);
+
     let outcome = run_via_pc_agent(
         agent_id,
         user_id,
@@ -786,9 +790,9 @@ pub async fn run_with_pc_agent_chat(
         None,
         AiCliRequestMode::Execute,
         read_only_scope,
-        cli_name.unwrap_or("codex"),
+        cli_name,
         copilot_model,
-        codex_reasoning_effort,
+        chat_codex_reasoning_effort.as_deref(),
         model_label,
         state,
         tx,
@@ -799,6 +803,26 @@ pub async fn run_with_pc_agent_chat(
         PcAgentRunOutcome::Completed => PcAgentChatOutcome::Answered,
         PcAgentRunOutcome::NoReadableLightweightReply => PcAgentChatOutcome::NoReadableReply,
     })
+}
+
+fn pc_lightweight_chat_reasoning_effort(
+    cli_name: &str,
+    requested_effort: Option<&str>,
+) -> Option<String> {
+    if cli_name != "codex" {
+        return None;
+    }
+
+    let clean = requested_effort
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("low")
+        .to_ascii_lowercase();
+
+    match clean.as_str() {
+        "high" | "xhigh" => Some("low".to_string()),
+        _ => Some(clean),
+    }
 }
 
 fn native_session_uuid(cli_name: &str, scope: &NativeSessionScope) -> String {
@@ -1085,6 +1109,42 @@ async fn run_via_pc_agent(
                 Ok(None) => break,
                 Err(_) => {
                     abort_pc_progress(&mut progress_handle);
+                    if let Some(reply) =
+                        extract_lightweight_pc_chat_timeout_reply(&full_text, is_codex)
+                    {
+                        let _ = tx.send(
+                            WsMessage::AssistantMessage {
+                                text: reply.clone(),
+                                model_used: Some(display_model.clone()),
+                                stream_id: None,
+                                node_id: Some(agent_id.to_string()),
+                            }
+                            .to_json(),
+                        );
+                        let _ = tx.send(
+                            WsMessage::Done {
+                                message: reply,
+                                apk_url: None,
+                                image_url: None,
+                                model_used: Some(display_model.clone()),
+                                node_id: Some(agent_id.to_string()),
+                            }
+                            .to_json(),
+                        );
+                        pc_billing_call.release_no_usage();
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "released_no_usage",
+                            None,
+                            None,
+                            None,
+                            Some(
+                                "Lightweight PC chat timed out after partial readable reply was delivered",
+                            ),
+                        );
+                        return Ok(PcAgentRunOutcome::Completed);
+                    }
                     pc_billing_call.release_no_usage();
                     finish_pc_node_compute_run(
                         state,
@@ -1468,6 +1528,11 @@ fn extract_lightweight_pc_chat_reply(output: &str, is_codex: bool) -> String {
     }
 
     extract_marker_lightweight_reply(&clean)
+}
+
+fn extract_lightweight_pc_chat_timeout_reply(output: &str, is_codex: bool) -> Option<String> {
+    let reply = extract_lightweight_pc_chat_reply(output, is_codex);
+    (!reply.trim().is_empty()).then_some(reply)
 }
 
 fn extract_marker_lightweight_reply(output: &str) -> String {
@@ -2074,10 +2139,11 @@ fn is_useful_codex_reply(reply: &str) -> bool {
 #[cfg(test)]
 mod pc_cli_passthrough_tests {
     use super::{
-        extract_codex_reply, extract_lightweight_pc_chat_reply, native_session_uuid,
-        pc_cli_passthrough_event, pc_dispatch_started_event, pc_lightweight_chat_prompt,
-        pc_route_a_extra_args, strip_terminal_control_sequences, AiCliRequestMode,
-        NativeSessionScope,
+        extract_codex_reply, extract_lightweight_pc_chat_reply,
+        extract_lightweight_pc_chat_timeout_reply, native_session_uuid, pc_cli_passthrough_event,
+        pc_dispatch_started_event, pc_lightweight_chat_prompt,
+        pc_lightweight_chat_reasoning_effort, pc_route_a_extra_args,
+        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2152,6 +2218,26 @@ mod pc_cli_passthrough_tests {
         assert_eq!(args[0], format!("--session-id={session_id}"));
         assert!(args.contains(&"--codex-model=gpt-5.3-codex".to_string()));
         assert!(args.contains(&"--codex-effort=medium".to_string()));
+    }
+
+    #[test]
+    fn pc_lightweight_chat_downgrades_heavy_codex_effort() {
+        assert_eq!(
+            pc_lightweight_chat_reasoning_effort("codex", Some("xhigh")).as_deref(),
+            Some("low")
+        );
+        assert_eq!(
+            pc_lightweight_chat_reasoning_effort("codex", Some("high")).as_deref(),
+            Some("low")
+        );
+        assert_eq!(
+            pc_lightweight_chat_reasoning_effort("codex", Some("medium")).as_deref(),
+            Some("medium")
+        );
+        assert_eq!(
+            pc_lightweight_chat_reasoning_effort("copilot", Some("xhigh")),
+            None
+        );
     }
 
     #[test]
@@ -2242,5 +2328,15 @@ Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查
         let reply = extract_lightweight_pc_chat_reply("", true);
 
         assert!(reply.trim().is_empty());
+    }
+
+    #[test]
+    fn pc_lightweight_chat_timeout_keeps_partial_readable_reply() {
+        let output = "OpenAI Codex\nmodel: test\ncodex\nhello, tell me your idea.";
+
+        assert_eq!(
+            extract_lightweight_pc_chat_timeout_reply(output, true).as_deref(),
+            Some("hello, tell me your idea.")
+        );
     }
 }
