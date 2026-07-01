@@ -11,6 +11,7 @@ import {
   memberRoleSummary,
   presenceLabel,
   memberPrimaryRoleKey,
+  roleLabel,
 } from './memberUtils'
 import styles from './ConversationPage.module.css'
 
@@ -25,8 +26,18 @@ const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
 const MEMBER_PANEL_COLLAPSED_KEY = 'elon.pc.memberPanel.collapsedStatusSections.v1'
 type MemberStatusSectionId = 'online' | 'offline'
+type MemberPanelStatusFilter = 'all' | 'online' | 'offline' | 'restricted'
+type MemberPanelSortMode = 'role' | 'name' | 'joined'
+type MemberRoleFilterOption = { id: string; label: string; count: number }
 export type MemberModerationAction = 'mute' | 'unmute' | 'ban' | 'unban'
 export type MemberMenuRequest = { member: ProjectMember; x: number; y: number }
+
+const MEMBER_STATUS_FILTERS: Array<{ id: MemberPanelStatusFilter; label: string }> = [
+  { id: 'all', label: '全部' },
+  { id: 'online', label: '在线' },
+  { id: 'offline', label: '离线' },
+  { id: 'restricted', label: '受限' },
+]
 
 /* ── 角色分组 ── */
 export const ROLE_GROUPS = [
@@ -130,6 +141,7 @@ function readCollapsedStatusSections(): Record<MemberStatusSectionId, boolean> {
 function buildMemberRows(
   members: ProjectMember[],
   collapsedStatusSections: Record<MemberStatusSectionId, boolean>,
+  sortMode: MemberPanelSortMode = 'role',
 ): MemberVirtualRow[] {
   const buckets = [
     {
@@ -148,6 +160,12 @@ function buildMemberRows(
     const collapsed = !!collapsedStatusSections[bucket.id]
     if (collapsed) {
       return [{ kind: 'status-header' as const, id: `status-${bucket.id}`, label: bucket.label, count: bucket.members.length, collapsed }]
+    }
+    if (sortMode !== 'role') {
+      return [
+        { kind: 'status-header' as const, id: `status-${bucket.id}`, label: bucket.label, count: bucket.members.length, collapsed },
+        ...sortMembersByMode(bucket.members, sortMode).map(member => ({ kind: 'member' as const, id: `${bucket.id}-${member.user_id}`, member })),
+      ]
     }
     const roleRows = ROLE_GROUPS.flatMap((group) => {
       const list = sortMembersForPanel(bucket.members.filter((member) => memberRoleGroup(member) === group.id))
@@ -178,6 +196,77 @@ function filterVisibleMembers(members: ProjectMember[], query: string) {
   })
 }
 
+function memberDisplayName(member: ProjectMember) {
+  return clean(member.account ?? member.user_id)
+}
+
+function memberJoinedTime(member: ProjectMember) {
+  const timestamp = Date.parse(member.joined_at ?? '')
+  return Number.isNaN(timestamp) ? 0 : timestamp
+}
+
+function sortMembersByMode(members: ProjectMember[], sortMode: MemberPanelSortMode) {
+  if (sortMode === 'name') {
+    return [...members].sort((left, right) =>
+      memberDisplayName(left).localeCompare(memberDisplayName(right)) || compareMembersForPanel(left, right)
+    )
+  }
+  if (sortMode === 'joined') {
+    return [...members].sort((left, right) =>
+      memberJoinedTime(right) - memberJoinedTime(left) || compareMembersForPanel(left, right)
+    )
+  }
+  return sortMembersForPanel(members)
+}
+
+function memberMatchesStatusFilter(member: ProjectMember, statusFilter: MemberPanelStatusFilter) {
+  if (statusFilter === 'all') return true
+  if (statusFilter === 'restricted') return !!(member.is_banned || member.is_muted)
+  const status = memberPresenceStatus(member)
+  if (statusFilter === 'online') return status !== 'offline'
+  return status === 'offline'
+}
+
+function memberMatchesRoleFilter(member: ProjectMember, roleFilter: string) {
+  if (!roleFilter) return true
+  const keys = memberRoleKeys(member)
+  if (roleFilter === 'member' && keys.length === 0) return true
+  return keys.includes(roleFilter)
+}
+
+function memberRoleFilterOptions(members: ProjectMember[]): MemberRoleFilterOption[] {
+  const options = new Map<string, MemberRoleFilterOption & { position: number }>()
+  members.forEach((member) => {
+    const roles = member.roles?.length
+      ? member.roles
+      : [{ id: member.role ?? 'member', name: roleLabel(member.role ?? 'member'), position: memberRolePosition(member) }]
+    const seen = new Set<string>()
+    roles.forEach((role) => {
+      const rawId = role.id || role.name || 'member'
+      const id = clean(String(rawId)).toLowerCase()
+      if (!id || seen.has(id)) return
+      seen.add(id)
+      const current = options.get(id)
+      if (current) {
+        current.count += 1
+        current.position = Math.max(current.position, role.position ?? 0)
+        return
+      }
+      options.set(id, {
+        id,
+        label: role.name || roleLabel(String(rawId)),
+        count: 1,
+        position: role.position ?? 0,
+      })
+    })
+  })
+  return Array.from(options.values())
+    .sort((left, right) =>
+      right.position - left.position || right.count - left.count || left.label.localeCompare(right.label)
+    )
+    .map(({ position: _position, ...option }) => option)
+}
+
 /* ── MemberSearch ── */
 export function MemberSearch({
   members,
@@ -197,20 +286,33 @@ export function MemberSearch({
   channelId?: string
 }) {
   const [query, setQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState<MemberPanelStatusFilter>('all')
+  const [roleFilter, setRoleFilter] = useState('')
+  const [sortMode, setSortMode] = useState<MemberPanelSortMode>('role')
   const [scrollTop, setScrollTop] = useState(0)
   const [collapsedStatusSections, setCollapsedStatusSections] = useState(readCollapsedStatusSections)
   const q = query.trim().toLowerCase()
+  const roleOptions = useMemo(() => memberRoleFilterOptions(members), [members])
   const filtered = useMemo(
-    () => q ? filterVisibleMembers(members, q) : members,
-    [members, q],
+    () => {
+      const visible = q ? filterVisibleMembers(members, q) : members
+      return visible.filter((member) =>
+        memberMatchesStatusFilter(member, statusFilter) && memberMatchesRoleFilter(member, roleFilter)
+      )
+    },
+    [members, q, roleFilter, statusFilter],
   )
-  const rows = useMemo(() => buildMemberRows(filtered, collapsedStatusSections), [filtered, collapsedStatusSections])
+  const rows = useMemo(() => buildMemberRows(filtered, collapsedStatusSections, sortMode), [filtered, collapsedStatusSections, sortMode])
   const start = Math.max(0, Math.floor(scrollTop / MEMBER_VIRTUAL_ROW_HEIGHT) - MEMBER_LIST_OVERSCAN)
   const end = Math.min(rows.length, start + MEMBER_LIST_WINDOW)
   const visibleRows = rows.slice(start, end)
+  const activeFilterCount = (q ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (roleFilter ? 1 : 0) + (sortMode !== 'role' ? 1 : 0)
   useEffect(() => {
     window.localStorage.setItem(MEMBER_PANEL_COLLAPSED_KEY, JSON.stringify(collapsedStatusSections))
   }, [collapsedStatusSections])
+  useEffect(() => {
+    setScrollTop(0)
+  }, [members, q, roleFilter, sortMode, statusFilter])
   function toggleStatusSection(rowId: string) {
     const id = rowId === 'status-online' ? 'online' : rowId === 'status-offline' ? 'offline' : null
     if (!id) return
@@ -231,8 +333,49 @@ export function MemberSearch({
           autoComplete="off"
         />
         {query && (
-          <button className={styles.memberSearchClear} type="button" onClick={() => setQuery('')}>×</button>
+          <button className={styles.memberSearchClear} type="button" onClick={() => {
+            setQuery('')
+            setScrollTop(0)
+          }}>×</button>
         )}
+        <div className={styles.memberFilterBar}>
+          <div className={styles.memberStatusFilter} role="group" aria-label="成员状态筛选">
+            {MEMBER_STATUS_FILTERS.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                data-active={statusFilter === filter.id ? 'true' : undefined}
+                onClick={() => setStatusFilter(filter.id)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+          <select
+            className={styles.memberFilterSelect}
+            value={roleFilter}
+            onChange={(event) => setRoleFilter(event.target.value)}
+            aria-label="按角色筛选成员"
+          >
+            <option value="">全部角色</option>
+            {roleOptions.map((option) => (
+              <option key={option.id} value={option.id}>{option.label} ({option.count})</option>
+            ))}
+          </select>
+          <select
+            className={styles.memberFilterSelect}
+            value={sortMode}
+            onChange={(event) => setSortMode(event.target.value as MemberPanelSortMode)}
+            aria-label="成员排序"
+          >
+            <option value="role">按角色</option>
+            <option value="name">按名称</option>
+            <option value="joined">按加入</option>
+          </select>
+        </div>
+        <div className={styles.memberFilterMeta}>
+          显示 {filtered.length}/{members.length}{activeFilterCount ? ` · ${activeFilterCount} 个条件` : ''}
+        </div>
       </div>
       <div className={styles.memberVirtualList} onScroll={event => setScrollTop(event.currentTarget.scrollTop)}>
         {rows.length === 0 && <div className={styles.memberSection}>没有匹配成员</div>}
