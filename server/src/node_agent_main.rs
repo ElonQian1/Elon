@@ -1486,6 +1486,23 @@ async fn run_cli_prompt(run: CliPromptRun) {
     let mut cmd = tokio::process::Command::new(actual_bin);
     let mut sidecar_args = Vec::new();
     let mut sidecar_env = Vec::new();
+    let codex_last_message_path = if cli_name == "codex" {
+        let safe_req_id: String = req_id
+            .chars()
+            .map(|ch| {
+                if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                    ch
+                } else {
+                    '_'
+                }
+            })
+            .collect();
+        let path = std::env::temp_dir().join(format!("elon_codex_last_message_{safe_req_id}.txt"));
+        let _ = std::fs::remove_file(&path);
+        Some(path)
+    } else {
+        None
+    };
     if let Some((_, args)) = batch_wrapper.as_ref() {
         cmd.args(args);
         sidecar_args.extend(args.iter().map(|arg| arg.to_string()));
@@ -1511,6 +1528,14 @@ async fn run_cli_prompt(run: CliPromptRun) {
             // 续接已有会话
             push_tracked_arg(&mut cmd, &mut sidecar_args, "resume");
             push_tracked_arg(&mut cmd, &mut sidecar_args, "--json");
+            if let Some(path) = codex_last_message_path.as_ref() {
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "--output-last-message");
+                push_tracked_arg(
+                    &mut cmd,
+                    &mut sidecar_args,
+                    path.to_string_lossy().to_string(),
+                );
+            }
             if full_access {
                 push_tracked_arg(
                     &mut cmd,
@@ -1523,6 +1548,14 @@ async fn run_cli_prompt(run: CliPromptRun) {
             push_tracked_arg(&mut cmd, &mut sidecar_args, real_sid);
         } else {
             push_tracked_arg(&mut cmd, &mut sidecar_args, "--json");
+            if let Some(path) = codex_last_message_path.as_ref() {
+                push_tracked_arg(&mut cmd, &mut sidecar_args, "--output-last-message");
+                push_tracked_arg(
+                    &mut cmd,
+                    &mut sidecar_args,
+                    path.to_string_lossy().to_string(),
+                );
+            }
             // 首次执行：默认限制在项目 worktree；显式授权后才使用 Codex 全权限。
             if full_access {
                 push_tracked_arg(
@@ -1688,7 +1721,7 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     },
                 )
                 .await;
-                let result = match result {
+                let mut result = match result {
                     Ok(result) => result,
                     Err(error) => {
                         let message = format!("sidecar 输出跟随失败: {error}");
@@ -1766,6 +1799,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
                     }))
                     .await;
                     return;
+                }
+                if cli_name == "codex" && !contains_codex_reply_marker(&result.stdout_text) {
+                    if let Some(text) = codex_last_message_chunk(codex_last_message_path.as_ref()) {
+                        send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &text);
+                        result.stdout_text.push_str(&text);
+                    }
                 }
                 if result.exit_ok
                     && cli_name == "codex"
@@ -1993,6 +2032,12 @@ async fn run_cli_prompt(run: CliPromptRun) {
     }
 
     let exit_ok = child.wait().await.map(|s| s.success()).unwrap_or(false);
+    if cli_name == "codex" && !contains_codex_reply_marker(&stdout_text) {
+        if let Some(text) = codex_last_message_chunk(codex_last_message_path.as_ref()) {
+            send_cli_chunk(&out_tx, &task_journal, &req_id, "stdout", &text);
+            stdout_text.push_str(&text);
+        }
+    }
     if !exit_ok
         && cli_name == "codex"
         && codex_plan.is_resume()
@@ -2107,6 +2152,18 @@ fn send_cli_chunk_message(
         req_id: req_id.to_string(),
         text: text.to_string(),
     }));
+}
+
+fn codex_last_message_chunk(path: Option<&PathBuf>) -> Option<String> {
+    let path = path?;
+    let text = std::fs::read_to_string(path).ok()?;
+    let _ = std::fs::remove_file(path);
+    let reply = text.trim();
+    if reply.is_empty() {
+        None
+    } else {
+        Some(format!("codex\n{reply}\n"))
+    }
 }
 
 fn contains_codex_reply_marker(output: &str) -> bool {
