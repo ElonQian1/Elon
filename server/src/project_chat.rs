@@ -464,6 +464,10 @@ fn append_project_icon_context(
     format!("{message}\n\n[项目 APK 图标]\n{note}")
 }
 
+fn should_append_project_icon_context_for_pc_fast_path(needs_project_workflow: bool) -> bool {
+    needs_project_workflow
+}
+
 fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
     let mut total = 0usize;
     let mut question_marks = 0usize;
@@ -498,7 +502,9 @@ fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::looks_like_replaced_unicode_mojibake;
+    use super::{
+        looks_like_replaced_unicode_mojibake, should_append_project_icon_context_for_pc_fast_path,
+    };
 
     #[test]
     fn detects_windows_question_mark_mojibake() {
@@ -517,6 +523,12 @@ mod tests {
         assert!(!looks_like_replaced_unicode_mojibake(
             "Why??? Can Codex read AGENTS.md and run cargo check?"
         ));
+    }
+
+    #[test]
+    fn pc_node_fast_path_keeps_lightweight_chat_message_plain() {
+        assert!(!should_append_project_icon_context_for_pc_fast_path(false));
+        assert!(should_append_project_icon_context_for_pc_fast_path(true));
     }
 }
 
@@ -679,13 +691,18 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 .to_json(),
             );
         }
-        let message = append_project_icon_context(
-            &state,
-            &project,
-            &base_workspace,
-            message,
-            project_icon_data_url.as_deref(),
-        );
+        let message = if should_append_project_icon_context_for_pc_fast_path(needs_project_workflow)
+        {
+            append_project_icon_context(
+                &state,
+                &project,
+                &base_workspace,
+                message,
+                project_icon_data_url.as_deref(),
+            )
+        } else {
+            message
+        };
         agent::run_for_project(
             &user_id,
             &project,
