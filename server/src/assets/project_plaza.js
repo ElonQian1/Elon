@@ -331,17 +331,19 @@
         </div>
         <div class="project-plaza-stats">
           <div class="project-plaza-stat project-plaza-stat-member">
-            <span class="project-plaza-member-icon" aria-hidden="true">
-              <img src="/assets/ic_plaza_member_stat.png" alt="" loading="lazy" />
+            <span class="project-plaza-stat-top">
+              <span class="project-plaza-member-icon" aria-hidden="true">
+                <img src="/assets/ic_plaza_member_stat.png" alt="" loading="lazy" />
+              </span>
             </span>
             <span class="project-plaza-stat-label">成员：${escapeHtml(projectMemberCount(project))}</span>
           </div>
           <span class="project-plaza-stat-sep" aria-hidden="true"></span>
-          <div class="project-plaza-stat"><strong>${escapeHtml(projectInstallCount(project))}</strong><span>次安装</span></div>
+          <div class="project-plaza-stat"><span class="project-plaza-stat-top"><strong>${escapeHtml(projectInstallCount(project))}</strong></span><span>次安装</span></div>
           <span class="project-plaza-stat-sep" aria-hidden="true"></span>
-          <div class="project-plaza-stat project-plaza-stat-size"><strong>${escapeHtml(projectApkSize(project))}</strong><span>大小</span></div>
+          <div class="project-plaza-stat project-plaza-stat-size"><span class="project-plaza-stat-top"><strong>${escapeHtml(projectApkSize(project))}</strong></span><span>大小</span></div>
           <span class="project-plaza-stat-sep" aria-hidden="true"></span>
-          <div class="project-plaza-stat"><strong>${escapeHtml(projectCommentCount(project))}</strong><span>评论</span></div>
+          <div class="project-plaza-stat"><span class="project-plaza-stat-top"><strong>${escapeHtml(projectCommentCount(project))}</strong></span><span>评论</span></div>
         </div>
         ${renderDescription(project, identity)}
         <span class="project-plaza-divider" aria-hidden="true"></span>
