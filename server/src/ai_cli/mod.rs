@@ -58,6 +58,8 @@ use crate::{
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
 const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
 const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 120;
+const PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT: &str = "medium";
+const PC_CODEX_PROGRESS_HINT_COOLDOWN_SECS: u64 = 15;
 
 pub use self::ai_cli_intent_gate::confirm_project_intent;
 
@@ -836,6 +838,32 @@ fn pc_lightweight_chat_reasoning_effort(
     }
 }
 
+fn pc_project_reasoning_effort(
+    cli_name: &str,
+    requested_effort: Option<&str>,
+    request_mode: AiCliRequestMode,
+) -> Option<String> {
+    if cli_name != "codex" {
+        return None;
+    }
+
+    let clean = requested_effort
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_ascii_lowercase);
+
+    clean.or_else(|| {
+        Some(
+            if request_mode.is_plan() {
+                "low"
+            } else {
+                PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT
+            }
+            .to_string(),
+        )
+    })
+}
+
 fn should_skip_pc_chat_native_session(user_message: &str) -> bool {
     if is_tiny_chat_message(user_message) {
         return true;
@@ -1009,6 +1037,11 @@ async fn run_via_pc_agent(
     tx: &UnboundedSender<String>,
 ) -> Result<PcAgentRunOutcome> {
     let lightweight_pc_chat = !request_mode.is_plan() && cwd.is_none();
+    let effective_codex_reasoning_effort = if lightweight_pc_chat {
+        pc_lightweight_chat_reasoning_effort(cli_name, codex_reasoning_effort)
+    } else {
+        pc_project_reasoning_effort(cli_name, codex_reasoning_effort, request_mode)
+    };
     // prompt 构造
     let prompt = if lightweight_pc_chat {
         pc_lightweight_chat_prompt(user_message, cli_name, model_label.or(copilot_model))
@@ -1040,7 +1073,7 @@ async fn run_via_pc_agent(
         cli_name,
         native_cli_session_uuid.as_deref(),
         copilot_model,
-        codex_reasoning_effort,
+        effective_codex_reasoning_effort.as_deref(),
     );
 
     // dispatch 时节点可能刚好掉线重连
@@ -1130,7 +1163,7 @@ async fn run_via_pc_agent(
     let display_model = pc_display_model_label(
         cli_name,
         model_label.or(copilot_model),
-        codex_reasoning_effort,
+        effective_codex_reasoning_effort.as_deref(),
         lightweight_pc_chat,
         agent_id,
     );
@@ -1164,6 +1197,7 @@ async fn run_via_pc_agent(
     let mut stream_started = false;
     let is_codex = cli_name == "codex";
     let mut lightweight_streamed_reply = String::new();
+    let mut last_codex_progress_hint: Option<(&'static str, std::time::Instant)> = None;
 
     // 进度心跳：开发/规划每 5s 发一次；轻量聊天只回流真实文本，不刷内部状态。
     let progress_tx = tx.clone();
@@ -1323,6 +1357,25 @@ async fn run_via_pc_agent(
                 }
                 if is_codex {
                     full_text.push_str(&text);
+                    if let Some((hint_key, message)) = pc_codex_progress_hint(&text, &display_model)
+                    {
+                        let should_send = match last_codex_progress_hint {
+                            Some((last_key, last_at))
+                                if last_key == hint_key
+                                    && last_at.elapsed()
+                                        < std::time::Duration::from_secs(
+                                            PC_CODEX_PROGRESS_HINT_COOLDOWN_SECS,
+                                        ) =>
+                            {
+                                false
+                            }
+                            _ => true,
+                        };
+                        if should_send {
+                            last_codex_progress_hint = Some((hint_key, std::time::Instant::now()));
+                            let _ = tx.send(WsMessage::progress(message).to_json());
+                        }
+                    }
                     // Codex Route A runs in a PTY. Its raw stream includes model labels, prompt
                     // echoes, cursor frames, and startup warnings split across chunks; filtering
                     // each chunk independently still leaks noise into APK chat bubbles. Keep the
@@ -2208,6 +2261,66 @@ fn is_lightweight_cli_noise_line(line: &str) -> bool {
         || lower.starts_with(r"\\?\")
 }
 
+fn pc_codex_progress_hint(text: &str, display_model: &str) -> Option<(&'static str, String)> {
+    let clean = strip_terminal_control_sequences(text);
+    let lower = clean.to_ascii_lowercase();
+
+    if lower.contains("stream disconnected - retrying sampling request")
+        || lower.contains("reconnecting...")
+    {
+        let attempt = extract_codex_reconnect_attempt(&clean)
+            .map(|value| format!("（第 {value} 次）"))
+            .unwrap_or_default();
+        return Some((
+            "codex_reconnecting",
+            format!("Codex ({display_model}) 流式连接不稳定，正在自动重连{attempt}。"),
+        ));
+    }
+
+    if lower.contains("falling back to http") {
+        return Some((
+            "codex_http_fallback",
+            format!("Codex ({display_model}) 已切换到 HTTP fallback 继续生成。"),
+        ));
+    }
+
+    if lower.contains("failed to refresh remote installed plugins cache")
+        || lower.contains("curated plugin sync")
+        || lower.contains("git sync failed for curated plugin")
+    {
+        return Some((
+            "codex_plugin_cache",
+            "Codex 插件远程同步不可达，已继续使用本地缓存。".to_string(),
+        ));
+    }
+
+    None
+}
+
+fn extract_codex_reconnect_attempt(text: &str) -> Option<String> {
+    let lower = text.to_ascii_lowercase();
+    let marker = "reconnecting...";
+    if let Some(index) = lower.find(marker) {
+        let rest = &text[index + marker.len()..];
+        return rest
+            .split(|ch: char| !(ch.is_ascii_digit() || ch == '/'))
+            .find(|part| {
+                let mut split = part.split('/');
+                matches!((split.next(), split.next()), (Some(a), Some(b)) if !a.is_empty() && !b.is_empty())
+            })
+            .map(str::to_string);
+    }
+
+    let marker = "sampling request (";
+    let index = lower.find(marker)?;
+    let rest = &text[index + marker.len()..];
+    rest.split(')')
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty() && value.contains('/'))
+        .map(str::to_string)
+}
+
 fn pc_cli_passthrough_event(text: &str) -> Option<String> {
     let trimmed = text.trim();
     if trimmed.is_empty() {
@@ -2628,10 +2741,11 @@ mod pc_cli_passthrough_tests {
     use super::{
         clean_codex_stream_chunk, extract_codex_reply, extract_lightweight_pc_chat_reply,
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
-        pc_cli_passthrough_event, pc_dispatch_started_event, pc_display_model_label,
-        pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort, pc_route_a_extra_args,
-        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
-        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
+        pc_cli_passthrough_event, pc_codex_progress_hint, pc_dispatch_started_event,
+        pc_display_model_label, pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
+        pc_project_reasoning_effort, pc_route_a_extra_args, sanitize_pc_development_reply,
+        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
+        NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2740,6 +2854,41 @@ mcp_native_chat_ok\n";
             pc_lightweight_chat_reasoning_effort("copilot", Some("xhigh")),
             None
         );
+    }
+
+    #[test]
+    fn pc_project_codex_defaults_to_medium_effort() {
+        assert_eq!(
+            pc_project_reasoning_effort("codex", None, AiCliRequestMode::Execute).as_deref(),
+            Some("medium")
+        );
+        assert_eq!(
+            pc_project_reasoning_effort("codex", None, AiCliRequestMode::Plan).as_deref(),
+            Some("low")
+        );
+        assert_eq!(
+            pc_project_reasoning_effort("codex", Some("high"), AiCliRequestMode::Execute)
+                .as_deref(),
+            Some("high")
+        );
+        assert_eq!(
+            pc_project_reasoning_effort("copilot", None, AiCliRequestMode::Execute),
+            None
+        );
+    }
+
+    #[test]
+    fn pc_codex_progress_hint_reports_network_fallbacks() {
+        let reconnect = "\u{1b}[31mERROR:\u{1b}[m Reconnecting... 3/5";
+        let (_, message) =
+            pc_codex_progress_hint(reconnect, "Codex · 推理 medium").expect("reconnect hint");
+        assert!(message.contains("自动重连"));
+        assert!(message.contains("第 3/5 次"));
+
+        let (_, message) =
+            pc_codex_progress_hint("codex_core::client: falling back to HTTP", "Codex")
+                .expect("fallback hint");
+        assert!(message.contains("HTTP fallback"));
     }
 
     #[test]
