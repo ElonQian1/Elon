@@ -3,7 +3,10 @@ use elon_pc_dev_runtime::{
     ensure_project_git_baseline, ensure_project_scaffold, safe_path_part, workspace_root,
     ProjectGitBaselineRequest, ProjectScaffoldRequest,
 };
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use crate::git_command_error::{git_command, git_failure_message, git_spawn_context};
 use crate::pc_workspace_git_remote::{
@@ -215,6 +218,8 @@ pub fn prepare_conversation_workspace(
     })?;
 
     let branch = format!("ai/session/{}/{}", project_part, conversation_part);
+    let _ = git_fetch_origin(&base_workspace);
+    let _ = run_git_dynamic(&base_workspace, &["worktree", "prune"]);
     if is_git_work_tree(&worktree_path) {
         return Ok(ConversationWorkspaceResult {
             base_workspace_path: Some(base_workspace.to_string_lossy().to_string()),
@@ -224,21 +229,9 @@ pub fn prepare_conversation_workspace(
         });
     }
     if worktree_path.exists() {
-        if std::fs::read_dir(&worktree_path)?.next().is_some() {
-            return Err(anyhow!(
-                "conversation worktree path exists but is not a git worktree: {}",
-                worktree_path.display()
-            ));
-        }
-        std::fs::remove_dir(&worktree_path).with_context(|| {
-            format!(
-                "failed to remove empty conversation worktree path {}",
-                worktree_path.display()
-            )
-        })?;
+        recover_stale_conversation_worktree_path(&base_workspace, &worktree_root, &worktree_path)?;
     }
 
-    let _ = git_fetch_origin(&base_workspace);
     let start_ref = conversation_start_ref(&base_workspace);
     let worktree_arg = git_path_arg(&worktree_path);
     if local_branch_exists(&base_workspace, &branch) {
@@ -266,6 +259,76 @@ pub fn prepare_conversation_workspace(
         isolated: true,
         branch: Some(branch),
     })
+}
+
+fn recover_stale_conversation_worktree_path(
+    base_workspace: &Path,
+    worktree_root: &Path,
+    worktree_path: &Path,
+) -> Result<()> {
+    ensure_within_root(worktree_root, worktree_path)?;
+    let _ = run_git_dynamic(
+        base_workspace,
+        &[
+            "worktree",
+            "remove",
+            "--force",
+            git_path_arg(worktree_path).as_str(),
+        ],
+    );
+    let _ = run_git_dynamic(base_workspace, &["worktree", "prune"]);
+    if !worktree_path.exists() {
+        return Ok(());
+    }
+
+    if worktree_path.is_dir() && std::fs::read_dir(worktree_path)?.next().is_none() {
+        std::fs::remove_dir(worktree_path).with_context(|| {
+            format!(
+                "failed to remove empty conversation worktree path {}",
+                worktree_path.display()
+            )
+        })?;
+    } else {
+        let archive_path = stale_conversation_archive_path(worktree_path);
+        std::fs::rename(worktree_path, &archive_path).with_context(|| {
+            format!(
+                "failed to archive stale conversation worktree path {} to {}",
+                worktree_path.display(),
+                archive_path.display()
+            )
+        })?;
+        tracing::warn!(
+            path = %worktree_path.display(),
+            archived_to = %archive_path.display(),
+            "archived stale conversation worktree path before recreating it"
+        );
+    }
+    let _ = run_git_dynamic(base_workspace, &["worktree", "prune"]);
+    Ok(())
+}
+
+fn stale_conversation_archive_path(worktree_path: &Path) -> PathBuf {
+    let parent = worktree_path.parent().unwrap_or_else(|| Path::new("."));
+    let name = worktree_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("conversation");
+    let millis = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|value| value.as_millis())
+        .unwrap_or(0);
+    for index in 0..100 {
+        let suffix = if index == 0 {
+            format!(".stale-{millis}")
+        } else {
+            format!(".stale-{millis}-{index}")
+        };
+        let candidate = parent.join(format!("{name}{suffix}"));
+        if !candidate.exists() {
+            return candidate;
+        }
+    }
+    parent.join(format!("{name}.stale-{millis}-overflow"))
 }
 
 pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> Result<String> {
@@ -521,14 +584,16 @@ fn git_path_buf(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::{
-        ensure_conversation_workspace_committed, git_output, git_path_arg,
-        prepare_conversation_workspace, worktree_clean,
+        ensure_conversation_workspace_committed, git_output, git_path_arg, is_git_work_tree,
+        prepare_conversation_workspace, recover_stale_conversation_worktree_path, worktree_clean,
     };
     use elon_pc_dev_runtime::safe_path_part;
-    use std::fs;
     use std::path::Path;
     use std::process::Command;
+    use std::{env, ffi::OsString, fs, sync::Mutex};
     use uuid::Uuid;
+
+    static WORKSPACE_ROOT_ENV_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn safe_path_part_removes_path_separators() {
@@ -575,6 +640,86 @@ mod tests {
     }
 
     #[test]
+    fn stale_conversation_worktree_path_is_archived() {
+        let root = std::env::temp_dir().join(format!(
+            "elon_stale_conversation_{}",
+            Uuid::new_v4().simple()
+        ));
+        let worktree_root = root.join("conversation-worktrees").join("project-a");
+        let worktree_path = worktree_root.join("conversation-a");
+        fs::create_dir_all(&worktree_path).expect("stale path should create");
+        fs::write(worktree_path.join("leftover.txt"), "partial output\n")
+            .expect("leftover file should write");
+
+        recover_stale_conversation_worktree_path(&root, &worktree_root, &worktree_path)
+            .expect("stale path should be recovered");
+
+        assert!(!worktree_path.exists());
+        let archived = fs::read_dir(&worktree_root)
+            .expect("worktree root should be readable")
+            .filter_map(|entry| entry.ok())
+            .map(|entry| entry.path())
+            .find(|path| {
+                path.file_name()
+                    .and_then(|value| value.to_str())
+                    .map(|value| value.starts_with("conversation-a.stale-"))
+                    .unwrap_or(false)
+            })
+            .expect("stale directory should be archived");
+        assert!(archived.join("leftover.txt").exists());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn prepare_conversation_workspace_recovers_stale_path() {
+        let _guard = WORKSPACE_ROOT_ENV_LOCK
+            .lock()
+            .expect("env lock should work");
+        let root = std::env::temp_dir().join(format!(
+            "elon_prepare_stale_conversation_root_{}",
+            Uuid::new_v4().simple()
+        ));
+        let base = std::env::temp_dir().join(format!(
+            "elon_prepare_stale_conversation_repo_{}",
+            Uuid::new_v4().simple()
+        ));
+        let _env_guard = EnvVarGuard::set("ELON_NODE_WORKSPACE_ROOT", &root);
+
+        fs::create_dir_all(&base).expect("base repo should create");
+        run_git(&base, &["init"]);
+        run_git(&base, &["config", "user.email", "ai@example.test"]);
+        run_git(&base, &["config", "user.name", "AI Test"]);
+        fs::write(base.join("README.md"), "seed\n").expect("seed file should write");
+        run_git(&base, &["add", "README.md"]);
+        run_git(&base, &["commit", "-m", "seed"]);
+
+        let worktree_root = root.join("conversation-worktrees").join("project-a");
+        let stale_path = worktree_root.join("conversation-a");
+        fs::create_dir_all(&stale_path).expect("stale path should create");
+        fs::write(stale_path.join("leftover.txt"), "partial output\n")
+            .expect("leftover file should write");
+
+        let workspace =
+            prepare_conversation_workspace(&base.to_string_lossy(), "project-a", "conversation-a")
+                .expect("stale path should be recovered");
+
+        assert!(workspace.isolated);
+        let active = std::path::PathBuf::from(&workspace.workspace_path);
+        assert!(is_git_work_tree(&active));
+        assert!(fs::read_dir(&worktree_root)
+            .expect("worktree root should be readable")
+            .filter_map(|entry| entry.ok())
+            .any(|entry| entry
+                .file_name()
+                .to_str()
+                .map(|value| value.starts_with("conversation-a.stale-"))
+                .unwrap_or(false)));
+
+        let _ = fs::remove_dir_all(root);
+        let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
     fn dirty_conversation_workspace_is_auto_committed() {
         let repo = std::env::temp_dir().join(format!(
             "elon_dirty_conversation_{}",
@@ -615,5 +760,27 @@ mod tests {
             String::from_utf8_lossy(&output.stdout),
             String::from_utf8_lossy(&output.stderr)
         );
+    }
+
+    struct EnvVarGuard {
+        key: &'static str,
+        old: Option<OsString>,
+    }
+
+    impl EnvVarGuard {
+        fn set(key: &'static str, value: &Path) -> Self {
+            let old = env::var_os(key);
+            env::set_var(key, value);
+            Self { key, old }
+        }
+    }
+
+    impl Drop for EnvVarGuard {
+        fn drop(&mut self) {
+            match self.old.as_ref() {
+                Some(value) => env::set_var(self.key, value),
+                None => env::remove_var(self.key),
+            }
+        }
     }
 }
