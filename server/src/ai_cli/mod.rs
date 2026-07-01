@@ -1488,17 +1488,6 @@ async fn run_via_pc_agent(
                         }
                         return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
                     }
-                    if !reply.is_empty() && !stream_started {
-                        let _ = tx.send(
-                            WsMessage::AssistantMessage {
-                                text: reply.clone(),
-                                model_used: Some(display_model.clone()),
-                                stream_id: None,
-                                node_id: Some(agent_id.to_string()),
-                            }
-                            .to_json(),
-                        );
-                    }
                     let apk_url = sync_pc_agent_apk_after_success(
                         state,
                         agent_id,
@@ -1510,6 +1499,22 @@ async fn run_via_pc_agent(
                         tx,
                     )
                     .await;
+                    let reply = if lightweight_pc_chat {
+                        reply
+                    } else {
+                        sanitize_pc_development_reply(&reply, apk_url.as_deref())
+                    };
+                    if !reply.is_empty() && !stream_started {
+                        let _ = tx.send(
+                            WsMessage::AssistantMessage {
+                                text: reply.clone(),
+                                model_used: Some(display_model.clone()),
+                                stream_id: None,
+                                node_id: Some(agent_id.to_string()),
+                            }
+                            .to_json(),
+                        );
+                    }
                     if cli_usage.is_none() {
                         pc_billing_call.release_no_usage();
                         finish_pc_node_compute_run(
@@ -1935,6 +1940,102 @@ fn sanitize_lightweight_pc_reply(reply: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join("\n")
+        .trim()
+        .to_string()
+}
+
+fn sanitize_pc_development_reply(reply: &str, apk_url: Option<&str>) -> String {
+    let clean = strip_terminal_control_sequences(reply);
+    let mut lines = Vec::<String>::new();
+    let mut in_code_block = false;
+
+    for raw in clean.lines() {
+        let line = raw.trim();
+        if line.starts_with("```") {
+            in_code_block = !in_code_block;
+            continue;
+        }
+        if in_code_block {
+            continue;
+        }
+        if is_pc_development_reply_boundary(line) {
+            break;
+        }
+        if line.is_empty() || is_pc_development_reply_noise_line(line) {
+            continue;
+        }
+        lines.push(sanitize_user_reply_line(line));
+        if lines.len() >= 4 {
+            break;
+        }
+    }
+
+    let mut text = lines
+        .into_iter()
+        .filter(|line| !line.trim().is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+        .trim()
+        .to_string();
+    text = truncate_chars(text.as_str(), 220).trim().to_string();
+
+    if text.is_empty() {
+        text = if apk_url.is_some() {
+            "已改好，并生成了新的安装包。".to_string()
+        } else {
+            "已改好。本轮开发任务已完成。".to_string()
+        };
+    }
+
+    if apk_url.is_some()
+        && !text.contains("项目空间")
+        && !text.contains("安装按钮")
+        && !text.contains("点击「安装」")
+    {
+        if !text.ends_with('。') && !text.ends_with('！') && !text.ends_with('!') {
+            text.push('。');
+        }
+        text.push_str("\n请到项目空间点击「安装」下载体验。");
+    }
+
+    text
+}
+
+fn is_pc_development_reply_boundary(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    line.starts_with("diff --git")
+        || line.starts_with("```")
+        || line.starts_with("安装命令")
+        || lower.starts_with("adb ")
+        || lower.contains("adb.exe")
+        || lower.starts_with("powershell")
+        || lower.starts_with("git diff")
+}
+
+fn is_pc_development_reply_noise_line(line: &str) -> bool {
+    let lower = line.to_ascii_lowercase();
+    lower.contains("c:\\")
+        || lower.contains("c:/")
+        || lower.contains("\\users\\")
+        || lower.contains("/users/")
+        || lower.contains("conversation-worktrees")
+        || lower.contains("app/build/outputs/apk")
+        || lower.contains("app\\build\\outputs\\apk")
+        || lower.contains("platform-tools")
+        || lower.contains("adb.exe")
+        || lower.contains("diff --git")
+        || lower.starts_with("index ")
+        || lower.starts_with("--- ")
+        || lower.starts_with("+++ ")
+        || lower.starts_with("@@")
+        || lower.starts_with("apply patch")
+        || (line.contains(".apk](") && (lower.contains("c:/") || lower.contains("c:\\")))
+        || (line.contains("安装包") && line.contains("这里"))
+}
+
+fn sanitize_user_reply_line(line: &str) -> String {
+    line.replace('`', "")
+        .replace("APK 已重新构建成功", "新的安装包已生成")
         .trim()
         .to_string()
 }
@@ -2529,8 +2630,8 @@ mod pc_cli_passthrough_tests {
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
         pc_cli_passthrough_event, pc_dispatch_started_event, pc_display_model_label,
         pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort, pc_route_a_extra_args,
-        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
-        NativeSessionScope,
+        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
+        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2750,6 +2851,27 @@ codex\n\
 Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查看 PC 节点日志确认是否已完成文件修改。\n";
 
         assert_eq!(extract_codex_reply(output), "完成。真实最终回复。");
+    }
+
+    #[test]
+    fn pc_development_reply_hides_paths_commands_and_diff() {
+        let reply = "已改好，“开始”按钮现在是绿色，文字是白色，并且 APK 已重新构建成功。\n\
+新的安装包仍在这里:\n\
+[app-debug.apk](C:/Users/Administrator/Elon/workspaces/conversation-worktrees/prj/app/build/outputs/apk/debug/app-debug.apk)\n\
+安装命令不变:\n\
+```powershell\n\
+C:\\Users\\Administrator\\AppData\\Local\\Android\\Sdk\\platform-tools\\adb.exe install -r app\\build\\outputs\\apk\\debug\\app-debug.apk\n\
+```\n\
+diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/java/com/dadapao/app/MainActivity.java\n";
+
+        let sanitized =
+            sanitize_pc_development_reply(reply, Some("https://example.test/latest.apk"));
+
+        assert!(sanitized.contains("已改好"));
+        assert!(sanitized.contains("项目空间"));
+        assert!(!sanitized.contains("C:/Users"));
+        assert!(!sanitized.contains("adb.exe"));
+        assert!(!sanitized.contains("diff --git"));
     }
 
     #[test]
