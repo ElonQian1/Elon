@@ -1,7 +1,7 @@
 use anyhow::{anyhow, Result};
 use rusqlite::{params, OptionalExtension};
 
-use super::{new_id, now, project_branding, ProjectSummary, Store};
+use super::{new_id, now, project_branding, project_identities, ProjectSummary, Store};
 
 impl Store {
     pub fn count_active_pc_projects_for_node(&self, node_id: &str) -> Result<i64> {
@@ -95,6 +95,14 @@ impl Store {
                 .to_string(),
                 now
             ],
+        )?;
+        project_identities::upsert_project_workspace_identity(
+            &tx,
+            project_id,
+            user_id,
+            node_id,
+            workspace_path,
+            &now,
         )?;
         tx.commit()?;
         drop(conn);

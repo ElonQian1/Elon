@@ -7,6 +7,8 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
+use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
+
 use crate::{
     project_auth::{auth_from_headers, json_error, project_access},
     project_storage, project_workspace_provision,
@@ -19,6 +21,8 @@ use crate::{
 pub struct RecoverProjectWorkspaceRequest {
     pub action: String,
     pub node_id: Option<String>,
+    #[serde(default, alias = "workspacePath", alias = "localWorkspacePath")]
+    pub workspace_path: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -67,11 +71,48 @@ pub async fn recover_project_workspace(
         .as_deref()
         .map(str::trim)
         .filter(|value| !value.is_empty());
+    let requested_workspace = req
+        .workspace_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
     let target_node =
         match resolve_recovery_node(&state, &user.id, &project, action, requested_node).await {
             Ok(node_id) => node_id,
             Err((status, message)) => return json_error(status, message),
         };
+    if action == "bind_pc_node" {
+        if let Some(workspace_path) = requested_workspace {
+            return match bind_existing_pc_workspace(
+                &state,
+                &user.id,
+                &project.id,
+                &target_node,
+                workspace_path,
+            )
+            .await
+            {
+                Ok((rebound, status)) => Json(RecoverProjectWorkspaceResponse {
+                    action: action.to_string(),
+                    archive_project: build_user_archive_project_response(
+                        &state,
+                        &user.id,
+                        &project.id,
+                    )
+                    .await
+                    .ok()
+                    .flatten(),
+                    project: rebound,
+                    node_id: target_node,
+                    workspace_path: status.workspace_path,
+                    workspace_created: false,
+                    message: "已绑定当前 PC 节点上的现有项目目录".into(),
+                })
+                .into_response(),
+                Err((status, message)) => json_error(status, message),
+            };
+        }
+    }
     let rebuild_repo_url = project_storage::clone_url_for_project_storage(&project, &target_node);
     if requires_git_remote_for_cross_node(action, &project, &target_node)
         && rebuild_repo_url
@@ -154,6 +195,69 @@ pub async fn recover_project_workspace(
         message: recovery_message(action, provisioned.created),
     })
     .into_response()
+}
+
+pub async fn bind_existing_pc_workspace(
+    state: &AppState,
+    user_id: &str,
+    project_id: &str,
+    node_id: &str,
+    workspace_path: &str,
+) -> Result<(ProjectSummary, ProjectWorkspaceInspectStatus), (StatusCode, String)> {
+    let target_node =
+        project_workspace_provision::resolve_pc_project_node(state, user_id, Some(node_id)).await?;
+    let status = match state
+        .agent_manager
+        .dispatch_project_workspace_inspect(&target_node, workspace_path.to_string())
+        .await
+    {
+        Ok(AgentToServer::ProjectWorkspaceInspected { status, .. }) => status,
+        Ok(AgentToServer::ProjectWorkspaceInspectError { message, .. }) => {
+            return Err((StatusCode::BAD_REQUEST, message))
+        }
+        Ok(other) => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                format!("PC 节点返回了非预期工作区检查结果: {other:?}"),
+            ))
+        }
+        Err(error) => return Err((StatusCode::SERVICE_UNAVAILABLE, error.to_string())),
+    };
+    if !workspace_usable_for_binding(&status) {
+        return Err((
+            StatusCode::BAD_REQUEST,
+            workspace_binding_problem(&status).to_string(),
+        ));
+    }
+    let rebound = state
+        .store
+        .bind_project_to_pc_workspace(
+            user_id,
+            project_id,
+            &status.workspace_path,
+            &target_node,
+            status.git_head.as_deref(),
+            status.git_remote_origin.as_deref(),
+            status.git_branch.as_deref(),
+        )
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    Ok((rebound, status))
+}
+
+fn workspace_usable_for_binding(status: &ProjectWorkspaceInspectStatus) -> bool {
+    status.path_exists && status.is_dir && (status.codex_available || status.copilot_available)
+}
+
+fn workspace_binding_problem(status: &ProjectWorkspaceInspectStatus) -> &'static str {
+    if !status.path_exists {
+        "当前 PC 节点上的项目目录不存在"
+    } else if !status.is_dir {
+        "当前 PC 节点上的 workspace_path 不是目录"
+    } else if !status.codex_available && !status.copilot_available {
+        "当前 PC 节点未检测到可用 Codex/Copilot CLI"
+    } else {
+        "当前 PC 节点项目目录不可用"
+    }
 }
 
 async fn resolve_recovery_node(

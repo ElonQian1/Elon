@@ -33,6 +33,8 @@ interface ProjectState {
     runtimeRoute?: RuntimeRoute,
     conversationId?: string | null,
     conversationTitle?: string | null,
+    localNodeId?: string | null,
+    localWorkspacePath?: string | null,
   ) => Promise<SendMessageResponse | null>
   cancelTask: (taskId: string) => Promise<void>
   approveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
@@ -163,6 +165,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     runtimeRoute: RuntimeRoute = DEFAULT_RUNTIME_ROUTE,
     conversationId?: string | null,
     conversationTitle?: string | null,
+    localNodeId?: string | null,
+    localWorkspacePath?: string | null,
   ) => {
     const { activeProjectId, activeChannelId } = get()
     if (!activeProjectId || !activeChannelId || !content.trim()) return null
@@ -176,6 +180,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           runtimeRoute,
           conversation_id: conversationId || undefined,
           conversation_title: conversationTitle || undefined,
+          localNodeId: localNodeId || undefined,
+          localWorkspacePath: localWorkspacePath || undefined,
         },
       )
       // 立即刷新消息

@@ -238,6 +238,8 @@ export interface SendMessagePayload {
   runtimeRoute?: RuntimeRoute
   conversation_id?: string
   conversation_title?: string
+  localNodeId?: string
+  localWorkspacePath?: string
 }
 
 export interface SendMessageResponse {

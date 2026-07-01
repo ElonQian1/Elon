@@ -29,6 +29,22 @@ pub struct ProjectChatRequest {
     pub plan_mode: Option<bool>,
     pub conversation_id: Option<String>,
     pub conversation_title: Option<String>,
+    #[serde(
+        default,
+        alias = "localNodeId",
+        alias = "currentNodeId",
+        alias = "preferredNodeId",
+        alias = "nodeId"
+    )]
+    pub local_node_id: Option<String>,
+    #[serde(
+        default,
+        alias = "localWorkspacePath",
+        alias = "currentWorkspacePath",
+        alias = "preferredWorkspacePath",
+        alias = "workspacePath"
+    )]
+    pub local_workspace_path: Option<String>,
     #[serde(default, alias = "projectIconDataUrl")]
     pub project_icon_data_url: Option<String>,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
@@ -226,6 +242,8 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         plan_mode: None,
         conversation_id: None,
         conversation_title: None,
+        local_node_id: None,
+        local_workspace_path: None,
         project_icon_data_url: None,
         attachments: None,
         protocol_version: None,

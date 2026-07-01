@@ -31,6 +31,7 @@ use crate::{
     project_keys::clean_trace_id,
     project_keys::codex_prewarm_key,
     project_trace_events::record_server_message,
+    project_workspace_recovery,
     project_ws_protocol::{ProjectAttachmentRef, ProjectChatRequest},
     store::{ProjectAccess, MEMORY_SCOPE_PROJECT},
     tools,
@@ -47,7 +48,7 @@ pub async fn chat_project(
         Ok(user) => user,
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
-    let project = match project_access(&state, &user.id, &project_id) {
+    let mut project = match project_access(&state, &user.id, &project_id) {
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
@@ -71,6 +72,39 @@ pub async fn chat_project(
         Ok(route) => route,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
     };
+    if should_auto_bind_local_node(pc_runtime_route) {
+        if let (Some(node_id), Some(workspace_path)) = (
+            req.local_node_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty()),
+            req.local_workspace_path
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty()),
+        ) {
+            if project.node_id.as_deref() != Some(node_id)
+                || project.workspace_path.as_deref() != Some(workspace_path)
+            {
+                match project_workspace_recovery::bind_existing_pc_workspace(
+                    &state,
+                    &user.id,
+                    &project.id,
+                    node_id,
+                    workspace_path,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        if let Ok(updated) = project_access(&state, &user.id, &project_id) {
+                            project = updated;
+                        }
+                    }
+                    Err((status, message)) => return json_error(status, message),
+                }
+            }
+        }
+    }
 
     let conversation_id = match state.store.ensure_conversation(
         &project.id,
@@ -261,6 +295,13 @@ pub async fn chat_project(
         "image_url": image_url,
     }))
     .into_response()
+}
+
+fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool {
+    !matches!(
+        route,
+        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
+    )
 }
 
 pub use crate::project_prewarm::{prewarm_project, prewarm_user_project};

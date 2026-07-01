@@ -25,7 +25,7 @@ use crate::{
     project_keys::clean_trace_id,
     project_landing,
     project_mobile::ensure_mobile_project,
-    project_tool_approval_recovery, project_tool_approvals,
+    project_tool_approval_recovery, project_tool_approvals, project_workspace_recovery,
     project_ws_protocol::enrich_project_ws_event,
     store::{
         ProjectAccess, ProjectChannelMemberPermissionOverride,
@@ -104,6 +104,22 @@ pub struct StartChannelAiTaskRequest {
     pub conversation_id: Option<String>,
     #[serde(default, alias = "conversationTitle")]
     pub conversation_title: Option<String>,
+    #[serde(
+        default,
+        alias = "localNodeId",
+        alias = "currentNodeId",
+        alias = "preferredNodeId",
+        alias = "nodeId"
+    )]
+    pub local_node_id: Option<String>,
+    #[serde(
+        default,
+        alias = "localWorkspacePath",
+        alias = "currentWorkspacePath",
+        alias = "preferredWorkspacePath",
+        alias = "workspacePath"
+    )]
+    pub local_workspace_path: Option<String>,
     pub trace_id: Option<String>,
 }
 
@@ -1225,7 +1241,7 @@ pub async fn start_user_project_channel_ai_task(
         Ok(pair) => pair,
         Err(response) => return response,
     };
-    start_channel_ai_task_response(state, user.id, project, channel_id, req, true)
+    start_channel_ai_task_response(state, user.id, project, channel_id, req, true).await
 }
 
 pub async fn start_channel_ai_task(
@@ -1242,7 +1258,7 @@ pub async fn start_channel_ai_task(
         Ok(project) => project,
         Err(e) => return json_error(StatusCode::FORBIDDEN, e.to_string()),
     };
-    start_channel_ai_task_response(state, user.id, project, channel_id, req, false)
+    start_channel_ai_task_response(state, user.id, project, channel_id, req, false).await
 }
 
 pub async fn cancel_user_project_channel_ai_task(
@@ -1513,10 +1529,10 @@ fn cancel_channel_ai_task_response(
     .into_response()
 }
 
-fn start_channel_ai_task_response(
+async fn start_channel_ai_task_response(
     state: Arc<AppState>,
     user_id: String,
-    project: ProjectAccess,
+    mut project: ProjectAccess,
     channel_id: String,
     req: StartChannelAiTaskRequest,
     use_user_download_route: bool,
@@ -1567,6 +1583,39 @@ fn start_channel_ai_task_response(
         },
         None => None,
     };
+    if should_auto_bind_local_node(runtime_route) {
+        if let (Some(node_id), Some(workspace_path)) = (
+            req.local_node_id
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty()),
+            req.local_workspace_path
+                .as_deref()
+                .map(str::trim)
+                .filter(|v| !v.is_empty()),
+        ) {
+            if project.node_id.as_deref() != Some(node_id)
+                || project.workspace_path.as_deref() != Some(workspace_path)
+            {
+                match project_workspace_recovery::bind_existing_pc_workspace(
+                    &state,
+                    &user_id,
+                    &project.id,
+                    node_id,
+                    workspace_path,
+                )
+                .await
+                {
+                    Ok(_) => {
+                        if let Ok(updated) = project_access(&state, &user_id, &project_id) {
+                            project = updated;
+                        }
+                    }
+                    Err((status, message)) => return json_error(status, message),
+                }
+            }
+        }
+    }
 
     let fallback_conversation_id = format!("channel-{}", channel_id);
     let fallback_conversation_title = format!("项目频道 {}", channel_id);
@@ -1643,6 +1692,13 @@ fn start_channel_ai_task_response(
         "message": task_message,
     }))
     .into_response()
+}
+
+fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool {
+    !matches!(
+        route,
+        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
+    )
 }
 
 pub async fn summarize_user_project_channel_selection(

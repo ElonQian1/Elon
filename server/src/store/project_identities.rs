@@ -119,6 +119,63 @@ pub(super) fn replace_project_identities(
     Ok(())
 }
 
+pub(super) fn upsert_project_workspace_identity(
+    conn: &Connection,
+    project_id: &str,
+    owner_user_id: &str,
+    node_id: &str,
+    workspace_path: &str,
+    now: &str,
+) -> Result<()> {
+    let normalized_workspace = normalize_workspace_path(workspace_path);
+    let node_id = node_id.trim();
+    if node_id.is_empty() || normalized_workspace.is_empty() {
+        return Ok(());
+    }
+    let scope_key = workspace_scope_key(Some(node_id));
+    let changed = conn.execute(
+        "INSERT INTO project_identities (
+            id, project_id, owner_user_id, scope_key, node_id, identity_type,
+            identity_value, confidence, source, created_at, updated_at
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5, 'workspace_path', ?6, 100, 'pc_workspace_binding', ?7, ?7)
+         ON CONFLICT(owner_user_id, scope_key, identity_type, identity_value)
+         DO UPDATE SET
+            project_id = excluded.project_id,
+            node_id = excluded.node_id,
+            confidence = excluded.confidence,
+            source = excluded.source,
+            updated_at = excluded.updated_at
+         WHERE project_identities.project_id = excluded.project_id",
+        params![
+            new_id("pident"),
+            project_id,
+            owner_user_id,
+            scope_key,
+            node_id,
+            normalized_workspace,
+            now,
+        ],
+    )?;
+    if changed == 0 {
+        if let Some(project) = find_owner_project_by_identity(
+            conn,
+            owner_user_id,
+            &[ProjectIdentityCandidate {
+                scope_key,
+                node_id: Some(node_id.to_string()),
+                identity_type: IDENTITY_WORKSPACE_PATH,
+                identity_value: normalized_workspace,
+                confidence: 100,
+            }],
+        )? {
+            return Err(identity_conflict_error(&project));
+        }
+        return Err(anyhow!("项目工作区身份写入冲突，请重试"));
+    }
+    Ok(())
+}
+
 pub(super) fn find_owner_project_by_identity(
     conn: &Connection,
     owner_user_id: &str,

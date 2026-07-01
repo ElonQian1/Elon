@@ -16,7 +16,8 @@ import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import { api } from '../../api/client'
-import { clean } from '../../lib/utils'
+import { clean, safeNodeAdminUrl } from '../../lib/utils'
+import { localJson } from '../doctor/localApi'
 import {
   routeModelButtonCopy,
   selectedAgentForRuntimeRoute,
@@ -75,6 +76,14 @@ import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
+interface LocalNodeStatus {
+  agent_id?: string
+  owner_user_id?: string
+  device_name?: string
+  connected?: boolean
+  codex_cli?: { available?: boolean; logged_in?: boolean; status?: string }
+}
+
 export default function ConversationPage() {
   useChannelAutoRefresh()
   const navigate = useNavigate()
@@ -106,6 +115,10 @@ export default function ConversationPage() {
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
   const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
   const [roleFocusMemberId, setRoleFocusMemberId] = useState('')
+  const [localNode, setLocalNode] = useState<LocalNodeStatus | null>(null)
+  const [localNodeError, setLocalNodeError] = useState('')
+  const [localBindStatus, setLocalBindStatus] = useState('')
+  const autoBindRef = useRef('')
 
   // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
   const [memberConversationTarget, setMemberConversationTarget] = useState<MemberConversationTarget | null>(null)
@@ -133,6 +146,28 @@ export default function ConversationPage() {
   useEffect(() => {
     persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
   }, [runtimeRoute])
+
+  useEffect(() => {
+    let canceled = false
+    async function loadLocalNode() {
+      try {
+        const status = await localJson<LocalNodeStatus>(safeNodeAdminUrl(), '/api/status')
+        if (canceled) return
+        setLocalNode(status)
+        setLocalNodeError('')
+      } catch (err) {
+        if (canceled) return
+        setLocalNode(null)
+        setLocalNodeError((err as { message?: string }).message ?? '未检测到本机节点')
+      }
+    }
+    loadLocalNode()
+    const timer = window.setInterval(loadLocalNode, 10000)
+    return () => {
+      canceled = true
+      window.clearInterval(timer)
+    }
+  }, [])
 
   const ownConversationTarget = useMemo(() => targetFromUser(user), [user])
   const activeConversationTarget = memberConversationTarget ?? ownConversationTarget
@@ -309,6 +344,8 @@ export default function ConversationPage() {
         runtimeRoute,
         conversationId,
         conversationTitle,
+        shouldPreferLocalNode && localNodeReady ? localNodeId : null,
+        shouldPreferLocalNode && localNodeReady ? activeWorkspacePath : null,
       )
       const openedConversationId = response?.conversation_id ?? conversationId
       waitingForNewSession.current = false
@@ -363,8 +400,51 @@ export default function ConversationPage() {
   const activeChannel = channels.find((c) => c.id === activeChannelId)
   const isDevChannel = activeChannel?.kind === 'ai_development'
   const activeWorkspacePath = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
+  const localNodeId = clean(localNode?.agent_id)
+  const localNodeOwnerOk = !!localNodeId && !!user?.id && clean(localNode?.owner_user_id) === user.id
+  const localNodeReady = localNodeOwnerOk
+    && localNode?.connected !== false
+    && localNode?.codex_cli?.available !== false
+  const shouldPreferLocalNode = !['route_c2', 'route_c3'].includes(runtimeRoute)
+  const projectBoundToLocalNode = !!localNodeId && activeProject?.node_id === localNodeId
   const canManagePermissions = channels.some(channelCanManage)
   // taskContext 和 hasRunningTask 已在上方 P1.3 代码块中定义
+
+  useEffect(() => {
+    if (!activeProjectId || !activeProject || !localNodeReady || !localNodeId || !activeWorkspacePath) return
+    if (!shouldPreferLocalNode) return
+    if (activeProject.node_id === localNodeId) {
+      setLocalBindStatus('')
+      return
+    }
+    const key = `${activeProjectId}:${localNodeId}:${activeWorkspacePath}`
+    if (autoBindRef.current === key) return
+    autoBindRef.current = key
+    setLocalBindStatus('正在切换到当前电脑…')
+    api.post<{ project?: unknown; message?: string }>(
+      `/api/projects/${encodeURIComponent(activeProjectId)}/workspace/recover`,
+      {
+        action: 'bind_pc_node',
+        node_id: localNodeId,
+        workspacePath: activeWorkspacePath,
+      },
+    ).then(async () => {
+      setLocalBindStatus('已优先使用当前电脑')
+      await loadProjects()
+      await reloadProjectSpace()
+    }).catch((err: { message?: string }) => {
+      setLocalBindStatus(err.message ?? '当前电脑自动绑定失败')
+    })
+  }, [
+    activeProjectId,
+    activeProject,
+    activeWorkspacePath,
+    localNodeReady,
+    localNodeId,
+    shouldPreferLocalNode,
+    loadProjects,
+    reloadProjectSpace,
+  ])
 
   const filteredChannels = channelSearch
     ? channels.filter((c) => c.name.toLowerCase().includes(channelSearch.toLowerCase()))
@@ -765,6 +845,20 @@ export default function ConversationPage() {
 
         {/* 节点离线提示：电脑重启后节点未运行时出现 */}
         {activeProjectId && <NodeOfflineBanner />}
+        {activeProjectId && (
+          <div className={styles.localNodeNotice}>
+            <strong>
+              {localNodeReady
+                ? projectBoundToLocalNode ? '当前电脑节点已锁定' : '当前电脑节点优先'
+                : '未锁定当前电脑节点'}
+            </strong>
+            <span>
+              {localNodeReady
+                ? `${clean(localNode?.device_name) || '本机'} · ${localNodeId}${localBindStatus ? ` · ${localBindStatus}` : ''}`
+                : localNodeError || '请确认 Windows 节点助手正在运行并已登录当前账号'}
+            </span>
+          </div>
+        )}
 
         {/* 消息列表（1fr）*/}
         {/* 无频道或未选中会话（landing）vs 选中会话（feed）*/}

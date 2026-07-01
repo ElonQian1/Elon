@@ -18,7 +18,7 @@ pub struct PcProjectWorkspace {
 
 pub async fn resolve_pc_project_node(
     state: &AppState,
-    _user_id: &str,
+    user_id: &str,
     requested_node_id: Option<&str>,
 ) -> Result<String, (StatusCode, String)> {
     let requested_node_id = requested_node_id
@@ -40,6 +40,12 @@ pub async fn resolve_pc_project_node(
             return Err((
                 StatusCode::SERVICE_UNAVAILABLE,
                 format!("PC 节点不在线或未连接 CLI 通道: {node_id}"),
+            ));
+        }
+        if runtime.owner_user_id.trim() != user_id {
+            return Err((
+                StatusCode::FORBIDDEN,
+                format!("PC 节点不属于当前账号: {node_id}"),
             ));
         }
         if !runtime.workspace_provision_ready() {
