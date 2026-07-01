@@ -474,6 +474,8 @@ You are already inside an APK native MCP-triggered Codex development task for th
 
 Hard rules:
 - This is not a planning request. After reading required repo instructions, continue and complete every direct task in this message before final reply.
+- You already have the concrete task list below. Never ask the user to provide more requirements or say that you are ready for the next task.
+- Reading AGENTS.md, .github/copilot-instructions.md, or git status is only preparation. After that, immediately execute the first unfinished item under Required direct tasks.
 - Do not run scripts\test-apk-mcp-e2e.ps1.
 - Do not run scripts\invoke-apk-mcp.ps1.
 - Do not start another phone, APK, ADB, MCP, or E2E probe.
@@ -494,6 +496,7 @@ Required direct tasks:
         }
         $gitMessage += @"
 
+Final reply is allowed only after `git fetch origin main`, `git log -1 --oneline -- $docPath`, and `git cat-file -e origin/main:$docPath` succeed locally.
 End your final reply with marker $gitTrace.
 "@
 
