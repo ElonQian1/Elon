@@ -773,14 +773,17 @@ pub async fn run_with_pc_agent_chat(
         return Err(anyhow!(msg));
     }
 
-    let read_only_scope = native_session_scope.map(|mut scope| {
-        scope.runtime_permission = "read_only".to_string();
-        scope
-    });
-
     let cli_name = cli_name.unwrap_or("codex");
     let chat_codex_reasoning_effort =
         pc_lightweight_chat_reasoning_effort(cli_name, codex_reasoning_effort);
+    let read_only_scope = if should_skip_pc_chat_native_session(user_message) {
+        None
+    } else {
+        native_session_scope.map(|mut scope| {
+            scope.runtime_permission = "read_only".to_string();
+            scope
+        })
+    };
 
     let outcome = run_via_pc_agent(
         agent_id,
@@ -823,6 +826,80 @@ fn pc_lightweight_chat_reasoning_effort(
         "high" | "xhigh" => Some("low".to_string()),
         _ => Some(clean),
     }
+}
+
+fn should_skip_pc_chat_native_session(user_message: &str) -> bool {
+    if is_tiny_chat_message(user_message) {
+        return true;
+    }
+
+    let compact: String = user_message
+        .trim()
+        .to_lowercase()
+        .chars()
+        .filter(|ch| {
+            !ch.is_whitespace()
+                && !matches!(
+                    ch,
+                    '!' | '！'
+                        | '?'
+                        | '？'
+                        | '.'
+                        | '。'
+                        | ','
+                        | '，'
+                        | ';'
+                        | '；'
+                        | ':'
+                        | '：'
+                        | '~'
+                        | '～'
+                )
+        })
+        .take(32)
+        .collect();
+
+    matches!(
+        compact.as_str(),
+        "我有一个想法"
+            | "我有个想法"
+            | "有一个想法"
+            | "有个想法"
+            | "我刚有个想法"
+            | "我刚刚有个想法"
+            | "我有一个需求"
+            | "我有个需求"
+            | "有一个需求"
+            | "有个需求"
+    )
+}
+
+fn pc_display_model_label(
+    cli_name: &str,
+    requested_label: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
+    lightweight_pc_chat: bool,
+    fallback: &str,
+) -> String {
+    let base = requested_label
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or(fallback);
+
+    if lightweight_pc_chat && cli_name == "codex" {
+        if let Some(effort) = codex_reasoning_effort
+            .map(str::trim)
+            .filter(|v| !v.is_empty())
+        {
+            let model = base
+                .split_once(" · 推理 ")
+                .map(|(model, _)| model)
+                .unwrap_or(base);
+            return format!("{model} · 轻量 {effort}");
+        }
+    }
+
+    base.to_string()
 }
 
 fn native_session_uuid(cli_name: &str, scope: &NativeSessionScope) -> String {
@@ -1040,10 +1117,13 @@ async fn run_via_pc_agent(
         pc_reserve_fen,
     )
     .map_err(|msg| anyhow!(msg))?;
-    let display_model = model_label
-        .or(copilot_model)
-        .map(String::from)
-        .unwrap_or_else(|| agent_id.to_string());
+    let display_model = pc_display_model_label(
+        cli_name,
+        model_label.or(copilot_model),
+        codex_reasoning_effort,
+        lightweight_pc_chat,
+        agent_id,
+    );
     start_pc_node_compute_run(
         state,
         user_id,
@@ -1073,6 +1153,7 @@ async fn run_via_pc_agent(
     let stream_id = Uuid::new_v4().to_string();
     let mut stream_started = false;
     let is_codex = cli_name == "codex";
+    let mut lightweight_streamed_reply = String::new();
 
     // 进度心跳：开发/规划每 5s 发一次；轻量聊天只回流真实文本，不刷内部状态。
     let progress_tx = tx.clone();
@@ -1109,6 +1190,32 @@ async fn run_via_pc_agent(
                 Ok(None) => break,
                 Err(_) => {
                     abort_pc_progress(&mut progress_handle);
+                    if stream_started && !lightweight_streamed_reply.trim().is_empty() {
+                        let reply = lightweight_streamed_reply.trim().to_string();
+                        let _ = tx.send(
+                            WsMessage::Done {
+                                message: reply,
+                                apk_url: None,
+                                image_url: None,
+                                model_used: Some(display_model.clone()),
+                                node_id: Some(agent_id.to_string()),
+                            }
+                            .to_json(),
+                        );
+                        pc_billing_call.release_no_usage();
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "released_no_usage",
+                            None,
+                            None,
+                            None,
+                            Some(
+                                "Lightweight PC chat timed out after streamed readable reply was delivered",
+                            ),
+                        );
+                        return Ok(PcAgentRunOutcome::Completed);
+                    }
                     if let Some(reply) =
                         extract_lightweight_pc_chat_timeout_reply(&full_text, is_codex)
                     {
@@ -1171,6 +1278,32 @@ async fn run_via_pc_agent(
             AgentToServer::CliChunk { text, .. } => {
                 if lightweight_pc_chat {
                     full_text.push_str(&text);
+                    if let Some(delta) = lightweight_pc_reply_delta(
+                        &full_text,
+                        is_codex,
+                        &mut lightweight_streamed_reply,
+                    ) {
+                        if !stream_started {
+                            stream_started = true;
+                            let _ = tx.send(
+                                WsMessage::AssistantMessage {
+                                    text: delta,
+                                    model_used: Some(display_model.clone()),
+                                    stream_id: Some(stream_id.clone()),
+                                    node_id: Some(agent_id.to_string()),
+                                }
+                                .to_json(),
+                            );
+                        } else {
+                            let _ = tx.send(
+                                WsMessage::AssistantChunk {
+                                    stream_id: stream_id.clone(),
+                                    text: delta,
+                                }
+                                .to_json(),
+                            );
+                        }
+                    }
                     continue;
                 }
                 if let Some(event) = pc_cli_passthrough_event(&text) {
@@ -1303,6 +1436,19 @@ async fn run_via_pc_agent(
                     } else {
                         full_text.trim().to_string()
                     };
+                    if lightweight_pc_chat && stream_started && !reply.is_empty() {
+                        if let Some(delta) =
+                            lightweight_reply_text_delta(&reply, &mut lightweight_streamed_reply)
+                        {
+                            let _ = tx.send(
+                                WsMessage::AssistantChunk {
+                                    stream_id: stream_id.clone(),
+                                    text: delta,
+                                }
+                                .to_json(),
+                            );
+                        }
+                    }
                     if lightweight_pc_chat && reply.is_empty() {
                         if cli_usage.is_none() {
                             pc_billing_call.release_no_usage();
@@ -1332,7 +1478,7 @@ async fn run_via_pc_agent(
                         }
                         return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
                     }
-                    if !reply.is_empty() && (!stream_started || lightweight_pc_chat) {
+                    if !reply.is_empty() && !stream_started {
                         let _ = tx.send(
                             WsMessage::AssistantMessage {
                                 text: reply.clone(),
@@ -1397,20 +1543,37 @@ async fn run_via_pc_agent(
 
     abort_pc_progress(&mut progress_handle);
     if lightweight_pc_chat {
-        let reply = extract_lightweight_pc_chat_reply(&full_text, is_codex);
+        let mut reply = extract_lightweight_pc_chat_reply(&full_text, is_codex);
+        if reply.is_empty() && stream_started && !lightweight_streamed_reply.trim().is_empty() {
+            reply = lightweight_streamed_reply.trim().to_string();
+        }
         if !reply.is_empty() {
-            let _ = tx.send(
-                WsMessage::AssistantMessage {
-                    text: reply,
-                    model_used: Some(display_model.clone()),
-                    stream_id: None,
-                    node_id: Some(agent_id.to_string()),
+            if stream_started {
+                if let Some(delta) =
+                    lightweight_reply_text_delta(&reply, &mut lightweight_streamed_reply)
+                {
+                    let _ = tx.send(
+                        WsMessage::AssistantChunk {
+                            stream_id: stream_id.clone(),
+                            text: delta,
+                        }
+                        .to_json(),
+                    );
                 }
-                .to_json(),
-            );
+            } else {
+                let _ = tx.send(
+                    WsMessage::AssistantMessage {
+                        text: reply.clone(),
+                        model_used: Some(display_model.clone()),
+                        stream_id: None,
+                        node_id: Some(agent_id.to_string()),
+                    }
+                    .to_json(),
+                );
+            }
             let _ = tx.send(
                 WsMessage::Done {
-                    message: String::new(),
+                    message: reply,
                     apk_url: None,
                     image_url: None,
                     model_used: Some(display_model.clone()),
@@ -1494,6 +1657,38 @@ fn extract_lightweight_pc_chat_reply(output: &str, is_codex: bool) -> String {
     }
 
     extract_marker_lightweight_reply(&clean)
+}
+
+fn lightweight_pc_reply_delta(
+    output: &str,
+    is_codex: bool,
+    streamed_reply: &mut String,
+) -> Option<String> {
+    let reply = extract_lightweight_pc_chat_reply(output, is_codex);
+    lightweight_reply_text_delta(&reply, streamed_reply)
+}
+
+fn lightweight_reply_text_delta(reply: &str, streamed_reply: &mut String) -> Option<String> {
+    let reply = reply.trim();
+    if reply.is_empty() || reply == streamed_reply.trim() {
+        return None;
+    }
+
+    if streamed_reply.trim().is_empty() {
+        streamed_reply.clear();
+        streamed_reply.push_str(reply);
+        return Some(reply.to_string());
+    }
+
+    if let Some(delta) = reply.strip_prefix(streamed_reply.as_str()) {
+        if delta.is_empty() {
+            return None;
+        }
+        streamed_reply.push_str(delta);
+        return Some(delta.to_string());
+    }
+
+    None
 }
 
 fn extract_lightweight_pc_chat_timeout_reply(output: &str, is_codex: bool) -> Option<String> {
@@ -2132,10 +2327,11 @@ fn is_useful_codex_reply(reply: &str) -> bool {
 mod pc_cli_passthrough_tests {
     use super::{
         clean_codex_stream_chunk, extract_codex_reply, extract_lightweight_pc_chat_reply,
-        extract_lightweight_pc_chat_timeout_reply, native_session_uuid, pc_cli_passthrough_event,
-        pc_dispatch_started_event, pc_lightweight_chat_prompt,
-        pc_lightweight_chat_reasoning_effort, pc_route_a_extra_args,
-        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
+        extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
+        pc_cli_passthrough_event, pc_dispatch_started_event, pc_display_model_label,
+        pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort, pc_route_a_extra_args,
+        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
+        NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2247,6 +2443,34 @@ mcp_native_chat_ok\n";
     }
 
     #[test]
+    fn pc_lightweight_chat_skips_native_session_for_short_starters() {
+        assert!(should_skip_pc_chat_native_session("你好"));
+        assert!(should_skip_pc_chat_native_session("我有一个想法"));
+        assert!(should_skip_pc_chat_native_session("有个需求"));
+        assert!(!should_skip_pc_chat_native_session(
+            "我有一个想法，想做一个可以扫描商品并自动比价的 App"
+        ));
+    }
+
+    #[test]
+    fn pc_lightweight_display_label_reports_effective_low_effort() {
+        assert_eq!(
+            pc_display_model_label(
+                "codex",
+                Some("GPT-5.5 · 推理 xhigh"),
+                Some("low"),
+                true,
+                "node-a",
+            ),
+            "GPT-5.5 · 轻量 low"
+        );
+        assert_eq!(
+            pc_display_model_label("codex", Some("GPT-5.5"), Some("low"), false, "node-a"),
+            "GPT-5.5"
+        );
+    }
+
+    #[test]
     fn pc_copilot_extra_args_keep_session_and_model_flags() {
         let session_id = native_session_uuid("copilot", &test_scope("conversation-1"));
         let args = pc_route_a_extra_args("copilot", Some(&session_id), Some("gpt-5"), None);
@@ -2343,6 +2567,33 @@ Codex CLI 执行完成，但输出里没有可解析的 codex 回复段。请查
         assert_eq!(
             extract_lightweight_pc_chat_timeout_reply(output, true).as_deref(),
             Some("hello, tell me your idea.")
+        );
+    }
+
+    #[test]
+    fn pc_lightweight_chat_reply_delta_streams_growth_only() {
+        let mut streamed = String::new();
+        assert_eq!(
+            lightweight_pc_reply_delta("OpenAI Codex\nmodel: test\ncodex\n说", true, &mut streamed)
+                .as_deref(),
+            Some("说")
+        );
+        assert_eq!(
+            lightweight_pc_reply_delta(
+                "OpenAI Codex\nmodel: test\ncodex\n说说看。",
+                true,
+                &mut streamed,
+            )
+            .as_deref(),
+            Some("说看。")
+        );
+        assert_eq!(
+            lightweight_pc_reply_delta(
+                "OpenAI Codex\nmodel: test\ncodex\n说说看。",
+                true,
+                &mut streamed,
+            ),
+            None
         );
     }
 }
