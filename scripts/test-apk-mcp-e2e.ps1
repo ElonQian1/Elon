@@ -495,19 +495,12 @@ Required direct tasks:
         } else {
             $gitMessage += "`r`n- Do not publish APK or server unless a required code fix is made."
         }
-        $gitMessage += @"
-
-Final reply is allowed only after git fetch origin main, git log -1 --oneline -- $docPath, and git cat-file -e origin/main:$docPath succeed locally.
-"@
+        $gitMessage += "`r`nFinal reply is allowed only after git fetch origin main, git log -1 --oneline -- $docPath, and git cat-file -e origin/main:$docPath succeed locally."
         if ($RunPublishProbe) {
-            $gitMessage += @"
-Because this run requested server publish, final reply is also allowed only after scripts\publish-server.ps1 succeeds and /api/server/version reports gitSha equal to the current HEAD.
-Your final reply must include SERVER_RELEASE_STATUS=published and the server gitSha.
-"@
+            $gitMessage += "`r`nBecause this run requested server publish, final reply is also allowed only after scripts\publish-server.ps1 succeeds and /api/server/version reports gitSha equal to the current HEAD."
+            $gitMessage += "`r`nYour final reply must include SERVER_RELEASE_STATUS=published and the server gitSha."
         }
-        $gitMessage += @"
-End your final reply with marker $gitTrace.
-"@
+        $gitMessage += "`r`nEnd your final reply with marker $gitTrace."
 
         $gitProbe = Start-ChatProbe `
             -Serial $effectiveSerial `
@@ -535,11 +528,13 @@ End your final reply with marker $gitTrace.
                 $summary.server_publish_initial_error = $_.Exception.Message
                 Write-Step "server publish not observed after git probe; continuing publish through native MCP"
                 $publishTrace = "${runId}_publish"
+                $publishConversationId = "${conversationId}_publish"
                 $publishMessage = @"
-Continue the same APK native MCP E2E development task. The previous Git probe pushed commit $pushedCommit, but server publish has not reached that SHA yet.
+Run this APK native MCP publish-only E2E follow-up for the elon self-project. The previous Git probe pushed commit $pushedCommit, but server publish has not reached that SHA yet.
 
 Hard rules:
 - This is not a planning request.
+- This message is the actual task body.
 - Do not modify files.
 - Do not create a new commit.
 - Do not push another commit.
@@ -558,7 +553,7 @@ End your final reply with marker $publishTrace.
                 $publishProbe = Start-ChatProbe `
                     -Serial $effectiveSerial `
                     -TraceId $publishTrace `
-                    -ConversationId "${conversationId}_git" `
+                    -ConversationId $publishConversationId `
                     -Message $publishMessage `
                     -IsDevelopment $true `
                     -WaitFor "first_server_event" `
