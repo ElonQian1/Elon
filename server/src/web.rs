@@ -64,6 +64,13 @@ pub async fn web_page() -> impl IntoResponse {
     (headers, Html(body))
 }
 
+pub async fn favicon() -> impl IntoResponse {
+    (
+        [(header::CONTENT_TYPE, HeaderValue::from_static("image/png"))],
+        decode_brand_png(),
+    )
+}
+
 pub async fn download_page(State(state): State<Arc<AppState>>) -> Html<String> {
     let public_url = state.public_url.trim_end_matches('/');
     let apk_url = format!("{public_url}/app/ElonSpeed-latest.apk");
@@ -74,6 +81,14 @@ pub async fn download_page(State(state): State<Arc<AppState>>) -> Html<String> {
             .replace("__PAGE_URL__", &page_url)
             .replace("__BRAND_PNG_B64__", BRAND_PNG_B64.trim()),
     )
+}
+
+fn decode_brand_png() -> Vec<u8> {
+    base64::Engine::decode(
+        &base64::engine::general_purpose::STANDARD,
+        BRAND_PNG_B64.trim(),
+    )
+    .unwrap_or_default()
 }
 
 fn build_html() -> String {

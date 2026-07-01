@@ -97,6 +97,7 @@ pub fn build_app(state: Arc<AppState>) -> Router {
     Router::new()
         .route("/", get(web::web_page))
         .route("/web", get(web::web_page))
+        .route("/favicon.ico", get(web::favicon))
         .nest_service("/pc", pc_router)
         .nest_service("/pc-next", pc_next_router)
         .nest_service("/pc-legacy", pc_legacy_svc)
