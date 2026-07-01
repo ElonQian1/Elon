@@ -32,38 +32,49 @@ pub(crate) fn is_short_resume_command(user_message: &str, workspace: &Path) -> b
 }
 
 pub(crate) fn is_project_delivery_request(user_message: &str, workspace: &Path) -> bool {
-    if !is_project_workspace(workspace) {
+    is_project_workspace(workspace) && is_project_delivery_message(user_message)
+}
+
+pub(crate) fn is_project_delivery_message(user_message: &str) -> bool {
+    let normalized = user_message.trim().to_lowercase();
+    if normalized.is_empty() {
         return false;
     }
-    let normalized = user_message.trim().to_lowercase();
     let asks_for_apk = normalized.contains("apk")
         || normalized.contains("安装包")
         || normalized.contains("下载包");
-    let asks_for_delivery = normalized.contains("地址")
+    let asks_for_install = normalized.contains("下载") || normalized.contains("安装");
+    let mentions_app_artifact = normalized.contains("项目")
+        || normalized.contains("应用")
+        || normalized.contains("app")
+        || normalized.contains("软件");
+    let asks_for_location = normalized.contains("地址")
         || normalized.contains("链接")
-        || normalized.contains("下载")
+        || normalized.contains("入口")
+        || normalized.contains("按钮")
+        || normalized.contains("哪里")
+        || normalized.contains("在哪")
+        || normalized.contains("怎么")
+        || normalized.contains("如何")
         || normalized.contains("发给我")
         || normalized.contains("给我")
-        || normalized.contains("做好")
+        || normalized.contains("下载");
+    let mentions_completion = normalized.contains("做好")
         || normalized.contains("做完")
-        || normalized.contains("完成");
+        || normalized.contains("完成")
+        || normalized.contains("生成")
+        || normalized.contains("打包");
 
-    asks_for_apk && asks_for_delivery
+    (asks_for_apk && (asks_for_location || mentions_completion))
+        || (asks_for_install && mentions_app_artifact && (asks_for_location || mentions_completion))
 }
 
-/// 消息是否**纯粹**只在问 APK 下载地址，不含任何额外的开发需求。
-///
-/// 用于区分两种情形：
-/// - 纯交付（"apk在哪里"、"下载地址是什么"）→ 立即返回链接，无需 AI
-/// - 混合（"发我APK，然后再帮我加第8步"）→ 先发链接，再走 AI 继续完成开发
-pub(crate) fn is_pure_apk_delivery_request(user_message: &str, workspace: &Path) -> bool {
-    if !is_project_delivery_request(user_message, workspace) {
+pub(crate) fn is_pure_project_delivery_message(user_message: &str) -> bool {
+    if !is_project_delivery_message(user_message) {
         return false;
     }
     let normalized = user_message.trim().to_lowercase();
-    // 含以下开发关键词说明是混合请求，不能直接短路
-    let has_dev_keywords = normalized.contains("帮我")
-        || normalized.contains("添加")
+    let has_dev_keywords = normalized.contains("添加")
         || normalized.contains("增加")
         || normalized.contains("修改")
         || normalized.contains("改一下")
@@ -74,7 +85,9 @@ pub(crate) fn is_pure_apk_delivery_request(user_message: &str, workspace: &Path)
         || normalized.contains("开发")
         || normalized.contains("做一个")
         || normalized.contains("编写")
-        || normalized.contains("功能");
+        || normalized.contains("功能")
+        || normalized.contains("修复")
+        || normalized.contains("删除");
     !has_dev_keywords
 }
 

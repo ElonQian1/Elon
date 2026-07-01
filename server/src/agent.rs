@@ -8,8 +8,8 @@ use tracing::{error, info, warn};
 use crate::{
     agent_api_loop::run_api_inner_with_workspace,
     agent_intent::{
-        has_origin_remote, is_project_delivery_request, is_short_build_command,
-        is_short_resume_command,
+        has_origin_remote, is_project_delivery_request, is_pure_project_delivery_message,
+        is_short_build_command, is_short_resume_command,
     },
     agent_routing::{
         api_agent_name, choose_backend, has_api_agents, is_local_cli_option, quick_casual_reply,
@@ -80,6 +80,26 @@ pub async fn run_for_project_in_workspace(
         "local_path" | "github" | "pc_managed"
     );
     let requires_project_workflow = requires_project_workflow_for_message(user_message, workspace);
+
+    if is_pure_project_delivery_message(user_message) {
+        let apk_url = latest_project_delivery_apk_url(state, project, workspace, download_base);
+        let message = if apk_url.is_some() {
+            "这个项目的安装包已经放到项目空间的「安装」按钮上了。你可以回到项目空间点「安装」自动下载并安装；我也把直接下载链接发给你。"
+        } else {
+            "我查了这个项目，目前还没有可安装 APK 记录。等开发任务真正构建出安装包后，项目空间的「安装」按钮会自动出现下载入口。"
+        };
+        let _ = tx.send(
+            WsMessage::Done {
+                message: message.to_string(),
+                apk_url,
+                image_url: None,
+                model_used: None,
+                node_id: None,
+            }
+            .to_json(),
+        );
+        return;
+    }
 
     if !requires_project_workflow {
         let requested_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
@@ -213,6 +233,7 @@ pub async fn run_for_project_in_workspace(
             });
             let pc_user_message =
                 append_project_dev_profile_context(state, user_id, project, user_message);
+            let server_artifact_workspace = state.get_project_workspace(&project.workspace_key);
             let run_result = ai_cli::run_with_pc_agent_workspace(
                 agent_id,
                 user_id,
@@ -221,6 +242,8 @@ pub async fn run_for_project_in_workspace(
                 None,
                 ai_cli::AiCliRequestMode::Execute,
                 session_scope.clone(),
+                Some(download_base),
+                Some(server_artifact_workspace.as_path()),
                 Some(runtime_choice.cli_name.as_str()),
                 runtime_choice.copilot_model.as_deref(),
                 runtime_choice.codex_reasoning_effort.as_deref(),
@@ -248,6 +271,8 @@ pub async fn run_for_project_in_workspace(
                         None,
                         ai_cli::AiCliRequestMode::Execute,
                         session_scope,
+                        Some(download_base),
+                        Some(server_artifact_workspace.as_path()),
                         Some("copilot"),
                         None,
                         None,
@@ -357,11 +382,36 @@ pub async fn run_for_project_in_workspace(
 }
 
 fn requires_project_workflow_for_message(user_message: &str, workspace: &Path) -> bool {
+    if is_pure_project_delivery_message(user_message) {
+        return false;
+    }
     let decision = intent_router::classify(user_message);
     decision.route != CapabilityRoute::ChatAgent
         || is_short_resume_command(user_message, workspace)
         || is_short_build_command(user_message, workspace)
         || is_project_delivery_request(user_message, workspace)
+}
+
+fn latest_project_delivery_apk_url(
+    state: &AppState,
+    project: &ProjectAccess,
+    workspace: &Path,
+    download_base: &str,
+) -> Option<String> {
+    match state.store.latest_project_apk_url(&project.id) {
+        Ok(Some(apk_url)) => return Some(apk_url),
+        Ok(None) => {}
+        Err(error) => warn!(
+            project_id = %project.id,
+            error = %error,
+            "读取项目历史 APK 下载地址失败，回退到工作区扫描"
+        ),
+    }
+
+    let managed_workspace = state.get_project_workspace(&project.workspace_key);
+    let has_apk = tools::find_latest_apk(&managed_workspace).is_some()
+        || tools::find_latest_apk(workspace).is_some();
+    has_apk.then(|| tools::stable_apk_url(download_base))
 }
 
 fn pc_cli_chat_requested(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> bool {
@@ -424,6 +474,8 @@ pub async fn plan_for_project_in_workspace(
             None,
             ai_cli::AiCliRequestMode::Plan,
             plan_session_scope.clone(),
+            None,
+            None,
             Some(runtime_choice.cli_name.as_str()),
             runtime_choice.copilot_model.as_deref(),
             runtime_choice.codex_reasoning_effort.as_deref(),
@@ -450,6 +502,8 @@ pub async fn plan_for_project_in_workspace(
                     None,
                     ai_cli::AiCliRequestMode::Plan,
                     plan_session_scope,
+                    None,
+                    None,
                     Some("copilot"),
                     None,
                     None,
@@ -1440,6 +1494,14 @@ mod tests {
         assert!(!requires_project_workflow_for_message(
             "我有一个想法",
             Path::new("C:/tmp/project")
+        ));
+    }
+
+    #[test]
+    fn completed_project_install_question_stays_in_chat_route() {
+        assert!(!requires_project_workflow_for_message(
+            "完成的项目我在哪里下载安装呢",
+            Path::new("C:/tmp/project__demo")
         ));
     }
 

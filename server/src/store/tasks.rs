@@ -438,6 +438,25 @@ impl Store {
         Ok(count > 0)
     }
 
+    /// 获取项目最近一次任务产出的 APK 下载地址。
+    /// 这是项目空间"安装"按钮和交付问答的权威来源，避免依赖当前 worktree 是否可用。
+    pub fn latest_project_apk_url(&self, project_id: &str) -> Result<Option<String>> {
+        self.conn()?
+            .query_row(
+                "SELECT TRIM(apk_url)
+                 FROM tasks
+                 WHERE project_id = ?1
+                   AND apk_url IS NOT NULL
+                   AND TRIM(apk_url) != ''
+                 ORDER BY updated_at DESC, created_at DESC
+                 LIMIT 1",
+                params![project_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(Into::into)
+    }
+
     /// 服务重启恢复：标记运行中任务，并给频道 AI 任务补一条终态消息。
     ///
     /// `project_channel_messages` 是 PC 页面任务卡的权威输入；只更新 `tasks`

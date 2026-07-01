@@ -118,6 +118,7 @@ fn android_sdk_configured() -> bool {
 pub(crate) fn looks_like_android_task(user_message: &str) -> bool {
     let lower = user_message.to_ascii_lowercase();
     lower.contains("apk")
+        || lower.contains("app")
         || lower.contains("android")
         || user_message.contains("安卓")
         || user_message.contains("应用")

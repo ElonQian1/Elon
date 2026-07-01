@@ -2131,9 +2131,22 @@ fn latest_project_apk_url(
     state: &AppState,
     project: &crate::store::ProjectAccess,
 ) -> Option<String> {
+    match state.store.latest_project_apk_url(&project.id) {
+        Ok(Some(apk_url)) => return Some(apk_url),
+        Ok(None) => {}
+        Err(error) => tracing::warn!(
+            project_id = %project.id,
+            error = %error,
+            "读取项目历史 APK 下载地址失败，回退到工作区扫描"
+        ),
+    }
+
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    tools::find_latest_apk(&workspace).map(|_| {
+    let managed_workspace = state.get_project_workspace(&project.workspace_key);
+    let has_apk = tools::find_latest_apk(&managed_workspace).is_some()
+        || tools::find_latest_apk(&workspace).is_some();
+    has_apk.then(|| {
         tools::stable_apk_url(&format!(
             "{}/api/projects/{}/download",
             state.public_url, project.id

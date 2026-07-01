@@ -55,7 +55,10 @@ async fn serve_project_apk(state: &AppState, project: &ProjectAccess, filename: 
     }
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    let Some(apk_path) = tools::find_download_apk(&workspace, filename) else {
+    let managed_workspace = state.get_project_workspace(&project.workspace_key);
+    let apk_path = tools::find_download_apk(&managed_workspace, filename)
+        .or_else(|| tools::find_download_apk(&workspace, filename));
+    let Some(apk_path) = apk_path else {
         return json_error(StatusCode::NOT_FOUND, "APK 文件不存在");
     };
     let download_name = apk_path

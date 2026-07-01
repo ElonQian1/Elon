@@ -365,3 +365,22 @@ fn parses_intent_gate_development_result() {
     assert_eq!(result.route, intent_router::CapabilityRoute::CodeAgent);
     assert!(result.should_enter_development());
 }
+
+#[test]
+fn app_keyword_counts_as_android_task_for_pc_artifact_sync() {
+    assert!(super::ai_cli_environment::looks_like_android_task(
+        "帮我开发一个 APP"
+    ));
+}
+
+#[test]
+fn pc_apk_filename_is_sanitized() {
+    assert_eq!(
+        safe_pc_apk_filename(r"C:\tmp\outputs\app-debug.apk"),
+        "app-debug.apk"
+    );
+    assert_eq!(
+        safe_pc_apk_filename("not-an-apk.txt"),
+        "ElonSpeed-latest.apk"
+    );
+}
