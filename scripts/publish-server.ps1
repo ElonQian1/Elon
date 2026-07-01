@@ -923,6 +923,45 @@ function Invoke-PcFrontendLocalBuild {
     }
 }
 
+function Resolve-PnpmCommand {
+    if (-not [string]::IsNullOrWhiteSpace($env:PNPM_CMD) -and (Test-Path $env:PNPM_CMD)) {
+        return $env:PNPM_CMD
+    }
+
+    $pnpm = Get-Command "pnpm" -ErrorAction SilentlyContinue
+    if ($pnpm) {
+        return $pnpm.Source
+    }
+
+    $codexPnpm = Join-Path $HOME ".cache\codex-runtimes\codex-primary-runtime\dependencies\bin\pnpm.cmd"
+    if (Test-Path $codexPnpm) {
+        return $codexPnpm
+    }
+
+    return $null
+}
+
+function Invoke-PcFrontendPnpmBuild {
+    param([string]$FrontendDir)
+
+    $pnpmCmd = Resolve-PnpmCommand
+    if (-not $pnpmCmd) {
+        throw "pnpm 不可用"
+    }
+
+    Write-Host "   🔁 npm 不可用，改用 pnpm 构建 PC 前端 ..." -ForegroundColor Gray
+    Push-Location $FrontendDir
+    try {
+        cmd /c "`"$pnpmCmd`" install --no-frozen-lockfile --config.dangerously-allow-all-builds=true" 2>&1 | Write-Host
+        if ($LASTEXITCODE -ne 0) { throw "pnpm install 失败，exit=$LASTEXITCODE" }
+
+        cmd /c "`"$pnpmCmd`" run build" 2>&1 | Write-Host
+        if ($LASTEXITCODE -ne 0) { throw "pnpm run build 失败，exit=$LASTEXITCODE" }
+    } finally {
+        Pop-Location
+    }
+}
+
 if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
     if (-not (Get-Command "npm" -ErrorAction SilentlyContinue)) {
         Write-Host "3.5⃣  ⚠️  npm 不在 PATH，跳过前端构建（/pc 将使用现有 dist 或返回 404）" -ForegroundColor Yellow
@@ -957,7 +996,13 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
                 Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
             } catch {
                 Write-Host "   ⚠️  前端构建失败（不中止部署）: $primaryBuildError；fallback: $_" -ForegroundColor Yellow
-                $PcDistDir = $null   # 跳过上传
+                try {
+                    Invoke-PcFrontendPnpmBuild -FrontendDir $PcFrontendDir
+                    Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
+                } catch {
+                    Write-Host "   ⚠️  pnpm 前端构建也失败（不中止部署）: $_" -ForegroundColor Yellow
+                    $PcDistDir = $null   # 跳过上传
+                }
             }
         } finally {
             Pop-Location
