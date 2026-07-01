@@ -25,6 +25,7 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
+pub(crate) use self::ai_cli_environment::looks_like_android_task;
 pub(crate) use self::ai_cli_output::truncate_chars;
 pub use self::ai_cli_prewarm::prewarm_codex_session;
 pub(crate) use self::ai_cli_process::{
@@ -40,7 +41,7 @@ pub(crate) use self::pc_dispatch_capture::{
 
 use self::{
     ai_cli_chat::{chat_timeout_cap_secs, codex_network_or_timeout_error, is_tiny_chat_message},
-    ai_cli_environment::{ensure_git, environment_notes, looks_like_android_task},
+    ai_cli_environment::{ensure_git, environment_notes},
     ai_cli_native_session::{
         append_native_session_continuity, native_session_continuity_note,
         retire_native_session_and_schedule_repair, should_retry_without_native_session,
@@ -197,6 +198,7 @@ async fn run_with_workspace_mode(
                 None,
                 None,
                 None,
+                false,
                 "copilot",
                 None,
                 None, // codex_reasoning_effort
@@ -721,6 +723,7 @@ pub async fn run_with_pc_agent_workspace(
     native_session_scope: Option<NativeSessionScope>,
     download_base: Option<&str>,
     artifact_workspace: Option<&Path>,
+    attempt_apk_sync: bool,
     cli_name: Option<&str>,
     copilot_model: Option<&str>,
     codex_reasoning_effort: Option<&str>,
@@ -742,6 +745,7 @@ pub async fn run_with_pc_agent_workspace(
         native_session_scope,
         download_base,
         artifact_workspace,
+        attempt_apk_sync,
         cli_name.unwrap_or("copilot"),
         copilot_model,
         codex_reasoning_effort,
@@ -803,6 +807,7 @@ pub async fn run_with_pc_agent_chat(
         read_only_scope,
         None,
         None,
+        false,
         cli_name,
         copilot_model,
         chat_codex_reasoning_effort.as_deref(),
@@ -1029,6 +1034,7 @@ async fn run_via_pc_agent(
     native_session_scope: Option<NativeSessionScope>,
     download_base: Option<&str>,
     artifact_workspace: Option<&Path>,
+    attempt_apk_sync: bool,
     cli_name: &str,
     copilot_model: Option<&str>,
     codex_reasoning_effort: Option<&str>,
@@ -1547,6 +1553,7 @@ async fn run_via_pc_agent(
                         cwd,
                         user_message,
                         request_mode,
+                        attempt_apk_sync,
                         download_base,
                         artifact_workspace,
                         tx,
@@ -1694,11 +1701,14 @@ async fn sync_pc_agent_apk_after_success(
     pc_workspace: Option<&str>,
     user_message: &str,
     request_mode: AiCliRequestMode,
+    attempt_apk_sync: bool,
     download_base: Option<&str>,
     artifact_workspace: Option<&Path>,
     tx: &UnboundedSender<String>,
 ) -> Option<String> {
-    if request_mode != AiCliRequestMode::Execute || !looks_like_android_task(user_message) {
+    if request_mode != AiCliRequestMode::Execute
+        || !(attempt_apk_sync || looks_like_android_task(user_message))
+    {
         return None;
     }
     let (Some(pc_workspace), Some(download_base), Some(artifact_workspace)) =

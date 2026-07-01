@@ -49,8 +49,8 @@ internal fun projectSpaceQuickActions(
                 isClickable = true
                 foreground = selectableForeground()
                 setOnClickListener {
-                    val url = apkUrl?.trim().orEmpty()
-                    if (url.isBlank()) {
+                    val url = cleanProjectApkUrl(apkUrl)
+                    if (url == null) {
                         Toast.makeText(activity, "暂无可安装 APK", Toast.LENGTH_SHORT).show()
                     } else {
                         openProjectApkDownload(activity, url)
@@ -232,8 +232,8 @@ internal fun openProjectApkDownload(
     ) {
         return
     }
-    val url = apkUrl?.trim().orEmpty()
-    if (url.isBlank()) {
+    val url = cleanProjectApkUrl(apkUrl)
+    if (url == null) {
         Toast.makeText(activity, "暂无可安装 APK", Toast.LENGTH_SHORT).show()
         return
     }

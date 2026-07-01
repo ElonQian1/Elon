@@ -12,9 +12,20 @@ import java.util.Locale
 
 internal fun isAndroidApkInstallSupported(): Boolean = Build.VERSION.SDK_INT > 0
 
+internal fun cleanProjectApkUrl(apkUrl: String?): String? {
+    val trimmedUrl = apkUrl?.trim().orEmpty()
+    if (trimmedUrl.isBlank() || trimmedUrl.equals("null", ignoreCase = true)) return null
+    if (!trimmedUrl.startsWith("http://", ignoreCase = true) &&
+        !trimmedUrl.startsWith("https://", ignoreCase = true)
+    ) {
+        return null
+    }
+    return trimmedUrl
+}
+
 internal fun projectApkUrlWithToken(apkUrl: String, token: String): String {
-    val trimmedUrl = apkUrl.trim()
-    if (trimmedUrl.isBlank() || trimmedUrl.contains("token=")) return trimmedUrl
+    val trimmedUrl = cleanProjectApkUrl(apkUrl) ?: return ""
+    if (trimmedUrl.contains("token=")) return trimmedUrl
     val separator = if (trimmedUrl.contains("?")) "&" else "?"
     val encodedToken = URLEncoder.encode(token.trim(), Charsets.UTF_8.name())
     return "$trimmedUrl${separator}token=$encodedToken"
@@ -32,7 +43,8 @@ internal fun openProjectApkInstall(
         Toast.makeText(activity, "当前设备不是 Android，无法直接安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
-    if (apkUrl.isBlank()) {
+    val cleanUrl = cleanProjectApkUrl(apkUrl)
+    if (cleanUrl == null) {
         Toast.makeText(activity, "这个项目还没有可安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
@@ -43,7 +55,7 @@ internal fun openProjectApkInstall(
 
     ApkChatInstaller.downloadAndInstall(
         activity = activity,
-        url = projectApkUrlWithToken(apkUrl, token),
+        url = projectApkUrlWithToken(cleanUrl, token),
         http = http,
         projectId = projectId,
         projectName = projectName
@@ -57,7 +69,7 @@ internal fun projectApkActionLabel(
     apkUrl: String?
 ): String {
     if (resolveInstalledProjectApp(activity, projectId, projectName) != null) return "打开应用"
-    return if (apkUrl.isNullOrBlank()) "暂无APK" else "安装"
+    return if (cleanProjectApkUrl(apkUrl) == null) "暂无APK" else "安装"
 }
 
 internal fun isProjectAppInstalled(

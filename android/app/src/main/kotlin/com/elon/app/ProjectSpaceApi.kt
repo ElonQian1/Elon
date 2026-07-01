@@ -422,7 +422,7 @@ private fun parseProjectSpace(json: JSONObject): ProjectSpace {
         project = parseProjectSpaceSummary(project),
         channels = List(channels.length()) { parseProjectChannel(channels.optJSONObject(it) ?: JSONObject()) },
         members = List(members.length()) { parseProjectMember(members.optJSONObject(it) ?: JSONObject()) },
-        latestApkUrl = json.optString("latest_apk_url").takeIf { it.isNotBlank() },
+        latestApkUrl = cleanProjectApkUrl(json.optString("latest_apk_url")),
         galleryImages = parseProjectImageList(
             json.optJSONArray("gallery_images")
                 ?: project.optJSONArray("gallery_images")

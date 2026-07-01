@@ -235,6 +235,7 @@ pub async fn run_for_project_in_workspace(
             let pc_user_message =
                 append_project_dev_profile_context(state, user_id, project, user_message);
             let server_artifact_workspace = state.get_project_workspace(&project.workspace_key);
+            let attempt_apk_sync = should_attempt_pc_apk_sync(project, &pc_user_message);
             let run_result = ai_cli::run_with_pc_agent_workspace(
                 agent_id,
                 user_id,
@@ -245,6 +246,7 @@ pub async fn run_for_project_in_workspace(
                 session_scope.clone(),
                 Some(download_base),
                 Some(server_artifact_workspace.as_path()),
+                attempt_apk_sync,
                 Some(runtime_choice.cli_name.as_str()),
                 runtime_choice.copilot_model.as_deref(),
                 runtime_choice.codex_reasoning_effort.as_deref(),
@@ -274,6 +276,7 @@ pub async fn run_for_project_in_workspace(
                         session_scope,
                         Some(download_base),
                         Some(server_artifact_workspace.as_path()),
+                        attempt_apk_sync,
                         Some("copilot"),
                         None,
                         None,
@@ -415,6 +418,11 @@ fn latest_project_delivery_apk_url(
     has_apk.then(|| tools::stable_apk_url(download_base))
 }
 
+fn should_attempt_pc_apk_sync(project: &ProjectAccess, user_message: &str) -> bool {
+    project.template.eq_ignore_ascii_case("android")
+        || ai_cli::looks_like_android_task(user_message)
+}
+
 fn pc_cli_chat_requested(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> bool {
     matches!(
         pc_runtime_route,
@@ -477,6 +485,7 @@ pub async fn plan_for_project_in_workspace(
             plan_session_scope.clone(),
             None,
             None,
+            false,
             Some(runtime_choice.cli_name.as_str()),
             runtime_choice.copilot_model.as_deref(),
             runtime_choice.codex_reasoning_effort.as_deref(),
@@ -505,6 +514,7 @@ pub async fn plan_for_project_in_workspace(
                     plan_session_scope,
                     None,
                     None,
+                    false,
                     Some("copilot"),
                     None,
                     None,
@@ -1609,9 +1619,10 @@ mod tests {
     use super::{
         pc_cli_chat_requested, pc_cli_chat_route_label, pc_workspace_inspect_problem,
         pc_workspace_inspect_usable, project_fields_require_pc_workspace,
-        requires_project_workflow_for_message,
+        requires_project_workflow_for_message, should_attempt_pc_apk_sync,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
+    use crate::store::ProjectAccess;
     use homecli_proto::ProjectWorkspaceInspectStatus;
     use std::path::Path;
 
@@ -1672,6 +1683,31 @@ mod tests {
             "远程 Codex"
         );
         assert_eq!(pc_cli_chat_route_label(None), "本机 AI");
+    }
+
+    #[test]
+    fn android_template_pc_project_attempts_apk_sync_for_ui_changes() {
+        let project = ProjectAccess {
+            id: "prj_android".into(),
+            name: "大大泡泡".into(),
+            workspace_key: "prj_android".into(),
+            template: "android".into(),
+            source_type: "pc_managed".into(),
+            repo_url: None,
+            branch: None,
+            workspace_path: Some(r"C:\Users\Administrator\Elon\workspaces\prj\repo".into()),
+            node_id: Some("node-local".into()),
+            storage_node_id: None,
+            storage_repo_path: None,
+            storage_repo_url: None,
+            storage_worktree_path: None,
+            storage_status: "none".into(),
+            role: "owner".into(),
+            status: "active".into(),
+            runtime_permission: "workspace_write".into(),
+        };
+
+        assert!(should_attempt_pc_apk_sync(&project, "把按钮改成绿色"));
     }
 
     #[test]

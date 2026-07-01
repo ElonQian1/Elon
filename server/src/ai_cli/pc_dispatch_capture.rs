@@ -56,6 +56,7 @@ pub(crate) async fn run_pc_agent_workspace_capture(
         request.native_session_scope.clone(),
         None,
         None,
+        false,
         Some(&request.cli_name),
         request.copilot_model.as_deref(),
         request.codex_reasoning_effort.as_deref(),

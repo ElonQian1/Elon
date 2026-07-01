@@ -514,8 +514,8 @@ internal fun parseStoreProject(obj: JSONObject) = StoreProject(
     viewerRole = obj.optCleanStoreString("viewer_role")
         ?: obj.optCleanStoreString("viewerRole"),
     lastTaskStatus = obj.optString("last_task_status").takeIf { it.isNotBlank() },
-    latestApkUrl = obj.optString("latest_apk_url").takeIf { it.isNotBlank() }
-        ?: obj.optString("last_apk_url").takeIf { it.isNotBlank() },
+    latestApkUrl = cleanProjectApkUrl(obj.optCleanStoreString("latest_apk_url"))
+        ?: cleanProjectApkUrl(obj.optCleanStoreString("last_apk_url")),
     installCount = obj.optNullableInt("install_count")
         ?: obj.optNullableInt("installCount")
         ?: obj.optNullableInt("download_count")

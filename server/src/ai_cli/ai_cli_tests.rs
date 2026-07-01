@@ -374,6 +374,13 @@ fn app_keyword_counts_as_android_task_for_pc_artifact_sync() {
 }
 
 #[test]
+fn project_dev_profile_counts_as_android_task_for_pc_artifact_sync() {
+    assert!(super::ai_cli_environment::looks_like_android_task(
+        "把按钮改成绿色\n\n<project_dev_profile>\nproject_type: android\nbuild_command: ./gradlew assembleDebug\n</project_dev_profile>"
+    ));
+}
+
+#[test]
 fn pc_apk_filename_is_sanitized() {
     assert_eq!(
         safe_pc_apk_filename(r"C:\tmp\outputs\app-debug.apk"),
