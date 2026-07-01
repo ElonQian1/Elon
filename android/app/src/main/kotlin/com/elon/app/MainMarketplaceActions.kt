@@ -391,7 +391,7 @@ internal class MainMarketplaceActions(
             addView(createMemberStat(project.memberCount.coerceAtLeast(0)), LinearLayout.LayoutParams(
                 0,
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                0.92f
+                1f
             ))
             addStatSeparator()
             addView(createTextStat(
@@ -402,7 +402,7 @@ internal class MainMarketplaceActions(
             addView(createTextStat(
                 value = projectApkSizeLabel(project),
                 label = "大小"
-            ), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1.22f))
+            ), LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, 1f))
             addStatSeparator()
             addView(createTextStat(
                 value = (project.commentCount ?: 0).coerceAtLeast(0).toString(),
@@ -424,22 +424,20 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
             addView(ImageView(activity).apply {
-                setImageResource(R.drawable.ic_project_members)
-                setColorFilter(Color.parseColor(COLOR_TEXT_PRIMARY))
+                setImageResource(R.drawable.ic_plaza_member_stat)
                 contentDescription = null
             }, LinearLayout.LayoutParams(dp(MEMBER_STAT_ICON_DP), dp(MEMBER_STAT_ICON_DP)))
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "成员：$count"
                 gravity = Gravity.CENTER
-                translationY = -dp(3).toFloat()
                 setTextColor(Color.parseColor(COLOR_TEXT_TERTIARY))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_STAT_LABEL_SP)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply {
-                topMargin = 0
+                topMargin = dp(4)
             })
         }
     }

@@ -40,6 +40,7 @@ const PROJECT_PREVIEW_PLACEHOLDER_ICON_PNG: &[u8] =
 const PLAZA_ENTER_SPACE_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_enter_space.png");
 const PLAZA_SHARE_PROJECT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_share_project.png");
 const PLAZA_DOWNLOAD_APK_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_download_apk.png");
+const PLAZA_MEMBER_STAT_ICON_PNG: &[u8] = include_bytes!("assets/ic_plaza_member_stat.png");
 const ADD_FRIEND_SCAN_ICON_PNG: &[u8] = include_bytes!("assets/ic_add_friend_scan.png");
 const POPUP_NEW_PROJECT_PNG_B64: &str = include_str!("assets/ic_popup_new_project.b64");
 const CHAT_SIDE_MENU_HANDLE_PNG_B64: &str = include_str!("assets/ic_chat_side_menu_handle.b64");
@@ -194,6 +195,10 @@ pub async fn project_plaza_share_project_icon() -> impl IntoResponse {
 
 pub async fn project_plaza_download_apk_icon() -> impl IntoResponse {
     plaza_icon_response(PLAZA_DOWNLOAD_APK_ICON_PNG)
+}
+
+pub async fn project_plaza_member_stat_icon() -> impl IntoResponse {
+    plaza_icon_response(PLAZA_MEMBER_STAT_ICON_PNG)
 }
 
 pub async fn side_menu_folder_closed_icon() -> impl IntoResponse {

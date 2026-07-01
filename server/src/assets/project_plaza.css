@@ -233,10 +233,6 @@
   text-align: center;
 }
 
-.project-plaza-stat-size {
-  flex-grow: 1.22;
-}
-
 .project-plaza-stat strong {
   max-width: 100%;
   color: #d9d9d9;
@@ -256,10 +252,6 @@
   white-space: nowrap;
 }
 
-.project-plaza-stat-member {
-  flex-grow: 0.92;
-}
-
 .project-plaza-member-icon {
   width: 28px;
   height: 28px;
@@ -270,16 +262,15 @@
   justify-content: center;
 }
 
-.project-plaza-member-icon svg {
+.project-plaza-member-icon img {
   width: 28px;
   height: 28px;
   display: block;
-  fill: currentColor;
+  object-fit: contain;
 }
 
 .project-plaza-stat .project-plaza-stat-label {
-  margin-top: 0;
-  transform: translateY(-3px);
+  margin-top: 6px;
 }
 
 .project-plaza-stat-sep {

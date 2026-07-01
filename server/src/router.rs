@@ -117,6 +117,10 @@ pub fn build_app(state: Arc<AppState>) -> Router {
             get(web::project_plaza_download_apk_icon),
         )
         .route(
+            "/assets/ic_plaza_member_stat.png",
+            get(web::project_plaza_member_stat_icon),
+        )
+        .route(
             "/assets/ic_side_menu_folder_closed.png",
             get(web::side_menu_folder_closed_icon),
         )
