@@ -4,6 +4,9 @@ param(
     [string]$Tool = "phone_status",
     [string]$Arguments = "{}",
     [int]$Port = 8787,
+    [int]$HealthTimeoutSec = 6,
+    [int]$HealthPollMs = 250,
+    [switch]$OpenAppOnFailure,
     [switch]$NoBootstrap
 )
 
@@ -22,15 +25,56 @@ function Invoke-Adb {
     & $Adb @serialArgs @AdbArgs
 }
 
-if (!$NoBootstrap) {
-    Invoke-Adb shell am broadcast `
+function Start-ApkMcpDebug {
+    $serviceOutput = Invoke-Adb shell am start-foreground-service `
+        -a com.elon.app.mcp.START_KEEPALIVE `
+        -n com.elon.app/.mcp.McpDebugKeepAliveService 2>&1
+    $serviceText = ($serviceOutput | Out-String).Trim()
+    if ($LASTEXITCODE -eq 0 -and $serviceText -notmatch "Error:") {
+        return
+    }
+
+    Invoke-Adb shell am broadcast --receiver-foreground `
         -a com.elon.app.mcp.START_DEBUG `
         -n com.elon.app/.mcp.McpDebugControlReceiver | Out-Null
 }
 
+function Wait-ApkMcpHealth {
+    $deadline = [DateTimeOffset]::UtcNow.AddSeconds([Math]::Max(1, $HealthTimeoutSec))
+    $lastError = $null
+    do {
+        try {
+            return Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
+        } catch {
+            $lastError = $_.Exception.Message
+            Start-Sleep -Milliseconds ([Math]::Max(50, $HealthPollMs))
+        }
+    } while ([DateTimeOffset]::UtcNow -lt $deadline)
+
+    if ($OpenAppOnFailure) {
+        Invoke-Adb shell am start -n com.elon.app/.MainActivity | Out-Null
+        Start-Sleep -Milliseconds 600
+        $retryDeadline = [DateTimeOffset]::UtcNow.AddSeconds(3)
+        do {
+            try {
+                return Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 2
+            } catch {
+                $lastError = $_.Exception.Message
+                Start-Sleep -Milliseconds ([Math]::Max(50, $HealthPollMs))
+            }
+        } while ([DateTimeOffset]::UtcNow -lt $retryDeadline)
+    }
+
+    throw "APK MCP health did not respond on port $Port within ${HealthTimeoutSec}s. Last error: $lastError"
+}
+
+if (!$NoBootstrap) {
+    Start-ApkMcpDebug
+}
+
 Invoke-Adb forward "tcp:$Port" "tcp:$Port" | Out-Null
 
-$health = Invoke-RestMethod -Method Get -Uri "http://127.0.0.1:$Port/health" -TimeoutSec 10
+$health = Wait-ApkMcpHealth
 $token = [string]$health.auth_token
 if (!$token) {
     throw "MCP health endpoint did not return auth_token."

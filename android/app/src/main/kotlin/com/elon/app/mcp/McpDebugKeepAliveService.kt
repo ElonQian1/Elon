@@ -29,6 +29,7 @@ class McpDebugKeepAliveService : Service() {
                 .putBoolean(PREF_ACTIVE, false)
                 .remove(PREF_STARTED_AT)
                 .apply()
+            McpDebugServer.stop()
             stopSelf()
             return START_NOT_STICKY
         }
