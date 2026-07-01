@@ -1604,7 +1604,8 @@ async fn start_channel_ai_task_response(
         },
         None => None,
     };
-    if should_auto_bind_local_node(runtime_route) {
+    let skip_auto_bind_for_casual_chat = channel_ai_quick_reply(&content).is_some();
+    if should_auto_bind_local_node(runtime_route) && !skip_auto_bind_for_casual_chat {
         if let (Some(node_id), Some(workspace_path)) = (
             req.local_node_id
                 .as_deref()

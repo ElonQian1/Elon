@@ -221,7 +221,27 @@ pub async fn bind_existing_pc_workspace(
                 format!("PC 节点返回了非预期工作区检查结果: {other:?}"),
             ))
         }
-        Err(error) => return Err((StatusCode::SERVICE_UNAVAILABLE, error.to_string())),
+        Err(error) => {
+            let message = error.to_string();
+            if is_workspace_inspect_timeout(&message) {
+                tracing::warn!(
+                    project_id = %project_id,
+                    user_id = %user_id,
+                    node_id = %target_node,
+                    workspace_path = %workspace_path,
+                    error = %message,
+                    "workspace inspect timed out while binding PC node; persisting requested binding so current browser can prefer this node"
+                );
+                return persist_pc_workspace_binding_after_inspect_timeout(
+                    state,
+                    user_id,
+                    project_id,
+                    &target_node,
+                    workspace_path,
+                );
+            }
+            return Err((StatusCode::SERVICE_UNAVAILABLE, message));
+        }
     };
     if !workspace_usable_for_binding(&status) {
         return Err((
@@ -242,6 +262,49 @@ pub async fn bind_existing_pc_workspace(
         )
         .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     Ok((rebound, status))
+}
+
+fn persist_pc_workspace_binding_after_inspect_timeout(
+    state: &AppState,
+    user_id: &str,
+    project_id: &str,
+    node_id: &str,
+    workspace_path: &str,
+) -> Result<(ProjectSummary, ProjectWorkspaceInspectStatus), (StatusCode, String)> {
+    let rebound = state
+        .store
+        .bind_project_to_pc_workspace(
+            user_id,
+            project_id,
+            workspace_path,
+            node_id,
+            None,
+            None,
+            None,
+        )
+        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    Ok((rebound, unconfirmed_workspace_status(workspace_path)))
+}
+
+fn unconfirmed_workspace_status(workspace_path: &str) -> ProjectWorkspaceInspectStatus {
+    ProjectWorkspaceInspectStatus {
+        workspace_path: workspace_path.to_string(),
+        path_exists: false,
+        is_dir: false,
+        is_git_worktree: false,
+        git_branch: None,
+        git_head: None,
+        git_remote_origin: None,
+        has_uncommitted_changes: false,
+        uncommitted_count: None,
+        disk_free_bytes: None,
+        codex_available: false,
+        copilot_available: false,
+    }
+}
+
+fn is_workspace_inspect_timeout(message: &str) -> bool {
+    message.contains("project workspace inspect timeout")
 }
 
 fn workspace_usable_for_binding(status: &ProjectWorkspaceInspectStatus) -> bool {

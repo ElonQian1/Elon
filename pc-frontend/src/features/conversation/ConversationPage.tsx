@@ -27,6 +27,7 @@ import type { RuntimeRoute } from './runtimeRoutes'
 import type {
   Channel,
   Message,
+  Project,
   ProjectInvitePreview,
   ProjectInvitePreviewResponse,
   ProjectMember,
@@ -433,7 +434,14 @@ export default function ConversationPage() {
     }
   }
 
-  const activeProject = space?.project ?? projects.find((p) => p.id === activeProjectId)
+  const listedProject = useMemo(
+    () => projects.find((p) => p.id === activeProjectId),
+    [projects, activeProjectId],
+  )
+  const activeProject = useMemo(
+    () => mergeProjectRecords(listedProject, space?.project),
+    [listedProject, space?.project],
+  )
   const activeChannel = channels.find((c) => c.id === activeChannelId)
   const isDevChannel = activeChannel?.kind === 'ai_development'
   const activeWorkspacePath = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
@@ -446,7 +454,6 @@ export default function ConversationPage() {
     && localNode?.codex_cli?.available !== false
   const shouldPreferLocalNode = !['route_c2', 'route_c3'].includes(runtimeRoute)
   const projectBoundToLocalNode = !!localNodeId && activeProject?.node_id === localNodeId
-  const projectBoundToOtherNode = !!localNodeId && !!activeProject?.node_id && activeProject.node_id !== localNodeId
   const activeChannelBlocksAi = !!activeChannel && activeChannel.kind === 'ai_development' && !channelAllowsAiStart(activeChannel)
   const activeChannelIsNotAi = !!activeChannel && activeChannel.kind !== 'ai_development'
   const canManagePermissions = channels.some(channelCanManage)
@@ -463,6 +470,10 @@ export default function ConversationPage() {
       setLocalBindStatus('')
       return
     }
+    if (!activeWorkspacePath) {
+      setLocalBindStatus('当前项目缺少工作区路径，暂不自动切换')
+      return
+    }
     const key = `${activeProjectId}:${localNodeId}:${activeProject.node_id ?? ''}:${activeWorkspacePath || 'no-path'}`
     if (autoBindRef.current === key) return
     autoBindRef.current = key
@@ -470,29 +481,12 @@ export default function ConversationPage() {
     let canceled = false
     async function recoverOnLocalNode() {
       const endpoint = `/api/projects/${encodeURIComponent(activeProjectId)}/workspace/recover`
-      const bindPayload: { action: string; node_id: string; workspacePath?: string } = {
-        action: activeWorkspacePath ? 'bind_pc_node' : 'recreate_workspace',
+      const bindPayload: { action: string; node_id: string; workspacePath: string } = {
+        action: 'bind_pc_node',
         node_id: localNodeId,
+        workspacePath: activeWorkspacePath,
       }
-      if (activeWorkspacePath) bindPayload.workspacePath = activeWorkspacePath
-      try {
-        await api.post<{ project?: unknown; message?: string }>(endpoint, bindPayload)
-      } catch (err) {
-        const message = (err as { message?: string }).message ?? ''
-        if (!projectBoundToOtherNode || !activeWorkspacePath) throw err
-        if (canceled) return
-        setLocalBindStatus('旧目录不可用，正在当前电脑重建…')
-        try {
-          await api.post<{ project?: unknown; message?: string }>(endpoint, {
-            action: 'migrate_workspace',
-            node_id: localNodeId,
-          })
-        } catch (fallbackErr) {
-          throw fallbackErr instanceof Error || (fallbackErr as { message?: string }).message
-            ? fallbackErr
-            : new Error(message || '当前电脑自动绑定失败')
-        }
-      }
+      await api.post<{ project?: unknown; message?: string }>(endpoint, bindPayload)
       if (canceled) return
       setLocalBindStatus('已优先使用当前电脑')
       await loadProjects()
@@ -507,7 +501,6 @@ export default function ConversationPage() {
     activeProject,
     activeWorkspacePath,
     activeProjectRole,
-    projectBoundToOtherNode,
     localNodeReady,
     localNodeId,
     shouldPreferLocalNode,
@@ -1374,6 +1367,22 @@ function titleFromMessage(message: string): string {
   const title = message.replace(/\s+/g, ' ').trim()
   if (!title) return '新会话'
   return title.length > 24 ? `${title.slice(0, 24)}...` : title
+}
+
+function mergeProjectRecords(listedProject?: Project, spaceProject?: Project | null): Project | undefined {
+  if (!listedProject) return spaceProject ?? undefined
+  if (!spaceProject) return listedProject
+  return {
+    ...listedProject,
+    ...spaceProject,
+    source_type: spaceProject.source_type ?? listedProject.source_type,
+    workspace_path: spaceProject.workspace_path ?? listedProject.workspace_path,
+    storage_worktree_path: spaceProject.storage_worktree_path ?? listedProject.storage_worktree_path,
+    node_id: spaceProject.node_id ?? listedProject.node_id,
+    role: spaceProject.role ?? listedProject.role,
+    my_role: spaceProject.my_role ?? listedProject.my_role,
+    runtime_permission: spaceProject.runtime_permission ?? listedProject.runtime_permission,
+  }
 }
 
 function channelAllowsAiStart(channel?: Channel | null): boolean {

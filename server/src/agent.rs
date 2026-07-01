@@ -103,6 +103,20 @@ pub async fn run_for_project_in_workspace(
     }
 
     if !requires_project_workflow {
+        if let Some(reply) = quick_casual_reply(user_message) {
+            let _ = tx.send(
+                WsMessage::Done {
+                    message: reply.to_string(),
+                    apk_url: None,
+                    image_url: None,
+                    model_used: None,
+                    node_id: None,
+                }
+                .to_json(),
+            );
+            return;
+        }
+
         let requested_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
         let force_pc_cli_chat = pc_cli_chat_requested(pc_runtime_route)
             || agent_name
@@ -164,20 +178,6 @@ pub async fn run_for_project_in_workspace(
                     return;
                 }
             }
-        }
-
-        if let Some(reply) = quick_casual_reply(user_message) {
-            let _ = tx.send(
-                WsMessage::Done {
-                    message: reply.to_string(),
-                    apk_url: None,
-                    image_url: None,
-                    model_used: None,
-                    node_id: None,
-                }
-                .to_json(),
-            );
-            return;
         }
 
         if let Err(error) = run_api_inner_with_workspace(
