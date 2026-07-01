@@ -4,7 +4,8 @@
 use std::sync::Arc;
 
 use crate::{
-    agent, pc_agent_runtime_choice::PcRuntimeRoutePreference, store::ProjectAccess, types::AppState,
+    agent, pc_agent_runtime_choice::PcRuntimeRoutePreference, project_events, store::ProjectAccess,
+    types::AppState,
 };
 
 pub(crate) struct ChannelSummaryTask {
@@ -21,15 +22,29 @@ pub(crate) struct ChannelSummaryTask {
 
 pub(crate) fn spawn_channel_summary(task: ChannelSummaryTask) {
     tokio::spawn(async move {
-        let _ = task.state.store.insert_project_channel_message(
-            &task.project_id,
-            &task.channel_id,
-            None,
-            "ai_progress",
-            "AI 正在总结这些聊天记录...",
-            None,
-            None,
-        );
+        if task
+            .state
+            .store
+            .insert_project_channel_message(
+                &task.project_id,
+                &task.channel_id,
+                None,
+                "ai_progress",
+                "AI 正在总结这些聊天记录...",
+                None,
+                None,
+            )
+            .is_ok()
+        {
+            project_events::publish_message_updated(
+                task.state.as_ref(),
+                &task.project_id,
+                Some(&task.channel_id),
+                None,
+                None,
+                "ai_progress",
+            );
+        }
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
         let run_state = task.state.clone();
         let run_project = task.project.clone();
@@ -85,15 +100,29 @@ pub(crate) fn spawn_channel_summary(task: ChannelSummaryTask) {
                 final_reply.if_blank("AI 已完成总结，但没有返回可展示内容。")
             )
         };
-        let _ = task.state.store.insert_project_channel_message(
-            &task.project_id,
-            &task.channel_id,
-            None,
-            "ai_result",
-            &content,
-            None,
-            None,
-        );
+        if task
+            .state
+            .store
+            .insert_project_channel_message(
+                &task.project_id,
+                &task.channel_id,
+                None,
+                "ai_result",
+                &content,
+                None,
+                None,
+            )
+            .is_ok()
+        {
+            project_events::publish_message_updated(
+                task.state.as_ref(),
+                &task.project_id,
+                Some(&task.channel_id),
+                None,
+                None,
+                "ai_result",
+            );
+        }
         task.state.server_traces.record(
             &task.trace_id,
             "channel_summary_done",

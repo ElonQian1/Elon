@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/auth'
 const MAX_RECONNECT_MS = 30_000
 const DONE_EVENT_TYPE = 'project_task_done'
 const GROUP_AI_EVENT_TYPE = 'project_ai_matter_event'
+const PROJECT_MESSAGE_EVENT_TYPE = 'project_message_updated'
 
 /** 对应旧 pc_app_notifications.js：WebSocket 任务完成通知 + 声音 + 标题角标 */
 export function useNotifications() {
@@ -75,6 +76,10 @@ export function useNotifications() {
       let data: Record<string, unknown>
       try { data = JSON.parse(raw) } catch { return }
       if (!data) return
+      if (data.type === PROJECT_MESSAGE_EVENT_TYPE) {
+        window.dispatchEvent(new CustomEvent('elon:project-message-updated', { detail: data }))
+        return
+      }
       if (data.type === GROUP_AI_EVENT_TYPE) {
         handleGroupAiEvent(data)
         return

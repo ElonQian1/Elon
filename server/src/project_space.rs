@@ -20,7 +20,7 @@ use crate::{
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
     project_chat::run_project_agent_with_scheduler,
-    project_docs_channel,
+    project_docs_channel, project_events,
     project_execution_mode::ProjectExecutionMode,
     project_keys::clean_trace_id,
     project_landing,
@@ -975,7 +975,17 @@ pub async fn send_member_conversation_message(
             &conversation_id,
             &req.content,
         ) {
-        Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
+        Ok(message) => {
+            project_events::publish_message_updated(
+                state.as_ref(),
+                &project_id,
+                None,
+                Some(&conversation_id),
+                None,
+                "discussion",
+            );
+            Json(serde_json::json!({ "message": message })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -1157,7 +1167,17 @@ fn send_channel_message_response(
         None,
         req.reply_to_message_id.as_deref(),
     ) {
-        Ok(message) => Json(serde_json::json!({ "message": message })).into_response(),
+        Ok(message) => {
+            publish_channel_message_updated(
+                state.as_ref(),
+                &project.id,
+                &channel_id,
+                None,
+                None,
+                message_kind,
+            );
+            Json(serde_json::json!({ "message": message })).into_response()
+        }
         Err(e) => json_error(StatusCode::BAD_REQUEST, e.to_string()),
     }
 }
@@ -1669,6 +1689,14 @@ async fn start_channel_ai_task_response(
         Ok(message) => message,
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
+    publish_channel_message_updated(
+        state.as_ref(),
+        &project_id,
+        &channel_id,
+        Some(&conversation_id),
+        Some(&task_id),
+        "ai_task",
+    );
 
     spawn_channel_ai_task(ChannelAiTask {
         state: state.clone(),
@@ -1787,6 +1815,7 @@ fn summarize_channel_selection_response(
         Ok(message) => message,
         Err(e) => return json_error(StatusCode::BAD_REQUEST, e.to_string()),
     };
+    publish_channel_message_updated(state.as_ref(), &project_id, &channel_id, None, None, "text");
     let trace_id = clean_trace_id(req.trace_id.as_deref());
     spawn_channel_summary(ChannelSummaryTask {
         state: state.clone(),
@@ -1861,6 +1890,68 @@ struct ChannelAiTask {
     trace_id: String,
 }
 
+fn publish_channel_message_updated(
+    state: &AppState,
+    project_id: &str,
+    channel_id: &str,
+    conversation_id: Option<&str>,
+    task_id: Option<&str>,
+    kind: &str,
+) {
+    project_events::publish_message_updated(
+        state,
+        project_id,
+        Some(channel_id),
+        conversation_id,
+        task_id,
+        kind,
+    );
+}
+
+fn publish_channel_task_updated(task: &ChannelAiTask, kind: &str) {
+    publish_channel_message_updated(
+        task.state.as_ref(),
+        &task.project_id,
+        &task.channel_id,
+        Some(&task.conversation_id),
+        Some(&task.task_id),
+        kind,
+    );
+}
+
+fn insert_channel_ai_progress(task: &ChannelAiTask, content: &str) {
+    if task
+        .state
+        .store
+        .insert_project_channel_message(
+            &task.project_id,
+            &task.channel_id,
+            None,
+            "ai_progress",
+            content,
+            Some(&task.task_id),
+            None,
+        )
+        .is_ok()
+    {
+        publish_channel_task_updated(task, "ai_progress");
+    }
+}
+
+fn insert_channel_ai_result(task: &ChannelAiTask, content: &str) {
+    if matches!(
+        task.state.store.insert_project_channel_ai_result_once(
+            &task.project_id,
+            &task.channel_id,
+            content,
+            &task.task_id,
+        ),
+        Ok(true)
+    ) {
+        publish_channel_task_updated(task, "ai_result");
+    }
+}
+
 fn spawn_channel_ai_task(task: ChannelAiTask) {
     tokio::spawn(async move {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -1920,15 +2011,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             .trim();
                         match event_type {
                             "progress" if !message.is_empty() => {
-                                let _ = task.state.store.insert_project_channel_message(
-                                    &task.project_id,
-                                    &task.channel_id,
-                                    None,
-                                    "ai_progress",
-                                    message,
-                                    Some(&task.task_id),
-                                    None,
-                                );
+                                insert_channel_ai_progress(&task, message);
                             }
                             "tool_approval_required" => {
                                 project_tool_approvals::register_required(
@@ -1938,28 +2021,12 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     &value,
                                 );
                                 if let Ok(content) = serde_json::to_string(&value) {
-                                    let _ = task.state.store.insert_project_channel_message(
-                                        &task.project_id,
-                                        &task.channel_id,
-                                        None,
-                                        "ai_progress",
-                                        &content,
-                                        Some(&task.task_id),
-                                        None,
-                                    );
+                                    insert_channel_ai_progress(&task, &content);
                                 }
                             }
                             "tool_approval_decision" | "tool_call" | "tool_result" => {
                                 if let Ok(content) = serde_json::to_string(&value) {
-                                    let _ = task.state.store.insert_project_channel_message(
-                                        &task.project_id,
-                                        &task.channel_id,
-                                        None,
-                                        "ai_progress",
-                                        &content,
-                                        Some(&task.task_id),
-                                        None,
-                                    );
+                                    insert_channel_ai_progress(&task, &content);
                                 }
                             }
                             "assistant_message" | "assistant_chunk" => {
@@ -1969,15 +2036,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     .unwrap_or("")
                                     .trim();
                                 if !text.is_empty() {
-                                    let _ = task.state.store.insert_project_channel_message(
-                                        &task.project_id,
-                                        &task.channel_id,
-                                        None,
-                                        "ai_progress",
-                                        text,
-                                        Some(&task.task_id),
-                                        None,
-                                    );
+                                    insert_channel_ai_progress(&task, text);
                                 }
                             }
                             "done" => {
@@ -1989,12 +2048,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                     .and_then(|v| v.as_str())
                                     .map(ToOwned::to_owned);
                                 let result = result_message(message, apk_url.as_deref(), None);
-                                let _ = task.state.store.insert_project_channel_ai_result_once(
-                                    &task.project_id,
-                                    &task.channel_id,
-                                    &result,
-                                    &task.task_id,
-                                );
+                                insert_channel_ai_result(&task, &result);
                             }
                             "error" => {
                                 remove_channel_ai_task_control(&task.task_id);
@@ -2003,12 +2057,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                                 let msg = message.if_blank("AI 开发任务失败。").to_string();
                                 final_reply = msg.clone();
                                 error = Some(msg.clone());
-                                let _ = task.state.store.insert_project_channel_ai_result_once(
-                                    &task.project_id,
-                                    &task.channel_id,
-                                    &result_message(&msg, None, Some("失败")),
-                                    &task.task_id,
-                                );
+                                insert_channel_ai_result(&task, &result_message(&msg, None, Some("失败")));
                             }
                             _ => {}
                         }
@@ -2021,11 +2070,9 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                         final_status = "canceled".to_string();
                         final_reply = CHANNEL_AI_CANCEL_MESSAGE.to_string();
                         error = Some(CHANNEL_AI_CANCEL_MESSAGE.to_string());
-                        let _ = task.state.store.insert_project_channel_ai_result_once(
-                            &task.project_id,
-                            &task.channel_id,
+                        insert_channel_ai_result(
+                            &task,
                             &result_message(CHANNEL_AI_CANCEL_MESSAGE, None, Some("已停止")),
-                            &task.task_id,
                         );
                         break;
                     }
@@ -2038,13 +2085,18 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         if final_reply.is_empty() {
             final_reply = "AI 开发任务已结束。".to_string();
         }
-        let _ = task.state.store.finish_running_task(
-            &task.task_id,
-            &final_status,
-            Some(&final_reply),
-            apk_url.as_deref(),
-            error.as_deref(),
-        );
+        if matches!(
+            task.state.store.finish_running_task(
+                &task.task_id,
+                &final_status,
+                Some(&final_reply),
+                apk_url.as_deref(),
+                error.as_deref(),
+            ),
+            Ok(true)
+        ) {
+            publish_channel_task_updated(&task, "conversation_result");
+        }
     });
 }
 

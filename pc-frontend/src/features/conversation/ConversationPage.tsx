@@ -84,6 +84,14 @@ interface LocalNodeStatus {
   codex_cli?: { available?: boolean; logged_in?: boolean; status?: string }
 }
 
+interface ProjectRealtimeDetail {
+  projectId?: string
+  channelId?: string
+  conversationId?: string
+  taskId?: string
+  kind?: string
+}
+
 export default function ConversationPage() {
   useChannelAutoRefresh()
   const navigate = useNavigate()
@@ -136,6 +144,10 @@ export default function ConversationPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
+  // 会话视图模式：null=默认(全部) / 'new'=新建空会话 / string=会话 ID
+  const [sessionView, setSessionView] = useState<string | 'new' | null>(null)
+  const prevSessionIdsRef = useRef<Set<string>>(new Set())
+  const waitingForNewSession = useRef(false)
   const modelButtonCopy = useMemo(
     () => routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent),
     [runtimeRoute, modelLabel, modelOptions, selectedAgent],
@@ -252,7 +264,7 @@ export default function ConversationPage() {
     } else {
       setShowNewMsg(true)
     }
-  }, [messages])
+  }, [messages, convMessages, sessionView])
 
   // P1.3：检测用户是否滚到底部
   function handleFeedScroll() {
@@ -520,10 +532,6 @@ export default function ConversationPage() {
     return false
   }
 
-  // 会话视图模式：null=默认(全部) / 'new'=新建空会话 / string=只看该task_id
-  const [sessionView, setSessionView] = useState<string | 'new' | null>(null)
-  const prevSessionIdsRef = useRef<Set<string>>(new Set())
-  const waitingForNewSession = useRef(false)
   const memberDiscussionNeedsConversation = isAssistingMember && (!sessionView || sessionView === 'new')
   const composerBusy = sendingMessage || sendingMemberDiscussion
   const composerDisabled = composerBusy
@@ -602,7 +610,14 @@ export default function ConversationPage() {
   useEffect(() => {
     if (!activeProjectId || !activeConversationTargetId || !sessionView || sessionView === 'new') return
     let canceled = false
-    let timer: number | undefined
+    let refreshTimer: number | undefined
+
+    function clearRefreshTimer() {
+      if (refreshTimer) {
+        window.clearTimeout(refreshTimer)
+        refreshTimer = undefined
+      }
+    }
 
     async function refreshConversation() {
       try {
@@ -616,18 +631,39 @@ export default function ConversationPage() {
         listMemberConversations(activeProjectId, activeConversationTargetId)
           .then((items) => { if (!canceled) setMemberConversations(items) })
           .catch(() => {})
-        const delay = hasOpenConversationTask(nextMessages as Message[]) ? 3000 : 8000
-        timer = window.setTimeout(refreshConversation, delay)
       } catch (err) {
         console.warn('[ConvMessages] refresh failed:', err)
-        if (!canceled) timer = window.setTimeout(refreshConversation, 8000)
       }
     }
 
-    timer = window.setTimeout(refreshConversation, 1500)
+    function scheduleConversationRefresh(delay = 160) {
+      clearRefreshTimer()
+      refreshTimer = window.setTimeout(refreshConversation, delay)
+    }
+
+    function matchesCurrentConversation(detail: ProjectRealtimeDetail | undefined) {
+      if (!detail) return false
+      if (detail.projectId && detail.projectId !== activeProjectId) return false
+      return detail.conversationId === sessionView
+    }
+
+    function onProjectMessageUpdated(e: Event) {
+      const detail = (e as CustomEvent<ProjectRealtimeDetail>).detail
+      if (matchesCurrentConversation(detail)) scheduleConversationRefresh()
+    }
+
+    function onProjectTaskDone(e: Event) {
+      const detail = (e as CustomEvent<ProjectRealtimeDetail>).detail
+      if (matchesCurrentConversation(detail)) scheduleConversationRefresh(0)
+    }
+
+    window.addEventListener('elon:project-message-updated', onProjectMessageUpdated)
+    window.addEventListener('elon:project-task-done', onProjectTaskDone)
     return () => {
       canceled = true
-      if (timer) window.clearTimeout(timer)
+      clearRefreshTimer()
+      window.removeEventListener('elon:project-message-updated', onProjectMessageUpdated)
+      window.removeEventListener('elon:project-task-done', onProjectTaskDone)
     }
   }, [activeProjectId, activeConversationTargetId, sessionView])
 
@@ -886,22 +922,26 @@ export default function ConversationPage() {
           </div>
         </header>
 
-        {/* 节点离线提示：电脑重启后节点未运行时出现 */}
-        {activeProjectId && <NodeOfflineBanner />}
-        {activeProjectId && (
-          <div className={styles.localNodeNotice}>
-            <strong>
-              {localNodeReady
-                ? projectBoundToLocalNode ? '当前电脑节点已锁定' : '当前电脑节点优先'
-                : '未锁定当前电脑节点'}
-            </strong>
-            <span>
-              {localNodeReady
-                ? `${clean(localNode?.device_name) || '本机'} · ${localNodeId}${localBindStatus ? ` · ${localBindStatus}` : ''}`
-                : localNodeError || '请确认 Windows 节点助手正在运行并已登录当前账号'}
-            </span>
-          </div>
-        )}
+        <div className={styles.chatStatusStack}>
+          {activeProjectId && (
+            <>
+              {/* 节点离线提示：电脑重启后节点未运行时出现 */}
+              <NodeOfflineBanner />
+              <div className={styles.localNodeNotice}>
+                <strong>
+                  {localNodeReady
+                    ? projectBoundToLocalNode ? '当前电脑节点已锁定' : '当前电脑节点优先'
+                    : '未锁定当前电脑节点'}
+                </strong>
+                <span>
+                  {localNodeReady
+                    ? `${clean(localNode?.device_name) || '本机'} · ${localNodeId}${localBindStatus ? ` · ${localBindStatus}` : ''}`
+                    : localNodeError || '请确认 Windows 节点助手正在运行并已登录当前账号'}
+                </span>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* 消息列表（1fr）*/}
         {/* 无频道或未选中会话（landing）vs 选中会话（feed）*/}
@@ -1245,27 +1285,4 @@ function titleFromMessage(message: string): string {
   const title = message.replace(/\s+/g, ' ').trim()
   if (!title) return '新会话'
   return title.length > 24 ? `${title.slice(0, 24)}...` : title
-}
-
-function hasOpenConversationTask(messages: Message[]): boolean {
-  const taskIds = new Set<string>()
-  const doneIds = new Set<string>()
-  for (const message of messages) {
-    const role = clean(message.kind ?? message.role ?? '').toLowerCase()
-    const taskId = clean(message.task_id ?? message.taskId ?? '')
-    if (!taskId) continue
-    if (role === 'user' || role === 'human' || role === 'ai_task') taskIds.add(taskId)
-    if (
-      ['assistant', 'ai', 'ai_result'].includes(role)
-      || ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(
-        clean(message.task_status ?? message.taskStatus ?? '').toLowerCase(),
-      )
-    ) {
-      doneIds.add(taskId)
-    }
-  }
-  for (const taskId of taskIds) {
-    if (!doneIds.has(taskId)) return true
-  }
-  return false
 }

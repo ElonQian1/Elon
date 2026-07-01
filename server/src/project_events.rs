@@ -23,6 +23,11 @@ static PROJECT_AI_MATTER_TX: LazyLock<broadcast::Sender<ProjectAiMatterEvent>> =
         let (tx, _) = broadcast::channel(128);
         tx
     });
+static PROJECT_MESSAGE_UPDATED_TX: LazyLock<broadcast::Sender<ProjectMessageUpdatedEvent>> =
+    LazyLock::new(|| {
+        let (tx, _) = broadcast::channel(256);
+        tx
+    });
 
 /// 项目任务完成推送事件。
 ///
@@ -65,6 +70,23 @@ pub struct ProjectAiMatterEvent {
     pub member_user_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMessageUpdatedEvent {
+    #[serde(rename = "type")]
+    pub event_type: &'static str,
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "channelId", skip_serializing_if = "Option::is_none")]
+    pub channel_id: Option<String>,
+    #[serde(rename = "conversationId", skip_serializing_if = "Option::is_none")]
+    pub conversation_id: Option<String>,
+    #[serde(rename = "taskId", skip_serializing_if = "Option::is_none")]
+    pub task_id: Option<String>,
+    pub kind: String,
+    #[serde(skip)]
+    pub member_user_ids: Vec<String>,
+}
+
 impl ProjectTaskDoneEvent {
     pub fn to_json(&self) -> Option<String> {
         serde_json::to_string(self).ok()
@@ -77,12 +99,22 @@ impl ProjectAiMatterEvent {
     }
 }
 
+impl ProjectMessageUpdatedEvent {
+    pub fn to_json(&self) -> Option<String> {
+        serde_json::to_string(self).ok()
+    }
+}
+
 pub fn subscribe() -> broadcast::Receiver<ProjectTaskDoneEvent> {
     PROJECT_TASK_DONE_TX.subscribe()
 }
 
 pub fn subscribe_group_ai() -> broadcast::Receiver<ProjectAiMatterEvent> {
     PROJECT_AI_MATTER_TX.subscribe()
+}
+
+pub fn subscribe_message_updated() -> broadcast::Receiver<ProjectMessageUpdatedEvent> {
+    PROJECT_MESSAGE_UPDATED_TX.subscribe()
 }
 
 /// 广播项目任务完成事件给所有在线项目成员。
@@ -164,4 +196,34 @@ pub fn publish_group_ai_matter_event(
         member_user_ids: member_ids,
     };
     let _ = PROJECT_AI_MATTER_TX.send(event);
+}
+
+pub fn publish_message_updated(
+    state: &AppState,
+    project_id: &str,
+    channel_id: Option<&str>,
+    conversation_id: Option<&str>,
+    task_id: Option<&str>,
+    kind: &str,
+) {
+    let member_ids = state
+        .store
+        .list_project_members(project_id)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|member| member.user_id)
+        .collect::<Vec<_>>();
+    if member_ids.is_empty() {
+        return;
+    }
+    let event = ProjectMessageUpdatedEvent {
+        event_type: "project_message_updated",
+        project_id: project_id.to_string(),
+        channel_id: channel_id.map(ToOwned::to_owned),
+        conversation_id: conversation_id.map(ToOwned::to_owned),
+        task_id: task_id.map(ToOwned::to_owned),
+        kind: kind.chars().take(80).collect(),
+        member_user_ids: member_ids,
+    };
+    let _ = PROJECT_MESSAGE_UPDATED_TX.send(event);
 }

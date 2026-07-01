@@ -166,14 +166,14 @@
 
 /* ══════════════════════════════════════
    聊天区（中 1fr）
-   grid-rows: 58px | 1fr | auto
+   grid-rows: 58px | status | 1fr | composer
    ══════════════════════════════════════ */
 .chatColumn {
   min-width: 0;
   min-height: 0;
   overflow: hidden;
   display: grid;
-  grid-template-rows: 58px minmax(0, 1fr) auto;
+  grid-template-rows: 58px auto minmax(0, 1fr) auto;
   background: #242529;
   position: relative;   /* 新消息按钮的定位锚 */
 }
@@ -234,11 +234,19 @@
 }
 .textBtn:hover { color: var(--text); background: #343741; }
 
+.chatStatusStack {
+  min-height: 0;
+  display: grid;
+  gap: 6px;
+  padding: 8px 16px 0;
+}
+.chatStatusStack:empty { padding: 0; }
+
 /* 消息列表 */
 .messageList {
   min-height: 0;
   overflow-y: auto;
-  padding: 20px 22px;
+  padding: 22px clamp(18px, 3vw, 42px);
   scrollbar-width: thin;
 }
 
@@ -275,11 +283,8 @@
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding: 10px 0;
-  border-radius: 4px;
-  transition: background 0.1s;
+  padding: 6px 0 10px;
 }
-.messageRow:hover { background: rgba(0,0,0,.07); }
 .messageRow.ownRow { justify-content: flex-end; }
 .messageRow.ownRow .messageAvatar { order: 2; }
 .messageRow.ownRow .messageBody { order: 1; align-items: flex-end; }
@@ -290,8 +295,8 @@
 
 .messageAvatar {
   flex-shrink: 0;
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   border-radius: 50%;
   background: #3a3d46;
   display: grid;
@@ -302,22 +307,25 @@
 }
 .messageBody {
   min-width: 0;
-  max-width: min(760px, calc(100% - 54px));
+  max-width: min(720px, 76%);
   display: flex;
   flex-direction: column;
 }
 .ownRow .messageBody {
-  max-width: min(680px, 78%);
+  max-width: min(620px, 68%);
 }
 .messageMeta {
   display: flex;
   gap: 8px;
   align-items: baseline;
-  margin-bottom: 4px;
+  margin-bottom: 5px;
+  opacity: .9;
 }
 .ownRow .messageMeta { flex-direction: row-reverse; }
 .messageMeta strong { font-size: 14px; font-weight: 600; color: var(--text); }
 .messageMeta span   { color: var(--text-muted); font-size: 12px; }
+.aiRow .messageMeta strong { color: #c9d8ff; }
+.ownRow .messageMeta strong { color: #dff7e8; }
 
 /* 消息内容 */
 .messageContent {
@@ -330,22 +338,27 @@
 /* 自己发的消息 — 绿色气泡 */
 .ownRow .messageContent {
   display: inline-block;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: 1px solid rgba(46, 168, 97, .32);
   border-radius: 8px 8px 2px 8px;
   background: rgba(46, 168, 97, .18);
   color: #effff4;
   text-align: left;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .14);
 }
 /* AI 消息 — 淡蓝色 */
 .messageContent.aiContent { color: #dfe8ff; }
 .aiRow .messageContent {
   display: inline-block;
-  padding: 8px 12px;
+  padding: 9px 12px;
   border: 1px solid rgba(96, 139, 214, .24);
   border-radius: 8px 8px 8px 2px;
   background: rgba(55, 69, 102, .38);
   color: #e5edff;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .12);
+}
+.messageRow:hover .messageContent {
+  border-color: rgba(130, 160, 220, .34);
 }
 
 /* Markdown 消息：去掉 pre-wrap，交给 MarkdownContent 组件处理 */
@@ -1135,7 +1148,6 @@
 }
 
 .localNodeNotice {
-  margin: 8px 16px 0;
   min-height: 34px;
   padding: 7px 10px;
   border: 1px solid rgba(88,190,106,.22);
