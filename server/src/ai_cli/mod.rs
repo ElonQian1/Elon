@@ -1545,6 +1545,7 @@ fn sanitize_lightweight_pc_reply(reply: &str) -> String {
         .to_string()
 }
 
+#[cfg(test)]
 fn clean_codex_stream_chunk(text: &str) -> String {
     let clean = strip_terminal_control_sequences(text);
     let mut lines = Vec::<String>::new();
