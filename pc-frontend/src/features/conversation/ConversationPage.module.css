@@ -1070,6 +1070,10 @@
   width: min(760px, 92vw);
 }
 
+.roleDrawer {
+  width: min(980px, 94vw);
+}
+
 .drawerHeader {
   display: flex;
   justify-content: space-between;
@@ -1087,7 +1091,7 @@
 
 .drawerHeader strong { color: var(--text); font-size: 15px; }
 .drawerHeader span { color: var(--text-muted); font-size: 12px; min-height: 16px; }
-.drawerHeaderActions {
+.drawerHeader .drawerHeaderActions {
   display: flex;
   flex-direction: row;
   align-items: center;
@@ -1349,6 +1353,210 @@
   border: 1px solid rgba(255,255,255,.07);
   color: var(--text-muted);
   font-size: 11px;
+}
+
+.roleManagerBody {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(360px, .95fr) minmax(340px, 1.05fr);
+  gap: 12px;
+  padding: 12px;
+  overflow: auto;
+}
+
+.roleManagerColumn {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.roleCreateRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+.roleCreateRow input {
+  min-width: 0;
+  min-height: 34px;
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 12px;
+  outline: none;
+}
+
+.roleCreateRow input:focus {
+  border-color: var(--green);
+}
+
+.roleList,
+.roleMemberList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.roleList {
+  max-height: 220px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.roleListItem {
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  background: var(--sidebar-2);
+  color: var(--text-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.roleListItem:hover,
+.roleListItemActive {
+  border-color: rgba(88,101,242,.38);
+  background: rgba(88,101,242,.1);
+}
+
+.roleListItem strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.roleListItem em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
+}
+
+.roleEditor,
+.roleAssignmentPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  background: var(--sidebar-2);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+}
+
+.roleEditorHead,
+.roleAssignmentHead {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.roleEditorHead strong,
+.roleAssignmentHead strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.roleEditorHead span,
+.roleAssignmentHead span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.rolePermissionGrid,
+.roleCheckGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.rolePermissionItem,
+.roleCheckItem {
+  min-width: 0;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 0 8px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 4px;
+  background: rgba(255,255,255,.025);
+  color: var(--text-soft);
+  font-size: 12px;
+}
+
+.rolePermissionItem span,
+.roleCheckItem strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 650;
+}
+
+.roleMemberList {
+  max-height: 320px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.roleMemberItem {
+  min-width: 0;
+  min-height: 44px;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  background: var(--sidebar-2);
+  color: var(--text-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.roleMemberItem:hover,
+.roleMemberItemActive {
+  border-color: rgba(88,101,242,.38);
+  background: rgba(88,101,242,.1);
+}
+
+.roleMemberItem span:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.roleMemberItem strong,
+.roleMemberItem em {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roleMemberItem strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.roleMemberItem em {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-style: normal;
 }
 
 .inviteBanner {

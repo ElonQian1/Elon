@@ -50,6 +50,7 @@ import {
   membersForChannel,
   projectMemberHasRolePermission,
   ROLE_PERMISSION_MANAGE_MEMBERS,
+  ROLE_PERMISSION_MANAGE_ROLES,
   ROLE_PERMISSION_MODERATE_MEMBERS,
   ROLE_PERMISSION_VIEW_AUDIT_LOG,
   inviteTitle,
@@ -59,6 +60,7 @@ import { PresenceDrawer } from './PresenceDrawer'
 import { InviteDrawer } from './InviteDrawer'
 import { ModerationDrawer } from './ModerationDrawer'
 import { MemberAuditDrawer } from './MemberAuditDrawer'
+import { RoleManagementDrawer } from './RoleManagementDrawer'
 import { PermissionDrawer } from './PermissionDrawer'
 import { MessageItem } from './ConversationMessage'
 import {
@@ -96,6 +98,7 @@ export default function ConversationPage() {
   const [showInvites, setShowInvites] = useState(false)
   const [showModeration, setShowModeration] = useState(false)
   const [showAudit, setShowAudit] = useState(false)
+  const [showRoles, setShowRoles] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [memberPopoverY, setMemberPopoverY] = useState(200)
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
@@ -160,6 +163,7 @@ export default function ConversationPage() {
     setMemberMenu(null)
     setPermissionFocusMemberId('')
     setShowAudit(false)
+    setShowRoles(false)
   }, [activeProjectId, activeChannelId])
 
   useEffect(() => {
@@ -365,6 +369,9 @@ export default function ConversationPage() {
       projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_VIEW_AUDIT_LOG)
       || projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_MEMBERS)
     )
+  const canManageRoles = !!activeProjectId
+    && !!currentProjectMember
+    && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_ROLES)
   const hasChannelMemberPermissions = !!activeChannelId && membersHaveChannelPermissionMap(spaceMembers, activeChannelId)
   const panelMembers = useMemo(
     () => activeChannelId ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
@@ -887,6 +894,7 @@ export default function ConversationPage() {
             <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowModeration(true)}>管理</button>}
+            {activeProjectId && canManageRoles && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowRoles(true)}>角色</button>}
             {activeProjectId && canViewMemberAudit && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowAudit(true)}>日志</button>}
             {activeProjectId && activeChannelId && canManagePermissions && (
               <button className={styles.memberInviteBtn} type="button" onClick={() => { setPermissionFocusMemberId(''); setShowPermissions(true) }}>权限</button>
@@ -1024,6 +1032,15 @@ export default function ConversationPage() {
       )}
       {showAudit && activeProjectId && (
         <MemberAuditDrawer projectId={activeProjectId} onClose={() => setShowAudit(false)} />
+      )}
+      {showRoles && activeProjectId && (
+        <RoleManagementDrawer
+          projectId={activeProjectId}
+          members={members}
+          currentUserId={user?.id}
+          onClose={() => setShowRoles(false)}
+          onSaved={reloadProjectSpace}
+        />
       )}
       {showPermissions && activeProjectId && activeChannelId && (
         <PermissionDrawer
