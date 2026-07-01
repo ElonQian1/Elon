@@ -15,13 +15,15 @@ import styles from './ConversationPage.module.css'
 
 /* ── 虚拟列表类型和常量 ── */
 export type MemberVirtualRow =
-  | { kind: 'status-header'; id: string; label: string; count: number }
+  | { kind: 'status-header'; id: string; label: string; count: number; collapsed: boolean }
   | { kind: 'role-header'; id: string; label: string; count: number }
   | { kind: 'member'; id: string; member: ProjectMember }
 
 export const MEMBER_VIRTUAL_ROW_HEIGHT = 48
 const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
+const MEMBER_PANEL_COLLAPSED_KEY = 'elon.pc.memberPanel.collapsedStatusSections.v1'
+type MemberStatusSectionId = 'online' | 'offline'
 
 /* ── 角色分组 ── */
 export const ROLE_GROUPS = [
@@ -110,21 +112,40 @@ function memberPresencePillClass(status: string) {
   return styles.memberPresencePillOnline
 }
 
-function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
+function readCollapsedStatusSections(): Record<MemberStatusSectionId, boolean> {
+  if (typeof window === 'undefined') return { online: false, offline: false }
+  try {
+    const value = window.localStorage.getItem(MEMBER_PANEL_COLLAPSED_KEY)
+    if (!value) return { online: false, offline: false }
+    const parsed = JSON.parse(value) as Partial<Record<MemberStatusSectionId, boolean>>
+    return { online: !!parsed.online, offline: !!parsed.offline }
+  } catch {
+    return { online: false, offline: false }
+  }
+}
+
+function buildMemberRows(
+  members: ProjectMember[],
+  collapsedStatusSections: Record<MemberStatusSectionId, boolean>,
+): MemberVirtualRow[] {
   const buckets = [
     {
-      id: 'online',
+      id: 'online' as const,
       label: '在线',
       members: members.filter((member) => memberPresenceStatus(member) !== 'offline'),
     },
     {
-      id: 'offline',
+      id: 'offline' as const,
       label: '离线',
       members: members.filter((member) => memberPresenceStatus(member) === 'offline'),
     },
   ]
-  return buckets.flatMap((bucket) => {
+  return buckets.flatMap((bucket): MemberVirtualRow[] => {
     if (!bucket.members.length) return []
+    const collapsed = !!collapsedStatusSections[bucket.id]
+    if (collapsed) {
+      return [{ kind: 'status-header' as const, id: `status-${bucket.id}`, label: bucket.label, count: bucket.members.length, collapsed }]
+    }
     const roleRows = ROLE_GROUPS.flatMap((group) => {
       const list = sortMembersForPanel(bucket.members.filter((member) => memberRoleGroup(member) === group.id))
       if (!list.length) return []
@@ -134,7 +155,7 @@ function buildMemberRows(members: ProjectMember[]): MemberVirtualRow[] {
       ]
     })
     return [
-      { kind: 'status-header' as const, id: `status-${bucket.id}`, label: bucket.label, count: bucket.members.length },
+      { kind: 'status-header' as const, id: `status-${bucket.id}`, label: bucket.label, count: bucket.members.length, collapsed },
       ...roleRows,
     ]
   })
@@ -172,15 +193,25 @@ export function MemberSearch({
 }) {
   const [query, setQuery] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
+  const [collapsedStatusSections, setCollapsedStatusSections] = useState(readCollapsedStatusSections)
   const q = query.trim().toLowerCase()
   const filtered = useMemo(
     () => q ? filterVisibleMembers(members, q) : members,
     [members, q],
   )
-  const rows = useMemo(() => buildMemberRows(filtered), [filtered])
+  const rows = useMemo(() => buildMemberRows(filtered, collapsedStatusSections), [filtered, collapsedStatusSections])
   const start = Math.max(0, Math.floor(scrollTop / MEMBER_VIRTUAL_ROW_HEIGHT) - MEMBER_LIST_OVERSCAN)
   const end = Math.min(rows.length, start + MEMBER_LIST_WINDOW)
   const visibleRows = rows.slice(start, end)
+  useEffect(() => {
+    window.localStorage.setItem(MEMBER_PANEL_COLLAPSED_KEY, JSON.stringify(collapsedStatusSections))
+  }, [collapsedStatusSections])
+  function toggleStatusSection(rowId: string) {
+    const id = rowId === 'status-online' ? 'online' : rowId === 'status-offline' ? 'offline' : null
+    if (!id) return
+    setCollapsedStatusSections((current) => ({ ...current, [id]: !current[id] }))
+    setScrollTop(0)
+  }
   return (
     <>
       <div className={styles.memberSearch}>
@@ -207,7 +238,15 @@ export function MemberSearch({
                 if (row.kind === 'status-header') {
                   return (
                     <div key={row.id} className={styles.memberVirtualStatusHeader}>
-                      <div className={styles.memberStatusSection}>{row.label}<em>{row.count}</em></div>
+                      <button
+                        className={styles.memberStatusSection}
+                        type="button"
+                        onClick={() => toggleStatusSection(row.id)}
+                        aria-expanded={!row.collapsed}
+                      >
+                        <span>{row.collapsed ? '>' : 'v'} {row.label}</span>
+                        <em>{row.count}</em>
+                      </button>
                     </div>
                   )
                 }
