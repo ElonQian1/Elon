@@ -111,6 +111,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (77, "项目空间商店截图列表", migration_v77),
     (78, "群体 AI 开发 Matter 与节点授权骨架", migration_v78),
     (79, "群体 AI 产物上传与人工合并队列", migration_v79),
+    (80, "项目 PC 节点级工作区绑定", migration_v80),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2795,6 +2796,61 @@ fn migration_v79(conn: &Connection) -> Result<()> {
 
         CREATE INDEX IF NOT EXISTS idx_project_ai_merge_requests_assignment
           ON project_ai_merge_requests(assignment_id, status, updated_at DESC);
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v80(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_pc_workspace_bindings (
+          id                        TEXT PRIMARY KEY,
+          project_id                TEXT NOT NULL,
+          owner_user_id             TEXT NOT NULL,
+          node_id                   TEXT NOT NULL,
+          workspace_path            TEXT NOT NULL,
+          normalized_workspace_path TEXT NOT NULL,
+          repo_url                  TEXT,
+          branch                    TEXT,
+          git_head                  TEXT,
+          source                    TEXT NOT NULL DEFAULT 'manual',
+          created_at                TEXT NOT NULL,
+          updated_at                TEXT NOT NULL,
+          UNIQUE(project_id, owner_user_id, node_id),
+          UNIQUE(owner_user_id, node_id, normalized_workspace_path),
+          FOREIGN KEY (project_id) REFERENCES projects(id),
+          FOREIGN KEY (owner_user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_project_pc_workspace_bindings_project
+          ON project_pc_workspace_bindings(project_id, owner_user_id, updated_at DESC);
+        CREATE INDEX IF NOT EXISTS idx_project_pc_workspace_bindings_node
+          ON project_pc_workspace_bindings(owner_user_id, node_id, updated_at DESC);
+
+        INSERT OR IGNORE INTO project_pc_workspace_bindings (
+          id, project_id, owner_user_id, node_id, workspace_path,
+          normalized_workspace_path, repo_url, branch, git_head, source, created_at, updated_at
+        )
+        SELECT
+          'ppwb_' || lower(hex(randomblob(16))),
+          p.id,
+          p.created_by,
+          p.node_id,
+          p.workspace_path,
+          lower(replace(rtrim(rtrim(trim(p.workspace_path), '/'), '\'), '\', '/')),
+          p.repo_url,
+          p.branch,
+          NULL,
+          'backfill_projects',
+          datetime('now'),
+          datetime('now')
+        FROM projects p
+        WHERE p.node_id IS NOT NULL
+          AND trim(p.node_id) != ''
+          AND p.workspace_path IS NOT NULL
+          AND trim(p.workspace_path) != ''
+          AND p.status != 'deleted';
         "#,
     )?;
     Ok(())

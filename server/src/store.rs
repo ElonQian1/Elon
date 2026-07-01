@@ -497,6 +497,20 @@ impl Store {
                 branch,
                 &now,
             )?;
+            if let Some(node_id) = node_id {
+                pc_project_binding::upsert_project_pc_workspace_binding_tx(
+                    &tx,
+                    &id,
+                    user_id,
+                    node_id,
+                    workspace_path,
+                    None,
+                    repo_url,
+                    branch,
+                    "register_external_project",
+                    &now,
+                )?;
+            }
             tx.commit()?;
             Ok::<(), anyhow::Error>(())
         };
@@ -1164,6 +1178,20 @@ fn update_external_project_binding(
         project.branch.as_deref(),
         now,
     )?;
+    if let Some(node_id) = project.node_id.as_deref() {
+        pc_project_binding::upsert_project_pc_workspace_binding_tx(
+            &tx,
+            project_id,
+            user_id,
+            node_id,
+            project.workspace_path.as_deref().unwrap_or(workspace_path),
+            None,
+            project.repo_url.as_deref(),
+            project.branch.as_deref(),
+            event_type,
+            now,
+        )?;
+    }
     tx.commit()?;
 
     find_project_by_id_for_user(conn, user_id, project_id)?
@@ -1646,6 +1674,22 @@ mod tests {
         assert_eq!(second.project.id, first.project.id);
         assert_eq!(second.project.name, "江西吉安商会");
         assert_eq!(second.project.node_id.as_deref(), Some("node-b"));
+        assert_eq!(
+            store
+                .get_project_pc_workspace_binding(&user.id, &second.project.id, "node-a")
+                .expect("node-a binding lookup")
+                .expect("node-a binding")
+                .workspace_path,
+            workspace_path
+        );
+        assert_eq!(
+            store
+                .get_project_pc_workspace_binding(&user.id, &second.project.id, "node-b")
+                .expect("node-b binding lookup")
+                .expect("node-b binding")
+                .workspace_path,
+            "D:/rust/active-projects/江西吉安商会/"
+        );
 
         let count: i64 = store
             .conn()
@@ -1698,6 +1742,22 @@ mod tests {
             second.project.workspace_path.as_deref(),
             Some(r"D:\rust\active-projects\jx-ja-copy")
         );
+        assert_eq!(
+            store
+                .get_project_pc_workspace_binding(&user.id, &second.project.id, "node-a")
+                .expect("node-a binding lookup")
+                .expect("node-a binding")
+                .workspace_path,
+            r"D:\rust\active-projects\江西吉安商会"
+        );
+        assert_eq!(
+            store
+                .get_project_pc_workspace_binding(&user.id, &second.project.id, "node-b")
+                .expect("node-b binding lookup")
+                .expect("node-b binding")
+                .workspace_path,
+            r"D:\rust\active-projects\jx-ja-copy"
+        );
         let conn = store.conn().expect("db connection");
         let project_count: i64 = conn
             .query_row(
@@ -1714,7 +1774,7 @@ mod tests {
             )
             .expect("identity count");
         assert_eq!(project_count, 1);
-        assert_eq!(identity_count, 3);
+        assert_eq!(identity_count, 4);
     }
 
     #[test]

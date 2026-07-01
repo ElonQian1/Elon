@@ -35,6 +35,17 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
     val conversationTitle = args.optString("conversation_title").takeIf { it.isNotBlank() }
     val isDevelopment = if (args.has("is_development")) args.optBoolean("is_development") else true
     val startAckTimeoutMs = args.optInt("start_ack_timeout_ms", 1_800).coerceIn(0, 10_000)
+    val runtimeRoute = cleanArg(args, "runtimeRoute", "runtime_route", "pcRuntimeRoute", "pc_runtime_route")
+    val executionMode = cleanArg(args, "execution_mode", "executionMode")
+    val localNodeId = cleanArg(args, "local_node_id", "localNodeId", "preferred_node_id", "preferredNodeId", "nodeId")
+    val localWorkspacePath = cleanArg(
+        args,
+        "local_workspace_path",
+        "localWorkspacePath",
+        "preferred_workspace_path",
+        "preferredWorkspacePath",
+        "workspacePath"
+    )
 
     val payload = JSONObject()
         .put("trace_id", traceId)
@@ -45,6 +56,11 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
     if (agent != null) payload.put("agent", agent)
     if (conversationId != null) payload.put("conversation_id", conversationId)
     if (conversationTitle != null) payload.put("conversation_title", conversationTitle)
+    if (runtimeRoute != null) payload.put("runtimeRoute", runtimeRoute)
+    if (executionMode != null) payload.put("execution_mode", executionMode)
+    if (args.has("plan_mode")) payload.put("plan_mode", args.optBoolean("plan_mode"))
+    if (localNodeId != null) payload.put("local_node_id", localNodeId)
+    if (localWorkspacePath != null) payload.put("local_workspace_path", localWorkspacePath)
     val payloadText = payload.toString()
 
     if (!force) {
@@ -126,8 +142,20 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
         .put("project_title", projectTitle)
         .put("conversation_id", conversationId ?: JSONObject.NULL)
         .put("is_development", isDevelopment)
+        .put("runtimeRoute", runtimeRoute ?: JSONObject.NULL)
+        .put("execution_mode", executionMode ?: JSONObject.NULL)
+        .put("local_node_id", localNodeId ?: JSONObject.NULL)
+        .put("local_workspace_path", localWorkspacePath ?: JSONObject.NULL)
         .put("force", force)
         .put("message_chars", message.length)
         .put("service_start", serviceStart)
     return toolResult("Chat request queued on phone.", structured)
+}
+
+private fun cleanArg(args: JSONObject, vararg keys: String): String? {
+    for (key in keys) {
+        val value = args.optString(key).trim()
+        if (value.isNotEmpty()) return value
+    }
+    return null
 }

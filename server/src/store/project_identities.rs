@@ -71,12 +71,16 @@ pub(super) fn replace_project_identities(
     now: &str,
 ) -> Result<()> {
     let candidates = identity_candidates(node_id, workspace_path, repo_url, branch);
+    let workspace_scope = workspace_scope_key(node_id);
     conn.execute(
         "DELETE FROM project_identities
          WHERE project_id = ?1
            AND owner_user_id = ?2
-           AND identity_type IN ('workspace_path', 'git_remote', 'git_remote_branch')",
-        params![project_id, owner_user_id],
+           AND (
+             identity_type IN ('git_remote', 'git_remote_branch')
+             OR (identity_type = 'workspace_path' AND scope_key = ?3)
+           )",
+        params![project_id, owner_user_id, workspace_scope],
     )?;
 
     for candidate in candidates {

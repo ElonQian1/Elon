@@ -7,6 +7,9 @@ param(
     [string]$ProjectId = "elon-self",
     [string]$ProjectTitle = "Elon Self Project",
     [string]$ConversationPrefix = "mcp_native_e2e",
+    [string]$PreferredNodeId = "",
+    [string]$PreferredWorkspacePath = "",
+    [string]$RuntimeRoute = "",
     [int]$FirstReplyTimeoutSec = 90,
     [int]$FinishTimeoutSec = 420,
     [int]$PollIntervalSec = 5,
@@ -219,7 +222,7 @@ function New-ChatProbeArguments {
         [string]$WaitFor = "first_reply",
         [int]$WaitTimeoutSec = 90
     )
-    return [ordered]@{
+    $args = [ordered]@{
         message = $Message
         project_id = $ProjectId
         project_title = $ProjectTitle
@@ -236,6 +239,20 @@ function New-ChatProbeArguments {
         server_trace_limit = 160
         timeline_limit = 120
     }
+    if ($RuntimeRoute.Trim()) {
+        $args.runtimeRoute = $RuntimeRoute.Trim()
+    }
+    if ($IsDevelopment) {
+        $args.execution_mode = "execute"
+        $args.plan_mode = $false
+    }
+    if ($PreferredNodeId.Trim()) {
+        $args.local_node_id = $PreferredNodeId.Trim()
+    }
+    if ($PreferredWorkspacePath.Trim()) {
+        $args.local_workspace_path = $PreferredWorkspacePath.Trim()
+    }
+    return $args
 }
 
 function Wait-TraceDone {
@@ -456,6 +473,7 @@ try {
 You are already inside an APK native MCP-triggered Codex development task for the elon self-project.
 
 Hard rules:
+- This is not a planning request. After reading required repo instructions, continue and complete every direct task in this message before final reply.
 - Do not run scripts\test-apk-mcp-e2e.ps1.
 - Do not run scripts\invoke-apk-mcp.ps1.
 - Do not start another phone, APK, ADB, MCP, or E2E probe.
@@ -469,14 +487,10 @@ Required direct tasks:
 - Run scripts\check-task-complete.ps1 -Kind CodePushed.
 "@
         if ($RunPublishProbe) {
-            $gitMessage += @"
-- Run scripts\publish-server.ps1 after CodePushed succeeds.
-- Verify /health plus /api/server/version after publish.
-"@
+            $gitMessage += "`r`n- Run scripts\publish-server.ps1 after CodePushed succeeds."
+            $gitMessage += "`r`n- Verify /health plus /api/server/version after publish."
         } else {
-            $gitMessage += @"
-- Do not publish APK or server unless a required code fix is made.
-"@
+            $gitMessage += "`r`n- Do not publish APK or server unless a required code fix is made."
         }
         $gitMessage += @"
 
@@ -493,14 +507,14 @@ End your final reply with marker $gitTrace.
             -WaitTimeoutSec $FirstReplyTimeoutSec
         $gitStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $gitTrace -TimeoutSec ([Math]::Max($FinishTimeoutSec, 1200))
         Assert-TraceDone -Status $gitStatus -TraceId $gitTrace
-        $pushedCommit = Assert-GitProbePushed -DocPath $docPath -RunId $runId
         $summary.traces.git_probe = [ordered]@{
             trace_id = $gitTrace
             probe = $gitProbe
             final_status = $gitStatus
             requested_publish = [bool]$RunPublishProbe
-            pushed_commit = $pushedCommit
         }
+        $pushedCommit = Assert-GitProbePushed -DocPath $docPath -RunId $runId
+        $summary.traces.git_probe.pushed_commit = $pushedCommit
         if ($RunPublishProbe) {
             Write-Step "verify server publish gitSha $pushedCommit"
             $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec $PublishVerifyTimeoutSec

@@ -1063,10 +1063,12 @@ async fn run_via_pc_agent(
             ),
         }
     } else {
-        match preflight_note {
-            Some(note) => format!("注意：{}\n\n{}", note, user_message),
-            None => user_message.to_string(),
-        }
+        pc_project_execution_prompt(
+            user_message,
+            preflight_note,
+            cli_name,
+            model_label.or(copilot_model),
+        )
     };
 
     // Route A CLI 会话锚点：服务器只下发稳定 scope，本机节点再按权限 + cwd 分桶。
@@ -1880,6 +1882,37 @@ fn abort_pc_progress(handle: &mut Option<tokio::task::JoinHandle<()>>) {
     if let Some(handle) = handle.take() {
         handle.abort();
     }
+}
+
+fn pc_project_execution_prompt(
+    user_message: &str,
+    preflight_note: Option<&str>,
+    cli_name: &str,
+    model_label: Option<&str>,
+) -> String {
+    let model_line = model_label
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("当前选择：{value}\n"))
+        .unwrap_or_default();
+    let preflight = preflight_note
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|value| format!("预检提示：{value}\n\n"))
+        .unwrap_or_default();
+
+    format!(
+        "你是「一龙」平台调度到用户本机节点的项目执行助手，当前 CLI 是 {}。\n\
+{model_line}\
+当前请求已经被判定为项目开发、Git、构建或发布执行任务。请直接在当前工作区完成用户请求；不要只做计划，不要在读完 AGENTS、README 或规则文档后停下来要求用户再次说明任务。\n\
+必须先读取并遵守工作区入口规则；读完规则后回到下面“用户请求”逐项执行。\n\
+如果用户请求包含 Hard rules、Required direct tasks、End your final reply with marker 或类似完成契约，必须把它们当作本轮任务契约。\n\
+只有遇到真实阻塞（权限、缺少密钥、冲突无法判断、命令失败且无法恢复）才停下，并说明已经完成的步骤和阻塞证据。\n\n\
+{preflight}\
+用户请求：\n\
+{user_message}",
+        pc_cli_progress_label(cli_name)
+    )
 }
 
 fn pc_lightweight_chat_prompt(
@@ -2757,9 +2790,9 @@ mod pc_cli_passthrough_tests {
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
         pc_cli_passthrough_event, pc_codex_progress_hint, pc_dispatch_started_event,
         pc_display_model_label, pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
-        pc_project_reasoning_effort, pc_route_a_extra_args, sanitize_pc_development_reply,
-        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
-        NativeSessionScope,
+        pc_project_execution_prompt, pc_project_reasoning_effort, pc_route_a_extra_args,
+        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
+        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -2959,6 +2992,24 @@ mcp_native_chat_ok\n";
         assert!(prompt.contains("不运行命令"));
         assert!(prompt.contains("不修改代码"));
         assert!(prompt.contains("我有一个想法"));
+    }
+
+    #[test]
+    fn pc_project_execution_prompt_requires_continuing_after_rules() {
+        let prompt = pc_project_execution_prompt(
+            "Create docs/e2e.md, commit, push, and end with marker mcp_git.",
+            Some("workspace ok"),
+            "codex",
+            Some("Codex"),
+        );
+
+        assert!(prompt.contains("项目执行助手"));
+        assert!(prompt.contains("不要只做计划"));
+        assert!(prompt.contains("不要在读完 AGENTS"));
+        assert!(prompt.contains("读完规则后回到下面"));
+        assert!(prompt.contains("Hard rules"));
+        assert!(prompt.contains("预检提示：workspace ok"));
+        assert!(prompt.contains("Create docs/e2e.md"));
     }
 
     #[test]

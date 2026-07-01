@@ -9,10 +9,13 @@ use std::sync::{atomic::Ordering, Arc};
 use tokio::sync::broadcast;
 
 use crate::{
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_attachment_notes::append_project_attachment_notes,
+    project_auth::project_access,
     project_execution_mode::ProjectExecutionMode,
     project_keys::{clean_trace_id, project_ws_fingerprint},
     project_trace_events::record_server_transport,
+    project_workspace_recovery,
     project_ws_job::{cancel_project_ws_job, emit_project_job_event, get_or_start_project_ws_job},
     project_ws_protocol::{
         is_terminal_project_ws_message, parse_project_message, project_client_request_id,
@@ -29,7 +32,7 @@ pub(crate) async fn handle_project_ws(
     socket: WebSocket,
     state: Arc<AppState>,
     user: PublicUser,
-    project: ProjectAccess,
+    mut project: ProjectAccess,
     download_base: String,
     client_version_code: Option<i64>,
 ) {
@@ -130,16 +133,6 @@ pub(crate) async fn handle_project_ws(
         if message.is_empty() {
             continue;
         }
-        let attachments = request.attachments.clone();
-        let message = append_project_attachment_notes(
-            &state,
-            &project,
-            &conversation_id,
-            message,
-            request.attachments.as_deref(),
-        );
-
-        let trace_id = clean_trace_id(request.trace_id.as_deref());
         let pc_runtime_route = match request.pc_runtime_route() {
             Ok(route) => route,
             Err(message) => {
@@ -153,6 +146,60 @@ pub(crate) async fn handle_project_ws(
                 continue;
             }
         };
+        if should_auto_bind_local_node(pc_runtime_route) {
+            if let (Some(node_id), Some(workspace_path)) = (
+                request
+                    .local_node_id
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty()),
+                request
+                    .local_workspace_path
+                    .as_deref()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty()),
+            ) {
+                if project.node_id.as_deref() != Some(node_id)
+                    || project.workspace_path.as_deref() != Some(workspace_path)
+                {
+                    match project_workspace_recovery::bind_existing_pc_workspace(
+                        &state,
+                        &user.id,
+                        &project.id,
+                        node_id,
+                        workspace_path,
+                    )
+                    .await
+                    {
+                        Ok(_) => {
+                            if let Ok(updated) = project_access(&state, &user.id, &project.id) {
+                                project = updated;
+                            }
+                        }
+                        Err((_status, message)) => {
+                            if sender
+                                .send(Message::Text(WsMessage::error(message).to_json()))
+                                .await
+                                .is_err()
+                            {
+                                break;
+                            }
+                            continue;
+                        }
+                    }
+                }
+            }
+        }
+        let attachments = request.attachments.clone();
+        let message = append_project_attachment_notes(
+            &state,
+            &project,
+            &conversation_id,
+            message,
+            request.attachments.as_deref(),
+        );
+
+        let trace_id = clean_trace_id(request.trace_id.as_deref());
         let client_request_id =
             project_client_request_id(&request, &project.id, &user.id, &conversation_id, &message);
         state.server_traces.record(
@@ -397,4 +444,11 @@ mod tests {
         assert!(should_stop_forwarding_after_send(done, false));
         assert!(should_stop_forwarding_after_send(done, true));
     }
+}
+
+fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool {
+    !matches!(
+        route,
+        Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
+    )
 }

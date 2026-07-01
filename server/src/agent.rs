@@ -683,54 +683,10 @@ async fn resolve_pc_project_binding(
     {
         let belongs_to_user = pc_agent_belongs_to_user(state, user_id, agent_id);
         if belongs_to_user && pc_agent_is_connected(state, agent_id).await {
-            if let Some(workspace) = workspace {
-                match inspect_pc_agent_workspace(state, agent_id, workspace).await {
-                    Ok(status) if pc_workspace_inspect_usable(&status) => {
-                        return Some(PcProjectBinding {
-                            agent_id: agent_id.to_string(),
-                            workspace: workspace.to_string(),
-                        });
-                    }
-                    Ok(status) => {
-                        let problem = pc_workspace_inspect_problem(&status);
-                        warn!(
-                            project_id = %project.id,
-                            user_id = %user_id,
-                            bound_agent_id = %agent_id,
-                            workspace_path = %workspace,
-                            problem = %problem,
-                            "bound PC project workspace is not usable; trying another online user node"
-                        );
-                        send_optional_progress(
-                            tx,
-                            "绑定的 PC 节点工作区不可用，正在查找其它在线 PC 节点。",
-                        );
-                    }
-                    Err(error) => {
-                        warn!(
-                            project_id = %project.id,
-                            user_id = %user_id,
-                            bound_agent_id = %agent_id,
-                            workspace_path = %workspace,
-                            error = %error,
-                            "could not inspect bound PC project workspace"
-                        );
-                        if pc_workspace_inspect_error_allows_bound_dispatch(&error) {
-                            send_optional_progress(
-                                tx,
-                                "绑定的 PC 节点工作区检查超时，继续使用当前绑定节点执行，避免自动切换到其它电脑。",
-                            );
-                            return Some(PcProjectBinding {
-                                agent_id: agent_id.to_string(),
-                                workspace: workspace.to_string(),
-                            });
-                        }
-                        send_optional_progress(
-                            tx,
-                            "绑定的 PC 节点暂时无法确认工作区状态，正在查找其它在线 PC 节点。",
-                        );
-                    }
-                }
+            if let Some(binding) =
+                usable_project_binding_for_agent(state, user_id, project, agent_id, true, tx).await
+            {
+                return Some(binding);
             }
         } else {
             bound_agent_wrong_owner = !belongs_to_user;
@@ -741,6 +697,18 @@ async fn resolve_pc_project_binding(
             bound_agent_id = %agent_id,
             "PC project bound node is not usable for the current user; trying an online user node"
         );
+    }
+
+    if let Some(binding) = connected_pc_agent_with_recorded_workspace_binding(
+        state,
+        user_id,
+        project,
+        project.node_id.as_deref(),
+    )
+    .await
+    {
+        send_optional_progress(tx, "已找到当前节点记录的项目路径，正在切换执行。");
+        return Some(binding);
     }
 
     if let Some(workspace) = workspace {
@@ -815,6 +783,131 @@ async fn resolve_pc_project_binding(
         agent_id: fallback_agent_id,
         workspace: workspace.to_string(),
     })
+}
+
+async fn connected_pc_agent_with_recorded_workspace_binding(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    skip_agent_id: Option<&str>,
+) -> Option<PcProjectBinding> {
+    let skip_agent_id = skip_agent_id
+        .map(str::trim)
+        .filter(|value| !value.is_empty());
+    for agent in state.agent_manager.list().await {
+        if skip_agent_id == Some(agent.agent_id.as_str()) {
+            continue;
+        }
+        if !pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
+            continue;
+        }
+        if let Some(binding) =
+            usable_project_binding_for_agent(state, user_id, project, &agent.agent_id, false, None)
+                .await
+        {
+            warn!(
+                project_id = %project.id,
+                user_id = %user_id,
+                fallback_agent_id = %binding.agent_id,
+                workspace_path = %binding.workspace,
+                "PC project will run on another online node using that node's recorded workspace"
+            );
+            return Some(binding);
+        }
+    }
+    None
+}
+
+async fn usable_project_binding_for_agent(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    agent_id: &str,
+    is_bound_agent: bool,
+    tx: Option<&UnboundedSender<String>>,
+) -> Option<PcProjectBinding> {
+    let recorded =
+        match state
+            .store
+            .get_project_pc_workspace_binding(user_id, &project.id, agent_id)
+        {
+            Ok(binding) => binding,
+            Err(error) => {
+                warn!(
+                    project_id = %project.id,
+                    user_id = %user_id,
+                    agent_id = %agent_id,
+                    error = %error,
+                    "failed to read node-specific PC workspace binding"
+                );
+                None
+            }
+        };
+
+    let workspace = recorded
+        .as_ref()
+        .map(|binding| binding.workspace_path.as_str())
+        .or_else(|| {
+            if project.node_id.as_deref() == Some(agent_id) {
+                project.workspace_path.as_deref()
+            } else {
+                None
+            }
+        })
+        .map(str::trim)
+        .filter(|value| !value.is_empty())?;
+
+    match inspect_pc_agent_workspace(state, agent_id, workspace).await {
+        Ok(status) if pc_workspace_inspect_usable(&status) => Some(PcProjectBinding {
+            agent_id: agent_id.to_string(),
+            workspace: workspace.to_string(),
+        }),
+        Ok(status) => {
+            let problem = pc_workspace_inspect_problem(&status);
+            warn!(
+                project_id = %project.id,
+                user_id = %user_id,
+                agent_id = %agent_id,
+                workspace_path = %workspace,
+                problem = %problem,
+                "PC project workspace binding is not usable"
+            );
+            if is_bound_agent {
+                send_optional_progress(
+                    tx,
+                    "绑定的 PC 节点工作区不可用，正在查找其它在线 PC 节点。",
+                );
+            }
+            None
+        }
+        Err(error) => {
+            warn!(
+                project_id = %project.id,
+                user_id = %user_id,
+                agent_id = %agent_id,
+                workspace_path = %workspace,
+                error = %error,
+                "could not inspect PC project workspace binding"
+            );
+            if is_bound_agent {
+                if pc_workspace_inspect_error_allows_bound_dispatch(&error) {
+                    send_optional_progress(
+                        tx,
+                        "绑定的 PC 节点工作区检查超时，继续使用当前绑定节点执行，避免自动切换到其它电脑。",
+                    );
+                    return Some(PcProjectBinding {
+                        agent_id: agent_id.to_string(),
+                        workspace: workspace.to_string(),
+                    });
+                }
+                send_optional_progress(
+                    tx,
+                    "绑定的 PC 节点暂时无法确认工作区状态，正在查找其它在线 PC 节点。",
+                );
+            }
+            None
+        }
+    }
 }
 
 async fn provision_pc_project_binding(

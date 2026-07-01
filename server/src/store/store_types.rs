@@ -878,6 +878,19 @@ pub struct ProjectWorkspaceHealthTarget {
     pub workspace_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ProjectPcWorkspaceBinding {
+    pub project_id: String,
+    pub owner_user_id: String,
+    pub node_id: String,
+    pub workspace_path: String,
+    pub repo_url: Option<String>,
+    pub branch: Option<String>,
+    pub git_head: Option<String>,
+    pub source: String,
+    pub updated_at: String,
+}
+
 #[derive(Debug, Clone)]
 pub struct ProjectAccess {
     pub id: String,

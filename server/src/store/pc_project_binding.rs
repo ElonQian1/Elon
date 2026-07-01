@@ -1,7 +1,64 @@
 use anyhow::{anyhow, Result};
-use rusqlite::{params, OptionalExtension};
+use rusqlite::{params, Connection, OptionalExtension};
 
-use super::{new_id, now, project_branding, project_identities, ProjectSummary, Store};
+use super::{
+    new_id, now, project_branding, project_identities, ProjectPcWorkspaceBinding, ProjectSummary,
+    Store,
+};
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn upsert_project_pc_workspace_binding_tx(
+    conn: &Connection,
+    project_id: &str,
+    owner_user_id: &str,
+    node_id: &str,
+    workspace_path: &str,
+    git_head: Option<&str>,
+    repo_url: Option<&str>,
+    branch: Option<&str>,
+    source: &str,
+    now: &str,
+) -> Result<()> {
+    let node_id = node_id.trim();
+    let workspace_path = workspace_path.trim();
+    if node_id.is_empty() || workspace_path.is_empty() {
+        return Ok(());
+    }
+    let normalized_workspace_path = project_identities::normalize_workspace_path(workspace_path);
+    if normalized_workspace_path.is_empty() {
+        return Ok(());
+    }
+    conn.execute(
+        "INSERT INTO project_pc_workspace_bindings (
+            id, project_id, owner_user_id, node_id, workspace_path,
+            normalized_workspace_path, repo_url, branch, git_head, source, created_at, updated_at
+         )
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?11)
+         ON CONFLICT(project_id, owner_user_id, node_id)
+         DO UPDATE SET
+            workspace_path = excluded.workspace_path,
+            normalized_workspace_path = excluded.normalized_workspace_path,
+            repo_url = COALESCE(excluded.repo_url, project_pc_workspace_bindings.repo_url),
+            branch = COALESCE(excluded.branch, project_pc_workspace_bindings.branch),
+            git_head = COALESCE(excluded.git_head, project_pc_workspace_bindings.git_head),
+            source = excluded.source,
+            updated_at = excluded.updated_at",
+        params![
+            new_id("ppwb"),
+            project_id,
+            owner_user_id,
+            node_id,
+            workspace_path,
+            normalized_workspace_path,
+            repo_url,
+            branch,
+            git_head,
+            source,
+            now,
+        ],
+    )?;
+    Ok(())
+}
 
 impl Store {
     pub fn count_active_pc_projects_for_node(&self, node_id: &str) -> Result<i64> {
@@ -104,6 +161,18 @@ impl Store {
             workspace_path,
             &now,
         )?;
+        upsert_project_pc_workspace_binding_tx(
+            &tx,
+            project_id,
+            user_id,
+            node_id,
+            workspace_path,
+            git_head,
+            repo_url,
+            branch,
+            "pc_workspace_binding",
+            &now,
+        )?;
         tx.commit()?;
         drop(conn);
 
@@ -170,5 +239,43 @@ impl Store {
         )
         .optional()?
         .ok_or_else(|| anyhow!("项目绑定成功但重新读取失败"))
+    }
+
+    pub fn get_project_pc_workspace_binding(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        node_id: &str,
+    ) -> Result<Option<ProjectPcWorkspaceBinding>> {
+        let node_id = node_id.trim();
+        if node_id.is_empty() {
+            return Ok(None);
+        }
+        self.conn()?
+            .query_row(
+                "SELECT project_id, owner_user_id, node_id, workspace_path,
+                        repo_url, branch, git_head, source, updated_at
+                   FROM project_pc_workspace_bindings
+                  WHERE project_id = ?1
+                    AND owner_user_id = ?2
+                    AND node_id = ?3
+                  LIMIT 1",
+                params![project_id, user_id, node_id],
+                |row| {
+                    Ok(ProjectPcWorkspaceBinding {
+                        project_id: row.get(0)?,
+                        owner_user_id: row.get(1)?,
+                        node_id: row.get(2)?,
+                        workspace_path: row.get(3)?,
+                        repo_url: row.get(4)?,
+                        branch: row.get(5)?,
+                        git_head: row.get(6)?,
+                        source: row.get(7)?,
+                        updated_at: row.get(8)?,
+                    })
+                },
+            )
+            .optional()
+            .map_err(Into::into)
     }
 }
