@@ -90,14 +90,17 @@ function Connect-WirelessDevice {
 
 function Get-DeviceWifiAddress {
     param([string]$Serial)
-    $route = Invoke-AdbCommand -Serial $Serial -AdbArgs @("shell", "ip", "route")
-    $routeText = ($route | Out-String)
-    if ($routeText -match "\bsrc\s+(\d+\.\d+\.\d+\.\d+)") {
-        return $Matches[1]
-    }
     $wlan = Invoke-AdbCommand -Serial $Serial -AdbArgs @("shell", "ip", "-f", "inet", "addr", "show", "wlan0")
     $wlanText = ($wlan | Out-String)
     if ($wlanText -match "\binet\s+(\d+\.\d+\.\d+\.\d+)") {
+        return $Matches[1]
+    }
+    $route = Invoke-AdbCommand -Serial $Serial -AdbArgs @("shell", "ip", "route")
+    $routeText = ($route | Out-String)
+    if ($routeText -match "\bwlan\d*\b.*\bsrc\s+(\d+\.\d+\.\d+\.\d+)") {
+        return $Matches[1]
+    }
+    if ($routeText -match "\bsrc\s+((?!10\.|127\.|169\.254\.)\d+\.\d+\.\d+\.\d+)") {
         return $Matches[1]
     }
     throw "Could not determine phone Wi-Fi address from adb shell ip output."
@@ -164,16 +167,16 @@ function Invoke-ApkMcpTool {
         [switch]$EnsureMainActivity
     )
     $json = ConvertTo-JsonCompact $Arguments
-    $cmd = @(
-        "-Adb", $Adb,
-        "-DeviceSerial", $Serial,
-        "-Tool", $Tool,
-        "-Arguments", $json,
-        "-HealthTimeoutSec", "8",
-        "-RequestTimeoutSec", [string]$RequestTimeoutSec
-    )
+    $cmd = @{
+        Adb = $Adb
+        DeviceSerial = $Serial
+        Tool = $Tool
+        Arguments = $json
+        HealthTimeoutSec = 8
+        RequestTimeoutSec = $RequestTimeoutSec
+    }
     if ($EnsureMainActivity) {
-        $cmd += "-EnsureMainActivity"
+        $cmd.EnsureMainActivity = $true
     }
     return & $InvokeMcpScript @cmd
 }
