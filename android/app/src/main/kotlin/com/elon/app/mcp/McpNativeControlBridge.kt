@@ -4,11 +4,13 @@ import com.elon.app.DebugTraceStore
 import com.elon.app.MainActivity
 import android.content.Context
 import android.content.Intent
+import android.os.SystemClock
 import androidx.core.content.ContextCompat
 import org.json.JSONObject
 
 internal object McpNativeControlBridge {
     private const val TOKEN_PREF = "mcp_debug_token"
+    private const val DEFAULT_OPEN_MAIN_BIND_WAIT_MS = 1_200L
 
     interface Controller {
         fun uiState(): JSONObject
@@ -46,10 +48,27 @@ internal object McpNativeControlBridge {
     fun control(context: Context, args: JSONObject): JSONObject {
         val action = args.optString("action", "state").trim().lowercase()
         if (action == "open_main") {
-            openMainActivity(context)
+            val openError = runCatching { openMainActivity(context) }.exceptionOrNull()
+            val waitMs = args.optLong("wait_for_bind_ms", DEFAULT_OPEN_MAIN_BIND_WAIT_MS)
+                .coerceIn(0L, 5_000L)
+            val boundAfterOpen = waitForController(waitMs) != null
             return uiState(context, args)
                 .put("action", action)
-                .put("opened_main_activity", true)
+                .put("opened_main_activity", openError == null)
+                .put("activity_bound_after_open", boundAfterOpen)
+                .apply {
+                    if (openError != null) {
+                        put("error", "open_main_failed")
+                        put("message", openError.message ?: openError.javaClass.simpleName)
+                    } else if (!boundAfterOpen) {
+                        put("error", "main_activity_not_bound_after_open")
+                        put(
+                            "hint",
+                            "Android may block background activity starts from the APK service. Start MainActivity through adb, then retry the MCP UI control."
+                        )
+                        put("adb_start_activity", "adb shell am start -n com.elon.app/.MainActivity")
+                    }
+                }
         }
         val current = controller ?: return JSONObject()
             .put("schema", "elon.apk.native_mcp_control_result.v1")
@@ -86,6 +105,16 @@ internal object McpNativeControlBridge {
         }
         ContextCompat.startActivity(context, intent, null)
         DebugTraceStore.record("mcp_native_control_open_main")
+    }
+
+    private fun waitForController(timeoutMs: Long): Controller? {
+        val deadline = SystemClock.elapsedRealtime() + timeoutMs
+        do {
+            controller?.let { return it }
+            if (timeoutMs <= 0L) return null
+            SystemClock.sleep(100L)
+        } while (SystemClock.elapsedRealtime() < deadline)
+        return controller
     }
 }
 

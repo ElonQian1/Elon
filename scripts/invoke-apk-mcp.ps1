@@ -6,6 +6,7 @@ param(
     [int]$Port = 8787,
     [int]$HealthTimeoutSec = 6,
     [int]$HealthPollMs = 250,
+    [switch]$EnsureMainActivity,
     [switch]$OpenAppOnFailure,
     [switch]$NoBootstrap
 )
@@ -68,6 +69,11 @@ function Wait-ApkMcpHealth {
     throw "APK MCP health did not respond on port $Port within ${HealthTimeoutSec}s. Last error: $lastError"
 }
 
+function Start-ApkMainActivity {
+    Invoke-Adb shell am start -n com.elon.app/.MainActivity | Out-Null
+    Start-Sleep -Milliseconds 700
+}
+
 if (!$NoBootstrap) {
     Start-ApkMcpDebug
 }
@@ -78,6 +84,10 @@ $health = Wait-ApkMcpHealth
 $token = [string]$health.auth_token
 if (!$token) {
     throw "MCP health endpoint did not return auth_token."
+}
+
+if ($EnsureMainActivity) {
+    Start-ApkMainActivity
 }
 
 $argumentObject = $Arguments | ConvertFrom-Json
