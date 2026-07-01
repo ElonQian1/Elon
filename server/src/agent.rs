@@ -275,6 +275,17 @@ pub async fn run_for_project_in_workspace(
         }
     }
 
+    if requires_project_workflow && project_requires_pc_workspace(project) {
+        let msg = pc_workspace_unavailable_message(project);
+        warn!(
+            project_id = %project.id,
+            user_id = %user_id,
+            "PC workspace project cannot run without an online PC node"
+        );
+        let _ = tx.send(WsMessage::error(msg).to_json());
+        return;
+    }
+
     let require_git_for_this_request = require_existing_git && requires_project_workflow;
     let mut preflight_note: Option<String> = None;
     if require_git_for_this_request
@@ -459,6 +470,17 @@ pub async fn plan_for_project_in_workspace(
         return;
     }
 
+    if project_requires_pc_workspace(project) {
+        let msg = pc_workspace_unavailable_message(project);
+        warn!(
+            project_id = %project.id,
+            user_id = %user_id,
+            "PC workspace project planning cannot run without an online PC node"
+        );
+        let _ = tx.send(WsMessage::error(msg).to_json());
+        return;
+    }
+
     let user_config_workspace = state.get_user_workspace(user_id);
     let route_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
     if let Err(e) = run_backend_with_workspace(
@@ -514,6 +536,64 @@ fn requested_agent_for_runtime_route<'a>(
 struct PcProjectBinding {
     agent_id: String,
     workspace: String,
+}
+
+fn project_requires_pc_workspace(project: &ProjectAccess) -> bool {
+    project_fields_require_pc_workspace(
+        &project.source_type,
+        project.node_id.as_deref(),
+        project.workspace_path.as_deref(),
+    )
+}
+
+fn project_fields_require_pc_workspace(
+    source_type: &str,
+    node_id: Option<&str>,
+    workspace_path: Option<&str>,
+) -> bool {
+    if source_type == "pc_managed" {
+        return true;
+    }
+    if node_id
+        .map(str::trim)
+        .is_some_and(|value| !value.is_empty())
+    {
+        return true;
+    }
+    workspace_path
+        .map(str::trim)
+        .is_some_and(path_looks_windows_workspace)
+}
+
+fn path_looks_windows_workspace(path: &str) -> bool {
+    let value = path.trim();
+    if value.starts_with("\\\\") || value.starts_with("//") {
+        return true;
+    }
+    let bytes = value.as_bytes();
+    bytes.len() >= 3
+        && bytes[0].is_ascii_alphabetic()
+        && bytes[1] == b':'
+        && (bytes[2] == b'\\' || bytes[2] == b'/')
+}
+
+fn pc_workspace_unavailable_message(project: &ProjectAccess) -> String {
+    let workspace = project
+        .workspace_path
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("未记录本机路径");
+    let node_hint = project
+        .node_id
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(|node_id| format!("，绑定节点 {node_id} 当前不可用"))
+        .unwrap_or_default();
+    format!(
+        "当前项目绑定到 PC 本机工作区 {workspace}{node_hint}，但当前用户没有可用的在线 PC 节点可以访问它。请确认一龙开发平台/PC node 在线后重试；我不会在服务器上把这个本机路径当作 Git 仓库校验。"
+    )
 }
 
 async fn resolve_pc_project_binding(
@@ -1144,7 +1224,8 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
 #[cfg(test)]
 mod tests {
     use super::{
-        pc_cli_chat_requested, pc_cli_chat_route_label, requires_project_workflow_for_message,
+        pc_cli_chat_requested, pc_cli_chat_route_label, project_fields_require_pc_workspace,
+        requires_project_workflow_for_message,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
     use std::path::Path;
@@ -1198,5 +1279,60 @@ mod tests {
             "远程 Codex"
         );
         assert_eq!(pc_cli_chat_route_label(None), "本机 AI");
+    }
+
+    #[test]
+    fn pc_managed_projects_require_pc_workspace_route() {
+        assert!(project_fields_require_pc_workspace(
+            "pc_managed",
+            None,
+            Some("/srv/elon/project")
+        ));
+    }
+
+    #[test]
+    fn bound_node_projects_require_pc_workspace_route() {
+        assert!(project_fields_require_pc_workspace(
+            "local_path",
+            Some("node-local"),
+            Some("/srv/elon/project")
+        ));
+    }
+
+    #[test]
+    fn windows_local_paths_require_pc_workspace_route() {
+        assert!(project_fields_require_pc_workspace(
+            "local_path",
+            None,
+            Some(r"D:\rust\active-projects\elon cli")
+        ));
+        assert!(project_fields_require_pc_workspace(
+            "local_path",
+            None,
+            Some("D:/rust/active-projects/elon cli")
+        ));
+    }
+
+    #[test]
+    fn unc_paths_require_pc_workspace_route() {
+        assert!(project_fields_require_pc_workspace(
+            "local_path",
+            None,
+            Some(r"\\workstation\repos\elon")
+        ));
+        assert!(project_fields_require_pc_workspace(
+            "local_path",
+            None,
+            Some("//workstation/repos/elon")
+        ));
+    }
+
+    #[test]
+    fn server_local_paths_can_still_use_server_git_route() {
+        assert!(!project_fields_require_pc_workspace(
+            "local_path",
+            None,
+            Some("/srv/elon/project")
+        ));
     }
 }
