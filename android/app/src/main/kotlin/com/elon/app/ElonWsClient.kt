@@ -8,6 +8,8 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 class ElonWsClient(
     private val serverUrl: String,
+    private val debugTraceId: String? = null,
+    private val debugKind: String? = null,
     private val onMessage: (String) -> Unit,
     private val onConnected: () -> Unit,
     private val onDisconnected: () -> Unit,
@@ -25,7 +27,14 @@ class ElonWsClient(
         if (connected.get()) return
         ws?.cancel()
 
-        DebugTraceStore.record("ws_connect_start", mapOf("url" to serverUrl))
+        DebugTraceStore.record(
+            "ws_connect_start",
+            mapOf(
+                "trace_id" to debugTraceId,
+                "kind" to debugKind,
+                "url" to serverUrl
+            )
+        )
         val request = Request.Builder().url(serverUrl).build()
         ws = client.newWebSocket(request, object : WebSocketListener() {
             override fun onOpen(webSocket: WebSocket, response: Response) {
@@ -33,7 +42,12 @@ class ElonWsClient(
                 Log.i(TAG, "WebSocket 已连接")
                 DebugTraceStore.record(
                     "ws_connected",
-                    mapOf("url" to serverUrl, "http_code" to response.code)
+                    mapOf(
+                        "trace_id" to debugTraceId,
+                        "kind" to debugKind,
+                        "url" to serverUrl,
+                        "http_code" to response.code
+                    )
                 )
                 onConnected()
             }
@@ -42,7 +56,12 @@ class ElonWsClient(
                 Log.d(TAG, "收到消息: $text")
                 DebugTraceStore.record(
                     "ws_message",
-                    mapOf("type" to messageType(text), "bytes" to text.toByteArray().size)
+                    mapOf(
+                        "trace_id" to debugTraceId,
+                        "kind" to debugKind,
+                        "type" to messageType(text),
+                        "bytes" to text.toByteArray().size
+                    )
                 )
                 onMessage(text)
             }
@@ -54,7 +73,13 @@ class ElonWsClient(
                 val httpCode = response?.code
                 DebugTraceStore.record(
                     "ws_failure",
-                    mapOf("error" to t.message, "http_code" to httpCode)
+                    mapOf(
+                        "trace_id" to debugTraceId,
+                        "kind" to debugKind,
+                        "url" to serverUrl,
+                        "error" to t.message,
+                        "http_code" to httpCode
+                    )
                 )
                 if (httpCode == 401) {
                     onAuthRequired()
@@ -67,7 +92,16 @@ class ElonWsClient(
                 connected.set(false)
                 if (ws == webSocket) ws = null
                 Log.i(TAG, "连接关闭: $reason")
-                DebugTraceStore.record("ws_closed", mapOf("code" to code, "reason" to reason))
+                DebugTraceStore.record(
+                    "ws_closed",
+                    mapOf(
+                        "trace_id" to debugTraceId,
+                        "kind" to debugKind,
+                        "url" to serverUrl,
+                        "code" to code,
+                        "reason" to reason
+                    )
+                )
                 onDisconnected()
             }
         })

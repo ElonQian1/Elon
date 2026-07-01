@@ -19,7 +19,6 @@ class TaskWorkService : Service() {
         super.onCreate()
         createTaskWorkNotificationChannels(this)
         restorePersistedTaskWork(prefs, activeTasks)
-        if (hasActiveTasks()) connectAll()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -154,6 +153,8 @@ class TaskWorkService : Service() {
         task.clientGeneration = generation
         val created = ElonWsClient(
             serverUrl = serverUrl,
+            debugTraceId = task.traceId,
+            debugKind = task.requestKind,
             onMessage = { raw -> handleServerMessage(task.traceId, raw) },
             onConnected = onConnected@{
                 val current = activeTasks[task.traceId] ?: return@onConnected

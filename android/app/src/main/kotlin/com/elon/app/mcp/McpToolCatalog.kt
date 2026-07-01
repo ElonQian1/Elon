@@ -222,7 +222,9 @@ internal fun mcpToolsListResult(): JSONObject {
                     title = "Task Status",
                     description = "Return the active or most recent task status with timing milestones and last message preview.",
                     properties = JSONObject()
-                        .put("trace_id", stringProperty("Optional trace id. Defaults to current pending task or latest traced task.")),
+                        .put("trace_id", stringProperty("Optional trace id. Defaults to current pending task or latest traced task."))
+                        .put("include_events", booleanProperty("Include recent trace events for the selected trace. Defaults to false."))
+                        .put("event_limit", intProperty("Maximum trace events to include, 1-300. Defaults to 80.")),
                     required = JSONArray()
                 )
             )

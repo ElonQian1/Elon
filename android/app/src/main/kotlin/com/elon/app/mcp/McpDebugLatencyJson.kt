@@ -48,7 +48,7 @@ internal fun taskStatusJson(context: Context, args: JSONObject): JSONObject {
         else -> "idle"
     }
     val lastMessage = traceEvents.lastOrNull { it.phase == "task_server_message" }
-    return JSONObject()
+    val result = JSONObject()
         .put("status", status)
         .put("busy", isTaskBusy(prefs))
         .put("trace_id", traceId ?: JSONObject.NULL)
@@ -64,6 +64,13 @@ internal fun taskStatusJson(context: Context, args: JSONObject): JSONObject {
         .put("has_apk_url", finish?.details?.get("has_apk_url") ?: JSONObject.NULL)
         .put("last_phase", traceEvents.lastOrNull()?.phase ?: JSONObject.NULL)
         .put("last_event_wall_time_ms", traceEvents.lastOrNull()?.wallTimeMs ?: JSONObject.NULL)
+    if (args.optBoolean("include_events", false)) {
+        val eventLimit = args.optInt("event_limit", 80).coerceIn(1, 300)
+        result
+            .put("event_limit", eventLimit)
+            .put("events", mcpTraceEventsJson(traceEvents.takeLast(eventLimit)))
+    }
+    return result
 }
 
 internal fun latencyReportJson(context: Context, args: JSONObject): JSONObject {
