@@ -77,9 +77,9 @@ internal class MainNavigationController(
     fun setupNavigation() {
         applyProjectManagementDesignMetrics()
         binding.tabChat.setOnClickListener { selectBottomTab(binding.tabChat, animate = false) }
-        binding.tabProject.setOnClickListener { showProjectPlaza() }
+        binding.tabProject.setOnClickListener { selectBottomTab(binding.tabProject, animate = false) }
         binding.tabProfile.setOnClickListener { selectBottomTab(binding.tabProfile, animate = false) }
-        binding.projectHomeTopTabWrap.setOnClickListener { showProjectPlaza() }
+        binding.projectHomeTopTabWrap.setOnClickListener { showProjectHome() }
         binding.projectPlazaTopTabWrap.setOnClickListener { showProjectPlaza() }
         binding.conversationItem.setOnClickListener { openConversation(0) }
         binding.conversationItem.setOnLongClickListener {
@@ -125,20 +125,23 @@ internal class MainNavigationController(
         binding.projectSpaceAiMenu.visibility = View.GONE
     }
 
-    private fun showProjectTopTabs() {
+    private fun showProjectTopTabs(plazaSelected: Boolean) {
         setProjectToolbarExpanded(true)
         binding.topTitleText.visibility = View.GONE
         binding.projectTopTabs.visibility = View.VISIBLE
         binding.projectTopTabs.setPadding(0, 0, 0, 0)
         binding.projectTopTabs.gravity = Gravity.CENTER
-        binding.projectHomeTopTabWrap.visibility = View.GONE
+        binding.projectHomeTopTabWrap.visibility = View.VISIBLE
         binding.projectPlazaTopTabWrap.visibility = View.VISIBLE
-        binding.projectHomeTabIndicator.visibility = View.INVISIBLE
+        updateProjectTopTabVisual(
+            tab = binding.projectHomeTopTab,
+            indicator = binding.projectHomeTabIndicator,
+            selected = !plazaSelected
+        )
         updateProjectTopTabVisual(
             tab = binding.projectPlazaTopTab,
             indicator = binding.projectPlazaTabIndicator,
-            selected = true,
-            showIndicator = false
+            selected = plazaSelected
         )
     }
 
@@ -228,6 +231,10 @@ internal class MainNavigationController(
     }
 
     private fun applyBottomTabChrome(tab: TextView) {
+        if (tab == binding.tabProject) {
+            applyProjectHomeChrome()
+            return
+        }
         binding.toolbar.setBackgroundColor(activity.getColor(R.color.elon_bg_app))
         listOf(binding.tabChat, binding.tabProject, binding.tabProfile).forEach {
             updateBottomTabVisual(it, it == tab)
@@ -250,24 +257,12 @@ internal class MainNavigationController(
             showHomeActionPopup(binding.addButton, tab)
         }
         binding.topTitleText.setOnLongClickListener(null)
-        if (tab == binding.tabProject) {
-            loadMarketplace()
-            showProjectTopTabs()
-            setProjectHomeSegmentVisible(false)
-        } else {
-            hideProjectTopTabs()
-        }
+        hideProjectTopTabs()
         binding.topTitleText.text = when (tab) {
-            binding.tabProject -> "项目广场"
             binding.tabProfile -> "我的"
             else -> conversationHomeTitle()
         }
-        if (tab != binding.tabChat) {
-            renderConversationList()
-        }
-        if (tab == binding.tabProject) {
-            loadMarketplace()
-        } else if (tab == binding.tabChat) {
+        if (tab == binding.tabChat) {
             refreshFriends()
             renderConversationList()
         } else if (tab == binding.tabProfile) {
@@ -277,10 +272,10 @@ internal class MainNavigationController(
 
     private fun finishBottomTabSelection(tab: TextView) {
         binding.conversationPage.visibility = if (tab == binding.tabChat) View.VISIBLE else View.GONE
-        binding.projectPage.visibility = View.GONE
+        binding.projectPage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
         binding.profilePage.visibility = if (tab == binding.tabProfile) View.VISIBLE else View.GONE
         binding.chatPage.visibility = View.GONE
-        binding.marketplacePage.visibility = if (tab == binding.tabProject) View.VISIBLE else View.GONE
+        binding.marketplacePage.visibility = View.GONE
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
@@ -289,7 +284,7 @@ internal class MainNavigationController(
     private fun pageForBottomTab(tab: TextView): View? {
         return when (tab) {
             binding.tabChat -> binding.conversationPage
-            binding.tabProject -> binding.marketplacePage
+            binding.tabProject -> binding.projectPage
             binding.tabProfile -> binding.profilePage
             else -> null
         }
@@ -798,7 +793,13 @@ internal class MainNavigationController(
 
     private fun showProjectHome(animate: Boolean = false) {
         if (animate) closeChatSideMenu(false)
-        showProjectPlaza()
+        if (pageTransitionRunning) return
+        clearMessageSelection()
+        resetProjectReturnTargets()
+        actionPopupProvider()?.dismiss()
+        closeChatSideMenu(false)
+        applyProjectHomeChrome()
+        clearPageTranslations()
     }
 
     private fun showExitConfirmation() {
@@ -900,7 +901,7 @@ internal class MainNavigationController(
         binding.marketplacePage.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
-        showProjectTopTabs()
+        showProjectTopTabs(plazaSelected = false)
         setProjectHomeSegmentVisible(true)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
@@ -931,7 +932,7 @@ internal class MainNavigationController(
         binding.agentPage.root.visibility = View.GONE
         binding.inputLayout.visibility = View.GONE
         showMainTabs()
-        showProjectTopTabs()
+        showProjectTopTabs(plazaSelected = true)
         setProjectHomeSegmentVisible(false)
         binding.backButton.visibility = View.GONE
         binding.searchButton.visibility = View.GONE
