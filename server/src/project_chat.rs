@@ -468,6 +468,16 @@ fn should_append_project_icon_context_for_pc_fast_path(needs_project_workflow: b
     needs_project_workflow
 }
 
+fn pc_node_fast_path_route(
+    needs_project_workflow: bool,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+) -> Option<PcRuntimeRoutePreference> {
+    if !needs_project_workflow && pc_runtime_route.is_none() {
+        return Some(PcRuntimeRoutePreference::RouteA);
+    }
+    pc_runtime_route
+}
+
 fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
     let mut total = 0usize;
     let mut question_marks = 0usize;
@@ -503,8 +513,10 @@ fn looks_like_replaced_unicode_mojibake(message: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::{
-        looks_like_replaced_unicode_mojibake, should_append_project_icon_context_for_pc_fast_path,
+        looks_like_replaced_unicode_mojibake, pc_node_fast_path_route,
+        should_append_project_icon_context_for_pc_fast_path,
     };
+    use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
 
     #[test]
     fn detects_windows_question_mark_mojibake() {
@@ -529,6 +541,19 @@ mod tests {
     fn pc_node_fast_path_keeps_lightweight_chat_message_plain() {
         assert!(!should_append_project_icon_context_for_pc_fast_path(false));
         assert!(should_append_project_icon_context_for_pc_fast_path(true));
+    }
+
+    #[test]
+    fn pc_node_fast_path_defaults_lightweight_chat_to_route_a() {
+        assert_eq!(
+            pc_node_fast_path_route(false, None),
+            Some(PcRuntimeRoutePreference::RouteA)
+        );
+        assert_eq!(
+            pc_node_fast_path_route(false, Some(PcRuntimeRoutePreference::RouteC3)),
+            Some(PcRuntimeRoutePreference::RouteC3)
+        );
+        assert_eq!(pc_node_fast_path_route(true, None), None);
     }
 }
 
@@ -710,7 +735,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
             Some(&conversation_id),
             &message,
             agent_name.as_deref(),
-            pc_runtime_route,
+            pc_node_fast_path_route(needs_project_workflow, pc_runtime_route),
             trace_id.as_deref(),
             &state,
             tx,
