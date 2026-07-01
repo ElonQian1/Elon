@@ -2,7 +2,7 @@
 
 use anyhow::{anyhow, bail, Result};
 use homecli_proto::CliProjectContext;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const ROUTE_A_CLIS: &[&str] = &["codex", "copilot", "claude", "gemini"];
 const BUILTIN_CLIS: &[&str] = &["api-runtime", "server-runtime"];
@@ -83,8 +83,7 @@ pub(crate) fn prepare_cli_base_cwd(
     if !path.is_absolute() {
         bail!("PC CLI 工作目录必须是绝对路径: {cwd_str}");
     }
-    let full = std::fs::canonicalize(&path)
-        .map_err(|error| anyhow!("PC CLI 工作目录不可用: {} ({error})", path.display()))?;
+    let full = canonical_cwd_path(&path)?;
     if !full.is_dir() {
         bail!("PC CLI 工作目录不是目录: {}", full.display());
     }
@@ -215,15 +214,25 @@ fn canonical_cli_path(path: &str) -> Result<PathBuf> {
     if !full.is_file() {
         bail!("CLI 路径不是文件: {}", full.display());
     }
+    Ok(strip_windows_verbatim_prefix(full))
+}
+
+fn canonical_cwd_path(path: &Path) -> Result<PathBuf> {
+    let full = std::fs::canonicalize(path)
+        .map_err(|error| anyhow!("PC CLI 工作目录不可用: {} ({error})", path.display()))?;
+    Ok(strip_windows_verbatim_prefix(full))
+}
+
+fn strip_windows_verbatim_prefix(path: PathBuf) -> PathBuf {
     // Windows canonicalize 返回 \\?\ 长路径前缀，但 cmd.exe 不接受该前缀，必须去掉。
     #[cfg(windows)]
     {
-        let s = full.to_string_lossy();
+        let s = path.to_string_lossy();
         if let Some(stripped) = s.strip_prefix(r"\\?\") {
-            return Ok(PathBuf::from(stripped));
+            return PathBuf::from(stripped);
         }
     }
-    Ok(full)
+    path
 }
 
 fn reject_dangerous_arg(arg: &str) -> Result<()> {
@@ -326,9 +335,20 @@ mod tests {
     }
 
     #[test]
-    fn cli_prompt_requires_project_context_and_absolute_cwd() {
-        assert!(prepare_cli_base_cwd(None, None).is_err());
+    fn cli_prompt_requires_absolute_cwd_when_provided() {
         assert!(prepare_cli_base_cwd(Some("relative".to_string()), None).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn cli_prompt_cwd_strips_windows_verbatim_prefix() {
+        let user_profile = std::env::var("USERPROFILE").expect("USERPROFILE should exist");
+        let (cwd, _) = prepare_cli_base_cwd(Some(user_profile), None).unwrap();
+        assert!(
+            !cwd.to_string_lossy().starts_with(r"\\?\"),
+            "cmd.exe cannot start from verbatim cwd {}",
+            cwd.display()
+        );
     }
 
     #[test]
@@ -390,7 +410,7 @@ mod tests {
                 "/D".to_string(),
                 "/S".to_string(),
                 "/C".to_string(),
-                r#""C:\Users\me\AppData\Roaming\npm\codex.cmd""#.to_string()
+                r"C:\Users\me\AppData\Roaming\npm\codex.cmd".to_string()
             ]
         );
     }
