@@ -334,6 +334,7 @@ internal class MainMarketplaceActions(
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
             addView(projectThumbnail(project), LinearLayout.LayoutParams(dp(THUMB_SIZE_DP), dp(THUMB_SIZE_DP)).apply {
+                marginStart = memberColumnThumbStartPx()
                 marginEnd = dp(CARD_THUMB_TEXT_GAP_DP)
             })
             addView(LinearLayout(activity).apply {
@@ -423,10 +424,13 @@ internal class MainMarketplaceActions(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            addView(ImageView(activity).apply {
+            addView(createStatTopSlot(ImageView(activity).apply {
                 setImageResource(R.drawable.ic_plaza_member_stat)
                 contentDescription = null
-            }, LinearLayout.LayoutParams(dp(MEMBER_STAT_ICON_DP), dp(MEMBER_STAT_ICON_DP)))
+            }, dp(MEMBER_STAT_ICON_DP), dp(MEMBER_STAT_ICON_DP)), LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                dp(STAT_TOP_SLOT_HEIGHT_DP)
+            ))
             addView(TextView(activity).apply {
                 includeFontPadding = false
                 text = "成员：$count"
@@ -446,7 +450,7 @@ internal class MainMarketplaceActions(
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            addView(TextView(activity).apply {
+            addView(createStatTopSlot(TextView(activity).apply {
                 includeFontPadding = false
                 text = value
                 gravity = Gravity.CENTER
@@ -455,9 +459,9 @@ internal class MainMarketplaceActions(
                 setTextColor(Color.parseColor(COLOR_TEXT_PRIMARY))
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, FONT_STAT_VALUE_SP)
                 setTypeface(typeface, Typeface.NORMAL)
-            }, LinearLayout.LayoutParams(
+            }), LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
+                dp(STAT_TOP_SLOT_HEIGHT_DP)
             ))
             addView(TextView(activity).apply {
                 includeFontPadding = false
@@ -472,6 +476,12 @@ internal class MainMarketplaceActions(
             ).apply {
                 topMargin = dp(4)
             })
+        }
+    }
+
+    private fun createStatTopSlot(content: View, widthPx: Int = FrameLayout.LayoutParams.MATCH_PARENT, heightPx: Int = FrameLayout.LayoutParams.WRAP_CONTENT): FrameLayout {
+        return FrameLayout(activity).apply {
+            addView(content, FrameLayout.LayoutParams(widthPx, heightPx, Gravity.CENTER))
         }
     }
 
@@ -658,6 +668,14 @@ internal class MainMarketplaceActions(
         return (value * (width / DESIGN_WIDTH_PX.toFloat())).roundToInt()
     }
 
+    private fun memberColumnThumbStartPx(): Int {
+        val screenWidth = activity.resources.displayMetrics.widthPixels.takeIf { it > 0 } ?: dp(360)
+        val cardWidth = screenWidth - dp(CARD_SIDE_MARGIN_DP * 2)
+        val separatorWidth = dp(1) * 3
+        val firstStatCenter = (cardWidth - separatorWidth).coerceAtLeast(0) / 8f
+        return (firstStatCenter - dp(THUMB_SIZE_DP) / 2f).roundToInt().coerceAtLeast(0)
+    }
+
     private companion object {
         const val FILTER_ALL = "all"
         const val COLOR_CARD_HEADER = "#1F2023"
@@ -692,6 +710,7 @@ internal class MainMarketplaceActions(
         const val HEADER_META_TOP_MARGIN_DP = 4
         const val STATS_TOP_MARGIN_DP = 12
         const val STATS_ROW_HEIGHT_DP = 58
+        const val STAT_TOP_SLOT_HEIGHT_DP = 28
         const val STAT_SEPARATOR_HEIGHT_DP = 34
         const val DESC_TOP_MARGIN_DP = 14
         const val CARD_DIVIDER_TOP_MARGIN_DP = 16
