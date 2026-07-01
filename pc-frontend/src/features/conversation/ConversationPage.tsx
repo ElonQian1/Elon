@@ -103,6 +103,7 @@ export default function ConversationPage() {
   const [memberPopoverY, setMemberPopoverY] = useState(200)
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
   const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
+  const [roleFocusMemberId, setRoleFocusMemberId] = useState('')
 
   // ── 手机/PC 同步会话列表（直接读服务端，与移动端完全同步）──
   const [memberConversationTarget, setMemberConversationTarget] = useState<MemberConversationTarget | null>(null)
@@ -162,6 +163,7 @@ export default function ConversationPage() {
     setSelectedMember(null)
     setMemberMenu(null)
     setPermissionFocusMemberId('')
+    setRoleFocusMemberId('')
     setShowAudit(false)
     setShowRoles(false)
   }, [activeProjectId, activeChannelId])
@@ -363,15 +365,19 @@ export default function ConversationPage() {
   const canModerateMembers = !!activeProjectId
     && !!currentProjectMember
     && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MODERATE_MEMBERS)
+  const canManageMembers = !!activeProjectId
+    && !!currentProjectMember
+    && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_MEMBERS)
   const canViewMemberAudit = !!activeProjectId
     && !!currentProjectMember
     && (
       projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_VIEW_AUDIT_LOG)
-      || projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_MEMBERS)
+      || canManageMembers
     )
   const canManageRoles = !!activeProjectId
     && !!currentProjectMember
     && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_ROLES)
+  const canUseRoleManager = canManageRoles || canManageMembers
   const hasChannelMemberPermissions = !!activeChannelId && membersHaveChannelPermissionMap(spaceMembers, activeChannelId)
   const panelMembers = useMemo(
     () => activeChannelId ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
@@ -522,6 +528,13 @@ export default function ConversationPage() {
   function openMemberPermissions(member: ProjectMember) {
     setPermissionFocusMemberId(member.user_id)
     setShowPermissions(true)
+    setMemberMenu(null)
+  }
+
+  function openMemberRoles(member: ProjectMember) {
+    setRoleFocusMemberId(member.user_id)
+    setShowRoles(true)
+    setSelectedMember(null)
     setMemberMenu(null)
   }
 
@@ -894,7 +907,7 @@ export default function ConversationPage() {
             <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowModeration(true)}>管理</button>}
-            {activeProjectId && canManageRoles && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowRoles(true)}>角色</button>}
+            {activeProjectId && canUseRoleManager && <button className={styles.memberInviteBtn} type="button" onClick={() => { setRoleFocusMemberId(''); setShowRoles(true) }}>角色</button>}
             {activeProjectId && canViewMemberAudit && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowAudit(true)}>日志</button>}
             {activeProjectId && activeChannelId && canManagePermissions && (
               <button className={styles.memberInviteBtn} type="button" onClick={() => { setPermissionFocusMemberId(''); setShowPermissions(true) }}>权限</button>
@@ -912,6 +925,7 @@ export default function ConversationPage() {
               onOpenProfile={openMemberProfile}
               onOpenConversations={openMemberConversations}
               onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
+              onOpenRoles={activeProjectId && canUseRoleManager ? openMemberRoles : undefined}
               onModerate={moderateMemberFromPopover}
             />,
             document.body
@@ -924,6 +938,7 @@ export default function ConversationPage() {
               canModerate={canModerateMembers && selectedMember.user_id !== user?.id}
               onClose={() => setSelectedMember(null)}
               onOpenConversations={openMemberConversations}
+              onOpenRoles={canUseRoleManager ? openMemberRoles : undefined}
               onModerate={moderateMemberFromPopover}
             />,
             document.body
@@ -1038,7 +1053,10 @@ export default function ConversationPage() {
           projectId={activeProjectId}
           members={members}
           currentUserId={user?.id}
-          onClose={() => setShowRoles(false)}
+          initialMemberId={roleFocusMemberId}
+          canManageRoles={canManageRoles}
+          canManageMembers={canManageMembers}
+          onClose={() => { setShowRoles(false); setRoleFocusMemberId('') }}
           onSaved={reloadProjectSpace}
         />
       )}

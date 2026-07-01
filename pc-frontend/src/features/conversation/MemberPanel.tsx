@@ -371,6 +371,7 @@ export function MemberContextMenu({
   onOpenProfile,
   onOpenConversations,
   onOpenPermissions,
+  onOpenRoles,
   onModerate,
 }: {
   member: ProjectMember
@@ -381,6 +382,7 @@ export function MemberContextMenu({
   onOpenProfile: (member: ProjectMember, y: number) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenPermissions?: (member: ProjectMember) => void
+  onOpenRoles?: (member: ProjectMember) => void
   onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
@@ -468,6 +470,9 @@ export function MemberContextMenu({
         {onOpenPermissions && (
           <button type="button" role="menuitem" onClick={() => run(() => onOpenPermissions(member))}>频道权限</button>
         )}
+        {onOpenRoles && (
+          <button type="button" role="menuitem" onClick={() => run(() => onOpenRoles(member))}>编辑角色</button>
+        )}
       </div>
       {canModerate && onModerate && (
         <div className={styles.memberContextMenuGroup}>
@@ -491,6 +496,7 @@ export function MemberProfilePopover({
   canModerate,
   onClose,
   onOpenConversations,
+  onOpenRoles,
   onModerate,
 }: {
   member: ProjectMember
@@ -499,6 +505,7 @@ export function MemberProfilePopover({
   canModerate?: boolean
   onClose: () => void
   onOpenConversations?: (member: ProjectMember) => void
+  onOpenRoles?: (member: ProjectMember) => void
   onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
 }) {
   const popRef = useRef<HTMLDivElement>(null)
@@ -545,6 +552,10 @@ export function MemberProfilePopover({
 
   function openConversations() {
     onOpenConversations?.(member)
+  }
+
+  function openRoles() {
+    onOpenRoles?.(member)
   }
 
   async function addFriend() {
@@ -653,6 +664,9 @@ export function MemberProfilePopover({
             </button>
           )}
           <button className={styles.memberPopoverBtn} type="button" onClick={copyId}>复制 ID</button>
+          {onOpenRoles && (
+            <button className={styles.memberPopoverBtn} type="button" onClick={openRoles}>编辑角色</button>
+          )}
           <button className={styles.memberPopoverBtn} type="button"
             onClick={addFriend} disabled={isFriend || addingFriend}
             data-state={isFriend ? 'success' : undefined}>

@@ -16,12 +16,18 @@ export function RoleManagementDrawer({
   projectId,
   members,
   currentUserId,
+  initialMemberId,
+  canManageRoles = true,
+  canManageMembers = true,
   onClose,
   onSaved,
 }: {
   projectId: string
   members: ProjectMember[]
   currentUserId?: string
+  initialMemberId?: string
+  canManageRoles?: boolean
+  canManageMembers?: boolean
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
@@ -65,6 +71,13 @@ export function RoleManagementDrawer({
   const visibleMembers = useMemo(() => filterMembers(members, memberQuery), [members, memberQuery])
 
   useEffect(() => {
+    if (initialMemberId && members.some((member) => member.user_id === initialMemberId)) {
+      setSelectedMemberId(initialMemberId)
+      setMemberQuery('')
+    }
+  }, [initialMemberId, members])
+
+  useEffect(() => {
     if (!selectedRole) {
       setRoleName('')
       setRoleColor(DEFAULT_ROLE_COLOR)
@@ -106,6 +119,10 @@ export function RoleManagementDrawer({
   }
 
   async function createRole() {
+    if (!canManageRoles) {
+      setStatus('当前角色无权管理角色定义')
+      return
+    }
     const name = clean(newRoleName)
     if (!name) return
     setStatus('创建中...')
@@ -128,6 +145,10 @@ export function RoleManagementDrawer({
 
   async function saveRole() {
     if (!selectedRole || selectedRole.builtin) return
+    if (!canManageRoles) {
+      setStatus('当前角色无权管理角色定义')
+      return
+    }
     setStatus('保存角色中...')
     try {
       const data = await api.patch<RoleResponse>(`/api/projects/${encodeURIComponent(projectId)}/roles/${encodeURIComponent(selectedRole.id)}`, {
@@ -147,6 +168,10 @@ export function RoleManagementDrawer({
 
   async function deleteRole() {
     if (!selectedRole || selectedRole.builtin) return
+    if (!canManageRoles) {
+      setStatus('当前角色无权管理角色定义')
+      return
+    }
     if (!window.confirm(`确认删除角色「${selectedRole.name || selectedRole.id}」？`)) return
     setStatus('删除中...')
     try {
@@ -162,6 +187,10 @@ export function RoleManagementDrawer({
 
   async function saveMemberRoles() {
     if (!selectedMember) return
+    if (!canManageMembers) {
+      setStatus('当前角色无权修改成员角色')
+      return
+    }
     if (selectedMemberRoles.length === 0) {
       setStatus('成员至少需要一个角色')
       return
@@ -196,7 +225,7 @@ export function RoleManagementDrawer({
           <section className={styles.roleManagerColumn}>
             <div className={styles.roleCreateRow}>
               <input value={newRoleName} onChange={(event) => setNewRoleName(event.target.value)} placeholder="新角色名称" />
-              <button className={styles.primaryBtn} onClick={createRole} disabled={!clean(newRoleName)}>创建</button>
+              <button className={styles.primaryBtn} onClick={createRole} disabled={!canManageRoles || !clean(newRoleName)}>创建</button>
             </div>
             <div className={styles.roleList}>
               {roles.map((role) => (
@@ -225,6 +254,7 @@ export function RoleManagementDrawer({
               onTogglePermission={toggleRolePermission}
               onSave={saveRole}
               onDelete={deleteRole}
+              canManageRoles={canManageRoles}
             />
           </section>
 
@@ -264,7 +294,7 @@ export function RoleManagementDrawer({
                       type="checkbox"
                       checked={selectedMemberRoles.includes(role.id)}
                       onChange={() => toggleMemberRole(role.id)}
-                      disabled={!selectedMember || selectedMember.user_id === currentUserId}
+                      disabled={!canManageMembers || !selectedMember || selectedMember.user_id === currentUserId}
                     />
                     <span className={styles.roleSwatch} style={{ background: role.color || '#747f8d' }} />
                     <strong>{role.name || roleLabel(role.id)}</strong>
@@ -272,10 +302,13 @@ export function RoleManagementDrawer({
                 ))}
               </div>
               <div className={styles.actionRow}>
-                <button className={styles.primaryBtn} onClick={saveMemberRoles} disabled={!selectedMember || selectedMember.user_id === currentUserId}>
+                <button className={styles.primaryBtn} onClick={saveMemberRoles} disabled={!canManageMembers || !selectedMember || selectedMember.user_id === currentUserId}>
                   保存成员角色
                 </button>
               </div>
+              {!canManageMembers && (
+                <p className={styles.sideHint}>当前角色只能查看成员角色，不能修改。</p>
+              )}
               {selectedMember?.user_id === currentUserId && (
                 <p className={styles.sideHint}>不能在这里修改自己的角色。</p>
               )}
@@ -300,6 +333,7 @@ function RoleEditor({
   onTogglePermission,
   onSave,
   onDelete,
+  canManageRoles,
 }: {
   role?: ProjectRole
   permissions: PermissionOption[]
@@ -313,14 +347,15 @@ function RoleEditor({
   onTogglePermission: (permission: string) => void
   onSave: () => void
   onDelete: () => void
+  canManageRoles: boolean
 }) {
   if (!role) return <p className={styles.sideHint}>暂无角色</p>
-  const readOnly = !!role.builtin
+  const readOnly = !!role.builtin || !canManageRoles
   return (
     <div className={styles.roleEditor}>
       <div className={styles.roleEditorHead}>
         <strong>{readOnly ? '内置角色' : '编辑角色'}</strong>
-        <span>{readOnly ? '内置角色不能直接编辑，可用频道权限覆盖。' : '调整名称、颜色、排序和项目权限。'}</span>
+        <span>{role.builtin ? '内置角色不能直接编辑，可用频道权限覆盖。' : !canManageRoles ? '当前角色只能查看角色定义，不能编辑。' : '调整名称、颜色、排序和项目权限。'}</span>
       </div>
       <div className={styles.formGrid}>
         <label className={styles.field}>
