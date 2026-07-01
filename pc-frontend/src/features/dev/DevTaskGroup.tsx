@@ -9,7 +9,7 @@
  */
 import { useState, useEffect, useRef } from 'react'
 import { DevTaskMessage } from './DevTaskCard'
-import { messageKind, taskIdOf } from './devTaskUtils'
+import { messageKind, messageText, taskIdOf, taskIsTerminal } from './devTaskUtils'
 import type { ChatMessage, TaskContext } from './types'
 import styles from './DevTaskGroup.module.css'
 
@@ -23,7 +23,7 @@ interface Props {
 export default function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const taskId  = taskIdOf(messages[0]) || ''
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
-  const isDone  = !!task?.result
+  const isDone  = taskIsTerminal(task)
 
   // 任务完成后默认折叠；从历史加载的已完成任务也默认折叠
   const [collapsed, setCollapsed] = useState(isDone)
@@ -40,6 +40,7 @@ export default function DevTaskGroup({ messages, taskContext, onCancel, onApprov
 
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
   const resultMsg   = messages.find((m) => messageKind(m) === 'ai_result')
+    ?? (isDone ? latestVisibleProgress(messages) : undefined)
   const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress')
   const progressCount = progressMsgs.length
 
@@ -112,4 +113,15 @@ export default function DevTaskGroup({ messages, taskContext, onCancel, onApprov
       )}
     </div>
   )
+}
+
+function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined {
+  const progress = messages.filter((m) => messageKind(m) === 'ai_progress')
+  for (let index = progress.length - 1; index >= 0; index--) {
+    const message = progress[index]
+    const text = messageText(message)
+    if (!text || text.includes('正在处理中…') || text.startsWith('AI 还在')) continue
+    return { ...message, kind: 'ai_result' }
+  }
+  return undefined
 }

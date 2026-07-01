@@ -91,8 +91,15 @@ export function useChannelAutoRefresh() {
   }, [])
 }
 
-/** 判断消息列表里是否有正在运行的任务（有 ai_task 但无对应 ai_result）*/
-function hasRunningTask(messages: { kind?: string; role?: string; task_id?: string; taskId?: string }[]): boolean {
+/** 判断消息列表里是否有正在运行的任务（有 ai_task 且尚未进入终态）*/
+function hasRunningTask(messages: {
+  kind?: string
+  role?: string
+  task_id?: string
+  taskId?: string
+  task_status?: string
+  taskStatus?: string
+}[]): boolean {
   const taskIds = new Set<string>()
   const doneIds = new Set<string>()
   for (const m of messages) {
@@ -100,10 +107,14 @@ function hasRunningTask(messages: { kind?: string; role?: string; task_id?: stri
     const taskId = m.task_id ?? m.taskId ?? ''
     if (!taskId) continue
     if (kind === 'ai_task') taskIds.add(taskId)
-    if (kind === 'ai_result') doneIds.add(taskId)
+    if (kind === 'ai_result' || isTerminalTaskStatus(m.task_status ?? m.taskStatus)) doneIds.add(taskId)
   }
   for (const id of taskIds) {
     if (!doneIds.has(id)) return true
   }
   return false
+}
+
+function isTerminalTaskStatus(status: unknown): boolean {
+  return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(String(status ?? '').toLowerCase())
 }

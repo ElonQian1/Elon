@@ -245,11 +245,15 @@ export default function ConversationPage() {
       const id = (m.task_id ?? m.taskId ?? '') as string
       if (!id) continue
       if (kind === 'ai_task') taskIds.add(id)
-      if (kind === 'ai_result') doneIds.add(id)
+      if (kind === 'ai_result' || isTerminalTaskStatus(m.task_status ?? m.taskStatus)) doneIds.add(id)
     }
     for (const id of taskIds) if (!doneIds.has(id)) return true
     return false
   })()
+
+  function isTerminalTaskStatus(status: unknown): boolean {
+    return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(String(status ?? '').toLowerCase())
+  }
   const autoResize = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
