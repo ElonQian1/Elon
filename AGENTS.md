@@ -36,6 +36,7 @@
 
 - 任务开始：先运行 `scripts\ai-task-preflight.ps1 -CreateWorktree`（Linux/macOS：`bash scripts/ai-task-preflight.sh --create-worktree`）。脚本会同步本地 `main` 基线并从最新 `origin/main` 派生独立任务 worktree；业务修改必须切到脚本输出的 `WORKTREE_PATH` / `EDIT_ROOT` 后进行，`main` 只做共享最新基线。
 - 预检输出为准：如果看到 `EDIT_ROOT=BLOCKED_CREATE_WORKTREE_FIRST`，说明当前目录不能编辑，必须重新按脚本提示创建 worktree；如果看到具体路径，所有读写、格式化、测试、提交都先切到该路径。
+- PC 节点 MCP 会话例外：如果当前目录已经是一龙平台创建的 `conversation-worktrees/<project>/<conversation>`，或当前分支形如 `ai/session/<project>/<conversation>`，说明平台已经完成隔离 worktree 准备；不要再运行 `ai-task-preflight.ps1 -CreateWorktree` 创建嵌套 worktree。直接在当前 worktree 运行 `git status --short --branch`，按任务继续执行，不能只停在“已读取规则、后续会执行”的说明。
 - PowerShell 版本：Windows bootstrap 脚本可继续用系统自带 `powershell.exe`；凡脚本头部有 `#requires -Version 7.0`，必须用 `pwsh` 运行。PowerShell 5 设备先运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-pwsh7.ps1` 检查；没有 PowerShell 7 时不要修改或降级 PS7 脚本，按 `docs/powershell-version-policy.md` 安装或转交给有 `pwsh` 的环境。
 - 任务流程门禁：修改 `ai-task-preflight`、worktree 清理、并行 AI 说明或 Git 工作流文档后，必须运行 `powershell -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1`，防止 `-CreateWorktree`、`WORKTREE_PATH`、`main` 基线规则漂移。
 - 后端发布：业务代码 commit + push 后运行 `scripts\publish-server.ps1` 或 `scripts/publish-server.sh`，再验证 `/health` 和 `/api/server/version`；若发布期间被更新的 `origin/main` 或服务器版本超越，按脚本提示汇报“代码已推送，发布交由后续最新 main”，不要反复 rebase 重跑。
