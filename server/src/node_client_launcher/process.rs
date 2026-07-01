@@ -5,8 +5,8 @@ use std::{
     collections::HashMap,
     io::{Read, Write},
     net::TcpStream,
-    path::Path,
-    time::Duration,
+    path::{Path, PathBuf},
+    time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
 use super::{
@@ -122,22 +122,26 @@ fn spawn_agent_runtime_via_powershell(
     port: u16,
     env_values: &HashMap<String, String>,
 ) -> Result<u32> {
-    let script = spawn_agent_runtime_script(client, install_dir, port, env_values);
+    let pid_file = runtime_spawn_pid_file(install_dir)?;
+    let _ = std::fs::remove_file(&pid_file);
+    let script = spawn_agent_runtime_script(client, install_dir, port, env_values, &pid_file);
     let mut ps = launcher_command::powershell_hidden_command(&script);
-    let output = launcher_command::output_hidden(&mut ps)
+    let status = launcher_command::status_hidden(&mut ps)
         .context("failed to start node runtime via PowerShell")?;
-    if !output.status.success() {
-        bail!(
-            "PowerShell Start-Process failed: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+    if !status.success() {
+        bail!("PowerShell Start-Process failed with status {status}");
     }
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    stdout
-        .lines()
-        .rev()
-        .find_map(|line| line.trim().parse::<u32>().ok())
-        .context("PowerShell Start-Process did not return a runtime pid")
+    let pid_text = std::fs::read_to_string(&pid_file).with_context(|| {
+        format!(
+            "PowerShell Start-Process did not write {}",
+            pid_file.display()
+        )
+    })?;
+    let _ = std::fs::remove_file(&pid_file);
+    pid_text
+        .trim()
+        .parse::<u32>()
+        .context("PowerShell Start-Process wrote an invalid runtime pid")
 }
 
 #[cfg(windows)]
@@ -146,6 +150,7 @@ fn spawn_agent_runtime_script(
     install_dir: &Path,
     port: u16,
     env_values: &HashMap<String, String>,
+    pid_file: &Path,
 ) -> String {
     let mut script = String::from("$ErrorActionPreference = 'Stop'\n");
     let mut env_pairs: Vec<_> = env_values.iter().collect();
@@ -163,12 +168,30 @@ fn spawn_agent_runtime_script(
         "$installDir = '{}'\n",
         launcher_command::ps_single_quote(&install_dir.to_string_lossy())
     ));
+    script.push_str(&format!(
+        "$pidFile = '{}'\n",
+        launcher_command::ps_single_quote(&pid_file.to_string_lossy())
+    ));
     script.push_str("$process = Start-Process -FilePath $client -ArgumentList '--agent-runtime' -WorkingDirectory $installDir -WindowStyle Hidden -PassThru\n");
     script.push_str(
         "if ($null -eq $process) { throw 'Start-Process did not return a process handle' }\n",
     );
-    script.push_str("Write-Output $process.Id\n");
+    script.push_str(
+        "Set-Content -LiteralPath $pidFile -Value ([string]$process.Id) -Encoding ASCII\n",
+    );
     script
+}
+
+#[cfg(windows)]
+fn runtime_spawn_pid_file(install_dir: &Path) -> Result<PathBuf> {
+    let logs_dir = paths::internal_dir(install_dir).join("logs");
+    std::fs::create_dir_all(&logs_dir)
+        .with_context(|| format!("failed to create {}", logs_dir.display()))?;
+    let nonce = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis();
+    Ok(logs_dir.join(format!("runtime-spawn-{}-{nonce}.pid", std::process::id())))
 }
 
 #[cfg(windows)]
@@ -374,8 +397,7 @@ $targets = Get-CimInstance Win32_Process | Where-Object {{
       $exeMatch = $false
     }}
   }}
-  $lineMatch = $line.IndexOf($target, [StringComparison]::OrdinalIgnoreCase) -ge 0
-  ($line -match '--agent-runtime') -and ($exeMatch -or $lineMatch)
+  ($line -match '--agent-runtime') -and $exeMatch
 }}
 if ($targets) {{ Write-Output 'running' }}
 "#,
@@ -495,6 +517,8 @@ mod tests {
 
         assert!(script.contains("--agent-runtime"));
         assert!(script.contains(r"C:\ElonNode\一龙PC节点.exe"));
+        assert!(script.contains("and $exeMatch"));
+        assert!(!script.contains("lineMatch"));
         assert!(!script.contains("elon-node-agent.exe"));
     }
 
@@ -514,15 +538,19 @@ mod tests {
             Path::new(r"C:\ElonNode"),
             7801,
             &env_values,
+            Path::new(r"C:\ElonNode\_internal\logs\runtime-spawn.pid"),
         );
 
         assert!(script.contains("Start-Process -FilePath $client -ArgumentList '--agent-runtime'"));
+        assert!(script.contains("Set-Content -LiteralPath $pidFile"));
+        assert!(!script.contains("Write-Output $process.Id"));
         assert!(script.contains(
             "[Environment]::SetEnvironmentVariable('NODE_ADMIN_PORT', '7801', 'Process')"
         ));
         assert!(script
             .contains("[Environment]::SetEnvironmentVariable('QUOTED', 'O''Hara', 'Process')"));
         assert!(script.contains(r"$client = 'C:\ElonNode\client.exe'"));
+        assert!(script.contains(r"$pidFile = 'C:\ElonNode\_internal\logs\runtime-spawn.pid'"));
 
         let inherited_auto_open = script
             .find("[Environment]::SetEnvironmentVariable('NODE_AUTO_OPEN_ADMIN', '1', 'Process')")
