@@ -6,6 +6,7 @@ param(
     [int]$Port = 8787,
     [int]$HealthTimeoutSec = 6,
     [int]$HealthPollMs = 250,
+    [int]$RequestTimeoutSec = 120,
     [switch]$EnsureMainActivity,
     [switch]$OpenAppOnFailure,
     [switch]$NoBootstrap
@@ -96,6 +97,17 @@ if ($null -eq $argumentObject) {
 }
 $argumentObject | Add-Member -NotePropertyName auth_token -NotePropertyValue $token -Force
 
+$effectiveRequestTimeoutSec = [Math]::Max(1, $RequestTimeoutSec)
+$waitTimeoutProperty = $argumentObject.PSObject.Properties["wait_timeout_ms"]
+if ($waitTimeoutProperty -and $null -ne $waitTimeoutProperty.Value) {
+    try {
+        $waitTimeoutSec = [Math]::Ceiling(([double]$waitTimeoutProperty.Value) / 1000)
+        $effectiveRequestTimeoutSec = [Math]::Max($effectiveRequestTimeoutSec, [int]$waitTimeoutSec + 15)
+    } catch {
+        throw "Invalid wait_timeout_ms: $($waitTimeoutProperty.Value)"
+    }
+}
+
 $request = [ordered]@{
     jsonrpc = "2.0"
     id = "ps-$([DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds())"
@@ -112,4 +124,4 @@ Invoke-RestMethod `
     -Uri "http://127.0.0.1:$Port/mcp" `
     -ContentType "application/json" `
     -Body $body `
-    -TimeoutSec 120
+    -TimeoutSec $effectiveRequestTimeoutSec
