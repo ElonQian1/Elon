@@ -76,11 +76,13 @@ function sortModerationMembers(members: ProjectMember[], sortMode: ModerationSor
 export function ModerationDrawer({
   projectId,
   members,
+  initialMemberId,
   onClose,
   onSaved,
 }: {
   projectId: string
   members: ProjectMember[]
+  initialMemberId?: string
   onClose: () => void
   onSaved: () => Promise<void>
 }) {
@@ -140,6 +142,16 @@ export function ModerationDrawer({
     refreshAudit()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
+  useEffect(() => {
+    if (!initialMemberId) return
+    const member = members.find((item) => item.user_id === initialMemberId)
+    if (!member) return
+    setQuery(memberName(member))
+    setFilter(member.is_banned ? 'banned' : member.is_muted ? 'muted' : 'all')
+    setSortMode('status')
+    setListScrollTop(0)
+    if (listRef.current) listRef.current.scrollTop = 0
+  }, [initialMemberId, members])
   useEffect(() => {
     setListScrollTop(0)
     if (listRef.current) listRef.current.scrollTop = 0
