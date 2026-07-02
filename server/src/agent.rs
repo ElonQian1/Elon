@@ -2,7 +2,7 @@
 
 use anyhow::Result;
 use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
-use std::{path::Path, sync::Arc};
+use std::{path::Path, sync::Arc, time::Duration};
 use tokio::sync::mpsc::UnboundedSender;
 use tracing::{error, info, warn};
 
@@ -24,6 +24,9 @@ use crate::{
     tools,
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
 };
+
+const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 30;
+const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
 
 /// 一龙自项目路径（默认 /root/Elon，可由 ELON_SELF_PATH 环境变量覆盖）
 pub fn elon_self_workspace() -> std::path::PathBuf {
@@ -683,14 +686,22 @@ async fn resolve_pc_project_binding(
         .filter(|value| !value.is_empty())
     {
         let belongs_to_user = pc_agent_belongs_to_user(state, user_id, agent_id);
-        if belongs_to_user && pc_agent_is_connected(state, agent_id).await {
-            if let Some(binding) =
-                usable_project_binding_for_agent(state, user_id, project, agent_id, true, tx).await
-            {
-                return Some(binding);
+        if belongs_to_user {
+            let connected = if pc_agent_is_connected(state, agent_id).await {
+                true
+            } else {
+                wait_for_bound_pc_agent_reconnect(state, agent_id, tx).await
+            };
+            if connected {
+                if let Some(binding) =
+                    usable_project_binding_for_agent(state, user_id, project, agent_id, true, tx)
+                        .await
+                {
+                    return Some(binding);
+                }
             }
         } else {
-            bound_agent_wrong_owner = !belongs_to_user;
+            bound_agent_wrong_owner = true;
         }
         warn!(
             project_id = %project.id,
@@ -817,6 +828,29 @@ async fn connected_pc_agent_with_recorded_workspace_binding(
         }
     }
     None
+}
+
+async fn wait_for_bound_pc_agent_reconnect(
+    state: &Arc<AppState>,
+    agent_id: &str,
+    tx: Option<&UnboundedSender<String>>,
+) -> bool {
+    send_optional_progress(
+        tx,
+        "绑定的 PC 节点正在重连，先等待它恢复，避免把同一项目错误切到其它电脑。",
+    );
+    let deadline =
+        tokio::time::Instant::now() + Duration::from_secs(BOUND_PC_NODE_RECONNECT_WAIT_SECS);
+    loop {
+        tokio::time::sleep(Duration::from_millis(BOUND_PC_NODE_RECONNECT_POLL_MS)).await;
+        if pc_agent_is_connected(state, agent_id).await {
+            send_optional_progress(tx, "绑定的 PC 节点已恢复连接，继续使用原本项目路径执行。");
+            return true;
+        }
+        if tokio::time::Instant::now() >= deadline {
+            return false;
+        }
+    }
 }
 
 async fn usable_project_binding_for_agent(
