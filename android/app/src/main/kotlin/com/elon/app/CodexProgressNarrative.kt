@@ -29,6 +29,7 @@ object CodexProgressNarrative {
                 )
             }
         }
+        if (isSelfRecoveringWorkflowProgress(clean)) return null
 
         return when {
             clean.contains("失败") || clean.contains("错误") || clean.contains("不可用") -> narrative(
@@ -47,6 +48,7 @@ object CodexProgressNarrative {
     fun fromCliOutput(category: String, line: String): Narrative? {
         val clean = userSafeCliLine(line)
         val lower = clean.lowercase(Locale.CHINA)
+        if (isSelfRecoveringWorkflowProgress(clean)) return null
         if (category == "模型回复") {
             val userVisible = extractUserVisibleCliMessage(clean) ?: return null
             if (!shouldExposeAssistantLine(userVisible)) return null

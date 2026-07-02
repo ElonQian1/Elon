@@ -1,5 +1,7 @@
 package com.elon.app
 
+import java.util.Locale
+
 internal fun progressStepLabel(content: String): String {
     return when {
         content.startsWith("AI 回复片段") -> "开发说明"
@@ -39,6 +41,60 @@ internal fun isRoutineHeartbeatProgress(content: String): Boolean {
         backgroundHeartbeatRegex.matches(clean)
 }
 
+internal fun isSelfRecoveringWorkflowProgress(content: String): Boolean {
+    val clean = content.replace(Regex("\\s+"), " ").trim()
+    if (clean.isBlank()) return false
+    val lower = clean.lowercase(Locale.CHINA)
+    val rawCliRecovery = listOf(
+        "reconnecting...",
+        "stream disconnected - retrying sampling request",
+        "falling back to http",
+        "failed to refresh remote installed plugins cache",
+        "curated plugin sync",
+        "git sync failed for curated plugin"
+    )
+    if (rawCliRecovery.any { lower.contains(it) }) return true
+
+    val recoveryActions = listOf(
+        "正在重连",
+        "等待重连",
+        "自动重连",
+        "已恢复连接",
+        "短暂离线",
+        "正在查找其它在线 pc 节点",
+        "正在查找其他在线 pc 节点",
+        "正在切换",
+        "已切换",
+        "回退",
+        "fallback",
+        "继续使用",
+        "继续生成",
+        "继续执行",
+        "正在从代码源重建",
+        "正在重新创建",
+        "正在尝试",
+        "使用本地缓存"
+    )
+    if (recoveryActions.none { lower.contains(it) }) return false
+
+    val recoverySubjects = listOf(
+        "pc 节点",
+        "pc agent",
+        "cli",
+        "codex",
+        "copilot",
+        "本地 ai cli",
+        "主 ai cli",
+        "开发助手",
+        "工作区",
+        "插件",
+        "网络",
+        "流式连接",
+        "server-runtime"
+    )
+    return recoverySubjects.any { lower.contains(it) }
+}
+
 internal fun workflowProgressMessage(content: String): String {
     if (isRoutineHeartbeatProgress(content)) return "正在思考"
     val progress = userFacingProgress(content.ifBlank { "正在推进当前任务。" })
@@ -48,6 +104,7 @@ internal fun workflowProgressMessage(content: String): String {
 
 internal fun shouldShowProgressBubble(content: String): Boolean {
     if (isRoutineHeartbeatProgress(content)) return false
+    if (isSelfRecoveringWorkflowProgress(content)) return false
     val progress = userFacingProgress(content)
     return !isRoutineWorkflowMessage(workflowProgressMessage(content)) &&
         !isRoutineWorkflowMessage(progress) &&
@@ -76,6 +133,20 @@ internal fun userFacingProgress(content: String): String {
             "开发助手正在给出阶段说明。"
         content.contains("已识别为开发任务") ->
             "已确认这是开发任务，开始进入项目流程。"
+        content.contains("绑定的 PC 节点正在重连") ->
+            "绑定的 PC 节点正在重连，正在等待原节点恢复。"
+        content.contains("绑定的 PC 节点已恢复连接") ->
+            "绑定的 PC 节点已恢复连接，继续使用原本项目路径执行。"
+        content.contains("PC 节点短暂离线") || content.contains("正在自动重连") ->
+            "PC 节点连接不稳定，正在自动重连。"
+        content.contains("工作区不可用") && content.contains("正在查找") ->
+            "绑定工作区暂时不可用，正在查找可接手的在线 PC 节点。"
+        content.contains("暂不可用") && content.contains("切换") ->
+            "当前执行通道暂不可用，正在切换备用通道。"
+        content.contains("流式连接不稳定") && content.contains("重连") ->
+            "模型流式连接不稳定，正在自动重连。"
+        content.contains("插件远程同步不可达") || content.contains("本地缓存") ->
+            "插件同步暂不可达，已继续使用本地缓存。"
         content.contains("正在确认这是否需要进入开发流程") ->
             "我正在确认这条消息是否需要改代码。"
         content.startsWith("正在准备项目工作区") ->
