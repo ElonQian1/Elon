@@ -1195,9 +1195,20 @@ export function MemberContextSummary({
   usingChannelPermissions?: boolean
 }) {
   const stats = memberPanelStats(members)
+  const scopeLabel = channel ? '频道范围' : '项目范围'
+  const modeLabel = channel
+    ? usingChannelPermissions ? '按频道权限' : '继承项目成员'
+    : '全项目成员'
   return (
     <section className={styles.memberContextSummary}>
-      <strong>{title || (channel ? '频道视图' : '项目视图')}</strong>
+      <div className={styles.memberContextTop}>
+        <strong>{title || (channel ? '频道视图' : '项目视图')}</strong>
+        <em data-scope={channel ? 'channel' : 'project'}>{scopeLabel}</em>
+      </div>
+      <div className={styles.memberContextMode}>
+        <em>{modeLabel}</em>
+        {typeof projectTotal === 'number' && channel && <em>项目 {projectTotal}</em>}
+      </div>
       <span>{label}</span>
       {channel && usingChannelPermissions && typeof projectTotal === 'number' && (
         <span>按频道权限过滤，项目成员 {projectTotal} 人</span>
