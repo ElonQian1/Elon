@@ -58,6 +58,7 @@ pub(crate) async fn get_or_start_project_ws_job(
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
     trace_id: Option<String>,
     client_request_id: String,
     fingerprint: String,
@@ -228,6 +229,7 @@ pub(crate) async fn get_or_start_project_ws_job(
             attachments,
             execution_mode,
             pc_runtime_route,
+            direct_pc_cli,
             trace_id,
             task_id,
             job_for_task,
@@ -252,6 +254,7 @@ async fn run_project_ws_job(
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
     trace_id: Option<String>,
     task_id: String,
     job: Arc<ProjectWsJob>,
@@ -269,6 +272,7 @@ async fn run_project_ws_job(
                 "message_chars": message.chars().count(),
                 "agent": agent_name.as_deref(),
                 "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
+                "direct_pc_cli": direct_pc_cli,
                 "execution_mode": execution_mode.as_str(),
             }),
         );
@@ -316,6 +320,7 @@ async fn run_project_ws_job(
     let task_agent_name = agent_name.clone();
     let task_attachments = attachments.clone();
     let task_pc_runtime_route = pc_runtime_route;
+    let task_direct_pc_cli = direct_pc_cli;
     let task_trace_id = trace_id.clone();
     let agent_task = tokio::spawn(async move {
         run_project_agent_with_scheduler(
@@ -330,6 +335,7 @@ async fn run_project_ws_job(
             task_attachments,
             execution_mode,
             task_pc_runtime_route,
+            task_direct_pc_cli,
             task_trace_id,
             tx,
         )

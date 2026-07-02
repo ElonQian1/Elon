@@ -242,6 +242,7 @@ export interface SendMessagePayload {
   conversation_title?: string
   localNodeId?: string
   localWorkspacePath?: string
+  directPcCli?: boolean
 }
 
 export interface SendMessageResponse {
@@ -257,6 +258,7 @@ export interface StartAiTaskPayload {
   runtimeRoute?: RuntimeRoute
   conversation_id?: string
   conversation_title?: string
+  directPcCli?: boolean
 }
 
 export interface ProjectListResponse {

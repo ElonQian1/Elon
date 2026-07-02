@@ -124,6 +124,8 @@ pub struct StartChannelAiTaskRequest {
         alias = "workspacePath"
     )]
     pub local_workspace_path: Option<String>,
+    #[serde(default, alias = "directPcCli", alias = "pcDirectCli")]
+    pub direct_pc_cli: Option<bool>,
     pub trace_id: Option<String>,
 }
 
@@ -1607,7 +1609,9 @@ async fn start_channel_ai_task_response(
         },
         None => None,
     };
-    let skip_auto_bind_for_casual_chat = channel_ai_quick_reply(&content).is_some();
+    let direct_pc_cli = req.direct_pc_cli.unwrap_or(false);
+    let skip_auto_bind_for_casual_chat =
+        !direct_pc_cli && channel_ai_quick_reply(&content).is_some();
     if should_auto_bind_local_node(runtime_route) && !skip_auto_bind_for_casual_chat {
         if let (Some(node_id), Some(workspace_path)) = (
             req.local_node_id
@@ -1703,76 +1707,81 @@ async fn start_channel_ai_task_response(
         "ai_task",
     );
 
-    if let Some(reply) = channel_ai_quick_reply(&content) {
-        let done_raw = WsMessage::Done {
-            message: reply.clone(),
-            apk_url: None,
-            image_url: None,
-            model_used: None,
-            node_id: None,
-        }
-        .to_json();
-        let _ = state.store.record_task_event(
-            &task_id,
-            &enrich_project_ws_event(done_raw.clone(), &task_id),
-        );
+    if !direct_pc_cli {
+        if let Some(reply) = channel_ai_quick_reply(&content) {
+            let done_raw = WsMessage::Done {
+                message: reply.clone(),
+                apk_url: None,
+                image_url: None,
+                model_used: None,
+                node_id: None,
+            }
+            .to_json();
+            let _ = state.store.record_task_event(
+                &task_id,
+                &enrich_project_ws_event(done_raw.clone(), &task_id),
+            );
 
-        match state
-            .store
-            .finish_running_task(&task_id, "done", Some(reply.as_str()), None, None)
-        {
-            Ok(true) => {
-                project_events::publish_task_done(
-                    &state,
-                    &project_id,
-                    &user_id,
-                    &conversation_id,
-                    &done_raw,
-                );
-                publish_channel_message_updated(
+            match state.store.finish_running_task(
+                &task_id,
+                "done",
+                Some(reply.as_str()),
+                None,
+                None,
+            ) {
+                Ok(true) => {
+                    project_events::publish_task_done(
+                        &state,
+                        &project_id,
+                        &user_id,
+                        &conversation_id,
+                        &done_raw,
+                    );
+                    publish_channel_message_updated(
+                        state.as_ref(),
+                        &project_id,
+                        &channel_id,
+                        Some(&conversation_id),
+                        Some(&task_id),
+                        "conversation_result",
+                    );
+                }
+                Ok(false) => {}
+                Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
+            }
+
+            match state.store.insert_project_channel_ai_result_once(
+                &project_id,
+                &channel_id,
+                reply.as_str(),
+                &task_id,
+            ) {
+                Ok(true) => publish_channel_message_updated(
                     state.as_ref(),
                     &project_id,
                     &channel_id,
                     Some(&conversation_id),
                     Some(&task_id),
-                    "conversation_result",
-                );
+                    "ai_result",
+                ),
+                Ok(false) => {}
+                Err(e) => tracing::warn!(
+                    project_id = %project_id,
+                    channel_id = %channel_id,
+                    task_id = %task_id,
+                    error = %e,
+                    "写入频道普通聊天 AI 结果失败"
+                ),
             }
-            Ok(false) => {}
-            Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-        }
 
-        match state.store.insert_project_channel_ai_result_once(
-            &project_id,
-            &channel_id,
-            reply.as_str(),
-            &task_id,
-        ) {
-            Ok(true) => publish_channel_message_updated(
-                state.as_ref(),
-                &project_id,
-                &channel_id,
-                Some(&conversation_id),
-                Some(&task_id),
-                "ai_result",
-            ),
-            Ok(false) => {}
-            Err(e) => tracing::warn!(
-                project_id = %project_id,
-                channel_id = %channel_id,
-                task_id = %task_id,
-                error = %e,
-                "写入频道普通聊天 AI 结果失败"
-            ),
+            return Json(serde_json::json!({
+                "task_id": task_id,
+                "trace_id": trace_id,
+                "conversation_id": conversation_id,
+                "message": task_message,
+            }))
+            .into_response();
         }
-
-        return Json(serde_json::json!({
-            "task_id": task_id,
-            "trace_id": trace_id,
-            "conversation_id": conversation_id,
-            "message": task_message,
-        }))
-        .into_response();
     }
 
     spawn_channel_ai_task(ChannelAiTask {
@@ -1787,6 +1796,7 @@ async fn start_channel_ai_task_response(
         content,
         agent: req.agent,
         runtime_route,
+        direct_pc_cli,
         trace_id: trace_id.clone(),
     });
 
@@ -1968,6 +1978,7 @@ struct ChannelAiTask {
     content: String,
     agent: Option<String>,
     runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
     trace_id: String,
 }
 
@@ -2066,6 +2077,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let run_content = task.content.clone();
         let run_agent = task.agent.clone();
         let run_runtime_route = task.runtime_route;
+        let run_direct_pc_cli = task.direct_pc_cli;
         let run_trace_id = task.trace_id.clone();
         let download_base = task.download_base.clone();
         let runner = tokio::spawn(async move {
@@ -2081,6 +2093,7 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                 None,
                 ProjectExecutionMode::Execute,
                 run_runtime_route,
+                run_direct_pc_cli,
                 Some(run_trace_id),
                 tx,
             )

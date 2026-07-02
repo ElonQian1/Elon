@@ -48,6 +48,8 @@ pub struct ProjectChatRequest {
     #[serde(default, alias = "projectIconDataUrl")]
     pub project_icon_data_url: Option<String>,
     pub attachments: Option<Vec<ProjectAttachmentRef>>,
+    #[serde(default, alias = "directPcCli", alias = "pcDirectCli")]
+    pub direct_pc_cli: Option<bool>,
     /// 方案8: 客户端声明的 WS 协议版本，旧客户端为 None（服务器按 v1 处理）
     pub protocol_version: Option<u32>,
     /// 仅闲聊：true 时强制走轻量 casual chat，绝不进入项目 Codex 开发工作流。
@@ -246,6 +248,7 @@ pub fn parse_project_message(raw: &str) -> ProjectChatRequest {
         local_workspace_path: None,
         project_icon_data_url: None,
         attachments: None,
+        direct_pc_cli: None,
         protocol_version: None,
         chat_only: None,
     })

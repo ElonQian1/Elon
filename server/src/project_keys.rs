@@ -16,15 +16,17 @@ pub fn project_ws_fingerprint(
     conversation_id: &str,
     agent_name: Option<&str>,
     pc_runtime_route: Option<&str>,
+    direct_pc_cli: bool,
     execution_mode: &str,
     project_icon_data_url: Option<&str>,
     message: &str,
 ) -> String {
     format!(
-        "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
+        "{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}\u{1f}{}",
         conversation_id,
         agent_name.unwrap_or(""),
         pc_runtime_route.unwrap_or(""),
+        direct_pc_cli,
         execution_mode,
         project_icon_data_url.unwrap_or(""),
         message

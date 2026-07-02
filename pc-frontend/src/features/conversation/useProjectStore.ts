@@ -43,6 +43,7 @@ interface ProjectState {
     localNodeId?: string | null,
     localWorkspacePath?: string | null,
     channelIdOverride?: string | null,
+    directPcCli?: boolean,
   ) => Promise<SendMessageResponse | null>
   cancelTask: (taskId: string) => Promise<void>
   approveTool: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
@@ -215,6 +216,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     localNodeId?: string | null,
     localWorkspacePath?: string | null,
     channelIdOverride?: string | null,
+    directPcCli?: boolean,
   ) => {
     const { activeProjectId, activeChannelId } = get()
     const channelId = channelIdOverride || activeChannelId
@@ -231,6 +233,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
           conversation_title: conversationTitle || undefined,
           localNodeId: localNodeId || undefined,
           localWorkspacePath: localWorkspacePath || undefined,
+          directPcCli: directPcCli || undefined,
         },
       )
       // 立即刷新消息

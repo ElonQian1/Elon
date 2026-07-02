@@ -86,6 +86,8 @@ import type { MemberMenuRequest, MemberModerationAction } from './MemberPanel'
 import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
+const DIRECT_PC_CLI_STORAGE_KEY = 'elon_pc_project_direct_pc_cli'
+
 interface LocalNodeStatus {
   agent_id?: string
   owner_user_id?: string
@@ -115,6 +117,26 @@ interface TaskMessageCacheEntry {
 
 const TASK_MESSAGE_CACHE_FRESH_MS = 4000
 
+function initialDirectPcCliFromStorage(storage?: Storage | null): boolean {
+  try {
+    return storage?.getItem(DIRECT_PC_CLI_STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function persistDirectPcCliSelection(storage: Storage | null | undefined, enabled: boolean): void {
+  try {
+    if (enabled) {
+      storage?.setItem(DIRECT_PC_CLI_STORAGE_KEY, '1')
+    } else {
+      storage?.removeItem(DIRECT_PC_CLI_STORAGE_KEY)
+    }
+  } catch {
+    // Ignore blocked storage; the selected value still works for the current session.
+  }
+}
+
 export default function ConversationPage() {
   useChannelAutoRefresh()
   const navigate = useNavigate()
@@ -133,6 +155,9 @@ export default function ConversationPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
   const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialRuntimeRouteFromStorage(
+    typeof window === 'undefined' ? null : window.localStorage,
+  ))
+  const [directPcCli, setDirectPcCli] = useState(() => initialDirectPcCliFromStorage(
     typeof window === 'undefined' ? null : window.localStorage,
   ))
   const [showPermissions, setShowPermissions] = useState(false)
@@ -190,16 +215,20 @@ export default function ConversationPage() {
     taskMessageCacheRef.current.set(key, { messages, loadedAt: Date.now() })
     return messages
   }, [])
-  const modelButtonCopy = useMemo(
-    () => routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent),
-    [runtimeRoute, modelLabel, modelOptions, selectedAgent],
-  )
+  const handleRuntimeRouteChange = useCallback((route: RuntimeRoute) => {
+    setRuntimeRoute(route)
+    setDirectPcCli(false)
+  }, [])
 
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
 
   useEffect(() => {
     persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
   }, [runtimeRoute])
+
+  useEffect(() => {
+    persistDirectPcCliSelection(window.localStorage, directPcCli)
+  }, [directPcCli])
 
   useEffect(() => {
     let canceled = false
@@ -412,16 +441,20 @@ export default function ConversationPage() {
       const isExistingConversation = typeof sessionView === 'string' && sessionView !== 'new'
       const conversationId = isExistingConversation ? sessionView : uuidv4()
       const conversationTitle = isExistingConversation ? null : titleFromMessage(text)
-      const requestAgent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, runtimeRoute)
+      const directPcCliForRequest = directPcCliActive
+      const requestRuntimeRoute: RuntimeRoute = directPcCliForRequest ? 'route_a' : runtimeRoute
+      const useLocalNodeForRequest = (directPcCliForRequest || shouldPreferLocalNode) && localNodeReady
+      const requestAgent = selectedAgentForRuntimeRoute(selectedAgent, modelOptions, requestRuntimeRoute)
       const response = await sendMessage(
         fullContent,
         requestAgent || null,
-        runtimeRoute,
+        requestRuntimeRoute,
         conversationId,
         conversationTitle,
-        shouldPreferLocalNode && localNodeReady ? localNodeId : null,
-        shouldPreferLocalNode && localNodeReady ? activeWorkspacePath : null,
+        useLocalNodeForRequest ? localNodeId : null,
+        useLocalNodeForRequest ? activeWorkspacePath : null,
         targetChannelId,
+        directPcCliForRequest,
       )
       const openedConversationId = response?.conversation_id ?? conversationId
       waitingForNewSession.current = false
@@ -519,6 +552,15 @@ export default function ConversationPage() {
     && localNode?.connected !== false
     && localNode?.codex_cli?.available !== false
   const shouldPreferLocalNode = !['route_c2', 'route_c3'].includes(runtimeRoute)
+  const directPcCliAvailable = !!activeProjectId
+    && !isAssistingMember
+    && localNodeReady
+  const directPcCliActive = directPcCli && directPcCliAvailable
+  const composerRuntimeRoute: RuntimeRoute = directPcCliActive ? 'route_a' : runtimeRoute
+  const modelButtonCopy = useMemo(
+    () => routeModelButtonCopy(composerRuntimeRoute, modelLabel, modelOptions, selectedAgent),
+    [composerRuntimeRoute, modelLabel, modelOptions, selectedAgent],
+  )
   const projectBoundToLocalNode = !!localNodeId && activeProject?.node_id === localNodeId
   const activeChannelBlocksAi = !!activeChannel && activeChannel.kind === 'ai_development' && !channelAllowsAiStart(activeChannel)
   const activeChannelIsNotAi = !!activeChannel && activeChannel.kind !== 'ai_development'
@@ -1255,6 +1297,25 @@ export default function ConversationPage() {
                 <strong>{modelButtonCopy.detail}</strong>
               </button>
 
+              <label
+                className={styles.directCliToggle}
+                data-active={directPcCliActive ? 'true' : 'false'}
+                data-disabled={!directPcCliAvailable || composerDisabled ? 'true' : 'false'}
+                title="打开后，本项目会话直接交给本机 Codex CLI"
+              >
+                <input
+                  type="checkbox"
+                  checked={directPcCliActive}
+                  disabled={!directPcCliAvailable || composerDisabled}
+                  onChange={(event) => setDirectPcCli(event.target.checked)}
+                />
+                <span className={styles.directCliSwitch} aria-hidden="true" />
+                <span className={styles.directCliCopy}>
+                  <strong>直连Codex</strong>
+                  <em>{directPcCliActive ? '开启' : '关闭'}</em>
+                </span>
+              </label>
+
               {/* Textarea */}
               <textarea
                 ref={textareaRef}
@@ -1424,7 +1485,7 @@ export default function ConversationPage() {
         <ModelPickerPopover
           anchorRef={modelBtnRef}
           runtimeRoute={runtimeRoute}
-          onRuntimeRouteChange={setRuntimeRoute}
+          onRuntimeRouteChange={handleRuntimeRouteChange}
           onClose={() => setShowModelPicker(false)}
         />
       )}

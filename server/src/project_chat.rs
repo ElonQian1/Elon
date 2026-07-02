@@ -185,6 +185,7 @@ pub async fn chat_project(
             attachments,
             ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
             pc_runtime_route,
+            req.direct_pc_cli.unwrap_or(false),
             Some(trace_id.clone()),
             tx,
         )
@@ -386,6 +387,7 @@ pub async fn chat_project_stream(
         attachments,
         ProjectExecutionMode::from_request(req.execution_mode.as_deref(), req.plan_mode),
         pc_runtime_route,
+        req.direct_pc_cli.unwrap_or(false),
         Some(trace_id),
         tx,
     )
@@ -471,10 +473,10 @@ fn should_append_project_icon_context_for_pc_fast_path(needs_project_workflow: b
 }
 
 fn pc_node_fast_path_route(
-    needs_project_workflow: bool,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
 ) -> Option<PcRuntimeRoutePreference> {
-    if !needs_project_workflow && pc_runtime_route.is_none() {
+    if direct_pc_cli {
         return Some(PcRuntimeRoutePreference::RouteA);
     }
     pc_runtime_route
@@ -546,16 +548,24 @@ mod tests {
     }
 
     #[test]
-    fn pc_node_fast_path_defaults_lightweight_chat_to_route_a() {
+    fn pc_node_fast_path_does_not_default_lightweight_chat_to_route_a() {
+        assert_eq!(pc_node_fast_path_route(None, false), None);
         assert_eq!(
-            pc_node_fast_path_route(false, None),
+            pc_node_fast_path_route(Some(PcRuntimeRoutePreference::RouteC3), false),
+            Some(PcRuntimeRoutePreference::RouteC3)
+        );
+    }
+
+    #[test]
+    fn pc_node_direct_cli_switch_selects_route_a() {
+        assert_eq!(
+            pc_node_fast_path_route(None, true),
             Some(PcRuntimeRoutePreference::RouteA)
         );
         assert_eq!(
-            pc_node_fast_path_route(false, Some(PcRuntimeRoutePreference::RouteC3)),
-            Some(PcRuntimeRoutePreference::RouteC3)
+            pc_node_fast_path_route(Some(PcRuntimeRoutePreference::RouteC), true),
+            Some(PcRuntimeRoutePreference::RouteA)
         );
-        assert_eq!(pc_node_fast_path_route(true, None), None);
     }
 }
 
@@ -613,6 +623,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     attachments: Option<Vec<ProjectAttachmentRef>>,
     execution_mode: ProjectExecutionMode,
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    direct_pc_cli: bool,
     trace_id: Option<String>,
     tx: UnboundedSender<String>,
 ) {
@@ -647,13 +658,21 @@ pub(crate) async fn run_project_agent_with_scheduler(
         );
     }
     let routing_decision = intent_router::classify(&message);
+    let base_workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    // PC 节点项目（有 node_id）的路径在用户 PC 上，不在服务器本地。
+    let is_pc_node_project = project
+        .node_id
+        .as_deref()
+        .map(|n| !n.is_empty())
+        .unwrap_or(false);
+    let direct_pc_cli_enabled = direct_pc_cli && is_pc_node_project && !execution_mode.is_plan();
     // force_cli: 悬浮球手机控制专用模式，绕过本地 intent_router 分流，
     // 直接进入 Codex CLI 意图门控，由 Codex 自己判断"闲聊还是生成脚本"。
     let needs_project_workflow = execution_mode.is_plan()
         || execution_mode.is_force_cli()
+        || direct_pc_cli_enabled
         || routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
-    let base_workspace =
-        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     if needs_project_workflow && !can_edit(&project.role) {
         let apk_url = if agent_intent::is_project_delivery_request(&message, &base_workspace)
             && tools::find_latest_apk(&base_workspace).is_some()
@@ -695,19 +714,13 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 "local_confidence": routing_decision.confidence,
                 "local_reason": routing_decision.reason,
                 "skip_intent_gate": skip_intent_gate,
+                "direct_pc_cli": direct_pc_cli_enabled,
                 "execution_mode": execution_mode.as_str(),
             }),
         );
     }
-    // PC 节点项目（有 node_id）的路径在用户 PC 上，不在服务器本地。
     // 服务器上不应创建 worktree——直接透传给 agent 层，由 pc_project_binding 接管。
     // 同时 bypass 整个 scheduler（PC项目无需 worktree/合并锁），减少不必要的等待。
-    let is_pc_node_project = project
-        .node_id
-        .as_deref()
-        .map(|n| !n.is_empty())
-        .unwrap_or(false);
-
     if is_pc_node_project {
         // PC 节点项目快速路径：服务器不创建 worktree，但仍按会话串行，避免同一
         // conversation 的多个 CLI 进程同时写同一个 PC 会话 worktree。
@@ -775,7 +788,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 Some(&conversation_id),
                 &message,
                 agent_name.as_deref(),
-                pc_node_fast_path_route(needs_project_workflow, pc_runtime_route),
+                pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
                 trace_id.as_deref(),
                 &state,
                 tx,
@@ -790,7 +803,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
             Some(&conversation_id),
             &message,
             agent_name.as_deref(),
-            pc_node_fast_path_route(needs_project_workflow, pc_runtime_route),
+            pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
             trace_id.as_deref(),
             &state,
             tx,

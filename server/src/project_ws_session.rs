@@ -146,6 +146,7 @@ pub(crate) async fn handle_project_ws(
                 continue;
             }
         };
+        let direct_pc_cli = request.direct_pc_cli.unwrap_or(false);
         if should_auto_bind_local_node(pc_runtime_route) {
             if let (Some(node_id), Some(workspace_path)) = (
                 request
@@ -213,6 +214,7 @@ pub(crate) async fn handle_project_ws(
                 "message_chars": message.chars().count(),
                 "agent": request.agent.as_deref(),
                 "pc_runtime_route": pc_runtime_route.map(|route| route.as_request_value()),
+                "direct_pc_cli": direct_pc_cli,
                 "execution_mode": request.execution_mode.as_deref(),
                 "plan_mode": request.plan_mode,
             }),
@@ -225,6 +227,7 @@ pub(crate) async fn handle_project_ws(
             &conversation_id,
             request.agent.as_deref(),
             pc_runtime_route.map(|route| route.as_request_value()),
+            direct_pc_cli,
             execution_mode.as_str(),
             request.project_icon_data_url.as_deref(),
             &message,
@@ -241,6 +244,7 @@ pub(crate) async fn handle_project_ws(
             attachments,
             execution_mode,
             pc_runtime_route,
+            direct_pc_cli,
             Some(trace_id.clone()),
             client_request_id.clone(),
             fingerprint,
