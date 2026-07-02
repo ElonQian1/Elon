@@ -511,6 +511,8 @@ Hard rules:
 - This is not a planning request. After reading required repo instructions, continue and complete every direct task in this message before final reply.
 - You already have the concrete task list below. Never ask the user to provide more requirements or say that you are ready for the next task.
 - Reading AGENTS.md, .github/copilot-instructions.md, or git status is only preparation. After that, immediately execute the first unfinished item under Required direct tasks.
+- A final reply that only says instructions were read, branch/status was checked, or the worktree is clean is a failing reply.
+- Do not summarize readiness. Run the required file, git, push, and verification commands before final reply.
 - Do not run scripts\test-apk-mcp-e2e.ps1.
 - Do not run scripts\invoke-apk-mcp.ps1.
 - Do not start another phone, APK, ADB, MCP, or E2E probe.
@@ -555,7 +557,63 @@ Required direct tasks:
             final_status = $gitStatus
             requested_publish = [bool]$RunPublishProbe
         }
-        $pushedCommit = Assert-GitProbePushed -DocPath $docPath -RunId $runId
+        $pushedCommit = $null
+        try {
+            $pushedCommit = Assert-GitProbePushed -DocPath $docPath -RunId $runId
+        } catch {
+            $summary.traces.git_probe.push_verification_error = $_.Exception.Message
+            $gitRetryTrace = "${runId}_git_retry"
+            $gitRetryMessage = @"
+Continue the APK native MCP Git E2E task now. Your previous reply stopped after startup checks, but the required file was not found on origin/main.
+
+This is the concrete failure to fix:
+- origin/main is missing $docPath for run id $runId.
+
+Hard rules:
+- This is not a planning request.
+- Do not only report that rules were read, status was checked, or the worktree is clean.
+- Do not ask for more requirements.
+- Do not run scripts\test-apk-mcp-e2e.ps1.
+- Do not run scripts\invoke-apk-mcp.ps1.
+- Work directly in the current Git worktree.
+
+Required direct tasks:
+- Create or update $docPath with trace id $gitRetryTrace and the current timestamp.
+- Run git status --short.
+- Commit only that file with message: test(mcp): verify native apk git path $runId
+- Push the current commit to origin main.
+- Run scripts\check-task-complete.ps1 -Kind CodePushed.
+"@
+            if ($RunPublishProbe) {
+                $gitRetryMessage += "`r`n- This is server publish only. Do not run scripts\publish-apk.ps1, do not publish APK, and do not run check-task-complete.ps1 -Kind AndroidFeature."
+                $gitRetryMessage += "`r`n- After CodePushed succeeds, run scripts\publish-server.ps1 and verify /health plus /api/server/version."
+            } else {
+                $gitRetryMessage += "`r`n- Do not publish APK or server unless a required code fix is made."
+            }
+            $gitRetryMessage += "`r`nFinal reply is allowed only after git fetch origin main, git log -1 --oneline -- $docPath, and git cat-file -e origin/main:$docPath succeed locally."
+            if ($RunPublishProbe) {
+                $gitRetryMessage += "`r`nBecause this run requested server publish, final reply is also allowed only after scripts\publish-server.ps1 succeeds and /api/server/version reports gitSha equal to the current HEAD."
+                $gitRetryMessage += "`r`nYour final reply must include SERVER_RELEASE_STATUS=published and the server gitSha."
+            }
+            $gitRetryMessage += "`r`nEnd your final reply with marker $gitRetryTrace."
+
+            $gitRetryProbe = Start-ChatProbe `
+                -Serial $effectiveSerial `
+                -TraceId $gitRetryTrace `
+                -ConversationId "${conversationId}_git" `
+                -Message $gitRetryMessage `
+                -IsDevelopment $true `
+                -WaitFor "first_server_event" `
+                -WaitTimeoutSec $FirstReplyTimeoutSec
+            $gitRetryStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $gitRetryTrace -TimeoutSec ([Math]::Max($FinishTimeoutSec, 1200))
+            Assert-TraceDone -Status $gitRetryStatus -TraceId $gitRetryTrace
+            $summary.traces.git_probe_retry = [ordered]@{
+                trace_id = $gitRetryTrace
+                probe = $gitRetryProbe
+                final_status = $gitRetryStatus
+            }
+            $pushedCommit = Assert-GitProbePushed -DocPath $docPath -RunId $runId
+        }
         $summary.traces.git_probe.pushed_commit = $pushedCommit
         if ($RunPublishProbe) {
             Write-Step "verify server publish gitSha $pushedCommit"
