@@ -14,6 +14,10 @@ export function taskIdOf(msg: ChatMessage): string {
   return clean(msg.task_id ?? msg.taskId)
 }
 
+function isAssistantReplyKind(kind: string): boolean {
+  return ['assistant', 'ai', 'bot'].includes(kind)
+}
+
 export function emptyTask(taskId: string): TaskState {
   return {
     taskId, progressCount: 0, result: null, request: '', resultText: '',
@@ -56,7 +60,7 @@ export function buildContext(messages: ChatMessage[]): TaskContext {
       const event = parseToolEvent(messageText(msg))
       if (event) rememberApprovalState(approvals, taskId, event)
     }
-    if (kind === 'ai_result') {
+    if (kind === 'ai_result' || isAssistantReplyKind(kind)) {
       const content = messageText(msg)
       task.result = msg
       task.resultText = content
@@ -115,6 +119,10 @@ export function statusForTask(task: TaskState | null): { tone: TaskTone; label: 
   if (task.result) {
     if (task.canceled) return { tone: 'canceled', label: '已停止' }
     return task.failed ? { tone: 'failed', label: '任务失败' } : { tone: 'done', label: '任务完成' }
+  }
+  if (['queued', 'pending'].includes(task.status)) return { tone: 'queued', label: '已排队' }
+  if (['running', 'in_progress', 'processing'].includes(task.status)) {
+    return { tone: 'running', label: task.progressCount > 0 ? '执行中' : '等待AI响应' }
   }
   if (task.progressCount > 0) return { tone: 'running', label: '执行中' }
   return { tone: 'queued', label: '已排队' }

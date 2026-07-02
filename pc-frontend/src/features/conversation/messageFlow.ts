@@ -38,6 +38,16 @@ export function isTaskProcessMessage(message: Message): boolean {
   return TASK_PROCESS_KINDS.has(messageKind(message)) && !!messageTaskId(message)
 }
 
+function isTaskLinkedConversationMessage(message: Message): boolean {
+  const kind = messageKind(message)
+  if (!messageTaskId(message)) return false
+  return CONVERSATION_USER_TASK_ROLES.has(kind) || CONVERSATION_ASSISTANT_TASK_ROLES.has(kind)
+}
+
+function isTaskThreadMessage(message: Message): boolean {
+  return isTaskProcessMessage(message) || isTaskLinkedConversationMessage(message)
+}
+
 export function isTerminalTaskStatus(status: unknown): boolean {
   return TERMINAL_TASK_STATUSES.has(String(status ?? '').toLowerCase())
 }
@@ -118,7 +128,7 @@ export function buildMessageGroups(messages: Message[], taskFlowEnabled: boolean
 
   messages.forEach((message, index) => {
     const taskId = messageTaskId(message)
-    if (taskFlowEnabled && isTaskProcessMessage(message)) {
+    if (taskFlowEnabled && isTaskThreadMessage(message)) {
       const existing = taskGroupById.get(taskId)
       if (existing) {
         existing.messages.push(message)
@@ -164,6 +174,7 @@ function mergeConversationMessagesWithTaskProcess(
     const taskMessages = taskId ? taskMessagesById.get(taskId) : undefined
 
     if (taskId && taskMessages?.length && isConversationUserTaskMessage(message)) {
+      pushUniqueMessage(merged, seen, message)
       if (!insertedTaskIds.has(taskId)) {
         for (const taskMessage of taskMessages) pushUniqueMessage(merged, seen, taskMessage)
         insertedTaskIds.add(taskId)

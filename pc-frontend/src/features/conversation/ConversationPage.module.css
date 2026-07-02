@@ -535,6 +535,10 @@
   border-color: rgba(37, 211, 102, .45);
   background: rgba(37, 211, 102, .11);
 }
+.directCliToggle[data-default-local="true"][data-active="false"] {
+  border-color: rgba(96, 139, 214, .34);
+  background: rgba(96, 139, 214, .09);
+}
 .directCliToggle[data-disabled="true"] {
   opacity: .52;
   cursor: not-allowed;

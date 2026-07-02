@@ -23,7 +23,10 @@ interface Props {
 function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const taskId  = taskIdOf(messages[0]) || ''
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
-  const isDone  = taskIsTerminal(task) || messages.some(isTerminalTaskMessage)
+  const userMsg = firstMessageMatching(messages, isUserTaskMessage)
+  const assistantMsg = latestMessageMatching(messages, isAssistantTaskMessage)
+  const explicitResultMsg = latestMessageOfKind(messages, 'ai_result') ?? assistantMsg
+  const isDone  = taskIsTerminal(task) || !!explicitResultMsg || messages.some(isTerminalTaskMessage)
 
   // 任务完成后默认折叠；从历史加载的已完成任务也默认折叠
   const [collapsed, setCollapsed] = useState(isDone)
@@ -39,12 +42,11 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   }, [isDone])
 
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
-  const resultMsg   = latestMessageOfKind(messages, 'ai_result')
-    ?? (isDone ? latestVisibleProgress(messages) : undefined)
+  const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
   const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress')
   const progressCount = progressMsgs.length
   const status = statusForTask(task)
-  const request = task?.request || taskRequestText(headerMsg)
+  const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const hasProgressDetails = progressCount > 0
   const tone = status.tone
 
@@ -144,6 +146,35 @@ function latestMessageOfKind(messages: ChatMessage[], kind: string): ChatMessage
   return undefined
 }
 
+function firstMessageMatching(
+  messages: ChatMessage[],
+  predicate: (message: ChatMessage) => boolean,
+): ChatMessage | undefined {
+  for (const message of messages) {
+    if (predicate(message)) return message
+  }
+  return undefined
+}
+
+function latestMessageMatching(
+  messages: ChatMessage[],
+  predicate: (message: ChatMessage) => boolean,
+): ChatMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (predicate(message)) return message
+  }
+  return undefined
+}
+
+function isUserTaskMessage(message: ChatMessage): boolean {
+  return ['user', 'human'].includes(messageKind(message))
+}
+
+function isAssistantTaskMessage(message: ChatMessage): boolean {
+  return ['assistant', 'ai', 'bot'].includes(messageKind(message))
+}
+
 function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined {
   const progress = messages.filter((m) => messageKind(m) === 'ai_progress')
   for (let index = progress.length - 1; index >= 0; index--) {
@@ -157,6 +188,7 @@ function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined
 
 function isTerminalTaskMessage(message: ChatMessage): boolean {
   if (messageKind(message) === 'ai_result') return true
+  if (isAssistantTaskMessage(message) && taskIdOf(message)) return true
   const status = String(message.task_status ?? message.taskStatus ?? '').toLowerCase()
   return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(status)
 }
