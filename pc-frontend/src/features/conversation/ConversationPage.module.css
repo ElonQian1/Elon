@@ -1832,7 +1832,7 @@
 
 .moderationStats {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -1899,6 +1899,115 @@
 
 .moderationToolbar select:focus {
   border-color: var(--green);
+}
+
+.moderationControlPanel,
+.moderationCaseSummary,
+.moderationAuditPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: rgba(255,255,255,.025);
+}
+
+.moderationControlHead {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.moderationControlHead strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.moderationControlHead span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.moderationPresetGrid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.moderationPresetGrid button {
+  min-width: 0;
+  min-height: 30px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 850;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moderationPresetGrid button:hover,
+.moderationPresetGrid button[data-active="true"] {
+  border-color: rgba(240,178,50,.42);
+  background: rgba(240,178,50,.08);
+  color: #f0c978;
+}
+
+.moderationPolicyGrid {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.moderationCaseStrip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.moderationCaseStrip button {
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 9px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 5px;
+  background: var(--sidebar-2);
+  color: var(--text-soft);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+}
+
+.moderationCaseStrip button:hover {
+  border-color: rgba(88,190,106,.35);
+}
+
+.moderationCaseStrip strong,
+.moderationCaseStrip span {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moderationCaseStrip strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.moderationCaseStrip span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 800;
 }
 
 .inviteRow {
@@ -2015,6 +2124,14 @@
   border-radius: 4px;
 }
 
+.moderationRow[data-state="banned"] {
+  border-color: rgba(223,92,92,.18);
+}
+
+.moderationRow[data-state="muted"] {
+  border-color: rgba(240,178,50,.18);
+}
+
 .moderationRow .memberAvatar img {
   width: 100%;
   height: 100%;
@@ -2077,6 +2194,43 @@
   align-content: flex-start;
   gap: 6px;
   max-width: 250px;
+}
+
+.moderationAuditList {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.moderationAuditList article {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 4px 8px;
+  align-items: center;
+  padding: 8px;
+  border-radius: 5px;
+  background: rgba(255,255,255,.025);
+}
+
+.moderationAuditList strong {
+  color: var(--text);
+  font-size: 12px;
+}
+
+.moderationAuditList span,
+.moderationAuditList em {
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.moderationAuditList em {
+  grid-column: 2;
+  font-style: normal;
 }
 
 .auditRow {
@@ -2920,6 +3074,12 @@
 
   .moderationStats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .moderationPresetGrid,
+  .moderationPolicyGrid,
+  .moderationCaseStrip {
+    grid-template-columns: 1fr;
   }
 
   .moderationRow {
