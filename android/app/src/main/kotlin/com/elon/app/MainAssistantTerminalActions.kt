@@ -18,6 +18,7 @@ internal class MainAssistantTerminalActions(
     private val stopWorkingEvidenceForActiveConversation: () -> Unit,
     private val clearCurrentEvidence: () -> Unit,
     private val resetFoldedCliLog: () -> Unit,
+    private val promoteLatestAssistantReplyWithCurrentEvidence: (String?, String?) -> Boolean,
     private val aiMessageWithCurrentEvidence: (String, List<ChatAttachment>) -> ChatMessage,
     private val appendMessage: (ChatMessage) -> Unit,
     private val preparePlanImplementationPrompt: () -> Unit,
@@ -47,8 +48,13 @@ internal class MainAssistantTerminalActions(
             preparePlanImplementationPrompt()
         }
         val visibleApkUrl = if (wasDevelopment && !wasPlanning) apkUrl else null
-        // 若服务端已通过 assistant_message 流式推送过 AI 回复（Done.message 为空），
-        // 非开发任务无需再额外追加一条"回复已完成"气泡；开发任务仍创建气泡以附上证据。
+        if (content.isBlank() && wasDevelopment &&
+            promoteLatestAssistantReplyWithCurrentEvidence(modelUsed, nodeId)
+        ) {
+            return null
+        }
+        // 若服务端已通过 assistant_message 推送过回复（Done.message 为空），
+        // 优先复用那条真实回复，避免追加泛化的"完成"气泡。
         if (content.isBlank() && !wasDevelopment && visibleApkUrl == null && imageUrl == null) {
             return null
         }

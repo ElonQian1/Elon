@@ -52,6 +52,41 @@ internal class MainEvidenceActions(
         saveConversations()
     }
 
+    fun promoteLatestAssistantReplyWithCurrentEvidence(modelUsed: String?, nodeId: String?): Boolean {
+        val messages = activeConversation().messages
+        val latestUserIndex = messages.indexOfLast { it.role == "user" }
+        val index = messages.indices.lastOrNull {
+            it > latestUserIndex &&
+                messages[it].role in assistantEvidenceRoles &&
+                messages[it].content.isNotBlank()
+        } ?: return false
+
+        val source = messages[index]
+        val promoted = source.copy(
+            role = "ai",
+            modelUsed = modelUsed ?: source.modelUsed,
+            nodeId = nodeId ?: source.nodeId
+        )
+        if (entries.isNotEmpty()) {
+            clearDuplicateCurrentEvidenceFromActiveConversation(entries)
+            applyEvidenceToMessage(promoted, entries, working = false)
+            entries.clear()
+        } else {
+            promoted.evidenceWorking = false
+        }
+
+        messages.forEachIndexed { i, msg ->
+            if (i != index && msg.evidenceWorking) {
+                msg.evidenceWorking = false
+                chatAdapter().notifyMessageUpdated(i)
+            }
+        }
+        messages[index] = promoted
+        chatAdapter().notifyMessageUpdated(index)
+        saveConversations()
+        return true
+    }
+
     fun aiMessageWithCurrentEvidence(
         content: String,
         attachments: List<ChatAttachment> = emptyList()

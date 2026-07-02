@@ -176,6 +176,8 @@ internal class MainWorkflowActions(
             },
             clearCurrentEvidence = { evidenceActions.clearCurrentEvidence() },
             resetFoldedCliLog = { foldedCliLogActions.reset() },
+            promoteLatestAssistantReplyWithCurrentEvidence =
+                evidenceActions::promoteLatestAssistantReplyWithCurrentEvidence,
             aiMessageWithCurrentEvidence = evidenceActions::aiMessageWithCurrentEvidence,
             appendMessage = messageAppendActions::appendMessage,
             preparePlanImplementationPrompt = preparePlanImplementationPrompt,
