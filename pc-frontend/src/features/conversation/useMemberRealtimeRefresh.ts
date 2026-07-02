@@ -17,6 +17,12 @@ interface PresenceEvent extends CustomEvent {
   detail: {
     userId?: string
     isOnline?: boolean
+    status?: string
+    customStatus?: string | null
+    custom_status?: string | null
+    activity?: string | null
+    updatedAt?: string
+    updated_at?: string
   }
 }
 
@@ -52,7 +58,23 @@ export function useMemberRealtimeRefresh() {
       if (!userId) return
       const { activeProjectId, members, applyMemberPresence } = useProjectStore.getState()
       if (!activeProjectId || !members.some((member) => member.user_id === userId)) return
-      applyMemberPresence(userId, !!event.detail?.isOnline)
+      const patch: {
+        status?: string
+        customStatus?: string | null
+        activity?: string | null
+      } = {}
+      if (typeof event.detail?.status === 'string') patch.status = event.detail.status
+      if (
+        event.detail
+        && (Object.prototype.hasOwnProperty.call(event.detail, 'customStatus')
+          || Object.prototype.hasOwnProperty.call(event.detail, 'custom_status'))
+      ) {
+        patch.customStatus = event.detail.customStatus ?? event.detail.custom_status ?? null
+      }
+      if (event.detail && Object.prototype.hasOwnProperty.call(event.detail, 'activity')) {
+        patch.activity = event.detail.activity ?? null
+      }
+      applyMemberPresence(userId, !!event.detail?.isOnline, patch)
       scheduleProjectSpaceRefresh(PRESENCE_RELOAD_DEBOUNCE_MS)
     }
 

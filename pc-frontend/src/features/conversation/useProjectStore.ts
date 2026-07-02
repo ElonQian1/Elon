@@ -9,6 +9,13 @@ interface ChannelMessageCacheEntry {
   loadedAt: number
 }
 
+interface MemberPresencePatch {
+  status?: string
+  customStatus?: string | null
+  custom_status?: string | null
+  activity?: string | null
+}
+
 const CHANNEL_MESSAGE_CACHE_FRESH_MS = 10000
 const CACHED_CHANNEL_REFRESH_DELAY_MS = 300
 
@@ -35,7 +42,7 @@ interface ProjectState {
   loadProjects: () => Promise<void>
   selectProject: (id: string) => Promise<void>
   reloadProjectSpace: () => Promise<void>
-  applyMemberPresence: (userId: string, isOnline: boolean) => void
+  applyMemberPresence: (userId: string, isOnline: boolean, patch?: MemberPresencePatch) => void
   selectChannel: (id: string) => Promise<void>
   loadMessages: (projectId: string, channelId: string) => Promise<void>
   sendMessage: (
@@ -151,17 +158,38 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }
   },
 
-  applyMemberPresence: (userId: string, isOnline: boolean) => {
+  applyMemberPresence: (userId: string, isOnline: boolean, patch: MemberPresencePatch = {}) => {
     const targetId = userId.trim()
     if (!targetId) return
     const updateMember = (member: ProjectMember): ProjectMember => {
       if (member.user_id !== targetId) return member
       const currentStatus = String(member.presence_status ?? '').trim().toLowerCase()
+      const eventStatus = String(patch.status ?? '').trim().toLowerCase()
       const nextStatus = isOnline
-        ? (currentStatus && currentStatus !== 'offline' && currentStatus !== 'invisible' ? currentStatus : 'online')
+        ? (eventStatus && eventStatus !== 'offline' && eventStatus !== 'invisible'
+          ? eventStatus
+          : currentStatus && currentStatus !== 'offline' && currentStatus !== 'invisible'
+            ? currentStatus
+            : 'online')
         : 'offline'
-      if (member.is_online === isOnline && member.presence_status === nextStatus) return member
-      return { ...member, is_online: isOnline, presence_status: nextStatus }
+      const hasCustomStatus = Object.prototype.hasOwnProperty.call(patch, 'customStatus')
+        || Object.prototype.hasOwnProperty.call(patch, 'custom_status')
+      const hasActivity = Object.prototype.hasOwnProperty.call(patch, 'activity')
+      const customStatus = hasCustomStatus ? (patch.customStatus ?? patch.custom_status ?? null) : member.custom_status
+      const activity = hasActivity ? (patch.activity ?? null) : member.activity
+      if (
+        member.is_online === isOnline
+        && member.presence_status === nextStatus
+        && member.custom_status === customStatus
+        && member.activity === activity
+      ) return member
+      return {
+        ...member,
+        is_online: isOnline,
+        presence_status: nextStatus,
+        custom_status: customStatus,
+        activity,
+      }
     }
     set((state) => {
       if (!state.members.some((member) => member.user_id === targetId)) return {}

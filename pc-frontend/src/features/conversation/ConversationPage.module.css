@@ -1527,6 +1527,154 @@
   gap: 10px;
 }
 
+.presencePreview {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 11px;
+  align-items: center;
+  padding: 11px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: var(--sidebar-2);
+}
+
+.presencePreviewAvatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: #38414a;
+  color: var(--text);
+  display: grid;
+  place-items: center;
+  font-size: 13px;
+  font-weight: 900;
+  position: relative;
+}
+
+.presencePreviewAvatar::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--sidebar-2);
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.presencePreviewAvatar[data-status="idle"]::after { background: #f0b232; }
+.presencePreviewAvatar[data-status="dnd"]::after { background: var(--red); }
+.presencePreviewAvatar[data-status="invisible"]::after { background: #545862; }
+
+.presencePreview div:last-child {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.presencePreview strong {
+  color: var(--text);
+  font-size: 14px;
+}
+
+.presencePreview span {
+  color: var(--text-muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presencePreview p {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 4px 0 0;
+}
+
+.presencePreview em {
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 0 6px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 4px;
+  background: rgba(255,255,255,.035);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presenceOptionGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.presenceOptionGrid button {
+  min-width: 0;
+  min-height: 62px;
+  display: grid;
+  grid-template-columns: 13px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  column-gap: 8px;
+  row-gap: 3px;
+  align-items: center;
+  padding: 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: var(--surface-2);
+  color: var(--text-soft);
+  text-align: left;
+  cursor: pointer;
+}
+
+.presenceOptionGrid button:hover,
+.presenceOptionGrid button[data-active="true"] {
+  border-color: rgba(88,190,106,.42);
+  background: rgba(88,190,106,.08);
+}
+
+.presenceOptionGrid strong {
+  min-width: 0;
+  color: var(--text);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presenceOptionGrid em {
+  grid-column: 2;
+  min-width: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.presenceOptionDot {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.presenceOptionDot[data-status="idle"] { background: #f0b232; }
+.presenceOptionDot[data-status="dnd"] { background: var(--red); }
+.presenceOptionDot[data-status="invisible"] { background: #545862; }
+
 .inviteList,
 .moderationList,
 .auditList {
@@ -2682,6 +2830,10 @@
   }
 
   .permissionPreviewList {
+    grid-template-columns: 1fr;
+  }
+
+  .presenceOptionGrid {
     grid-template-columns: 1fr;
   }
 

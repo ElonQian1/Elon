@@ -67,7 +67,18 @@ pub async fn update_my_presence(
         req.custom_status.as_deref(),
         req.activity.as_deref(),
     ) {
-        Ok(presence) => Json(presence).into_response(),
+        Ok(presence) => {
+            let connected = state.online_users.read().await.contains_key(&user.id);
+            crate::presence_events::publish_settings(
+                user.id.clone(),
+                connected,
+                &presence.status,
+                presence.custom_status.clone(),
+                presence.activity.clone(),
+                Some(presence.updated_at.clone()),
+            );
+            Json(presence).into_response()
+        }
         Err(err) => json_error(StatusCode::BAD_REQUEST, err.to_string()),
     }
 }

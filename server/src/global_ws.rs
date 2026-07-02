@@ -257,8 +257,21 @@ async fn mark_online(state: &AppState, user_id: &str) {
     let mut online = state.online_users.write().await;
     let count = online.entry(user_id.to_string()).or_insert(0);
     *count += 1;
-    if *count == 1 {
-        crate::presence_events::publish_online(user_id.to_string());
+    let first_connection = *count == 1;
+    drop(online);
+    if !first_connection {
+        return;
+    }
+    match state.store.user_presence_settings(user_id) {
+        Ok(presence) => crate::presence_events::publish_settings(
+            user_id.to_string(),
+            true,
+            &presence.status,
+            presence.custom_status,
+            presence.activity,
+            Some(presence.updated_at),
+        ),
+        Err(_) => crate::presence_events::publish_online(user_id.to_string()),
     }
 }
 

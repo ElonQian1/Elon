@@ -1,8 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { api } from '../../api/client'
 import type { UserPresenceSettings } from './types'
-import { PRESENCE_OPTIONS } from './memberUtils'
+import { PRESENCE_OPTIONS, presenceLabel } from './memberUtils'
 import styles from './ConversationPage.module.css'
+
+const PRESENCE_DESCRIPTIONS: Record<string, string> = {
+  online: '正常接收消息',
+  idle: '暂时离开',
+  dnd: '减少打扰',
+  invisible: '显示离线',
+}
 
 export function PresenceDrawer({
   onClose,
@@ -16,6 +23,16 @@ export function PresenceDrawer({
   const [activity, setActivity] = useState('')
   const [message, setMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const preview = useMemo(() => {
+    const custom = customStatus.trim()
+    const doing = activity.trim()
+    return {
+      label: presenceLabel(status),
+      subtitle: doing || custom || PRESENCE_DESCRIPTIONS[status] || '在线',
+      custom,
+      doing,
+    }
+  }, [activity, customStatus, status])
 
   useEffect(() => {
     setMessage('读取中…')
@@ -56,27 +73,55 @@ export function PresenceDrawer({
         <header className={styles.drawerHeader}>
           <div>
             <strong>在线状态</strong>
-            <span>{message}</span>
+            <span>{message || `${preview.label} · ${preview.subtitle}`}</span>
           </div>
           <button className={styles.drawerCloseBtn} onClick={onClose}>关闭</button>
         </header>
         <div className={styles.drawerBody}>
-          <label className={styles.field}>
-            <span>展示状态</span>
-            <select value={status} onChange={(event) => setStatus(event.target.value)}>
+          <section className={styles.presencePreview}>
+            <div className={styles.presencePreviewAvatar} data-status={status}>我</div>
+            <div>
+              <strong>{preview.label}</strong>
+              <span>{preview.subtitle}</span>
+              {(preview.custom || preview.doing) && (
+                <p>
+                  {preview.custom && <em>{preview.custom}</em>}
+                  {preview.doing && <em>{preview.doing}</em>}
+                </p>
+              )}
+            </div>
+          </section>
+
+          <section className={styles.drawerSection}>
+            <strong className={styles.sectionTitle}>展示状态</strong>
+            <div className={styles.presenceOptionGrid}>
               {PRESENCE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
+                <button
+                  key={option.value}
+                  type="button"
+                  data-status={option.value}
+                  data-active={status === option.value ? 'true' : undefined}
+                  onClick={() => setStatus(option.value)}
+                >
+                  <span className={styles.presenceOptionDot} data-status={option.value} />
+                  <strong>{option.label}</strong>
+                  <em>{PRESENCE_DESCRIPTIONS[option.value] ?? option.label}</em>
+                </button>
               ))}
-            </select>
-          </label>
-          <label className={styles.field}>
-            <span>自定义状态</span>
-            <input value={customStatus} onChange={(event) => setCustomStatus(event.target.value)} maxLength={80} placeholder="例如：写代码中" />
-          </label>
-          <label className={styles.field}>
-            <span>正在做</span>
-            <input value={activity} onChange={(event) => setActivity(event.target.value)} maxLength={80} placeholder="例如：调试 PC 网页版" />
-          </label>
+            </div>
+          </section>
+
+          <section className={styles.drawerSection}>
+            <strong className={styles.sectionTitle}>状态文案</strong>
+            <label className={styles.field}>
+              <span>自定义状态</span>
+              <input value={customStatus} onChange={(event) => setCustomStatus(event.target.value)} maxLength={80} placeholder="例如：写代码中" />
+            </label>
+            <label className={styles.field}>
+              <span>正在做</span>
+              <input value={activity} onChange={(event) => setActivity(event.target.value)} maxLength={80} placeholder="例如：调试 PC 网页版" />
+            </label>
+          </section>
           <div className={styles.actionRow}>
             <button className={styles.primaryBtn} onClick={save} disabled={saving}>保存</button>
           </div>
