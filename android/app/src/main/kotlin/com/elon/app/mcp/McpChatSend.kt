@@ -71,20 +71,18 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
     if (localWorkspacePath != null) payload.put("local_workspace_path", localWorkspacePath)
     val payloadText = payload.toString()
 
+    val seed = McpConversationSeed(
+        traceId = traceId,
+        projectId = projectId,
+        projectTitle = projectTitle,
+        conversationId = conversationId,
+        conversationTitle = conversationTitle,
+        message = message,
+        isDevelopment = isDevelopment,
+        executionMode = executionModeForUi
+    )
     val conversationSeed = runCatching {
-        seedMcpConversation(
-            context,
-            McpConversationSeed(
-                traceId = traceId,
-                projectId = projectId,
-                projectTitle = projectTitle,
-                conversationId = conversationId,
-                conversationTitle = conversationTitle,
-                message = message,
-                isDevelopment = isDevelopment,
-                executionMode = executionModeForUi
-            )
-        )
+        seedMcpConversation(context, seed)
     }.getOrElse { error ->
         DebugTraceStore.record(
             "mcp_conversation_seed_failed",
@@ -100,7 +98,7 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
             isError = true
         )
     }
-    val uiOpen = openSeededMcpConversationInUi(context, projectId, conversationId, showInUi)
+    val uiOpen = openSeededMcpConversationInUi(context, seed, showInUi)
 
     if (!force) {
         reservePendingTask(prefs, payloadText, isDevelopment)

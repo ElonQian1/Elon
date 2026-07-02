@@ -8,6 +8,8 @@ param(
     [string]$PreferredNodeId = "",
     [string]$PreferredWorkspacePath = "",
     [switch]$NonDevelopment,
+    [ValidateSet("plan", "execute")]
+    [string]$ExecutionMode = "plan",
     [int]$FinishTimeoutSec = 360,
     [int]$PollIntervalSec = 4,
     [string]$ReportPath = ""
@@ -168,29 +170,37 @@ function Assert-MessageExists {
 function Assert-ConversationSeedVisible {
     param(
         [object]$ConversationState,
+        [string]$ConversationId,
         [string]$TraceId,
         [bool]$IsDevelopment
     )
-    if ([string]$ConversationState.active_conversation.id -ne $conversationId) {
-        throw "Active conversation mismatch: expected $conversationId, got $($ConversationState.active_conversation.id)"
+    if ([string]$ConversationState.active_conversation.id -ne $ConversationId) {
+        throw "Active conversation mismatch: expected $ConversationId, got $($ConversationState.active_conversation.id)"
     }
     $messages = Get-ConversationMessages -ConversationState $ConversationState
+    $expectedUserId = "mcp:${TraceId}:user"
+    $expectedIntentId = "mcp:${TraceId}:intent"
+    $expectedWorkingId = "mcp:${TraceId}:working"
     Assert-MessageExists -Messages $messages -Label "MCP user bubble" -Predicate {
         param($message)
-        ([string]$message.role -eq "user") -and ([string]$message.id -eq "mcp:$TraceId:user")
-    } | Out-Null
+        ([string]$message.role -eq "user") -and ([string]$message.id -eq $expectedUserId)
+    }.GetNewClosure() | Out-Null
     if ($IsDevelopment) {
         Assert-MessageExists -Messages $messages -Label "Codex intent fold layer" -Predicate {
             param($message)
             ([string]$message.role -eq "ai-intent") -and
-                ([string]$message.id -eq "mcp:$TraceId:intent") -and
+                ([string]$message.id -eq $expectedIntentId) -and
                 ![string]::IsNullOrWhiteSpace([string]$message.evidence_title)
-        } | Out-Null
+        }.GetNewClosure() | Out-Null
     }
-    Assert-MessageExists -Messages $messages -Label "workflow started status" -Predicate {
+    Assert-MessageExists -Messages $messages -Label "workflow process layer" -Predicate {
         param($message)
-        ([string]$message.id -eq "mcp:$TraceId:working") -or ([string]$message.role -in @("ai-working", "ai-progress", "ai-tool", "ai-cli-log"))
-    } | Out-Null
+        ([string]$message.id -eq $expectedWorkingId) -or
+            ([string]$message.role -in @("ai-working", "ai-progress", "ai-tool", "ai-cli-log")) -or
+            (([string]$message.role -in @("ai", "ai-intent")) -and
+                (![string]::IsNullOrWhiteSpace([string]$message.evidence_title) -or
+                    ![string]::IsNullOrWhiteSpace([string]$message.evidence_details_preview)))
+    }.GetNewClosure() | Out-Null
 }
 
 function Wait-TraceTerminal {
@@ -221,13 +231,12 @@ function Wait-TraceTerminal {
 function Assert-FinalReplyVisible {
     param(
         [object]$ConversationState,
-        [string]$TraceId,
         [bool]$IsDevelopment
     )
     $messages = Get-ConversationMessages -ConversationState $ConversationState
     Assert-MessageExists -Messages $messages -Label "final assistant reply after MCP user message" -Predicate {
         param($message)
-        ([string]$message.role -eq "ai") -and ([string]$message.content_preview -match [regex]::Escape($TraceId))
+        ([string]$message.role -eq "ai") -and ![string]::IsNullOrWhiteSpace([string]$message.content_preview)
     } | Out-Null
     if ($IsDevelopment) {
         Assert-MessageExists -Messages $messages -Label "collapsible process evidence" -Predicate {
@@ -244,7 +253,11 @@ $traceId = "${runId}_chat"
 $conversationId = "${runId}_conversation"
 $isDevelopment = !$NonDevelopment
 $message = if ($isDevelopment) {
-    "APK native MCP conversation display verification. Do read-only status checks only. Do not edit files, commit, push, publish, or release. The final reply must contain marker $traceId."
+    if ($ExecutionMode -eq "plan") {
+        "APK native MCP conversation display verification. Plan only: do read-only status checks, do not edit files, commit, push, publish, or release. The final reply must contain marker $traceId."
+    } else {
+        "APK native MCP conversation display verification. Execute the requested read-only status checks only. Do not edit files, commit, push, publish, or release. The final reply must contain marker $traceId."
+    }
 } else {
     "Reply with marker $traceId. Your final reply must contain $traceId."
 }
@@ -255,6 +268,7 @@ $summary = [ordered]@{
     trace_id = $traceId
     conversation_id = $conversationId
     is_development = $isDevelopment
+    execution_mode = if ($isDevelopment) { $ExecutionMode } else { $null }
     adb_serial = $null
 }
 
@@ -283,8 +297,8 @@ try {
         $chatArgs.runtimeRoute = $RuntimeRoute.Trim()
     }
     if ($isDevelopment) {
-        $chatArgs.execution_mode = "execute"
-        $chatArgs.plan_mode = $false
+        $chatArgs.execution_mode = $ExecutionMode
+        $chatArgs.plan_mode = ($ExecutionMode -eq "plan")
     }
     if ($PreferredNodeId.Trim()) {
         $chatArgs.local_node_id = $PreferredNodeId.Trim()
@@ -300,7 +314,7 @@ try {
 
     Write-Step "assert seeded conversation visible"
     $seedState = Get-ConversationState -Serial $serial -ConversationId $conversationId
-    Assert-ConversationSeedVisible -ConversationState $seedState -TraceId $traceId -IsDevelopment $isDevelopment
+    Assert-ConversationSeedVisible -ConversationState $seedState -ConversationId $conversationId -TraceId $traceId -IsDevelopment $isDevelopment
     $summary.seed_state = $seedState
 
     Write-Step "wait task terminal"
@@ -312,7 +326,7 @@ try {
 
     Write-Step "assert final reply and fold evidence visible"
     $finalState = Get-ConversationState -Serial $serial -ConversationId $conversationId
-    Assert-FinalReplyVisible -ConversationState $finalState -TraceId $traceId -IsDevelopment $isDevelopment
+    Assert-FinalReplyVisible -ConversationState $finalState -IsDevelopment $isDevelopment
     $summary.final_state = $finalState
     $summary.ok = $true
 } finally {

@@ -30,6 +30,30 @@ internal data class McpConversationSeed(
     val executionMode: ProjectRequestExecutionMode
 )
 
+internal data class McpConversationSeedApplyResult(
+    val appended: Boolean,
+    val projectId: String,
+    val projectTitle: String,
+    val projectIndex: Int,
+    val conversationId: String,
+    val conversationTitle: String,
+    val conversationIndex: Int,
+    val messageCount: Int
+) {
+    fun toJson(): JSONObject {
+        return JSONObject()
+            .put("seeded", true)
+            .put("appended", appended)
+            .put("project_id", projectId)
+            .put("project_title", projectTitle)
+            .put("project_index", projectIndex)
+            .put("conversation_id", conversationId)
+            .put("conversation_title", conversationTitle)
+            .put("conversation_index", conversationIndex)
+            .put("message_count", messageCount)
+    }
+}
+
 internal fun seedMcpConversation(context: Context, seed: McpConversationSeed): JSONObject {
     val prefs = AuthManager.userDataPrefs(context)
     val gson = Gson()
@@ -40,6 +64,28 @@ internal fun seedMcpConversation(context: Context, seed: McpConversationSeed): J
     )
     val projects = loaded.projects
     val now = System.currentTimeMillis()
+    val result = applyMcpConversationSeed(projects, seed, now)
+    saveStoredProjects(prefs, gson, projects, result.projectIndex, result.projectId, synchronous = true)
+
+    DebugTraceStore.record(
+        "mcp_conversation_seeded",
+        mapOf(
+            "trace_id" to seed.traceId,
+            "project_id" to result.projectId,
+            "conversation_id" to result.conversationId,
+            "appended" to result.appended,
+            "message_count" to result.messageCount
+        )
+    )
+
+    return result.toJson()
+}
+
+internal fun applyMcpConversationSeed(
+    projects: MutableList<AppProject>,
+    seed: McpConversationSeed,
+    now: Long
+): McpConversationSeedApplyResult {
     val projectIndex = ensureMcpProject(projects, seed.projectId, seed.projectTitle, now)
     val project = projects[projectIndex]
     val conversationIndex = ensureMcpConversation(project, seed, now)
@@ -85,35 +131,22 @@ internal fun seedMcpConversation(context: Context, seed: McpConversationSeed): J
     project.activeConversationIndex = conversationIndex
     project.subtitle = summarize(seed.message, 34)
     project.updatedAt = now
-    saveStoredProjects(prefs, gson, projects, projectIndex, project.id, synchronous = true)
 
-    DebugTraceStore.record(
-        "mcp_conversation_seeded",
-        mapOf(
-            "trace_id" to seed.traceId,
-            "project_id" to project.id,
-            "conversation_id" to conversation.id,
-            "appended" to !alreadySeeded,
-            "message_count" to conversation.messages.size
-        )
+    return McpConversationSeedApplyResult(
+        appended = !alreadySeeded,
+        projectId = project.id,
+        projectTitle = project.title,
+        projectIndex = projectIndex,
+        conversationId = conversation.id,
+        conversationTitle = conversation.title,
+        conversationIndex = conversationIndex,
+        messageCount = conversation.messages.size
     )
-
-    return JSONObject()
-        .put("seeded", true)
-        .put("appended", !alreadySeeded)
-        .put("project_id", project.id)
-        .put("project_title", project.title)
-        .put("project_index", projectIndex)
-        .put("conversation_id", conversation.id)
-        .put("conversation_title", conversation.title)
-        .put("conversation_index", conversationIndex)
-        .put("message_count", conversation.messages.size)
 }
 
 internal fun openSeededMcpConversationInUi(
     context: Context,
-    projectId: String,
-    conversationId: String,
+    seed: McpConversationSeed,
     showInUi: Boolean
 ): JSONObject {
     if (!showInUi) {
@@ -124,10 +157,15 @@ internal fun openSeededMcpConversationInUi(
     val result = McpNativeControlBridge.control(
         context,
         JSONObject()
-            .put("action", "open_project_chat")
-            .put("project_id", projectId)
-            .put("conversation_id", conversationId)
-            .put("reload_if_missing", true)
+            .put("action", "seed_project_chat")
+            .put("trace_id", seed.traceId)
+            .put("project_id", seed.projectId)
+            .put("project_title", seed.projectTitle)
+            .put("conversation_id", seed.conversationId)
+            .put("conversation_title", seed.conversationTitle ?: JSONObject.NULL)
+            .put("message", seed.message)
+            .put("is_development", seed.isDevelopment)
+            .put("execution_mode", seed.executionMode.wireValue)
     )
     return JSONObject()
         .put("attempted", true)

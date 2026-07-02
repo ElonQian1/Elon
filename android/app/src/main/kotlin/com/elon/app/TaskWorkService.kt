@@ -123,6 +123,7 @@ class TaskWorkService : Service() {
         task.payloadSentForCurrentConnection = false
         task.startedAtMs = System.currentTimeMillis()
         task.firstServerEventAtMs = 0L
+        task.lastServerEventAtMs = 0L
         task.firstChatReplyAtMs = 0L
         Log.i(TAG, "request_start trace=$traceId kind=${task.requestKind} payload_bytes=${payload.length}")
         DebugTraceStore.record(
@@ -139,6 +140,7 @@ class TaskWorkService : Service() {
         )
         persistTaskWork(prefs, activeTasks.values)
         enterForeground()
+        scheduleTaskWatchdog(task)
         connect(task)
     }
 
@@ -237,6 +239,7 @@ class TaskWorkService : Service() {
 
     private fun connect(task: RunningTask) {
         val client = ensureClient(task)
+        scheduleTaskWatchdog(task)
         client.connect()
         if (client.isConnected()) {
             sendPendingPayloadIfNeeded(task)
@@ -304,10 +307,7 @@ class TaskWorkService : Service() {
                 "task_reconnect_max_exceeded_force_cleanup",
                 mapOf("trace_id" to task.traceId, "attempts" to task.reconnectAttempts)
             )
-            val fakeError = org.json.JSONObject()
-                .put("type", "error")
-                .put("message", "连接超时，任务可能已在服务器完成，请重新发送消息确认状态。")
-            finishWork(task.traceId, fakeError, success = false)
+            handleTaskTimeout(task, "连接多次重试仍未恢复，已自动停止本轮任务，避免会话一直卡住。")
             return
         }
         val delay = (900L * task.reconnectAttempts).coerceAtMost(6_000L)
@@ -343,6 +343,10 @@ class TaskWorkService : Service() {
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
         val messageType = parsed?.optString("type")?.takeIf { it.isNotBlank() }
         val messagePreview = parsed?.let { taskJsonStringOrNull(it, "message") }?.let { taskTextPreview(it) }
+        if (messageType != "app_update_available") {
+            task.lastServerEventAtMs = System.currentTimeMillis()
+            scheduleTaskWatchdog(task)
+        }
         DebugTraceStore.record(
             "task_server_message",
             mapOf(
@@ -464,8 +468,92 @@ class TaskWorkService : Service() {
         task.waitingForReply = false
         task.reconnectRunnable?.let { handler.removeCallbacks(it) }
         task.reconnectRunnable = null
+        task.watchdogRunnable?.let { handler.removeCallbacks(it) }
+        task.watchdogRunnable = null
         if (disconnect) task.wsClient?.disconnect()
         task.wsClient = null
+    }
+
+    private fun scheduleTaskWatchdog(task: RunningTask) {
+        if (!task.waitingForReply || activeTasks[task.traceId] == null) return
+        task.watchdogRunnable?.let { handler.removeCallbacks(it) }
+        val deadline = nextTaskWatchdogDeadline(task) ?: return
+        val delayMs = (deadline - System.currentTimeMillis()).coerceAtLeast(0L)
+        val runnable = Runnable { checkTaskWatchdog(task.traceId) }
+        task.watchdogRunnable = runnable
+        handler.postDelayed(runnable, delayMs)
+    }
+
+    private fun checkTaskWatchdog(traceId: String) {
+        val task = activeTasks[traceId] ?: return
+        if (!task.waitingForReply) return
+        val timeoutMessage = taskTimeoutMessage(task, System.currentTimeMillis())
+        if (timeoutMessage != null) {
+            handleTaskTimeout(task, timeoutMessage)
+            return
+        }
+        scheduleTaskWatchdog(task)
+    }
+
+    private fun nextTaskWatchdogDeadline(task: RunningTask): Long? {
+        val deadlines = mutableListOf<Long>()
+        if (task.startedAtMs > 0L) {
+            deadlines.add(task.startedAtMs + taskTotalTimeoutMs(task))
+            if (task.firstServerEventAtMs <= 0L) {
+                deadlines.add(task.startedAtMs + TASK_FIRST_EVENT_TIMEOUT_MS)
+            }
+        }
+        if (task.lastServerEventAtMs > 0L) {
+            deadlines.add(task.lastServerEventAtMs + TASK_IDLE_TIMEOUT_MS)
+        }
+        return deadlines.minOrNull()
+    }
+
+    private fun taskTimeoutMessage(task: RunningTask, now: Long): String? {
+        if (task.startedAtMs > 0L && now - task.startedAtMs >= taskTotalTimeoutMs(task)) {
+            return if (task.isDevelopment) {
+                "本轮开发任务运行时间过长，已自动停止，避免会话一直卡住。请确认本机节点和 Codex 状态后重发。"
+            } else {
+                "本轮回复等待时间过长，已自动停止，避免会话一直卡住。请稍后重发。"
+            }
+        }
+        if (task.firstServerEventAtMs <= 0L &&
+            task.startedAtMs > 0L &&
+            now - task.startedAtMs >= TASK_FIRST_EVENT_TIMEOUT_MS
+        ) {
+            return "本轮任务启动后一直没有收到服务端进度，已自动停止，避免会话一直卡住。请确认账号、本机节点和网络后重发。"
+        }
+        if (task.lastServerEventAtMs > 0L && now - task.lastServerEventAtMs >= TASK_IDLE_TIMEOUT_MS) {
+            return "本轮任务长时间没有新的服务端进度，已自动停止，避免会话一直卡住。请确认本机节点或 Codex 是否仍在运行后重发。"
+        }
+        return null
+    }
+
+    private fun handleTaskTimeout(task: RunningTask, message: String) {
+        DebugTraceStore.record(
+            "task_watchdog_timeout",
+            mapOf(
+                "trace_id" to task.traceId,
+                "kind" to task.requestKind,
+                "elapsed_ms" to elapsedSinceRequestStart(task),
+                "last_server_event_age_ms" to if (task.lastServerEventAtMs > 0L) {
+                    System.currentTimeMillis() - task.lastServerEventAtMs
+                } else {
+                    null
+                }
+            )
+        )
+        val error = JSONObject()
+            .put("type", "error")
+            .put("code", "ai_service_timeout")
+            .put("retryable", true)
+            .put("trace_id", task.traceId)
+            .put("message", message)
+        handleServerMessage(task.traceId, error.toString())
+    }
+
+    private fun taskTotalTimeoutMs(task: RunningTask): Long {
+        return if (task.isDevelopment) TASK_DEVELOPMENT_TOTAL_TIMEOUT_MS else TASK_CHAT_TOTAL_TIMEOUT_MS
     }
 
     private fun pauseWork(traceId: String?) {
@@ -570,5 +658,9 @@ class TaskWorkService : Service() {
         const val APP_UPDATE_NOTIFICATION_ID = 2402
         const val EXTRA_SHOW_APP_UPDATE = "show_app_update"
         const val PENDING_WORK_TTL_MS = 24 * 60 * 60 * 1000L
+        private const val TASK_FIRST_EVENT_TIMEOUT_MS = 90_000L
+        private const val TASK_IDLE_TIMEOUT_MS = 8 * 60 * 1000L
+        private const val TASK_CHAT_TOTAL_TIMEOUT_MS = 8 * 60 * 1000L
+        private const val TASK_DEVELOPMENT_TOTAL_TIMEOUT_MS = 45 * 60 * 1000L
     }
 }

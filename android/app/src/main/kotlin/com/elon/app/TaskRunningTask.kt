@@ -13,9 +13,11 @@ internal data class RunningTask(
     var clientGeneration: Int = 0,
     var startedAtMs: Long = System.currentTimeMillis(),
     var firstServerEventAtMs: Long = 0L,
+    var lastServerEventAtMs: Long = 0L,
     var firstChatReplyAtMs: Long = 0L,
     var wsClient: ElonWsClient? = null,
     var reconnectRunnable: Runnable? = null,
+    var watchdogRunnable: Runnable? = null,
     var lastStep: Int = 0,
     var lastStepTotal: Int = 4,
     var lastPhaseStartMs: Long = 0L

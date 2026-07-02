@@ -1,6 +1,9 @@
 package com.elon.app
 
 import com.elon.app.databinding.ActivityMainBinding
+import com.elon.app.mcp.McpConversationSeed
+import com.elon.app.mcp.applyMcpConversationSeed
+import com.elon.app.mcp.mcpExecutionMode
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Locale
@@ -83,6 +86,7 @@ internal class MainMcpNativeControlActions(
                 openActiveProjectConversation()
                 uiState()
             }
+            "seed_project_chat" -> seedProjectChat(args)
             "new_project_conversation" -> {
                 selectProject(args)?.let { return it }
                 createProjectConversation(args)
@@ -114,6 +118,26 @@ internal class MainMcpNativeControlActions(
             else -> return errorJson(action, "unsupported_action")
         }
         return result.put("control_ok", true)
+    }
+
+    private fun seedProjectChat(args: JSONObject): JSONObject {
+        val seed = McpConversationSeed(
+            traceId = args.optString("trace_id").trim(),
+            projectId = args.optString("project_id").trim().ifBlank { ELON_SELF_PROJECT_ID },
+            projectTitle = args.optString("project_title").trim().ifBlank { "Elon debug project" },
+            conversationId = args.optString("conversation_id").trim().ifBlank { "default" },
+            conversationTitle = args.optString("conversation_title").trim().takeIf { it.isNotBlank() },
+            message = args.optString("message"),
+            isDevelopment = if (args.has("is_development")) args.optBoolean("is_development") else true,
+            executionMode = mcpExecutionMode(args)
+        )
+        val result = applyMcpConversationSeed(projects, seed, System.currentTimeMillis())
+        setActiveProjectIndex(result.projectIndex)
+        activeProject().activeConversationIndex = result.conversationIndex
+        saveProjects()
+        renderConversationList()
+        openActiveProjectConversation()
+        return uiState().put("conversation_seed", result.toJson())
     }
 
     private fun reloadTargetConversationIfNeeded(args: JSONObject) {
