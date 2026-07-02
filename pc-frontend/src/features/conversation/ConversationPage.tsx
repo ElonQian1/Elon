@@ -1004,6 +1004,18 @@ export default function ConversationPage() {
     await reloadProjectSpace()
   }
 
+  async function removeMemberFromProject(member: ProjectMember) {
+    if (!activeProjectId) return false
+    const name = member.account || member.user_id
+    if (!window.confirm(`确定要将 ${name} 移出项目吗？`)) return false
+    await api.delete(`/api/projects/${encodeURIComponent(activeProjectId)}/members/${encodeURIComponent(member.user_id)}`)
+    setSelectedMember((current) => current?.user_id === member.user_id ? null : current)
+    setDetailMember((current) => current?.user_id === member.user_id ? null : current)
+    setMemberMenu(null)
+    await reloadProjectSpace()
+    return true
+  }
+
   function resetMemberConversationTarget() {
     setMemberConversationTarget(null)
     setSendError('')
@@ -1425,6 +1437,7 @@ export default function ConversationPage() {
               x={memberMenu.x}
               y={memberMenu.y}
               canModerate={canModerateMembers && memberMenu.member.user_id !== user?.id}
+              canRemove={canManageMembers && memberMenu.member.user_id !== user?.id}
               onClose={() => setMemberMenu(null)}
               onOpenProfile={openMemberProfile}
               onOpenDetails={openMemberDetails}
@@ -1432,6 +1445,7 @@ export default function ConversationPage() {
               onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
               onOpenRoles={activeProjectId && canUseRoleManager ? openMemberRoles : undefined}
               onModerate={moderateMemberFromPopover}
+              onRemove={removeMemberFromProject}
             />,
             document.body
           )}
@@ -1443,11 +1457,13 @@ export default function ConversationPage() {
               channels={channels}
               channel={activeChannel}
               canModerate={canModerateMembers && selectedMember.user_id !== user?.id}
+              canRemove={canManageMembers && selectedMember.user_id !== user?.id}
               onClose={() => setSelectedMember(null)}
               onOpenDetails={openMemberDetails}
               onOpenConversations={openMemberConversations}
               onOpenRoles={canUseRoleManager ? openMemberRoles : undefined}
               onModerate={moderateMemberFromPopover}
+              onRemove={removeMemberFromProject}
             />,
             document.body
           )}
@@ -1628,6 +1644,7 @@ export default function ConversationPage() {
           channels={channels}
           currentChannel={activeChannel}
           canModerate={canModerateMembers && detailMember.user_id !== user?.id}
+          canRemove={canManageMembers && detailMember.user_id !== user?.id}
           canManageRoles={canUseRoleManager}
           canManagePermissions={!!(activeProjectId && activeChannelId && canManagePermissions)}
           onClose={() => setDetailMember(null)}
@@ -1635,6 +1652,7 @@ export default function ConversationPage() {
           onOpenRoles={canUseRoleManager ? openMemberRoles : undefined}
           onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
           onModerate={moderateMemberFromPopover}
+          onRemove={removeMemberFromProject}
         />
       )}
       {showPermissions && activeProjectId && activeChannelId && (

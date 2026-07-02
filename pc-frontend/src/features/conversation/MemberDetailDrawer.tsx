@@ -44,6 +44,7 @@ export function MemberDetailDrawer({
   channels,
   currentChannel,
   canModerate,
+  canRemove,
   canManageRoles,
   canManagePermissions,
   onClose,
@@ -51,12 +52,14 @@ export function MemberDetailDrawer({
   onOpenRoles,
   onOpenPermissions,
   onModerate,
+  onRemove,
 }: {
   projectId: string
   member: ProjectMember
   channels: Channel[]
   currentChannel?: Channel
   canModerate?: boolean
+  canRemove?: boolean
   canManageRoles?: boolean
   canManagePermissions?: boolean
   onClose: () => void
@@ -64,11 +67,13 @@ export function MemberDetailDrawer({
   onOpenRoles?: (member: ProjectMember) => void
   onOpenPermissions?: (member: ProjectMember) => void
   onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
+  onRemove?: (member: ProjectMember) => Promise<boolean | void>
 }) {
   const [auditEntries, setAuditEntries] = useState<ProjectMemberAuditEntry[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
   const [statusMsg, setStatusMsg] = useState('')
   const [busyAction, setBusyAction] = useState<MemberModerationAction | ''>('')
+  const [removing, setRemoving] = useState(false)
   const name = member.account || member.user_id
   const presence = memberPresenceStatus(member)
   const roleChips = memberDetailRoles(member)
@@ -146,6 +151,21 @@ export function MemberDetailDrawer({
     }
   }
 
+  async function removeMember() {
+    if (!onRemove || removing) return
+    setRemoving(true)
+    setStatusMsg('移除中...')
+    try {
+      const removed = await onRemove(member)
+      if (removed !== false) onClose()
+      else setStatusMsg('')
+    } catch (err) {
+      setStatusMsg((err as { message?: string }).message ?? '移除失败')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   return (
     <div className={styles.drawerBackdrop}>
       <section className={[styles.permissionDrawer, styles.memberDetailDrawer].join(' ')} role="dialog" aria-modal="true">
@@ -188,6 +208,7 @@ export function MemberDetailDrawer({
             <button className={styles.drawerCloseBtn} onClick={copyId}>复制 ID</button>
             {canManageRoles && onOpenRoles && <button className={styles.drawerCloseBtn} onClick={openRoles}>编辑角色</button>}
             {canManagePermissions && onOpenPermissions && <button className={styles.drawerCloseBtn} onClick={openPermissions}>频道权限</button>}
+            {canRemove && onRemove && <button className={styles.dangerBtn} onClick={removeMember} disabled={removing || !!busyAction}>{removing ? '移除中...' : '移除成员'}</button>}
           </div>
 
           <div className={styles.memberDetailGrid}>
@@ -229,11 +250,11 @@ export function MemberDetailDrawer({
               </div>
               {canModerate && onModerate && (
                 <div className={styles.memberDetailModerationGrid}>
-                  <button className={styles.drawerCloseBtn} onClick={() => moderate('mute', 60)} disabled={!!busyAction || !!member.is_banned}>禁言 1 小时</button>
-                  <button className={styles.drawerCloseBtn} onClick={() => moderate('mute', 1440)} disabled={!!busyAction || !!member.is_banned}>禁言 1 天</button>
-                  <button className={styles.drawerCloseBtn} onClick={() => moderate('unmute')} disabled={!!busyAction || !member.is_muted}>解禁言</button>
-                  <button className={styles.dangerBtn} onClick={() => moderate('ban')} disabled={!!busyAction || !!member.is_banned}>封禁</button>
-                  <button className={styles.drawerCloseBtn} onClick={() => moderate('unban')} disabled={!!busyAction || !member.is_banned}>解封</button>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate('mute', 60)} disabled={!!busyAction || !!member.is_banned || removing}>禁言 1 小时</button>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate('mute', 1440)} disabled={!!busyAction || !!member.is_banned || removing}>禁言 1 天</button>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate('unmute')} disabled={!!busyAction || !member.is_muted || removing}>解禁言</button>
+                  <button className={styles.dangerBtn} onClick={() => moderate('ban')} disabled={!!busyAction || !!member.is_banned || removing}>封禁</button>
+                  <button className={styles.drawerCloseBtn} onClick={() => moderate('unban')} disabled={!!busyAction || !member.is_banned || removing}>解封</button>
                 </div>
               )}
             </section>

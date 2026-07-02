@@ -616,6 +616,7 @@ export function MemberContextMenu({
   x,
   y,
   canModerate,
+  canRemove,
   onClose,
   onOpenProfile,
   onOpenDetails,
@@ -623,11 +624,13 @@ export function MemberContextMenu({
   onOpenPermissions,
   onOpenRoles,
   onModerate,
+  onRemove,
 }: {
   member: ProjectMember
   x: number
   y: number
   canModerate?: boolean
+  canRemove?: boolean
   onClose: () => void
   onOpenProfile: (member: ProjectMember, y: number) => void
   onOpenDetails?: (member: ProjectMember) => void
@@ -635,9 +638,11 @@ export function MemberContextMenu({
   onOpenPermissions?: (member: ProjectMember) => void
   onOpenRoles?: (member: ProjectMember) => void
   onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
+  onRemove?: (member: ProjectMember) => Promise<boolean | void>
 }) {
   const menuRef = useRef<HTMLDivElement>(null)
   const [moderating, setModerating] = useState<MemberModerationAction | ''>('')
+  const [removing, setRemoving] = useState(false)
   const [message, setMessage] = useState('')
   const name = member.account || member.user_id
   const status = memberPresenceStatus(member)
@@ -688,8 +693,22 @@ export function MemberContextMenu({
     }
   }
 
+  async function removeMember() {
+    if (!onRemove || removing) return
+    setRemoving(true)
+    setMessage('移除中...')
+    try {
+      const removed = await onRemove(member)
+      if (removed !== false) onClose()
+    } catch (err) {
+      setMessage((err as { message?: string }).message ?? '移除失败')
+    } finally {
+      setRemoving(false)
+    }
+  }
+
   const MENU_WIDTH = 220
-  const MENU_HEIGHT = canModerate ? 396 : 236
+  const MENU_HEIGHT = canModerate || canRemove ? 438 : 236
   const left = Math.min(Math.max(x, 8), Math.max(8, window.innerWidth - MENU_WIDTH - 8))
   const top = Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - MENU_HEIGHT - 8))
 
@@ -728,14 +747,23 @@ export function MemberContextMenu({
           <button type="button" role="menuitem" onClick={() => run(() => onOpenRoles(member))}>编辑角色</button>
         )}
       </div>
-      {canModerate && onModerate && (
+      {((canModerate && onModerate) || (canRemove && onRemove)) && (
         <div className={styles.memberContextMenuGroup}>
-          <span className={styles.memberContextMenuLabel}>{message || memberModerationSummary(member)}</span>
-          <button type="button" role="menuitem" onClick={() => moderate('mute', 60)} disabled={!!moderating || !!member.is_banned}>禁言 1 小时</button>
-          <button type="button" role="menuitem" onClick={() => moderate('mute', 1440)} disabled={!!moderating || !!member.is_banned}>禁言 1 天</button>
-          <button type="button" role="menuitem" onClick={() => moderate('unmute')} disabled={!!moderating || !member.is_muted}>解禁言</button>
-          <button type="button" role="menuitem" onClick={() => moderate('ban')} disabled={!!moderating || !!member.is_banned} data-tone="danger">封禁</button>
-          <button type="button" role="menuitem" onClick={() => moderate('unban')} disabled={!!moderating || !member.is_banned}>解封</button>
+          <span className={styles.memberContextMenuLabel}>{message || (canModerate ? memberModerationSummary(member) : '成员管理')}</span>
+          {canModerate && onModerate && (
+            <>
+              <button type="button" role="menuitem" onClick={() => moderate('mute', 60)} disabled={!!moderating || !!member.is_banned || removing}>禁言 1 小时</button>
+              <button type="button" role="menuitem" onClick={() => moderate('mute', 1440)} disabled={!!moderating || !!member.is_banned || removing}>禁言 1 天</button>
+              <button type="button" role="menuitem" onClick={() => moderate('unmute')} disabled={!!moderating || !member.is_muted || removing}>解禁言</button>
+              <button type="button" role="menuitem" onClick={() => moderate('ban')} disabled={!!moderating || !!member.is_banned || removing} data-tone="danger">封禁</button>
+              <button type="button" role="menuitem" onClick={() => moderate('unban')} disabled={!!moderating || !member.is_banned || removing}>解封</button>
+            </>
+          )}
+          {canRemove && onRemove && (
+            <button type="button" role="menuitem" onClick={removeMember} disabled={!!moderating || removing} data-tone="danger">
+              {removing ? '移除中...' : '移除成员'}
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -750,11 +778,13 @@ export function MemberProfilePopover({
   channels,
   channel,
   canModerate,
+  canRemove,
   onClose,
   onOpenDetails,
   onOpenConversations,
   onOpenRoles,
   onModerate,
+  onRemove,
 }: {
   member: ProjectMember
   anchorY: number
@@ -762,11 +792,13 @@ export function MemberProfilePopover({
   channels?: Channel[]
   channel?: Channel
   canModerate?: boolean
+  canRemove?: boolean
   onClose: () => void
   onOpenDetails?: (member: ProjectMember) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenRoles?: (member: ProjectMember) => void
   onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
+  onRemove?: (member: ProjectMember) => Promise<boolean | void>
 }) {
   const popRef = useRef<HTMLDivElement>(null)
   const status = memberPresenceStatus(member)
@@ -782,6 +814,7 @@ export function MemberProfilePopover({
   const [addingFriend, setAddingFriend] = useState(false)
   const [addMsg, setAddMsg] = useState('')
   const [moderating, setModerating] = useState<MemberModerationAction | ''>('')
+  const [removing, setRemoving] = useState(false)
   const [moderationMsg, setModerationMsg] = useState('')
   const [auditEntries, setAuditEntries] = useState<ProjectMemberAuditEntry[]>([])
   const [auditLoading, setAuditLoading] = useState(false)
@@ -798,6 +831,7 @@ export function MemberProfilePopover({
 
   useEffect(() => {
     setModerating('')
+    setRemoving(false)
     setModerationMsg('')
   }, [member.user_id, member.is_muted, member.is_banned])
 
@@ -890,6 +924,20 @@ export function MemberProfilePopover({
       setModerationMsg((err as { message?: string }).message ?? '操作失败')
     } finally {
       setModerating('')
+    }
+  }
+
+  async function removeMember() {
+    if (!onRemove || removing) return
+    setRemoving(true)
+    setModerationMsg('移除中...')
+    try {
+      const removed = await onRemove(member)
+      if (removed !== false) onClose()
+    } catch (err) {
+      setModerationMsg((err as { message?: string }).message ?? '移除失败')
+    } finally {
+      setRemoving(false)
     }
   }
 
@@ -1049,28 +1097,37 @@ export function MemberProfilePopover({
             {addMsg || (isFriend ? '已是好友' : addingFriend ? '添加中…' : '加好友')}
           </button>
         </div>
-        {canModerate && onModerate && (
+        {((canModerate && onModerate) || (canRemove && onRemove)) && (
           <div className={styles.memberPopoverModeration}>
             <div className={styles.memberPopoverModerationHead}>
               <strong>管理操作</strong>
-              <span>{moderationMsg || memberModerationSummary(member)}</span>
+              <span>{moderationMsg || (canModerate ? memberModerationSummary(member) : '成员管理')}</span>
             </div>
             <div className={styles.memberPopoverModerationGrid}>
-              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('mute', 60)} disabled={!!moderating || !!member.is_banned}>
-                禁言1小时
-              </button>
-              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('mute', 1440)} disabled={!!moderating || !!member.is_banned}>
-                禁言1天
-              </button>
-              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('unmute')} disabled={!!moderating || !member.is_muted}>
-                解禁言
-              </button>
-              <button className={[styles.memberPopoverBtn, styles.memberPopoverBtnDanger].join(' ')} type="button" onClick={() => moderate('ban')} disabled={!!moderating || !!member.is_banned}>
-                封禁
-              </button>
-              <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('unban')} disabled={!!moderating || !member.is_banned}>
-                解封
-              </button>
+              {canModerate && onModerate && (
+                <>
+                  <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('mute', 60)} disabled={!!moderating || !!member.is_banned || removing}>
+                    禁言1小时
+                  </button>
+                  <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('mute', 1440)} disabled={!!moderating || !!member.is_banned || removing}>
+                    禁言1天
+                  </button>
+                  <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('unmute')} disabled={!!moderating || !member.is_muted || removing}>
+                    解禁言
+                  </button>
+                  <button className={[styles.memberPopoverBtn, styles.memberPopoverBtnDanger].join(' ')} type="button" onClick={() => moderate('ban')} disabled={!!moderating || !!member.is_banned || removing}>
+                    封禁
+                  </button>
+                  <button className={styles.memberPopoverBtn} type="button" onClick={() => moderate('unban')} disabled={!!moderating || !member.is_banned || removing}>
+                    解封
+                  </button>
+                </>
+              )}
+              {canRemove && onRemove && (
+                <button className={[styles.memberPopoverBtn, styles.memberPopoverBtnDanger].join(' ')} type="button" onClick={removeMember} disabled={!!moderating || removing}>
+                  {removing ? '移除中...' : '移除成员'}
+                </button>
+              )}
             </div>
           </div>
         )}
