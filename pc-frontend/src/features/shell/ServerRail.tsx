@@ -83,31 +83,30 @@ export default function ServerRail() {
       {/* ── 项目列表分隔线 ── */}
       {projects.length > 0 && <div className={styles.divider} />}
 
-      {/* ── 每个项目的 logo 按钮 ── */}
-      {projects.map((p) => {
-        const isActiveProject = p.id === activeProjectId
-        const iconSrc = p.icon_data_url || p.icon || ''
-        return (
-          <button
-            key={p.id}
-            className={[styles.avatar, styles.projectAvatar, isActiveProject ? styles.active : ''].join(' ')}
-            onClick={() => openProject(p.id)}
-            onMouseEnter={(e) => showTip(e, p.name)}
-            onMouseLeave={() => setTooltip(null)}
-            title={p.name}
-            type="button"
-          >
-            {iconSrc
-              ? <img src={iconSrc} alt="" className={styles.projectIcon} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-              : <span className={styles.projectFallback}>{p.name[0]?.toUpperCase() ?? '?'}</span>
-            }
-          </button>
-        )
-      })}
+      <div className={styles.projectStack} aria-label="项目快捷入口">
+        {projects.map((p) => {
+          const isActiveProject = p.id === activeProjectId
+          const iconSrc = p.icon_data_url || p.icon || ''
+          return (
+            <button
+              key={p.id}
+              className={[styles.avatar, styles.projectAvatar, isActiveProject ? styles.active : ''].join(' ')}
+              onClick={() => openProject(p.id)}
+              onMouseEnter={(e) => showTip(e, p.name)}
+              onMouseLeave={() => setTooltip(null)}
+              title={p.name}
+              type="button"
+            >
+              {iconSrc
+                ? <img src={iconSrc} alt="" className={styles.projectIcon} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                : <span className={styles.projectFallback}>{p.name[0]?.toUpperCase() ?? '?'}</span>
+              }
+            </button>
+          )
+        })}
+      </div>
 
       <div className={styles.divider} />
-
-      <div className={styles.spacer} />
 
       {/* 账号头像 → 点击进账号页 */}
       {user && (

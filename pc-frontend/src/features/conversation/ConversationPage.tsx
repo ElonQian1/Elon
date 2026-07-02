@@ -717,6 +717,9 @@ export default function ConversationPage() {
     () => buildMessageGroups(displayMessages, taskFlowEnabled),
     [displayMessages, taskFlowEnabled],
   )
+  const feedLoading = !!sessionView
+    && sessionView !== 'new'
+    && (convLoading || (messagesLoading && displayMessages.length === 0))
 
   // sessionView='new' 时，一旦会话列表出现新会话，自动切入
   useEffect(() => {
@@ -1244,12 +1247,12 @@ export default function ConversationPage() {
           </div>
         ) : (
           <div className={styles.messageList} ref={feedRef} onScroll={handleFeedScroll}>
-            {messagesLoading && messages.length === 0 && (
+            {feedLoading && displayMessages.length === 0 && (
               <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
-                <p>正在读取消息…</p>
+                <p>正在打开会话…</p>
               </div>
             )}
-            {!messagesLoading && displayMessages.length === 0 && (
+            {!feedLoading && displayMessages.length === 0 && (
               <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
                 {sessionView === 'new'
                   ? <><strong>新会话</strong><p>输入消息开始全新对话，发送后自动保存为独立会话。</p></>

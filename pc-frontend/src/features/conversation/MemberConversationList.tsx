@@ -64,7 +64,7 @@ export default function MemberConversationList({
       <div className={styles.list}>
         {conversations.map((conversation) => {
           const failed = conversation.last_task_status === 'error' || conversation.last_task_status === 'failed'
-          const title = conversation.title || conversation.last_message || '新会话'
+          const title = conversationDisplayTitle(conversation)
           const active = conversation.id === selectedId
           return (
             <button
@@ -73,8 +73,9 @@ export default function MemberConversationList({
               className={[styles.item, active ? styles.itemActive : ''].join(' ')}
               onClick={() => onOpen(conversation.id)}
             >
-              <span className={styles.itemTitle}>
-                {failed ? '✗ ' : ''}{title.slice(0, 40)}
+              <span className={styles.itemTitleRow}>
+                <span className={styles.itemTitle}>{title}</span>
+                {failed && <span className={styles.statusPill}>失败</span>}
               </span>
               <span className={styles.itemMeta}>
                 {conversation.updated_at ? formatTime(conversation.updated_at) : '未更新'}
@@ -86,4 +87,29 @@ export default function MemberConversationList({
       </div>
     </section>
   )
+}
+
+function conversationDisplayTitle(conversation: MemberConversationEntry): string {
+  const raw = String(conversation.title || conversation.last_message || '').trim()
+  if (!raw) return '新会话'
+
+  const normalized = raw
+    .replace(/^MCP\s+Display\s*/i, 'MCP 验收 ')
+    .replace(/\bmcp_display_e2e_\d+_\d+\b/gi, '')
+    .replace(/\bmcp_native_e2e_\d+_\d+(?:_[a-z]+)?\b/gi, '')
+    .replace(/\bpch_[a-f0-9]+\b/gi, '')
+    .replace(/\bforce-cli-parallel-[ab]-\d+\b/gi, '并行任务测试')
+    .replace(/^Force\s+CLI\s+cancellation\s+smoke\s+test\.?.*/i, 'CLI 取消验证')
+    .replace(/\bpost-publish-casual(?:-lookup)?-\d+\b/gi, '发布后验证')
+    .replace(/\bparallel\s+real\s+([ab])\s+\d+\b/gi, '并行会话 $1')
+    .replace(/\bsingle\s+node\s+lock\s+\d+\b/gi, '单节点锁定验证')
+    .replace(/^MCP\s+Native\s+Absolute\s+Pub\S*/i, 'MCP 原生发布验证')
+    .replace(/\s+/g, ' ')
+    .replace(/[·\-\s]+$/g, '')
+    .trim()
+
+  if (normalized) return normalized.slice(0, 34)
+  if (/mcp/i.test(raw)) return 'MCP 验收会话'
+  if (/pch_[a-f0-9]+/i.test(raw) || raw.includes('项目频道')) return '项目频道会话'
+  return raw.slice(0, 34)
 }
