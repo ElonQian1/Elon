@@ -75,6 +75,7 @@ import { ModerationDrawer } from './ModerationDrawer'
 import { MemberAuditDrawer } from './MemberAuditDrawer'
 import { RoleManagementDrawer } from './RoleManagementDrawer'
 import { PermissionDrawer } from './PermissionDrawer'
+import { MemberDetailDrawer } from './MemberDetailDrawer'
 import { MessageItem } from './ConversationMessage'
 import {
   MemberSearch,
@@ -171,6 +172,7 @@ export default function ConversationPage() {
   const [showAudit, setShowAudit] = useState(false)
   const [showRoles, setShowRoles] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
+  const [detailMember, setDetailMember] = useState<ProjectMember | null>(null)
   const [memberPopoverY, setMemberPopoverY] = useState(200)
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
   const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
@@ -291,6 +293,7 @@ export default function ConversationPage() {
   useEffect(() => {
     setSelectedMember(null)
     setMemberMenu(null)
+    setDetailMember(null)
     setPermissionFocusMemberId('')
     setRoleFocusMemberId('')
     setShowAudit(false)
@@ -303,6 +306,13 @@ export default function ConversationPage() {
     if (fresh && fresh !== selectedMember) setSelectedMember(fresh)
     if (!fresh) setSelectedMember(null)
   }, [members, selectedMember])
+
+  useEffect(() => {
+    if (!detailMember?.user_id) return
+    const fresh = members.find((member) => member.user_id === detailMember.user_id)
+    if (fresh && fresh !== detailMember) setDetailMember(fresh)
+    if (!fresh) setDetailMember(null)
+  }, [members, detailMember])
 
   useEffect(() => {
     if (!memberMenu?.member.user_id) return
@@ -946,6 +956,12 @@ export default function ConversationPage() {
     setMemberMenu(null)
   }
 
+  function openMemberDetails(member: ProjectMember) {
+    setDetailMember(member)
+    setSelectedMember(null)
+    setMemberMenu(null)
+  }
+
   function openMemberPermissions(member: ProjectMember) {
     setPermissionFocusMemberId(member.user_id)
     setShowPermissions(true)
@@ -956,6 +972,7 @@ export default function ConversationPage() {
     setRoleFocusMemberId(member.user_id)
     setShowRoles(true)
     setSelectedMember(null)
+    setDetailMember(null)
     setMemberMenu(null)
   }
 
@@ -1426,6 +1443,7 @@ export default function ConversationPage() {
               canModerate={canModerateMembers && memberMenu.member.user_id !== user?.id}
               onClose={() => setMemberMenu(null)}
               onOpenProfile={openMemberProfile}
+              onOpenDetails={openMemberDetails}
               onOpenConversations={openMemberConversations}
               onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
               onOpenRoles={activeProjectId && canUseRoleManager ? openMemberRoles : undefined}
@@ -1442,6 +1460,7 @@ export default function ConversationPage() {
               channel={activeChannel}
               canModerate={canModerateMembers && selectedMember.user_id !== user?.id}
               onClose={() => setSelectedMember(null)}
+              onOpenDetails={openMemberDetails}
               onOpenConversations={openMemberConversations}
               onOpenRoles={canUseRoleManager ? openMemberRoles : undefined}
               onModerate={moderateMemberFromPopover}
@@ -1563,6 +1582,22 @@ export default function ConversationPage() {
           canManageMembers={canManageMembers}
           onClose={() => { setShowRoles(false); setRoleFocusMemberId('') }}
           onSaved={reloadProjectSpace}
+        />
+      )}
+      {detailMember && activeProjectId && (
+        <MemberDetailDrawer
+          projectId={activeProjectId}
+          member={detailMember}
+          channels={channels}
+          currentChannel={activeChannel}
+          canModerate={canModerateMembers && detailMember.user_id !== user?.id}
+          canManageRoles={canUseRoleManager}
+          canManagePermissions={!!(activeProjectId && activeChannelId && canManagePermissions)}
+          onClose={() => setDetailMember(null)}
+          onOpenConversations={openMemberConversations}
+          onOpenRoles={canUseRoleManager ? openMemberRoles : undefined}
+          onOpenPermissions={activeProjectId && activeChannelId && canManagePermissions ? openMemberPermissions : undefined}
+          onModerate={moderateMemberFromPopover}
         />
       )}
       {showPermissions && activeProjectId && activeChannelId && (

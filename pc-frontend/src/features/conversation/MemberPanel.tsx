@@ -618,6 +618,7 @@ export function MemberContextMenu({
   canModerate,
   onClose,
   onOpenProfile,
+  onOpenDetails,
   onOpenConversations,
   onOpenPermissions,
   onOpenRoles,
@@ -629,6 +630,7 @@ export function MemberContextMenu({
   canModerate?: boolean
   onClose: () => void
   onOpenProfile: (member: ProjectMember, y: number) => void
+  onOpenDetails?: (member: ProjectMember) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenPermissions?: (member: ProjectMember) => void
   onOpenRoles?: (member: ProjectMember) => void
@@ -687,7 +689,7 @@ export function MemberContextMenu({
   }
 
   const MENU_WIDTH = 220
-  const MENU_HEIGHT = canModerate ? 376 : 216
+  const MENU_HEIGHT = canModerate ? 396 : 236
   const left = Math.min(Math.max(x, 8), Math.max(8, window.innerWidth - MENU_WIDTH - 8))
   const top = Math.min(Math.max(y, 8), Math.max(8, window.innerHeight - MENU_HEIGHT - 8))
 
@@ -712,6 +714,9 @@ export function MemberContextMenu({
       </div>
       <div className={styles.memberContextMenuGroup}>
         <button type="button" role="menuitem" onClick={() => run(() => onOpenProfile(member, y))}>查看资料</button>
+        {onOpenDetails && (
+          <button type="button" role="menuitem" onClick={() => run(() => onOpenDetails(member))}>完整资料</button>
+        )}
         {onOpenConversations && (
           <button type="button" role="menuitem" onClick={() => run(() => onOpenConversations(member))}>打开会话</button>
         )}
@@ -746,6 +751,7 @@ export function MemberProfilePopover({
   channel,
   canModerate,
   onClose,
+  onOpenDetails,
   onOpenConversations,
   onOpenRoles,
   onModerate,
@@ -757,6 +763,7 @@ export function MemberProfilePopover({
   channel?: Channel
   canModerate?: boolean
   onClose: () => void
+  onOpenDetails?: (member: ProjectMember) => void
   onOpenConversations?: (member: ProjectMember) => void
   onOpenRoles?: (member: ProjectMember) => void
   onModerate?: (member: ProjectMember, action: MemberModerationAction, durationMinutes?: number) => Promise<void>
@@ -851,6 +858,11 @@ export function MemberProfilePopover({
 
   function openRoles() {
     onOpenRoles?.(member)
+  }
+
+  function openDetails() {
+    onOpenDetails?.(member)
+    onClose()
   }
 
   async function addFriend() {
@@ -1017,6 +1029,11 @@ export function MemberProfilePopover({
           </section>
         )}
         <div className={styles.memberPopoverActions}>
+          {onOpenDetails && (
+            <button className={[styles.memberPopoverBtn, styles.memberPopoverBtnPrimary].join(' ')} type="button" onClick={openDetails}>
+              完整资料
+            </button>
+          )}
           {onOpenConversations && (
             <button className={[styles.memberPopoverBtn, styles.memberPopoverBtnPrimary].join(' ')} type="button" onClick={openConversations}>
               打开会话
