@@ -12,6 +12,7 @@ use serde::Deserialize;
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock, Mutex},
+    time::{Duration, Instant},
 };
 use tokio::sync::watch;
 
@@ -39,6 +40,8 @@ use crate::{
 
 const DOCS_CHANNEL_KIND: &str = "docs";
 const CHANNEL_AI_CANCEL_MESSAGE: &str = "用户已停止 AI 开发任务。";
+const CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_ENV: &str = "ELON_CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_SECS";
+const CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_DEFAULT_SECS: u64 = 180;
 
 static CHANNEL_AI_TASKS: LazyLock<Mutex<HashMap<String, ChannelAiTaskControl>>> =
     LazyLock::new(|| Mutex::new(HashMap::new()));
@@ -2030,6 +2033,22 @@ fn insert_channel_ai_result(task: &ChannelAiTask, content: &str) {
     }
 }
 
+fn channel_ai_heartbeat_only_timeout() -> Duration {
+    let secs = std::env::var(CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_ENV)
+        .ok()
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .unwrap_or(CHANNEL_AI_HEARTBEAT_ONLY_TIMEOUT_DEFAULT_SECS)
+        .clamp(60, 1800);
+    Duration::from_secs(secs)
+}
+
+fn is_pc_cli_heartbeat_progress(event_type: &str, message: &str) -> bool {
+    event_type == "progress"
+        && message.contains("正在处理中")
+        && message.contains("已等待")
+        && message.contains("Codex")
+}
+
 fn spawn_channel_ai_task(task: ChannelAiTask) {
     tokio::spawn(async move {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<String>();
@@ -2072,6 +2091,9 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
         let mut final_status = "done".to_string();
         let mut apk_url = None;
         let mut error = None;
+        let heartbeat_only_timeout = channel_ai_heartbeat_only_timeout();
+        let mut last_effective_progress_at = Instant::now();
+        let mut watchdog = tokio::time::interval(Duration::from_secs(5));
         loop {
             tokio::select! {
                 raw = rx.recv() => {
@@ -2087,6 +2109,9 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             .and_then(|v| v.as_str())
                             .unwrap_or("")
                             .trim();
+                        if !is_pc_cli_heartbeat_progress(event_type, message) {
+                            last_effective_progress_at = Instant::now();
+                        }
                         match event_type {
                             "progress" if !message.is_empty() => {
                                 insert_channel_ai_progress(&task, message);
@@ -2152,6 +2177,26 @@ fn spawn_channel_ai_task(task: ChannelAiTask) {
                             &task,
                             &result_message(CHANNEL_AI_CANCEL_MESSAGE, None, Some("已停止")),
                         );
+                        break;
+                    }
+                }
+                _ = watchdog.tick() => {
+                    if last_effective_progress_at.elapsed() >= heartbeat_only_timeout {
+                        runner.abort();
+                        project_tool_approvals::clear_task(&task.task_id);
+                        final_status = "failed".to_string();
+                        let msg = format!(
+                            "本机 AI 在 {} 秒内没有返回有效进展，已停止本轮任务。请稍后重试，或检查 Codex 网络/代理状态。",
+                            heartbeat_only_timeout.as_secs()
+                        );
+                        final_reply = msg.clone();
+                        error = Some(msg.clone());
+                        let raw_error = WsMessage::error(&msg).to_json();
+                        let _ = task.state.store.record_task_event(
+                            &task.task_id,
+                            &enrich_project_ws_event(raw_error, &task.task_id),
+                        );
+                        insert_channel_ai_result(&task, &result_message(&msg, None, Some("超时")));
                         break;
                     }
                 }
