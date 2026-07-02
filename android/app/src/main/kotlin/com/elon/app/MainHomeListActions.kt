@@ -437,6 +437,7 @@ internal class MainHomeListActions(
         return (groupItems + friendItems + projectItems)
             .sortedWith(
                 compareByDescending<HomeChatItem> { pinnedHomeChatPriority(it) }
+                    .thenByDescending { workingHomeChatPriority(it) }
                     .thenByDescending { it.sortTime }
                     .thenBy { item ->
                         when (item) {
@@ -453,6 +454,14 @@ internal class MainHomeListActions(
             is HomeChatItem.FriendItem -> if (item.friend.id == SOCIAL_AI_USER_ID) 1 else 0
             is HomeChatItem.GroupItem -> 0
             is HomeChatItem.ProjectItem -> 0
+        }
+    }
+
+    private fun workingHomeChatPriority(item: HomeChatItem): Int {
+        return when (item) {
+            is HomeChatItem.ProjectItem -> conversationWorkingSortKey(isProjectWorking(item.project))
+            is HomeChatItem.FriendItem,
+            is HomeChatItem.GroupItem -> 0
         }
     }
 
@@ -579,17 +588,14 @@ internal class MainHomeListActions(
     fun isConversationWorking(index: Int): Boolean {
         val conversations = conversations()
         if (index !in conversations.indices || conversations[index].ended) return false
-        return isTaskRunning(activeProject().id, conversations[index].id)
+        return activeProject().isConversationWorking(conversations[index], isTaskRunning)
     }
 
     private fun isProjectWorking(project: AppProject): Boolean {
         if (projectHasRunningStatus(project)) return true
         if (isProjectTaskRunning(project)) return true
-        val projectIds = project.projectTaskBadgeIds()
         return project.conversations.any { conversation ->
-            !conversation.ended && projectIds.any { projectId ->
-                !projectId.isNullOrBlank() && isTaskRunning(projectId, conversation.id)
-            }
+            project.isConversationWorking(conversation, isTaskRunning)
         }
     }
 

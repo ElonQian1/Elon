@@ -23,16 +23,30 @@ internal class ProjectSpacePersonalConversationPanel(
             container.addView(emptyRow())
         } else {
             val activeIndex = activePersonalConversationIndex()
-            conversations.forEachIndexed { index, conversation ->
-                container.addView(
-                    row(
+            conversations
+                .mapIndexed { index, conversation ->
+                    PersonalConversationEntry(
                         index = index,
                         conversation = conversation,
-                        active = index == activeIndex,
                         working = isPersonalConversationWorking(index)
                     )
+                }
+                .sortedWith(
+                    compareByDescending<PersonalConversationEntry> { conversationWorkingSortKey(it.working) }
+                        .thenByDescending { conversationOpenSortKey(it.conversation.ended) }
+                        .thenByDescending { it.conversation.updatedAt }
+                        .thenBy { it.conversation.title }
                 )
-            }
+                .forEach { entry ->
+                    container.addView(
+                        row(
+                            index = entry.index,
+                            conversation = entry.conversation,
+                            active = entry.index == activeIndex,
+                            working = entry.working
+                        )
+                    )
+                }
             container.addView(projectSpaceDivider(activity, dp))
         }
         container.addView(createRow())
@@ -111,3 +125,9 @@ internal class ProjectSpacePersonalConversationPanel(
         }
     }
 }
+
+private data class PersonalConversationEntry(
+    val index: Int,
+    val conversation: AppConversation,
+    val working: Boolean
+)

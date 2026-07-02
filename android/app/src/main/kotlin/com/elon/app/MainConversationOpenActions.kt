@@ -18,6 +18,7 @@ internal class MainConversationOpenActions(
     private val showProjectChat: (Boolean) -> Unit,
     private val showProjectPersonalChat: (String, Boolean) -> Unit,
     private val saveProjects: () -> Unit,
+    private val preferredConversationIndex: (AppProject) -> Int,
     private val syncConversationAgentLock: ((Int) -> Unit)? = null
 ) {
     fun openConversation(index: Int) {
@@ -34,10 +35,8 @@ internal class MainConversationOpenActions(
         setActiveProjectIndex(index)
         val currentConversations = conversations()
         if (currentConversations.isEmpty()) currentConversations.add(defaultAppConversation())
-        val recentConversationIndex = currentConversations
-            .indices
-            .maxByOrNull { currentConversations[it].updatedAt }
-            ?: 0
+        val recentConversationIndex = preferredConversationIndex(projects()[index])
+            .coerceIn(0, currentConversations.lastIndex)
         setActiveConversationIndex(recentConversationIndex)
         saveProjects()
         openActiveConversation(showProjectChat)

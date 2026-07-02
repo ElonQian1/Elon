@@ -30,6 +30,7 @@ internal class ChatProjectSideMenuView(
     private val openPersonalProject: (Int) -> Unit,
     private val openJointProject: (Int) -> Unit,
     private val openRecentConversation: (Int, Int) -> Unit,
+    private val isRecentConversationWorking: (Int, Int) -> Boolean,
     private val requestClose: (Boolean) -> Unit,
     private val dp: (Int) -> Int,
     private val selectableForeground: () -> Drawable?
@@ -186,11 +187,18 @@ internal class ChatProjectSideMenuView(
                         projectIndex = projectIndex,
                         conversationIndex = conversationIndex,
                         title = title,
-                        updatedAt = conversation.updatedAt
+                        updatedAt = conversation.updatedAt,
+                        ended = conversation.ended,
+                        working = isRecentConversationWorking(projectIndex, conversationIndex)
                     )
                 }
             }
-        }.sortedByDescending { it.updatedAt }
+        }.sortedWith(
+            compareByDescending<RecentConversationEntry> { conversationWorkingSortKey(it.working) }
+                .thenByDescending { conversationOpenSortKey(it.ended) }
+                .thenByDescending { it.updatedAt }
+                .thenBy { it.title }
+        )
             .take(RECENT_CONVERSATION_LIMIT)
     }
 
@@ -286,7 +294,9 @@ private data class RecentConversationEntry(
     val projectIndex: Int,
     val conversationIndex: Int,
     val title: String,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val ended: Boolean,
+    val working: Boolean
 )
 
 internal fun showChatProjectDropRipple(

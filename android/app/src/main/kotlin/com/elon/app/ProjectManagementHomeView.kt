@@ -48,11 +48,15 @@ internal class ProjectManagementHomeView(
             .filter { !it.project.isJointDevelopmentProject() }
             .sortedWith(
                 compareByDescending<IndexedProject> { it.project.isSystemArchiveProject() }
+                    .thenByDescending { conversationWorkingSortKey(isProjectWorking(it.project)) }
                     .thenByDescending { it.project.updatedAt }
             )
         val joint = indexed
             .filter { it.project.isJointDevelopmentProject() }
-            .sortedByDescending { it.project.updatedAt }
+            .sortedWith(
+                compareByDescending<IndexedProject> { conversationWorkingSortKey(isProjectWorking(it.project)) }
+                    .thenByDescending { it.project.updatedAt }
+            )
         val showJoint = jointProjectsExpanded() && !personalProjectsExpanded()
         val visibleProjects = if (showJoint) joint else personal
 

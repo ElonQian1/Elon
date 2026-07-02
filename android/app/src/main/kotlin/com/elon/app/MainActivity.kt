@@ -807,6 +807,7 @@ class MainActivity : AppCompatActivity() {
                 navigationController.captureProjectEntryReturnTarget()
                 conversationOpenActions.openProjectSpaceConversation(projectIndex, conversationIndex)
             },
+            isProjectConversationWorking = ::isProjectConversationWorking,
             openProjectManagement = { openProjectSpaceForProject(s.activeProjectIndex, true) },
             sendProjectShare = chatProjectShareActions::sendToCurrentChat,
             createConversationAndOpen = { conversationActions.createConversationAndOpen() },
@@ -904,6 +905,7 @@ class MainActivity : AppCompatActivity() {
             showProjectChat = { animate -> navigationController.showProjectChat(animate = animate) },
             showProjectPersonalChat = { title, animate -> navigationController.showProjectPersonalChat(title, animate) },
             saveProjects = projectStateActions::saveProjects,
+            preferredConversationIndex = ::preferredConversationIndex,
             syncConversationAgentLock = conversationIdentityActions::syncConversationAgentLock
         )
     }
@@ -978,10 +980,7 @@ class MainActivity : AppCompatActivity() {
             activeProject = projectStateActions::activeProject,
             compactProjectTitle = { projectRecordActions.compactProjectTitle() },
             formatTime = { s.timeFormatter.format(Date(it)) },
-            isTaskRunning = { projectId, conversationId ->
-                val key = conversationTaskRegistryActions.conversationTaskKey(projectId, conversationId)
-                s.runningConversationTasks.containsKey(key)
-            },
+            isTaskRunning = ::isTaskRunningForConversation,
             isProjectTaskRunning = { project ->
                 val ids = project.projectTaskBadgeIds().mapNotNull { it?.takeIf(String::isNotBlank) }.toSet()
                 s.runningConversationTasks.values.any { task -> task.projectId in ids }
@@ -1033,6 +1032,21 @@ class MainActivity : AppCompatActivity() {
             friendId = friendChatActions.currentFriend()?.id,
             groupId = groupChatActions.currentGroup()?.id
         )
+    }
+
+    private fun preferredConversationIndex(project: AppProject): Int {
+        return project.preferredConversationIndex(::isTaskRunningForConversation)
+    }
+
+    private fun isProjectConversationWorking(projectIndex: Int, conversationIndex: Int): Boolean {
+        val project = s.projects.getOrNull(projectIndex) ?: return false
+        return project.isConversationWorkingAt(conversationIndex, ::isTaskRunningForConversation)
+    }
+
+    private fun isTaskRunningForConversation(projectId: String, conversationId: String): Boolean {
+        val cleanProjectId = projectId.trim().takeIf { it.isNotBlank() } ?: return false
+        val cleanConversationId = conversationId.trim().takeIf { it.isNotBlank() } ?: return false
+        return s.runningConversationTasks.containsKey("$cleanProjectId\u001F$cleanConversationId")
     }
 
     private fun clearProjectTaskCompletionBadge(project: AppProject) {

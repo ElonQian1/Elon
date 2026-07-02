@@ -326,7 +326,8 @@ internal class ChatAiSideMenuView(
                 )
             }
             .sortedWith(
-                compareByDescending<ConversationDirectoryEntry> { it.working }
+                compareByDescending<ConversationDirectoryEntry> { conversationWorkingSortKey(it.working) }
+                    .thenByDescending { conversationOpenSortKey(it.conversation.ended) }
                     .thenByDescending { it.conversation.updatedAt }
                     .thenBy { it.conversation.title }
             )
