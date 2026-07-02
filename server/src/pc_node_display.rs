@@ -32,6 +32,22 @@ pub fn pc_node_progress_name_from_parts(display_name: &str, node_id: &str) -> St
     format!("{display_name}（{suffix}）")
 }
 
+pub fn pc_cli_heartbeat_subject(
+    display_model: &str,
+    node_progress_name: &str,
+    node_id: &str,
+) -> String {
+    let display_model = display_model.trim();
+    if display_model.is_empty()
+        || display_model == node_id
+        || display_model.contains(node_id)
+        || display_model.starts_with("node-")
+    {
+        return node_progress_name.to_string();
+    }
+    display_model.to_string()
+}
+
 fn compact_node_suffix(node_id: &str) -> String {
     let node_id = node_id.trim();
     node_id
@@ -61,6 +77,30 @@ mod tests {
         assert_eq!(
             pc_node_progress_name_from_parts("", "node-usr_5c-dd33ed36"),
             "节点 dd33ed36"
+        );
+    }
+
+    #[test]
+    fn heartbeat_subject_replaces_raw_node_id_with_pc_name() {
+        assert_eq!(
+            pc_cli_heartbeat_subject(
+                "node-usr_5c-dd33ed36",
+                "ELON-4060（dd33ed36）",
+                "node-usr_5c-dd33ed36"
+            ),
+            "ELON-4060（dd33ed36）"
+        );
+    }
+
+    #[test]
+    fn heartbeat_subject_keeps_real_model_label() {
+        assert_eq!(
+            pc_cli_heartbeat_subject(
+                "GPT-5.5 · 推理 xhigh",
+                "ELON-4060（dd33ed36）",
+                "node-usr_5c-dd33ed36"
+            ),
+            "GPT-5.5 · 推理 xhigh"
         );
     }
 }

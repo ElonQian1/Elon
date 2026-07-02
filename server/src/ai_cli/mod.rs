@@ -54,7 +54,9 @@ use self::{
 };
 use crate::{
     agent_routing::quick_casual_reply,
-    billing, intent_router, tools,
+    billing, intent_router,
+    pc_node_display::{pc_cli_heartbeat_subject, pc_node_progress_name},
+    tools,
     types::{AppState, WsMessage},
 };
 
@@ -1378,7 +1380,8 @@ async fn run_via_pc_agent(
     // 进度心跳：开发/规划每 5s 发一次；轻量聊天只回流真实文本，不刷内部状态。
     let progress_tx = tx.clone();
     let cli_label = pc_cli_progress_label(cli_name);
-    let disp_model_clone = display_model.clone();
+    let node_progress_name = pc_node_progress_name(state.as_ref(), agent_id).await;
+    let disp_model_clone = pc_cli_heartbeat_subject(&display_model, &node_progress_name, agent_id);
     let mut progress_handle = if lightweight_pc_chat {
         None
     } else {
