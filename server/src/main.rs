@@ -256,8 +256,11 @@ async fn main() -> Result<()> {
         );
     }
 
-    // 定期清理：running 超过 10 分钟的任务自动标记为 failed
-    // 防止 PC 节点断线但任务因异常未收到 CliDone 而永久卡住
+    const STALE_RUNNING_TASK_TIMEOUT_SECS: u64 = 45 * 60;
+
+    // 定期清理：长期 running 的任务自动标记为 failed。
+    // PC 节点上的 Codex 发布/首次编译可能因为 cargo build、上传和服务重启超过 10 分钟；
+    // 阈值需要覆盖真实发布窗口，避免发布已成功但频道任务先被标记失败。
     {
         let state_cleanup = state.clone();
         tokio::spawn(async move {
@@ -268,7 +271,7 @@ async fn main() -> Result<()> {
                 match state_cleanup
                     .store
                     .mark_stale_running_tasks_with_channel_results_excluding(
-                        10 * 60,
+                        STALE_RUNNING_TASK_TIMEOUT_SECS,
                         &active_channel_tasks,
                     ) {
                     Ok(n) if n > 0 => {
