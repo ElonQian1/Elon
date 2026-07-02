@@ -106,6 +106,10 @@ export function ModerationDrawer({
     banned: members.filter((member) => member.is_banned).length,
     normal: members.filter((member) => !member.is_banned && !member.is_muted).length,
   }), [members])
+  const focusedMember = useMemo(() => {
+    if (!initialMemberId) return undefined
+    return members.find((member) => member.user_id === initialMemberId)
+  }, [initialMemberId, members])
   const activeCases = useMemo(
     () => sortModerationMembers(members.filter((member) => member.is_banned || member.is_muted), 'expires'),
     [members],
@@ -195,7 +199,11 @@ export function ModerationDrawer({
         <header className={styles.drawerHeader}>
           <div>
             <strong>成员限制中心</strong>
-            <span>{message || `${stats.restricted} 个当前案件 · ${stats.muted} 个禁言 · ${stats.banned} 个封禁`}</span>
+            <span>
+              {message || (focusedMember
+                ? `已定位 ${memberName(focusedMember)} · ${memberModerationSummary(focusedMember)}`
+                : `${stats.restricted} 个当前案件 · ${stats.muted} 个禁言 · ${stats.banned} 个封禁`)}
+            </span>
           </div>
           <div className={styles.drawerHeaderActions}>
             <button className={styles.drawerCloseBtn} onClick={refreshAudit}>刷新记录</button>
@@ -219,6 +227,37 @@ export function ModerationDrawer({
               )
             })}
           </div>
+
+          {focusedMember && (
+            <section
+              className={styles.moderationFocusPanel}
+              data-state={focusedMember.is_banned ? 'banned' : focusedMember.is_muted ? 'muted' : 'normal'}
+            >
+              <span className={[styles.memberAvatar, focusedMember.is_banned ? styles.moderationAvatarBanned : focusedMember.is_muted ? styles.moderationAvatarMuted : ''].join(' ')}>
+                {focusedMember.avatar_data_url
+                  ? <img src={focusedMember.avatar_data_url} alt="" />
+                  : memberInitial(focusedMember)
+                }
+              </span>
+              <div className={styles.moderationFocusInfo}>
+                <strong>已定位成员 · {memberName(focusedMember)}</strong>
+                <span>{memberModerationSummary(focusedMember)} · {memberRoleLabel(focusedMember)} · {restrictionUntilLabel(focusedMember)}</span>
+              </div>
+              <button
+                type="button"
+                className={styles.drawerCloseBtn}
+                onClick={() => {
+                  setQuery(memberName(focusedMember))
+                  setFilter(focusedMember.is_banned ? 'banned' : focusedMember.is_muted ? 'muted' : 'all')
+                  setSortMode('status')
+                  setListScrollTop(0)
+                  if (listRef.current) listRef.current.scrollTop = 0
+                }}
+              >
+                回到该成员
+              </button>
+            </section>
+          )}
 
           <section className={styles.moderationControlPanel}>
             <div className={styles.moderationControlHead}>
@@ -308,7 +347,11 @@ export function ModerationDrawer({
                     const restriction = restrictionStatusLabel(member)
                     return (
                       <div key={member.user_id} className={styles.moderationVirtualSlot}>
-                        <article className={styles.moderationRow} data-state={member.is_banned ? 'banned' : member.is_muted ? 'muted' : 'normal'}>
+                        <article
+                          className={styles.moderationRow}
+                          data-state={member.is_banned ? 'banned' : member.is_muted ? 'muted' : 'normal'}
+                          data-focus={member.user_id === focusedMember?.user_id ? 'true' : undefined}
+                        >
                           <span className={[styles.memberAvatar, member.is_banned ? styles.moderationAvatarBanned : member.is_muted ? styles.moderationAvatarMuted : ''].join(' ')}>
                             {member.avatar_data_url
                               ? <img src={member.avatar_data_url} alt="" />
