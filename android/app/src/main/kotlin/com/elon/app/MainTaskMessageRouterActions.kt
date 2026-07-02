@@ -26,7 +26,8 @@ internal class MainTaskMessageRouterActions(
         val parsed = runCatching { JSONObject(raw) }.getOrNull()
         val type = parsed?.optString("type")?.takeIf { it.isNotBlank() }
         val key = taskKey(traceId, projectId, conversationId)
-        val activeVisible = key == activeConversationTaskKey() && isProjectConversationVisible()
+        val hasExplicitTarget = !projectId.isNullOrBlank() && !conversationId.isNullOrBlank()
+        val activeVisible = !hasExplicitTarget && key == activeConversationTaskKey() && isProjectConversationVisible()
         if (activeVisible) {
             appendActiveMessage(raw)
         } else {
