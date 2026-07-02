@@ -23,7 +23,7 @@ interface Props {
 export default function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const taskId  = taskIdOf(messages[0]) || ''
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
-  const isDone  = taskIsTerminal(task)
+  const isDone  = taskIsTerminal(task) || messages.some(isTerminalTaskMessage)
 
   // 任务完成后默认折叠；从历史加载的已完成任务也默认折叠
   const [collapsed, setCollapsed] = useState(isDone)
@@ -124,4 +124,10 @@ function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined
     return { ...message, kind: 'ai_result' }
   }
   return undefined
+}
+
+function isTerminalTaskMessage(message: ChatMessage): boolean {
+  if (messageKind(message) === 'ai_result') return true
+  const status = String(message.task_status ?? message.taskStatus ?? '').toLowerCase()
+  return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(status)
 }

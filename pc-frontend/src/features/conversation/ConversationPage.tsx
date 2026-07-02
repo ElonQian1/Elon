@@ -26,6 +26,7 @@ import { initialRuntimeRouteFromStorage, persistRuntimeRouteSelection } from './
 import type { RuntimeRoute } from './runtimeRoutes'
 import type {
   Channel,
+  ChannelMessagesResponse,
   Message,
   Project,
   ProjectInvitePreview,
@@ -33,6 +34,13 @@ import type {
   ProjectMember,
 } from './types'
 import MemberConversationList from './MemberConversationList'
+import {
+  buildDisplayMessages,
+  buildMessageGroups,
+  buildTaskProcessMessageMap,
+  containsTaskProcess,
+  hasRunningTask as hasRunningTaskInMessages,
+} from './messageFlow'
 import {
   listMemberConversationMessages,
   listMemberConversations,
@@ -102,7 +110,7 @@ export default function ConversationPage() {
     projects, projectsLoaded, activeProjectId, channels, categories, members, activeChannelId,
     messages, messagesLoading, sendingMessage, space, landing, spaceLoading, spaceError,
     projectHomeVersion,
-    loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage, cancelTask, approveTool,
+    loadProjects, selectProject, reloadProjectSpace, selectChannel, sendMessage,
   } = useProjectStore()
   const selectedAgent = useModelStore((s) => s.selectedAgent)
   const modelLabel = useModelStore((s) => s.label)
@@ -135,6 +143,7 @@ export default function ConversationPage() {
   const [memberConversations, setMemberConversations] = useState<MemberConversationEntry[]>([])
   const [convMessages, setConvMessages] = useState<Message[]>([])
   const [convLoading, setConvLoading] = useState(false)
+  const [sessionTaskMessages, setSessionTaskMessages] = useState<Message[]>([])
   const [sendingMemberDiscussion, setSendingMemberDiscussion] = useState(false)
   const [inviteCode, setInviteCode] = useState('')
   const [invitePreview, setInvitePreview] = useState<ProjectInvitePreview | null>(null)
@@ -205,6 +214,7 @@ export default function ConversationPage() {
   // 项目切换时清空会话消息
   useEffect(() => {
     setConvMessages([])
+    setSessionTaskMessages([])
     setSessionView(null)
     setMemberConversationTarget(null)
     waitingForNewSession.current = false
@@ -236,6 +246,7 @@ export default function ConversationPage() {
   useEffect(() => {
     setSessionView(null)
     setConvMessages([])
+    setSessionTaskMessages([])
     waitingForNewSession.current = false
   }, [activeConversationTargetId])
 
@@ -266,7 +277,7 @@ export default function ConversationPage() {
     } else {
       setShowNewMsg(true)
     }
-  }, [messages, convMessages, sessionView])
+  }, [messages, convMessages, sessionTaskMessages, sessionView])
 
   // P1.3：检测用户是否滚到底部
   function handleFeedScroll() {
@@ -284,11 +295,6 @@ export default function ConversationPage() {
     setShowNewMsg(false)
   }
 
-  const taskContext = buildContext(messages as Parameters<typeof buildContext>[0])
-
-  function isTerminalTaskStatus(status: unknown): boolean {
-    return ['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'].includes(String(status ?? '').toLowerCase())
-  }
   const autoResize = useCallback(() => {
     const el = textareaRef.current
     if (!el) return
@@ -329,8 +335,8 @@ export default function ConversationPage() {
         return
       }
 
-      let targetChannelId = activeChannelId
-      let targetChannel = targetChannelId ? channels.find((c) => c.id === targetChannelId) : undefined
+      let targetChannel = activeChannel?.kind === 'ai_development' ? activeChannel : aiDevelopmentChannel
+      let targetChannelId = targetChannel?.id ?? ''
       if (!targetChannelId) {
         const best = channels.find((c) => c.kind === 'ai_development')
         if (!best) {
@@ -368,6 +374,7 @@ export default function ConversationPage() {
       const openedConversationId = response?.conversation_id ?? conversationId
       waitingForNewSession.current = false
       setSessionView(openedConversationId)
+      setSessionTaskMessages([])
       const optimisticTaskId = clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId)
       setConvMessages([{
         id: `optimistic-${openedConversationId}-${Date.now()}`,
@@ -444,6 +451,9 @@ export default function ConversationPage() {
   )
   const activeChannel = channels.find((c) => c.id === activeChannelId)
   const isDevChannel = activeChannel?.kind === 'ai_development'
+  const aiDevelopmentChannel = channels.find((channel) => channel.kind === 'ai_development')
+  const aiDevelopmentChannelId = aiDevelopmentChannel?.id ?? ''
+  const taskActionChannelId = isDevChannel ? activeChannelId : aiDevelopmentChannelId
   const activeWorkspacePath = clean(activeProject?.workspace_path ?? activeProject?.storage_worktree_path)
   const activeProjectRole = clean(activeProject?.role ?? activeProject?.my_role ?? space?.my_role).toLowerCase()
   const activeProjectRoleLabel = projectRoleLabel(activeProjectRole)
@@ -456,8 +466,9 @@ export default function ConversationPage() {
   const projectBoundToLocalNode = !!localNodeId && activeProject?.node_id === localNodeId
   const activeChannelBlocksAi = !!activeChannel && activeChannel.kind === 'ai_development' && !channelAllowsAiStart(activeChannel)
   const activeChannelIsNotAi = !!activeChannel && activeChannel.kind !== 'ai_development'
+  const aiDevelopmentChannelBlocksAi = !!aiDevelopmentChannel && !channelAllowsAiStart(aiDevelopmentChannel)
   const canManagePermissions = channels.some(channelCanManage)
-  // taskContext 和 hasRunningTask 已在上方 P1.3 代码块中定义
+  // taskContext 和 hasRunningTask 在当前实际渲染的消息流上推导，避免会话视图丢失折叠状态。
 
   useEffect(() => {
     if (!activeProjectId || !activeProject || !localNodeReady || !localNodeId) return
@@ -551,83 +562,45 @@ export default function ConversationPage() {
   // 成员卡片弹窗
   // (memberPopover state removed - not currently used)
 
-  // 消息分组：判断某条消息是否与上一条来自同一发送者（仅用于非任务消息）
-  // src 必须与当前渲染的消息数组一致，避免索引越界
-  function isGroupedIn(src: Message[], idx: number): boolean {
-    if (idx === 0 || idx >= src.length) return false
-    const cur  = src[idx]
-    const prev = src[idx - 1]
-    if (!cur || !prev) return false
-    const curRole  = clean(cur.kind  ?? cur.role  ?? '').toLowerCase()
-    const prevRole = clean(prev.kind ?? prev.role ?? '').toLowerCase()
-    const curId  = clean(cur.user_id  ?? (cur as Record<string, unknown>).userId  ?? '')
-    const prevId = clean(prev.user_id ?? (prev as Record<string, unknown>).userId ?? '')
-    if (['ai_task','ai_progress','ai_result'].includes(curRole)) return false
-    if (['ai_task','ai_progress','ai_result'].includes(prevRole)) return false
-    if (curRole === prevRole) {
-      if (curRole === 'user' || curRole === 'human' || curRole === 'discussion') return curId !== '' && curId === prevId
-      return true
-    }
-    return false
-  }
-
   const memberDiscussionNeedsConversation = isAssistingMember && (!sessionView || sessionView === 'new')
   const composerBusy = sendingMessage || sendingMemberDiscussion
   const composerDisabled = composerBusy
     || memberDiscussionNeedsConversation
-    || activeChannelBlocksAi
-    || activeChannelIsNotAi
+    || aiDevelopmentChannelBlocksAi
+    || (!aiDevelopmentChannelId && !isAssistingMember)
     || (!activeChannelId && channels.length === 0 && !isAssistingMember)
 
-  // 根据会话视图过滤显示的消息（必须在 messageGroups 之前声明）
-  const displayMessages = useMemo(() => {
-    if (!sessionView) return messages
-    if (sessionView === 'new') return []
-    // 选中了真实会话（从服务端加载）
-    if (convMessages.length > 0 || convLoading) return convMessages
-    // 降级：从频道消息中按 task_id 过滤
-    return messages.filter((msg) => {
-      const tid = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
-      return tid === sessionView
-    })
-  }, [messages, sessionView, convMessages, convLoading])
+  const channelTaskMessagesById = useMemo(
+    () => buildTaskProcessMessageMap([messages, sessionTaskMessages]),
+    [messages, sessionTaskMessages],
+  )
+
+  // 根据会话视图过滤显示的消息，并把频道任务过程挂回独立会话。
+  const displayMessages = useMemo(
+    () => buildDisplayMessages({
+      sessionView,
+      channelMessages: messages,
+      conversationMessages: convMessages,
+      conversationLoading: convLoading,
+      taskMessagesById: channelTaskMessagesById,
+    }),
+    [messages, sessionView, convMessages, convLoading, channelTaskMessagesById],
+  )
+
+  const taskContext = useMemo(
+    () => buildContext(displayMessages as Parameters<typeof buildContext>[0]),
+    [displayMessages],
+  )
 
   // P1.3：打字指示器只看当前可见会话，避免其它历史任务让本会话一直显示处理中。
-  const hasRunningTask = useMemo(() => {
-    const taskIds = new Set<string>()
-    const doneIds = new Set<string>()
-    for (const m of displayMessages) {
-      const kind = ((m.kind ?? m.role ?? '') as string).toLowerCase()
-      const id = (m.task_id ?? m.taskId ?? '') as string
-      if (!id) continue
-      if (kind === 'ai_task') taskIds.add(id)
-      if (kind === 'ai_result' || isTerminalTaskStatus(m.task_status ?? m.taskStatus)) doneIds.add(id)
-    }
-    for (const id of taskIds) if (!doneIds.has(id)) return true
-    return false
-  }, [displayMessages])
+  const hasRunningTask = useMemo(() => hasRunningTaskInMessages(displayMessages), [displayMessages])
 
   // 消息分组：dev频道中把同一 task_id 的消息聚合为 DevTaskGroup（任务级折叠层）
-  type SingleGroup = { type: 'single'; msg: Message; grouped: boolean; key: string }
-  type TaskGroup   = { type: 'task';   taskId: string; msgs: Message[]; key: string }
-  const messageGroups = useMemo(() => {
-    const src = displayMessages
-    const groups: Array<SingleGroup | TaskGroup> = []
-    for (let i = 0; i < src.length; i++) {
-      const msg  = src[i]
-      const kind = clean(msg.kind ?? msg.role ?? '').toLowerCase()
-      const tid  = String((msg.task_id ?? (msg as Record<string, unknown>).taskId) ?? '')
-      const isTask = isDevChannel && ['ai_task','ai_progress','ai_result'].includes(kind) && !!tid
-      if (isTask) {
-        const last = groups[groups.length - 1]
-        if (last?.type === 'task' && last.taskId === tid) last.msgs.push(msg)
-        else groups.push({ type: 'task', taskId: tid, msgs: [msg], key: `task-${tid}-${i}` })
-      } else {
-        groups.push({ type: 'single', msg, grouped: isGroupedIn(src, i), key: msg.id ?? String(i) })
-      }
-    }
-    return groups
-  }, [displayMessages, isDevChannel]) // eslint-disable-line
+  const taskFlowEnabled = isDevChannel || containsTaskProcess(displayMessages)
+  const messageGroups = useMemo(
+    () => buildMessageGroups(displayMessages, taskFlowEnabled),
+    [displayMessages, taskFlowEnabled],
+  )
 
   // sessionView='new' 时，一旦会话列表出现新会话，自动切入
   useEffect(() => {
@@ -643,6 +616,7 @@ export default function ConversationPage() {
   useEffect(() => {
     setSessionView(null)
     setConvMessages([])
+    setSessionTaskMessages([])
     waitingForNewSession.current = false
   }, [activeChannelId]) // eslint-disable-line
 
@@ -651,16 +625,69 @@ export default function ConversationPage() {
     if (!activeProjectId || !activeConversationTargetId) return
     setSessionView(convId)
     setConvMessages([])
+    setSessionTaskMessages([])
     setConvLoading(true)
     try {
-      const messages = await listMemberConversationMessages(
-        activeProjectId,
-        activeConversationTargetId,
-        convId,
-      )
-      setConvMessages(messages as Message[])
+      const [conversationMessages, taskMessages] = await Promise.all([
+        listMemberConversationMessages(
+          activeProjectId,
+          activeConversationTargetId,
+          convId,
+        ),
+        loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId),
+      ])
+      setConvMessages(conversationMessages as Message[])
+      setSessionTaskMessages(taskMessages)
     } catch (err) { console.warn('[ConvMessages] failed:', err) }
     finally { setConvLoading(false) }
+  }
+
+  async function refreshTaskSurface() {
+    if (activeProjectId && activeConversationTargetId && sessionView && sessionView !== 'new') {
+      const [nextMessages, taskMessages] = await Promise.all([
+        listMemberConversationMessages(
+          activeProjectId,
+          activeConversationTargetId,
+          String(sessionView),
+        ),
+        loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId),
+      ])
+      setConvMessages(nextMessages as Message[])
+      setSessionTaskMessages(taskMessages)
+      listMemberConversations(activeProjectId, activeConversationTargetId)
+        .then(setMemberConversations)
+        .catch(() => {})
+    } else if (activeProjectId && aiDevelopmentChannelId) {
+      setSessionTaskMessages(await loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId))
+    }
+
+    if (activeProjectId && activeChannelId) {
+      await useProjectStore.getState().loadMessages(activeProjectId, activeChannelId)
+    }
+  }
+
+  async function handleCancelTask(taskId: string) {
+    if (!activeProjectId || !taskActionChannelId) {
+      setSendError('当前项目没有可操作的 AI 开发频道')
+      return
+    }
+    await api.post(
+      `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(taskActionChannelId)}/ai-tasks/${encodeURIComponent(taskId)}/cancel`,
+      {},
+    )
+    await refreshTaskSurface()
+  }
+
+  async function handleApproveTool(taskId: string, approvalId: string, decision: 'approve' | 'deny') {
+    if (!activeProjectId || !taskActionChannelId) {
+      setSendError('当前项目没有可操作的 AI 开发频道')
+      return
+    }
+    await api.post(
+      `/api/projects/${encodeURIComponent(activeProjectId)}/channels/${encodeURIComponent(taskActionChannelId)}/ai-tasks/${encodeURIComponent(taskId)}/tool-approvals/${encodeURIComponent(approvalId)}/decision`,
+      { decision },
+    )
+    await refreshTaskSurface()
   }
 
   useEffect(() => {
@@ -677,13 +704,17 @@ export default function ConversationPage() {
 
     async function refreshConversation() {
       try {
-        const nextMessages = await listMemberConversationMessages(
-          activeProjectId,
-          activeConversationTargetId,
-          String(sessionView),
-        )
+        const [nextMessages, taskMessages] = await Promise.all([
+          listMemberConversationMessages(
+            activeProjectId,
+            activeConversationTargetId,
+            String(sessionView),
+          ),
+          loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId),
+        ])
         if (canceled) return
         setConvMessages(nextMessages as Message[])
+        setSessionTaskMessages(taskMessages)
         listMemberConversations(activeProjectId, activeConversationTargetId)
           .then((items) => { if (!canceled) setMemberConversations(items) })
           .catch(() => {})
@@ -721,7 +752,7 @@ export default function ConversationPage() {
       window.removeEventListener('elon:project-message-updated', onProjectMessageUpdated)
       window.removeEventListener('elon:project-task-done', onProjectTaskDone)
     }
-  }, [activeProjectId, activeConversationTargetId, sessionView])
+  }, [activeProjectId, activeConversationTargetId, sessionView, aiDevelopmentChannelId])
 
   function startNewSession() {
     if (!isOwnConversationTarget) {
@@ -731,6 +762,7 @@ export default function ConversationPage() {
     prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
     setSessionView('new')
     setConvMessages([])
+    setSessionTaskMessages([])
     waitingForNewSession.current = true
     setTimeout(() => textareaRef.current?.focus(), 50)
   }
@@ -786,6 +818,7 @@ export default function ConversationPage() {
     if (!activeProjectId) return
     setSessionView(null)
     setConvMessages([])
+    setSessionTaskMessages([])
     setMemberConversationTarget(null)
     waitingForNewSession.current = false
     await selectProject(activeProjectId)
@@ -1012,10 +1045,10 @@ export default function ConversationPage() {
                       : '项目尚未记录节点'}
                 </span>
               </div>
-              {(activeChannelBlocksAi || activeChannelIsNotAi) && (
+              {(activeChannelBlocksAi || (!sessionView && activeChannelIsNotAi)) && (
                 <div className={styles.permissionNotice}>
                   {activeChannelIsNotAi
-                    ? '当前频道不是 AI 开发频道，请切换到 AI开发 后发起 AI 对话。'
+                    ? '当前输入会通过 AI开发 频道发起项目 AI 对话。'
                     : '当前角色不能在这个频道发起 AI 开发。'}
                 </div>
               )}
@@ -1070,21 +1103,21 @@ export default function ConversationPage() {
               group.type === 'task' ? (
                 <div key={group.key} data-task-id={group.taskId} className={styles.devTaskWrap}>
                   <DevTaskGroup
-                    messages={group.msgs as Parameters<typeof DevTaskGroup>[0]['messages']}
+                    messages={group.messages as Parameters<typeof DevTaskGroup>[0]['messages']}
                     taskContext={taskContext}
-                    onCancel={cancelTask}
-                    onApprove={approveTool}
+                    onCancel={handleCancelTask}
+                    onApprove={handleApproveTool}
                   />
                 </div>
               ) : (
                 <MessageItem
                   key={group.key}
-                  message={group.msg}
+                  message={group.message}
                   isDevChannel={isDevChannel}
                   taskContext={taskContext}
                   user={user}
-                  onCancel={cancelTask}
-                  onApprove={approveTool}
+                  onCancel={handleCancelTask}
+                  onApprove={handleApproveTool}
                   grouped={group.grouped}
                 />
               )
@@ -1148,10 +1181,12 @@ export default function ConversationPage() {
                 placeholder={
                   isAssistingMember
                     ? `以我的账号在 ${activeConversationTargetName} 的会话中发送协助消息…`
+                    : sessionView && sessionView !== 'new'
+                      ? '继续这个项目会话… (Enter 发送，Shift+Enter 换行)'
                     : !activeChannelId
                     ? `向 ${activeProject?.name ?? '项目'} 发送消息或需求… (Enter 发送)`
                     : activeChannelIsNotAi
-                      ? '请选择 AI开发 频道后发起 AI 对话'
+                      ? '通过 AI开发 频道发送需求'
                     : isDevChannel
                       ? `向 ${activeChannel?.name ?? 'AI'} 描述开发需求… (Enter 发送，Shift+Enter 换行)`
                       : `在 #${activeChannel?.name ?? ''} 发送消息`
@@ -1410,4 +1445,12 @@ function shortNodeId(nodeId: string): string {
   const cleanId = clean(nodeId)
   if (cleanId.length <= 18) return cleanId
   return `${cleanId.slice(0, 11)}…${cleanId.slice(-6)}`
+}
+
+async function loadAiDevelopmentTaskMessages(projectId: string, channelId: string): Promise<Message[]> {
+  if (!projectId || !channelId) return []
+  const data = await api.get<ChannelMessagesResponse>(
+    `/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(channelId)}/messages?limit=200`,
+  )
+  return data.messages ?? []
 }
