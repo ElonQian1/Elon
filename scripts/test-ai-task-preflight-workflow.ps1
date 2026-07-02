@@ -44,14 +44,18 @@ $preflightSh = Join-Path $repoRoot "scripts\ai-task-preflight.sh"
 $preflightContent = Get-Content -Raw -LiteralPath $preflightScript
 $preflightShContent = Get-Content -Raw -LiteralPath $preflightSh
 
-$expectedPsNeedsWorktree = '$needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline'
+$expectedPsNeedsWorktree = '$needsWorktree = -not $isPcConversationWorktree -and ($AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline)'
 Assert-Contains $preflightContent $expectedPsNeedsWorktree "PowerShell preflight must not treat -CreateWorktree alone as a need for another worktree."
-Assert-Contains $preflightShContent 'if [[ "$always_create_worktree" -eq 1 || "$dirty" -eq 1 || "$behind" -gt 0 || "$branch" == "main" ]]; then' "Shell preflight must not treat --create-worktree alone as a need for another worktree."
+Assert-Contains $preflightShContent 'if [[ "$pc_conversation_worktree" -ne 1 && ( "$always_create_worktree" -eq 1 || "$dirty" -eq 1 || "$behind" -gt 0 || "$branch" == "main" ) ]]; then' "Shell preflight must not treat --create-worktree alone as a need for another worktree."
 Assert-Contains $preflightContent "function Write-AiWorkflowGuard" "PowerShell preflight must print the AI workflow guard."
 Assert-Contains $preflightShContent "write_ai_workflow_guard()" "Shell preflight must print the AI workflow guard."
 Assert-Contains $preflightContent "EDIT_ROOT=" "PowerShell preflight must expose the only safe edit root."
 Assert-Contains $preflightShContent "EDIT_ROOT=" "Shell preflight must expose the only safe edit root."
 Assert-Contains $preflightContent "AUTO_CLEANUP=skipped_created_worktree" "PowerShell preflight must not clean up the worktree it just created."
+Assert-Contains $preflightContent "function Test-PcConversationWorktree" "PowerShell preflight must detect platform-created PC conversation worktrees."
+Assert-Contains $preflightShContent "is_pc_conversation_worktree()" "Shell preflight must detect platform-created PC conversation worktrees."
+Assert-Contains $preflightContent "PC_CONVERSATION_WORKTREE=true" "PowerShell preflight must expose when the current workspace is already a PC conversation worktree."
+Assert-Contains $preflightShContent "PC_CONVERSATION_WORKTREE=true" "Shell preflight must expose when the current workspace is already a PC conversation worktree."
 
 function Assert-DocumentContains {
     param(
@@ -101,6 +105,62 @@ function Assert-WorkflowFileContains {
     $docPath = Join-Path $repoRoot $RelativePath
     $docContent = Get-Content -Raw -LiteralPath $docPath
     Assert-Contains -Text $docContent -Expected $Snippet -Message "Workflow file is missing required release guidance in $RelativePath. $Reason"
+}
+
+function Invoke-PreflightAndAssertNoNestedWorktree {
+    param(
+        [string]$WorktreePath,
+        [string]$WorktreeParent,
+        [string]$ExpectedBranch,
+        [string]$ExpectedState,
+        [string]$Reason
+    )
+
+    New-Item -ItemType Directory -Path $WorktreeParent -Force | Out-Null
+    $preflightArgs = @(
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        (Join-Path $WorktreePath "scripts\ai-task-preflight.ps1"),
+        "-CreateWorktree",
+        "-BranchPrefix",
+        "codex/preflight-test",
+        "-WorktreeParent",
+        $WorktreeParent,
+        "-SkipAutoCleanup"
+    )
+
+    Push-Location -LiteralPath $WorktreePath
+    try {
+        $oldPreference = $ErrorActionPreference
+        $ErrorActionPreference = "Continue"
+        try {
+            $output = & powershell @preflightArgs 2>&1
+        } finally {
+            $ErrorActionPreference = $oldPreference
+        }
+    } finally {
+        Pop-Location
+    }
+
+    $outputText = ($output -join "`n").Trim()
+    if ($LASTEXITCODE -ne 0) {
+        throw "ai-task-preflight.ps1 failed in isolated fixture: $outputText"
+    }
+
+    Assert-Contains $outputText "BRANCH=$ExpectedBranch" "$Reason Fixture ran from the wrong branch."
+    Assert-Contains $outputText "WORKTREE_CREATED=false" "$Reason must not create another worktree."
+    Assert-Contains $outputText "AI_WORKFLOW_GUARD_BEGIN" "$Reason output must include the self-contained AI workflow guard."
+    Assert-Contains $outputText "EDIT_ROOT=" "$Reason output must expose the safe edit root."
+    Assert-Contains $outputText "EDIT_STATE=$ExpectedState" "$Reason must report the expected edit state."
+
+    $createdChildren = @(Get-ChildItem -LiteralPath $WorktreeParent -Force)
+    if ($createdChildren.Count -ne 0) {
+        throw "$Reason unexpectedly created nested worktree entries under $WorktreeParent."
+    }
+
+    return $outputText
 }
 
 Assert-DocumentContains -RelativePath "AGENTS.md" -Snippet "scripts\ai-task-preflight.ps1 -CreateWorktree"
@@ -173,6 +233,10 @@ try {
     $seedRepo = Join-Path $testRoot "seed"
     $existingWorktree = Join-Path $testRoot "existing-worktree"
     $createdWorktreeParent = Join-Path $testRoot "created"
+    $conversationPathOnlyWorktree = Join-Path $testRoot "conversation-worktrees\demo-project\path-only"
+    $conversationBranchOnlyWorktree = Join-Path $testRoot "branch-session-worktree"
+    $conversationPathCreatedParent = Join-Path $testRoot "created-conversation-path"
+    $conversationBranchCreatedParent = Join-Path $testRoot "created-conversation-branch"
 
     & git init --bare $originPath *> $null
     if ($LASTEXITCODE -ne 0) { throw "git init --bare failed" }
@@ -195,51 +259,47 @@ try {
     Invoke-Git $seedRepo @("worktree", "add", "-b", "codex/existing-clean", $existingWorktree, "origin/main") | Out-Null
     New-Item -ItemType Directory -Path $createdWorktreeParent | Out-Null
 
-    $preflightArgs = @(
-        "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        (Join-Path $existingWorktree "scripts\ai-task-preflight.ps1"),
-        "-CreateWorktree",
-        "-BranchPrefix",
-        "codex/preflight-test",
-        "-WorktreeParent",
-        $createdWorktreeParent,
-        "-SkipAutoCleanup"
-    )
-    Push-Location -LiteralPath $existingWorktree
-    try {
-        $oldPreference = $ErrorActionPreference
-        $ErrorActionPreference = "Continue"
-        try {
-            $output = & powershell @preflightArgs 2>&1
-        } finally {
-            $ErrorActionPreference = $oldPreference
-        }
-    } finally {
-        Pop-Location
-    }
-    $outputText = ($output -join "`n").Trim()
-    if ($LASTEXITCODE -ne 0) {
-        throw "ai-task-preflight.ps1 failed in isolated fixture: $outputText"
-    }
+    $outputText = Invoke-PreflightAndAssertNoNestedWorktree `
+        -WorktreePath $existingWorktree `
+        -WorktreeParent $createdWorktreeParent `
+        -ExpectedBranch "codex/existing-clean" `
+        -ExpectedState "current_worktree_ok" `
+        -Reason "Clean current non-main worktree"
 
     Assert-Contains $outputText "BRANCH=codex/existing-clean" "Fixture did not run from the clean non-main worktree."
     Assert-Contains $outputText "DIRTY=False" "Fixture worktree should be clean."
     Assert-Contains $outputText "AHEAD=0" "Fixture should not be ahead of origin/main."
     Assert-Contains $outputText "BEHIND=0" "Fixture should not be behind origin/main."
-    Assert-Contains $outputText "WORKTREE_CREATED=false" "Clean current non-main worktree must not create another worktree just because -CreateWorktree was passed."
     Assert-Contains $outputText "NEXT=Workspace is already isolated and current enough for direct edits." "Clean current non-main worktree should remain usable."
-    Assert-Contains $outputText "AI_WORKFLOW_GUARD_BEGIN" "Preflight output must include the self-contained AI workflow guard."
-    Assert-Contains $outputText "EDIT_ROOT=" "Preflight output must expose the safe edit root."
-    Assert-Contains $outputText "EDIT_STATE=current_worktree_ok" "Clean current non-main worktree must be marked as directly editable."
     Assert-Contains $outputText "RULE_MAIN_BASELINE=main checkout is sync-only; do not edit business files in main." "Preflight guard must warn that main is a baseline only."
 
-    $createdChildren = @(Get-ChildItem -LiteralPath $createdWorktreeParent -Force)
-    if ($createdChildren.Count -ne 0) {
-        throw "Clean current non-main worktree unexpectedly created nested worktree entries under $createdWorktreeParent."
-    }
+    Invoke-Git $seedRepo @("worktree", "add", "-b", "codex/path-only", $conversationPathOnlyWorktree, "origin/main") | Out-Null
+    Invoke-Git $seedRepo @("worktree", "add", "-b", "ai/session/demo-project/branch-only", $conversationBranchOnlyWorktree, "origin/main") | Out-Null
+
+    Set-Content -LiteralPath (Join-Path $seedRepo "README.md") -Value "preflight workflow test advanced`n" -Encoding UTF8
+    Invoke-Git $seedRepo @("add", "README.md") | Out-Null
+    Invoke-Git $seedRepo @("commit", "-m", "advance origin main for preflight workflow test") | Out-Null
+    Invoke-Git $seedRepo @("push", "origin", "main") | Out-Null
+
+    $conversationPathOutput = Invoke-PreflightAndAssertNoNestedWorktree `
+        -WorktreePath $conversationPathOnlyWorktree `
+        -WorktreeParent $conversationPathCreatedParent `
+        -ExpectedBranch "codex/path-only" `
+        -ExpectedState "pc_conversation_worktree_ok" `
+        -Reason "PC conversation path worktree"
+    Assert-Contains $conversationPathOutput "BEHIND=1" "PC conversation path fixture must be behind origin/main to prove the exception suppresses nested worktree creation."
+    Assert-Contains $conversationPathOutput "PC_CONVERSATION_WORKTREE=true" "PC conversation path fixture must be detected from the worktree path."
+    Assert-Contains $conversationPathOutput "NEXT=PC conversation worktree is already isolated; use the current workspace for direct edits." "PC conversation path fixture should remain usable in place."
+
+    $conversationBranchOutput = Invoke-PreflightAndAssertNoNestedWorktree `
+        -WorktreePath $conversationBranchOnlyWorktree `
+        -WorktreeParent $conversationBranchCreatedParent `
+        -ExpectedBranch "ai/session/demo-project/branch-only" `
+        -ExpectedState "pc_conversation_worktree_ok" `
+        -Reason "PC conversation branch worktree"
+    Assert-Contains $conversationBranchOutput "BEHIND=1" "PC conversation branch fixture must be behind origin/main to prove the exception suppresses nested worktree creation."
+    Assert-Contains $conversationBranchOutput "PC_CONVERSATION_WORKTREE=true" "PC conversation branch fixture must be detected from the branch name."
+    Assert-Contains $conversationBranchOutput "NEXT=PC conversation worktree is already isolated; use the current workspace for direct edits." "PC conversation branch fixture should remain usable in place."
 
     Write-Host "PASS ai-task-preflight workflow guard"
 } finally {

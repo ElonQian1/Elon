@@ -177,6 +177,18 @@ function Write-AiWorkflowGuard {
     Write-Host "AI_WORKFLOW_GUARD_END"
 }
 
+function Test-PcConversationWorktree {
+    param(
+        [string]$RepoRoot,
+        [string]$Branch
+    )
+
+    $normalizedRepoRoot = ($RepoRoot -replace "\\", "/").TrimEnd("/")
+    $isConversationPath = $normalizedRepoRoot -match '(^|/)conversation-worktrees/[^/]+/[^/]+(/|$)'
+    $isSessionBranch = $Branch -match '^ai/session/[^/]+/[^/]+$'
+    return $isConversationPath -or $isSessionBranch
+}
+
 $repoRoot = GitOutput @("rev-parse", "--show-toplevel")
 Set-Location -LiteralPath $repoRoot
 
@@ -214,13 +226,18 @@ Write-Host "DIRTY=$isDirty"
 Write-Host "AHEAD=$ahead"
 Write-Host "BEHIND=$behind"
 
+$isPcConversationWorktree = Test-PcConversationWorktree -RepoRoot $repoRoot -Branch $branch
+if ($isPcConversationWorktree) {
+    Write-Host "PC_CONVERSATION_WORKTREE=true"
+}
+
 if ($isDirty) {
     Write-Host "Changed files:"
     $statusShort | ForEach-Object { Write-Host "  $_" }
 }
 
 $isMainBaseline = $branch -eq "main"
-$needsWorktree = $AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline
+$needsWorktree = -not $isPcConversationWorktree -and ($AlwaysCreateWorktree -or $isDirty -or ($behind -gt 0) -or $isMainBaseline)
 $createdWorktree = $false
 $createdWorktreePath = ""
 if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
@@ -258,6 +275,10 @@ if (($CreateWorktree -or $AlwaysCreateWorktree) -and $needsWorktree) {
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Run powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree before editing."
     Write-AiWorkflowGuard -EditRoot "BLOCKED_CREATE_WORKTREE_FIRST" -State "blocked_needs_worktree"
+} elseif ($isPcConversationWorktree) {
+    Write-Host "WORKTREE_CREATED=false"
+    Write-Host "NEXT=PC conversation worktree is already isolated; use the current workspace for direct edits."
+    Write-AiWorkflowGuard -EditRoot $repoRoot -State "pc_conversation_worktree_ok"
 } else {
     Write-Host "WORKTREE_CREATED=false"
     Write-Host "NEXT=Workspace is already isolated and current enough for direct edits."
