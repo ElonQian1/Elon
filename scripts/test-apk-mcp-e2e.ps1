@@ -303,6 +303,22 @@ function Assert-TraceReplyContains {
     }
 }
 
+function Test-TransientLocalAiFailure {
+    param([object]$Status)
+    if ($null -eq $Status) {
+        return $false
+    }
+    $statusText = [string]$Status.status
+    if ($statusText -ne "error") {
+        return $false
+    }
+    $preview = [string]$Status.last_message_preview
+    return $preview.Contains("没有返回可读内容") `
+        -or $preview.Contains("网络请求超时") `
+        -or $preview.Contains("request timed out") `
+        -or $preview.Contains("Reconnecting")
+}
+
 function Invoke-GitChecked {
     param([string[]]$GitArgs)
     $previousErrorActionPreference = $ErrorActionPreference
@@ -458,6 +474,25 @@ try {
         -WaitFor "first_reply" `
         -WaitTimeoutSec $FirstReplyTimeoutSec
     $contextStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $contextTrace -TimeoutSec $FinishTimeoutSec
+    if (Test-TransientLocalAiFailure -Status $contextStatus) {
+        $summary.traces.context_conversation_first_attempt = [ordered]@{
+            trace_id = $contextTrace
+            probe = $contextProbe
+            final_status = $contextStatus
+            retry_reason = "transient_local_ai_failure"
+        }
+        $contextTrace = "${runId}_context_retry"
+        Write-Step "chat_probe $contextTrace retry after transient local AI failure"
+        $contextProbe = Start-ChatProbe `
+            -Serial $effectiveSerial `
+            -TraceId $contextTrace `
+            -ConversationId $conversationId `
+            -Message "Continue the same conversation. Reply with marker $contextTrace and include the marker from your previous reply. Do not ask me to provide it." `
+            -IsDevelopment $false `
+            -WaitFor "first_reply" `
+            -WaitTimeoutSec $FirstReplyTimeoutSec
+        $contextStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $contextTrace -TimeoutSec $FinishTimeoutSec
+    }
     Assert-TraceDone -Status $contextStatus -TraceId $contextTrace
     Assert-TraceReplyContains -Status $contextStatus -TraceId $contextTrace -Needle $contextTrace
     Assert-TraceReplyContains -Status $contextStatus -TraceId $contextTrace -Needle $newTrace

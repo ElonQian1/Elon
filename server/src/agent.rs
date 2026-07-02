@@ -163,10 +163,11 @@ pub async fn run_for_project_in_workspace(
             .await
             {
                 Ok(ai_cli::PcAgentChatOutcome::Answered) => return,
-                Ok(ai_cli::PcAgentChatOutcome::NoReadableReply) => {
-                    let msg = format!(
-                        "{route_label}这轮没有返回可读内容，请稍后直接重发一次。我不会自动切换到平台 AI。"
-                    );
+                Ok(ai_cli::PcAgentChatOutcome::NoReadableReply { diagnostic }) => {
+                    let detail = diagnostic.unwrap_or_else(|| {
+                        "这轮没有返回可读内容，请稍后直接重发一次。".to_string()
+                    });
+                    let msg = format!("{route_label}：{detail}我不会自动切换到平台 AI。");
                     warn!("{msg}");
                     let _ = tx.send(WsMessage::error(msg).to_json());
                     return;

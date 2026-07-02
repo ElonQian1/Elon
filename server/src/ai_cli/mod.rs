@@ -209,8 +209,11 @@ async fn run_with_workspace_mode(
             .await
             {
                 Ok(PcAgentRunOutcome::Completed) => return Ok(()),
-                Ok(PcAgentRunOutcome::NoReadableLightweightReply) => {
-                    tracing::warn!("[ai_cli] PC agent CLI 未返回可读内容，回退本地");
+                Ok(PcAgentRunOutcome::NoReadableLightweightReply { diagnostic }) => {
+                    tracing::warn!(
+                        diagnostic = diagnostic.as_deref().unwrap_or_default(),
+                        "[ai_cli] PC agent CLI 未返回可读内容，回退本地"
+                    );
                     let _ = tx.send(WsMessage::progress("已切换到云端开发通道。").to_json());
                 }
                 Err(e) => {
@@ -757,16 +760,17 @@ pub async fn run_with_pc_agent_workspace(
 
     match outcome {
         PcAgentRunOutcome::Completed => Ok(()),
-        PcAgentRunOutcome::NoReadableLightweightReply => {
-            Err(anyhow!("PC agent CLI 未返回可读内容"))
-        }
+        PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => Err(anyhow!(
+            "{}",
+            diagnostic.unwrap_or_else(|| "PC agent CLI 未返回可读内容".to_string())
+        )),
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PcAgentChatOutcome {
     Answered,
-    NoReadableReply,
+    NoReadableReply { diagnostic: Option<String> },
 }
 
 pub async fn run_with_pc_agent_chat(
@@ -819,7 +823,9 @@ pub async fn run_with_pc_agent_chat(
 
     Ok(match outcome {
         PcAgentRunOutcome::Completed => PcAgentChatOutcome::Answered,
-        PcAgentRunOutcome::NoReadableLightweightReply => PcAgentChatOutcome::NoReadableReply,
+        PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => {
+            PcAgentChatOutcome::NoReadableReply { diagnostic }
+        }
     })
 }
 
@@ -1018,10 +1024,10 @@ fn pc_route_a_extra_args(
 
 /// 把 AI 请求委托给通过 WS 连接的 PC agent，在 PC 上执行指定 CLI（copilot 或 codex）。
 /// 结果以流式 CliChunk 形式返回并转发给 APK。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 enum PcAgentRunOutcome {
     Completed,
-    NoReadableLightweightReply,
+    NoReadableLightweightReply { diagnostic: Option<String> },
 }
 
 async fn run_via_pc_agent(
@@ -1316,7 +1322,7 @@ async fn run_via_pc_agent(
                             "Lightweight PC chat timed out before CliDone; fallback to normal chat",
                         ),
                     );
-                    return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
+                    return Ok(no_readable_lightweight_reply(&full_text, cli_name));
                 }
             }
         } else {
@@ -1547,7 +1553,7 @@ async fn run_via_pc_agent(
                                 ),
                             );
                         }
-                        return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
+                        return Ok(no_readable_lightweight_reply(&full_text, cli_name));
                     }
                     let apk_url = sync_pc_agent_apk_after_success(
                         state,
@@ -1681,7 +1687,7 @@ async fn run_via_pc_agent(
             None,
             Some("Lightweight PC chat channel closed before CliDone; fallback to normal chat"),
         );
-        return Ok(PcAgentRunOutcome::NoReadableLightweightReply);
+        return Ok(no_readable_lightweight_reply(&full_text, cli_name));
     }
 
     finish_pc_node_compute_run(
@@ -1972,6 +1978,70 @@ fn extract_lightweight_pc_chat_reply(output: &str, is_codex: bool) -> String {
     }
 
     extract_marker_lightweight_reply(&clean)
+}
+
+fn no_readable_lightweight_reply(output: &str, cli_name: &str) -> PcAgentRunOutcome {
+    PcAgentRunOutcome::NoReadableLightweightReply {
+        diagnostic: pc_lightweight_no_readable_diagnostic(output, cli_name),
+    }
+}
+
+fn pc_lightweight_no_readable_diagnostic(output: &str, cli_name: &str) -> Option<String> {
+    let clean = strip_terminal_control_sequences(output);
+    let lower = clean.to_ascii_lowercase();
+    let cli_label = pc_cli_progress_label(cli_name);
+
+    if lower.contains("usage limit") || lower.contains("hit your usage limit") {
+        return Some(format!(
+            "{}达到使用额度或限流，未返回可读内容；请稍后重发或检查本机 Codex 登录额度。",
+            cli_label
+        ));
+    }
+
+    if lower.contains("request timed out")
+        || lower.contains("stream disconnected")
+        || lower.contains("reconnecting")
+    {
+        let reconnect_count = lower.matches("reconnecting").count();
+        let timeout_count = lower.matches("request timed out").count();
+        let mut detail = format!(
+            "{}网络请求超时，未返回可读内容；已观察到 {} 次重连、{} 次 request timed out，请稍后直接重发一次。",
+            cli_label, reconnect_count, timeout_count
+        );
+        if lower.contains("falling back to http") {
+            detail.push_str(" Codex 已尝试 fallback HTTP。");
+        }
+        return Some(detail);
+    }
+
+    if lower.contains("canceled") || clean.contains("用户已停止 PC CLI 任务") {
+        return Some(format!(
+            "{}任务被取消，未返回可读内容；请稍后直接重发一次。",
+            cli_label
+        ));
+    }
+
+    last_non_noise_cli_line(&clean).map(|line| {
+        format!(
+            "{}未返回可读内容；最后的本机 CLI 输出是：{}",
+            cli_label,
+            truncate_chars(line.trim(), 160)
+        )
+    })
+}
+
+fn last_non_noise_cli_line(output: &str) -> Option<String> {
+    output
+        .lines()
+        .rev()
+        .map(str::trim)
+        .find(|line| {
+            !line.is_empty()
+                && !is_lightweight_cli_noise_line(line)
+                && !is_codex_output_boundary(line)
+                && !line.starts_with("{\"type\":\"turn.started\"")
+        })
+        .map(ToOwned::to_owned)
 }
 
 fn lightweight_pc_reply_delta(
@@ -2801,9 +2871,10 @@ mod pc_cli_passthrough_tests {
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
         pc_cli_passthrough_event, pc_codex_progress_hint, pc_dispatch_started_event,
         pc_display_model_label, pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
-        pc_project_execution_prompt, pc_project_reasoning_effort, pc_route_a_extra_args,
-        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
-        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
+        pc_lightweight_no_readable_diagnostic, pc_project_execution_prompt,
+        pc_project_reasoning_effort, pc_route_a_extra_args, sanitize_pc_development_reply,
+        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
+        NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -3127,6 +3198,20 @@ diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/
             extract_lightweight_pc_chat_timeout_reply(output, true).as_deref(),
             Some("hello, tell me your idea.")
         );
+    }
+
+    #[test]
+    fn pc_lightweight_no_readable_diagnostic_exposes_codex_network_timeout() {
+        let output = "2026-07-02 WARN stream disconnected - retrying sampling request (5/5)\n\
+{\"type\":\"error\",\"message\":\"Reconnecting... 5/5 (request timed out)\"}\n\
+2026-07-02 WARN falling back to HTTP";
+
+        let diagnostic = pc_lightweight_no_readable_diagnostic(output, "codex").unwrap();
+
+        assert!(diagnostic.contains("Codex"));
+        assert!(diagnostic.contains("网络请求超时"));
+        assert!(diagnostic.contains("request timed out"));
+        assert!(diagnostic.contains("fallback HTTP"));
     }
 
     #[test]
