@@ -32,7 +32,20 @@ if [ -n "$UNTRACKED_RS" ]; then
   exit 1
 fi
 
-# 2. cargo check 守门（如果存在 server/Cargo.toml）
+# 2. 源文件体量守门：历史红区可存在，但不能继续变大或新增红区文件
+echo -e "${YELLOW}🔍 pre-push: scripts/check-source-size.ps1...${NC}"
+PS_CMD=""
+if command -v powershell >/dev/null 2>&1; then PS_CMD="powershell"; elif command -v pwsh >/dev/null 2>&1; then PS_CMD="pwsh"; fi
+if [ -z "$PS_CMD" ]; then
+  echo -e "${RED}❌ pre-push 拒绝：未找到 powershell/pwsh，无法运行 source-size guard${NC}" >&2
+  exit 1
+fi
+if ! "$PS_CMD" -NoProfile -ExecutionPolicy Bypass -File scripts/check-source-size.ps1 2>&1; then
+  echo -e "${RED}❌ pre-push 拒绝：源文件体量门禁失败${NC}" >&2
+  exit 1
+fi
+
+# 3. cargo check 守门（如果存在 server/Cargo.toml）
 if [ -f "server/Cargo.toml" ]; then
   echo -e "${YELLOW}🔍 pre-push: scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace...${NC}"
   if ! bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace --quiet 2>&1; then

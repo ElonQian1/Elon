@@ -47,6 +47,21 @@ applyTo: "**/*.{rs,kt,java,ts,tsx,js,jsx,toml,gradle}"
 
 > **500–800 行是可容忍区间**；800 行是所有普通业务模块的硬约束上限，超出即必须拆分，不讨价还价。
 
+## 增量门禁
+
+仓库提供 `scripts/check-source-size.ps1`，pre-push hook 会自动调用它。这个门禁不是一次性清空历史债务，而是阻止继续变差：
+
+- 历史红区文件可以暂时存在，但本次提交不能让它继续增加行数。
+- 原本未到红区的文件，本次提交不能跨入对应角色的红区阈值。
+- 新增源文件超过 500 行会给出警告；新增文件进入红区会直接失败。
+- 如果确实需要例外，必须先和用户确认，并显式运行 `scripts/check-source-size.ps1 -AllowRedGrowth` 说明理由；默认流程不得使用这个参数。
+
+手动验证命令：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-source-size.ps1
+```
+
 ## 本仓库重点治理对象
 
 - `android/app/src/main/kotlin/com/elon/app/MainActivity.kt`：只保留 Activity 生命周期、顶层导航和模块组装；输入框、附件、会话列表、项目工作流、CLI 输出清洗、证据展示、账号/版本等职责应继续下沉。
