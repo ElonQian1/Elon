@@ -10,11 +10,12 @@ internal class MainAssistantRawMessageActions(
     private val assistantTerminalActions: () -> MainAssistantTerminalActions,
     private val incrementServerResponseToken: () -> Unit,
     private val appendMessage: (ChatMessage) -> Unit,
+    private val isDevelopmentRequest: () -> Boolean,
     /** 流式追加块到已有气泡（打字机效果），找不到 streamId 对应气泡时忽略 */
     private val streamAppendChunk: (streamId: String, chunk: String) -> Unit = { _, _ -> }
 ) {
-    // 追踪当前 turn 是否已通过流式 assistant_message 推送过 AI 回复。
-    // 若是，done 事件里的 message 字段是相同内容的冗余副本，传 "" 给 handleDone 避免重复气泡。
+    // 追踪当前 turn 是否已通过流式 assistant_message 推送过普通聊天回复。
+    // 普通聊天的 done.message 常是冗余副本；开发任务则把 done.message 作为最终答复气泡。
     // background 任务走 MainBackgroundTaskMessageActions，此标志不影响那条路径。
     private var receivedStreamingReplyThisTurn = false
 
@@ -59,9 +60,8 @@ internal class MainAssistantRawMessageActions(
                     val imageUrl = jsonStringOrNull(json, "image_url")
                     val modelUsed = jsonStringOrNull(json, "model_used")
                     val nodeId = jsonStringOrNull(json, "node_id")
-                    // 若已收到流式 AI 回复，done.message 与最后一条 assistant_message 相同，
-                    // 传空串给 handleDone 避免重复气泡
-                    val content = if (receivedStreamingReplyThisTurn) "" else rawContent
+                    val suppressDuplicateDone = receivedStreamingReplyThisTurn && !isDevelopmentRequest()
+                    val content = if (suppressDuplicateDone) "" else rawContent
                     receivedStreamingReplyThisTurn = false
                     assistantTerminalActions().handleDone(content, apkUrl, imageUrl, modelUsed, nodeId) ?: return
                 }

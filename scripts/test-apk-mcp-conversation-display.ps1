@@ -232,12 +232,14 @@ function Wait-TraceTerminal {
 function Assert-FinalReplyVisible {
     param(
         [object]$ConversationState,
+        [string]$TraceId,
         [bool]$IsDevelopment
     )
     $messages = Get-ConversationMessages -ConversationState $ConversationState
     Assert-MessageExists -Messages $messages -Label "final assistant reply after MCP user message" -Predicate {
         param($message)
-        ([string]$message.role -eq "ai") -and ![string]::IsNullOrWhiteSpace([string]$message.content_preview)
+        ([string]$message.role -eq "ai") -and
+            ([string]$message.content_preview -like "*$TraceId*")
     } | Out-Null
     if ($IsDevelopment) {
         Assert-MessageExists -Messages $messages -Label "collapsible process evidence" -Predicate {
@@ -255,12 +257,12 @@ $conversationId = "${runId}_conversation"
 $isDevelopment = !$NonDevelopment
 $message = if ($isDevelopment) {
     if ($ExecutionMode -eq "plan") {
-        "APK native MCP conversation display verification. Plan only: do read-only status checks, do not edit files, commit, push, publish, or release. The final reply must contain marker $traceId."
+        "APK native MCP conversation display verification. Plan only: do read-only status checks, do not edit files, commit, push, publish, or release. Start the final reply with exact marker $traceId."
     } else {
-        "APK native MCP conversation display verification. Execute the requested read-only status checks only. Do not edit files, commit, push, publish, or release. The final reply must contain marker $traceId."
+        "APK native MCP conversation display verification. Execute the requested read-only status checks only. Do not edit files, commit, push, publish, or release. Start the final reply with exact marker $traceId."
     }
 } else {
-    "Reply with marker $traceId. Your final reply must contain $traceId."
+    "Start your final reply with exact marker $traceId."
 }
 
 $summary = [ordered]@{
@@ -327,7 +329,7 @@ try {
 
     Write-Step "assert final reply and fold evidence visible"
     $finalState = Get-ConversationState -Serial $serial -ConversationId $conversationId
-    Assert-FinalReplyVisible -ConversationState $finalState -IsDevelopment $isDevelopment
+    Assert-FinalReplyVisible -ConversationState $finalState -TraceId $traceId -IsDevelopment $isDevelopment
     $summary.final_state = $finalState
     $summary.ok = $true
 } finally {
