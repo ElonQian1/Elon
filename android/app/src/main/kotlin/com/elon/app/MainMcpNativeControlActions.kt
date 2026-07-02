@@ -151,9 +151,37 @@ internal class MainMcpNativeControlActions(
     }
 
     private fun reloadTargetConversationIfNeeded(args: JSONObject) {
+        if (!args.optBoolean("reload_if_missing", true)) return
+        val requestedProject = localProjectForArgs(args)
+        if (requestedProject == null) {
+            reloadProjects()
+            return
+        }
         val hasConversationTarget = args.optString("conversation_id").isNotBlank() || args.has("conversation_index")
-        if (!hasConversationTarget || !args.optBoolean("reload_if_missing", true)) return
-        reloadProjects()
+        if (!hasConversationTarget) return
+        if (!localConversationExists(requestedProject, args)) {
+            reloadProjects()
+        }
+    }
+
+    private fun localProjectForArgs(args: JSONObject): AppProject? {
+        val requestedId = args.optString("project_id").trim().takeIf { it.isNotBlank() }
+        val requestedIndex = if (args.has("project_index")) args.optInt("project_index") else null
+        return when {
+            requestedId != null -> projects.firstOrNull { it.id == requestedId || it.projectSpaceId() == requestedId }
+            requestedIndex != null -> projects.getOrNull(requestedIndex)
+            else -> projects.getOrNull(activeProjectIndex())
+        }
+    }
+
+    private fun localConversationExists(project: AppProject, args: JSONObject): Boolean {
+        val requestedId = args.optString("conversation_id").trim().takeIf { it.isNotBlank() }
+        val requestedIndex = if (args.has("conversation_index")) args.optInt("conversation_index") else null
+        return when {
+            requestedId != null -> project.conversations.any { it.id == requestedId }
+            requestedIndex != null -> requestedIndex in project.conversations.indices
+            else -> true
+        }
     }
 
     private fun selectProject(args: JSONObject): JSONObject? {
