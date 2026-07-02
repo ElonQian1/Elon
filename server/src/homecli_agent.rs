@@ -41,6 +41,7 @@ const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
 const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
 const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
     "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
+const PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV: &str = "ELON_PROJECT_WORKSPACE_INSPECT_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
 
 /// Snapshot of one connected PC agent.
@@ -563,12 +564,16 @@ impl AgentManager {
             .map_err(|_| anyhow!("agent writer closed"))?;
         drop(agents);
 
-        let outcome = match tokio::time::timeout(Duration::from_secs(6), rx.recv()).await {
+        let timeout = project_workspace_inspect_timeout();
+        let outcome = match tokio::time::timeout(timeout, rx.recv()).await {
             Ok(Some(msg)) => Ok(msg),
             Ok(None) => Err(anyhow!(
                 "agent disconnected before workspace inspect response"
             )),
-            Err(_) => Err(anyhow!("project workspace inspect timeout (6s)")),
+            Err(_) => Err(anyhow!(
+                "project workspace inspect timeout ({}s)",
+                timeout.as_secs()
+            )),
         };
         if outcome.is_err() {
             pending.lock().await.remove(&req_id);
@@ -1224,6 +1229,10 @@ async fn fail_pending_approvals(
 
 fn project_workspace_provision_timeout() -> Duration {
     env_timeout(PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV, 30, 5, 180)
+}
+
+fn project_workspace_inspect_timeout() -> Duration {
+    env_timeout(PROJECT_WORKSPACE_INSPECT_TIMEOUT_ENV, 3, 1, 30)
 }
 
 fn project_storage_prepare_timeout() -> Duration {

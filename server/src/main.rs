@@ -108,6 +108,7 @@ mod node_runtime;
 mod node_scheduler;
 mod pc_agent_runtime_choice;
 mod pc_node_capacity;
+mod pc_node_display;
 mod pc_relay;
 mod pc_relay_client;
 mod pc_workspace_git_remote;

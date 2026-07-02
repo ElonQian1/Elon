@@ -306,6 +306,27 @@ impl Store {
         Ok(owner)
     }
 
+    /// 查询单个节点凭证（不含 secret_hash），用于后端进度和运行时展示。
+    pub fn get_node_credential(&self, agent_id: &str) -> Result<Option<NodeCredential>> {
+        let conn = self.conn.lock().unwrap();
+        conn.query_row(
+            "SELECT agent_id, owner_user_id, label, device_name, created_at
+             FROM node_credentials WHERE agent_id = ?1",
+            params![agent_id],
+            |row| {
+                Ok(NodeCredential {
+                    agent_id: row.get(0)?,
+                    owner_user_id: row.get(1)?,
+                    label: row.get(2)?,
+                    device_name: row.get(3)?,
+                    created_at: row.get(4)?,
+                })
+            },
+        )
+        .optional()
+        .map_err(Into::into)
+    }
+
     /// 续约节点 secret：验证旧 secret_hash 属于该用户后，更新为新 hash，返回 true；
     /// 旧凭证不匹配或节点不属于该用户时返回 false（不修改任何内容）。
     pub fn renew_node_credential_secret(

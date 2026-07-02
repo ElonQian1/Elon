@@ -109,6 +109,7 @@ pub async fn node_runtime_by_id(state: &AppState, node_id: &str) -> Result<Optio
     if node_id.is_empty() {
         return Ok(None);
     }
+    let credential = state.store.get_node_credential(node_id)?;
     let registry = state
         .node_registry
         .list_online()
@@ -117,13 +118,18 @@ pub async fn node_runtime_by_id(state: &AppState, node_id: &str) -> Result<Optio
         .find(|node| node.node_id == node_id);
     let cli_agents = state.agent_manager.list().await;
     let cli = cli_agents.iter().find(|agent| agent.agent_id == node_id);
-    if registry.is_none() && cli.is_none() {
+    if registry.is_none() && cli.is_none() && credential.is_none() {
         return Ok(None);
     }
 
     let owner_user_id = registry
         .as_ref()
         .map(|node| node.owner_user_id.clone())
+        .or_else(|| {
+            credential
+                .as_ref()
+                .map(|credential| credential.owner_user_id.clone())
+        })
         .or_else(|| {
             state
                 .store
@@ -143,9 +149,17 @@ pub async fn node_runtime_by_id(state: &AppState, node_id: &str) -> Result<Optio
     Ok(Some(build_runtime_for_parts(
         node_id,
         owner_user_id,
-        String::new(),
-        None,
-        String::new(),
+        credential
+            .as_ref()
+            .map(|credential| credential.label.trim().to_string())
+            .unwrap_or_default(),
+        credential
+            .as_ref()
+            .and_then(|credential| credential.device_name.as_deref()),
+        credential
+            .as_ref()
+            .map(|credential| credential.created_at.clone())
+            .unwrap_or_default(),
         registry.as_ref(),
         cli,
         project_count,

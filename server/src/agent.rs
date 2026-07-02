@@ -18,6 +18,7 @@ use crate::{
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     pc_agent_runtime_choice::{choose_pc_agent_runtime, PcRuntimeRoutePreference},
+    pc_node_display::pc_node_progress_name,
     project_workspace_provision, source_hygiene,
     store::{ProjectAccess, ProjectDevProfile, MEMORY_SCOPE_PROJECT},
     tools,
@@ -135,7 +136,7 @@ pub async fn run_pc_cli_passthrough_for_project(
     let _ = tx.send(
         WsMessage::progress(format!(
             "正在直连 PC 节点 {} 使用 {} 处理本轮消息。",
-            agent_id,
+            pc_node_progress_name(state.as_ref(), agent_id).await,
             runtime_choice.progress_label()
         ))
         .to_json(),
@@ -392,8 +393,8 @@ async fn run_for_project_in_workspace_with_routing(
             }
             let _ = tx.send(
                 WsMessage::progress(format!(
-                    "正在连接 PC 节点 {} 使用 {} 处理本地项目。",
-                    agent_id,
+                    "正在直连 PC 节点 {} 使用 {} 处理本地项目。",
+                    pc_node_progress_name(state.as_ref(), agent_id).await,
                     runtime_choice.progress_label()
                 ))
                 .to_json(),
@@ -661,8 +662,8 @@ pub async fn plan_for_project_in_workspace(
         }
         let _ = tx.send(
             WsMessage::progress(format!(
-                "正在连接 PC 节点 {} 使用 {} 规划本地项目。",
-                agent_id,
+                "正在直连 PC 节点 {} 使用 {} 规划本地项目。",
+                pc_node_progress_name(state.as_ref(), agent_id).await,
                 runtime_choice.progress_label()
             ))
             .to_json(),
@@ -1088,6 +1089,20 @@ async fn usable_project_binding_for_agent(
         .map(str::trim)
         .filter(|value| !value.is_empty())?;
 
+    let bound_agent_progress_name = if is_bound_agent {
+        Some(pc_node_progress_name(state.as_ref(), agent_id).await)
+    } else {
+        None
+    };
+    if let Some(name) = bound_agent_progress_name.as_deref() {
+        send_optional_progress(
+            tx,
+            &format!(
+                "正在快速检查绑定 PC 节点 {name} 的项目目录；若巡检未及时返回，将继续直连该节点。"
+            ),
+        );
+    }
+
     match inspect_pc_agent_workspace(state, agent_id, workspace).await {
         Ok(status) if pc_workspace_inspect_usable(&status) => Some(PcProjectBinding {
             agent_id: agent_id.to_string(),
@@ -1104,10 +1119,15 @@ async fn usable_project_binding_for_agent(
                 "PC project workspace binding is not usable"
             );
             if is_bound_agent {
-                send_optional_progress(
-                    tx,
-                    "绑定的 PC 节点工作区不可用，正在查找其它在线 PC 节点。",
-                );
+                let message = bound_agent_progress_name
+                    .as_deref()
+                    .map(|name| {
+                        format!("绑定的 PC 节点 {name} 工作区不可用，正在查找其它在线 PC 节点。")
+                    })
+                    .unwrap_or_else(|| {
+                        "绑定的 PC 节点工作区不可用，正在查找其它在线 PC 节点。".to_string()
+                    });
+                send_optional_progress(tx, &message);
             }
             None
         }
@@ -1122,19 +1142,33 @@ async fn usable_project_binding_for_agent(
             );
             if is_bound_agent {
                 if pc_workspace_inspect_error_allows_bound_dispatch(&error) {
-                    send_optional_progress(
-                        tx,
-                        "绑定的 PC 节点工作区检查超时，继续使用当前绑定节点执行，避免自动切换到其它电脑。",
-                    );
+                    let message = bound_agent_progress_name
+                        .as_deref()
+                        .map(|name| {
+                            format!(
+                                "绑定的 PC 节点 {name} 工作区检查未及时返回，已跳过巡检并继续直连，避免自动切换到其它电脑。"
+                            )
+                        })
+                        .unwrap_or_else(|| {
+                            "绑定的 PC 节点工作区检查未及时返回，已跳过巡检并继续直连，避免自动切换到其它电脑。".to_string()
+                        });
+                    send_optional_progress(tx, &message);
                     return Some(PcProjectBinding {
                         agent_id: agent_id.to_string(),
                         workspace: workspace.to_string(),
                     });
                 }
-                send_optional_progress(
-                    tx,
-                    "绑定的 PC 节点暂时无法确认工作区状态，正在查找其它在线 PC 节点。",
-                );
+                let message = bound_agent_progress_name
+                    .as_deref()
+                    .map(|name| {
+                        format!(
+                            "绑定的 PC 节点 {name} 暂时无法确认工作区状态，正在查找其它在线 PC 节点。"
+                        )
+                    })
+                    .unwrap_or_else(|| {
+                        "绑定的 PC 节点暂时无法确认工作区状态，正在查找其它在线 PC 节点。".to_string()
+                    });
+                send_optional_progress(tx, &message);
             }
             None
         }
@@ -2158,7 +2192,7 @@ mod tests {
     #[test]
     fn pc_workspace_inspect_timeout_keeps_bound_node() {
         assert!(pc_workspace_inspect_error_allows_bound_dispatch(
-            "project workspace inspect timeout (6s)"
+            "project workspace inspect timeout (3s)"
         ));
         assert!(pc_workspace_inspect_error_allows_bound_dispatch(
             "PC 节点创建项目工作区超时（30 秒）"
