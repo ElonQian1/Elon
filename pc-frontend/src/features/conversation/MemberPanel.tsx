@@ -25,10 +25,17 @@ export const MEMBER_VIRTUAL_ROW_HEIGHT = 48
 const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
 const MEMBER_PANEL_COLLAPSED_KEY = 'elon.pc.memberPanel.collapsedStatusSections.v1'
+const MEMBER_PANEL_FILTERS_KEY = 'elon.pc.memberPanel.filters.v1'
 type MemberStatusSectionId = 'online' | 'offline'
 type MemberPanelStatusFilter = 'all' | 'online' | 'offline' | 'restricted'
 type MemberPanelSortMode = 'role' | 'name' | 'joined'
 type MemberRoleFilterOption = { id: string; label: string; count: number }
+type MemberPanelFilterPrefs = {
+  scope: string
+  statusFilter: MemberPanelStatusFilter
+  roleFilter: string
+  sortMode: MemberPanelSortMode
+}
 export type MemberModerationAction = 'mute' | 'unmute' | 'ban' | 'unban'
 export type MemberMenuRequest = { member: ProjectMember; x: number; y: number }
 
@@ -38,6 +45,12 @@ const MEMBER_STATUS_FILTERS: Array<{ id: MemberPanelStatusFilter; label: string 
   { id: 'offline', label: '离线' },
   { id: 'restricted', label: '受限' },
 ]
+
+const DEFAULT_MEMBER_PANEL_FILTERS: Omit<MemberPanelFilterPrefs, 'scope'> = {
+  statusFilter: 'all',
+  roleFilter: '',
+  sortMode: 'role',
+}
 
 /* ── 角色分组 ── */
 export const ROLE_GROUPS = [
@@ -135,6 +148,58 @@ function readCollapsedStatusSections(): Record<MemberStatusSectionId, boolean> {
     return { online: !!parsed.online, offline: !!parsed.offline }
   } catch {
     return { online: false, offline: false }
+  }
+}
+
+function memberPanelFilterScope(channelId?: string) {
+  return channelId ? `channel:${channelId}` : 'project'
+}
+
+function isMemberPanelStatusFilter(value: unknown): value is MemberPanelStatusFilter {
+  return value === 'all' || value === 'online' || value === 'offline' || value === 'restricted'
+}
+
+function isMemberPanelSortMode(value: unknown): value is MemberPanelSortMode {
+  return value === 'role' || value === 'name' || value === 'joined'
+}
+
+function readMemberPanelFilters(scope: string): MemberPanelFilterPrefs {
+  if (typeof window === 'undefined') return { scope, ...DEFAULT_MEMBER_PANEL_FILTERS }
+  try {
+    const value = window.localStorage.getItem(MEMBER_PANEL_FILTERS_KEY)
+    if (!value) return { scope, ...DEFAULT_MEMBER_PANEL_FILTERS }
+    const parsed = JSON.parse(value) as Record<string, Partial<MemberPanelFilterPrefs>>
+    const prefs = parsed[scope] ?? {}
+    return {
+      scope,
+      statusFilter: isMemberPanelStatusFilter(prefs.statusFilter) ? prefs.statusFilter : DEFAULT_MEMBER_PANEL_FILTERS.statusFilter,
+      roleFilter: typeof prefs.roleFilter === 'string' ? prefs.roleFilter : DEFAULT_MEMBER_PANEL_FILTERS.roleFilter,
+      sortMode: isMemberPanelSortMode(prefs.sortMode) ? prefs.sortMode : DEFAULT_MEMBER_PANEL_FILTERS.sortMode,
+    }
+  } catch {
+    return { scope, ...DEFAULT_MEMBER_PANEL_FILTERS }
+  }
+}
+
+function writeMemberPanelFilters(prefs: MemberPanelFilterPrefs) {
+  if (typeof window === 'undefined') return
+  try {
+    const value = window.localStorage.getItem(MEMBER_PANEL_FILTERS_KEY)
+    const parsed = value ? JSON.parse(value) as Record<string, Partial<MemberPanelFilterPrefs>> : {}
+    parsed[prefs.scope] = {
+      statusFilter: prefs.statusFilter,
+      roleFilter: prefs.roleFilter,
+      sortMode: prefs.sortMode,
+    }
+    window.localStorage.setItem(MEMBER_PANEL_FILTERS_KEY, JSON.stringify(parsed))
+  } catch {
+    window.localStorage.setItem(MEMBER_PANEL_FILTERS_KEY, JSON.stringify({
+      [prefs.scope]: {
+        statusFilter: prefs.statusFilter,
+        roleFilter: prefs.roleFilter,
+        sortMode: prefs.sortMode,
+      },
+    }))
   }
 }
 
@@ -286,11 +351,11 @@ export function MemberSearch({
   channelId?: string
 }) {
   const [query, setQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState<MemberPanelStatusFilter>('all')
-  const [roleFilter, setRoleFilter] = useState('')
-  const [sortMode, setSortMode] = useState<MemberPanelSortMode>('role')
   const [scrollTop, setScrollTop] = useState(0)
   const [collapsedStatusSections, setCollapsedStatusSections] = useState(readCollapsedStatusSections)
+  const filterScope = memberPanelFilterScope(channelId)
+  const [filterPrefs, setFilterPrefs] = useState(() => readMemberPanelFilters(filterScope))
+  const { statusFilter, roleFilter, sortMode } = filterPrefs
   const q = query.trim().toLowerCase()
   const roleOptions = useMemo(() => memberRoleFilterOptions(members), [members])
   const filtered = useMemo(
@@ -310,6 +375,18 @@ export function MemberSearch({
   useEffect(() => {
     window.localStorage.setItem(MEMBER_PANEL_COLLAPSED_KEY, JSON.stringify(collapsedStatusSections))
   }, [collapsedStatusSections])
+  useEffect(() => {
+    setFilterPrefs(readMemberPanelFilters(filterScope))
+    setScrollTop(0)
+  }, [filterScope])
+  useEffect(() => {
+    if (filterPrefs.scope !== filterScope) return
+    writeMemberPanelFilters(filterPrefs)
+  }, [filterPrefs, filterScope])
+  useEffect(() => {
+    if (!roleFilter || roleOptions.some((option) => option.id === roleFilter)) return
+    setFilterPrefs((current) => ({ ...current, scope: filterScope, roleFilter: '' }))
+  }, [roleFilter, roleOptions])
   useEffect(() => {
     setScrollTop(0)
   }, [members, q, roleFilter, sortMode, statusFilter])
@@ -345,7 +422,7 @@ export function MemberSearch({
                 key={filter.id}
                 type="button"
                 data-active={statusFilter === filter.id ? 'true' : undefined}
-                onClick={() => setStatusFilter(filter.id)}
+                onClick={() => setFilterPrefs((current) => ({ ...current, scope: filterScope, statusFilter: filter.id }))}
               >
                 {filter.label}
               </button>
@@ -354,7 +431,7 @@ export function MemberSearch({
           <select
             className={styles.memberFilterSelect}
             value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
+            onChange={(event) => setFilterPrefs((current) => ({ ...current, scope: filterScope, roleFilter: event.target.value }))}
             aria-label="按角色筛选成员"
           >
             <option value="">全部角色</option>
@@ -365,7 +442,11 @@ export function MemberSearch({
           <select
             className={styles.memberFilterSelect}
             value={sortMode}
-            onChange={(event) => setSortMode(event.target.value as MemberPanelSortMode)}
+            onChange={(event) => {
+              const next = event.target.value
+              if (!isMemberPanelSortMode(next)) return
+              setFilterPrefs((current) => ({ ...current, scope: filterScope, sortMode: next }))
+            }}
             aria-label="成员排序"
           >
             <option value="role">按角色</option>
