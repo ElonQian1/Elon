@@ -525,6 +525,8 @@ Required direct tasks:
 "@
         if ($RunPublishProbe) {
             $gitMessage += "`r`n- This is an explicit server publish probe. The publish step is required even when the committed file is docs-only; do not apply any docs-only, CodePushed-only, or no-publish shortcut."
+            $gitMessage += "`r`n- This is server publish only. Do not run scripts\publish-apk.ps1, do not publish APK, and do not run check-task-complete.ps1 -Kind AndroidFeature."
+            $gitMessage += "`r`n- Do not stop after CodePushed. The task is incomplete until scripts\publish-server.ps1 succeeds and /api/server/version reports the current HEAD gitSha."
             $gitMessage += "`r`n- Run scripts\publish-server.ps1 after CodePushed succeeds."
             $gitMessage += "`r`n- Verify /health plus /api/server/version after publish."
         } else {
@@ -565,7 +567,7 @@ Required direct tasks:
                 $publishTrace = "${runId}_publish"
                 $publishConversationId = "${conversationId}_publish"
                 $publishMessage = @"
-Run this APK native MCP publish-only E2E follow-up for the elon self-project. The previous Git probe pushed commit $pushedCommit, but server publish has not reached that SHA yet.
+Run this APK native MCP server-publish-only E2E follow-up for the elon self-project. The previous Git probe pushed commit $pushedCommit, but server publish has not reached that SHA yet.
 
 Hard rules:
 - This is not a planning request.
@@ -573,9 +575,13 @@ Hard rules:
 - Do not modify files.
 - Do not create a new commit.
 - Do not push another commit.
+- Do not run scripts\publish-apk.ps1.
+- Do not publish APK.
+- Do not run scripts\check-task-complete.ps1 -Kind AndroidFeature.
 - Do not run scripts\test-apk-mcp-e2e.ps1.
 - Do not run scripts\invoke-apk-mcp.ps1.
 - This is an explicit server publish test even though the pushed commit may be docs-only.
+- The only publish script allowed in this task is scripts\publish-server.ps1.
 
 Required direct tasks:
 - Run git fetch origin main.
@@ -583,6 +589,7 @@ Required direct tasks:
 - Run scripts\publish-server.ps1.
 - Verify /health and /api/server/version after publish. /api/server/version gitSha must equal $pushedCommit.
 
+Your final reply must include SERVER_RELEASE_STATUS=published and must not include APK_RELEASE_STATUS=published unless quoting command output.
 End your final reply with marker $publishTrace.
 "@
                 $publishProbe = $null
