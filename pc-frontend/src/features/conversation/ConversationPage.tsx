@@ -10,12 +10,12 @@ import type { UploadedAttachment } from './AttachmentButton'
 import { useAuthStore } from '../../store/auth'
 import { useModelStore } from '../models/useModelStore'
 import { ModelPickerPopover } from '../models/ModelPicker'
-import DevTaskGroup from '../dev/DevTaskGroup'
 import AgentRunsPanel from '../dev/AgentRunsPanel'
 import { buildContext } from '../dev/devTaskUtils'
 import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
+import ConversationFeed from './ConversationFeed'
 import { api } from '../../api/client'
 import { clean, safeNodeAdminUrl } from '../../lib/utils'
 import { localJson } from '../doctor/localApi'
@@ -76,7 +76,6 @@ import { MemberAuditDrawer } from './MemberAuditDrawer'
 import { RoleManagementDrawer } from './RoleManagementDrawer'
 import { PermissionDrawer } from './PermissionDrawer'
 import { MemberDetailDrawer } from './MemberDetailDrawer'
-import { MessageItem } from './ConversationMessage'
 import {
   MemberSearch,
   MemberContextMenu,
@@ -1273,56 +1272,21 @@ export default function ConversationPage() {
             )}
           </div>
         ) : (
-          <div className={styles.messageList} ref={feedRef} onScroll={handleFeedScroll}>
-            {feedLoading && displayMessages.length === 0 && (
-              <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
-                <p>正在打开会话…</p>
-              </div>
-            )}
-            {!feedLoading && displayMessages.length === 0 && (
-              <div className={styles.emptyState} style={{ marginTop: '4vh' }}>
-                {sessionView === 'new'
-                  ? <><strong>新会话</strong><p>输入消息开始全新对话，发送后自动保存为独立会话。</p></>
-                  : <p>还没有消息，发送第一条吧！</p>
-                }
-              </div>
-            )}
-            {displayMessages.length > 0 && messageGroups.map((group) =>
-              group.type === 'task' ? (
-                <div key={group.key} data-task-id={group.taskId} className={styles.devTaskWrap}>
-                  <DevTaskGroup
-                    messages={group.messages as Parameters<typeof DevTaskGroup>[0]['messages']}
-                    taskContext={taskContext}
-                    onCancel={handleCancelTask}
-                    onApprove={handleApproveTool}
-                  />
-                </div>
-              ) : (
-                <MessageItem
-                  key={group.key}
-                  message={group.message}
-                  isDevChannel={isDevChannel}
-                  taskContext={taskContext}
-                  user={user}
-                  onCancel={handleCancelTask}
-                  onApprove={handleApproveTool}
-                  grouped={group.grouped}
-                />
-              )
-            )}
-            {/* P1.3：AI 打字指示器 */}
-            {(hasRunningTask || sendingMessage) && (
-              <div className={styles.typingRow}>
-                <div className={styles.typingAvatar}>AI</div>
-                <div className={styles.typingBubble}>
-                  <span>AI 正在处理</span>
-                  <div className={styles.typingDots}>
-                    <span /><span /><span />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          <ConversationFeed
+            sessionView={sessionView}
+            feedRef={feedRef}
+            feedLoading={feedLoading}
+            displayMessages={displayMessages}
+            messageGroups={messageGroups}
+            taskContext={taskContext}
+            isDevChannel={isDevChannel}
+            user={user}
+            hasRunningTask={hasRunningTask}
+            sendingMessage={sendingMessage}
+            onScroll={handleFeedScroll}
+            onCancelTask={handleCancelTask}
+            onApproveTool={handleApproveTool}
+          />
         )}
         {/* P1.3：新消息跳转按钮 */}
         {showNewMsg && activeChannelId && (
