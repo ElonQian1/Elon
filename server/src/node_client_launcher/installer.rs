@@ -43,6 +43,8 @@ const LEGACY_INTERNAL_FILES: &[&str] = &[
     "elon-pc-node.exe.new",
     "一龙PC节点.exe.new",
     "一龙开发平台.exe.new", // 名称更新后的临时文件
+    "elon-node-agent-windows.zip.new",
+    "node-agent-version.json.new",
 ];
 
 pub(crate) fn ensure_installed() -> Result<PathBuf> {

@@ -271,12 +271,12 @@ fn schedule_self_replace_package(
 ) -> Result<()> {
     #[cfg(windows)]
     {
-        let script = package_replace_script(
-            Some(std::process::id()),
+        let _ = version_file;
+        let script = package_self_update_via_repair_script(
+            std::process::id(),
             tmp_zip,
             install_dir,
             tmp_version,
-            version_file,
         );
         let mut cmd = launcher_command::powershell_hidden_command(&script);
         launcher_command::spawn_hidden(&mut cmd).context("无法安排完整客户端包自更新")?;
@@ -286,6 +286,60 @@ fn schedule_self_replace_package(
     {
         replace_client_package(tmp_zip, install_dir, tmp_version, version_file)
     }
+}
+
+#[cfg(windows)]
+fn package_self_update_via_repair_script(
+    pid_to_wait: u32,
+    tmp_zip: &Path,
+    install_dir: &Path,
+    tmp_version: &Path,
+) -> String {
+    format!(
+        r#"
+$ErrorActionPreference = 'Stop'
+$pidToWait = {pid_to_wait}
+$zip = '{tmp_zip}'
+$installDir = '{install_dir}'
+$tmpVersion = '{tmp_version}'
+$extractDir = Join-Path ([System.IO.Path]::GetTempPath()) ('elon-node-agent-update-' + [Guid]::NewGuid().ToString('N'))
+$logDir = Join-Path $installDir '_internal\logs'
+$logFile = Join-Path $logDir 'client-update.log'
+function Write-ElonNodeUpdateLog {{
+  param([string]$Message)
+  try {{
+    New-Item -ItemType Directory -Force -Path $logDir | Out-Null
+    Add-Content -LiteralPath $logFile -Encoding UTF8 -Value ((Get-Date).ToString('o') + ' ' + $Message)
+  }} catch {{}}
+}}
+try {{
+  Write-ElonNodeUpdateLog "scheduled package repair update from $zip"
+  Wait-Process -Id $pidToWait -ErrorAction SilentlyContinue
+  New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+  Expand-Archive -LiteralPath $zip -DestinationPath $extractDir -Force
+  $packageClient = Join-Path $extractDir '一龙开发平台.exe'
+  if (-not (Test-Path -LiteralPath $packageClient)) {{ $packageClient = Join-Path $extractDir '一龙PC节点.exe' }}
+  if (!(Test-Path -LiteralPath $packageClient)) {{ throw '完整客户端包缺少主程序' }}
+  $repair = Start-Process -FilePath $packageClient -ArgumentList '--repair' -WorkingDirectory $extractDir -WindowStyle Hidden -PassThru
+  if ($null -eq $repair) {{ throw 'Start-Process did not return a repair process handle' }}
+  Wait-Process -Id $repair.Id -Timeout 120 -ErrorAction Stop
+  $repair.Refresh()
+  if (($null -ne $repair.ExitCode) -and ($repair.ExitCode -ne 0)) {{ throw "repair process failed with exit code $($repair.ExitCode)" }}
+  Write-ElonNodeUpdateLog "package repair update finished"
+}} catch {{
+  Write-ElonNodeUpdateLog ("package repair update failed: " + ($_ | Out-String))
+  throw
+}} finally {{
+  Remove-Item -LiteralPath $extractDir -Recurse -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $zip -Force -ErrorAction SilentlyContinue
+  Remove-Item -LiteralPath $tmpVersion -Force -ErrorAction SilentlyContinue
+}}
+"#,
+        pid_to_wait = pid_to_wait,
+        tmp_zip = launcher_command::ps_single_quote(&tmp_zip.to_string_lossy()),
+        install_dir = launcher_command::ps_single_quote(&install_dir.to_string_lossy()),
+        tmp_version = launcher_command::ps_single_quote(&tmp_version.to_string_lossy())
+    )
 }
 
 #[cfg(windows)]
@@ -654,5 +708,27 @@ mod tests {
         );
         assert!(script.contains("Start-Process -FilePath $Client -ArgumentList '--agent-runtime'"));
         assert!(script.contains("Wait-ElonNodeAdminHealth"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn package_self_update_uses_extracted_repair_entrypoint() {
+        use std::path::Path;
+
+        let script = super::package_self_update_via_repair_script(
+            1234,
+            Path::new(r"C:\ElonNode\_internal\elon-node-agent-windows.zip.new"),
+            Path::new(r"C:\ElonNode"),
+            Path::new(r"C:\ElonNode\_internal\node-agent-version.json.new"),
+        );
+
+        assert!(script.contains("Wait-Process -Id $pidToWait"));
+        assert!(script.contains("Expand-Archive -LiteralPath $zip"));
+        assert!(script.contains("Start-Process -FilePath $packageClient -ArgumentList '--repair'"));
+        assert!(script.contains("Wait-Process -Id $repair.Id -Timeout 120"));
+        assert!(script.contains("client-update.log"));
+        assert!(script.contains("Remove-Item -LiteralPath $tmpVersion"));
+        assert!(!script.contains("Copy-ElonNodeFileWithRetry -Source $packageClient"));
+        assert!(!script.contains("Start-ElonNodeRuntimeAndWait"));
     }
 }
