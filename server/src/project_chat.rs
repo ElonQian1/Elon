@@ -766,6 +766,23 @@ pub(crate) async fn run_project_agent_with_scheduler(
             message
         };
         let _keep_conversation_permit = conversation_permit;
+        if execution_mode.is_plan() {
+            agent::plan_for_project_in_workspace(
+                &user_id,
+                &project,
+                &base_workspace,
+                &download_base,
+                Some(&conversation_id),
+                &message,
+                agent_name.as_deref(),
+                pc_node_fast_path_route(needs_project_workflow, pc_runtime_route),
+                trace_id.as_deref(),
+                &state,
+                tx,
+            )
+            .await;
+            return;
+        }
         agent::run_for_project(
             &user_id,
             &project,
