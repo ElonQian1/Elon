@@ -80,9 +80,15 @@ async fn refresh_one_workspace_health_snapshot(
     let can_run_on_pc = node_can_run_project_cli && !target.workspace_path.trim().is_empty();
     let (live_inspect, inspect_error) =
         inspect_target_workspace(state, target, node_can_run_project_cli).await;
+    let inspect_timed_out = inspect_error
+        .as_deref()
+        .is_some_and(is_workspace_inspect_timeout);
 
     let mut warnings = warnings_for_target(target, node.as_ref());
-    if let Some(error) = inspect_error.as_deref() {
+    if let Some(error) = inspect_error
+        .as_deref()
+        .filter(|_| !soft_inspect_timeout(inspect_timed_out, can_run_on_pc))
+    {
         warnings.push(format!("PC 工作区后台巡检失败：{error}"));
     }
     if let Some(status) = live_inspect.as_ref() {
@@ -186,4 +192,12 @@ fn append_inspect_warnings(status: &ProjectWorkspaceInspectStatus, warnings: &mu
 
 fn cli_available(status: &ProjectWorkspaceInspectStatus) -> bool {
     status.codex_available || status.copilot_available
+}
+
+fn soft_inspect_timeout(inspect_timed_out: bool, can_run_on_pc: bool) -> bool {
+    inspect_timed_out && can_run_on_pc
+}
+
+fn is_workspace_inspect_timeout(message: &str) -> bool {
+    message.contains("project workspace inspect timeout")
 }

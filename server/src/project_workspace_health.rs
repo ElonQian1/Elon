@@ -91,6 +91,16 @@ pub async fn get_project_workspace_health(
     )
     .await;
 
+    let node_can_run_project_cli = node
+        .as_ref()
+        .map(|node| node.cli_connected && node.cli_project_ready)
+        .unwrap_or(false);
+    let can_run_on_pc =
+        access.node_id.is_some() && access.workspace_path.is_some() && node_can_run_project_cli;
+    let inspect_timed_out = inspect_error
+        .as_deref()
+        .is_some_and(is_workspace_inspect_timeout);
+
     let mut warnings = Vec::new();
     if access.node_id.as_deref().unwrap_or_default().is_empty() {
         warnings.push("项目未绑定 PC 节点".to_string());
@@ -111,27 +121,25 @@ pub async fn get_project_workspace_health(
     } else if matches!(node.as_ref(), Some(node) if node.cli_connected && !node.cli_project_ready) {
         warnings.push("PC 节点未上报 Codex/Copilot CLI 能力".to_string());
     }
-    if matches!(
+    let legacy_execution_without_workspace_status = matches!(
         latest_execution
             .as_ref()
             .and_then(|session| session.merge_status.as_deref()),
         Some("legacy_no_workspace_status")
-    ) {
+    );
+    if legacy_execution_without_workspace_status && !can_run_on_pc {
         warnings.push("最近一次执行来自旧版节点，未返回工作区状态".to_string());
     }
-    if let Some(error) = inspect_error.as_deref() {
+    if let Some(error) = inspect_error
+        .as_deref()
+        .filter(|_| !soft_inspect_timeout(inspect_timed_out, can_run_on_pc))
+    {
         warnings.push(format!("PC 工作区实时巡检失败：{error}"));
     }
     if let Some(status) = live_inspect.as_ref() {
         append_live_inspect_warnings(status, &mut warnings);
     }
 
-    let node_can_run_project_cli = node
-        .as_ref()
-        .map(|node| node.cli_connected && node.cli_project_ready)
-        .unwrap_or(false);
-    let can_run_on_pc =
-        access.node_id.is_some() && access.workspace_path.is_some() && node_can_run_project_cli;
     let verified_can_run_on_pc = live_inspect
         .as_ref()
         .map(|status| status.path_exists && status.is_dir && cli_available(status))
@@ -283,6 +291,14 @@ fn append_live_inspect_warnings(
 
 fn cli_available(status: &ProjectWorkspaceInspectStatus) -> bool {
     status.codex_available || status.copilot_available
+}
+
+fn soft_inspect_timeout(inspect_timed_out: bool, can_run_on_pc: bool) -> bool {
+    inspect_timed_out && can_run_on_pc
+}
+
+fn is_workspace_inspect_timeout(message: &str) -> bool {
+    message.contains("project workspace inspect timeout")
 }
 
 async fn node_health(state: &AppState, node_id: &str) -> ProjectWorkspaceHealthNode {

@@ -18,6 +18,24 @@ interface WorkspaceHealth {
   disk_free_bytes?: number
   issues?: string[]
   cli_ready?: boolean
+  can_run_on_pc?: boolean
+  verified_can_run_on_pc?: boolean | null
+  warnings?: string[]
+  project?: {
+    workspace_path?: string | null
+    node_id?: string | null
+  }
+  node?: {
+    node_id?: string
+    online?: boolean
+    cli_connected?: boolean
+    cli_project_ready?: boolean
+  } | null
+  live_inspect?: {
+    is_git_worktree?: boolean
+    git_remote_origin?: string | null
+    disk_free_bytes?: number | null
+  } | null
 }
 
 export default function ProjectDetailPage() {
@@ -279,14 +297,21 @@ function WorkspaceTab({ health, loading, channels, onRefresh, onOpenChannel }: {
     </div>
   )
 
+  const nodeOnline = health.node_online ?? health.node?.online ?? false
+  const nodeId = health.node_id ?? health.node?.node_id ?? health.project?.node_id ?? '未知'
+  const cliReady = health.cli_ready ?? (health.node?.cli_connected && health.node?.cli_project_ready) ?? health.can_run_on_pc ?? false
+  const diskFreeBytes = health.disk_free_bytes ?? health.live_inspect?.disk_free_bytes ?? undefined
+  const gitInitialized = health.git_initialized ?? health.live_inspect?.is_git_worktree
+  const gitRemote = health.git_remote ?? health.live_inspect?.git_remote_origin ?? undefined
+  const issues = health.issues ?? health.warnings ?? []
   const rows: [string, string][] = [
-    ['Git 初始化', health.git_initialized ? '已初始化' : '未初始化'],
-    ['Git 远端', health.git_remote ?? '未配置'],
-    ['节点在线', health.node_online ? '在线' : '离线'],
-    ['节点 ID', health.node_id ?? '未知'],
-    ['AI Agent', health.cli_ready ? '就绪' : '未就绪'],
-    ['磁盘剩余', health.disk_free_bytes
-      ? `${(health.disk_free_bytes / 1024 / 1024 / 1024).toFixed(1)} GB`
+    ['Git 初始化', gitInitialized === false ? '未初始化' : '已初始化'],
+    ['Git 远端', gitRemote ?? '未配置'],
+    ['节点在线', nodeOnline ? '在线' : '离线'],
+    ['节点 ID', nodeId],
+    ['AI Agent', cliReady ? '就绪' : '未就绪'],
+    ['磁盘剩余', diskFreeBytes
+      ? `${(diskFreeBytes / 1024 / 1024 / 1024).toFixed(1)} GB`
       : '未知'],
   ]
 
@@ -313,10 +338,10 @@ function WorkspaceTab({ health, loading, channels, onRefresh, onOpenChannel }: {
           </div>
         ))}
       </div>
-      {(health.issues ?? []).length > 0 && (
+      {issues.length > 0 && (
         <div className={styles.issues}>
           <strong>问题：</strong>
-          {(health.issues ?? []).map((issue, i) => <div key={i}>{issue}</div>)}
+          {issues.map((issue, i) => <div key={i}>{issue}</div>)}
         </div>
       )}
     </div>
