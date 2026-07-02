@@ -585,24 +585,46 @@ Required direct tasks:
 
 End your final reply with marker $publishTrace.
 "@
-                $publishProbe = Start-ChatProbe `
-                    -Serial $effectiveSerial `
-                    -TraceId $publishTrace `
-                    -ConversationId $publishConversationId `
-                    -Message $publishMessage `
-                    -IsDevelopment $true `
-                    -WaitFor "first_server_event" `
-                    -WaitTimeoutSec $FirstReplyTimeoutSec
-                $publishStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $publishTrace -TimeoutSec ([Math]::Max($FinishTimeoutSec, 1200))
-                Assert-TraceDone -Status $publishStatus -TraceId $publishTrace
-                $summary.traces.publish_probe = [ordered]@{
-                    trace_id = $publishTrace
-                    probe = $publishProbe
-                    final_status = $publishStatus
-                    expected_git_sha = $pushedCommit
+                $publishProbe = $null
+                $publishStatus = $null
+                try {
+                    $publishProbe = Start-ChatProbe `
+                        -Serial $effectiveSerial `
+                        -TraceId $publishTrace `
+                        -ConversationId $publishConversationId `
+                        -Message $publishMessage `
+                        -IsDevelopment $true `
+                        -WaitFor "first_server_event" `
+                        -WaitTimeoutSec $FirstReplyTimeoutSec
+                    $publishStatus = Wait-TraceDone -Serial $effectiveSerial -TraceId $publishTrace -TimeoutSec ([Math]::Max($FinishTimeoutSec, 1200))
+                    $summary.traces.publish_probe = [ordered]@{
+                        trace_id = $publishTrace
+                        probe = $publishProbe
+                        final_status = $publishStatus
+                        expected_git_sha = $pushedCommit
+                    }
+                    Assert-TraceDone -Status $publishStatus -TraceId $publishTrace
+                    Write-Step "verify server publish gitSha $pushedCommit after continuation"
+                    $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec $PublishVerifyTimeoutSec
+                } catch {
+                    $publishError = $_.Exception.Message
+                    if ($null -eq $summary.traces.publish_probe) {
+                        $summary.traces.publish_probe = [ordered]@{
+                            trace_id = $publishTrace
+                            probe = $publishProbe
+                            final_status = $publishStatus
+                            expected_git_sha = $pushedCommit
+                        }
+                    }
+                    $summary.traces.publish_probe.error = $publishError
+                    Write-Step "publish continuation trace failed; verifying server gitSha $pushedCommit directly"
+                    try {
+                        $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec $PublishVerifyTimeoutSec
+                        $summary.traces.publish_probe.recovered_by_server_version = $true
+                    } catch {
+                        throw "Publish continuation failed: $publishError`nServer version verification after continuation also failed: $($_.Exception.Message)"
+                    }
                 }
-                Write-Step "verify server publish gitSha $pushedCommit after continuation"
-                $summary.server_publish = Wait-ServerGitSha -ExpectedSha $pushedCommit -TimeoutSec $PublishVerifyTimeoutSec
             }
         }
     }
