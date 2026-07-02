@@ -1334,7 +1334,7 @@ async fn run_via_pc_agent(
         model_label.or(copilot_model),
         effective_codex_reasoning_effort.as_deref(),
         lightweight_pc_chat,
-        agent_id,
+        cli_name,
     );
     start_pc_node_compute_run(
         state,

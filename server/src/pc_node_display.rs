@@ -42,10 +42,18 @@ pub fn pc_cli_heartbeat_subject(
         || display_model == node_id
         || display_model.contains(node_id)
         || display_model.starts_with("node-")
+        || is_cli_name_label(display_model)
     {
         return node_progress_name.to_string();
     }
     display_model.to_string()
+}
+
+fn is_cli_name_label(value: &str) -> bool {
+    matches!(
+        value.to_ascii_lowercase().as_str(),
+        "codex" | "copilot" | "claude" | "gemini"
+    )
 }
 
 fn compact_node_suffix(node_id: &str) -> String {
@@ -88,6 +96,14 @@ mod tests {
                 "ELON-4060（dd33ed36）",
                 "node-usr_5c-dd33ed36"
             ),
+            "ELON-4060（dd33ed36）"
+        );
+    }
+
+    #[test]
+    fn heartbeat_subject_replaces_cli_name_with_pc_name() {
+        assert_eq!(
+            pc_cli_heartbeat_subject("codex", "ELON-4060（dd33ed36）", "node-usr_5c-dd33ed36"),
             "ELON-4060（dd33ed36）"
         );
     }
