@@ -7,6 +7,7 @@
  *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
  */
 import { memo, useState, useEffect, useRef } from 'react'
+import { ChevronDown, ChevronRight } from 'lucide-react'
 import { DevTaskMessage } from './DevTaskCard'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
@@ -73,7 +74,9 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
                 {collapsed ? `查看 ${progressCount} 步过程` : '收起过程'}
                 {taskId ? ` · ${shortId(taskId)}` : ''}
               </span>
-              <span className={styles.toggleArrow}>{collapsed ? '▸' : '▾'}</span>
+              <span className={styles.toggleArrow} aria-hidden="true">
+                {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
+              </span>
             </button>
           ) : (
             <div className={styles.processStatic}>
@@ -83,15 +86,19 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
             </div>
           )}
 
-          {!collapsed && progressMsgs.map((msg, i) => (
-            <DevTaskMessage
-              key={String(msg.id ?? i)}
-              message={msg}
-              context={taskContext}
-              onCancel={onCancel}
-              onApprove={onApprove}
-            />
-          ))}
+          {!collapsed && (
+            <div className={styles.processBody}>
+              {progressMsgs.map((msg, i) => (
+                <DevTaskMessage
+                  key={String(msg.id ?? i)}
+                  message={msg}
+                  context={taskContext}
+                  onCancel={onCancel}
+                  onApprove={onApprove}
+                />
+              ))}
+            </div>
+          )}
         </div>
       )}
 

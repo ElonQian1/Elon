@@ -111,9 +111,7 @@ export function hasRunningTask(messages: Message[]): boolean {
     const taskId = messageTaskId(message)
     if (!taskId) continue
     if (kind === 'ai_task') taskIds.add(taskId)
-    if (kind === 'ai_result' || isTerminalTaskStatus(message.task_status ?? message.taskStatus)) {
-      doneIds.add(taskId)
-    }
+    if (isTaskTerminalMessage(message)) doneIds.add(taskId)
   }
 
   for (const taskId of taskIds) {
@@ -158,6 +156,12 @@ export function buildMessageGroups(messages: Message[], taskFlowEnabled: boolean
 
 export function containsTaskProcess(messages: Message[]): boolean {
   return messages.some(isTaskProcessMessage)
+}
+
+function isTaskTerminalMessage(message: Message): boolean {
+  return messageKind(message) === 'ai_result'
+    || isConversationAssistantTaskMessage(message)
+    || isTerminalTaskStatus(message.task_status ?? message.taskStatus)
 }
 
 function mergeConversationMessagesWithTaskProcess(

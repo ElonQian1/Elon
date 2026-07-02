@@ -109,6 +109,16 @@ try {
     ['msg-user', 'msg-assistant'],
     'conversation-only task thread should keep user and assistant turns connected',
   );
+  assert.strictEqual(
+    hasRunningTask([
+      conversationMessages[0],
+      { id: 'pcm-task-2', kind: 'ai_task', task_id: 'tsk-1', content: '发起 AI 开发任务：修复会话 UI' },
+      { id: 'pcm-progress-2', kind: 'ai_progress', task_id: 'tsk-1', content: '处理中' },
+      conversationMessages[1],
+    ]),
+    false,
+    'assistant task reply should stop the typing indicator even before channel ai_result refreshes',
+  );
 
   const runningMessages = taskMessages.slice(0, 2);
   assert.strictEqual(hasRunningTask(runningMessages), true, 'task without result should remain running');
