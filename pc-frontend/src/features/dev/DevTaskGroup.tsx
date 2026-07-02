@@ -1,16 +1,16 @@
 /**
- * DevTaskGroup — 任务级折叠层
+ * DevTaskGroup — 会话里的任务线程
  *
- * 将同一 task_id 的所有消息（header + N progress + result）
- * 折叠成一行：
- *  - 任务运行中 → 展开，实时显示所有进度
- *  - 任务完成后 → 默认折叠，只显示 header + "查看N步详情" + result
- *  - 点击按钮可随时展开 / 折叠
+ * 将同一 task_id 的用户请求、过程消息和最终回复连成一个对话段：
+ *  - 用户请求显示为右侧气泡
+ *  - 工具调用 / 命令 / 过程默认可折叠
+ *  - 最终回复显示为左侧 AI 气泡，避免被过程卡片淹没
  */
 import { memo, useState, useEffect, useRef } from 'react'
 import { DevTaskMessage } from './DevTaskCard'
-import { messageKind, messageText, taskIdOf, taskIsTerminal } from './devTaskUtils'
-import type { ChatMessage, TaskContext } from './types'
+import MarkdownContent from '../markdown/MarkdownContent'
+import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
+import type { ChatMessage, TaskContext, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
 
 interface Props {
@@ -39,78 +39,61 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   }, [isDone])
 
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
-  const resultMsg   = messages.find((m) => messageKind(m) === 'ai_result')
+  const resultMsg   = latestMessageOfKind(messages, 'ai_result')
     ?? (isDone ? latestVisibleProgress(messages) : undefined)
   const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress')
   const progressCount = progressMsgs.length
+  const status = statusForTask(task)
+  const request = task?.request || taskRequestText(headerMsg)
+  const hasProgressDetails = progressCount > 0
+  const tone = status.tone
 
-  // 未完成：直接渲染所有消息（实时追踪进度）
-  if (!isDone) {
-    return (
-      <>
-        {messages.map((msg, i) => (
-          <DevTaskMessage
-            key={String(msg.id ?? i)}
-            message={msg}
-            context={taskContext}
-            onCancel={onCancel}
-            onApprove={onApprove}
-          />
-        ))}
-      </>
-    )
-  }
-
-  // 已完成：可折叠布局
   return (
-    <div className={styles.group}>
-      {/* 任务标题行（始终可见）*/}
-      {headerMsg && (
-        <DevTaskMessage
-          message={headerMsg}
-          context={taskContext}
-          onCancel={onCancel}
-          onApprove={onApprove}
-        />
+    <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')}>
+      {request && (
+        <div className={styles.userTurn}>
+          <div className={styles.userBubble}>{request}</div>
+        </div>
       )}
 
-      {/* 折叠切换按钮（有进度消息才显示）*/}
-      {progressCount > 0 && (
-        <button
-          type="button"
-          className={styles.toggle}
-          onClick={() => setCollapsed((c) => !c)}
-          aria-expanded={!collapsed}
-        >
-          <span className={styles.toggleArrow}>{collapsed ? '▸' : '▾'}</span>
-          <span>
-            {collapsed
-              ? `查看 ${progressCount} 步详情`
-              : '收起详情'}
-          </span>
-        </button>
+      {(hasProgressDetails || !isDone) && (
+        <div className={styles.processPanel}>
+          {hasProgressDetails ? (
+            <button
+              type="button"
+              className={styles.processToggle}
+              onClick={() => setCollapsed((c) => !c)}
+              aria-expanded={!collapsed}
+            >
+              <span className={styles.processDot} />
+              <span className={styles.processLabel}>{status.label}</span>
+              <span className={styles.processMeta}>
+                {collapsed ? `查看 ${progressCount} 步过程` : '收起过程'}
+                {taskId ? ` · ${shortId(taskId)}` : ''}
+              </span>
+              <span className={styles.toggleArrow}>{collapsed ? '▸' : '▾'}</span>
+            </button>
+          ) : (
+            <div className={styles.processStatic}>
+              <span className={styles.processDot} />
+              <span>{status.label}</span>
+              {taskId && <em>{shortId(taskId)}</em>}
+            </div>
+          )}
+
+          {!collapsed && progressMsgs.map((msg, i) => (
+            <DevTaskMessage
+              key={String(msg.id ?? i)}
+              message={msg}
+              context={taskContext}
+              onCancel={onCancel}
+              onApprove={onApprove}
+            />
+          ))}
+        </div>
       )}
 
-      {/* 进度消息（折叠时隐藏）*/}
-      {!collapsed && progressMsgs.map((msg, i) => (
-        <DevTaskMessage
-          key={String(msg.id ?? i)}
-          message={msg}
-          context={taskContext}
-          onCancel={onCancel}
-          onApprove={onApprove}
-        />
-      ))}
-
-      {/* 结果块（始终可见）*/}
-      {resultMsg && (
-        <DevTaskMessage
-          message={resultMsg}
-          context={taskContext}
-          onCancel={onCancel}
-          onApprove={onApprove}
-        />
-      )}
+      {resultMsg && <TaskFinalReply message={resultMsg} tone={tone} />}
     </div>
   )
 }
@@ -118,7 +101,48 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
 export default memo(DevTaskGroup, (prev, next) =>
   prev.messages === next.messages
   && prev.taskContext === next.taskContext
+  && prev.onCancel === next.onCancel
+  && prev.onApprove === next.onApprove
 )
+
+function TaskFinalReply({ message, tone }: { message: ChatMessage; tone: TaskTone }) {
+  const content = messageText(message)
+  if (!content) return null
+  const failed = tone === 'failed'
+  const canceled = tone === 'canceled'
+  const label = failed ? '任务失败' : canceled ? '任务已停止' : '最终回复'
+  const hasMarkdown = /[#*`\[\]>|]/.test(content)
+
+  return (
+    <div className={styles.assistantTurn}>
+      <div className={styles.assistantAvatar}>AI</div>
+      <div className={styles.assistantBody}>
+        <div className={styles.assistantMeta}>
+          <strong>一龙</strong>
+          <span>{label}</span>
+        </div>
+        <div className={[styles.assistantBubble, failed ? styles.replyFailed : canceled ? styles.replyCanceled : ''].join(' ')}>
+          {hasMarkdown ? <MarkdownContent content={content} copy /> : content}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function taskRequestText(message: ChatMessage | undefined): string {
+  if (!message) return ''
+  return messageText(message)
+    .replace(/^发起\s*AI\s*开发任务[：:]\s*/i, '')
+    .trim()
+}
+
+function latestMessageOfKind(messages: ChatMessage[], kind: string): ChatMessage | undefined {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    const message = messages[index]
+    if (messageKind(message) === kind) return message
+  }
+  return undefined
+}
 
 function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined {
   const progress = messages.filter((m) => messageKind(m) === 'ai_progress')

@@ -157,6 +157,7 @@ function mergeConversationMessagesWithTaskProcess(
   const merged: Message[] = []
   const seen = new Set<string>()
   const insertedTaskIds = new Set<string>()
+  const insertedAssistantFallbackTaskIds = new Set<string>()
 
   for (const message of conversationMessages) {
     const taskId = messageTaskId(message)
@@ -175,8 +176,12 @@ function mergeConversationMessagesWithTaskProcess(
         for (const taskMessage of taskMessages) pushUniqueMessage(merged, seen, taskMessage)
         insertedTaskIds.add(taskId)
       }
-      if (!taskMessages.some((taskMessage) => messageKind(taskMessage) === 'ai_result')) {
+      if (
+        !taskMessages.some((taskMessage) => messageKind(taskMessage) === 'ai_result')
+        && !insertedAssistantFallbackTaskIds.has(taskId)
+      ) {
         pushUniqueMessage(merged, seen, assistantMessageAsTaskResult(message))
+        insertedAssistantFallbackTaskIds.add(taskId)
       }
       continue
     }
