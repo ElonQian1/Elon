@@ -143,6 +143,20 @@ impl Store {
         Ok(())
     }
 
+    pub fn mark_interrupted_running_project_execution_sessions(&self) -> Result<usize> {
+        let ts = now();
+        let n = self.conn()?.execute(
+            "UPDATE project_execution_sessions
+             SET status = 'failed',
+                 merge_status = COALESCE(merge_status, 'interrupted'),
+                 last_error = COALESCE(last_error, 'server restarted before PC CLI terminal event'),
+                 updated_at = ?1
+             WHERE status = 'running'",
+            params![ts],
+        )?;
+        Ok(n)
+    }
+
     pub fn latest_project_execution_session(
         &self,
         project_id: &str,
@@ -302,6 +316,51 @@ mod tests {
         assert_eq!(
             by_request.branch.as_deref(),
             Some("ai/session/prj-a/conv-a")
+        );
+    }
+
+    #[test]
+    fn startup_interrupts_running_project_execution_sessions() {
+        let store = temp_store();
+        let user = store
+            .create_user(
+                "project-execution-restart@example.com",
+                "secret1",
+                None,
+                None,
+            )
+            .expect("user should be created");
+        let project = store
+            .create_project(&user.id, "执行会话重启项目", None, Some("android"))
+            .expect("project should be created")
+            .project;
+        store
+            .record_project_execution_started(ProjectExecutionSessionStart {
+                project_id: &project.id,
+                conversation_id: "conv-restart",
+                user_id: &user.id,
+                node_id: "node-a",
+                request_id: "req-restart",
+                requested_workspace_path: Some("D:/repo"),
+                model: Some("codex"),
+            })
+            .expect("start should record");
+
+        assert_eq!(
+            store
+                .mark_interrupted_running_project_execution_sessions()
+                .expect("running sessions should be interrupted"),
+            1
+        );
+        let session = store
+            .get_project_execution_session_by_request_id("req-restart")
+            .expect("request lookup should query")
+            .expect("request lookup should find session");
+        assert_eq!(session.status, "failed");
+        assert_eq!(session.merge_status.as_deref(), Some("interrupted"));
+        assert_eq!(
+            session.last_error.as_deref(),
+            Some("server restarted before PC CLI terminal event")
         );
     }
 }

@@ -118,6 +118,21 @@ fn project_lightweight_chat_split_is_disabled_by_default() {
 }
 
 #[test]
+fn codex_reconnect_attempt_ignores_backoff_delay() {
+    assert_eq!(
+        extract_codex_reconnect_attempt(
+            "stream disconnected - retrying sampling request (1/5 in 1199ms)"
+        )
+        .as_deref(),
+        Some("1/5")
+    );
+    assert_eq!(
+        extract_codex_reconnect_attempt("reconnecting... 3/5 in 7728ms").as_deref(),
+        Some("3/5")
+    );
+}
+
+#[test]
 fn project_lightweight_chat_split_can_be_enabled_explicitly() {
     let split_enabled = project_lightweight_chat_split_enabled_from(|name| {
         (name == PROJECT_LIGHTWEIGHT_CHAT_ENABLED_ENV).then(|| "true".to_string())

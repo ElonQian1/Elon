@@ -256,6 +256,26 @@ async fn main() -> Result<()> {
             interrupted_tasks
         );
     }
+    let interrupted_pc_runs = state
+        .store
+        .mark_interrupted_started_pc_agent_runs()
+        .unwrap_or(0);
+    if interrupted_pc_runs > 0 {
+        info!(
+            "{} 个 PC CLI 执行证明因服务器重启被标记为失败",
+            interrupted_pc_runs
+        );
+    }
+    let interrupted_pc_sessions = state
+        .store
+        .mark_interrupted_running_project_execution_sessions()
+        .unwrap_or(0);
+    if interrupted_pc_sessions > 0 {
+        info!(
+            "{} 个 PC 项目执行会话因服务器重启被标记为失败",
+            interrupted_pc_sessions
+        );
+    }
 
     const STALE_RUNNING_TASK_TIMEOUT_SECS: u64 = 45 * 60;
 

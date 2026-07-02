@@ -152,6 +152,23 @@ impl Store {
         select_run_by_compute_call_id(&conn, compute_call_id)
     }
 
+    pub fn mark_interrupted_started_pc_agent_runs(&self) -> Result<usize> {
+        let ts = now();
+        let conn = self.conn.lock().unwrap();
+        let n = conn.execute(
+            "UPDATE node_compute_runs
+                SET status = 'failed',
+                    finished_at = ?1,
+                    duration_ms = MAX(0, CAST((julianday(?1) - julianday(started_at)) * 86400000 AS INTEGER)),
+                    error_message = COALESCE(error_message, 'server restarted before PC CLI terminal event'),
+                    updated_at = ?1
+              WHERE status = 'started'
+                AND usage_mode = 'pc_agent_cli'",
+            params![ts],
+        )?;
+        Ok(n)
+    }
+
     pub fn admin_list_node_compute_runs(
         &self,
         status: Option<&str>,
@@ -392,6 +409,67 @@ mod tests {
         assert_eq!(score.total_runs, 1);
         assert_eq!(score.successful_runs, 1);
         assert_eq!(score.success_rate_x1000, 1000);
+
+        drop(store);
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn startup_interrupts_started_pc_agent_runs() {
+        let (store, path) = temp_store();
+        let consumer = store
+            .create_user("node-run-restart@example.com", "secret1", None, None)
+            .unwrap();
+        let provider = store
+            .create_user(
+                "node-run-restart-provider@example.com",
+                "secret1",
+                None,
+                None,
+            )
+            .unwrap();
+
+        store
+            .start_node_compute_run(NodeComputeRunStart {
+                compute_call_id: "pc_agent_cli:restart-1",
+                consumer_user_id: &consumer.id,
+                provider_user_id: Some(&provider.id),
+                node_id: "node-a",
+                model_id: Some("pc-cli/codex"),
+                feature: "pc_agent_cli_dev",
+                usage_mode: "pc_agent_cli",
+                route_reason: Some("pc_agent_selected"),
+            })
+            .unwrap();
+        store
+            .start_node_compute_run(NodeComputeRunStart {
+                compute_call_id: "node_llm:still-running",
+                consumer_user_id: &consumer.id,
+                provider_user_id: Some(&provider.id),
+                node_id: "node-a",
+                model_id: Some("gpt"),
+                feature: "node_llm",
+                usage_mode: "node_llm",
+                route_reason: None,
+            })
+            .unwrap();
+
+        assert_eq!(store.mark_interrupted_started_pc_agent_runs().unwrap(), 1);
+        let pc_run = store
+            .get_node_compute_run_by_compute_call_id("pc_agent_cli:restart-1")
+            .unwrap()
+            .unwrap();
+        assert_eq!(pc_run.status, "failed");
+        assert!(pc_run.finished_at.is_some());
+        assert_eq!(
+            pc_run.error_message.as_deref(),
+            Some("server restarted before PC CLI terminal event")
+        );
+        let other_run = store
+            .get_node_compute_run_by_compute_call_id("node_llm:still-running")
+            .unwrap()
+            .unwrap();
+        assert_eq!(other_run.status, "started");
 
         drop(store);
         let _ = std::fs::remove_file(path);

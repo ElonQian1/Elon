@@ -241,23 +241,16 @@ pub fn prepare_conversation_workspace(
 
     let start_ref = conversation_start_ref(&base_workspace);
     let worktree_arg = git_path_arg(&worktree_path);
-    if local_branch_exists(&base_workspace, &branch) {
-        run_git_dynamic(
-            &base_workspace,
-            &["worktree", "add", worktree_arg.as_str(), &branch],
-        )?;
-    } else {
-        run_git_dynamic(
-            &base_workspace,
-            &[
-                "worktree",
-                "add",
-                "-b",
-                &branch,
-                worktree_arg.as_str(),
-                &start_ref,
-            ],
-        )?;
+    add_conversation_worktree(&base_workspace, &worktree_arg, &branch, &start_ref)?;
+    if !is_git_work_tree(&worktree_path) {
+        recover_stale_conversation_worktree_path(&base_workspace, &worktree_root, &worktree_path)?;
+        add_conversation_worktree(&base_workspace, &worktree_arg, &branch, &start_ref)?;
+        if !is_git_work_tree(&worktree_path) {
+            return Err(anyhow!(
+                "conversation worktree was created but is not a git repository: {}",
+                worktree_path.display()
+            ));
+        }
     }
 
     Ok(ConversationWorkspaceResult {
@@ -266,6 +259,22 @@ pub fn prepare_conversation_workspace(
         isolated: true,
         branch: Some(branch),
     })
+}
+
+fn add_conversation_worktree(
+    base_workspace: &Path,
+    worktree_arg: &str,
+    branch: &str,
+    start_ref: &str,
+) -> Result<()> {
+    if local_branch_exists(base_workspace, branch) {
+        run_git_dynamic(base_workspace, &["worktree", "add", worktree_arg, branch])
+    } else {
+        run_git_dynamic(
+            base_workspace,
+            &["worktree", "add", "-b", branch, worktree_arg, start_ref],
+        )
+    }
 }
 
 fn recover_stale_conversation_worktree_path(
@@ -358,6 +367,12 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
         .lock()
         .map_err(|_| anyhow!("conversation workspace merge lock poisoned"))?;
 
+    if !is_git_work_tree(&active_workspace) {
+        return Ok(format!(
+            "conversation worktree missing git metadata; skipped auto-merge: {}",
+            active_workspace.display()
+        ));
+    }
     let saved_dirty_commit = ensure_conversation_workspace_committed(&active_workspace)?;
     if !worktree_clean(&active_workspace)? {
         return Ok(format!(
@@ -695,7 +710,7 @@ fn git_path_buf(path: &Path) -> PathBuf {
 mod tests {
     use super::{
         ensure_conversation_workspace_committed, git_output, git_path_arg, is_git_work_tree,
-        is_retryable_push_rejection, prepare_conversation_workspace,
+        is_retryable_push_rejection, merge_conversation_workspace, prepare_conversation_workspace,
         recover_stale_conversation_worktree_path, worktree_clean,
     };
     use elon_pc_dev_runtime::safe_path_part;
@@ -847,6 +862,39 @@ mod tests {
 
         let _ = fs::remove_dir_all(root);
         let _ = fs::remove_dir_all(base);
+    }
+
+    #[test]
+    fn merge_missing_conversation_git_metadata_is_blocked_message() {
+        let base = std::env::temp_dir().join(format!(
+            "elon_missing_conversation_git_base_{}",
+            Uuid::new_v4().simple()
+        ));
+        let active = std::env::temp_dir().join(format!(
+            "elon_missing_conversation_git_active_{}",
+            Uuid::new_v4().simple()
+        ));
+        fs::create_dir_all(&base).expect("base repo should create");
+        fs::create_dir_all(&active).expect("active path should create");
+        run_git(&base, &["init"]);
+        run_git(&base, &["config", "user.email", "ai@example.test"]);
+        run_git(&base, &["config", "user.name", "AI Test"]);
+        fs::write(base.join("README.md"), "seed\n").expect("seed file should write");
+        run_git(&base, &["add", "README.md"]);
+        run_git(&base, &["commit", "-m", "seed"]);
+
+        let workspace = super::ConversationWorkspaceResult {
+            base_workspace_path: Some(base.to_string_lossy().to_string()),
+            workspace_path: active.to_string_lossy().to_string(),
+            isolated: true,
+            branch: Some("ai/session/project-a/conversation-a".into()),
+        };
+        let message = merge_conversation_workspace(&workspace)
+            .expect("missing git metadata should return a blocked merge message");
+        assert!(message.starts_with("conversation worktree missing git metadata"));
+
+        let _ = fs::remove_dir_all(base);
+        let _ = fs::remove_dir_all(active);
     }
 
     #[test]

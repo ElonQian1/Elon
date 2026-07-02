@@ -2682,22 +2682,21 @@ fn extract_codex_reconnect_attempt(text: &str) -> Option<String> {
     let marker = "reconnecting...";
     if let Some(index) = lower.find(marker) {
         let rest = &text[index + marker.len()..];
-        return rest
-            .split(|ch: char| !(ch.is_ascii_digit() || ch == '/'))
-            .find(|part| {
-                let mut split = part.split('/');
-                matches!((split.next(), split.next()), (Some(a), Some(b)) if !a.is_empty() && !b.is_empty())
-            })
-            .map(str::to_string);
+        return extract_retry_fraction(rest);
     }
 
     let marker = "sampling request (";
     let index = lower.find(marker)?;
     let rest = &text[index + marker.len()..];
-    rest.split(')')
-        .next()
-        .map(str::trim)
-        .filter(|value| !value.is_empty() && value.contains('/'))
+    extract_retry_fraction(rest.split(')').next().unwrap_or(rest))
+}
+
+fn extract_retry_fraction(text: &str) -> Option<String> {
+    text.split(|ch: char| !(ch.is_ascii_digit() || ch == '/'))
+        .find(|part| {
+            let mut split = part.split('/');
+            matches!((split.next(), split.next()), (Some(a), Some(b)) if !a.is_empty() && !b.is_empty())
+        })
         .map(str::to_string)
 }
 

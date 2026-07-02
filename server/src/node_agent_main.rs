@@ -2318,6 +2318,7 @@ fn finalize_cli_prompt_workspace(
     match pc_workspace_provisioner::merge_conversation_workspace(&workspace) {
         Ok(message)
             if message.starts_with("conversation worktree still")
+                || message.starts_with("conversation worktree missing git metadata")
                 || message.starts_with("base workspace") =>
         {
             warn!("会话 worktree 暂未合并: {message}");

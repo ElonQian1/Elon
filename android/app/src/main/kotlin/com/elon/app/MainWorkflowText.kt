@@ -137,14 +137,16 @@ internal fun userFacingProgress(content: String): String {
             "绑定的 PC 节点正在重连，正在等待原节点恢复。"
         content.contains("绑定的 PC 节点已恢复连接") ->
             "绑定的 PC 节点已恢复连接，继续使用原本项目路径执行。"
-        content.contains("PC 节点短暂离线") || content.contains("正在自动重连") ->
-            "PC 节点连接不稳定，正在自动重连。"
+        content.contains("流式连接不稳定") && content.contains("重连") ->
+            "模型流式连接不稳定，正在自动重连。"
+        content.contains("PC 节点短暂离线") ->
+            "PC 节点短暂离线，正在等待重连。"
+        content.contains("正在自动重连") ->
+            "连接正在自动恢复。"
         content.contains("工作区不可用") && content.contains("正在查找") ->
             "绑定工作区暂时不可用，正在查找可接手的在线 PC 节点。"
         content.contains("暂不可用") && content.contains("切换") ->
             "当前执行通道暂不可用，正在切换备用通道。"
-        content.contains("流式连接不稳定") && content.contains("重连") ->
-            "模型流式连接不稳定，正在自动重连。"
         content.contains("插件远程同步不可达") || content.contains("本地缓存") ->
             "插件同步暂不可达，已继续使用本地缓存。"
         content.contains("正在确认这是否需要进入开发流程") ->
