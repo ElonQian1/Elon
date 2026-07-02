@@ -17,6 +17,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.elon.app.databinding.ActivityMainBinding
 import com.elon.app.mcp.McpNativeControlBridge
+import com.elon.app.mcp.rememberPendingMcpConversationSeed
 import com.elon.app.update.AppUpdateManager
 import org.json.JSONObject
 import java.util.Date
@@ -280,7 +281,10 @@ class MainActivity : AppCompatActivity() {
             backendConnected = { s.backendConnected },
             activeRequestIsDevelopment = { s.activeRequestIsDevelopment },
             runningTaskCount = { s.runningConversationTasks.size },
-            currentStage = { projectStateActions.currentStage }
+            currentStage = { projectStateActions.currentStage },
+            rememberMcpConversationSeed = { seed ->
+                rememberPendingMcpConversationSeed(prefs, s.gson, seed)
+            }
         )
     }
 

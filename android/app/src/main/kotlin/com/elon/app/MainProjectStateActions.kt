@@ -1,6 +1,7 @@
 package com.elon.app
 
 import android.content.SharedPreferences
+import com.elon.app.mcp.applyPendingMcpConversationSeeds
 import com.google.gson.Gson
 
 internal class MainProjectStateActions(
@@ -68,9 +69,14 @@ internal class MainProjectStateActions(
             normalizeProject = normalizeProject,
             elonSelfIconDataUrl = elonSelfIconDataUrl()
         )
+        val pendingSeedResults = applyPendingMcpConversationSeeds(
+            prefs = prefs,
+            gson = gson,
+            projects = loaded.projects
+        )
         projects.clear()
         projects.addAll(loaded.projects)
-        setActiveProjectIndex(loaded.activeProjectIndex)
+        setActiveProjectIndex(pendingSeedResults.lastOrNull()?.projectIndex ?: loaded.activeProjectIndex)
         activeProject()
         saveProjects()
     }

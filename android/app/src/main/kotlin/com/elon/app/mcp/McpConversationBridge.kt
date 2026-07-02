@@ -1,6 +1,7 @@
 package com.elon.app.mcp
 
 import android.content.Context
+import android.content.SharedPreferences
 import com.elon.app.AppConversation
 import com.elon.app.AppProject
 import com.elon.app.AuthManager
@@ -19,6 +20,10 @@ import com.elon.app.welcomeChatMessage
 import com.google.gson.Gson
 import org.json.JSONObject
 
+private const val PENDING_MCP_SEEDS_KEY = "mcp_pending_conversation_seeds_json"
+private const val PENDING_MCP_SEED_MAX_COUNT = 50
+private const val PENDING_MCP_SEED_MAX_AGE_MS = 30 * 60 * 1000L
+
 internal data class McpConversationSeed(
     val traceId: String,
     val projectId: String,
@@ -29,6 +34,51 @@ internal data class McpConversationSeed(
     val isDevelopment: Boolean,
     val executionMode: ProjectRequestExecutionMode
 )
+
+private data class PendingMcpConversationSeed(
+    val traceId: String,
+    val projectId: String,
+    val projectTitle: String,
+    val conversationId: String,
+    val conversationTitle: String?,
+    val message: String,
+    val isDevelopment: Boolean,
+    val executionMode: String,
+    val storedAtMs: Long
+) {
+    fun toSeed(): McpConversationSeed {
+        return McpConversationSeed(
+            traceId = traceId,
+            projectId = projectId,
+            projectTitle = projectTitle,
+            conversationId = conversationId,
+            conversationTitle = conversationTitle,
+            message = message,
+            isDevelopment = isDevelopment,
+            executionMode = if (executionMode == ProjectRequestExecutionMode.Plan.wireValue) {
+                ProjectRequestExecutionMode.Plan
+            } else {
+                ProjectRequestExecutionMode.Execute
+            }
+        )
+    }
+
+    companion object {
+        fun fromSeed(seed: McpConversationSeed, now: Long): PendingMcpConversationSeed {
+            return PendingMcpConversationSeed(
+                traceId = seed.traceId,
+                projectId = seed.projectId,
+                projectTitle = seed.projectTitle,
+                conversationId = seed.conversationId,
+                conversationTitle = seed.conversationTitle,
+                message = seed.message,
+                isDevelopment = seed.isDevelopment,
+                executionMode = seed.executionMode.wireValue,
+                storedAtMs = now
+            )
+        }
+    }
+}
 
 internal data class McpConversationSeedApplyResult(
     val appended: Boolean,
@@ -66,6 +116,7 @@ internal fun seedMcpConversation(context: Context, seed: McpConversationSeed): J
     val now = System.currentTimeMillis()
     val result = applyMcpConversationSeed(projects, seed, now)
     saveStoredProjects(prefs, gson, projects, result.projectIndex, result.projectId, synchronous = true)
+    rememberPendingMcpConversationSeed(prefs, gson, seed, now)
 
     DebugTraceStore.record(
         "mcp_conversation_seeded",
@@ -79,6 +130,49 @@ internal fun seedMcpConversation(context: Context, seed: McpConversationSeed): J
     )
 
     return result.toJson()
+}
+
+internal fun rememberPendingMcpConversationSeed(
+    context: Context,
+    seed: McpConversationSeed,
+    now: Long = System.currentTimeMillis()
+) {
+    rememberPendingMcpConversationSeed(AuthManager.userDataPrefs(context), Gson(), seed, now)
+}
+
+internal fun rememberPendingMcpConversationSeed(
+    prefs: SharedPreferences,
+    gson: Gson,
+    seed: McpConversationSeed,
+    now: Long = System.currentTimeMillis()
+) {
+    val fresh = loadPendingMcpConversationSeeds(prefs, gson, now)
+        .filterNot { it.traceId == seed.traceId }
+        .toMutableList()
+    fresh.add(PendingMcpConversationSeed.fromSeed(seed, now))
+    savePendingMcpConversationSeeds(prefs, gson, fresh.takeLast(PENDING_MCP_SEED_MAX_COUNT))
+}
+
+internal fun applyPendingMcpConversationSeeds(
+    prefs: SharedPreferences,
+    gson: Gson,
+    projects: MutableList<AppProject>,
+    now: Long = System.currentTimeMillis()
+): List<McpConversationSeedApplyResult> {
+    val pending = loadPendingMcpConversationSeeds(prefs, gson, now)
+        .takeLast(PENDING_MCP_SEED_MAX_COUNT)
+    if (pending.isEmpty()) return emptyList()
+
+    val results = pending.map { applyMcpConversationSeed(projects, it.toSeed(), now) }
+    savePendingMcpConversationSeeds(prefs, gson, pending)
+    DebugTraceStore.record(
+        "mcp_pending_conversation_seeds_applied",
+        mapOf(
+            "count" to pending.size,
+            "latest_trace_id" to pending.lastOrNull()?.traceId
+        )
+    )
+    return results
 }
 
 internal fun applyMcpConversationSeed(
@@ -260,6 +354,32 @@ private fun normalizeMcpStoredProject(project: AppProject) {
     project.activeConversationIndex = project.activeConversationIndex.coerceIn(0, project.conversations.lastIndex)
     if (project.stage.isBlank()) project.stage = "待提交需求"
     if (project.subtitle.isBlank()) project.subtitle = "点击进入会话"
+}
+
+private fun loadPendingMcpConversationSeeds(
+    prefs: SharedPreferences,
+    gson: Gson,
+    now: Long
+): List<PendingMcpConversationSeed> {
+    val saved = prefs.getString(PENDING_MCP_SEEDS_KEY, null)
+    return runCatching {
+        if (saved.isNullOrBlank()) emptyList()
+        else gson.fromJson(saved, Array<PendingMcpConversationSeed>::class.java)?.toList().orEmpty()
+    }.getOrNull()
+        .orEmpty()
+        .filter { it.traceId.isNotBlank() && it.conversationId.isNotBlank() && it.projectId.isNotBlank() }
+        .filter { now - it.storedAtMs <= PENDING_MCP_SEED_MAX_AGE_MS }
+        .sortedBy { it.storedAtMs }
+}
+
+private fun savePendingMcpConversationSeeds(
+    prefs: SharedPreferences,
+    gson: Gson,
+    seeds: List<PendingMcpConversationSeed>
+) {
+    prefs.edit()
+        .putString(PENDING_MCP_SEEDS_KEY, gson.toJson(seeds))
+        .commit()
 }
 
 private fun mcpSeedMessageId(traceId: String, suffix: String): String = "mcp:$traceId:$suffix"

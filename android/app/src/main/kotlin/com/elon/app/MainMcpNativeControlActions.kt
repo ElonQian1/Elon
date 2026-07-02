@@ -30,7 +30,8 @@ internal class MainMcpNativeControlActions(
     private val backendConnected: () -> Boolean,
     private val activeRequestIsDevelopment: () -> Boolean,
     private val runningTaskCount: () -> Int,
-    private val currentStage: () -> String
+    private val currentStage: () -> String,
+    private val rememberMcpConversationSeed: (McpConversationSeed) -> Unit = {}
 ) {
     fun uiState(): JSONObject {
         val project = activeProject()
@@ -141,6 +142,7 @@ internal class MainMcpNativeControlActions(
             isDevelopment = if (args.has("is_development")) args.optBoolean("is_development") else true,
             executionMode = mcpExecutionMode(args)
         )
+        rememberMcpConversationSeed(seed)
         val result = applyMcpConversationSeed(projects, seed, System.currentTimeMillis())
         setActiveProjectIndex(result.projectIndex)
         activeProject().activeConversationIndex = result.conversationIndex
