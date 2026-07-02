@@ -25,7 +25,9 @@ internal object ApkChatInstaller {
         url: String,
         http: OkHttpClient,
         projectId: String? = null,
-        projectName: String? = null
+        projectName: String? = null,
+        apkIdentity: String? = null,
+        apkUpdatedAt: String? = null
     ) {
         val progressBar = ProgressBar(activity, null, android.R.attr.progressBarStyleHorizontal)
             .apply { max = 100 }
@@ -82,7 +84,15 @@ internal object ApkChatInstaller {
                     }
                     activity.runOnUiThread {
                         progressDialog.dismiss()
-                        rememberProjectApkPackage(activity, projectId, projectApkPackageName(activity, apkFile))
+                        val packageName = projectApkPackageName(activity, apkFile)
+                        rememberProjectApkPackage(activity, projectId, packageName)
+                        rememberPendingProjectApkInstall(
+                            activity,
+                            projectId,
+                            apkIdentity,
+                            apkUpdatedAt,
+                            projectApkVersionCode(activity, apkFile)
+                        )
                         installApk(activity, apkFile)
                     }
                 }

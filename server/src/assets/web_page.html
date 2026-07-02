@@ -3894,6 +3894,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   let groups = [];
   let currentProject = null;
   let currentProjectSpaceLatestApkUrl = '';
+  let currentProjectSpaceLatestApkIdentity = '';
+  let currentProjectSpaceLatestApkUpdatedAt = '';
   let currentProjectSpacePostCount = 0;
   let projectSpaceAnnouncementExpanded = false;
   let currentFriend = null;
@@ -5824,6 +5826,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
   function resetProjectPage() {
     projectHealthRequestSeq += 1;
     currentProjectSpaceLatestApkUrl = '';
+    currentProjectSpaceLatestApkIdentity = '';
+    currentProjectSpaceLatestApkUpdatedAt = '';
     currentProjectSpacePostCount = 0;
     projectSpaceAnnouncementExpanded = false;
     setMoreButtonMode('chat');
@@ -6348,6 +6352,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new Error(data.error || '加载项目空间失败');
     currentProjectSpaceLatestApkUrl = String(data.latest_apk_url || data.latestApkUrl || '').trim();
+    currentProjectSpaceLatestApkIdentity = String(data.latest_apk_identity || data.latestApkIdentity || '').trim();
+    currentProjectSpaceLatestApkUpdatedAt = String(data.latest_apk_updated_at || data.latestApkUpdatedAt || '').trim();
     if (data.project && currentProject && currentProject.id === project.id) {
       currentProject = Object.assign({}, currentProject, data.project);
       renderProjectIntroCard(currentProject);
@@ -6474,6 +6480,8 @@ Codex 每次任务都会重新读取项目文档，不靠记忆猜。</div>
       progressPanel.setAttribute('aria-hidden', 'false');
     }
     currentProjectSpaceLatestApkUrl = String(p.latest_apk_url || p.latestApkUrl || '').trim();
+    currentProjectSpaceLatestApkIdentity = String(p.latest_apk_identity || p.latestApkIdentity || '').trim();
+    currentProjectSpaceLatestApkUpdatedAt = String(p.latest_apk_updated_at || p.latestApkUpdatedAt || '').trim();
     projectSpaceAnnouncementExpanded = false;
     setMoreButtonMode('project-members');
     moreBtn.style.display = '';

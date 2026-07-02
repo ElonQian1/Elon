@@ -95,7 +95,9 @@ internal class ProjectSpaceController(
                 activity,
                 space?.project?.id.orEmpty(),
                 space?.project?.name.orEmpty(),
-                space?.latestApkUrl
+                space?.latestApkUrl,
+                space?.latestApkIdentity,
+                space?.latestApkUpdatedAt
             )
         },
         downloadProjectApk = {
@@ -104,7 +106,9 @@ internal class ProjectSpaceController(
                 activity,
                 space?.latestApkUrl,
                 space?.project?.id,
-                space?.project?.name
+                space?.project?.name,
+                space?.latestApkIdentity,
+                space?.latestApkUpdatedAt
             )
         },
         replaceProjectPreviewImage = { space, slot -> replaceProjectPreviewImage(space, slot) }

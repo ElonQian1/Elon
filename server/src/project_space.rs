@@ -12,7 +12,7 @@ use serde::Deserialize;
 use std::{
     collections::HashMap,
     sync::{Arc, LazyLock, Mutex},
-    time::{Duration, Instant},
+    time::{Duration, Instant, UNIX_EPOCH},
 };
 use tokio::sync::watch;
 
@@ -853,13 +853,16 @@ async fn project_space_response(
             member.channel_permissions = Some(channel_permissions);
         }
     }
+    let latest_apk = latest_project_apk_delivery(&state, &access);
     Json(serde_json::json!({
         "project": project,
         "categories": categories,
         "channels": channels,
         "members": members,
         "landing": project_landing_manifest(&state, &user.id, &access),
-        "latest_apk_url": latest_project_apk_url(&state, &access),
+        "latest_apk_url": latest_apk.as_ref().map(|apk| apk.url.as_str()),
+        "latest_apk_identity": latest_apk.as_ref().map(|apk| apk.identity.as_str()),
+        "latest_apk_updated_at": latest_apk.as_ref().and_then(|apk| apk.updated_at.as_deref()),
     }))
     .into_response()
 }
@@ -2378,30 +2381,54 @@ fn channel_permission_options() -> serde_json::Value {
     ])
 }
 
-fn latest_project_apk_url(
+struct LatestProjectApkDelivery {
+    url: String,
+    identity: String,
+    updated_at: Option<String>,
+}
+
+fn latest_project_apk_delivery(
     state: &AppState,
     project: &crate::store::ProjectAccess,
-) -> Option<String> {
-    match state.store.latest_project_apk_url(&project.id) {
-        Ok(Some(apk_url)) => return Some(apk_url),
+) -> Option<LatestProjectApkDelivery> {
+    match state.store.latest_project_apk_delivery(&project.id) {
+        Ok(Some((task_id, apk_url, updated_at))) => {
+            return Some(LatestProjectApkDelivery {
+                url: apk_url.clone(),
+                identity: format!("task:{}:{}:{}", task_id, updated_at, apk_url),
+                updated_at: Some(updated_at),
+            });
+        }
         Ok(None) => {}
         Err(error) => tracing::warn!(
             project_id = %project.id,
             error = %error,
-            "读取项目历史 APK 下载地址失败，回退到工作区扫描"
+            "读取项目历史 APK 交付记录失败，回退到工作区扫描"
         ),
     }
 
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let managed_workspace = state.get_project_workspace(&project.workspace_key);
-    let has_apk = tools::find_latest_apk(&managed_workspace).is_some()
-        || tools::find_latest_apk(&workspace).is_some();
-    has_apk.then(|| {
-        tools::stable_apk_url(&format!(
+    let apk_path =
+        tools::find_latest_apk(&managed_workspace).or_else(|| tools::find_latest_apk(&workspace));
+    apk_path.map(|path| {
+        let modified_secs = path
+            .metadata()
+            .and_then(|metadata| metadata.modified())
+            .ok()
+            .and_then(|modified| modified.duration_since(UNIX_EPOCH).ok())
+            .map(|duration| duration.as_secs())
+            .unwrap_or_default();
+        let url = tools::stable_apk_url(&format!(
             "{}/api/projects/{}/download",
             state.public_url, project.id
-        ))
+        ));
+        LatestProjectApkDelivery {
+            url: url.clone(),
+            identity: format!("workspace:{}:{}:{}", project.id, modified_secs, url),
+            updated_at: Some(modified_secs.to_string()),
+        }
     })
 }
 

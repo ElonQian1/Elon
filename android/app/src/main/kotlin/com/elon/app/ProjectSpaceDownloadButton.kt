@@ -225,9 +225,12 @@ internal fun openProjectApkDownload(
     activity: AppCompatActivity,
     apkUrl: String?,
     projectId: String? = null,
-    projectName: String? = null
+    projectName: String? = null,
+    apkIdentity: String? = null,
+    apkUpdatedAt: String? = null
 ) {
     if (!projectId.isNullOrBlank() && !projectName.isNullOrBlank() &&
+        !hasProjectApkUpdate(activity, projectId, projectName, apkIdentity, apkUpdatedAt) &&
         openInstalledProjectApp(activity, projectId, projectName)
     ) {
         return
@@ -242,5 +245,5 @@ internal fun openProjectApkDownload(
         Toast.makeText(activity, "请先登录后安装 APK", Toast.LENGTH_SHORT).show()
         return
     }
-    openProjectApkInstall(activity, url, token, projectId, projectName)
+    openProjectApkInstall(activity, url, token, projectId, projectName, apkIdentity, apkUpdatedAt)
 }

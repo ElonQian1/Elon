@@ -5,6 +5,8 @@ internal data class ProjectSpace(
     val channels: List<ProjectChannel>,
     val members: List<ProjectMember>,
     val latestApkUrl: String?,
+    val latestApkIdentity: String?,
+    val latestApkUpdatedAt: String?,
     val galleryImages: List<String>,
     val landingPreviewImages: List<String>
 )

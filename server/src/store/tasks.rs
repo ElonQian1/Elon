@@ -441,9 +441,21 @@ impl Store {
     /// 获取项目最近一次任务产出的 APK 下载地址。
     /// 这是项目空间"安装"按钮和交付问答的权威来源，避免依赖当前 worktree 是否可用。
     pub fn latest_project_apk_url(&self, project_id: &str) -> Result<Option<String>> {
+        Ok(self
+            .latest_project_apk_delivery(project_id)?
+            .map(|(_, apk_url, _)| apk_url))
+    }
+
+    /// 获取项目最近一次任务产出的 APK 交付记录。
+    ///
+    /// 返回 `(task_id, apk_url, updated_at)`，用于客户端判断稳定下载地址背后是否已有新交付。
+    pub fn latest_project_apk_delivery(
+        &self,
+        project_id: &str,
+    ) -> Result<Option<(String, String, String)>> {
         self.conn()?
             .query_row(
-                "SELECT TRIM(apk_url)
+                "SELECT id, TRIM(apk_url), updated_at
                  FROM tasks
                  WHERE project_id = ?1
                    AND apk_url IS NOT NULL
@@ -451,7 +463,7 @@ impl Store {
                  ORDER BY updated_at DESC, created_at DESC
                  LIMIT 1",
                 params![project_id],
-                |row| row.get(0),
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
             )
             .optional()
             .map_err(Into::into)
