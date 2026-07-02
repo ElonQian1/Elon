@@ -1702,7 +1702,7 @@ async fn start_channel_ai_task_response(
 
     if let Some(reply) = channel_ai_quick_reply(&content) {
         let done_raw = WsMessage::Done {
-            message: reply.to_string(),
+            message: reply.clone(),
             apk_url: None,
             image_url: None,
             model_used: None,
@@ -1716,7 +1716,7 @@ async fn start_channel_ai_task_response(
 
         match state
             .store
-            .finish_running_task(&task_id, "done", Some(reply), None, None)
+            .finish_running_task(&task_id, "done", Some(reply.as_str()), None, None)
         {
             Ok(true) => {
                 project_events::publish_task_done(
@@ -1742,7 +1742,7 @@ async fn start_channel_ai_task_response(
         match state.store.insert_project_channel_ai_result_once(
             &project_id,
             &channel_id,
-            reply,
+            reply.as_str(),
             &task_id,
         ) {
             Ok(true) => publish_channel_message_updated(
@@ -1803,7 +1803,7 @@ fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool 
     )
 }
 
-fn channel_ai_quick_reply(content: &str) -> Option<&'static str> {
+fn channel_ai_quick_reply(content: &str) -> Option<String> {
     quick_casual_reply(content)
 }
 

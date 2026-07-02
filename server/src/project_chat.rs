@@ -709,7 +709,8 @@ pub(crate) async fn run_project_agent_with_scheduler(
         .unwrap_or(false);
 
     if is_pc_node_project {
-        // PC 节点项目快速路径：跳过 worktree/调度器，直接交给 agent
+        // PC 节点项目快速路径：服务器不创建 worktree，但仍按会话串行，避免同一
+        // conversation 的多个 CLI 进程同时写同一个 PC 会话 worktree。
         if needs_project_workflow {
             let _ = tx.send(
                 WsMessage::progress(
@@ -717,6 +718,40 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 )
                 .to_json(),
             );
+        }
+        let queued_tx = tx.clone();
+        let trace_state = state.clone();
+        let queued_trace_id = trace_id.clone();
+        let queued_project_id = project.id.clone();
+        let queued_conversation_id = conversation_id.clone();
+        let conversation_execution_key =
+            project_conversation_execution_key(&project.id, &conversation_id);
+        let conversation_permit = state
+            .project_task_scheduler
+            .acquire(&conversation_execution_key, move || {
+                if let Some(trace_id) = queued_trace_id.as_deref() {
+                    trace_state.server_traces.record(
+                        trace_id,
+                        "server_pc_conversation_queue_wait",
+                        serde_json::json!({
+                            "project_id": &queued_project_id,
+                            "conversation_id": &queued_conversation_id,
+                        }),
+                    );
+                }
+                let _ = queued_tx.send(
+                    WsMessage::progress("当前 PC 会话已有任务在运行，本次消息已进入该会话队列；其他会话仍可并行执行。")
+                        .to_json(),
+                );
+            })
+            .await;
+        if needs_project_workflow {
+            let message = if conversation_permit.was_queued() {
+                "已轮到本 PC 会话任务，开始交给 PC 节点执行。"
+            } else {
+                "已获得本 PC 会话执行权，开始交给 PC 节点执行。"
+            };
+            let _ = tx.send(WsMessage::progress(message).to_json());
         }
         let message = if should_append_project_icon_context_for_pc_fast_path(needs_project_workflow)
         {
@@ -730,6 +765,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
         } else {
             message
         };
+        let _keep_conversation_permit = conversation_permit;
         agent::run_for_project(
             &user_id,
             &project,

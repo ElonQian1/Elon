@@ -12,6 +12,8 @@ use crate::{
     user_agent_secrets::user_byok_api_enabled,
 };
 
+use chrono::{Duration, Utc};
+
 pub(crate) async fn has_api_agents(state: &Arc<AppState>) -> bool {
     !state.agents_config.read().await.agents.is_empty()
 }
@@ -158,17 +160,74 @@ pub(crate) fn casual_chat_prompt() -> &'static str {
 注意：用户的部分消息来自手机语音识别，可能含有同音字替换或音近字错误。请优先推断最合理的语义，忽略明显的识别错误，直接给出正确理解下的回复，无需向用户解释纠错过程。"#
 }
 
-pub(crate) fn quick_casual_reply(user_message: &str) -> Option<&'static str> {
-    match user_message.trim().to_lowercase().as_str() {
+pub(crate) fn quick_casual_reply(user_message: &str) -> Option<String> {
+    let normalized = user_message.trim().to_lowercase();
+    if looks_like_current_time_question(&normalized) {
+        return Some(current_beijing_time_reply());
+    }
+
+    match normalized.as_str() {
         "你好" | "你好？" | "你好?" | "你好呀" | "你好啊" | "你好在吗" | "你好，在吗"
         | "你好吗" | "你好吗？" | "你好吗?" | "在吗" | "你在吗" | "在不在" | "hi" | "hello" => {
-            Some("你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。")
+            Some("你好，我在。你可以直接告诉我想改代码、查问题、构建 APK，或者先聊聊想法。".into())
         }
         "谢谢" | "谢谢你" | "辛苦了" => {
-            Some("不客气，我在这边。你继续说下一步想怎么改就行。")
+            Some("不客气，我在这边。你继续说下一步想怎么改就行。".into())
         }
         _ => None,
     }
+}
+
+fn looks_like_current_time_question(message: &str) -> bool {
+    let compact: String = message
+        .chars()
+        .filter(|ch| {
+            !ch.is_whitespace()
+                && !matches!(
+                    ch,
+                    '!' | '！'
+                        | '?'
+                        | '？'
+                        | '.'
+                        | '。'
+                        | ','
+                        | '，'
+                        | ';'
+                        | '；'
+                        | ':'
+                        | '：'
+                        | '~'
+                        | '～'
+                )
+        })
+        .collect();
+    let chars = compact.chars().count();
+    if chars == 0 || chars > 12 {
+        return false;
+    }
+
+    matches!(
+        compact.as_str(),
+        "几点"
+            | "几点了"
+            | "几点几分"
+            | "现在几点"
+            | "现在几点了"
+            | "现在几点几分"
+            | "现在几分"
+            | "现在时间"
+            | "当前时间"
+            | "当前几点"
+            | "当前几点了"
+            | "现在是什么时间"
+            | "现在时间是多少"
+    ) || ((compact.contains("现在") || compact.contains("当前"))
+        && (compact.contains("几点") || compact.contains("几分") || compact.contains("时间")))
+}
+
+fn current_beijing_time_reply() -> String {
+    let now = Utc::now() + Duration::hours(8);
+    format!("现在是北京时间 {}。", now.format("%Y-%m-%d %H:%M"))
 }
 
 #[cfg(test)]
@@ -181,5 +240,18 @@ mod tests {
         assert!(quick_casual_reply("你好，在吗").is_some());
         assert!(quick_casual_reply("你好吗？").is_some());
         assert!(quick_casual_reply("你好？").is_some());
+    }
+
+    #[test]
+    fn quick_reply_handles_current_time_questions() {
+        let reply = quick_casual_reply("现在几点几分").expect("time question should be quick");
+        assert!(reply.starts_with("现在是北京时间 "));
+        assert!(quick_casual_reply("现在几点").is_some());
+        assert!(quick_casual_reply("当前时间？").is_some());
+    }
+
+    #[test]
+    fn quick_reply_does_not_capture_time_feature_requests() {
+        assert!(quick_casual_reply("帮我做一个显示当前时间的网页").is_none());
     }
 }
