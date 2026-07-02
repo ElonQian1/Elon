@@ -112,6 +112,7 @@ pub(crate) static MIGRATIONS: &[(u32, &str, fn(&Connection) -> Result<()>)] = &[
     (78, "群体 AI 开发 Matter 与节点授权骨架", migration_v78),
     (79, "群体 AI 产物上传与人工合并队列", migration_v79),
     (80, "项目 PC 节点级工作区绑定", migration_v80),
+    (81, "用户 Codex Pro 凭据保险箱", migration_v81),
 ];
 
 // ── v1：初始表结构 ────────────────────────────────────────────────────────────
@@ -2851,6 +2852,42 @@ fn migration_v80(conn: &Connection) -> Result<()> {
           AND p.workspace_path IS NOT NULL
           AND trim(p.workspace_path) != ''
           AND p.status != 'deleted';
+        "#,
+    )?;
+    Ok(())
+}
+
+fn migration_v81(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS user_codex_credentials (
+          user_id             TEXT PRIMARY KEY,
+          auth_mode           TEXT NOT NULL,
+          account_hint_hash   TEXT,
+          source_device       TEXT,
+          ciphertext_b64      TEXT NOT NULL,
+          nonce_b64           TEXT NOT NULL,
+          credential_version  INTEGER NOT NULL DEFAULT 1,
+          last_backup_at      TEXT,
+          last_lease_at       TEXT,
+          created_at          TEXT NOT NULL,
+          updated_at          TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE TABLE IF NOT EXISTS user_codex_credential_events (
+          id          TEXT PRIMARY KEY,
+          user_id     TEXT NOT NULL,
+          event_type  TEXT NOT NULL,
+          node_id     TEXT,
+          success     INTEGER NOT NULL DEFAULT 1,
+          error       TEXT,
+          created_at  TEXT NOT NULL,
+          FOREIGN KEY (user_id) REFERENCES users(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_user_codex_credential_events_user_time
+          ON user_codex_credential_events(user_id, created_at DESC);
         "#,
     )?;
     Ok(())

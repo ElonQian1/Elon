@@ -74,6 +74,7 @@ mod node_agent_client_install_status;
 mod node_agent_client_maintenance;
 mod node_agent_codex_approval;
 mod node_agent_codex_session;
+mod node_agent_codex_vault;
 mod node_agent_download_router;
 mod node_agent_file_info;
 mod node_agent_file_range;
@@ -3879,6 +3880,7 @@ fn spawn_admin_server(runtime: Arc<NodeRuntime>, port: u16) {
                 axum::routing::post(admin_register_project),
             )
             .merge(node_agent_cli_sidecar_admin::routes())
+            .merge(node_agent_codex_vault::routes())
             .merge(node_agent_task_journal_api::routes())
             .route(
                 "/api/project-folder/pick",
@@ -4179,6 +4181,7 @@ async fn admin_status(
             "stale": cli_probe.is_stale(),
         },
         "download_router": node_agent_download_router::status_payload(),
+        "codex_vault": node_agent_codex_vault::local_status_payload(),
         "codex_cli": codex_cli,
         "allowed_clis": available_clis,
         "cli_tools": cli_probe.tools.clone(),

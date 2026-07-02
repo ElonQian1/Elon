@@ -15,8 +15,8 @@ use tower_http::set_header::SetResponseHeaderLayer;
 use crate::types::AppState;
 use crate::{
     admin, admin_quota, admin_token_stats, agent_balloon, api, app_update, auth_api, billing_admin,
-    billing_api, billing_pay, chat_attachments, context_compiler, external_app_api,
-    external_app_chat_bootstrap, external_app_mvp_chat, external_app_route_c_sdk,
+    billing_api, billing_pay, chat_attachments, codex_vault_api, context_compiler,
+    external_app_api, external_app_chat_bootstrap, external_app_mvp_chat, external_app_route_c_sdk,
     external_app_tool_report_api, friend_api, global_ws, group_ai, group_chat_retrieval_api,
     group_summary_api, lan_peer, lm_chat, node_api, node_compute_admin, node_payout_admin,
     peer_relay, project_api, project_attachments, project_chat, project_conversation_identity,
@@ -183,6 +183,18 @@ pub fn build_app(state: Arc<AppState>) -> Router {
         .route("/api/auth/login", post(auth_api::login))
         .route("/api/auth/register", post(auth_api::register))
         .route("/api/me", get(auth_api::me))
+        .route(
+            "/api/me/codex-vault/status",
+            get(codex_vault_api::status),
+        )
+        .route(
+            "/api/me/codex-vault/auth-cache",
+            post(codex_vault_api::save_auth_cache).delete(codex_vault_api::delete_auth_cache),
+        )
+        .route(
+            "/api/me/codex-vault/lease",
+            post(codex_vault_api::lease_auth_cache),
+        )
         .route("/api/me/progression", get(user_progression::get_my_progression))
         .route(
             "/api/external/apps/:app_id",

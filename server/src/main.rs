@@ -36,6 +36,7 @@ mod cli_config;
 mod cli_usage;
 mod codex_health;
 mod codex_stream;
+mod codex_vault_api;
 mod compute_usage;
 mod context_compiler;
 mod conversation_router;

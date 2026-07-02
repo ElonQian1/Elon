@@ -15,6 +15,7 @@ mod billing_price_rules;
 mod billing_reservation_tests;
 mod billing_reservations;
 mod build_quota;
+mod codex_vault;
 mod common;
 mod compute_metering;
 mod conversations;
@@ -79,6 +80,7 @@ pub use billing::{AdminBalanceRow, AdminBillingEventRow, BillingEvent, RechargeR
 pub use billing_alerts::BillingAlertRow;
 pub use billing_price_rules::{BillingPriceRule, BillingPriceRuleUpsert, BillingPriceSnapshot};
 pub use billing_reservations::{BillingReservationOutcome, BillingReservationRequest};
+pub use codex_vault::CodexVaultRecord;
 use common::{
     account_columns, clean_optional, hash_password, hash_token, new_id, normalize_account, now,
     safe_external_id, validate_password, verify_password,

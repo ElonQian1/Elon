@@ -350,6 +350,67 @@
   font-size: 12px;
 }
 
+.vaultCard {
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.vaultHead {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.vaultHead h4 {
+  margin: 0;
+  font-size: 14px;
+}
+
+.vaultState {
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.vaultOnline { color: #4caf78; }
+.vaultOffline { color: #e07070; }
+.vaultChecking { color: #c8a040; }
+
+.vaultGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+}
+
+.vaultGrid > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.vaultGrid span {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.vaultGrid strong {
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.vaultActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 /* ── 节点详情 ── */
 .localPage, .detailPage { max-width: 720px; }
 
@@ -391,6 +452,9 @@
     grid-template-columns: 1fr;
   }
   .codexKeyGrid {
+    grid-template-columns: 1fr;
+  }
+  .vaultGrid {
     grid-template-columns: 1fr;
   }
 }

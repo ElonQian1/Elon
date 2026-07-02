@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Settings } from 'lucide-react'
+import { DownloadCloud, Settings, ShieldCheck, Trash2, UploadCloud } from 'lucide-react'
 import { nodeApi, probeLocalNode } from './localNodeApi'
 import { fetchMyNodes, fetchNodeAgentVersion, nodeId, nodeName, nodeSummaryLine } from './nodeHelpers'
 import RuntimeRouteConfigGuide, { isRouteConfigKey } from './RuntimeRouteConfigGuide'
 import { safeNodeAdminUrl } from '../../lib/utils'
-import type { AutostartStatus, NodeSummary, LocalNodeStatus, LocalCliToolStatus } from './types'
+import type {
+  AutostartStatus,
+  CodexVaultLocalStatus,
+  CodexVaultStatusResponse,
+  LocalCliToolStatus,
+  LocalNodeStatus,
+  NodeSummary,
+} from './types'
 import styles from './NodePage.module.css'
 
 const DOWNLOAD_URL = '/api/node-agent/download/windows-client'
@@ -172,6 +179,8 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
   const [result, setResult] = useState('')
   const [error, setError] = useState('')
   const [codexBusy, setCodexBusy] = useState(false)
+  const [vaultBusy, setVaultBusy] = useState(false)
+  const [vaultStatus, setVaultStatus] = useState<CodexVaultStatusResponse | null>(null)
   const [apiKey, setApiKey] = useState('')
   const [apiModel, setApiModel] = useState('gpt-5')
   const cliNames = [
@@ -183,6 +192,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
   const uniqueCliNames = Array.from(new Set(cliNames.map((item) => String(item).trim()).filter(Boolean)))
   const localModelCount = status.local_ai?.models?.length ?? status.models?.length ?? 0
   const codex = codexStatusFrom(status)
+  const codexVault = vaultStatus?.local ?? status.codex_vault ?? null
 
   const refreshStatus = useCallback(async (quiet = false) => {
     if (!quiet) { setResult('刷新中…'); setError('') }
@@ -192,6 +202,24 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
       if (!quiet) setResult('本机状态已刷新。')
     } catch (err) {
       if (!quiet) setError((err as Error).message)
+    }
+  }, [adminUrl])
+
+  const loadCodexVaultStatus = useCallback(async (quiet = true) => {
+    if (!quiet) { setResult('读取 Codex 保险箱状态…'); setError('') }
+    try {
+      const data = await nodeApi<CodexVaultStatusResponse>(adminUrl, '/api/codex-vault/status', {}, 12000)
+      setVaultStatus(data)
+      if (!quiet) setResult('Codex 保险箱状态已刷新。')
+    } catch (err) {
+      const message = (err as Error).message
+      setVaultStatus((prev) => ({
+        ...(prev ?? {}),
+        ok: false,
+        cloud: { ok: false, error: message },
+        error: message,
+      }))
+      if (!quiet) setError(message)
     }
   }, [adminUrl])
 
@@ -209,6 +237,10 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
   }, [loadAutostart])
 
   useEffect(() => {
+    loadCodexVaultStatus()
+  }, [loadCodexVaultStatus])
+
+  useEffect(() => {
     if (!status.cli_probe?.refreshing && codex?.status !== 'checking') return
     const timer = setTimeout(() => { refreshStatus(true) }, 1600)
     return () => clearTimeout(timer)
@@ -219,6 +251,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
     try {
       await nodeApi(adminUrl, '/api/login', { method: 'POST', body: JSON.stringify({ token: '' }) })
       setResult('本机节点已绑定当前账号。')
+      await loadCodexVaultStatus()
     } catch (err) { setError((err as Error).message) }
   }
 
@@ -228,6 +261,7 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
       await nodeApi(adminUrl, '/api/logout', { method: 'POST' })
       setResult('本机节点已登出。')
       await refreshStatus(true)
+      setVaultStatus(null)
     } catch (err) { setError((err as Error).message) }
   }
 
@@ -241,6 +275,84 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
       setError((err as Error).message)
     } finally {
       setCodexBusy(false)
+    }
+  }
+
+  async function backupCodexVault() {
+    setVaultBusy(true); setResult('正在备份本机 Codex Pro 凭据…'); setError('')
+    try {
+      const data = await nodeApi<CodexVaultStatusResponse>(
+        adminUrl,
+        '/api/codex-vault/backup',
+        { method: 'POST', body: JSON.stringify({}) },
+        30000,
+      )
+      setVaultStatus(data)
+      setResult(data.message || 'Codex Pro 凭据已加密备份到云端保险箱。')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setVaultBusy(false)
+    }
+  }
+
+  async function restoreCodexVault() {
+    setVaultBusy(true); setCodexBusy(true); setResult('正在恢复临时 Codex Pro 登录态…'); setError('')
+    try {
+      const data = await nodeApi<CodexVaultStatusResponse>(
+        adminUrl,
+        '/api/codex-vault/restore',
+        { method: 'POST', body: JSON.stringify({ purpose: 'pc_web_temporary_codex_cli' }) },
+        30000,
+      )
+      setVaultStatus(data)
+      await refreshStatus(true)
+      await loadCodexVaultStatus(true)
+      setResult(data.message || '已恢复为本机临时 Codex Pro 会话。')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setVaultBusy(false)
+      setCodexBusy(false)
+    }
+  }
+
+  async function clearCodexVault() {
+    setVaultBusy(true); setCodexBusy(true); setResult('正在清理本机临时 Codex 登录态…'); setError('')
+    try {
+      const data = await nodeApi<CodexVaultStatusResponse>(
+        adminUrl,
+        '/api/codex-vault/clear',
+        { method: 'POST', body: JSON.stringify({}) },
+        20000,
+      )
+      setVaultStatus(data)
+      await refreshStatus(true)
+      await loadCodexVaultStatus(true)
+      setResult(data.message || '已清理本机保险箱临时 CODEX_HOME。')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setVaultBusy(false)
+      setCodexBusy(false)
+    }
+  }
+
+  async function deleteCloudCodexVault() {
+    setVaultBusy(true); setResult('正在删除云端 Codex Pro 保险箱备份…'); setError('')
+    try {
+      const data = await nodeApi<CodexVaultStatusResponse>(
+        adminUrl,
+        '/api/codex-vault/delete-cloud',
+        { method: 'POST', body: JSON.stringify({}) },
+        20000,
+      )
+      setVaultStatus(data)
+      setResult(data.message || '已删除云端 Codex Pro 保险箱备份。')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setVaultBusy(false)
     }
   }
 
@@ -333,6 +445,16 @@ function NodeAdminPanel({ adminUrl, initialStatus }: { adminUrl: string; initial
         onRefresh={refreshCodex}
         onInstall={installEnv}
         onSaveKey={saveCodexKey}
+      />
+      <CodexVaultCard
+        status={codexVault}
+        cloud={vaultStatus?.cloud}
+        busy={vaultBusy}
+        onBackup={backupCodexVault}
+        onRestore={restoreCodexVault}
+        onClear={clearCodexVault}
+        onDeleteCloud={deleteCloudCodexVault}
+        onRefresh={() => loadCodexVaultStatus(false)}
       />
       <div className={styles.actions}>
         <button className={[styles.btn, styles.primary].join(' ')} onClick={login}>
@@ -490,6 +612,141 @@ function CodexStatusCard({
         )}
         <button className={styles.btn} onClick={onRefresh} disabled={busy}>
           重新检测
+        </button>
+      </div>
+    </section>
+  )
+}
+
+function formatVaultTime(value?: string | null): string {
+  if (!value) return '无'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+function authStateText(auth?: CodexVaultLocalStatus['default_auth']): string {
+  if (!auth?.present) return '未找到'
+  if (auth.problem) return '读取异常'
+  if (auth.auth_mode && auth.auth_mode !== 'chatgpt') return auth.auth_mode
+  return auth.has_refresh_token ? 'ChatGPT / Pro' : '缺少 refresh_token'
+}
+
+function CodexVaultCard({
+  status,
+  cloud,
+  busy,
+  onBackup,
+  onRestore,
+  onClear,
+  onDeleteCloud,
+  onRefresh,
+}: {
+  status: CodexVaultLocalStatus | null
+  cloud?: CodexVaultStatusResponse['cloud']
+  busy: boolean
+  onBackup: () => void
+  onRestore: () => void
+  onClear: () => void
+  onDeleteCloud: () => void
+  onRefresh: () => void
+}) {
+  const vault = cloud?.vault
+  const cloudReady = !!vault?.configured
+  const bound = !!vault?.bound
+  const defaultAuth = status?.default_auth
+  const managedAuth = status?.managed_auth
+  const activeManaged = !!status?.active_home_managed
+  const canBackup = !!defaultAuth?.present
+    && defaultAuth.auth_mode !== 'api_key'
+    && !!defaultAuth.has_refresh_token
+  const canRestore = cloudReady && bound
+  const canClear = activeManaged || !!managedAuth?.present
+  const state = cloud?.error
+    ? '云端不可用'
+    : !cloud
+      ? '读取中'
+      : !cloudReady
+        ? '服务器未配置'
+        : bound
+          ? `已备份 v${vault?.credential_version ?? 1}`
+          : '未备份'
+  const stateTone = cloudReady && bound ? styles.vaultOnline : cloud?.error ? styles.vaultOffline : styles.vaultChecking
+  return (
+    <section className={styles.vaultCard}>
+      <div className={styles.vaultHead}>
+        <div>
+          <span className={styles.codexLabel}>Codex Pro 保险箱</span>
+          <h4>临时登录到陌生电脑</h4>
+        </div>
+        <span className={[styles.vaultState, stateTone].join(' ')}>{state}</span>
+      </div>
+      <div className={styles.vaultGrid}>
+        <div>
+          <span>默认 auth.json</span>
+          <strong>{authStateText(defaultAuth)}</strong>
+        </div>
+        <div>
+          <span>托管 CODEX_HOME</span>
+          <strong>{activeManaged ? '当前生效' : managedAuth?.present ? '已写入' : '未写入'}</strong>
+        </div>
+        <div>
+          <span>最近备份</span>
+          <strong>{formatVaultTime(vault?.last_backup_at)}</strong>
+        </div>
+        <div>
+          <span>最近租用</span>
+          <strong>{formatVaultTime(vault?.last_lease_at)}</strong>
+        </div>
+      </div>
+      {cloud?.error && <p className={styles.codexFixHint}>{cloud.error}</p>}
+      {defaultAuth?.problem && <p className={styles.codexFixHint}>{defaultAuth.problem}</p>}
+      {status?.managed_home && <code className={styles.codexPath}>{status.managed_home}</code>}
+      <div className={styles.vaultActions}>
+        <button
+          className={[styles.btn, styles.primary, styles.iconBtn].join(' ')}
+          onClick={onBackup}
+          disabled={busy || !canBackup}
+          title="把本机默认 Codex Pro 登录态加密备份到云端保险箱"
+        >
+          <UploadCloud size={15} strokeWidth={2.2} aria-hidden="true" />
+          备份本机登录
+        </button>
+        <button
+          className={[styles.btn, styles.iconBtn].join(' ')}
+          onClick={onRestore}
+          disabled={busy || !canRestore}
+          title="把云端保险箱凭据写入本机节点托管的临时 CODEX_HOME"
+        >
+          <DownloadCloud size={15} strokeWidth={2.2} aria-hidden="true" />
+          临时恢复
+        </button>
+        <button
+          className={[styles.btn, styles.iconBtn].join(' ')}
+          onClick={onClear}
+          disabled={busy || !canClear}
+          title="删除本机节点托管的临时 CODEX_HOME，不影响默认 auth.json"
+        >
+          <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
+          清理本机
+        </button>
+        <button
+          className={[styles.btn, styles.iconBtn].join(' ')}
+          onClick={onDeleteCloud}
+          disabled={busy || !bound}
+          title="删除云端保险箱中的 Codex Pro 备份，不影响本机文件"
+        >
+          <Trash2 size={15} strokeWidth={2.2} aria-hidden="true" />
+          删除云端
+        </button>
+        <button
+          className={[styles.btn, styles.iconBtn].join(' ')}
+          onClick={onRefresh}
+          disabled={busy}
+          title="刷新 Codex Pro 保险箱状态"
+        >
+          <ShieldCheck size={15} strokeWidth={2.2} aria-hidden="true" />
+          刷新
         </button>
       </div>
     </section>
