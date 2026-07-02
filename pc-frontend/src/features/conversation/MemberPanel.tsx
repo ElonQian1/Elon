@@ -24,6 +24,7 @@ export type MemberVirtualRow =
 export const MEMBER_VIRTUAL_ROW_HEIGHT = 48
 const MEMBER_LIST_OVERSCAN = 6
 const MEMBER_LIST_WINDOW = 28
+const MEMBER_LIST_MIN_WINDOW = 12
 const MEMBER_PANEL_COLLAPSED_KEY = 'elon.pc.memberPanel.collapsedStatusSections.v1'
 const MEMBER_PANEL_FILTERS_KEY = 'elon.pc.memberPanel.filters.v1'
 type MemberStatusSectionId = 'online' | 'offline'
@@ -352,6 +353,8 @@ export function MemberSearch({
 }) {
   const [query, setQuery] = useState('')
   const [scrollTop, setScrollTop] = useState(0)
+  const [listHeight, setListHeight] = useState(0)
+  const listRef = useRef<HTMLDivElement | null>(null)
   const [collapsedStatusSections, setCollapsedStatusSections] = useState(readCollapsedStatusSections)
   const filterScope = memberPanelFilterScope(channelId)
   const [filterPrefs, setFilterPrefs] = useState(() => readMemberPanelFilters(filterScope))
@@ -368,8 +371,12 @@ export function MemberSearch({
     [members, q, roleFilter, statusFilter],
   )
   const rows = useMemo(() => buildMemberRows(filtered, collapsedStatusSections, sortMode), [filtered, collapsedStatusSections, sortMode])
+  const windowSize = Math.max(
+    MEMBER_LIST_MIN_WINDOW,
+    Math.ceil((listHeight || MEMBER_VIRTUAL_ROW_HEIGHT * MEMBER_LIST_WINDOW) / MEMBER_VIRTUAL_ROW_HEIGHT) + MEMBER_LIST_OVERSCAN * 2,
+  )
   const start = Math.max(0, Math.floor(scrollTop / MEMBER_VIRTUAL_ROW_HEIGHT) - MEMBER_LIST_OVERSCAN)
-  const end = Math.min(rows.length, start + MEMBER_LIST_WINDOW)
+  const end = Math.min(rows.length, start + windowSize)
   const visibleRows = rows.slice(start, end)
   const activeFilterCount = (q ? 1 : 0) + (statusFilter !== 'all' ? 1 : 0) + (roleFilter ? 1 : 0) + (sortMode !== 'role' ? 1 : 0)
   useEffect(() => {
@@ -390,6 +397,19 @@ export function MemberSearch({
   useEffect(() => {
     setScrollTop(0)
   }, [members, q, roleFilter, sortMode, statusFilter])
+  useEffect(() => {
+    const node = listRef.current
+    if (!node) return
+    const updateHeight = () => setListHeight(node.clientHeight)
+    updateHeight()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight)
+      return () => window.removeEventListener('resize', updateHeight)
+    }
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
   function toggleStatusSection(rowId: string) {
     const id = rowId === 'status-online' ? 'online' : rowId === 'status-offline' ? 'offline' : null
     if (!id) return
@@ -458,7 +478,11 @@ export function MemberSearch({
           显示 {filtered.length}/{members.length}{activeFilterCount ? ` · ${activeFilterCount} 个条件` : ''}
         </div>
       </div>
-      <div className={styles.memberVirtualList} onScroll={event => setScrollTop(event.currentTarget.scrollTop)}>
+      <div
+        ref={listRef}
+        className={styles.memberVirtualList}
+        onScroll={event => setScrollTop(event.currentTarget.scrollTop)}
+      >
         {rows.length === 0 && <div className={styles.memberSection}>没有匹配成员</div>}
         {rows.length > 0 && (
           <div className={styles.memberVirtualCanvas} style={{ height: rows.length * MEMBER_VIRTUAL_ROW_HEIGHT }}>

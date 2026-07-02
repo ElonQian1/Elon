@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { api } from '../../api/client'
 import type { ProjectMember, ProjectMemberAuditEntry, ProjectMemberAuditResponse } from './types'
 import {
@@ -31,6 +31,9 @@ const MUTE_PRESETS = [
 ]
 
 const MODERATION_AUDIT_ACTIONS = new Set(['mute_member', 'unmute_member', 'ban_member', 'unban_member'])
+const MODERATION_ROW_HEIGHT = 112
+const MODERATION_LIST_OVERSCAN = 5
+const MODERATION_LIST_MIN_WINDOW = 10
 
 function memberName(member: ProjectMember) {
   return member.account || member.user_id
@@ -88,8 +91,11 @@ export function ModerationDrawer({
   const [customMinutes, setCustomMinutes] = useState('')
   const [note, setNote] = useState('')
   const [auditEntries, setAuditEntries] = useState<ProjectMemberAuditEntry[]>([])
+  const [listScrollTop, setListScrollTop] = useState(0)
+  const [listHeight, setListHeight] = useState(0)
   const [message, setMessage] = useState('')
   const [busyMemberId, setBusyMemberId] = useState('')
+  const listRef = useRef<HTMLDivElement | null>(null)
   const activeMuteMinutes = useMemo(() => moderationDurationMinutes(customMinutes, muteMinutes), [customMinutes, muteMinutes])
   const stats = useMemo(() => ({
     total: members.length,
@@ -113,6 +119,13 @@ export function ModerationDrawer({
     () => auditEntries.filter((entry) => MODERATION_AUDIT_ACTIONS.has(entry.action)).slice(0, 6),
     [auditEntries],
   )
+  const listWindowSize = Math.max(
+    MODERATION_LIST_MIN_WINDOW,
+    Math.ceil((listHeight || MODERATION_ROW_HEIGHT * MODERATION_LIST_MIN_WINDOW) / MODERATION_ROW_HEIGHT) + MODERATION_LIST_OVERSCAN * 2,
+  )
+  const listStart = Math.max(0, Math.floor(listScrollTop / MODERATION_ROW_HEIGHT) - MODERATION_LIST_OVERSCAN)
+  const listEnd = Math.min(visibleMembers.length, listStart + listWindowSize)
+  const virtualMembers = visibleMembers.slice(listStart, listEnd)
 
   async function refreshAudit() {
     try {
@@ -127,6 +140,23 @@ export function ModerationDrawer({
     refreshAudit()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId])
+  useEffect(() => {
+    setListScrollTop(0)
+    if (listRef.current) listRef.current.scrollTop = 0
+  }, [filter, query, sortMode, visibleMembers.length])
+  useEffect(() => {
+    const node = listRef.current
+    if (!node) return
+    const updateHeight = () => setListHeight(node.clientHeight)
+    updateHeight()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight)
+      return () => window.removeEventListener('resize', updateHeight)
+    }
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
   async function moderate(member: ProjectMember, action: ModerationAction, durationMinutes?: number) {
     setMessage('提交中…')
@@ -252,38 +282,50 @@ export function ModerationDrawer({
               <option value="joined">按加入</option>
             </select>
           </div>
-          <div className={styles.moderationList}>
-            {visibleMembers.map((member) => {
-              const isBusy = busyMemberId === member.user_id
-              const restriction = restrictionStatusLabel(member)
-              return (
-                <article key={member.user_id} className={styles.moderationRow} data-state={member.is_banned ? 'banned' : member.is_muted ? 'muted' : 'normal'}>
-                  <span className={[styles.memberAvatar, member.is_banned ? styles.moderationAvatarBanned : member.is_muted ? styles.moderationAvatarMuted : ''].join(' ')}>
-                    {member.avatar_data_url
-                      ? <img src={member.avatar_data_url} alt="" />
-                      : memberInitial(member)
-                    }
-                  </span>
-                  <div className={styles.moderationInfo}>
-                    <strong>{memberName(member)}</strong>
-                    <span>{memberModerationSummary(member)}</span>
-                    <div className={styles.moderationBadges}>
-                      <em data-tone={member.is_banned ? 'danger' : member.is_muted ? 'warning' : 'normal'}>{restriction}</em>
-                      <em>{memberRoleLabel(member)}</em>
-                      <em>{restrictionUntilLabel(member)}</em>
-                      {member.joined_at && <em>加入 {new Date(member.joined_at).toLocaleDateString()}</em>}
-                    </div>
-                  </div>
-                  <div className={styles.moderationActions}>
-                    <button type="button" className={styles.drawerCloseBtn} onClick={() => moderate(member, 'mute', activeMuteMinutes)} disabled={isBusy || !!member.is_banned}>禁言 {durationLabel(activeMuteMinutes)}</button>
-                    <button type="button" className={styles.drawerCloseBtn} onClick={() => moderate(member, 'unmute')} disabled={isBusy || !member.is_muted}>解禁言</button>
-                    <button type="button" className={styles.dangerBtn} onClick={() => moderate(member, 'ban')} disabled={isBusy || !!member.is_banned}>永久封禁</button>
-                    <button type="button" className={styles.drawerCloseBtn} onClick={() => moderate(member, 'unban')} disabled={isBusy || !member.is_banned}>解封</button>
-                  </div>
-                </article>
-              )
-            })}
+          <div
+            ref={listRef}
+            className={styles.moderationVirtualList}
+            onScroll={(event) => setListScrollTop(event.currentTarget.scrollTop)}
+          >
             {visibleMembers.length === 0 && <p className={styles.sideHint}>没有匹配成员</p>}
+            {visibleMembers.length > 0 && (
+              <div className={styles.moderationVirtualCanvas} style={{ height: visibleMembers.length * MODERATION_ROW_HEIGHT }}>
+                <div style={{ transform: `translateY(${listStart * MODERATION_ROW_HEIGHT}px)` }}>
+                  {virtualMembers.map((member) => {
+                    const isBusy = busyMemberId === member.user_id
+                    const restriction = restrictionStatusLabel(member)
+                    return (
+                      <div key={member.user_id} className={styles.moderationVirtualSlot}>
+                        <article className={styles.moderationRow} data-state={member.is_banned ? 'banned' : member.is_muted ? 'muted' : 'normal'}>
+                          <span className={[styles.memberAvatar, member.is_banned ? styles.moderationAvatarBanned : member.is_muted ? styles.moderationAvatarMuted : ''].join(' ')}>
+                            {member.avatar_data_url
+                              ? <img src={member.avatar_data_url} alt="" />
+                              : memberInitial(member)
+                            }
+                          </span>
+                          <div className={styles.moderationInfo}>
+                            <strong>{memberName(member)}</strong>
+                            <span>{memberModerationSummary(member)}</span>
+                            <div className={styles.moderationBadges}>
+                              <em data-tone={member.is_banned ? 'danger' : member.is_muted ? 'warning' : 'normal'}>{restriction}</em>
+                              <em>{memberRoleLabel(member)}</em>
+                              <em>{restrictionUntilLabel(member)}</em>
+                              {member.joined_at && <em>加入 {new Date(member.joined_at).toLocaleDateString()}</em>}
+                            </div>
+                          </div>
+                          <div className={styles.moderationActions}>
+                            <button type="button" className={styles.drawerCloseBtn} onClick={() => moderate(member, 'mute', activeMuteMinutes)} disabled={isBusy || !!member.is_banned}>禁言 {durationLabel(activeMuteMinutes)}</button>
+                            <button type="button" className={styles.drawerCloseBtn} onClick={() => moderate(member, 'unmute')} disabled={isBusy || !member.is_muted}>解禁言</button>
+                            <button type="button" className={styles.dangerBtn} onClick={() => moderate(member, 'ban')} disabled={isBusy || !!member.is_banned}>永久封禁</button>
+                            <button type="button" className={styles.drawerCloseBtn} onClick={() => moderate(member, 'unban')} disabled={isBusy || !member.is_banned}>解封</button>
+                          </div>
+                        </article>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
           <section className={styles.moderationAuditPanel}>
             <div className={styles.moderationControlHead}>
