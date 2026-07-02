@@ -62,6 +62,7 @@ import {
   membersHaveChannelPermissionMap,
   membersForChannel,
   projectMemberHasRolePermission,
+  ROLE_PERMISSION_INVITE_MEMBERS,
   ROLE_PERMISSION_MANAGE_MEMBERS,
   ROLE_PERMISSION_MANAGE_ROLES,
   ROLE_PERMISSION_MODERATE_MEMBERS,
@@ -668,6 +669,9 @@ export default function ConversationPage() {
   const canManageMembers = !!activeProjectId
     && !!currentProjectMember
     && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_MEMBERS)
+  const canInviteMembers = !!activeProjectId
+    && !!currentProjectMember
+    && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_INVITE_MEMBERS)
   const canViewMemberAudit = !!activeProjectId
     && !!currentProjectMember
     && (
@@ -1405,7 +1409,7 @@ export default function ConversationPage() {
           <div className={styles.memberActions}>
             <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowDirectory(true)}>目录</button>}
-            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
+            {activeProjectId && canInviteMembers && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => { setModerationFocusMemberId(''); setShowModeration(true) }}>管理</button>}
             {activeProjectId && canUseRoleManager && <button className={styles.memberInviteBtn} type="button" onClick={() => { setRoleFocusMemberId(''); setShowRoles(true) }}>角色</button>}
             {activeProjectId && canViewMemberAudit && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowAudit(true)}>日志</button>}
