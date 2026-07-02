@@ -87,6 +87,7 @@ fn run_command(command: ClientCommand) -> Result<()> {
         ClientCommand::Start => {
             let install_dir = installer::ensure_installed()?;
             if updater::update_client_if_needed(&install_dir)? {
+                process::open_installed_pc_web_page(&install_dir)?;
                 return Ok(());
             }
             process::start_or_open(&install_dir)?;
@@ -94,6 +95,7 @@ fn run_command(command: ClientCommand) -> Result<()> {
         ClientCommand::Install => {
             let install_dir = installer::install_or_repair()?;
             if updater::update_client_if_needed(&install_dir)? {
+                process::open_installed_pc_web_page(&install_dir)?;
                 return Ok(());
             }
             process::launch_installed_client(&install_dir)?;

@@ -28,10 +28,7 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     }
 
     let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
-    let port = env_values
-        .get("NODE_ADMIN_PORT")
-        .and_then(|value| value.parse::<u16>().ok())
-        .unwrap_or(DEFAULT_ADMIN_PORT);
+    let port = admin_port_from_env_values(&env_values);
     let runtime_already_running = agent_runtime_running(install_dir);
     let port = select_admin_port_for_runtime(port, runtime_already_running);
 
@@ -73,6 +70,18 @@ pub(crate) fn start_or_open(install_dir: &Path) -> Result<()> {
     }
 
     open_pc_web_page(port, &env_values)
+}
+
+pub(crate) fn open_installed_pc_web_page(install_dir: &Path) -> Result<()> {
+    let env_values = env_file::read_env_file(&paths::env_file(install_dir))?;
+    open_pc_web_page(admin_port_from_env_values(&env_values), &env_values)
+}
+
+fn admin_port_from_env_values(env_values: &HashMap<String, String>) -> u16 {
+    env_values
+        .get("NODE_ADMIN_PORT")
+        .and_then(|value| value.parse::<u16>().ok())
+        .unwrap_or(DEFAULT_ADMIN_PORT)
 }
 
 fn spawn_agent_runtime(
@@ -488,6 +497,19 @@ mod tests {
 
         assert_eq!(open_target_from_env_values(&env_values), OpenTarget::PcWeb);
         assert!(!open_target_from_env_values(&env_values).requires_admin_ready());
+    }
+
+    #[test]
+    fn admin_port_defaults_and_accepts_configured_value() {
+        let env_values = HashMap::new();
+        assert_eq!(admin_port_from_env_values(&env_values), DEFAULT_ADMIN_PORT);
+
+        let mut env_values = HashMap::new();
+        env_values.insert("NODE_ADMIN_PORT".to_string(), "7801".to_string());
+        assert_eq!(admin_port_from_env_values(&env_values), 7801);
+
+        env_values.insert("NODE_ADMIN_PORT".to_string(), "not-a-port".to_string());
+        assert_eq!(admin_port_from_env_values(&env_values), DEFAULT_ADMIN_PORT);
     }
 
     #[test]
