@@ -85,7 +85,7 @@ internal fun seedMcpConversation(context: Context, seed: McpConversationSeed): J
     project.activeConversationIndex = conversationIndex
     project.subtitle = summarize(seed.message, 34)
     project.updatedAt = now
-    saveStoredProjects(prefs, gson, projects, projectIndex, project.id)
+    saveStoredProjects(prefs, gson, projects, projectIndex, project.id, synchronous = true)
 
     DebugTraceStore.record(
         "mcp_conversation_seeded",

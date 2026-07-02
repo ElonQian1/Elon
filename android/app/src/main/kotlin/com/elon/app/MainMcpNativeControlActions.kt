@@ -77,6 +77,7 @@ internal class MainMcpNativeControlActions(
                 uiState()
             }
             "open_project_chat" -> {
+                reloadTargetConversationIfNeeded(args)
                 selectProject(args)?.let { return it }
                 selectConversation(args, createIfMissing = false)?.let { return it }
                 openActiveProjectConversation()
@@ -113,6 +114,12 @@ internal class MainMcpNativeControlActions(
             else -> return errorJson(action, "unsupported_action")
         }
         return result.put("control_ok", true)
+    }
+
+    private fun reloadTargetConversationIfNeeded(args: JSONObject) {
+        val hasConversationTarget = args.optString("conversation_id").isNotBlank() || args.has("conversation_index")
+        if (!hasConversationTarget || !args.optBoolean("reload_if_missing", true)) return
+        reloadProjects()
     }
 
     private fun selectProject(args: JSONObject): JSONObject? {

@@ -99,13 +99,18 @@ internal fun saveStoredProjects(
     gson: Gson,
     projects: List<AppProject>,
     activeProjectIndex: Int,
-    activeProjectId: String
+    activeProjectId: String,
+    synchronous: Boolean = false
 ) {
-    prefs.edit()
+    val editor = prefs.edit()
         .putString(PROJECTS_JSON_KEY, gson.toJson(projects))
         .putInt(ACTIVE_PROJECT_INDEX_KEY, activeProjectIndex)
         .putString(TaskWorkService.PREF_ACTIVE_PROJECT_ID, activeProjectId)
-        .apply()
+    if (synchronous) {
+        editor.commit()
+    } else {
+        editor.apply()
+    }
 }
 
 private fun ensureElonSelfProject(projects: MutableList<AppProject>, iconDataUrl: String?) {
