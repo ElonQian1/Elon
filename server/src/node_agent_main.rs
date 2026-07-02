@@ -48,6 +48,8 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tower_http::cors::{AllowOrigin, CorsLayer};
 use tracing::{info, warn};
 
+const CLOUD_WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
+
 mod agent_runtime_error_summary;
 mod cli_usage;
 mod git_command_error;
@@ -2769,9 +2771,15 @@ async fn run_session(
                     info!("凭证已变更，断开当前会话以应用新状态");
                     break;
                 }
-                frame = ws_read.next() => match frame {
-                    Some(f) => f.map_err(|e| anyhow!("ws read: {e}"))?,
-                    None => break,
+                frame = tokio::time::timeout(CLOUD_WS_READ_TIMEOUT, ws_read.next()) => match frame {
+                    Ok(Some(f)) => f.map_err(|e| anyhow!("ws read: {e}"))?,
+                    Ok(None) => break,
+                    Err(_) => {
+                        return Err(anyhow!(
+                            "云端 WebSocket {} 秒内无任何消息，主动重连",
+                            CLOUD_WS_READ_TIMEOUT.as_secs()
+                        ));
+                    }
                 },
             };
             match frame {

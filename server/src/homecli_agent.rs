@@ -30,7 +30,7 @@ use std::{
     sync::Arc,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use tokio::sync::{mpsc, oneshot, watch, Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::types::AppState;
@@ -38,6 +38,7 @@ use crate::types::AppState;
 // ── manager state ────────────────────────────────────────────────────────────
 
 const TOOL_APPROVAL_ACK_TIMEOUT: Duration = Duration::from_secs(10);
+const AGENT_WS_READ_TIMEOUT: Duration = Duration::from_secs(90);
 const PROJECT_WORKSPACE_PROVISION_TIMEOUT_ENV: &str =
     "ELON_PROJECT_WORKSPACE_PROVISION_TIMEOUT_SECS";
 const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_TIMEOUT_SECS";
@@ -45,6 +46,7 @@ const PROJECT_STORAGE_PREPARE_TIMEOUT_ENV: &str = "ELON_PROJECT_STORAGE_PREPARE_
 /// Snapshot of one connected PC agent.
 #[derive(Clone)]
 pub struct AgentEntry {
+    session_id: String,
     pub agent_id: String,
     pub version: String,
     pub device_name: Option<String>,
@@ -60,6 +62,8 @@ pub struct AgentEntry {
     pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
     /// One-shot ACK waiters keyed by req_id + approval_id + dispatch_id.
     approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+    /// Signals the session reader/writer to close when a newer connection replaces it.
+    session_shutdown: watch::Sender<bool>,
 }
 
 pub struct CliPromptDispatch {
@@ -178,12 +182,13 @@ impl AgentManager {
             .get(agent_id)
             .ok_or_else(|| anyhow!("agent not connected: {agent_id}"))?;
         let (tx, rx) = mpsc::unbounded_channel();
-        agent.pending.lock().await.insert(req_id.clone(), tx);
+        let pending = agent.pending.clone();
+        pending.lock().await.insert(req_id.clone(), tx);
         let cancel_handle = CliPromptCancelHandle {
             req_id: req_id.clone(),
             cmd_tx: agent.cmd_tx.clone(),
         };
-        agent
+        if let Err(error) = agent
             .cmd_tx
             .send(ServerToAgent::CliPrompt {
                 req_id: req_id.clone(),
@@ -193,7 +198,11 @@ impl AgentManager {
                 project_context,
                 prompt,
             })
-            .map_err(|_| anyhow!("agent writer closed"))?;
+            .map_err(|_| anyhow!("agent writer closed"))
+        {
+            pending.lock().await.remove(&req_id);
+            return Err(error);
+        }
         Ok(CliPromptDispatch {
             req_id,
             rx,
@@ -274,6 +283,29 @@ impl AgentManager {
                 connected_at: a.connected_at,
             })
             .collect()
+    }
+
+    /// Close the currently registered session for an agent, forcing the PC client to reconnect.
+    pub async fn close_agent_session(&self, agent_id: &str, reason: &str) -> bool {
+        let shutdown = {
+            let agents = self.agents.read().await;
+            agents.get(agent_id).map(|entry| {
+                (
+                    entry.session_id.clone(),
+                    entry.session_shutdown.clone(),
+                    entry.pending.clone(),
+                    entry.approval_acks.clone(),
+                )
+            })
+        };
+        let Some((session_id, shutdown, pending, approval_acks)) = shutdown else {
+            return false;
+        };
+        tracing::warn!(%agent_id, %session_id, %reason, "closing PC agent session");
+        fail_pending_requests(&pending, reason).await;
+        fail_pending_approvals(&approval_acks).await;
+        let _ = shutdown.send(true);
+        true
     }
 
     /// 广播 UpdateClient 消息给所有在线节点，触发无感自动更新。
@@ -836,12 +868,15 @@ async fn run_agent_session(
 
     tracing::info!(%agent_id, %version, device_name = ?device_name, "agent registered");
 
+    let session_id = Uuid::new_v4().to_string();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
     let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
         Arc::new(Mutex::new(HashMap::new()));
+    let (session_shutdown, session_shutdown_rx) = watch::channel(false);
     let entry = AgentEntry {
+        session_id: session_id.clone(),
         agent_id: agent_id.clone(),
         version,
         device_name: device_name.clone(),
@@ -857,6 +892,7 @@ async fn run_agent_session(
         cmd_tx: cmd_tx.clone(),
         pending: pending.clone(),
         approval_acks: approval_acks.clone(),
+        session_shutdown: session_shutdown.clone(),
     };
 
     // 若同一 agent_id 已有旧连接，通过旧 cmd_tx 发 Close 消息主动终止它，
@@ -864,34 +900,16 @@ async fn run_agent_session(
     {
         let mut agents = state.agent_manager.agents.write().await;
         if let Some(old_entry) = agents.get(&agent_id) {
-            tracing::info!(%agent_id, "evicting previous agent session (same agent_id re-registered)");
+            tracing::info!(
+                %agent_id,
+                old_session_id = %old_entry.session_id,
+                new_session_id = %session_id,
+                "evicting previous agent session (same agent_id re-registered)"
+            );
             // 通知旧连接的所有挂起请求立即失败
-            let mut old_pending = old_entry.pending.lock().await;
-            let stale: Vec<_> = old_pending.drain().collect();
-            drop(old_pending);
-            for (req_id, sender) in stale {
-                let _ = sender.send(AgentToServer::CliDone {
-                    req_id,
-                    exit_ok: false,
-                    error: Some("节点重新注册，旧连接已关闭".to_string()),
-                    prompt_tokens: None,
-                    cached_input_tokens: None,
-                    completion_tokens: None,
-                    reasoning_tokens: None,
-                    total_tokens: None,
-                    model: None,
-                    workspace_status: None,
-                });
-            }
-            let mut old_acks = old_entry.approval_acks.lock().await;
-            let stale_acks: Vec<_> = old_acks.drain().collect();
-            drop(old_acks);
-            for (_, sender) in stale_acks {
-                let _ = sender.send(false);
-            }
-            // 发 Close 让旧连接的 writer 关闭 WebSocket
-            let _ = old_entry.cmd_tx.send(ServerToAgent::Ping { nonce: None }); // flush any pending
-            drop(old_entry.cmd_tx.clone()); // 通过 drop sender 让 writer 退出
+            fail_pending_requests(&old_entry.pending, "节点重新注册，旧连接已关闭").await;
+            fail_pending_approvals(&old_entry.approval_acks).await;
+            let _ = old_entry.session_shutdown.send(true);
         }
         agents.insert(agent_id.clone(), entry);
     }
@@ -917,17 +935,20 @@ async fn run_agent_session(
         )
         .await;
 
-    // 服务端 → 节点 ping 定时器：每 30s 发一次 ServerToAgent::Ping，
-    // 节点收到后回 Pong，服务端 touch() 刷新 TTL（防止 90s 后被标为离线）。
+    // 服务端 → 节点 ping 定时器：每 30s 发一次 ServerToAgent::Ping。
+    // 只有节点回 Pong 或发送其他消息时才刷新 TTL，避免僵尸连接被误判在线。
     {
         let ping_tx = cmd_tx.clone();
-        let registry = state.node_registry.clone();
         let aid = agent_id.clone();
+        let mut shutdown_rx = session_shutdown_rx.clone();
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(Duration::from_secs(30));
             let mut nonce: u64 = 0;
             loop {
-                interval.tick().await;
+                tokio::select! {
+                    _ = shutdown_rx.changed() => break,
+                    _ = interval.tick() => {}
+                }
                 nonce += 1;
                 if ping_tx
                     .send(ServerToAgent::Ping {
@@ -937,15 +958,22 @@ async fn run_agent_session(
                 {
                     break; // 连接已断开
                 }
-                // 发出 ping 时也顺手 touch，防止节点 pong 漏到
-                registry.touch(&aid).await;
+                tracing::trace!(agent_id = %aid, "agent ping sent");
             }
         });
     }
 
     // Writer: drain cmd_rx → ws_tx.
+    let mut writer_shutdown_rx = session_shutdown_rx.clone();
     let writer = tokio::spawn(async move {
-        while let Some(msg) = cmd_rx.recv().await {
+        loop {
+            let msg = tokio::select! {
+                _ = writer_shutdown_rx.changed() => break,
+                msg = cmd_rx.recv() => match msg {
+                    Some(msg) => msg,
+                    None => break,
+                },
+            };
             let s = match serde_json::to_string(&msg) {
                 Ok(s) => s,
                 Err(e) => {
@@ -963,12 +991,26 @@ async fn run_agent_session(
     // Reader: route AgentToServer events to the right pending task.
     let pending_r = pending.clone();
     let approval_acks_r = approval_acks.clone();
+    let mut reader_shutdown_rx = session_shutdown_rx.clone();
     let read_result: Result<()> = async {
-        while let Some(frame) = ws_rx.next().await {
-            let frame = frame.map_err(|e| anyhow!("ws read: {e}"))?;
+        loop {
+            let frame = tokio::select! {
+                _ = reader_shutdown_rx.changed() => break,
+                maybe_frame = tokio::time::timeout(AGENT_WS_READ_TIMEOUT, ws_rx.next()) => {
+                    match maybe_frame {
+                        Ok(Some(frame)) => frame.map_err(|e| anyhow!("ws read: {e}"))?,
+                        Ok(None) => break,
+                        Err(_) => return Err(anyhow!(
+                            "agent ws read timeout ({}s)",
+                            AGENT_WS_READ_TIMEOUT.as_secs()
+                        )),
+                    }
+                }
+            };
             match frame {
                 Message::Text(t) => match serde_json::from_str::<AgentToServer>(&t) {
                     Ok(msg) => {
+                        state.node_registry.touch(&agent_id).await;
                         if let AgentToServer::ToolApprovalDecisionAck {
                             req_id,
                             approval_id,
@@ -1090,38 +1132,37 @@ async fn run_agent_session(
     .await;
 
     // Clean up: 先移除 agent，再通知挂起请求失败，避免断线后调用方永久阻塞
-    state.agent_manager.agents.write().await.remove(&agent_id);
-    state.node_registry.unregister(&agent_id).await;
+    let removed_current_session = {
+        let mut agents = state.agent_manager.agents.write().await;
+        let is_current = agents
+            .get(&agent_id)
+            .map(|entry| entry.session_id == session_id)
+            .unwrap_or(false);
+        if is_current {
+            agents.remove(&agent_id);
+            true
+        } else {
+            false
+        }
+    };
+    if removed_current_session {
+        state.node_registry.unregister(&agent_id).await;
+    } else {
+        tracing::info!(
+            %agent_id,
+            %session_id,
+            "stale PC agent session ended after a newer session was registered"
+        );
+    }
 
     // 节点断线时，向所有还在等待响应的 CLI 请求发送 CliDone(exit_ok=false)，
     // 让 run_via_pc_agent 的 while rx.recv() 立即收到错误并返回，
     // 而不是永远阻塞到 HTTP 请求超时。
     {
-        let mut p = pending.lock().await;
-        let stale: Vec<(String, mpsc::UnboundedSender<AgentToServer>)> = p.drain().collect();
-        drop(p);
-        for (req_id, sender) in stale {
-            let _ = sender.send(AgentToServer::CliDone {
-                req_id,
-                exit_ok: false,
-                error: Some("PC节点已断线，请重试".to_string()),
-                prompt_tokens: None,
-                cached_input_tokens: None,
-                completion_tokens: None,
-                reasoning_tokens: None,
-                total_tokens: None,
-                model: None,
-                workspace_status: None,
-            });
-        }
+        fail_pending_requests(&pending, "PC节点已断线，请重试").await;
     }
     {
-        let mut acks = approval_acks.lock().await;
-        let stale: Vec<_> = acks.drain().collect();
-        drop(acks);
-        for (_, sender) in stale {
-            let _ = sender.send(false);
-        }
+        fail_pending_approvals(&approval_acks).await;
     }
 
     drop(cmd_tx);
@@ -1132,6 +1173,40 @@ async fn run_agent_session(
 
 fn tool_approval_ack_key(req_id: &str, approval_id: &str, dispatch_id: &str) -> String {
     format!("{req_id}:{approval_id}:{dispatch_id}")
+}
+
+async fn fail_pending_requests(
+    pending: &Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>>,
+    message: &str,
+) {
+    let mut pending = pending.lock().await;
+    let stale: Vec<(String, mpsc::UnboundedSender<AgentToServer>)> = pending.drain().collect();
+    drop(pending);
+    for (req_id, sender) in stale {
+        let _ = sender.send(AgentToServer::CliDone {
+            req_id,
+            exit_ok: false,
+            error: Some(message.to_string()),
+            prompt_tokens: None,
+            cached_input_tokens: None,
+            completion_tokens: None,
+            reasoning_tokens: None,
+            total_tokens: None,
+            model: None,
+            workspace_status: None,
+        });
+    }
+}
+
+async fn fail_pending_approvals(
+    approval_acks: &Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+) {
+    let mut approval_acks = approval_acks.lock().await;
+    let stale: Vec<_> = approval_acks.drain().collect();
+    drop(approval_acks);
+    for (_, sender) in stale {
+        let _ = sender.send(false);
+    }
 }
 
 fn project_workspace_provision_timeout() -> Duration {
@@ -1333,21 +1408,25 @@ mod tests {
     struct TestApprovalAgent {
         manager: Arc<AgentManager>,
         cmd_rx: mpsc::UnboundedReceiver<ServerToAgent>,
+        pending_rx: mpsc::UnboundedReceiver<AgentToServer>,
         approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>>,
+        session_shutdown_rx: watch::Receiver<bool>,
     }
 
     async fn registered_approval_agent() -> TestApprovalAgent {
         let manager = Arc::new(AgentManager::new());
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel();
+        let (session_shutdown, session_shutdown_rx) = watch::channel(false);
         let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
             Arc::new(Mutex::new(HashMap::new()));
         let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
             Arc::new(Mutex::new(HashMap::new()));
-        let (pending_tx, _pending_rx) = mpsc::unbounded_channel();
+        let (pending_tx, pending_rx) = mpsc::unbounded_channel();
         pending.lock().await.insert("req".to_string(), pending_tx);
         manager.agents.write().await.insert(
             "agent".to_string(),
             AgentEntry {
+                session_id: "session".to_string(),
                 agent_id: "agent".to_string(),
                 version: "test".to_string(),
                 device_name: None,
@@ -1360,12 +1439,15 @@ mod tests {
                 cmd_tx,
                 pending,
                 approval_acks: approval_acks.clone(),
+                session_shutdown,
             },
         );
         TestApprovalAgent {
             manager,
             cmd_rx,
+            pending_rx,
             approval_acks,
+            session_shutdown_rx,
         }
     }
 
@@ -1390,6 +1472,7 @@ mod tests {
             manager,
             mut cmd_rx,
             approval_acks,
+            ..
         } = registered_approval_agent().await;
 
         let manager_for_send = manager.clone();
@@ -1429,6 +1512,7 @@ mod tests {
             manager,
             mut cmd_rx,
             approval_acks,
+            ..
         } = registered_approval_agent().await;
 
         let manager_for_first = manager.clone();
@@ -1477,5 +1561,38 @@ mod tests {
 
         assert!(retry_send.await.unwrap().unwrap());
         assert!(first_send.await.unwrap().is_err());
+    }
+
+    #[tokio::test]
+    async fn close_agent_session_fails_pending_work_and_signals_shutdown() {
+        let TestApprovalAgent {
+            manager,
+            mut pending_rx,
+            approval_acks,
+            mut session_shutdown_rx,
+            ..
+        } = registered_approval_agent().await;
+        let (ack_tx, ack_rx) = oneshot::channel();
+        approval_acks.lock().await.insert("ack".to_string(), ack_tx);
+
+        assert!(
+            manager
+                .close_agent_session("agent", "test forced close")
+                .await
+        );
+        tokio::time::timeout(Duration::from_secs(1), session_shutdown_rx.changed())
+            .await
+            .expect("session shutdown signal should arrive")
+            .expect("shutdown sender should still be alive");
+        assert!(*session_shutdown_rx.borrow());
+
+        match pending_rx.recv().await {
+            Some(AgentToServer::CliDone { exit_ok, error, .. }) => {
+                assert!(!exit_ok);
+                assert_eq!(error.as_deref(), Some("test forced close"));
+            }
+            other => panic!("expected failed CliDone, got {other:?}"),
+        }
+        assert!(!ack_rx.await.expect("approval ack should be rejected"));
     }
 }

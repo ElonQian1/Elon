@@ -1349,6 +1349,13 @@ async fn run_via_pc_agent(
                             agent_id,
                             recv_timeout_secs,
                         );
+                        let _ = state
+                            .agent_manager
+                            .close_agent_session(
+                                agent_id,
+                                "lightweight CLI prompt did not receive any node event",
+                            )
+                            .await;
                         pc_billing_call.release_no_usage();
                         finish_pc_node_compute_run(
                             state,
@@ -1493,6 +1500,13 @@ async fn run_via_pc_agent(
                         "PC agent CLI 等待终态超时（{}s），已取消本机任务",
                         project_recv_timeout_secs
                     );
+                    let _ = state
+                        .agent_manager
+                        .close_agent_session(
+                            agent_id,
+                            "project CLI prompt timed out before terminal event",
+                        )
+                        .await;
                     finish_pc_node_compute_run(
                         state,
                         &pc_accounting_key,
