@@ -922,6 +922,9 @@ fn command_allowed(command: &str) -> bool {
     if legacy_git_push_has_high_risk_args(&lower) {
         return false;
     }
+    if lower.starts_with("git rebase") {
+        return legacy_git_rebase_allowed(&lower);
+    }
     let allowed_prefixes = [
         "git status",
         "git diff",
@@ -1049,8 +1052,21 @@ fn git_args_allowed(args: &[String]) -> bool {
         "status" | "diff" | "log" | "show" | "branch" | "remote" | "fetch" | "add" | "commit"
         | "push" => first != "push" || !git_push_args_high_risk(args),
         "pull" => args.iter().any(|arg| arg == "--ff-only"),
+        "rebase" => git_rebase_args_allowed(args),
         _ => false,
     }
+}
+
+fn legacy_git_rebase_allowed(command: &str) -> bool {
+    let parts: Vec<&str> = command.split_whitespace().collect();
+    matches!(
+        parts.as_slice(),
+        ["git", "rebase", "origin/main"] | ["git", "rebase", "--continue"]
+    )
+}
+
+fn git_rebase_args_allowed(args: &[String]) -> bool {
+    args.len() == 2 && matches!(args[1].as_str(), "origin/main" | "--continue")
 }
 
 fn legacy_git_push_has_high_risk_args(command: &str) -> bool {
@@ -1175,6 +1191,8 @@ mod tests {
     fn command_policy_allows_project_checks() {
         assert!(command_allowed("git status --short"));
         assert!(command_allowed("git push origin HEAD:main"));
+        assert!(command_allowed("git rebase origin/main"));
+        assert!(command_allowed("git rebase --continue"));
         assert!(command_allowed("cargo check"));
         assert!(command_allowed("npm run build"));
         assert!(command_allowed("pnpm run typecheck"));
@@ -1198,6 +1216,8 @@ mod tests {
         assert!(!command_allowed("git push --force origin main"));
         assert!(!command_allowed("git push origin :main"));
         assert!(!command_allowed("git push --mirror origin"));
+        assert!(!command_allowed("git rebase --abort"));
+        assert!(!command_allowed("git rebase origin/main --exec cargo test"));
     }
 
     #[test]
@@ -1213,6 +1233,14 @@ mod tests {
                 "origin".to_string(),
                 "HEAD:main".to_string()
             ]
+        ));
+        assert!(structured_command_allowed(
+            "git",
+            &["rebase".to_string(), "origin/main".to_string()]
+        ));
+        assert!(structured_command_allowed(
+            "git",
+            &["rebase".to_string(), "--continue".to_string()]
         ));
         assert!(structured_command_allowed(
             "cargo",
@@ -1272,6 +1300,19 @@ mod tests {
                 "push".to_string(),
                 "origin".to_string(),
                 "+HEAD:main".to_string()
+            ]
+        ));
+        assert!(!structured_command_allowed(
+            "git",
+            &["rebase".to_string(), "--abort".to_string()]
+        ));
+        assert!(!structured_command_allowed(
+            "git",
+            &[
+                "rebase".to_string(),
+                "origin/main".to_string(),
+                "--exec".to_string(),
+                "cargo test".to_string()
             ]
         ));
     }

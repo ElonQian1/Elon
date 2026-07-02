@@ -4,7 +4,9 @@ use elon_pc_dev_runtime::{
     ProjectGitBaselineRequest, ProjectScaffoldRequest,
 };
 use std::{
+    collections::HashMap,
     path::{Path, PathBuf},
+    sync::{Arc, Mutex, OnceLock},
     time::{SystemTime, UNIX_EPOCH},
 };
 
@@ -13,6 +15,11 @@ use crate::pc_workspace_git_remote::{
     clean_git_branch, clean_git_remote, ensure_git_remote_workspace, git_remote_origin,
 };
 use crate::project_default_docs::ensure_default_docs_in_workspace;
+
+const CONVERSATION_MERGE_PUSH_ATTEMPTS: usize = 3;
+
+static CONVERSATION_MERGE_LOCKS: OnceLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> =
+    OnceLock::new();
 
 pub struct ProjectWorkspaceRequest {
     pub project_id: String,
@@ -346,6 +353,11 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
         .as_deref()
         .ok_or_else(|| anyhow!("isolated conversation workspace is missing branch"))?;
 
+    let merge_lock = conversation_merge_lock(&base_workspace)?;
+    let _merge_guard = merge_lock
+        .lock()
+        .map_err(|_| anyhow!("conversation workspace merge lock poisoned"))?;
+
     let saved_dirty_commit = ensure_conversation_workspace_committed(&active_workspace)?;
     if !worktree_clean(&active_workspace)? {
         return Ok(format!(
@@ -360,35 +372,7 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
         ));
     }
 
-    let base_branch = current_branch(&base_workspace).unwrap_or_else(|| "main".into());
-    if git_output(&base_workspace, &["remote", "get-url", "origin"]).is_ok() {
-        fast_forward_current_branch_from_origin(&base_workspace, &base_branch)?;
-    }
-
-    let before = git_output(&base_workspace, &["rev-parse", "HEAD"])?;
-    let merge_args = ["merge", "--no-ff", "--no-edit", branch];
-    let base_git_cwd = git_path_buf(&base_workspace);
-    let merge_output = git_command()
-        .args(merge_args)
-        .current_dir(&base_git_cwd)
-        .output()
-        .with_context(|| format!("failed to run {}", git_spawn_context(&merge_args)))?;
-    if !merge_output.status.success() {
-        let _ = git_command()
-            .args(["merge", "--abort"])
-            .current_dir(&base_git_cwd)
-            .output();
-        return Err(anyhow!(git_failure_message(
-            &base_git_cwd,
-            &merge_args,
-            &merge_output
-        )));
-    }
-
-    if git_output(&base_workspace, &["remote", "get-url", "origin"]).is_ok() {
-        run_git_dynamic(&base_workspace, &["push", "origin", &base_branch])?;
-    }
-    let after = git_output(&base_workspace, &["rev-parse", "HEAD"])?;
+    let (before, after) = merge_conversation_branch_into_base(&base_workspace, branch)?;
     let _ = run_git_dynamic(
         &base_workspace,
         &[
@@ -411,6 +395,127 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
     } else {
         Ok(format!("conversation branch merged: {}", short_sha(&after)))
     }
+}
+
+fn conversation_merge_lock(base_workspace: &Path) -> Result<Arc<Mutex<()>>> {
+    let key =
+        std::fs::canonicalize(base_workspace).unwrap_or_else(|_| base_workspace.to_path_buf());
+    let registry = CONVERSATION_MERGE_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut locks = registry
+        .lock()
+        .map_err(|_| anyhow!("conversation merge lock registry poisoned"))?;
+    Ok(locks
+        .entry(key)
+        .or_insert_with(|| Arc::new(Mutex::new(())))
+        .clone())
+}
+
+fn merge_conversation_branch_into_base(
+    base_workspace: &Path,
+    branch: &str,
+) -> Result<(String, String)> {
+    let base_branch = current_branch(base_workspace).unwrap_or_else(|| "main".into());
+    let has_origin = git_output(base_workspace, &["remote", "get-url", "origin"]).is_ok();
+    let origin_ref = format!("origin/{base_branch}");
+
+    let mut last_push_error = None;
+    for attempt in 1..=CONVERSATION_MERGE_PUSH_ATTEMPTS {
+        if has_origin {
+            if attempt == 1 {
+                fast_forward_current_branch_from_origin(base_workspace, &base_branch)?;
+            } else {
+                reset_base_branch_to_origin(base_workspace, &origin_ref)?;
+            }
+        }
+
+        let before = git_output(base_workspace, &["rev-parse", "HEAD"])?;
+        merge_session_branch(base_workspace, branch)?;
+        let after = git_output(base_workspace, &["rev-parse", "HEAD"])?;
+
+        if !has_origin {
+            return Ok((before, after));
+        }
+        if before == after && commit_contained_in_ref(base_workspace, "HEAD", &origin_ref) {
+            return Ok((before, after));
+        }
+
+        match push_base_branch(base_workspace, &base_branch) {
+            Ok(()) => return Ok((before, after)),
+            Err(error) if is_retryable_push_rejection(&error) => {
+                last_push_error = Some(error);
+                if attempt < CONVERSATION_MERGE_PUSH_ATTEMPTS {
+                    continue;
+                }
+            }
+            Err(error) => return Err(anyhow!(error)),
+        }
+    }
+
+    Err(anyhow!(
+        "conversation branch merge push was rejected after {} attempts: {}",
+        CONVERSATION_MERGE_PUSH_ATTEMPTS,
+        last_push_error.unwrap_or_else(|| "unknown push rejection".to_string())
+    ))
+}
+
+fn merge_session_branch(base_workspace: &Path, branch: &str) -> Result<()> {
+    let merge_args = ["merge", "--no-ff", "--no-edit", branch];
+    let base_git_cwd = git_path_buf(base_workspace);
+    let merge_output = git_command()
+        .args(merge_args)
+        .current_dir(&base_git_cwd)
+        .output()
+        .with_context(|| format!("failed to run {}", git_spawn_context(&merge_args)))?;
+    if !merge_output.status.success() {
+        let _ = git_command()
+            .args(["merge", "--abort"])
+            .current_dir(&base_git_cwd)
+            .output();
+        return Err(anyhow!(git_failure_message(
+            &base_git_cwd,
+            &merge_args,
+            &merge_output,
+        )));
+    }
+    Ok(())
+}
+
+fn reset_base_branch_to_origin(base_workspace: &Path, origin_ref: &str) -> Result<()> {
+    git_fetch_origin(base_workspace)?;
+    run_git_dynamic(base_workspace, &["reset", "--hard", origin_ref])
+}
+
+fn push_base_branch(base_workspace: &Path, base_branch: &str) -> Result<(), String> {
+    let push_args = ["push", "origin", base_branch];
+    let base_git_cwd = git_path_buf(base_workspace);
+    let push_output = git_command()
+        .args(push_args)
+        .current_dir(&base_git_cwd)
+        .output()
+        .map_err(|error| format!("failed to run {}: {error}", git_spawn_context(&push_args)))?;
+    if push_output.status.success() {
+        return Ok(());
+    }
+    Err(git_failure_message(&base_git_cwd, &push_args, &push_output))
+}
+
+fn commit_contained_in_ref(repo: &Path, commit: &str, reference: &str) -> bool {
+    let git_cwd = git_path_buf(repo);
+    git_command()
+        .args(["merge-base", "--is-ancestor", commit, reference])
+        .current_dir(&git_cwd)
+        .output()
+        .map(|output| output.status.success())
+        .unwrap_or(false)
+}
+
+fn is_retryable_push_rejection(error: &str) -> bool {
+    let lower = error.to_ascii_lowercase();
+    lower.contains("non-fast-forward")
+        || lower.contains("fetch first")
+        || lower.contains("remote contains work")
+        || lower.contains("failed to push some refs")
+        || (lower.contains("rejected") && lower.contains("push"))
 }
 
 fn ensure_seed_files(repo: &Path, req: &ProjectWorkspaceRequest) -> Result<()> {
@@ -590,7 +695,8 @@ fn git_path_buf(path: &Path) -> PathBuf {
 mod tests {
     use super::{
         ensure_conversation_workspace_committed, git_output, git_path_arg, is_git_work_tree,
-        prepare_conversation_workspace, recover_stale_conversation_worktree_path, worktree_clean,
+        is_retryable_push_rejection, prepare_conversation_workspace,
+        recover_stale_conversation_worktree_path, worktree_clean,
     };
     use elon_pc_dev_runtime::safe_path_part;
     use std::path::Path;
@@ -611,6 +717,25 @@ mod tests {
     #[test]
     fn safe_path_part_uses_fallback_when_empty() {
         assert_eq!(safe_path_part("///", "fallback", 80), "fallback");
+    }
+
+    #[test]
+    fn retryable_push_rejection_only_matches_remote_race_errors() {
+        assert!(is_retryable_push_rejection(
+            "! [rejected] HEAD -> main (fetch first)"
+        ));
+        assert!(is_retryable_push_rejection(
+            "error: failed to push some refs to 'origin'"
+        ));
+        assert!(is_retryable_push_rejection(
+            "Updates were rejected because the remote contains work that you do not have locally"
+        ));
+        assert!(!is_retryable_push_rejection(
+            "Permission denied (publickey). fatal: Could not read from remote repository."
+        ));
+        assert!(!is_retryable_push_rejection(
+            "remote: error: GH006: Protected branch update failed for refs/heads/main."
+        ));
     }
 
     #[cfg(windows)]
