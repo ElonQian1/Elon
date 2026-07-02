@@ -80,10 +80,20 @@ internal class MainMcpNativeControlActions(
                 uiState()
             }
             "open_project_chat" -> {
+                val beforeProject = activeProject()
+                val beforeConversationId = activeConversation().id
+                val wasTargetChatOpen = activePage() == "chat"
                 reloadTargetConversationIfNeeded(args)
                 selectProject(args)?.let { return it }
                 selectConversation(args, createIfMissing = false)?.let { return it }
-                openActiveProjectConversation()
+                if (!isSameOpenProjectChat(
+                        wasTargetChatOpen,
+                        beforeProject,
+                        beforeConversationId
+                    )
+                ) {
+                    openActiveProjectConversation()
+                }
                 uiState()
             }
             "seed_project_chat" -> seedProjectChat(args)
@@ -252,6 +262,17 @@ internal class MainMcpNativeControlActions(
         binding.chatList.adapter = adapter
         navigationController().showProjectChat(animate = false)
         if (adapter.itemCount > 0) binding.chatList.scrollToPosition(adapter.itemCount - 1)
+    }
+
+    private fun isSameOpenProjectChat(
+        wasTargetChatOpen: Boolean,
+        beforeProject: AppProject,
+        beforeConversationId: String
+    ): Boolean {
+        if (!wasTargetChatOpen) return false
+        val project = activeProject()
+        return beforeConversationId == activeConversation().id &&
+            (beforeProject.id == project.id || beforeProject.projectSpaceId() == project.projectSpaceId())
     }
 
     private fun activePage(): String {

@@ -137,6 +137,7 @@ function Get-ConversationState {
             project_id = $ProjectId
             conversation_id = $ConversationId
             reload_if_missing = $true
+            main_thread_timeout_ms = 20000
         }) `
         -RequestTimeoutSec 30 `
         -EnsureMainActivity

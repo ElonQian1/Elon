@@ -202,7 +202,8 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("title", stringProperty("Optional alias for conversation_title."))
                         .put("text", stringProperty("Text for set_input_text."))
                         .put("message", stringProperty("Message for send_project_message."))
-                        .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false.")),
+                        .put("new_conversation", booleanProperty("Create a new conversation before send_project_message. Defaults to false."))
+                        .put("main_thread_timeout_ms", intProperty("How long native MCP waits for the APK main thread, 1000-60000. Defaults to 15000.")),
                     required = JSONArray().put("action")
                 )
             )

@@ -289,12 +289,19 @@ class MainActivity : AppCompatActivity() {
             mcpNativeControlActions.uiState()
         }
 
-        override fun control(args: JSONObject): JSONObject = runMcpNativeControlOnMain {
-            mcpNativeControlActions.control(args)
-        }
+        override fun control(args: JSONObject): JSONObject =
+            runMcpNativeControlOnMain(mcpControlMainThreadTimeoutMs(args)) {
+                mcpNativeControlActions.control(args)
+            }
     }
 
-    private fun runMcpNativeControlOnMain(action: () -> JSONObject): JSONObject {
+    private fun mcpControlMainThreadTimeoutMs(args: JSONObject): Long =
+        args.optLong("main_thread_timeout_ms", 15_000L).coerceIn(1_000L, 60_000L)
+
+    private fun runMcpNativeControlOnMain(
+        timeoutMs: Long = 15_000L,
+        action: () -> JSONObject
+    ): JSONObject {
         if (Looper.myLooper() == Looper.getMainLooper()) return action()
         var result: JSONObject? = null
         var error: Throwable? = null
@@ -308,10 +315,11 @@ class MainActivity : AppCompatActivity() {
                 latch.countDown()
             }
         }
-        if (!latch.await(5, TimeUnit.SECONDS)) {
+        if (!latch.await(timeoutMs, TimeUnit.MILLISECONDS)) {
             return JSONObject()
                 .put("control_ok", false)
                 .put("error", "main_thread_timeout")
+                .put("timeout_ms", timeoutMs)
         }
         error?.let {
             return JSONObject()
