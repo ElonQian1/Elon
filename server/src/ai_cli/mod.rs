@@ -1122,6 +1122,9 @@ enum PcAgentRunOutcome {
     NoReadableLightweightReply { diagnostic: Option<String> },
 }
 
+const PC_PROJECT_NO_CHANGES_ERROR: &str =
+    "开发助手已经结束，但项目工作区没有产生新提交；本轮需求没有实际修改项目。请重新发送需求，或切换可用 PC 节点后再试。";
+
 async fn run_via_pc_agent(
     agent_id: &str,
     user_id: &str,
@@ -1683,12 +1686,23 @@ async fn run_via_pc_agent(
                     }
                     cli_usage = Some(usage);
                 }
+                let no_project_changes = pc_project_execution_had_no_changes(
+                    request_mode,
+                    lightweight_pc_chat,
+                    workspace_status.as_ref(),
+                );
+                let effective_exit_ok = exit_ok && !no_project_changes;
+                let effective_error = if no_project_changes {
+                    Some(PC_PROJECT_NO_CHANGES_ERROR.to_string())
+                } else {
+                    error.clone()
+                };
                 record_pc_execution_finished(
                     state,
                     native_session_scope.as_ref(),
                     &pc_req_id,
-                    exit_ok,
-                    error.as_deref(),
+                    effective_exit_ok,
+                    effective_error.as_deref(),
                     model.as_deref().or(Some(display_model.as_str())),
                     workspace_status.as_ref(),
                     cli_usage.as_ref(),
@@ -1696,19 +1710,19 @@ async fn run_via_pc_agent(
                 );
                 pc_execution_guard.disarm();
                 let has_useful_output = !full_text.trim().is_empty();
-                if exit_ok
-                    || (is_codex
-                        && has_useful_output
-                        && error
-                            .as_deref()
-                            .map(|e| {
-                                !e.contains("断线")
-                                    && !e.contains("超时")
-                                    && !e.contains("worktree")
-                                    && !e.contains("合并")
-                            })
-                            .unwrap_or(true))
-                {
+                let allow_codex_output_despite_error = is_codex
+                    && has_useful_output
+                    && !no_project_changes
+                    && effective_error
+                        .as_deref()
+                        .map(|e| {
+                            !e.contains("断线")
+                                && !e.contains("超时")
+                                && !e.contains("worktree")
+                                && !e.contains("合并")
+                        })
+                        .unwrap_or(true);
+                if effective_exit_ok || allow_codex_output_despite_error {
                     // Codex 的 PTY 输出会先流式给前端；HTTP/历史记录仍依赖 done.message，
                     // 因此需要从完整输出中提取最终可读总结，避免任务完成但聊天记录为空。
                     let codex_final_reply = if is_codex {
@@ -1781,10 +1795,12 @@ async fn run_via_pc_agent(
                     .await;
                     let reply = if lightweight_pc_chat {
                         reply
+                    } else if stream_started && reply.trim().is_empty() && apk_url.is_none() {
+                        String::new()
                     } else {
                         sanitize_pc_development_reply(&reply, apk_url.as_deref())
                     };
-                    if !reply.is_empty() && !stream_started {
+                    if lightweight_pc_chat && !reply.is_empty() && !stream_started {
                         let _ = tx.send(
                             WsMessage::AssistantMessage {
                                 text: reply.clone(),
@@ -1829,7 +1845,11 @@ async fn run_via_pc_agent(
                     );
                     return Ok(PcAgentRunOutcome::Completed);
                 } else {
-                    let error_message = format!("PC CLI 执行失败: {}", error.unwrap_or_default());
+                    let error_message = if no_project_changes {
+                        PC_PROJECT_NO_CHANGES_ERROR.to_string()
+                    } else {
+                        format!("PC CLI 执行失败: {}", effective_error.unwrap_or_default())
+                    };
                     finish_pc_node_compute_run(
                         state,
                         &pc_accounting_key,
@@ -1940,6 +1960,21 @@ async fn run_via_pc_agent(
     pc_execution_guard.disarm();
     pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
+}
+
+fn pc_project_execution_had_no_changes(
+    request_mode: AiCliRequestMode,
+    lightweight_pc_chat: bool,
+    workspace_status: Option<&CliWorkspaceStatus>,
+) -> bool {
+    if lightweight_pc_chat || request_mode.is_plan() {
+        return false;
+    }
+
+    workspace_status
+        .and_then(|status| status.merge_message.as_deref())
+        .map(|message| message.contains("conversation branch had no new commits"))
+        .unwrap_or(false)
 }
 
 async fn sync_pc_agent_apk_after_success(
@@ -2414,9 +2449,9 @@ fn sanitize_pc_development_reply(reply: &str, apk_url: Option<&str>) -> String {
 
     if text.is_empty() {
         text = if apk_url.is_some() {
-            "已改好，并生成了新的安装包。".to_string()
+            "新的安装包已生成。".to_string()
         } else {
-            "已改好。本轮开发任务已完成。".to_string()
+            "开发助手已结束，但没有返回可展示的总结。请查看进度日志确认结果。".to_string()
         };
     }
 
@@ -3136,10 +3171,12 @@ mod pc_cli_passthrough_tests {
         pc_cli_passthrough_event, pc_codex_progress_hint, pc_dispatch_started_event,
         pc_display_model_label, pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
         pc_lightweight_no_node_event_diagnostic, pc_lightweight_no_readable_diagnostic,
-        pc_project_execution_prompt, pc_project_reasoning_effort, pc_route_a_extra_args,
-        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
-        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
+        pc_project_execution_had_no_changes, pc_project_execution_prompt,
+        pc_project_reasoning_effort, pc_route_a_extra_args, sanitize_pc_development_reply,
+        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
+        NativeSessionScope,
     };
+    use homecli_proto::CliWorkspaceStatus;
     use serde_json::Value;
 
     fn test_scope(conversation_id: &str) -> NativeSessionScope {
@@ -3445,6 +3482,44 @@ diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/
         assert!(!sanitized.contains("C:/Users"));
         assert!(!sanitized.contains("adb.exe"));
         assert!(!sanitized.contains("diff --git"));
+    }
+
+    #[test]
+    fn pc_development_empty_reply_does_not_claim_code_was_changed() {
+        let sanitized = sanitize_pc_development_reply("", None);
+
+        assert!(sanitized.contains("没有返回可展示的总结"));
+        assert!(!sanitized.contains("已改好"));
+        assert!(!sanitized.contains("本轮开发任务已完成"));
+    }
+
+    #[test]
+    fn pc_project_execution_detects_no_new_commits_as_no_changes() {
+        let status = CliWorkspaceStatus {
+            base_workspace_path: Some("D:/project".into()),
+            active_workspace_path: "D:/project-worktree".into(),
+            isolated: true,
+            branch: Some("ai/session/project/conversation".into()),
+            prepare_status: "prepared".into(),
+            merge_status: Some("merged".into()),
+            merge_message: Some("conversation branch had no new commits".into()),
+        };
+
+        assert!(pc_project_execution_had_no_changes(
+            AiCliRequestMode::Execute,
+            false,
+            Some(&status)
+        ));
+        assert!(!pc_project_execution_had_no_changes(
+            AiCliRequestMode::Plan,
+            false,
+            Some(&status)
+        ));
+        assert!(!pc_project_execution_had_no_changes(
+            AiCliRequestMode::Execute,
+            true,
+            Some(&status)
+        ));
     }
 
     #[test]

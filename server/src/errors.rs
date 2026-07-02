@@ -225,15 +225,17 @@ pub fn classify_ai_error(raw: &str) -> ClassifiedAiError {
             category: AiErrorCategory::Workspace,
             retryable: false,
             retry_after_secs: None,
-            message: dirty_conversation_worktree_message(&lower).unwrap_or_else(|| {
-                detail
-                    .as_deref()
-                    .map(|value| truncate_chars(value, 180))
-                    .filter(|value| !value.is_empty())
-                    .unwrap_or_else(|| {
-                        "项目工作区准备失败，请检查项目 Git/worktree 状态后重试。".into()
-                    })
-            }),
+            message: dirty_conversation_worktree_message(&lower)
+                .or_else(|| no_project_changes_message(&lower))
+                .unwrap_or_else(|| {
+                    detail
+                        .as_deref()
+                        .map(|value| truncate_chars(value, 180))
+                        .filter(|value| !value.is_empty())
+                        .unwrap_or_else(|| {
+                            "项目工作区准备失败，请检查项目 Git/worktree 状态后重试。".into()
+                        })
+                }),
             operator_detail: detail,
         };
     }
@@ -323,6 +325,9 @@ fn contains_workspace_error(lower: &str) -> bool {
         || lower.contains("worktree")
         || lower.contains("not a git repository")
         || lower.contains("合并回项目主分支失败")
+        || lower.contains("没有产生新提交")
+        || lower.contains("没有实际修改项目")
+        || lower.contains("conversation branch had no new commits")
 }
 
 fn dirty_conversation_worktree_message(lower: &str) -> Option<String> {
@@ -331,6 +336,13 @@ fn dirty_conversation_worktree_message(lower: &str) -> Option<String> {
         .then(|| {
             "项目会话工作区里还有未提交改动，本轮改动已保留但暂时不能自动合并。请稍后重试；如果仍失败，需要在 PC 节点提交或清理该会话工作区。".into()
         })
+}
+
+fn no_project_changes_message(lower: &str) -> Option<String> {
+    (lower.contains("没有产生新提交")
+        || lower.contains("没有实际修改项目")
+        || lower.contains("conversation branch had no new commits"))
+    .then(|| "开发助手本轮没有实际修改项目，所以我没有把它标记为已完成。请重新发送需求，或切换可用 PC 节点后再试。".into())
 }
 
 fn compact_detail(raw: &str) -> String {
@@ -383,5 +395,16 @@ mod tests {
         assert_eq!(classified.code, "project_workspace_error");
         assert!(classified.message.contains("未提交改动"));
         assert!(!classified.message.contains("/tmp/worktree"));
+    }
+
+    #[test]
+    fn classifies_no_project_changes_as_failed_workspace_result() {
+        let classified = classify_ai_error(
+            "开发助手已经结束，但项目工作区没有产生新提交；本轮需求没有实际修改项目。",
+        );
+
+        assert_eq!(classified.code, "project_workspace_error");
+        assert!(classified.message.contains("没有实际修改项目"));
+        assert!(!classified.retryable);
     }
 }
