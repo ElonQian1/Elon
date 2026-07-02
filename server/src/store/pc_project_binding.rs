@@ -284,6 +284,14 @@ impl Store {
             return Err(anyhow!("系统归档项目不能绑定 PC 工作区"));
         }
 
+        project_identities::upsert_project_workspace_identity(
+            &tx,
+            project_id,
+            user_id,
+            node_id,
+            workspace_path,
+            &now,
+        )?;
         upsert_project_pc_workspace_binding_tx(
             &tx,
             project_id,
