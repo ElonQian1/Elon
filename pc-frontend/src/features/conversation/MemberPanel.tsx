@@ -1180,12 +1180,14 @@ function profileAuditNote(note: string) {
 
 /* ── MemberContextSummary ── */
 export function MemberContextSummary({
+  title,
   label,
   members,
   channel,
   projectTotal,
   usingChannelPermissions,
 }: {
+  title?: string
   label: string
   members: ProjectMember[]
   channel?: Channel
@@ -1195,7 +1197,7 @@ export function MemberContextSummary({
   const stats = memberPanelStats(members)
   return (
     <section className={styles.memberContextSummary}>
-      <strong>{channel ? '频道视图' : '项目视图'}</strong>
+      <strong>{title || (channel ? '频道视图' : '项目视图')}</strong>
       <span>{label}</span>
       {channel && usingChannelPermissions && typeof projectTotal === 'number' && (
         <span>按频道权限过滤，项目成员 {projectTotal} 人</span>

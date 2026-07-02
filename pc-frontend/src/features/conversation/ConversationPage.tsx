@@ -89,6 +89,7 @@ import SidebarUserStrip from '../shell/SidebarUserStrip'
 import styles from './ConversationPage.module.css'
 
 const DIRECT_PC_CLI_STORAGE_KEY = 'elon_pc_project_direct_pc_cli'
+type MemberPanelScope = 'channel' | 'project'
 
 interface LocalNodeStatus {
   agent_id?: string
@@ -173,6 +174,7 @@ export default function ConversationPage() {
   const [showRoles, setShowRoles] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [detailMember, setDetailMember] = useState<ProjectMember | null>(null)
+  const [memberPanelScope, setMemberPanelScope] = useState<MemberPanelScope>('project')
   const [memberPopoverY, setMemberPopoverY] = useState(200)
   const [memberMenu, setMemberMenu] = useState<MemberMenuRequest | null>(null)
   const [permissionFocusMemberId, setPermissionFocusMemberId] = useState('')
@@ -298,6 +300,7 @@ export default function ConversationPage() {
     setRoleFocusMemberId('')
     setShowAudit(false)
     setShowRoles(false)
+    setMemberPanelScope(activeChannelId ? 'channel' : 'project')
   }, [activeProjectId, activeChannelId])
 
   useEffect(() => {
@@ -672,17 +675,24 @@ export default function ConversationPage() {
     && projectMemberHasRolePermission(currentProjectMember, [], ROLE_PERMISSION_MANAGE_ROLES)
   const canUseRoleManager = canManageRoles || canManageMembers
   const hasChannelMemberPermissions = !!activeChannelId && membersHaveChannelPermissionMap(spaceMembers, activeChannelId)
+  const activeMemberPanelScope: MemberPanelScope = activeChannelId && memberPanelScope === 'channel' ? 'channel' : 'project'
+  const panelUsesChannelScope = activeMemberPanelScope === 'channel'
+  const panelUsesChannelPermissions = panelUsesChannelScope && hasChannelMemberPermissions
   const panelMembers = useMemo(
-    () => activeChannelId ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
-    [spaceMembers, activeChannelId],
+    () => panelUsesChannelScope ? membersForChannel(spaceMembers, activeChannelId) : spaceMembers,
+    [spaceMembers, activeChannelId, panelUsesChannelScope],
   )
-  const memberPanelTitle = activeChannel ? '频道成员' : activeProjectId ? '项目成员' : '工作台'
-  const memberPanelContext = activeChannel?.name ?? activeProject?.name ?? '我的项目'
+  const memberPanelTitle = panelUsesChannelScope ? '频道成员' : activeProjectId ? '项目大厅' : '工作台'
+  const memberPanelContext = panelUsesChannelScope
+    ? activeChannel?.name ?? '当前频道'
+    : activeProject?.name ?? '我的项目'
   const memberPanelCount = activeProjectId ? panelMembers.length : (user ? 1 : 0)
-  const memberPanelSummary = activeChannel
-    ? channelPermissionSummary(activeChannel, panelMembers.length, spaceMembers.length, hasChannelMemberPermissions)
+  const memberPanelSummary = panelUsesChannelScope && activeChannel
+    ? panelUsesChannelPermissions
+      ? channelPermissionSummary(activeChannel, panelMembers.length, spaceMembers.length, true)
+      : `${activeChannel.name} · 当前频道未设置成员级可见限制，显示项目内全部成员`
     : activeProjectId
-      ? `项目共 ${spaceMembers.length} 位成员，按角色分组`
+      ? `项目大厅显示 ${spaceMembers.length} 位项目成员，适合查看全局在线、角色和管理状态`
       : '个人 AI 工作台'
 
   // 成员卡片弹窗
@@ -1475,12 +1485,33 @@ export default function ConversationPage() {
             ) : null
           )}
           {activeProjectId && (
+            <div className={styles.memberScopeSwitch} role="group" aria-label="成员列表范围">
+              {activeChannelId && (
+                <button
+                  type="button"
+                  data-active={panelUsesChannelScope ? 'true' : undefined}
+                  onClick={() => setMemberPanelScope('channel')}
+                >
+                  当前频道
+                </button>
+              )}
+              <button
+                type="button"
+                data-active={!panelUsesChannelScope ? 'true' : undefined}
+                onClick={() => setMemberPanelScope('project')}
+              >
+                项目大厅
+              </button>
+            </div>
+          )}
+          {activeProjectId && (
             <MemberContextSummary
+              title={panelUsesChannelScope ? '当前频道' : '项目大厅'}
               label={memberPanelSummary}
               members={panelMembers}
-              channel={activeChannel}
+              channel={panelUsesChannelScope ? activeChannel : undefined}
               projectTotal={spaceMembers.length}
-              usingChannelPermissions={hasChannelMemberPermissions}
+              usingChannelPermissions={panelUsesChannelPermissions}
             />
           )}
           {activeProjectId && spaceLoading && panelMembers.length === 0 && (
@@ -1496,12 +1527,12 @@ export default function ConversationPage() {
                 onOpenConversations={openMemberConversations}
                 onOpenMenu={setMemberMenu}
                 activeConversationMemberId={isAssistingMember ? activeConversationTargetId : null}
-                placeholder={activeChannel ? '搜索频道成员' : '搜索项目成员'}
-              channelId={activeChannelId ?? undefined}
+                placeholder={panelUsesChannelScope ? '搜索频道成员' : '搜索项目成员'}
+              channelId={panelUsesChannelScope ? activeChannelId ?? undefined : undefined}
             />
           )}
           {activeProjectId && !spaceLoading && !spaceError && panelMembers.length === 0 && (
-            <p className={styles.sideHint}>{activeChannel ? '暂无可见频道成员' : '暂无项目成员'}</p>
+            <p className={styles.sideHint}>{panelUsesChannelScope ? '暂无可见频道成员' : '暂无项目成员'}</p>
           )}
           {!activeProjectId && user && (
             <>
