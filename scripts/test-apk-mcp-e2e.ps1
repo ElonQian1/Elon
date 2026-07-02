@@ -42,6 +42,14 @@ function ConvertTo-JsonCompact {
     return ($Value | ConvertTo-Json -Depth 40 -Compress)
 }
 
+function Test-RetryableMcpTransportError {
+    param([string]$Message)
+    if ([string]::IsNullOrWhiteSpace($Message)) {
+        return $false
+    }
+    return $Message.Contains("APK MCP health did not respond")
+}
+
 function Invoke-AdbCommand {
     param(
         [string[]]$AdbArgs,
@@ -172,18 +180,33 @@ function Invoke-ApkMcpTool {
         [switch]$EnsureMainActivity
     )
     $json = ConvertTo-JsonCompact $Arguments
-    $cmd = @{
-        Adb = $Adb
-        DeviceSerial = $Serial
-        Tool = $Tool
-        Arguments = $json
-        HealthTimeoutSec = 8
-        RequestTimeoutSec = $RequestTimeoutSec
+    $maxAttempts = 3
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        $cmd = @{
+            Adb = $Adb
+            DeviceSerial = $Serial
+            Tool = $Tool
+            Arguments = $json
+            HealthTimeoutSec = 20
+            RequestTimeoutSec = $RequestTimeoutSec
+            OpenAppOnFailure = $true
+        }
+        if ($EnsureMainActivity) {
+            $cmd.EnsureMainActivity = $true
+        }
+
+        try {
+            return & $InvokeMcpScript @cmd
+        } catch {
+            $message = $_.Exception.Message
+            if ($attempt -ge $maxAttempts -or !(Test-RetryableMcpTransportError -Message $message)) {
+                throw
+            }
+            Write-Step "MCP transport retry $attempt/$maxAttempts after $Tool health timeout: $message"
+            & $Adb -s $Serial forward --remove tcp:8787 2>$null | Out-Null
+            Start-Sleep -Seconds ([Math]::Min(6, 2 * $attempt))
+        }
     }
-    if ($EnsureMainActivity) {
-        $cmd.EnsureMainActivity = $true
-    }
-    return & $InvokeMcpScript @cmd
 }
 
 function Get-McpStructuredContent {
