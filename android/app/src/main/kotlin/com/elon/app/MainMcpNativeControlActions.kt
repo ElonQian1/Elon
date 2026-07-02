@@ -15,6 +15,7 @@ internal class MainMcpNativeControlActions(
     private val activeConversationIndex: () -> Int,
     private val setActiveConversationIndex: (Int) -> Unit,
     private val saveProjects: () -> Unit,
+    private val reloadProjects: () -> Unit,
     private val renderConversationList: () -> Unit,
     private val setChatAdapter: (ChatAdapter) -> Unit,
     private val pauseCurrentWork: () -> Unit,
@@ -58,6 +59,11 @@ internal class MainMcpNativeControlActions(
         )
         val result = when (action) {
             "state" -> uiState()
+            "reload_projects" -> {
+                reloadProjects()
+                renderConversationList()
+                uiState()
+            }
             "show_conversation_home" -> {
                 navigationController().showConversationHome(animate = false)
                 uiState()
@@ -117,12 +123,22 @@ internal class MainMcpNativeControlActions(
             requestedIndex != null -> requestedIndex
             else -> activeProjectIndex()
         }
-        if (index !in projects.indices) {
+        val resolvedIndex = if (index !in projects.indices && args.optBoolean("reload_if_missing", true)) {
+            reloadProjects()
+            when {
+                requestedId != null -> projects.indexOfFirst { it.id == requestedId || it.projectSpaceId() == requestedId }
+                requestedIndex != null -> requestedIndex
+                else -> activeProjectIndex()
+            }
+        } else {
+            index
+        }
+        if (resolvedIndex !in projects.indices) {
             return errorJson(args.optString("action"), "project_not_found")
                 .put("requested_project_id", requestedId ?: JSONObject.NULL)
                 .put("requested_project_index", requestedIndex ?: JSONObject.NULL)
         }
-        setActiveProjectIndex(index)
+        setActiveProjectIndex(resolvedIndex)
         saveProjects()
         return null
     }
@@ -137,14 +153,27 @@ internal class MainMcpNativeControlActions(
             requestedIndex != null -> requestedIndex
             else -> activeConversationIndex()
         }
-        if (index in project.conversations.indices) {
-            setActiveConversationIndex(index)
+        val resolvedIndex = if (index !in project.conversations.indices && args.optBoolean("reload_if_missing", true)) {
+            reloadProjects()
+            val reloadedProject = activeProject()
+            when {
+                requestedId != null -> reloadedProject.conversations.indexOfFirst { it.id == requestedId }
+                requestedIndex != null -> requestedIndex
+                else -> activeConversationIndex()
+            }
+        } else {
+            index
+        }
+        val resolvedProject = activeProject()
+        if (resolvedIndex in resolvedProject.conversations.indices) {
+            setActiveConversationIndex(resolvedIndex)
             saveProjects()
             return null
         }
         if (requestedId != null && createIfMissing) {
-            project.conversations.add(newMcpConversation(args))
-            setActiveConversationIndex(project.conversations.lastIndex)
+            val targetProject = activeProject()
+            targetProject.conversations.add(newMcpConversation(args))
+            setActiveConversationIndex(targetProject.conversations.lastIndex)
             saveProjects()
             return null
         }
@@ -272,8 +301,34 @@ internal class MainMcpNativeControlActions(
             .put("message_count", conversation.messages.size)
             .put("last_message_role", lastMessage?.role ?: JSONObject.NULL)
             .put("last_message_preview", lastMessage?.content?.replace('\n', ' ')?.take(240) ?: JSONObject.NULL)
+            .put("messages", messagesJson(conversation.messages))
             .put("locked_agent_name", conversation.lockedAgentName ?: JSONObject.NULL)
             .put("codex_thread_uri", conversation.codexThreadUri ?: JSONObject.NULL)
+    }
+
+    private fun messagesJson(messages: List<ChatMessage>): JSONArray {
+        val start = (messages.size - 16).coerceAtLeast(0)
+        return JSONArray().apply {
+            messages.drop(start).forEachIndexed { offset, message ->
+                put(messageJson(start + offset, message))
+            }
+        }
+    }
+
+    private fun messageJson(index: Int, message: ChatMessage): JSONObject {
+        return JSONObject()
+            .put("index", index)
+            .put("id", message.id ?: JSONObject.NULL)
+            .put("role", message.role)
+            .put("content_preview", message.content.replace('\n', ' ').take(360))
+            .put("content_chars", message.content.length)
+            .put("evidence_title", message.evidenceTitle ?: JSONObject.NULL)
+            .put("evidence_details_preview", message.evidenceDetails?.replace('\n', ' ')?.take(500) ?: JSONObject.NULL)
+            .put("evidence_working", message.evidenceWorking)
+            .put("evidence_expanded", message.evidenceExpanded)
+            .put("stream_id", message.streamId ?: JSONObject.NULL)
+            .put("model_used", message.modelUsed ?: JSONObject.NULL)
+            .put("node_id", message.nodeId ?: JSONObject.NULL)
     }
 
     private fun inputJson(): JSONObject {

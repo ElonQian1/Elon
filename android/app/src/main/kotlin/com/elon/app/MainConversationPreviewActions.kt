@@ -18,6 +18,7 @@ internal class MainConversationPreviewActions(
     private val hasRunningTasks: () -> Boolean,
     private val saveConversations: () -> Unit,
     private val saveProjects: () -> Unit,
+    private val reloadProjects: () -> Unit,
     private val renderConversationList: () -> Unit,
     private val renderProjectList: () -> Unit
 ) {
@@ -30,6 +31,14 @@ internal class MainConversationPreviewActions(
             }
         }
         return null
+    }
+
+    fun ensureConversationLocationByKey(key: String): Pair<Int, Int>? {
+        findConversationLocationByKey(key)?.let { return it }
+        reloadProjects()
+        renderConversationList()
+        renderProjectList()
+        return findConversationLocationByKey(key)
     }
 
     fun appendMessageToConversation(projectIndex: Int, conversationIndex: Int, message: ChatMessage) {
@@ -47,10 +56,76 @@ internal class MainConversationPreviewActions(
         }
         saveProjects()
         renderConversationList()
-        if (projectIndex == activeProjectIndex() && conversationIndex == activeConversationIndex()) {
+        if (isAdapterShowing(projectIndex, conversationIndex)) {
             chatAdapter().notifyDataSetChanged()
             binding.chatList.scrollToPosition(chatAdapter().itemCount - 1)
         }
+    }
+
+    fun appendEvidenceToConversation(
+        projectIndex: Int,
+        conversationIndex: Int,
+        entry: EvidenceEntry,
+        working: Boolean
+    ) {
+        val project = projects().getOrNull(projectIndex) ?: return
+        val conversation = project.conversations.getOrNull(conversationIndex) ?: return
+        val clean = sanitizeEvidenceDetail(entry.text)
+        if (clean.isBlank()) return
+        val latestUserIndex = conversation.messages.indexOfLast { it.role == "user" }
+        val evidenceIndex = conversation.messages.indices.lastOrNull { index ->
+            index > latestUserIndex && conversation.messages[index].role in MainWorkflowRoles.assistantEvidence
+        } ?: run {
+            conversation.messages.add(
+                ChatMessage(
+                    role = "ai-intent",
+                    content = "我正在处理这次请求，过程会折叠在这里。",
+                    evidenceWorking = working
+                )
+            )
+            conversation.messages.lastIndex
+        }
+        val target = conversation.messages[evidenceIndex]
+        val entries = evidenceEntriesFrom(target).toMutableList()
+        entries.add(EvidenceEntry(entry.kind, summarize(clean, 96)))
+        while (entries.size > 40) entries.removeAt(0)
+        target.evidenceTitle = evidenceTitle(entries)
+        target.evidenceDetails = evidenceDetails(entries)
+        target.evidenceWorking = working
+        markConversationUpdated(project, conversation, target.content)
+        saveProjects()
+        notifyConversationChanged(projectIndex, conversationIndex, evidenceIndex)
+    }
+
+    fun stopEvidenceForConversation(projectIndex: Int, conversationIndex: Int) {
+        val project = projects().getOrNull(projectIndex) ?: return
+        val conversation = project.conversations.getOrNull(conversationIndex) ?: return
+        var changed = false
+        conversation.messages.forEach { message ->
+            if (message.evidenceWorking) {
+                message.evidenceWorking = false
+                changed = true
+            }
+        }
+        if (!changed) return
+        saveProjects()
+        notifyConversationChanged(projectIndex, conversationIndex, null)
+    }
+
+    fun appendStreamChunkToConversation(
+        projectIndex: Int,
+        conversationIndex: Int,
+        streamId: String,
+        chunk: String
+    ) {
+        val project = projects().getOrNull(projectIndex) ?: return
+        val conversation = project.conversations.getOrNull(conversationIndex) ?: return
+        val index = conversation.messages.indexOfLast { it.streamId == streamId }
+        if (index < 0) return
+        conversation.messages[index].content += chunk
+        markConversationUpdated(project, conversation, conversation.messages[index].content)
+        saveProjects()
+        notifyConversationChanged(projectIndex, conversationIndex, index)
     }
 
     fun updateFirstConversationStatus(text: String) {
@@ -115,5 +190,69 @@ internal class MainConversationPreviewActions(
         conversation.title = title
         binding.topTitleText.text = title
         return true
+    }
+
+    private fun markConversationUpdated(
+        project: AppProject,
+        conversation: AppConversation,
+        preview: String
+    ) {
+        conversation.updatedAt = System.currentTimeMillis()
+        project.updatedAt = conversation.updatedAt
+        if (!conversation.ended) {
+            conversation.subtitle = summarize(preview, 30)
+            project.subtitle = summarize(preview, 34)
+        }
+    }
+
+    private fun notifyConversationChanged(projectIndex: Int, conversationIndex: Int, messageIndex: Int?) {
+        renderConversationList()
+        if (binding.projectPage.visibility == View.VISIBLE) renderProjectList()
+        if (isAdapterShowing(projectIndex, conversationIndex)) {
+            if (messageIndex != null) {
+                chatAdapter().notifyMessageUpdated(messageIndex)
+            } else {
+                chatAdapter().notifyDataSetChanged()
+            }
+            binding.chatList.scrollToPosition(chatAdapter().itemCount - 1)
+        }
+    }
+
+    private fun isAdapterShowing(projectIndex: Int, conversationIndex: Int): Boolean {
+        val conversation = projects()
+            .getOrNull(projectIndex)
+            ?.conversations
+            ?.getOrNull(conversationIndex)
+            ?: return false
+        return projectIndex == activeProjectIndex() &&
+            conversationIndex == activeConversationIndex() &&
+            chatAdapter().ownsMessages(conversation.messages)
+    }
+
+    private fun evidenceEntriesFrom(message: ChatMessage): List<EvidenceEntry> {
+        return message.evidenceDetails
+            ?.lineSequence()
+            ?.mapNotNull(::evidenceEntryFromLine)
+            ?.toList()
+            .orEmpty()
+    }
+
+    private fun evidenceEntryFromLine(line: String): EvidenceEntry? {
+        val cleaned = line.trim().removePrefix("·").trim()
+        if (cleaned.isBlank()) return null
+        val label = cleaned.substringBefore("：", "").trim()
+        val text = cleaned.substringAfter("：", cleaned).trim()
+        val kind = when (label) {
+            "命令" -> "command"
+            "文件" -> "file"
+            "编辑" -> "edit"
+            "构建" -> "build"
+            "CLI" -> "cli"
+            "环境" -> "env"
+            "连接" -> "connection"
+            "结果" -> "result"
+            else -> "progress"
+        }
+        return EvidenceEntry(kind, text)
     }
 }

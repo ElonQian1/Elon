@@ -32,8 +32,15 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
         ?: "mcp_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
     val agent = args.optString("agent").takeIf { it.isNotBlank() }
     val conversationId = args.optString("conversation_id").takeIf { it.isNotBlank() }
+        ?: generatedMcpConversationId()
     val conversationTitle = args.optString("conversation_title").takeIf { it.isNotBlank() }
-    val isDevelopment = if (args.has("is_development")) args.optBoolean("is_development") else true
+    val executionModeForUi = mcpExecutionMode(args)
+    val isDevelopment = if (args.has("is_development")) {
+        args.optBoolean("is_development")
+    } else {
+        true
+    } || executionModeForUi.isPlan
+    val showInUi = if (args.has("show_in_ui")) args.optBoolean("show_in_ui") else true
     val startAckTimeoutMs = args.optInt("start_ack_timeout_ms", 1_800).coerceIn(0, 10_000)
     val runtimeRoute = cleanArg(args, "runtimeRoute", "runtime_route", "pcRuntimeRoute", "pc_runtime_route")
     val executionMode = cleanArg(args, "execution_mode", "executionMode")
@@ -49,12 +56,13 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
 
     val payload = JSONObject()
         .put("trace_id", traceId)
+        .put("client_request_id", traceId)
         .put("user_id", userId)
         .put("project_id", projectId)
         .put("project_title", projectTitle)
+        .put("conversation_id", conversationId)
         .put("message", message)
     if (agent != null) payload.put("agent", agent)
-    if (conversationId != null) payload.put("conversation_id", conversationId)
     if (conversationTitle != null) payload.put("conversation_title", conversationTitle)
     if (runtimeRoute != null) payload.put("runtimeRoute", runtimeRoute)
     if (executionMode != null) payload.put("execution_mode", executionMode)
@@ -62,6 +70,37 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
     if (localNodeId != null) payload.put("local_node_id", localNodeId)
     if (localWorkspacePath != null) payload.put("local_workspace_path", localWorkspacePath)
     val payloadText = payload.toString()
+
+    val conversationSeed = runCatching {
+        seedMcpConversation(
+            context,
+            McpConversationSeed(
+                traceId = traceId,
+                projectId = projectId,
+                projectTitle = projectTitle,
+                conversationId = conversationId,
+                conversationTitle = conversationTitle,
+                message = message,
+                isDevelopment = isDevelopment,
+                executionMode = executionModeForUi
+            )
+        )
+    }.getOrElse { error ->
+        DebugTraceStore.record(
+            "mcp_conversation_seed_failed",
+            mapOf("trace_id" to traceId, "error" to (error.message ?: error.javaClass.simpleName))
+        )
+        return toolResult(
+            "Could not prepare native phone conversation.",
+            JSONObject()
+                .put("trace_id", traceId)
+                .put("project_id", projectId)
+                .put("conversation_id", conversationId)
+                .put("error", error.message ?: error.javaClass.simpleName),
+            isError = true
+        )
+    }
+    val uiOpen = openSeededMcpConversationInUi(context, projectId, conversationId, showInUi)
 
     if (!force) {
         reservePendingTask(prefs, payloadText, isDevelopment)
@@ -72,8 +111,10 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
         mapOf(
             "trace_id" to traceId,
             "project_id" to projectId,
+            "conversation_id" to conversationId,
             "chars" to message.length,
-            "reserved_pending" to !force
+            "reserved_pending" to !force,
+            "show_in_ui" to showInUi
         )
     )
     val intent = Intent(context, TaskWorkService::class.java).apply {
@@ -96,6 +137,7 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
             JSONObject()
                 .put("trace_id", traceId)
                 .put("project_id", projectId)
+                .put("conversation_id", conversationId)
                 .put("error", startResult.message ?: startResult.javaClass.simpleName),
             isError = true
         )
@@ -140,8 +182,11 @@ internal fun chatSend(context: Context, args: JSONObject): JSONObject {
         .put("trace_id", traceId)
         .put("project_id", projectId)
         .put("project_title", projectTitle)
-        .put("conversation_id", conversationId ?: JSONObject.NULL)
+        .put("conversation_id", conversationId)
+        .put("conversation_title", conversationTitle ?: conversationSeed.optString("conversation_title"))
         .put("is_development", isDevelopment)
+        .put("conversation_seed", conversationSeed)
+        .put("ui_open", uiOpen)
         .put("runtimeRoute", runtimeRoute ?: JSONObject.NULL)
         .put("execution_mode", executionMode ?: JSONObject.NULL)
         .put("local_node_id", localNodeId ?: JSONObject.NULL)

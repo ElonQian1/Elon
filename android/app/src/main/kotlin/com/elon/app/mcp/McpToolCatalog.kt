@@ -264,7 +264,7 @@ internal fun mcpToolsListResult(): JSONObject {
                 tool(
                     name = "chat_send",
                     title = "Send Chat",
-                    description = "Queue a chat request on the phone through the same TaskWorkService path used by the UI.",
+                    description = "Queue a chat request on the phone and seed the native conversation with the user message, collapsible process layer, and final-reply path.",
                     properties = JSONObject()
                         .put("message", stringProperty("Chat message to send from the phone."))
                         .put("project_id", stringProperty("Optional project id. Defaults to the active project."))
@@ -279,6 +279,7 @@ internal fun mcpToolsListResult(): JSONObject {
                         .put("local_workspace_path", stringProperty("Optional workspace path on the target PC node."))
                         .put("trace_id", stringProperty("Optional caller-provided trace id."))
                         .put("is_development", booleanProperty("Whether this should be treated as a development task."))
+                        .put("show_in_ui", booleanProperty("Open the seeded native project conversation in the APK when MainActivity is bound. Defaults to true."))
                         .put("force", booleanProperty("Override an active phone task. Defaults to false."))
                         .put("start_ack_timeout_ms", intProperty("How long MCP waits for TaskWorkService to acknowledge startup, 0-10000. Defaults to 1800.")),
                     required = JSONArray().put("message")

@@ -268,6 +268,7 @@ class MainActivity : AppCompatActivity() {
             activeConversationIndex = { projectStateActions.activeConversationIndex },
             setActiveConversationIndex = { projectStateActions.activeConversationIndex = it },
             saveProjects = projectStateActions::saveProjects,
+            reloadProjects = projectStateActions::loadProjects,
             renderConversationList = homeListActions::renderConversationList,
             setChatAdapter = ::setAdapterAndWireApkActions,
             pauseCurrentWork = { activeWorkControlActions.pauseCurrentWork() },
@@ -950,6 +951,7 @@ class MainActivity : AppCompatActivity() {
             hasRunningTasks = { s.runningConversationTasks.isNotEmpty() },
             saveConversations = projectStateActions::saveConversations,
             saveProjects = projectStateActions::saveProjects,
+            reloadProjects = projectStateActions::loadProjects,
             renderConversationList = homeListActions::renderConversationList,
             renderProjectList = homeListActions::renderProjectList
         )

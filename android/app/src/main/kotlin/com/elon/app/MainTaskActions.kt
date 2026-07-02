@@ -93,9 +93,18 @@ internal class MainTaskActions(
     val backgroundTaskMessageActions: MainBackgroundTaskMessageActions by lazy {
         MainBackgroundTaskMessageActions(
             activity = activity,
-            findConversationLocationByKey = { key -> conversationPreviewActions().findConversationLocationByKey(key) },
+            findConversationLocationByKey = { key -> conversationPreviewActions().ensureConversationLocationByKey(key) },
             appendMessageToConversation = { projectIndex, conversationIndex, message ->
                 conversationPreviewActions().appendMessageToConversation(projectIndex, conversationIndex, message)
+            },
+            appendEvidenceToConversation = { projectIndex, conversationIndex, entry, working ->
+                conversationPreviewActions().appendEvidenceToConversation(projectIndex, conversationIndex, entry, working)
+            },
+            stopEvidenceForConversation = { projectIndex, conversationIndex ->
+                conversationPreviewActions().stopEvidenceForConversation(projectIndex, conversationIndex)
+            },
+            appendStreamChunkToConversation = { projectIndex, conversationIndex, streamId, chunk ->
+                conversationPreviewActions().appendStreamChunkToConversation(projectIndex, conversationIndex, streamId, chunk)
             }
         )
     }
