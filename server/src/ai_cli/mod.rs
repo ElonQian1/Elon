@@ -1636,13 +1636,12 @@ async fn run_via_pc_agent(
                     }
                     continue;
                 }
-                if let Some(event) = pc_cli_passthrough_event(&text) {
-                    abort_pc_progress(&mut progress_handle);
-                    let _ = tx.send(event);
-                    continue;
-                }
                 if is_codex {
                     full_text.push_str(&text);
+                    let events = pc_cli_passthrough_events(&text, Some(display_model.as_str()));
+                    for event in events {
+                        let _ = tx.send(event);
+                    }
                     if let Some((hint_key, message)) = pc_codex_progress_hint(&text, &display_model)
                     {
                         let should_send = match last_codex_progress_hint {
@@ -1667,6 +1666,11 @@ async fn run_via_pc_agent(
                     // each chunk independently still leaks noise into APK chat bubbles. Keep the
                     // raw buffer for final reply extraction, but only forward structured passthrough
                     // events above while the task is running.
+                    continue;
+                }
+                if let Some(event) = pc_cli_passthrough_event(&text) {
+                    abort_pc_progress(&mut progress_handle);
+                    let _ = tx.send(event);
                     continue;
                 }
                 if text.trim().is_empty() {
@@ -2793,6 +2797,18 @@ fn pc_cli_passthrough_event(text: &str) -> Option<String> {
     }
 }
 
+fn pc_cli_passthrough_events(text: &str, model_used: Option<&str>) -> Vec<String> {
+    text.lines()
+        .flat_map(|line| {
+            let mut events = crate::codex_stream::stream_event_to_ws_messages(line, model_used);
+            if let Some(event) = pc_cli_passthrough_event(line) {
+                events.push(event);
+            }
+            events
+        })
+        .collect()
+}
+
 fn pc_dispatch_started_event(
     pc_req_id: &str,
     agent_id: &str,
@@ -3215,12 +3231,12 @@ mod pc_cli_passthrough_tests {
     use super::{
         clean_codex_stream_chunk, extract_codex_reply, extract_lightweight_pc_chat_reply,
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
-        pc_cli_passthrough_event, pc_codex_progress_hint, pc_dispatch_started_event,
-        pc_display_model_label, pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
-        pc_lightweight_no_node_event_diagnostic, pc_lightweight_no_readable_diagnostic,
-        pc_project_execution_had_no_changes, pc_project_execution_prompt,
-        pc_project_passthrough_prompt, pc_project_reasoning_effort, pc_route_a_extra_args,
-        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
+        pc_cli_passthrough_event, pc_cli_passthrough_events, pc_codex_progress_hint,
+        pc_dispatch_started_event, pc_display_model_label, pc_lightweight_chat_prompt,
+        pc_lightweight_chat_reasoning_effort, pc_lightweight_no_node_event_diagnostic,
+        pc_lightweight_no_readable_diagnostic, pc_project_execution_had_no_changes,
+        pc_project_execution_prompt, pc_project_passthrough_prompt, pc_project_reasoning_effort,
+        pc_route_a_extra_args, sanitize_pc_development_reply, should_skip_pc_chat_native_session,
         strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use homecli_proto::CliWorkspaceStatus;
@@ -3250,6 +3266,33 @@ mod pc_cli_passthrough_tests {
     fn pc_cli_passthrough_rejects_unknown_json_events() {
         assert!(pc_cli_passthrough_event(r#"{"type":"unknown","message":"x"}"#).is_none());
         assert!(pc_cli_passthrough_event("not json").is_none());
+    }
+
+    #[test]
+    fn pc_cli_passthrough_events_translate_codex_json_stream() {
+        let raw = r#"{"type":"item.started","item":{"id":"call_1","type":"command_execution","command":"rg -n \"TODO\" server/src"}}"#;
+        let events = pc_cli_passthrough_events(raw, Some("Codex"));
+
+        assert_eq!(events.len(), 2);
+        let tool: Value = serde_json::from_str(&events[0]).unwrap();
+        assert_eq!(tool["type"], "tool_call");
+        assert_eq!(tool["tool"], "shell");
+        assert_eq!(tool["args"]["command"], "rg -n \"TODO\" server/src");
+        let progress: Value = serde_json::from_str(&events[1]).unwrap();
+        assert_eq!(progress["type"], "progress");
+        assert!(progress["message"].as_str().unwrap().contains("rg -n"));
+    }
+
+    #[test]
+    fn pc_cli_passthrough_events_keep_legacy_tool_event_lines() {
+        let raw = r#"{"type":"tool_result","tool":"shell","result":"ok"}"#;
+        let events = pc_cli_passthrough_events(raw, None);
+
+        assert_eq!(events.len(), 1);
+        let value: Value = serde_json::from_str(&events[0]).unwrap();
+        assert_eq!(value["type"], "tool_result");
+        assert_eq!(value["tool"], "shell");
+        assert_eq!(value["result"], "ok");
     }
 
     #[test]
