@@ -19,6 +19,92 @@ def signingValue = { name, fallback = "" ->
     return fallback
 }
 
+def repoRootDir = rootProject.projectDir.parentFile
+def projectIconMetadataFile = new File(repoRootDir, ".elon/project-icon.json")
+def projectIconGeneratedResDir = layout.buildDirectory.dir("generated/res/projectIcon/main")
+def projectIconEnabled = projectIconMetadataFile.exists()
+
+def readProjectIconDataUrl = {
+    if (!projectIconMetadataFile.exists()) return null
+    def metadata
+    try {
+        metadata = new groovy.json.JsonSlurper().parse(projectIconMetadataFile)
+    } catch (Exception ex) {
+        throw new GradleException("无法解析 ${projectIconMetadataFile}: ${ex.message}", ex)
+    }
+    def value = metadata?.icon_data_url?.toString()?.trim()
+    if (!value) {
+        throw new GradleException("${projectIconMetadataFile} 缺少 icon_data_url，无法生成 APK launcher icon。")
+    }
+    return value
+}
+
+def decodeProjectIconImage = { String dataUrl ->
+    def trimmed = dataUrl.trim()
+    def commaIndex = trimmed.indexOf(",")
+    if (!trimmed.toLowerCase(Locale.ROOT).startsWith("data:image/") || commaIndex < 0) {
+        throw new GradleException("icon_data_url 必须是 data:image/...;base64,... 格式。")
+    }
+    def header = trimmed.substring(0, commaIndex).toLowerCase(Locale.ROOT)
+    if (!header.contains(";base64")) {
+        throw new GradleException("icon_data_url 必须使用 base64 编码。")
+    }
+    byte[] bytes
+    try {
+        bytes = java.util.Base64.getDecoder().decode(trimmed.substring(commaIndex + 1).replaceAll("\\s", ""))
+    } catch (IllegalArgumentException ex) {
+        throw new GradleException("icon_data_url base64 解码失败: ${ex.message}", ex)
+    }
+    def image = javax.imageio.ImageIO.read(new java.io.ByteArrayInputStream(bytes))
+    if (image == null) {
+        throw new GradleException("icon_data_url 不是 Java ImageIO 可识别的图片，请使用 PNG 或 JPEG。")
+    }
+    return image
+}
+
+def createProjectIconBitmap = { source, int targetSize, boolean roundMask, double imageScale ->
+    System.setProperty("java.awt.headless", "true")
+    def target = new java.awt.image.BufferedImage(
+        targetSize,
+        targetSize,
+        java.awt.image.BufferedImage.TYPE_INT_ARGB
+    )
+    def g = target.createGraphics()
+    try {
+        g.setRenderingHint(java.awt.RenderingHints.KEY_INTERPOLATION, java.awt.RenderingHints.VALUE_INTERPOLATION_BICUBIC)
+        g.setRenderingHint(java.awt.RenderingHints.KEY_RENDERING, java.awt.RenderingHints.VALUE_RENDER_QUALITY)
+        g.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON)
+        if (roundMask) {
+            g.setClip(new java.awt.geom.Ellipse2D.Double(0, 0, targetSize, targetSize))
+        }
+        def maxDrawSize = Math.max(1, Math.round(targetSize * imageScale) as int)
+        def scale = Math.min(
+            maxDrawSize / (double) source.getWidth(),
+            maxDrawSize / (double) source.getHeight()
+        )
+        def width = Math.max(1, Math.round(source.getWidth() * scale) as int)
+        def height = Math.max(1, Math.round(source.getHeight() * scale) as int)
+        def x = Math.round((targetSize - width) / 2.0) as int
+        def y = Math.round((targetSize - height) / 2.0) as int
+        g.drawImage(source, x, y, width, height, null)
+    } finally {
+        g.dispose()
+    }
+    return target
+}
+
+def writeProjectIconPng = { image, File outputFile ->
+    outputFile.parentFile.mkdirs()
+    if (!javax.imageio.ImageIO.write(image, "png", outputFile)) {
+        throw new GradleException("写入 PNG 失败: ${outputFile}")
+    }
+}
+
+def writeProjectIconXml = { File outputFile, String text ->
+    outputFile.parentFile.mkdirs()
+    outputFile.setText(text, "UTF-8")
+}
+
 def defaultKeystorePath = new File(System.getProperty("user.home"), ".elon/signing/elon-release.jks").absolutePath
 def releaseKeystorePath = signingValue("ELON_RELEASE_KEYSTORE", defaultKeystorePath)
 def releaseStorePassword = signingValue("ELON_RELEASE_STORE_PASSWORD")
@@ -66,6 +152,10 @@ android {
         // 备用服务器地址（本地开发机）：通过环境变量 ELON_FALLBACK_SERVER_URL 配置，留空则运行时从设置读取
         def fallbackUrl = signingValue("ELON_FALLBACK_SERVER_URL", "")
         buildConfigField "String", "FALLBACK_SERVER_URL", "\"${fallbackUrl}\""
+        manifestPlaceholders += [
+            elonLauncherIcon     : projectIconEnabled ? "@mipmap/elon_project_launcher" : "@mipmap/ic_launcher",
+            elonLauncherRoundIcon: projectIconEnabled ? "@mipmap/elon_project_launcher_round" : "@mipmap/ic_launcher_round"
+        ]
     }
 
     buildTypes {
@@ -83,6 +173,7 @@ android {
     sourceSets {
         main {
             assets.srcDirs += ['../../default-project-docs']
+            res.srcDirs += [projectIconGeneratedResDir.get().asFile]
         }
     }
 
@@ -94,6 +185,78 @@ android {
     kotlinOptions {
         jvmTarget = '17'
     }
+}
+
+def generateProjectLauncherIcon = tasks.register("generateProjectLauncherIcon") {
+    inputs.files(projectIconMetadataFile)
+        .withPropertyName("projectIconMetadata")
+        .optional()
+    outputs.dir(projectIconGeneratedResDir)
+
+    doLast {
+        def outputDir = projectIconGeneratedResDir.get().asFile
+        delete(outputDir)
+
+        def dataUrl = readProjectIconDataUrl()
+        if (!dataUrl) {
+            logger.lifecycle("No .elon/project-icon.json found; using default launcher icon resources.")
+            return
+        }
+
+        def source = decodeProjectIconImage(dataUrl)
+        def legacySizes = [
+            "mipmap-mdpi"   : 48,
+            "mipmap-hdpi"   : 72,
+            "mipmap-xhdpi"  : 96,
+            "mipmap-xxhdpi" : 144,
+            "mipmap-xxxhdpi": 192
+        ]
+        def foregroundSizes = [
+            "mipmap-mdpi"   : 108,
+            "mipmap-hdpi"   : 162,
+            "mipmap-xhdpi"  : 216,
+            "mipmap-xxhdpi" : 324,
+            "mipmap-xxxhdpi": 432
+        ]
+
+        legacySizes.each { qualifier, size ->
+            writeProjectIconPng(
+                createProjectIconBitmap(source, size as int, false, 1.0d),
+                new File(outputDir, "${qualifier}/elon_project_launcher.png")
+            )
+            writeProjectIconPng(
+                createProjectIconBitmap(source, size as int, true, 1.0d),
+                new File(outputDir, "${qualifier}/elon_project_launcher_round.png")
+            )
+        }
+
+        foregroundSizes.each { qualifier, size ->
+            writeProjectIconPng(
+                createProjectIconBitmap(source, size as int, false, 2.0d / 3.0d),
+                new File(outputDir, "${qualifier}/elon_project_launcher_foreground.png")
+            )
+        }
+
+        def adaptiveIconXml = """<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@android:color/transparent" />
+    <foreground android:drawable="@mipmap/elon_project_launcher_foreground" />
+</adaptive-icon>
+"""
+        writeProjectIconXml(new File(outputDir, "mipmap-anydpi-v26/elon_project_launcher.xml"), adaptiveIconXml)
+        writeProjectIconXml(new File(outputDir, "mipmap-anydpi-v26/elon_project_launcher_round.xml"), adaptiveIconXml)
+        logger.lifecycle("Generated launcher icon resources from ${projectIconMetadataFile}.")
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(generateProjectLauncherIcon)
+}
+
+tasks.matching { task ->
+    task.name.startsWith("merge") && task.name.endsWith("Resources")
+}.configureEach {
+    dependsOn(generateProjectLauncherIcon)
 }
 
 dependencies {
