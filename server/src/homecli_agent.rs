@@ -870,6 +870,7 @@ async fn run_agent_session(
 
     let session_id = Uuid::new_v4().to_string();
     let (cmd_tx, mut cmd_rx) = mpsc::unbounded_channel::<ServerToAgent>();
+    let (control_tx, mut control_rx) = mpsc::unbounded_channel::<Message>();
     let pending: Arc<Mutex<HashMap<String, mpsc::UnboundedSender<AgentToServer>>>> =
         Arc::new(Mutex::new(HashMap::new()));
     let approval_acks: Arc<Mutex<HashMap<String, oneshot::Sender<bool>>>> =
@@ -967,21 +968,24 @@ async fn run_agent_session(
     let mut writer_shutdown_rx = session_shutdown_rx.clone();
     let writer = tokio::spawn(async move {
         loop {
-            let msg = tokio::select! {
+            let outbound = tokio::select! {
                 _ = writer_shutdown_rx.changed() => break,
-                msg = cmd_rx.recv() => match msg {
+                control = control_rx.recv() => match control {
                     Some(msg) => msg,
                     None => break,
                 },
+                msg = cmd_rx.recv() => match msg {
+                    Some(msg) => match serde_json::to_string(&msg) {
+                        Ok(text) => Message::Text(text),
+                        Err(e) => {
+                            tracing::error!("serialize ServerToAgent: {e}");
+                            continue;
+                        }
+                    },
+                    None => break,
+                },
             };
-            let s = match serde_json::to_string(&msg) {
-                Ok(s) => s,
-                Err(e) => {
-                    tracing::error!("serialize ServerToAgent: {e}");
-                    continue;
-                }
-            };
-            if ws_tx.send(Message::Text(s)).await.is_err() {
+            if ws_tx.send(outbound).await.is_err() {
                 break;
             }
         }
@@ -1123,8 +1127,17 @@ async fn run_agent_session(
                     }
                     Err(e) => tracing::warn!("bad agent msg: {e}: {t}"),
                 },
+                Message::Ping(payload) => {
+                    state.node_registry.touch(&agent_id).await;
+                    if control_tx.send(Message::Pong(payload)).is_err() {
+                        break;
+                    }
+                }
+                Message::Pong(_) => {
+                    state.node_registry.touch(&agent_id).await;
+                }
                 Message::Close(_) => break,
-                _ => {}
+                Message::Binary(_) => {}
             }
         }
         Ok(())

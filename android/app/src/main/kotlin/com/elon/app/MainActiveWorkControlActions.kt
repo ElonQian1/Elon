@@ -59,8 +59,8 @@ internal class MainActiveWorkControlActions(
         setSendEnabled(false)
         updateFirstConversationStatus("连接恢复中 · 回来后继续")
         if (getActiveRequestIsDevelopment()) {
-            updateStage(getCurrentStage(), "连接暂时断开，正在保留本轮任务并准备自动恢复。")
-            recordEvidence("connection", "连接暂时断开，正在自动恢复任务")
+            updateStage(getCurrentStage(), "前台连接正在恢复，后台任务仍在继续。")
+            recordEvidence("connection", "前台连接短暂恢复中，后台任务仍在继续")
         }
 
         scheduleReconnectForActiveWork(task.traceId)
