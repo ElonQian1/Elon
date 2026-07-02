@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { clean, formatTime } from '../../lib/utils'
 import type { Channel, ProjectMember } from './types'
 import {
@@ -26,6 +26,9 @@ const DIRECTORY_FILTERS: Array<{ id: DirectoryFilter; label: string }> = [
 ]
 
 const RECENT_JOIN_MS = 7 * 24 * 60 * 60 * 1000
+const DIRECTORY_ROW_HEIGHT = 82
+const DIRECTORY_LIST_OVERSCAN = 6
+const DIRECTORY_LIST_MIN_WINDOW = 10
 
 export function MemberDirectoryDrawer({
   members,
@@ -52,6 +55,9 @@ export function MemberDirectoryDrawer({
   const [filter, setFilter] = useState<DirectoryFilter>('all')
   const [sortMode, setSortMode] = useState<DirectorySort>('status')
   const [roleFilter, setRoleFilter] = useState('')
+  const [listScrollTop, setListScrollTop] = useState(0)
+  const [listHeight, setListHeight] = useState(0)
+  const listRef = useRef<HTMLDivElement | null>(null)
   const stats = useMemo(() => memberDirectoryStats(members), [members])
   const roleOptions = useMemo(() => memberDirectoryRoles(members), [members])
   const visibleMembers = useMemo(() => {
@@ -62,6 +68,32 @@ export function MemberDirectoryDrawer({
       sortMode,
     )
   }, [members, query, filter, roleFilter, sortMode])
+  const listWindowSize = Math.max(
+    DIRECTORY_LIST_MIN_WINDOW,
+    Math.ceil((listHeight || DIRECTORY_ROW_HEIGHT * DIRECTORY_LIST_MIN_WINDOW) / DIRECTORY_ROW_HEIGHT) + DIRECTORY_LIST_OVERSCAN * 2,
+  )
+  const listStart = Math.max(0, Math.floor(listScrollTop / DIRECTORY_ROW_HEIGHT) - DIRECTORY_LIST_OVERSCAN)
+  const listEnd = Math.min(visibleMembers.length, listStart + listWindowSize)
+  const virtualMembers = visibleMembers.slice(listStart, listEnd)
+
+  useEffect(() => {
+    setListScrollTop(0)
+    if (listRef.current) listRef.current.scrollTop = 0
+  }, [query, filter, roleFilter, sortMode, visibleMembers.length])
+
+  useEffect(() => {
+    const node = listRef.current
+    if (!node) return
+    const updateHeight = () => setListHeight(node.clientHeight)
+    updateHeight()
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', updateHeight)
+      return () => window.removeEventListener('resize', updateHeight)
+    }
+    const observer = new ResizeObserver(updateHeight)
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
   function openDetails(member: ProjectMember) {
     onOpenDetails?.(member)
@@ -138,21 +170,32 @@ export function MemberDirectoryDrawer({
             {filter !== 'all' ? ` · ${DIRECTORY_FILTERS.find((item) => item.id === filter)?.label ?? filter}` : ''}
           </div>
 
-          <div className={styles.memberDirectoryList}>
+          <div
+            ref={listRef}
+            className={styles.memberDirectoryList}
+            onScroll={(event) => setListScrollTop(event.currentTarget.scrollTop)}
+          >
             {visibleMembers.length === 0 && <p className={styles.sideHint}>没有匹配成员</p>}
-            {visibleMembers.map((member) => (
-              <MemberDirectoryRow
-                key={member.user_id}
-                member={member}
-                channels={channels}
-                canManageRoles={canManageRoles}
-                canModerate={canModerate}
-                onOpenDetails={openDetails}
-                onOpenConversations={onOpenConversations ? openConversations : undefined}
-                onOpenRoles={canManageRoles && onOpenRoles ? openRoles : undefined}
-                onOpenModerationCenter={canModerate && onOpenModerationCenter ? openModeration : undefined}
-              />
-            ))}
+            {visibleMembers.length > 0 && (
+              <div className={styles.memberDirectoryVirtualCanvas} style={{ height: visibleMembers.length * DIRECTORY_ROW_HEIGHT }}>
+                <div style={{ transform: `translateY(${listStart * DIRECTORY_ROW_HEIGHT}px)` }}>
+                  {virtualMembers.map((member) => (
+                    <div key={member.user_id} className={styles.memberDirectoryVirtualSlot}>
+                      <MemberDirectoryRow
+                        member={member}
+                        channels={channels}
+                        canManageRoles={canManageRoles}
+                        canModerate={canModerate}
+                        onOpenDetails={openDetails}
+                        onOpenConversations={onOpenConversations ? openConversations : undefined}
+                        onOpenRoles={canManageRoles && onOpenRoles ? openRoles : undefined}
+                        onOpenModerationCenter={canModerate && onOpenModerationCenter ? openModeration : undefined}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </section>
