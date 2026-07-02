@@ -58,6 +58,7 @@ use crate::{
 
 const DEFAULT_CHAT_RESUME_TIMEOUT_CAP_SECS: u64 = 12;
 const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
+const PC_LIGHTWEIGHT_CHAT_FIRST_EVENT_TIMEOUT_SECS: u64 = 15;
 const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 120;
 const PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT: &str = "medium";
 const PC_CODEX_PROGRESS_HINT_COOLDOWN_SECS: u64 = 15;
@@ -1300,6 +1301,7 @@ async fn run_via_pc_agent(
     let mut stream_started = false;
     let is_codex = cli_name == "codex";
     let mut lightweight_streamed_reply = String::new();
+    let mut lightweight_received_event = false;
     let mut last_codex_progress_hint: Option<(&'static str, std::time::Instant)> = None;
     let project_recv_timeout_secs =
         pc_agent_cli_recv_timeout_secs(cli_name, request_mode, native_session_scope.as_ref());
@@ -1329,16 +1331,47 @@ async fn run_via_pc_agent(
 
     loop {
         let event = if lightweight_pc_chat {
-            match tokio::time::timeout(
-                std::time::Duration::from_secs(PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS),
-                rx.recv(),
-            )
-            .await
+            let recv_timeout_secs = if lightweight_received_event {
+                PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS
+            } else {
+                PC_LIGHTWEIGHT_CHAT_FIRST_EVENT_TIMEOUT_SECS
+            };
+            match tokio::time::timeout(std::time::Duration::from_secs(recv_timeout_secs), rx.recv())
+                .await
             {
                 Ok(Some(event)) => event,
                 Ok(None) => break,
                 Err(_) => {
                     abort_pc_progress(&mut progress_handle);
+                    if !lightweight_received_event {
+                        let message = pc_lightweight_no_node_event_diagnostic(
+                            cli_name,
+                            agent_id,
+                            recv_timeout_secs,
+                        );
+                        pc_billing_call.release_no_usage();
+                        finish_pc_node_compute_run(
+                            state,
+                            &pc_accounting_key,
+                            "released_no_usage",
+                            None,
+                            None,
+                            None,
+                            Some(&message),
+                        );
+                        record_pc_execution_without_cli_done(
+                            state,
+                            native_session_scope.as_ref(),
+                            &pc_req_id,
+                            false,
+                            Some(&message),
+                            Some(display_model.as_str()),
+                        );
+                        pc_execution_guard.disarm();
+                        return Ok(PcAgentRunOutcome::NoReadableLightweightReply {
+                            diagnostic: Some(message),
+                        });
+                    }
                     if stream_started && !lightweight_streamed_reply.trim().is_empty() {
                         let reply = lightweight_streamed_reply.trim().to_string();
                         let _ = tx.send(
@@ -1483,6 +1516,10 @@ async fn run_via_pc_agent(
                 }
             }
         };
+
+        if lightweight_pc_chat {
+            lightweight_received_event = true;
+        }
 
         match event {
             AgentToServer::CliChunk { text, .. } => {
@@ -2164,6 +2201,19 @@ fn no_readable_lightweight_reply(output: &str, cli_name: &str) -> PcAgentRunOutc
     PcAgentRunOutcome::NoReadableLightweightReply {
         diagnostic: pc_lightweight_no_readable_diagnostic(output, cli_name),
     }
+}
+
+fn pc_lightweight_no_node_event_diagnostic(
+    cli_name: &str,
+    agent_id: &str,
+    timeout_secs: u64,
+) -> String {
+    format!(
+        "{}已派发到 PC 节点 {}，但 {} 秒内没有收到节点确认或任何 CLI 输出；本轮已停止。请检查本机节点是否正在重连、是否有重复/旧连接，或稍后重发。",
+        pc_cli_progress_label(cli_name),
+        agent_id,
+        timeout_secs
+    )
 }
 
 fn pc_lightweight_no_readable_diagnostic(output: &str, cli_name: &str) -> Option<String> {
@@ -3064,10 +3114,10 @@ mod pc_cli_passthrough_tests {
         extract_lightweight_pc_chat_timeout_reply, lightweight_pc_reply_delta, native_session_uuid,
         pc_cli_passthrough_event, pc_codex_progress_hint, pc_dispatch_started_event,
         pc_display_model_label, pc_lightweight_chat_prompt, pc_lightweight_chat_reasoning_effort,
-        pc_lightweight_no_readable_diagnostic, pc_project_execution_prompt,
-        pc_project_reasoning_effort, pc_route_a_extra_args, sanitize_pc_development_reply,
-        should_skip_pc_chat_native_session, strip_terminal_control_sequences, AiCliRequestMode,
-        NativeSessionScope,
+        pc_lightweight_no_node_event_diagnostic, pc_lightweight_no_readable_diagnostic,
+        pc_project_execution_prompt, pc_project_reasoning_effort, pc_route_a_extra_args,
+        sanitize_pc_development_reply, should_skip_pc_chat_native_session,
+        strip_terminal_control_sequences, AiCliRequestMode, NativeSessionScope,
     };
     use serde_json::Value;
 
@@ -3405,6 +3455,16 @@ diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/
         assert!(diagnostic.contains("网络请求超时"));
         assert!(diagnostic.contains("request timed out"));
         assert!(diagnostic.contains("fallback HTTP"));
+    }
+
+    #[test]
+    fn pc_lightweight_first_event_timeout_names_node_ack_gap() {
+        let diagnostic = pc_lightweight_no_node_event_diagnostic("codex", "node-a", 15);
+
+        assert!(diagnostic.contains("Codex"));
+        assert!(diagnostic.contains("node-a"));
+        assert!(diagnostic.contains("15 秒内没有收到节点确认"));
+        assert!(diagnostic.contains("本轮已停止"));
     }
 
     #[test]
