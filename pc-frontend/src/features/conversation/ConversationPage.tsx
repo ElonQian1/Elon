@@ -76,6 +76,7 @@ import { MemberAuditDrawer } from './MemberAuditDrawer'
 import { RoleManagementDrawer } from './RoleManagementDrawer'
 import { PermissionDrawer } from './PermissionDrawer'
 import { MemberDetailDrawer } from './MemberDetailDrawer'
+import { MemberDirectoryDrawer } from './MemberDirectoryDrawer'
 import {
   MemberSearch,
   MemberContextMenu,
@@ -171,6 +172,7 @@ export default function ConversationPage() {
   const [showModeration, setShowModeration] = useState(false)
   const [showAudit, setShowAudit] = useState(false)
   const [showRoles, setShowRoles] = useState(false)
+  const [showDirectory, setShowDirectory] = useState(false)
   const [selectedMember, setSelectedMember] = useState<ProjectMember | null>(null)
   const [detailMember, setDetailMember] = useState<ProjectMember | null>(null)
   const [memberPanelScope, setMemberPanelScope] = useState<MemberPanelScope>('project')
@@ -299,6 +301,7 @@ export default function ConversationPage() {
     setRoleFocusMemberId('')
     setShowAudit(false)
     setShowRoles(false)
+    setShowDirectory(false)
     setMemberPanelScope(activeChannelId ? 'channel' : 'project')
   }, [activeProjectId, activeChannelId])
 
@@ -1399,6 +1402,7 @@ export default function ConversationPage() {
           </div>
           <div className={styles.memberActions}>
             <button className={styles.memberInviteBtn} type="button" onClick={() => setShowPresence(true)}>状态</button>
+            {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowDirectory(true)}>目录</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowInvites(true)}>邀请</button>}
             {activeProjectId && <button className={styles.memberInviteBtn} type="button" onClick={() => setShowModeration(true)}>管理</button>}
             {activeProjectId && canUseRoleManager && <button className={styles.memberInviteBtn} type="button" onClick={() => { setRoleFocusMemberId(''); setShowRoles(true) }}>角色</button>}
@@ -1563,6 +1567,31 @@ export default function ConversationPage() {
       )}
       {showModeration && activeProjectId && (
         <ModerationDrawer projectId={activeProjectId} members={members} onClose={() => setShowModeration(false)} onSaved={reloadProjectSpace} />
+      )}
+      {showDirectory && activeProjectId && (
+        <MemberDirectoryDrawer
+          members={members}
+          channels={channels}
+          canManageRoles={canUseRoleManager}
+          canModerate={canModerateMembers}
+          onClose={() => setShowDirectory(false)}
+          onOpenDetails={(member) => {
+            setShowDirectory(false)
+            openMemberDetails(member)
+          }}
+          onOpenConversations={(member) => {
+            setShowDirectory(false)
+            openMemberConversations(member)
+          }}
+          onOpenRoles={canUseRoleManager ? (member) => {
+            setShowDirectory(false)
+            openMemberRoles(member)
+          } : undefined}
+          onOpenModerationCenter={() => {
+            setShowDirectory(false)
+            setShowModeration(true)
+          }}
+        />
       )}
       {showAudit && activeProjectId && (
         <MemberAuditDrawer projectId={activeProjectId} onClose={() => setShowAudit(false)} />
