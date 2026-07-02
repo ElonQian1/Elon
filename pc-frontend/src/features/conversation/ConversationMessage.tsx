@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { clean } from '../../lib/utils'
 import type { Message } from './types'
 import MarkdownContent from '../markdown/MarkdownContent'
@@ -6,7 +7,7 @@ import { buildContext } from '../dev/devTaskUtils'
 import { formatTime } from '../../lib/utils'
 import styles from './ConversationPage.module.css'
 
-export function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove, grouped }: {
+interface MessageItemProps {
   message: Message
   isDevChannel: boolean
   taskContext: ReturnType<typeof buildContext>
@@ -14,7 +15,9 @@ export function MessageItem({ message, isDevChannel, taskContext, user, onCancel
   onCancel: (id: string) => Promise<void>
   onApprove: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => Promise<void>
   grouped?: boolean
-}) {
+}
+
+export const MessageItem = memo(function MessageItem({ message, isDevChannel, taskContext, user, onCancel, onApprove, grouped }: MessageItemProps) {
   const kind = clean(message.kind ?? message.role ?? '').toLowerCase()
 
   // Dev 任务消息用 DevTaskCard 渲染
@@ -68,4 +71,16 @@ export function MessageItem({ message, isDevChannel, taskContext, user, onCancel
       </div>
     </div>
   )
+}, areMessageItemPropsEqual)
+
+function areMessageItemPropsEqual(
+  prev: MessageItemProps,
+  next: MessageItemProps,
+): boolean {
+  return prev.message === next.message
+    && prev.isDevChannel === next.isDevChannel
+    && prev.taskContext === next.taskContext
+    && prev.grouped === next.grouped
+    && prev.user?.nickname === next.user?.nickname
+    && prev.user?.account === next.user?.account
 }

@@ -9,6 +9,9 @@ interface ChannelMessageCacheEntry {
   loadedAt: number
 }
 
+const CHANNEL_MESSAGE_CACHE_FRESH_MS = 10000
+const CACHED_CHANNEL_REFRESH_DELAY_MS = 300
+
 interface ProjectState {
   projects: Project[]
   projectsLoaded: boolean
@@ -181,6 +184,19 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       messages: cached?.messages ?? [],
       messagesLoading: !cached,
     })
+    if (cached && Date.now() - cached.loadedAt < CHANNEL_MESSAGE_CACHE_FRESH_MS) {
+      get().startPolling()
+      return
+    }
+    if (cached) {
+      window.setTimeout(() => {
+        const state = get()
+        if (state.activeProjectId !== activeProjectId || state.activeChannelId !== id) return
+        state.loadMessages(activeProjectId, id).catch(() => {})
+      }, CACHED_CHANNEL_REFRESH_DELAY_MS)
+      get().startPolling()
+      return
+    }
     await get().loadMessages(activeProjectId, id)
     get().startPolling()
   },

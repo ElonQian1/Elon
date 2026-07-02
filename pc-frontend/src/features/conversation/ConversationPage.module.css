@@ -248,6 +248,7 @@
   overflow-y: auto;
   padding: 22px clamp(18px, 3vw, 42px);
   scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 
 /* 空状态 */
@@ -284,7 +285,10 @@
   align-items: flex-start;
   gap: 12px;
   padding: 6px 0 10px;
+  content-visibility: auto;
+  contain-intrinsic-size: 72px;
 }
+.messageRow.grouped { contain-intrinsic-size: 44px; }
 .messageRow.ownRow { justify-content: flex-end; }
 .messageRow.ownRow .messageAvatar { order: 2; }
 .messageRow.ownRow .messageBody { order: 1; align-items: flex-end; }
@@ -367,7 +371,11 @@
 }
 
 /* Dev task card 包装 */
-.devTaskWrap { width: 100%; }
+.devTaskWrap {
+  width: 100%;
+  content-visibility: auto;
+  contain-intrinsic-size: 132px;
+}
 
 /* ── 打字指示器（AI 正在处理）── */
 .typingRow {

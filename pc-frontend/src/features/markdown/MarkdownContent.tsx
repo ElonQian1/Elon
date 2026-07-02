@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import type { Components } from 'react-markdown'
@@ -10,12 +10,13 @@ interface Props {
   copy?: boolean
 }
 
-export default function MarkdownContent({ content, copy = true }: Props) {
+function MarkdownContent({ content, copy = true }: Props) {
+  const components = useMemo(() => buildComponents(copy), [copy])
   return (
     <div className={styles.root}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
-        components={buildComponents(copy)}
+        components={components}
         // 不使用 rehype-sanitize：react-markdown 本身不执行脚本，已足够安全
       >
         {content}
@@ -23,6 +24,8 @@ export default function MarkdownContent({ content, copy = true }: Props) {
     </div>
   )
 }
+
+export default memo(MarkdownContent)
 
 function buildComponents(showCopy: boolean): Components {
   return {

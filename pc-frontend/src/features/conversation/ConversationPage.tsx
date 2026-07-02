@@ -117,6 +117,8 @@ interface TaskMessageCacheEntry {
 }
 
 const TASK_MESSAGE_CACHE_FRESH_MS = 4000
+const CONVERSATION_CACHE_FRESH_MS = 12000
+const CACHED_CONVERSATION_REFRESH_DELAY_MS = 450
 
 function initialDirectPcCliFromStorage(storage?: Storage | null): boolean {
   try {
@@ -192,6 +194,7 @@ export default function ConversationPage() {
   const [showNewMsg, setShowNewMsg] = useState(false)
   const [attachments, setAttachments] = useState<UploadedAttachment[]>([])   // P1.4   // P1.3：新消息提示
   const feedRef = useRef<HTMLDivElement>(null)
+  const scrollFrameRef = useRef<number | null>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const modelBtnRef = useRef<HTMLButtonElement>(null)
   const atBottomRef = useRef(true)   // P1.3：用户是否在底部
@@ -333,15 +336,28 @@ export default function ConversationPage() {
       })
   }, [])
 
-  // P1.3：智能滚动——只有用户在底部时才自动跟随；否则显示"新消息"按钮
+  // P1.3：智能滚动——延后一帧读写 scrollHeight，避免切换会话时同步强制布局。
   useEffect(() => {
-    const el = feedRef.current
-    if (!el) return
-    if (atBottomRef.current) {
-      el.scrollTop = el.scrollHeight
-      setShowNewMsg(false)
-    } else {
-      setShowNewMsg(true)
+    if (scrollFrameRef.current) {
+      window.cancelAnimationFrame(scrollFrameRef.current)
+      scrollFrameRef.current = null
+    }
+    scrollFrameRef.current = window.requestAnimationFrame(() => {
+      scrollFrameRef.current = null
+      const el = feedRef.current
+      if (!el) return
+      if (atBottomRef.current) {
+        el.scrollTop = el.scrollHeight
+        setShowNewMsg((visible) => visible ? false : visible)
+      } else {
+        setShowNewMsg((visible) => visible || true)
+      }
+    })
+    return () => {
+      if (scrollFrameRef.current) {
+        window.cancelAnimationFrame(scrollFrameRef.current)
+        scrollFrameRef.current = null
+      }
     }
   }, [messages, convMessages, sessionTaskMessages, sessionView])
 
@@ -483,7 +499,7 @@ export default function ConversationPage() {
           try {
             const conversations = await listMemberConversations(activeProjectId, activeConversationTargetId)
             setMemberConversations(conversations)
-            await openConversation(openedConversationId)
+            await openConversation(openedConversationId, { force: true })
           } catch {}
         }, 400)
       }
@@ -722,13 +738,14 @@ export default function ConversationPage() {
   }, [activeChannelId]) // eslint-disable-line
 
   // 打开一个会话：从服务端加载该会话的消息（与手机端同步）
-  async function openConversation(convId: string) {
+  async function openConversation(convId: string, options: { force?: boolean } = {}) {
     if (!activeProjectId || !activeConversationTargetId) return
     const projectId = activeProjectId
     const targetUserId = activeConversationTargetId
     const channelId = aiDevelopmentChannelId
     const cacheKey = conversationMessageCacheKey(projectId, targetUserId, convId)
     const cached = conversationMessageCacheRef.current.get(cacheKey)
+    const cacheAge = cached ? Date.now() - cached.loadedAt : Number.POSITIVE_INFINITY
     const requestSeq = conversationLoadSeqRef.current + 1
     conversationLoadSeqRef.current = requestSeq
 
@@ -743,6 +760,15 @@ export default function ConversationPage() {
       setConvLoading(true)
     }
 
+    if (cached && !options.force && cacheAge < CONVERSATION_CACHE_FRESH_MS) {
+      return
+    }
+
+    if (cached && !options.force) {
+      await delay(CACHED_CONVERSATION_REFRESH_DELAY_MS)
+      if (conversationLoadSeqRef.current !== requestSeq) return
+    }
+
     try {
       const [conversationMessages, taskMessages] = await Promise.all([
         listMemberConversationMessages(
@@ -750,13 +776,17 @@ export default function ConversationPage() {
           targetUserId,
           convId,
         ),
-        loadCachedTaskMessages(projectId, channelId),
+        loadCachedTaskMessages(projectId, channelId, !!options.force),
       ])
       if (conversationLoadSeqRef.current !== requestSeq) return
       const nextMessages = conversationMessages as Message[]
+      if (cached && sameMessageList(cached.messages, nextMessages) && sameMessageList(cached.taskMessages, taskMessages)) {
+        conversationMessageCacheRef.current.set(cacheKey, { ...cached, loadedAt: Date.now() })
+        return
+      }
       writeConversationCache(projectId, targetUserId, convId, nextMessages, taskMessages)
-      setConvMessages(nextMessages)
-      setSessionTaskMessages(taskMessages)
+      setConvMessages((prev) => sameMessageList(prev, nextMessages) ? prev : nextMessages)
+      setSessionTaskMessages((prev) => sameMessageList(prev, taskMessages) ? prev : taskMessages)
     } catch (err) { console.warn('[ConvMessages] failed:', err) }
     finally {
       if (conversationLoadSeqRef.current === requestSeq) setConvLoading(false)
@@ -776,8 +806,8 @@ export default function ConversationPage() {
       ])
       const conversationMessages = nextMessages as Message[]
       writeConversationCache(activeProjectId, activeConversationTargetId, conversationId, conversationMessages, taskMessages)
-      setConvMessages(conversationMessages)
-      setSessionTaskMessages(taskMessages)
+      setConvMessages((prev) => sameMessageList(prev, conversationMessages) ? prev : conversationMessages)
+      setSessionTaskMessages((prev) => sameMessageList(prev, taskMessages) ? prev : taskMessages)
       listMemberConversations(activeProjectId, activeConversationTargetId)
         .then(setMemberConversations)
         .catch(() => {})
@@ -839,8 +869,8 @@ export default function ConversationPage() {
         if (canceled) return
         const conversationMessages = nextMessages as Message[]
         writeConversationCache(activeProjectId, activeConversationTargetId, String(sessionView), conversationMessages, taskMessages)
-        setConvMessages(conversationMessages)
-        setSessionTaskMessages(taskMessages)
+        setConvMessages((prev) => sameMessageList(prev, conversationMessages) ? prev : conversationMessages)
+        setSessionTaskMessages((prev) => sameMessageList(prev, taskMessages) ? prev : taskMessages)
         listMemberConversations(activeProjectId, activeConversationTargetId)
           .then((items) => { if (!canceled) setMemberConversations(items) })
           .catch(() => {})
@@ -1608,4 +1638,29 @@ function conversationMessageCacheKey(projectId: string, targetUserId: string, co
 
 function taskMessageCacheKey(projectId: string, channelId: string): string {
   return `${projectId}::${channelId}`
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => window.setTimeout(resolve, ms))
+}
+
+function sameMessageList(left: Message[], right: Message[]): boolean {
+  if (left === right) return true
+  if (left.length !== right.length) return false
+  for (let index = 0; index < left.length; index += 1) {
+    if (messageFingerprint(left[index]) !== messageFingerprint(right[index])) return false
+  }
+  return true
+}
+
+function messageFingerprint(message: Message | undefined): string {
+  if (!message) return ''
+  return [
+    clean(message.id),
+    clean(message.kind ?? message.role ?? (message as Record<string, unknown>).message_kind ?? ''),
+    clean(message.task_id ?? message.taskId ?? ''),
+    clean(message.task_status ?? message.taskStatus ?? ''),
+    clean(message.created_at),
+    clean(message.content ?? message.text ?? ''),
+  ].join('|')
 }

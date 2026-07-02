@@ -7,7 +7,7 @@
  *  - 任务完成后 → 默认折叠，只显示 header + "查看N步详情" + result
  *  - 点击按钮可随时展开 / 折叠
  */
-import { useState, useEffect, useRef } from 'react'
+import { memo, useState, useEffect, useRef } from 'react'
 import { DevTaskMessage } from './DevTaskCard'
 import { messageKind, messageText, taskIdOf, taskIsTerminal } from './devTaskUtils'
 import type { ChatMessage, TaskContext } from './types'
@@ -20,7 +20,7 @@ interface Props {
   onApprove?: (taskId: string, approvalId: string, decision: 'approve' | 'deny') => void
 }
 
-export default function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
+function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const taskId  = taskIdOf(messages[0]) || ''
   const task    = taskId ? (taskContext.tasks.get(taskId) ?? null) : null
   const isDone  = taskIsTerminal(task) || messages.some(isTerminalTaskMessage)
@@ -114,6 +114,11 @@ export default function DevTaskGroup({ messages, taskContext, onCancel, onApprov
     </div>
   )
 }
+
+export default memo(DevTaskGroup, (prev, next) =>
+  prev.messages === next.messages
+  && prev.taskContext === next.taskContext
+)
 
 function latestVisibleProgress(messages: ChatMessage[]): ChatMessage | undefined {
   const progress = messages.filter((m) => messageKind(m) === 'ai_progress')
