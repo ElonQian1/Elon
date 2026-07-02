@@ -1,4 +1,8 @@
 use super::ai_cli_chat::{intent_gate_timeout_chat_result, DEFAULT_TINY_CHAT_TIMEOUT_CAP_SECS};
+use super::ai_cli_chat_policy::{
+    project_lightweight_chat_split_enabled_from, prompt_route_for_project_chat,
+    should_use_project_lightweight_chat, PROJECT_LIGHTWEIGHT_CHAT_ENABLED_ENV,
+};
 use super::ai_cli_native_session::build_native_session_continuity_note;
 use super::ai_cli_output::parse_intent_gate_result;
 use super::ai_cli_prompts::{build_native_session_repair_prompt, build_prewarm_cli_prompt};
@@ -94,6 +98,42 @@ fn chat_prompt_uses_lightweight_mode() {
     assert!(prompt.contains("轻量聊天模式"));
     assert!(!prompt.contains("轻量项目工作流必须执行"));
     assert!(!prompt.contains("git pull --rebase"));
+}
+
+#[test]
+fn project_lightweight_chat_split_is_disabled_by_default() {
+    let split_enabled = project_lightweight_chat_split_enabled_from(|_| None);
+
+    assert!(!split_enabled);
+    assert!(!should_use_project_lightweight_chat(
+        split_enabled,
+        false,
+        intent_router::CapabilityRoute::ChatAgent,
+        "你好"
+    ));
+    assert_eq!(
+        prompt_route_for_project_chat(split_enabled, intent_router::CapabilityRoute::ChatAgent),
+        intent_router::CapabilityRoute::CodeAgent
+    );
+}
+
+#[test]
+fn project_lightweight_chat_split_can_be_enabled_explicitly() {
+    let split_enabled = project_lightweight_chat_split_enabled_from(|name| {
+        (name == PROJECT_LIGHTWEIGHT_CHAT_ENABLED_ENV).then(|| "true".to_string())
+    });
+
+    assert!(split_enabled);
+    assert!(should_use_project_lightweight_chat(
+        split_enabled,
+        false,
+        intent_router::CapabilityRoute::ChatAgent,
+        "你好"
+    ));
+    assert_eq!(
+        prompt_route_for_project_chat(split_enabled, intent_router::CapabilityRoute::ChatAgent),
+        intent_router::CapabilityRoute::ChatAgent
+    );
 }
 
 #[test]

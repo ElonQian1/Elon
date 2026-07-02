@@ -27,6 +27,13 @@ use crate::{
 const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
 const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProjectWorkflowRouting {
+    Auto,
+    ForceProjectWorkflow,
+    ForceCasualChat,
+}
+
 /// 一龙自项目路径（默认 /root/Elon，可由 ELON_SELF_PATH 环境变量覆盖）
 pub fn elon_self_workspace() -> std::path::PathBuf {
     std::path::PathBuf::from(
@@ -48,7 +55,7 @@ pub async fn run_for_project(
 ) {
     let workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
-    run_for_project_in_workspace(
+    run_for_project_in_workspace_with_routing(
         user_id,
         project,
         &workspace,
@@ -60,11 +67,74 @@ pub async fn run_for_project(
         trace_id,
         state,
         tx,
+        ProjectWorkflowRouting::Auto,
     )
     .await;
 }
 
-pub async fn run_for_project_in_workspace(
+pub async fn run_project_workflow_for_project(
+    user_id: &str,
+    project: &ProjectAccess,
+    download_base: &str,
+    conversation_id: Option<&str>,
+    user_message: &str,
+    agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    run_for_project_in_workspace_with_routing(
+        user_id,
+        project,
+        &workspace,
+        download_base,
+        conversation_id,
+        user_message,
+        agent_name,
+        pc_runtime_route,
+        trace_id,
+        state,
+        tx,
+        ProjectWorkflowRouting::ForceProjectWorkflow,
+    )
+    .await;
+}
+
+pub async fn run_chat_only_for_project(
+    user_id: &str,
+    project: &ProjectAccess,
+    download_base: &str,
+    conversation_id: Option<&str>,
+    user_message: &str,
+    agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
+    let workspace =
+        state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
+    run_for_project_in_workspace_with_routing(
+        user_id,
+        project,
+        &workspace,
+        download_base,
+        conversation_id,
+        user_message,
+        agent_name,
+        pc_runtime_route,
+        trace_id,
+        state,
+        tx,
+        ProjectWorkflowRouting::ForceCasualChat,
+    )
+    .await;
+}
+
+pub async fn run_project_workflow_for_project_in_workspace(
     user_id: &str,
     project: &ProjectAccess,
     workspace: &Path,
@@ -77,12 +147,49 @@ pub async fn run_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
+    run_for_project_in_workspace_with_routing(
+        user_id,
+        project,
+        workspace,
+        download_base,
+        conversation_id,
+        user_message,
+        agent_name,
+        pc_runtime_route,
+        trace_id,
+        state,
+        tx,
+        ProjectWorkflowRouting::ForceProjectWorkflow,
+    )
+    .await;
+}
+
+async fn run_for_project_in_workspace_with_routing(
+    user_id: &str,
+    project: &ProjectAccess,
+    workspace: &Path,
+    download_base: &str,
+    conversation_id: Option<&str>,
+    user_message: &str,
+    agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    trace_id: Option<&str>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+    workflow_routing: ProjectWorkflowRouting,
+) {
     let user_config_workspace = state.get_user_workspace(user_id);
     let require_existing_git = matches!(
         project.source_type.as_str(),
         "local_path" | "github" | "pc_managed"
     );
-    let requires_project_workflow = requires_project_workflow_for_message(user_message, workspace);
+    let auto_requires_project_workflow =
+        requires_project_workflow_for_message(user_message, workspace);
+    let requires_project_workflow = match workflow_routing {
+        ProjectWorkflowRouting::Auto => auto_requires_project_workflow,
+        ProjectWorkflowRouting::ForceProjectWorkflow => true,
+        ProjectWorkflowRouting::ForceCasualChat => false,
+    };
 
     if is_pure_project_delivery_message(user_message) {
         let apk_url = latest_project_delivery_apk_url(state, project, workspace, download_base);
@@ -361,6 +468,7 @@ pub async fn run_for_project_in_workspace(
         pc_runtime_route,
         trace_id,
         require_git_for_this_request,
+        workflow_routing == ProjectWorkflowRouting::ForceProjectWorkflow,
         state,
         &tx,
     )
@@ -1331,6 +1439,7 @@ async fn run_dispatch_with_workspace(
     pc_runtime_route: Option<PcRuntimeRoutePreference>,
     trace_id: Option<&str>,
     require_existing_git: bool,
+    force_code_route: bool,
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<()> {
@@ -1363,6 +1472,17 @@ async fn run_dispatch_with_workspace(
             needs_code_change: true,
             allow_user_agent_preference: true,
             reason: "project_resume_command",
+        };
+    }
+    if force_code_route && decision.route == CapabilityRoute::ChatAgent {
+        decision = RoutingDecision {
+            intent: intent_router::UserIntent::AppDevelopment,
+            route: CapabilityRoute::CodeAgent,
+            confidence: 76,
+            needs_image_generation: false,
+            needs_code_change: true,
+            allow_user_agent_preference: true,
+            reason: "project_direct_codex_mode",
         };
     }
     info!("intent routing decision: {:?}", decision);

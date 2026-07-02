@@ -70,7 +70,7 @@ pub(crate) async fn run_project_agent_in_execution_workspace(
             )
             .await;
         } else {
-            agent::run_for_project_in_workspace(
+            agent::run_project_workflow_for_project_in_workspace(
                 &agent_user_id,
                 &agent_project,
                 &agent_workspace,

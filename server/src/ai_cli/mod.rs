@@ -1,6 +1,7 @@
 // server/src/ai_cli/mod.rs
 
 mod ai_cli_chat;
+mod ai_cli_chat_policy;
 mod ai_cli_environment;
 mod ai_cli_intent_gate;
 mod ai_cli_native_session;
@@ -25,6 +26,7 @@ use std::{path::Path, sync::Arc};
 use tokio::sync::mpsc::UnboundedSender;
 use uuid::Uuid;
 
+pub(crate) use self::ai_cli_chat_policy::project_lightweight_chat_split_enabled;
 pub(crate) use self::ai_cli_environment::looks_like_android_task;
 pub(crate) use self::ai_cli_output::truncate_chars;
 pub use self::ai_cli_prewarm::prewarm_codex_session;
@@ -149,7 +151,9 @@ async fn run_with_workspace_mode(
     request_mode: AiCliRequestMode,
     started: std::time::Instant,
 ) -> Result<()> {
-    if request_mode == AiCliRequestMode::Execute
+    let lightweight_chat_split_enabled = project_lightweight_chat_split_enabled();
+    if lightweight_chat_split_enabled
+        && request_mode == AiCliRequestMode::Execute
         && route == intent_router::CapabilityRoute::ChatAgent
         && !intent_router::looks_like_development_request(user_message)
     {
@@ -173,17 +177,21 @@ async fn run_with_workspace_mode(
     }
 
     let planning_task = request_mode.is_plan();
-    let development_task = planning_task
-        || route != intent_router::CapabilityRoute::ChatAgent
-        || intent_router::looks_like_development_request(user_message);
-    let lightweight_chat_task =
-        route == intent_router::CapabilityRoute::ChatAgent && !development_task;
+    let lightweight_chat_task = ai_cli_chat_policy::should_use_project_lightweight_chat(
+        lightweight_chat_split_enabled,
+        planning_task,
+        route,
+        user_message,
+    );
+    let development_task = planning_task || !lightweight_chat_task;
     let tiny_chat_task = lightweight_chat_task && is_tiny_chat_message(user_message);
+    let prompt_route =
+        ai_cli_chat_policy::prompt_route_for_project_chat(lightweight_chat_split_enabled, route);
 
     // ── PC agent 委托（优先）──────────────────────────────────────────────────
     // 当云端有 PC agent（elon-pc-1）在线时，把 AI 提示委托给 PC 上的本地 Copilot CLI，
     // 利用 PC 性能处理项目开发请求，同时将结果流式返回给 APK。
-    // 普通聊天不走 PC CLI，避免把节点/CLI 降级等内部状态暴露到对话里。
+    // 只有显式开启轻量聊天分流时，普通聊天才留在轻量通道；默认项目消息直连 PC/Codex。
     // 通过 PC_CLI_RELAY_ENABLED=false 可禁用此功能，回退到云端本地 CLI。
     let pc_relay_enabled = std::env::var("PC_CLI_RELAY_ENABLED")
         .map(|v| v != "false")
@@ -347,7 +355,7 @@ async fn run_with_workspace_mode(
         user_message,
         preflight_note,
         &option,
-        route,
+        prompt_route,
         prompt_bootstrapped,
         request_mode,
     );
@@ -419,7 +427,7 @@ async fn run_with_workspace_mode(
                 user_message,
                 preflight_note,
                 &option,
-                route,
+                prompt_route,
                 prompt_bootstrapped,
                 request_mode,
             );
@@ -509,7 +517,7 @@ async fn run_with_workspace_mode(
             user_message,
             preflight_note,
             &option,
-            route,
+            prompt_route,
             prompt_bootstrapped,
             request_mode,
         );

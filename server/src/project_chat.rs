@@ -157,7 +157,7 @@ pub async fn chat_project(
     if req.chat_only.unwrap_or(false) {
         // 轻量对话：agent 子系统（悬浮球语音）借用服务器 AI 的对话能力，
         // 强制走 casual chat，绝不触发项目 Codex 工作流（避免误判开发任务而超时）。
-        agent::run_for_project(
+        agent::run_chat_only_for_project(
             &user.id,
             &project,
             &download_base,
@@ -665,11 +665,14 @@ pub(crate) async fn run_project_agent_with_scheduler(
         .map(|n| !n.is_empty())
         .unwrap_or(false);
     let direct_pc_cli_enabled = direct_pc_cli && is_pc_node_project && !execution_mode.is_plan();
+    let lightweight_chat_split_enabled = ai_cli::project_lightweight_chat_split_enabled();
+    let direct_codex_project_mode = !lightweight_chat_split_enabled && !execution_mode.is_plan();
     // force_cli: 悬浮球手机控制专用模式，绕过本地 intent_router 分流，
     // 直接进入 Codex CLI 意图门控，由 Codex 自己判断"闲聊还是生成脚本"。
     let needs_project_workflow = execution_mode.is_plan()
         || execution_mode.is_force_cli()
         || direct_pc_cli_enabled
+        || direct_codex_project_mode
         || routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
     if needs_project_workflow && !can_edit(&project.role) {
         let apk_url = if agent_intent::is_project_delivery_request(&message, &base_workspace)
@@ -702,7 +705,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
     // 不能跳过（否则 Codex 不读 AGENTS.md，无法生成手机控制 JSON）。
     let skip_intent_gate = needs_project_workflow
         && !execution_mode.is_force_cli()
-        && routing_decision.confidence >= 84;
+        && (!lightweight_chat_split_enabled || routing_decision.confidence >= 84);
     if let Some(trace_id) = trace_id.as_deref() {
         state.server_traces.record(
             trace_id,
@@ -713,6 +716,7 @@ pub(crate) async fn run_project_agent_with_scheduler(
                 "local_reason": routing_decision.reason,
                 "skip_intent_gate": skip_intent_gate,
                 "direct_pc_cli": direct_pc_cli_enabled,
+                "lightweight_chat_split_enabled": lightweight_chat_split_enabled,
                 "execution_mode": execution_mode.as_str(),
             }),
         );
@@ -794,19 +798,35 @@ pub(crate) async fn run_project_agent_with_scheduler(
             .await;
             return;
         }
-        agent::run_for_project(
-            &user_id,
-            &project,
-            &download_base,
-            Some(&conversation_id),
-            &message,
-            agent_name.as_deref(),
-            pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
-            trace_id.as_deref(),
-            &state,
-            tx,
-        )
-        .await;
+        if needs_project_workflow {
+            agent::run_project_workflow_for_project(
+                &user_id,
+                &project,
+                &download_base,
+                Some(&conversation_id),
+                &message,
+                agent_name.as_deref(),
+                pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
+                trace_id.as_deref(),
+                &state,
+                tx,
+            )
+            .await;
+        } else {
+            agent::run_for_project(
+                &user_id,
+                &project,
+                &download_base,
+                Some(&conversation_id),
+                &message,
+                agent_name.as_deref(),
+                pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
+                trace_id.as_deref(),
+                &state,
+                tx,
+            )
+            .await;
+        }
         return;
     }
 
