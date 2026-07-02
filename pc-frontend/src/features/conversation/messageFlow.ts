@@ -2,7 +2,8 @@ import { clean } from '../../lib/utils'
 import type { Message } from './types'
 
 const TASK_PROCESS_KINDS = new Set(['ai_task', 'ai_progress', 'ai_result'])
-const CONVERSATION_TASK_ROLES = new Set(['user', 'human', 'assistant', 'ai', 'bot'])
+const CONVERSATION_USER_TASK_ROLES = new Set(['user', 'human'])
+const CONVERSATION_ASSISTANT_TASK_ROLES = new Set(['assistant', 'ai', 'bot'])
 const TERMINAL_TASK_STATUSES = new Set(['done', 'failed', 'error', 'canceled', 'cancelled', 'interrupted'])
 
 export type SingleMessageGroup = {
@@ -161,10 +162,21 @@ function mergeConversationMessagesWithTaskProcess(
     const taskId = messageTaskId(message)
     const taskMessages = taskId ? taskMessagesById.get(taskId) : undefined
 
-    if (taskId && taskMessages?.length && shouldReplaceConversationMessageWithTaskProcess(message)) {
+    if (taskId && taskMessages?.length && isConversationUserTaskMessage(message)) {
       if (!insertedTaskIds.has(taskId)) {
         for (const taskMessage of taskMessages) pushUniqueMessage(merged, seen, taskMessage)
         insertedTaskIds.add(taskId)
+      }
+      continue
+    }
+
+    if (taskId && taskMessages?.length && isConversationAssistantTaskMessage(message)) {
+      if (!insertedTaskIds.has(taskId)) {
+        for (const taskMessage of taskMessages) pushUniqueMessage(merged, seen, taskMessage)
+        insertedTaskIds.add(taskId)
+      }
+      if (!taskMessages.some((taskMessage) => messageKind(taskMessage) === 'ai_result')) {
+        pushUniqueMessage(merged, seen, assistantMessageAsTaskResult(message))
       }
       continue
     }
@@ -175,8 +187,22 @@ function mergeConversationMessagesWithTaskProcess(
   return merged
 }
 
-function shouldReplaceConversationMessageWithTaskProcess(message: Message): boolean {
-  return CONVERSATION_TASK_ROLES.has(messageKind(message))
+function isConversationUserTaskMessage(message: Message): boolean {
+  return CONVERSATION_USER_TASK_ROLES.has(messageKind(message))
+}
+
+function isConversationAssistantTaskMessage(message: Message): boolean {
+  return CONVERSATION_ASSISTANT_TASK_ROLES.has(messageKind(message))
+}
+
+function assistantMessageAsTaskResult(message: Message): Message {
+  return {
+    ...message,
+    id: `task-result-${clean(message.id) || messageIdentity(message)}`,
+    kind: 'ai_result',
+    role: undefined,
+    task_status: clean(message.task_status ?? message.taskStatus) || 'done',
+  }
 }
 
 function pushUniqueMessage(target: Message[], seen: Set<string>, message: Message) {

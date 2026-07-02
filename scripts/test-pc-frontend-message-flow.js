@@ -71,6 +71,33 @@ try {
     'task group should preserve user request, progress, and final result together',
   );
 
+  const inFlightTaskMessages = taskMessages.slice(0, 2);
+  const mergedWithAssistantFallback = buildDisplayMessages({
+    sessionView: 'conv-1',
+    channelMessages: [],
+    conversationMessages,
+    conversationLoading: false,
+    taskMessagesById: buildTaskProcessMessageMap([inFlightTaskMessages]),
+  });
+  assert.deepStrictEqual(
+    mergedWithAssistantFallback.map((message) => message.id),
+    ['pcm-task', 'pcm-progress', 'task-result-msg-assistant'],
+    'assistant conversation reply should remain visible when channel ai_result is not available yet',
+  );
+  assert.strictEqual(
+    mergedWithAssistantFallback[2].kind,
+    'ai_result',
+    'assistant fallback should render inside the structured task group as the final result',
+  );
+  assert.strictEqual(hasRunningTask(mergedWithAssistantFallback), false, 'assistant fallback should close the task');
+  const fallbackGroups = buildMessageGroups(mergedWithAssistantFallback, true);
+  assert.strictEqual(fallbackGroups.length, 1, 'assistant fallback should stay connected to the task group');
+  assert.deepStrictEqual(
+    fallbackGroups[0].messages.map((message) => message.id),
+    ['pcm-task', 'pcm-progress', 'task-result-msg-assistant'],
+    'task group should include the fallback final answer',
+  );
+
   const runningMessages = taskMessages.slice(0, 2);
   assert.strictEqual(hasRunningTask(runningMessages), true, 'task without result should remain running');
 
