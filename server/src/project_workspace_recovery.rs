@@ -10,7 +10,7 @@ use std::sync::Arc;
 use homecli_proto::{AgentToServer, ProjectWorkspaceInspectStatus};
 
 use crate::{
-    project_auth::{auth_from_headers, json_error, project_access},
+    project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_storage, project_workspace_provision,
     store::{is_system_project_source_type, ProjectSummary, UserArchiveProject},
     types::AppState,
@@ -50,7 +50,14 @@ pub async fn recover_project_workspace(
         Ok(access) => access,
         Err(e) => return json_error(StatusCode::NOT_FOUND, e),
     };
-    if access.role != "owner" {
+    let action = req.action.trim();
+    if action == "bind_pc_node" && !can_edit(&access.role) {
+        return json_error(
+            StatusCode::FORBIDDEN,
+            "只有项目 owner、管理员或协作者可以绑定自己的 PC 工作区",
+        );
+    }
+    if action != "bind_pc_node" && access.role != "owner" {
         return json_error(StatusCode::FORBIDDEN, "只有项目 owner 可以修复 PC 工作区");
     }
 
@@ -65,7 +72,6 @@ pub async fn recover_project_workspace(
         );
     }
 
-    let action = req.action.trim();
     let requested_node = req
         .node_id
         .as_deref()
@@ -87,6 +93,7 @@ pub async fn recover_project_workspace(
                 &state,
                 &user.id,
                 &project.id,
+                &access.role,
                 &target_node,
                 workspace_path,
             )
@@ -158,8 +165,10 @@ pub async fn recover_project_workspace(
         .as_deref()
         .filter(|origin| Some(*origin) != local_storage_path)
         .or(project.repo_url.as_deref());
-    let rebound = match state.store.bind_project_to_pc_workspace(
+    let rebound = match persist_project_workspace_binding(
+        &state,
         &user.id,
+        &access.role,
         &project.id,
         &provisioned.workspace_path,
         &target_node,
@@ -201,6 +210,7 @@ pub async fn bind_existing_pc_workspace(
     state: &AppState,
     user_id: &str,
     project_id: &str,
+    project_role: &str,
     node_id: &str,
     workspace_path: &str,
 ) -> Result<(ProjectSummary, ProjectWorkspaceInspectStatus), (StatusCode, String)> {
@@ -236,6 +246,7 @@ pub async fn bind_existing_pc_workspace(
                     state,
                     user_id,
                     project_id,
+                    project_role,
                     &target_node,
                     workspace_path,
                 );
@@ -249,40 +260,76 @@ pub async fn bind_existing_pc_workspace(
             workspace_binding_problem(&status).to_string(),
         ));
     }
-    let rebound = state
-        .store
-        .bind_project_to_pc_workspace(
+    let rebound = persist_project_workspace_binding(
+        state,
+        user_id,
+        project_role,
+        project_id,
+        &status.workspace_path,
+        &target_node,
+        status.git_head.as_deref(),
+        status.git_remote_origin.as_deref(),
+        status.git_branch.as_deref(),
+    )
+    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    Ok((rebound, status))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn persist_project_workspace_binding(
+    state: &AppState,
+    user_id: &str,
+    project_role: &str,
+    project_id: &str,
+    workspace_path: &str,
+    node_id: &str,
+    git_head: Option<&str>,
+    repo_url: Option<&str>,
+    branch: Option<&str>,
+) -> anyhow::Result<ProjectSummary> {
+    if project_role == "owner" {
+        state.store.bind_project_to_pc_workspace(
             user_id,
             project_id,
-            &status.workspace_path,
-            &target_node,
-            status.git_head.as_deref(),
-            status.git_remote_origin.as_deref(),
-            status.git_branch.as_deref(),
+            workspace_path,
+            node_id,
+            git_head,
+            repo_url,
+            branch,
         )
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
-    Ok((rebound, status))
+    } else {
+        state.store.bind_project_member_to_pc_workspace(
+            user_id,
+            project_id,
+            workspace_path,
+            node_id,
+            git_head,
+            repo_url,
+            branch,
+        )
+    }
 }
 
 fn persist_pc_workspace_binding_after_inspect_timeout(
     state: &AppState,
     user_id: &str,
     project_id: &str,
+    project_role: &str,
     node_id: &str,
     workspace_path: &str,
 ) -> Result<(ProjectSummary, ProjectWorkspaceInspectStatus), (StatusCode, String)> {
-    let rebound = state
-        .store
-        .bind_project_to_pc_workspace(
-            user_id,
-            project_id,
-            workspace_path,
-            node_id,
-            None,
-            None,
-            None,
-        )
-        .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
+    let rebound = persist_project_workspace_binding(
+        state,
+        user_id,
+        project_role,
+        project_id,
+        workspace_path,
+        node_id,
+        None,
+        None,
+        None,
+    )
+    .map_err(|error| (StatusCode::INTERNAL_SERVER_ERROR, error.to_string()))?;
     Ok((rebound, unconfirmed_workspace_status(workspace_path)))
 }
 

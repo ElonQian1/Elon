@@ -90,6 +90,7 @@ pub async fn chat_project(
                     &state,
                     &user.id,
                     &project.id,
+                    &project.role,
                     node_id,
                     workspace_path,
                 )

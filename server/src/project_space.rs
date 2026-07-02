@@ -1630,6 +1630,7 @@ async fn start_channel_ai_task_response(
                     &state,
                     &user_id,
                     &project.id,
+                    &project.role,
                     node_id,
                     workspace_path,
                 )

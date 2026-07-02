@@ -39,7 +39,7 @@ pub(crate) fn schedule_assignment_run(
         anyhow::bail!("当前 Assignment 状态不能重复执行");
     }
 
-    let workspace_path = resolve_workspace_path(&access, &assignment)?;
+    let workspace_path = resolve_workspace_path(&state, &access, &assignment)?;
     let runtime_permission =
         runtime_permission_for_assignment(&state, &access, &matter.project_id, &assignment)?;
     let prompt = build_assignment_execution_prompt(
@@ -331,11 +331,20 @@ fn finish_assignment_failure(job: &AssignmentRunJob, capture: PcAgentWorkspaceCa
 }
 
 fn resolve_workspace_path(
+    state: &AppState,
     access: &ProjectAccess,
     assignment: &ProjectAiMatterAssignment,
 ) -> Result<String> {
-    [
+    let provider_binding = state.store.get_project_pc_workspace_binding(
+        &assignment.provider_user_id,
+        &access.id,
+        &assignment.node_id,
+    )?;
+    let workspace_path = [
         assignment.worktree_path.as_deref(),
+        provider_binding
+            .as_ref()
+            .map(|binding| binding.workspace_path.as_str()),
         access.workspace_path.as_deref(),
         access.storage_worktree_path.as_deref(),
     ]
@@ -344,7 +353,8 @@ fn resolve_workspace_path(
     .map(str::trim)
     .find(|value| !value.is_empty())
     .map(ToOwned::to_owned)
-    .ok_or_else(|| anyhow!("项目没有可派发到 PC 节点的 workspace_path"))
+    .ok_or_else(|| anyhow!("项目没有可派发到 PC 节点的 workspace_path"));
+    workspace_path
 }
 
 fn runtime_permission_for_assignment(

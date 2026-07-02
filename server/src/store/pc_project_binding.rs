@@ -2,8 +2,8 @@ use anyhow::{anyhow, Result};
 use rusqlite::{params, Connection, OptionalExtension};
 
 use super::{
-    new_id, now, project_branding, project_identities, ProjectPcWorkspaceBinding, ProjectSummary,
-    Store,
+    is_system_project_source_type, new_id, now, project_branding, project_identities,
+    ProjectAccess, ProjectPcWorkspaceBinding, ProjectSummary, Store,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -241,6 +241,88 @@ impl Store {
         .ok_or_else(|| anyhow!("项目绑定成功但重新读取失败"))
     }
 
+    /// 为可编辑成员记录其自己的 PC 工作区，不改写项目 owner 的全局主绑定。
+    pub fn bind_project_member_to_pc_workspace(
+        &self,
+        user_id: &str,
+        project_id: &str,
+        workspace_path: &str,
+        node_id: &str,
+        git_head: Option<&str>,
+        repo_url: Option<&str>,
+        branch: Option<&str>,
+    ) -> Result<ProjectSummary> {
+        let workspace_path = workspace_path.trim();
+        let node_id = node_id.trim();
+        if workspace_path.is_empty() {
+            return Err(anyhow!("workspace_path 不能为空"));
+        }
+        if node_id.is_empty() {
+            return Err(anyhow!("node_id 不能为空"));
+        }
+
+        let now = now();
+        let conn = self.conn()?;
+        let tx = conn.unchecked_transaction()?;
+        let (role, source_type): (String, String) = tx
+            .query_row(
+                "SELECT pm.role, p.source_type
+                   FROM projects p
+                   JOIN project_members pm ON pm.project_id = p.id
+                  WHERE p.id = ?1 AND pm.user_id = ?2 AND p.status != 'deleted'",
+                params![project_id, user_id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
+            .optional()?
+            .ok_or_else(|| anyhow!("项目不存在或当前用户不是项目成员"))?;
+        if !matches!(role.as_str(), "owner" | "admin" | "editor") {
+            return Err(anyhow!(
+                "只有项目 owner、管理员或协作者可以绑定自己的 PC 工作区"
+            ));
+        }
+        if is_system_project_source_type(&source_type) {
+            return Err(anyhow!("系统归档项目不能绑定 PC 工作区"));
+        }
+
+        upsert_project_pc_workspace_binding_tx(
+            &tx,
+            project_id,
+            user_id,
+            node_id,
+            workspace_path,
+            git_head,
+            repo_url,
+            branch,
+            "member_pc_workspace_binding",
+            &now,
+        )?;
+        tx.execute(
+            "INSERT INTO project_events (id, project_id, user_id, event_type, payload_json, created_at)
+             VALUES (?1, ?2, ?3, 'member_pc_workspace_bound', ?4, ?5)",
+            params![
+                new_id("evt"),
+                project_id,
+                user_id,
+                serde_json::json!({
+                    "workspace_path": workspace_path,
+                    "node_id": node_id,
+                    "git_head": git_head,
+                    "repo_url": repo_url,
+                    "branch": branch,
+                })
+                .to_string(),
+                now
+            ],
+        )?;
+        tx.commit()?;
+        drop(conn);
+
+        self.list_projects_for_user(user_id)?
+            .into_iter()
+            .find(|project| project.id == project_id)
+            .ok_or_else(|| anyhow!("成员工作区绑定成功但重新读取失败"))
+    }
+
     pub fn get_project_pc_workspace_binding(
         &self,
         user_id: &str,
@@ -277,5 +359,137 @@ impl Store {
             )
             .optional()
             .map_err(Into::into)
+    }
+}
+
+pub(super) fn apply_user_pc_workspace_binding_to_summary(
+    conn: &Connection,
+    user_id: &str,
+    project: &mut ProjectSummary,
+) -> Result<()> {
+    if let Some(binding) = latest_user_pc_workspace_binding(conn, user_id, &project.id)? {
+        project.workspace_path = Some(binding.workspace_path);
+        project.node_id = Some(binding.node_id);
+    }
+    Ok(())
+}
+
+pub(super) fn apply_user_pc_workspace_binding_to_access(
+    conn: &Connection,
+    user_id: &str,
+    access: &mut ProjectAccess,
+) -> Result<()> {
+    if let Some(binding) = latest_user_pc_workspace_binding(conn, user_id, &access.id)? {
+        access.workspace_path = Some(binding.workspace_path);
+        access.node_id = Some(binding.node_id);
+    }
+    Ok(())
+}
+
+fn latest_user_pc_workspace_binding(
+    conn: &Connection,
+    user_id: &str,
+    project_id: &str,
+) -> Result<Option<ProjectPcWorkspaceBinding>> {
+    conn.query_row(
+        "SELECT project_id, owner_user_id, node_id, workspace_path,
+                repo_url, branch, git_head, source, updated_at
+           FROM project_pc_workspace_bindings
+          WHERE project_id = ?1 AND owner_user_id = ?2
+          ORDER BY updated_at DESC
+          LIMIT 1",
+        params![project_id, user_id],
+        |row| {
+            Ok(ProjectPcWorkspaceBinding {
+                project_id: row.get(0)?,
+                owner_user_id: row.get(1)?,
+                node_id: row.get(2)?,
+                workspace_path: row.get(3)?,
+                repo_url: row.get(4)?,
+                branch: row.get(5)?,
+                git_head: row.get(6)?,
+                source: row.get(7)?,
+                updated_at: row.get(8)?,
+            })
+        },
+    )
+    .optional()
+    .map_err(Into::into)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use uuid::Uuid;
+
+    fn temp_store() -> Store {
+        let path = std::env::temp_dir().join(format!(
+            "elon-member-pc-binding-{}.db",
+            Uuid::new_v4().simple()
+        ));
+        Store::open(&path).expect("store should open")
+    }
+
+    #[test]
+    fn editor_binding_overlays_only_the_editors_workspace() {
+        let store = temp_store();
+        let owner = store
+            .create_user("pc-owner@example.com", "secret1", None, None)
+            .expect("owner should be created");
+        let editor = store
+            .create_user("pc-editor@example.com", "secret1", None, None)
+            .expect("editor should be created");
+        let project = store
+            .create_project(&owner.id, "Collaborative PC Project", None, None)
+            .expect("project should be created")
+            .project;
+        store
+            .add_project_member_by_account(&project.id, &editor.id, "editor")
+            .expect("editor should be added");
+        store
+            .bind_project_to_pc_workspace(
+                &owner.id,
+                &project.id,
+                "D:/owner/project",
+                "node-owner",
+                Some("owner-head"),
+                Some("git@example.com:owner/project.git"),
+                Some("main"),
+            )
+            .expect("owner workspace should bind");
+
+        let rebound = store
+            .bind_project_member_to_pc_workspace(
+                &editor.id,
+                &project.id,
+                "E:/editor/project",
+                "node-editor",
+                Some("editor-head"),
+                Some("git@example.com:owner/project.git"),
+                Some("main"),
+            )
+            .expect("editor workspace should bind");
+
+        assert_eq!(rebound.role, "editor");
+        assert_eq!(rebound.node_id.as_deref(), Some("node-editor"));
+        assert_eq!(rebound.workspace_path.as_deref(), Some("E:/editor/project"));
+
+        let editor_access = store
+            .get_project_access(&editor.id, &project.id)
+            .expect("editor access should resolve");
+        assert_eq!(editor_access.node_id.as_deref(), Some("node-editor"));
+        assert_eq!(
+            editor_access.workspace_path.as_deref(),
+            Some("E:/editor/project")
+        );
+
+        let owner_access = store
+            .get_project_access(&owner.id, &project.id)
+            .expect("owner access should resolve");
+        assert_eq!(owner_access.node_id.as_deref(), Some("node-owner"));
+        assert_eq!(
+            owner_access.workspace_path.as_deref(),
+            Some("D:/owner/project")
+        );
     }
 }

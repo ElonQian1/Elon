@@ -801,6 +801,9 @@ impl Store {
         drop(stmt);
         for project in &mut projects {
             apply_effective_project_summary_role(&conn, user_id, project)?;
+            pc_project_binding::apply_user_pc_workspace_binding_to_summary(
+                &conn, user_id, project,
+            )?;
         }
 
         Ok(projects)
@@ -853,6 +856,7 @@ impl Store {
         {
             access.role = effective_role;
         }
+        pc_project_binding::apply_user_pc_workspace_binding_to_access(&conn, user_id, &mut access)?;
         drop(conn);
         if self.project_member_is_banned(project_id, user_id)? {
             anyhow::bail!("你已被该项目封禁，无法访问项目空间");

@@ -167,6 +167,7 @@ pub(crate) async fn handle_project_ws(
                         &state,
                         &user.id,
                         &project.id,
+                        &project.role,
                         node_id,
                         workspace_path,
                     )
