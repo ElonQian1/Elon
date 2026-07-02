@@ -248,7 +248,7 @@ bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
 bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
 ```
 
-脚本会读取 `.env.local` / `ELON_DEV_CARGO_TARGET_DIR`，设置开发用 `CARGO_TARGET_DIR` 并在 target 目录上加锁。同一台机器多个 AI 可以复用同一份开发编译缓存，但同一时间只允许一个 Cargo 进程写这个 target，避免 dep-info / fingerprint 临时文件互踩。不要把开发验证 target 和发布构建 target 混用；服务端发布继续由 `RUST_SERVER_MUSL_TARGET_DIR` + `publish-server.*` 管理。
+脚本会读取 `.env.local` / `ELON_DEV_CARGO_TARGET_DIR`，设置开发用 `CARGO_TARGET_DIR` 并在 target 目录上加锁。同一台机器多个 AI 可以复用同一份开发编译缓存，但同一时间只允许一个 Cargo 进程写这个 target，避免 dep-info / fingerprint 临时文件互踩。版本化的 pre-push hook 也必须走同一个 `cargo-dev` 入口。不要把开发验证 target 和发布构建 target 混用；服务端发布继续由 `RUST_SERVER_MUSL_TARGET_DIR` + `publish-server.*` 管理。
 
 ```powershell
 # ✅ 一条命令格式化所有本次改动的 .rs 文件（修改 + 新增全覆盖）

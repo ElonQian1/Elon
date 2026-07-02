@@ -33,10 +33,9 @@ if [ -n "$UNTRACKED_RS" ]; then
 fi
 
 # 2. cargo check 守门（如果存在 server/Cargo.toml）
-# 2. cargo check 守门（如果存在 server/Cargo.toml）
 if [ -f "server/Cargo.toml" ]; then
-  echo -e "${YELLOW}🔍 pre-push: cargo check --workspace（server）...${NC}"
-  if ! (cd server && cargo check --workspace --quiet 2>&1); then
+  echo -e "${YELLOW}🔍 pre-push: scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace...${NC}"
+  if ! bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml --workspace --quiet 2>&1; then
     echo -e "${RED}❌ pre-push 拒绝：cargo check 失败${NC}" >&2
     echo -e "${YELLOW}   修复编译错误后再 push。${NC}" >&2
     exit 1

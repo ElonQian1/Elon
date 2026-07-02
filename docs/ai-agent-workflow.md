@@ -291,7 +291,7 @@ bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
 bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
 ```
 
-`scripts/cargo-dev.*` 会读取 `.env.local`，设置 `CARGO_TARGET_DIR`，并在目标目录上加锁。这样多个 worktree / 多个 AI 可以复用同一份日常编译缓存，但不会同时写入同一个 target。不要并行裸跑 `cargo check` 和 `cargo test` 到同一个 `server/target` 或同一个共享 target；如确实要并行验证，必须显式指定不同 `ELON_DEV_CARGO_TARGET_DIR` / `-TargetDir` / `--target-dir`。
+`scripts/cargo-dev.*` 会读取 `.env.local`，设置 `CARGO_TARGET_DIR`，并在目标目录上加锁。这样多个 worktree / 多个 AI 可以复用同一份日常编译缓存，但不会同时写入同一个 target。版本化的 pre-push hook 也走同一个 `cargo-dev` 入口。不要并行裸跑 `cargo check` 和 `cargo test` 到同一个 `server/target` 或同一个共享 target；如确实要并行验证，必须显式指定不同 `ELON_DEV_CARGO_TARGET_DIR` / `-TargetDir` / `--target-dir`。
 
 ### 7.3 Android APK 编译打包
 ```powershell

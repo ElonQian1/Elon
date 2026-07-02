@@ -6,7 +6,7 @@
     Daily AI validation should reuse a persistent dev target for speed, but Cargo
     commands must not write the same target directory concurrently. This wrapper
     resolves a machine-local target directory, sets CARGO_TARGET_DIR for the child
-    cargo process, and serializes writes with a lock file.
+    cargo process, and serializes writes with a lock directory.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
@@ -104,7 +104,7 @@ function Resolve-DevCargoTargetDir {
     return $fullPath
 }
 
-function Lock-File {
+function Lock-Directory {
     param(
         [string]$Path,
         [int]$TimeoutSeconds
@@ -113,20 +113,16 @@ function Lock-File {
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     while ($true) {
         try {
-            $stream = [System.IO.File]::Open(
-                $Path,
-                [System.IO.FileMode]::OpenOrCreate,
-                [System.IO.FileAccess]::ReadWrite,
-                [System.IO.FileShare]::None
-            )
+            New-Item -ItemType Directory -Path $Path -ErrorAction Stop | Out-Null
             $content = "pid=$PID`nstarted_utc=$([DateTime]::UtcNow.ToString("o"))`n"
-            $bytes = [System.Text.Encoding]::UTF8.GetBytes($content)
-            $stream.SetLength(0)
-            $stream.Write($bytes, 0, $bytes.Length)
-            $stream.Flush()
-            return $stream
-        } catch [System.IO.IOException] {
+            Set-Content -LiteralPath (Join-Path $Path "owner") -Value $content -NoNewline -Encoding UTF8
+            return $Path
+        } catch {
             if ([DateTime]::UtcNow -ge $deadline) {
+                $owner = Join-Path $Path "owner"
+                if (Test-Path -LiteralPath $owner) {
+                    Write-Host (Get-Content -LiteralPath $owner -Raw)
+                }
                 throw "Timed out waiting for Cargo dev target lock: $Path"
             }
             Start-Sleep -Seconds 2
@@ -137,15 +133,15 @@ function Lock-File {
 Import-LocalEnvFile -Path (Join-Path $RepoRoot ".env.local")
 
 $ResolvedTargetDir = Resolve-DevCargoTargetDir -RepoRoot $RepoRoot -ExplicitTargetDir $TargetDir
-$LockPath = Join-Path $ResolvedTargetDir ".cargo-dev.lock"
-$lockStream = $null
+$LockPath = Join-Path $ResolvedTargetDir ".cargo-dev.lockdir"
+$lockDir = $null
 $oldCargoTargetDir = $env:CARGO_TARGET_DIR
 $hadCargoTargetDir = Test-Path Env:CARGO_TARGET_DIR
 
 try {
     if (-not $NoLock) {
         Write-Host "Waiting for Cargo dev target lock: $LockPath"
-        $lockStream = Lock-File -Path $LockPath -TimeoutSeconds $LockTimeoutSeconds
+        $lockDir = Lock-Directory -Path $LockPath -TimeoutSeconds $LockTimeoutSeconds
     }
 
     $env:CARGO_TARGET_DIR = $ResolvedTargetDir
@@ -154,8 +150,12 @@ try {
     & cargo @CargoArgs
     exit $LASTEXITCODE
 } finally {
-    if ($lockStream) {
-        $lockStream.Dispose()
+    if ($lockDir) {
+        $owner = Join-Path $lockDir "owner"
+        $ownerText = if (Test-Path -LiteralPath $owner) { Get-Content -LiteralPath $owner -Raw } else { "" }
+        if ($ownerText -match "pid=$PID") {
+            Remove-Item -LiteralPath $lockDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
     if ($hadCargoTargetDir) {
         $env:CARGO_TARGET_DIR = $oldCargoTargetDir
