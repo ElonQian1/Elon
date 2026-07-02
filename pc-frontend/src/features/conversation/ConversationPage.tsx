@@ -23,7 +23,7 @@ import {
   routeModelButtonCopy,
   selectedAgentForRuntimeRoute,
 } from '../models/routeModelPolicy'
-import { initialRuntimeRouteFromStorage, persistRuntimeRouteSelection } from './runtimeRoutes'
+import { initialProjectRuntimeRouteFromStorage, persistProjectRuntimeRouteSelection } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 import type {
   Channel,
@@ -158,7 +158,7 @@ export default function ConversationPage() {
   const [sendError, setSendError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
   const [showModelPicker, setShowModelPicker] = useState(false)
-  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialRuntimeRouteFromStorage(
+  const [runtimeRoute, setRuntimeRoute] = useState<RuntimeRoute>(() => initialProjectRuntimeRouteFromStorage(
     typeof window === 'undefined' ? null : window.localStorage,
   ))
   const [directPcCli, setDirectPcCli] = useState(() => initialDirectPcCliFromStorage(
@@ -228,7 +228,7 @@ export default function ConversationPage() {
   useEffect(() => { loadProjects() }, [user?.id]) // eslint-disable-line
 
   useEffect(() => {
-    persistRuntimeRouteSelection(window.localStorage, runtimeRoute)
+    persistProjectRuntimeRouteSelection(window.localStorage, runtimeRoute)
   }, [runtimeRoute])
 
   useEffect(() => {

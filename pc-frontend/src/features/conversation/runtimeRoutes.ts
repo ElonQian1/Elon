@@ -21,6 +21,8 @@ export const RUNTIME_ROUTE_STORAGE_KEY = 'elon_pc_project_runtime_route'
 export const RUNTIME_ROUTE_DEFAULT_VERSION_KEY = 'elon_pc_project_runtime_route_default_v2'
 export const RUNTIME_ROUTE_DEFAULT_VERSION = 'platform-ai-default-20260630'
 export const DEFAULT_RUNTIME_ROUTE: RuntimeRoute = 'route_c'
+export const PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION = 'project-local-codex-default-20260702'
+export const DEFAULT_PROJECT_RUNTIME_ROUTE: RuntimeRoute = 'route_a'
 
 export const FIRST_STAGE_RUNTIME_ROUTES: RuntimeRouteOption[] = [
   {
@@ -127,12 +129,32 @@ export function initialRuntimeRouteFromStorage(storage?: Storage | null): Runtim
   return normalizeRuntimeRoute(stored)
 }
 
+export function initialProjectRuntimeRouteFromStorage(storage?: Storage | null): RuntimeRoute {
+  if (!storage) return DEFAULT_PROJECT_RUNTIME_ROUTE
+  const stored = getStorageValue(storage, RUNTIME_ROUTE_STORAGE_KEY)
+  const defaultVersion = getStorageValue(storage, RUNTIME_ROUTE_DEFAULT_VERSION_KEY)
+  if (!stored || (!defaultVersion && stored === 'auto')) return DEFAULT_PROJECT_RUNTIME_ROUTE
+  if (stored === DEFAULT_RUNTIME_ROUTE && defaultVersion !== PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION) {
+    return DEFAULT_PROJECT_RUNTIME_ROUTE
+  }
+  return normalizeRuntimeRoute(stored, DEFAULT_PROJECT_RUNTIME_ROUTE)
+}
+
 export function persistRuntimeRouteSelection(storage: Storage | null | undefined, value: RuntimeRoute): void {
   try {
     storage?.setItem(RUNTIME_ROUTE_STORAGE_KEY, value)
     storage?.setItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, RUNTIME_ROUTE_DEFAULT_VERSION)
   } catch {
     // Ignore blocked storage; the selected route still works for the current session.
+  }
+}
+
+export function persistProjectRuntimeRouteSelection(storage: Storage | null | undefined, value: RuntimeRoute): void {
+  try {
+    storage?.setItem(RUNTIME_ROUTE_STORAGE_KEY, value)
+    storage?.setItem(RUNTIME_ROUTE_DEFAULT_VERSION_KEY, PROJECT_RUNTIME_ROUTE_DEFAULT_VERSION)
+  } catch {
+    // Ignore blocked storage; the selected value still works for the current session.
   }
 }
 

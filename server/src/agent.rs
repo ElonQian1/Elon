@@ -13,8 +13,7 @@ use crate::{
         is_short_build_command, is_short_resume_command,
     },
     agent_routing::{
-        api_agent_name, choose_backend, has_api_agents, is_local_cli_option, quick_casual_reply,
-        resolve_cli_option_id,
+        api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
     },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
@@ -106,30 +105,15 @@ pub async fn run_for_project_in_workspace(
     }
 
     if !requires_project_workflow {
-        if let Some(reply) = quick_casual_reply(user_message) {
-            let _ = tx.send(
-                WsMessage::Done {
-                    message: reply.to_string(),
-                    apk_url: None,
-                    image_url: None,
-                    model_used: None,
-                    node_id: None,
-                }
-                .to_json(),
-            );
-            return;
-        }
-
         let requested_agent_name = requested_agent_for_runtime_route(agent_name, pc_runtime_route);
-        let force_pc_cli_chat = pc_cli_chat_requested(pc_runtime_route)
-            || agent_name
-                .map(|name| is_local_cli_option(state, name))
-                .unwrap_or(false);
-        if force_pc_cli_chat {
+        let agent_is_local_cli = agent_name
+            .map(|name| is_local_cli_option(state, name))
+            .unwrap_or(false);
+        if project_chat_should_use_pc_cli(pc_runtime_route, agent_name, agent_is_local_cli) {
             let route_label = pc_cli_chat_route_label(pc_runtime_route);
             let Some(agent_id) = resolve_pc_chat_agent(state, user_id, project).await else {
                 let msg = format!(
-                    "已选择{route_label}，但当前项目还没有绑定可用 PC 节点。请先连接节点，或切回平台 AI。"
+                    "项目会话默认交给{route_label}处理，但当前项目还没有绑定可用 PC 节点。请先连接节点，或手动切换到平台 AI。"
                 );
                 warn!("{msg}");
                 let _ = tx.send(WsMessage::error(msg).to_json());
@@ -432,6 +416,33 @@ fn pc_cli_chat_requested(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> 
         pc_runtime_route,
         Some(PcRuntimeRoutePreference::RouteA | PcRuntimeRoutePreference::RouteC3)
     )
+}
+
+fn project_chat_should_use_pc_cli(
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    agent_name: Option<&str>,
+    agent_is_local_cli: bool,
+) -> bool {
+    if pc_cli_chat_requested(pc_runtime_route) {
+        return true;
+    }
+    if matches!(
+        pc_runtime_route,
+        Some(
+            PcRuntimeRoutePreference::RouteB
+                | PcRuntimeRoutePreference::RouteC
+                | PcRuntimeRoutePreference::RouteC2
+        )
+    ) {
+        return false;
+    }
+    if agent_name
+        .map(str::trim)
+        .is_some_and(|name| !name.is_empty())
+    {
+        return agent_is_local_cli;
+    }
+    true
 }
 
 fn pc_cli_chat_route_label(pc_runtime_route: Option<PcRuntimeRoutePreference>) -> &'static str {
@@ -1762,9 +1773,9 @@ mod tests {
     use super::{
         pc_cli_chat_requested, pc_cli_chat_route_label,
         pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
-        pc_workspace_inspect_usable, project_fields_require_pc_workspace,
-        requires_project_workflow_for_message, should_attempt_pc_apk_sync,
-        BOUND_PC_NODE_RECONNECT_WAIT_SECS,
+        pc_workspace_inspect_usable, project_chat_should_use_pc_cli,
+        project_fields_require_pc_workspace, requires_project_workflow_for_message,
+        should_attempt_pc_apk_sync, BOUND_PC_NODE_RECONNECT_WAIT_SECS,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
     use crate::store::ProjectAccess;
@@ -1819,6 +1830,20 @@ mod tests {
             PcRuntimeRoutePreference::RouteC
         )));
         assert!(!pc_cli_chat_requested(None));
+
+        assert!(project_chat_should_use_pc_cli(None, None, false));
+        assert!(project_chat_should_use_pc_cli(
+            Some(PcRuntimeRoutePreference::RouteA),
+            None,
+            false
+        ));
+        assert!(project_chat_should_use_pc_cli(None, Some("codex"), true));
+        assert!(!project_chat_should_use_pc_cli(
+            Some(PcRuntimeRoutePreference::RouteC),
+            None,
+            false
+        ));
+        assert!(!project_chat_should_use_pc_cli(None, Some("api"), false));
     }
 
     #[test]
