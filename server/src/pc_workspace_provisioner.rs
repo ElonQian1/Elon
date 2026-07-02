@@ -362,11 +362,7 @@ pub fn merge_conversation_workspace(workspace: &ConversationWorkspaceResult) -> 
 
     let base_branch = current_branch(&base_workspace).unwrap_or_else(|| "main".into());
     if git_output(&base_workspace, &["remote", "get-url", "origin"]).is_ok() {
-        git_fetch_origin(&base_workspace)?;
-        run_git_dynamic(
-            &base_workspace,
-            &["pull", "--rebase", "origin", &base_branch],
-        )?;
+        fast_forward_current_branch_from_origin(&base_workspace, &base_branch)?;
     }
 
     let before = git_output(&base_workspace, &["rev-parse", "HEAD"])?;
@@ -473,6 +469,15 @@ fn git_fetch_origin(repo: &Path) -> Result<String> {
     } else {
         Ok(String::new())
     }
+}
+
+fn fast_forward_current_branch_from_origin(repo: &Path, branch: &str) -> Result<()> {
+    git_fetch_origin(repo)?;
+    let origin_ref = format!("origin/{branch}");
+    if git_output(repo, &["rev-parse", "--verify", &origin_ref]).is_err() {
+        return Ok(());
+    }
+    run_git_dynamic(repo, &["merge", "--ff-only", &origin_ref])
 }
 
 fn tracked_worktree_clean(repo: &Path) -> Result<bool> {

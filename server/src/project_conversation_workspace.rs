@@ -120,16 +120,7 @@ pub(crate) fn merge_conversation_worktree(
 
     let base_branch = current_branch(&workspace.base_workspace).unwrap_or_else(|| "main".into());
     if has_origin_remote(&workspace.base_workspace) {
-        git_fetch_origin(&workspace.base_workspace)?;
-        git_output_owned(
-            &workspace.base_workspace,
-            &[
-                "pull".into(),
-                "--rebase".into(),
-                "origin".into(),
-                base_branch.clone(),
-            ],
-        )?;
+        fast_forward_current_branch_from_origin(&workspace.base_workspace, &base_branch)?;
     }
 
     let before = git_output(&workspace.base_workspace, &["rev-parse", "HEAD"])?;
@@ -282,6 +273,15 @@ fn git_fetch_origin(workspace: &Path) -> anyhow::Result<String> {
     } else {
         Ok(String::new())
     }
+}
+
+fn fast_forward_current_branch_from_origin(workspace: &Path, branch: &str) -> anyhow::Result<()> {
+    git_fetch_origin(workspace)?;
+    let origin_ref = format!("origin/{branch}");
+    if git_output(workspace, &["rev-parse", "--verify", &origin_ref]).is_err() {
+        return Ok(());
+    }
+    git_output_owned(workspace, &["merge".into(), "--ff-only".into(), origin_ref]).map(|_| ())
 }
 
 fn tracked_worktree_clean(workspace: &Path) -> anyhow::Result<bool> {
