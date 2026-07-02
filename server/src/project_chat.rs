@@ -667,14 +667,15 @@ pub(crate) async fn run_project_agent_with_scheduler(
         .unwrap_or(false);
     let direct_pc_cli_enabled = direct_pc_cli && is_pc_node_project && !execution_mode.is_plan();
     let lightweight_chat_split_enabled = ai_cli::project_lightweight_chat_split_enabled();
-    let direct_codex_project_mode = !lightweight_chat_split_enabled && !execution_mode.is_plan();
     // force_cli: 悬浮球手机控制专用模式，绕过本地 intent_router 分流，
     // 直接进入 Codex CLI 意图门控，由 Codex 自己判断"闲聊还是生成脚本"。
-    let needs_project_workflow = execution_mode.is_plan()
-        || execution_mode.is_force_cli()
-        || direct_pc_cli_enabled
-        || direct_codex_project_mode
-        || routing_decision.route != intent_router::CapabilityRoute::ChatAgent;
+    let needs_project_workflow = if is_pc_node_project && !execution_mode.is_plan() {
+        false
+    } else {
+        execution_mode.is_plan()
+            || execution_mode.is_force_cli()
+            || routing_decision.route != intent_router::CapabilityRoute::ChatAgent
+    };
     if needs_project_workflow && !can_edit(&project.role) {
         let apk_url = if agent_intent::is_project_delivery_request(&message, &base_workspace)
             && tools::find_latest_apk(&base_workspace).is_some()
@@ -799,35 +800,17 @@ pub(crate) async fn run_project_agent_with_scheduler(
             .await;
             return;
         }
-        if needs_project_workflow {
-            agent::run_project_workflow_for_project(
-                &user_id,
-                &project,
-                &download_base,
-                Some(&conversation_id),
-                &message,
-                agent_name.as_deref(),
-                pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
-                trace_id.as_deref(),
-                &state,
-                tx,
-            )
-            .await;
-        } else {
-            agent::run_for_project(
-                &user_id,
-                &project,
-                &download_base,
-                Some(&conversation_id),
-                &message,
-                agent_name.as_deref(),
-                pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
-                trace_id.as_deref(),
-                &state,
-                tx,
-            )
-            .await;
-        }
+        agent::run_pc_cli_passthrough_for_project(
+            &user_id,
+            &project,
+            Some(&conversation_id),
+            &message,
+            agent_name.as_deref(),
+            pc_node_fast_path_route(pc_runtime_route, direct_pc_cli_enabled),
+            &state,
+            tx,
+        )
+        .await;
         return;
     }
 

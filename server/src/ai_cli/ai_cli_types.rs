@@ -13,11 +13,16 @@ pub struct NativeSessionScope {
 pub enum AiCliRequestMode {
     Execute,
     Plan,
+    Passthrough,
 }
 
 impl AiCliRequestMode {
     pub fn is_plan(self) -> bool {
         self == Self::Plan
+    }
+
+    pub fn is_passthrough(self) -> bool {
+        self == Self::Passthrough
     }
 }
 

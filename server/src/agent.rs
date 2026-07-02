@@ -103,6 +103,83 @@ pub async fn run_project_workflow_for_project(
     .await;
 }
 
+pub async fn run_pc_cli_passthrough_for_project(
+    user_id: &str,
+    project: &ProjectAccess,
+    conversation_id: Option<&str>,
+    user_message: &str,
+    agent_name: Option<&str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+    state: &Arc<AppState>,
+    tx: UnboundedSender<String>,
+) {
+    let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project, Some(&tx)).await
+    else {
+        if project.source_type == "pc_managed" {
+            send_pc_workspace_unavailable_error(project, &tx);
+        } else {
+            let _ = tx.send(WsMessage::error("当前项目还没有绑定可用 PC 节点。").to_json());
+        }
+        return;
+    };
+
+    let agent_id = pc_binding.agent_id.as_str();
+    let pc_workspace = pc_binding.workspace.as_str();
+    let runtime_choice =
+        choose_pc_agent_runtime(state, agent_id, agent_name, pc_runtime_route).await;
+    if let Some(error) = runtime_choice.error {
+        let _ = tx.send(WsMessage::error(error).to_json());
+        return;
+    }
+
+    let _ = tx.send(
+        WsMessage::progress(format!(
+            "正在直连 PC 节点 {} 使用 {} 处理本轮消息。",
+            agent_id,
+            runtime_choice.progress_label()
+        ))
+        .to_json(),
+    );
+    let session_scope = conversation_id.map(|cid| ai_cli::NativeSessionScope {
+        project_id: project.id.clone(),
+        user_id: user_id.to_string(),
+        conversation_id: cid.to_string(),
+        runtime_permission: project.runtime_permission.clone(),
+    });
+
+    match ai_cli::run_with_pc_agent_passthrough_workspace(
+        agent_id,
+        user_id,
+        pc_workspace,
+        user_message,
+        session_scope,
+        Some(runtime_choice.cli_name.as_str()),
+        runtime_choice.copilot_model.as_deref(),
+        runtime_choice.codex_reasoning_effort.as_deref(),
+        runtime_choice.model_label.as_deref(),
+        state,
+        &tx,
+    )
+    .await
+    {
+        Ok(ai_cli::PcAgentChatOutcome::Answered) => {}
+        Ok(ai_cli::PcAgentChatOutcome::NoReadableReply { diagnostic }) => {
+            let detail = diagnostic
+                .unwrap_or_else(|| "这轮没有返回可读内容，请稍后直接重发一次。".to_string());
+            let msg = format!("本机 AI：{detail}我不会自动切换到平台 AI。");
+            warn!("{msg}");
+            let _ = tx.send(WsMessage::error(msg).to_json());
+        }
+        Err(error) => {
+            error!("PC 本地 Codex 直连运行出错: {}", error);
+            let _ = tx.send(
+                WsMessage::classified_error(crate::errors::classify_ai_error(&error.to_string()))
+                    .to_json(),
+            );
+        }
+    }
+}
+
 pub async fn run_chat_only_for_project(
     user_id: &str,
     project: &ProjectAccess,

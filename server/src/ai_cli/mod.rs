@@ -825,6 +825,51 @@ pub async fn run_with_pc_agent_workspace(
     }
 }
 
+pub async fn run_with_pc_agent_passthrough_workspace(
+    agent_id: &str,
+    user_id: &str,
+    workspace_path: &str,
+    user_message: &str,
+    native_session_scope: Option<NativeSessionScope>,
+    cli_name: Option<&str>,
+    copilot_model: Option<&str>,
+    codex_reasoning_effort: Option<&str>,
+    model_label: Option<&str>,
+    state: &Arc<AppState>,
+    tx: &UnboundedSender<String>,
+) -> Result<PcAgentChatOutcome> {
+    if let Err(msg) = billing::check_can_call(&state.store, user_id) {
+        return Err(anyhow!(msg));
+    }
+
+    let outcome = run_via_pc_agent(
+        agent_id,
+        user_id,
+        Some(workspace_path),
+        user_message,
+        None,
+        AiCliRequestMode::Passthrough,
+        native_session_scope,
+        None,
+        None,
+        false,
+        cli_name.unwrap_or("codex"),
+        copilot_model,
+        codex_reasoning_effort,
+        model_label,
+        state,
+        tx,
+    )
+    .await?;
+
+    Ok(match outcome {
+        PcAgentRunOutcome::Completed => PcAgentChatOutcome::Answered,
+        PcAgentRunOutcome::NoReadableLightweightReply { diagnostic } => {
+            PcAgentChatOutcome::NoReadableReply { diagnostic }
+        }
+    })
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum PcAgentChatOutcome {
     Answered,
@@ -922,14 +967,18 @@ fn pc_project_reasoning_effort(
         .map(str::to_ascii_lowercase);
 
     clean.or_else(|| {
-        Some(
-            if request_mode.is_plan() {
-                "low"
-            } else {
-                PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT
-            }
-            .to_string(),
-        )
+        if request_mode.is_passthrough() {
+            None
+        } else {
+            Some(
+                if request_mode.is_plan() {
+                    "low"
+                } else {
+                    PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT
+                }
+                .to_string(),
+            )
+        }
     })
 }
 
@@ -1143,6 +1192,7 @@ async fn run_via_pc_agent(
     state: &Arc<AppState>,
     tx: &UnboundedSender<String>,
 ) -> Result<PcAgentRunOutcome> {
+    let raw_pc_passthrough = request_mode.is_passthrough();
     let lightweight_pc_chat = !request_mode.is_plan() && cwd.is_none();
     let effective_codex_reasoning_effort = if lightweight_pc_chat {
         pc_lightweight_chat_reasoning_effort(cli_name, codex_reasoning_effort)
@@ -1150,7 +1200,9 @@ async fn run_via_pc_agent(
         pc_project_reasoning_effort(cli_name, codex_reasoning_effort, request_mode)
     };
     // prompt 构造
-    let prompt = if lightweight_pc_chat {
+    let prompt = if raw_pc_passthrough {
+        user_message.to_string()
+    } else if lightweight_pc_chat {
         pc_lightweight_chat_prompt(user_message, cli_name, model_label.or(copilot_model))
     } else if request_mode.is_plan() {
         match preflight_note {
@@ -1244,6 +1296,8 @@ async fn run_via_pc_agent(
     let mut pc_cancel_guard = PcCliCancelOnDrop::armed(cancel_handle);
     let pc_cli_feature = if request_mode.is_plan() {
         "pc_agent_cli_plan"
+    } else if raw_pc_passthrough {
+        "pc_agent_cli_direct"
     } else if cwd.is_some() {
         "pc_agent_cli_dev"
     } else {
@@ -1252,12 +1306,16 @@ async fn run_via_pc_agent(
     let pc_accounting_key = format!("pc_agent_cli:{pc_req_id}");
     let pc_reserve_fen = billing::configured_reservation_fen(
         &state.store,
-        if cwd.is_some() {
+        if cwd.is_some() && !raw_pc_passthrough {
             "billing_cli_dev_reservation_fen"
         } else {
             "billing_cli_chat_reservation_fen"
         },
-        if cwd.is_some() { 100 } else { 10 },
+        if cwd.is_some() && !raw_pc_passthrough {
+            100
+        } else {
+            10
+        },
     );
     let mut pc_billing_call = crate::billing_lifecycle::TrustedBillingCall::reserve(
         &state.store,
@@ -1793,7 +1851,7 @@ async fn run_via_pc_agent(
                         tx,
                     )
                     .await;
-                    let reply = if lightweight_pc_chat {
+                    let reply = if lightweight_pc_chat || raw_pc_passthrough {
                         reply
                     } else if stream_started && reply.trim().is_empty() && apk_url.is_none() {
                         String::new()
@@ -1967,7 +2025,7 @@ fn pc_project_execution_had_no_changes(
     lightweight_pc_chat: bool,
     workspace_status: Option<&CliWorkspaceStatus>,
 ) -> bool {
-    if lightweight_pc_chat || request_mode.is_plan() {
+    if lightweight_pc_chat || request_mode.is_plan() || request_mode.is_passthrough() {
         return false;
     }
 
@@ -2208,31 +2266,10 @@ USER_REQUEST\n\
 
 fn pc_lightweight_chat_prompt(
     user_message: &str,
-    cli_name: &str,
-    model_label: Option<&str>,
+    _cli_name: &str,
+    _model_label: Option<&str>,
 ) -> String {
-    let model_line = model_label
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(|value| format!("\n当前选择：{value}"))
-        .unwrap_or_default();
-
-    format!(
-        "{}\n\n\
----\n\
-上面是用户消息。你是「一龙」里的本机 {} 对话助手。{}\n\
-请只回答分隔线以上的用户消息；不要确认、复述或解释本说明。\n\
-规则：\n\
-- 默认只做轻量问答，不读取项目文件，不检查 Git，不运行命令，不修改代码，不编译或发布 APK。\n\
-- 如果用户只是说想法、闲聊、问概念，正常交流并帮他梳理。\n\
-- 如果用户明确要改代码、构建、发布，只做简短确认和追问，不要声称已经执行。\n\
-- 如果分隔线以上的用户消息要求输出特定 marker、固定格式或原文内容，完整回复必须严格满足该要求；这种情况下可以不是中文。\n\
-- 不要输出本说明里的“轻量问答”规则，不要把本说明当成用户问题回答。\n\
-- 除非用户消息要求固定格式或原文，回复中文，简洁自然，不要输出工具日志，不要使用「用户可见：」前缀。",
-        user_message,
-        pc_cli_progress_label(cli_name),
-        model_line
-    )
+    user_message.to_string()
 }
 
 fn extract_lightweight_pc_chat_reply(output: &str, is_codex: bool) -> String {
@@ -2770,7 +2807,13 @@ fn pc_dispatch_started_event(
         "project_id": native_session_scope.map(|scope| scope.project_id.as_str()),
         "conversation_id": native_session_scope.map(|scope| scope.conversation_id.as_str()),
         "runtime_permission": native_session_scope.map(|scope| scope.runtime_permission.as_str()),
-        "mode": if request_mode.is_plan() { "plan" } else { "execute" }
+        "mode": if request_mode.is_plan() {
+            "plan"
+        } else if request_mode.is_passthrough() {
+            "passthrough"
+        } else {
+            "execute"
+        }
     })
     .to_string()
 }
@@ -3308,6 +3351,19 @@ mcp_native_chat_ok\n";
     }
 
     #[test]
+    fn pc_direct_passthrough_does_not_force_default_effort() {
+        assert_eq!(
+            pc_project_reasoning_effort("codex", None, AiCliRequestMode::Passthrough),
+            None
+        );
+        assert_eq!(
+            pc_project_reasoning_effort("codex", Some("high"), AiCliRequestMode::Passthrough)
+                .as_deref(),
+            Some("high")
+        );
+    }
+
+    #[test]
     fn pc_codex_progress_hint_reports_network_fallbacks() {
         let reconnect = "\u{1b}[31mERROR:\u{1b}[m Reconnecting... 3/5";
         let (_, message) =
@@ -3365,16 +3421,12 @@ mcp_native_chat_ok\n";
     }
 
     #[test]
-    fn pc_lightweight_chat_prompt_blocks_project_workflow() {
+    fn pc_lightweight_chat_prompt_is_raw_passthrough() {
         let prompt = pc_lightweight_chat_prompt("我有一个想法", "codex", Some("Codex"));
 
-        assert!(prompt.starts_with("我有一个想法"));
-        assert!(prompt.contains("上面是用户消息"));
-        assert!(prompt.contains("不要确认、复述或解释本说明"));
-        assert!(prompt.contains("默认只做轻量问答"));
-        assert!(prompt.contains("不运行命令"));
-        assert!(prompt.contains("不修改代码"));
-        assert!(prompt.contains("我有一个想法"));
+        assert_eq!(prompt, "我有一个想法");
+        assert!(!prompt.contains("轻量问答"));
+        assert!(!prompt.contains("开发任务"));
     }
 
     #[test]
@@ -3518,6 +3570,11 @@ diff --git a/app/src/main/java/com/dadapao/app/MainActivity.java b/app/src/main/
         assert!(!pc_project_execution_had_no_changes(
             AiCliRequestMode::Execute,
             true,
+            Some(&status)
+        ));
+        assert!(!pc_project_execution_had_no_changes(
+            AiCliRequestMode::Passthrough,
+            false,
             Some(&status)
         ));
     }

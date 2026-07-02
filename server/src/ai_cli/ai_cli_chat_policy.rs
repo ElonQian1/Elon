@@ -12,7 +12,7 @@ where
 {
     env_bool_from(
         lookup(PROJECT_LIGHTWEIGHT_CHAT_ENABLED_ENV).as_deref(),
-        false,
+        true,
     )
 }
 

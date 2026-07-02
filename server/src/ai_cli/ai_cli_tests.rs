@@ -101,11 +101,11 @@ fn chat_prompt_uses_lightweight_mode() {
 }
 
 #[test]
-fn project_lightweight_chat_split_is_disabled_by_default() {
+fn project_lightweight_chat_split_is_enabled_by_default() {
     let split_enabled = project_lightweight_chat_split_enabled_from(|_| None);
 
-    assert!(!split_enabled);
-    assert!(!should_use_project_lightweight_chat(
+    assert!(split_enabled);
+    assert!(should_use_project_lightweight_chat(
         split_enabled,
         false,
         intent_router::CapabilityRoute::ChatAgent,
@@ -113,7 +113,7 @@ fn project_lightweight_chat_split_is_disabled_by_default() {
     ));
     assert_eq!(
         prompt_route_for_project_chat(split_enabled, intent_router::CapabilityRoute::ChatAgent),
-        intent_router::CapabilityRoute::CodeAgent
+        intent_router::CapabilityRoute::ChatAgent
     );
 }
 
