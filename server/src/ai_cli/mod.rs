@@ -2265,15 +2265,7 @@ USER_REQUEST\n\
 }
 
 fn pc_project_passthrough_prompt(user_message: &str) -> String {
-    format!(
-        "{user_message}\n\n\
----\n\
-项目上下文：当前工作目录是用户当前项目的工作区；请像 Codex 桌面版一样基于这个目录工作。\n\
-- 如果本轮只是普通问答、概念解释或简单时间/事实问题，直接回答，不需要读文件或改代码。\n\
-- 如果本轮要求理解、检查、修改、构建、测试、提交或发布当前项目，先读取当前目录中存在的入口文档（如 AGENTS.md、CODEX.md、README.md、AI_PROJECT.md、AI_ARCHITECTURE.md、AI_INDEX.md、.github/copilot-instructions.md），再按入口文档路由只读取相关细则并完成请求。\n\
-- 不要因为这段上下文强制改代码、提交或发布；只有用户请求或项目文档明确要求时才执行。\n\
-- 回复用户使用中文，除非用户另有要求。"
-    )
+    user_message.to_string()
 }
 
 fn pc_lightweight_chat_prompt(
@@ -3442,17 +3434,15 @@ mcp_native_chat_ok\n";
     }
 
     #[test]
-    fn pc_project_passthrough_prompt_keeps_project_context_without_dev_contract() {
+    fn pc_project_passthrough_prompt_is_raw_user_message() {
         let prompt = pc_project_passthrough_prompt("你是 codex 吗？");
 
-        assert!(prompt.contains("你是 codex 吗？"));
-        assert!(prompt.contains("当前工作目录是用户当前项目的工作区"));
-        assert!(prompt.contains("像 Codex 桌面版一样"));
-        assert!(prompt.contains("AGENTS.md"));
-        assert!(prompt.contains("CODEX.md"));
-        assert!(prompt.contains(".github/copilot-instructions.md"));
-        assert!(prompt.contains("普通问答"));
-        assert!(prompt.contains("不要因为这段上下文强制改代码"));
+        assert_eq!(prompt, "你是 codex 吗？");
+        assert!(!prompt.contains("项目上下文"));
+        assert!(!prompt.contains("普通问答"));
+        assert!(!prompt.contains("AGENTS.md"));
+        assert!(!prompt.contains(".github/copilot-instructions.md"));
+        assert!(!prompt.contains("强制改代码"));
         assert!(!prompt.contains("必须完成后才能最终回复"));
         assert!(!prompt.contains("当前请求已经被判定为项目开发"));
         assert!(!prompt.contains("第一步必须使用工具"));
