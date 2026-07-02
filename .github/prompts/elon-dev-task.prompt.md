@@ -25,7 +25,7 @@ argument-hint: "<用户需求或任务描述>"
 6. 根据影响范围运行最小有效验证。
 7. 如任务修改后端运行代码，不要递增 `server/Cargo.toml` 的 `version`；版本号由服务器 release API 分配。提交并 push 后先用 `scripts\check-task-complete.ps1 -Kind CodePushed` 校验代码已进入远端，再按需运行发布脚本。
 8. 只 stage 当前任务文件并 commit。
-9. push 到 `origin/main`；如被拒绝，fetch/rebase 或 merge 后重试。
+9. push 到 `origin/main`；只有 push 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main`，解决冲突后重推。不要因为 `origin/main` 在编码或构建期间前进就主动 rebase、重跑验证或重新发布。
 10. 如果本次在隔离 worktree 完成，回到原主工作区用 `git fetch origin` + `git pull --ff-only origin main` 同步已跟踪文件，不碰未跟踪文件。
-11. 如任务修改 APK 可安装端能力，至少运行 `scripts\check-task-complete.ps1 -Kind CodePushed`；明确负责 APK 发布时再运行 `scripts\publish-apk.ps1` 和 `scripts\check-task-complete.ps1 -Kind AndroidFeature`。发布被更新 main 超越时不要反复 rebase 重跑。
+11. 如任务修改 APK 可安装端能力，至少运行 `scripts\check-task-complete.ps1 -Kind CodePushed`；明确负责 APK 发布时再运行 `scripts\publish-apk.ps1` 和 `scripts\check-task-complete.ps1 -Kind AndroidFeature`。发布被更新 main 超越时汇报“代码已合并，发布交给最新主线”，不要反复 rebase 重跑。
 12. 结束时汇报提交 SHA、push 状态、主工作区同步状态、验证结果、部署状态；Android 任务汇报 APK 发布状态（已发布 / 被更新 main 接管 / 未尝试），发布成功时再汇报版本号和下载地址；后端发布成功时汇报服务器版本接口结果。

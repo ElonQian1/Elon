@@ -17,12 +17,22 @@
 
 1. 每次进入项目先运行任务预检脚本：Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\ai-task-preflight.ps1 -CreateWorktree`，Linux/macOS/服务器 CLI 用 `bash scripts/ai-task-preflight.sh --create-worktree`；脚本会先同步本地 `main` 基线，再从最新 `origin/main` 派生独立任务 worktree。如果脚本创建了 worktree，必须切到 `WORKTREE_PATH` 后再观察目录结构和修改文件。脚本输出的 `EDIT_ROOT` 是本轮唯一允许编辑、格式化、测试、提交的目录；如果是 `BLOCKED_CREATE_WORKTREE_FIRST`，当前目录不能继续改。
 2. 如果存在 `AGENTS.md`、`CODEX.md` 或 `README.md`，先读轻量入口；`.github/instructions/*.md` 和 `docs/` 只在当前任务需要时读取。
-3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建的任务 worktree 开始。当前任务自己的提交完成后第一时间 `git push origin HEAD:main`；只有 push 被 non-fast-forward 拒绝时才 rebase。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
+3. `local_path` 和 GitHub 项目按已有 Git 仓库处理。`main` checkout 只作为共享同步基线，不作为业务编辑区；新业务流必须从预检脚本创建的任务 worktree 开始。当前任务自己的提交完成后第一时间 `git push origin HEAD:main`；只有 push 被 non-fast-forward 拒绝时才 rebase。`origin/main` 在编码或构建期间前进是并行常态，不是自动 rebase、重跑验证或重新发布的条件。其他任务或来源不明的未提交改动必须用 `origin/main` 新建 worktree。
 4. 一龙项目只是默认登记的 `local_path` 项目，不走特殊执行路径；其他 GitHub 下载或本地挂载项目也应靠自己的项目文档驱动流程。
 5. Codex CLI 的长期记忆来自项目文件，不来自服务器进程本身。流程变化必须写回文档并提交。
 6. 如果任务在隔离 worktree 完成并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不要 stage、stash、删除或移动原主工作区的未跟踪文件，遇到同名路径冲突就报告。
 7. Android APK 新功能默认先以“业务提交已进入 `origin/main`”为第一层完成定义；并行任务可以先用 `CodePushed` 收尾。只有用户明确要求安装包交付、下载链接或线上发布时，才以“服务器 APK 指向最新主线”为最终完成定义。
 8. 手机触发的项目开发流程中，后端预检错误只作为上下文交给 CLI；CLI 应先自查 Git 现场并尝试安全处理，只有判断无法克服时才向用户说明并暂停。
+
+### 并行 rebase 边界
+
+合理流程固定为：
+
+1. 开工前：从当时最新 `origin/main` 派生独立 worktree。
+2. 提交后：立即 `git push origin HEAD:main`。
+3. 只有 push 被 non-fast-forward 拒绝：才 `git fetch origin` + `git rebase origin/main`，解决冲突后再 push。
+4. 自己的 commit 已经进入 `origin/main` 后：任务代码层面完成；后续 `origin/main` 再前进，不应该为了“保持自己是最新 HEAD”反复 rebase。
+5. 发布阶段：如果构建产物被更新的 main 超越，停止上传旧产物，汇报“代码已合并，发布交给最新主线”，而不是重跑。
 
 ---
 
@@ -313,7 +323,7 @@ powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind A
 
 发布脚本会完成：快进到当前 `origin/main`、向服务器申请版本号、临时注入 `build.gradle`、构建 release APK、还原版本字段、上传 APK 和 `version.json`、写入 `.apk-deployed-sha`、验证服务器版本。版本号不写入 git，也不会生成 release-only commit。
 
-APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进且包含 Android 改动，就停止上传并汇报“代码已推送，发布交由后续最新 main”。脚本不得在 APK 编译完成后自动 rebase 或要求本代理重新跑旧产物。**这类发布并发中止不会否定“代码已经同步到远端主线”这一完成状态。**
+APK 发布脚本必须防止慢构建覆盖新版本：构建期间如果发现服务器已部署包含本次基础提交的更新 APK，就中止本地旧编译并测试线上新版；构建完成后如果 `origin/main` 已前进且包含 Android 改动，就停止上传并汇报“代码已合并，发布交给最新主线”。脚本不得在 APK 编译完成后自动 rebase 或要求本代理重新跑旧产物。**这类发布并发中止不会否定“代码已经同步到远端主线”这一完成状态。**
 
 ### 8.3 推送结果给用户
 

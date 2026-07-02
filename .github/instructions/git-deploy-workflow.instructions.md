@@ -82,13 +82,26 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 10. push 成功后运行 `powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind CodePushed`（Linux/macOS 可用同等 git 祖先检查），确认本次 HEAD 已包含在 `origin/main`。
 11. 如果本次是在隔离 worktree 中提交并推送，收尾时回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，让本地已跟踪文件追上远端；不 `git add`、不 stash、不删除/移动未跟踪文件。若本地未跟踪文件与远端新增同名路径冲突，停止并报告路径。
 
+### Rebase 触发条件
+
+| 事件 | 是否 rebase | 正确动作 |
+|---|---|---|
+| 开工前 `origin/main` 已前进 | 否 | 由预检脚本从当时最新 `origin/main` 派生隔离 worktree |
+| 编码中发现 `origin/main` 又前进 | 否 | 继续完成本任务提交；不要为了“保持最新”中断重跑 |
+| 提交前 `git fetch origin main` 发现远端前进 | 否 | 只作为态势信息；提交后立即 push |
+| `git push origin HEAD:main` 被 non-fast-forward 拒绝 | 是 | `git fetch origin` → `git rebase origin/main` → 解决冲突 → 重推 |
+| 本任务 HEAD 已包含在 `origin/main` | 否 | 代码同步完成；后续 main 前进不影响本任务完成状态 |
+| 发布构建期间被更新 main / 服务器版本超越 | 否 | 停止上传旧产物，汇报“代码已合并，发布交给最新主线” |
+
+**禁止把 `origin/main` 前进本身当作 rebase / 重跑构建 / 重新发布条件。** 这种追最新 HEAD 的行为会让多个代理互相追车，形成活锁。
+
 ### 本地 main 基线和任务 worktree
 
 | 场景 | 做法 |
 |---|---|
 | 当前在 `main` | 运行预检脚本并进入 `WORKTREE_PATH`，不要直接编辑 `main` |
 | 当前任务 worktree 干净且不落后 | 可以继续当前任务 |
-| 当前任务 worktree 落后远端 | 先完成本任务提交；push 被拒绝时再 `git fetch origin` → `git rebase origin/main` → 解决冲突并重推 |
+| 当前任务 worktree 落后远端 | 继续完成本任务提交并第一时间 push；只有 push 被拒绝时才 `git fetch origin` → `git rebase origin/main` → 解决冲突并重推 |
 | 未提交改动属于其他 AI / 其他任务 / 来源不明 | 不在当前工作区 pull/rebase；从 `origin/main` 创建独立 worktree |
 
 独立 worktree 示例：
@@ -190,7 +203,7 @@ git push origin HEAD:main
 |---|---|
 | 当前在 `main`，即使干净 | 先运行预检脚本，进入新建的 `WORKTREE_PATH`，不要直接编辑 `main` |
 | 当前在本任务 worktree，且干净不落后 | 可以继续当前任务 |
-| 当前在本任务 worktree，但落后远端 | 完成本任务提交后 push；push 被拒绝时再 rebase 到 `origin/main` |
+| 当前在本任务 worktree，但落后远端 | 完成本任务提交后立即 push；只有 push 被拒绝时再 rebase 到 `origin/main` |
 | 当前 worktree 有其他 AI / 其他任务 / 来源不明改动 | 不回退、不覆盖；重新从 `origin/main` 创建独立 worktree |
 
 ### 独立工作树隔离
@@ -313,7 +326,7 @@ scripts\publish-apk.ps1 -Changelog "<本次用户可见改动>"
 powershell -ExecutionPolicy Bypass -File scripts\check-task-complete.ps1 -Kind AndroidFeature
 ```
 
-> APK 发布并发保护（慢构建防覆盖、finish 槽位释放）详见 `scripts/publish-apk.ps1` 注释。并行任务中，若发布脚本提示已被更新的 `origin/main` 或服务器 APK 超越，视为“代码已合并，发布交由后续最新 main”，不要为了当前代理发布成功继续 rebase 重跑。
+> APK 发布并发保护（慢构建防覆盖、finish 槽位释放）详见 `scripts/publish-apk.ps1` 注释。并行任务中，若发布脚本提示已被更新的 `origin/main` 或服务器 APK 超越，视为“代码已合并，发布交给最新主线”，不要为了当前代理发布成功继续 rebase 重跑。
 ---
 
 ## 🏷️ 版本号管理规则（v0.3.69+ 服务器分配）

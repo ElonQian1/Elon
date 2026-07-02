@@ -31,7 +31,7 @@
 **绝不能**在改动 elon 自身代码后用 `assembleDebug` 或跳过签名脚本直接运行 `./gradlew assembleRelease`。
 ### Android 任务完成定义
 
-涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算发布完成；默认分成两层完成定义。用户当前偏好：改动 elon APK/APP 后，代码同步完成后继续发布 APK，除非用户明确说只同步代码、暂不发布或发布稍后再说。并行任务里，代码进入远端主线是本代理的硬完成；发布脚本只负责发布“运行脚本时的最新 main”，如果构建期间被后续提交或服务器版本超越，按脚本提示汇报“代码已合并，发布交由后续最新 main”，不要反复 rebase 重跑。
+涉及 APK 可安装端能力的任务，PR、分支推送、`assembleDebug` 都不算发布完成；默认分成两层完成定义。用户当前偏好：改动 elon APK/APP 后，代码同步完成后继续发布 APK，除非用户明确说只同步代码、暂不发布或发布稍后再说。并行任务里，代码进入远端主线是本代理的硬完成；发布脚本只负责发布“运行脚本时的最新 main”，如果构建期间被后续提交或服务器版本超越，按脚本提示汇报“代码已合并，发布交给最新主线”，不要反复 rebase 重跑。
 
 1. **代码同步完成**
    - 业务代码已 `commit` 并 `git push origin HEAD:main` 进入 `origin/main`
@@ -72,8 +72,9 @@
 - **PC 节点 MCP 会话 worktree 例外**：如果当前目录已经位于一龙平台创建的 `conversation-worktrees/<project>/<conversation>`，或当前分支形如 `ai/session/<project>/<conversation>`，说明平台已经完成隔离工作区准备。此时不要再运行 `ai-task-preflight.ps1 -CreateWorktree` 创建嵌套 worktree；直接在当前 worktree 运行 `git status --short --branch`，读取当前任务需要的规则后继续完成用户的直接任务。不能只回复“已读取规则、后续会执行”就结束。
 - **PowerShell 版本边界**：Windows `powershell.exe` 5.1 只用于 bootstrap/兼容脚本；任何头部带 `#requires -Version 7.0` 的脚本必须用 `pwsh` 运行。先用 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-pwsh7.ps1` 检查本机；缺 PowerShell 7 时安装 `winget install --id Microsoft.PowerShell --source winget` 或转到有 `pwsh` 的环境。绝不要删除 `#requires`、降级语法或复制一套低版本逻辑来绕过 PS7 要求；需要 PS5 入口时只写薄 wrapper 或明确命名的 `*-ps5.ps1`，并保留原 PS7 脚本。
 - **主工作区只做 main 基线**：`main` checkout 是共享同步基线，不作为业务编辑区。多个本地 AI 并行时，各自只能在预检脚本创建的 `codex/task-*` worktree 中修改、验证、提交和推送，避免互相占用 `main`
+- **并行 rebase 只由 push 拒绝触发**：`origin/main` 前进是多 AI 并行的正常现象，不代表当前任务必须 rebase、重跑验证或重新发布。正确流程是：开工前从当时最新 `origin/main` 派生隔离 worktree；提交后立即 `git push origin HEAD:main`；只有 push 被 non-fast-forward 拒绝时才 `git fetch origin` + `git rebase origin/main` 后重推；一旦本任务 HEAD 已包含在 `origin/main`，代码层面即完成。后续 `origin/main` 再前进，不得为了“让本代理保持最新 HEAD / 发布成功”反复 rebase 或重跑构建。
 - **预检/worktree 流程改动必须跑门禁**：修改 `scripts/ai-task-preflight.*`、`scripts/cleanup-task-worktrees.*` 或相关并行 AI/Git 工作流说明后，运行 `powershell -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1`；该测试会锁住 `-CreateWorktree`、`WORKTREE_PATH` 和 `main` 基线规则
-- **有未提交改动时先判断归属**：属于本任务可 stash/rebase/pop；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
+- **有未提交改动时先判断归属**：属于本任务则先在当前隔离 worktree 内完成提交，再按“push 被拒绝才 rebase”的规则处理；来源不明或属于其他任务时必须从 `origin/main` 新建 worktree，不得在脏工作区硬拉远端
 - **隔离 worktree 推送后同步主工作区**：回到原主工作区执行 `git fetch origin` + `git pull --ff-only origin main`，只同步已跟踪文件；不 stage、不 stash、不删除/移动未跟踪文件，遇到同名路径冲突就报告
 - **任务完成后清理 worktree**：push 并同步主工作区后，运行 `powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -Apply`（Linux：`bash scripts/cleanup-task-worktrees.sh --apply`）回收已合并的 AI worktree（含 `*-task-*` 与 `codex/*` 分支 worktree）。脚本只删"已合并到 origin/main + 工作树干净"的，绝对安全；带未提交改动的会被自动保留
 - **手机触发的开发流程优先让 CLI 自愈**：Git 预检失败不是最终失败，应作为上下文交给 CLI；只有 CLI 判定无法克服时再友好提示用户

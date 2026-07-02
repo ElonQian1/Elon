@@ -66,7 +66,7 @@ applyTo: "**/*.{rs,kt,java,ts,tsx,js,jsx,toml,gradle}"
 | 4 | 看自己要新增的逻辑是否能落进已有模块 | 优先复用 / 扩展现有 sibling module，不另起新文件 |
 | 5 | 决策：在原文件内追加 vs 抽新模块 | 见下方"拆分决策树" |
 | 6 | 如果要抽：先做"纯搬迁"提交（行为不变），再单独提交"新功能" | 两个 commit，message 类型分别是 `refactor` 与 `feat`/`fix` |
-| 7 | 提交前再 `git fetch origin main`，避免其他 AI 已经抽走同一块 | 若已抽走则 rebase 后基于他们的拆分继续 |
+| 7 | 提交前再 `git fetch origin main`，避免其他 AI 已经抽走同一块 | 若已抽走则先基于远端新结构重定位修改；真正 rebase 仍只在 push 被 non-fast-forward 拒绝时发生 |
 | 8 | 推送后立即 `git fetch origin main` 同步其他 AI 拆分进度 | 用 `git log --oneline --since="2 hours"` 看其他 AI 最近动作 |
 
 ### 写前计划格式（步骤 3 的输出）
