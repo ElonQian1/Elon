@@ -25,7 +25,7 @@ use crate::{
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
 };
 
-const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 30;
+const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
 const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
 
 /// 一龙自项目路径（默认 /root/Elon，可由 ELON_SELF_PATH 环境变量覆盖）
@@ -837,7 +837,7 @@ async fn wait_for_bound_pc_agent_reconnect(
 ) -> bool {
     send_optional_progress(
         tx,
-        "绑定的 PC 节点正在重连，先等待它恢复，避免把同一项目错误切到其它电脑。",
+        "绑定的 PC 节点正在重连，最长等待 2 分钟让原节点恢复，避免把同一项目错误切到其它电脑。",
     );
     let deadline =
         tokio::time::Instant::now() + Duration::from_secs(BOUND_PC_NODE_RECONNECT_WAIT_SECS);
@@ -1764,6 +1764,7 @@ mod tests {
         pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
         pc_workspace_inspect_usable, project_fields_require_pc_workspace,
         requires_project_workflow_for_message, should_attempt_pc_apk_sync,
+        BOUND_PC_NODE_RECONNECT_WAIT_SECS,
     };
     use crate::pc_agent_runtime_choice::PcRuntimeRoutePreference;
     use crate::store::ProjectAccess;
@@ -1943,6 +1944,11 @@ mod tests {
         assert!(!pc_workspace_inspect_error_allows_bound_dispatch(
             "workspace path does not exist"
         ));
+    }
+
+    #[test]
+    fn bound_pc_node_reconnect_window_covers_server_restart() {
+        assert!(BOUND_PC_NODE_RECONNECT_WAIT_SECS >= 90);
     }
 
     fn inspect_status() -> ProjectWorkspaceInspectStatus {
