@@ -54,6 +54,7 @@ export function InviteDrawer({
   const [loading, setLoading] = useState(false)
   const [creating, setCreating] = useState(false)
   const [busyCode, setBusyCode] = useState('')
+  const [createdInvite, setCreatedInvite] = useState<ProjectInviteLink | null>(null)
   const roleOptions = useMemo(() => inviteRoleOptions(roles), [roles])
   const inviteStats = useMemo(() => inviteStateStats(invites), [invites])
   const visibleInvites = useMemo(
@@ -99,7 +100,10 @@ export function InviteDrawer({
         max_uses: numberOrUndefined(maxUses),
         temporary,
       })
-      if (data.invite) setInvites((items) => [data.invite as ProjectInviteLink, ...items])
+      if (data.invite) {
+        setInvites((items) => [data.invite as ProjectInviteLink, ...items])
+        setCreatedInvite(data.invite)
+      }
       setMessage('已创建')
       setFilter('active')
     } catch (err) {
@@ -115,6 +119,7 @@ export function InviteDrawer({
     try {
       await api.delete<ProjectInviteResponse>(`/api/projects/${encodeURIComponent(projectId)}/invite-links/${encodeURIComponent(code)}`)
       await refreshInvites()
+      setCreatedInvite((current) => current?.code === code ? { ...current, revoked_at: new Date().toISOString() } : current)
       setMessage('已撤销')
     } catch (err) {
       setMessage((err as { message?: string }).message ?? '撤销失败')
@@ -166,6 +171,25 @@ export function InviteDrawer({
               </button>
             ))}
           </div>
+
+          {createdInvite && (
+            <section className={styles.inviteSpotlight} data-state={inviteState(createdInvite)}>
+              <div className={styles.inviteSpotlightMain}>
+                <strong>最新邀请链接</strong>
+                <span>{inviteUrl(createdInvite.code)}</span>
+                <div className={styles.inviteMeta}>
+                  <em>{roleLabel(createdInvite.role)}</em>
+                  <em>{inviteUseCopy(createdInvite)}</em>
+                  <em>{inviteExpiresCopy(createdInvite)}</em>
+                  {createdInvite.temporary && <em>临时邀请</em>}
+                </div>
+              </div>
+              <div className={styles.inviteRowActions}>
+                <button className={styles.drawerCloseBtn} onClick={() => copyInvite(createdInvite.code)}>复制链接</button>
+                <button className={styles.drawerCloseBtn} onClick={() => setCreatedInvite(null)}>收起</button>
+              </div>
+            </section>
+          )}
 
           <section className={styles.drawerSection}>
             <strong className={styles.sectionTitle}>创建邀请</strong>
