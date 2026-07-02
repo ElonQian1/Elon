@@ -14,9 +14,24 @@ object CodexProgressNarrative {
         val message: ChatMessage
     )
 
-    @Suppress("UNUSED_PARAMETER")
     fun fromTaskEvent(event: String, content: String): Narrative? {
-        return null
+        val cleanEvent = event.trim().lowercase(Locale.US)
+        val cleanContent = content.cleanSignalText()
+        return when (cleanEvent) {
+            "started" -> narrative(
+                key = "task_started",
+                content = "我已经开始执行这轮任务，后续检查、命令、文件修改和验证结果会折叠记录在同一轮会话里。"
+            )
+            "runtime_note_received" -> cleanContent
+                .takeIf { it.isNotBlank() && !isSelfRecoveringWorkflowProgress(it) }
+                ?.let {
+                    narrative(
+                        key = "runtime_note:${it.take(48)}",
+                        content = userFacingProgress(it)
+                    )
+                }
+            else -> null
+        }
     }
 
     fun fromWorkflowProgress(content: String): Narrative? {
@@ -40,9 +55,30 @@ object CodexProgressNarrative {
         }
     }
 
-    @Suppress("UNUSED_PARAMETER")
     fun fromToolCall(tool: String): Narrative? {
-        return null
+        return when (tool.trim().lowercase(Locale.US)) {
+            "read_file", "list_dir" -> narrative(
+                key = "tool_read_project",
+                content = "我正在读取项目文件和规则，先确认现有结构再决定怎么改。"
+            )
+            "run_shell", "shell" -> narrative(
+                key = "tool_run_command",
+                content = "我开始在项目工作区执行命令检查现状，命令细节会折叠在这条回复下面。"
+            )
+            "write_file", "file_change", "init_project" -> narrative(
+                key = "tool_change_files",
+                content = "我已经进入修改阶段，文件变更会继续折叠记录，完成后再统一验证。"
+            )
+            "build_project" -> narrative(
+                key = "tool_build_project",
+                content = "我正在运行构建或测试，等结果出来后再判断是否继续修。"
+            )
+            "git_commit" -> narrative(
+                key = "tool_git_commit",
+                content = "我正在保存这次改动，提交和发布结果会作为最终交付的一部分展示。"
+            )
+            else -> null
+        }
     }
 
     fun fromCliOutput(category: String, line: String): Narrative? {

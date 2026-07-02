@@ -23,7 +23,7 @@ internal class MainEvidenceActions(
         if (entries.isEmpty()) return
         val messages = activeConversation().messages
         val latestUserIndex = messages.indexOfLast { it.role == "user" }
-        val index = messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
+        val index = latestEvidenceIndexOrCreate(messages, latestUserIndex, working = true)
             ?: return
 
         // 清除其他消息上遗留的 evidenceWorking 标志，避免旧折叠层误触发闪烁动画
@@ -43,7 +43,7 @@ internal class MainEvidenceActions(
         if (entries.isEmpty()) return
         val messages = activeConversation().messages
         val latestUserIndex = messages.indexOfLast { it.role == "user" }
-        val index = messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
+        val index = latestEvidenceIndexOrCreate(messages, latestUserIndex, working = false)
             ?: return
 
         applyEvidenceToMessage(messages[index], entries, working = false)
@@ -121,6 +121,30 @@ internal class MainEvidenceActions(
         message.evidenceTitle = evidenceTitle(entries)
         message.evidenceDetails = evidenceDetails(entries)
         message.evidenceWorking = working
+    }
+
+    private fun latestEvidenceIndexOrCreate(
+        messages: MutableList<ChatMessage>,
+        latestUserIndex: Int,
+        working: Boolean
+    ): Int? {
+        messages.indices.lastOrNull { it > latestUserIndex && messages[it].role in assistantEvidenceRoles }
+            ?.let { return it }
+
+        val placeholder = ChatMessage(
+            role = "ai-intent",
+            content = "我正在处理这次请求，过程会折叠在这里。",
+            evidenceWorking = working
+        )
+        val adapter = chatAdapter()
+        if (adapter.ownsMessages(messages)) {
+            adapter.addMessage(placeholder)
+        } else {
+            messages.add(placeholder)
+            adapter.notifyDataSetChanged()
+        }
+        saveConversations()
+        return messages.indexOfLast { it === placeholder }.takeIf { it >= 0 }
     }
 
     private fun clearDuplicateCurrentEvidenceFromActiveConversation(currentEntries: List<EvidenceEntry>) {

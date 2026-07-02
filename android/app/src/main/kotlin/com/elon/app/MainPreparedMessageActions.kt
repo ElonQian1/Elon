@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.elon.app.databinding.ActivityMainBinding
 import com.google.gson.JsonArray
 import com.google.gson.JsonObject
+import java.util.Locale
 import java.util.UUID
 
 internal class MainPreparedMessageActions(
@@ -95,8 +96,7 @@ internal class MainPreparedMessageActions(
         val traceId = "ui_${System.currentTimeMillis()}_${UUID.randomUUID().toString().take(8)}"
         val payload = buildPayload(traceId, target, outgoingText, attachmentRefs, executionMode)
         val payloadJson = payload.toString()
-        val requestIsDevelopment = executionMode.isPlan ||
-            (looksLikeDevelopmentRequest(outgoingText) && !looksLikeDirectImageRequest(outgoingText))
+        val requestIsDevelopment = shouldUseDevelopmentPresentation(outgoingText, executionMode)
 
         if (appendUserBubble) appendUserMessage(visibleText, chatAttachments)
         recordSendTrace(traceId, target, outgoingText, attachmentRefs, executionMode)
@@ -193,6 +193,23 @@ internal class MainPreparedMessageActions(
             )
         }
         appendMessage(ChatMessage("ai-working", initialWorkflowMessage(requestIsDevelopment)))
+    }
+
+    private fun shouldUseDevelopmentPresentation(
+        outgoingText: String,
+        executionMode: ProjectRequestExecutionMode
+    ): Boolean {
+        if (executionMode.isPlan) return true
+        if (looksLikeDirectImageRequest(outgoingText)) return false
+
+        val runtimeRoute = selectedRuntimeRouteForRequest()
+            ?.trim()
+            ?.lowercase(Locale.US)
+        if (runtimeRoute == AiRuntimeRoute.MyKey.wireValue) {
+            return looksLikeDevelopmentRequest(outgoingText)
+        }
+
+        return true
     }
 
     private fun startForegroundWork(
