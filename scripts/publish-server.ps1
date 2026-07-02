@@ -909,6 +909,23 @@ function Publish-StaticDist {
     }
 }
 
+function Invoke-LoggedCmd {
+    param([string]$Command)
+
+    $previousErrorAction = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = "Continue"
+        $output = & cmd /c $Command 2>&1
+        $exitCode = $LASTEXITCODE
+        foreach ($line in $output) {
+            Write-Host $line
+        }
+        return $exitCode
+    } finally {
+        $ErrorActionPreference = $previousErrorAction
+    }
+}
+
 function Invoke-PcFrontendLocalBuild {
     param([string]$FrontendDir)
     $tscCmd = Join-Path $FrontendDir "node_modules\.bin\tsc.cmd"
@@ -917,9 +934,9 @@ function Invoke-PcFrontendLocalBuild {
         throw "本地 node_modules 缺少 tsc/vite"
     }
     Write-Host "   🔁 npm 构建失败，尝试直接使用 node_modules/.bin/tsc + vite ..." -ForegroundColor Gray
-    cmd /c "`"$tscCmd`" --noEmit && `"$viteCmd`" build" 2>&1 | Write-Host
-    if ($LASTEXITCODE -ne 0) {
-        throw "node_modules/.bin 构建失败，exit=$LASTEXITCODE"
+    $exitCode = Invoke-LoggedCmd -Command "`"$tscCmd`" --noEmit && `"$viteCmd`" build"
+    if ($exitCode -ne 0) {
+        throw "node_modules/.bin 构建失败，exit=$exitCode"
     }
 }
 
@@ -952,11 +969,11 @@ function Invoke-PcFrontendPnpmBuild {
     Write-Host "   🔁 npm 不可用，改用 pnpm 构建 PC 前端 ..." -ForegroundColor Gray
     Push-Location $FrontendDir
     try {
-        cmd /c "`"$pnpmCmd`" install --no-frozen-lockfile --config.dangerously-allow-all-builds=true" 2>&1 | Write-Host
-        if ($LASTEXITCODE -ne 0) { throw "pnpm install 失败，exit=$LASTEXITCODE" }
+        $installExit = Invoke-LoggedCmd -Command "`"$pnpmCmd`" install --no-frozen-lockfile --config.dangerously-allow-all-builds=true"
+        if ($installExit -ne 0) { throw "pnpm install 失败，exit=$installExit" }
 
-        cmd /c "`"$pnpmCmd`" run build" 2>&1 | Write-Host
-        if ($LASTEXITCODE -ne 0) { throw "pnpm run build 失败，exit=$LASTEXITCODE" }
+        $buildExit = Invoke-LoggedCmd -Command "`"$pnpmCmd`" run build"
+        if ($buildExit -ne 0) { throw "pnpm run build 失败，exit=$buildExit" }
     } finally {
         Pop-Location
     }
@@ -982,12 +999,12 @@ if (Test-Path (Join-Path $PcFrontendDir "package.json")) {
             $needInstall = (-not (Test-Path $nmDir)) -or ($lockHash -ne $prevHash.Trim())
             if ($needInstall) {
                 Write-Host "   📦 安装/更新前端依赖（npm ci）..." -ForegroundColor Gray
-                cmd /c "npm ci" 2>&1 | Write-Host
-                if ($LASTEXITCODE -ne 0) { throw "npm ci 失败，exit=$LASTEXITCODE" }
+                $installExit = Invoke-LoggedCmd -Command "npm ci"
+                if ($installExit -ne 0) { throw "npm ci 失败，exit=$installExit" }
                 $lockHash | Set-Content $nmInstalled -NoNewline
             }
-            cmd /c "npm run build" 2>&1 | Write-Host
-            if ($LASTEXITCODE -ne 0) { throw "npm run build 失败，exit=$LASTEXITCODE" }
+            $buildExit = Invoke-LoggedCmd -Command "npm run build"
+            if ($buildExit -ne 0) { throw "npm run build 失败，exit=$buildExit" }
             Write-Host "   ✅ 前端构建成功: $PcDistDir" -ForegroundColor Green
         } catch {
             $primaryBuildError = $_
