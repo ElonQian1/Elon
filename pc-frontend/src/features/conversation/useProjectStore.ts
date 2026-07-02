@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { api } from '../../api/client'
+import { useAuthStore } from '../../store/auth'
 import type { Project, Channel, ChannelCategory, Message, ProjectMember, ProjectSpace, ProjectLanding, ProjectListResponse, ChannelMessagesResponse, SendMessageResponse } from './types'
 import { DEFAULT_RUNTIME_ROUTE } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
@@ -18,6 +19,15 @@ interface MemberPresencePatch {
 
 const CHANNEL_MESSAGE_CACHE_FRESH_MS = 10000
 const CACHED_CHANNEL_REFRESH_DELAY_MS = 300
+const PROJECT_SPACE_CACHE_PREFIX = 'elon.pc.projectSpace.v1'
+const PROJECT_SPACE_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000
+
+interface ProjectSpaceCacheEntry {
+  projectId: string
+  userId: string
+  cachedAt: number
+  space: ProjectSpace
+}
 
 interface ProjectState {
   projects: Project[]
@@ -98,13 +108,15 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       return
     }
     get().stopPolling()
+    const cachedSpace = id ? readProjectSpaceCache(id) : null
+    const cachedChannels = cachedSpace?.channels ?? []
     set({
       activeProjectId: id,
-      space: null,
-      landing: null,
-      channels: [],
-      categories: [],
-      members: [],
+      space: cachedSpace,
+      landing: cachedSpace?.landing ?? null,
+      channels: cachedChannels,
+      categories: cachedSpace?.categories ?? [],
+      members: cachedSpace?.members ?? [],
       spaceLoading: !!id,
       spaceError: '',
       activeChannelId: '',
@@ -118,6 +130,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     try {
       const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(id)}/space`)
       const channels = space.channels ?? []
+      writeProjectSpaceCache(id, space)
       set({
         space,
         landing: space.landing ?? null,
@@ -142,6 +155,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       const space = await api.get<ProjectSpace>(`/api/projects/${encodeURIComponent(activeProjectId)}/space`)
       const channels = space.channels ?? []
       const nextActive = channels.some((c) => c.id === activeChannelId) ? activeChannelId : (channels[0]?.id ?? '')
+      writeProjectSpaceCache(activeProjectId, space)
       set({
         space,
         landing: space.landing ?? null,
@@ -349,4 +363,40 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
 
 function channelMessageCacheKey(projectId: string, channelId: string): string {
   return `${projectId}::${channelId}`
+}
+
+function projectSpaceCacheKey(projectId: string): string {
+  const userId = useAuthStore.getState().user?.id || 'anonymous'
+  return `${PROJECT_SPACE_CACHE_PREFIX}:${userId}:${projectId}`
+}
+
+function readProjectSpaceCache(projectId: string): ProjectSpace | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = window.localStorage.getItem(projectSpaceCacheKey(projectId))
+    if (!raw) return null
+    const entry = JSON.parse(raw) as ProjectSpaceCacheEntry
+    const userId = useAuthStore.getState().user?.id || 'anonymous'
+    if (entry.projectId !== projectId || entry.userId !== userId || !entry.space) return null
+    if (Date.now() - Number(entry.cachedAt || 0) > PROJECT_SPACE_CACHE_MAX_AGE_MS) return null
+    return entry.space
+  } catch {
+    return null
+  }
+}
+
+function writeProjectSpaceCache(projectId: string, space: ProjectSpace): void {
+  if (typeof window === 'undefined') return
+  try {
+    const userId = useAuthStore.getState().user?.id || 'anonymous'
+    const entry: ProjectSpaceCacheEntry = {
+      projectId,
+      userId,
+      cachedAt: Date.now(),
+      space,
+    }
+    window.localStorage.setItem(projectSpaceCacheKey(projectId), JSON.stringify(entry))
+  } catch {
+    // Storage may be full or disabled; the live store still works.
+  }
 }
