@@ -4,6 +4,11 @@ import type { Project, Channel, ChannelCategory, Message, ProjectMember, Project
 import { DEFAULT_RUNTIME_ROUTE } from './runtimeRoutes'
 import type { RuntimeRoute } from './runtimeRoutes'
 
+interface ChannelMessageCacheEntry {
+  messages: Message[]
+  loadedAt: number
+}
+
 interface ProjectState {
   projects: Project[]
   projectsLoaded: boolean
@@ -17,6 +22,8 @@ interface ProjectState {
   spaceError: string
   activeChannelId: string
   messages: Message[]
+  messageCache: Record<string, ChannelMessageCacheEntry>
+  messageRequestSeq: number
   messagesLoading: boolean
   sendingMessage: boolean
   pollTimer: ReturnType<typeof setInterval> | null
@@ -56,6 +63,8 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
   spaceError: '',
   activeChannelId: '',
   messages: [],
+  messageCache: {},
+  messageRequestSeq: 0,
   messagesLoading: false,
   sendingMessage: false,
   pollTimer: null,
@@ -141,22 +150,59 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     const { activeProjectId } = get()
     if (!activeProjectId) return
     get().stopPolling()
-    set({ activeChannelId: id, messages: [] })
+    const cached = get().messageCache[channelMessageCacheKey(activeProjectId, id)]
+    set({
+      activeChannelId: id,
+      messages: cached?.messages ?? [],
+      messagesLoading: !cached,
+    })
     await get().loadMessages(activeProjectId, id)
     get().startPolling()
   },
 
   loadMessages: async (projectId: string, channelId: string) => {
-    set({ messagesLoading: true })
+    const startState = get()
+    const isActiveRequest = startState.activeProjectId === projectId && startState.activeChannelId === channelId
+    const requestSeq = isActiveRequest ? startState.messageRequestSeq + 1 : startState.messageRequestSeq
+    const key = channelMessageCacheKey(projectId, channelId)
+    if (isActiveRequest) {
+      set({ messagesLoading: true, messageRequestSeq: requestSeq })
+    }
     try {
       const data = await api.get<ChannelMessagesResponse>(
         `/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(channelId)}/messages?limit=120`,
       )
-      set({ messages: data.messages ?? [] })
+      const nextMessages = data.messages ?? []
+      set((state) => {
+        const nextCache = {
+          ...state.messageCache,
+          [key]: { messages: nextMessages, loadedAt: Date.now() },
+        }
+        if (
+          !isActiveRequest
+          || state.messageRequestSeq !== requestSeq
+          || state.activeProjectId !== projectId
+          || state.activeChannelId !== channelId
+        ) {
+          return { messageCache: nextCache }
+        }
+        return {
+          messages: nextMessages,
+          messageCache: nextCache,
+          messagesLoading: false,
+        }
+      })
     } catch (err) {
       console.warn('Failed to load messages:', err)
-    } finally {
-      set({ messagesLoading: false })
+      const state = get()
+      if (
+        isActiveRequest
+        && state.messageRequestSeq === requestSeq
+        && state.activeProjectId === projectId
+        && state.activeChannelId === channelId
+      ) {
+        set({ messagesLoading: false })
+      }
     }
   },
 
@@ -229,3 +275,7 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
     }
   },
 }))
+
+function channelMessageCacheKey(projectId: string, channelId: string): string {
+  return `${projectId}::${channelId}`
+}

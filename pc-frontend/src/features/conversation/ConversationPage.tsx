@@ -102,6 +102,19 @@ interface ProjectRealtimeDetail {
   kind?: string
 }
 
+interface ConversationMessageCacheEntry {
+  messages: Message[]
+  taskMessages: Message[]
+  loadedAt: number
+}
+
+interface TaskMessageCacheEntry {
+  messages: Message[]
+  loadedAt: number
+}
+
+const TASK_MESSAGE_CACHE_FRESH_MS = 4000
+
 export default function ConversationPage() {
   useChannelAutoRefresh()
   const navigate = useNavigate()
@@ -159,6 +172,24 @@ export default function ConversationPage() {
   const [sessionView, setSessionView] = useState<string | 'new' | null>(null)
   const prevSessionIdsRef = useRef<Set<string>>(new Set())
   const waitingForNewSession = useRef(false)
+  const conversationMessageCacheRef = useRef<Map<string, ConversationMessageCacheEntry>>(new Map())
+  const taskMessageCacheRef = useRef<Map<string, TaskMessageCacheEntry>>(new Map())
+  const conversationLoadSeqRef = useRef(0)
+  const loadCachedTaskMessages = useCallback(async (
+    projectId: string,
+    channelId: string,
+    force = false,
+  ): Promise<Message[]> => {
+    if (!projectId || !channelId) return []
+    const key = taskMessageCacheKey(projectId, channelId)
+    const cached = taskMessageCacheRef.current.get(key)
+    if (!force && cached && Date.now() - cached.loadedAt < TASK_MESSAGE_CACHE_FRESH_MS) {
+      return cached.messages
+    }
+    const messages = await loadAiDevelopmentTaskMessages(projectId, channelId)
+    taskMessageCacheRef.current.set(key, { messages, loadedAt: Date.now() })
+    return messages
+  }, [])
   const modelButtonCopy = useMemo(
     () => routeModelButtonCopy(runtimeRoute, modelLabel, modelOptions, selectedAgent),
     [runtimeRoute, modelLabel, modelOptions, selectedAgent],
@@ -213,6 +244,9 @@ export default function ConversationPage() {
 
   // 项目切换时清空会话消息
   useEffect(() => {
+    conversationLoadSeqRef.current += 1
+    conversationMessageCacheRef.current.clear()
+    taskMessageCacheRef.current.clear()
     setConvMessages([])
     setSessionTaskMessages([])
     setSessionView(null)
@@ -244,6 +278,7 @@ export default function ConversationPage() {
   }, [members, memberMenu])
 
   useEffect(() => {
+    conversationLoadSeqRef.current += 1
     setSessionView(null)
     setConvMessages([])
     setSessionTaskMessages([])
@@ -303,6 +338,19 @@ export default function ConversationPage() {
     el.style.overflowY = el.scrollHeight > 120 ? 'auto' : 'hidden'
   }, [])
 
+  const writeConversationCache = useCallback((
+    projectId: string,
+    targetUserId: string,
+    conversationId: string,
+    nextMessages: Message[],
+    nextTaskMessages: Message[],
+  ) => {
+    conversationMessageCacheRef.current.set(
+      conversationMessageCacheKey(projectId, targetUserId, conversationId),
+      { messages: nextMessages, taskMessages: nextTaskMessages, loadedAt: Date.now() },
+    )
+  }, [])
+
   async function handleSend(e: React.FormEvent | React.KeyboardEvent) {
     e.preventDefault()
     const text = input.trim()
@@ -328,7 +376,11 @@ export default function ConversationPage() {
           String(sessionView),
           fullContent,
         )
-        setConvMessages((prev) => [...prev, message as MemberConversationMessage])
+        setConvMessages((prev) => {
+          const next = [...prev, message as MemberConversationMessage]
+          writeConversationCache(activeProjectId, activeConversationTargetId, String(sessionView), next, sessionTaskMessages)
+          return next
+        })
         listMemberConversations(activeProjectId, activeConversationTargetId)
           .then(setMemberConversations)
           .catch(() => {})
@@ -376,7 +428,7 @@ export default function ConversationPage() {
       setSessionView(openedConversationId)
       setSessionTaskMessages([])
       const optimisticTaskId = clean(response?.task_id ?? response?.message?.task_id ?? response?.message?.taskId)
-      setConvMessages([{
+      const optimisticMessages: Message[] = [{
         id: `optimistic-${openedConversationId}-${Date.now()}`,
         role: 'user',
         content: fullContent,
@@ -385,7 +437,11 @@ export default function ConversationPage() {
         sender_name: user?.nickname ?? user?.account ?? '我',
         outgoing: true,
         task_id: optimisticTaskId || undefined,
-      } as Message])
+      } as Message]
+      setConvMessages(optimisticMessages)
+      if (activeProjectId && activeConversationTargetId) {
+        writeConversationCache(activeProjectId, activeConversationTargetId, openedConversationId, optimisticMessages, [])
+      }
       // 发送后刷新会话列表和当前会话消息，保证继续输入时仍在同一上下文。
       if (activeProjectId && activeConversationTargetId) {
         setTimeout(async () => {
@@ -614,6 +670,7 @@ export default function ConversationPage() {
 
   // 切换频道时重置会话视图
   useEffect(() => {
+    conversationLoadSeqRef.current += 1
     setSessionView(null)
     setConvMessages([])
     setSessionTaskMessages([])
@@ -623,42 +680,65 @@ export default function ConversationPage() {
   // 打开一个会话：从服务端加载该会话的消息（与手机端同步）
   async function openConversation(convId: string) {
     if (!activeProjectId || !activeConversationTargetId) return
+    const projectId = activeProjectId
+    const targetUserId = activeConversationTargetId
+    const channelId = aiDevelopmentChannelId
+    const cacheKey = conversationMessageCacheKey(projectId, targetUserId, convId)
+    const cached = conversationMessageCacheRef.current.get(cacheKey)
+    const requestSeq = conversationLoadSeqRef.current + 1
+    conversationLoadSeqRef.current = requestSeq
+
     setSessionView(convId)
-    setConvMessages([])
-    setSessionTaskMessages([])
-    setConvLoading(true)
+    if (cached) {
+      setConvMessages(cached.messages)
+      setSessionTaskMessages(cached.taskMessages)
+      setConvLoading(false)
+    } else {
+      setConvMessages([])
+      setSessionTaskMessages([])
+      setConvLoading(true)
+    }
+
     try {
       const [conversationMessages, taskMessages] = await Promise.all([
         listMemberConversationMessages(
-          activeProjectId,
-          activeConversationTargetId,
+          projectId,
+          targetUserId,
           convId,
         ),
-        loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId),
+        loadCachedTaskMessages(projectId, channelId),
       ])
-      setConvMessages(conversationMessages as Message[])
+      if (conversationLoadSeqRef.current !== requestSeq) return
+      const nextMessages = conversationMessages as Message[]
+      writeConversationCache(projectId, targetUserId, convId, nextMessages, taskMessages)
+      setConvMessages(nextMessages)
       setSessionTaskMessages(taskMessages)
     } catch (err) { console.warn('[ConvMessages] failed:', err) }
-    finally { setConvLoading(false) }
+    finally {
+      if (conversationLoadSeqRef.current === requestSeq) setConvLoading(false)
+    }
   }
 
   async function refreshTaskSurface() {
     if (activeProjectId && activeConversationTargetId && sessionView && sessionView !== 'new') {
+      const conversationId = String(sessionView)
       const [nextMessages, taskMessages] = await Promise.all([
         listMemberConversationMessages(
           activeProjectId,
           activeConversationTargetId,
-          String(sessionView),
+          conversationId,
         ),
-        loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId),
+        loadCachedTaskMessages(activeProjectId, aiDevelopmentChannelId, true),
       ])
-      setConvMessages(nextMessages as Message[])
+      const conversationMessages = nextMessages as Message[]
+      writeConversationCache(activeProjectId, activeConversationTargetId, conversationId, conversationMessages, taskMessages)
+      setConvMessages(conversationMessages)
       setSessionTaskMessages(taskMessages)
       listMemberConversations(activeProjectId, activeConversationTargetId)
         .then(setMemberConversations)
         .catch(() => {})
     } else if (activeProjectId && aiDevelopmentChannelId) {
-      setSessionTaskMessages(await loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId))
+      setSessionTaskMessages(await loadCachedTaskMessages(activeProjectId, aiDevelopmentChannelId, true))
     }
 
     if (activeProjectId && activeChannelId) {
@@ -710,10 +790,12 @@ export default function ConversationPage() {
             activeConversationTargetId,
             String(sessionView),
           ),
-          loadAiDevelopmentTaskMessages(activeProjectId, aiDevelopmentChannelId),
+          loadCachedTaskMessages(activeProjectId, aiDevelopmentChannelId, true),
         ])
         if (canceled) return
-        setConvMessages(nextMessages as Message[])
+        const conversationMessages = nextMessages as Message[]
+        writeConversationCache(activeProjectId, activeConversationTargetId, String(sessionView), conversationMessages, taskMessages)
+        setConvMessages(conversationMessages)
         setSessionTaskMessages(taskMessages)
         listMemberConversations(activeProjectId, activeConversationTargetId)
           .then((items) => { if (!canceled) setMemberConversations(items) })
@@ -752,13 +834,14 @@ export default function ConversationPage() {
       window.removeEventListener('elon:project-message-updated', onProjectMessageUpdated)
       window.removeEventListener('elon:project-task-done', onProjectTaskDone)
     }
-  }, [activeProjectId, activeConversationTargetId, sessionView, aiDevelopmentChannelId])
+  }, [activeProjectId, activeConversationTargetId, sessionView, aiDevelopmentChannelId, loadCachedTaskMessages, writeConversationCache])
 
   function startNewSession() {
     if (!isOwnConversationTarget) {
       setSendError('只能为自己的项目会话新建对话')
       return
     }
+    conversationLoadSeqRef.current += 1
     prevSessionIdsRef.current = new Set(memberConversations.map((c) => c.id))
     setSessionView('new')
     setConvMessages([])
@@ -816,6 +899,7 @@ export default function ConversationPage() {
 
   async function openProjectHome() {
     if (!activeProjectId) return
+    conversationLoadSeqRef.current += 1
     setSessionView(null)
     setConvMessages([])
     setSessionTaskMessages([])
@@ -1453,4 +1537,12 @@ async function loadAiDevelopmentTaskMessages(projectId: string, channelId: strin
     `/api/projects/${encodeURIComponent(projectId)}/channels/${encodeURIComponent(channelId)}/messages?limit=200`,
   )
   return data.messages ?? []
+}
+
+function conversationMessageCacheKey(projectId: string, targetUserId: string, conversationId: string): string {
+  return `${projectId}::${targetUserId}::${conversationId}`
+}
+
+function taskMessageCacheKey(projectId: string, channelId: string): string {
+  return `${projectId}::${channelId}`
 }
