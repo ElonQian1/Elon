@@ -19,6 +19,7 @@
 |---|---|
 | 项目定位、架构、模块入口、AI 任务模板 | `AI_PROJECT.md`、`AI_ARCHITECTURE.md`、`AI_INDEX.md`、`AI_TASK_TEMPLATE.md` |
 | Git、worktree、提交、push、部署、发布 | `.github/instructions/git-deploy-workflow.instructions.md` |
+| Rust 验证、`cargo check`、`cargo test`、`cargo build`、`cargo clippy` | `.github/instructions/git-deploy-workflow.instructions.md` 的 Cargo 验证共享缓存与锁章节 |
 | Rust 格式化、`cargo fmt`、纯格式化拆提交 | `.github/instructions/git-deploy-workflow.instructions.md` 的 Rust 格式化章节 |
 | PowerShell 版本、`powershell`/`pwsh` 选择、PS5 设备兼容 | `docs/powershell-version-policy.md` |
 | 模块化、拆文件、治理巨型文件 | `.github/instructions/modular-architecture.instructions.md` |
@@ -40,6 +41,7 @@
 - 并行 rebase 边界：`origin/main` 前进是并行常态，不能把“远端前进”当作自动 rebase / 重跑 / 重新发布的条件。只在 `git push origin HEAD:main` 被 non-fast-forward 拒绝时，才 `git fetch origin` + `git rebase origin/main` 一次；本任务提交已经包含在 `origin/main` 后，代码层面即完成，后续更新 main 由后续任务或发布协调者接管。
 - PowerShell 版本：Windows bootstrap 脚本可继续用系统自带 `powershell.exe`；凡脚本头部有 `#requires -Version 7.0`，必须用 `pwsh` 运行。PowerShell 5 设备先运行 `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\check-pwsh7.ps1` 检查；没有 PowerShell 7 时不要修改或降级 PS7 脚本，按 `docs/powershell-version-policy.md` 安装或转交给有 `pwsh` 的环境。
 - 任务流程门禁：修改 `ai-task-preflight`、worktree 清理、并行 AI 说明或 Git 工作流文档后，必须运行 `powershell -ExecutionPolicy Bypass -File scripts\test-ai-task-preflight-workflow.ps1`，防止 `-CreateWorktree`、`WORKTREE_PATH`、`main` 基线规则漂移。
+- Rust 日常验证：不要并行裸跑 `cargo check` / `cargo test` / `cargo build` / `cargo clippy` 到同一个 target。Windows 用 `powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml`，Linux/macOS 用 `bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml`；脚本读取 `.env.local` / `ELON_DEV_CARGO_TARGET_DIR`，复用开发 target 并加锁。发布构建仍由 `RUST_SERVER_MUSL_TARGET_DIR` + `publish-server.*` 管理。
 - 后端发布：业务代码 commit + push 后运行 `scripts\publish-server.ps1` 或 `scripts/publish-server.sh`，再验证 `/health` 和 `/api/server/version`；若发布期间被更新的 `origin/main` 或服务器版本超越，按脚本提示汇报“代码已合并，发布交给最新主线”，不要反复 rebase 重跑。
 - Android 可安装端发布：业务代码 commit + push 后，Windows 运行 `scripts\publish-apk.ps1 -Changelog "<用户可见改动>"`，Linux 运行 `bash scripts/publish-apk.sh --changelog="<用户可见改动>"`；并行任务若只要求代码先合并，运行 `scripts\check-task-complete.ps1 -Kind CodePushed` 即可收尾；明确负责 APK 发布的任务再运行 `-Kind AndroidFeature`。
 - 任务收尾清理 worktree：`scripts\cleanup-task-worktrees.ps1 -Apply`（Windows）或 `bash scripts/cleanup-task-worktrees.sh --apply`（Linux）。预览模式（不带 `-Apply`/`--apply`）只列不删；脏 worktree 和未合并分支会自动保留。

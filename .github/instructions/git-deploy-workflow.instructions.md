@@ -60,6 +60,7 @@ ssh -o ProxyCommand=none root@43.139.149.158 'curl -s http://127.0.0.1:8080/heal
 | 夹带无关文件进同一次 commit | 污染提交历史，妨碍定位问题 |
 | 编译完成后跳过"服务器是否已有更新版本"的祖先检查，强推上传 | 用旧编译覆盖别人刚发布的新版本，手机端版本倒退 |
 | 代码已 push 后为了让本代理发布成功而反复 rebase / 重跑构建 | 并行任务会互相追车；发布应由运行时最新 main 或发布协调者统一完成 |
+| 在同一个 `target` 上并行裸跑多个 Cargo 验证命令 | `cargo check` / `cargo test` 会同时写 dep-info / fingerprint 临时文件，Windows 上尤其容易互踩；日常验证必须走 `scripts\cargo-dev.ps1` / `scripts/cargo-dev.sh` 的共享 target 锁 |
 | 在共享脚本里写死某台机器的本机盘符（如 `E:\rust-target\...`） | 其他 PC / 远程 Codex 没有这个盘，脚本秒退；本机差异必须走 `.env.local` + `RUST_SERVER_MUSL_TARGET_DIR` / `ELON_BUILD_TARGET_DIR`（详见 `scripts/publish-server.ps1` 的 `.NOTES` 注释和 `.env.local.example`） |
 
 ---
@@ -232,6 +233,22 @@ powershell -ExecutionPolicy Bypass -File scripts\cleanup-task-worktrees.ps1 -App
 ## 🦀 Rust 代码格式化规则（增量优先，纯格式化拆提交）
 
 > **方针**：日常任务不重构历史代码，优先只对新改动增量规范。改 `.rs` 文件后，**只对自己改过的文件**跑仓库格式化脚本；脚本会按文件所属 crate 的 `Cargo.toml` 读取 edition，再调用 `rustfmt --edition <crate edition>`。
+
+### Cargo 验证共享缓存与锁
+
+日常 `cargo check` / `cargo test` / `cargo build` / `cargo clippy` 使用开发验证脚本，不直接裸跑 Cargo：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
+powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml pc_lightweight
+```
+
+```bash
+bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
+bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
+```
+
+脚本会读取 `.env.local` / `ELON_DEV_CARGO_TARGET_DIR`，设置开发用 `CARGO_TARGET_DIR` 并在 target 目录上加锁。同一台机器多个 AI 可以复用同一份开发编译缓存，但同一时间只允许一个 Cargo 进程写这个 target，避免 dep-info / fingerprint 临时文件互踩。不要把开发验证 target 和发布构建 target 混用；服务端发布继续由 `RUST_SERVER_MUSL_TARGET_DIR` + `publish-server.*` 管理。
 
 ```powershell
 # ✅ 一条命令格式化所有本次改动的 .rs 文件（修改 + 新增全覆盖）

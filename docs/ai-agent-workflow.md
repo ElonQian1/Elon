@@ -269,14 +269,38 @@ bash scripts/publish-server.sh --skip-upload
 
 后端运行代码变更必须先 commit + push，再使用发布脚本部署。版本号由服务器 release API 分配，脚本会把版本号和 git SHA 注入二进制；禁止为了发布手动递增并提交 `server/Cargo.toml`。服务端通过 `/api/server/version` 暴露 `versionName` 和 `gitSha`，APK 个人页会动态显示该后端版本。
 
-### 7.2 Android APK 编译打包
+### 7.2 Rust 日常验证缓存
+
+发布构建缓存只服务于 `publish-server.*` 的 Linux musl release 产物。日常开发验证使用单独的开发 target：
+
+```powershell
+# .env.local（不提交）
+ELON_DEV_CARGO_TARGET_DIR=D:\rust\shared\elon-dev-cargo-target
+
+# Windows
+powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 check --manifest-path server\Cargo.toml
+powershell -ExecutionPolicy Bypass -File scripts\cargo-dev.ps1 test --manifest-path server\Cargo.toml pc_lightweight
+```
+
+```bash
+# .env.local（不提交）
+ELON_DEV_CARGO_TARGET_DIR=/var/tmp/elon-dev-cargo-target
+
+# Linux/macOS
+bash scripts/cargo-dev.sh check --manifest-path server/Cargo.toml
+bash scripts/cargo-dev.sh test --manifest-path server/Cargo.toml pc_lightweight
+```
+
+`scripts/cargo-dev.*` 会读取 `.env.local`，设置 `CARGO_TARGET_DIR`，并在目标目录上加锁。这样多个 worktree / 多个 AI 可以复用同一份日常编译缓存，但不会同时写入同一个 target。不要并行裸跑 `cargo check` 和 `cargo test` 到同一个 `server/target` 或同一个共享 target；如确实要并行验证，必须显式指定不同 `ELON_DEV_CARGO_TARGET_DIR` / `-TargetDir` / `--target-dir`。
+
+### 7.3 Android APK 编译打包
 ```powershell
 cd android
 ./gradlew assembleRelease
 # 编译产物: android/app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
-### 7.3 APK 签名
+### 7.4 APK 签名
 ```powershell
 # 签名密钥从环境变量注入，不要硬编码
 apksigner sign --ks $env:APK_KEYSTORE --ks-pass pass:$env:APK_KEYSTORE_PASS `
@@ -284,7 +308,7 @@ apksigner sign --ks $env:APK_KEYSTORE --ks-pass pass:$env:APK_KEYSTORE_PASS `
   android/app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
-### 7.4 前端构建
+### 7.5 前端构建
 ```powershell
 cd frontend
 npm run build
