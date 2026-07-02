@@ -1,11 +1,12 @@
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { api } from '../../api/client'
 import { clean, formatTime } from '../../lib/utils'
-import type { Channel, ProjectMember } from './types'
+import type { Channel, ProjectMember, ProjectMemberAuditEntry, ProjectMemberAuditResponse, ProjectRoleRef } from './types'
 import {
   memberPresenceStatus,
   memberChannelSubtitle,
   memberChannelPermissions,
+  memberChannelCanView,
   memberChannelCapabilityLabels,
   memberModerationSummary,
   memberRoleSummary,
@@ -740,6 +741,8 @@ export function MemberContextMenu({
 export function MemberProfilePopover({
   member,
   anchorY,
+  projectId,
+  channels,
   channel,
   canModerate,
   onClose,
@@ -749,6 +752,8 @@ export function MemberProfilePopover({
 }: {
   member: ProjectMember
   anchorY: number
+  projectId?: string
+  channels?: Channel[]
   channel?: Channel
   canModerate?: boolean
   onClose: () => void
@@ -771,6 +776,9 @@ export function MemberProfilePopover({
   const [addMsg, setAddMsg] = useState('')
   const [moderating, setModerating] = useState<MemberModerationAction | ''>('')
   const [moderationMsg, setModerationMsg] = useState('')
+  const [auditEntries, setAuditEntries] = useState<ProjectMemberAuditEntry[]>([])
+  const [auditLoading, setAuditLoading] = useState(false)
+  const [auditMsg, setAuditMsg] = useState('')
 
   useEffect(() => {
     if (!member.user_id) return
@@ -785,6 +793,45 @@ export function MemberProfilePopover({
     setModerating('')
     setModerationMsg('')
   }, [member.user_id, member.is_muted, member.is_banned])
+
+  useEffect(() => {
+    if (!projectId || !canModerate || !member.user_id) {
+      setAuditEntries([])
+      setAuditMsg('')
+      setAuditLoading(false)
+      return
+    }
+    let alive = true
+    const targetId = clean(member.user_id)
+    const targetAccount = clean(member.account ?? '').toLowerCase()
+    setAuditLoading(true)
+    setAuditMsg('')
+    api.get<ProjectMemberAuditResponse>(`/api/projects/${encodeURIComponent(projectId)}/member-audit?limit=80`)
+      .then((data) => {
+        if (!alive) return
+        const entries = (data.entries ?? [])
+          .filter((entry) => {
+            const entryTargetId = clean(entry.target_user_id ?? '')
+            const entryTargetAccount = clean(entry.target_account ?? '').toLowerCase()
+            return (!!targetId && entryTargetId === targetId)
+              || (!!targetAccount && entryTargetAccount === targetAccount)
+          })
+          .slice(0, 5)
+        setAuditEntries(entries)
+        setAuditMsg('')
+      })
+      .catch((err) => {
+        if (!alive) return
+        setAuditEntries([])
+        setAuditMsg((err as { message?: string }).message ?? '暂无权限查看成员记录')
+      })
+      .finally(() => {
+        if (alive) setAuditLoading(false)
+      })
+    return () => {
+      alive = false
+    }
+  }, [projectId, canModerate, member.user_id, member.account])
 
   useEffect(() => {
     function onDown(e: MouseEvent) {
@@ -841,9 +888,21 @@ export function MemberProfilePopover({
   ].filter(Boolean) as [string, string][]
   const channelPermissions = memberChannelPermissions(member, channel?.id)
   const channelCapabilityLabels = memberChannelCapabilityLabels(channelPermissions)
+  const roleChips = profileRoleChips(member)
+  const profileVisibleChannels = (channels ?? []).filter((item) => {
+    const permissions = memberChannelPermissions(member, item.id)
+    return !permissions || memberChannelCanView(permissions)
+  })
+  const previewChannels = profileVisibleChannels.slice(0, 6)
+  const hiddenChannelCount = Math.max(0, (channels ?? []).length - profileVisibleChannels.length)
+  const extraChannelCount = Math.max(0, profileVisibleChannels.length - previewChannels.length)
+  const presenceDetails = [
+    clean(member.custom_status ?? ''),
+    clean(member.activity ?? ''),
+  ].filter(Boolean)
 
-  const POPOVER_WIDTH = 300
-  const POPOVER_HEIGHT = 360
+  const POPOVER_WIDTH = 328
+  const POPOVER_HEIGHT = 580
   const viewW = window.innerWidth
   const viewH = window.innerHeight
   const maxTop = Math.max(12, viewH - POPOVER_HEIGHT - 12)
@@ -874,6 +933,13 @@ export function MemberProfilePopover({
             {presenceLabel(status)}
           </em>
         </div>
+        {presenceDetails.length > 0 && (
+          <div className={styles.memberPopoverPresence}>
+            {presenceDetails.map((item) => (
+              <span key={item}>{item}</span>
+            ))}
+          </div>
+        )}
         {channel && channelPermissions && (
           <div className={styles.memberPopoverChannel}>
             <div>
@@ -904,6 +970,51 @@ export function MemberProfilePopover({
               </div>
             ))}
           </div>
+        )}
+        <section className={styles.memberPopoverSection}>
+          <div className={styles.memberPopoverSectionHead}>
+            <strong>角色</strong>
+            <span>{roleChips.length} 个</span>
+          </div>
+          <div className={styles.memberPopoverRoleList}>
+            {roleChips.map((role) => (
+              <em
+                key={role.id}
+                className={styles.memberPopoverRoleChip}
+                style={role.color ? { borderColor: role.color, color: role.color } : undefined}
+              >
+                {role.name || roleLabel(role.id)}
+              </em>
+            ))}
+          </div>
+        </section>
+        {channels && channels.length > 0 && (
+          <section className={styles.memberPopoverSection}>
+            <div className={styles.memberPopoverSectionHead}>
+              <strong>可见频道</strong>
+              <span>
+                {profileVisibleChannels.length}/{channels.length}
+                {hiddenChannelCount > 0 ? ` · 隐藏 ${hiddenChannelCount}` : ''}
+              </span>
+            </div>
+            <div className={styles.memberPopoverChannelList}>
+              {previewChannels.length === 0 && (
+                <p className={styles.memberPopoverEmpty}>当前没有可见频道</p>
+              )}
+              {previewChannels.map((item) => (
+                <div key={item.id} className={styles.memberPopoverChannelItem}>
+                  <span>{channelKindMark(item.kind)}</span>
+                  <div>
+                    <strong title={item.name}>{item.name}</strong>
+                    <em>{item.category_name || channelKindLabel(item.kind)}</em>
+                  </div>
+                </div>
+              ))}
+              {extraChannelCount > 0 && (
+                <p className={styles.memberPopoverMore}>还有 {extraChannelCount} 个可见频道</p>
+              )}
+            </div>
+          </section>
         )}
         <div className={styles.memberPopoverActions}>
           {onOpenConversations && (
@@ -946,9 +1057,108 @@ export function MemberProfilePopover({
             </div>
           </div>
         )}
+        {projectId && canModerate && (
+          <section className={styles.memberPopoverSection}>
+            <div className={styles.memberPopoverSectionHead}>
+              <strong>近期记录</strong>
+              <span>{auditLoading ? '同步中' : `${auditEntries.length} 条`}</span>
+            </div>
+            <div className={styles.memberPopoverTimeline}>
+              {auditLoading && auditEntries.length === 0 && (
+                <p className={styles.memberPopoverEmpty}>正在读取成员记录...</p>
+              )}
+              {!auditLoading && auditEntries.length === 0 && (
+                <p className={styles.memberPopoverEmpty}>{auditMsg || '暂无近期成员记录'}</p>
+              )}
+              {auditEntries.map((entry) => (
+                <article key={entry.id} className={styles.memberPopoverTimelineItem}>
+                  <div>
+                    <strong>{profileAuditActionLabel(entry.action)}</strong>
+                    <time>{formatTime(entry.created_at)}</time>
+                  </div>
+                  <span>{profileAuditSummary(entry)}</span>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </div>
   )
+}
+
+function profileRoleChips(member: ProjectMember): ProjectRoleRef[] {
+  if (member.roles?.length) return member.roles
+  const fallbackId = clean(member.role ?? 'member') || 'member'
+  return [{ id: fallbackId, name: roleLabel(fallbackId), builtin: true }]
+}
+
+function channelKindMark(kind?: string) {
+  const normalized = clean(kind ?? '').toLowerCase()
+  if (normalized === 'ai_development') return '⚒'
+  if (normalized === 'builds') return '◆'
+  if (normalized === 'announce' || normalized === 'announcements') return '!'
+  if (normalized === 'docs') return '文'
+  return '#'
+}
+
+function channelKindLabel(kind?: string) {
+  const normalized = clean(kind ?? '').toLowerCase()
+  const labels: Record<string, string> = {
+    ai_development: 'AI 开发频道',
+    builds: '构建发布频道',
+    announce: '公告频道',
+    announcements: '公告频道',
+    docs: '文档频道',
+    chat: '聊天频道',
+  }
+  return labels[normalized] ?? '项目频道'
+}
+
+const PROFILE_AUDIT_ACTION_LABELS: Record<string, string> = {
+  add_member: '添加成员',
+  invite_member: '邀请成员',
+  join_by_invite_link: '通过邀请加入',
+  update_member_role: '调整角色',
+  remove_member: '移除成员',
+  mute_member: '禁言成员',
+  unmute_member: '解除禁言',
+  ban_member: '封禁成员',
+  unban_member: '解封成员',
+}
+
+function profileAuditActionLabel(action: string) {
+  return PROFILE_AUDIT_ACTION_LABELS[clean(action)] ?? (clean(action) || '成员操作')
+}
+
+function profileAuditSummary(entry: ProjectMemberAuditEntry) {
+  const actor = clean(entry.actor_account ?? entry.actor_user_id ?? '') || '系统'
+  const oldRole = clean(entry.old_role ?? '')
+  const newRole = clean(entry.new_role ?? '')
+  const parts = [`操作者 ${actor}`]
+  if (oldRole || newRole) {
+    if (oldRole && newRole) parts.push(`${roleLabel(oldRole)} -> ${roleLabel(newRole)}`)
+    else parts.push(roleLabel(newRole || oldRole))
+  }
+  const note = clean(entry.note ?? '')
+  if (note) parts.push(profileAuditNote(note))
+  return parts.join(' · ')
+}
+
+function profileAuditNote(note: string) {
+  const first = note.split(';').map((part) => part.trim()).filter(Boolean)[0] ?? note
+  const index = first.indexOf('=')
+  if (index < 0) return first
+  const labels: Record<string, string> = {
+    reason: '原因',
+    duration: '时长',
+    duration_minutes: '时长',
+    invite_code: '邀请码',
+    channel_id: '频道',
+  }
+  const key = first.slice(0, index)
+  const value = first.slice(index + 1)
+  return `${labels[key] ?? key}: ${value || '-'}`
 }
 
 /* ── MemberContextSummary ── */

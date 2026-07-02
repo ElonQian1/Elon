@@ -1436,6 +1436,8 @@ export default function ConversationPage() {
             <MemberProfilePopover
               member={selectedMember}
               anchorY={memberPopoverY}
+              projectId={activeProjectId}
+              channels={channels}
               channel={activeChannel}
               canModerate={canModerateMembers && selectedMember.user_id !== user?.id}
               onClose={() => setSelectedMember(null)}
