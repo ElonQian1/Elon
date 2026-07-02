@@ -144,7 +144,7 @@ internal class MainConversationPreviewActions(
     }
 
     fun prepareActiveConversationTitle(messageText: String) {
-        if (updateConversationTitleFromUserMessage(activeConversation(), messageText)) {
+        if (refreshConversationTitleFromUserMessage(activeConversation(), messageText)) {
             saveConversations()
             renderConversationList()
         }
@@ -176,19 +176,17 @@ internal class MainConversationPreviewActions(
     ) {
         conversation.subtitle = summarize(message.content, 30)
         project.subtitle = summarize(message.content, 34)
-        updateConversationTitleFromUserMessage(conversation, message.content)
+        refreshConversationTitleFromUserMessage(conversation, message.content)
     }
 
-    private fun updateConversationTitleFromUserMessage(
+    private fun refreshConversationTitleFromUserMessage(
         conversation: AppConversation,
         messageText: String
     ): Boolean {
         if (!shouldAutoGenerateConversationTitle(conversation)) return false
-        val title = autoConversationTitleFromMessage(messageText)
-        if (title.isBlank()) return false
-        conversation.title = title
-        binding.topTitleText.text = title
-        return true
+        val changed = updateConversationTitleFromUserMessage(conversation, messageText)
+        if (changed) binding.topTitleText.text = conversation.title
+        return changed
     }
 
     private fun markConversationUpdated(
