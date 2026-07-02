@@ -133,7 +133,6 @@ internal class MainConversationPreviewActions(
         if (conversations.isEmpty()) conversations.add(defaultAppConversation())
         if (conversations[0].ended) return
         conversations[0].subtitle = text
-        conversations[0].updatedAt = System.currentTimeMillis()
         saveConversations()
         renderConversationList()
     }

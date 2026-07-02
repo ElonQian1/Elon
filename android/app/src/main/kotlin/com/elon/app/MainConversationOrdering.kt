@@ -29,9 +29,14 @@ internal fun AppProject.preferredConversationIndex(
         }.thenBy { index ->
             conversationOpenSortKey(conversations[index].ended)
         }.thenBy { index ->
-            conversations[index].updatedAt
+            conversations[index].conversationActivityAt()
         }
     ) ?: 0
+}
+
+internal fun AppConversation.conversationActivityAt(): Long {
+    val latestMessageAt = messages.maxOfOrNull { it.createdAtMs } ?: 0L
+    return latestMessageAt.takeIf { it > 0L } ?: updatedAt
 }
 
 internal fun conversationWorkingSortKey(working: Boolean): Int {

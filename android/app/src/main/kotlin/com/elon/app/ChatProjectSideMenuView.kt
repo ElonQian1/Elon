@@ -187,7 +187,7 @@ internal class ChatProjectSideMenuView(
                         projectIndex = projectIndex,
                         conversationIndex = conversationIndex,
                         title = title,
-                        updatedAt = conversation.updatedAt,
+                        updatedAt = conversation.conversationActivityAt(),
                         ended = conversation.ended,
                         working = isRecentConversationWorking(projectIndex, conversationIndex)
                     )

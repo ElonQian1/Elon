@@ -34,7 +34,7 @@ internal class ProjectSpacePersonalConversationPanel(
                 .sortedWith(
                     compareByDescending<PersonalConversationEntry> { conversationWorkingSortKey(it.working) }
                         .thenByDescending { conversationOpenSortKey(it.conversation.ended) }
-                        .thenByDescending { it.conversation.updatedAt }
+                        .thenByDescending { it.conversation.conversationActivityAt() }
                         .thenBy { it.conversation.title }
                 )
                 .forEach { entry ->
