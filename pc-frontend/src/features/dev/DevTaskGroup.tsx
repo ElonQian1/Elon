@@ -8,9 +8,10 @@
  */
 import { memo, useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
-import { DevTaskMessage } from './DevTaskCard'
+import TaskTimeline from './TaskTimeline'
 import MarkdownContent from '../markdown/MarkdownContent'
 import { messageKind, messageText, shortId, statusForTask, taskIdOf, taskIsTerminal } from './devTaskUtils'
+import { buildTaskTimeline, timelineSummary } from './taskTimelineModel'
 import type { ChatMessage, TaskContext, TaskTone } from './types'
 import styles from './DevTaskGroup.module.css'
 
@@ -45,11 +46,13 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
   const headerMsg   = messages.find((m) => messageKind(m) === 'ai_task')
   const resultMsg   = explicitResultMsg ?? (isDone ? latestVisibleProgress(messages) : undefined)
   const progressMsgs = messages.filter((m) => messageKind(m) === 'ai_progress')
-  const progressCount = progressMsgs.length
+  const timeline = buildTaskTimeline(progressMsgs, resultMsg)
+  const progressCount = timeline.visibleStepCount
   const status = statusForTask(task)
   const request = taskRequestText(userMsg) || task?.request || taskRequestText(headerMsg)
   const hasProgressDetails = progressCount > 0
   const tone = status.tone
+  const processSummary = timelineSummary(timeline, taskId, taskId ? shortId(taskId) : '')
 
   return (
     <div className={[styles.thread, styles[`tone_${tone}`] ?? ''].join(' ')}>
@@ -71,8 +74,7 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
               <span className={styles.processDot} />
               <span className={styles.processLabel}>{status.label}</span>
               <span className={styles.processMeta}>
-                {collapsed ? `查看 ${progressCount} 步过程` : '收起过程'}
-                {taskId ? ` · ${shortId(taskId)}` : ''}
+                {collapsed ? `查看 ${processSummary || `${progressCount} 步过程`}` : `收起过程${processSummary ? ` · ${processSummary}` : ''}`}
               </span>
               <span className={styles.toggleArrow} aria-hidden="true">
                 {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
@@ -88,15 +90,12 @@ function DevTaskGroup({ messages, taskContext, onCancel, onApprove }: Props) {
 
           {!collapsed && (
             <div className={styles.processBody}>
-              {progressMsgs.map((msg, i) => (
-                <DevTaskMessage
-                  key={String(msg.id ?? i)}
-                  message={msg}
-                  context={taskContext}
-                  onCancel={onCancel}
-                  onApprove={onApprove}
-                />
-              ))}
+              <TaskTimeline
+                model={timeline}
+                taskContext={taskContext}
+                onCancel={onCancel}
+                onApprove={onApprove}
+              />
             </div>
           )}
         </div>

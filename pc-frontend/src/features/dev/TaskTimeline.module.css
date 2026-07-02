@@ -1,0 +1,142 @@
+.timeline {
+  display: grid;
+  gap: 0;
+  padding: 7px 0 2px;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  min-width: 0;
+  position: relative;
+}
+
+.item:not(:last-child)::before {
+  content: "";
+  position: absolute;
+  left: 13px;
+  top: 26px;
+  bottom: -2px;
+  width: 1px;
+  background: rgba(148, 163, 184, .16);
+}
+
+.rail {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #9fb2d8;
+  background: #202632;
+  border: 1px solid rgba(148, 163, 184, .18);
+  z-index: 1;
+}
+
+.content {
+  min-width: 0;
+  padding: 3px 0 10px;
+}
+
+.compact .content {
+  padding-bottom: 7px;
+}
+
+.head {
+  min-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.title {
+  color: #d7e2f7;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.meta {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.detail {
+  color: #98a6bc;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding-right: 8px;
+}
+
+.embedded {
+  margin-top: 4px;
+  min-width: 0;
+}
+
+.tone_done .icon {
+  color: #2bd576;
+  border-color: rgba(43, 213, 118, .28);
+  background: rgba(35, 165, 90, .10);
+}
+
+.tone_running .icon,
+.tone_queued .icon {
+  color: #8ca4ff;
+  border-color: rgba(88, 101, 242, .28);
+  background: rgba(88, 101, 242, .10);
+}
+
+.tone_failed .icon {
+  color: #ff7b7f;
+  border-color: rgba(218, 55, 60, .30);
+  background: rgba(218, 55, 60, .10);
+}
+
+.tone_canceled .icon,
+.tone_muted .icon {
+  color: #9aa3b1;
+  border-color: rgba(148, 163, 184, .20);
+  background: rgba(148, 163, 184, .08);
+}
+
+.tone_approval .icon {
+  color: #ffd166;
+  border-color: rgba(255, 209, 102, .28);
+  background: rgba(255, 209, 102, .10);
+}
+
+@media (max-width: 780px) {
+  .item {
+    grid-template-columns: 24px minmax(0, 1fr);
+  }
+  .item:not(:last-child)::before {
+    left: 11px;
+  }
+  .icon {
+    width: 20px;
+    height: 20px;
+  }
+  .head {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .title {
+    white-space: normal;
+  }
+}
