@@ -28,6 +28,11 @@ static PROJECT_MESSAGE_UPDATED_TX: LazyLock<broadcast::Sender<ProjectMessageUpda
         let (tx, _) = broadcast::channel(256);
         tx
     });
+static PROJECT_MEMBERS_UPDATED_TX: LazyLock<broadcast::Sender<ProjectMembersUpdatedEvent>> =
+    LazyLock::new(|| {
+        let (tx, _) = broadcast::channel(128);
+        tx
+    });
 
 /// 项目任务完成推送事件。
 ///
@@ -87,6 +92,22 @@ pub struct ProjectMessageUpdatedEvent {
     pub member_user_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ProjectMembersUpdatedEvent {
+    #[serde(rename = "type")]
+    pub event_type: &'static str,
+    #[serde(rename = "projectId")]
+    pub project_id: String,
+    #[serde(rename = "action")]
+    pub action: String,
+    #[serde(rename = "targetUserId", skip_serializing_if = "Option::is_none")]
+    pub target_user_id: Option<String>,
+    #[serde(rename = "actorUserId", skip_serializing_if = "Option::is_none")]
+    pub actor_user_id: Option<String>,
+    #[serde(skip)]
+    pub member_user_ids: Vec<String>,
+}
+
 impl ProjectTaskDoneEvent {
     pub fn to_json(&self) -> Option<String> {
         serde_json::to_string(self).ok()
@@ -105,6 +126,12 @@ impl ProjectMessageUpdatedEvent {
     }
 }
 
+impl ProjectMembersUpdatedEvent {
+    pub fn to_json(&self) -> Option<String> {
+        serde_json::to_string(self).ok()
+    }
+}
+
 pub fn subscribe() -> broadcast::Receiver<ProjectTaskDoneEvent> {
     PROJECT_TASK_DONE_TX.subscribe()
 }
@@ -115,6 +142,10 @@ pub fn subscribe_group_ai() -> broadcast::Receiver<ProjectAiMatterEvent> {
 
 pub fn subscribe_message_updated() -> broadcast::Receiver<ProjectMessageUpdatedEvent> {
     PROJECT_MESSAGE_UPDATED_TX.subscribe()
+}
+
+pub fn subscribe_members_updated() -> broadcast::Receiver<ProjectMembersUpdatedEvent> {
+    PROJECT_MEMBERS_UPDATED_TX.subscribe()
 }
 
 /// 广播项目任务完成事件给所有在线项目成员。
@@ -226,4 +257,32 @@ pub fn publish_message_updated(
         member_user_ids: member_ids,
     };
     let _ = PROJECT_MESSAGE_UPDATED_TX.send(event);
+}
+
+pub fn publish_members_updated(
+    state: &AppState,
+    project_id: &str,
+    action: &str,
+    target_user_id: Option<&str>,
+    actor_user_id: Option<&str>,
+) {
+    let member_ids = state
+        .store
+        .list_project_members(project_id)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|member| member.user_id)
+        .collect::<Vec<_>>();
+    if member_ids.is_empty() {
+        return;
+    }
+    let event = ProjectMembersUpdatedEvent {
+        event_type: "project_members_updated",
+        project_id: project_id.to_string(),
+        action: action.chars().take(80).collect(),
+        target_user_id: target_user_id.map(ToOwned::to_owned),
+        actor_user_id: actor_user_id.map(ToOwned::to_owned),
+        member_user_ids: member_ids,
+    };
+    let _ = PROJECT_MEMBERS_UPDATED_TX.send(event);
 }

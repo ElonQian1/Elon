@@ -56,6 +56,7 @@ async fn handle(
     let mut project_task_rx = crate::project_events::subscribe();
     let mut project_ai_rx = crate::project_events::subscribe_group_ai();
     let mut project_message_rx = crate::project_events::subscribe_message_updated();
+    let mut project_members_rx = crate::project_events::subscribe_members_updated();
     let mut presence_rx = crate::presence_events::subscribe();
     let mut typing_rx = crate::typing_events::subscribe();
     let mut billing_rx = crate::billing_events::subscribe();
@@ -139,6 +140,18 @@ async fn handle(
                 }
             }
             msg = project_message_rx.recv(), if authenticated_user_id.is_some() => {
+                match msg {
+                    Ok(event) if authenticated_user_id
+                        .as_ref()
+                        .is_some_and(|uid| event.member_user_ids.iter().any(|id| id == uid)) => {
+                        let Some(payload) = event.to_json() else { continue; };
+                        if tx.send(Message::Text(payload)).await.is_err() { break; }
+                    }
+                    Err(RecvError::Lagged(_)) => {}
+                    _ => {}
+                }
+            }
+            msg = project_members_rx.recv(), if authenticated_user_id.is_some() => {
                 match msg {
                     Ok(event) if authenticated_user_id
                         .as_ref()

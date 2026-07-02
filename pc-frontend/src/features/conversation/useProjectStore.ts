@@ -32,6 +32,7 @@ interface ProjectState {
   loadProjects: () => Promise<void>
   selectProject: (id: string) => Promise<void>
   reloadProjectSpace: () => Promise<void>
+  applyMemberPresence: (userId: string, isOnline: boolean) => void
   selectChannel: (id: string) => Promise<void>
   loadMessages: (projectId: string, channelId: string) => Promise<void>
   sendMessage: (
@@ -145,6 +146,29 @@ export const useProjectStore = create<ProjectState>()((set, get) => ({
       console.warn('Failed to reload project space:', err)
       set({ spaceLoading: false, spaceError: (err as { message?: string }).message ?? '项目空间加载失败' })
     }
+  },
+
+  applyMemberPresence: (userId: string, isOnline: boolean) => {
+    const targetId = userId.trim()
+    if (!targetId) return
+    const updateMember = (member: ProjectMember): ProjectMember => {
+      if (member.user_id !== targetId) return member
+      const currentStatus = String(member.presence_status ?? '').trim().toLowerCase()
+      const nextStatus = isOnline
+        ? (currentStatus && currentStatus !== 'offline' && currentStatus !== 'invisible' ? currentStatus : 'online')
+        : 'offline'
+      if (member.is_online === isOnline && member.presence_status === nextStatus) return member
+      return { ...member, is_online: isOnline, presence_status: nextStatus }
+    }
+    set((state) => {
+      if (!state.members.some((member) => member.user_id === targetId)) return {}
+      const members = state.members.map(updateMember)
+      const spaceMembers = state.space?.members?.map(updateMember)
+      return {
+        members,
+        space: state.space && spaceMembers ? { ...state.space, members: spaceMembers } : state.space,
+      }
+    })
   },
 
   selectChannel: async (id: string) => {

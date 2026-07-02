@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom'
 import { v4 as uuidv4 } from 'uuid'
 import { useProjectStore } from './useProjectStore'
 import { useChannelAutoRefresh } from './useChannelAutoRefresh'
+import { useMemberRealtimeRefresh } from './useMemberRealtimeRefresh'
 import { AttachmentButton, AttachmentChip, attachmentsToMarkdown } from './AttachmentButton'
 import type { UploadedAttachment } from './AttachmentButton'
 import { useAuthStore } from '../../store/auth'
@@ -139,6 +140,7 @@ function persistDirectPcCliSelection(storage: Storage | null | undefined, enable
 
 export default function ConversationPage() {
   useChannelAutoRefresh()
+  useMemberRealtimeRefresh()
   const navigate = useNavigate()
   const user = useAuthStore((s) => s.user)
   const {

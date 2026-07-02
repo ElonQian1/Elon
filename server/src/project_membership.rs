@@ -122,13 +122,24 @@ pub async fn join_project(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     match state.store.join_project(&user.id, &project_id) {
-        Ok(already_member) => Json(serde_json::json!({
-            "ok": true,
-            "already_member": already_member,
-            "message": if already_member { "你已经是该项目成员" } else { "已成功加入项目" },
-            "project_id": project_id,
-        }))
-        .into_response(),
+        Ok(already_member) => {
+            if !already_member {
+                publish_members_updated(
+                    &state,
+                    &project_id,
+                    "join_project",
+                    Some(&user.id),
+                    Some(&user.id),
+                );
+            }
+            Json(serde_json::json!({
+                "ok": true,
+                "already_member": already_member,
+                "message": if already_member { "你已经是该项目成员" } else { "已成功加入项目" },
+                "project_id": project_id,
+            }))
+            .into_response()
+        }
         Err(e) => {
             let msg = e.to_string();
             let status = if msg.contains("不存在") {
@@ -163,11 +174,20 @@ pub async fn leave_project(
         Err(e) => return json_error(StatusCode::UNAUTHORIZED, e.to_string()),
     };
     match state.store.leave_project(&user.id, &project_id) {
-        Ok(()) => Json(serde_json::json!({
-            "ok": true,
-            "message": "已退出项目",
-        }))
-        .into_response(),
+        Ok(()) => {
+            publish_members_updated(
+                &state,
+                &project_id,
+                "leave_project",
+                Some(&user.id),
+                Some(&user.id),
+            );
+            Json(serde_json::json!({
+                "ok": true,
+                "message": "已退出项目",
+            }))
+            .into_response()
+        }
         Err(e) => {
             let msg = e.to_string();
             let status = if msg.contains("不是该项目的成员") {
@@ -461,6 +481,13 @@ pub async fn join_project_by_invite_link(
                 ) {
                     tracing::warn!(?err, project_id = %preview.project_id, "记录邀请链接加入审计日志失败");
                 }
+                publish_members_updated(
+                    &state,
+                    &preview.project_id,
+                    "join_by_invite_link",
+                    Some(&user.id),
+                    Some(&user.id),
+                );
             }
             Json(serde_json::json!({
                 "ok": true,
@@ -579,6 +606,13 @@ pub async fn add_member(
             ) {
                 tracing::warn!(?err, project_id = %project_id, "记录成员邀请审计日志失败");
             }
+            publish_members_updated(
+                &state,
+                &project_id,
+                action,
+                Some(&member.user_id),
+                Some(&user.id),
+            );
             Json(serde_json::json!({
                 "ok": true,
                 "project_id": project_id,
@@ -740,6 +774,7 @@ pub async fn create_project_role(
             ) {
                 tracing::warn!(?err, project_id = %project_id, "记录角色创建审计日志失败");
             }
+            publish_members_updated(&state, &project_id, "create_role", None, Some(&user.id));
             Json(serde_json::json!({
                 "ok": true,
                 "project_id": project_id,
@@ -829,6 +864,13 @@ pub async fn update_project_role(
             ) {
                 tracing::warn!(?err, project_id = %project_id, "记录角色更新审计日志失败");
             }
+            publish_members_updated(
+                &state,
+                &project_id,
+                "update_role_definition",
+                None,
+                Some(&user.id),
+            );
             Json(serde_json::json!({
                 "ok": true,
                 "project_id": project_id,
@@ -894,6 +936,7 @@ pub async fn delete_project_role(
             ) {
                 tracing::warn!(?err, project_id = %project_id, "记录角色删除审计日志失败");
             }
+            publish_members_updated(&state, &project_id, "delete_role", None, Some(&user.id));
             Json(serde_json::json!({
                 "ok": true,
                 "project_id": project_id,
@@ -1053,6 +1096,22 @@ fn apply_member_presence(member: &mut crate::store::ProjectMemberEntry, connecte
         "idle" | "dnd" | "online" => configured,
         _ => "online".to_string(),
     };
+}
+
+fn publish_members_updated(
+    state: &AppState,
+    project_id: &str,
+    action: &str,
+    target_user_id: Option<&str>,
+    actor_user_id: Option<&str>,
+) {
+    crate::project_events::publish_members_updated(
+        state,
+        project_id,
+        action,
+        target_user_id,
+        actor_user_id,
+    );
 }
 
 fn member_has_project_permission(
@@ -1453,6 +1512,13 @@ pub async fn update_member_role(
             ) {
                 tracing::warn!(?err, project_id = %project_id, "记录成员角色审计日志失败");
             }
+            publish_members_updated(
+                &state,
+                &project_id,
+                "update_member_role",
+                Some(&target_user_id),
+                Some(&user.id),
+            );
             Json(serde_json::json!({
                 "ok": true,
                 "project_id": project_id,
@@ -1528,6 +1594,13 @@ pub async fn remove_member(
             ) {
                 tracing::warn!(?err, project_id = %project_id, "记录成员移除审计日志失败");
             }
+            publish_members_updated(
+                &state,
+                &project_id,
+                "remove_member",
+                Some(&target_user_id),
+                Some(&user.id),
+            );
             Json(serde_json::json!({
                 "ok": true,
                 "message": "成员已移除",
@@ -1608,6 +1681,13 @@ pub async fn update_member_moderation(
             ) {
                 tracing::warn!(?err, project_id = %project_id, "记录成员限制审计日志失败");
             }
+            publish_members_updated(
+                &state,
+                &project_id,
+                audit_action,
+                Some(&target_user_id),
+                Some(&user.id),
+            );
             Json(serde_json::json!({
                 "ok": true,
                 "project_id": project_id,

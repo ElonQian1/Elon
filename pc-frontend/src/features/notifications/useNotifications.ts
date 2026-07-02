@@ -5,6 +5,8 @@ const MAX_RECONNECT_MS = 30_000
 const DONE_EVENT_TYPE = 'project_task_done'
 const GROUP_AI_EVENT_TYPE = 'project_ai_matter_event'
 const PROJECT_MESSAGE_EVENT_TYPE = 'project_message_updated'
+const PROJECT_MEMBERS_EVENT_TYPE = 'project_members_updated'
+const PRESENCE_EVENT_TYPE = 'presence'
 
 /** 对应旧 pc_app_notifications.js：WebSocket 任务完成通知 + 声音 + 标题角标 */
 export function useNotifications() {
@@ -78,6 +80,14 @@ export function useNotifications() {
       if (!data) return
       if (data.type === PROJECT_MESSAGE_EVENT_TYPE) {
         window.dispatchEvent(new CustomEvent('elon:project-message-updated', { detail: data }))
+        return
+      }
+      if (data.type === PROJECT_MEMBERS_EVENT_TYPE) {
+        window.dispatchEvent(new CustomEvent('elon:project-members-updated', { detail: data }))
+        return
+      }
+      if (data.type === PRESENCE_EVENT_TYPE) {
+        window.dispatchEvent(new CustomEvent('elon:presence', { detail: data }))
         return
       }
       if (data.type === GROUP_AI_EVENT_TYPE) {
