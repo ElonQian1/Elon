@@ -61,6 +61,8 @@ const DEFAULT_CHAT_FRESH_TIMEOUT_CAP_SECS: u64 = 20;
 const PC_LIGHTWEIGHT_CHAT_RECV_TIMEOUT_SECS: u64 = 120;
 const PC_CODEX_PROJECT_DEFAULT_REASONING_EFFORT: &str = "medium";
 const PC_CODEX_PROGRESS_HINT_COOLDOWN_SECS: u64 = 15;
+const PC_AGENT_CLI_RECV_TIMEOUT_ENV: &str = "ELON_PC_AGENT_CLI_RECV_TIMEOUT_SECS";
+const PC_AGENT_CLI_RECV_TIMEOUT_GRACE_SECS: u64 = 45;
 
 pub use self::ai_cli_intent_gate::confirm_project_intent;
 
@@ -716,6 +718,53 @@ impl Drop for PcCliCancelOnDrop {
     }
 }
 
+struct PcExecutionFinishOnDrop {
+    state: Option<Arc<AppState>>,
+    scope: Option<NativeSessionScope>,
+    request_id: String,
+    model: Option<String>,
+}
+
+impl PcExecutionFinishOnDrop {
+    fn armed(
+        state: Arc<AppState>,
+        scope: Option<NativeSessionScope>,
+        request_id: String,
+        model: Option<String>,
+    ) -> Self {
+        Self {
+            state: scope.as_ref().map(|_| state),
+            scope,
+            request_id,
+            model,
+        }
+    }
+
+    fn disarm(&mut self) {
+        self.state = None;
+        self.scope = None;
+    }
+}
+
+impl Drop for PcExecutionFinishOnDrop {
+    fn drop(&mut self) {
+        let (Some(state), Some(scope)) = (self.state.as_ref(), self.scope.as_ref()) else {
+            return;
+        };
+        record_pc_execution_finished(
+            state.as_ref(),
+            Some(scope),
+            &self.request_id,
+            false,
+            Some("PC CLI 请求在收到终态前被取消或连接断开"),
+            self.model.as_deref(),
+            None,
+            None,
+            None,
+        );
+    }
+}
+
 pub async fn run_with_pc_agent_workspace(
     agent_id: &str,
     user_id: &str,
@@ -873,6 +922,40 @@ fn pc_project_reasoning_effort(
             .to_string(),
         )
     })
+}
+
+fn pc_runtime_full_access(runtime_permission: Option<&str>) -> bool {
+    matches!(
+        runtime_permission.map(str::trim),
+        Some("project_write" | "full_access" | "danger_full_access")
+    )
+}
+
+fn pc_agent_cli_node_timeout_secs(cli_name: &str, runtime_permission: Option<&str>) -> u64 {
+    match cli_name.trim().to_ascii_lowercase().as_str() {
+        "codex" if pc_runtime_full_access(runtime_permission) => 1200,
+        "codex" => 300,
+        _ => 180,
+    }
+}
+
+fn pc_agent_cli_recv_timeout_secs(
+    cli_name: &str,
+    request_mode: AiCliRequestMode,
+    scope: Option<&NativeSessionScope>,
+) -> u64 {
+    if let Ok(value) = std::env::var(PC_AGENT_CLI_RECV_TIMEOUT_ENV) {
+        if let Ok(parsed) = value.trim().parse::<u64>() {
+            return parsed.clamp(60, 3600);
+        }
+    }
+    let runtime_permission = if request_mode.is_plan() {
+        Some("read_only")
+    } else {
+        scope.map(|scope| scope.runtime_permission.as_str())
+    };
+    pc_agent_cli_node_timeout_secs(cli_name, runtime_permission)
+        .saturating_add(PC_AGENT_CLI_RECV_TIMEOUT_GRACE_SECS)
 }
 
 fn should_skip_pc_chat_native_session(user_message: &str) -> bool {
@@ -1197,6 +1280,12 @@ async fn run_via_pc_agent(
         cwd,
         model_label.or(copilot_model),
     );
+    let mut pc_execution_guard = PcExecutionFinishOnDrop::armed(
+        state.clone(),
+        native_session_scope.clone(),
+        pc_req_id.clone(),
+        Some(display_model.clone()),
+    );
     let _ = tx.send(pc_dispatch_started_event(
         &pc_req_id,
         agent_id,
@@ -1212,6 +1301,8 @@ async fn run_via_pc_agent(
     let is_codex = cli_name == "codex";
     let mut lightweight_streamed_reply = String::new();
     let mut last_codex_progress_hint: Option<(&'static str, std::time::Instant)> = None;
+    let project_recv_timeout_secs =
+        pc_agent_cli_recv_timeout_secs(cli_name, request_mode, native_session_scope.as_ref());
 
     // 进度心跳：开发/规划每 5s 发一次；轻量聊天只回流真实文本，不刷内部状态。
     let progress_tx = tx.clone();
@@ -1272,6 +1363,15 @@ async fn run_via_pc_agent(
                                 "Lightweight PC chat timed out after streamed readable reply was delivered",
                             ),
                         );
+                        record_pc_execution_without_cli_done(
+                            state,
+                            native_session_scope.as_ref(),
+                            &pc_req_id,
+                            true,
+                            None,
+                            Some(display_model.as_str()),
+                        );
+                        pc_execution_guard.disarm();
                         return Ok(PcAgentRunOutcome::Completed);
                     }
                     if let Some(reply) =
@@ -1308,6 +1408,15 @@ async fn run_via_pc_agent(
                                 "Lightweight PC chat timed out after partial readable reply was delivered",
                             ),
                         );
+                        record_pc_execution_without_cli_done(
+                            state,
+                            native_session_scope.as_ref(),
+                            &pc_req_id,
+                            true,
+                            None,
+                            Some(display_model.as_str()),
+                        );
+                        pc_execution_guard.disarm();
                         return Ok(PcAgentRunOutcome::Completed);
                     }
                     pc_billing_call.release_no_usage();
@@ -1322,13 +1431,56 @@ async fn run_via_pc_agent(
                             "Lightweight PC chat timed out before CliDone; fallback to normal chat",
                         ),
                     );
+                    record_pc_execution_without_cli_done(
+                        state,
+                        native_session_scope.as_ref(),
+                        &pc_req_id,
+                        false,
+                        Some(
+                            "Lightweight PC chat timed out before CliDone; fallback to normal chat",
+                        ),
+                        Some(display_model.as_str()),
+                    );
+                    pc_execution_guard.disarm();
                     return Ok(no_readable_lightweight_reply(&full_text, cli_name));
                 }
             }
         } else {
-            match rx.recv().await {
-                Some(event) => event,
-                None => break,
+            match tokio::time::timeout(
+                std::time::Duration::from_secs(project_recv_timeout_secs),
+                rx.recv(),
+            )
+            .await
+            {
+                Ok(Some(event)) => event,
+                Ok(None) => break,
+                Err(_) => {
+                    abort_pc_progress(&mut progress_handle);
+                    let message = format!(
+                        "PC agent CLI 等待终态超时（{}s），已取消本机任务",
+                        project_recv_timeout_secs
+                    );
+                    finish_pc_node_compute_run(
+                        state,
+                        &pc_accounting_key,
+                        "failed",
+                        None,
+                        None,
+                        None,
+                        Some(&message),
+                    );
+                    record_pc_execution_without_cli_done(
+                        state,
+                        native_session_scope.as_ref(),
+                        &pc_req_id,
+                        false,
+                        Some(&message),
+                        Some(display_model.as_str()),
+                    );
+                    pc_execution_guard.disarm();
+                    pc_billing_call.release_error();
+                    return Err(anyhow!(message));
+                }
             }
         };
 
@@ -1483,6 +1635,7 @@ async fn run_via_pc_agent(
                     cli_usage.as_ref(),
                     accounting_result.as_ref(),
                 );
+                pc_execution_guard.disarm();
                 let has_useful_output = !full_text.trim().is_empty();
                 if exit_ok
                     || (is_codex
@@ -1675,6 +1828,15 @@ async fn run_via_pc_agent(
                 }
                 .to_json(),
             );
+            record_pc_execution_without_cli_done(
+                state,
+                native_session_scope.as_ref(),
+                &pc_req_id,
+                true,
+                None,
+                Some(display_model.as_str()),
+            );
+            pc_execution_guard.disarm();
             return Ok(PcAgentRunOutcome::Completed);
         }
         pc_billing_call.release_no_usage();
@@ -1687,6 +1849,15 @@ async fn run_via_pc_agent(
             None,
             Some("Lightweight PC chat channel closed before CliDone; fallback to normal chat"),
         );
+        record_pc_execution_without_cli_done(
+            state,
+            native_session_scope.as_ref(),
+            &pc_req_id,
+            false,
+            Some("Lightweight PC chat channel closed before CliDone; fallback to normal chat"),
+            Some(display_model.as_str()),
+        );
+        pc_execution_guard.disarm();
         return Ok(no_readable_lightweight_reply(&full_text, cli_name));
     }
 
@@ -1699,6 +1870,15 @@ async fn run_via_pc_agent(
         None,
         Some("PC agent CLI 连接中断（未收到 CliDone）"),
     );
+    record_pc_execution_without_cli_done(
+        state,
+        native_session_scope.as_ref(),
+        &pc_req_id,
+        false,
+        Some("PC agent CLI 连接中断（未收到 CliDone）"),
+        Some(display_model.as_str()),
+    );
+    pc_execution_guard.disarm();
     pc_billing_call.release_error();
     Err(anyhow!("PC agent CLI 连接中断（未收到 CliDone）"))
 }
@@ -2670,6 +2850,19 @@ fn record_pc_execution_finished(
     {
         tracing::warn!("record project execution finish failed: {e:#}");
     }
+}
+
+fn record_pc_execution_without_cli_done(
+    state: &AppState,
+    scope: Option<&NativeSessionScope>,
+    request_id: &str,
+    exit_ok: bool,
+    error: Option<&str>,
+    model: Option<&str>,
+) {
+    record_pc_execution_finished(
+        state, scope, request_id, exit_ok, error, model, None, None, None,
+    );
 }
 
 fn settle_pc_cli_node_usage(
