@@ -14,7 +14,7 @@ use tokio::sync::mpsc::UnboundedSender;
 
 use crate::{
     agent, agent_intent,
-    agent_routing::{is_local_cli_option, quick_casual_reply},
+    agent_routing::is_local_cli_option,
     ai_cli, billing, intent_router,
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_attachment_notes::{
@@ -72,9 +72,7 @@ pub async fn chat_project(
         Ok(route) => route,
         Err(message) => return json_error(StatusCode::BAD_REQUEST, message),
     };
-    let skip_auto_bind_for_casual_chat =
-        req.chat_only.unwrap_or(false) || quick_casual_reply(&message).is_some();
-    if should_auto_bind_local_node(pc_runtime_route) && !skip_auto_bind_for_casual_chat {
+    if should_auto_bind_local_node(pc_runtime_route) && !req.chat_only.unwrap_or(false) {
         if let (Some(node_id), Some(workspace_path)) = (
             req.local_node_id
                 .as_deref()

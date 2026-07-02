@@ -17,7 +17,6 @@ use std::{
 use tokio::sync::watch;
 
 use crate::{
-    agent_routing::quick_casual_reply,
     pc_agent_runtime_choice::PcRuntimeRoutePreference,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
     project_channel_summary::{spawn_channel_summary, ChannelSummaryTask},
@@ -1610,9 +1609,7 @@ async fn start_channel_ai_task_response(
         None => None,
     };
     let direct_pc_cli = req.direct_pc_cli.unwrap_or(false);
-    let skip_auto_bind_for_casual_chat =
-        !direct_pc_cli && channel_ai_quick_reply(&content).is_some();
-    if should_auto_bind_local_node(runtime_route) && !skip_auto_bind_for_casual_chat {
+    if should_auto_bind_local_node(runtime_route) {
         if let (Some(node_id), Some(workspace_path)) = (
             req.local_node_id
                 .as_deref()
@@ -1707,83 +1704,6 @@ async fn start_channel_ai_task_response(
         "ai_task",
     );
 
-    if !direct_pc_cli {
-        if let Some(reply) = channel_ai_quick_reply(&content) {
-            let done_raw = WsMessage::Done {
-                message: reply.clone(),
-                apk_url: None,
-                image_url: None,
-                model_used: None,
-                node_id: None,
-            }
-            .to_json();
-            let _ = state.store.record_task_event(
-                &task_id,
-                &enrich_project_ws_event(done_raw.clone(), &task_id),
-            );
-
-            match state.store.finish_running_task(
-                &task_id,
-                "done",
-                Some(reply.as_str()),
-                None,
-                None,
-            ) {
-                Ok(true) => {
-                    project_events::publish_task_done(
-                        &state,
-                        &project_id,
-                        &user_id,
-                        &conversation_id,
-                        &done_raw,
-                    );
-                    publish_channel_message_updated(
-                        state.as_ref(),
-                        &project_id,
-                        &channel_id,
-                        Some(&conversation_id),
-                        Some(&task_id),
-                        "conversation_result",
-                    );
-                }
-                Ok(false) => {}
-                Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
-            }
-
-            match state.store.insert_project_channel_ai_result_once(
-                &project_id,
-                &channel_id,
-                reply.as_str(),
-                &task_id,
-            ) {
-                Ok(true) => publish_channel_message_updated(
-                    state.as_ref(),
-                    &project_id,
-                    &channel_id,
-                    Some(&conversation_id),
-                    Some(&task_id),
-                    "ai_result",
-                ),
-                Ok(false) => {}
-                Err(e) => tracing::warn!(
-                    project_id = %project_id,
-                    channel_id = %channel_id,
-                    task_id = %task_id,
-                    error = %e,
-                    "写入频道普通聊天 AI 结果失败"
-                ),
-            }
-
-            return Json(serde_json::json!({
-                "task_id": task_id,
-                "trace_id": trace_id,
-                "conversation_id": conversation_id,
-                "message": task_message,
-            }))
-            .into_response();
-        }
-    }
-
     spawn_channel_ai_task(ChannelAiTask {
         state: state.clone(),
         user_id,
@@ -1814,10 +1734,6 @@ fn should_auto_bind_local_node(route: Option<PcRuntimeRoutePreference>) -> bool 
         route,
         Some(PcRuntimeRoutePreference::RouteC2 | PcRuntimeRoutePreference::RouteC3)
     )
-}
-
-fn channel_ai_quick_reply(content: &str) -> Option<String> {
-    quick_casual_reply(content)
 }
 
 pub async fn summarize_user_project_channel_selection(
@@ -2476,7 +2392,7 @@ impl BlankFallback for str {
 
 #[cfg(test)]
 mod tests {
-    use super::{can_start_channel_ai, channel_ai_quick_reply};
+    use super::can_start_channel_ai;
 
     #[test]
     fn channel_ai_requires_edit_role() {
@@ -2486,11 +2402,5 @@ mod tests {
         assert!(!can_start_channel_ai("member"));
         assert!(!can_start_channel_ai("observer"));
         assert!(!can_start_channel_ai("viewer"));
-    }
-
-    #[test]
-    fn channel_ai_short_circuits_common_greeting() {
-        assert!(channel_ai_quick_reply("你好吗？").is_some());
-        assert!(channel_ai_quick_reply("你好？").is_some());
     }
 }
