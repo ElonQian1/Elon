@@ -473,10 +473,10 @@
 }
 .newMsgBtn:hover { background: var(--bg-hover); color: var(--text); }
 
-/* 输入框区（composer）5 列：AI 来源/模型 | 直连开关 | 输入 | 附件 | 发送 */
+/* 输入框区（composer）6 列：AI 来源/模型 | 直连开关 | 预热 | 输入 | 附件 | 发送 */
 .composer {
   display: grid;
-  grid-template-columns: minmax(118px, 148px) minmax(88px, 104px) minmax(0, 1fr) 36px 58px;
+  grid-template-columns: minmax(118px, 148px) minmax(88px, 104px) 68px minmax(0, 1fr) 36px 58px;
   gap: 8px;
   align-items: end;
   min-height: 60px;
@@ -607,6 +607,54 @@
   font-size: 10px;
   font-weight: 800;
   line-height: 1;
+}
+.projectPrewarmToggle {
+  height: var(--composer-control-height);
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.projectPrewarmToggle[data-active="true"] {
+  color: var(--text-soft);
+  border-color: rgba(82, 140, 255, .45);
+  background: rgba(82, 140, 255, .12);
+}
+.projectPrewarmToggle[data-disabled="true"] {
+  opacity: .52;
+  cursor: not-allowed;
+}
+.projectPrewarmToggle input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+.projectPrewarmToggle span {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #59606d;
+  box-shadow: 0 0 0 3px rgba(89, 96, 109, .16);
+}
+.projectPrewarmToggle[data-active="true"] span {
+  background: #70a2ff;
+  box-shadow: 0 0 0 3px rgba(112, 162, 255, .2);
+}
+.projectPrewarmToggle strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 850;
 }
 .composerTextarea {
   height: var(--composer-control-height);
@@ -828,7 +876,7 @@
     font-size: 21px;
   }
   .composer {
-    grid-template-columns: minmax(112px, 132px) minmax(86px, 102px) minmax(0, 1fr) 38px 58px;
+    grid-template-columns: minmax(112px, 132px) minmax(86px, 102px) 62px minmax(0, 1fr) 38px 58px;
     gap: 8px;
     padding: 10px;
   }

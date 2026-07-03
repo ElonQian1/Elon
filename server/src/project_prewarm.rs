@@ -15,6 +15,7 @@ use axum::{
 use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use crate::{
+    agent,
     agent_routing::is_local_cli_option,
     ai_cli,
     project_auth::{auth_from_headers, can_edit, json_error, project_access},
@@ -89,6 +90,81 @@ async fn prewarm_project_response(
         Err(e) => return json_error(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()),
     };
 
+    let trace_id = req
+        .trace_id
+        .as_deref()
+        .map(|value| clean_trace_id(Some(value)))
+        .filter(|value| !value.is_empty());
+    let requested_agent = req
+        .agent
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(ToOwned::to_owned);
+
+    if should_use_route_a_runtime_prewarm(&project) {
+        if let Some(trace_id) = trace_id.as_deref() {
+            state.server_traces.record(
+                trace_id,
+                "route_a_runtime_prewarm_request",
+                serde_json::json!({
+                    "project_id": &project.id,
+                    "user_id": &user.id,
+                    "conversation_id": &conversation_id,
+                    "node_id": project.node_id.as_deref(),
+                }),
+            );
+        }
+        if let Some(result) =
+            agent::prewarm_route_a_runtime_for_project(&state, &user.id, &project, &conversation_id)
+                .await
+        {
+            if let Some(trace_id) = trace_id.as_deref() {
+                state.server_traces.record(
+                    trace_id,
+                    "route_a_runtime_prewarm_ready",
+                    serde_json::json!({
+                        "project_id": &project.id,
+                        "conversation_id": &conversation_id,
+                        "agent_id": &result.agent_id,
+                        "workspace": &result.workspace,
+                        "reused": result.reused,
+                    }),
+                );
+            }
+            return Json(serde_json::json!({
+                "status": "accepted",
+                "mode": "route_a_runtime",
+                "project_id": project.id,
+                "conversation_id": conversation_id,
+                "agent_id": result.agent_id,
+                "workspace": result.workspace,
+                "lease_ttl_secs": result.ttl_secs,
+                "reused": result.reused,
+            }))
+            .into_response();
+        }
+        if let Some(trace_id) = trace_id.as_deref() {
+            state.server_traces.record(
+                trace_id,
+                "route_a_runtime_prewarm_skipped",
+                serde_json::json!({
+                    "reason": "pc_binding_unavailable",
+                    "project_id": &project.id,
+                    "conversation_id": &conversation_id,
+                }),
+            );
+        }
+        return Json(serde_json::json!({
+            "status": "skipped",
+            "mode": "route_a_runtime",
+            "reason": "pc_binding_unavailable",
+            "project_id": project.id,
+            "conversation_id": conversation_id,
+        }))
+        .into_response();
+    }
+
     let base_workspace =
         state.resolve_project_workspace(&project.workspace_key, project.workspace_path.as_deref());
     let conversation_workspace =
@@ -105,17 +181,6 @@ async fn prewarm_project_response(
             }
         };
     let workspace = conversation_workspace.active_path().to_path_buf();
-    let trace_id = req
-        .trace_id
-        .as_deref()
-        .map(|value| clean_trace_id(Some(value)))
-        .filter(|value| !value.is_empty());
-    let requested_agent = req
-        .agent
-        .as_deref()
-        .map(str::trim)
-        .filter(|value| !value.is_empty())
-        .map(ToOwned::to_owned);
     let agent = if state.ai_cli.codex_cli_only {
         requested_agent
             .as_deref()
@@ -228,4 +293,14 @@ async fn prewarm_project_response(
         "workspace": workspace_key,
     }))
     .into_response()
+}
+
+fn should_use_route_a_runtime_prewarm(project: &ProjectAccess) -> bool {
+    project.source_type == "pc_managed"
+        || project
+            .node_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .is_some()
 }

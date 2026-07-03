@@ -8,6 +8,7 @@ use std::sync::Arc;
 
 use crate::{
     intent_router::CapabilityRoute,
+    pc_agent_runtime_choice::PcRuntimeRoutePreference,
     types::{AiBackend, AppState, UserAgentConfig},
     user_agent_secrets::user_byok_api_enabled,
 };
@@ -114,6 +115,26 @@ pub(crate) fn resolve_cli_option_id(
 
 pub(crate) fn is_local_cli_option(state: &Arc<AppState>, name: &str) -> bool {
     is_cli_alias(name) || state.ai_cli.has_option(name)
+}
+
+pub(crate) fn requested_agent_for_runtime_route<'a>(
+    agent_name: Option<&'a str>,
+    pc_runtime_route: Option<PcRuntimeRoutePreference>,
+) -> Option<&'a str> {
+    if agent_name
+        .map(str::trim)
+        .is_some_and(|name| !name.is_empty())
+    {
+        return agent_name;
+    }
+    match pc_runtime_route {
+        Some(
+            PcRuntimeRoutePreference::RouteB
+            | PcRuntimeRoutePreference::RouteC
+            | PcRuntimeRoutePreference::RouteC2,
+        ) => Some("api"),
+        _ => agent_name,
+    }
 }
 
 fn is_cli_alias(name: &str) -> bool {

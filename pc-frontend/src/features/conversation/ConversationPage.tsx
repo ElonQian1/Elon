@@ -17,6 +17,7 @@ import { CreateProjectModal } from '../projects/CreateProjectModal'
 import ProjectLanding from './ProjectLanding'
 import NodeOfflineBanner from './NodeOfflineBanner'
 import ConversationFeed from './ConversationFeed'
+import ComposerRuntimeToggles from './ComposerRuntimeToggles'
 import { api } from '../../api/client'
 import { clean, safeNodeAdminUrl } from '../../lib/utils'
 import { localJson } from '../doctor/localApi'
@@ -1402,25 +1403,21 @@ export default function ConversationPage() {
                 <strong>{modelButtonCopy.detail}</strong>
               </button>
 
-              <label
-                className={styles.directCliToggle}
-                data-active={directPcCliActive ? 'true' : 'false'}
-                data-default-local={shouldPreferLocalNode && localNodeReady ? 'true' : 'false'}
-                data-disabled={!directPcCliAvailable || composerDisabled ? 'true' : 'false'}
-                title="自动模式会在可用时使用本机节点；打开后强制交给本机 AI CLI"
-              >
-                <input
-                  type="checkbox"
-                  checked={directPcCliActive}
-                  disabled={!directPcCliAvailable || composerDisabled}
-                  onChange={(event) => setDirectPcCli(event.target.checked)}
-                />
-                <span className={styles.directCliSwitch} aria-hidden="true" />
-                <span className={styles.directCliCopy}>
-                  <strong>{directPcCliActive ? '直连CLI' : '自动'}</strong>
-                  <em>{!directPcCliAvailable ? '未就绪' : directPcCliActive ? '直连' : '自动'}</em>
-                </span>
-              </label>
+              <ComposerRuntimeToggles
+                activeProjectId={activeProjectId ?? ''}
+                directPcCliActive={directPcCliActive}
+                shouldPreferLocalNode={shouldPreferLocalNode}
+                localNodeReady={localNodeReady}
+                directPcCliAvailable={directPcCliAvailable}
+                composerDisabled={composerDisabled}
+                onDirectPcCliChange={setDirectPcCli}
+                isOwnConversationTarget={isOwnConversationTarget}
+                sessionView={sessionView}
+                memberConversations={memberConversations}
+                selectedAgent={selectedAgent}
+                modelOptions={modelOptions}
+                composerRuntimeRoute={composerRuntimeRoute}
+              />
 
               {/* Textarea */}
               <textarea

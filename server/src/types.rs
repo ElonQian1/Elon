@@ -91,6 +91,9 @@ pub struct AppState {
     /// Best-effort Codex CLI native-session prewarm throttle, scoped by project,
     /// user, conversation, agent, and workspace.
     pub codex_prewarm: Arc<CodexPrewarmRegistry>,
+    /// Hot Route A runtime lease: recent verified PC node + workspace + CLI
+    /// readiness, scoped by project/user/conversation/node/workspace.
+    pub route_a_session_leases: Arc<RouteASessionLeaseRegistry>,
     /// Cached Codex CLI network health and circuit-breaker state.
     pub codex_network: Arc<crate::codex_health::CodexNetworkHealth>,
     /// Short-lived in-memory debug events keyed by client trace_id.
@@ -101,7 +104,9 @@ pub struct AppState {
     pub owner_token: Option<String>,
 }
 
-pub use crate::project_task_scheduler::{CodexPrewarmRegistry, ProjectTaskScheduler};
+pub use crate::project_task_scheduler::{
+    CodexPrewarmRegistry, ProjectTaskScheduler, RouteASessionLeaseRegistry,
+};
 
 impl AppState {
     pub fn new() -> Result<Self> {
@@ -300,6 +305,7 @@ impl AppState {
             agent_manager: Arc::new(crate::homecli_agent::AgentManager::new()),
             project_task_scheduler: Arc::new(ProjectTaskScheduler::new()),
             codex_prewarm: Arc::new(CodexPrewarmRegistry::new()),
+            route_a_session_leases: Arc::new(RouteASessionLeaseRegistry::new()),
             codex_network: Arc::new(crate::codex_health::CodexNetworkHealth::from_env()),
             server_traces: Arc::new(crate::server_trace::ServerTraceStore::new()),
             owner_token,

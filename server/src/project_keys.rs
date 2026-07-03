@@ -65,6 +65,19 @@ pub fn codex_prewarm_key(
     )
 }
 
+pub fn route_a_session_lease_key(
+    project_id: &str,
+    user_id: &str,
+    conversation_id: &str,
+    agent_id: &str,
+    workspace_path: &str,
+) -> String {
+    format!(
+        "{}|{}|{}|{}|{}",
+        project_id, user_id, conversation_id, agent_id, workspace_path
+    )
+}
+
 fn current_wall_time_ms() -> u128 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -89,6 +102,14 @@ mod tests {
         assert_eq!(
             codex_prewarm_key("p", "u", "c", None, "workspace"),
             "p|u|c|default|workspace"
+        );
+    }
+
+    #[test]
+    fn builds_route_a_session_lease_key() {
+        assert_eq!(
+            route_a_session_lease_key("p", "u", "c", "node-1", "D:/repo"),
+            "p|u|c|node-1|D:/repo"
         );
     }
 

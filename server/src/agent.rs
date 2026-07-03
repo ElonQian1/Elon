@@ -18,13 +18,16 @@ use crate::{
         should_attempt_pc_apk_sync,
     },
     agent_routing::{
-        api_agent_name, choose_backend, has_api_agents, is_local_cli_option, resolve_cli_option_id,
+        api_agent_name, choose_backend, has_api_agents, is_local_cli_option,
+        requested_agent_for_runtime_route, resolve_cli_option_id,
     },
     ai_cli, context_compiler,
     intent_router::{self, CapabilityRoute, RoutingDecision},
     pc_agent_runtime_choice::{choose_pc_agent_runtime, PcRuntimeRoutePreference},
     pc_node_display::pc_node_progress_name,
-    project_workspace_provision, source_hygiene,
+    project_workspace_provision,
+    route_a_session_lease::{self, RouteARuntimePrewarmResult},
+    source_hygiene,
     store::{ProjectAccess, ProjectDevProfile, MEMORY_SCOPE_PROJECT},
     tools,
     types::{AiBackend, AppState, UserAgentConfig, WsMessage},
@@ -32,6 +35,10 @@ use crate::{
 
 const BOUND_PC_NODE_RECONNECT_WAIT_SECS: u64 = 120;
 const BOUND_PC_NODE_RECONNECT_POLL_MS: u64 = 1_000;
+
+#[cfg(test)]
+#[path = "agent_tests.rs"]
+mod agent_tests;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ProjectWorkflowRouting {
@@ -120,7 +127,8 @@ pub async fn run_pc_cli_passthrough_for_project(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project, Some(&tx)).await
+    let Some(pc_binding) =
+        resolve_pc_project_binding(state, user_id, project, conversation_id, Some(&tx)).await
     else {
         if project.source_type == "pc_managed" {
             send_pc_workspace_unavailable_error(project, &tx);
@@ -435,7 +443,7 @@ async fn run_for_project_in_workspace_with_routing(
 
     if requires_project_workflow {
         if let Some(pc_binding) =
-            resolve_pc_project_binding(state, user_id, project, Some(&tx)).await
+            resolve_pc_project_binding(state, user_id, project, conversation_id, Some(&tx)).await
         {
             let agent_id = pc_binding.agent_id.as_str();
             let pc_workspace = pc_binding.workspace.as_str();
@@ -666,7 +674,9 @@ pub async fn plan_for_project_in_workspace(
     state: &Arc<AppState>,
     tx: UnboundedSender<String>,
 ) {
-    if let Some(pc_binding) = resolve_pc_project_binding(state, user_id, project, Some(&tx)).await {
+    if let Some(pc_binding) =
+        resolve_pc_project_binding(state, user_id, project, conversation_id, Some(&tx)).await
+    {
         let agent_id = pc_binding.agent_id.as_str();
         let pc_workspace = pc_binding.workspace.as_str();
         let runtime_choice =
@@ -787,26 +797,6 @@ pub async fn plan_for_project_in_workspace(
     }
 }
 
-fn requested_agent_for_runtime_route<'a>(
-    agent_name: Option<&'a str>,
-    pc_runtime_route: Option<PcRuntimeRoutePreference>,
-) -> Option<&'a str> {
-    if agent_name
-        .map(str::trim)
-        .is_some_and(|name| !name.is_empty())
-    {
-        return agent_name;
-    }
-    match pc_runtime_route {
-        Some(
-            PcRuntimeRoutePreference::RouteB
-            | PcRuntimeRoutePreference::RouteC
-            | PcRuntimeRoutePreference::RouteC2,
-        ) => Some("api"),
-        _ => agent_name,
-    }
-}
-
 #[derive(Debug, Clone)]
 struct PcProjectBinding {
     agent_id: String,
@@ -837,7 +827,56 @@ async fn resolve_pc_project_binding(
     state: &Arc<AppState>,
     user_id: &str,
     project: &ProjectAccess,
+    conversation_id: Option<&str>,
     tx: Option<&UnboundedSender<String>>,
+) -> Option<PcProjectBinding> {
+    resolve_pc_project_binding_with_options(
+        state,
+        user_id,
+        project,
+        conversation_id,
+        tx,
+        true,
+        true,
+    )
+    .await
+}
+
+pub(crate) async fn prewarm_route_a_runtime_for_project(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    conversation_id: &str,
+) -> Option<RouteARuntimePrewarmResult> {
+    let binding = resolve_pc_project_binding_with_options(
+        state,
+        user_id,
+        project,
+        Some(conversation_id),
+        None,
+        false,
+        false,
+    )
+    .await?;
+    route_a_session_lease::prewarm_result(
+        state,
+        user_id,
+        project,
+        conversation_id,
+        binding.agent_id,
+        binding.workspace,
+    )
+    .await
+}
+
+async fn resolve_pc_project_binding_with_options(
+    state: &Arc<AppState>,
+    user_id: &str,
+    project: &ProjectAccess,
+    conversation_id: Option<&str>,
+    tx: Option<&UnboundedSender<String>>,
+    wait_for_bound_reconnect: bool,
+    allow_provision: bool,
 ) -> Option<PcProjectBinding> {
     let workspace = project
         .workspace_path
@@ -862,13 +901,22 @@ async fn resolve_pc_project_binding(
         if belongs_to_user {
             let connected = if pc_agent_is_connected(state, agent_id).await {
                 true
-            } else {
+            } else if wait_for_bound_reconnect {
                 wait_for_bound_pc_agent_reconnect(state, agent_id, tx).await
+            } else {
+                false
             };
             if connected {
-                if let Some(binding) =
-                    usable_project_binding_for_agent(state, user_id, project, agent_id, true, tx)
-                        .await
+                if let Some(binding) = usable_project_binding_for_agent(
+                    state,
+                    user_id,
+                    project,
+                    conversation_id,
+                    agent_id,
+                    true,
+                    tx,
+                )
+                .await
                 {
                     return Some(binding);
                 }
@@ -888,6 +936,7 @@ async fn resolve_pc_project_binding(
         state,
         user_id,
         project,
+        conversation_id,
         project.node_id.as_deref(),
     )
     .await
@@ -913,6 +962,15 @@ async fn resolve_pc_project_binding(
                 "PC project will run on another online node that has the same workspace path"
             );
             send_optional_progress(tx, "已找到同一路径可用的在线 PC 节点，正在切换执行。");
+            route_a_session_lease::record_verified(
+                state,
+                user_id,
+                project,
+                conversation_id,
+                &fallback_agent_id,
+                workspace,
+            )
+            .await;
             return Some(PcProjectBinding {
                 agent_id: fallback_agent_id,
                 workspace: workspace.to_string(),
@@ -938,6 +996,9 @@ async fn resolve_pc_project_binding(
         "PC project will run on the current user's online node"
     );
     if project.source_type == "pc_managed" {
+        if !allow_provision {
+            return None;
+        }
         let clone_url = clone_url_for_project_access(project, &fallback_agent_id);
         let can_recreate_without_remote = workspace.is_none()
             || clone_url.is_some()
@@ -974,6 +1035,7 @@ async fn connected_pc_agent_with_recorded_workspace_binding(
     state: &Arc<AppState>,
     user_id: &str,
     project: &ProjectAccess,
+    conversation_id: Option<&str>,
     skip_agent_id: Option<&str>,
 ) -> Option<PcProjectBinding> {
     let skip_agent_id = skip_agent_id
@@ -986,9 +1048,16 @@ async fn connected_pc_agent_with_recorded_workspace_binding(
         if !pc_agent_belongs_to_user(state, user_id, &agent.agent_id) {
             continue;
         }
-        if let Some(binding) =
-            usable_project_binding_for_agent(state, user_id, project, &agent.agent_id, false, None)
-                .await
+        if let Some(binding) = usable_project_binding_for_agent(
+            state,
+            user_id,
+            project,
+            conversation_id,
+            &agent.agent_id,
+            false,
+            None,
+        )
+        .await
         {
             warn!(
                 project_id = %project.id,
@@ -1030,6 +1099,7 @@ async fn usable_project_binding_for_agent(
     state: &Arc<AppState>,
     user_id: &str,
     project: &ProjectAccess,
+    conversation_id: Option<&str>,
     agent_id: &str,
     is_bound_agent: bool,
     tx: Option<&UnboundedSender<String>>,
@@ -1065,6 +1135,25 @@ async fn usable_project_binding_for_agent(
         .map(str::trim)
         .filter(|value| !value.is_empty())?;
 
+    if route_a_session_lease::is_hot(
+        state,
+        user_id,
+        project,
+        conversation_id,
+        agent_id,
+        workspace,
+    )
+    .await
+    {
+        if is_bound_agent {
+            send_optional_progress(tx, "已命中 PC 会话热状态，跳过重复工作区巡检。");
+        }
+        return Some(PcProjectBinding {
+            agent_id: agent_id.to_string(),
+            workspace: workspace.to_string(),
+        });
+    }
+
     let bound_agent_progress_name = if is_bound_agent {
         Some(pc_node_progress_name(state.as_ref(), agent_id).await)
     } else {
@@ -1080,10 +1169,21 @@ async fn usable_project_binding_for_agent(
     }
 
     match inspect_pc_agent_workspace(state, agent_id, workspace).await {
-        Ok(status) if pc_workspace_inspect_usable(&status) => Some(PcProjectBinding {
-            agent_id: agent_id.to_string(),
-            workspace: workspace.to_string(),
-        }),
+        Ok(status) if pc_workspace_inspect_usable(&status) => {
+            route_a_session_lease::record_verified(
+                state,
+                user_id,
+                project,
+                conversation_id,
+                agent_id,
+                workspace,
+            )
+            .await;
+            Some(PcProjectBinding {
+                agent_id: agent_id.to_string(),
+                workspace: workspace.to_string(),
+            })
+        }
         Ok(status) => {
             let problem = pc_workspace_inspect_problem(&status);
             warn!(
@@ -1972,106 +2072,5 @@ fn combine_preflight_notes(git_note: Option<&str>, source_note: Option<&str>) ->
         (Some(git), None) => Some(git.to_string()),
         (None, Some(source)) => Some(source.to_string()),
         (None, None) => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{
-        pc_workspace_inspect_error_allows_bound_dispatch, pc_workspace_inspect_problem,
-        pc_workspace_inspect_usable, requires_project_workflow_for_message,
-        BOUND_PC_NODE_RECONNECT_WAIT_SECS,
-    };
-    use homecli_proto::ProjectWorkspaceInspectStatus;
-    use std::path::Path;
-
-    #[test]
-    fn casual_greeting_does_not_require_project_workflow() {
-        assert!(!requires_project_workflow_for_message(
-            "你好",
-            Path::new("C:/tmp/project")
-        ));
-        assert!(!requires_project_workflow_for_message(
-            "你好吗？",
-            Path::new("C:/tmp/project")
-        ));
-    }
-
-    #[test]
-    fn app_change_requires_project_workflow() {
-        assert!(requires_project_workflow_for_message(
-            "帮我在首页加一个按钮",
-            Path::new("C:/tmp/project")
-        ));
-    }
-
-    #[test]
-    fn open_idea_stays_in_chat_route() {
-        assert!(!requires_project_workflow_for_message(
-            "我有一个想法",
-            Path::new("C:/tmp/project")
-        ));
-    }
-
-    #[test]
-    fn completed_project_install_question_stays_in_chat_route() {
-        assert!(!requires_project_workflow_for_message(
-            "完成的项目我在哪里下载安装呢",
-            Path::new("C:/tmp/project__demo")
-        ));
-    }
-
-    #[test]
-    fn pc_workspace_inspect_requires_existing_dir_and_cli() {
-        let mut status = inspect_status();
-        assert!(pc_workspace_inspect_usable(&status));
-
-        status.path_exists = false;
-        assert!(!pc_workspace_inspect_usable(&status));
-        assert_eq!(
-            pc_workspace_inspect_problem(&status),
-            "workspace_path_missing"
-        );
-
-        status = inspect_status();
-        status.codex_available = false;
-        status.copilot_available = false;
-        assert!(!pc_workspace_inspect_usable(&status));
-        assert_eq!(pc_workspace_inspect_problem(&status), "cli_unavailable");
-    }
-
-    #[test]
-    fn pc_workspace_inspect_timeout_keeps_bound_node() {
-        assert!(pc_workspace_inspect_error_allows_bound_dispatch(
-            "project workspace inspect timeout (3s)"
-        ));
-        assert!(pc_workspace_inspect_error_allows_bound_dispatch(
-            "PC 节点创建项目工作区超时（30 秒）"
-        ));
-        assert!(!pc_workspace_inspect_error_allows_bound_dispatch(
-            "workspace path does not exist"
-        ));
-    }
-
-    #[test]
-    fn bound_pc_node_reconnect_window_covers_server_restart() {
-        assert!(BOUND_PC_NODE_RECONNECT_WAIT_SECS >= 90);
-    }
-
-    fn inspect_status() -> ProjectWorkspaceInspectStatus {
-        ProjectWorkspaceInspectStatus {
-            workspace_path: r"D:\rust\active-projects\elon cli".to_string(),
-            path_exists: true,
-            is_dir: true,
-            is_git_worktree: true,
-            git_branch: Some("main".to_string()),
-            git_head: Some("2580208".to_string()),
-            git_remote_origin: Some("git@github.com:ElonQian1/Elon.git".to_string()),
-            has_uncommitted_changes: false,
-            uncommitted_count: Some(0),
-            disk_free_bytes: Some(10 * 1024 * 1024 * 1024),
-            codex_available: true,
-            copilot_available: false,
-        }
     }
 }
